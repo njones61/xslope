@@ -2608,7 +2608,8 @@ def main():
           "on both drivers and is bounded by its cap and reduced by the trial "
           "strength, the pile beam element reproduces the closed-form beam and its own "
           "tangent to round-off on every capacity branch while the displacement "
-          "bound stays a length, and the "
+          "bound stays a length, a minimum slip depth keeps a failing surficial "
+          "skin from ending a trial the deep mechanism carries, and the "
           "environment override cannot swap the driver in silence. The monotonic "
           "ramp reaches the same limit along one warm-started history, reports it "
           "on the bisection's midpoint convention, and never solves past it.")

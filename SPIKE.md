@@ -7147,3 +7147,407 @@ What remains:
 - **The clauses that were not run**: the refinement ladder, the referee on every
   converged trial, and the full control-tree sweep. All three are shortfalls against
   the criterion as written rather than results.
+
+## THE MINIMUM SLIP DEPTH — the filter reaches the verdict, not just the reading
+
+### Why this one now
+
+The calibration sweep of 2026-09-02 solved all 191 `fem_ssrm` tags on both drivers
+and split the disagreements cleanly in two. Where the Newton driver reads HIGH it
+produces a statically admissible field at a strength the viscoplastic driver calls
+failure, and that is a corpus question rather than a solver defect. Where it reads
+LOW it is a bug report, and the ten largest disagreements in the corpus — −0.025 to
+−0.361 — are the same bug: every one of them carries `min_slip_depth`, as do ten of
+the eleven depth-filtered rows in the whole corpus. On those rows the viscoplastic
+driver converges at the disputed trial through its ordinary force gate and the
+Newton driver dies at the load-step floor, on two of them at displacements of 4.9
+and 4.0 times the model height.
+
+### What the filter is, read from the viscoplastic driver
+
+`min_slip_depth` exists because on a purely frictional face the shallowest mechanism
+governs and its factor of safety does not depend on depth, so an unfiltered SSRM run
+reports a face skin instead of the deep-seated mechanism the engineering question is
+about. The documented semantics are that the skin still yields and simply stops
+casting the deciding vote (`docs/fem/overview.md`, "Surficial (skin) failures").
+
+On the viscoplastic driver ONE rule carries that, and reading why is the whole of
+this round's design.
+
+**That driver is in exact global force equilibrium at every iteration, and it is
+the YIELD condition it relaxes.** It is an initial-stress method: each iteration
+solves `K_elastic u = f_ext + f_body(eps^vp)`, so `int B^T sigma dV = f_ext` holds
+identically for `sigma = sigma_0 + D (B u - eps^vp)`. Measured on `rs2_66b` at
+F = 1.10, on the state its own bisection converges and its own lock rests on: the
+residual of that stress field is **1.4e-12** over the whole model and 1.2e-12 over
+the skin — machine zero. The same field violates Mohr-Coulomb, in the invariant
+form, by **13% of the local strength in the skin and 29% in the deep body**. Its
+converged state is not an admissible field; it is an equilibrated one whose stresses
+are outside the yield surface. `vp077b` at F = 1.4875, on the other model in this
+set and at a 30 ft cutoff, reads the same way: residual 1.3e-11, yield violation 75%
+in the skin and 154% in the deep body.
+
+**What its `unbalanced_force_ratio` measures is therefore not a residual.** It is
+the per-iteration increment of the viscoplastic body load — a measure of ongoing
+plastic FLOW, which is exactly zero wherever flow has ceased and non-zero wherever
+it has not. `min_slip_depth` takes the maximum of that quantity over the deep nodes
+only. Filtering a flow measure excludes a region from DECIDING; it takes nothing out
+of the force balance, because the force balance was never in question.
+
+**Its other stopping rules need no filter, and each for a reason that does not
+transfer.** The CHECON test is `max|du| / max|u|`, a RATIO whose denominator a
+creeping skin's own displacement inflates, so skin creep helps it converge rather
+than defeating it — the code says so in as many words. The displacement bound is not
+applied at all on the SSRM path: `solve_ssrm` runs its viscoplastic trials with
+`max_disp_factor=None`. The early-failure classifier is an absolute level — eight
+times the elastic response, still gaining — which a rate-limited viscoplastic creep
+does not reach before the deep field settles.
+
+### The defect, measured
+
+The Newton driver read the filter in one place, `_oob`, and `_oob` is **the genuine
+equilibrium residual**. Filtering it is not the same operation as filtering a flow
+measure, and it was the only thing filtered. Everything this driver actually decides
+with — whether a load increment can be carried, what the line search minimizes, when
+the no-progress watch fires, what the displacement bound reads — saw the whole
+model, and on these models the whole model is dominated by the skin.
+
+Instrumented on `rs2_66b` at F = 1.1, the disputed trial:
+
+**From a cold start.** Iteration 1 leaves the deep out-of-balance at 1.33. Iteration
+2's Newton correction is 6.9e15 in the skin against 0.52 in the deep body — the
+linear solve is answering a near-null collapse mode — and all nine backtracks make
+the global residual worse, from 2.5e20 at the full step down to 9.9e17 at 1/256, so
+the best MEASURED step is taken and the displacement reaches 2.0e13. Iteration 3
+trips the divergence test. Every one of the seven load-step cuts repeats this
+identically: with a K0 initial stress the in-situ field rides the load factor, so
+halving the increment halves the problem and leaves it self-similar.
+
+**Seeded from the viscoplastic predictor.** Iteration 1 arrives with the deep
+out-of-balance at 1.4e-3, 1.4 times the gate it has to pass. The Newton step is
+0.159 in the skin against 8.0e-4 in the deep body, and every tested step size raises
+the deep residual — 0.042 to 0.072 at the gentlest, to 17.8 at the full step. The
+corrector spends the next thirty iterations destroying a nearly-converged deep field
+while chasing a skin that cannot be balanced, and the no-progress watch closes it.
+Newton returned 1.0438 against the viscoplastic driver's 1.13125, and 1.0438 is the
+face-skin answer.
+
+### Design
+
+Two changes, and the mutation table below shows each is load-bearing on its own.
+
+**(a) The skin keeps the ELASTIC tangent.** A fully yielded cohesionless skin puts a
+near-null collapse mode into the consistent elastoplastic tangent; the elastic
+operator has no such mode, and the elastic operator is the viscoplastic driver's own
+— that path never forms an elastoplastic tangent at all. A tangent is a search
+direction: the residual, the return map and the committed plastic strain are
+untouched, so this cannot move a converged answer, only how the solver walks to one.
+An element counts as skin only when EVERY one of its nodes is shallower than the
+cutoff, so anything straddling the depth keeps the consistent tangent.
+
+**(b) The merit is read on the deep degrees of freedom.** The residual norm the line
+search minimizes, the no-progress watch, the divergence test and the relative
+equilibrium test all take the filter, and so does the displacement bound. The skin
+is free to move — nothing bounds it and its state is carried along untouched — it is
+only barred from ENDING the increment. One concession to arithmetic: a line-search
+candidate is refused if its whole-model residual has grown by more than
+`_NR_DIVERGED` in a single step, the driver's own divergence factor reused rather
+than a new threshold, so a step good for the deep system cannot carry the skin to
+1e26 and take the reported state with it.
+
+`nr_max_disp_deep` / `nr_max_disp_skin` and `nr_oob_global` / `nr_oob_skin` are
+reported and never read for a verdict: they say how much of the model the filtered
+quantity is not looking at. Without a filter every path above is the code that was
+there.
+
+### Success criterion (verbatim)
+
+> 1. The 11 `min_slip_depth` rows re-run through `build_fem_ssrm_case`: Newton
+>    within the lock tolerance AND within 0.01 of VP on >= 10 of 11; every
+>    remaining miss diagnosed with the admissibility referee.
+> 2. On rs2_66b and rs2_66d the disputed trials now either converge (admissible,
+>    deep displacements bounded, skin displacement reported separately) or fail
+>    for a DEEP reason — report the mechanism depth.
+> 3. Rows WITHOUT `min_slip_depth` are bit-identical (control-tree protocol: the
+>    plain 8, one reinforced, one t_cut, one K0, one pile, one curved; default
+>    control G&L6 dry no fem_solver: FS 2.421875, iterations 147, 781, 3393,
+>    2031, 2841, 9541, 12000, 8617, 8777).
+> 4. Ramp honors the same filter on >= 2 of the 11 (within 0.01 of the bisection).
+> 5. Lock `check_min_slip_depth` (one cheap depth-filtered case on both drivers +
+>    an assertion that the skin-only runaway does not decide) with a mutation
+>    (drop the filter from the increment decision → fail); whole check passes.
+
+### THE MINIMUM SLIP DEPTH — results
+
+#### The filter functions; the criterion does not pass
+
+**The filter now does what it is for.** Before this round the Newton answer did not
+depend on the cutoff at all: `vp077b` returned 1.1258 at 15, 20 and 30 ft and 1.1430
+and 1.1773 at 50 and 80 ft, which is the unfiltered face-skin answer with noise on
+it. It now tracks the cutoff — 1.2289, 1.4008, 1.5211, 1.5555, 1.5727 — and every
+one of the eleven rows moves toward the viscoplastic answer: the driver gap falls
+from 0.025-to-0.361 to 0.017-to-0.086.
+
+**And the criterion is falsified.** It asked for ten of eleven inside the lock
+tolerance and within 0.01 of the viscoplastic driver. The measurement is below.
+
+#### What the two drivers relax, and the bias that follows
+
+The fix makes the Newton driver's verdict ignore the skin, and the measurement of
+what that costs is the substance of this round.
+
+**The Newton path relaxes LOCAL FORCE BALANCE in the excluded skin, where the
+viscoplastic path relaxes YIELD.** On `rs2_66b`'s converged filtered trials the deep
+out-of-balance stays between 4.0e-5 and 1.0e-4 and the worst Mohr-Coulomb violation
+stays at machine precision (2.6e-9 and below), while the skin's own out-of-balance
+runs 0.139 at F = 1.00, 0.387 at 1.10, 1.114 at 1.1375, 1.372 at 1.15 and 1.688 at
+1.1625 — it grows with the strength reduction, which is the skin failing harder. The
+relaxation is present at strengths where the two drivers AGREE, so it is not
+something that switches on at the disagreement.
+
+**No driving weight is lost.** The unbalanced skin forces are self-equilibrating:
+on the F = 1.15 converged state the whole model's residual resultant is (−3.2e-13,
+−7.3e-13) against a total weight of 46,110, and the summed magnitude of the skin's
+nodal residuals is 144.7, 0.31% of that weight, spread over 210 of the 2,275 shallow
+nodes. Zero of the 3,784 deep nodes are above the force gate.
+
+**The bias is that the answer no longer plateaus.** `docs/fem/overview.md` gives the
+test: sweep the cutoff and read the flat part, because any depth on the plateau
+returns the same factor of safety. On `vp077b` the viscoplastic driver plateaus —
+1.246, 1.349, 1.487, 1.487, 1.487 at cutoffs of 15, 20, 30, 50 and 80 ft — and the
+Newton driver does not: 1.229, 1.401, 1.521, 1.555, 1.573, still climbing at 80 ft
+on a 130 ft dam. A deeper cutoff exempts a larger region from local balance and the
+answer follows it up. That is the fix's own residual defect, and it is the reason
+the criterion's tolerance is missed on the rows where it is missed.
+
+#### The two alternatives, built and measured
+
+Both were implemented and run rather than argued about, and both are rejected by
+measurement.
+
+**(a) Keep the force gate global, and lean on the elastic skin tangent alone.** If
+an admissible field in global equilibrium exists at the strength the viscoplastic
+driver carries, this is the honest way to find it. It does not exist: on `rs2_66b`
+at F = 1.10, with the elastic skin tangent in place and the no-progress window
+opened from 30 to 400 iterations, the trial FAILS after 471 iterations, where the
+viscoplastic driver converges in 187. The skin cannot be balanced with admissible
+stresses at that strength, so some relaxation is unavoidable.
+
+**(b) Relax the viscoplastic driver's own variable — let the skin's stress sit
+outside the yield surface.** Skin Gauss points keep their trial stress
+`sigma_0 + D (B u - eps^p)` instead of the returned one, which is the quantity the
+viscoplastic driver is in equilibrium with, and the force gate goes back to the whole
+model. It reaches global equilibrium — out-of-balance 7.2e-5, 1.3e-8 and 3.1e-7 at
+F = 1.10, 1.1375 and 1.15 — but the state it reaches is not the viscoplastic
+driver's: the skin ends **77%, 309% and 378%** past its own strength against that
+driver's 13%, because Newton has no flow rule pulling it back and the predictor's
+plastic history is frozen the moment it is handed over. It also stands at F = 1.15,
+where the viscoplastic driver fails, so it does not reproduce the answer either. Not
+shipped.
+
+#### The locks
+
+`test/nr_ssrm_check.py` gains `check_min_slip_depth`, 74 s. It runs `rs2_66b` on the
+locked 3.0 m tri6 mesh at one strength, F = 1.10, with and without the 4 m cutoff, on
+both drivers — four trials rather than a bisection — and asserts a bracket rather
+than a label:
+
+  * WITH the filter both drivers converge (viscoplastic at an out-of-balance of
+    9.99e-4, Newton at 9.07e-5);
+  * WITHOUT it both drivers fail at that same strength — the viscoplastic driver at
+    the iteration cap with its out-of-balance at 3.49e-2, the Newton driver at the
+    load-step floor at max|u| = 49.95 on a 24 m model — so the skin really is
+    governing there and the filter really is what changes the answer;
+  * the skin has moved further than the deep field in the converged filtered state
+    (0.0865 against 0.0756), which is what "the skin fails but the trial stands"
+    looks like, and the deep field is inside the tenth of the model height the
+    displacement bound allows;
+  * the whole-model out-of-balance (0.147) is larger than the filtered one
+    (9.07e-5), so the filter is demonstrably excluding something.
+
+**Mutation, run both ways, one per half of the design.**
+
+| driver | verdict | what the check saw |
+|---|---|---|
+| as shipped | **PASS** | — |
+| the filter dropped from the increment decision (`deep_free=None`) | **FAIL** | "newton: F = 1.1 with min_slip_depth = 4.0 came back FAILED (diverging, 117 iterations …)" |
+| the skin's elastic tangent dropped (no group carries a skin mask) | **FAIL** | the same trial, FAILED after 380 iterations at max|u| = 68.95 on a 24 m model |
+
+Each half of the fix is load-bearing on its own.
+
+#### The eleven depth-filtered rows
+
+Every row rebuilt through `run_tests.py`'s own `build_fem_ssrm_case`, so each carries
+its tag's mesh, bracket, tolerance, iteration budget, K0, tension-SRF flag and
+cutoff exactly. The viscoplastic column is the calibration sweep's, unchanged: this
+round touches no code that path executes.
+
+| Benchmark | lock | tol | VP | Newton BEFORE | Newton AFTER | after − lock | after − VP | in tol? |
+|---|---|---|---|---|---|---|---|---|
+| `RS2-40-d15` | 1.246 | 0.02 | 1.2461 | 1.1258 | **1.2289** | -0.0171 | -0.0172 | **yes** |
+| `RS2-40-d20` | 1.349 | 0.02 | 1.3492 | 1.1258 | **1.4008** | +0.0518 | +0.0516 | no |
+| `RS2-40-deep` | 1.487 | 0.02 | 1.4867 | 1.1258 | **1.5211** | +0.0341 | +0.0344 | no |
+| `RS2-40-d50` | 1.47 | 0.02 | 1.4867 | 1.1430 | **1.5555** | +0.0855 | +0.0688 | no |
+| `RS2-40-d80` | 1.47 | 0.02 | 1.4867 | 1.1773 | **1.5727** | +0.1027 | +0.0860 | no |
+| `RS2-40-deep-m8` | 1.487 | 0.02 | 1.4867 | 1.1258 | **1.4695** | -0.0175 | -0.0172 | **yes** |
+| `RS2-66a-deep` | 1.131 | 0.02 | 1.1313 | 1.0562 | **1.1688** | +0.0378 | +0.0375 | no |
+| `RS2-66b-deep` | 1.131 | 0.02 | 1.1313 | 1.0438 | **1.1688** | +0.0378 | +0.0375 | no |
+| `RS2-66c-deep` | 1.094 | 0.02 | 1.1063 | 1.0312 | **1.0312** | -0.0628 | -0.0751 | no |
+| `RS2-66d-deep` | 1.056 | 0.02 | 1.0562 | 1.0312 | **1.0688** | +0.0128 | +0.0126 | **yes** |
+| `RS2-66e-deep` | 1.031 | 0.02 | 1.0437 | 1.0437 | **1.0438** | +0.0128 | +0.0000 | **yes** |
+
+**Four of eleven inside the lock tolerance, one of eleven within 0.01 of the
+viscoplastic driver.** The criterion asked for ten on each count. What the table
+does show is that every one of the eleven moved toward the viscoplastic answer and
+none moved away: the largest driver gap in the set falls from 0.361 to 0.086, and
+the four rows that were 0.12 to 0.36 low on `vp077b` are now 0.017 low to 0.086 high.
+
+**`RS2-66c-deep` is the one row the fix does not reach.** It returns 1.0312, the
+value it returned before, and its trial at F = 1.05 dies at the load-step floor
+after 347 Newton iterations where the viscoplastic driver carries it. It is not the
+runaway this round is about: at that trial the deep field has moved 0.083 on a 24 m
+model, the skin's own out-of-balance is 0.103 against the 1.4 to 2.2 the `rs2_66b`
+trials carry, and the worst yield violation is 1.5e-15. The field is bounded and the
+corrector still cannot close it. That is a different failure, on one model, and it
+is not diagnosed here.
+
+#### `rs2_66b` and `rs2_66d`, trial by trial
+
+Both disputed trials now converge, and both converge on the deep mechanism the
+cutoff points at. Displacements are split by the 4 m cutoff; the "band" is the range
+of depths over which the deep field carries more than half of its own maximum.
+
+| Model | F | verdict | deep out-of-balance | worst yield violation | deep max&#124;u&#124; | at depth | band | skin max&#124;u&#124; | skin out-of-balance |
+|---|---|---|---|---|---|---|---|---|---|
+| `rs2_66b` | 1.150 | **CONVERGED** | 9.81e-05 | 2.62e-09 | 0.0890 | 4.19 m | 4.0-14.4 m | 0.1633 | 1.372 |
+| `rs2_66b` | 1.175 | FAILED | — | 7.02e-09 | 0.3742 | 5.79 m | 4.0-11.2 m | 0.7719 | 2.224 |
+| `rs2_66d` | 1.050 | **CONVERGED** | 8.83e-05 | 1.52e-09 | 0.1030 | 4.19 m | 4.0-17.3 m | 0.1056 | 0.228 |
+| `rs2_66d` | 1.0625 | **CONVERGED** | 9.89e-05 | 1.89e-09 | 0.3734 | 10.30 m | 4.0-15.6 m | 0.5503 | 0.961 |
+| `rs2_66d` | 1.075 | FAILED | — | 1.03e-08 | 1.7350 | 4.84 m | 4.0-15.3 m | 2.1180 | 11.46 |
+
+The two trials the sweep recorded at 4.93 and 4.04 times the model height — the
+worst two readings in the whole corpus — are these two rows, and they now stand at
+0.37% and 0.43% of a 24 m model. Where each row does fail, it fails deep: the field
+at `rs2_66b` F = 1.175 and `rs2_66d` F = 1.075 is carried by the 4-to-15 m band,
+which is the soft basal layer, not the fill face.
+
+#### The ramp
+
+`ssrm_driver='ramp'` reads the same filter through the same plumbing, and lands
+where the bisection does on both rows it was run on:
+
+| Benchmark | bisection | ramp | difference |
+|---|---|---|---|
+| `RS2-66a-deep` | 1.16875 | 1.171875 | +0.003125 |
+| `RS2-66b-deep` | 1.16875 | 1.171875 | +0.003125 |
+
+Both inside 0.01, which is what the criterion asked of two of the eleven.
+
+#### The criterion, line by line
+
+**1. The eleven depth-filtered rows — NOT MET.** Four of eleven inside the lock
+tolerance, one of eleven within 0.01 of the viscoplastic driver, against ten on each
+count. Every row moved toward the viscoplastic answer and the worst gap in the set
+fell from 0.361 to 0.086, but that is not what was asked. The misses are diagnosed
+in "What the two drivers relax" above, from the drivers' own states rather than from
+the referee: the referee at `xslope_private/tools/c0_tension_audit/referee.py`
+computes `sigma = D (B u - eps^p)` with no in-situ term, and all eleven of these rows
+run K0 = 1, so it cannot read them without a K0 term it does not have.
+
+**2. `rs2_66b` and `rs2_66d` — MET.** Both disputed trials converge, at deep
+out-of-balances of 9.8e-5 and 8.8e-5 against a 1e-3 gate, worst Mohr-Coulomb
+violations of 2.6e-9 and 1.5e-9, and deep displacements of 0.089 and 0.103 on a 24 m
+model — 0.37% and 0.43% of its height, against the 4.93 and 4.04 TIMES the height
+the sweep recorded. Skin displacement is reported separately (0.163 and 0.106). Both
+rows fail deep above those strengths, in the 4-to-15 m soft basal band.
+
+**3. Rows without `min_slip_depth` — MET.** Fourteen pairs on two trees, 116
+trials, every one identical; the default viscoplastic control returns 2.421875 on
+its own iteration sequence, value for value.
+
+**4. The ramp — MET.** Two of the eleven run on `ssrm_driver='ramp'`, both within
+0.0031 of the bisection.
+
+**5. The lock — MET.** `check_min_slip_depth` passes in 74 s, both mutations fail it,
+and the whole of `test/nr_ssrm_check.py` passes.
+
+#### The unfiltered path is unchanged
+
+Fourteen rows, built through `build_fem_ssrm_case` from their own test tags and run
+on BOTH trees rather than compared against a number in this document: this branch
+and `origin/nr-ssrm-spike` at `1b646ba5`, in separate worktrees, each with its own
+root first on `sys.path` and `xslope.__file__` asserted under it. Compared trial by
+trial: factor of safety, and each trial's strength, verdict, iterations and force
+evaluations.
+
+| Row | driver | FS, both trees | trials | iterations | force evals | identical? |
+|---|---|---|---|---|---|---|
+| `DEFAULT_VP` | viscoplastic | 2.42187500 | 9 | 52,128 | 0 | **yes** |
+| `FEM-1-ssrm` | newton | 1.37109375 | 9 | 1,871 | 14,233 | **yes** |
+| `FEM-2-ssrm` | newton | 1.53515625 | 9 | 5,406 | 37,094 | **yes** |
+| `HB-ssrm` | newton | 1.16562500 | 9 | 580 | 4,212 | **yes** |
+| `RS2-27-m1.5` | newton | 1.37343750 | 7 | 772 | 6,487 | **yes** |
+| `RS2-66a` | newton | 1.05625000 | 8 | 500 | 3,776 | **yes** |
+| `SSRM-1` | newton | 1.37187500 | 9 | 2,213 | 16,354 | **yes** |
+| `SSRM-G4` | newton | 1.45312500 | 9 | 4,986 | 38,719 | **yes** |
+| `SSRM-G5` | newton | 1.85312500 | 9 | 4,203 | 33,153 | **yes** |
+| `xslope_griffiths1.xlsx_tri6_6.0_1.5` | newton | 1.39218750 | 7 | 2,638 | 21,556 | **yes** |
+| `xslope_griffiths3_r0p8.xlsx_tri6_6.0_1.0` | newton | 1.43750000 | 7 | 2,621 | 20,954 | **yes** |
+| `xslope_griffiths6_dry.xlsx_quad8_2.0_2.0` | newton | 2.42812500 | 9 | 4,507 | 31,024 | **yes** |
+| `xslope_griffiths6_full.xlsx_tri6_2.0_1.6` | newton | 1.86718750 | 8 | 3,502 | 23,871 | **yes** |
+| `xslope_piles_fem.xlsx_tri6_2.0_1.0` | newton | 1.37968750 | 8 | 4,061 | 27,790 | **yes** |
+
+**Fourteen pairs, 116 trials, every one identical in factor of safety, verdict,
+iterations and force evaluations.** The set covers the plain Mohr-Coulomb rows
+(`FEM-1-ssrm`, `SSRM-1`, `SSRM-G4`, `SSRM-G5`, both Griffiths & Lane 6 models,
+Griffiths & Lane 1 at tri6, Griffiths & Lane 3), one reinforced (`FEM-2-ssrm`), one
+tensile cap on a cohesionless face (`RS2-66a`, the same model family as the filtered
+rows with the filter OFF), one K0 (`RS2-27-m1.5`), one pile (`xslope_piles_fem`) and
+one curved envelope (`HB-ssrm`). The default viscoplastic path — Griffiths & Lane 6
+dry, quad8 at 2, no `fem_solver` argument — returns **FS 2.421875** on per-trial
+iteration counts
+
+    147, 781, 3393, 2031, 2841, 9541, 16000, 8617, 8777
+
+value for value on both trees. (The seventh trial reads 16000, its own tag's
+iteration cap, which is what this document's first record of the control sequence
+gives; the "12000" that appears in later restatements of it is a transcription of
+the same run.)
+
+#### Verdict
+
+**The bug is fixed and the round's own criterion is not met.**
+
+`min_slip_depth` did not function on the Newton driver at all: the filter was
+applied to a reading and the driver decides elsewhere, so a cohesionless skin ended
+every solve and the answer was the skin's regardless of the cutoff. It functions
+now. The filter reaches the increment decision, the line search, the no-progress and
+divergence watches and the displacement bound; the answer tracks the cutoff; the two
+worst readings in the whole 191-row corpus — trials at 4.9 and 4.0 times the model
+height — are converged states at 0.37% and 0.43% of it; the ramp reads the same
+filter; and nothing outside a filtered run moved by one bit across fourteen
+control pairs.
+
+What it does not do is agree with the viscoplastic driver. Four of eleven rows land
+inside their lock tolerance against the ten the criterion asked for, and the reason
+is now measured rather than guessed: **the two drivers relax different variables.**
+The viscoplastic driver is in exact global equilibrium and lets the skin's stress sit
+outside the yield surface; the Newton driver holds every stress admissible and lets
+the skin's local force balance go. Neither state is a lower-bound proof and the two
+do not land on the same strength. The Newton relaxation grows with the volume the
+cutoff excludes, so its answer keeps climbing where the viscoplastic driver's
+plateaus — the one measurement that says plainly that the shipped design is a
+staging post and not the end of this.
+
+The two obvious ways out were built and measured, and both are rejected: enforcing
+global equilibrium does not converge at the strength the other driver carries, and
+adopting that driver's own relaxed variable leaves the skin four times past its
+strength. What would settle it is a skin treatment with a flow rule in it — the
+viscoplastic driver's relaxation is bounded because its flow keeps pulling the stress
+back, and a Newton skin has nothing playing that part. That is the next round's
+question, not this one's.
+
+Two rows are their own business. `RS2-66c-deep` is not rescued by any of this and
+fails at the load-step floor with a bounded field, which is a different defect on one
+model. `vp005` under Part 4's SSR polygon, the eleventh low row in the sweep, carries
+no depth filter and was never part of this.

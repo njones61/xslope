@@ -107,6 +107,7 @@ from xslope import fem as _fem
 from xslope.fem import (build_fem_data, mc_return_map, solve_fem, solve_ssrm,
                         _NR_APEX, _NR_ELASTIC)
 from xslope.fileio import load_slope_data
+from xslope.hoekbrown import hb_constants, hb_tangent
 from xslope.mesh import build_mesh_from_polygons, get_material_polygons
 
 MODEL = (Path(__file__).resolve().parents[1] / 'docs' / 'fem' / 'files'
@@ -203,8 +204,8 @@ def run():
     failures += check_load_path_invariance(fem_data)
     failures += check_step_control_not_decisive(fem_data)
     failures += check_displacement_bound()
-    failures += check_unsupported_features_refuse()
     failures += check_reinforcement_refusals()
+    failures += check_curved_envelopes()
     failures += check_reinforcement()
     failures += check_cohesionless_solve()
     failures += check_cohesionless_seed_depth()
@@ -547,81 +548,309 @@ def check_displacement_bound():
     return fails
 
 
-def check_unsupported_features_refuse():
-    """The Newton driver must REFUSE a model whose strength it cannot represent.
+def _curved_variant(option, mesh=None, slope_data=None, **params):
+    """The check file's own coarse model with its material re-declared curved."""
+    import copy
+    if slope_data is None or mesh is None:
+        slope_data, mesh = _mesh()
+    d = copy.deepcopy(slope_data)
+    d['materials'][0].update(option=option, **params)
+    return build_fem_data(d, mesh)
 
-    The driver's return map is plain Mohr-Coulomb. A model built on a different
-    strength envelope, or one that carries suction strength, would still solve on
-    it — the guard is the only thing standing between such a model and a factor of
-    safety computed with the wrong envelope, which is the failure mode that looks
-    right. Three of the guarded features had no test:
 
-      * Hoek-Brown (``option='hb'``), which the viscoplastic loop handles by
-        inverting Balmer's curve for a tangent (c_i, phi_i) at each Gauss point;
-      * the power-curve envelope (``option='pow'``), linearized the same way.
+HB_PARAMS = dict(hb_sci=30000.0, hb_gsi=60.0, hb_mi=10.0, hb_d=0.0)
+POW_PARAMS = dict(pow_a=2.0, pow_b=0.85, pow_c=0.0, pow_d=5.0)
 
-    Matric suction used to be the third. It is CARRIED now (see
-    :func:`check_matric_suction`), so it is no longer asserted here — the guard
-    that refused it is gone, and a check still expecting the refusal would be
-    holding the driver to a limitation it no longer has.
+# The mixed model: four materials on one mesh, two Mohr-Coulomb, one Hoek-Brown,
+# one power curve. Its numbers are written out rather than imported for the same
+# reason every other lock in this file writes its own out — an assertion that
+# reads the code it is checking asserts nothing.
+MIXED_FILE = (Path(__file__).resolve().parents[1] / 'docs' / 'fem'
+              / 'files' / 'xslope_noncircular_fem.xlsx')
+MIXED_SIZE = 4.0
+MIXED_HB = dict(hb_sci=886.6288783215639, hb_gsi=55.0, hb_mi=12.0, hb_d=0.0)
+MIXED_POW = dict(pow_a=0.8826850799708558, pow_b=0.85, pow_c=0.0, pow_d=0.0)
+MIXED_F_STANDS = 1.10
+MIXED_F_FAILS = 2.10
 
-    Each is built as a real model — the same coarse mesh the rest of this file
-    uses, with the material re-declared on that envelope, or with a suction angle
-    passed in — and the driver has to raise ``NotImplementedError`` naming the
-    feature. The message is asserted, not just the exception type, so a guard that
-    fires for some OTHER reason cannot pass this.
 
-    The control matters as much as the guard: the same three models run on the
-    default viscoplastic driver, which is where they belong.
+def _mixed_fem_data():
+    """Two Mohr-Coulomb materials, one Hoek-Brown and one power curve, one mesh.
+
+    Constructed rather than found: every curved-envelope model in the corpus is
+    SINGLE-material, so nothing shipped exercises per-element dispatch (see
+    SPIKE.md, "CURVED ENVELOPES"). The two curved materials are fitted to the
+    strengths the file's own Mohr-Coulomb materials carry at mid-height
+    overburden, so the model is a slope and not a shape.
     """
     import copy
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    sd = load_slope_data(str(MIXED_FILE))
+    sd = copy.deepcopy(sd)
+    sd['materials'][1].update(option='hb', **MIXED_HB)
+    sd['materials'][2].update(option='pow', **MIXED_POW)
+    mesh = build_mesh_from_polygons(get_material_polygons(sd),
+                                    target_size=MIXED_SIZE, element_type='tri6')
+    return sd, build_fem_data(sd, mesh)
+
+
+def check_curved_envelopes():
+    """Hoek-Brown and the power curve, per Gauss point, on both drivers.
+
+    Four legs, and each fails on a different defect (see SPIKE.md, "CURVED
+    ENVELOPES"):
+
+      * the RETURN MAP on both envelopes — every returned state on the linearized
+        Mohr-Coulomb surface and under its tensile cap, the principal ordering
+        intact, no elastic state modified, and a branch histogram that reaches
+        every region, because a fuzz that never lands on a region proves nothing
+        about it;
+      * the LINEARIZATION is the one the viscoplastic driver takes — the tangent
+        the return was computed on is the tangent of the F-reduced envelope at the
+        abscissa the RETURNED stress produces, which is the fixed point the
+        viscoplastic loop converges to;
+      * the F-REDUCTION divides the tangent and not the constants: at F = 2 the
+        cohesive intercept and tan(phi) are exactly half what they are at F = 1,
+        on both envelopes;
+      * and the MIXED model — four materials, two Mohr-Coulomb, one Hoek-Brown,
+        one power curve, on one mesh — solves to the same verdicts on both
+        drivers, with the per-element dispatch asserted from the solve rather than
+        inferred: every Mohr-Coulomb element on the plain path and every curved one
+        on its own, in the same solve.
+    """
     fails = []
     slope_data, mesh = _mesh()
 
-    def _variant(**over):
-        d = copy.deepcopy(slope_data)
-        d['materials'][0].update(over)
-        return build_fem_data(d, mesh)
+    # ---- the return map, per envelope ---------------------------------------
+    rng = np.random.default_rng(20260901)
+    n = 40000
+    scale = 1000.0
+    # mb / s / a are DERIVED from GSI, mi and D through the package's own
+    # hb_constants, not written out, so a defect in that derivation reaches this
+    # fuzz as well as the model legs below.
+    _mb, _s, _a = hb_constants(HB_PARAMS['hb_gsi'], HB_PARAMS['hb_mi'],
+                               HB_PARAMS['hb_d'])
+    for label, code, params in (
+            ('Hoek-Brown', _fem._NR_ENV_HB,
+             dict(hb_sci=np.full(n, HB_PARAMS['hb_sci']),
+                  hb_mb=np.full(n, float(_mb)), hb_s=np.full(n, float(_s)),
+                  hb_a=np.full(n, float(_a)))),
+            ('power curve', _fem._NR_ENV_POW,
+             dict(pow_a=np.full(n, POW_PARAMS['pow_a']),
+                  pow_b=np.full(n, POW_PARAMS['pow_b']),
+                  pow_cp=np.full(n, POW_PARAMS['pow_c']),
+                  pow_d=np.full(n, POW_PARAMS['pow_d'])))):
+        for cap_label, t_cut in (('no cap', None), ('t_cut = 0', 0.0),
+                                 ('t_cut inert', 1e9)):
+            mu = rng.uniform(2e4, 2e5, n)
+            env = {'code': np.full(n, code, dtype=np.int8), 'F': np.full(n, 1.3)}
+            for k in ('pow_a', 'pow_b', 'pow_cp', 'pow_d',
+                      'hb_sci', 'hb_mb', 'hb_s', 'hb_a'):
+                env[k] = params.get(k, np.ones(n) if k == 'pow_b' else np.zeros(n))
+            grp = {'env': env, 'mu': mu,
+                   'c_r': np.full(n, 50.0), 'snph': np.full(n, np.sin(0.6)),
+                   'csph': np.full(n, np.cos(0.6))}
+            if t_cut is not None:
+                grp['t_cap'] = np.full(n, t_cut)
+                grp['lam'] = 1.5 * mu
+            sig_tr = rng.normal(0.0, scale, (n, 4))
+            sig_tr[:, 2] *= 0.6
+            sig_tr[rng.integers(0, 4, n) == 0] *= 8.0
+            out, branch, c, sn, cs, _ = _fem._nr_envelope_return(grp, sig_tr.copy())
 
-    cases = [
-        ("Hoek-Brown",
-         _variant(option='hb', hb_sci=30000.0, hb_gsi=60.0, hb_mi=10.0, hb_d=0.0),
-         {}, 'hb_flag_by_elem'),
-        ("power-curve",
-         _variant(option='pow', pow_a=1.1, pow_b=0.9, pow_c=2.0, pow_d=4.0),
-         {}, 'pow_flag_by_elem'),
-    ]
-
-    for label, fd, kwargs, flag_key in cases:
-        # The model really is on that feature, so a guard firing is a guard doing
-        # its job rather than an unrelated refusal.
-        if flag_key is not None and not np.any(fd[flag_key]):
-            fails.append(
-                f"the {label} test model carries no {flag_key} elements, so it "
-                f"cannot exercise the guard — the model, not the guard, is broken")
-            continue
-        try:
-            solve_fem(fd, F=1.0, fem_solver='newton', **kwargs)
-        except NotImplementedError as exc:
-            if label not in str(exc):
+            ctr, half = 0.5 * (out[:, 0] + out[:, 1]), 0.5 * (out[:, 0] - out[:, 1])
+            R = np.hypot(half, out[:, 2])
+            P = -np.sort(-np.stack([ctr + R, ctr - R, out[:, 3]], 1), axis=1)
+            s1, s2, s3 = P[:, 0], P[:, 1], P[:, 2]
+            A, Bc = 0.5 * (1 + sn), 0.5 * (1 - sn)
+            sc = np.maximum.reduce([np.abs(s1), np.abs(s3), np.abs(c * cs),
+                                    np.full(n, scale)])
+            worst = float(np.max((A * s1 - Bc * s3 - c * cs) / sc))
+            tag = f"{label} / {cap_label}"
+            if worst > 1e-10:
                 fails.append(
-                    f"the Newton driver refused the {label} model with a message "
-                    f"that does not name it: {exc}")
-        else:
-            fails.append(
-                f"the Newton driver ACCEPTED a {label} model. Its return map is "
-                f"plain Mohr-Coulomb, so it would report a factor of safety "
-                f"computed on the wrong strength envelope — the one failure mode "
-                f"the guard exists for, because the answer looks right.")
+                    f"{tag}: a returned state sits {worst:.3e} of the stress "
+                    f"scale OUTSIDE the linearized Mohr-Coulomb surface — "
+                    f"strength the point has not got")
+            if t_cut is not None and np.isfinite(t_cut):
+                over = float(np.max((s1 - t_cut) / sc))
+                if over > 1e-10:
+                    fails.append(f"{tag}: a returned major principal stress is "
+                                 f"{over:.3e} of the scale above its cap")
+            nbad = int(np.count_nonzero((s1 < s2 - 1e-9 * sc)
+                                        | (s2 < s3 - 1e-9 * sc)))
+            if nbad:
+                fails.append(f"{tag}: {nbad} returned state(s) came back with the "
+                             f"principal stresses out of order")
+            el = branch == 0
+            if el.any() and np.any(out[el] != sig_tr[el]):
+                fails.append(f"{tag}: an ELASTIC state was modified by the return")
+            # the histogram: a region the fuzz never reaches is a region it says
+            # nothing about
+            got = set(np.unique(branch).tolist())
+            want = {0, 1, 2, 3} | ({4} if t_cut is None or t_cut > 1e8
+                                   else {5, 8, 9})
+            missing = sorted(want - got)
+            if missing:
+                fails.append(
+                    f"{tag}: the fuzz never reached branch(es) "
+                    + ", ".join(_fem._NR_BRANCH_NAMES[b] for b in missing)
+                    + " — it proves nothing about them")
+            if _fem._NR_TENS_FALLBACK in got:
+                fails.append(f"{tag}: state(s) came back on the unresolved "
+                             f"fallback, so the candidate region list is incomplete")
 
-    # Control: the viscoplastic driver, which does carry all three, must not be
-    # refusing them. Two iterations is enough — the guard would raise before any.
-    for label, fd, kwargs, _flag in cases:
+            # the linearization IS the envelope's tangent at the returned state
+            sp = -0.5 * (out[:, 0] + out[:, 1])
+            c2, sn2, cs2, _ = _fem._nr_envelope_step(env['code'], c, sn, cs, sp,
+                                                     env, None)
+            cref = max(1.0, float(np.abs(c2 * cs2).mean()))
+            resid = float(max(np.max(np.abs(c2 * cs2 - c * cs)) / cref,
+                              np.max(np.abs(sn2 - sn))))
+            if resid > 1e-3:
+                fails.append(
+                    f"{tag}: the tangent the return was taken on is not the "
+                    f"tangent of the envelope at the abscissa the RETURNED stress "
+                    f"produces — the self-consistency residual is {resid:.3e}, so "
+                    f"the returned circle does not touch the curve")
+
+    # ---- the tangent is the ENVELOPE's, from the material table -------------
+    # The strongest leg, and the one a driver-against-driver comparison could not
+    # supply: the tangent the Newton path derives is compared against one computed
+    # from scratch out of the MATERIAL's own columns, through the public
+    # hb_tangent (which re-derives mb, s and a from GSI, mi and D) and through the
+    # power curve's own formula. A parameter wired from the wrong per-element
+    # array is self-consistent with itself and only this can see it.
+    for label, option, params in (('Hoek-Brown', 'hb', HB_PARAMS),
+                                  ('power curve', 'pow', POW_PARAMS)):
+        F_env = 1.7
+        fd = _curved_variant(option, mesh, slope_data, **params)
+        prep = _fem._prepare_fem_model(fd)
+        n_el = len(fd['elements'])
+        env = _fem._nr_envelope_by_elem(fd, np.full(n_el, F_env))
+        groups = _fem._nr_build_groups(prep, np.zeros(n_el), np.zeros(n_el), None,
+                                       env_by_elem=env)
+        g = groups[0]
+        m = g['n']
+        sp = np.linspace(0.0, 4000.0, m)
+        c0 = np.full(m, 40.0)
+        sn0, cs0 = np.full(m, np.sin(0.45)), np.full(m, np.cos(0.45))
+        c, sn, cs, _ = _fem._nr_envelope_step(g['env']['code'], c0, sn0, cs0, sp,
+                                              g['env'], None)
+        if option == 'hb':
+            sig_n = np.maximum(sp * cs0 ** 2 - c0 * sn0 * cs0, 0.0)
+            c_i, phi_i = hb_tangent(sig_n, params['hb_sci'], params['hb_gsi'],
+                                    params['hb_mi'], params['hb_d'])
+            c_ex = c_i / F_env
+            t_ex = np.tan(np.radians(phi_i)) / F_env
+        else:
+            s_n = np.maximum(sp, 0.0)
+            ref = max(1.0, float(s_n.mean()))
+            s_ef = np.maximum(s_n + params['pow_d'], 1e-4 * ref)
+            t_ex = (params['pow_a'] * params['pow_b']
+                    * s_ef ** (params['pow_b'] - 1.0)) / F_env
+            c_ex = ((params['pow_a'] * s_ef ** params['pow_b'] + params['pow_c'])
+                    / F_env) - s_n * t_ex
+        d_c = float(np.max(np.abs(c - c_ex)) / max(1.0, float(np.abs(c_ex).max())))
+        d_t = float(np.max(np.abs(sn / cs - t_ex)) / max(1e-3, float(np.abs(t_ex).max())))
+        if d_c > 1e-9 or d_t > 1e-9:
+            fails.append(
+                f"{label}: the tangent the Newton path derives is not the "
+                f"envelope the material declares — the cohesive intercept differs "
+                f"by {d_c:.3e} and tan(phi) by {d_t:.3e} relative, against an "
+                f"expectation computed from the material's own columns")
+
+    # ---- the F-reduction divides the tangent, not the constants -------------
+    for label, option, params in (('Hoek-Brown', 'hb', HB_PARAMS),
+                                  ('power curve', 'pow', POW_PARAMS)):
+        got = {}
+        for F in (1.0, 2.0):
+            fd = _curved_variant(option, mesh, slope_data, **params)
+            prep = _fem._prepare_fem_model(fd)
+            n_el = len(fd['elements'])
+            envF = np.full(n_el, float(F))
+            env = _fem._nr_envelope_by_elem(fd, envF)
+            groups = _fem._nr_build_groups(
+                prep, np.zeros(n_el), np.zeros(n_el), None, env_by_elem=env)
+            g = groups[0]
+            sp = np.full(g['n'], 250.0)
+            c, sn, cs, _ = _fem._nr_envelope_step(
+                g['env']['code'], np.full(g['n'], 10.0),
+                np.full(g['n'], np.sin(0.5)), np.full(g['n'], np.cos(0.5)),
+                sp, g['env'], None)
+            got[F] = (c.copy(), (sn / cs).copy())
+        for what, i in (('cohesive intercept', 0), ('tan(phi)', 1)):
+            r = got[2.0][i] / np.maximum(got[1.0][i], 1e-30)
+            if not np.allclose(r, 0.5, rtol=1e-9):
+                fails.append(
+                    f"{label}: the {what} of the F-reduced tangent at F = 2 is "
+                    f"{float(r.min()):.6f} to {float(r.max()):.6f} of its value "
+                    f"at F = 1, where strength reduction divides it by exactly 2 "
+                    f"— the reduction is on the TANGENT and not on the envelope's "
+                    f"own constants")
+
+    # ---- the mixed model ----------------------------------------------------
+    sd_mix, fd_mix = _mixed_fem_data()
+    n_el = len(fd_mix['elements'])
+    hbm = np.asarray(fd_mix['hb_flag_by_elem'], bool)
+    pwm = np.asarray(fd_mix['pow_flag_by_elem'], bool)
+    n_mc = int(n_el - hbm.sum() - pwm.sum())
+    if not (hbm.any() and pwm.any() and n_mc):
+        fails.append(
+            f"the mixed model does not mix: {int(hbm.sum())} Hoek-Brown, "
+            f"{int(pwm.sum())} power-curve and {n_mc} Mohr-Coulomb elements of "
+            f"{n_el} — it cannot exercise per-element dispatch")
+    else:
+        stash = []
+        _orig = _fem._nr_build_groups
+        def _grab(*a, **k):
+            g = _orig(*a, **k)
+            stash.append(g)
+            return g
+        _fem._nr_build_groups = _grab
         try:
-            solve_fem(fd, F=1.0, max_iterations=2, **kwargs)
-        except NotImplementedError as exc:
-            fails.append(f"the DEFAULT viscoplastic driver now refuses the "
-                         f"{label} model, which it is meant to handle: {exc}")
+            sol = solve_fem(fd_mix, F=MIXED_F_STANDS, fem_solver='newton',
+                            force_tol=1e-3, k0=sd_mix.get('k0'))
+        finally:
+            _fem._nr_build_groups = _orig
+        emat = np.asarray(fd_mix['element_materials'])
+        seen = {}
+        for g in stash[-1]:
+            code = (g['env']['code'] if g.get('env') is not None
+                    else np.zeros(g['n'], np.int8))
+            for e, cd in zip(g['e_idx'], code):
+                seen.setdefault(int(emat[e]), set()).add(int(cd))
+        want = {1: _fem._NR_ENV_MC, 2: _fem._NR_ENV_HB,
+                3: _fem._NR_ENV_POW, 4: _fem._NR_ENV_MC}
+        for mat, code in want.items():
+            got = seen.get(mat, set())
+            if got != {code}:
+                fails.append(
+                    f"material {mat} ({sd_mix['materials'][mat-1].get('name')}) "
+                    f"was dispatched to envelope code(s) {sorted(got)} where the "
+                    f"model declares {code}: the dispatch is per ELEMENT and a "
+                    f"model that mixes strength models in one mesh has to send "
+                    f"each element to its own")
+        if not sol['converged']:
+            fails.append(
+                f"the mixed model does not stand at F = {MIXED_F_STANDS} on the "
+                f"Newton driver ({sol.get('exit_reason')}), so the dispatch above "
+                f"was read off a state that means nothing")
+        elif sol.get('nr_max_yield_violation', 1.0) > 1e-6:
+            fails.append(
+                f"the mixed model's converged field at F = {MIXED_F_STANDS} is "
+                f"{sol['nr_max_yield_violation']:.2e} of the local strength "
+                f"outside its own yield surface")
+        for F, must_stand in ((MIXED_F_STANDS, True), (MIXED_F_FAILS, False)):
+            for drv in ('viscoplastic', 'newton'):
+                r = solve_fem(fd_mix, F=F, fem_solver=drv, force_tol=1e-3,
+                              max_iterations=8000, k0=sd_mix.get('k0'))
+                if bool(r['converged']) != must_stand:
+                    fails.append(
+                        f"the mixed model at F = {F} on the {drv} driver came "
+                        f"back {'FAILED' if must_stand else 'CONVERGED'} where "
+                        f"the other strength model in the same mesh is what "
+                        f"decides it — the two drivers must agree on this bracket")
     return fails
 
 

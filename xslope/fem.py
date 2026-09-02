@@ -4336,11 +4336,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     # capped suction itself is F-independent and stays cached.
                     _nr_group_apparent_cohesion(grp, 1.0 / Fb)
                     _nr_group_tension_cap(grp, tc_new)
+                    # A curved envelope is reduced on its TANGENT, which is
+                    # re-derived at every evaluation, so what has to be carried
+                    # forward is the per-element F the linearization divides by.
+                    # Without this the ramp would linearize the whole way up at
+                    # the strength its foot was solved at.
+                    _nr_group_restrength_envelope(grp, Fb)
+                    grp.pop('_env_seed', None)
             _nr_export['restrength'] = _restrength
         _nr_kw = dict(
             c_reduced=c_reduced, phi_reduced=phi_reduced,
             elastic_by_elem=elastic_by_elem, t_cap_by_elem=t_cap_by_elem,
-            finv_by_elem=1.0 / F_by_elem,
+            finv_by_elem=1.0 / F_by_elem, _nr_env_F=F_by_elem,
             force_tol=force_tol,
             min_slip_depth=min_slip_depth, max_iterations=max_iterations,
             max_disp_factor=max_disp_factor, _nr_export=_nr_export,
@@ -6186,6 +6193,285 @@ def mc_return_map(sig_tr4, c, snph, csph, mu, t_cap=None, lam=None):
     return out, branch
 
 
+# ---- curved strength envelopes: Hoek-Brown and the power curve ---------------
+# Both are carried here the way the viscoplastic driver carries them: as a
+# per-Gauss-point MOHR-COULOMB TANGENT to the F-reduced envelope, re-derived from
+# the current stress, with the ordinary psi = 0 return map running on that tangent.
+# Neither driver has a curved yield surface anywhere — solve_fem's Step 6
+# overwrites grp['c_r'] / ['snph'] / ['csph'] in place for the flagged Gauss points
+# and then runs the same MC yield function and the same MOCOUQ flow on all points
+# alike. Reproducing THAT is what makes the two drivers answer the same question;
+# an exact curved-surface return would converge somewhere else. See SPIKE.md,
+# "CURVED ENVELOPES".
+#
+# The one thing this path must do that the viscoplastic path need not: the
+# linearization has to be a pure function of the displacement, or the residual is
+# not one and neither the line search nor the convergence test means anything. So
+# the tangent is closed as a SELF-CONSISTENT fixed point inside every residual
+# evaluation — linearize, return, re-read the abscissa off the RETURNED stress,
+# re-linearize — which is the same fixed point the viscoplastic loop reaches over a
+# whole solve, reached per evaluation instead.
+_NR_ENV_MC, _NR_ENV_POW, _NR_ENV_HB = 0, 1, 2
+_NR_ENV_MAX_ITER = 60      # self-consistency passes allowed per evaluation
+_NR_ENV_RELAX1 = 14        # ... after this many, relax by 1/2
+_NR_ENV_RELAX2 = 34        # ... and after this many, by 1/4
+_NR_ENV_TOL = 1e-10        # ... and the relative change that ends them.
+# 1e-10 and not tighter because the Balmer inversion is a 40-step BISECTION: its
+# bracket closes at 2^-40 of the initial width, which puts a floor of about 6e-12
+# under the tangent it can return, and a fixed point asked for less than that
+# never exits. Measured on the Hoek-Brown benchmark, the residual falls by a
+# decade a pass — 1.4e-1, 4.8e-3, 4.7e-4, ... — and then sits on that floor. The
+# level itself is eight orders below `force_tol` and is not a physical setting.
+_NR_HB_BISECT = 40         # Balmer inversion steps — the viscoplastic path's own
+
+
+def _nr_pow_tangent(s_prime, a, b, cp, d, F, pow_ref=None):
+    """The power curve's F-reduced tangent line at the in-plane Mohr-circle centre.
+
+    ``tau = a (sigma_n + d)^b + c_p``, so ``d`` is the tension intercept: it shifts
+    the origin, and the ``1e-4 ref`` floor is what stops a tensile point running
+    past it. Every line here mirrors solve_fem's Step-6 block, including the
+    abscissa: the CENTRE ``s' = -(sx + sy)/2`` clamped at zero, not the
+    failure-plane normal, because that is the abscissa the viscoplastic driver
+    linearizes at and the two have to be solving the same model.
+
+    ``pow_ref`` is the group-wide scale of the floor. It is computed here when the
+    caller has the whole group and passed back in for the tangent's difference
+    quotient, so the perturbed evaluation floors against the same number the base
+    one did rather than against a mean over the yielded subset.
+    """
+    s_n = np.maximum(s_prime, 0.0)
+    if pow_ref is None:
+        pow_ref = max(1.0, float(s_n.mean()) if s_n.size else 1.0)
+    s_ef = np.maximum(s_n + d, 1e-4 * pow_ref)
+    slope = a * b * s_ef ** (b - 1.0) / F
+    tau_F = (a * s_ef ** b + cp) / F
+    phi = np.arctan(slope)
+    return tau_F - s_n * slope, np.sin(phi), np.cos(phi), pow_ref
+
+
+def _nr_hb_tangent(s_prime, c_cur, snph_cur, csph_cur, sci, mb, s_, a_, F):
+    """Hoek-Brown's F-reduced tangent at the FAILURE-PLANE normal stress.
+
+    ``sigma_n = s' cos^2(phi) - c sin(phi) cos(phi)`` is where a Mohr circle of
+    centre ``s'`` touches its own tangent line, which is why the linearization
+    closes as a fixed point: at convergence the circle, the tangent line and the
+    reduced envelope all meet at one ``sigma_n``. It is also the abscissa the
+    limit-equilibrium engine uses (the slice-base normal), so the two solvers
+    linearize the same curve at the same place. Balmer's parametric curve is then
+    inverted by the same bisection the viscoplastic path runs.
+
+    The ``sigma_n >= 0`` clamp inside ``hb_tangent_const`` is load-bearing and is
+    documented there: at the Hoek-Brown tensile apex ``dsigma_1/dsigma_3`` diverges
+    and ``phi_i -> 90 deg``, i.e. effectively infinite strength.
+
+    Strength reduction divides the TANGENT — ``c_i/F`` and ``tan(phi_i)/F`` — and
+    NOT the Hoek-Brown constants: ``sigma_ci/F`` is a different envelope, because of
+    the exponent ``a``.
+    """
+    s_n = np.maximum(s_prime * csph_cur ** 2 - c_cur * snph_cur * csph_cur, 0.0)
+    c_i, phi_i = hb_tangent_const(s_n, sci, mb, s_, a_, iters=_NR_HB_BISECT)
+    slope = np.tan(np.radians(phi_i)) / F
+    phi = np.arctan(slope)
+    return c_i / F, np.sin(phi), np.cos(phi)
+
+
+def _nr_envelope_step(code, c_cur, sn_cur, cs_cur, s_prime, env, pow_ref):
+    """One linearization pass: every curved Gauss point gets its own new tangent.
+
+    This is the per-element dispatch, done per GAUSS POINT: ``code`` carries
+    _NR_ENV_MC / _NR_ENV_POW / _NR_ENV_HB from the model's own
+    ``pow_flag_by_elem`` / ``hb_flag_by_elem``, so one group — one mesh — can hold
+    Mohr-Coulomb, power-curve and Hoek-Brown points at once and each takes its own
+    branch in the same pass. A Mohr-Coulomb point is not touched at all, which is
+    what keeps a mixed model's MC half on exactly the arithmetic it would be on
+    alone.
+    """
+    c, sn, cs = c_cur.copy(), sn_cur.copy(), cs_cur.copy()
+    m = code == _NR_ENV_POW
+    if m.any():
+        cc, ss, cz, pow_ref = _nr_pow_tangent(
+            s_prime[m], env['pow_a'][m], env['pow_b'][m], env['pow_cp'][m],
+            env['pow_d'][m], env['F'][m], pow_ref)
+        c[m], sn[m], cs[m] = cc, ss, cz
+    m = code == _NR_ENV_HB
+    if m.any():
+        cc, ss, cz = _nr_hb_tangent(
+            s_prime[m], c_cur[m], sn_cur[m], cs_cur[m], env['hb_sci'][m],
+            env['hb_mb'][m], env['hb_s'][m], env['hb_a'][m], env['F'][m])
+        c[m], sn[m], cs[m] = cc, ss, cz
+    return c, sn, cs, pow_ref
+
+
+def _nr_envelope_return(grp, sig_tr, sel=None, pow_ref=None):
+    """The return map with any curved envelope linearized self-consistently.
+
+    Returns ``(sig, branch, c, snph, csph, pow_ref)`` — the returned stress, the
+    branch codes, and the tangent the return was actually taken on, which is what
+    the verdict's yield reading has to be read against.
+
+    The seed is the group's stored ``c_r`` / ``snph`` / ``csph``, which for a
+    curved-envelope element is the overburden-estimate tangent build_fem_data
+    lays down, already divided by F. It is a fixed, deterministic starting point,
+    so the fixed point below is a function of the displacement and of nothing
+    else — not of the iteration that came before it.
+
+    ``sel`` restricts the whole thing to a subset of the group, which is what the
+    tangent's difference quotient needs; ``pow_ref`` carries the base evaluation's
+    floor scale into it.
+
+    ``grp['_env_seed']`` replaces that cold seed once a solve is under way, and it
+    is updated ONLY at an accepted iterate (in :func:`_nr_group_state`). Within one
+    Newton iteration the seed is therefore frozen, so the residual the line search
+    evaluates is a pure function of the displacement; and because the fixed point
+    is driven to ``_NR_ENV_TOL`` the answer does not depend on where it started,
+    only the number of passes to reach it does — 2 or 3 warm against 6 to 10 cold,
+    which is most of this feature's cost.
+    """
+    env = grp['env']
+    seed = grp.get('_env_seed')
+    if sel is None:
+        code = env['code']
+        c, sn, cs = (grp['c_r'], grp['snph'], grp['csph']) if seed is None else seed
+        mu, sub = grp['mu'], env
+        t_cap, lam = grp.get('t_cap'), grp.get('lam')
+    else:
+        code = env['code'][sel]
+        src = (grp['c_r'], grp['snph'], grp['csph']) if seed is None else seed
+        c, sn, cs = src[0][sel], src[1][sel], src[2][sel]
+        mu = grp['mu'][sel]
+        sub = {k: v[sel] for k, v in env.items() if k != 'code'}
+        t_cap = None if grp.get('t_cap') is None else grp['t_cap'][sel]
+        lam = None if grp.get('lam') is None else grp['lam'][sel]
+    c = np.array(c, dtype=float, copy=True)
+    phi = np.arctan2(np.asarray(sn, float), np.asarray(cs, float))
+    sn, cs = np.sin(phi), np.cos(phi)
+    m_env = code != _NR_ENV_MC
+    sig, branch = mc_return_map(sig_tr, c, sn, cs, mu, t_cap=t_cap, lam=lam)
+    # Under-relaxation, applied only when the plain iteration stops making
+    # progress. It is not a tuning dial: the fixed point it converges to is the
+    # same one, and theta only decides how it gets there. It exists because a
+    # HANDFUL of trial states put the iteration in a period-2 limit cycle — the
+    # tangent moves the returned state across a branch boundary and the new
+    # abscissa moves it back — and a cycle at one Gauss point stalls the whole
+    # group. Measured on the fuzz below, damping is what takes the worst residual
+    # from a stalled 2.2e-1 to convergence.
+    theta = 1.0
+    err = 0.0
+    for _it in range(_NR_ENV_MAX_ITER):
+        # The abscissa is read off the RETURNED stress, which is the stress the
+        # viscoplastic loop reads it off too (its sig4 is the current state, not an
+        # elastic predictor). At the fixed point the tangent is therefore taken
+        # where the returned Mohr circle actually touches it.
+        s_prime = -0.5 * (sig[:, 0] + sig[:, 1])
+        c_new, sn_new, cs_new, pow_ref = _nr_envelope_step(
+            code, c, sn, cs, s_prime, sub, pow_ref)
+        fin = np.isfinite(c_new) & m_env
+        cref = max(1.0, float(np.abs(c_new[fin] * cs_new[fin]).mean())
+                   if fin.any() else 1.0)
+        err = 0.0
+        if fin.any():
+            # The residual of the fixed point itself, g(x) - x, read BEFORE any
+            # relaxation, so the convergence test means the same thing at every
+            # theta.
+            err = max(float(np.abs(c_new[fin] * cs_new[fin]
+                                   - c[fin] * cs[fin]).max()) / cref,
+                      float(np.abs(sn_new[fin] - sn[fin]).max()))
+        if err < _NR_ENV_TOL:
+            break
+        # The schedule is on the PASS COUNT and not on the error trend, because a
+        # trend test cannot tell a slow contraction from a cycle and this one does
+        # not have to: an iteration that has not closed in _NR_ENV_RELAX1 passes is
+        # either cycling, in which case halving breaks it, or converging at a rate
+        # that halving costs a factor of two on. On the corpus the loop exits in one
+        # to ten passes and never reaches either level.
+        theta = (1.0 if _it < _NR_ENV_RELAX1
+                 else 0.5 if _it < _NR_ENV_RELAX2 else 0.25)
+        if theta == 1.0:
+            c, sn, cs = c_new, sn_new, cs_new
+        else:
+            # Relax on (c, phi) and rebuild the sine and cosine from the angle, so
+            # the pair can never drift off the unit circle. Mohr-Coulomb points are
+            # excluded from the blend: their c is +inf where a material is held
+            # elastic, and inf + theta*(inf - inf) is a NaN.
+            phi_new = np.arctan2(sn_new, cs_new)
+            c = np.where(m_env, c + theta * (c_new - c), c)
+            phi = np.where(m_env, phi + theta * (phi_new - phi), phi)
+            sn, cs = np.sin(phi), np.cos(phi)
+        sig, branch = mc_return_map(sig_tr, c, sn, cs, mu, t_cap=t_cap, lam=lam)
+    return sig, branch, c, sn, cs, pow_ref
+
+
+def _nr_envelope_by_elem(fem_data, F_by_elem):
+    """Per-element curved-envelope parameters, or ``None`` on a plain model.
+
+    ``None`` is the whole of the no-envelope guarantee: a model with no ``pow`` or
+    ``hb`` material never gets an ``env`` key on any group, so ``grp.get('env')``
+    is None at the one point the linearization could enter and the return map is
+    called with the group's own arrays exactly as it always was.
+    """
+    n = len(fem_data["elements"])
+    pm = np.asarray(fem_data.get("pow_flag_by_elem", np.zeros(n, bool)), dtype=bool)
+    hm = np.asarray(fem_data.get("hb_flag_by_elem", np.zeros(n, bool)), dtype=bool)
+    if not (pm.any() or hm.any()):
+        return None
+    code = np.zeros(n, dtype=np.int8)
+    code[pm] = _NR_ENV_POW
+    code[hm] = _NR_ENV_HB
+    z = np.zeros(n)
+    out = {'code': code, 'F': np.asarray(F_by_elem, dtype=float).copy()}
+    for key, src in (('pow_a', 'pow_a_by_elem'), ('pow_b', 'pow_b_by_elem'),
+                     ('pow_cp', 'pow_cp_by_elem'), ('pow_d', 'pow_d_by_elem'),
+                     ('hb_sci', 'hb_sci_by_elem'), ('hb_mb', 'hb_mb_by_elem'),
+                     ('hb_s', 'hb_s_by_elem'), ('hb_a', 'hb_a_by_elem')):
+        out[key] = np.asarray(fem_data.get(src, z), dtype=float)
+    # pow_b defaults to 1 on a non-power element so the exponent is never 0^-1 in
+    # a masked-off lane; the mask means it is never read, and this keeps it finite.
+    out['pow_b'] = np.where(code == _NR_ENV_POW, out['pow_b'], 1.0)
+    return out
+
+
+def _nr_group_envelope(grp, env_by_elem):
+    """Attach (or refresh) one group's per-Gauss-point envelope arrays.
+
+    A Gauss point in a material held LINEAR ELASTIC is dispatched back to the
+    plain Mohr-Coulomb code even where its material declares a curved envelope.
+    On this path "elastic" is carried as an unreachable cohesion, ``c_r = inf``,
+    and the linearization writes a finite tangent into ``c_r`` — so without this
+    line a curved material inside an SSR elastic zone would start yielding, which
+    is the opposite of what the zone says. The viscoplastic path never meets the
+    problem because it drops elastic points from the yielding mask instead
+    (``m & ~grp['elastic']``) and does not care what its ``c_r`` says. Measured on
+    `vp040`, where 1,284 of 2,539 elements are held elastic: without it the first
+    Newton step leaves 47% of the load uncarried at every load factor down to
+    1/64, because half the mesh is yielding a material that cannot yield.
+    """
+    if env_by_elem is None:
+        return
+    e = grp['e_idx']
+    env = {k: v[e] for k, v in env_by_elem.items()}
+    if 'elastic' in grp:
+        env['code'] = env['code'].copy()
+        env['code'][grp['elastic']] = _NR_ENV_MC
+    grp['env'] = env
+    if not np.any(env['code'] != _NR_ENV_MC):
+        # Nothing curved is left in this group, so it takes the plain path.
+        del grp['env']
+
+
+def _nr_group_restrength_envelope(grp, F_by_elem):
+    """Re-reduce one group's envelope for a new trial strength.
+
+    For a curved-envelope point the reduction is 1/F on the TANGENT, and the
+    tangent is re-derived at every evaluation anyway, so all the ramp has to carry
+    forward is the per-element F the linearization divides by. Without this a ramp
+    would linearize the whole way up at the strength its foot was solved at.
+    """
+    env = grp.get('env')
+    if env is not None:
+        env['F'] = np.asarray(F_by_elem, dtype=float)[grp['e_idx']]
+
+
 def _nr_group_state(grp, u, h_eps):
     """One group's stress, branch codes and algorithmic tangent at displacement u.
 
@@ -6212,8 +6498,20 @@ def _nr_group_state(grp, u, h_eps):
     if _s0 is not None:
         sig_tr = sig_tr + _s0
     t_cap, lam = grp.get('t_cap'), grp.get('lam')
-    sig, branch = mc_return_map(sig_tr, grp['c_r'], grp['snph'], grp['csph'],
-                                grp['mu'], t_cap=t_cap, lam=lam)
+    if grp.get('env') is None:
+        sig, branch = mc_return_map(sig_tr, grp['c_r'], grp['snph'], grp['csph'],
+                                    grp['mu'], t_cap=t_cap, lam=lam)
+        pref = None
+        grp['_c_eff'] = grp['c_r']
+        grp['_snph_eff'] = grp['snph']
+        grp['_csph_eff'] = grp['csph']
+    else:
+        sig, branch, _ce, _se, _cse, pref = _nr_envelope_return(grp, sig_tr)
+        grp['_c_eff'], grp['_snph_eff'], grp['_csph_eff'] = _ce, _se, _cse
+        # The accepted iterate's converged linearization becomes the next
+        # evaluation's starting point. Only here, so the seed is frozen for the
+        # whole of a line search.
+        grp['_env_seed'] = (_ce, _se, _cse)
     yid = branch != _NR_ELASTIC
     Dep = np.array(grp['D3'], copy=True)
     if np.any(yid):
@@ -6224,10 +6522,20 @@ def _nr_group_state(grp, u, h_eps):
         tc_y = None if t_cap is None else t_cap[idx]
         lam_y = None if lam is None else lam[idx]
         for j in range(3):
-            sp, _ = mc_return_map(s_tr + h_eps * D4y[:, :, j],
-                                  grp['c_r'][idx], grp['snph'][idx],
-                                  grp['csph'][idx], grp['mu'][idx],
-                                  t_cap=tc_y, lam=lam_y)
+            if grp.get('env') is None:
+                sp, _ = mc_return_map(s_tr + h_eps * D4y[:, :, j],
+                                      grp['c_r'][idx], grp['snph'][idx],
+                                      grp['csph'][idx], grp['mu'][idx],
+                                      t_cap=tc_y, lam=lam_y)
+            else:
+                # Through the WHOLE map, linearization included, so the quotient
+                # carries d(c, phi)/d(sigma) as well. The tangent is then the
+                # derivative of the map the residual actually uses, with no
+                # separate algebra to keep in step — at the price of the
+                # linearization's own first-order truncation, alongside the
+                # principal frame's, which is measured rather than assumed.
+                sp = _nr_envelope_return(grp, s_tr + h_eps * D4y[:, :, j],
+                                         sel=idx, pow_ref=pref)[0]
             Dep[idx, :, j] = (sp[:, :3] - base) / h_eps
     return sig, branch, Dep
 
@@ -6524,10 +6832,17 @@ def _nr_internal_force(gp_groups, u, n_dof, h_eps=None, want_tangent=False,
             # and K0 initial stress included. This branch exists only to skip the differencing, so any
             # divergence between the two is a residual and a tangent for two
             # different materials.
-            sig, branch = mc_return_map(sig_tr, grp['c_r'], grp['snph'],
-                                        grp['csph'], grp['mu'],
-                                        t_cap=grp.get('t_cap'),
-                                        lam=grp.get('lam'))
+            if grp.get('env') is None:
+                sig, branch = mc_return_map(sig_tr, grp['c_r'], grp['snph'],
+                                            grp['csph'], grp['mu'],
+                                            t_cap=grp.get('t_cap'),
+                                            lam=grp.get('lam'))
+                grp['_c_eff'] = grp['c_r']
+                grp['_snph_eff'] = grp['snph']
+                grp['_csph_eff'] = grp['csph']
+            else:
+                sig, branch, _ce, _se, _cse, _ = _nr_envelope_return(grp, sig_tr)
+                grp['_c_eff'], grp['_snph_eff'], grp['_csph_eff'] = _ce, _se, _cse
         grp['_sig'] = sig
         grp['_branch'] = branch
         n_plastic_gp += int(np.count_nonzero(branch))
@@ -6692,7 +7007,8 @@ def _nr_set_load_factor(groups, lam):
 
 
 def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
-                     t_cap_by_elem=None, k0=None, finv_by_elem=None):
+                     t_cap_by_elem=None, k0=None, finv_by_elem=None,
+                     env_by_elem=None):
     """The Newton path's working Gauss-point groups.
 
     Geometry (B, D4, w, dof) is shared BY REFERENCE with the prepared model, which
@@ -6736,6 +7052,11 @@ def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
             _nr_group_apparent_cohesion(grp, finv_by_elem)
         _nr_group_tension_cap(grp, t_cap_by_elem)
         _nr_group_sig0(grp, sg, prep, k0)
+        # The curved envelopes last: they carry no cohesion of their own, only the
+        # parameters the tangent is re-derived from. c_r / snph / csph stay the
+        # SEED tangent build_fem_data laid down, which is what the fixed point
+        # starts from.
+        _nr_group_envelope(grp, env_by_elem)
         groups.append(grp)
     return groups
 
@@ -7156,7 +7477,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                       debug_level=0, progress_callback=None,
                       nr_max_iter=_NR_MAX_ITER, nr_min_step=_NR_MIN_STEP,
                       _nr_seed=None, k0=None, _nr_init_state=None,
-                      _nr_seed_state=None):
+                      _nr_seed_state=None, _nr_env_F=None):
     """One strength-reduction trial by Newton-Raphson (SPIKE; see SPIKE.md).
 
     Returns the same result dictionary solve_fem returns, so the SSRM bisection
@@ -7226,10 +7547,12 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                 f"post-peak softening on {int(_soft.sum())} of {_n1d} "
                 f"reinforcement bar element(s) (a residual tension t_res below the "
                 f"capacity the embedment develops)")
-    if np.any(fem_data.get("pow_flag_by_elem", np.zeros(n_elements, bool))):
-        unsupported.append("power-curve strength envelopes")
-    if np.any(fem_data.get("hb_flag_by_elem", np.zeros(n_elements, bool))):
-        unsupported.append("Hoek-Brown strength envelopes")
+    # The two CURVED envelopes ARE carried (see _nr_envelope_return and
+    # _nr_envelope_by_elem), per GAUSS POINT, so one mesh can hold a Mohr-Coulomb
+    # soil and a Hoek-Brown rock and solve them together. Both arrive here the way
+    # the viscoplastic driver carries them — as a Mohr-Coulomb tangent to the
+    # F-reduced envelope, re-derived from the current stress — because neither
+    # driver has a curved yield surface and the two have to solve the same model.
     # Matric suction IS carried (see _nr_group_suction / _nr_group_apparent_
     # cohesion). Fredlund's credit is an apparent cohesion on the same linear
     # envelope, so it arrives here folded into the per-Gauss-point c_r that the
@@ -7261,8 +7584,10 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # vector, bit for bit.
     trans_dofs = _nr_translational_dofs(fem_data, n_dof)
 
+    env_by_elem = _nr_envelope_by_elem(fem_data, _nr_env_F)
     groups = _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
-                              t_cap_by_elem, k0=k0, finv_by_elem=finv_by_elem)
+                              t_cap_by_elem, k0=k0, finv_by_elem=finv_by_elem,
+                              env_by_elem=env_by_elem)
     bars = _nr_build_bars(fem_data)
     piles = _nr_build_piles(fem_data)
     pattern = _nr_prepare_assembly(groups, free_dofs, n_dof, bars=bars, piles=piles)
@@ -7563,13 +7888,21 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                                  -13.5 * (dx_ * dy_ * dz_ - dz_ * txy_ ** 2) / ds3_,
                                  0.0), -1.0, 1.0)
         th_ = np.arcsin(sine_) / 3.0
-        fv_ = (sigm_ * grp['snph']
-               + dsbar_ * (np.cos(th_) / sq3_ - np.sin(th_) * grp['snph'] / 3.0)
-               - grp['c_r'] * grp['csph'])
+        # The envelope the trial was actually solved on. On a Mohr-Coulomb group
+        # these three ARE grp['c_r'] / ['snph'] / ['csph'], the same objects, so
+        # this reading is unchanged there; on a curved-envelope group they are the
+        # converged linearization the return was taken on, which is the only
+        # envelope against which "how far outside" means anything.
+        _ce_ = grp.get('_c_eff', grp['c_r'])
+        _se_ = grp.get('_snph_eff', grp['snph'])
+        _cse_ = grp.get('_csph_eff', grp['csph'])
+        fv_ = (sigm_ * _se_
+               + dsbar_ * (np.cos(th_) / sq3_ - np.sin(th_) * _se_ / 3.0)
+               - _ce_ * _cse_)
         # Strength scale at the point: the two terms the deviatoric radius is held
         # against. A material held linear elastic carries c = inf and is skipped,
         # as is a point with no strength scale to divide by.
-        den_ = grp['c_r'] * grp['csph'] + np.abs(sigm_) * grp['snph']
+        den_ = _ce_ * _cse_ + np.abs(sigm_) * _se_
         ok_ = np.isfinite(den_) & (den_ > 0.0)
         if np.any(ok_):
             max_yield_violation = max(max_yield_violation,

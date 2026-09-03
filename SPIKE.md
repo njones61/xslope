@@ -9177,3 +9177,230 @@ ceiling exit away and the bisection never reaches 1.409375 at all, so the `vp300
 conversion that was going to save the row never happens. Conversions are conditional
 on the bisection path that produced their trial, and only a corpus run measures
 them.
+
+### THE YIELD GATE — results
+
+#### Where the threshold came from
+
+The gate had to be set from a measurement, because `_CORRECTOR_YIELD_TOL` is a
+Newton number and a viscoplastic field is not built the way a Newton field is. So
+the invariant-form reading was taken on all 266 CONVERGED viscoplastic trials the
+corpus produces — the trials the corrector did not decide — and on the 513 states
+the corrector certified, for comparison.
+
+| worst violation, as a fraction of the local strength | converged viscoplastic trials | cumulative |
+|---|---|---|
+| exactly 0 | 45 | 16.9% |
+| below 1e-6 | 23 | 25.6% |
+| 1e-6 to 1e-4 | 8 | 28.6% |
+| 1e-4 to 1e-3 | 89 | 62.0% |
+| 1e-3 to 3e-3 | 22 | 70.3% |
+| 3e-3 to 1e-2 | 39 | 85.0% |
+| 1e-2 to 3e-2 | 8 | 88.0% |
+| 3e-2 to 1e-1 | 1 | 88.3% |
+| 1e-1 to 1 | 4 | 89.8% |
+| 1 and above | 22 | 98.1% |
+
+The 513 corrector-certified states on the same corpus read 7.6e-15 at the median
+and 2.2e-08 at worst.
+
+**The gate is 1e-2 (`_VP_YIELD_GATE`), and 1e-6 was rejected on the evidence.**
+Only 26% of converged viscoplastic states reach 1e-6, and holding the driver to it
+would condemn 198 of 266 states that are simply not finished relaxing. The
+asymmetry is structural: a Newton state is the solution of the equations this
+reading is taken from, while a viscoplastic state approaches the surface from
+outside along the relaxation and stops when the DISPLACEMENT increment falls below
+`tolerance` — its yield residual is set by a displacement tolerance, not by a yield
+one. 1e-2 is where the population separates. Below it the readings are dense and
+continuous and they are that residual; above it they thin by an order of magnitude
+before a tail that runs to 33 times the local strength, and those are not residuals.
+It is also the threshold `_YIELD_FLAG_FRAC` already counts points against, so the
+gate and the reading printed beside it say the same thing about the same state.
+
+#### What it cost, and what it caught
+
+The gate fired 49 times over the corpus and cost 58 s — 0.6% of the corrector's
+wall and 0.2% of the run — because it fires on a state the loop has just settled,
+which is the best seed the corrector ever gets: **25 of the 49 are certified, a 51%
+rate against the checkpoint ladder's 37% and the rule exits' 1%.**
+
+Twenty-four trials on twelve rows are refused by both the gate and the corrector,
+and are FAILED. Eleven of those twelve rows read lower than the shipped
+viscoplastic driver, and **no row anywhere on the corpus reads lower for any other
+reason**: the corrector's safety property is intact and the gate is the one thing
+that can, and is meant to, bring an answer down.
+
+#### One mechanism, on all twenty-four
+
+Every refused trial's worst Gauss point sits in a material with `c = 0` and no
+declared tensile cap. Twelve rows, nine models, one mechanism. With `c = 0` the
+Mohr-Coulomb surface passes through the origin, so any tensile mean stress at that
+point is outside it, and with a blank `t_cut` nothing in the constitutive model
+stops the state from getting there. That is the mechanism
+`c0_tension_audit_2026-09-02.md` documented, now firing as a verdict rather than as
+a referee's note.
+
+Five of that audit's ten flagged models are condemned here — `rs2_65`, `rs2_66c`,
+`vp033`, `vp069`, `vp077b` — and five models it did not flag are:
+`xslope_noncircular_fem`, `vp022a`, `vp022b`, `vp082`, `vp006`. Five flagged models
+are NOT condemned (`rs2_66a`, `rs2_66b`, `vp034`, `xslope_reinforce_fem`,
+`xslope_reinforced_slope`), because on those rows the corrector reaches an
+admissible field at the same strength and the trial stands on that instead. The two
+readings ask different questions: the audit refereed the state a lock stands on,
+and the gate refuses to let an inadmissible state end a trial at all.
+
+The sharpest case is `RS2-65-m3`. The viscoplastic loop reports CONVERGED at
+F = 1.1 on a field with 18 Gauss points more than 1% of their local strength
+outside the surface, the worst of them 9.9 times its own strength outside, in
+`Tailings` (c = 0, phi = 34.8, blank cap). No corrector attempt reaches an
+admissible field at that strength, nor at 1.05, 0.85, 0.825, 0.7125 or 0.684375;
+the first strength at which one exists is 0.670313. The lock is 1.294 and RS2 reads
+1.29.
+
+## RE-LOCK TABLE
+
+The full table — 42 rows with lock, tolerance, both values, direction, what decided
+it, the gate readings with the material of the worst point, the vendor value and
+whether the new value is closer, and the docs pages that carry each model — is
+`xslope_private/reports/relock_table_2026-09-03.md` and its `.csv`. **No lock, tag,
+verification page, tutorial or doc was edited.**
+
+### The corpus, on the final `auto`
+
+| | viscoplastic (Sweep 1) | hybrid `auto` |
+|---|---|---|
+| corpus wall | 42,449 s | 33,950 s — takes 80% of the time, 20% faster |
+| INCONCLUSIVE trials | 35 | 4 |
+| trials a corrector decided | — | 546 of 1,548 |
+| rows reading higher than the viscoplastic driver | — | 58 |
+| rows reading lower | — | 11, every one the yield gate |
+
+By class the ratio runs 0.879 on the 143 RS2 transcriptions, 0.687 on the 31 SSRM
+verification rows, 0.617 on the ten other rows and 1.230 on the seven tutorial
+rows; by mesh size 0.828 under 1,000 elements, 0.950 from 1,000 to 3,000 and 0.721
+above 3,000. The corrector was asked 2,961 times for 10,475 s, of which the gate's
+49 attempts are 58 s.
+
+### The counts the owner is being asked to rule on
+
+* **42 rows** move by more than a bisection cell, leave their lock tolerance, or
+  are touched by the yield gate.
+* **31 up, 11 down.** Every upward move carries a corrector certificate; every
+  downward move is a yield-gate refusal.
+* **33 leave their lock tolerance.**
+* **Against the published source: 16 closer, 18 farther**, and 8 of the 42 carry
+  no published source at all. The set does not move the corpus toward the vendors
+  on balance, and that is worth weighing against the fact that every value in it
+  is certified admissible where the old one was not.
+* **Two tutorials print a number in the table**: `fem03_piles.md`
+  (FEM-3-wall-ssrm, 1.559 to 1.793) and `fem02_reinforcement.md` (FEM-2-ssrm,
+  1.496 to 1.535). Both are full updates — prose and figures — not number swaps.
+  The rest of the table lands on `docs/verification/rs2.md` (27 rows),
+  `rocscience.md` (14), `ssrm.md` (8), `geostudio.md` (4) and
+  `docs/fem/samples.md` (2).
+
+### The rows that move, ordered by the move
+
+| i | benchmark | page | lock ± tol | vp | auto | move | decided by |
+|---|---|---|---|---|---|---|---|
+| 114 | RS2-65-m3 | rs2.md | 1.294 ± 0.02 | 1.29375 | 0.67734 | -0.61641 | yield gate |
+| 10 | FEM-3-wall-ssrm | fem03_piles.md | 1.559 ± 0.01 | 1.55859 | 1.79297 | +0.23438 | corrector at `rule:runaway` |
+| 144 | RS2-P4-VP69-m4 | rs2.md | 1.931 ± 0.02 | 1.93125 | 1.70625 | -0.22500 | yield gate |
+| 115 | RS2-65 | rs2.md | 1.306 ± 0.02 | 1.30625 | 1.20625 | -0.10000 | yield gate |
+| 190 | SSRM-TORGGLER | ssrm.md | 1.673 ± 0.01 | 1.67266 | 1.74297 | +0.07031 | corrector at `vp3000` |
+| 78 | RS2-40-d20 | rs2.md | 1.349 ± 0.02 | 1.34922 | 1.41797 | +0.06875 | corrector at `vp3000` |
+| 79 | RS2-40-d50 | rs2.md | 1.470 ± 0.02 | 1.48672 | 1.55547 | +0.06875 | corrector at `vp1000` |
+| 80 | RS2-40-d80 | rs2.md | 1.470 ± 0.02 | 1.48672 | 1.55547 | +0.06875 | corrector at `vp1000` |
+| 108 | RS2-64d | rs2.md | 5.391 ± 0.02 | 5.39844 | 5.46094 | +0.06250 | corrector at `vp300` |
+| 123 | RS2-66c-deep | rs2.md | 1.094 ± 0.02 | 1.10625 | 1.04375 | -0.06250 | yield gate |
+| 107 | RS2-64b | rs2.md | 6.486 ± 0.02 | 6.50586 | 6.56445 | +0.05859 | corrector at `vp300` |
+| 21 | RS2-4-zone | rs2.md | 1.844 ± 0.02 | 1.84375 | 1.89375 | +0.05000 | path opened at `rule:iteration_cap` |
+| 55 | RS2-28a | rs2.md | 1.606 ± 0.02 | 1.61875 | 1.66875 | +0.05000 | corrector at `vp1000` |
+| 172 | griffiths3_r0p2_thin | ssrm.md | 0.510 ± 0.05 | 0.51250 | 0.56250 | +0.05000 | corrector at `vp300` |
+| 13 | SIGMAW-SRS-wall | geostudio.md | 1.647 ± 0.01 | 1.64688 | 1.69063 | +0.04375 | corrector at `vp300` |
+| 7 | FEM-2-ssrm | fem02_reinforcement.md | 1.496 ± 0.01 | 1.49609 | 1.53516 | +0.03906 | corrector at `vp300` |
+| 0 | xslope_reinforce_fem | samples.md | 1.497 ± 0.01 | 1.49687 | 1.53438 | +0.03750 | corrector at `vp300` |
+| 121 | RS2-66a-deep | rs2.md | 1.131 ± 0.02 | 1.13125 | 1.16875 | +0.03750 | corrector at `vp300` |
+| 122 | RS2-66b-deep | rs2.md | 1.131 ± 0.02 | 1.13125 | 1.16875 | +0.03750 | corrector at `vp300` |
+| 170 | griffiths3_r0p4 | ssrm.md | 0.930 ± 0.05 | 0.92500 | 0.96250 | +0.03750 | corrector at `vp300` |
+| 171 | griffiths3_r0p2 | ssrm.md | 0.480 ± 0.05 | 0.47500 | 0.51250 | +0.03750 | corrector at `vp300` |
+| 12 | SIGMAW-SRS-nowall | geostudio.md | 1.0203 ± 0.01 | 1.02031 | 1.04844 | +0.02813 | corrector at `vp300` |
+| 106 | RS2-64e | rs2.md | 5.579 ± 0.02 | 5.59277 | 5.62012 | +0.02734 | corrector at `vp300` |
+| 15 | VP106-FEM-free | rocscience.md | 1.472 ± 0.01 | 1.47188 | 1.49687 | +0.02500 | corrector at `rule:runaway` |
+| 112 | RS2-65-m8 | rs2.md | 1.344 ± 0.02 | 1.34375 | 1.31875 | -0.02500 | yield gate |
+| 174 | SSRM-G4 | ssrm.md | 2.034 ± 0.01 | 2.03906 | 2.05781 | +0.01875 | corrector at `vp300` |
+| 77 | RS2-40-d15 | rs2.md | 1.246 ± 0.02 | 1.24609 | 1.22891 | -0.01719 | yield gate |
+| 50 | RS2-25 | rs2.md | 1.202 ± 0.02 | 1.20234 | 1.18828 | -0.01406 | yield gate |
+| 57 | RS2-28c | rs2.md | 1.381 ± 0.02 | 1.39375 | 1.40625 | +0.01250 | corrector at `vp1000` |
+| 140 | RS2-P4-VP64 | rs2.md | 2.369 ± 0.02 | 2.38125 | 2.39375 | +0.01250 | corrector at `vp300` |
+| 177 | SSRM-G5 | ssrm.md | 1.834 ± 0.01 | 1.84062 | 1.85312 | +0.01250 | corrector at `vp300` |
+| 104 | RS2-64a | rs2.md | 5.166 ± 0.02 | 5.17773 | 5.18945 | +0.01172 | corrector at `vp300` |
+| 105 | RS2-64c | rs2.md | 4.783 ± 0.02 | 4.79492 | 4.80664 | +0.01172 | corrector at `vp300` |
+| 126 | RS2-67a | rs2.md | 2.479 ± 0.02 | 2.49023 | 2.50195 | +0.01172 | corrector at `vp300` |
+| 41 | RS2-18 | rs2.md | 1.323 ± 0.02 | 1.33359 | 1.32266 | -0.01094 | yield gate |
+| 136 | RS2-P4-VP6 | rs2.md | 2.188 ± 0.02 | 2.18828 | 2.17734 | -0.01094 | yield gate |
+| 51 | RS2-26 | rs2.md | 2.274 ± 0.02 | 2.28398 | 2.29414 | +0.01016 | corrector at `vp300` |
+| 42 | RS2-18b | rs2.md | 1.042 ± 0.02 | 1.05781 | 1.04805 | -0.00977 | yield gate |
+| 3 | xslope_noncircular_fem | samples.md | 1.616 ± 0.01 | 1.61563 | 1.60938 | -0.00625 | yield gate |
+| 160 | SSRM-1 | ssrm.md | 1.359 ± 0.01 | 1.36563 | 1.37187 | +0.00625 | corrector at `vp300` |
+| 178 | SSRM-G5 | ssrm.md | 1.278 ± 0.01 | 1.28438 | 1.29062 | +0.00625 | corrector at `vp300` |
+| 83 | RS2-44 | rs2.md | 1.490 ± 0.02 | 1.48984 | 1.49355 | +0.00371 | yield gate, then certified higher |
+
+### The criterion, line by line
+
+**1. The ladder — MET, and answered with a negative.** The trim was designed from
+the per-attempt records, built, and run on all 191 rows. It keeps 76 of 79 deciding
+trials and saves 772 s, and it costs three rows their certified move, so it is not
+taken. The candidate ladders and their numbers are in "THE LADDER — results".
+
+**2. The safety property — MET.** No row reads lower than the shipped viscoplastic
+value for any reason other than the yield gate. All eleven downward rows carry a
+gate refusal, and the twelfth gate row reads higher.
+
+**3. The yield gate — MET.** The threshold is 1e-2, justified by the measured
+distribution over 266 converged viscoplastic trials and quoted above. Every
+condemned trial is reported with its worst violation, its count of points above 1%,
+its element and Gauss point, and the material — and all 24 sit in a zero-cohesion
+material with a blank cap, cross-referenced to the c = 0 audit.
+
+**4. The escape hatch — MET.** `fem_solver='viscoplastic'` reproduces the Sweep 1
+viscoplastic column bit for bit on the 22-row sample: same factor of safety, same
+iteration count, same trial sequence and the same SHA-1 of the displacement field
+on all 22, with zero corrector attempts. Against the pre-round tree at `3740b710`
+directly, Griffiths & Lane 1 at F = 1.35, 1.39 and 1.45 agree in verdict, iteration
+count, out-of-balance and displacement-field hash, and the default control —
+Griffiths & Lane 6 dry, quad8 at 2 — returns FS 2.421875 on per-trial iteration
+counts 147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777.
+
+**5. Locks — MET.** `check_corrector` now holds `_CORRECTOR_RULE_EXITS` in both
+directions and the yield gate on a converged viscoplastic state: that such a state
+is handed to the corrector, that it may not end a trial on its own, and that where
+no admissible field is reachable the trial is FAILED with `stable` False under
+every criterion. The mutation — the gate neutered so an inadmissible converged
+state is accepted — was run and fails the check on five assertions. The whole of
+`test/nr_ssrm_check.py` passes, and `run_tests.py --preflight` passes in the
+worktree, 31 of 31.
+
+**6. The re-lock table — MET.** This section and
+`relock_table_2026-09-03.md`/`.csv`. Nothing was edited.
+
+**7. The honest negative — TRIGGERED on the ladder, and written.** Trimming saves
+2% and costs three certified moves, because a dropped rung hands its trials back to
+the viscoplastic loop rather than making them free. The cost is not in the ladder.
+
+### Verdict
+
+The gate is the round's result, not the ladder. Trimming was the question the owner
+asked and the answer is that there is nothing there: the corrector's cost is in its
+refusals, refusals are what a hard trial produces, and a rung dropped to avoid one
+buys viscoplastic passes instead. What the round did find is that a converged
+viscoplastic verdict was never checked for admissibility, and that on twelve rows
+it should not have stood — every one of them on a zero-cohesion material with no
+tensile cap, the same mechanism the c = 0 audit found and could not act on. The
+gate costs 58 s over the whole corpus and it is 51% likely to be answered with a
+certified state rather than a failure, because it fires exactly where the corrector
+has its best seed.
+
+The corpus now takes 80% of the shipped driver's time, decides all but four of its
+formerly 35 undecided trials, and every one of its 42 changed rows carries either a
+certificate or a reading. What the published numbers should be is the owner's call.

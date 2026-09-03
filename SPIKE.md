@@ -8183,13 +8183,22 @@ The driver has re-used its factorization since the first spike commit —
 by four per iteration — and on 37,775 iterations across thirteen rows it held it
 1,563 times. The rule is not wrong; the premise under it is. A backtracking line
 search that accepts a fraction of the Newton step does not cut the residual by four,
-and the line search accepts a fraction on nearly every iteration: 264,000 force
-evaluations against 37,775 iterations is **seven line-search evaluations per
+and the line search accepts a fraction on nearly every iteration: 226,906 backtrack
+evaluations against 37,775 iterations is **six line-search evaluations per
 iteration** on a search that is allowed nine. Two more iterations per load increment
 are unconditional — the first has no factorization and the second has no ratio yet —
 so an increment that converges in three iterations cannot re-use anything at all.
-The measured consequence is one triangular solve per factorization: **33 s of solves
-against 1,061 s of factorizations, a ratio of 32 to 1.**
+The measured consequence is one triangular solve per factorization: **38 s of solves
+against 1,077 s of factorizations, a ratio of 28 to 1.**
+
+**The unit costs, which are what every lever below trades in.** A factorization is
+29.7 ms, an assembly 6.7 ms, the tangent-forming constitutive pass 4.8 ms, one
+line-search evaluation 3.0 ms, and one viscoplastic predictor iteration 2.3 ms.
+A Newton iteration therefore costs about 59 ms — 36 ms of linear algebra and 23 ms
+of constitutive work — which is **twenty-six viscoplastic iterations**. That single
+ratio is why the calibration sweep's "Newton does 69% of the constitutive passes"
+read as a saving next to 127% of the wall, and it is the arithmetic behind the ramp
+round's 72%-less-work-13%-longer.
 
 **Factorization is the largest single item at 28% of the wall, and it grows with the
 mesh.** Against the 61% average, linear algebra is 51% of Newton's own work at 387

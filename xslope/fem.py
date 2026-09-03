@@ -4565,8 +4565,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # P4: the cold attempt's own step control, coarsened only when it is going to
         # be handed off anyway (see _NR_COLD_CHEAP). The correctors below take the
         # shipped control from _nr_kw.
+        # ... and only where there IS a hand-off. A ramp foot (_nr_export) has no
+        # predictor behind it — the ramp manages its own plastic history — so its
+        # cold solve keeps the shipped step control.
         _cold_kw = dict(_nr_kw)
-        if _NR_COLD_CHEAP:
+        if _NR_COLD_CHEAP and _nr_export is None:
             _cold_kw.update(nr_min_step=_NR_COLD_MIN_STEP,
                             nr_max_iter=_NR_COLD_MAX_ITER)
         _t_cold = time.perf_counter()

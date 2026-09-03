@@ -7842,3 +7842,154 @@ never the cold attempt: it is 91% rescue.
 On the slice this takes the Newton driver from 1.71x the viscoplastic driver's wall
 to **1.11x**. The slice is weighted toward the classes where Newton is worst, so what
 that ratio does on the whole corpus is a separate measurement and is below.
+
+### The full 191-row sweep, and where the slice was wrong
+
+The combined configuration was run on all 191 `fem_ssrm` tags, same harness, same
+eight workers, one model per process. **The cost is what the slice predicted.**
+
+| | Sweep 1 Newton | with P2+P3+P4 | ratio | viscoplastic | now / VP |
+|---|---|---|---|---|---|
+| wall (s) | 53,975 | **33,941** | 0.629 | 42,449 | **0.800** |
+| Newton force evaluations | 2,036,692 | 1,059,941 | 0.520 | | |
+| predictor iterations | 5,054,073 | 4,568,043 | **0.904** | | |
+| Newton iterations | 281,578 | 142,009 | 0.504 | | |
+| constitutive passes | 7,090,765 | 5,627,984 | 0.794 | 10,341,933 | 0.544 |
+| inconclusive trials | 0 | **0** | | 37 | |
+| rows faster than viscoplastic | 72 / 191 | **97 / 191** | | | |
+
+| class | rows | Sweep 1 N | now | VP | now / VP |
+|---|---|---|---|---|---|
+| vendor K0 + tension cap | 125 | 22,056 | 15,144 | 20,538 | 0.74 |
+| plain Mohr-Coulomb | 36 | 15,578 | 7,294 | 8,484 | **0.86** |
+| reinforced / piled | 11 | 9,015 | 4,822 | 6,250 | 0.77 |
+| K0, no cap | 18 | 5,181 | 5,399 | 4,824 | 1.12 |
+| tension cap, no K0 | 1 | 2,145 | 1,283 | 2,353 | 0.55 |
+
+The Newton driver runs the corpus in **80% of the viscoplastic driver's wall time**
+while still leaving zero trials undecided, and plain Mohr-Coulomb — the class that was
+1.8x SLOWER — comes in at 0.86x. Two of the criterion's three work clauses are met by
+these numbers. The third is not: predictor iterations fall 10% against the 50% asked
+for, because none of the three policies takes the predictor away from a trial near
+the answer, and that is where nearly all of it is spent.
+
+**And the configuration is rejected. Ten rows move by exactly one bisection cell.**
+Each of the ten was re-run with every policy off and then with one policy at a time,
+each in its own pool. The policies-off column reproduces the Sweep 1 Newton value on
+all ten, so the driver is repeating itself and the movements are the policies':
+
+| row | Sweep 1 | policies off | P2 | P3 | P4 | combined |
+|---|---|---|---|---|---|---|
+| `xslope_johnson_res` COMBO-1-ssrm | 1.238281 | 1.238281 | 1.238281 | **1.230469** | **1.230469** | 1.230469 |
+| `rs2_9` RS2-9 | 1.319531 | 1.319531 | 1.319531 | **1.308594** | 1.319531 | 1.308594 |
+| `rs2_28c` RS2-28c | 1.406250 | 1.406250 | 1.406250 | **1.393750** | **1.393750** | 1.393750 |
+| `vp040` RS2-30 | 1.023438 | 1.023438 | 1.023438 | 1.023438 | **1.007812** | 1.007812 |
+| `rs2_57b` RS2-57b | 1.413750 | 1.413750 | 1.413750 | **1.401250** | 1.413750 | 1.401250 |
+| `rs2_58b` RS2-58b | 1.078750 | 1.078750 | 1.078750 | 1.078750 | **1.066250** | 1.066250 |
+| `rs2_65` RS2-65-m3 | 1.306250 | 1.306250 | 1.306250 | **1.293750** | 1.306250 | 1.293750 |
+| `rs2_67b` RS2-67b | 1.710938 | 1.710938 | 1.710938 | **1.695312** | 1.710938 | 1.695312 |
+| `vp102a` RS2-P4-VP102 | 2.469531 | 2.469531 | 2.469531 | 2.469531 | **2.455469** | 2.455469 |
+| `xslope_torggler_3b_plate` | 1.742969 | 1.742969 | **1.696094** | 1.742969 | 1.742969 | 1.696094 |
+
+**P3 moves six rows, P4 five, P2 one. Every one of the three was bit-identical on all
+46 slice rows.**
+
+**P2's failure is exact and is the general lesson.** On `SSRM-TORGGLER` the adaptive
+rung carries the trial at F = 1.70000, and that trial sits at **0.500** initial-bracket
+widths above the standing bound. The slice's largest adaptive-rung conversion was at
+0.250, which is where the 0.30 threshold came from. The quantity P2 bounds — how far
+above a standing bound a rescue can still overturn a cold refusal — has a corpus
+maximum twice the slice's, and there is nothing in the mechanism that says 0.500 is
+the end of it either. **A threshold fitted to a sample of a corpus is not a property
+of the corpus**, and this is a cost policy whose whole safety argument was that fit.
+
+**P3's and P4's failures are the same failure seen twice.** Both remove work from the
+cold attempt — P3 the whole attempt on a model a seed has carried, P4 the fine end of
+its load-increment ladder — and on eleven rows between them a trial that only the full
+cold attempt reaches is lost, with no rung picking it up. The rescue chain is not a
+superset of the cold attempt: a seed grown by a bounded viscoplastic run reaches a
+different state, and on these rows it is the wrong one.
+
+### The criterion, line by line
+
+1. **Verdict bit-identity — FAILED.** Each of P2, P3 and P4 reproduced the Phase 0
+   baseline exactly on all 46 slice rows: same factor of safety, same final interval,
+   same verdict at the same strength for every trial, singly and combined. On the
+   full 191 each of them moves verdicts — six rows for P3, five for P4, one for P2,
+   ten between them. No policy is adopted.
+2. **The ramp within 0.01 on >= 95% — FAILED.** 41 of 46, or 89%. Three of the five
+   misses are refusals: two models whose foot the ramp cannot solve because it holds
+   the predictor off, and one whose bracket the ramp cannot expand upward.
+3. **Work — two of three clauses met, by a configuration that is rejected.** The
+   combined policy runs the corpus at 0.800x the viscoplastic driver's wall against
+   the "at or below" the criterion asked for, and plain Mohr-Coulomb at 0.86x against
+   the "no longer slower" it asked for. Predictor iterations fall 10%, not 50%.
+4. **Inconclusive trials: 0.** Met, on every configuration measured, including the
+   ramp. Nothing here trades the robustness away.
+5. **Locks — met.** `check_rescue_cost` holds that the policy ships off, that the
+   fixture still exercises the chain, that turning the policy on changes what the
+   driver spends and no verdict on that fixture, and that driving the threshold to
+   zero silences the chain, which is what says the knob is wired to it. A second
+   mutation sits inside `check_cohesionless_solve`, where the chain is decisive: with
+   the rung budget at zero, F = 1.3 on the cohesionless specimen must go back to
+   failing at the load-step floor. The default viscoplastic control is untouched.
+6. **The honest negative is the result**, and it is written above.
+
+### Verdict
+
+**No cost policy is adopted, and the reason is not that the savings are small.**
+
+The savings are large and they are measured: the three policies together run the
+whole 191-row corpus in 33,941 s against 53,975, which is 80% of the viscoplastic
+driver's own wall time, with plain Mohr-Coulomb at 0.86x where it had been 1.8x
+slower, 97 rows faster than the viscoplastic driver against 72, and not one trial
+left undecided. That is the Newton driver's cost problem solved, on the numbers.
+
+It is rejected because on ten of 191 rows it is a different driver. Each of the three
+policies passed verdict bit-identity on all 46 slice rows — 383 trials, six
+configurations, not one moved verdict — and each of them fails on the corpus. That
+gap between a slice and a corpus is the round's finding, and it has a mechanism
+rather than a moral: the quantity every one of these policies bounds is *how much
+work a trial at the convergence boundary needs*, and a boundary trial's need is not
+bounded by any sample of boundary trials. P2 assumed a rescue cannot overturn a cold
+refusal more than 0.30 bracket widths above a standing bound because the slice's
+maximum was 0.25; the corpus has one at 0.500. P3 and P4 assumed the rescue chain
+reaches everything the full cold attempt reaches; on eleven rows it does not.
+
+**What Phase 0 established stands, and is the reason a cheap policy is hard.** Half of
+the Newton driver's wall time goes into a rescue chain that confirms failures the
+cold attempt has already reached — 4,413 s of the slice's 8,774, firing on all 181
+failing trials and converting none of them. The adaptive rung alone is 32% of the
+wall for seven verdicts in 383 trials. And no cheap predicate separates the trials
+that need it: distance does not (conversions occur at every bisection depth), a
+budget cap does not (the conversions are the *expensive* predictor runs, median
+20,379 iterations against the failures' 2,001), and the cold attempt's own effort
+does not (a cap that keeps all 62 conversions still keeps 168 of the 181 failures).
+
+**The ramp is not the way out either, and that is a correction to this document.**
+The ramp round measured eight plain Mohr-Coulomb benchmarks and reported force
+evaluations lower on eight of eight and wall time below the viscoplastic driver on
+all eight. Across 46 rows drawn from every class it does 72% less constitutive work
+and takes **13% more wall time**, because its work is Newton tangent factorizations
+where the bisection's predictor work is pre-factorized viscoplastic iterations — and
+because it evaluates a median of 16 strengths where the bisection visits 8. It is
+faster exactly where the cold attempts are expensive (piled 0.53x, reinforced 0.57x,
+sub-unity 0.66x) and 1.5x to 2.3x slower on everything whose bisection is already
+cheap. It also loses three rows outright.
+
+**What would actually close this**, and it is a design rather than a threshold: make
+the cheap path a PRE-FILTER instead of a replacement. Run the coarse cold attempt,
+run the chain, and — before declaring a trial FAILED — run the full cold attempt that
+was skipped. That is verdict-safe by construction rather than by fit, because nothing
+is ever refused on less evidence than the driver refuses it on today. The cost is
+bounded and measurable from Phase 0: 2,787 s of the slice's 3,614 s of cold-attempt
+time is spent on trials that end FAILED, so a last-resort rule gives back about
+three quarters of what P3 and P4 save and keeps about a quarter. That is roughly a 5%
+saving, against the 35% a fitted threshold buys and cannot keep.
+
+Two smaller things belong in the record. The ramp's two defects are specific and
+fixable — its foot is a cold solve with the predictor held off, so it cannot start on
+a model only a seed carries, and it does not expand F_max upward. And the
+instrumentation this round added is worth keeping on its own: a Newton trial now
+reports its cold attempt, its predictor rungs and its seeded correctors separately,
+in the trial record, so the next attempt at this does not have to measure it again.

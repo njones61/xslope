@@ -2597,14 +2597,18 @@ def check_env_override_announces_itself():
 
 # The rescue chain's cost policy (SPIKE.md, "THE COST OF THE RESCUE"). Phase 0
 # attributed half the Newton driver's wall time to a chain that confirms failures the
-# cold attempt had already reached, so the chain is budgeted by how far a trial sits
-# above the highest strength the search has shown to stand. The two thresholds are
-# read off that measurement rather than chosen: across 383 trials no rung of any
-# length converted a verdict more than half the initial bracket above a standing
-# bound, and the adaptive rung -- the one that costs a whole viscoplastic solve --
-# never converted one more than a quarter above. They are written out here rather
-# than imported from the module, so the assertion holds the code instead of
-# following it.
+# cold attempt had already reached, and the policy budgets that chain by how far a
+# trial sits above the highest strength the search has shown to stand.
+#
+# THE POLICY SHIPS OFF, and these two numbers are NOT a safe setting. They are the
+# thresholds a 46-row slice supported -- on that slice no rung converted a verdict
+# more than half the initial bracket above a standing bound and the adaptive rung
+# never more than a quarter -- and the 191-row corpus falsified them: on
+# SSRM-TORGGLER the adaptive rung carries a trial at exactly half a bracket above the
+# bound, which a 0.30 threshold takes away, and the factor of safety moves by a whole
+# bisection cell. What this check holds is the MECHANISM: that the policy is off by
+# default, that it is wired to the chain, and that on this fixture it changes what
+# the driver spends and nothing else. It is not evidence that any threshold is safe.
 COST_ADAPTIVE_FRAC = 0.30
 COST_NONE_FRAC = 0.75
 
@@ -2638,15 +2642,15 @@ def _predictor_work(res):
 
 
 def check_rescue_cost(fem_data, base):
-    """The rescue chain is budgeted by distance, and the budget moves no verdict.
+    """The chain's cost policy is off, is wired, and on this fixture moves no verdict.
 
     The viscoplastic predictor is what makes the Newton driver decide every trial --
     across the 191-row corpus it left none inconclusive where the viscoplastic driver
     left 37 -- and it is also two thirds of the driver's constitutive work, because
     it runs on every trial that dies at the load-step floor and half of every
-    bisection does. What keeps both is a distance rule: a trial near the highest
-    strength the search has carried gets the whole chain; a trial far above it, which
-    the search is visiting only to prove a failure, gets less of it.
+    bisection does. Budgeting it by distance from the standing bound is the cheapest
+    way to keep both, and the corpus says no threshold measured so far is safe (see
+    COST_ADAPTIVE_FRAC above). So this locks the machinery rather than a setting.
 
     Four assertions, and the last two are what make the first two mean anything:
 
@@ -2654,9 +2658,9 @@ def check_rescue_cost(fem_data, base):
         value in SPIKE.md is defined on;
       * this fixture still exercises the chain -- a mesh on which the predictor never
         fired would pass everything below without testing any of it;
-      * at the measured thresholds the bisection returns the same factor of safety,
-        the same final interval and the same verdict for every trial at the same
-        strength, on strictly less predictor work;
+      * turning the policy on changes what the driver SPENDS and nothing else here:
+        the same factor of safety, the same final interval, the same verdict for
+        every trial at the same strength, on strictly less predictor work;
       * and the knob reaches the chain: drive the threshold to zero and no trial
         above a standing bound may be charged a predictor iteration. Without that, a
         rule quietly doing nothing would pass the identity test perfectly.

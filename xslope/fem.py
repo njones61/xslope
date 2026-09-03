@@ -104,6 +104,13 @@ _SSRM_RUN_RESULT_KEYS = ("failure_criterion", "method", "final_interval",
 # already has.
 _SSRM_RUN_OPTION_KEYS = ("tolerance", "F_min", "F_max", "ssr_exclude")
 
+# Per-trial keys that stay OUT of a meta sidecar: the Newton cost attribution added
+# for SPIKE.md's "THE COST OF THE RESCUE". They are how the answer was reached and
+# how long it took on one machine, not what the answer is.
+_SSRM_TRIAL_COST_KEYS = frozenset((
+    "wall", "bracket", "nr_cold_wall", "nr_cold_iterations", "nr_cold_force_evals",
+    "nr_rungs", "nr_cold_skipped"))
+
 
 def _jsonable(value):
     """``value`` as something :mod:`json` will write: numpy scalars become plain
@@ -143,8 +150,17 @@ def ssrm_run_record(result, fem_data=None, options=None):
     record = {}
     for key in _SSRM_RUN_RESULT_KEYS:
         value = (result or {}).get(key)
-        if value is not None:
-            record[key] = _jsonable(value)
+        if value is None:
+            continue
+        if key == "trials":
+            # The Newton driver's cost attribution (SPIKE.md, "THE COST OF THE
+            # RESCUE") is measurement, not a fact about the slope: wall times are
+            # machine-dependent and the rung breakdown is about how the answer was
+            # reached rather than what it is. A meta sidecar is a committed artifact,
+            # so it carries neither.
+            value = [{k: v for k, v in trial.items() if k not in _SSRM_TRIAL_COST_KEYS}
+                     for trial in value]
+        record[key] = _jsonable(value)
     for key in _SSRM_RUN_OPTION_KEYS:
         value = (options or {}).get(key)
         if value is not None and value != []:

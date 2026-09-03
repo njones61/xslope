@@ -7993,3 +7993,41 @@ a model only a seed carries, and it does not expand F_max upward. And the
 instrumentation this round added is worth keeping on its own: a Newton trial now
 reports its cold attempt, its predictor rungs and its seeded correctors separately,
 in the trial record, so the next attempt at this does not have to measure it again.
+
+### What this round left in the tree
+
+- **Per-trial cost attribution, always on and never read for a verdict.** A Newton
+  trial's record now carries its wall time, the standing bracket it was asked from,
+  and the split between the cold attempt, each predictor rung and each seeded
+  corrector. It is measurement, so it stays out of a saved run's meta sidecar —
+  `ssrm_run_record` strips it, and a regenerated sidecar is byte-identical to one
+  written before this round.
+- **Three cost knobs, all off.** `_NR_RESCUE_ADAPTIVE_FRAC` and
+  `_NR_RESCUE_NONE_FRAC` (None), `_NR_SEED_MEMORY` and `_NR_COLD_CHEAP` (False). With
+  them off every path is the code that was there, and the measurements above say what
+  each one buys and what it breaks.
+- **`check_rescue_cost`**, plus a rung-budget mutation inside
+  `check_cohesionless_solve`. Both mutations were verified to fail the check: shipping
+  the policy on raises the "does not ship off" failure, and neutering the rung budget
+  raises "the rung budget does not reach the chain" naming the three trials that still
+  ran the predictor.
+
+**Controls.** The whole of `test/nr_ssrm_check.py` passes. The default viscoplastic
+control — Griffiths & Lane 6 dry, quad8 at 2, no `fem_solver` argument, built by
+`run_tests.py`'s own `build_fem_ssrm_case` — returns **FS 2.421875** on per-trial
+iteration counts
+
+    147, 781, 3393, 2031, 2841, 9541, 16000, 8617, 8777
+
+value for value. On the Newton side the policies-off bisection reproduces the Sweep 1
+column exactly on every row it was re-run on, in four separate processes, so the
+identity test above is measuring the policies and not the harness.
+
+**Reproducing this.** Every measurement was made on the `nr-ssrm-spike` worktree with
+the worktree first on `sys.path` and `xslope.__file__` asserted under it, eight worker
+processes, one model per process, every numerical library pinned to a single thread,
+`capture_failure_state=False`, and each model built by `run_tests.py`'s own
+`build_fem_ssrm_case` so it carries the suite's mesh, bracket, tolerance, budget, K0,
+tension-SRF flag, SSR zone, depth filter and suction exactly. The compiled
+Mohr-Coulomb kernel is not built in this checkout, so everything ran the pure-NumPy
+reference path.

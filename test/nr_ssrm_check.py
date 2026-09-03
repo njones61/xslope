@@ -2749,7 +2749,9 @@ def main():
           "skin from ending a trial the deep mechanism carries, and the "
           "environment override cannot swap the driver in silence. The monotonic "
           "ramp reaches the same limit along one warm-started history, reports it "
-          "on the bisection's midpoint convention, and never solves past it.")
+          "on the bisection's midpoint convention, and never solves past it. The "
+          "rescue chain's cost policy ships off, is wired to the chain it budgets, "
+          "and where it is on it changes what the driver spends and no verdict.")
 
 
 if __name__ == '__main__':

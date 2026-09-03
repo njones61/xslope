@@ -181,6 +181,19 @@ VENDOR_T_CUT = {
         'Clay 4': 32.0,
         'Clay 5': 32.0,
     },
+    # RS2-25 — the Syncrude tailings dyke, vendor model 'slope stability #025.fez',
+    #   which states T: 0 on all five materials.
+    #   The file-number join missed this one for the same reason VENDOR_E_NU records
+    #   above: vp033 is named for its Slide2 problem number (VP33) while its vendor
+    #   model is RS2 #025, so the join looked at #033.fez — a different problem — and
+    #   correctly declined rather than transcribe the wrong constants.
+    'vp033.xlsx': {
+        'Tailing sand (TS)': 0.0,
+        'Glacio-fluvial sand (Pf4)': 0.0,
+        'Sandy till (Pgs)': 0.0,
+        'Clayey till (Pgc)': 0.0,
+        'Disturbed clay-shale (Kca)': 0.0,
+    },
     # RS2-26
     #   PARTIAL: this row is built from the manual tables, not the .fez. Only the
     #   two fills exist in the vendor model; the two c = 0 sands have no
@@ -314,6 +327,14 @@ VENDOR_T_CUT = {
     'vp084d.xlsx': {
         'Embankment': 0.0,
         'Foundation': 0.0,
+    },
+    # RS2-40 — vendor models 'slope stability #040_01/02.fez' state T: 0 on both
+    #   materials (C: 0 phi: 38 for the Shell, C: 0 phi: 20 for the Core).
+    #   vp077b is authored from the Slide2 manual's figures rather than from a .fez,
+    #   so the vendor-first pass never reached it.
+    'vp077b.xlsx': {
+        'Shell': 0.0,
+        'Core': 0.0,
     },
     # RS2-47
     'vp078.xlsx': {

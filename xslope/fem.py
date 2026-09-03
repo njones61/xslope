@@ -29,6 +29,46 @@ from .hoekbrown import hb_constants, hb_tangent_const
 from .units import require_gamma_water
 
 
+# ===================== Phase 0 profiling (SPIKE, "THE FACTORIZATION") ============
+# Timers only. Nothing here reads or writes solver state, so a profiled run and an
+# unprofiled one execute the same arithmetic in the same order and return the same
+# numbers — verified on the 13-row representative set, where a profiled Newton
+# bisection reproduces the Sweep 1 column value for value in factor of safety,
+# Newton iterations, force evaluations and predictor iterations. The only
+# difference is a perf_counter pair around six call sites, and it is off unless
+# XSLOPE_NR_PROFILE is set, so the shipped path pays one boolean per call.
+#
+# Keys are (phase -> seconds) plus (n_<phase> -> count):
+#   nr_assemble     the consistent tangent's bincount into the ready-made pattern
+#   nr_factorize    splu on it
+#   nr_trisolve     lu.solve for the Newton correction
+#   nr_const_tan    the constitutive pass that also differences the moduli
+#   nr_const_res    the residual-only constitutive pass at the top of an iteration
+#                   (an iteration that re-uses its factorization takes this instead)
+#   nr_linesearch   the line search's residual-only constitutive passes
+#   vp_const / vp_trisolve / vp_factorize   the same for the viscoplastic driver,
+#                   whose assembly and factorization are once per trial rather than
+#                   once per iteration
+_PROF_ON = bool(os.environ.get("XSLOPE_NR_PROFILE", "").strip())
+_PROF = {}
+
+
+def _prof_reset():
+    """Start a fresh accumulation. Read it back with :func:`_prof_read`."""
+    _PROF.clear()
+
+
+def _prof_read():
+    """A copy of the accumulated timers, safe to ship across a process boundary."""
+    return dict(_PROF)
+
+
+def _prof_add(key, t0, n=1):
+    _PROF[key] = _PROF.get(key, 0.0) + (time.perf_counter() - t0)
+    _PROF["n_" + key] = _PROF.get("n_" + key, 0) + n
+
+
+
 def _extract_nodal_uv(disp, fem_data):
     """Extract per-node translational displacements from a mixed-DOF vector."""
     dof_offset = fem_data.get("dof_offset", None)
@@ -3254,7 +3294,10 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     K_csr = K_csr.tocsr()
     K_free = K_csr[free_dofs][:, free_dofs]
     K_free.eliminate_zeros()
+    _tp = time.perf_counter() if _PROF_ON else None
     K_factor, K_factor_kind = _factorize_free_stiffness(K_free)
+    if _PROF_ON:
+        _prof_add("vp_factorize", _tp)
 
     if debug_level >= 1:
         print(f"  DOFs: {n_dof} total, {n_free} free, {len(constraint_dofs)} constrained")
@@ -5119,6 +5162,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     iteration -= 1          # the last iteration actually performed
                     break
             # Build body load correction from accumulated viscoplastic strains
+            _tp = time.perf_counter() if _PROF_ON else None
             loads = base_loads.copy()
 
             n_yielding = 0
@@ -5329,6 +5373,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 contrib = np.einsum('gij,gi->gj', Bg, s4[:, :3]) * wg[:, None]
                 np.add.at(loads, dofg.ravel(), contrib.ravel())
 
+            if _PROF_ON:
+                _prof_add("vp_const", _tp)
+
             # ---- 1D Truss element body-force corrections ----
             if has_1d_elements:
                 n_1d_compression = 0
@@ -5533,7 +5580,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
 
             # Solve K * u_new = loads
             loads_free = loads[free_dofs]
+            _tp = time.perf_counter() if _PROF_ON else None
             u_free_new = K_factor.solve(loads_free)
+            if _PROF_ON:
+                _prof_add("vp_trisolve", _tp)
 
             u_new = np.zeros(n_dof)
             u_new[free_dofs] = u_free_new
@@ -7959,9 +8009,12 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         # whole per-iteration expense, the return map is not. A step whose
         # residual stops falling by 4x per iteration gets a fresh tangent.
         reform = lu is None or prev_r is None or r_hist[-1] > 0.25 * prev_r
+        _tp = time.perf_counter() if _PROF_ON else None
         fint, tangents, _ = _nr_internal_force(groups, u_try, n_dof,
                                                h_eps=h_eps, want_tangent=reform,
                                                bars=bars, piles=piles)
+        if _PROF_ON:
+            _prof_add("nr_const_tan" if reform else "nr_const_res", _tp)
         n_fe += 1
         r = f_ext - fint
         r_free = r[free_dofs]
@@ -7989,15 +8042,25 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
             break                       # no progress: this load is unreachable
 
         if reform:
+            _tp = time.perf_counter() if _PROF_ON else None
             K = _nr_assemble_tangent(groups, tangents, pattern, bars=bars,
                                      piles=piles)
+            if _PROF_ON:
+                _prof_add("nr_assemble", _tp)
             if not _nr_tangent_factorable(K):
                 break                   # structurally singular = the limit load
+            _tp = time.perf_counter() if _PROF_ON else None
             try:
                 lu = splu(K)
             except RuntimeError:
                 break                   # singular tangent = the limit load
+            finally:
+                if _PROF_ON:
+                    _prof_add("nr_factorize", _tp)
+        _tp = time.perf_counter() if _PROF_ON else None
         du_free = lu.solve(r_free)
+        if _PROF_ON:
+            _prof_add("nr_trisolve", _tp)
         if not np.all(np.isfinite(du_free)):
             break
         du = np.zeros(n_dof)
@@ -8022,8 +8085,11 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
                  else max(float(np.linalg.norm(r_free)), 1e-30))
         for _ls in range(_NR_LS_MAX):
             cand = u_try + alpha * du
+            _tp = time.perf_counter() if _PROF_ON else None
             f_c, _, _ = _nr_internal_force(groups, cand, n_dof, bars=bars,
                                            piles=piles)
+            if _PROF_ON:
+                _prof_add("nr_linesearch", _tp)
             n_fe += 1
             rc_free = (f_ext - f_c)[free_dofs]
             rc = _merit(rc_free)

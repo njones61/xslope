@@ -8139,3 +8139,74 @@ priced it at about 5%.
 > 7. **An honest negative is a valid outcome and must be written.** If the driver is
 >    not factorization-bound, that is the finding, and it retires the compiled-kernel
 >    idea for this driver along with it.
+
+### THE FACTORIZATION — Phase 0, where an iteration's time goes
+
+Thirteen rows from the 191-tag enumeration, Newton driver, eight worker processes,
+one model per process, every numerical library pinned to a single thread,
+`capture_failure_state=False`, each model built by `run_tests.py`'s own
+`build_fem_ssrm_case`. The instrumentation is timers: the profiled run reproduces
+the Sweep 1 Newton column on all thirteen rows value for value — same factor of
+safety, same Newton iterations, same force evaluations, same predictor iterations —
+so what follows attributes the driver that is already measured and not a different
+one.
+
+Percentages are of the row's whole wall time, so the Newton columns and the
+predictor columns together are the trial. "Reform" is the share of Newton iterations
+that re-formed and re-factorized the tangent.
+
+| row | elements | wall (s) | assembly | factorization | solves | tangent pass | line search | predictor | predictor solve | reform |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `xslope_griffiths1` (162) | 387 | 27 | 10% | 24% | 1% | 8% | 24% | 21% | 4% | 96% |
+| `xslope_griffiths1` (161) | 387 | 40 | 10% | 25% | 1% | 8% | 26% | 19% | 4% | 97% |
+| `xslope_griffiths1` (160) | 466 | 95 | 9% | 29% | 1% | 5% | 13% | 30% | 7% | 96% |
+| `rs2_64b` (107) | 579 | 71 | 4% | 8% | 0% | 4% | 12% | 54% | 11% | 97% |
+| `xslope_griffiths6_dry` (185) | 738 | 321 | 8% | 29% | 1% | 4% | 10% | 28% | 10% | 95% |
+| `xslope_griffiths2` (163) | 1,010 | 532 | 9% | 36% | 2% | 3% | 9% | 22% | 10% | 94% |
+| `xslope_ssrm_embankment` (6) | 1,087 | 91 | 8% | 26% | 1% | 5% | 16% | 25% | 8% | 96% |
+| `hammah_hb1` (159) | 1,485 | 604 | 1% | 2% | 0% | 8% | 41% | 35% | 2% | 95% |
+| `xslope_piles` (9) | 1,521 | 282 | 10% | 36% | 2% | 7% | 23% | 10% | 4% | 96% |
+| `xslope_griffiths6_full` (186) | 1,671 | 210 | 10% | 29% | 1% | 5% | 21% | 20% | 6% | 96% |
+| `xslope_reinforced_slope` (7) | 2,101 | 530 | 8% | 36% | 1% | 4% | 16% | 19% | 7% | 96% |
+| `xslope_griffiths3_r0p8` (167) | 3,042 | 336 | 7% | 49% | 1% | 6% | 18% | 10% | 4% | 97% |
+| `rs2_65` (115) | 6,802 | 661 | 3% | 28% | 1% | 2% | 7% | 34% | 18% | 96% |
+| **all 13** | | **3,802** | **6%** | **28%** | **1%** | **5%** | **18%** | **25%** | **8%** | **96%** |
+
+**Newton's own work is 2,211 s of the 3,802: linear algebra 1,357 s (61%) and
+constitutive 854 s (39%).** The viscoplastic predictor is another 1,264 s, a third of
+the wall, and 9% is unattributed — the return-to-caller passes, the bracket
+bookkeeping, the mesh-derived setup each trial does once.
+
+**The tangent is re-formed on 96% of Newton iterations, and that is the finding.**
+The driver has re-used its factorization since the first spike commit —
+`_nr_equilibrate` holds the standing `splu` object while the residual keeps falling
+by four per iteration — and on 37,775 iterations across thirteen rows it held it
+1,563 times. The rule is not wrong; the premise under it is. A backtracking line
+search that accepts a fraction of the Newton step does not cut the residual by four,
+and the line search accepts a fraction on nearly every iteration: 264,000 force
+evaluations against 37,775 iterations is **seven line-search evaluations per
+iteration** on a search that is allowed nine. Two more iterations per load increment
+are unconditional — the first has no factorization and the second has no ratio yet —
+so an increment that converges in three iterations cannot re-use anything at all.
+The measured consequence is one triangular solve per factorization: **33 s of solves
+against 1,061 s of factorizations, a ratio of 32 to 1.**
+
+**Factorization is the largest single item at 28% of the wall, and it grows with the
+mesh.** Against the 61% average, linear algebra is 51% of Newton's own work at 387
+elements, 71% at 3,042 and 79% at 6,802 — a numeric factorization grows faster than
+linearly in the unknowns where a constitutive pass is linear in them. On the largest
+row in the set the tangent takes 196 ms to factorize and 4 ms to back-substitute.
+
+**Two rows are not that shape, and they say what the levers cannot reach.**
+`rs2_64b` spends 65% of its wall inside the viscoplastic predictor and 8% on
+factorization: nothing done to the Newton iteration touches it. `hammah_hb1` spends
+41% in the line search and 2% on factorization, because a Hoek-Brown Gauss point
+re-linearizes its envelope to self-consistency on every evaluation — up to sixty
+passes — so its constitutive pass costs what an ordinary model's factorization
+costs. **The curved-envelope class is constitutive-bound; every other class in the
+set is factorization-bound.**
+
+The answer to "where does a Newton iteration's time go" is therefore: **into
+building and factorizing a tangent that is thrown away one triangular solve later,
+on 96% of iterations, and increasingly so as the mesh grows.** That is what the
+levers below are measured against.

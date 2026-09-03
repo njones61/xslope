@@ -8680,3 +8680,76 @@ this branch, unchanged and selectable. Nothing is deleted.
 > 6. **SPIKE.md** carries this criterion, the design as built, the corpus table
 >    summary, and the list of locks that would move — for the owner's re-lock
 >    ruling. No lock, tag, verification page or doc is edited in this round.
+
+### THE CORRECTOR — the design as built
+
+`resolve_fem_solver` now answers with three names. `'auto'` is what `None` and an
+unset environment resolve to, and it is the viscoplastic loop with the corrector
+wired into it. `'viscoplastic'` is that loop with `_corrector_on` False, which is
+the function as it stood at `3740b710` — the switch is read once, at the top of
+`solve_fem`, and every line the corrector adds is behind it. `'newton'` still
+reaches the cold-start driver, its rescue chain, its ramp and its three cost knobs,
+none of which this round touched.
+
+The corrector itself is `_try_corrector`, a closure built where the trial's reduced
+strengths are: it takes the current displacement field and the Gauss-point plastic
+strains, copies them into `_solve_fem_newton` through `_nr_seed_state`, and lets
+that call's own `_one_shot` path make ONE attempt at full gravity. There is no load
+walk on this route and no cold start, because the seed has already walked the load
+path. The K0 in-situ state rides along as `_nr_init_state` exactly as the rescue
+chain passed it, so displacement is still measured from the in-situ datum; a post-
+peak set the loop has latched rides along as `_softened_seed`, so the corrector
+solves the constitutive law the seed was grown on rather than a stronger one.
+
+It is called from four places in the loop and one ladder:
+
+* `rule:inconclusive` and `rule:iteration_cap` — the budget block at the top of the
+  iteration, where the ceiling is reached or the budget-extension heuristic
+  declines;
+* `rule:runaway` — where `_early_failure` fires;
+* `rule:disp_limit` — where the displacement cap fires (off on the default SSRM
+  path, which passes `max_disp_factor=None`);
+* `vp300`, `vp1000`, `vp3000` — the checkpoint ladder, read at the foot of the
+  iteration on the state the loop has just accepted.
+
+A returned state ends the trial only if `converged` is true AND all three gates
+hold on the RESULT rather than on the record: the Dawson out-of-balance below
+`force_tol` at full gravity, `max_yield_violation` at or below
+`_CORRECTOR_YIELD_TOL`, and the translational displacement — the deep degrees of
+freedom where a `min_slip_depth` filter is in force — inside `_NR_DISP_FACTOR`
+times the model height. The first and third are `_solve_fem_newton`'s own refusals
+and are re-read here; the second is new, because that path only ever REPORTED it.
+Anything else, including an exception, is a refusal: the attempt is recorded, and
+control returns to the loop with nothing about its state changed. The corrector is
+handed a COPY of the displacement field and of every group's plastic strain, so a
+refused attempt cannot leave a mark on the iteration that continues.
+
+A certified trial returns `_solve_fem_newton`'s result dictionary — the bisection
+has consumed that shape since the first spike commit — with `corrector` attached:
+the checkpoint, the viscoplastic passes in the seed, the corrector's iterations and
+force evaluations, the three gate readings, the displacement as a fraction of the
+model height, and every attempt made along the way. `iterations` is the seed's
+passes PLUS the corrector's, so the trial is charged for the work that produced it.
+
+Two viscoplastic-side changes ride with it. The runaway classifier no longer ends a
+trial on its own — it triggers the corrector first — so a trial's displacement
+verdict is the 0.1 H bound on a converged state wherever the corrector reaches one.
+And `_yield_reading` puts the invariant-form admissibility reading on EVERY result
+on both drivers: the largest Mohr-Coulomb violation as a fraction of the local
+strength, the count of Gauss points above 1% of it, the Rankine half of the same
+reading, and a flag when a state called CONVERGED fails it. It is one pass over the
+Gauss points, it reads the same state the loop reports, and no verdict on any path
+consults it.
+
+What a saved meta sidecar carries is unchanged. The evidence record, the attempts
+and the yield reading are all in `_SSRM_TRIAL_COST_KEYS`, so `ssrm_run_record`
+strips them and a regenerated sidecar is byte-identical to one written before this
+round. Whether a certified edge should carry its evidence into the committed record
+is a question about the artifact rather than about the solver, and it is left open.
+
+One place is explicitly held out: `solve_ssrm`'s at-failure capture passes
+`_corrector=False`. That solve runs past the failure strength with the displacement
+cap and the early exit deliberately off so the mechanism develops for the figure. A
+corrector that certified an equilibrium there would replace the runaway field the
+figure exists to show, and nothing may read a factor of safety off that path
+anyway.

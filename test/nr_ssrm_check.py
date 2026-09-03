@@ -2766,7 +2766,8 @@ def check_factorization(fem_data):
 
     for name, want in (('_NR_REFORM_EVERY', None),
                        ('_NR_REFORM_RATIO', 0.25),
-                       ('_NR_FACTOR_SYMMETRIC', False)):
+                       ('_NR_FACTOR_SYMMETRIC', False),
+                       ('_NR_FACTOR_CACHED_ORDER', True)):
         got = getattr(_fem, name, '<not defined>')
         if got != want:
             fails.append(

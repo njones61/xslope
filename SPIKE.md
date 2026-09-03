@@ -8409,10 +8409,11 @@ errors and zero inconclusive trials.** The nine that differ are all `min_slip_de
 rows — `vp077b` at six depths, and `rs2_66a`, `rs2_66b` and `rs2_66d` — and they are
 the rows the depth-filter fix committed after that sweep already moved (`19b55e17`,
 "the depth filter reaches the verdict, not just the reading"); the cost round
-measured five of them moving for the same reason. Run against each other on the
-depth-filtered rows, the cached ordering and the plain `splu` call it replaces return
-the same factor of safety, the same interval, the same per-trial verdicts, the same
-iteration and force-evaluation counts and the same converged field.
+measured five of them moving for the same reason. Run against each other on **all
+eleven** `min_slip_depth` rows, the cached ordering and the plain `splu` call it
+replaces return the same factor of safety, the same interval, the same per-trial
+verdicts, the same iteration and force-evaluation counts and the same converged
+field — eleven of eleven — so the nine movements are the fix and not the ordering.
 
 The sweep's wall time is 61,528 s against Sweep 1's 53,975 s. That is not a
 measurement of L2a and is not read as one: the counts on the 182 unchanged rows are
@@ -8470,7 +8471,8 @@ above.
    iterations cuts the factorization count — the last being what makes the third mean
    anything. Three mutations were verified to fail it: shipping the symmetric mode on,
    returning a differently ordered factorization from the cached path, and a refresh
-   knob wired to nothing. The whole of `test/nr_ssrm_check.py` passes.
+   knob wired to nothing, and shipping the cached ordering off. The whole of
+   `test/nr_ssrm_check.py` passes.
 7. **The honest negative is the result**, and it is written below.
 
 ### Verdict

@@ -8574,3 +8574,109 @@ by `run_tests.py`'s own `build_fem_ssrm_case`. The compiled Mohr-Coulomb kernel 
 built in this checkout, so everything ran the pure-NumPy reference path. Rows are named
 by their index in the 191-tag enumeration, which is `parse_test_tags` over
 `sorted(glob('docs/**/*.md'))`.
+
+
+## THE CORRECTOR — Newton stops being a driver and becomes the finishing phase
+
+Written before any of it was built, so what follows is a test and not a description.
+
+### Why this one now
+
+An independent review of the whole spike (`newton_second_opinion_2026-09-03.md`)
+read the kernel, the drivers and every round above, and came back with one
+structural finding: the two drivers are not competitors, they are the two halves of
+one solver. The viscoplastic iteration is the globally robust, slowly convergent
+phase — the initial-stiffness mode every vendor ships as its safe path — and the
+Newton iteration is the locally quadratic finishing phase. The campaign only ever
+ran them in the wrong order: a cold Newton walk from zero stress first, and the
+viscoplastic predictor as a rescue after that walk had already failed, so the
+corrector's cost was always charged on top of the most expensive path there is.
+
+The review's probes ran them in the other order and beat both shipped drivers on
+every trial measured. The 50,000-iteration LEM-3 edge that this campaign was
+commissioned on — 241.8 s and INCONCLUSIVE on the viscoplastic driver — is decided
+with an admissible field in 4-5 s from a 300-pass seed. A near-limit standing trial
+on Griffiths & Lane 1 goes from 15.2 s to 0.8 s. A failing trial goes from 22.8 s
+(viscoplastic) and 37.6 s (Newton cold) to 3.6 s.
+
+So the cold load walk, the three-rung rescue chain, the ramp and the three cost
+knobs are the scaffolding around a driver that should not exist, and the kernel,
+the gates and the admissibility reading are the parts worth keeping. This round
+inverts the arrangement: the viscoplastic loop stays the driver and Newton becomes
+a bounded corrector called from inside it.
+
+### The design, before it is built
+
+Inside `solve_fem` on the DEFAULT path — a new `fem_solver` value `'auto'`, which
+`None` now resolves to — the viscoplastic loop runs exactly as it does today and
+builds the plastic history. At a short ladder of checkpoints (300, 1,000 and 3,000
+viscoplastic passes) and again wherever the loop would otherwise EXIT on a rule
+(the 50,000 ceiling, the budget-extension heuristic declining, the early-failure
+runaway classifier, the displacement limit), the current `(u, eps^p)` is handed to
+`_nr_equilibrate` through `_solve_fem_newton` for ONE bounded corrector attempt at
+full gravity and this trial's strengths. No load walk, no cold start, no rescue
+chain: the seed has already walked the load path.
+
+A ladder rather than a single seed is REQUIRED, not a convenience — the review
+measured a reinforced trial at F = 1.55 refused from a 100-pass seed and standing
+from a 300-pass one, so a refusal from one seed is not evidence about the slope.
+
+A corrector state ends the trial CONVERGED only if it converges AND passes three
+gates: the Dawson out-of-balance below `force_tol` at full gravity, the
+invariant-form yield violation at or below 1e-6 of the local strength — ASSERTED
+here, where today it is only reported — and the translational displacement bound,
+0.1 of the model height, read on the deep degrees of freedom where a
+`min_slip_depth` filter is in force. It carries an `evidence` record: which
+checkpoint, the corrector's iterations and force evaluations, the three gate
+readings, and `driver_of_record = 'corrector'`.
+
+A corrector refusal is NEVER a verdict. Control returns to the viscoplastic loop,
+which continues to its next checkpoint or to its own exit exactly as today. The
+hybrid can therefore never read LOWER than the shipped driver: it can only convert
+a rule-decided refusal into a certified stand.
+
+Two viscoplastic-side changes ride with it, both indicted by the review
+independently of any Newton work:
+
+1. `_EARLY_FAIL_U_MAX = 8.0` no longer decides a trial by itself. A runaway signal
+   triggers the corrector; only if the corrector refuses does the rule stand. The
+   displacement verdict on a certified trial is then the 0.1 H bound on a CONVERGED
+   state rather than a ratio threshold on an iterate.
+2. Every viscoplastic result carries the invariant-form yield reading — the largest
+   violation as a fraction of local strength and the count of Gauss points above 1%
+   of it — with a flag when a CONVERGED state fails it. One pass over the Gauss
+   points, no solve, never read for a verdict.
+
+`fem_solver='viscoplastic'` remains an escape hatch that is the pre-round loop, and
+`fem_solver='newton'` keeps the cold-walk driver, the ramp and the cost knobs on
+this branch, unchanged and selectable. Nothing is deleted.
+
+### Success criterion (verbatim)
+
+> 1. **FS.** On the full 191-row corpus (suite configuration through
+>    `build_fem_ssrm_case`, eight workers, incremental CSV) every factor of safety
+>    is either within its lock tolerance or HIGHER than the lock with a certified
+>    corrector edge — an evidence record present on the deciding trial. NO row
+>    reads lower than the shipped viscoplastic value by more than one bisection
+>    cell. Every row that moves is reported with its evidence.
+> 2. **Work.** Corpus wall at or below 0.6x the shipped viscoplastic driver's
+>    42,449 s on the same machine and settings, reported as a ratio and as
+>    per-class ratios. The 37 formerly INCONCLUSIVE viscoplastic trials decided in
+>    at most 5% of their former wall each. Inconclusive trials: zero.
+> 3. **The escape hatch is the shipped loop.** `fem_solver='viscoplastic'`
+>    reproduces the Sweep 1 viscoplastic column bit for bit — factor of safety and
+>    iteration count — on a 20-row sample spanning the corpus classes, and on the
+>    default control: Griffiths & Lane 6 dry, quad8 at 2, FS 2.421875 on per-trial
+>    iteration counts 147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777.
+> 4. **An honest negative is a valid outcome and must be written.** If fewer than
+>    half of the rule-decided viscoplastic refusals (ceiling, budget heuristic,
+>    runaway) convert under the corrector, that is the result and the round stops
+>    there.
+> 5. **Locks.** `test/nr_ssrm_check.py` gains `check_corrector`: a cheap case where
+>    the viscoplastic driver alone is inconclusive and the hybrid certifies it in
+>    seconds, the evidence record asserted rather than assumed, the escape hatch's
+>    bit-identity asserted, and a mutation that lets a corrector refusal decide a
+>    trial made to FAIL the check. The whole check passes.
+> 6. **SPIKE.md** carries this criterion, the design as built, the corpus table
+>    summary, and the list of locks that would move — for the owner's re-lock
+>    ruling. No lock, tag, verification page or doc is edited in this round.

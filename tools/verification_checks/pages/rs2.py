@@ -27,7 +27,7 @@ CONFIG = PageConfig(
         ('−1.7', 'case 4 (−1.7%) is the widest', '1.091', '1.11'),
         ('+2.7', 'all six within ±2.7%', '0.339', '0.33'),
         ('−1.3', 'which XSLOPE sits', '1.323', '1.34'),
-        ('+2.1', 'The same uncapped machinery is within 2.1%', '1.381', '1.41'),
+        ('+1.8', 'The same uncapped machinery is within 1.8%', '1.669', '1.64'),
         ('+3.5', 'baseline is within 3.5% at every frame', '1.987', '2.06'),
         ('+7.7', '| Ordinary (OMS) |', '1.568', '1.456'),
         ('+7.3', '| Bishop simplified |', '1.601', '1.492'),

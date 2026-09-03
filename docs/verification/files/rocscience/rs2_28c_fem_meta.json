@@ -1,12 +1,12 @@
 {
   "benchmark": "RS2-28c",
   "analysis": "ssrm",
-  "FS": 1.38125,
-  "expected_fs": "1.381",
+  "FS": 1.40625,
+  "expected_fs": "1.406",
   "file": "files/rocscience/rs2_28c.xlsx",
   "unit_system": "si",
-  "converged": false,
-  "iterations": 16000,
-  "residual": 4.3613864970045173e-07,
-  "max_displacement": 0.06625856569952976
+  "converged": true,
+  "iterations": 1057,
+  "residual": 1.5152087174068785e-06,
+  "max_displacement": 0.12675370534897884
 }

@@ -9404,3 +9404,80 @@ has its best seed.
 The corpus now takes 80% of the shipped driver's time, decides all but four of its
 formerly 35 undecided trials, and every one of its 42 changed rows carries either a
 certificate or a reading. What the published numbers should be is the owner's call.
+
+## HELD ROWS — producers needed
+
+Added 2026-09-03, during the application round that merged this branch to `main`.
+
+The re-lock campaign found a defect in the yield gate before it re-locked anything.
+The gate read each Gauss point's violation as a fraction of `c cos(phi) + |sigma_m|
+sin(phi)`, and both terms vanish together in a cohesionless material near a free
+surface, so the ratio there is round-off over round-off. The measurement that proves
+it is an equivalence: for a material with `c = 0`, `t_cut = 0` and no cap at all
+describe the same admissible set, and the verdict flipped between those two ways of
+writing the same surface — `rs2_65` read 0.677 with the vendor's `T = 0` present and
+1.219 with it removed. The strength scale now carries an absolute floor of 1e-4 of
+the model's own overburden (`_YIELD_ABS_FLOOR_FRAC`). Nine of the eleven rows the
+gate had brought down return to their locks exactly; `rs2_66c` and
+`xslope_noncircular_fem` stay condemned on readings that survive the floor, and the
+second of those passes its lock anyway.
+
+Two transcription gaps the source check found were also closed: `vp033` and `vp077b`
+now carry the `T = 0` their vendor models state. `vp077b`'s `RS2-40-d15` row returns
+to its 1.246 lock as a result.
+
+### Why rows are held rather than re-locked
+
+A verification section states measurements BESIDE its locked value that no tag covers
+— a mesh sweep, a depth-cutoff sweep, a variant transcription, a comparison run on
+the vendor's own mesh, a field reading taken at the critical strength. Those move
+with the answer. Where such a companion has no committed producer, re-locking the row
+alone would leave the section printing companions that no longer belong to the value
+beside them, and re-deriving one by reconstructing an undocumented procedure would be
+a guess presented as a measurement.
+
+So a row is re-locked only where every companion in its section is itself tagged,
+published by the source, or re-derivable from a procedure that can be stated exactly.
+Otherwise the row is pinned to the escape hatch with `solver=viscoplastic` in its tag
+— a keyword `build_fem_ssrm_case` reads — so the lock reproduces bit for bit and the
+page stays true to the driver it was measured on, until a producer exists and the
+section can be re-measured whole.
+
+### The held rows
+
+| page | rows | fresh value on `auto` | blocker | companions |
+|---|---|---|---|---|
+| rs2.md | RS2-40-d20, -d50, -d80, -deep | 1.418, 1.555, 1.555, 1.521 | the deep band's depth range at the critical strength, a field reading on a moved row | 1 |
+| rs2.md | RS2-66a-deep, -66b-deep, -66c-deep | 1.169, 1.169, 1.044 | four untagged tables and two sweeps, one run on vendor mesh files | ~40 |
+| rs2.md | RS2-64a, -b, -c, -d, -e | 5.189, 6.564, 4.807, 5.461, 5.620 | the results table mixes locked rows with reported-not-locked rows that move too | 7 |
+| rs2.md | RS2-26 | 2.294 | a no-tailwater variant run | 1 |
+| rs2.md | RS2-P4-VP64 | 2.394 | a crest tension-cutoff variant transcription | 1 |
+
+### RS2-40 — two conclusions invert, and that is the owner's call
+
+RS2-40's numbers are all tagged, so a producer for one field reading would release it.
+Two of its conclusions change under the hybrid driver, and neither is a wording
+problem. The depth sweep no longer plateaus at the 30 ft cutoff the tag pins: 20 ft
+reads 1.418, 30 ft 1.521, and 50 and 80 ft are bit-identical at 1.5554687500000002,
+so the tagged cutoff sits 2.2% BELOW the plateau where it used to sit 1.2% above it.
+By the plateau test the filter's own documentation prescribes, the deep-seated value
+is 1.555 and 30 ft is inside the band where the reading is still climbing. And the
+deep value is no longer mesh-independent: 1.521 at the tagged 12.4 ft mesh against
+1.487 at 8 ft, where both read 1.487 before. Whether the tag should move to a 50 ft
+cutoff is a modeling decision rather than a re-lock, and the owner ruled on 2026-09-03 that it
+stays at 30 ft: the trimmed section states that the deep answer settles at 50 ft, read off the
+tagged rows.
+
+### How the held rows are resolved
+
+The owner ruled on 2026-09-03 that they are resolved by TRIMMING rather than by writing producers,
+and set a standing rule for the verification pages: a section prints only numbers a test tag
+guards — the locked value, the source or vendor value, and the comparison between them. A
+companion measurement appears only if it carries its own tag, so the suite regenerates and defends
+it. Everything hand-typed and untagged is removed along with the prose that exists only to carry
+it. Each held row is then re-locked to its fresh `auto` value, its pin removed, its figure
+re-rendered and its page recertified. `rs2_66c` is re-locked to the lower value the yield gate
+gives it rather than held.
+
+`xslope_private/reports/relock_held_rows_2026-09-03.md` carries what each producer
+would have to compute.

@@ -1154,6 +1154,23 @@ def build_fem_ssrm_case(test):
     # Failures"). Absent -> the solver's None = filter off, the true global minimum.
     if 'min_slip_depth' in test:
         kwargs['min_slip_depth'] = float(test['min_slip_depth'])
+    # Pin the row to a per-trial driver: solver=viscoplastic runs the plain
+    # viscoplastic loop with no Newton corrector and no yield gate, which is how
+    # every lock on this corpus was produced before the corrector shipped. Absent
+    # -> the solver's own default, 'auto'.
+    #
+    # This exists for one situation and should not be reached for any other. A
+    # verification section states measurements BESIDE its locked value that no tag
+    # covers — a mesh sweep, a depth-cutoff sweep, a variant transcription, a
+    # comparison on the vendor's own mesh — and those move with the answer. Where
+    # such a companion has no committed producer, re-locking the row alone would
+    # leave the section printing companions that no longer belong to the value
+    # beside them. Pinning the row keeps the page true to the driver it was
+    # measured on, bit for bit, until a producer exists for its companions and the
+    # section can be re-measured whole. Every pinned row is listed with its blocker
+    # in SPIKE.md, "HELD ROWS — producers needed".
+    if 'solver' in test:
+        kwargs['fem_solver'] = str(test['solver']).strip()
     if 'char_x' in test and 'char_y' in test:
         kwargs['char_point'] = (float(test['char_x']), float(test['char_y']))
     # SSR-exclusion material names. Tags split on commas, so the material names

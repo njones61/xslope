@@ -19,7 +19,7 @@ from math import degrees, sin, cos, sqrt, asin, tan
 
 
 import numpy as np
-from scipy.sparse import csr_matrix, issparse
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, issparse
 from scipy.sparse.linalg import splu
 import shapely
 from shapely.geometry import LineString, Point, Polygon
@@ -27,6 +27,46 @@ from shapely.ops import unary_union
 
 from .hoekbrown import hb_constants, hb_tangent_const
 from .units import require_gamma_water
+
+
+# ===================== Phase 0 profiling (SPIKE, "THE FACTORIZATION") ============
+# Timers only. Nothing here reads or writes solver state, so a profiled run and an
+# unprofiled one execute the same arithmetic in the same order and return the same
+# numbers — verified on the 13-row representative set, where a profiled Newton
+# bisection reproduces the Sweep 1 column value for value in factor of safety,
+# Newton iterations, force evaluations and predictor iterations. The only
+# difference is a perf_counter pair around six call sites, and it is off unless
+# XSLOPE_NR_PROFILE is set, so the shipped path pays one boolean per call.
+#
+# Keys are (phase -> seconds) plus (n_<phase> -> count):
+#   nr_assemble     the consistent tangent's bincount into the ready-made pattern
+#   nr_factorize    splu on it
+#   nr_trisolve     lu.solve for the Newton correction
+#   nr_const_tan    the constitutive pass that also differences the moduli
+#   nr_const_res    the residual-only constitutive pass at the top of an iteration
+#                   (an iteration that re-uses its factorization takes this instead)
+#   nr_linesearch   the line search's residual-only constitutive passes
+#   vp_const / vp_trisolve / vp_factorize   the same for the viscoplastic driver,
+#                   whose assembly and factorization are once per trial rather than
+#                   once per iteration
+_PROF_ON = bool(os.environ.get("XSLOPE_NR_PROFILE", "").strip())
+_PROF = {}
+
+
+def _prof_reset():
+    """Start a fresh accumulation. Read it back with :func:`_prof_read`."""
+    _PROF.clear()
+
+
+def _prof_read():
+    """A copy of the accumulated timers, safe to ship across a process boundary."""
+    return dict(_PROF)
+
+
+def _prof_add(key, t0, n=1):
+    _PROF[key] = _PROF.get(key, 0.0) + (time.perf_counter() - t0)
+    _PROF["n_" + key] = _PROF.get("n_" + key, 0) + n
+
 
 
 def _extract_nodal_uv(disp, fem_data):
@@ -104,6 +144,20 @@ _SSRM_RUN_RESULT_KEYS = ("failure_criterion", "method", "final_interval",
 # already has.
 _SSRM_RUN_OPTION_KEYS = ("tolerance", "F_min", "F_max", "ssr_exclude")
 
+# Per-trial keys that stay OUT of a meta sidecar: the Newton cost attribution added
+# for SPIKE.md's "THE COST OF THE RESCUE". They are how the answer was reached and
+# how long it took on one machine, not what the answer is.
+_SSRM_TRIAL_COST_KEYS = frozenset((
+    "wall", "bracket", "nr_cold_wall", "nr_cold_iterations", "nr_cold_force_evals",
+    "nr_rungs", "nr_cold_skipped",
+    # ... and the corrector round's evidence and admissibility reading (SPIKE.md,
+    # "THE CORRECTOR"). They are held out of a committed sidecar for now so that a
+    # regenerated file is byte-identical to one written before this round; whether
+    # a certified edge should CARRY its evidence into the saved record is a
+    # decision about the artifact, not about the solver, and it is the owner's.
+    "corrector", "corrector_attempts", "max_yield_violation",
+    "n_yield_above_1pct", "yield_flagged", "gate_failed", "max_yield_at"))
+
 
 def _jsonable(value):
     """``value`` as something :mod:`json` will write: numpy scalars become plain
@@ -143,8 +197,17 @@ def ssrm_run_record(result, fem_data=None, options=None):
     record = {}
     for key in _SSRM_RUN_RESULT_KEYS:
         value = (result or {}).get(key)
-        if value is not None:
-            record[key] = _jsonable(value)
+        if value is None:
+            continue
+        if key == "trials":
+            # The Newton driver's cost attribution (SPIKE.md, "THE COST OF THE
+            # RESCUE") is measurement, not a fact about the slope: wall times are
+            # machine-dependent and the rung breakdown is about how the answer was
+            # reached rather than what it is. A meta sidecar is a committed artifact,
+            # so it carries neither.
+            value = [{k: v for k, v in trial.items() if k not in _SSRM_TRIAL_COST_KEYS}
+                     for trial in value]
+        record[key] = _jsonable(value)
     for key in _SSRM_RUN_OPTION_KEYS:
         value = (options or {}).get(key)
         if value is not None and value != []:
@@ -2874,6 +2937,38 @@ def _resolve_suction_by_elem(fem_data, suction_phi_b, suction_cap, element_mater
     return tanphib_by_elem, scap_by_elem, active
 
 
+def _suction_capped(u_signed_gp, scap):
+    """The suction credited at a Gauss point, before phi_b and the trial F.
+
+    Fredlund's ``s = max(0, -u_w)`` on the SIGNED pore pressure -- not the
+    clamped ``u >= 0`` the effective-normal term reads, since the whole point is
+    the negative pressure above the water table the clamp throws away -- bounded
+    by the material's ``s_cap`` (``inf`` = uncapped).
+
+    F-INDEPENDENT, which is why it is separated from the product below: the
+    Newton path caches it per group and re-forms only the ``tan(phi_b) * s / F``
+    factor when a ramp step changes the strength.
+    """
+    return np.minimum(np.maximum(-u_signed_gp, 0.0), scap)
+
+
+def _suction_apparent_cohesion(tanphib, s_capped, Finv):
+    """Fredlund's apparent cohesion at a Gauss point, reduced by the trial F.
+
+        c_suction,r = tan(phi_b) * min(max(0, -u_w), s_cap) / F
+
+    added to c' in the Mohr-Coulomb envelope. It IS divided by the trial strength,
+    alongside c' and tan(phi'), and by the same per-element factor -- so an
+    ssr_exclude element, whose F is 1.0, keeps its whole credit. That is what
+    distinguishes it from the tensile cap, which is reduced only when
+    ``tension_srf`` says so.
+
+    BOTH drivers call this, so the only thing a driver-against-driver comparison
+    can find is a plumbing difference: which field, which cap, which F.
+    """
+    return tanphib * s_capped * Finv
+
+
 # UNUSED (see solve_fem). Cormeau's limits are material-point bounds on the local
 # viscoplastic rate recurrence — they contain only E, nu and phi, and are element
 # INDEPENDENT, which is why Smith & Griffiths tabulate them per yield criterion
@@ -3206,7 +3301,10 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     K_csr = K_csr.tocsr()
     K_free = K_csr[free_dofs][:, free_dofs]
     K_free.eliminate_zeros()
+    _tp = time.perf_counter() if _PROF_ON else None
     K_factor, K_factor_kind = _factorize_free_stiffness(K_free)
+    if _PROF_ON:
+        _prof_add("vp_factorize", _tp)
 
     if debug_level >= 1:
         print(f"  DOFs: {n_dof} total, {n_free} free, {len(constraint_dofs)} constrained")
@@ -3534,6 +3632,8 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     g_node_den = np.maximum(g_node, _floor)
 
     _deep_free_mask = None
+    _deep_dof_mask = None
+    _skin_elem_mask = None
     if min_slip_depth is not None and float(min_slip_depth) > 0:
         _nd = fem_data.get("node_depth")
         if _nd is not None:
@@ -3545,6 +3645,27 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                     f"deepest lies {float(_nd_free.max()) if _nd_free.size else 0.0:.3g} "
                     f"below the ground surface. Reduce min_slip_depth, or check that a "
                     f"ground surface is defined.")
+            # The same filter, in the two other shapes a driver needs it in.
+            #
+            # `deep_dof_mask` carries it to the DEGREES OF FREEDOM: the x and y
+            # translations of every deep node that has at least one free one. The
+            # Newton path reads its residual norms and its displacement bound
+            # through this, so the skin the filter excludes cannot decide a verdict
+            # there either — see the note above _nr_equilibrate's merit.
+            _dn = np.flatnonzero(node_has_free)[_deep_free_mask]
+            _deep_dof_mask = np.zeros(n_dof, dtype=bool)
+            _deep_dof_mask[node_dof_x[_dn]] = True
+            _deep_dof_mask[node_dof_y[_dn]] = True
+            _deep_dof_mask &= free_dof_mask.astype(bool)
+            # `skin_elem_mask` carries it to the ELEMENTS, and an element counts as
+            # skin only when EVERY one of its nodes is shallower than the filter, so
+            # anything straddling the depth keeps the consistent tangent.
+            _nd_all = np.asarray(_nd, dtype=float)
+            _en = np.asarray(elements)[:, :]
+            _skin_elem_mask = np.zeros(n_elements, dtype=bool)
+            for _e in range(n_elements):
+                _ids = [int(_n) - 1 for _n in _en[_e] if int(_n) > 0]
+                _skin_elem_mask[_e] = bool(np.all(_nd_all[_ids] < float(min_slip_depth)))
 
     return {
         "K_factor": K_factor,
@@ -3570,6 +3691,8 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         "node_has_free": node_has_free,
         "g_node_den": g_node_den,
         "deep_free_mask": _deep_free_mask,
+        "deep_dof_mask": _deep_dof_mask,
+        "skin_elem_mask": _skin_elem_mask,
         "suction_active": suction_active,
         "suction_tanphib_by_elem": suction_tanphib_by_elem,
         "suction_scap_by_elem": suction_scap_by_elem,
@@ -3670,20 +3793,43 @@ _OOB_TREND_MIN = 0.01          # the later window must be this much lower (1%)
 # loop samples every `_HYBRID_SAMPLE_EVERY` iterations, and once it is unambiguous
 # there is nothing left to learn from the remaining iterations.
 #
-# What makes this safe is where the thresholds sit. Every candidate test was
-# measured pass-by-pass on 45 strength-reduction trials — 24 that reached
-# equilibrium and 21 that did not — drawn from five complete bisection walks on two
-# models (an embankment at two mesh sizes, a reinforced slope under two bar rules,
-# and one of those at a deliberately small budget). NEAR the critical strength the
-# two sides of the bracket are not separable: a trial that reaches equilibrium can
-# grow past five times its elastic response, sit with a flat residual for thousands
-# of iterations, and then converge. So the two tests below are placed OUTSIDE that
-# region entirely — at levels no trial that reached equilibrium was observed to
-# come near (the closest came within a factor of 3.0 of the first and 1.59 of the
-# second). They therefore catch only the gross runaways, about half of the failing
-# trials, and leave the near-critical ones to spend their budget as before. That is
-# the deliberate trade: the factor of safety is decided by the near-critical trials,
-# and nothing here is allowed to touch them.
+# The thresholds were calibrated pass-by-pass on 45 strength-reduction trials — 24
+# that reached equilibrium and 21 that did not — drawn from five complete bisection
+# walks on two models (an embankment at two mesh sizes, a reinforced slope under two
+# bar rules, and one of those at a deliberately small budget). NEAR the critical
+# strength the two sides of the bracket are not separable: a trial that reaches
+# equilibrium can grow past five times its elastic response, sit with a flat
+# residual for thousands of iterations, and then converge. The intent of the levels
+# below is therefore to sit OUTSIDE that region, catching only the gross runaways —
+# about half of the failing trials — and leaving the near-critical ones to spend
+# their budget as before.
+#
+# CORRECTED 2026-08-31. This comment used to state the margin as a fact about the
+# rule: that the levels sit where no trial that reached equilibrium was observed to
+# come near, "the closest came within a factor of 3.0 of the first and 1.59 of the
+# second". That is a property of the calibration set, not of the rule, and it does
+# not survive contact with a model outside it.
+#
+# Measured this session on Griffiths & Lane 1 at quad9, mesh size 3.5, force
+# tolerance 1e-3. The trial at F = 1.3875 is closed HERE as 'runaway', at 23,861
+# iterations, with max|u| at 8.0002 times its elastic response — the level, to four
+# figures. Re-run with early_failure=False and one 400,000-iteration budget, the
+# same trial on the same mesh reaches equilibrium: 72,580 iterations, out-of-balance
+# 9.998e-4 against the 1e-3 tolerance, max|u| = 0.5689 m on a 50 m model, which is
+# 1.14% of its height and 10.03 times the elastic response.
+#
+# So `u_max` = 8.0 does not sit outside the equilibrating trials' range on this
+# model; it sits INSIDE the displacement path of one of them, at 80% of where that
+# trial finally settles. The margin is not a factor of 3, it is negative, and the
+# rule has a demonstrated false-positive mode: it can close a trial that would have
+# stood. The two neighbours are closed the same way (F = 1.390625 at 15,231
+# iterations, F = 1.396875 at 9,241, both at 8.00 times elastic).
+#
+# The rule is left EXACTLY as calibrated. Every locked and published factor of
+# safety in this repository is defined by it, and moving it would move them; that is
+# the owner's call, not a comment's. What changes here is only the claim: this is a
+# threshold with a known false-positive mode near the critical strength, not a
+# threshold with a proven margin.
 #
 # Both are measured in the trial's OWN elastic displacement, so the rule carries to
 # any model and any mesh without retuning.
@@ -3885,6 +4031,167 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
     return 'AMBIGUOUS', u_ratio, growth
 
 
+# ===================== The Newton corrector (SPIKE; see SPIKE.md) ============
+#
+# The viscoplastic iteration is globally robust and slowly convergent; the Newton
+# iteration is locally quadratic and needs a developed plastic field to start from.
+# Run in that order on ONE trial they are two phases of one solver, and that is what
+# the default 'auto' path does: the viscoplastic loop drives, and at a few points
+# along it the current (u, eps^p) is handed to one bounded Newton attempt at FULL
+# gravity — no load walk, no cold start, because the seed has already walked the load
+# path.
+#
+# The checkpoints are a LADDER, not a single seed, and that is a measured
+# requirement rather than a convenience: a reinforced trial at F = 1.55 is refused
+# from a 100-pass seed and stands from a 300-pass one (newton_second_opinion_
+# 2026-09-03.md, appendix). One refusal says nothing about the slope, so a refusal
+# never decides anything here.
+_CORRECTOR_CHECKPOINTS = (300, 1000, 3000)
+# Which of the loop's own EXITS also get a corrector attempt, by `exit_reason`.
+#
+# All four, and that is a MEASURED answer rather than the default. The trim was built
+# and run: with this tuple cut to the runaway rule alone — the one exit the review
+# indicts on its own merits, since `_EARLY_FAIL_U_MAX` reads a displacement RATIO on
+# an ITERATE and closed a reinforced trial at u_ratio = 8.0000 that reaches
+# machine-precision equilibrium three percent of the model height away — the full
+# 191-row corpus gave up 772 s of corrector work, 2% of the run, and lost three rows
+# their certified move (RS2-4-zone, RS2-40-d20, RS2-66d-deep, all of which fell back
+# to the value the stopping rule had been holding them at). Corpus wall 34,907 s
+# against 35,104 s for the whole ladder, both against the viscoplastic driver's
+# 42,449 s.
+#
+# The cost is not in the ladder. A rung that is dropped does not stop being paid for:
+# its trials go back to the viscoplastic loop, which spends the passes the corrector
+# was standing in for. The three certified moves are worth more than 2% of a run, so
+# the ladder keeps every exit; SPIKE.md's "THE LADDER AND THE YIELD GATE" carries the
+# candidate ladders and their numbers.
+_CORRECTOR_RULE_EXITS = ('inconclusive', 'iteration_cap', 'runaway', 'disp_limit')
+# The yield gate, ASSERTED on a corrector state before it may end a trial. The
+# reading is the invariant-form Mohr-Coulomb function over every Gauss point as a
+# fraction of the local strength scale (see _solve_fem_newton's "the verdict's own
+# evidence"), which is an independent form of the surface the return map solves on.
+# Converged corrector states measure 1e-8 or better on it, so this is a fence and
+# not a tolerance being leaned on.
+_CORRECTOR_YIELD_TOL = 1e-6
+# The same gate, on a VISCOPLASTIC state that is about to be called CONVERGED.
+#
+# A converged state must be admissible. The force gate cannot see a yield violation —
+# the viscoplastic iteration is in force balance at every iteration, and what it
+# relaxes is yield — so a trial that settles in force with a Gauss point far outside
+# the surface is not a verdict about the slope, it is a verdict about the stopping
+# rule. A state that fails this gate is handed to the corrector; where the corrector
+# certifies an admissible field the trial stands on that, and where it refuses too the
+# trial is FAILED.
+#
+# The threshold is NOT `_CORRECTOR_YIELD_TOL`, and the reason is measured. Over the
+# 266 CONVERGED viscoplastic trials on the 191-row corpus the reading distributes:
+# 27% at or below 1e-6, 64% below 1e-4, 87% below 1e-2, and then a tail that runs to
+# 33 times the local strength. The 513 states the corrector certified on the same
+# corpus read 2.2e-8 at worst. That asymmetry is structural rather than incidental: a
+# Newton state is the solution of the equations this reading is taken from, while a
+# viscoplastic state approaches the surface from outside along the relaxation and
+# stops when the DISPLACEMENT increment falls below `tolerance` — its yield residual
+# is set by a displacement tolerance, not by a yield one. Holding it to 1e-6 would
+# condemn 193 of 266 states that are simply not finished relaxing.
+#
+# 1e-2 is where the population separates. Below it the readings are continuous and
+# dense — 39 trials in [3e-3, 1e-2) — and they are the relaxation's finite residual.
+# Above it they thin by an order of magnitude, 8 trials in [1e-2, 3e-2) and one in
+# [3e-2, 1e-1), before the tail; those are not residuals, they are unrelaxed yield. It
+# is also the threshold `_YIELD_FLAG_FRAC` already counts points against, so the gate
+# and the reading beside it say the same thing about the same state.
+_VP_YIELD_GATE = 1e-2
+# The count reported beside the reading: Gauss points whose violation exceeds 1% of
+# the local strength available there. A CONVERGED viscoplastic state with points over
+# this is FLAGGED — the force gate cannot see a yield violation, because the
+# viscoplastic iteration is in force balance at every iteration and what it relaxes
+# is yield.
+_YIELD_FLAG_FRAC = 0.01
+
+
+def _yield_reading(gp_groups, u, sq3=None):
+    """The invariant-form admissibility reading on a viscoplastic state.
+
+    Returns ``(max_violation, n_above_flag, max_tension_violation, worst)``: the
+    largest Mohr-Coulomb yield-function value over every Gauss point divided by that
+    point's own strength scale, how many points exceed ``_YIELD_FLAG_FRAC`` of it,
+    the same reading for the Rankine cap where one is finite (None where no point
+    carries a cap), and ``worst`` — the ``(element, gauss point)`` the largest
+    violation sits at, or None where nothing violates. A reading that condemns a
+    state has to say WHERE, or a reader cannot check it.
+
+    Same quantity, same normalization and same invariant form as the Newton path's
+    reading, computed here from the state the viscoplastic loop actually reports —
+    sigma = D (B u - eps^p) + sigma_0, with the pore pressure added back the way the
+    loop's own yield check adds it — so the two drivers' evidence is comparable
+    number for number. One pass over the Gauss points, no solve, and nothing here is
+    ever read for a verdict.
+    """
+    if sq3 is None:
+        sq3 = np.sqrt(3.0)
+    max_viol = 0.0
+    n_above = 0
+    max_tens = None
+    worst = None
+    for grp in gp_groups:
+        Bg, D4g, dofg, evpg = grp['B'], grp['D4'], grp['dof'], grp['evp']
+        eps = np.einsum('gij,gj->gi', Bg, u[dofg])
+        eps4 = np.empty((len(grp['w']), 4))
+        eps4[:, :3] = eps - evpg[:, :3]
+        eps4[:, 3] = -evpg[:, 3]
+        sig4 = np.einsum('gij,gj->gi', D4g, eps4)
+        _sig0 = grp.get('sig0')
+        if _sig0 is not None:
+            sig4 = sig4 + _sig0
+        sig = sig4.copy()
+        sig[:, [0, 1, 3]] += grp['u_gp'][:, None]
+        sx, sy, txy, sz = sig.T
+        sigm = (sx + sy + sz) / 3.0
+        dsbar = np.sqrt(((sx - sy) ** 2 + (sy - sz) ** 2 + (sz - sx) ** 2
+                         + 6.0 * txy ** 2) / 2.0)
+        dxv, dyv, dzv = sx - sigm, sy - sigm, sz - sigm
+        ds3 = np.maximum(dsbar, 1e-10) ** 3
+        sine = np.clip(np.where(dsbar > 1e-10,
+                                -13.5 * (dxv * dyv * dzv - dzv * txy ** 2) / ds3,
+                                0.0), -1.0, 1.0)
+        th = np.arcsin(sine) / 3.0
+        _c_suc = grp.get('c_suc_r')
+        c_env = grp['c_r'] if _c_suc is None else grp['c_r'] + _c_suc
+        fv = (sigm * grp['snph']
+              + dsbar * (np.cos(th) / sq3 - np.sin(th) * grp['snph'] / 3.0)
+              - c_env * grp['csph'])
+        den = c_env * grp['csph'] + np.abs(sigm) * grp['snph']
+        ok = np.isfinite(den) & (den > 0.0)
+        if grp.get('has_elastic'):
+            # A material held linear elastic has no yield surface to violate.
+            ok = ok & ~grp['elastic']
+        if np.any(ok):
+            idx = np.flatnonzero(ok)
+            ratio = fv[ok] / den[ok]
+            _k = int(np.argmax(ratio))
+            if float(ratio[_k]) > max_viol:
+                max_viol = float(ratio[_k])
+                worst = tuple(int(x) for x in grp['pairs'][int(idx[_k])])
+            n_above += int(np.count_nonzero(ratio > _YIELD_FLAG_FRAC))
+        _tc = grp.get('t_cap')
+        if _tc is not None:
+            m = np.isfinite(_tc) & ok
+            if np.any(m):
+                ctr = 0.5 * (sx + sy)
+                rad = np.sqrt((0.5 * (sx - sy)) ** 2 + txy ** 2)
+                s1 = np.maximum(ctr + rad, sz)
+                _tr = (s1[m] - _tc[m]) / den[m]
+                _j = int(np.argmax(_tr))
+                tv = float(_tr[_j])
+                if tv > max_viol:
+                    worst = tuple(int(x) for x in
+                                  grp['pairs'][int(np.flatnonzero(m)[_j])])
+                max_tens = tv if max_tens is None else max(max_tens, tv)
+    if max_tens is not None:
+        max_viol = max(max_viol, max_tens)
+    return max_viol, n_above, max_tens, worst
+
+
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, dt_scale=1.0,
               force_tol=1e-3, oob_window=10,
@@ -3894,7 +4201,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               suction_phi_b=None, suction_cap=None, _prepared=None,
               fast_kernel='auto', failure_criterion="hybrid", k0=None,
               max_iterations_ceiling=50000, early_failure=True, _init_state=None,
-              _softened_seed=None):
+              _softened_seed=None, fem_solver=None, _nr_export=None,
+              _nr_rescue_rungs=None, _nr_seed_first=False, _corrector=True):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -3941,6 +4249,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             exit_reason 'inconclusive' - neither converged nor failed - and
             solve_ssrm reports it as the bracket's upper uncertainty rather than
             counting it as a failure.
+        fem_solver (str or None): Which per-trial driver runs — 'auto' (the
+            default: the viscoplastic loop with the Newton corrector called from
+            inside it), 'viscoplastic' (that loop alone, with no corrector) or
+            'newton' (the spike's cold-start Newton driver). None falls through to
+            the XSLOPE_FEM_SOLVER environment variable and then to 'auto'. See
+            resolve_fem_solver and SPIKE.md, "THE CORRECTOR".
         early_failure (bool): End a trial as soon as its movement is unambiguously
             running away, rather than spending the rest of its budget proving it
             (default True). exit_reason 'diverging', which the bisection reads as
@@ -4416,6 +4730,320 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         _red = np.isfinite(t_cap_by_elem) & (t_cap_by_elem > 0.0)
         t_cap_by_elem[_red] = t_cap_by_elem[_red] / F_by_elem[_red]
 
+    # ---- Solver switch (INTERNAL, spike; see SPIKE.md) ----------------------
+    # The only place fem_solver is read. 'viscoplastic' falls straight through and
+    # the rest of this function is the loop exactly as it stood before the corrector
+    # round — the definition of every factor of safety locked up to it. 'auto', the
+    # default, runs that same loop with the Newton CORRECTOR called from inside it
+    # (see "The Newton corrector" below and SPIKE.md, "THE CORRECTOR"). 'newton'
+    # hands the trial to the cold-start Newton-Raphson driver, which returns the
+    # same result dictionary.
+    _solver = resolve_fem_solver(fem_solver)
+    if _solver == 'newton':
+        if _nr_export is not None:
+            # The ramp driver (see _ssrm_ramp_newton) continues ONE solve across
+            # strength steps, so it needs the working state this call is about to
+            # build and a way to re-reduce the strengths in place. Only the ramp
+            # passes this; every other caller leaves it None and nothing here runs.
+            def _restrength(groups, F_new):
+                Fb = np.full(n_elements, float(F_new))
+                if ssr_exclude_mask is not None:
+                    Fb[np.asarray(ssr_exclude_mask, dtype=bool)] = 1.0
+                c_r_new = c_by_elem / Fb
+                phi_r_new = np.arctan(np.tan(np.radians(phi_by_elem)) / Fb)
+                # The tensile cap is reduced with the shear strength when
+                # `tension_srf` is on, exactly as it is in the per-trial code
+                # above. Without this the ramp would carry the cap the FOOT was
+                # solved at all the way up, so the strength being reduced would
+                # not be the whole envelope the setting says it is.
+                tc_new = prep["t_cap_base"]
+                if tension_srf:
+                    tc_new = tc_new.copy()
+                    _rr = np.isfinite(tc_new) & (tc_new > 0.0)
+                    tc_new[_rr] = tc_new[_rr] / Fb[_rr]
+                for grp in groups:
+                    e = grp['e_idx']
+                    cc = c_r_new[e]
+                    if 'elastic' in grp:
+                        cc = cc.copy()
+                        cc[grp['elastic']] = np.inf
+                    grp['c_r'] = cc
+                    grp['snph'] = np.sin(phi_r_new[e])
+                    grp['csph'] = np.cos(phi_r_new[e])
+                    # The matric-suction apparent cohesion is re-derived at the
+                    # new strength for the same reason the tensile cap is: it
+                    # scales as 1/F, so a ramp carrying the FOOT's credit up the
+                    # whole ramp would be reducing only part of the envelope. The
+                    # capped suction itself is F-independent and stays cached.
+                    _nr_group_apparent_cohesion(grp, 1.0 / Fb)
+                    _nr_group_tension_cap(grp, tc_new)
+                    # A curved envelope is reduced on its TANGENT, which is
+                    # re-derived at every evaluation, so what has to be carried
+                    # forward is the per-element F the linearization divides by.
+                    # Without this the ramp would linearize the whole way up at
+                    # the strength its foot was solved at.
+                    _nr_group_restrength_envelope(grp, Fb)
+                    grp.pop('_env_seed', None)
+            _nr_export['restrength'] = _restrength
+        _nr_kw = dict(
+            c_reduced=c_reduced, phi_reduced=phi_reduced,
+            elastic_by_elem=elastic_by_elem, t_cap_by_elem=t_cap_by_elem,
+            finv_by_elem=1.0 / F_by_elem, _nr_env_F=F_by_elem,
+            force_tol=force_tol,
+            min_slip_depth=min_slip_depth, max_iterations=max_iterations,
+            max_disp_factor=max_disp_factor, _nr_export=_nr_export,
+            k0=k0, _nr_init_state=_init_state,
+            debug_level=debug_level, progress_callback=progress_callback)
+        # P3: on a model already known to be carried only from a seed, the cold
+        # attempt is skipped and the chain starts at the first rung (see
+        # _NR_SEED_MEMORY). The seed-first path is never taken by the ramp, which
+        # manages its own history.
+        _seed_first = bool(_nr_seed_first) and _nr_export is None
+        # P4: the cold attempt's own step control, coarsened only when it is going to
+        # be handed off anyway (see _NR_COLD_CHEAP). The correctors below take the
+        # shipped control from _nr_kw.
+        # ... and only where there IS a hand-off. A ramp foot (_nr_export) has no
+        # predictor behind it — the ramp manages its own plastic history — so its
+        # cold solve keeps the shipped step control.
+        _cold_kw = dict(_nr_kw)
+        if _NR_COLD_CHEAP and _nr_export is None:
+            _cold_kw.update(nr_min_step=_NR_COLD_MIN_STEP,
+                            nr_max_iter=_NR_COLD_MAX_ITER)
+        _t_cold = time.perf_counter()
+        _sol = (None if _seed_first
+                else _solve_fem_newton(fem_data, F, prep, **_cold_kw))
+        if _sol is None:
+            _sol = {"converged": False, "exit_reason": 'diverging', "iterations": 0,
+                    "nr_force_evals": 0, "nr_predictor_iterations": 0,
+                    "softened_1d_elements": None, "_nr_cold_skipped": True}
+        # Cost attribution, bookkeeping only (see SPIKE.md, "THE COST OF THE RESCUE").
+        # Nothing below is ever read for a verdict; it exists so a trial's wall time
+        # can be split between the cold attempt, the predictor rungs and the seeded
+        # correctors without re-deriving it from a log.
+        _sol["nr_cold_wall"] = time.perf_counter() - _t_cold
+        _sol["nr_cold_iterations"] = int(_sol.get("iterations", 0) or 0)
+        _sol["nr_cold_force_evals"] = int(_sol.get("nr_force_evals", 0) or 0)
+        _sol["nr_rungs"] = []
+        # The viscoplastic predictor (see _NR_VP_PREDICTOR_ITERS). Only a trial that
+        # died at the LOAD-STEP FLOOR is retried — a trial that reached full gravity
+        # and was refused on force or on displacement has an answer already, and
+        # re-deriving it from a different starting state would be re-litigating a
+        # verdict rather than reaching one.
+        if (_nr_export is None and not _sol["converged"]
+                and _sol.get("exit_reason") == 'diverging'):
+            # The post-peak set the failed attempt had reached, so both the seed and
+            # the corrector that reads it are built on the same constitutive law. A
+            # seed grown with every bar at its peak would be a different model.
+            _soft_seed = _sol.get("softened_1d_elements", None)
+            if _soft_seed is not None and not np.any(_soft_seed):
+                _soft_seed = None
+            _cold_rec = dict(wall=_sol["nr_cold_wall"],
+                             iterations=_sol["nr_cold_iterations"],
+                             force_evals=_sol["nr_cold_force_evals"],
+                             rungs=[])
+            _rungs = _nr_predictor_rungs(
+                prep, n_elements, max_iterations, max_iterations_ceiling,
+                early_failure)
+            if _nr_rescue_rungs is not None:
+                # P2: a trial far above a standing bound gets a truncated chain. A
+                # seed-first trial (P3) has no cold attempt to fall back on, so it
+                # always keeps at least one rung — a trial with no attempt at all
+                # would be a verdict nothing measured.
+                _keep = int(_nr_rescue_rungs)
+                if _seed_first:
+                    _keep = max(_keep, 1)
+                _rungs = _rungs[:max(0, _keep)]
+            for (_chunk, _ceiling, _prep_seed,
+                 _pred_early_failure) in _rungs:
+                _t_pred = time.perf_counter()
+                _vp = solve_fem(
+                    fem_data, F=F, debug_level=0, max_iterations=_chunk,
+                    _softened_seed=_soft_seed,
+                    tolerance=tolerance, max_disp_factor=None,
+                    tension_cutoff=tension_cutoff,
+                    dt_scale=dt_scale,
+                    force_tol=force_tol, oob_window=oob_window,
+                    early_exit=early_exit, min_slip_depth=min_slip_depth,
+                    ssr_exclude_mask=ssr_exclude_mask,
+                    tension_cap_by_elem=tension_cap_by_elem,
+                    tension_srf=tension_srf, elastic_mask=elastic_mask,
+                    suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                    _prepared=_prep_seed, fast_kernel=fast_kernel,
+                    failure_criterion=failure_criterion,
+                    max_iterations_ceiling=_ceiling,
+                    early_failure=_pred_early_failure,
+                    k0=k0, _init_state=_init_state,
+                    fem_solver='viscoplastic')
+                _pred_wall = time.perf_counter() - _t_pred
+                # On a K0 model the predictor's reported displacement is measured
+                # from the in-situ datum, so the seed is read off its `_k0_state`,
+                # which carries the ABSOLUTE field and the plastic strain in this
+                # prepared model's own group order. Without K0 the reported
+                # displacement IS the absolute one and the legacy per-element form
+                # is used unchanged, which is what keeps that path bit-identical.
+                _seed_kw = (dict(_nr_seed_state=_vp["_k0_state"]) if k0 is not None
+                            else dict(_nr_seed=(_vp["displacements"],
+                                                _vp["plastic_strains"])))
+                # The predictor is allowed to have latched further than the cold
+                # attempt did; the corrector takes whichever set the seed was
+                # actually grown on, and its own latch continues from there.
+                _vp_soft = _vp.get("softened_1d_elements", None)
+                if _vp_soft is not None and np.any(_vp_soft):
+                    _seed_kw['_softened_seed'] = _vp_soft
+                elif _soft_seed is not None:
+                    _seed_kw['_softened_seed'] = _soft_seed
+                _t_seed = time.perf_counter()
+                _retry = _solve_fem_newton(fem_data, F, prep, **_seed_kw, **_nr_kw)
+                _seed_wall = time.perf_counter() - _t_seed
+                _cold_rec['rungs'].append(dict(
+                    chunk=int(_chunk),
+                    pred_iterations=int(_vp.get("iterations", 0) or 0),
+                    pred_wall=_pred_wall,
+                    seed_iterations=int(_retry.get("iterations", 0) or 0),
+                    seed_force_evals=int(_retry.get("nr_force_evals", 0) or 0),
+                    seed_wall=_seed_wall,
+                    converged=bool(_retry.get("converged", False))))
+                # Work is CUMULATIVE: the failed cold attempt, every predictor run
+                # and every corrector are all charged to this trial, so no cost is
+                # hidden by the retry succeeding.
+                _retry["iterations"] += _sol["iterations"]
+                _retry["nr_force_evals"] += _sol["nr_force_evals"]
+                _retry["nr_predictor_iterations"] = (
+                    _sol.get("nr_predictor_iterations", 0)
+                    + int(_vp.get("iterations", 0)))
+                _sol = _retry
+                if _sol["converged"]:
+                    break
+            _sol["nr_cold_wall"] = _cold_rec['wall']
+            _sol["nr_cold_iterations"] = _cold_rec['iterations']
+            _sol["nr_cold_force_evals"] = _cold_rec['force_evals']
+            _sol["nr_rungs"] = _cold_rec['rungs']
+        # L4: the coarse attempt was a PRE-FILTER, so the trial does not get to fail
+        # on it. The full cold attempt the shipped driver would have made runs here,
+        # from zero, on the shipped step control, and its work is charged to this
+        # trial like every other attempt.
+        if (_NR_COLD_FALLBACK and _NR_COLD_CHEAP and _nr_export is None
+                and not _sol["converged"] and not _seed_first):
+            _t_full = time.perf_counter()
+            _full = _solve_fem_newton(fem_data, F, prep, **_nr_kw)
+            _full["iterations"] += _sol["iterations"]
+            _full["nr_force_evals"] += _sol["nr_force_evals"]
+            _full["nr_predictor_iterations"] = _sol.get("nr_predictor_iterations", 0)
+            _full["nr_cold_wall"] = (_sol.get("nr_cold_wall", 0.0)
+                                     + time.perf_counter() - _t_full)
+            _full["nr_rungs"] = _sol.get("nr_rungs", [])
+            _sol = _full
+        return _sol
+
+    # ---- The Newton corrector, on the default 'auto' path -------------------
+    # Everything the corrector needs is fixed by the time the strengths above are
+    # reduced, so the call arguments are built once here and only the STATE changes
+    # at each attempt. `_corrector_on` is the whole switch: with it False this
+    # function is the loop exactly as it was before this round, which is what
+    # fem_solver='viscoplastic' selects.
+    _corrector_on = (_solver == 'auto') and bool(_corrector)
+    _corr_attempts = []
+    _corr_nr_kw = None
+    if _corrector_on:
+        _corr_nr_kw = dict(
+            c_reduced=c_reduced, phi_reduced=phi_reduced,
+            elastic_by_elem=elastic_by_elem, t_cap_by_elem=t_cap_by_elem,
+            finv_by_elem=1.0 / F_by_elem, _nr_env_F=F_by_elem,
+            force_tol=force_tol, min_slip_depth=min_slip_depth,
+            max_iterations=max_iterations, max_disp_factor=max_disp_factor,
+            k0=k0, _nr_init_state=_init_state,
+            debug_level=max(0, debug_level - 1))
+
+    def _try_corrector(u_now, groups_now, where, vp_iterations, softened_now=None):
+        """One bounded Newton attempt at full gravity from the current state.
+
+        Returns the corrector's own result dictionary when the state it reaches
+        CONVERGES and passes all three gates, and ``None`` otherwise. A ``None`` is
+        not a verdict about anything: the caller returns to the viscoplastic loop,
+        which continues exactly as it would have.
+
+        The gates are asserted here rather than trusted. `_solve_fem_newton` already
+        refuses a state that misses the Dawson force tolerance at full gravity or
+        travels past the displacement bound, and both are re-read from its result;
+        what it only REPORTS is the invariant-form yield violation, and a corrector
+        state may not end a trial while any Gauss point sits more than
+        `_CORRECTOR_YIELD_TOL` of its own strength outside the surface.
+
+        Any exception from the corrector is a refusal and nothing more — a model the
+        Newton path cannot carry must fall back to the viscoplastic verdict rather
+        than lose its trial to a traceback.
+        """
+        _t0 = time.perf_counter()
+        _seed = {"u": np.asarray(u_now, dtype=float).copy(),
+                 "evp": [g['evp'].copy() for g in groups_now]}
+        _kw = dict(_corr_nr_kw)
+        if softened_now is not None and np.any(softened_now):
+            _kw['_softened_seed'] = softened_now
+        try:
+            _sol = _solve_fem_newton(fem_data, F, prep, _nr_seed_state=_seed, **_kw)
+        except Exception as _exc:      # KeyboardInterrupt is a BaseException
+            _corr_attempts.append(dict(
+                at=where, vp_iterations=int(vp_iterations), certified=False,
+                refusal=f"{type(_exc).__name__}: {_exc}"[:200],
+                wall=time.perf_counter() - _t0))
+            return None
+        _wall = time.perf_counter() - _t0
+        _oob = float(_sol.get("unbalanced_force_ratio", np.inf))
+        _yv = float(_sol.get("nr_max_yield_violation", np.inf))
+        _dl = _sol.get("nr_disp_limit")
+        _dd = _sol.get("nr_max_disp_deep")
+        _gate_force = bool(_sol.get("converged")) and _oob < force_tol
+        _gate_yield = _yv <= _CORRECTOR_YIELD_TOL
+        _gate_disp = (_dl is None or (_dd is not None and _dd <= _dl))
+        _certified = bool(_sol.get("converged")) and _gate_force and _gate_yield \
+            and _gate_disp
+        _rec = dict(
+            at=where, vp_iterations=int(vp_iterations), certified=_certified,
+            nr_iterations=int(_sol.get("iterations", 0) or 0),
+            nr_force_evals=int(_sol.get("nr_force_evals", 0) or 0),
+            exit_reason=str(_sol.get("exit_reason", "")),
+            oob=_oob, yield_violation=_yv,
+            max_disp_deep=(None if _dd is None else float(_dd)),
+            disp_limit=(None if _dl is None else float(_dl)),
+            wall=_wall)
+        _corr_attempts.append(_rec)
+        if debug_level >= 1:
+            print(f"  Newton corrector at {where} ({vp_iterations} viscoplastic "
+                  f"passes): "
+                  + ("CERTIFIED" if _certified else
+                     f"refused ({_sol.get('exit_reason')})")
+                  + f" — {_rec['nr_iterations']} Newton iteration(s), "
+                    f"out-of-balance {_oob:.2e}, worst yield {_yv:.2e}, "
+                    f"{_wall:.2f} s")
+        if not _certified:
+            return None
+        # Work is CUMULATIVE: the viscoplastic passes that grew the seed and the
+        # corrector that finished it are both charged to this trial, so the saving
+        # this path reports is a saving and not an accounting choice.
+        _sol["vp_iterations"] = int(vp_iterations)
+        _sol["nr_iterations"] = int(_sol.get("iterations", 0) or 0)
+        _sol["iterations"] = int(vp_iterations) + _sol["nr_iterations"]
+        _sol["failure_criterion"] = failure_criterion
+        _sol["corrector"] = {
+            "driver_of_record": "corrector",
+            "checkpoint": where,
+            "vp_iterations": int(vp_iterations),
+            "nr_iterations": _sol["nr_iterations"],
+            "nr_force_evals": _rec['nr_force_evals'],
+            "oob": _oob,
+            "force_tol": float(force_tol),
+            "yield_violation": _yv,
+            "yield_tol": float(_CORRECTOR_YIELD_TOL),
+            "max_disp_deep": _rec['max_disp_deep'],
+            "disp_limit": _rec['disp_limit'],
+            "disp_frac_height": (None if (_dd is None or mesh_height <= 0)
+                                 else float(_dd) / float(mesh_height)),
+            "wall": _wall,
+            "attempts": list(_corr_attempts),
+        }
+        _sol["corrector_attempts"] = list(_corr_attempts)
+        return _sol
+
     if debug_level >= 1:
         print(f"  c: {c_by_elem[0]:.1f} -> {c_reduced[0]:.1f}")
         print(f"  phi: {phi_by_elem[0]:.1f} -> {np.degrees(phi_reduced[0]):.1f}")
@@ -4662,6 +5290,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     disp_hist = []
     u_elastic_scale = 0.0
     exit_reason = 'iteration_cap'
+    gate_failed = False            # a force-settled state the yield gate refused
     plateau_iter = None            # iteration at which the residual plateaued
     plateau_ratio = None           # the out-of-balance ratio it plateaued at
     diverging_iter = None          # iteration at which the early-failure rule fired
@@ -4687,8 +5316,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 # stage credits no suction.
                 if u_gp_signed_active is not None:
                     u_sgn = np.array([u_gp_signed_active[e][g] for e, g in grp['pairs']])
-                    s_suc = np.minimum(np.maximum(-u_sgn, 0.0), grp['scap'])
-                    grp['c_suc_r'] = grp['tanphib'] * s_suc * grp['Finv']
+                    s_suc = _suction_capped(u_sgn, grp['scap'])
+                    grp['c_suc_r'] = _suction_apparent_cohesion(
+                        grp['tanphib'], s_suc, grp['Finv'])
                 else:
                     grp['c_suc_r'] = np.zeros(len(grp['pairs']))
 
@@ -4831,10 +5461,24 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                   f"({unbalanced_force_ratio:.2e} against tolerance "
                                   f"{force_tol:.1e}) - INCONCLUSIVE, neither "
                                   f"converged nor failed")
+                    # The loop is about to end this trial on a RULE — the ceiling or
+                    # the budget-extension heuristic declining — rather than on the
+                    # slope. One bounded corrector attempt from the state it reached
+                    # gets the last word; a refusal leaves the rule's verdict exactly
+                    # as it was. Off by default: see _CORRECTOR_RULE_EXITS, where the
+                    # measurement says these two exits convert four trials for 904 s.
+                    if _corrector_on and exit_reason in _CORRECTOR_RULE_EXITS:
+                        _c = _try_corrector(
+                            u, gp_groups, f"rule:{exit_reason}",
+                            total_iterations + iteration,
+                            softened_1d if has_1d_elements else None)
+                        if _c is not None:
+                            return _c
                     converged = False
                     iteration -= 1          # the last iteration actually performed
                     break
             # Build body load correction from accumulated viscoplastic strains
+            _tp = time.perf_counter() if _PROF_ON else None
             loads = base_loads.copy()
 
             n_yielding = 0
@@ -5045,6 +5689,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 contrib = np.einsum('gij,gi->gj', Bg, s4[:, :3]) * wg[:, None]
                 np.add.at(loads, dofg.ravel(), contrib.ravel())
 
+            if _PROF_ON:
+                _prof_add("vp_const", _tp)
+
             # ---- 1D Truss element body-force corrections ----
             if has_1d_elements:
                 n_1d_compression = 0
@@ -5249,7 +5896,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
 
             # Solve K * u_new = loads
             loads_free = loads[free_dofs]
+            _tp = time.perf_counter() if _PROF_ON else None
             u_free_new = K_factor.solve(loads_free)
+            if _PROF_ON:
+                _prof_add("vp_trisolve", _tp)
 
             u_new = np.zeros(n_dof)
             u_new[free_dofs] = u_free_new
@@ -5393,6 +6043,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     if debug_level >= 1:
                         print(f"  Displacement limit exceeded at iteration {iteration+1}: "
                               f"max VP disp = {max_vp_disp:.2f} > limit {vp_disp_limit:.2f}")
+                    if _corrector_on and 'disp_limit' in _CORRECTOR_RULE_EXITS:
+                        _c = _try_corrector(
+                            u, gp_groups, "rule:disp_limit",
+                            total_iterations + iteration + 1,
+                            softened_1d if has_1d_elements else None)
+                        if _c is not None:
+                            return _c
                     break
 
             if relative_change < tolerance and plastic_settled:
@@ -5430,6 +6087,38 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         u = u_new
                         continue
                 # -------------------------------------------------------------
+                # ---- the yield gate on a CONVERGED viscoplastic state --------
+                # Force balance is only half of a verdict. Before this state may end
+                # the trial it must also be admissible: no Gauss point materially
+                # outside its own yield surface (see _VP_YIELD_GATE). A state that
+                # settles in force and fails in yield is handed to the corrector,
+                # exactly as a rule exit is; where the corrector certifies an
+                # admissible field the trial stands on THAT, and where it refuses the
+                # trial is FAILED, because the viscoplastic loop has reached its own
+                # fixed point and this is the state it exits on.
+                if _corrector_on:
+                    _gv, _gn, _, _gw = _yield_reading(gp_groups, u_new, sq3)
+                    if _gv > _VP_YIELD_GATE:
+                        u = u_new
+                        if debug_level >= 1:
+                            print(f"  Force-settled at iteration {iteration+1} but "
+                                  f"NOT admissible: worst yield violation "
+                                  f"{_gv:.3e} of local strength on {_gn} Gauss "
+                                  f"point(s) above 1% (worst at element/Gauss point "
+                                  f"{_gw}) - handing to the corrector")
+                        _c = _try_corrector(
+                            u, gp_groups, "gate:yield",
+                            total_iterations + iteration + 1,
+                            softened_1d if has_1d_elements else None)
+                        if _c is not None:
+                            return _c
+                        converged = False
+                        exit_reason = 'yield_gate'
+                        gate_failed = True
+                        if debug_level >= 1:
+                            print("  The corrector refused; a slope does not stand "
+                                  "on an inadmissible field - FAILED")
+                        break
                 converged = True
                 exit_reason = 'converged'
                 u = u_new
@@ -5460,9 +6149,35 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                               f"({_signal}) - the slope is running away; the trial "
                               f"is closed as FAILED without spending the rest of "
                               f"its budget")
+                    # _EARLY_FAIL_U_MAX no longer decides a trial on its own. The
+                    # runaway signal is read on an ITERATE, against a displacement
+                    # RATIO, and the review measured a reinforced trial closed at
+                    # u_ratio = 8.0000 that reaches admissible equilibrium at ~19x
+                    # elastic. So the signal triggers the corrector, and the trial's
+                    # displacement verdict becomes the 0.1 H bound on a CONVERGED
+                    # state; only where the corrector refuses does the rule stand.
+                    if _corrector_on and 'runaway' in _CORRECTOR_RULE_EXITS:
+                        _c = _try_corrector(
+                            u, gp_groups, "rule:runaway",
+                            total_iterations + iteration + 1,
+                            softened_1d if has_1d_elements else None)
+                        if _c is not None:
+                            return _c
                     break
 
             u = u_new
+
+            # ---- the checkpoint ladder (see _CORRECTOR_CHECKPOINTS) ----------
+            # The plastic history is now developed enough to be worth correcting.
+            # Nothing about the viscoplastic state is changed by the attempt: it is
+            # copied out, and a refusal returns here with the loop untouched.
+            if _corrector_on and (iteration + 1) in _CORRECTOR_CHECKPOINTS:
+                _c = _try_corrector(
+                    u, gp_groups, f"vp{iteration + 1}",
+                    total_iterations + iteration + 1,
+                    softened_1d if has_1d_elements else None)
+                if _c is not None:
+                    return _c
 
 
         total_iterations += iteration + 1
@@ -5483,6 +6198,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     else:
         verdict, u_ratio, u_growth = classify_nonconvergence(
             disp_hist, u_elastic_scale, exit_reason, model_height=mesh_height)
+    if gate_failed:
+        # The yield gate is not a displacement reading and the hybrid criterion may
+        # not overturn it: this state settled in force and is outside the surface, so
+        # the trial has no admissible field to stand on whatever its displacements did.
+        verdict = 'FAILED'
     stable = bool(converged or (failure_criterion == 'hybrid'
                                 and verdict == 'STABLE_STUCK'))
     if not converged and debug_level >= 1:
@@ -5721,11 +6441,42 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                   f"max axial = {max_axial:.2f}, max shear = {max_lateral:.2f}, "
                   f"max moment = {max_moment:.2f}")
 
+    # ---- the state's own admissibility, on every trial ----------------------
+    # The force gate CANNOT see a yield violation: the viscoplastic iteration is in
+    # force balance at every iteration, and what it relaxes is yield. So a converged
+    # trial's evidence has two halves and only one of them was ever reported. This is
+    # the other half, in the same invariant form and on the same normalization the
+    # Newton path reports, computed once here on the state being returned. It is
+    # reporting only — no verdict on any path reads it — and the flag says when a
+    # trial called CONVERGED is standing on a field that is materially outside the
+    # yield surface somewhere.
+    _mvy, _n_above_y, _mvt, _worst_y = _yield_reading(gp_groups, u, sq3)
+
     return {
         "converged": converged,
         # Hybrid-criterion metadata (present on every criterion; see
         # classify_nonconvergence). `stable` is what a bisection should read.
         "stable": stable,
+        # The invariant-form admissibility reading on the returned state: the largest
+        # Mohr-Coulomb violation as a fraction of the local strength, how many Gauss
+        # points sit above 1% of it, the Rankine half of the same reading (None where
+        # no point carries a finite cap), and whether a CONVERGED state fails it.
+        "max_yield_violation": float(_mvy),
+        "n_yield_above_1pct": int(_n_above_y),
+        "max_tension_violation": _mvt,
+        # Where the worst violation sits, as (element, Gauss point), or None.
+        "max_yield_at": _worst_y,
+        "yield_flagged": bool(converged and _n_above_y > 0),
+        # True where this trial settled in FORCE and the yield gate refused the state
+        # it settled on, and the corrector could not reach an admissible one either
+        # (see _VP_YIELD_GATE). The trial is FAILED, and this is why.
+        "gate_failed": bool(gate_failed),
+        # Every corrector attempt this trial made and what it read, including the
+        # ones that refused — a refusal decides nothing, but it is the measurement
+        # that says whether the corrector is earning its cost. Empty on the plain
+        # viscoplastic path, where none is made.
+        "corrector_attempts": list(_corr_attempts),
+        "corrector": None,
         "verdict": verdict,
         "u_ratio": u_ratio,
         "u_growth": u_growth,
@@ -5779,6 +6530,3273 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         "yielded_pile_V": yielded_pile_V if has_pile_elements else np.array([], dtype=bool),
         "yielded_pile_M": yielded_pile_M if has_pile_elements else np.array([], dtype=bool),
         "yielded_pile": (yielded_pile_V | yielded_pile_M) if has_pile_elements else np.array([], dtype=bool),
+    }
+
+
+# ===================== Newton-Raphson Mohr-Coulomb path (SPIKE) ==============
+#
+# An ALTERNATIVE driver for a single strength-reduction trial, selected by the
+# internal `fem_solver` switch ('viscoplastic', the default and the definition of
+# every locked result, or 'newton'). Nothing below runs unless the switch is
+# thrown, and the switch is read in exactly one place — the hook at the top of
+# solve_fem — so the viscoplastic path is untouched.
+#
+# The scheme is the textbook one: an implicit backward-Euler closest-point return
+# to the Mohr-Coulomb cone in principal-stress space, its consistent (algorithmic)
+# tangent, and a global Newton-Raphson iteration on the equilibrium residual under
+# incremental (adaptively sub-stepped) gravity loading. Non-associated flow with
+# psi = 0 makes the tangent non-symmetric, so the sparse solve is a general LU.
+#
+# Reference for the return mapping and its corner/apex cases: de Souza Neto,
+# Peric & Owen, "Computational Methods for Plasticity" (2008), Section 8.2 —
+# a two-vector return at the sextant corners and a return to the tensile apex.
+
+_FEM_SOLVER_ENV = "XSLOPE_FEM_SOLVER"
+# The environment override announces itself once per process. A stale shell
+# variable would otherwise silently recompute every factor of safety in a session
+# on the non-default driver, and the run would look exactly like a default run.
+_FEM_SOLVER_ENV_ANNOUNCED = False
+
+
+def resolve_fem_solver(fem_solver=None):
+    """Which per-trial driver runs: 'auto' (the default), 'viscoplastic' or 'newton'.
+
+    Three values, and only the first two are production paths:
+
+      * ``'auto'`` — the viscoplastic iteration with the Newton CORRECTOR called
+        from inside it (see SPIKE.md, "THE CORRECTOR"). The viscoplastic loop
+        drives and builds the plastic history; at a short checkpoint ladder, and
+        wherever the loop would otherwise exit on a rule, the current state is
+        handed to one bounded Newton attempt at full gravity. A corrector that
+        converges AND passes the force, yield and displacement gates ends the trial
+        as standing; a corrector that refuses is not a verdict and the viscoplastic
+        loop carries on untouched. So this path can only ever convert a
+        rule-decided refusal into a certified stand — it can never read lower than
+        the plain viscoplastic driver.
+      * ``'viscoplastic'`` — the plain loop with no corrector, which is the
+        definition of every locked and published factor of safety up to this round.
+      * ``'newton'`` — the cold-start Newton driver with its load walk and rescue
+        chain (SPIKE only; not a production path).
+
+    ``None`` means UNSPECIFIED and falls through to the environment variable
+    ``XSLOPE_FEM_SOLVER``, then to 'auto'. The environment hook exists so a whole
+    benchmark run can be flipped without touching a call site; an explicit argument
+    always wins over it.
+
+    When the ENVIRONMENT — and not an explicit argument — is what selects a
+    non-default driver, one warning line is printed per process. The explicit
+    argument path stays silent: a caller that named the solver knows which one it
+    asked for, while a shell variable left over from an earlier session does not
+    announce itself any other way.
+    """
+    global _FEM_SOLVER_ENV_ANNOUNCED
+    from_env = False
+    if fem_solver is None:
+        env_value = os.environ.get(_FEM_SOLVER_ENV)
+        from_env = bool(env_value)
+        fem_solver = env_value or "auto"
+    key = str(fem_solver).strip().lower()
+    if key in ("auto", "hybrid", "corrector", "default"):
+        return "auto"
+    if key in ("vp", "viscoplastic", "griffiths"):
+        if from_env and not _FEM_SOLVER_ENV_ANNOUNCED:
+            _FEM_SOLVER_ENV_ANNOUNCED = True
+            print(f"\n*** {_FEM_SOLVER_ENV}={fem_solver!r} is set in the environment: "
+                  f"every FEM/SSRM solve in this process runs on the plain "
+                  f"'viscoplastic' driver with the Newton corrector OFF. Unset "
+                  f"{_FEM_SOLVER_ENV} to restore the default. ***\n")
+        return "viscoplastic"
+    if key in ("nr", "newton", "newton-raphson", "newton_raphson"):
+        if from_env and not _FEM_SOLVER_ENV_ANNOUNCED:
+            _FEM_SOLVER_ENV_ANNOUNCED = True
+            print(f"\n*** {_FEM_SOLVER_ENV}={fem_solver!r} is set in the environment: "
+                  f"every FEM/SSRM solve in this process runs on the NON-DEFAULT "
+                  f"'newton' driver, and its factors of safety are NOT the locked "
+                  f"viscoplastic ones. Unset {_FEM_SOLVER_ENV} to restore the "
+                  f"default. ***\n")
+        return "newton"
+    raise ValueError(
+        f"Unknown fem_solver {fem_solver!r}. Supported: 'auto' (default), "
+        "'viscoplastic' and 'newton'.")
+
+
+# Branch codes recorded per Gauss point by the return map, for reporting only.
+_NR_ELASTIC, _NR_MAIN, _NR_RIGHT, _NR_LEFT, _NR_APEX = 0, 1, 2, 3, 4
+# ... and the Rankine tension-cutoff branches, reached only where a Gauss point
+# carries a FINITE tensile cap. The naming says which surfaces are active:
+# TENS = the cap alone on sigma_1; TENS2 = on sigma_1 and sigma_2; TENS3 = the
+# hydrostatic-tension return to (T, T, T), which is what replaces the Mohr-Coulomb
+# apex whenever T sits below it; MC_TENS = the Mohr-Coulomb main plane AND the cap,
+# which is the intersection edge; CORNER_TENS = a sextant corner and the cap;
+# MC_TENS2 = the main plane with the cap on two principal stresses.
+(_NR_TENS, _NR_TENS2, _NR_TENS3, _NR_MC_TENS, _NR_CORNER_TENS,
+ _NR_MC_TENS2, _NR_TENS_FALLBACK) = 5, 6, 7, 8, 9, 10, 11
+
+_NR_BRANCH_NAMES = {
+    _NR_ELASTIC: "elastic", _NR_MAIN: "main", _NR_RIGHT: "right_corner",
+    _NR_LEFT: "left_corner", _NR_APEX: "apex",
+    _NR_TENS: "tension", _NR_TENS2: "tension_2", _NR_TENS3: "tension_apex",
+    _NR_MC_TENS: "mc_tension_edge", _NR_CORNER_TENS: "corner_tension",
+    _NR_MC_TENS2: "mc_tension_2", _NR_TENS_FALLBACK: "tension_fallback",
+}
+
+# The active sets the combined Mohr-Coulomb / Rankine return tries, in order, with
+# the branch code each one records. A surface index is
+#   0,1,2 -> the Mohr-Coulomb planes on the ordered pairs (1,3), (1,2), (2,3)
+#   3,4,5 -> the Rankine planes sigma_1 <= T, sigma_2 <= T, sigma_3 <= T
+#
+# Two facts about the ordered sextant sigma_1 >= sigma_2 >= sigma_3 cut the
+# combinatorics down to these seven, and both are exact rather than heuristic:
+#
+#   * f(1,3) >= f(1,2) and f(1,3) >= f(2,3) identically there, so plane (1,3) is in
+#     the Mohr-Coulomb active set whenever any Mohr-Coulomb plane is. The only
+#     Mohr-Coulomb sets are {}, {13}, {13,12} and {13,23} — which are exactly the
+#     main plane and the two corners the plain map already carries.
+#   * a RETURNED state must be ordered, so if sigma_2 is at the cap then sigma_1 is
+#     too. The only Rankine sets are the prefixes {1}, {1,2} and {1,2,3}.
+#
+# Three principal stresses admit at most three independent active constraints, which
+# rules out the corner-plus-two-cap and main-plus-three-cap combinations.
+_NR_RANKINE_SETS = (
+    ((3,), _NR_TENS),
+    ((0, 3), _NR_MC_TENS),
+    ((0, 2, 3), _NR_CORNER_TENS),
+    ((0, 1, 3), _NR_CORNER_TENS),
+    ((3, 4), _NR_TENS2),
+    ((0, 3, 4), _NR_MC_TENS2),
+    ((3, 4, 5), _NR_TENS3),
+)
+
+
+def _nr_surface(k, A, Bc, ccp, mu, lam, T):
+    """One yield surface's normal, its elastic return vector, and its intercept.
+
+    Every surface here is LINEAR in the ordered principal stress — ``f_k = n_k . s
+    - r_k`` — with a CONSTANT flow direction, which is what makes a return for a
+    given active set one small linear solve and exact rather than iterated.
+
+    ``v_k = D m_k`` is the stress change per unit multiplier. For a Mohr-Coulomb
+    plane the psi = 0 flow ``m = (e_i - e_j)/2`` is deviatoric and the isotropic
+    operator maps it to ``mu (e_i - e_j)``, so that return cannot move the mean
+    stress. For a Rankine plane the flow is ASSOCIATED, ``m = e_k``, and
+    ``D m = 2 mu e_k + lambda 1`` DOES move it — which is the entire reason the
+    second surface exists, since a psi = 0 Mohr-Coulomb flow cannot relieve a
+    tensile mean stress at all.
+    """
+    z = np.zeros_like(A)
+    o = np.ones_like(A)
+    if k == 0:                                   # Mohr-Coulomb on (sigma_1, sigma_3)
+        return (np.stack([A, z, -Bc], 1),
+                mu[:, None] * np.stack([o, z, -o], 1), ccp)
+    if k == 1:                                   # ... on (sigma_1, sigma_2)
+        return (np.stack([A, -Bc, z], 1),
+                mu[:, None] * np.stack([o, -o, z], 1), ccp)
+    if k == 2:                                   # ... on (sigma_2, sigma_3)
+        return (np.stack([z, A, -Bc], 1),
+                mu[:, None] * np.stack([z, o, -o], 1), ccp)
+    e = np.zeros((len(A), 3))
+    e[:, k - 3] = 1.0                            # Rankine on sigma_(k-3)
+    return e, 2.0 * mu[:, None] * e + lam[:, None], T
+
+
+def _nr_solve_small(M, rhs):
+    """Solve a stack of small dense systems, flagging the singular ones.
+
+    ``M`` is (N, m, m) with m at most 3. A singular member is a degenerate active
+    set — two surfaces whose return vectors are parallel — and it is reported
+    rather than solved, so the caller moves on to the next candidate instead of
+    taking a nonsense multiplier.
+    """
+    m = M.shape[1]
+    det = np.linalg.det(M)
+    scale = np.max(np.abs(M), axis=(1, 2)) ** m
+    ok = np.abs(det) > 1e-12 * np.maximum(scale, 1e-300)
+    Ms = np.where(ok[:, None, None], M, np.eye(m))
+    # rhs is stacked explicitly: NumPy 2 reads a (N, m) right-hand side as one
+    # m-by-N matrix rather than as N vectors.
+    return np.linalg.solve(Ms, rhs[:, :, None])[:, :, 0], ok
+
+
+def _nr_rankine_return(s, A, Bc, ccp, mu, lam, T):
+    """Return ordered principal stresses to Mohr-Coulomb INTERSECTED with the cap.
+
+    ``s`` is (N, 3), already ordered sigma_1 >= sigma_2 >= sigma_3, tension-positive,
+    and every other argument is per-point. Returns ``(sigma, branch, unresolved)``.
+
+    This is Koiter's rule done as an ACTIVE-SET SEARCH rather than a case tree: each
+    candidate set in ``_NR_RANKINE_SETS`` is returned exactly by one linear solve,
+    and a candidate is accepted only if it is CONSISTENT — every multiplier
+    non-negative, the returned state still ordered, and BOTH surfaces satisfied. The
+    first consistent candidate wins. Nothing here decides a region by inspecting the
+    trial state, so a region the design got wrong shows up as an inconsistent return
+    rather than as a wrong answer that looks right.
+
+    Two passes over the candidates: the first at a tolerance three orders above
+    round-off, the second an order below the branch structure, which is what a point
+    sitting exactly ON a region boundary needs (there the two candidates agree to
+    round-off, so accepting either is the same answer). Anything still unresolved is
+    reported through ``unresolved`` and the caller decides; it is expected to be
+    empty and the fuzz asserts that it is.
+    """
+    n = len(s)
+    out = s.copy()
+    branch = np.zeros(n, dtype=np.int8)
+    todo = np.ones(n, dtype=bool)
+    sc = np.maximum.reduce([np.abs(s[:, 0]), np.abs(s[:, 2]), np.abs(T),
+                            np.abs(ccp), np.ones(n)])
+    for rel_tol in (1e-13, 1e-9):
+        for surf, code in _NR_RANKINE_SETS:
+            if not todo.any():
+                break
+            j = np.flatnonzero(todo)
+            parts = [_nr_surface(k, A[j], Bc[j], ccp[j], mu[j], lam[j], T[j])
+                     for k in surf]
+            nmat = np.stack([p[0] for p in parts], axis=1)      # (n, m, 3)
+            vmat = np.stack([p[1] for p in parts], axis=1)      # (n, m, 3)
+            rvec = np.stack([p[2] for p in parts], axis=1)      # (n, m)
+            M = np.einsum('nia,nja->nij', nmat, vmat)
+            rhs = np.einsum('nia,na->ni', nmat, s[j]) - rvec
+            gam, ok = _nr_solve_small(M, rhs)
+            sig = s[j] - np.einsum('ni,nia->na', gam, vmat)
+            tol = rel_tol * sc[j]
+            # A multiplier is checked through the stress it moves, so the test is in
+            # one unit whatever the surface's normalization.
+            ok &= np.all(gam * np.linalg.norm(vmat, axis=2)
+                         >= -tol[:, None], axis=1)
+            a1, a2, a3 = sig[:, 0], sig[:, 1], sig[:, 2]
+            ok &= (a1 >= a2 - tol) & (a2 >= a3 - tol)
+            ok &= (A[j] * a1 - Bc[j] * a3 - ccp[j]) <= tol
+            ok &= a1 <= T[j] + tol
+            if ok.any():
+                sel = j[ok]
+                out[sel] = sig[ok]
+                branch[sel] = code
+                todo[sel] = False
+        if not todo.any():
+            break
+    return out, branch, todo
+
+
+def mc_return_map(sig_tr4, c, snph, csph, mu, t_cap=None, lam=None):
+    """Closest-point return to the Mohr-Coulomb cone, psi = 0, plane strain.
+
+    ``sig_tr4`` is the (G, 4) elastic trial stress [sx, sy, txy, sz],
+    TENSION-POSITIVE, in the component order build_constitutive_matrix_4 uses.
+    ``c``, ``snph``, ``csph``, ``mu`` are per-Gauss-point arrays of length G
+    (cohesion, sin/cos of the friction angle, shear modulus).
+
+    ``t_cap`` is the per-point Rankine tensile cap T (``inf`` = none) and ``lam``
+    the Lame constant the associated Rankine flow needs; both ``None`` — the
+    default, and every call on a model that sets no ``t_cut`` — skips that code
+    entirely, so the plain Mohr-Coulomb path is untouched arithmetic for
+    untouched arithmetic. See :func:`_nr_rankine_return`.
+
+    Returns ``(sig4, branch)`` — the returned stress and a per-point branch code
+    (0 elastic, 1 main plane, 2 right corner, 3 left corner, 4 apex, and 5-11 for
+    the branches where the tensile cap is active; see ``_NR_BRANCH_NAMES``).
+
+    On the ordered principal stresses sigma_1 >= sigma_2 >= sigma_3
+    (tension-positive) the yield function is
+
+        f = A*sigma_1 - Bc*sigma_3 - c*cos(phi),
+        A = (1 + sin phi)/2,   Bc = (1 - sin phi)/2,
+
+    and the psi = 0 flow potential is g = (sigma_1 - sigma_3)/2. The isotropic
+    elastic operator maps that flow direction to 2*mu times itself, so the
+    main-plane multiplier is exactly f/mu and each corner is a 2x2 linear solve:
+    the return is LINEAR in the trial stress on every branch, which is what makes
+    the algorithmic tangent below exact on that branch.
+    """
+    sx, sy, txy, sz = sig_tr4[:, 0], sig_tr4[:, 1], sig_tr4[:, 2], sig_tr4[:, 3]
+    ctr = 0.5 * (sx + sy)
+    half = 0.5 * (sx - sy)
+    R = np.sqrt(half * half + txy * txy)
+
+    P = np.stack([ctr + R, ctr - R, sz], axis=1)
+    order = np.argsort(-P, axis=1, kind="stable")
+    Ps = np.take_along_axis(P, order, axis=1)
+    s1, s2, s3 = Ps[:, 0], Ps[:, 1], Ps[:, 2]
+
+    A = 0.5 * (1.0 + snph)
+    Bc = 0.5 * (1.0 - snph)
+    ccp = c * csph
+    f = A * s1 - Bc * s3 - ccp
+
+    branch = np.zeros(len(f), dtype=np.int8)
+    yid = f > 0.0
+    n1, n2, n3 = s1.copy(), s2.copy(), s3.copy()
+
+    if np.any(yid):
+        # --- main plane -------------------------------------------------------
+        gm = f                                   # = mu * dgamma
+        m1 = s1 - gm
+        m3 = s3 + gm
+        # An ordering violation is what sends a point to a corner. The slack is
+        # relative to the local stress scale, so a point sitting exactly on a
+        # sextant boundary is not thrown to a corner by rounding.
+        scale = np.maximum(np.abs(s1) + np.abs(s3), 1.0) * 1e-12
+        ok = (m1 >= s2 - scale) & (s2 >= m3 - scale)
+        take_main = yid & ok
+        n1 = np.where(take_main, m1, n1)
+        n3 = np.where(take_main, m3, n3)
+        branch[take_main] = _NR_MAIN
+
+        # --- corners ----------------------------------------------------------
+        bad = yid & ~ok
+        right = np.zeros_like(bad)
+        if np.any(bad):
+            fa = f
+            # right corner (sigma_1 collides with sigma_2): planes (1,3) and (2,3)
+            right = bad & (m1 < s2 - scale)
+            if np.any(right):
+                fb = A * s2 - Bc * s3 - ccp
+                det = 1.0 - Bc * Bc
+                ga = (fa - Bc * fb) / det          # = mu * dgamma_a
+                gb = (fb - Bc * fa) / det
+                n1 = np.where(right, s1 - ga, n1)
+                n2 = np.where(right, s2 - gb, n2)
+                n3 = np.where(right, s3 + ga + gb, n3)
+                branch[right] = _NR_RIGHT
+            # left corner (sigma_2 collides with sigma_3): planes (1,3) and (1,2)
+            left = bad & ~right
+            if np.any(left):
+                fb = A * s1 - Bc * s2 - ccp
+                det = 1.0 - A * A
+                ga = (fa - A * fb) / det
+                gb = (fb - A * fa) / det
+                n1 = np.where(left, s1 - ga - gb, n1)
+                n2 = np.where(left, s2 + gb, n2)
+                n3 = np.where(left, s3 + ga, n3)
+                branch[left] = _NR_LEFT
+
+        # --- apex -------------------------------------------------------------
+        # With psi = 0 every return direction above is purely deviatoric, so none
+        # of them changes the mean stress. A trial state whose mean stress already
+        # lies beyond the cone's tensile apex therefore cannot be returned to the
+        # cone at all by a deviatoric correction, and the only admissible point is
+        # the apex itself, sigma_1 = sigma_2 = sigma_3 = c*cot(phi). This is the
+        # case the viscoplastic scheme cannot resolve: its psi = 0 flow chases a
+        # yield function that never closes, which is why that path needs a
+        # separate Rankine surface to hold tensile states.
+        snph_safe = np.where(snph > 1e-12, snph, 1.0)
+        s_apex = np.where(snph > 1e-12, ccp / snph_safe, np.inf)
+        p_tr = (s1 + s2 + s3) / 3.0
+        apex = yid & (p_tr >= s_apex)
+        # A corner solve whose result is still inadmissible lands on the apex too.
+        apex = apex | (yid & ((n1 < n2 - scale) | (n2 < n3 - scale)))
+        if np.any(apex):
+            n1 = np.where(apex, s_apex, n1)
+            n2 = np.where(apex, s_apex, n2)
+            n3 = np.where(apex, s_apex, n3)
+            branch[apex] = _NR_APEX
+
+    # --- the Rankine tension cutoff, the SECOND surface -----------------------
+    # The cap is a separate yield surface from the Mohr-Coulomb one and the two
+    # combine by Koiter's rule, which is what the viscoplastic path does when it
+    # SUMS the two flows into evpg. Here the same physics is a multi-surface
+    # return: the Mohr-Coulomb-only state above is a valid answer for any point
+    # whose returned sigma_1 is already under its cap (the Rankine multiplier is
+    # zero there), so only the rest are reworked. That is what keeps a model with
+    # no cap on exactly the arithmetic it was on before this surface existed, and
+    # it is also why an inert cap — one at or above the Mohr-Coulomb apex, which no
+    # admissible state can reach — costs a comparison and nothing else.
+    if t_cap is not None:
+        T_ = np.broadcast_to(np.asarray(t_cap, dtype=float), f.shape)
+        over = np.isfinite(T_) & (n1 > T_)
+        if np.any(over):
+            if lam is None:
+                raise ValueError("mc_return_map needs `lam` when `t_cap` is set: "
+                                 "the Rankine flow is associated, so its return "
+                                 "vector is 2 mu e_k + lambda 1.")
+            k = np.flatnonzero(over)
+            A_ = np.broadcast_to(A, f.shape)
+            Bc_ = np.broadcast_to(Bc, f.shape)
+            ccp_ = np.broadcast_to(ccp, f.shape)
+            mu_ = np.broadcast_to(np.asarray(mu, dtype=float), f.shape)
+            lam_ = np.broadcast_to(np.asarray(lam, dtype=float), f.shape)
+            # From the TRIAL state, not from the Mohr-Coulomb-returned one. Koiter's
+            # rule is SIMULTANEOUS — sigma = sigma_trial - sum_k gamma_k D m_k over
+            # the whole active set — and returning to one surface and then to the
+            # other is a different, wrong operation. It is wrong in a way that
+            # hides: a state already returned to the Mohr-Coulomb surface and then
+            # capped comes back INSIDE that surface (the Rankine return lowers f by
+            # gamma*(2*mu*A + lambda*sin(phi)), which is non-negative at every
+            # friction angle), so every point looks admissible and the intersection
+            # edge never executes. The branch histogram is what says so.
+            sig_r, br_r, todo = _nr_rankine_return(
+                np.stack([s1[k], s2[k], s3[k]], axis=1),
+                A_[k], Bc_[k], ccp_[k], mu_[k], lam_[k], T_[k])
+            if np.any(todo):
+                # No candidate active set was consistent. The isotropic point at
+                # min(T, apex) satisfies BOTH surfaces, so the state stays
+                # admissible and the verdict's yield reading stays honest; the
+                # branch code says it happened, and the fuzz asserts it does not.
+                snph_s = np.where(snph > 1e-12, snph, 1.0)
+                apex_ = np.where(snph > 1e-12, ccp / snph_s, np.inf)
+                fb = np.minimum(np.broadcast_to(apex_, f.shape)[k][todo],
+                                T_[k][todo])
+                sig_r[todo] = fb[:, None]
+                br_r[todo] = _NR_TENS_FALLBACK
+            n1[k], n2[k], n3[k] = sig_r[:, 0], sig_r[:, 1], sig_r[:, 2]
+            branch[k] = br_r
+
+    # --- back to component form ----------------------------------------------
+    Pn = np.empty_like(P)
+    np.put_along_axis(Pn, order, np.stack([n1, n2, n3], axis=1), axis=1)
+    sa_n, sb_n, sz_n = Pn[:, 0], Pn[:, 1], Pn[:, 2]
+    ctr_n = 0.5 * (sa_n + sb_n)
+    rad_n = 0.5 * (sa_n - sb_n)
+    # Mohr-Coulomb flow is coaxial: the principal DIRECTIONS are the trial state's
+    # and only the principal VALUES move. Below a degenerate radius the in-plane
+    # state is isotropic and the direction is arbitrary; cos(2t) = 1, sin(2t) = 0
+    # is then the correct — and continuous — choice.
+    big = R > 1e-14 * np.maximum(np.abs(ctr), 1.0)
+    Rs = np.where(big, R, 1.0)
+    c2 = np.where(big, half / Rs, 1.0)
+    s2t = np.where(big, txy / Rs, 0.0)
+
+    out = np.empty_like(sig_tr4)
+    out[:, 0] = ctr_n + rad_n * c2
+    out[:, 1] = ctr_n - rad_n * c2
+    out[:, 2] = rad_n * s2t
+    out[:, 3] = sz_n
+    # An untouched point is restored EXACTLY rather than reconstructed, so a stress
+    # the return map did not act on carries no round-off from the round trip
+    # through the principal frame. Read off the branch code, which is zero on
+    # exactly the points no surface returned — including a point that yielded
+    # neither the shear surface nor the cap.
+    el = branch == _NR_ELASTIC
+    if np.any(el):
+        out[el] = sig_tr4[el]
+    return out, branch
+
+
+# ---- curved strength envelopes: Hoek-Brown and the power curve ---------------
+# Both are carried here the way the viscoplastic driver carries them: as a
+# per-Gauss-point MOHR-COULOMB TANGENT to the F-reduced envelope, re-derived from
+# the current stress, with the ordinary psi = 0 return map running on that tangent.
+# Neither driver has a curved yield surface anywhere — solve_fem's Step 6
+# overwrites grp['c_r'] / ['snph'] / ['csph'] in place for the flagged Gauss points
+# and then runs the same MC yield function and the same MOCOUQ flow on all points
+# alike. Reproducing THAT is what makes the two drivers answer the same question;
+# an exact curved-surface return would converge somewhere else. See SPIKE.md,
+# "CURVED ENVELOPES".
+#
+# The one thing this path must do that the viscoplastic path need not: the
+# linearization has to be a pure function of the displacement, or the residual is
+# not one and neither the line search nor the convergence test means anything. So
+# the tangent is closed as a SELF-CONSISTENT fixed point inside every residual
+# evaluation — linearize, return, re-read the abscissa off the RETURNED stress,
+# re-linearize — which is the same fixed point the viscoplastic loop reaches over a
+# whole solve, reached per evaluation instead.
+_NR_ENV_MC, _NR_ENV_POW, _NR_ENV_HB = 0, 1, 2
+_NR_ENV_MAX_ITER = 60      # self-consistency passes allowed per evaluation
+_NR_ENV_RELAX1 = 14        # ... after this many, relax by 1/2
+_NR_ENV_RELAX2 = 34        # ... and after this many, by 1/4
+_NR_ENV_TOL = 1e-10        # ... and the relative change that ends them.
+# 1e-10 and not tighter because the Balmer inversion is a 40-step BISECTION: its
+# bracket closes at 2^-40 of the initial width, which puts a floor of about 6e-12
+# under the tangent it can return, and a fixed point asked for less than that
+# never exits. Measured on the Hoek-Brown benchmark, the residual falls by a
+# decade a pass — 1.4e-1, 4.8e-3, 4.7e-4, ... — and then sits on that floor. The
+# level itself is eight orders below `force_tol` and is not a physical setting.
+_NR_HB_BISECT = 40         # Balmer inversion steps — the viscoplastic path's own
+
+
+def _nr_pow_tangent(s_prime, a, b, cp, d, F, pow_ref=None):
+    """The power curve's F-reduced tangent line at the in-plane Mohr-circle centre.
+
+    ``tau = a (sigma_n + d)^b + c_p``, so ``d`` is the tension intercept: it shifts
+    the origin, and the ``1e-4 ref`` floor is what stops a tensile point running
+    past it. Every line here mirrors solve_fem's Step-6 block, including the
+    abscissa: the CENTRE ``s' = -(sx + sy)/2`` clamped at zero, not the
+    failure-plane normal, because that is the abscissa the viscoplastic driver
+    linearizes at and the two have to be solving the same model.
+
+    ``pow_ref`` is the group-wide scale of the floor. It is computed here when the
+    caller has the whole group and passed back in for the tangent's difference
+    quotient, so the perturbed evaluation floors against the same number the base
+    one did rather than against a mean over the yielded subset.
+    """
+    s_n = np.maximum(s_prime, 0.0)
+    if pow_ref is None:
+        pow_ref = max(1.0, float(s_n.mean()) if s_n.size else 1.0)
+    s_ef = np.maximum(s_n + d, 1e-4 * pow_ref)
+    slope = a * b * s_ef ** (b - 1.0) / F
+    tau_F = (a * s_ef ** b + cp) / F
+    phi = np.arctan(slope)
+    return tau_F - s_n * slope, np.sin(phi), np.cos(phi), pow_ref
+
+
+def _nr_hb_tangent(s_prime, c_cur, snph_cur, csph_cur, sci, mb, s_, a_, F):
+    """Hoek-Brown's F-reduced tangent at the FAILURE-PLANE normal stress.
+
+    ``sigma_n = s' cos^2(phi) - c sin(phi) cos(phi)`` is where a Mohr circle of
+    centre ``s'`` touches its own tangent line, which is why the linearization
+    closes as a fixed point: at convergence the circle, the tangent line and the
+    reduced envelope all meet at one ``sigma_n``. It is also the abscissa the
+    limit-equilibrium engine uses (the slice-base normal), so the two solvers
+    linearize the same curve at the same place. Balmer's parametric curve is then
+    inverted by the same bisection the viscoplastic path runs.
+
+    The ``sigma_n >= 0`` clamp inside ``hb_tangent_const`` is load-bearing and is
+    documented there: at the Hoek-Brown tensile apex ``dsigma_1/dsigma_3`` diverges
+    and ``phi_i -> 90 deg``, i.e. effectively infinite strength.
+
+    Strength reduction divides the TANGENT — ``c_i/F`` and ``tan(phi_i)/F`` — and
+    NOT the Hoek-Brown constants: ``sigma_ci/F`` is a different envelope, because of
+    the exponent ``a``.
+    """
+    s_n = np.maximum(s_prime * csph_cur ** 2 - c_cur * snph_cur * csph_cur, 0.0)
+    c_i, phi_i = hb_tangent_const(s_n, sci, mb, s_, a_, iters=_NR_HB_BISECT)
+    slope = np.tan(np.radians(phi_i)) / F
+    phi = np.arctan(slope)
+    return c_i / F, np.sin(phi), np.cos(phi)
+
+
+def _nr_envelope_step(code, c_cur, sn_cur, cs_cur, s_prime, env, pow_ref):
+    """One linearization pass: every curved Gauss point gets its own new tangent.
+
+    This is the per-element dispatch, done per GAUSS POINT: ``code`` carries
+    _NR_ENV_MC / _NR_ENV_POW / _NR_ENV_HB from the model's own
+    ``pow_flag_by_elem`` / ``hb_flag_by_elem``, so one group — one mesh — can hold
+    Mohr-Coulomb, power-curve and Hoek-Brown points at once and each takes its own
+    branch in the same pass. A Mohr-Coulomb point is not touched at all, which is
+    what keeps a mixed model's MC half on exactly the arithmetic it would be on
+    alone.
+    """
+    c, sn, cs = c_cur.copy(), sn_cur.copy(), cs_cur.copy()
+    m = code == _NR_ENV_POW
+    if m.any():
+        cc, ss, cz, pow_ref = _nr_pow_tangent(
+            s_prime[m], env['pow_a'][m], env['pow_b'][m], env['pow_cp'][m],
+            env['pow_d'][m], env['F'][m], pow_ref)
+        c[m], sn[m], cs[m] = cc, ss, cz
+    m = code == _NR_ENV_HB
+    if m.any():
+        cc, ss, cz = _nr_hb_tangent(
+            s_prime[m], c_cur[m], sn_cur[m], cs_cur[m], env['hb_sci'][m],
+            env['hb_mb'][m], env['hb_s'][m], env['hb_a'][m], env['F'][m])
+        c[m], sn[m], cs[m] = cc, ss, cz
+    return c, sn, cs, pow_ref
+
+
+def _nr_envelope_return(grp, sig_tr, sel=None, pow_ref=None):
+    """The return map with any curved envelope linearized self-consistently.
+
+    Returns ``(sig, branch, c, snph, csph, pow_ref)`` — the returned stress, the
+    branch codes, and the tangent the return was actually taken on, which is what
+    the verdict's yield reading has to be read against.
+
+    The seed is the group's stored ``c_r`` / ``snph`` / ``csph``, which for a
+    curved-envelope element is the overburden-estimate tangent build_fem_data
+    lays down, already divided by F. It is a fixed, deterministic starting point,
+    so the fixed point below is a function of the displacement and of nothing
+    else — not of the iteration that came before it.
+
+    ``sel`` restricts the whole thing to a subset of the group, which is what the
+    tangent's difference quotient needs; ``pow_ref`` carries the base evaluation's
+    floor scale into it.
+
+    ``grp['_env_seed']`` replaces that cold seed once a solve is under way, and it
+    is updated ONLY at an accepted iterate (in :func:`_nr_group_state`). Within one
+    Newton iteration the seed is therefore frozen, so the residual the line search
+    evaluates is a pure function of the displacement; and because the fixed point
+    is driven to ``_NR_ENV_TOL`` the answer does not depend on where it started,
+    only the number of passes to reach it does — 2 or 3 warm against 6 to 10 cold,
+    which is most of this feature's cost.
+    """
+    env = grp['env']
+    seed = grp.get('_env_seed')
+    if sel is None:
+        code = env['code']
+        c, sn, cs = (grp['c_r'], grp['snph'], grp['csph']) if seed is None else seed
+        mu, sub = grp['mu'], env
+        t_cap, lam = grp.get('t_cap'), grp.get('lam')
+    else:
+        code = env['code'][sel]
+        src = (grp['c_r'], grp['snph'], grp['csph']) if seed is None else seed
+        c, sn, cs = src[0][sel], src[1][sel], src[2][sel]
+        mu = grp['mu'][sel]
+        sub = {k: v[sel] for k, v in env.items() if k != 'code'}
+        t_cap = None if grp.get('t_cap') is None else grp['t_cap'][sel]
+        lam = None if grp.get('lam') is None else grp['lam'][sel]
+    c = np.array(c, dtype=float, copy=True)
+    phi = np.arctan2(np.asarray(sn, float), np.asarray(cs, float))
+    sn, cs = np.sin(phi), np.cos(phi)
+    m_env = code != _NR_ENV_MC
+    sig, branch = mc_return_map(sig_tr, c, sn, cs, mu, t_cap=t_cap, lam=lam)
+    # Under-relaxation, applied only when the plain iteration stops making
+    # progress. It is not a tuning dial: the fixed point it converges to is the
+    # same one, and theta only decides how it gets there. It exists because a
+    # HANDFUL of trial states put the iteration in a period-2 limit cycle — the
+    # tangent moves the returned state across a branch boundary and the new
+    # abscissa moves it back — and a cycle at one Gauss point stalls the whole
+    # group. Measured on the fuzz below, damping is what takes the worst residual
+    # from a stalled 2.2e-1 to convergence.
+    theta = 1.0
+    err = 0.0
+    for _it in range(_NR_ENV_MAX_ITER):
+        # The abscissa is read off the RETURNED stress, which is the stress the
+        # viscoplastic loop reads it off too (its sig4 is the current state, not an
+        # elastic predictor). At the fixed point the tangent is therefore taken
+        # where the returned Mohr circle actually touches it.
+        s_prime = -0.5 * (sig[:, 0] + sig[:, 1])
+        c_new, sn_new, cs_new, pow_ref = _nr_envelope_step(
+            code, c, sn, cs, s_prime, sub, pow_ref)
+        fin = np.isfinite(c_new) & m_env
+        cref = max(1.0, float(np.abs(c_new[fin] * cs_new[fin]).mean())
+                   if fin.any() else 1.0)
+        err = 0.0
+        if fin.any():
+            # The residual of the fixed point itself, g(x) - x, read BEFORE any
+            # relaxation, so the convergence test means the same thing at every
+            # theta.
+            err = max(float(np.abs(c_new[fin] * cs_new[fin]
+                                   - c[fin] * cs[fin]).max()) / cref,
+                      float(np.abs(sn_new[fin] - sn[fin]).max()))
+        if err < _NR_ENV_TOL:
+            break
+        # The schedule is on the PASS COUNT and not on the error trend, because a
+        # trend test cannot tell a slow contraction from a cycle and this one does
+        # not have to: an iteration that has not closed in _NR_ENV_RELAX1 passes is
+        # either cycling, in which case halving breaks it, or converging at a rate
+        # that halving costs a factor of two on. On the corpus the loop exits in one
+        # to ten passes and never reaches either level.
+        theta = (1.0 if _it < _NR_ENV_RELAX1
+                 else 0.5 if _it < _NR_ENV_RELAX2 else 0.25)
+        if theta == 1.0:
+            c, sn, cs = c_new, sn_new, cs_new
+        else:
+            # Relax on (c, phi) and rebuild the sine and cosine from the angle, so
+            # the pair can never drift off the unit circle. Mohr-Coulomb points are
+            # excluded from the blend: their c is +inf where a material is held
+            # elastic, and inf + theta*(inf - inf) is a NaN.
+            phi_new = np.arctan2(sn_new, cs_new)
+            c = np.where(m_env, c + theta * (c_new - c), c)
+            phi = np.where(m_env, phi + theta * (phi_new - phi), phi)
+            sn, cs = np.sin(phi), np.cos(phi)
+        sig, branch = mc_return_map(sig_tr, c, sn, cs, mu, t_cap=t_cap, lam=lam)
+    return sig, branch, c, sn, cs, pow_ref
+
+
+def _nr_envelope_by_elem(fem_data, F_by_elem):
+    """Per-element curved-envelope parameters, or ``None`` on a plain model.
+
+    ``None`` is the whole of the no-envelope guarantee: a model with no ``pow`` or
+    ``hb`` material never gets an ``env`` key on any group, so ``grp.get('env')``
+    is None at the one point the linearization could enter and the return map is
+    called with the group's own arrays exactly as it always was.
+    """
+    n = len(fem_data["elements"])
+    pm = np.asarray(fem_data.get("pow_flag_by_elem", np.zeros(n, bool)), dtype=bool)
+    hm = np.asarray(fem_data.get("hb_flag_by_elem", np.zeros(n, bool)), dtype=bool)
+    if not (pm.any() or hm.any()):
+        return None
+    code = np.zeros(n, dtype=np.int8)
+    code[pm] = _NR_ENV_POW
+    code[hm] = _NR_ENV_HB
+    z = np.zeros(n)
+    out = {'code': code, 'F': np.asarray(F_by_elem, dtype=float).copy()}
+    for key, src in (('pow_a', 'pow_a_by_elem'), ('pow_b', 'pow_b_by_elem'),
+                     ('pow_cp', 'pow_cp_by_elem'), ('pow_d', 'pow_d_by_elem'),
+                     ('hb_sci', 'hb_sci_by_elem'), ('hb_mb', 'hb_mb_by_elem'),
+                     ('hb_s', 'hb_s_by_elem'), ('hb_a', 'hb_a_by_elem')):
+        out[key] = np.asarray(fem_data.get(src, z), dtype=float)
+    # pow_b defaults to 1 on a non-power element so the exponent is never 0^-1 in
+    # a masked-off lane; the mask means it is never read, and this keeps it finite.
+    out['pow_b'] = np.where(code == _NR_ENV_POW, out['pow_b'], 1.0)
+    return out
+
+
+def _nr_group_envelope(grp, env_by_elem):
+    """Attach (or refresh) one group's per-Gauss-point envelope arrays.
+
+    A Gauss point in a material held LINEAR ELASTIC is dispatched back to the
+    plain Mohr-Coulomb code even where its material declares a curved envelope.
+    On this path "elastic" is carried as an unreachable cohesion, ``c_r = inf``,
+    and the linearization writes a finite tangent into ``c_r`` — so without this
+    line a curved material inside an SSR elastic zone would start yielding, which
+    is the opposite of what the zone says. The viscoplastic path never meets the
+    problem because it drops elastic points from the yielding mask instead
+    (``m & ~grp['elastic']``) and does not care what its ``c_r`` says. Measured on
+    `vp040`, where 1,284 of 2,539 elements are held elastic: without it the first
+    Newton step leaves 47% of the load uncarried at every load factor down to
+    1/64, because half the mesh is yielding a material that cannot yield.
+    """
+    if env_by_elem is None:
+        return
+    e = grp['e_idx']
+    env = {k: v[e] for k, v in env_by_elem.items()}
+    if 'elastic' in grp:
+        env['code'] = env['code'].copy()
+        env['code'][grp['elastic']] = _NR_ENV_MC
+    grp['env'] = env
+    if not np.any(env['code'] != _NR_ENV_MC):
+        # Nothing curved is left in this group, so it takes the plain path.
+        del grp['env']
+
+
+def _nr_group_restrength_envelope(grp, F_by_elem):
+    """Re-reduce one group's envelope for a new trial strength.
+
+    For a curved-envelope point the reduction is 1/F on the TANGENT, and the
+    tangent is re-derived at every evaluation anyway, so all the ramp has to carry
+    forward is the per-element F the linearization divides by. Without this a ramp
+    would linearize the whole way up at the strength its foot was solved at.
+    """
+    env = grp.get('env')
+    if env is not None:
+        env['F'] = np.asarray(F_by_elem, dtype=float)[grp['e_idx']]
+
+
+def _nr_group_state(grp, u, h_eps):
+    """One group's stress, branch codes and algorithmic tangent at displacement u.
+
+    Returns ``(sig4, branch, Dep)`` where ``Dep`` is the (G, 3, 3) tangent
+    d[sx, sy, txy]/d[ex, ey, gxy] at fixed total eps_z = 0 — the block the global
+    tangent stiffness needs. Elastic points carry the elastic D exactly; yielded
+    points are differentiated through the return map by a one-sided difference in
+    each of the three free strain components. The map is linear in the trial
+    stress on each branch, so the quotient is exact there and the only error is
+    the (smooth) rotation of the principal frame.
+    """
+    B, D4, dof = grp['B'], grp['D4'], grp['dof']
+    ep = grp['ep']
+    eps = (B @ u[dof][:, :, None])[:, :, 0]           # (G, 3) total strain
+    eps4 = np.empty((len(eps), 4))
+    eps4[:, :3] = eps - ep[:, :3]
+    eps4[:, 3] = -ep[:, 3]
+    sig_tr = (D4 @ eps4[:, :, None])[:, :, 0]
+    # K0 initial stress, at the live load factor (see _nr_group_sig0). The return
+    # map is handed the TOTAL trial stress, so sigma_0 sits inside the yield
+    # surface evaluation exactly as it does on the viscoplastic path — and, being
+    # constant in the strain, it drops out of the difference quotient below.
+    _s0 = grp.get('sig0_s')
+    if _s0 is not None:
+        sig_tr = sig_tr + _s0
+    t_cap, lam = grp.get('t_cap'), grp.get('lam')
+    if grp.get('env') is None:
+        sig, branch = mc_return_map(sig_tr, grp['c_r'], grp['snph'], grp['csph'],
+                                    grp['mu'], t_cap=t_cap, lam=lam)
+        pref = None
+        grp['_c_eff'] = grp['c_r']
+        grp['_snph_eff'] = grp['snph']
+        grp['_csph_eff'] = grp['csph']
+    else:
+        sig, branch, _ce, _se, _cse, pref = _nr_envelope_return(grp, sig_tr)
+        grp['_c_eff'], grp['_snph_eff'], grp['_csph_eff'] = _ce, _se, _cse
+        # The accepted iterate's converged linearization becomes the next
+        # evaluation's starting point. Only here, so the seed is frozen for the
+        # whole of a line search.
+        grp['_env_seed'] = (_ce, _se, _cse)
+    yid = branch != _NR_ELASTIC
+    # The min_slip_depth skin keeps the ELASTIC tangent, which is the viscoplastic
+    # driver's own operator: that path solves K_elastic u = f_ext + f_body(eps^vp)
+    # every iteration and never forms an elastoplastic tangent at all. A tangent is
+    # a search direction and nothing else — the residual, the return map and the
+    # committed plastic strain here are untouched — so this cannot move a converged
+    # answer; what it removes is the near-null collapse mode a fully yielded
+    # cohesionless skin puts into the consistent tangent, which the linear solve
+    # otherwise answers with a correction 1e15 times the elastic response and no
+    # backtrack can rescue. Measured on rs2_66b at F = 1.1: with the consistent
+    # tangent the second iteration of every load increment reaches max|u| = 2e13
+    # and the increment is dead; with this it stays at 0.08.
+    _skin = grp.get('skin')
+    if _skin is not None:
+        yid = yid & ~_skin
+    Dep = np.array(grp['D3'], copy=True)
+    if np.any(yid):
+        idx = np.flatnonzero(yid)
+        base = sig[idx, :3]
+        s_tr = sig_tr[idx]
+        D4y = D4[idx]
+        tc_y = None if t_cap is None else t_cap[idx]
+        lam_y = None if lam is None else lam[idx]
+        for j in range(3):
+            if grp.get('env') is None:
+                sp, _ = mc_return_map(s_tr + h_eps * D4y[:, :, j],
+                                      grp['c_r'][idx], grp['snph'][idx],
+                                      grp['csph'][idx], grp['mu'][idx],
+                                      t_cap=tc_y, lam=lam_y)
+            else:
+                # Through the WHOLE map, linearization included, so the quotient
+                # carries d(c, phi)/d(sigma) as well. The tangent is then the
+                # derivative of the map the residual actually uses, with no
+                # separate algebra to keep in step — at the price of the
+                # linearization's own first-order truncation, alongside the
+                # principal frame's, which is measured rather than assumed.
+                sp = _nr_envelope_return(grp, s_tr + h_eps * D4y[:, :, j],
+                                         sel=idx, pow_ref=pref)[0]
+            Dep[idx, :, j] = (sp[:, :3] - base) / h_eps
+    return sig, branch, Dep
+
+
+def _nr_build_bars(fem_data):
+    """The model's reinforcement bar elements, grouped by DOF count, or ``None``.
+
+    One entry per distinct element size — four DOFs for a two-node bar, six for a
+    three-node bar standing on the midside node of its soil edge — so each group is
+    a dense array pass. Pile elements are excluded; the Newton driver refuses any
+    model that has them.
+
+    Every array here is read from ``fem_data`` and never written, so the two solvers
+    carry the SAME bar: ``K_global_1d_elems`` is the element matrix the global
+    elastic stiffness is assembled from, ``k_by_1d_elem`` the chord stiffness EA/L
+    the force recovery uses, and ``t_allow_by_1d_elem`` the capacity envelope shared
+    with the limit-equilibrium engine.
+
+    ``p`` is the chord pattern [-cos, -sin, +cos, +sin, 0, 0]: ``p . u_e`` is the
+    chord elongation, which on a three-node bar is the axial force station at the
+    element center — the same quantity every reader of ``forces_1d`` expects.
+    """
+    elements_1d = fem_data.get("elements_1d", None)
+    if elements_1d is None or len(elements_1d) == 0:
+        return None
+    n_1d = len(elements_1d)
+    pile_mask = np.asarray(fem_data.get("pile_elem_mask", np.zeros(n_1d)), dtype=bool)
+    reinf = np.flatnonzero(~pile_mask)
+    if reinf.size == 0:
+        return None
+    K_list = fem_data.get("K_global_1d_elems", [])
+    dof_all = np.asarray(fem_data["dof_indices_1d"], dtype=np.int64)
+    nd_all = np.asarray(fem_data.get("n_dof_by_1d_elem",
+                                     np.full(n_1d, 4, dtype=int)), dtype=int)
+    k_all = np.asarray(fem_data["k_by_1d_elem"], dtype=float)
+    cos_all = np.asarray(fem_data["cos_theta_1d"], dtype=float)
+    sin_all = np.asarray(fem_data["sin_theta_1d"], dtype=float)
+    cap_all = np.asarray(fem_data["t_allow_by_1d_elem"], dtype=float)
+    # The post-peak residual, and which bars can reach it. `build_fem_data` has
+    # already taken min(t_res, t_allow), so a bar inside a pullout ramp where
+    # t_allow < t_res cannot soften at all: bond slip stays perfectly plastic and
+    # only RUPTURE softens. Blank t_res is NaN, which is "no post-peak drop".
+    res_all = np.asarray(fem_data.get("t_res_by_1d_elem",
+                                      np.full(n_1d, np.nan)), dtype=float)
+    can_all = np.isfinite(res_all) & (res_all < cap_all - 1e-12)
+
+    bars = []
+    for nd in (4, 6):
+        sel = reinf[nd_all[reinf] == nd]
+        if sel.size == 0:
+            continue
+        p = np.zeros((sel.size, nd))
+        p[:, 0], p[:, 1] = -cos_all[sel], -sin_all[sel]
+        p[:, 2], p[:, 3] = cos_all[sel], sin_all[sel]
+        K = np.array([np.asarray(K_list[i], dtype=float)[:nd, :nd] for i in sel])
+        bars.append({
+            'idx': sel, 'nd': nd, 'dof': dof_all[sel, :nd], 'K': K, 'p': p,
+            'k': k_all[sel],
+            # `t_cap` is the WORKING cap, which is the peak until a bar softens.
+            't_cap': cap_all[sel].copy(),
+            't_peak': cap_all[sel], 't_res': res_all[sel],
+            'can_soften': can_all[sel],
+            'softened': np.zeros(sel.size, dtype=bool),
+            # k p (x) p, the rank-one block the tangent LOSES when a bar goes
+            # slack or reaches its capacity. On a two-node bar it is K itself.
+            'kpp': k_all[sel][:, None, None] * (p[:, :, None] * p[:, None, :]),
+        })
+    return bars or None
+
+
+def _nr_translational_dofs(fem_data, n_dof):
+    """Indices of the degrees of freedom that are LENGTHS, or None when all are.
+
+    A pile node carries a third degree of freedom, its rotation, and a rotation is
+    not comparable with a displacement: put one in a `max|u|` and the bound is
+    comparing a length against a radian. The viscoplastic driver's own
+    displacement-limit check already reads translational degrees of freedom only
+    ("Extract translational DOFs only for VP displacement check"); this is the same
+    reading for the Newton path.
+
+    ``None`` on a model with no pile — every entry is already a length there, so the
+    caller takes the plain ``np.max(np.abs(u))`` it always took and the arithmetic is
+    bit-identical.
+    """
+    dof_offset = fem_data.get("dof_offset", None)
+    is_pile = fem_data.get("is_pile_node", None)
+    if dof_offset is None or is_pile is None:
+        return None
+    is_pile = np.asarray(is_pile, dtype=bool)
+    if not is_pile.any():
+        return None
+    rot = np.asarray(dof_offset[:len(is_pile)], dtype=np.int64)[is_pile] + 2
+    keep = np.ones(n_dof, dtype=bool)
+    rot = rot[(rot >= 0) & (rot < n_dof)]
+    keep[rot] = False
+    return np.flatnonzero(keep)
+
+
+def _nr_umax(u, trans_dofs):
+    """max|u| over the translational degrees of freedom (all of them without a pile)."""
+    v = u if trans_dofs is None else u[trans_dofs]
+    return float(np.max(np.abs(v))) if v.size else 0.0
+
+
+def _nr_umax_split(u, trans_dofs, deep_dof_mask):
+    """``(deep, skin)`` maxima of |u|, split by the ``min_slip_depth`` filter.
+
+    With no filter (``deep_dof_mask is None``) the deep value is the ordinary
+    :func:`_nr_umax` and the skin value is ``None`` — the filtered path adds a
+    reading, it does not change the unfiltered one.
+    """
+    if deep_dof_mask is None:
+        return _nr_umax(u, trans_dofs), None
+    if trans_dofs is None:
+        trans = np.ones(len(u), dtype=bool)
+    else:
+        trans = np.zeros(len(u), dtype=bool)
+        trans[trans_dofs] = True
+    deep = trans & deep_dof_mask
+    skin = trans & ~deep_dof_mask
+    d = float(np.max(np.abs(u[deep]))) if deep.any() else 0.0
+    k = float(np.max(np.abs(u[skin]))) if skin.any() else 0.0
+    return d, k
+
+
+def _nr_oob_split(r_full, free_dof_mask, node_dof_x, node_dof_y, node_has_free,
+                  g_node_den, deep_free_mask):
+    """``(whole model, skin)`` Dawson out-of-balance from one residual vector.
+
+    The skin reading is ``None`` without a ``min_slip_depth`` filter, where there is
+    no skin to separate and the whole-model value is the reported one.
+    """
+    d = r_full * free_dof_mask
+    rn = np.sqrt(d[node_dof_x] ** 2 + d[node_dof_y] ** 2)
+    v = (rn / g_node_den)[node_has_free]
+    if v.size == 0:
+        return 0.0, (None if deep_free_mask is None else 0.0)
+    whole = float(np.max(v))
+    if deep_free_mask is None:
+        return whole, None
+    sk = v[~deep_free_mask]
+    return whole, (float(np.max(sk)) if sk.size else 0.0)
+
+
+def _nr_build_piles(fem_data):
+    """The model's pile beam elements, grouped by DOF count, or ``None``.
+
+    One entry per distinct element size — six degrees of freedom for a two-node beam,
+    nine for a three-node one standing on the midside node of its soil edge as well —
+    so each group is a dense array pass.
+
+    Every array is read from ``fem_data`` and never written, so the two solvers carry
+    the SAME beam: ``K_global_pile_elems`` is the element matrix the global elastic
+    stiffness is assembled from, and ``V_cap_by_pile_elem`` / ``M_cap_by_pile_elem``
+    are the per-unit-width capacities (the file's single-pile values divided by the
+    spacing) the viscoplastic path checks against.
+
+    ``act`` holds the three rows that read the ACTIONS out of the element's global
+    displacement — the shear at the element center and the bending moment at each
+    end node — so ``act @ u_e`` is ``(V, M1, M2)``. ``patV`` holds the internal
+    force pattern the SHEAR capacity is delivered on: the transverse pair at the two
+    end nodes, rotated into global coordinates. ``ax`` reads the axial force at the
+    element center, which carries no capacity and is reported only.
+
+    The MOMENT capacity is not delivered on a pattern at all — it is a plastic hinge
+    (see :func:`_nr_pile_force`), so what the group carries for it is ``S``, the
+    rotational block of the element stiffness that the hinge is solved on, and
+    ``hinge``, the mask of which of the element's two ends may take the release.
+    That mask is built ONCE over the whole pile element list, before the grouping,
+    because a hinge is one release at one pile NODE and the two element ends meeting
+    at an interior node can land in different DOF-count groups.
+    """
+    n_pile = int(fem_data.get("n_pile_elements", 0))
+    if n_pile == 0:
+        return None
+    K_list = fem_data["K_global_pile_elems"]
+    K_local_list = fem_data.get("K_local_by_pile_elem", None)
+    dof_all = np.asarray(fem_data["dof_indices_pile"], dtype=np.int64)
+    nd_all = np.asarray(fem_data.get("n_dof_by_pile_elem",
+                                     np.full(n_pile, 6, dtype=int)), dtype=int)
+    cos_all = np.asarray(fem_data["cos_theta_pile"], dtype=float)
+    sin_all = np.asarray(fem_data["sin_theta_pile"], dtype=float)
+    L_all = np.asarray(fem_data["elem_length_by_pile_elem"], dtype=float)
+    EI_all = np.asarray(fem_data["EI_by_pile_elem"], dtype=float)
+    EA_all = np.asarray(fem_data["EA_by_pile_elem"], dtype=float)
+    V_all = np.asarray(fem_data["V_cap_by_pile_elem"], dtype=float)
+    M_all = np.asarray(fem_data["M_cap_by_pile_elem"], dtype=float)
+    # Which element END may carry a plastic hinge, one per pile node. The same
+    # function the viscoplastic path uses, called on the WHOLE element list before
+    # the DOF-count grouping so the ownership is global: the two element ends that
+    # meet at an interior pile node can sit in different groups.
+    hinge_all = _pile_hinge_ends(fem_data.get("pile_elem_nodes", None), n_pile)
+
+    piles = []
+    for nd in (6, 9):
+        sel = np.flatnonzero(nd_all[:n_pile] == nd)
+        if sel.size == 0:
+            continue
+        n_node = nd // 3
+        act = np.zeros((sel.size, 3, nd))
+        patV = np.zeros((sel.size, nd))
+        ax = np.zeros((sel.size, nd))
+        K = np.zeros((sel.size, nd, nd))
+        Kl_g = np.zeros((sel.size, nd, nd))
+        S = np.zeros((sel.size, 2, 2))
+        for j, i in enumerate(sel):
+            L, EI, EA = L_all[i], EI_all[i], EA_all[i]
+            T = _beam_rotation(cos_all[i], sin_all[i], n_node)
+            Kl = (np.asarray(K_local_list[i], dtype=float)[:nd, :nd]
+                  if K_local_list is not None
+                  else _beam_local_stiffness(EA, EI, L, n_node == 3))
+            K[j] = np.asarray(K_list[i], dtype=float)[:nd, :nd]
+            Kl_g[j] = Kl
+            # The rotational block the hinge is solved on, rows and columns 2 and 5
+            # — the two END nodes. It is the same block in either frame: the beam
+            # rotation is the identity on a rotational row, so
+            # (T^T Kl T)[2, 5] == Kl[2, 5].
+            S[j] = Kl[np.ix_([2, 5], [2, 5])]
+            # --- the three actions, as local rows ---
+            rV = np.zeros(nd)
+            if n_node == 2:
+                rV[1], rV[2] = 12.0 * EI / L ** 3, 6.0 * EI / L ** 2
+                rV[4], rV[5] = -12.0 * EI / L ** 3, 6.0 * EI / L ** 2
+            else:
+                # V = EI/L**3 * (d3H/dxi3 at the center) . q_hat, with q_hat the
+                # bending dofs scaled to the unit interval: [v, L*theta] per node.
+                scale = np.array([1.0, L, 1.0, L, 1.0, L])
+                coef = (EI / L ** 3) * (_QUINTIC_SHEAR_MID * scale)
+                for k, slot in enumerate((1, 2, 4, 5, 7, 8)):
+                    rV[slot] = coef[k]
+            act[j, 0] = rV @ T
+            act[j, 1] = Kl[2] @ T          # M1, the end-1 moment
+            act[j, 2] = Kl[5] @ T          # M2, the end-2 moment
+            rT = np.zeros(nd)
+            rT[0], rT[3] = -EA / L, EA / L
+            ax[j] = rT @ T
+            # --- the pattern the SHEAR capacity is delivered on ---
+            pV = np.zeros(nd)
+            pV[1], pV[4] = 1.0, -1.0
+            patV[j] = T.T @ pV
+        piles.append({'idx': sel, 'nd': nd, 'dof': dof_all[sel, :nd], 'K': K,
+                      'Kl': Kl_g, 'S': S, 'act': act, 'patV': patV, 'ax': ax,
+                      'Vcap': V_all[sel], 'Mcap': M_all[sel],
+                      'hinge': hinge_all[sel]})
+    return piles or None
+
+
+def _nr_pile_force(pg, u, want_tangent):
+    """One pile group's internal force (and tangent) at displacement ``u``.
+
+    The beam is linear elastic; the only nonlinearities are its two structural
+    capacities, and they are two different KINDS of thing.
+
+    **The moment capacity is a plastic hinge**, the same one the viscoplastic path
+    carries (:func:`_pile_moment_hinge`, :func:`_pile_hinge_ends`). The element's
+    elastic end rotation is the nodal rotation less a plastic rotation ``p``, so the
+    element delivers ``K (u_e - p)``. A correction applied instead to the rotational
+    degree of freedom the two adjacent beam elements SHARE is equal and opposite
+    there and cancels exactly, which is a capacity that enforces nothing; the
+    element vector ``K p`` has a translational part and does not. Exactly one of the
+    two element ends at a pile node may take the release, and the other is left
+    elastic — node equilibrium puts it on the capacity with the opposite sign
+    anyway, and releasing both would leave the node's rotation undetermined by the
+    beam.
+
+    Written in the element's GLOBAL frame the correction is ``K_global p`` outright,
+    because ``p`` carries only ROTATIONAL components and a rotation is invariant
+    under the beam's frame change (``T^T K_local p_local = K_global p``). So the
+    residual is the element matrix applied to the RELEASED displacement.
+
+    **The shear capacity is the bar's convention** — the part of the elastic action
+    the member cannot deliver, subtracted from its own internal force — read on the
+    released displacement, because a hinge changes the shear:
+
+        f_int = K (u_e - p) - (V - clip(V, -V_cap, +V_cap)) q_V
+
+    A member at its cap therefore delivers the cap, which is what a cap is.
+
+    **The tangent is exact, with the rotational block condensed.** On a fixed hinge
+    set ``A``, ``p_A = S_AA^-1 (m_A - sign(m_A) M_cap)`` is affine in ``u_e`` — every
+    end moment is linear in ``u_e`` and ``S`` is the rotational block of the element
+    stiffness — so ``dp/du_e`` is the constant matrix ``R`` carrying ``S_AA^-1 G_A``
+    in the released rotational rows and zero elsewhere, with ``G`` the two moment
+    rows. Then ``dw/du_e = I - R`` and
+
+        dK/du_e = K (I - R) - [|V| > V_cap] q_V (x) (g_V (I - R))
+
+    which is the derivative of the map the residual actually uses. A hinged end's
+    delivered moment has derivative exactly zero, which is what a hinge means.
+
+    There is no state. ``p`` is a function of the current displacement alone and the
+    ``yielded_pile_*`` masks are read on the reported state, so the pile law is
+    nonlinear-ELASTIC and nothing is committed at the end of a step.
+    """
+    ue = u[pg['dof']]
+    n, nd = ue.shape
+    gM = pg['act'][:, 1:3]                              # the two end-moment rows
+    m_e = np.einsum('ikj,ij->ik', gM, ue)               # elastic end moments
+    Mcap = pg['Mcap']
+    p = np.zeros((n, nd))
+    R = None
+    # yielded_M is set wherever the capacity is EXCEEDED, whether or not this
+    # element's own end took the release: the other end of a shared node is on the
+    # capacity too. Same convention as _pile_element_capacity.
+    yM = np.isfinite(Mcap) & (np.abs(m_e) > Mcap[:, None]).any(axis=1)
+    if yM.any():
+        R = np.zeros((n, nd, nd))
+        slots = np.array([2, 5])
+        for i in np.flatnonzero(yM):
+            p_rot, _m = _pile_moment_hinge(m_e[i, 0], m_e[i, 1], Mcap[i],
+                                           pg['Kl'][i], allowed=pg['hinge'][i])
+            act_i = np.flatnonzero(p_rot != 0.0)
+            if act_i.size == 0:                 # over the cap at a node it does
+                continue                        # not own; the other end releases
+            p[i, 2], p[i, 5] = p_rot[0], p_rot[1]
+            R[i, slots[act_i], :] = np.linalg.solve(
+                pg['S'][i][np.ix_(act_i, act_i)], gM[i][act_i])
+        if not R.any():
+            R = None
+    w = ue - p
+    V = np.einsum('ij,ij->i', pg['act'][:, 0], w)
+    Vcap = pg['Vcap']
+    V_true = np.clip(V, -Vcap, Vcap)
+    f = np.einsum('ijk,ik->ij', pg['K'], w) - (V - V_true)[:, None] * pg['patV']
+    pg['_V'], pg['_V_true'], pg['_m_e'] = V, V_true, m_e
+    pg['_M'] = np.einsum('ikj,ij->ik', gM, w)           # the delivered end moments
+    pg['_p_rot'] = p[:, [2, 5]]
+    pg['_yV'], pg['_yM'] = np.abs(V) > Vcap, yM
+    pg['_axial'] = np.einsum('ij,ij->i', pg['ax'], w)
+    if want_tangent:
+        aV = (np.abs(V) > Vcap)[:, None, None]
+        gV = pg['act'][:, 0]
+        if R is None:
+            pg['_Ke'] = pg['K'] - aV * (pg['patV'][:, :, None] * gV[:, None, :])
+        else:
+            A = np.eye(nd)[None, :, :] - R
+            gVA = np.einsum('ij,ijk->ik', gV, A)
+            pg['_Ke'] = (np.einsum('ijk,ikl->ijl', pg['K'], A)
+                         - aV * (pg['patV'][:, :, None] * gVA[:, None, :]))
+    return f
+
+
+def _nr_bar_force(bg, u, want_tangent):
+    """One bar group's internal force (and tangent) at displacement ``u``.
+
+    The physics is the viscoplastic driver's, restated as a residual. There the
+    global stiffness carries the bar's FULL elastic matrix and the part of the
+    elastic force the bar cannot deliver is subtracted as a body load, so the bar's
+    internal force is
+
+        K_bar u_e - (T - T_true) p,   T = k (p . u_e),   T_true = clip(T, 0, t_cap)
+
+    — tension only, capped at the pullout/anchorage envelope, and on a two-node bar
+    that expression is exactly ``T_true p``. On a three-node bar it is not, and this
+    reproduces the three-node expression rather than a cleaner one, because the two
+    drivers have to be solving the same model.
+
+    The map is piecewise LINEAR in u_e, so its tangent is exact with nothing
+    differenced: dT/du = k p, and dT_true/du is k p while the bar is active
+    (0 < T < t_cap) and zero otherwise. The element tangent is therefore K_bar for
+    an active bar and K_bar - k p (x) p for a slack or capacity-limited one. On a
+    two-node bar the second is exactly zero — a yielded bar adds no stiffness. On a
+    three-node bar it is a rank-one positive-semidefinite block that resists only
+    the midside node leaving the chord.
+
+    There is no state: with softening refused, T_true is a function of the current
+    displacement alone, so the bar law is nonlinear-ELASTIC and nothing is committed
+    at the end of a step.
+    """
+    ue = u[bg['dof']]
+    T = bg['k'] * np.einsum('ij,ij->i', bg['p'], ue)
+    T_true = np.clip(T, 0.0, bg['t_cap'])
+    f = np.einsum('ijk,ik->ij', bg['K'], ue) - (T - T_true)[:, None] * bg['p']
+    bg['_T'], bg['_T_true'] = T, T_true
+    if want_tangent:
+        active = (T > 0.0) & (T < bg['t_cap'])
+        bg['_Ke'] = np.where(active[:, None, None], bg['K'], bg['K'] - bg['kpp'])
+    return f
+
+
+def _nr_internal_force(gp_groups, u, n_dof, h_eps=None, want_tangent=False,
+                       bars=None, piles=None):
+    """Assemble the internal force vector (and optionally the per-group tangents).
+
+    ``h_eps=None`` with ``want_tangent=False`` is the cheap residual-only pass the
+    line search uses: one return map per group and no differentiation.
+
+    ``bars`` adds the reinforcement bar elements' contribution and ``piles`` the
+    pile beam elements'. Their tangents are stashed on their own groups (``_Ke``)
+    rather than returned, because they need no differencing and the caller consumes
+    them through the same assembly pattern.
+    """
+    fint = np.zeros(n_dof)
+    tangents = [] if want_tangent else None
+    n_plastic_gp = 0
+    for grp in gp_groups:
+        if want_tangent:
+            sig, branch, Dep = _nr_group_state(grp, u, h_eps)
+            tangents.append(Dep)
+        else:
+            B, D4, dof = grp['B'], grp['D4'], grp['dof']
+            ep = grp['ep']
+            eps = (B @ u[dof][:, :, None])[:, :, 0]
+            eps4 = np.empty((len(eps), 4))
+            eps4[:, :3] = eps - ep[:, :3]
+            eps4[:, 3] = -ep[:, 3]
+            sig_tr = (D4 @ eps4[:, :, None])[:, :, 0]
+            _s0 = grp.get('sig0_s')
+            if _s0 is not None:
+                sig_tr = sig_tr + _s0
+            # The SAME constitutive law the tangent path takes, tensile cap
+            # and K0 initial stress included. This branch exists only to skip the differencing, so any
+            # divergence between the two is a residual and a tangent for two
+            # different materials.
+            if grp.get('env') is None:
+                sig, branch = mc_return_map(sig_tr, grp['c_r'], grp['snph'],
+                                            grp['csph'], grp['mu'],
+                                            t_cap=grp.get('t_cap'),
+                                            lam=grp.get('lam'))
+                grp['_c_eff'] = grp['c_r']
+                grp['_snph_eff'] = grp['snph']
+                grp['_csph_eff'] = grp['csph']
+            else:
+                sig, branch, _ce, _se, _cse, _ = _nr_envelope_return(grp, sig_tr)
+                grp['_c_eff'], grp['_snph_eff'], grp['_csph_eff'] = _ce, _se, _cse
+        grp['_sig'] = sig
+        grp['_branch'] = branch
+        n_plastic_gp += int(np.count_nonzero(branch))
+        contrib = (sig[:, None, :3] @ grp['B'])[:, 0, :] * grp['w'][:, None]
+        np.add.at(fint, grp['dof'].ravel(), contrib.ravel())
+    if bars is not None:
+        for bg in bars:
+            fb = _nr_bar_force(bg, u, want_tangent)
+            np.add.at(fint, bg['dof'].ravel(), fb.ravel())
+    if piles is not None:
+        for pg in piles:
+            fp = _nr_pile_force(pg, u, want_tangent)
+            np.add.at(fint, pg['dof'].ravel(), fp.ravel())
+    return fint, tangents, n_plastic_gp
+
+
+def _nr_commit_plastic_strain(gp_groups):
+    """Freeze the converged step: eps^p := eps - D4^-1 sigma, per Gauss point.
+
+    The elastic strain is recovered from the returned stress rather than from the
+    increment, so the committed plastic strain is exactly consistent with the
+    stress the residual was built from — no drift accumulates across steps.
+    """
+    for grp in gp_groups:
+        eps = (grp['B'] @ grp['_u'][grp['dof']][:, :, None])[:, :, 0]
+        # The ELASTIC part of the stress is what D4inv inverts: with a K0 initial
+        # stress the constitutive relation is sigma = sigma_0 + D (eps - eps^p), so
+        # sigma_0 comes off before the inversion or the whole in-situ field would be
+        # booked as elastic strain.
+        _sig = grp['_sig']
+        _s0 = grp.get('sig0_s')
+        if _s0 is not None:
+            _sig = _sig - _s0
+        eps_e4 = (grp['D4inv'] @ _sig[:, :, None])[:, :, 0]
+        ep = np.empty_like(grp['ep'])
+        ep[:, :3] = eps - eps_e4[:, :3]
+        ep[:, 3] = -eps_e4[:, 3]
+        grp['ep'] = ep
+
+
+def _nr_group_tension_cap(grp, t_cap_by_elem):
+    """Attach (or refresh) one group's Rankine tensile cap.
+
+    The keys are set ONLY where the group actually carries a finite cap, so
+    ``grp.get('t_cap')`` is None on every model that sets no ``t_cut`` and the
+    return map's cap code is never entered there. A material declared ``elastic``
+    is held out of the cap exactly as the viscoplastic path holds it out
+    (``tm & ~grp['elastic']``): it cannot fail, so it cannot crack either.
+    """
+    if t_cap_by_elem is None:
+        return
+    tc = np.asarray(t_cap_by_elem, dtype=float)[grp['e_idx']]
+    if 'elastic' in grp:
+        tc = tc.copy()
+        tc[grp['elastic']] = np.inf
+    if not np.isfinite(tc).any():
+        grp.pop('t_cap', None)
+        grp.pop('lam', None)
+        return
+    grp['t_cap'] = tc
+    # The associated Rankine flow returns 2*mu*e_k + lambda*1, so it needs the
+    # second Lame constant. D4[0, 1] is exactly lambda (see
+    # build_constitutive_matrix_4), which is why no second material lookup happens.
+    grp['lam'] = grp['D4'][:, 0, 1].copy()
+
+
+def _nr_group_suction(grp, sg, prep):
+    """Attach one group's capped matric suction, the F-independent half.
+
+    ``s_suc`` is ``min(max(0, -u_w), s_cap)`` per Gauss point, read off the same
+    SIGNED pore-pressure field (``prep['u_gp_signed']``) and the same per-element
+    cap the viscoplastic path reads, through the same helper. The keys are set
+    only on a model that actually carries suction, so ``grp.get('s_suc')`` is None
+    everywhere else and none of the apparent-cohesion arithmetic is entered.
+
+    The credit itself is F-dependent and is folded into the cohesion by
+    :func:`_nr_group_apparent_cohesion`, which the ramp re-runs at every step.
+    """
+    if not prep.get("suction_active"):
+        return
+    u_sgn_all = prep.get("u_gp_signed")
+    if u_sgn_all is None:
+        # Suction is switched on but the pore-pressure source carries no signed
+        # field (u = none or ru). The viscoplastic path credits zero there; so
+        # does this, rather than skipping the keys, so the two agree on a model
+        # that asks for suction it cannot have.
+        grp['tanphib'] = np.zeros(grp['n'])
+        grp['s_suc'] = np.zeros(grp['n'])
+        return
+    u_sgn = np.array([u_sgn_all[e][g] for e, g in sg['pairs']], dtype=float)
+    grp['tanphib'] = sg['tanphib']
+    grp['s_suc'] = _suction_capped(u_sgn, sg['scap'])
+
+
+def _nr_group_apparent_cohesion(grp, finv_by_elem):
+    """Fold the F-reduced apparent cohesion into one group's cohesion.
+
+    This is the whole of matric suction on the Newton path. The return map
+    already takes ``c`` per Gauss point, so Fredlund's credit is a per-point
+    cohesion and nothing else: no surface, no flow direction and no tangent
+    changes, and everything downstream that reads ``c_r`` -- the return map, the
+    algorithmic tangent, the strength scale ``nr_max_yield_violation`` divides by
+    -- reads the envelope the trial is actually solved on.
+
+    A no-op on a model without suction. On an ``elastic`` material ``c_r`` is
+    already ``inf``, so the credit is inert there exactly as it is on the
+    viscoplastic path, which drops elastic points from the yielding mask.
+    """
+    s_suc = grp.get('s_suc')
+    if s_suc is None:
+        return
+    c_suc = _suction_apparent_cohesion(grp['tanphib'], s_suc,
+                                       finv_by_elem[grp['e_idx']])
+    grp['c_suc'] = c_suc
+    grp['c_r'] = grp['c_r'] + c_suc
+
+
+def _nr_group_sig0(grp, sg, prep, k0):
+    """Attach one group's K0 initial stress, or leave the group without one.
+
+    The field is the viscoplastic driver's, read from the same cached overburden
+    (``prep['sv0_gp']``, F-independent) and built by the same formula, per Gauss
+    point and tension-positive:
+
+        sigma'_v = -(soil overburden) + u        (u >= 0)
+        sigma'_h = sigma'_z = K0 sigma'_v        (in-plane AND out-of-plane)
+        tau_xy   = 0
+
+    The field is EFFECTIVE, as it is on the viscoplastic path: the pore-pressure
+    term is already in the load vector and D (B u - eps^p) is the effective stress
+    directly, so the initial stress is effective too and needs no correction.
+
+    ``sig0`` is the full in-situ field and ``sig0_s`` is that field at the live
+    LOAD FACTOR: the driver walks gravity in increments and the overburden IS
+    gravity, so the two scale together and lam = 0 is a genuinely stress-free
+    state. The key is set only on a K0 run, so ``grp.get('sig0_s')`` is None on
+    every other model and none of the initial-stress arithmetic is entered there.
+    """
+    if k0 is None or prep.get("sv0_gp") is None:
+        return
+    sv0_gp, u_gp_all = prep["sv0_gp"], prep["u_gp"]
+    pairs = sg['pairs']
+    sv0 = np.array([sv0_gp[e][g] for e, g in pairs], dtype=float)
+    u_st = np.array([u_gp_all[e][g] for e, g in pairs], dtype=float)
+    sv_eff = -sv0 + u_st
+    sh_eff = float(k0) * sv_eff
+    z = np.zeros_like(sv_eff)
+    grp['sig0'] = np.stack([sh_eff, sv_eff, z, sh_eff], axis=1)
+    grp['sig0_s'] = grp['sig0']
+
+
+def _nr_set_load_factor(groups, lam):
+    """Scale every group's initial stress to the load factor being attempted.
+
+    A no-op on a model without K0. Within one increment ``lam`` is fixed, so the
+    residual, the line search and the tangent all see the same material.
+    """
+    for grp in groups:
+        s0 = grp.get('sig0')
+        if s0 is not None:
+            grp['sig0_s'] = s0 if lam == 1.0 else lam * s0
+
+
+def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
+                     t_cap_by_elem=None, k0=None, finv_by_elem=None,
+                     env_by_elem=None):
+    """The Newton path's working Gauss-point groups.
+
+    Geometry (B, D4, w, dof) is shared BY REFERENCE with the prepared model, which
+    the viscoplastic path also reads and never writes. Everything the Newton solve
+    mutates — the committed plastic strain, the stress, the branch codes — is
+    fresh per solve, so a shared prepared model cannot carry state between trials
+    or between the two solvers.
+    """
+    groups = []
+    for sg in prep["gp_groups_static"]:
+        e_idx = sg['e_idx']
+        G = sg['n']
+        D4 = sg['D4']
+        grp = {
+            'pairs': sg['pairs'], 'e_idx': e_idx, 'n': G,
+            'B': sg['B'], 'D4': D4, 'w': sg['w'], 'dof': sg['dof'],
+            'D3': D4[:, :3, :3],
+            'D4inv': np.linalg.inv(D4),
+            # mu is the (3,3) entry of the plane-strain operator, E/(2(1+nu)),
+            # so no second lookup of the material table is needed.
+            'mu': D4[:, 2, 2].copy(),
+            'c_r': c_reduced[e_idx],
+            'snph': np.sin(phi_reduced[e_idx]),
+            'csph': np.cos(phi_reduced[e_idx]),
+            'ep': np.zeros((G, 4)),
+        }
+        # The surficial skin the min_slip_depth filter excludes (None when the
+        # filter is off). It changes ONE thing: the tangent at these points stays
+        # elastic — see _nr_group_state. Nothing about the internal force, the
+        # return map or the committed plastic strain differs, so the equilibrium
+        # being solved is the same one.
+        _skin = prep.get("skin_elem_mask")
+        if _skin is not None:
+            _sk = _skin[e_idx]
+            if _sk.any():
+                grp['skin'] = _sk
+        if elastic_by_elem is not None:
+            em = elastic_by_elem[e_idx]
+            if em.any():
+                # A material held linear elastic never yields: give it an
+                # unreachable cohesion rather than branching in the return map.
+                grp['c_r'] = grp['c_r'].copy()
+                grp['c_r'][em] = np.inf
+                grp['elastic'] = em
+        # Matric suction, after the elastic override: an elastic point's c_r is
+        # already inf and adding a finite credit to it leaves it inf, which is the
+        # same inertness the viscoplastic path gets by dropping the point from the
+        # yielding mask.
+        _nr_group_suction(grp, sg, prep)
+        if finv_by_elem is not None:
+            _nr_group_apparent_cohesion(grp, finv_by_elem)
+        _nr_group_tension_cap(grp, t_cap_by_elem)
+        _nr_group_sig0(grp, sg, prep, k0)
+        # The curved envelopes last: they carry no cohesion of their own, only the
+        # parameters the tangent is re-derived from. c_r / snph / csph stay the
+        # SEED tangent build_fem_data laid down, which is what the fixed point
+        # starts from.
+        _nr_group_envelope(grp, env_by_elem)
+        groups.append(grp)
+    return groups
+
+
+def _nr_prepare_assembly(groups, free_dofs, n_dof, bars=None, piles=None):
+    """Cache the assembly pattern every tangent re-form reuses.
+
+    The sparsity pattern is fixed for the whole solve — only the VALUES change
+    from one Newton iteration to the next — so the (row, column) bookkeeping is
+    done once here and each assembly becomes a single ``np.bincount`` into a
+    ready-made CSC structure. Rebuilding a COO matrix and re-sorting it into CSC
+    every iteration, which is the obvious way to write this, costs as much as the
+    factorization it feeds.
+
+    Reinforcement bar blocks join the pattern EXPLICITLY, after the soil groups and
+    in the order :func:`_nr_assemble_tangent` walks them. On these meshes a bar lies
+    along a soil element edge, so its DOF pairs happen to be in the soil pattern
+    already — but relying on that would make the tangent silently lose a bar whose
+    end nodes did not share an element.
+
+    Pile beam blocks join it last, and for them the explicit join is not a precaution
+    but a requirement: a pile node's ROTATIONAL degree of freedom appears in no soil
+    element and in no bar, so every rotation would otherwise be missing from the
+    tangent entirely.
+    """
+    n_free = len(free_dofs)
+    fidx = np.full(n_dof, -1, dtype=np.int64)
+    fidx[free_dofs] = np.arange(n_free)
+    lin_parts = []
+    for grp in (list(groups) + (list(bars) if bars else [])
+                + (list(piles) if piles else [])):
+        fd = fidx[grp['dof']]
+        G, nd = fd.shape
+        rows = np.broadcast_to(fd[:, :, None], (G, nd, nd))
+        cols = np.broadcast_to(fd[:, None, :], (G, nd, nd))
+        keep = (rows >= 0) & (cols >= 0)
+        grp['_keep'] = keep
+        # Column-major key, so the unique keys come out in CSC order directly.
+        lin_parts.append((np.asarray(cols)[keep] * np.int64(n_free)
+                          + np.asarray(rows)[keep]))
+    lin = np.concatenate(lin_parts) if lin_parts else np.zeros(0, dtype=np.int64)
+    uniq, inv = np.unique(lin, return_inverse=True)
+    indices = (uniq % n_free).astype(np.int32)
+    col_of = (uniq // n_free).astype(np.int64)
+    indptr = np.searchsorted(col_of, np.arange(n_free + 1)).astype(np.int32)
+    return {"inv": inv, "nnz": len(uniq), "indices": indices,
+            "indptr": indptr, "n_free": n_free}
+
+
+def _nr_assemble_tangent(groups, tangents, pattern, bars=None, piles=None):
+    """Global non-symmetric tangent stiffness on the free degrees of freedom.
+
+    Soil groups first, then the reinforcement bar groups, then the pile beam groups
+    — the same order :func:`_nr_prepare_assembly` built the pattern in.
+    """
+    vals = []
+    for grp, Dep in zip(groups, tangents):
+        Bt = np.ascontiguousarray(grp['B'].transpose(0, 2, 1))
+        ke = (Bt @ Dep) @ grp['B']
+        ke *= grp['w'][:, None, None]
+        vals.append(ke[grp['_keep']])
+    if bars is not None:
+        for bg in bars:
+            vals.append(bg['_Ke'][bg['_keep']])
+    if piles is not None:
+        for pg in piles:
+            vals.append(pg['_Ke'][pg['_keep']])
+    data = np.bincount(pattern["inv"], weights=np.concatenate(vals),
+                       minlength=pattern["nnz"])
+    n_free = pattern["n_free"]
+    return csc_matrix((data, pattern["indices"], pattern["indptr"]),
+                      shape=(n_free, n_free))
+
+
+class _NrPermutedLU:
+    """``.solve(b)`` over a factorization taken on the column-permuted tangent."""
+
+    __slots__ = ("_lu", "_pc")
+
+    def __init__(self, lu, pc):
+        self._lu = lu
+        self._pc = pc
+
+    def solve(self, b):
+        return self._lu.solve(b)[self._pc]
+
+
+def _nr_factorize_tangent(K, cache):
+    """``splu`` on a Newton tangent, re-using the column ordering the pattern fixes.
+
+    ``splu``'s default ``permc_spec='COLAMD'`` orders for fill, and that ordering
+    is a function of the SPARSITY PATTERN ALONE — it never looks at a value. A
+    Newton trial re-forms its tangent hundreds of times into one pattern built
+    once by :func:`_nr_prepare_assembly`, so COLAMD is re-derived from the same
+    structure on every one of them and returns the same permutation every time.
+
+    The first factorization keeps that permutation. Every later one gathers the
+    tangent's values into the already-permuted CSC — the pattern's own gather
+    index, built once — and factorizes with ``permc_spec='NATURAL'``, which is
+    SuperLU doing exactly what it would have done after its own COLAMD call and
+    nothing before it. The factors and the solution are BIT-IDENTICAL to the
+    unpermuted call: same column order, same partial pivoting, same arithmetic in
+    the same sequence, and the fill measured on Griffiths & Lane 1 (435,014
+    nonzeros in L+U) and on RS2-65 (6,193,455) is equal to the last entry. What is
+    saved is the analysis, which is 21% of the factorization at 2,788 unknowns and
+    12% at 27,230 — the numeric work grows faster than the ordering does.
+    """
+    if _NR_FACTOR_SYMMETRIC:
+        return splu(K, permc_spec="MMD_AT_PLUS_A", diag_pivot_thresh=0.0,
+                    options=dict(SymmetricMode=True))
+    if not _NR_FACTOR_CACHED_ORDER:
+        return splu(K)                  # the pre-cache call, for measuring against
+    ipc = cache.get("ipc")
+    if ipc is not None and cache["sig"] != (K.shape, K.nnz):
+        # The pattern this cache was built on is not the pattern in hand. Nothing
+        # in the driver rebuilds a pattern under a live solve, so this cannot
+        # happen today; it is here because a wrong gather index would be silent.
+        ipc = None
+    if ipc is None:
+        lu = splu(K)
+        cache["sig"] = (K.shape, K.nnz)
+        pc = lu.perm_c
+        cache["pc"] = pc
+        cache["ipc"] = ipc = np.argsort(pc)
+        indptr = K.indptr
+        cache["take"] = np.concatenate(
+            [np.arange(indptr[j], indptr[j + 1]) for j in ipc]
+        ).astype(np.intp) if K.nnz else np.empty(0, dtype=np.intp)
+        newptr = np.zeros(K.shape[1] + 1, dtype=indptr.dtype)
+        np.cumsum(np.diff(indptr)[ipc], out=newptr[1:])
+        cache["newptr"] = newptr
+        cache["newind"] = K.indices[cache["take"]]
+        return lu
+    take = cache["take"]
+    Kp = csc_matrix((K.data[take], cache["newind"], cache["newptr"]),
+                    shape=K.shape)
+    return _NrPermutedLU(splu(Kp, permc_spec="NATURAL"), cache["pc"])
+
+
+def _nr_tangent_factorable(K):
+    """Is this tangent something SuperLU can be handed at all?
+
+    A consistent Mohr-Coulomb tangent can lose a degree of freedom ENTIRELY: the
+    apex branch returns a zero tangent, so a node every one of whose elements has
+    yielded to the apex carries an all-zero row and column. That matrix is
+    structurally singular, and ``splu`` does not raise on it — it builds a
+    degenerate supernode and the process DIES inside OpenBLAS, printing
+    "lda must be >= MAX(N,1)" and taking the whole run with it. Measured on
+    Griffiths & Lane 1 (quad8, 3.5) at F = 1.8, well past its limit of about 1.37:
+    the second tangent re-form of a seeded trial has 98 zero rows and 98 zero
+    columns out of 2,788, every entry finite, and SuperLU aborts on it.
+
+    A degree of freedom with no stiffness at all carries exactly the information the
+    ``RuntimeError`` path carries — this load is unreachable — so the caller takes
+    the same exit. The scan is a bincount and a reduceat over the stored values,
+    which costs a small fraction of the factorization it precedes.
+    """
+    if K.data.size == 0 or np.any(np.diff(K.indptr) == 0):
+        return False
+    a = np.abs(K.data)
+    if not np.all(np.add.reduceat(a, K.indptr[:-1]) > 0.0):
+        return False                    # an all-zero column
+    return bool(np.all(np.bincount(K.indices, weights=a,
+                                   minlength=K.shape[0]) > 0.0))
+
+
+# Newton-Raphson controls. These are the spike's defaults; every one of them is a
+# solver control, not a modeling choice, and none of them changes what the trial
+# means — only how hard the solver works before it declares the load unreachable.
+_NR_MAX_ITER = 150         # Newton iterations allowed inside ONE load increment
+_NR_MIN_STEP = 1.0 / 64    # smallest load increment; below it the load is unreachable
+# A load increment is abandoned when it makes NO PROGRESS — no improvement on the
+# best residual it has seen for this many iterations — or when the residual climbs
+# far above that best. It is NOT abandoned for being slow. An elastoplastic Newton
+# solve characteristically sits on a long plateau while the active set churns and
+# then drops quadratically: on the dry-dam benchmark at F = 2.4 the relative
+# residual holds between 1.4e-1 and 1.3e-1 for ten iterations and then falls
+# 4e-3 -> 6e-5 -> 9e-8 -> 1e-12. An earlier rule that required the residual to
+# HALVE over six iterations cut exactly that solve off mid-plateau and reported a
+# slope that demonstrably stands (the viscoplastic field there is in equilibrium
+# and violates the yield surface by 0.2% of the cohesion, which is a lower-bound
+# proof of stability) as failed, moving the factor of safety from 2.42 to 1.75.
+_NR_NO_PROGRESS = 30       # iterations without a >1% improvement on the best residual
+_NR_DIVERGED = 1.0e3       # ... or the residual standing this far above that best
+_NR_INIT_STEP = 1.0        # first load increment attempted (1.0 = full gravity in one step)
+_NR_GROW = 1.6             # increment growth after a comfortable step
+_NR_COMFORT = 8            # ... which is a step converged in this many iterations
+_NR_LS_MAX = 9             # line-search backtracks (down to a step of 1/256)
+_NR_REL_TOL = 1e-8         # ||r|| / ||f_ext||, the step-level equilibrium test
+_NR_TANGENT_H = 1e-7       # strain perturbation for the algorithmic tangent
+
+# ---- the tangent refresh rule, and what it costs (SPIKE, "THE FACTORIZATION") ----
+# _nr_equilibrate holds its factorization while the residual keeps falling by at
+# least 1/_NR_REFORM_RATIO per iteration, and re-forms when it does not. Measured on
+# the representative set, that rule fires on 96% of iterations: the line search
+# regularly accepts a fraction of the Newton step, a fractional step does not cut the
+# residual by four, and so the tangent is re-formed and re-factorized on nearly every
+# iteration. _NR_REFORM_EVERY overrides it with a fixed hold — reform on the first
+# iteration of an increment and every Nth after — for measuring what a genuine
+# modified-Newton trade costs. None keeps the shipped rule.
+_NR_REFORM_RATIO = 0.25
+_NR_REFORM_EVERY = None
+# The Newton tangent is NON-symmetric at psi = 0, so SuperLU's symmetric mode
+# (MMD_AT_PLUS_A ordering, diagonal pivoting) is an approximation on it rather than
+# the exact structural statement it is on the viscoplastic driver's elastic
+# stiffness. It is 1.8x faster to factorize and 1.5x faster to back-substitute and
+# it is NOT bit-identical, so it is a measurement knob and ships off.
+_NR_FACTOR_SYMMETRIC = False
+# The cached column ordering (see _nr_factorize_tangent). It IS bit-identical, so it
+# ships on; the knob exists so a run can be measured against the plain splu call it
+# replaces without editing the driver.
+_NR_FACTOR_CACHED_ORDER = True
+
+# Admissibility of the ANSWER, not a control on the solve. Reaching equilibrium is
+# only half of what "the slope stands at F" means; the other half is that the state
+# it stands in is one the model can represent. Everything here is small-strain
+# kinematics on an undeformed mesh, so a field that has moved a tenth of the model
+# height is outside the theory that produced it whatever its residual says. 0.1 is
+# solve_fem's own `max_disp_factor` default — the standard a SINGLE solve applies.
+# (It is not one the viscoplastic SSRM path enforces: solve_ssrm runs its VP trials
+# with `max_disp_factor=None` and leans on the runaway rule instead.)
+#
+# This is deliberately NOT the gate that was removed (see the long note in the
+# increment loop). That one abandoned a load INCREMENT mid-solve on a displacement
+# threshold, so it decided verdicts by stopping the solver early. This one is read
+# ONCE, on the final fully-loaded equilibrated state, and it changes nothing about
+# how hard the solver works — the trial is driven to convergence exactly as before
+# and only then asked whether the converged state is admissible.
+#
+# Measured need, on Griffiths & Lane 1 (quad9, 3.5): F = 1.400 converges to an
+# out-of-balance of 3.05e-8 — machine-precision statics, and a worst yield violation
+# of 1.5e-8 — at max|u| = 7.693 m on a 50 m model, 15.4% of its height. The
+# neighbouring trials read 1.66% (F = 1.3875) and 6.04% (F = 1.396875) of the height:
+# the classic displacement upturn, with the limit between the last two. Griffiths &
+# Lane read their own Example 1 at about 1.40 the same way, off the upturn.
+#
+# An explicit non-None `max_disp_factor` from the caller wins; the constant supplies
+# the standard on the hybrid/non-convergence path, where solve_ssrm passes None
+# because the viscoplastic driver substitutes its own runaway classifier there and
+# the Newton driver has none. Setting this to None turns the bound off entirely,
+# which is for experiments, not for runs whose answers are quoted.
+_NR_DISP_FACTOR = 0.1
+
+# The viscoplastic predictor. A trial that dies at the load-step floor is retried
+# once per budget here: a bounded viscoplastic run at the SAME strength on the SAME
+# prepared model supplies a displacement field and, more to the point, a plastic
+# strain field, and the Newton iteration corrects that instead of walking the load
+# path from zero.
+#
+# It exists because the Newton driver's difficulty on a cohesionless soil is the
+# plastic HISTORY and not the equilibrium. Measured on the reinforced specimen
+# (docs/fem/files/xslope_reinforce_fem.xlsx, softening unset, tri6/2.0), F = 1.3:
+# from zero the driver fails at every load increment down to the 1/64 floor, and
+# does so after 18,914 iterations when the per-increment cap and the no-progress
+# watch are both lifted, carrying 3% of gravity. Handed a 200-iteration
+# viscoplastic state it reaches full gravity in 27 Newton iterations at an
+# out-of-balance of 3.7e-7. The root was always there and always Newton-attracting;
+# load control from a zero start could not reach it.
+#
+# What this is NOT is a fallback to the viscoplastic verdict. The predictor's own
+# convergence is never read, and the answer is decided entirely by whether the Newton
+# corrector reaches full gravity in equilibrium and passes the same force gate, the
+# same displacement bound and the same yield reading every other trial passes. A
+# trial that is genuinely past failure gets a predictor state that is running away,
+# and the corrector refuses it.
+#
+# Two SHORT rungs, because a state near the limit needs a longer walk than one well
+# below it. The measured need on the specimen is 100 iterations at F = 1.3 and 50 at
+# F = 1.5; the rungs are set well above that and the second exists for the trials
+# that sit hard against the limit.
+_NR_VP_PREDICTOR_ITERS = (250, 1000)
+
+# AND ONE ADAPTIVE RUNG, appended. A fixed ladder cannot express "run until this walk
+# has finished", which is what a seed on a cohesionless model near its limit needs:
+# on the three-layer reinforced variant six FIXED budgets up to 32,000 iterations all
+# failed at F = 1.225 while a converged-state seed succeeded in a handful of
+# iterations. The last rung is therefore budgeted exactly as a viscoplastic trial of
+# the same model at the same strength would be — the caller's own `max_iterations` as
+# the chunk, the caller's own `max_iterations_ceiling` as the hard stop, and the
+# caller's own `early_failure` — which puts the stopping decision on
+# `_still_progressing`, the viscoplastic driver's already-calibrated budget-extension
+# rule: continue while the residual's trailing-window mean is falling by at least 1%,
+# or while the displacement field is standing still on evidence the failure
+# classifier cannot rule on. There is no new dial, and the hard ceiling is the same
+# one every viscoplastic trial on this model already respects.
+#
+# It is APPENDED rather than substituted, and that is deliberate. The short rungs are
+# not merely cheaper, they are sometimes better: on the locked tri6/2.0 reinforced
+# mesh at F = 1.55625 a 250-iteration seed corrects in 51 Newton iterations while the
+# adaptive rung stops one chunk short of its own convergence and the corrector
+# refuses it. Keeping the short rungs first and unchanged means every trial the
+# driver already rescued is rescued at the same rung from the same state, so the
+# extra rung can only convert a FAILED trial, never move a passing one.
+#
+# What justifies the progress test is a measurement, not its provenance. On the
+# three-layer model at the four strengths that decide its bisection, and at three
+# chunk sizes, the corrector converged on EVERY seed the adaptive rung had carried to
+# its own convergence and on NO seed it had not.
+_NR_VP_PREDICTOR_ADAPTIVE = True
+
+# THE ADAPTIVE RUNG RUNS UNDER A RANKINE CAP. With psi = 0 the Mohr-Coulomb flow is
+# purely deviatoric, so it cannot relieve a point's MEAN stress; on a c = 0 material
+# the yield surface is a cone through the origin, so a tensile point sheds its
+# deviatoric stress, stops flowing, and freezes hundreds of psf outside the surface.
+# The viscoplastic force gate has no term that could notice (see SPIKE.md, "THE
+# THREE-LAYER DISAGREEMENT"), so an uncapped long predictor hands the corrector a
+# state that is in force equilibrium but not admissible — and there is no root of the
+# Newton residual near it. Measured on the three-layer model at F = 1.20625: the
+# UNCAPPED rung converges in 19,716 iterations and the corrector refuses its state;
+# the capped rung converges in 22,964 and the corrector takes it in FOUR iterations,
+# to an out-of-balance of 1.1e-5 and a yield violation of 1.2e-15.
+#
+# The cap is on the SEED only. The corrector runs on the caller's own tensile caps
+# and reports the caller's own yield reading, so nothing about the verdict is capped.
+_NR_VP_PREDICTOR_TENSION_CAP = True
+
+# ===================== The rescue cost policy (SPIKE, "THE COST OF THE RESCUE") ==
+#
+# The rescue chain above buys the Newton driver its robustness — across the 191-row
+# corpus it left ZERO inconclusive trials against the viscoplastic driver's 37 — and
+# it buys it at two thirds of that driver's total constitutive work, because it runs
+# on every trial that dies at the load-step floor and half of every bisection is a
+# trial the search visits only to prove it fails. The three knobs below spend the
+# chain where it can change an answer and not where it cannot.
+#
+# ALL THREE DEFAULT TO OFF, and with them off every path below is the code that was
+# there, evaluation for evaluation.
+#
+# P2 — budget the chain by how far the trial sits above the highest strength this
+# search has SHOWN TO STAND, in units of the bracket it started from. A trial that
+# far above a standing bound is one the bisection visits to prove a failure; the
+# chain there can confirm the cold attempt's verdict but is not measured to overturn
+# one, and the adaptive rung costs a whole viscoplastic trial to do it.
+#
+# Two thresholds, both read off the Phase 0 slice rather than chosen: across 383
+# trials the adaptive rung converted a verdict only at or below a QUARTER of the
+# initial bracket above the standing bound, and no rung of any length converted one
+# above HALF. The values below sit clear of both measured edges. None = off, and the
+# whole chain runs on every trial as it did.
+_NR_RESCUE_ADAPTIVE_FRAC = None   # above this distance, no adaptive rung
+_NR_RESCUE_NONE_FRAC = None       # above this distance, no rescue at all
+
+# P3 — per-model memory. On a model whose trials are carried only from a predictor
+# seed, the cold attempt is a walk down to the load-step floor that has already been
+# measured to fail at every increment; once one trial has been rescued that way, the
+# later trials skip it and start at the first rung.
+_NR_SEED_MEMORY = False
+
+# P4 — a cheaper cold attempt: the load-path walk that is going to be handed off
+# anyway stops at a coarser increment floor and a shorter per-increment budget. The
+# SEEDED correctors keep the shipped control, so nothing that decides a verdict is
+# coarsened — only the attempt whose failure is the trigger for the hand-off.
+_NR_COLD_CHEAP = False
+_NR_COLD_MIN_STEP = 1.0 / 8
+_NR_COLD_MAX_ITER = 60
+
+# L4 — the cheap cold attempt as a PRE-FILTER rather than a replacement, which is
+# what the cost round's verdict named as the only verdict-safe shape for it. With
+# both this and _NR_COLD_CHEAP on, a trial runs the coarse attempt, then the rescue
+# chain, and then — before it may be called FAILED — the full cold attempt the coarse
+# one stood in for. Nothing is ever refused on less evidence than the driver refuses
+# it on today, so the FAILED verdict is safe by construction rather than by a
+# threshold fitted to a sample. What it is not is field-identical: a trial the coarse
+# attempt or the chain carries reports the state THEY reached, and on a trial the
+# full attempt would have carried that is a different converged field.
+_NR_COLD_FALLBACK = False
+
+
+def _nr_predictor_rungs(prep, n_elements, max_iterations, max_iterations_ceiling,
+                        early_failure):
+    """The predictor's rungs, in the order they are tried.
+
+    Each rung is ``(chunk, ceiling, prepared_model, early_failure)``. The short fixed
+    rungs come first, on the caller's own prepared model and with the predictor's own
+    convergence never able to end them early; the adaptive rung comes last, on a
+    prepared model that is the caller's with its tensile caps replaced by a Rankine
+    T = 0. That capped model shares everything else with ``prep`` — the
+    factorization, the geometry precompute, the Gauss-point groups are all
+    independent of the caps — so building it costs a dict copy.
+
+    See ``_NR_VP_PREDICTOR_ITERS`` and ``_NR_VP_PREDICTOR_ADAPTIVE``.
+    """
+    rungs = [(int(b), int(b), prep, False) for b in (_NR_VP_PREDICTOR_ITERS or ())]
+    if _NR_VP_PREDICTOR_ADAPTIVE:
+        prep_seed = prep
+        if _NR_VP_PREDICTOR_TENSION_CAP:
+            prep_seed = dict(prep)
+            # COMPOSED with the caller's own caps rather than replacing them, so a
+            # model that already sets t_cut keeps the tighter of the two. A tensile
+            # cap is never negative, so this is the same zeros array on every model
+            # that sets none — the seed is the caller's model with no tension
+            # permitted anywhere, which is what the seed is for.
+            prep_seed["t_cap_base"] = np.minimum(
+                np.asarray(prep["t_cap_base"], dtype=float), 0.0)
+        rungs.append((int(max_iterations),
+                      max(int(max_iterations_ceiling or 0), int(max_iterations)),
+                      prep_seed, bool(early_failure)))
+    return tuple(rungs)
+
+
+# ===================== Post-peak softening (SPIKE, "POST-PEAK SOFTENING") ====
+#
+# The step schedule the DROP is walked down on. A bar that has just been latched has
+# its cap taken from t_allow to t_res over eta in [0, 1], re-equilibrating at full
+# gravity at each accepted step, with the same halve-on-failure control the gravity
+# walk uses. A step the corrector cannot carry at the floor is a LIMIT POINT in the
+# drop -- the structure cannot shed that force -- which is the same argument this
+# driver already makes for gravity, and it is what keeps the verdict a statement
+# about the slope rather than about the solver.
+#
+# The first attempt is the whole drop in one step, because on a structure that can
+# carry it that is one equilibrate and the walk costs nothing.
+_NR_SOFTEN_INIT_STEP = 1.0
+_NR_SOFTEN_MIN_STEP = 1.0 / 64.0
+
+
+def _nr_soften_newly(bars):
+    """Which bars the latch drops now, per group.
+
+    The viscoplastic expression, unchanged: a bar softens when its UNCAPPED elastic
+    demand ``k*delta`` -- the quantity both drivers publish as ``forces_1d`` -- exceeds
+    the capacity it was allowed to carry, read on a state that has already reached
+    full gravity and passed the force gate. Never mid-iteration, never on a failed
+    trial, and the set only ever grows.
+    """
+    return [(~bg['softened'] & bg['can_soften']
+             & (bg['_T'] > bg['t_peak'] + 1e-9)) for bg in bars]
+
+
+def _nr_soften_set_eta(bars, newly, eta):
+    """Put the newly-dropping bars' caps at ``eta`` of the way from peak to residual."""
+    for bg, nw in zip(bars, newly):
+        if nw.any():
+            bg['t_cap'] = np.where(
+                nw, bg['t_peak'] - eta * (bg['t_peak'] - bg['t_res']), bg['t_cap'])
+
+
+def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
+                     force_tol, oob_fn, nr_max_iter, u_el, piles=None,
+                     trans_dofs=None, debug_level=0, deep_free=None):
+    """Run the post-peak latch to its fixed point on a converged full-load state.
+
+    Returns ``(ok, u, iterations, force_evaluations, out_of_balance, rounds, cuts)``.
+    ``ok`` is False when a drop reaches the step floor, which is a LIMIT POINT in the
+    drop: the structure cannot shed that force. Nothing is committed on failure
+    beyond the plastic strains the accepted sub-steps already committed, which the
+    caller restores if it rejects the state.
+
+    The law is the viscoplastic driver's, read on the same uncapped demand against
+    the same threshold, at the same moment — a state in equilibrium with full
+    gravity. The PATH is this driver's: the cap walks down rather than jumping, so a
+    drop the structure survives but a single step from the pre-drop state cannot
+    reach is carried instead of being reported as a failure.
+    """
+    n_bars = sum(len(bg['idx']) for bg in bars)
+    it_total = fe_total = rounds = cuts = 0
+    oob_last = 0.0
+    while rounds < n_bars:
+        newly = _nr_soften_newly(bars)
+        if not any(nw.any() for nw in newly):
+            break
+        rounds += 1
+        eta, deta = 0.0, float(_NR_SOFTEN_INIT_STEP)
+        while eta < 1.0 - 1e-12:
+            eta_try = min(eta + deta, 1.0)
+            _nr_soften_set_eta(bars, newly, eta_try)
+            ok, u_try, it, fe, oob_here, _rel = _nr_equilibrate(
+                groups, pattern, u, f_ext, free_dofs, n_dof, h_eps, force_tol,
+                oob_fn, nr_max_iter, u_el, debug_level=debug_level,
+                label=f"soften eta={eta_try:.4f}", bars=bars, piles=piles,
+                trans_dofs=trans_dofs, deep_free=deep_free)
+            it_total += it
+            fe_total += fe
+            if ok:
+                u = u_try
+                for grp in groups:
+                    grp['_u'] = u
+                _nr_commit_plastic_strain(groups)
+                eta = eta_try
+                oob_last = oob_here
+                if it <= _NR_COMFORT:
+                    deta = min(1.0, deta * _NR_GROW)
+            else:
+                cuts += 1
+                deta = (eta_try - eta) * 0.5
+                if deta < _NR_SOFTEN_MIN_STEP:
+                    return False, u_try, it_total, fe_total, oob_here, rounds, cuts
+        # The walk finished: those bars now hold the residual, permanently for this
+        # solve. The latch is one-way; the FORCE is not, since a softened bar that
+        # unloads carries less than its residual.
+        for bg, nw in zip(bars, newly):
+            if nw.any():
+                bg['softened'] |= nw
+                bg['t_cap'] = np.where(nw, bg['t_res'], bg['t_cap'])
+        if debug_level >= 1:
+            _n = sum(int(nw.sum()) for nw in newly)
+            _t = sum(int(bg['softened'].sum()) for bg in bars)
+            print(f"  Softening round {rounds}: {_n} bar element(s) dropped to "
+                  f"t_res ({_t} total); re-solved")
+    return True, u, it_total, fe_total, oob_last, rounds, cuts
+
+
+def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
+                    force_tol, oob_fn, nr_max_iter, u_elastic_scale,
+                    debug_level=0, label="", bars=None, piles=None,
+                    trans_dofs=None, deep_free=None):
+    """Drive the equilibrium residual to zero at a FIXED external load.
+
+    The inner Newton iteration, lifted out of :func:`_solve_fem_newton` verbatim so
+    the two drivers that need it share one copy. The bisection driver calls it once
+    per gravity increment with ``f_ext`` a fraction of the load; the ramp driver
+    calls it once per strength step with ``f_ext`` the whole load and ``u_start``
+    the previous step's converged field.
+
+    Nothing here knows what is being continued. It starts from ``u_start``, uses
+    whatever strengths the groups currently carry, and returns
+
+        (ok, u, iterations, force_evaluations, out_of_balance, relative_du)
+
+    without committing plastic strain — the caller decides whether the state is
+    worth keeping.
+
+    ``deep_free`` is the ``min_slip_depth`` filter as a boolean over the free
+    degrees of freedom (``None`` when the filter is off, which is every unfiltered
+    run and leaves every quantity below bit-identical). When it is given, the MERIT
+    the iteration is driven and judged on — the residual norm the line search
+    minimizes, the no-progress watch, the divergence test, and the relative
+    equilibrium test — is taken over the deep degrees of freedom only. That is the
+    same convention the out-of-balance reading already carries, extended to the
+    place the Newton driver actually decides: this driver's dominant failure is
+    "the load increment cannot be carried", and read on the whole model that
+    verdict belongs to a cohesionless surface skin the filter exists to exclude.
+    The viscoplastic driver never faces the question — its elastic operator is
+    non-singular, its convergence test is a RATIO that a creeping skin's own
+    displacement flatters, and the one gate that decides is already filtered — so
+    a skin runaway is not a verdict there, and it is not one here either.
+
+    The skin is still free to move: nothing bounds it, and its state is carried
+    along untouched. It is only barred from ENDING the increment. The one
+    concession to arithmetic is the eligibility test in the line search, which
+    refuses a candidate whose whole-model residual has grown by more than
+    ``_NR_DIVERGED`` in a single step — the driver's own divergence factor, reused
+    rather than a new threshold — so a step that is good for the deep system does
+    not carry the skin to 1e26 and take the reported state with it.
+    """
+    def _merit(v_free):
+        return float(np.linalg.norm(v_free if deep_free is None
+                                    else v_free[deep_free]))
+
+    f_ext_free = f_ext[free_dofs]
+    f_norm = max(_merit(f_ext_free), 1e-30)
+    n_fe = 0
+    rel_du = 0.0
+    u_try = u_start.copy()
+    ok = False
+    it = 0
+    r0_norm = None
+    oob_here = np.inf
+    r_hist = []
+    r_best = float('inf')
+    last_progress = 0
+    lu = None                  # the live tangent factorization (see below)
+    # The column ordering COLAMD derives from this pattern, kept for the whole
+    # trial (see _nr_factorize_tangent). The pattern is built once per solve, so
+    # this is the same structure every re-form and every load increment sees.
+    _order_cache = pattern.setdefault("_order", {})
+    prev_r = None
+    for it in range(1, nr_max_iter + 1):
+        # Re-form and re-factorize the tangent only when the previous step did
+        # not earn its keep. The consistent tangent changes only where the
+        # active set changes, so once the plastic zone has settled the SAME
+        # factorization drives the remaining iterations at essentially the same
+        # rate for a fraction of the cost — the assembly and the LU are the
+        # whole per-iteration expense, the return map is not. A step whose
+        # residual stops falling by 4x per iteration gets a fresh tangent.
+        if _NR_REFORM_EVERY is None:
+            reform = (lu is None or prev_r is None
+                      or r_hist[-1] > _NR_REFORM_RATIO * prev_r)
+        else:
+            reform = lu is None or (it - 1) % int(_NR_REFORM_EVERY) == 0
+        _tp = time.perf_counter() if _PROF_ON else None
+        fint, tangents, _ = _nr_internal_force(groups, u_try, n_dof,
+                                               h_eps=h_eps, want_tangent=reform,
+                                               bars=bars, piles=piles)
+        if _PROF_ON:
+            _prof_add("nr_const_tan" if reform else "nr_const_res", _tp)
+        n_fe += 1
+        r = f_ext - fint
+        r_free = r[free_dofs]
+        r_norm = _merit(r_free)
+        if not np.isfinite(r_norm):
+            break
+        r_full = np.zeros(n_dof)
+        r_full[free_dofs] = r_free
+        oob_here = oob_fn(r_full)
+        if r0_norm is None:
+            r0_norm = max(r_norm, 1e-30)
+        # Equilibrium for this increment. Either test alone is enough: the
+        # relative norm is the Newton-natural one, and the Dawson measure at a
+        # tenth of the trial tolerance guarantees the final state passes the
+        # same gate the viscoplastic verdict is read on.
+        if r_norm / f_norm < _NR_REL_TOL or oob_here < 0.1 * force_tol:
+            ok = True
+            break
+        prev_r = r_hist[-1] if r_hist else None
+        r_hist.append(r_norm)
+        if r_norm < 0.99 * r_best:
+            r_best = r_norm
+            last_progress = it
+        if it - last_progress > _NR_NO_PROGRESS or r_norm > _NR_DIVERGED * r_best:
+            break                       # no progress: this load is unreachable
+
+        if reform:
+            _tp = time.perf_counter() if _PROF_ON else None
+            K = _nr_assemble_tangent(groups, tangents, pattern, bars=bars,
+                                     piles=piles)
+            if _PROF_ON:
+                _prof_add("nr_assemble", _tp)
+            if not _nr_tangent_factorable(K):
+                break                   # structurally singular = the limit load
+            _tp = time.perf_counter() if _PROF_ON else None
+            try:
+                lu = _nr_factorize_tangent(K, _order_cache)
+            except RuntimeError:
+                break                   # singular tangent = the limit load
+            finally:
+                if _PROF_ON:
+                    _prof_add("nr_factorize", _tp)
+        _tp = time.perf_counter() if _PROF_ON else None
+        du_free = lu.solve(r_free)
+        if _PROF_ON:
+            _prof_add("nr_trisolve", _tp)
+        if not np.all(np.isfinite(du_free)):
+            break
+        du = np.zeros(n_dof)
+        du[free_dofs] = du_free
+
+        # Line search: accept the full Newton step unless it makes the
+        # residual worse, then backtrack. Near the limit load the full step
+        # regularly overshoots, and halving is what keeps the iteration in the
+        # basin instead of throwing it into a spurious runaway.
+        #
+        # The step actually taken is always one that was MEASURED, and the best
+        # of those measured. Taking an unmeasured fallback step — what this did
+        # when every backtrack failed — is how the dry-dam solve blew up: with a
+        # near-singular tangent the correction was enormous, no tested step
+        # reduced the residual, the untested one was applied anyway, and the
+        # displacement reached 4.6e13 times the elastic response in a single
+        # iteration. A step that cannot be shown to help is a step that has to
+        # stay small.
+        alpha = 1.0
+        best_alpha, best_rc = None, np.inf
+        g_now = (None if deep_free is None
+                 else max(float(np.linalg.norm(r_free)), 1e-30))
+        for _ls in range(_NR_LS_MAX):
+            cand = u_try + alpha * du
+            _tp = time.perf_counter() if _PROF_ON else None
+            f_c, _, _ = _nr_internal_force(groups, cand, n_dof, bars=bars,
+                                           piles=piles)
+            if _PROF_ON:
+                _prof_add("nr_linesearch", _tp)
+            n_fe += 1
+            rc_free = (f_ext - f_c)[free_dofs]
+            rc = _merit(rc_free)
+            eligible = bool(np.isfinite(rc))
+            if eligible and g_now is not None:
+                # See the docstring: the skin may run away, but not by a factor of
+                # a thousand in one accepted step.
+                eligible = float(np.linalg.norm(rc_free)) <= _NR_DIVERGED * g_now
+            if eligible and rc < best_rc:
+                best_rc, best_alpha = rc, alpha
+            if eligible and rc < r_norm:
+                break
+            alpha *= 0.5
+        alpha = best_alpha if best_alpha is not None else 0.0
+        if _PROF_ON:
+            # How much of the Newton step the search actually takes, and how often
+            # it runs out of backtracks. Both are bookkeeping.
+            _PROF["alpha_sum"] = _PROF.get("alpha_sum", 0.0) + alpha
+            _PROF["n_alpha"] = _PROF.get("n_alpha", 0) + 1
+            _PROF["n_ls_full"] = _PROF.get("n_ls_full", 0) + (1 if alpha == 1.0 else 0)
+            _PROF["n_ls_exhausted"] = (_PROF.get("n_ls_exhausted", 0)
+                                       + (1 if _ls == _NR_LS_MAX - 1 else 0))
+        u_try = u_try + alpha * du
+        # Translational degrees of freedom only: a rotation is not a length, and
+        # this ratio is reported as `residual` on both drivers. Without a pile every
+        # degree of freedom is translational and this is the same number as before.
+        _umax = _nr_umax(u_try, trans_dofs)
+        rel_du = ((_nr_umax(alpha * du, trans_dofs) / _umax)
+                  if _umax > 0.0 else 0.0)
+        if debug_level >= 3:
+            print(f"      NR {label} it={it:3d} "
+                  f"||r||/||f||={r_norm / f_norm:.3e} oob={oob_here:.2e} "
+                  f"alpha={alpha:.3g} max|u|={np.max(np.abs(u_try)):.4g} "
+                  f"({np.max(np.abs(u_try)) / max(u_elastic_scale, 1e-30):.1f}x "
+                  f"elastic){' [tangent re-formed]' if reform else ''}")
+
+        # There is deliberately NO displacement gate here. An earlier version
+        # abandoned an increment once max|u| passed 50x the elastic response, on
+        # the reasoning that a slope moving that far is running away. It is not a
+        # statement about the slope: at the limit load the load-displacement curve
+        # flattens, so the last standing increments are exactly the ones with the
+        # largest displacements, and the gate cut them off. Measured on Griffiths
+        # & Lane 1 (quad9, 3.5) at F = 1.400: with the gate the trial is reported
+        # FAILED after 440 iterations; without it the same driver reaches
+        # equilibrium in 48, at an out-of-balance of 3e-8 and with no Gauss point
+        # more than 1.5e-8 of its strength outside the yield surface -- a
+        # statically admissible field, which is the definition of the trial
+        # standing. One trial's verdict, and the factor of safety moved 1.3969 ->
+        # 1.4031. A load that cannot be carried already proves itself by driving
+        # the increment below its floor, which is a statement about the slope; a
+        # displacement threshold is a statement about a number nobody chose for a
+        # reason. The runaway is still caught, just not by a threshold: a
+        # non-finite residual, a singular tangent and the no-progress watch all
+        # end the increment, and the failing trials in the benchmark table all
+        # terminate at the load-step floor without it.
+
+    return ok, u_try, it, n_fe, oob_here, rel_du
+
+
+def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
+                      elastic_by_elem, t_cap_by_elem, finv_by_elem,
+                      force_tol, min_slip_depth, max_iterations,
+                      max_disp_factor=None, _nr_export=None,
+                      debug_level=0, progress_callback=None,
+                      nr_max_iter=_NR_MAX_ITER, nr_min_step=_NR_MIN_STEP,
+                      _nr_seed=None, k0=None, _nr_init_state=None,
+                      _nr_seed_state=None, _nr_env_F=None, _softened_seed=None):
+    """One strength-reduction trial by Newton-Raphson (SPIKE; see SPIKE.md).
+
+    Returns the same result dictionary solve_fem returns, so the SSRM bisection
+    consumes it unchanged. The verdict is BINARY by construction — the full
+    gravity load is either reached in equilibrium (`converged`, `stable`) or the
+    load increment is driven below its floor without reaching it (`FAILED`,
+    exit_reason 'diverging') — so this path can never leave a trial
+    'inconclusive'.
+
+    A trial that reaches full gravity in equilibrium is checked once more, against
+    the displacement bound (`_NR_DISP_FACTOR`): a converged state that has moved
+    more than a tenth of the model height is reported FAILED with exit_reason
+    'displacement_limit', which is distinguishable from the force-side failures
+    ('diverging' at the load-step floor, 'iteration_cap' at the final force gate).
+
+    Deliberately narrow: Mohr-Coulomb, psi = 0, no strain softening. The Rankine
+    tension cutoff IS carried, as a second yield surface combined with the shear
+    one by Koiter's rule (see mc_return_map and _nr_rankine_return), which is the
+    same physics the viscoplastic path gets by summing the two flows.
+    Reinforcement bar elements ARE carried (see _nr_build_bars and _nr_bar_force),
+    with the soil strength reduced and the bars keeping their capacity, which is the
+    vendor convention and what the LEM does. Pile beam elements ARE carried (see
+    _nr_build_piles and _nr_pile_force), rotational degrees of freedom and all, with
+    their rigidity and their structural capacity likewise held while only the soil
+    strength falls. The K0 initial stress IS carried (see
+    _nr_group_sig0): the in-situ field rides inside the internal force rather than
+    being moved to the right-hand side, because Newton has an internal force to
+    write, and `_nr_init_state` starts a trial from the equilibrated in-situ state
+    with its displacement measured from there — the same sequencing solve_ssrm
+    gives the viscoplastic driver. Everything else the spike does not cover raises
+    rather than being silently ignored, because a switch that quietly drops a
+    tensile cap or a softening bar would return a wrong factor of safety that looks
+    right.
+    """
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    n_elements = len(elements)
+    n_dof = prep["n_dof"]
+    free_dofs = prep["free_dofs"]
+    n_free = prep["n_free"]
+    dof_offset = fem_data.get("dof_offset", None)
+
+    # ---- what this path does NOT cover -------------------------------------
+    unsupported = []
+    # Pile beam elements ARE carried (see _nr_build_piles / _nr_pile_force): the same
+    # element matrix the global elastic stiffness is assembled from, the same
+    # per-unit-width rigidities and capacities, and the same head/tip fixity, which
+    # is a constraint on `prep["free_dofs"]` and therefore already in force on this
+    # path. Nothing about a pile is reduced by F, as nothing about a bar is.
+    # Reinforcement bars ARE carried (see _nr_build_bars), and so is their POST-PEAK
+    # drop (see _nr_soften). A bar with a finite t_res below the capacity its
+    # embedment develops drops to that residual through the same converged-state
+    # latch the viscoplastic path applies — read on the same uncapped demand, against
+    # the same threshold — with the drop walked down as a continuation on the cap so
+    # that a drop the structure cannot carry reads as a limit point rather than as a
+    # solver that gave up. CONTINUUM strain-softening is a different animal and stays
+    # refused on both drivers; there is no input for it, so there is nothing to guard.
+    # The two CURVED envelopes ARE carried (see _nr_envelope_return and
+    # _nr_envelope_by_elem), per GAUSS POINT, so one mesh can hold a Mohr-Coulomb
+    # soil and a Hoek-Brown rock and solve them together. Both arrive here the way
+    # the viscoplastic driver carries them — as a Mohr-Coulomb tangent to the
+    # F-reduced envelope, re-derived from the current stress — because neither
+    # driver has a curved yield surface and the two have to solve the same model.
+    # Matric suction IS carried (see _nr_group_suction / _nr_group_apparent_
+    # cohesion). Fredlund's credit is an apparent cohesion on the same linear
+    # envelope, so it arrives here folded into the per-Gauss-point c_r that the
+    # return map already takes, reduced by the trial F exactly as c' is. Nothing
+    # about its semantics is decided on this path.
+    # The Rankine tension cutoff IS carried (see mc_return_map's second surface and
+    # _nr_rankine_return). It arrives here as t_cap_by_elem, already reduced by the
+    # trial F where `tension_srf` says so, so nothing about the cap's semantics is
+    # decided on this path — it is the same per-element array the viscoplastic
+    # driver caps sigma_1 against.
+    # The K0 initial stress IS carried (see _nr_group_sig0): the same overburden
+    # integral the viscoplastic path reads, the same in-plane AND out-of-plane
+    # sigma_h = K0 sigma'_v, and the same in-situ pre-equilibration sequencing
+    # through `_nr_init_state`. It arrives here as prep['sv0_gp'] plus the k0
+    # argument, so nothing about the field's semantics is decided on this path.
+    if unsupported:
+        raise NotImplementedError(
+            "fem_solver='newton' is a plain Mohr-Coulomb spike and does not "
+            "handle " + ", ".join(unsupported) + ". Run this model on the "
+            "default viscoplastic solver.")
+
+    # The displacement bound (_NR_DISP_FACTOR), the elastic displacement scale, the
+    # tangent probe's step and the max|du|/max|u| both drivers report as `residual`
+    # are all LENGTHS, so they are read over the translational degrees of freedom
+    # only — which is what the viscoplastic driver's own displacement-limit check
+    # reads. A pile node carries a rotation as its third degree of freedom; putting
+    # one into any of those maxima would compare a length against a radian. Without a
+    # pile this index is None and every one of them is the plain max over the whole
+    # vector, bit for bit.
+    trans_dofs = _nr_translational_dofs(fem_data, n_dof)
+
+    env_by_elem = _nr_envelope_by_elem(fem_data, _nr_env_F)
+    groups = _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
+                              t_cap_by_elem, k0=k0, finv_by_elem=finv_by_elem,
+                              env_by_elem=env_by_elem)
+    bars = _nr_build_bars(fem_data)
+    # A carried-in post-peak set. The bisection never passes one — every trial is a
+    # cold solve with an empty set, which is the viscoplastic convention — so this is
+    # the retry path (a seeded corrector picks up the set its cold attempt had
+    # reached) and the ramp (a bar that ruptured at one strength is ruptured at the
+    # next). Softening only ever grows, so the seed is a lower bound and never a
+    # verdict.
+    if bars is not None and _softened_seed is not None:
+        _seed = np.asarray(_softened_seed, dtype=bool)
+        if _seed.size == len(fem_data.get("elements_1d", ())):
+            for bg in bars:
+                take = _seed[bg['idx']] & bg['can_soften']
+                if take.any():
+                    bg['softened'] |= take
+                    bg['t_cap'] = np.where(take, bg['t_res'], bg['t_cap'])
+    piles = _nr_build_piles(fem_data)
+    pattern = _nr_prepare_assembly(groups, free_dofs, n_dof, bars=bars, piles=piles)
+
+    # ---- external load -------------------------------------------------------
+    # Effective-stress formulation, exactly as the viscoplastic path builds it:
+    # the pore-pressure term joins the load vector and D*(B u - eps^p) is then the
+    # EFFECTIVE stress the yield check reads directly.
+    base_loads = prep["F_gravity"].copy()
+    F_u = np.zeros(n_dof)
+    any_u = False
+    for grp, sg in zip(groups, prep["gp_groups_static"]):
+        u_gp = np.array([prep["u_gp"][e][g] for e, g in sg['pairs']])
+        if np.any(u_gp):
+            any_u = True
+        contrib = (grp['w'] * u_gp)[:, None] * (grp['B'][:, 0, :] + grp['B'][:, 1, :])
+        np.add.at(F_u, grp['dof'], contrib)
+    if any_u:
+        base_loads = base_loads + F_u
+
+    node_dof_x = prep["node_dof_x"]
+    node_dof_y = prep["node_dof_y"]
+    node_has_free = prep["node_has_free"]
+    g_node_den = prep["g_node_den"]
+    deep_free_mask = prep["deep_free_mask"]
+    free_dof_mask = prep["free_dof_mask"]
+    # The same filter on the degrees of freedom, restricted to the free ones in
+    # the order the residual vector carries them. None without a filter, and every
+    # quantity it touches is then exactly what it was.
+    deep_dof_mask = prep.get("deep_dof_mask")
+    deep_free = None if deep_dof_mask is None else deep_dof_mask[free_dofs]
+
+    def _oob(r_full):
+        """The Dawson, Roth & Drescher measure, on the TRUE residual.
+
+        Same quantity the viscoplastic path reports — the largest nodal
+        out-of-balance force divided by that node's own tributary weight — but
+        read off the genuine equilibrium residual rather than off the increment of
+        a body-load correction, because Newton-Raphson has one to read.
+        """
+        d = r_full * free_dof_mask
+        rn = np.sqrt(d[node_dof_x] ** 2 + d[node_dof_y] ** 2)
+        v = (rn / g_node_den)[node_has_free]
+        if deep_free_mask is not None:
+            v = v[deep_free_mask]
+        return float(np.max(v)) if v.size else 0.0
+
+    # Elastic reference response (the displacement scale the runaway test and the
+    # reported u_ratio are measured in — the same yardstick the viscoplastic path
+    # uses, so the two solvers' metadata are comparable).
+    u_elastic = np.zeros(n_dof)
+    u_elastic[free_dofs] = prep["K_factor"].solve(base_loads[free_dofs])
+    u_elastic_scale = _nr_umax(u_elastic, trans_dofs) if n_free else 0.0
+    h_eps = _NR_TANGENT_H * max(
+        1e-12, _nr_umax(u_elastic, trans_dofs) / max(1e-12, prep["mesh_height"]))
+
+    ext_norm = float(np.linalg.norm(base_loads[free_dofs]))
+    u = np.zeros(n_dof)
+    # A seeded start (see _NR_VP_PREDICTOR_ITERS): the plastic strain field and the
+    # displacements come from a bounded viscoplastic run at this same strength, on
+    # this same prepared model, so the load path is already walked and this call has
+    # only to correct it. `plastic_strains` carries the same quantity on both
+    # drivers — eps^p per Gauss point, [ex, ey, gxy, ez], with
+    # sigma = D (B u - eps^p) — which is what makes the hand-over meaningful rather
+    # than a shared array name.
+    if _nr_seed is not None:
+        u_seed, ep_seed = _nr_seed
+        u = np.asarray(u_seed, dtype=float)[:n_dof].copy()
+        for grp in groups:
+            ep = np.empty_like(grp['ep'])
+            for k, (e, gp) in enumerate(grp['pairs']):
+                ep[k] = ep_seed[e][gp]
+            grp['ep'] = ep
+    # The equilibrated in-situ state (K0 runs only; see solve_ssrm's equilibration
+    # solve). It is the displacement field and the plastic strain at the end of a
+    # full-strength solve, in this prepared model's own group order, and starting
+    # here starts this trial from that solve's answer. Displacement is then measured
+    # FROM it — the reported field and the displacement bound both — because the
+    # in-situ displacement is the artifact of imposing a stress field the geometry
+    # does not hold in equilibrium, not travel the soil made. Stresses stay
+    # functions of the ABSOLUTE displacement, which is what the solve iterates on.
+    u_datum = np.zeros(n_dof)
+    if _nr_init_state is not None:
+        if not groups or groups[0].get('sig0') is None:
+            raise ValueError("_nr_init_state was given without k0; an equilibrated "
+                             "initial state has no meaning without the K0 "
+                             "formulation.")
+        _sizes = [len(g['pairs']) for g in groups]
+        _iu = np.asarray(_nr_init_state["u"], dtype=float)
+        _iev = _nr_init_state["evp"]
+        if [len(a) for a in _iev] != _sizes or _iu.shape != (n_dof,):
+            raise ValueError(
+                "_nr_init_state does not match this prepared model's Gauss-point "
+                "groups / degrees of freedom; the state must be produced on the "
+                "same prepared model.")
+        u_datum = _iu.copy()
+        u = u_datum.copy()
+        for grp, ev in zip(groups, _iev):
+            grp['ep'] = np.array(ev, dtype=float, copy=True)
+    # A predictor's state on a K0 model, in the same (u, eps^p) form the in-situ
+    # state carries. It moves where the solve STARTS and not what displacement is
+    # measured from: the datum stays the in-situ state, so a predictor's own travel
+    # is not quietly credited to the trial. (The `_nr_seed` form above is the
+    # no-K0 route, where the viscoplastic driver's reported displacement IS the
+    # absolute one and its plastic strain comes back per element.)
+    if _nr_seed_state is not None:
+        u = np.asarray(_nr_seed_state["u"], dtype=float)[:n_dof].copy()
+        for grp, ev in zip(groups, _nr_seed_state["evp"]):
+            grp['ep'] = np.array(ev, dtype=float, copy=True)
+    # A trial that starts from a state which already stands at full gravity does not
+    # walk the load path — the in-situ solve (or the predictor) already walked it,
+    # and cutting the load below full gravity from such a state would be solving a
+    # different problem.
+    _one_shot = (_nr_seed is not None or _nr_init_state is not None
+                 or _nr_seed_state is not None)
+    lam = 0.0
+    dlam = float(_NR_INIT_STEP)
+    total_iterations = 0
+    n_steps = 0
+    n_cuts = 0
+    step_iters = []
+    exit_reason = 'converged'
+    converged = True
+    last_oob = 0.0
+    # Work, honestly counted. An "iteration" here buys one residual evaluation AND
+    # up to `_NR_LS_MAX` more inside the line search, so an iteration count compared
+    # against the viscoplastic driver's — where an iteration is one constitutive
+    # pass — understates Newton's constitutive work by up to a factor of ten. Every
+    # call to _nr_internal_force in this solve is counted, including the two
+    # reporting passes at the end.
+    n_force_evals = 0
+    # The viscoplastic driver publishes max|du| / max|u| as `residual`. This is the
+    # same quantity on this path, recorded at the last accepted load increment, so
+    # the key means one thing on both drivers.
+    last_rel_du = 0.0
+    rel_du = 0.0
+
+    while lam < 1.0 - 1e-12:
+        # A seeded trial does not walk the load path — the predictor already did,
+        # and cutting the load below full gravity from a state that stands at full
+        # gravity would be solving a different problem. It is one attempt at the
+        # whole load, and it either corrects the seed or the trial has failed.
+        step = 1.0 - lam if _one_shot else min(dlam, 1.0 - lam)
+        lam_try = lam + step
+        f_ext = lam_try * base_loads
+        # The K0 initial stress is gravity's own field, so it rides the load factor
+        # with the load: at lam the material carries lam*sigma_0 and lam of the
+        # weight, and lam = 1 is the authored in-situ state. A no-op without K0.
+        _nr_set_load_factor(groups, lam_try)
+
+        ok, u_try, it, _fe, oob_here, rel_du = _nr_equilibrate(
+            groups, pattern, u, f_ext, free_dofs, n_dof, h_eps, force_tol,
+            _oob, nr_max_iter, u_elastic_scale, debug_level=debug_level,
+            label=f"lam={lam_try:.4f}", bars=bars, piles=piles,
+            trans_dofs=trans_dofs, deep_free=deep_free)
+        n_force_evals += _fe
+        total_iterations += it
+        if ok:
+            u = u_try
+            for grp in groups:
+                grp['_u'] = u
+            _nr_commit_plastic_strain(groups)
+            lam = lam_try
+            last_oob = oob_here
+            last_rel_du = rel_du
+            n_steps += 1
+            step_iters.append(it)
+            if it <= _NR_COMFORT:
+                dlam = min(1.0, dlam * _NR_GROW)
+            if debug_level >= 2:
+                print(f"    NR load factor {lam:.4f} reached in {it} iterations "
+                      f"(oob {oob_here:.2e})")
+            if progress_callback is not None:
+                try:
+                    progress_callback(lam, f"newton lambda={lam:.3f}, {it} iters")
+                except Exception:
+                    pass
+        else:
+            n_cuts += 1
+            dlam = step * 0.5
+            if debug_level >= 2:
+                print(f"    NR increment to {lam_try:.4f} failed after {it} "
+                      f"iterations; cutting to {dlam:.5f}")
+            if _one_shot:
+                converged = False
+                exit_reason = 'diverging'
+                u = u_try
+                break
+            if dlam < nr_min_step:
+                converged = False
+                exit_reason = 'diverging'
+                # Report the best state actually reached, which is the last
+                # equilibrated one plus whatever the failing attempt reached.
+                u = u_try
+                break
+
+    # A trial that reached full load must still pass the SAME force-equilibrium
+    # gate the viscoplastic verdict is read on, or it is not converged.
+    if converged:
+        fint, _, _ = _nr_internal_force(groups, u, n_dof, bars=bars, piles=piles)
+        n_force_evals += 1
+        r_full = np.zeros(n_dof)
+        r_full[free_dofs] = (base_loads - fint)[free_dofs]
+        last_oob = _oob(r_full)
+        if last_oob >= force_tol:
+            converged = False
+            exit_reason = 'iteration_cap'
+
+    # ---- post-peak softening: the viscoplastic latch, on a stepped continuation --
+    #
+    # The state is in equilibrium at full gravity. NOW, and only now, ask which bars
+    # have actually yielded -- their uncapped elastic demand exceeds the capacity they
+    # were allowed to carry -- and drop those with a finite residual to it. Shedding
+    # their load can push neighbours over, so the process repeats until the set stops
+    # growing; it terminates because the set only grows and is bounded by the element
+    # count. That is the viscoplastic driver's own fixed point, read on the same
+    # quantity against the same threshold.
+    #
+    # What is different here is the PATH, not the law. The viscoplastic driver applies
+    # the whole drop at once and relaxes; Newton is given a residual perturbed by a
+    # finite amount with no small parameter to continue in, and a drop the structure
+    # survives can sit outside the basin of a single step from the pre-drop state. So
+    # the cap is walked down from peak to residual and the step is halved when the
+    # corrector cannot carry it. Reaching the floor IS the verdict: the structure
+    # cannot shed that force. The end state at eta = 1 is the same law either way.
+    n_soften_rounds = 0
+    if converged and bars is not None and any(bg['can_soften'].any() for bg in bars):
+        _ok, u, _it, _fe, _oobs, n_soften_rounds, _cuts = _nr_soften_latch(
+            bars, groups, pattern, u, base_loads, free_dofs, n_dof, h_eps,
+            force_tol, _oob, nr_max_iter, u_elastic_scale, piles=piles,
+            trans_dofs=trans_dofs, debug_level=debug_level,
+            deep_free=deep_free)
+        total_iterations += _it
+        n_force_evals += _fe
+        n_cuts += _cuts
+        if not _ok:
+            converged = False
+            exit_reason = 'diverging'
+        # The state that came out of the last drop must pass the SAME force gate.
+        if converged:
+            fint, _, _ = _nr_internal_force(groups, u, n_dof, bars=bars, piles=piles)
+            n_force_evals += 1
+            r_full = np.zeros(n_dof)
+            r_full[free_dofs] = (base_loads - fint)[free_dofs]
+            last_oob = _oob(r_full)
+            if last_oob >= force_tol:
+                converged = False
+                exit_reason = 'iteration_cap'
+
+    # ... and the same displacement bound. Force equilibrium alone is not the
+    # question; equilibrium in a state the small-strain model can represent is.
+    # See _NR_DISP_FACTOR. Read once, here, on the final state.
+    disp_factor = (max_disp_factor if max_disp_factor is not None
+                   else _NR_DISP_FACTOR)
+    nr_disp_limit = (disp_factor * prep["mesh_height"]
+                     if disp_factor is not None and prep["mesh_height"] > 0
+                     else None)
+    # With a min_slip_depth filter the bound is read on the DEEP degrees of freedom
+    # only, for the reason the out-of-balance reading already is: the skin the filter
+    # excludes is allowed to fail, and a state whose deep field is small-strain
+    # admissible is not disqualified by how far that skin has travelled. The skin's
+    # own travel is reported beside it rather than dropped.
+    nr_disp_deep, nr_disp_skin = _nr_umax_split(u - u_datum, trans_dofs,
+                                               deep_dof_mask)
+    if converged and nr_disp_limit is not None:
+        if nr_disp_deep > nr_disp_limit:
+            converged = False
+            exit_reason = 'displacement_limit'
+
+    # ---- reporting ----------------------------------------------------------
+    for grp in groups:
+        grp['_u'] = u
+    # refresh _sig / _branch (and the bar and pile forces) at the reported state
+    _fint_rep, _, _ = _nr_internal_force(groups, u, n_dof, bars=bars, piles=piles)
+    n_force_evals += 1
+    # The out-of-balance at the reported state, over the WHOLE model and over the
+    # skin the min_slip_depth filter excludes. Reported, never read for a verdict:
+    # `unbalanced_force_ratio` stays the filtered quantity both drivers publish, and
+    # this says how much of the model that quantity is not looking at. Without a
+    # filter the skin reading is None and the global one is the same number.
+    _r_rep = np.zeros(n_dof)
+    _r_rep[free_dofs] = (base_loads - _fint_rep)[free_dofs]
+    nr_oob_global, nr_oob_skin = _nr_oob_split(
+        _r_rep, free_dof_mask, node_dof_x, node_dof_y, node_has_free, g_node_den,
+        deep_free_mask)
+
+    # ---- reinforcement diagnostics ------------------------------------------
+    # The same three arrays the viscoplastic path returns, at full 1D-element
+    # length so every reader indexes them the same way: the force each bar actually
+    # delivers (the elastic k*delta clipped into [0, t_allow], which is what
+    # forces_1d means on both drivers), which bars are AT their capacity, and the
+    # post-peak set, which is what the latch above wrote.
+    #
+    # One convention difference is deliberate and is not a defect on either side.
+    # The viscoplastic driver's failed mask LATCHES: it records every bar that
+    # exceeded its capacity at any point in the iteration history, including the
+    # elastic predictor's overshoot before the soil sheds load into the bars. This
+    # one is read on the reported state, so it says which bars are at capacity in
+    # the field being exported. The Newton mask is therefore a subset.
+    n_1d_total = len(fem_data.get("elements_1d", np.array([]).reshape(0, 3)))
+    forces_1d_out = np.zeros(n_1d_total)
+    failed_1d_out = np.zeros(n_1d_total, dtype=bool)
+    softened_1d_out = np.zeros(n_1d_total, dtype=bool)
+    if bars is not None:
+        for bg in bars:
+            forces_1d_out[bg['idx']] = bg['_T_true']
+            failed_1d_out[bg['idx']] = bg['_T'] > bg['t_cap'] + 1e-9
+            softened_1d_out[bg['idx']] = bg['softened']
+
+    # ---- pile diagnostics ---------------------------------------------------
+    # The same five arrays the viscoplastic path returns, indexed by pile element
+    # in the same order, so every reader — the summary printer, the result CSVs,
+    # the pile-shear colorbar — consumes them unchanged. The forces reported are
+    # the ones the element actually delivers, which is the capped action, exactly
+    # as `forces_1d` reports the capped bar force. The yielded masks are read on
+    # the REPORTED state, where the viscoplastic driver's latch every element that
+    # was ever over its capacity at any point in the iteration history, so this
+    # mask is a subset by construction — the same convention difference the bar
+    # masks carry, and for the same reason.
+    n_pile_out = int(fem_data.get("n_pile_elements", 0))
+    pile_axial = np.zeros(n_pile_out)
+    pile_shear = np.zeros(n_pile_out)
+    pile_moment = np.zeros((n_pile_out, 2))
+    pile_prot = np.zeros((n_pile_out, 2))
+    pile_yV = np.zeros(n_pile_out, dtype=bool)
+    pile_yM = np.zeros(n_pile_out, dtype=bool)
+    if piles is not None:
+        for pg in piles:
+            i = pg['idx']
+            pile_axial[i] = pg['_axial']
+            pile_shear[i] = pg['_V_true']
+            # The DELIVERED end moments, read on the released displacement, so a
+            # hinged end reports the capacity because the equilibrium carries it
+            # and not because the report was clipped.
+            pile_moment[i] = pg['_M']
+            pile_prot[i] = pg['_p_rot']
+            pile_yV[i] = pg['_yV']
+            pile_yM[i] = pg['_yM']
+
+    # ---- the verdict's own evidence -----------------------------------------
+    # A converged Newton trial asserts two things about the slope: that full
+    # gravity is carried in equilibrium, and that no Gauss point is outside the
+    # yield surface. `unbalanced_force_ratio` already carries the first as the
+    # Dawson out-of-balance. This carries the second — the largest yield-function value
+    # over every Gauss point, divided by that point's own strength scale, so it
+    # reads as a fraction of the strength available there.
+    #
+    # It is computed from the INVARIANT form of the Mohr-Coulomb function that the
+    # viscoplastic path uses, not from the ordered-principal-stress form the return
+    # map is written on. The two are the same surface algebraically, so a defect in
+    # one cannot hide behind the other, and a converged trial that reports a
+    # violation near machine precision is a statically admissible stress field
+    # rather than a solver's word for one.
+    sq3_ = np.sqrt(3.0)
+    max_yield_violation = 0.0
+    n_yield_above_1pct = 0
+    max_tension_violation = None
+    for grp in groups:
+        sg = grp['_sig']
+        sx_, sy_, txy_, sz_ = sg[:, 0], sg[:, 1], sg[:, 2], sg[:, 3]
+        sigm_ = (sx_ + sy_ + sz_) / 3.0
+        dsbar_ = np.sqrt(((sx_ - sy_) ** 2 + (sy_ - sz_) ** 2 + (sz_ - sx_) ** 2
+                          + 6.0 * txy_ ** 2) / 2.0)
+        dx_, dy_, dz_ = sx_ - sigm_, sy_ - sigm_, sz_ - sigm_
+        ds3_ = np.maximum(dsbar_, 1e-10) ** 3
+        sine_ = np.clip(np.where(dsbar_ > 1e-10,
+                                 -13.5 * (dx_ * dy_ * dz_ - dz_ * txy_ ** 2) / ds3_,
+                                 0.0), -1.0, 1.0)
+        th_ = np.arcsin(sine_) / 3.0
+        # The envelope the trial was actually solved on. On a Mohr-Coulomb group
+        # these three ARE grp['c_r'] / ['snph'] / ['csph'], the same objects, so
+        # this reading is unchanged there; on a curved-envelope group they are the
+        # converged linearization the return was taken on, which is the only
+        # envelope against which "how far outside" means anything.
+        _ce_ = grp.get('_c_eff', grp['c_r'])
+        _se_ = grp.get('_snph_eff', grp['snph'])
+        _cse_ = grp.get('_csph_eff', grp['csph'])
+        fv_ = (sigm_ * _se_
+               + dsbar_ * (np.cos(th_) / sq3_ - np.sin(th_) * _se_ / 3.0)
+               - _ce_ * _cse_)
+        # Strength scale at the point: the two terms the deviatoric radius is held
+        # against. A material held linear elastic carries c = inf and is skipped,
+        # as is a point with no strength scale to divide by.
+        den_ = _ce_ * _cse_ + np.abs(sigm_) * _se_
+        ok_ = np.isfinite(den_) & (den_ > 0.0)
+        if np.any(ok_):
+            _ratio_ = fv_[ok_] / den_[ok_]
+            max_yield_violation = max(max_yield_violation, float(np.max(_ratio_)))
+            n_yield_above_1pct += int(np.count_nonzero(_ratio_ > _YIELD_FLAG_FRAC))
+        # The tensile half of the same reading: how far the major principal stress
+        # sits above the cap, on the same scale. Computed from the components
+        # rather than from the return map's ordered principals, for the same reason
+        # the shear reading is — an independent form of the same statement.
+        _tc = grp.get('t_cap')
+        if _tc is not None:
+            _m = np.isfinite(_tc) & ok_
+            if np.any(_m):
+                _ctr = 0.5 * (sx_ + sy_)
+                _r = np.sqrt((0.5 * (sx_ - sy_)) ** 2 + txy_ ** 2)
+                _s1 = np.maximum(_ctr + _r, sz_)
+                _tv = float(np.max((_s1[_m] - _tc[_m]) / den_[_m]))
+                max_tension_violation = (
+                    _tv if max_tension_violation is None
+                    else max(max_tension_violation, _tv))
+    if max_tension_violation is not None:
+        max_yield_violation = max(max_yield_violation, max_tension_violation)
+
+    sig_by_gp = [[None] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
+    branch_by_gp = [[0] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
+    ep_by_gp = [[np.zeros(4)] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
+    # The matric-suction apparent cohesion per Gauss point, or None on a model
+    # without it. The REPORTED element yield function has to be read on the
+    # envelope the trial was solved on, which is c' + c_suction, and the
+    # viscoplastic path adds the element mean of exactly this quantity.
+    csuc_by_gp = ([[0.0] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
+                  if any(g.get('c_suc') is not None for g in groups) else None)
+    for grp in groups:
+        _cs = grp.get('c_suc')
+        for k, (e, g) in enumerate(grp['pairs']):
+            sig_by_gp[e][g] = grp['_sig'][k]
+            branch_by_gp[e][g] = int(grp['_branch'][k])
+            ep_by_gp[e][g] = grp['ep'][k]
+            if csuc_by_gp is not None and _cs is not None:
+                csuc_by_gp[e][g] = float(_cs[k])
+
+    final_stresses = np.zeros((n_elements, 4))
+    plastic_elements = np.zeros(n_elements, dtype=bool)
+    yield_function_out = np.zeros(n_elements)
+    vp_shear_strain = np.zeros(n_elements)
+    for e in range(n_elements):
+        n_gp = len(sig_by_gp[e])
+        sig_avg = sum(sig_by_gp[e]) / n_gp
+        u_avg = (sum(prep["u_gp"][e]) / len(prep["u_gp"][e])) if prep["u_gp"][e] else 0.0
+        stress_total = sig_avg - np.array([u_avg, u_avg, 0.0, u_avg])
+        _, sig_vm, _ = stress_invariants(stress_total)
+        final_stresses[e] = [-stress_total[0], -stress_total[1], stress_total[2], sig_vm]
+        sigm, dsbar, theta = stress_invariants(sig_avg)
+        _c_rep = c_reduced[e]
+        if csuc_by_gp is not None:
+            _c_rep = _c_rep + sum(csuc_by_gp[e]) / n_gp
+        yield_function_out[e] = mc_yield_invariants(sigm, dsbar, theta,
+                                                    _c_rep, phi_reduced[e])
+        plastic_elements[e] = any(b != _NR_ELASTIC for b in branch_by_gp[e])
+        ep_avg = sum(ep_by_gp[e]) / n_gp
+        vp_shear_strain[e] = float(np.sqrt((ep_avg[0] - ep_avg[1]) ** 2
+                                           + ep_avg[2] ** 2))
+    if elastic_by_elem is not None:
+        plastic_elements[elastic_by_elem] = False
+
+    if _nr_export is not None:
+        # Hand the live solve state to the ramp driver, which continues it.
+        _nr_export.update({
+            'groups': groups, 'bars': bars, 'piles': piles,
+            'trans_dofs': trans_dofs,
+            'pattern': pattern, 'base_loads': base_loads,
+            'oob_fn': _oob, 'h_eps': h_eps, 'u_elastic_scale': u_elastic_scale,
+            'free_dofs': free_dofs, 'n_dof': n_dof, 'u': u,
+            'disp_limit': nr_disp_limit, 'prep': prep,
+            'u_datum': u_datum, 'deep_free': deep_free,
+            'deep_dof_mask': deep_dof_mask,
+        })
+
+    strains = compute_strains(nodes, elements, element_types, u,
+                              dof_offset=dof_offset)
+    # Measured from the datum (zero without a carried in-situ state), exactly as the
+    # viscoplastic path measures it.
+    u_reported = u if _nr_init_state is None else u - u_datum
+    max_disp = _nr_umax(u_reported, trans_dofs) if u.size else 0.0
+    # The equilibrated state, for a later solve to start from. Same shape and same
+    # meaning as the viscoplastic driver's `_k0_state`, over the same Gauss-point
+    # groups in the same order, so either driver's state can seed the other.
+    nr_k0_state = None
+    if groups and groups[0].get('sig0') is not None:
+        nr_k0_state = {"u": u.copy(),
+                       "evp": [g['ep'].copy() for g in groups],
+                       "F": float(F), "converged": bool(converged)}
+    u_ratio = (max_disp / u_elastic_scale) if u_elastic_scale > 0 else None
+    verdict = 'CONVERGED' if converged else 'FAILED'
+
+    if debug_level >= 1:
+        print(f"  Newton-Raphson (F={F:.3f}): {'CONVERGED' if converged else 'FAILED'} "
+              f"— {n_steps} load increment(s), {n_cuts} cut(s), "
+              f"{total_iterations} Newton iterations, load factor {lam:.4f}, "
+              f"out-of-balance {last_oob:.2e}"
+              + ('' if converged else f", exit {exit_reason}")
+              + (f", max|u| {max_disp:.4g}"
+                 + (f" (deep {nr_disp_deep:.4g}, skin {nr_disp_skin:.4g})"
+                    if nr_disp_skin is not None else "")
+                 + (f" against limit {nr_disp_limit:.4g}"
+                    if nr_disp_limit is not None else "")))
+
+    return {
+        "converged": bool(converged),
+        "stable": bool(converged),
+        "verdict": verdict,
+        "u_ratio": u_ratio,
+        "u_growth": None,
+        "u_elastic_scale": u_elastic_scale,
+        "exit_reason": exit_reason,
+        "_k0_state": nr_k0_state,
+        "plateau_iteration": None,
+        "plateau_ratio": None,
+        "diverging_iteration": (total_iterations if not converged else None),
+        # WHY the trial failed, distinguishable at a glance: the load could not be
+        # carried at all ('load_step_floor'), it was carried but not to the force
+        # tolerance ('force_tolerance'), or it was carried in force but into a state
+        # the small-strain model cannot represent ('displacement_limit').
+        "diverging_signal": (None if converged else
+                             {'diverging': 'load_step_floor',
+                              'iteration_cap': 'force_tolerance',
+                              'displacement_limit': 'displacement_limit'}
+                             .get(exit_reason, 'load_step_floor')),
+        # The bound the final state was measured against (None = bound off).
+        "nr_disp_limit": nr_disp_limit,
+        # The displacement the bound was READ on, and the skin's own. Without a
+        # min_slip_depth filter the first is `max_displacement` and the second is
+        # None; with one, the deep field is what the verdict rests on and the skin's
+        # travel is reported rather than hidden or used.
+        "nr_max_disp_deep": nr_disp_deep,
+        "nr_max_disp_skin": nr_disp_skin,
+        # The same reading for the out-of-balance: the whole model's, and the
+        # excluded skin's. Diagnostics, not a verdict.
+        "nr_oob_global": nr_oob_global,
+        "nr_oob_skin": nr_oob_skin,
+        "early_exit_suppressed": False,
+        "budget_extensions": 0,
+        "iteration_budget": nr_max_iter,
+        "failure_criterion": "newton",
+        # The largest Mohr-Coulomb violation over all Gauss points at the reported
+        # state, as a fraction of the local strength scale (see above). On a
+        # converged trial this is the yield half of the verdict's evidence; the
+        # force half is `residual`.
+        "nr_max_yield_violation": float(max_yield_violation),
+        # The same reading under the names both drivers publish it by, so a reader
+        # comparing the two is comparing one quantity (see _yield_reading).
+        "max_yield_violation": float(max_yield_violation),
+        "n_yield_above_1pct": int(n_yield_above_1pct),
+        "yield_flagged": bool(converged and n_yield_above_1pct > 0),
+        # A Newton state is the solution of the equations the gate reads, and the
+        # corrector asserts the gate on it before it may end a trial, so this path
+        # never returns a gate-failed state. The key is here so that every result on
+        # every driver answers the question.
+        "gate_failed": False,
+        "iterations": int(total_iterations),
+        "displacements": u_reported,
+        "displacements_elastic": u_elastic,
+        "stresses": final_stresses,
+        "strains": strains,
+        "vp_shear_strain": vp_shear_strain,
+        "plastic_elements": plastic_elements,
+        "yield_function": yield_function_out,
+        "max_displacement": max_disp,
+        "plastic_strains": {e: np.array(ep_by_gp[e]) for e in range(n_elements)},
+        "algorithm": "Newton-Raphson, consistent Mohr-Coulomb tangent (psi = 0)",
+        "F": F,
+        # `residual` means the SAME thing on both drivers: the relative change in
+        # the displacement field over the last iteration, max|du| / max|u|. It used
+        # to carry the out-of-balance here, which reads like the viscoplastic key of
+        # the same name but is a different physical quantity by three or more orders
+        # of magnitude, so any code comparing the two drivers on it was comparing
+        # nothing. The out-of-balance is `unbalanced_force_ratio` — like-for-like on
+        # both drivers — and `nr_last_oob` for the Newton-specific reading.
+        "residual": float(last_rel_du),
+        "unbalanced_force_ratio": last_oob,
+        "nr_last_oob": last_oob,
+        # Constitutive work actually done: residual evaluations plus every line
+        # search backtrack. `iterations` counts only the outer Newton iterations, so
+        # it understates the work by up to _NR_LS_MAX per iteration.
+        "nr_force_evals": int(n_force_evals),
+        "plastic_fraction": (int(np.count_nonzero(plastic_elements)) / n_elements
+                             if n_elements else 0.0),
+        # Newton-specific accounting, read by the spike's measurement harness.
+        # The branch histogram is how a run is read for WHY it behaved as it did:
+        # apex points carry a zero tangent, so a field full of them has no
+        # stiffness left to iterate on.
+        "nr_branch_counts": {
+            name: int(sum(int(np.count_nonzero(g['_branch'] == code))
+                          for g in groups))
+            for code, name in sorted(_NR_BRANCH_NAMES.items())
+        },
+        # The largest violation of the Rankine cap at the reported state, as a
+        # fraction of the same local strength scale, or None on a model with no
+        # cap. It is the tensile half of the same evidence `nr_max_yield_violation`
+        # carries for the shear surface, and it is folded into that number too, so
+        # a reader who checks only one still sees a capped model's whole
+        # admissibility.
+        "nr_max_tension_violation": max_tension_violation,
+        "max_tension_violation": max_tension_violation,
+        # Whether this trial was solved from a viscoplastic predictor's state
+        # rather than from zero, and how many predictor iterations it cost (see
+        # _NR_VP_PREDICTOR_ITERS). Zero on every trial the driver solves on its own,
+        # which is every trial that does not fail at the load-step floor.
+        "nr_predictor_iterations": 0,
+        "nr_load_steps": n_steps,
+        "nr_step_cuts": n_cuts,
+        "nr_step_iterations": step_iters,
+        "nr_load_factor": float(lam),
+        # Empty arrays on a model with no bars, exactly as the viscoplastic path
+        # returns them there (`forces_1d if has_1d_elements else np.array([])`).
+        "forces_1d": forces_1d_out,
+        "failed_1d_elements": failed_1d_out,
+        "softened_1d_elements": softened_1d_out,
+        # Empty arrays on a model with no pile, exactly as the viscoplastic path
+        # returns them there.
+        "forces_pile_axial": pile_axial if n_pile_out else np.array([]),
+        "forces_pile_lateral": pile_shear if n_pile_out else np.array([]),
+        "forces_pile_moment": pile_moment if n_pile_out else np.zeros((0, 2)),
+        "pile_plastic_rotation": pile_prot if n_pile_out else np.zeros((0, 2)),
+        "yielded_pile_V": pile_yV if n_pile_out else np.array([], dtype=bool),
+        "yielded_pile_M": pile_yM if n_pile_out else np.array([], dtype=bool),
+        "yielded_pile": ((pile_yV | pile_yM) if n_pile_out
+                         else np.array([], dtype=bool)),
+    }
+
+
+# ===================== The monotonic strength-reduction ramp (SPIKE) =========
+#
+# An alternative to the bisection, reachable only on the Newton driver:
+# solve_ssrm(..., fem_solver='newton', ssrm_driver='ramp'). See SPIKE.md, "RAMP".
+#
+# The bisection asks an independent question at every trial — it drops the model
+# back to zero displacement, re-applies gravity from nothing and rediscovers the
+# whole elastoplastic history at the new strength. The ramp carries ONE history:
+# it reaches equilibrium once at the starting strength and then reduces strength
+# monotonically, each step warm-started from the state before it. The gravity load
+# never changes after the first solve; only c and tan(phi) do. So a step is a
+# continuation in F rather than in load, and the mechanism develops instead of
+# being rebuilt.
+#
+# Two properties follow by construction rather than by tuning:
+#   * the verdict sequence cannot be non-monotone, because there is one history;
+#   * no strength more than one step past the highest one carried is ever
+#     evaluated, which is where the Newton driver is at its worst (17x to 47x the
+#     viscoplastic driver's constitutive work on trials well past failure).
+_RAMP_DF_INIT = 0.05       # first strength increment
+_RAMP_DF_MIN = 0.005       # below this a failed step means the limit is reached
+_RAMP_DF_GROW = 1.6        # increment growth after a comfortable step
+# The ramp reports the MIDPOINT of its final interval, (F_stands + F_refused)/2,
+# because that is the convention every locked and published factor of safety in
+# this repository is defined on: the bisection returns the midpoint of the last
+# bracket it could not split further. The ramp used to report the last strength it
+# had CARRIED, floored to 0.01, which is the interval's lower edge rounded down —
+# two separate downward biases, measured at 0.0031 to 0.0119 below the bisection's
+# answer across the eight spike benchmarks, none of it a difference in what the two
+# routes found. The raw facts are still reported, unrounded, as `ramp_last_carried`
+# and `ramp_first_refused`, so the interval is always readable.
+
+
+def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_tol,
+                      max_iterations, oob_window, dt_scale,
+                      tension_cutoff, min_slip_depth, ssr_exclude_mask,
+                      tension_cap_by_elem, tension_srf, elastic_mask,
+                      suction_phi_b, suction_cap, k0, f_adjust, f_min_floor,
+                      max_expand, max_iterations_ceiling=50000, early_failure=True,
+                      init_state=None, debug_level=0, progress_callback=None,
+                      cancel_check=None):
+    """Walk F up from a converged state, warm-starting every step.
+
+    Returns the same result shape solve_ssrm's bisection drivers return, so the
+    caller consumes it unchanged. ``trials`` records every strength actually
+    evaluated, in the order evaluated, including the steps that were rejected and
+    retried at half the increment.
+    """
+    trials = []
+    ctx = {}
+
+    def _cold(F, export_only=False):
+        # `_nr_export` is what makes a solve a RAMP FOOT: it hands back the working
+        # state the ramp then continues, and it is also what holds the viscoplastic
+        # predictor off, because a ramp manages its own plastic history. The final
+        # export solve continues nothing, so it takes the predictor like any other
+        # standalone trial — without it the state written to figures and CSVs would
+        # be whatever the cold path could reach, which on a cohesionless model is
+        # not the state at the limit the ramp just carried.
+        return solve_fem(fem_data, F=F, debug_level=max(0, debug_level - 1),
+                         force_tol=force_tol, oob_window=oob_window,
+                         dt_scale=dt_scale,
+                         max_iterations=max_iterations, tolerance=convergence_tol,
+                         max_disp_factor=None,
+                         tension_cutoff=tension_cutoff,
+                         min_slip_depth=min_slip_depth,
+                         ssr_exclude_mask=ssr_exclude_mask,
+                         tension_cap_by_elem=tension_cap_by_elem,
+                         tension_srf=tension_srf, elastic_mask=elastic_mask,
+                         suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                         k0=k0, fem_solver='newton', _prepared=prep,
+                         max_iterations_ceiling=max_iterations_ceiling,
+                         early_failure=early_failure, _init_state=init_state,
+                         _nr_export=(None if export_only else ctx))
+
+    def _record(F, verdict, iters, fevals, oob, maxu, kind, why=None):
+        trials.append({"F": float(F), "verdict": verdict, "iterations": int(iters),
+                       "nr_force_evals": int(fevals),
+                       "unbalanced_force_ratio": float(oob),
+                       "max_displacement": float(maxu), "ramp_step": kind,
+                       "exit_reason": why})
+
+    # --- the foot of the ramp: one cold solve, walked down if it does not stand --
+    F0 = float(F_min)
+    n_expand = 0
+    sol0 = _cold(F0)
+    _record(F0, sol0['verdict'], sol0['iterations'], sol0.get('nr_force_evals', 0),
+            sol0['unbalanced_force_ratio'], sol0['max_displacement'], 'cold',
+            sol0.get('exit_reason'))
+    while not sol0['converged']:
+        if F0 <= f_min_floor + 1e-9 or n_expand >= max_expand:
+            msg = (f"SSRM (ramp): the slope does not reach equilibrium even at "
+                   f"F = {F0:.2f} — it is unstable at or below this strength-"
+                   f"reduction factor (FS < {F0:.2f}).")
+            print(f"\n{msg}")
+            return {"converged": False, "error": msg, "FS": None, "trials": trials}
+        F0 = max(f_min_floor, F0 - f_adjust)
+        n_expand += 1
+        ctx = {}
+        sol0 = _cold(F0)
+        _record(F0, sol0['verdict'], sol0['iterations'],
+                sol0.get('nr_force_evals', 0), sol0['unbalanced_force_ratio'],
+                sol0['max_displacement'], 'cold', sol0.get('exit_reason'))
+
+    groups, pattern, bars = ctx['groups'], ctx['pattern'], ctx.get('bars')
+    piles, trans_dofs = ctx.get('piles'), ctx.get('trans_dofs')
+    base_loads, oob_fn = ctx['base_loads'], ctx['oob_fn']
+    free_dofs, n_dof = ctx['free_dofs'], ctx['n_dof']
+    h_eps, u_el = ctx['h_eps'], ctx['u_elastic_scale']
+    disp_limit = ctx['disp_limit']
+    deep_free = ctx.get('deep_free')
+    deep_dof_mask = ctx.get('deep_dof_mask')
+    restrength = ctx['restrength']
+    u = ctx['u']
+    # Displacement is measured from the in-situ state on a K0 run and from zero
+    # otherwise, the same datum the foot's own verdict was read on.
+    u_datum = ctx.get('u_datum')
+    if u_datum is None:
+        u_datum = np.zeros(n_dof)
+
+    F_stands = F0
+    last_solution = sol0
+    dF = _RAMP_DF_INIT
+    n_steps, n_retries = 0, 0
+    # Every solve so far — the foot AND any failed walk-down solves — is already
+    # in `trials`; the totals count them all, not just the solve that stood.
+    total_iters = int(sum(t['iterations'] for t in trials))
+    total_fevals = int(sum(t['nr_force_evals'] for t in trials))
+    warm_iters = []
+    F_refused = None
+    cancelled = False
+    pred_iters = 0             # viscoplastic predictor iterations, charged on top
+
+    if debug_level >= 1:
+        print("=== SSRM Analysis (Newton, monotonic ramp) ===")
+        print(f"  Foot of the ramp: F = {F0:.4f} stands "
+              f"({sol0['iterations']} iterations, cold)")
+
+    while True:
+        if cancel_check is not None and cancel_check():
+            cancelled = True
+            break
+        F_try = F_stands + dF
+        if F_try > F_max + 1e-12:
+            # The ramp has carried the whole requested range. There is no failed
+            # step above it, so the answer is a lower bound, not a limit.
+            msg = (f"SSRM (ramp): the slope still stands at F = {F_stands:.4f}, the "
+                   f"top of the requested range — FS > {F_stands:.2f}. Raise F_max.")
+            print(f"\n{msg}")
+            return {"converged": False, "error": msg, "FS": None, "trials": trials,
+                    "last_solution": last_solution}
+
+        restrength(groups, F_try)
+        seeded = False
+        # The step's own history, kept so a REJECTED step leaves nothing behind —
+        # the plastic strains a predictor seed or a softening sub-step committed,
+        # and the post-peak set the latch may have grown. Softening only ever grows
+        # WITHIN a solve, and the ramp is one solve, so a bar that ruptured at F_k is
+        # ruptured at F_{k+1}; but a step that is refused never happened.
+        ep_save = [grp['ep'] for grp in groups]
+        soft_save = ([(bg['softened'].copy(), bg['t_cap'].copy()) for bg in bars]
+                     if bars is not None else None)
+        ok, u_try, it, fe, oob, _rel = _nr_equilibrate(
+            groups, pattern, u, base_loads, free_dofs, n_dof, h_eps, force_tol,
+            oob_fn, _NR_MAX_ITER, u_el, debug_level=debug_level,
+            label=f"ramp F={F_try:.4f}", bars=bars, piles=piles,
+            trans_dofs=trans_dofs, deep_free=deep_free)
+        total_iters += it
+        total_fevals += fe
+        if not (ok and oob < force_tol):
+            # The step is refused, and on a cohesionless model that is the same
+            # failure the bisection retries (see _NR_VP_PREDICTOR_ITERS): the warm
+            # plastic history this ramp carries is not the field this strength
+            # needs, and the corrector cannot grow one from it. So grow one the same
+            # way — a viscoplastic predictor at THIS strength, under the same
+            # Rankine cap — and give the corrector one attempt from that state.
+            #
+            # The verdict stays the corrector's: the same force gate and the same
+            # displacement bound the cold step just failed, read on the corrected
+            # state and not on the seed. The ramp used to walk every step cold,
+            # which is why it read 1.0531 on the three-layer model against the
+            # bisection's 1.2109.
+            for _chunk, _ceiling, _seed_prep, _seed_ef in _nr_predictor_rungs(
+                    prep, len(fem_data['elements']), max_iterations,
+                    max_iterations_ceiling, early_failure):
+                _vp = solve_fem(
+                    fem_data, F=F_try, debug_level=0, max_iterations=_chunk,
+                    max_iterations_ceiling=_ceiling, tolerance=convergence_tol,
+                    max_disp_factor=None, tension_cutoff=tension_cutoff,
+                    dt_scale=dt_scale, force_tol=force_tol,
+                    oob_window=oob_window, min_slip_depth=min_slip_depth,
+                    ssr_exclude_mask=ssr_exclude_mask,
+                    tension_cap_by_elem=tension_cap_by_elem,
+                    tension_srf=tension_srf, elastic_mask=elastic_mask,
+                    suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                    k0=k0, _init_state=init_state,
+                    _prepared=_seed_prep, early_failure=_seed_ef,
+                    fem_solver='viscoplastic')
+                pred_iters += int(_vp.get('iterations', 0) or 0)
+                if k0 is not None:
+                    # The predictor's reported displacement is measured from the
+                    # in-situ datum; its `_k0_state` carries the absolute field and
+                    # the plastic strain in this model's own group order.
+                    _ks = _vp['_k0_state']
+                    _u_seed = np.asarray(_ks['u'], dtype=float)[:n_dof].copy()
+                    for grp, _ev in zip(groups, _ks['evp']):
+                        grp['ep'] = np.array(_ev, dtype=float, copy=True)
+                else:
+                    _u_seed = np.asarray(_vp['displacements'],
+                                         dtype=float)[:n_dof].copy()
+                    _ep_vp = _vp['plastic_strains']
+                    for grp in groups:
+                        _ep = np.empty_like(grp['ep'])
+                        for _k, (_e, _gp) in enumerate(grp['pairs']):
+                            _ep[_k] = _ep_vp[_e][_gp]
+                        grp['ep'] = _ep
+                ok, u_try, it2, fe2, oob, _rel = _nr_equilibrate(
+                    groups, pattern, _u_seed, base_loads, free_dofs, n_dof, h_eps,
+                    force_tol, oob_fn, _NR_MAX_ITER, u_el, debug_level=debug_level,
+                    label=f"ramp F={F_try:.4f} (seeded)", bars=bars, piles=piles,
+                    trans_dofs=trans_dofs, deep_free=deep_free)
+                # Work is cumulative: the refused cold step, every predictor run and
+                # every corrector are all charged to this step.
+                it += it2
+                fe += fe2
+                total_iters += it2
+                total_fevals += fe2
+                if ok:
+                    seeded = True
+                    break
+                # Nothing was carried, so the ramp's own history goes back exactly
+                # as it was before the seed overwrote it.
+                for grp, _ep0 in zip(groups, ep_save):
+                    grp['ep'] = _ep0
+        # The post-peak latch, on the same converged full-load state the bisection
+        # reads it on. The set is carried FORWARD across steps by construction — the
+        # bar groups are built once for the whole ramp — so a bar that ruptured at a
+        # lower strength is ruptured here, which is what one continuous history
+        # means. A drop that reaches the step floor refuses the step.
+        if ok and oob < force_tol and bars is not None and any(
+                bg['can_soften'].any() for bg in bars):
+            ok, u_try, it_s, fe_s, oob_s, _r, _c = _nr_soften_latch(
+                bars, groups, pattern, u_try, base_loads, free_dofs, n_dof, h_eps,
+                force_tol, oob_fn, _NR_MAX_ITER, u_el, piles=piles,
+                trans_dofs=trans_dofs, debug_level=debug_level,
+                deep_free=deep_free)
+            it += it_s
+            fe += fe_s
+            total_iters += it_s
+            total_fevals += fe_s
+            if _r:
+                oob = oob_s
+        # The bound reads the DEEP field when a min_slip_depth filter is on — the
+        # same standard the bisection's trials are held to, for the same reason.
+        maxu, maxu_skin = (_nr_umax_split(u_try - u_datum, trans_dofs,
+                                          deep_dof_mask)
+                           if u_try.size else (0.0, None))
+        # The SAME admissibility standard a converged bisection trial passes: force
+        # equilibrium under the tolerance, and a state the small-strain model can
+        # represent.
+        admissible = bool(ok) and oob < force_tol and (
+            disp_limit is None or maxu <= disp_limit)
+        why = ('converged' if admissible else
+               'displacement_limit' if (ok and oob < force_tol) else
+               'diverging')
+        _record(F_try, 'CONVERGED' if admissible else 'FAILED', it, fe, oob, maxu,
+                f'step dF={dF:.5f}', why)
+
+        if admissible:
+            u = u_try
+            for grp in groups:
+                grp['_u'] = u
+            _nr_commit_plastic_strain(groups)
+            F_stands = F_try
+            n_steps += 1
+            warm_iters.append(it)
+            if it <= _NR_COMFORT:
+                dF = min(_RAMP_DF_INIT, dF * _RAMP_DF_GROW)
+            if debug_level >= 1:
+                print(f"    F = {F_stands:.4f} carried in {it} iterations "
+                      f"(oob {oob:.2e}, max|u| {maxu:.4g})")
+            if progress_callback is not None:
+                try:
+                    progress_callback(
+                        min(1.0, (F_stands - F0) / max(1e-9, F_max - F0)),
+                        f"ramp F={F_stands:.3f}")
+                except Exception:
+                    pass
+        else:
+            # Reject the step and retry from the SAME converged state at half the
+            # increment. Nothing was committed, so there is nothing to undo but the
+            # strengths, which the next attempt overwrites — and a predictor seed or
+            # a softening sub-step, if one committed a plastic strain or dropped a
+            # bar here only for the step to be refused.
+            for grp, _ep0 in zip(groups, ep_save):
+                grp['ep'] = _ep0
+            if soft_save is not None:
+                for bg, (_s0, _c0) in zip(bars, soft_save):
+                    bg['softened'], bg['t_cap'] = _s0, _c0
+            F_refused = F_try
+            n_retries += 1
+            if debug_level >= 1:
+                print(f"    F = {F_try:.4f} refused ({why}, {it} iterations, "
+                      f"oob {oob:.2e}, max|u| {maxu:.4g}); halving dF to "
+                      f"{dF / 2:.5f}")
+            dF *= 0.5
+            if dF < _RAMP_DF_MIN:
+                break
+
+    if cancelled:
+        msg = (f"SSRM (ramp): cancelled at F = {F_stands:.4f} after {n_steps} "
+               f"steps; no limit was reached.")
+        return {"converged": False, "error": msg, "FS": None, "trials": trials,
+                "last_solution": last_solution}
+
+    # Export the state at the limit, not the foot: figures and CSVs are written
+    # from `last_solution`, and the ramp's warm state carries no post-processing.
+    # One cold solve at the last carried strength matches what the bisection
+    # driver exports for its final converged trial.
+    sol_end = _cold(F_stands, export_only=True)
+    _record(F_stands, sol_end['verdict'], sol_end['iterations'],
+            sol_end.get('nr_force_evals', 0), sol_end['unbalanced_force_ratio'],
+            sol_end['max_displacement'], 'final_export', sol_end.get('exit_reason'))
+    total_iters += int(sol_end['iterations'])
+    total_fevals += int(sol_end.get('nr_force_evals', 0))
+    pred_iters += int(sol_end.get('nr_predictor_iterations', 0) or 0)
+    if sol_end.get('converged'):
+        last_solution = sol_end
+
+    # The limit lies between the last strength carried and the first one refused,
+    # and is reported as that interval's MIDPOINT — the bisection's convention, and
+    # therefore the convention of every locked and published factor of safety here.
+    # See the note at _RAMP_DF_GROW.
+    FS = 0.5 * (F_stands + F_refused)
+    restrength(groups, F_stands)
+    if debug_level >= 1:
+        print(f"  Ramp limit: {F_stands:.4f} carried, {F_refused:.4f} refused "
+              f"-> FS = {FS:.4f} ({n_steps} steps, {n_retries} retries, "
+              f"{total_iters} iterations, {total_fevals} force evaluations)")
+    return {
+        "converged": True,
+        "FS": float(FS),
+        "last_solution": last_solution,
+        "iterations_ssrm": n_steps,
+        "final_interval": (float(F_stands), float(F_refused)),
+        "interval_width": float(F_refused - F_stands),
+        "failed_edge_softened": None,
+        "trials": trials,
+        "inconclusive": [],
+        "note": None,
+        "failure_criterion": "newton_ramp",
+        "method": "SSRM — monotonic strength-reduction ramp (Newton)",
+        # Ramp accounting, read by the spike's measurement harness.
+        "ramp_steps": n_steps,
+        "ramp_retries": n_retries,
+        "ramp_iterations": total_iters,
+        "ramp_force_evals": total_fevals,
+        # Viscoplastic predictor iterations spent rescuing refused steps, charged
+        # on top of the Newton work above (see _NR_VP_PREDICTOR_ITERS).
+        "ramp_predictor_iterations": pred_iters,
+        "ramp_warm_iterations": warm_iters,
+        "ramp_foot": float(F0),
+        "ramp_last_carried": float(F_stands),
+        "ramp_first_refused": float(F_refused),
     }
 
 
@@ -6470,7 +10488,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                elastic_materials=None,
                suction_phi_b=None, suction_cap=None,
                capture_failure_state=True, capture_max_iterations=None,
-               capture_margin=0.15, early_failure=True):
+               capture_margin=0.15, early_failure=True, fem_solver=None,
+               ssrm_driver='bisection'):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -6962,6 +10981,11 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             elastic_mask=elastic_mask,
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
             failure_criterion=failure_criterion, early_failure=early_failure,
+            # The in-situ state is established on the SAME driver that will solve
+            # the trials. It is the state every trial starts from, so equilibrating
+            # it with one solver and then continuing it with another would hand the
+            # bisection a starting point its own corrector never produced.
+            fem_solver=fem_solver,
             _prepared=prep)
         equilibration = {
             "converged": bool(eq["converged"]),
@@ -6993,7 +11017,43 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 "does not stand under its own weight with this initial stress, so "
                 "FS < 1. The bisection runs without a carried in-situ state.")
 
-    if failure_criterion in ("non_convergence", "hybrid"):
+    # ---- SSRM driver switch (INTERNAL, spike; see SPIKE.md, "RAMP") ---------
+    # 'bisection' is the default and the definition of every locked factor of
+    # safety; it falls straight through and nothing below it changes. 'ramp' is
+    # the monotonic strength-reduction continuation, and it exists only on the
+    # Newton per-trial driver — there is no viscoplastic warm start to continue.
+    _driver = str(ssrm_driver or 'bisection').strip().lower()
+    if _driver not in ('bisection', 'ramp'):
+        raise ValueError(
+            f"Unknown ssrm_driver {ssrm_driver!r}. Supported: 'bisection' "
+            "(default) and 'ramp'.")
+    if _driver == 'ramp':
+        if resolve_fem_solver(fem_solver) != 'newton':
+            raise ValueError(
+                "ssrm_driver='ramp' requires fem_solver='newton'. The ramp warm-"
+                "starts each strength step from the previous step's converged "
+                "state, which the viscoplastic driver does not carry.")
+        if failure_criterion not in ("non_convergence", "hybrid"):
+            raise ValueError(
+                f"ssrm_driver='ramp' does not run failure_criterion="
+                f"'{failure_criterion}'. Its verdict is force equilibrium plus the "
+                "Newton displacement bound, which is the hybrid/non-convergence "
+                "question.")
+        result = _ssrm_ramp_newton(
+            fem_data_trials, F_min, F_max, prep=prep, force_tol=force_tol,
+            convergence_tol=convergence_tol, max_iterations=max_iterations,
+            oob_window=oob_window, dt_scale=dt_scale,
+            tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
+            ssr_exclude_mask=ssr_exclude_mask,
+            tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
+            elastic_mask=elastic_mask, suction_phi_b=suction_phi_b,
+            suction_cap=suction_cap, k0=k0, f_adjust=f_adjust,
+            f_min_floor=f_min_floor, max_expand=max_expand,
+            max_iterations_ceiling=max_iterations_ceiling,
+            early_failure=early_failure, init_state=init_state,
+            debug_level=debug_level, progress_callback=progress_callback,
+            cancel_check=cancel_check)
+    elif failure_criterion in ("non_convergence", "hybrid"):
         # Same driver, same trials — 'hybrid' only changes how a NON-CONVERGED
         # trial's verdict is read (see classify_nonconvergence).
         result = _ssrm_displacement_limit(
@@ -7010,7 +11070,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
             elastic_mask=elastic_mask,
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
-            early_failure=early_failure, _prepared=prep, _init_state=init_state)
+            early_failure=early_failure, fem_solver=fem_solver,
+            _prepared=prep, _init_state=init_state)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -7026,7 +11087,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
             elastic_mask=elastic_mask,
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
-            early_failure=early_failure, _prepared=prep, _init_state=init_state)
+            early_failure=early_failure, fem_solver=fem_solver,
+            _prepared=prep, _init_state=init_state)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -7092,6 +11154,14 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 elastic_mask=elastic_mask,
                 suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
                 _prepared=prep, _init_state=init_state,
+                # The corrector is OFF here and must stay off. This solve runs past
+                # the failure strength with the displacement cap and the early exit
+                # deliberately disabled, so that the mechanism develops for the
+                # figure; it is not asking whether the slope stands, and nothing may
+                # ever read a factor of safety off it. A corrector that certified an
+                # equilibrium on this path would replace the runaway field the figure
+                # exists to show.
+                _corrector=False,
                 _softened_seed=result.get("failed_edge_softened"))
             result["failure_solution"] = failure_solution
             if debug_level >= 1:
@@ -7131,7 +11201,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  grid=None, min_slip_depth=None, ssr_exclude_mask=None,
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
                  suction_phi_b=None, suction_cap=None, early_failure=True,
-                 _prepared=None, _init_state=None, hybrid=False):
+                 fem_solver=None, _prepared=None, _init_state=None, hybrid=False):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -7149,6 +11219,29 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
 
     trials = []                        # per-trial verdict metadata (both settings)
     inconclusive = []                  # trials that hit the iteration ceiling, still improving
+
+    # The rescue cost policy's state (SPIKE.md, "THE COST OF THE RESCUE"). With the
+    # policy off — the default — none of it is read and every trial is solved the
+    # way it was. `_w0` is the bracket the search was ASKED for, which is the natural
+    # unit for "far above a standing bound"; `_carried` is the highest strength shown
+    # to stand so far, and is None until the lower bound is established, so the
+    # walk-down that looks for one is never budgeted against a bound that does not
+    # exist yet.
+    _w0 = max(float(F_max) - float(F_min), 1e-9)
+    _carried = [None]
+    _seed_carried = [False]            # has any trial on this model been seed-carried?
+
+    def _rescue_policy(F):
+        """(rung budget, seed-first) for a trial at F, from the standing bracket."""
+        rungs = None
+        if _carried[0] is not None:
+            d = (float(F) - _carried[0]) / _w0
+            if _NR_RESCUE_NONE_FRAC is not None and d > _NR_RESCUE_NONE_FRAC:
+                rungs = 0
+            elif (_NR_RESCUE_ADAPTIVE_FRAC is not None
+                    and d > _NR_RESCUE_ADAPTIVE_FRAC):
+                rungs = len(_NR_VP_PREDICTOR_ITERS or ())
+        return rungs, bool(_NR_SEED_MEMORY and _seed_carried[0])
 
     def _stable(sol):
         """Does the bisection treat this trial as standing at its F?"""
@@ -7195,7 +11288,42 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "diverging_iteration": sol.get("diverging_iteration"),
             "ee_suppressed": bool(sol.get("early_exit_suppressed", False)),
             "iterations": int(sol.get("iterations", 0)),
+            # Newton-only, and zero on the viscoplastic driver: the constitutive
+            # work actually done (see the note at `nr_force_evals`), and the
+            # viscoplastic predictor iterations the trial was charged (see
+            # `_NR_VP_PREDICTOR_ITERS`). Both are here so a run's total work can be
+            # read off the trial record rather than re-derived.
+            "nr_force_evals": int(sol.get("nr_force_evals", 0) or 0),
+            "nr_predictor_iterations": int(sol.get("nr_predictor_iterations", 0) or 0),
+            # Cost attribution, bookkeeping only and never read for a verdict (see
+            # SPIKE.md, "THE COST OF THE RESCUE"): this trial's wall time, the
+            # standing bracket it was asked from, and — on the Newton driver — the
+            # split between the cold attempt, the predictor rungs and the seeded
+            # correctors. Zero/absent on the viscoplastic driver.
+            "wall": float(sol.get("_trial_wall", 0.0) or 0.0),
+            "bracket": (float(F_left), float(F_right)),
+            "nr_cold_wall": float(sol.get("nr_cold_wall", 0.0) or 0.0),
+            "nr_cold_iterations": int(sol.get("nr_cold_iterations", 0) or 0),
+            "nr_cold_force_evals": int(sol.get("nr_cold_force_evals", 0) or 0),
+            "nr_rungs": list(sol.get("nr_rungs", []) or []),
+            "nr_cold_skipped": bool(sol.get("_nr_cold_skipped", False)),
+            # The corrector's evidence where a corrector decided this trial, and
+            # every attempt it made either way (SPIKE.md, "THE CORRECTOR"). None /
+            # empty on the plain viscoplastic path and on the Newton driver.
+            "corrector": sol.get("corrector"),
+            "corrector_attempts": list(sol.get("corrector_attempts", []) or []),
+            # The state's own admissibility, on every trial and on both drivers.
+            "max_yield_violation": sol.get("max_yield_violation"),
+            "n_yield_above_1pct": sol.get("n_yield_above_1pct"),
+            "max_yield_at": sol.get("max_yield_at"),
+            "yield_flagged": bool(sol.get("yield_flagged", False)),
+            "gate_failed": bool(sol.get("gate_failed", False)),
         })
+        if _stable(sol):
+            _carried[0] = (float(F) if _carried[0] is None
+                           else max(_carried[0], float(F)))
+            if any(r.get('converged') for r in (sol.get("nr_rungs") or ())):
+                _seed_carried[0] = True
         return sol
 
     if debug_level >= 1:
@@ -7232,6 +11360,12 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         return _cb
 
     def _solve_at(F, step, prefix):
+        _t0 = time.perf_counter()
+        _sol_at = _solve_at_inner(F, step, prefix)
+        _sol_at["_trial_wall"] = time.perf_counter() - _t0
+        return _sol_at
+
+    def _solve_at_inner(F, step, prefix):
         return solve_fem(fem_data, F=F, debug_level=max(0, debug_level - 1), force_tol=force_tol,
                          oob_window=oob_window,
                          dt_scale=dt_scale,
@@ -7247,6 +11381,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          progress_callback=_fem_progress(step, prefix),
                          failure_criterion=("hybrid" if hybrid else "non_convergence"),
                          k0=k0, early_failure=early_failure,
+                         fem_solver=fem_solver,
+                         _nr_rescue_rungs=_rescue_policy(F)[0],
+                         _nr_seed_first=_rescue_policy(F)[1],
                          _prepared=_prepared, _init_state=_init_state)
 
     F_left = F_min

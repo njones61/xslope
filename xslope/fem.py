@@ -8219,6 +8219,14 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
                 break
             alpha *= 0.5
         alpha = best_alpha if best_alpha is not None else 0.0
+        if _PROF_ON:
+            # How much of the Newton step the search actually takes, and how often
+            # it runs out of backtracks. Both are bookkeeping.
+            _PROF["alpha_sum"] = _PROF.get("alpha_sum", 0.0) + alpha
+            _PROF["n_alpha"] = _PROF.get("n_alpha", 0) + 1
+            _PROF["n_ls_full"] = _PROF.get("n_ls_full", 0) + (1 if alpha == 1.0 else 0)
+            _PROF["n_ls_exhausted"] = (_PROF.get("n_ls_exhausted", 0)
+                                       + (1 if _ls == _NR_LS_MAX - 1 else 0))
         u_try = u_try + alpha * du
         # Translational degrees of freedom only: a rotation is not a length, and
         # this ratio is reported as `residual` on both drivers. Without a pile every

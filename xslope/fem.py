@@ -4024,6 +4024,108 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
     return 'AMBIGUOUS', u_ratio, growth
 
 
+# ===================== The Newton corrector (SPIKE; see SPIKE.md) ============
+#
+# The viscoplastic iteration is globally robust and slowly convergent; the Newton
+# iteration is locally quadratic and needs a developed plastic field to start from.
+# Run in that order on ONE trial they are two phases of one solver, and that is what
+# the default 'auto' path does: the viscoplastic loop drives, and at a few points
+# along it the current (u, eps^p) is handed to one bounded Newton attempt at FULL
+# gravity — no load walk, no cold start, because the seed has already walked the load
+# path.
+#
+# The checkpoints are a LADDER, not a single seed, and that is a measured
+# requirement rather than a convenience: a reinforced trial at F = 1.55 is refused
+# from a 100-pass seed and stands from a 300-pass one (newton_second_opinion_
+# 2026-09-03.md, appendix). One refusal says nothing about the slope, so a refusal
+# never decides anything here.
+_CORRECTOR_CHECKPOINTS = (300, 1000, 3000)
+# The yield gate, ASSERTED on a corrector state before it may end a trial. The
+# reading is the invariant-form Mohr-Coulomb function over every Gauss point as a
+# fraction of the local strength scale (see _solve_fem_newton's "the verdict's own
+# evidence"), which is an independent form of the surface the return map solves on.
+# Converged corrector states measure 1e-8 or better on it, so this is a fence and
+# not a tolerance being leaned on.
+_CORRECTOR_YIELD_TOL = 1e-6
+# The count reported beside the reading: Gauss points whose violation exceeds 1% of
+# the local strength available there. A CONVERGED viscoplastic state with points over
+# this is FLAGGED — the force gate cannot see a yield violation, because the
+# viscoplastic iteration is in force balance at every iteration and what it relaxes
+# is yield.
+_YIELD_FLAG_FRAC = 0.01
+
+
+def _yield_reading(gp_groups, u, sq3=None):
+    """The invariant-form admissibility reading on a viscoplastic state.
+
+    Returns ``(max_violation, n_above_flag, max_tension_violation)``: the largest
+    Mohr-Coulomb yield-function value over every Gauss point divided by that point's
+    own strength scale, how many points exceed ``_YIELD_FLAG_FRAC`` of it, and the
+    same reading for the Rankine cap where one is finite (None where no point
+    carries a cap).
+
+    Same quantity, same normalization and same invariant form as the Newton path's
+    reading, computed here from the state the viscoplastic loop actually reports —
+    sigma = D (B u - eps^p) + sigma_0, with the pore pressure added back the way the
+    loop's own yield check adds it — so the two drivers' evidence is comparable
+    number for number. One pass over the Gauss points, no solve, and nothing here is
+    ever read for a verdict.
+    """
+    if sq3 is None:
+        sq3 = np.sqrt(3.0)
+    max_viol = 0.0
+    n_above = 0
+    max_tens = None
+    for grp in gp_groups:
+        Bg, D4g, dofg, evpg = grp['B'], grp['D4'], grp['dof'], grp['evp']
+        eps = np.einsum('gij,gj->gi', Bg, u[dofg])
+        eps4 = np.empty((len(grp['w']), 4))
+        eps4[:, :3] = eps - evpg[:, :3]
+        eps4[:, 3] = -evpg[:, 3]
+        sig4 = np.einsum('gij,gj->gi', D4g, eps4)
+        _sig0 = grp.get('sig0')
+        if _sig0 is not None:
+            sig4 = sig4 + _sig0
+        sig = sig4.copy()
+        sig[:, [0, 1, 3]] += grp['u_gp'][:, None]
+        sx, sy, txy, sz = sig.T
+        sigm = (sx + sy + sz) / 3.0
+        dsbar = np.sqrt(((sx - sy) ** 2 + (sy - sz) ** 2 + (sz - sx) ** 2
+                         + 6.0 * txy ** 2) / 2.0)
+        dxv, dyv, dzv = sx - sigm, sy - sigm, sz - sigm
+        ds3 = np.maximum(dsbar, 1e-10) ** 3
+        sine = np.clip(np.where(dsbar > 1e-10,
+                                -13.5 * (dxv * dyv * dzv - dzv * txy ** 2) / ds3,
+                                0.0), -1.0, 1.0)
+        th = np.arcsin(sine) / 3.0
+        _c_suc = grp.get('c_suc_r')
+        c_env = grp['c_r'] if _c_suc is None else grp['c_r'] + _c_suc
+        fv = (sigm * grp['snph']
+              + dsbar * (np.cos(th) / sq3 - np.sin(th) * grp['snph'] / 3.0)
+              - c_env * grp['csph'])
+        den = c_env * grp['csph'] + np.abs(sigm) * grp['snph']
+        ok = np.isfinite(den) & (den > 0.0)
+        if grp.get('has_elastic'):
+            # A material held linear elastic has no yield surface to violate.
+            ok = ok & ~grp['elastic']
+        if np.any(ok):
+            ratio = fv[ok] / den[ok]
+            max_viol = max(max_viol, float(np.max(ratio)))
+            n_above += int(np.count_nonzero(ratio > _YIELD_FLAG_FRAC))
+        _tc = grp.get('t_cap')
+        if _tc is not None:
+            m = np.isfinite(_tc) & ok
+            if np.any(m):
+                ctr = 0.5 * (sx + sy)
+                rad = np.sqrt((0.5 * (sx - sy)) ** 2 + txy ** 2)
+                s1 = np.maximum(ctr + rad, sz)
+                tv = float(np.max((s1[m] - _tc[m]) / den[m]))
+                max_tens = tv if max_tens is None else max(max_tens, tv)
+    if max_tens is not None:
+        max_viol = max(max_viol, max_tens)
+    return max_viol, n_above, max_tens
+
+
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, dt_scale=1.0,
               force_tol=1e-3, oob_window=10,
@@ -4034,7 +4136,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               fast_kernel='auto', failure_criterion="hybrid", k0=None,
               max_iterations_ceiling=50000, early_failure=True, _init_state=None,
               _softened_seed=None, fem_solver=None, _nr_export=None,
-              _nr_rescue_rungs=None, _nr_seed_first=False):
+              _nr_rescue_rungs=None, _nr_seed_first=False, _corrector=True):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -4081,6 +4183,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             exit_reason 'inconclusive' - neither converged nor failed - and
             solve_ssrm reports it as the bracket's upper uncertainty rather than
             counting it as a failure.
+        fem_solver (str or None): Which per-trial driver runs — 'auto' (the
+            default: the viscoplastic loop with the Newton corrector called from
+            inside it), 'viscoplastic' (that loop alone, with no corrector) or
+            'newton' (the spike's cold-start Newton driver). None falls through to
+            the XSLOPE_FEM_SOLVER environment variable and then to 'auto'. See
+            resolve_fem_solver and SPIKE.md, "THE CORRECTOR".
         early_failure (bool): End a trial as soon as its movement is unambiguously
             running away, rather than spending the rest of its budget proving it
             (default True). exit_reason 'diverging', which the bisection reads as
@@ -4557,11 +4665,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         t_cap_by_elem[_red] = t_cap_by_elem[_red] / F_by_elem[_red]
 
     # ---- Solver switch (INTERNAL, spike; see SPIKE.md) ----------------------
-    # The only place fem_solver is read. 'viscoplastic' — the default, and the
-    # definition of every locked and published factor of safety — falls straight
-    # through and the rest of this function is untouched. 'newton' hands the trial
-    # to the Newton-Raphson driver, which returns the same result dictionary.
-    if resolve_fem_solver(fem_solver) == 'newton':
+    # The only place fem_solver is read. 'viscoplastic' falls straight through and
+    # the rest of this function is the loop exactly as it stood before the corrector
+    # round — the definition of every factor of safety locked up to it. 'auto', the
+    # default, runs that same loop with the Newton CORRECTOR called from inside it
+    # (see "The Newton corrector" below and SPIKE.md, "THE CORRECTOR"). 'newton'
+    # hands the trial to the cold-start Newton-Raphson driver, which returns the
+    # same result dictionary.
+    _solver = resolve_fem_solver(fem_solver)
+    if _solver == 'newton':
         if _nr_export is not None:
             # The ramp driver (see _ssrm_ramp_newton) continues ONE solve across
             # strength steps, so it needs the working state this call is about to
@@ -4755,6 +4867,114 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                      + time.perf_counter() - _t_full)
             _full["nr_rungs"] = _sol.get("nr_rungs", [])
             _sol = _full
+        return _sol
+
+    # ---- The Newton corrector, on the default 'auto' path -------------------
+    # Everything the corrector needs is fixed by the time the strengths above are
+    # reduced, so the call arguments are built once here and only the STATE changes
+    # at each attempt. `_corrector_on` is the whole switch: with it False this
+    # function is the loop exactly as it was before this round, which is what
+    # fem_solver='viscoplastic' selects.
+    _corrector_on = (_solver == 'auto') and bool(_corrector)
+    _corr_attempts = []
+    _corr_nr_kw = None
+    if _corrector_on:
+        _corr_nr_kw = dict(
+            c_reduced=c_reduced, phi_reduced=phi_reduced,
+            elastic_by_elem=elastic_by_elem, t_cap_by_elem=t_cap_by_elem,
+            finv_by_elem=1.0 / F_by_elem, _nr_env_F=F_by_elem,
+            force_tol=force_tol, min_slip_depth=min_slip_depth,
+            max_iterations=max_iterations, max_disp_factor=max_disp_factor,
+            k0=k0, _nr_init_state=_init_state,
+            debug_level=max(0, debug_level - 1))
+
+    def _try_corrector(u_now, groups_now, where, vp_iterations, softened_now=None):
+        """One bounded Newton attempt at full gravity from the current state.
+
+        Returns the corrector's own result dictionary when the state it reaches
+        CONVERGES and passes all three gates, and ``None`` otherwise. A ``None`` is
+        not a verdict about anything: the caller returns to the viscoplastic loop,
+        which continues exactly as it would have.
+
+        The gates are asserted here rather than trusted. `_solve_fem_newton` already
+        refuses a state that misses the Dawson force tolerance at full gravity or
+        travels past the displacement bound, and both are re-read from its result;
+        what it only REPORTS is the invariant-form yield violation, and a corrector
+        state may not end a trial while any Gauss point sits more than
+        `_CORRECTOR_YIELD_TOL` of its own strength outside the surface.
+
+        Any exception from the corrector is a refusal and nothing more — a model the
+        Newton path cannot carry must fall back to the viscoplastic verdict rather
+        than lose its trial to a traceback.
+        """
+        _t0 = time.perf_counter()
+        _seed = {"u": np.asarray(u_now, dtype=float).copy(),
+                 "evp": [g['evp'].copy() for g in groups_now]}
+        _kw = dict(_corr_nr_kw)
+        if softened_now is not None and np.any(softened_now):
+            _kw['_softened_seed'] = softened_now
+        try:
+            _sol = _solve_fem_newton(fem_data, F, prep, _nr_seed_state=_seed, **_kw)
+        except Exception as _exc:      # KeyboardInterrupt is a BaseException
+            _corr_attempts.append(dict(
+                at=where, vp_iterations=int(vp_iterations), certified=False,
+                refusal=f"{type(_exc).__name__}: {_exc}"[:200],
+                wall=time.perf_counter() - _t0))
+            return None
+        _wall = time.perf_counter() - _t0
+        _oob = float(_sol.get("unbalanced_force_ratio", np.inf))
+        _yv = float(_sol.get("nr_max_yield_violation", np.inf))
+        _dl = _sol.get("nr_disp_limit")
+        _dd = _sol.get("nr_max_disp_deep")
+        _gate_force = bool(_sol.get("converged")) and _oob < force_tol
+        _gate_yield = _yv <= _CORRECTOR_YIELD_TOL
+        _gate_disp = (_dl is None or (_dd is not None and _dd <= _dl))
+        _certified = bool(_sol.get("converged")) and _gate_force and _gate_yield \
+            and _gate_disp
+        _rec = dict(
+            at=where, vp_iterations=int(vp_iterations), certified=_certified,
+            nr_iterations=int(_sol.get("iterations", 0) or 0),
+            nr_force_evals=int(_sol.get("nr_force_evals", 0) or 0),
+            exit_reason=str(_sol.get("exit_reason", "")),
+            oob=_oob, yield_violation=_yv,
+            max_disp_deep=(None if _dd is None else float(_dd)),
+            disp_limit=(None if _dl is None else float(_dl)),
+            wall=_wall)
+        _corr_attempts.append(_rec)
+        if debug_level >= 1:
+            print(f"  Newton corrector at {where} ({vp_iterations} viscoplastic "
+                  f"passes): "
+                  + ("CERTIFIED" if _certified else
+                     f"refused ({_sol.get('exit_reason')})")
+                  + f" — {_rec['nr_iterations']} Newton iteration(s), "
+                    f"out-of-balance {_oob:.2e}, worst yield {_yv:.2e}, "
+                    f"{_wall:.2f} s")
+        if not _certified:
+            return None
+        # Work is CUMULATIVE: the viscoplastic passes that grew the seed and the
+        # corrector that finished it are both charged to this trial, so the saving
+        # this path reports is a saving and not an accounting choice.
+        _sol["vp_iterations"] = int(vp_iterations)
+        _sol["nr_iterations"] = int(_sol.get("iterations", 0) or 0)
+        _sol["iterations"] = int(vp_iterations) + _sol["nr_iterations"]
+        _sol["failure_criterion"] = failure_criterion
+        _sol["corrector"] = {
+            "driver_of_record": "corrector",
+            "checkpoint": where,
+            "vp_iterations": int(vp_iterations),
+            "nr_iterations": _sol["nr_iterations"],
+            "nr_force_evals": _rec['nr_force_evals'],
+            "oob": _oob,
+            "force_tol": float(force_tol),
+            "yield_violation": _yv,
+            "yield_tol": float(_CORRECTOR_YIELD_TOL),
+            "max_disp_deep": _rec['max_disp_deep'],
+            "disp_limit": _rec['disp_limit'],
+            "disp_frac_height": (None if (_dd is None or mesh_height <= 0)
+                                 else float(_dd) / float(mesh_height)),
+            "wall": _wall,
+            "attempts": list(_corr_attempts),
+        }
         return _sol
 
     if debug_level >= 1:
@@ -5173,6 +5393,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                   f"({unbalanced_force_ratio:.2e} against tolerance "
                                   f"{force_tol:.1e}) - INCONCLUSIVE, neither "
                                   f"converged nor failed")
+                    # The loop is about to end this trial on a RULE — the ceiling or
+                    # the budget-extension heuristic declining — rather than on the
+                    # slope. One bounded corrector attempt from the state it reached
+                    # gets the last word; a refusal leaves the rule's verdict exactly
+                    # as it was.
+                    if _corrector_on:
+                        _c = _try_corrector(
+                            u, gp_groups, f"rule:{exit_reason}",
+                            total_iterations + iteration,
+                            softened_1d if has_1d_elements else None)
+                        if _c is not None:
+                            return _c
                     converged = False
                     iteration -= 1          # the last iteration actually performed
                     break
@@ -5742,6 +5974,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     if debug_level >= 1:
                         print(f"  Displacement limit exceeded at iteration {iteration+1}: "
                               f"max VP disp = {max_vp_disp:.2f} > limit {vp_disp_limit:.2f}")
+                    if _corrector_on:
+                        _c = _try_corrector(
+                            u, gp_groups, "rule:disp_limit",
+                            total_iterations + iteration + 1,
+                            softened_1d if has_1d_elements else None)
+                        if _c is not None:
+                            return _c
                     break
 
             if relative_change < tolerance and plastic_settled:
@@ -5809,9 +6048,35 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                               f"({_signal}) - the slope is running away; the trial "
                               f"is closed as FAILED without spending the rest of "
                               f"its budget")
+                    # _EARLY_FAIL_U_MAX no longer decides a trial on its own. The
+                    # runaway signal is read on an ITERATE, against a displacement
+                    # RATIO, and the review measured a reinforced trial closed at
+                    # u_ratio = 8.0000 that reaches admissible equilibrium at ~19x
+                    # elastic. So the signal triggers the corrector, and the trial's
+                    # displacement verdict becomes the 0.1 H bound on a CONVERGED
+                    # state; only where the corrector refuses does the rule stand.
+                    if _corrector_on:
+                        _c = _try_corrector(
+                            u, gp_groups, "rule:runaway",
+                            total_iterations + iteration + 1,
+                            softened_1d if has_1d_elements else None)
+                        if _c is not None:
+                            return _c
                     break
 
             u = u_new
+
+            # ---- the checkpoint ladder (see _CORRECTOR_CHECKPOINTS) ----------
+            # The plastic history is now developed enough to be worth correcting.
+            # Nothing about the viscoplastic state is changed by the attempt: it is
+            # copied out, and a refusal returns here with the loop untouched.
+            if _corrector_on and (iteration + 1) in _CORRECTOR_CHECKPOINTS:
+                _c = _try_corrector(
+                    u, gp_groups, f"vp{iteration + 1}",
+                    total_iterations + iteration + 1,
+                    softened_1d if has_1d_elements else None)
+                if _c is not None:
+                    return _c
 
 
         total_iterations += iteration + 1
@@ -6070,11 +6335,30 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                   f"max axial = {max_axial:.2f}, max shear = {max_lateral:.2f}, "
                   f"max moment = {max_moment:.2f}")
 
+    # ---- the state's own admissibility, on every trial ----------------------
+    # The force gate CANNOT see a yield violation: the viscoplastic iteration is in
+    # force balance at every iteration, and what it relaxes is yield. So a converged
+    # trial's evidence has two halves and only one of them was ever reported. This is
+    # the other half, in the same invariant form and on the same normalization the
+    # Newton path reports, computed once here on the state being returned. It is
+    # reporting only — no verdict on any path reads it — and the flag says when a
+    # trial called CONVERGED is standing on a field that is materially outside the
+    # yield surface somewhere.
+    _mvy, _n_above_y, _mvt = _yield_reading(gp_groups, u, sq3)
+
     return {
         "converged": converged,
         # Hybrid-criterion metadata (present on every criterion; see
         # classify_nonconvergence). `stable` is what a bisection should read.
         "stable": stable,
+        # The invariant-form admissibility reading on the returned state: the largest
+        # Mohr-Coulomb violation as a fraction of the local strength, how many Gauss
+        # points sit above 1% of it, the Rankine half of the same reading (None where
+        # no point carries a finite cap), and whether a CONVERGED state fails it.
+        "max_yield_violation": float(_mvy),
+        "n_yield_above_1pct": int(_n_above_y),
+        "max_tension_violation": _mvt,
+        "yield_flagged": bool(converged and _n_above_y > 0),
         "verdict": verdict,
         "u_ratio": u_ratio,
         "u_growth": u_growth,
@@ -6157,12 +6441,29 @@ _FEM_SOLVER_ENV_ANNOUNCED = False
 
 
 def resolve_fem_solver(fem_solver=None):
-    """Which per-trial driver runs: 'viscoplastic' (default) or 'newton'.
+    """Which per-trial driver runs: 'auto' (the default), 'viscoplastic' or 'newton'.
+
+    Three values, and only the first two are production paths:
+
+      * ``'auto'`` — the viscoplastic iteration with the Newton CORRECTOR called
+        from inside it (see SPIKE.md, "THE CORRECTOR"). The viscoplastic loop
+        drives and builds the plastic history; at a short checkpoint ladder, and
+        wherever the loop would otherwise exit on a rule, the current state is
+        handed to one bounded Newton attempt at full gravity. A corrector that
+        converges AND passes the force, yield and displacement gates ends the trial
+        as standing; a corrector that refuses is not a verdict and the viscoplastic
+        loop carries on untouched. So this path can only ever convert a
+        rule-decided refusal into a certified stand — it can never read lower than
+        the plain viscoplastic driver.
+      * ``'viscoplastic'`` — the plain loop with no corrector, which is the
+        definition of every locked and published factor of safety up to this round.
+      * ``'newton'`` — the cold-start Newton driver with its load walk and rescue
+        chain (SPIKE only; not a production path).
 
     ``None`` means UNSPECIFIED and falls through to the environment variable
-    ``XSLOPE_FEM_SOLVER``, then to 'viscoplastic'. The environment hook exists so
-    a whole benchmark run can be flipped without touching a call site; an
-    explicit argument always wins over it.
+    ``XSLOPE_FEM_SOLVER``, then to 'auto'. The environment hook exists so a whole
+    benchmark run can be flipped without touching a call site; an explicit argument
+    always wins over it.
 
     When the ENVIRONMENT — and not an explicit argument — is what selects a
     non-default driver, one warning line is printed per process. The explicit
@@ -6175,9 +6476,17 @@ def resolve_fem_solver(fem_solver=None):
     if fem_solver is None:
         env_value = os.environ.get(_FEM_SOLVER_ENV)
         from_env = bool(env_value)
-        fem_solver = env_value or "viscoplastic"
+        fem_solver = env_value or "auto"
     key = str(fem_solver).strip().lower()
-    if key in ("vp", "viscoplastic", "griffiths", "default"):
+    if key in ("auto", "hybrid", "corrector", "default"):
+        return "auto"
+    if key in ("vp", "viscoplastic", "griffiths"):
+        if from_env and not _FEM_SOLVER_ENV_ANNOUNCED:
+            _FEM_SOLVER_ENV_ANNOUNCED = True
+            print(f"\n*** {_FEM_SOLVER_ENV}={fem_solver!r} is set in the environment: "
+                  f"every FEM/SSRM solve in this process runs on the plain "
+                  f"'viscoplastic' driver with the Newton corrector OFF. Unset "
+                  f"{_FEM_SOLVER_ENV} to restore the default. ***\n")
         return "viscoplastic"
     if key in ("nr", "newton", "newton-raphson", "newton_raphson"):
         if from_env and not _FEM_SOLVER_ENV_ANNOUNCED:
@@ -6189,8 +6498,8 @@ def resolve_fem_solver(fem_solver=None):
                   f"default. ***\n")
         return "newton"
     raise ValueError(
-        f"Unknown fem_solver {fem_solver!r}. Supported: 'viscoplastic' (default) "
-        "and 'newton'.")
+        f"Unknown fem_solver {fem_solver!r}. Supported: 'auto' (default), "
+        "'viscoplastic' and 'newton'.")
 
 
 # Branch codes recorded per Gauss point by the return map, for reporting only.
@@ -8746,6 +9055,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # rather than a solver's word for one.
     sq3_ = np.sqrt(3.0)
     max_yield_violation = 0.0
+    n_yield_above_1pct = 0
     max_tension_violation = None
     for grp in groups:
         sg = grp['_sig']
@@ -8776,8 +9086,9 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         den_ = _ce_ * _cse_ + np.abs(sigm_) * _se_
         ok_ = np.isfinite(den_) & (den_ > 0.0)
         if np.any(ok_):
-            max_yield_violation = max(max_yield_violation,
-                                      float(np.max(fv_[ok_] / den_[ok_])))
+            _ratio_ = fv_[ok_] / den_[ok_]
+            max_yield_violation = max(max_yield_violation, float(np.max(_ratio_)))
+            n_yield_above_1pct += int(np.count_nonzero(_ratio_ > _YIELD_FLAG_FRAC))
         # The tensile half of the same reading: how far the major principal stress
         # sits above the cap, on the same scale. Computed from the components
         # rather than from the return map's ordered principals, for the same reason
@@ -8922,6 +9233,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         # converged trial this is the yield half of the verdict's evidence; the
         # force half is `residual`.
         "nr_max_yield_violation": float(max_yield_violation),
+        # The same reading under the names both drivers publish it by, so a reader
+        # comparing the two is comparing one quantity (see _yield_reading).
+        "max_yield_violation": float(max_yield_violation),
+        "n_yield_above_1pct": int(n_yield_above_1pct),
+        "yield_flagged": bool(converged and n_yield_above_1pct > 0),
         "iterations": int(total_iterations),
         "displacements": u_reported,
         "displacements_elastic": u_elastic,
@@ -8966,6 +9282,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         # a reader who checks only one still sees a capped model's whole
         # admissibility.
         "nr_max_tension_violation": max_tension_violation,
+        "max_tension_violation": max_tension_violation,
         # Whether this trial was solved from a viscoplastic predictor's state
         # rather than from zero, and how many predictor iterations it cost (see
         # _NR_VP_PREDICTOR_ITERS). Zero on every trial the driver solves on its own,
@@ -10714,6 +11031,14 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 elastic_mask=elastic_mask,
                 suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
                 _prepared=prep, _init_state=init_state,
+                # The corrector is OFF here and must stay off. This solve runs past
+                # the failure strength with the displacement cap and the early exit
+                # deliberately disabled, so that the mechanism develops for the
+                # figure; it is not asking whether the slope stands, and nothing may
+                # ever read a factor of safety off it. A corrector that certified an
+                # equilibrium on this path would replace the runaway field the figure
+                # exists to show.
+                _corrector=False,
                 _softened_seed=result.get("failed_edge_softened"))
             result["failure_solution"] = failure_solution
             if debug_level >= 1:

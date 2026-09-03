@@ -8898,8 +8898,10 @@ makes the runaway rule provisional rather than final.
 **5. Locks — MET.** `check_corrector` holds the rule exit, the checkpoint ladder,
 the three gates re-read off the returned state, the seed's work being charged to
 the trial, the escape hatch making no attempt, and the two ways a refusal must
-leave a trial untouched. The mutation that lets a refusal decide a trial was run
-and fails the check on both of those assertions.
+leave a trial untouched. It runs in 11 s. The mutation that lets a refusal decide a
+trial — `if not _certified: return None` neutered — was run and fails the check on
+both of those assertions, naming the trial and the two verdicts that differ. The
+WHOLE of `test/nr_ssrm_check.py` passes: 0 failures in 573 s.
 
 **6. SPIKE.md — this section.** No lock, tag, verification page or doc was edited.
 

@@ -790,15 +790,15 @@ corrector or by the loop's own exit — the trial is failed. The force test cann
 own, because the viscoplastic scheme is in force balance at every iteration and yield is precisely
 what it relaxes.
 
-The threshold comes from where the two populations separate, not from the corrector's own limit.
-A Newton state solves the equations the reading is taken from and measures $10^{-8}$ or better; a
-viscoplastic state approaches the surface along the relaxation and stops when the *displacement*
-increment settles, so its yield residual is set by a displacement tolerance rather than a yield one.
-Across the verification corpus, converged viscoplastic readings are dense and continuous up to about
-$10^{-2}$ — that residual — and above it they thin by an order of magnitude before a tail running to
-many times the local strength, which is unrelaxed yield rather than residual. $10^{-2}$ is also the
-fraction the reported Gauss-point count is taken against, so the check and the number printed beside
-it say the same thing about the same state.
+The threshold is looser than the corrector's $10^{-6}$, and the asymmetry is structural rather than
+a concession. A Newton state solves the equations the reading is taken from and measures $10^{-8}$
+or better. A viscoplastic state approaches the surface from outside along the relaxation and stops
+when the *displacement* increment settles, so what is left of its yield violation is set by a
+displacement tolerance and not by a yield one; holding it to the corrector's figure would condemn
+most of the states on the verification corpus that are simply not finished relaxing. $10^{-2}$ is
+where that residual ends and unrelaxed yield begins, and it is also the fraction the reported
+Gauss-point count is taken against, so the check and the number printed beside it say the same thing
+about the same state.
 
 Where a state is condemned, the material at `max_yield_at` is where to look. In a material with
 $c = 0$ the Mohr-Coulomb surface passes through the origin, so any tensile mean stress there is

@@ -156,7 +156,7 @@ _SSRM_TRIAL_COST_KEYS = frozenset((
     # a certified edge should CARRY its evidence into the saved record is a
     # decision about the artifact, not about the solver, and it is the owner's.
     "corrector", "corrector_attempts", "max_yield_violation",
-    "n_yield_above_1pct", "yield_flagged"))
+    "n_yield_above_1pct", "yield_flagged", "gate_failed", "max_yield_at"))
 
 
 def _jsonable(value):
@@ -4047,6 +4047,25 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
 # 2026-09-03.md, appendix). One refusal says nothing about the slope, so a refusal
 # never decides anything here.
 _CORRECTOR_CHECKPOINTS = (300, 1000, 3000)
+# Which of the loop's own EXITS also get a corrector attempt, by `exit_reason`.
+#
+# All four, and that is a MEASURED answer rather than the default. The trim was built
+# and run: with this tuple cut to the runaway rule alone — the one exit the review
+# indicts on its own merits, since `_EARLY_FAIL_U_MAX` reads a displacement RATIO on
+# an ITERATE and closed a reinforced trial at u_ratio = 8.0000 that reaches
+# machine-precision equilibrium three percent of the model height away — the full
+# 191-row corpus gave up 772 s of corrector work, 2% of the run, and lost three rows
+# their certified move (RS2-4-zone, RS2-40-d20, RS2-66d-deep, all of which fell back
+# to the value the stopping rule had been holding them at). Corpus wall 34,907 s
+# against 35,104 s for the whole ladder, both against the viscoplastic driver's
+# 42,449 s.
+#
+# The cost is not in the ladder. A rung that is dropped does not stop being paid for:
+# its trials go back to the viscoplastic loop, which spends the passes the corrector
+# was standing in for. The three certified moves are worth more than 2% of a run, so
+# the ladder keeps every exit; SPIKE.md's "THE LADDER AND THE YIELD GATE" carries the
+# candidate ladders and their numbers.
+_CORRECTOR_RULE_EXITS = ('inconclusive', 'iteration_cap', 'runaway', 'disp_limit')
 # The yield gate, ASSERTED on a corrector state before it may end a trial. The
 # reading is the invariant-form Mohr-Coulomb function over every Gauss point as a
 # fraction of the local strength scale (see _solve_fem_newton's "the verdict's own
@@ -4054,6 +4073,34 @@ _CORRECTOR_CHECKPOINTS = (300, 1000, 3000)
 # Converged corrector states measure 1e-8 or better on it, so this is a fence and
 # not a tolerance being leaned on.
 _CORRECTOR_YIELD_TOL = 1e-6
+# The same gate, on a VISCOPLASTIC state that is about to be called CONVERGED.
+#
+# A converged state must be admissible. The force gate cannot see a yield violation —
+# the viscoplastic iteration is in force balance at every iteration, and what it
+# relaxes is yield — so a trial that settles in force with a Gauss point far outside
+# the surface is not a verdict about the slope, it is a verdict about the stopping
+# rule. A state that fails this gate is handed to the corrector; where the corrector
+# certifies an admissible field the trial stands on that, and where it refuses too the
+# trial is FAILED.
+#
+# The threshold is NOT `_CORRECTOR_YIELD_TOL`, and the reason is measured. Over the
+# 266 CONVERGED viscoplastic trials on the 191-row corpus the reading distributes:
+# 26% at or below 1e-6, 62% below 1e-4, 85% below 1e-2, and then a tail that runs to
+# 33 times the local strength. The 513 states the corrector certified on the same
+# corpus read 2.2e-8 at worst. That asymmetry is structural rather than incidental: a
+# Newton state is the solution of the equations this reading is taken from, while a
+# viscoplastic state approaches the surface from outside along the relaxation and
+# stops when the DISPLACEMENT increment falls below `tolerance` — its yield residual
+# is set by a displacement tolerance, not by a yield one. Holding it to 1e-6 would
+# condemn 198 of 266 states that are simply not finished relaxing.
+#
+# 1e-2 is where the population separates. Below it the readings are continuous and
+# dense — 39 trials in [3e-3, 1e-2) — and they are the relaxation's finite residual.
+# Above it they thin by an order of magnitude, 8 trials in [1e-2, 3e-2) and one in
+# [3e-2, 1e-1), before the tail; those are not residuals, they are unrelaxed yield. It
+# is also the threshold `_YIELD_FLAG_FRAC` already counts points against, so the gate
+# and the reading beside it say the same thing about the same state.
+_VP_YIELD_GATE = 1e-2
 # The count reported beside the reading: Gauss points whose violation exceeds 1% of
 # the local strength available there. A CONVERGED viscoplastic state with points over
 # this is FLAGGED — the force gate cannot see a yield violation, because the
@@ -4065,11 +4112,13 @@ _YIELD_FLAG_FRAC = 0.01
 def _yield_reading(gp_groups, u, sq3=None):
     """The invariant-form admissibility reading on a viscoplastic state.
 
-    Returns ``(max_violation, n_above_flag, max_tension_violation)``: the largest
-    Mohr-Coulomb yield-function value over every Gauss point divided by that point's
-    own strength scale, how many points exceed ``_YIELD_FLAG_FRAC`` of it, and the
-    same reading for the Rankine cap where one is finite (None where no point
-    carries a cap).
+    Returns ``(max_violation, n_above_flag, max_tension_violation, worst)``: the
+    largest Mohr-Coulomb yield-function value over every Gauss point divided by that
+    point's own strength scale, how many points exceed ``_YIELD_FLAG_FRAC`` of it,
+    the same reading for the Rankine cap where one is finite (None where no point
+    carries a cap), and ``worst`` — the ``(element, gauss point)`` the largest
+    violation sits at, or None where nothing violates. A reading that condemns a
+    state has to say WHERE, or a reader cannot check it.
 
     Same quantity, same normalization and same invariant form as the Newton path's
     reading, computed here from the state the viscoplastic loop actually reports —
@@ -4083,6 +4132,7 @@ def _yield_reading(gp_groups, u, sq3=None):
     max_viol = 0.0
     n_above = 0
     max_tens = None
+    worst = None
     for grp in gp_groups:
         Bg, D4g, dofg, evpg = grp['B'], grp['D4'], grp['dof'], grp['evp']
         eps = np.einsum('gij,gj->gi', Bg, u[dofg])
@@ -4116,8 +4166,12 @@ def _yield_reading(gp_groups, u, sq3=None):
             # A material held linear elastic has no yield surface to violate.
             ok = ok & ~grp['elastic']
         if np.any(ok):
+            idx = np.flatnonzero(ok)
             ratio = fv[ok] / den[ok]
-            max_viol = max(max_viol, float(np.max(ratio)))
+            _k = int(np.argmax(ratio))
+            if float(ratio[_k]) > max_viol:
+                max_viol = float(ratio[_k])
+                worst = tuple(int(x) for x in grp['pairs'][int(idx[_k])])
             n_above += int(np.count_nonzero(ratio > _YIELD_FLAG_FRAC))
         _tc = grp.get('t_cap')
         if _tc is not None:
@@ -4126,11 +4180,16 @@ def _yield_reading(gp_groups, u, sq3=None):
                 ctr = 0.5 * (sx + sy)
                 rad = np.sqrt((0.5 * (sx - sy)) ** 2 + txy ** 2)
                 s1 = np.maximum(ctr + rad, sz)
-                tv = float(np.max((s1[m] - _tc[m]) / den[m]))
+                _tr = (s1[m] - _tc[m]) / den[m]
+                _j = int(np.argmax(_tr))
+                tv = float(_tr[_j])
+                if tv > max_viol:
+                    worst = tuple(int(x) for x in
+                                  grp['pairs'][int(np.flatnonzero(m)[_j])])
                 max_tens = tv if max_tens is None else max(max_tens, tv)
     if max_tens is not None:
         max_viol = max(max_viol, max_tens)
-    return max_viol, n_above, max_tens
+    return max_viol, n_above, max_tens, worst
 
 
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e-3,
@@ -5231,6 +5290,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     disp_hist = []
     u_elastic_scale = 0.0
     exit_reason = 'iteration_cap'
+    gate_failed = False            # a force-settled state the yield gate refused
     plateau_iter = None            # iteration at which the residual plateaued
     plateau_ratio = None           # the out-of-balance ratio it plateaued at
     diverging_iter = None          # iteration at which the early-failure rule fired
@@ -5405,8 +5465,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     # the budget-extension heuristic declining — rather than on the
                     # slope. One bounded corrector attempt from the state it reached
                     # gets the last word; a refusal leaves the rule's verdict exactly
-                    # as it was.
-                    if _corrector_on:
+                    # as it was. Off by default: see _CORRECTOR_RULE_EXITS, where the
+                    # measurement says these two exits convert four trials for 904 s.
+                    if _corrector_on and exit_reason in _CORRECTOR_RULE_EXITS:
                         _c = _try_corrector(
                             u, gp_groups, f"rule:{exit_reason}",
                             total_iterations + iteration,
@@ -5982,7 +6043,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     if debug_level >= 1:
                         print(f"  Displacement limit exceeded at iteration {iteration+1}: "
                               f"max VP disp = {max_vp_disp:.2f} > limit {vp_disp_limit:.2f}")
-                    if _corrector_on:
+                    if _corrector_on and 'disp_limit' in _CORRECTOR_RULE_EXITS:
                         _c = _try_corrector(
                             u, gp_groups, "rule:disp_limit",
                             total_iterations + iteration + 1,
@@ -6026,6 +6087,38 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         u = u_new
                         continue
                 # -------------------------------------------------------------
+                # ---- the yield gate on a CONVERGED viscoplastic state --------
+                # Force balance is only half of a verdict. Before this state may end
+                # the trial it must also be admissible: no Gauss point materially
+                # outside its own yield surface (see _VP_YIELD_GATE). A state that
+                # settles in force and fails in yield is handed to the corrector,
+                # exactly as a rule exit is; where the corrector certifies an
+                # admissible field the trial stands on THAT, and where it refuses the
+                # trial is FAILED, because the viscoplastic loop has reached its own
+                # fixed point and this is the state it exits on.
+                if _corrector_on:
+                    _gv, _gn, _, _gw = _yield_reading(gp_groups, u_new, sq3)
+                    if _gv > _VP_YIELD_GATE:
+                        u = u_new
+                        if debug_level >= 1:
+                            print(f"  Force-settled at iteration {iteration+1} but "
+                                  f"NOT admissible: worst yield violation "
+                                  f"{_gv:.3e} of local strength on {_gn} Gauss "
+                                  f"point(s) above 1% (worst at element/Gauss point "
+                                  f"{_gw}) - handing to the corrector")
+                        _c = _try_corrector(
+                            u, gp_groups, "gate:yield",
+                            total_iterations + iteration + 1,
+                            softened_1d if has_1d_elements else None)
+                        if _c is not None:
+                            return _c
+                        converged = False
+                        exit_reason = 'yield_gate'
+                        gate_failed = True
+                        if debug_level >= 1:
+                            print("  The corrector refused; a slope does not stand "
+                                  "on an inadmissible field - FAILED")
+                        break
                 converged = True
                 exit_reason = 'converged'
                 u = u_new
@@ -6063,7 +6156,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     # elastic. So the signal triggers the corrector, and the trial's
                     # displacement verdict becomes the 0.1 H bound on a CONVERGED
                     # state; only where the corrector refuses does the rule stand.
-                    if _corrector_on:
+                    if _corrector_on and 'runaway' in _CORRECTOR_RULE_EXITS:
                         _c = _try_corrector(
                             u, gp_groups, "rule:runaway",
                             total_iterations + iteration + 1,
@@ -6105,6 +6198,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     else:
         verdict, u_ratio, u_growth = classify_nonconvergence(
             disp_hist, u_elastic_scale, exit_reason, model_height=mesh_height)
+    if gate_failed:
+        # The yield gate is not a displacement reading and the hybrid criterion may
+        # not overturn it: this state settled in force and is outside the surface, so
+        # the trial has no admissible field to stand on whatever its displacements did.
+        verdict = 'FAILED'
     stable = bool(converged or (failure_criterion == 'hybrid'
                                 and verdict == 'STABLE_STUCK'))
     if not converged and debug_level >= 1:
@@ -6352,7 +6450,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # reporting only — no verdict on any path reads it — and the flag says when a
     # trial called CONVERGED is standing on a field that is materially outside the
     # yield surface somewhere.
-    _mvy, _n_above_y, _mvt = _yield_reading(gp_groups, u, sq3)
+    _mvy, _n_above_y, _mvt, _worst_y = _yield_reading(gp_groups, u, sq3)
 
     return {
         "converged": converged,
@@ -6366,7 +6464,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         "max_yield_violation": float(_mvy),
         "n_yield_above_1pct": int(_n_above_y),
         "max_tension_violation": _mvt,
+        # Where the worst violation sits, as (element, Gauss point), or None.
+        "max_yield_at": _worst_y,
         "yield_flagged": bool(converged and _n_above_y > 0),
+        # True where this trial settled in FORCE and the yield gate refused the state
+        # it settled on, and the corrector could not reach an admissible one either
+        # (see _VP_YIELD_GATE). The trial is FAILED, and this is why.
+        "gate_failed": bool(gate_failed),
         # Every corrector attempt this trial made and what it read, including the
         # ones that refused — a refusal decides nothing, but it is the measurement
         # that says whether the corrector is earning its cost. Empty on the plain
@@ -9252,6 +9356,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "max_yield_violation": float(max_yield_violation),
         "n_yield_above_1pct": int(n_yield_above_1pct),
         "yield_flagged": bool(converged and n_yield_above_1pct > 0),
+        # A Newton state is the solution of the equations the gate reads, and the
+        # corrector asserts the gate on it before it may end a trial, so this path
+        # never returns a gate-failed state. The key is here so that every result on
+        # every driver answers the question.
+        "gate_failed": False,
         "iterations": int(total_iterations),
         "displacements": u_reported,
         "displacements_elastic": u_elastic,
@@ -11206,7 +11315,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             # The state's own admissibility, on every trial and on both drivers.
             "max_yield_violation": sol.get("max_yield_violation"),
             "n_yield_above_1pct": sol.get("n_yield_above_1pct"),
+            "max_yield_at": sol.get("max_yield_at"),
             "yield_flagged": bool(sol.get("yield_flagged", False)),
+            "gate_failed": bool(sol.get("gate_failed", False)),
         })
         if _stable(sol):
             _carried[0] = (float(F) if _carried[0] is None

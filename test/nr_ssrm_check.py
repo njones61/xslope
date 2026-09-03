@@ -2788,11 +2788,21 @@ def check_corrector(fem_data):
         bound;
       * a corrector REFUSAL is not a verdict. Where no attempt is certified the
         trial comes back exactly as the viscoplastic loop left it, down to the
-        displacement field, and `fem_solver='viscoplastic'` makes no attempt at all.
+        displacement field, and `fem_solver='viscoplastic'` makes no attempt at all;
+      * the LADDER IS TRIMMED. `_CORRECTOR_RULE_EXITS` names the loop exits worth an
+        attempt, an exit outside it gets none and reports exactly what the shipped
+        loop reports, and the rule route still works when an exit is put back;
+      * and a CONVERGED viscoplastic state must be ADMISSIBLE. A state that settles
+        in force and fails the yield reading is handed to the corrector; where the
+        corrector certifies an admissible field the trial stands on that, and where
+        it refuses too the trial is FAILED — `converged` False, `stable` False under
+        every criterion, `exit_reason` 'yield_gate'.
 
-    The last one is the safety property the whole design rests on: the corrector can
-    only ever convert a rule-decided refusal into a certified stand, so this path
-    cannot read lower than the driver it wraps.
+    The refusal property is the safety property the corrector rests on: it can only
+    ever convert a rule-decided refusal into a certified stand, so the corrector
+    cannot read lower than the driver it wraps. The yield gate is the one thing here
+    that CAN read lower, and it is meant to: a slope stands on an admissible field or
+    it does not stand.
     """
     fails = []
 
@@ -2845,6 +2855,34 @@ def check_corrector(fem_data):
             f"iteration ceiling the viscoplastic loop is meant to come back "
             f"undecided, and it came back {vp_small['exit_reason']!r} "
             f"(converged={vp_small['converged']})")
+    # `_CORRECTOR_RULE_EXITS` is the whole switch, and it is locked in both
+    # directions. With the ceiling exit taken OUT the corrector must not be asked
+    # there and the trial must come back exactly as the shipped loop leaves it; the
+    # measurement behind keeping every exit is in SPIKE.md, "THE LADDER AND THE
+    # YIELD GATE".
+    _saved_exits = _fem._CORRECTOR_RULE_EXITS
+    try:
+        _fem._CORRECTOR_RULE_EXITS = tuple(
+            x for x in _saved_exits if x != 'inconclusive')
+        trimmed = _solve(CORR_F, 'auto', CORR_SMALL_BUDGET)
+    finally:
+        _fem._CORRECTOR_RULE_EXITS = _saved_exits
+    if trimmed.get('corrector_attempts') or ():
+        fails.append(
+            f"with the ceiling exit out of _CORRECTOR_RULE_EXITS the corrector was "
+            f"asked there anyway: {len(trimmed['corrector_attempts'])} attempt(s)")
+    if _fingerprint(trimmed) != _fingerprint(vp_small):
+        fails.append(
+            f"with the ceiling exit trimmed out, the default path at F = {CORR_F} "
+            f"reports {trimmed['exit_reason']!r} in {trimmed['iterations']} "
+            f"iterations against the viscoplastic loop's {vp_small['exit_reason']!r} "
+            f"in {vp_small['iterations']}")
+    # ... and with it IN — the shipped tuple — the rule route decides the trial.
+    if 'inconclusive' not in _fem._CORRECTOR_RULE_EXITS:
+        fails.append(
+            f"the shipped _CORRECTOR_RULE_EXITS is {_fem._CORRECTOR_RULE_EXITS!r} "
+            f"and does not carry the ceiling exit, so the rule route below is not "
+            f"the shipped one")
     auto_small = _solve(CORR_F, 'auto', CORR_SMALL_BUDGET)
     if not auto_small['converged']:
         fails.append(
@@ -2949,9 +2987,62 @@ def check_corrector(fem_data):
             f"{settles['iterations']} iterations, before the first checkpoint at "
             f"{_fem._CORRECTOR_CHECKPOINTS[0]}, and a corrector was asked anyway")
 
+    # --- a CONVERGED viscoplastic state must be ADMISSIBLE ---------------------
+    # The force gate cannot see a yield violation, so a trial that settles in force
+    # is not yet a verdict: it must also pass the invariant-form yield reading
+    # (_VP_YIELD_GATE). The gate is exercised by making it unreachable on the trial
+    # the loop settles fastest on — the one that needs no corrector at all — so the
+    # only thing that can change the answer is the gate itself.
+    _saved_vp_gate = _fem._VP_YIELD_GATE
+    try:
+        _fem._VP_YIELD_GATE = -1.0
+        gated = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET)
+        # ... and with the corrector's own gate shut as well, nothing can be
+        # certified, so there is no admissible field anywhere and the trial FAILS.
+        _saved_c_gate = _fem._CORRECTOR_YIELD_TOL
+        try:
+            _fem._CORRECTOR_YIELD_TOL = -1.0
+            failed = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET)
+            hybrid = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET,
+                            failure_criterion='hybrid')
+        finally:
+            _fem._CORRECTOR_YIELD_TOL = _saved_c_gate
+    finally:
+        _fem._VP_YIELD_GATE = _saved_vp_gate
+    if not (gated.get('corrector_attempts') or ()):
+        fails.append(
+            f"with the yield gate unreachable the force-settled state at "
+            f"F = {CORR_SETTLES_F} was never handed to the corrector: a state that "
+            f"converges in FORCE and fails in YIELD is not a verdict")
+    if gated['converged'] and (gated.get('corrector') or {}) \
+            .get('driver_of_record') != 'corrector':
+        fails.append(
+            f"with the yield gate unreachable the trial at F = {CORR_SETTLES_F} "
+            f"still came back CONVERGED on the viscoplastic state itself "
+            f"({gated['exit_reason']!r}, {gated['iterations']} iterations): an "
+            f"inadmissible converged state may not end a trial")
+    if gated['converged']:
+        fails += _gates(gated, f"F = {CORR_SETTLES_F} through the yield gate")
+    for sol, name in ((failed, "the default criterion"),
+                      (hybrid, "failure_criterion='hybrid'")):
+        if sol['converged'] or sol.get('stable') or not sol.get('gate_failed'):
+            fails.append(
+                f"with both yield gates unreachable at F = {CORR_SETTLES_F} under "
+                f"{name} the trial came back converged={sol['converged']}, "
+                f"stable={sol.get('stable')}, gate_failed={sol.get('gate_failed')}, "
+                f"exit {sol['exit_reason']!r}: with no admissible field anywhere the "
+                f"trial has to be FAILED")
+        elif sol['exit_reason'] != 'yield_gate' or sol.get('verdict') != 'FAILED':
+            fails.append(
+                f"the gate-failed trial at F = {CORR_SETTLES_F} under {name} reports "
+                f"exit {sol['exit_reason']!r} / verdict {sol.get('verdict')!r} "
+                f"instead of 'yield_gate' / 'FAILED', so nothing downstream can say "
+                f"WHY it failed")
+
     # --- the admissibility reading is on every result, on both drivers ---------
     for sol, name in ((vp_full, 'the viscoplastic loop'), (auto_full, 'the default path')):
-        for key in ('max_yield_violation', 'n_yield_above_1pct', 'yield_flagged'):
+        for key in ('max_yield_violation', 'n_yield_above_1pct', 'yield_flagged',
+                    'gate_failed'):
             if key not in sol:
                 fails.append(f"{name} does not report {key!r}: the force gate "
                              f"cannot see a yield violation, so the reading has to "

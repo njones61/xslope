@@ -8178,6 +8178,9 @@ the wall, and 9% is unattributed — the return-to-caller passes, the bracket
 bookkeeping, the mesh-derived setup each trial does once.
 
 **The tangent is re-formed on 96% of Newton iterations, and that is the finding.**
+(Iteration counts here are the profiler's — one constitutive pass at the top of each
+Newton iteration, 37,775 of them. The trial records report 37,631, the difference
+being the reporting passes a converged trial makes after its last iteration.)
 The driver has re-used its factorization since the first spike commit —
 `_nr_equilibrate` holds the standing `splu` object while the residual keeps falling
 by four per iteration — and on 37,775 iterations across thirteen rows it held it
@@ -8290,15 +8293,16 @@ solution is equal to the last bit.
 
 Measured in ONE process, alternating, with nothing else on the machine:
 
-| row | unknowns | ms per factorization (cached / plain) | wall (cached / plain) |
-|---|---|---|---|
-| `xslope_griffiths1` (162) | 2,788 | 2.94, 3.05 / 3.74, 3.89 | 24.0 s, 23.8 s / 25.2 s, 25.9 s |
-| `xslope_griffiths3_r0p8` (167) | 12,600 | 47.36 / 54.73 | 266.9 s / 287.8 s |
+| row | elements | degrees of freedom | ms per factorization (cached / plain) | wall (cached / plain) |
+|---|---|---|---|---|
+| `xslope_griffiths1` (162) | 387 | 1,680 | 2.94, 3.05 / 3.74, 3.89 | 24.0 s, 23.8 s / 25.2 s, 25.9 s |
+| `xslope_griffiths3_r0p8` (167) | 3,042 | 12,458 | 47.36 / 54.73 | 266.9 s / 287.8 s |
 
 **0.78x and 0.87x on the factorization, 0.94x and 0.93x on the whole trial.** The
 saving is the analysis, and it shrinks with the mesh because the numeric
-factorization grows faster than the ordering does — 21% at 2,788 unknowns, 12% at
-27,230 in a direct benchmark of the two calls. On all thirteen representative rows
+factorization grows faster than the ordering does — on tangents lifted straight out
+of a running trial and factorized both ways, 21% at 2,788 free unknowns (Griffiths &
+Lane 1, quad8) and 12% at 27,230 (RS2-65). On all thirteen representative rows
 the factor of safety, the final interval, every per-trial verdict, the iteration and
 force-evaluation counts and **the hash of the converged displacement field** are
 identical.
@@ -8503,7 +8507,7 @@ second small.
 
 **One lever is adopted and it is small by construction.** Caching the column ordering
 takes the same factorization without re-deriving an ordering that cannot have changed:
-0.78x per factorization at 2,788 unknowns and 0.87x at 12,600, which is 6% to 7% of a
+0.78x per factorization at 387 elements and 0.87x at 3,042, which is 6% to 7% of a
 factorization-bound trial. It is bit-identical — the same fill, the same solution, the
 same converged displacement field down to its hash on every row measured, and 182 of
 191 corpus rows reproducing the Sweep 1 column with the other nine moved by a

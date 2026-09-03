@@ -3685,6 +3685,7 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         "gp_groups_static": gp_groups_static,
         "n_total_gp": n_total_gp,
         "mesh_height": mesh_height,
+        "yield_floor": _YIELD_ABS_FLOOR_FRAC * float(np.max(gamma_by_mat)) * mesh_height,
         "node_dof_x": node_dof_x,
         "node_dof_y": node_dof_y,
         "free_dof_mask": free_dof_mask,
@@ -4107,9 +4108,35 @@ _VP_YIELD_GATE = 1e-2
 # viscoplastic iteration is in force balance at every iteration and what it relaxes
 # is yield.
 _YIELD_FLAG_FRAC = 0.01
+# The absolute floor under the strength scale the violation is divided by, as a
+# fraction of the model's own overburden stress scale (max unit weight x mesh
+# height), so it is unit-safe: 1e-4 of the deepest overburden in the model.
+#
+# The reading is a RATIO, and its denominator `c cos(phi) + |sigma_m| sin(phi)`
+# collapses to zero in a cohesionless material near a free surface, where both
+# terms go to zero together. Without a floor a Gauss point carrying a quarter of a
+# millipascal of round-off over a "strength" of forty micropascals reads six times
+# its own strength outside the surface, and a gate calibrated on the population of
+# real readings condemns it. Measured on `rs2_65`: a Rankine violation of 2.7e-4
+# kPa over a denominator of 4.2e-5 kPa, at a point whose mean stress is 8.9e-5 kPa.
+# The same normalization on `vp033` reads 4.89 kPa over 3.47 kPa, which is a real
+# unrelaxed violation, and the floor leaves it untouched.
+#
+# The failing test that proves the defect is an EQUIVALENCE: for a c = 0 material
+# `t_cut = 0` and a blank `t_cut` describe the same admissible set, because the
+# Mohr-Coulomb apex already sits at the origin. Without the floor the verdict flips
+# between those two ways of writing the same surface — 0.677 against 1.219 on
+# `rs2_65` — which is a criterion reading the return map's path rather than the
+# slope. With the floor the two agree.
+#
+# 1e-4 of the overburden scale is the same order as the c = 0 tension audit's
+# absolute floor (10 psf against a slope's overburden), expressed so it does not
+# depend on the unit system. It is far below any stress a mechanism is carried at
+# and far above the round-off a near-free-surface point accumulates.
+_YIELD_ABS_FLOOR_FRAC = 1e-4
 
 
-def _yield_reading(gp_groups, u, sq3=None):
+def _yield_reading(gp_groups, u, sq3=None, floor=0.0):
     """The invariant-form admissibility reading on a viscoplastic state.
 
     Returns ``(max_violation, n_above_flag, max_tension_violation, worst)``: the
@@ -4119,6 +4146,12 @@ def _yield_reading(gp_groups, u, sq3=None):
     carries a cap), and ``worst`` — the ``(element, gauss point)`` the largest
     violation sits at, or None where nothing violates. A reading that condemns a
     state has to say WHERE, or a reader cannot check it.
+
+    ``floor`` is the absolute floor under that strength scale, in the model's own
+    stress units — ``prep['yield_floor']``, which is ``_YIELD_ABS_FLOOR_FRAC``
+    times the model's overburden scale. Without it the denominator collapses in a
+    cohesionless material near a free surface and the ratio reports round-off as a
+    gross violation; see ``_YIELD_ABS_FLOOR_FRAC``.
 
     Same quantity, same normalization and same invariant form as the Newton path's
     reading, computed here from the state the viscoplastic loop actually reports —
@@ -4161,6 +4194,8 @@ def _yield_reading(gp_groups, u, sq3=None):
               + dsbar * (np.cos(th) / sq3 - np.sin(th) * grp['snph'] / 3.0)
               - c_env * grp['csph'])
         den = c_env * grp['csph'] + np.abs(sigm) * grp['snph']
+        if floor > 0.0:
+            den = np.maximum(den, floor)
         ok = np.isfinite(den) & (den > 0.0)
         if grp.get('has_elastic'):
             # A material held linear elastic has no yield surface to violate.
@@ -4229,6 +4264,22 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
 
     Failure to satisfy both within `max_iterations` is failure of the slope, which
     is Griffiths & Lane's non-convergence criterion.
+
+    On the DEFAULT driver (`fem_solver='auto'`) two things qualify that. A state
+    that satisfies both conditions must ALSO be admissible — its largest
+    Mohr-Coulomb violation at or below `_VP_YIELD_GATE` of the local strength — or
+    it does not end the trial; the force test cannot see a yield violation, because
+    this scheme is in force balance at every iteration and yield is what it relaxes.
+    And a bounded Newton CORRECTOR is attempted at a checkpoint ladder
+    (`_CORRECTOR_CHECKPOINTS`) and at every stopping rule (`_CORRECTOR_RULE_EXITS`)
+    on the state the loop has reached: a corrector state that converges AND passes
+    force, yield and displacement ends the trial as standing, and a corrector
+    refusal is never a verdict — the loop carries on with its own state untouched.
+    So this path can convert a rule-decided refusal into a certified stand; it
+    cannot fail a trial the loop would have carried. A trial decided that way
+    carries a `corrector` record (checkpoint, seed passes, iterations, the three
+    readings, every attempt), and `iterations` is the seed's passes plus the
+    corrector's.
 
     With `failure_criterion='hybrid'` (the default since 2026-07-26) that last
     sentence is qualified: a non-converged trial is additionally required to show
@@ -4611,6 +4662,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     pp_option = prep["pp_option"]
     n_total_gp = prep["n_total_gp"]
     mesh_height = prep["mesh_height"]
+    # The absolute floor under the yield reading's strength scale, in this model's
+    # own stress units — see _YIELD_ABS_FLOOR_FRAC.
+    _yield_floor = float(prep.get("yield_floor", 0.0) or 0.0)
     # K0 initial stress. The prepared model decides whether the overburden exists
     # (solve_ssrm passes its own k0 through to _prepare_fem_model), so a trial that
     # inherits a prepared model built WITHOUT k0 cannot silently turn it on.
@@ -6097,7 +6151,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 # trial is FAILED, because the viscoplastic loop has reached its own
                 # fixed point and this is the state it exits on.
                 if _corrector_on:
-                    _gv, _gn, _, _gw = _yield_reading(gp_groups, u_new, sq3)
+                    _gv, _gn, _, _gw = _yield_reading(gp_groups, u_new, sq3,
+                                                      _yield_floor)
                     if _gv > _VP_YIELD_GATE:
                         u = u_new
                         if debug_level >= 1:
@@ -6450,7 +6505,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # reporting only — no verdict on any path reads it — and the flag says when a
     # trial called CONVERGED is standing on a field that is materially outside the
     # yield surface somewhere.
-    _mvy, _n_above_y, _mvt, _worst_y = _yield_reading(gp_groups, u, sq3)
+    _mvy, _n_above_y, _mvt, _worst_y = _yield_reading(gp_groups, u, sq3, _yield_floor)
 
     return {
         "converged": converged,
@@ -9172,6 +9227,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # violation near machine precision is a statically admissible stress field
     # rather than a solver's word for one.
     sq3_ = np.sqrt(3.0)
+    _yield_floor_abs = float(prep.get("yield_floor", 0.0) or 0.0)
     max_yield_violation = 0.0
     n_yield_above_1pct = 0
     max_tension_violation = None
@@ -9202,6 +9258,12 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         # against. A material held linear elastic carries c = inf and is skipped,
         # as is a point with no strength scale to divide by.
         den_ = _ce_ * _cse_ + np.abs(sigm_) * _se_
+        # The same absolute floor the viscoplastic reading carries, so the two
+        # drivers' evidence stays comparable number for number. See
+        # _YIELD_ABS_FLOOR_FRAC for why a bare ratio cannot be trusted where the
+        # strength scale collapses.
+        if _yield_floor_abs > 0.0:
+            den_ = np.maximum(den_, _yield_floor_abs)
         ok_ = np.isfinite(den_) & (den_ > 0.0)
         if np.any(ok_):
             _ratio_ = fv_[ok_] / den_[ok_]
@@ -10496,6 +10558,16 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     Finds the critical strength reduction factor F where the viscoplastic
     algorithm transitions from converging (stable) to non-converging (failure).
 
+    Each trial is a solve_fem call, so it is decided the way solve_fem describes:
+    on the default driver the viscoplastic loop builds the plastic history, a
+    bounded Newton corrector attempts to finish the trial at a checkpoint ladder
+    and at every stopping rule, and a state ends the trial as standing only if it
+    is in force equilibrium, inside the yield surface and under the displacement
+    bound. The at-failure capture solve below is the one exception: it runs the
+    viscoplastic loop with the corrector OFF, because that solve exists to let the
+    mechanism develop for the figure and a certified equilibrium there would
+    replace the field the figure shows.
+
     Parameters:
         fem_data (dict): FEM data from build_fem_data
         F_min (float): Lower bound for F (must converge). Default 1.0. If it does
@@ -10531,6 +10603,14 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             slope failing) — no element is masked and no strength is held back — so a
             shallow zone still yields, it just cannot decide the bisection alone. Set the
             same value on the LEM search (search.py) to compare like-for-like surfaces.
+        fem_solver (str or None): Which per-trial driver runs, passed to every
+            solve_fem trial — 'auto' (the default: the viscoplastic loop with the
+            Newton corrector and the yield gate), 'viscoplastic' (that loop alone,
+            which is how every locked and published factor of safety up to the
+            corrector round was produced) or 'newton'. None falls through to the
+            XSLOPE_FEM_SOLVER environment variable and then to 'auto'. See
+            resolve_fem_solver. The at-failure capture solve ignores this and always
+            runs the plain viscoplastic loop.
         debug_level (int): Verbosity (0=silent, 1=summary, 2=detailed)
         max_iterations (int): Viscoplastic iteration BUDGET per trial, passed to
             solve_fem (default 12000). A trial that reaches it with the
@@ -10538,7 +10618,11 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             budget's worth, repeatedly, up to max_iterations_ceiling.
         max_iterations_ceiling (int): Hard stop on that extension (default 50000).
             A trial that reaches the ceiling while still improving is INCONCLUSIVE:
-            it is not counted as a failure. The bisection carries on below it, the
+            it is not counted as a failure. On the default driver the corrector is
+            attempted at that exit, and a trial still improving at the ceiling is
+            exactly the one a locally quadratic iteration can finish, so an
+            inconclusive trial survives only where the corrector also refuses. The
+            bisection carries on below it, the
             factor of safety is reported as the final bracket's midpoint exactly as
             on any other run, and the result carries 'inconclusive' and a 'note'
             recording that the bracket's upper edge is undecided rather than a

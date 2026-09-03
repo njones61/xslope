@@ -3047,6 +3047,100 @@ def check_corrector(fem_data):
                 fails.append(f"{name} does not report {key!r}: the force gate "
                              f"cannot see a yield violation, so the reading has to "
                              f"be carried on every result")
+
+    fails += _check_yield_floor(fem_data)
+    return fails
+
+
+def _synthetic_gp(sx, sy, txy, sz, c, phi_deg):
+    """One Gauss point carrying exactly the stress asked for, as a `_yield_reading`
+    group. The strain path is short-circuited — B = 0 and the whole stress is the
+    in-situ term — so the reading is taken on a state chosen by hand rather than on
+    one a solve happened to produce, which is what lets a normalization be tested at
+    a magnitude no benchmark reaches on demand."""
+    ph = np.radians(phi_deg)
+    return {'B': np.zeros((1, 3, 2)), 'D4': np.zeros((1, 4, 4)),
+            'dof': np.zeros((1, 2), dtype=int), 'evp': np.zeros((1, 4)),
+            'w': np.ones(1), 'u_gp': np.zeros(1), 'pairs': [(0, 0)],
+            'c_r': np.array([float(c)]), 'snph': np.array([np.sin(ph)]),
+            'csph': np.array([np.cos(ph)]),
+            'sig0': np.array([[sx, sy, txy, sz]], dtype=float)}
+
+
+def _check_yield_floor(fem_data):
+    """The yield reading is a ratio, and its denominator has an absolute floor.
+
+    `den = c cos(phi) + |sigma_m| sin(phi)` collapses to zero in a cohesionless
+    material near a free surface, where both terms vanish together. A gate reading
+    the bare ratio there divides round-off by round-off and condemns a state that
+    carries no load at all: on `rs2_65` a Rankine violation of 2.7e-4 kPa over a
+    denominator of 4.2e-5 kPa read as six times the local strength, and the trial
+    that produced it fell from 1.294 to 0.677.
+
+    The property that proves it is an EQUIVALENCE. For a material with c = 0,
+    `t_cut = 0` and no cap at all describe the same admissible set, because the
+    Mohr-Coulomb apex already sits at the origin. Without the floor the verdict
+    flipped between those two ways of writing the same surface. So this holds three
+    things, on states chosen rather than solved for:
+
+      * the floor is WIRED and is the model's own overburden scale, not a constant
+        in someone's stress units;
+      * a near-free-surface cohesionless point whose absolute violation is far below
+        that floor reads under the gate WITH it and over the gate WITHOUT it — the
+        rs2_65 case, and the assertion that fails if `_YIELD_ABS_FLOOR_FRAC` is set
+        to zero;
+      * a REAL violation — `vp033`'s 4.9 kPa of overshoot at a point with 3.5 kPa of
+        strength available — still reads over the gate with the floor on. A floor
+        that rescued that one would be hiding the thing the gate exists to catch.
+    """
+    fails = []
+    prep = _fem._prepare_fem_model(fem_data)
+    floor = float(prep.get('yield_floor', 0.0) or 0.0)
+    gam = float(np.max(np.asarray(fem_data['gamma_by_mat'], float)))
+    want = _fem._YIELD_ABS_FLOOR_FRAC * gam * float(prep['mesh_height'])
+    if not (floor > 0.0 and abs(floor - want) <= 1e-12 * max(1.0, want)):
+        fails.append(
+            f"the prepared model carries yield_floor = {floor!r} where the model's "
+            f"own overburden scale gives {want:.6g}: the floor has to be in the "
+            f"model's stress units or it is not unit-safe")
+        return fails
+
+    # rs2_65: c = 0, phi = 34.8, a point in isotropic tension at a mean stress five
+    # orders of magnitude below the floor. Its absolute violation is round-off.
+    tiny = 1e-4 * floor
+    grp = _synthetic_gp(tiny, tiny, 0.0, tiny, 0.0, 34.8)
+    bare, _, _, _ = _fem._yield_reading([grp], np.zeros(2), floor=0.0)
+    fl, _, _, _ = _fem._yield_reading([grp], np.zeros(2), floor=floor)
+    if not bare > _fem._VP_YIELD_GATE:
+        fails.append(
+            f"the unfloored reading on a cohesionless point at a mean stress of "
+            f"{tiny:.3e} is {bare:.3e}, under the gate {_fem._VP_YIELD_GATE:g}: this "
+            f"specimen no longer reproduces the collapse the floor exists for, so "
+            f"the assertion below proves nothing")
+    if not fl < _fem._VP_YIELD_GATE:
+        fails.append(
+            f"a cohesionless point whose absolute violation is {tiny:.3e} — "
+            f"{tiny / floor:.1e} of the model's own {floor:.3g} stress floor — reads "
+            f"{fl:.3e} of the local strength and is CONDEMNED. The gate is dividing "
+            f"round-off by a denominator that has collapsed, not measuring the slope")
+
+    # vp033: a real unrelaxed violation. The floor is orders of magnitude below the
+    # strength available there and must not touch the reading.
+    sm = 20.0 * floor
+    big = _synthetic_gp(sm * 3.0, sm * 0.5, sm * 0.8, sm * 0.5, 0.0, 34.0)
+    r_bare, _, _, _ = _fem._yield_reading([big], np.zeros(2), floor=0.0)
+    r_fl, _, _, _ = _fem._yield_reading([big], np.zeros(2), floor=floor)
+    if not r_bare > _fem._VP_YIELD_GATE:
+        fails.append(
+            f"the real-violation specimen reads {r_bare:.3e} unfloored, under the "
+            f"gate: it is not a violation, so it cannot show that the floor spares "
+            f"one")
+    elif not (r_fl > _fem._VP_YIELD_GATE
+              and abs(r_fl - r_bare) <= 1e-9 * max(1.0, abs(r_bare))):
+        fails.append(
+            f"a genuine yield violation reads {r_bare:.6g} unfloored and {r_fl:.6g} "
+            f"with the floor on: the floor is meant to leave a point that has real "
+            f"strength available exactly where it was")
     return fails
 
 

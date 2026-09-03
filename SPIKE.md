@@ -8219,3 +8219,181 @@ The answer to "where does a Newton iteration's time go" is therefore: **into
 building and factorizing a tangent that is thrown away one triangular solve later,
 on 96% of iterations, and increasingly so as the mesh grows.** That is what the
 levers below are measured against.
+
+### L1 — the refresh rule, and why holding the tangent gives the saving back
+
+The profile says the driver re-forms on 96% of iterations, so the obvious lever is to
+stop it. `_NR_REFORM_EVERY = 3` replaces the residual-ratio rule with a fixed hold —
+re-form on the first iteration of a load increment and every third after — and it is
+by a wide margin the largest work reduction anything in this round produced.
+
+| row | verdict | field | factorizations | Newton iterations | force evaluations | predictor iterations |
+|---|---|---|---|---|---|---|
+| `xslope_ssrm_embankment` (6) | held | 7e-10 | 1,789 → 736 | 1,871 → 2,187 | 14,233 → 16,369 | 13,343 → 13,343 |
+| `xslope_reinforced_slope` (7) | **MOVED** | 3e-01 | 5,208 → 612 | 5,406 → 1,838 | 37,094 → 13,298 | 51,246 → 33,406 |
+| `xslope_piles` (9) | held | 3e-01 | 4,528 → 1,848 | 4,717 → 5,510 | 32,087 → 35,945 | 12,266 → 12,516 |
+| `rs2_64b` (107) | held | 3e-06 | 1,050 → 420 | 1,075 → 1,255 | 7,869 → 10,241 | 41,843 → 41,343 |
+| `rs2_65` (115) | **MOVED** | 1e-01 | 930 → 157 | 886 → 428 | 6,248 → 3,298 | 26,051 → 62,152 |
+| `hammah_hb1` (159) | held | 3e-03 | 612 → 250 | 580 → 703 | 4,212 → 5,491 | 13,088 → 13,354 |
+| `xslope_griffiths1` (160) | held | 4e-08 | 2,131 → 788 | 2,213 → 2,349 | 16,354 → 16,924 | 17,183 → 17,183 |
+| `xslope_griffiths1` (161) | held | 2e-06 | 2,553 → 918 | 2,638 → 2,733 | 21,556 → 21,593 | 12,174 → 12,174 |
+| `xslope_griffiths1` (162) | held | 6e-07 | 1,650 → 685 | 1,721 → 2,038 | 13,592 → 16,091 | 8,203 → 8,203 |
+| `xslope_griffiths2` (163) | held | 4e-01 | 5,569 → 2,214 | 5,894 → 6,609 | 35,147 → 44,007 | 89,088 → 107,838 |
+| `xslope_griffiths3_r0p8` (167) | held | 7e-02 | 2,540 → 1,020 | 2,621 → 3,038 | 20,954 → 24,030 | 9,114 → 9,114 |
+| `xslope_griffiths6_dry` (185) | held | 8e-08 | 4,304 → 1,563 | 4,507 → 4,630 | 31,024 → 30,799 | 79,831 → 79,684 |
+| `xslope_griffiths6_full` (186) | held | 5e-01 | 3,348 → 1,079 | 3,502 → 3,220 | 23,871 → 23,381 | 13,334 → 14,334 |
+
+**It removes two thirds of the linear algebra.** Across the thirteen rows,
+factorizations fall from 36,212 to 12,290 and assembly falls with them, one for one.
+On the eleven rows whose verdict held, the measured factorization time drops from
+698 s to 285 s and assembly from 178 s to 87 s: **504 s of linear algebra gone.**
+
+**It gives most of that back at the same time, and how much depends on the row.**
+Over those eleven rows Newton iterations rise 9%, force evaluations 11% and
+predictor iterations 6% — the trials whose cold attempt now fails reach the rescue
+chain and are charged a seed they did not need — and the measured line-search time
+rises from 545 s to 832 s. The net is within the noise of zero. Measured cleanly,
+one process at a time with nothing else on the machine, it is a genuine 0.74x on
+Griffiths & Lane 6 full (154 s against 116 s, factorizations 3,348 → 1,079, line
+search unchanged at 20,344 evaluations against 20,135) and a 25% rise in force
+evaluations on Griffiths & Lane 2 and a 30% rise on `rs2_64b` and `hammah_hb1`.
+
+**The mechanism is the line search, and it is the same one that made the standing
+reuse rule useless.** On Griffiths & Lane 1 the search exhausts all nine of its
+backtracks on 50% of iterations, takes the full Newton step on 6.6%, and the mean
+accepted step is **0.110** of the correction. A direction that already has to be cut
+to a ninth has no margin: make the tangent staler and the search cuts it further and
+pays three more constitutive passes to find out. Linear algebra and constitutive work
+are not two budgets here — the first buys the quality of the step and the second pays
+for its absence, which is why the profile's two halves cannot be traded against each
+other.
+
+**And it moves verdicts on two rows in thirteen.** `xslope_reinforced_slope` returns
+1.496094 against 1.535156 and `rs2_65` returns 1.306250 against 1.293750. The cost
+round's lesson was that a policy passing a 46-row slice can still move ten verdicts
+on 191; this one does not survive thirteen rows. **L1 is rejected.**
+
+### L2 — a faster sparse solve, and the one place bit-identity survives
+
+Two things can be done to a factorization: take the same one more cheaply, or take a
+different one. Only the first keeps an answer, and it is worth exactly what the
+symbolic analysis costs.
+
+**L2a, the cached column ordering, is adopted.** `splu`'s COLAMD ordering is a
+function of the sparsity pattern alone, and a Newton trial's pattern is built once by
+`_nr_prepare_assembly` and re-formed into hundreds of times, so the ordering is
+re-derived from the same structure on every factorization. `_nr_factorize_tangent`
+keeps the permutation from the first factorization and hands SuperLU the already
+permuted matrix under `permc_spec='NATURAL'`. The fill is equal to the last nonzero —
+435,014 in L+U on Griffiths & Lane 1 either way, 6,193,455 on RS2-65 — and the
+solution is equal to the last bit.
+
+Measured in ONE process, alternating, with nothing else on the machine:
+
+| row | unknowns | ms per factorization (cached / plain) | wall (cached / plain) |
+|---|---|---|---|
+| `xslope_griffiths1` (162) | 2,788 | 2.94, 3.05 / 3.74, 3.89 | 24.0 s, 23.8 s / 25.2 s, 25.9 s |
+| `xslope_griffiths3_r0p8` (167) | 12,600 | 47.36 / 54.73 | 266.9 s / 287.8 s |
+
+**0.78x and 0.87x on the factorization, 0.94x and 0.93x on the whole trial.** The
+saving is the analysis, and it shrinks with the mesh because the numeric
+factorization grows faster than the ordering does — 21% at 2,788 unknowns, 12% at
+27,230 in a direct benchmark of the two calls. On all thirteen representative rows
+the factor of safety, the final interval, every per-trial verdict, the iteration and
+force-evaluation counts and **the hash of the converged displacement field** are
+identical.
+
+**L2b, SuperLU's symmetric mode, is not adopted, and the reason is worth more than
+the measurement.** `MMD_AT_PLUS_A` ordering with the diagonal pivot threshold at zero
+is 1.8x faster to factorize and 1.5x faster to back-substitute on a stored tangent,
+and 0.81x per factorization measured inside the driver across the representative set,
+at 0.985x the factorizations and 0.983x the iterations. It left **every verdict on
+all thirteen rows identical.** It is nonetheless an approximation: the consistent
+tangent at psi = 0 is genuinely non-symmetric — its skew part is 19% of its largest
+entry, measured — so ordering for the symmetric pattern and pivoting down the
+diagonal is a different factorization, and the solution of one linear system moves by
+about 1e-13 relative.
+
+That 1e-13 is not where it stays. On Griffiths & Lane 6 dry the two configurations
+agree on the factor of safety, on the final interval and on the verdict of every
+trial, and the converged displacement field of the last standing trial differs by a
+factor of **3.3** — max|u| 0.402 against 0.126. Griffiths & Lane 6 full differs by
+0.6 relative in the same norm. The same rows under L2a reproduce the field's hash bit
+for bit.
+
+**That is a finding about the driver, not about the ordering.** The last standing
+trial sits one bisection cell below the limit load, where the load-displacement curve
+is flat and the tangent near-singular, so a great many displacement states satisfy the
+same equilibrium tolerance — `_NR_REL_TOL` is 1e-8 on the residual, which does not
+bound the displacement anywhere near as tightly. **Criterion 2 — converged fields
+identical to 1e-10 — is therefore unreachable by any lever that changes the iteration
+path at all, and it is unreachable for a physical reason rather than a numerical
+one.** It is also a caveat on what a near-limit displacement figure means, and that
+belongs on the roadmap rather than in a cost round.
+
+**The optional dependencies do not exist on this machine.** `pypardiso` installs and
+is useless: it needs Intel MKL's PARDISO and there is no `mkl` distribution for arm64
+macOS at all. `scikit-umfpack` and `scikit-sparse` are source distributions needing
+SuiteSparse headers, which are not installed and would need a system package manager
+to put there. The same absence is already in force on the shipped side —
+`_factorize_free_stiffness` prefers CHOLMOD and cannot import it here, so both drivers
+run SuperLU. None of the three would be bit-identical in any case: a different library
+is a different factorization, which is exactly what L2b shows costs a displacement
+field.
+
+### L3 — the compiled constitutive pass, retired by the profile
+
+The kernel was the original suspect and the profile removes it. Constitutive work is
+39% of Newton's own time across the representative set and it FALLS with mesh size —
+49% of Newton's own work at 387 elements, 29% at 3,042, 21% at 6,802 — because a
+factorization grows faster than linearly in the unknowns and a return map does not.
+A compiled Newton return map would buy least on exactly the models that cost most.
+
+Two further facts close it. `xslope/_fem_kernel.pyx` has one entry point,
+`mc_step6`, written for the viscoplastic Step-6 update; a Newton entry point would
+have to carry the return map AND the three-way difference quotient for the
+algorithmic moduli, which is the larger half of it. And every locked value in this
+repository is defined on the pure-NumPy reference path — `run_tests.py` passes
+`fast_kernel=False` on every suite row it renders a verdict from — so a compiled
+Newton kernel would not be exercised by a single measurement in this document.
+
+The one class it would help is the one the profile singles out. `hammah_hb1` spends
+41% of its wall in the line search and 2% on factorization, because a Hoek-Brown
+Gauss point re-linearizes its envelope to self-consistency, up to sixty passes, on
+every evaluation. A curved-envelope model is constitutive-bound. That is one row in
+thirteen, and it is an argument for a cheaper envelope linearization rather than for
+compiling the one that is there.
+
+### L4 — the safe pre-filter, which costs 20% instead of saving 5%
+
+The cost round's verdict named one shape it believed verdict-safe by construction:
+run the coarse cold attempt, run the rescue chain, and — before any trial may be
+called FAILED — run the full cold attempt the coarse one stood in for. Nothing is
+then ever refused on less evidence than the driver refuses it on today.
+`_NR_COLD_FALLBACK` implements it on top of `_NR_COLD_CHEAP`; both ship off.
+
+| | Newton iterations | force evaluations | factorizations | verdicts |
+|---|---|---|---|---|
+| baseline | 37,631 | 264,241 | 36,212 | — |
+| **P4** coarse cold attempt alone | 21,776 (**0.58x**) | 155,918 (0.59x) | 21,048 | identical 13/13 |
+| **L4** coarse attempt as a pre-filter | 45,223 (**1.20x**) | 317,382 (1.20x) | 43,512 | identical 13/13 |
+
+**The pre-filter is 20% MORE work than the driver it protects, and the arithmetic is
+not subtle.** A trial that ends FAILED now pays the coarse attempt, then the whole
+rescue chain, then the full attempt — strictly more than the baseline's full attempt
+plus the same chain. The only trial it saves anything on is one the coarse attempt or
+the chain carries, and on this set those are rare: the eight plain Mohr-Coulomb
+benchmarks are carried cold. The cost round priced the rule at about a 5% saving from
+its own slice, which was weighted toward rescue-heavy rows; drawn across the classes
+the sign reverses.
+
+**It is not field-identical either**, which was the one thing it could not be. A
+trial the coarse attempt carries reports the state THAT attempt reached, and on
+`xslope_griffiths6_full` that is 0.6 relative away from the baseline's, on
+`xslope_griffiths1` (160) 4e-4 away — the same near-limit non-uniqueness L2b exposes,
+reached by a different route. **L4 is rejected.**
+
+P4 alone is in the table for one reason: it reproduces every verdict on all thirteen
+rows, and the cost round already measured it moving five on 191. Thirteen rows are
+not evidence that a cost policy is safe. That is the same lesson twice and it is why
+nothing fitted is adopted here.

@@ -8753,3 +8753,225 @@ cap and the early exit deliberately off so the mechanism develops for the figure
 corrector that certified an equilibrium there would replace the runaway field the
 figure exists to show, and nothing may read a factor of safety off that path
 anyway.
+
+### THE CORRECTOR — results
+
+Every number below was measured on this checkout on 2026-09-03: the `nr-ssrm-spike`
+worktree first on `sys.path` with `xslope.__file__` asserted under it, all 191
+`fem_ssrm` tags built by `run_tests.py`'s own `build_fem_ssrm_case`, eight worker
+processes, one model per process, every numerical library pinned to a single
+thread, `capture_failure_state=False`, the pure-NumPy reference kernel, and the
+profiler off. Those are the settings Sweep 1 measured its viscoplastic column on,
+which is what the walls below are compared against. Rows are named by their index
+in the 191-tag enumeration.
+
+#### The corpus, in four numbers
+
+| | viscoplastic (Sweep 1) | hybrid ('auto') |
+|---|---|---|
+| corpus wall | 42,449 s | 35,104 s — **0.827x** |
+| INCONCLUSIVE trials | 35 | **3** |
+| trials whose verdict a corrector decided | — | 513 of 1,536 |
+| rows reading LOWER than the viscoplastic driver | — | **0** |
+
+No row errored. Fifty-seven rows moved and **every one of them moved UP**, which is
+the safety property the design was built on: the corrector can only convert a
+rule-decided refusal into a certified stand, so a factor of safety cannot fall.
+
+#### Where the work went, and it is not where the criterion assumed
+
+The corrector was asked 2,962 times and cost 10,729 s — 31% of the hybrid's whole
+wall. It divides cleanly:
+
+| trigger | asked | certified | rate | wall |
+|---|---|---|---|---|
+| `vp300` | 1,206 | 445 | 36.9% | 3,783 s |
+| `vp1000` | 639 | 43 | 6.7% | 2,864 s |
+| `vp3000` | 352 | 15 | 4.3% | 1,766 s |
+| **the checkpoint ladder** | **2,197** | **503** | **22.9%** | **8,414 s** |
+| `rule:runaway` | 593 | 6 | 1.0% | 1,411 s |
+| `rule:iteration_cap` | 169 | 4 | 2.4% | 894 s |
+| `rule:inconclusive` | 3 | 0 | 0.0% | 10 s |
+| **all rule triggers** | **765** | **10** | **1.3%** | **2,315 s** |
+
+This is the round's finding, and it inverts the criterion's own fallback. The
+honest-negative clause said that if fewer than half the rule-decided refusals
+convert, the hybrid should ship as the end-of-budget adjudicator alone. The
+measurement says the opposite: **the end-of-budget adjudicator is the half that
+converts almost nothing** — 10 trials for 2,315 s — and the checkpoint ladder is
+where every useful conversion happens. Shipping "step 2's rule trigger only" would
+keep 22% of the cost and throw away 98% of the benefit.
+
+The reason is visible in the trigger table itself. `vp300` converts 37% of what it
+is asked and the later rungs 4-7%: a trial that a 300-pass seed cannot carry is
+usually a trial that is genuinely failing, and the second and third rungs mostly
+re-confirm that at 4,630 s. But they are not free of value — 58 trials are decided
+at `vp1000` or `vp3000` and nowhere else, which is the ladder requirement the
+review measured on the reinforced F = 1.55 row, reproduced at corpus scale.
+
+#### Where the wall went
+
+The corpus ratio of 0.827 is an average over two populations that behave in
+opposite directions:
+
+| | rows | viscoplastic | hybrid | ratio |
+|---|---|---|---|---|
+| rows whose factor of safety did NOT move | 134 | 22,891 s | 23,281 s | **1.017** |
+| rows whose factor of safety MOVED | 57 | 19,558 s | 11,823 s | **0.605** |
+
+On a row the viscoplastic driver was already deciding correctly the corrector is
+pure overhead and costs 1.7%. On a row where a stopping rule was cutting the answer
+short it is 0.605x AND it returns a higher, certified answer. 109 rows got slower,
+by 3,925 s in total; 82 got faster, by 11,270 s. By class the ratio runs 0.933 on
+the 143 RS2 transcriptions, 0.679 on the 31 SSRM verification rows, 0.595 on the
+ten "other" rows and 1.263 on the seven tutorial rows, and by mesh size 0.843 under
+1,000 elements, 0.974 from 1,000 to 3,000 and 0.750 above 3,000.
+
+The 31 rows carrying the 35 formerly INCONCLUSIVE trials run at 0.531 — 15,908 s
+down to 8,454 s — and the deepest cuts are exactly the rows the campaign was
+commissioned on: SSRM-TORGGLER 2,103 s to 671 s (0.319) with three inconclusive
+trials gone, RS2-P4-VP68-m1.2 591 s to 106 s (0.179), SIGMAW-SRS-wall 3,053 s to
+1,293 s (0.423).
+
+Three inconclusive trials survive, on RS2-66a, RS2-32 and RS2-67f: the viscoplastic
+loop reaches its ceiling and no corrector attempt on those trials passes the gates.
+They are reported as inconclusive exactly as before.
+
+#### The three probe cases the review predicted
+
+| trial | viscoplastic | hybrid | |
+|---|---|---|---|
+| G&L1 tri6/3.5, F = 1.365 | INCONCLUSIVE at 50,000, 52.1 s | CONVERGED, 348 iterations, 1.4 s | certified at `vp300`, 48 Newton iterations, oob 2.8e-06, yield 1.4e-08 |
+| LEM-3 tri6/1.2, F = 1.2656 | INCONCLUSIVE at 50,000, 191.8 s | CONVERGED, 326 iterations, 4.7 s | certified at `vp300`, 26 Newton iterations, 2.1% of the model height |
+| reinforced tri6/4.0, F = 1.60 | FAILED at `u_ratio` = 8.0000, 14.6 s | CONVERGED, 349 iterations, 0.8 s | certified at `vp300`, oob 7.5e-06, yield 5.5e-15, 3.0% of the model height |
+
+The reinforced row is the `_EARLY_FAIL_U_MAX` finding reproduced: the runaway rule
+closed a trial that reaches machine-precision equilibrium three percent of the
+model height away.
+
+#### What the yield reading found on the viscoplastic side
+
+The invariant-form reading now rides on every result, and it immediately catches
+what the force gate cannot see: **26 CONVERGED trials on 17 rows are standing on a
+field with at least one Gauss point more than 1% of its local strength outside the
+yield surface.** The reinforced sample at F = 1.55 is the sharpest case measured —
+the viscoplastic driver reports CONVERGED with the out-of-balance at 9.98e-04, and
+one Gauss point sits 1.52 times its own strength outside the cone. The corrector's
+state at the same strength reads 3.5e-15. This is the dispatcher memo's L0 and the
+c = 0 audit's mechanism, now visible on every trial without a referee run.
+
+#### The criterion, line by line
+
+**1. FS — MET as written, and it moves 28 locks.** Every factor of safety is either
+inside its lock tolerance (163 of 191) or HIGHER than the lock with a certified
+corrector edge (28 of 191). No row reads lower than the shipped viscoplastic value
+at all, let alone by a bisection cell. Every one of the 28 carries its evidence:
+the worst yield violation over all 28 deciding edges is 2.2e-08 of local strength
+and the largest displacement is 0.099 of the model height, inside the 0.1 H bound.
+The moves run from +0.0126 (SSRM-G5) to +0.2340 (FEM-3-wall-ssrm).
+
+**2. Work — NOT met.** 0.827x against a 0.6x target. Inconclusive trials fell 35 to
+3 rather than to zero, and the formerly-inconclusive rows run at 0.531 rather than
+at the 0.05 the criterion asked of the trials. The ladder's second and third rungs
+are 4,630 s for 58 conversions, and that is where the gap lives.
+
+**3. The escape hatch — MET, exactly.** `fem_solver='viscoplastic'` reproduces
+Sweep 1's viscoplastic column bit for bit on a 22-row sample spanning quad8,
+reinforced and piled models, K0 with `tension_srf`, no-K0, `min_slip_depth`,
+`ssr_zone`, `elastic_materials`, suction, c = 0, formerly-inconclusive rows, large
+meshes and the SSRM verification page: same factor of safety AND same iteration
+count on all 22, with zero corrector attempts made. Against the pre-round code at
+`3740b710` directly, G&L1 tri6/6.0 at F = 1.35, 1.39 and 1.45 agree in verdict,
+iteration count, out-of-balance and the SHA-1 of the displacement field, and the
+default control — Griffiths & Lane 6 dry, quad8 at 2 — returns FS 2.421875 on
+per-trial iteration counts 147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777 with
+an identical trial sequence.
+
+**4. The honest negative — TRIGGERED, and it points the other way.** 1.3% of the
+rule-decided refusals convert, far below half. The clause's remedy — ship the rule
+trigger alone — is refuted by the same table: that half converts 10 trials for
+2,315 s while the ladder converts 503. The honest statement is that the corrector
+earns its place at the CHECKPOINTS and not at the exits, and that the exits should
+be kept only because they are cheap (2,315 s of 35,104) and because they are what
+makes the runaway rule provisional rather than final.
+
+**5. Locks — MET.** `check_corrector` holds the rule exit, the checkpoint ladder,
+the three gates re-read off the returned state, the seed's work being charged to
+the trial, the escape hatch making no attempt, and the two ways a refusal must
+leave a trial untouched. The mutation that lets a refusal decide a trial was run
+and fails the check on both of those assertions.
+
+**6. SPIKE.md — this section.** No lock, tag, verification page or doc was edited.
+
+#### The locks that would move — for the owner's ruling
+
+Twenty-eight rows read outside their lock tolerance, every one of them HIGH and
+every one with a certified edge. Ordered by the move:
+
+| i | benchmark | page | lock | tol | vp | hybrid | move |
+|---|---|---|---|---|---|---|---|
+| 10 | FEM-3-wall-ssrm | fem03_piles.md | 1.559 | 0.01 | 1.55859 | 1.79297 | +0.2340 |
+| 80 | RS2-40-d80 | rs2.md | 1.470 | 0.02 | 1.48672 | 1.55547 | +0.0855 |
+| 79 | RS2-40-d50 | rs2.md | 1.470 | 0.02 | 1.48672 | 1.55547 | +0.0855 |
+| 107 | RS2-64b | rs2.md | 6.486 | 0.02 | 6.50586 | 6.56445 | +0.0785 |
+| 190 | SSRM-TORGGLER | ssrm.md | 1.673 | 0.01 | 1.67266 | 1.74297 | +0.0700 |
+| 108 | RS2-64d | rs2.md | 5.391 | 0.02 | 5.39844 | 5.46094 | +0.0699 |
+| 78 | RS2-40-d20 | rs2.md | 1.349 | 0.02 | 1.34922 | 1.41797 | +0.0690 |
+| 55 | RS2-28a | rs2.md | 1.606 | 0.02 | 1.61875 | 1.66875 | +0.0628 |
+| 172 | griffiths3_r0p2_thin | ssrm.md | 0.510 | 0.05 | 0.51250 | 0.56250 | +0.0525 |
+| 21 | RS2-4-zone | rs2.md | 1.844 | 0.02 | 1.84375 | 1.89375 | +0.0497 |
+| 13 | SIGMAW-SRS-wall | geostudio.md | 1.647 | 0.01 | 1.64687 | 1.69063 | +0.0436 |
+| 106 | RS2-64e | rs2.md | 5.579 | 0.02 | 5.59277 | 5.62012 | +0.0411 |
+| 7 | FEM-2-ssrm | fem02_reinforcement.md | 1.496 | 0.01 | 1.49609 | 1.53516 | +0.0392 |
+| 122 | RS2-66b-deep | rs2.md | 1.131 | 0.02 | 1.13125 | 1.16875 | +0.0378 |
+| 121 | RS2-66a-deep | rs2.md | 1.131 | 0.02 | 1.13125 | 1.16875 | +0.0378 |
+| 0 | xslope_reinforce_fem | samples.md | 1.497 | 0.01 | 1.49687 | 1.53438 | +0.0374 |
+| 12 | SIGMAW-SRS-nowall | geostudio.md | 1.0203 | 0.01 | 1.02031 | 1.04844 | +0.0281 |
+| 57 | RS2-28c | rs2.md | 1.381 | 0.02 | 1.39375 | 1.40625 | +0.0252 |
+| 15 | VP106-FEM-free | rocscience.md | 1.472 | 0.01 | 1.47188 | 1.49687 | +0.0249 |
+| 140 | RS2-P4-VP64 | rs2.md | 2.369 | 0.02 | 2.38125 | 2.39375 | +0.0247 |
+| 174 | SSRM-G4 | ssrm.md | 2.034 | 0.01 | 2.03906 | 2.05781 | +0.0238 |
+| 105 | RS2-64c | rs2.md | 4.783 | 0.02 | 4.79492 | 4.80664 | +0.0236 |
+| 104 | RS2-64a | rs2.md | 5.166 | 0.02 | 5.17773 | 5.18945 | +0.0235 |
+| 126 | RS2-67a | rs2.md | 2.479 | 0.02 | 2.49023 | 2.50195 | +0.0230 |
+| 51 | RS2-26 | rs2.md | 2.274 | 0.02 | 2.28398 | 2.29414 | +0.0201 |
+| 177 | SSRM-G5 | ssrm.md | 1.834 | 0.01 | 1.84062 | 1.85312 | +0.0191 |
+| 160 | SSRM-1 | ssrm.md | 1.359 | 0.01 | 1.36562 | 1.37187 | +0.0129 |
+| 178 | SSRM-G5 | ssrm.md | 1.278 | 0.01 | 1.28438 | 1.29063 | +0.0126 |
+
+Two things belong beside that table. First, the direction is uniform: the corrector
+never lowers an answer, so this is a list of places where a stopping rule was
+holding the reported factor of safety DOWN. Second, uniform-high is exactly what
+the review warned would look like an improvement and is not automatically one — on
+the vendor comparison the Newton-high readings were closer to the source on 30 of
+57 rows and further on 25, and the largest moves were on the reinforced and piled
+rows, which is where FEM-3-wall-ssrm's +0.234 sits. The corrector's states are
+admissible in the discrete model; whether the published value should follow them is
+the owner's call, and it is a different question from whether the solver is right.
+
+#### Verdict
+
+**The corrector works, the safety property holds, and the cost target does not.**
+
+The mechanism does what the review said it would. A trial the viscoplastic loop
+cannot decide inside 50,000 iterations is finished from a 300-pass seed in tens of
+Newton iterations with an admissible field, and the campaign's motivating case —
+LEM-3's 50,000-iteration edge — falls from 191.8 s to 4.7 s. Across the corpus 513
+trials are decided by a corrector, 35 inconclusive trials become 3, and no factor
+of safety anywhere moves down. The escape hatch is the shipped loop bit for bit,
+so nothing is at risk that is not deliberately taken.
+
+What it does not do is pay for itself everywhere. The corrector costs 31% of the
+hybrid's wall and the corpus lands at 0.827x rather than 0.6x, because the cost is
+paid on all 191 rows and the saving arrives on 57. The ladder's later rungs are the
+expensive part — 4,630 s for 58 conversions — and the rule triggers are nearly
+inert at 1.3%. A cheaper ladder is the obvious next question and this round did not
+ask it: the checkpoints are 300/1,000/3,000 because the review measured a refusal
+at 100 and a stand at 300, not because anything here was fitted.
+
+And the round's most consequential result is not the corrector at all. Twenty-six
+CONVERGED viscoplastic trials on 17 rows are standing on stress fields with a Gauss
+point outside the yield surface — one of them 1.52 times its own strength outside —
+and the force gate reports them as settled. That reading costs one pass over the
+Gauss points, it is on every result on both drivers now, and it is worth having
+whatever is decided about the corrector.

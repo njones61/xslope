@@ -8977,3 +8977,101 @@ point outside the yield surface — one of them 1.52 times its own strength outs
 and the force gate reports them as settled. That reading costs one pass over the
 Gauss points, it is on every result on both drivers now, and it is worth having
 whatever is decided about the corrector.
+
+## THE LADDER AND THE YIELD GATE
+
+Written before any of it was built, so what follows is a test and not a
+description.
+
+### What the owner ruled
+
+On 2026-09-03 the owner adopted the hybrid as the default: `fem_solver='auto'` —
+the viscoplastic loop with the Newton corrector wired into it — with
+`fem_solver='viscoplastic'` kept as an escape hatch that is the shipped loop bit
+for bit. Two things ride with the adoption. The checkpoint ladder is to be trimmed
+to chase the cost the last round missed. And the 17 rows whose viscoplastic
+CONVERGED states are inadmissible are to be measured and tabled together with the
+28 upward moves, as one re-lock campaign, for the owner to rule on. No lock, tag,
+verification page, tutorial or doc is edited in this round.
+
+### The ladder, and what the last round's cost table does not say
+
+The last round read the trigger table — the ladder converts 503 trials for 8,414 s
+and the rule exits convert 10 for 2,315 s — and concluded that the later rungs are
+where the cost lives: 4,630 s for 58 conversions. That reading prices a rung by
+what its attempts cost and not by what dropping it costs, and those are different
+numbers, because a conversion that is given up hands its trial back to the
+viscoplastic loop, which then spends the passes the corrector was standing in for.
+
+So the design question is not which rung is dear. It is which rung's conversions
+are REDUNDANT — a conversion an earlier rung would have made anyway, or a
+conversion that changed no factor of safety — because only a redundant conversion
+can be dropped without paying for it twice.
+
+### The design, before it is built
+
+1. `_CORRECTOR_CHECKPOINTS` and the set of rule exits that call the corrector
+   become the trimmed ladder chosen by the per-attempt analysis of
+   `newton_corrector_round_2026-09-03.csv`, under the constraint that at least 95%
+   of the deciding trials — the certified, stable trials standing above the shipped
+   viscoplastic answer on the 57 rows that moved — survive the trim.
+2. A viscoplastic CONVERGED verdict is no longer a verdict on its own. On the
+   `auto` path it must pass the same invariant-form yield gate a corrector state
+   must pass. A state that converges in FORCE and fails in YIELD is handed to the
+   corrector; where the corrector certifies an admissible state the trial stands on
+   that, and where the corrector refuses AND the viscoplastic loop cannot reach an
+   admissible state by its own exit the trial is FAILED. A slope stands on an
+   admissible field or it does not stand.
+3. The gate's threshold is measured, not assumed. `_CORRECTOR_YIELD_TOL` is 1e-6
+   because converged corrector states measure 1e-8 or better, and a viscoplastic
+   field is not built the same way. So the distribution of the reading over every
+   CONVERGED viscoplastic trial on all 191 rows is measured FIRST, and the gate is
+   set at the tightest threshold that an admissible viscoplastic state actually
+   meets, with the measurement quoted beside it.
+4. `fem_solver='viscoplastic'` keeps today's behavior: no ladder, no gate, no
+   attempt.
+
+### Success criterion (verbatim)
+
+> 1. **The ladder.** The trimmed ladder keeps at least 95% of the deciding trials
+>    and is reported against the shipped ladder with conversions kept, rows whose
+>    move is lost, and wall. Candidate ladders are reported with their numbers, not
+>    just the one chosen. The full 191-row corpus is re-run on the choice — suite
+>    configuration through `build_fem_ssrm_case`, eight workers, incremental
+>    records, `capture_failure_state=False`, the reference kernel — and reported
+>    against the shipped viscoplastic driver's 42,449 s as a percentage of it,
+>    per class, with the inconclusive count.
+> 2. **The safety property still holds on the ladder.** No row reads lower than the
+>    shipped viscoplastic value by more than one bisection cell for any reason other
+>    than the yield gate of item 3. Rows the gate brings down are reported
+>    separately and are not counted against this.
+> 3. **The yield gate.** The threshold is justified by the measured distribution
+>    over the 191 rows' converged viscoplastic trials, quoted in this section. Every
+>    trial the gate condemns is reported with the reading that condemned it: the
+>    worst violation as a fraction of local strength, the count of Gauss points
+>    above 1% of it, the material the worst point sits in, and whether tension in a
+>    zero-cohesion material is involved, cross-referenced to
+>    `c0_tension_audit_2026-09-02.md`. Answers coming DOWN is an expected outcome
+>    and not a failure of the round.
+> 4. **The escape hatch is still the shipped loop.** `fem_solver='viscoplastic'`
+>    reproduces the Sweep 1 viscoplastic column bit for bit — factor of safety and
+>    iteration count — on the 22-row sample, and the default control returns
+>    Griffiths & Lane 6 dry, quad8 at 2, FS 2.421875 on per-trial iteration counts
+>    147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777.
+> 5. **Locks.** `check_corrector` gains the yield gate: a viscoplastic state that
+>    converges in force and fails the gate must not end a trial, asserted, with a
+>    mutation — accepting an inadmissible converged state — made to FAIL the check.
+>    The whole of `test/nr_ssrm_check.py` passes, and `run_tests.py --preflight`
+>    passes in the worktree.
+> 6. **The re-lock table.** Every row whose factor of safety differs from its lock
+>    by more than one bisection cell or leaves its tolerance is tabled with: lock
+>    and tolerance, the shipped viscoplastic value, the new `auto` value, the
+>    direction, what decided it, the gate readings, the vendor or source value from
+>    `newton_vs_vendor_2026-09-02.csv` and whether the new value is closer or
+>    farther, and which tutorials or docs print the number. The table goes in this
+>    section and to `relock_table_2026-09-03.md`. No lock, tag, verification page,
+>    tutorial or doc is edited.
+> 7. **An honest negative is a valid outcome and must be written.** If the trim
+>    saves nothing worth having — because the cost migrates to the viscoplastic
+>    loop rather than disappearing — that is the result, and it is written as the
+>    answer to the owner's cost question rather than worked around.

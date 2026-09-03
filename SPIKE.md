@@ -8031,3 +8031,111 @@ processes, one model per process, every numerical library pinned to a single thr
 tension-SRF flag, SSR zone, depth filter and suction exactly. The compiled
 Mohr-Coulomb kernel is not built in this checkout, so everything ran the pure-NumPy
 reference path.
+
+## THE FACTORIZATION — where a Newton iteration's time actually goes
+
+Written before any of it was measured or built, so what follows is a test and not a
+description.
+
+### Why this one now
+
+The cost round ended on a measurement it could not act on. The three fitted policies
+run the corpus at 0.800x the viscoplastic driver's wall and each of them moves a
+verdict, so the saving is real and unshippable. What the round did not do is ask
+where a Newton ITERATION's time goes. It attributed a trial's wall to the cold
+attempt, the predictor rungs and the seeded correctors — a decomposition by WHICH
+solve, not by what a solve spends its time on.
+
+One number from that round points at the answer. The ramp does 72% less constitutive
+work than the bisection and takes 13% longer. A viscoplastic predictor iteration
+reuses one pre-factorized elastic operator; a Newton iteration may re-form and
+re-factorize a consistent tangent. If the second is what the ramp's 13% is made of,
+then the Newton driver is FACTORIZATION-BOUND, and every cost policy that trades
+constitutive passes is trading the cheap thing.
+
+That hypothesis has a complication which this round has to measure rather than
+assume. The driver already re-uses its factorization: since the first spike commit,
+`_nr_equilibrate` re-forms the tangent only when the previous step failed to cut the
+residual by four, and reuses the standing `splu` object otherwise. So "every Newton
+iteration re-factorizes" is not what the code says, and the open question is what
+fraction of iterations reform in practice — near the limit load, where the active
+set is still moving, the rule may fire on every iteration and the reuse may be worth
+nothing exactly where the time is spent.
+
+The counting also cuts the other way. On the full sweep the driver spent 1,059,941
+force evaluations on 142,009 Newton iterations: 7.5 constitutive passes per
+iteration, six of them line-search backtracks. If a backtrack costs what a
+factorization costs, the line search is the expense and the tangent is not.
+
+**This round measures which, and changes only cost. No verdict may move.**
+
+### Phase 0 — the profile, and it is committed before any lever is written
+
+Per Newton trial, the wall is split into: tangent ASSEMBLY, FACTORIZATION,
+triangular SOLVES, the tangent-forming constitutive pass (return map plus
+algorithmic moduli), the LINE SEARCH's constitutive passes, and everything else.
+The same split is taken for the ramp driver, and the viscoplastic driver is split
+into its one-time assembly and factorization, its per-iteration constitutive pass
+and its per-iteration triangular solve.
+
+The instrumentation is timers only — it reads no state and changes no arithmetic —
+and it is off unless `XSLOPE_NR_PROFILE` is set.
+
+The representative set is 13 rows: the eight plain Mohr-Coulomb benchmarks this
+spike was built on, one reinforced, one piled, one K0 vendor transcription, one
+curved envelope, and one model whose mesh is large enough (5,000+ elements) to show
+how the split scales, since assembly and factorization scale super-linearly in the
+mesh where a constitutive pass is linear in it. Rows are named by their index in the
+191-tag enumeration so they are reproducible.
+
+### The levers, in the order they are tested
+
+**L1 — factorization reuse.** Measure what the standing 4x rule actually does
+(factorizations per iteration, by trial outcome and by mesh size), then decide by
+measurement whether a different refresh rule, reuse across load increments within a
+trial, or reuse across ramp steps buys anything.
+
+**L2 — a faster sparse solve.** The Newton tangent is non-symmetric at psi = 0, so
+the symmetric paths the viscoplastic driver uses are not available on it as written.
+Measure `splu`'s ordering options (COLAMD, MMD_AT_PLUS_A, NATURAL) first, since they
+need nothing installed. Then, behind a feature check and never as a hard dependency,
+one of scikit-umfpack, pypardiso or a symmetrized-tangent variant — the last only if
+it is shown to converge to the same root.
+
+**L3 — a compiled constitutive pass**, only if the profile says the constitutive
+passes still matter after L1 and L2. The repo already carries `_fem_kernel.pyx` for
+the viscoplastic inner loop, built by `setup_kernel.py`, with a pure-NumPy fallback;
+the Newton return map and consistent tangent would be a second entry point in the
+same module under the same fallback.
+
+**L4 — the safe pre-filter** the cost round's verdict named: run the cheap cold
+attempt, run the rescue chain, and before declaring a trial FAILED run the full cold
+attempt that was skipped. Verdict-safe by construction rather than by fit. Phase 0
+priced it at about 5%.
+
+### Success criterion (verbatim)
+
+> 1. **Verdict bit-identity.** Every lever adopted reproduces the baseline EXACTLY
+>    on the representative set and then on all 191 rows: same factor of safety, same
+>    final interval, same per-trial F sequence, same per-trial verdict. A single
+>    flipped verdict rejects that lever.
+> 2. **The same root, not the same path.** A modified-Newton or re-ordered-solve
+>    path may take a different number of iterations. On every case in the
+>    representative set the CONVERGED displacement field and stress field must agree
+>    with the baseline to 1e-10 relative. The path is free; the root is not.
+> 3. **Work.** Newton bisection wall at or below the viscoplastic driver's 42,449 s
+>    on the full sweep, reported as a ratio. On the 46-row cost slice the ramp's
+>    wall at or below 0.7x the bisection's.
+> 4. **Robustness is not traded away.** Inconclusive trials stay at 0.
+> 5. **The default viscoplastic path is untouched.** G&L6 dry, quad8 at 2, no
+>    `fem_solver`: FS 2.421875 on per-trial iteration counts 147, 781, 3393, 2031,
+>    2841, 9541, 12000, 8617, 8777 (a docs tag raising `max_iter` to 16000 reports
+>    16000 at the seventh; the solver default is 12000). Any viscoplastic-side gain
+>    L2 or L3 produces is reported separately and ships behind an off-by-default
+>    switch, if at all.
+> 6. **Locks.** `test/nr_ssrm_check.py` gains a factorization-reuse lock — iteration
+>    and factorization counts on a cheap case, together with field identity against
+>    a full-reform run — with mutations that fail it. The whole check passes.
+> 7. **An honest negative is a valid outcome and must be written.** If the driver is
+>    not factorization-bound, that is the finding, and it retires the compiled-kernel
+>    idea for this driver along with it.

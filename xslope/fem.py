@@ -4085,14 +4085,14 @@ _CORRECTOR_YIELD_TOL = 1e-6
 #
 # The threshold is NOT `_CORRECTOR_YIELD_TOL`, and the reason is measured. Over the
 # 266 CONVERGED viscoplastic trials on the 191-row corpus the reading distributes:
-# 26% at or below 1e-6, 62% below 1e-4, 85% below 1e-2, and then a tail that runs to
+# 27% at or below 1e-6, 64% below 1e-4, 87% below 1e-2, and then a tail that runs to
 # 33 times the local strength. The 513 states the corrector certified on the same
 # corpus read 2.2e-8 at worst. That asymmetry is structural rather than incidental: a
 # Newton state is the solution of the equations this reading is taken from, while a
 # viscoplastic state approaches the surface from outside along the relaxation and
 # stops when the DISPLACEMENT increment falls below `tolerance` — its yield residual
 # is set by a displacement tolerance, not by a yield one. Holding it to 1e-6 would
-# condemn 198 of 266 states that are simply not finished relaxing.
+# condemn 193 of 266 states that are simply not finished relaxing.
 #
 # 1e-2 is where the population separates. Below it the readings are continuous and
 # dense — 39 trials in [3e-3, 1e-2) — and they are the relaxation's finite residual.

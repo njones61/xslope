@@ -9191,22 +9191,22 @@ the corrector certified, for comparison.
 | worst violation, as a fraction of the local strength | converged viscoplastic trials | cumulative |
 |---|---|---|
 | exactly 0 | 45 | 16.9% |
-| below 1e-6 | 23 | 25.6% |
-| 1e-6 to 1e-4 | 8 | 28.6% |
-| 1e-4 to 1e-3 | 89 | 62.0% |
-| 1e-3 to 3e-3 | 22 | 70.3% |
-| 3e-3 to 1e-2 | 39 | 85.0% |
-| 1e-2 to 3e-2 | 8 | 88.0% |
-| 3e-2 to 1e-1 | 1 | 88.3% |
-| 1e-1 to 1 | 4 | 89.8% |
-| 1 and above | 22 | 98.1% |
+| above 0, below 1e-6 | 28 | 27.4% |
+| 1e-6 to 1e-4 | 8 | 30.5% |
+| 1e-4 to 1e-3 | 89 | 63.9% |
+| 1e-3 to 3e-3 | 22 | 72.2% |
+| 3e-3 to 1e-2 | 39 | 86.8% |
+| 1e-2 to 3e-2 | 8 | 89.8% |
+| 3e-2 to 1e-1 | 1 | 90.2% |
+| 1e-1 to 1 | 4 | 91.7% |
+| 1 and above | 22 | 100.0% |
 
 The 513 corrector-certified states on the same corpus read 7.6e-15 at the median
 and 2.2e-08 at worst.
 
 **The gate is 1e-2 (`_VP_YIELD_GATE`), and 1e-6 was rejected on the evidence.**
-Only 26% of converged viscoplastic states reach 1e-6, and holding the driver to it
-would condemn 198 of 266 states that are simply not finished relaxing. The
+Only 27% of converged viscoplastic states reach 1e-6, and holding the driver to it
+would condemn 193 of 266 states that are simply not finished relaxing. The
 asymmetry is structural: a Newton state is the solution of the equations this
 reading is taken from, while a viscoplastic state approaches the surface from
 outside along the relaxation and stops when the DISPLACEMENT increment falls below
@@ -9233,7 +9233,7 @@ that can, and is meant to, bring an answer down.
 #### One mechanism, on all twenty-four
 
 Every refused trial's worst Gauss point sits in a material with `c = 0` and no
-declared tensile cap. Twelve rows, nine models, one mechanism. With `c = 0` the
+declared tensile cap. Twelve rows, ten models, one mechanism. With `c = 0` the
 Mohr-Coulomb surface passes through the origin, so any tensile mean stress at that
 point is outside it, and with a blank `t_cut` nothing in the constitutive model
 stops the state from getting there. That is the mechanism
@@ -9271,7 +9271,7 @@ verification page, tutorial or doc was edited.**
 |---|---|---|
 | corpus wall | 42,449 s | 33,950 s — takes 80% of the time, 20% faster |
 | INCONCLUSIVE trials | 35 | 4 |
-| trials a corrector decided | — | 546 of 1,548 |
+| trials a corrector decided | — | 546 of 1,542 |
 | rows reading higher than the viscoplastic driver | — | 58 |
 | rows reading lower | — | 11, every one the yield gate |
 

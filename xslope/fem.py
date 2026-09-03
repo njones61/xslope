@@ -4740,6 +4740,21 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             _sol["nr_cold_iterations"] = _cold_rec['iterations']
             _sol["nr_cold_force_evals"] = _cold_rec['force_evals']
             _sol["nr_rungs"] = _cold_rec['rungs']
+        # L4: the coarse attempt was a PRE-FILTER, so the trial does not get to fail
+        # on it. The full cold attempt the shipped driver would have made runs here,
+        # from zero, on the shipped step control, and its work is charged to this
+        # trial like every other attempt.
+        if (_NR_COLD_FALLBACK and _NR_COLD_CHEAP and _nr_export is None
+                and not _sol["converged"] and not _seed_first):
+            _t_full = time.perf_counter()
+            _full = _solve_fem_newton(fem_data, F, prep, **_nr_kw)
+            _full["iterations"] += _sol["iterations"]
+            _full["nr_force_evals"] += _sol["nr_force_evals"]
+            _full["nr_predictor_iterations"] = _sol.get("nr_predictor_iterations", 0)
+            _full["nr_cold_wall"] = (_sol.get("nr_cold_wall", 0.0)
+                                     + time.perf_counter() - _t_full)
+            _full["nr_rungs"] = _sol.get("nr_rungs", [])
+            _sol = _full
         return _sol
 
     if debug_level >= 1:
@@ -7609,6 +7624,69 @@ def _nr_assemble_tangent(groups, tangents, pattern, bars=None, piles=None):
                       shape=(n_free, n_free))
 
 
+class _NrPermutedLU:
+    """``.solve(b)`` over a factorization taken on the column-permuted tangent."""
+
+    __slots__ = ("_lu", "_pc")
+
+    def __init__(self, lu, pc):
+        self._lu = lu
+        self._pc = pc
+
+    def solve(self, b):
+        return self._lu.solve(b)[self._pc]
+
+
+def _nr_factorize_tangent(K, cache):
+    """``splu`` on a Newton tangent, re-using the column ordering the pattern fixes.
+
+    ``splu``'s default ``permc_spec='COLAMD'`` orders for fill, and that ordering
+    is a function of the SPARSITY PATTERN ALONE — it never looks at a value. A
+    Newton trial re-forms its tangent hundreds of times into one pattern built
+    once by :func:`_nr_prepare_assembly`, so COLAMD is re-derived from the same
+    structure on every one of them and returns the same permutation every time.
+
+    The first factorization keeps that permutation. Every later one gathers the
+    tangent's values into the already-permuted CSC — the pattern's own gather
+    index, built once — and factorizes with ``permc_spec='NATURAL'``, which is
+    SuperLU doing exactly what it would have done after its own COLAMD call and
+    nothing before it. The factors and the solution are BIT-IDENTICAL to the
+    unpermuted call: same column order, same partial pivoting, same arithmetic in
+    the same sequence, and the fill measured on Griffiths & Lane 1 (435,014
+    nonzeros in L+U) and on RS2-65 (6,193,455) is equal to the last entry. What is
+    saved is the analysis, which is 21% of the factorization at 2,788 unknowns and
+    12% at 27,230 — the numeric work grows faster than the ordering does.
+    """
+    if _NR_FACTOR_SYMMETRIC:
+        return splu(K, permc_spec="MMD_AT_PLUS_A", diag_pivot_thresh=0.0,
+                    options=dict(SymmetricMode=True))
+    ipc = cache.get("ipc")
+    if ipc is not None and cache["sig"] != (K.shape, K.nnz):
+        # The pattern this cache was built on is not the pattern in hand. Nothing
+        # in the driver rebuilds a pattern under a live solve, so this cannot
+        # happen today; it is here because a wrong gather index would be silent.
+        ipc = None
+    if ipc is None:
+        lu = splu(K)
+        cache["sig"] = (K.shape, K.nnz)
+        pc = lu.perm_c
+        cache["pc"] = pc
+        cache["ipc"] = ipc = np.argsort(pc)
+        indptr = K.indptr
+        cache["take"] = np.concatenate(
+            [np.arange(indptr[j], indptr[j + 1]) for j in ipc]
+        ).astype(np.intp) if K.nnz else np.empty(0, dtype=np.intp)
+        newptr = np.zeros(K.shape[1] + 1, dtype=indptr.dtype)
+        np.cumsum(np.diff(indptr)[ipc], out=newptr[1:])
+        cache["newptr"] = newptr
+        cache["newind"] = K.indices[cache["take"]]
+        return lu
+    take = cache["take"]
+    Kp = csc_matrix((K.data[take], cache["newind"], cache["newptr"]),
+                    shape=K.shape)
+    return _NrPermutedLU(splu(Kp, permc_spec="NATURAL"), cache["pc"])
+
+
 def _nr_tangent_factorable(K):
     """Is this tangent something SuperLU can be handed at all?
 
@@ -7660,6 +7738,24 @@ _NR_COMFORT = 8            # ... which is a step converged in this many iteratio
 _NR_LS_MAX = 9             # line-search backtracks (down to a step of 1/256)
 _NR_REL_TOL = 1e-8         # ||r|| / ||f_ext||, the step-level equilibrium test
 _NR_TANGENT_H = 1e-7       # strain perturbation for the algorithmic tangent
+
+# ---- the tangent refresh rule, and what it costs (SPIKE, "THE FACTORIZATION") ----
+# _nr_equilibrate holds its factorization while the residual keeps falling by at
+# least 1/_NR_REFORM_RATIO per iteration, and re-forms when it does not. Measured on
+# the representative set, that rule fires on 96% of iterations: the line search
+# regularly accepts a fraction of the Newton step, a fractional step does not cut the
+# residual by four, and so the tangent is re-formed and re-factorized on nearly every
+# iteration. _NR_REFORM_EVERY overrides it with a fixed hold — reform on the first
+# iteration of an increment and every Nth after — for measuring what a genuine
+# modified-Newton trade costs. None keeps the shipped rule.
+_NR_REFORM_RATIO = 0.25
+_NR_REFORM_EVERY = None
+# The Newton tangent is NON-symmetric at psi = 0, so SuperLU's symmetric mode
+# (MMD_AT_PLUS_A ordering, diagonal pivoting) is an approximation on it rather than
+# the exact structural statement it is on the viscoplastic driver's elastic
+# stiffness. It is 1.8x faster to factorize and 1.5x faster to back-substitute and
+# it is NOT bit-identical, so it is a measurement knob and ships off.
+_NR_FACTOR_SYMMETRIC = False
 
 # Admissibility of the ANSWER, not a control on the solve. Reaching equilibrium is
 # only half of what "the slope stands at F" means; the other half is that the state
@@ -7803,6 +7899,17 @@ _NR_SEED_MEMORY = False
 _NR_COLD_CHEAP = False
 _NR_COLD_MIN_STEP = 1.0 / 8
 _NR_COLD_MAX_ITER = 60
+
+# L4 — the cheap cold attempt as a PRE-FILTER rather than a replacement, which is
+# what the cost round's verdict named as the only verdict-safe shape for it. With
+# both this and _NR_COLD_CHEAP on, a trial runs the coarse attempt, then the rescue
+# chain, and then — before it may be called FAILED — the full cold attempt the coarse
+# one stood in for. Nothing is ever refused on less evidence than the driver refuses
+# it on today, so the FAILED verdict is safe by construction rather than by a
+# threshold fitted to a sample. What it is not is field-identical: a trial the coarse
+# attempt or the chain carries reports the state THEY reached, and on a trial the
+# full attempt would have carried that is a different converged field.
+_NR_COLD_FALLBACK = False
 
 
 def _nr_predictor_rungs(prep, n_elements, max_iterations, max_iterations_ceiling,
@@ -7999,6 +8106,10 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
     r_best = float('inf')
     last_progress = 0
     lu = None                  # the live tangent factorization (see below)
+    # The column ordering COLAMD derives from this pattern, kept for the whole
+    # trial (see _nr_factorize_tangent). The pattern is built once per solve, so
+    # this is the same structure every re-form and every load increment sees.
+    _order_cache = pattern.setdefault("_order", {})
     prev_r = None
     for it in range(1, nr_max_iter + 1):
         # Re-form and re-factorize the tangent only when the previous step did
@@ -8008,7 +8119,11 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         # rate for a fraction of the cost — the assembly and the LU are the
         # whole per-iteration expense, the return map is not. A step whose
         # residual stops falling by 4x per iteration gets a fresh tangent.
-        reform = lu is None or prev_r is None or r_hist[-1] > 0.25 * prev_r
+        if _NR_REFORM_EVERY is None:
+            reform = (lu is None or prev_r is None
+                      or r_hist[-1] > _NR_REFORM_RATIO * prev_r)
+        else:
+            reform = lu is None or (it - 1) % int(_NR_REFORM_EVERY) == 0
         _tp = time.perf_counter() if _PROF_ON else None
         fint, tangents, _ = _nr_internal_force(groups, u_try, n_dof,
                                                h_eps=h_eps, want_tangent=reform,
@@ -8051,7 +8166,7 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
                 break                   # structurally singular = the limit load
             _tp = time.perf_counter() if _PROF_ON else None
             try:
-                lu = splu(K)
+                lu = _nr_factorize_tangent(K, _order_cache)
             except RuntimeError:
                 break                   # singular tangent = the limit load
             finally:

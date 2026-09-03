@@ -219,6 +219,7 @@ def run():
     failures += check_env_override_announces_itself()
     failures += check_ramp(fem_data, results['newton'].get('FS'))
     failures += check_rescue_cost(fem_data, results['newton'])
+    failures += check_factorization(fem_data)
 
     return failures
 
@@ -2716,6 +2717,141 @@ def check_rescue_cost(fem_data, base):
     return fails
 
 
+# The factorization is the Newton driver's single largest expense -- 35% of a
+# trial's wall time on the 13-row representative set, against 20% for the whole
+# line search (SPIKE.md, "THE FACTORIZATION"). Two things about it are held here.
+#
+# The FIRST is that the column ordering may be cached. splu's COLAMD ordering is a
+# function of the sparsity pattern alone, a trial's tangent pattern is built once,
+# and re-forming into that fixed pattern therefore re-derives the same permutation
+# hundreds of times. _nr_factorize_tangent keeps it and hands SuperLU the already
+# permuted matrix under permc_spec='NATURAL', which is bit-for-bit the same
+# factorization -- not close, the same. That claim is the reason the reuse is
+# allowed to ship, so it is asserted directly on a tangent taken out of a real
+# trial rather than inferred from a factor of safety that matched.
+#
+# The SECOND is the REFRESH RULE, which is the lever this round measured and did not
+# adopt. _nr_equilibrate holds its factorization while the residual keeps falling
+# fourfold and re-forms when it does not, and on the representative set that rule
+# fires on 95% to 97% of iterations: a line search that accepts a fractional step
+# does not cut the residual by four, so the tangent is re-formed on nearly every
+# iteration and the reuse is worth almost nothing. The count is locked so that a
+# change to the rule shows up as a failing assertion rather than as a wall time
+# nobody re-measures.
+REFORM_FRACTION_MIN = 0.90   # the representative set measured 0.96, with room below
+# A strength past this fixture's limit of about 1.39, so the trial walks its load
+# increment down to the floor and the iteration count is large enough for the refresh
+# rule to be measuring something. A converged trial at 1.35 takes 17 iterations.
+FACTOR_PROBE = 1.45
+
+
+def check_factorization(fem_data):
+    """The cached ordering is the same factorization, and the refresh rule is measured.
+
+    Four assertions, and the last is what makes the third mean anything:
+
+      * the measurement knobs ship as SPIKE.md's numbers were taken -- the refresh
+        rule on its residual ratio, the non-symmetric factorization;
+      * a cached-ordering factorization of a REAL tangent returns the same vector as
+        splu's own call on the same matrix, bit for bit;
+      * the driver re-forms its tangent on nearly every Newton iteration on this
+        fixture, which is the measurement that says factorization reuse is not
+        happening today;
+      * and the refresh rule is wired: holding the tangent for three iterations must
+        cut the factorization count. Without that the fraction above is a number the
+        code could not move.
+    """
+    from scipy.sparse.linalg import splu as _splu
+    fails = []
+
+    for name, want in (('_NR_REFORM_EVERY', None),
+                       ('_NR_REFORM_RATIO', 0.25),
+                       ('_NR_FACTOR_SYMMETRIC', False)):
+        got = getattr(_fem, name, '<not defined>')
+        if got != want:
+            fails.append(
+                f"the factorization controls do not ship as measured: {name} is "
+                f"{got!r}, not {want!r}. Every Newton wall time in SPIKE.md is taken "
+                f"on these settings.")
+
+    # A tangent out of a real trial, not a synthetic matrix: the claim is about the
+    # matrices this driver actually factorizes.
+    grabbed = []
+    real = _fem._nr_factorize_tangent
+
+    def _spy(K, cache):
+        if len(grabbed) < 1:
+            grabbed.append(K.copy())
+        return real(K, cache)
+
+    _fem._nr_factorize_tangent = _spy
+    try:
+        solve_fem(fem_data, F=FACTOR_PROBE, fem_solver='newton', max_iterations=MAX_ITER)
+    finally:
+        _fem._nr_factorize_tangent = real
+
+    if not grabbed:
+        fails.append("no tangent was factorized on this fixture, so nothing below "
+                     "this line tests the factorization at all")
+    else:
+        K = grabbed[0].tocsc()
+        b = np.arange(1.0, K.shape[0] + 1.0)
+        want = _splu(K).solve(b)
+        cache = {}
+        real(K, cache)                       # primes the cached ordering
+        got = real(K, cache).solve(b)        # ... and this one uses it
+        if not np.array_equal(want, got):
+            d = float(np.max(np.abs(want - got)) / max(float(np.max(np.abs(want))),
+                                                       1e-300))
+            fails.append(
+                f"the cached column ordering is not the same factorization: the "
+                f"solution moved by {d:.3e} relative. It is allowed to ship only "
+                f"because it is bit-identical, so any difference at all is a defect "
+                f"and not a tolerance.")
+
+    # The refresh rule, measured on the fixture and then moved.
+    def _counts(**over):
+        saved = {k: getattr(_fem, k) for k in over}
+        prof = _fem._PROF_ON
+        for k, v in over.items():
+            setattr(_fem, k, v)
+        _fem._PROF_ON = True
+        _fem._prof_reset()
+        try:
+            solve_fem(fem_data, F=FACTOR_PROBE, fem_solver='newton',
+                      max_iterations=MAX_ITER)
+            p = _fem._prof_read()
+        finally:
+            _fem._PROF_ON = prof
+            _fem._prof_reset()
+            for k, v in saved.items():
+                setattr(_fem, k, v)
+        return (int(p.get('n_nr_factorize', 0)),
+                int(p.get('n_nr_const_tan', 0)) + int(p.get('n_nr_const_res', 0)))
+
+    n_fac, n_it = _counts()
+    if n_it < 20:
+        fails.append(f"the fixture ran {n_it} Newton iterations at F = {FACTOR_PROBE}, too few "
+                     f"for the refresh rule below to be measuring anything")
+    else:
+        frac = n_fac / n_it
+        if frac < REFORM_FRACTION_MIN:
+            fails.append(
+                f"the tangent refresh rule now fires on {frac:.0%} of iterations "
+                f"({n_fac} factorizations in {n_it}), not the {REFORM_FRACTION_MIN:.0%} "
+                f"or more this driver was measured at. Factorization is 35% of a "
+                f"Newton trial, so a change here moves every wall time in SPIKE.md "
+                f"and has to be re-measured rather than merely noticed.")
+        n_fac3, _ = _counts(_NR_REFORM_EVERY=3)
+        if n_fac3 >= n_fac:
+            fails.append(
+                f"the refresh rule is not wired: holding the tangent for three "
+                f"iterations still took {n_fac3} factorizations against {n_fac}. The "
+                f"fraction above cannot be read as evidence while the knob that "
+                f"sets it reaches nothing.")
+    return fails
+
+
 def main():
     failures = run()
     if failures:
@@ -2751,7 +2887,10 @@ def main():
           "ramp reaches the same limit along one warm-started history, reports it "
           "on the bisection's midpoint convention, and never solves past it. The "
           "rescue chain's cost policy ships off, is wired to the chain it budgets, "
-          "and where it is on it changes what the driver spends and no verdict.")
+          "and where it is on it changes what the driver spends and no verdict. The "
+          "tangent's cached column ordering is the same factorization bit for bit, "
+          "and the refresh rule that decides how often that factorization is paid "
+          "for is measured and wired.")
 
 
 if __name__ == '__main__':

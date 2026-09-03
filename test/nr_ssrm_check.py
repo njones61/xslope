@@ -220,6 +220,7 @@ def run():
     failures += check_ramp(fem_data, results['newton'].get('FS'))
     failures += check_rescue_cost(fem_data, results['newton'])
     failures += check_factorization(fem_data)
+    failures += check_corrector(fem_data)
 
     return failures
 
@@ -2745,6 +2746,219 @@ REFORM_FRACTION_MIN = 0.90   # the representative set measured 0.96, with room b
 FACTOR_PROBE = 1.45
 
 
+# The Newton corrector (SPIKE.md, "THE CORRECTOR"). Every number below was
+# measured on this checkout on 2026-09-03, on the same coarse tri6 fixture the rest
+# of the file uses (387 elements), and each one is a property of the mechanism
+# rather than of the benchmark:
+#
+#   * at F = 1.39 the viscoplastic loop cannot decide the trial inside ANY budget it
+#     is given here — 200 iterations or 4,000, it comes back 'inconclusive' with the
+#     residual still falling — and the corrector certifies the same trial from a
+#     300-pass seed in 31 Newton iterations;
+#   * at F = 1.4125 no corrector certifies anything, and the trial must come back
+#     from the 'auto' path bit for bit as the viscoplastic loop left it;
+#   * at F = 1.30 the loop settles on its own in 180 passes — before the first
+#     checkpoint at 300 — so no attempt is made at all and the iteration count is
+#     the shipped one.
+CORR_F = 1.39
+CORR_SMALL_BUDGET = 200    # too small for the ladder: only the rule exit can fire
+CORR_BUDGET = 4000
+CORR_REFUSED_F = 1.4125    # ... a strength no corrector certifies
+CORR_SETTLES_F = 1.30      # ... and one the loop settles at before any checkpoint
+CORR_SETTLES_ITERS = 180   # the shipped loop's iteration count there
+CORR_LADDER_MAX_ITERS = 1000   # a certified trial ends far inside its budget
+
+
+def check_corrector(fem_data):
+    """Newton finishes the trials the viscoplastic loop cannot, and overrules none.
+
+    The default driver is the viscoplastic iteration with a bounded Newton
+    corrector called from inside it. Four properties make that safe, and this
+    holds all four:
+
+      * a trial the loop ends on a RULE — here the iteration ceiling, with the
+        residual still coming down — is handed to the corrector, and a corrector
+        that reaches equilibrium ends it as standing;
+      * the checkpoint LADDER fires too, so a trial that would have spent its whole
+        budget is finished from a 300-pass seed instead;
+      * a certified trial carries its evidence, and the three gates are re-read here
+        off the returned state rather than taken from the record: force balance to
+        the Dawson tolerance at full gravity, a yield violation at or below
+        `_CORRECTOR_YIELD_TOL` of the local strength, and a displacement inside the
+        bound;
+      * a corrector REFUSAL is not a verdict. Where no attempt is certified the
+        trial comes back exactly as the viscoplastic loop left it, down to the
+        displacement field, and `fem_solver='viscoplastic'` makes no attempt at all.
+
+    The last one is the safety property the whole design rests on: the corrector can
+    only ever convert a rule-decided refusal into a certified stand, so this path
+    cannot read lower than the driver it wraps.
+    """
+    fails = []
+
+    def _solve(F, solver, budget, **over):
+        return solve_fem(fem_data, F=F, max_disp_factor=None, force_tol=1e-3,
+                         max_iterations=budget, max_iterations_ceiling=budget,
+                         early_failure=True, fem_solver=solver, **over)
+
+    def _fingerprint(sol):
+        u = np.ascontiguousarray(np.asarray(sol['displacements'], float))
+        return (bool(sol['converged']), int(sol['iterations']),
+                str(sol['exit_reason']), float(sol['unbalanced_force_ratio']),
+                u.tobytes())
+
+    def _gates(sol, where):
+        """Re-read the three gates off the state, not off the evidence record."""
+        out = []
+        c = sol.get('corrector') or {}
+        if c.get('driver_of_record') != 'corrector':
+            out.append(f"{where}: the trial is certified but carries no "
+                       f"driver_of_record: {c!r}")
+            return out
+        oob = float(sol.get('unbalanced_force_ratio', float('inf')))
+        if not oob < 1e-3:
+            out.append(f"{where}: certified with the out-of-balance at {oob:.3e}, "
+                       f"which is not inside the force tolerance 1e-3")
+        yv = sol.get('max_yield_violation')
+        if yv is None or float(yv) > _fem._CORRECTOR_YIELD_TOL:
+            out.append(f"{where}: certified with a yield violation of {yv!r} of the "
+                       f"local strength, above the gate "
+                       f"{_fem._CORRECTOR_YIELD_TOL:g}")
+        dd, dl = c.get('max_disp_deep'), c.get('disp_limit')
+        if dl is not None and (dd is None or float(dd) > float(dl)):
+            out.append(f"{where}: certified with a displacement of {dd!r} against "
+                       f"the bound {dl!r}")
+        if int(c.get('vp_iterations', -1)) + int(c.get('nr_iterations', -1)) \
+                != int(sol.get('iterations', 0)):
+            out.append(f"{where}: the trial is charged {sol.get('iterations')!r} "
+                       f"iterations, which is not the viscoplastic passes "
+                       f"{c.get('vp_iterations')!r} plus the corrector's "
+                       f"{c.get('nr_iterations')!r} — the seed's work is not being "
+                       f"charged to the trial that used it")
+        return out
+
+    # --- the rule exit: a ceiling too small for the ladder to reach ------------
+    vp_small = _solve(CORR_F, 'viscoplastic', CORR_SMALL_BUDGET)
+    if vp_small['converged'] or vp_small['exit_reason'] != 'inconclusive':
+        fails.append(
+            f"the fixture has moved: at F = {CORR_F} on a {CORR_SMALL_BUDGET}-"
+            f"iteration ceiling the viscoplastic loop is meant to come back "
+            f"undecided, and it came back {vp_small['exit_reason']!r} "
+            f"(converged={vp_small['converged']})")
+    auto_small = _solve(CORR_F, 'auto', CORR_SMALL_BUDGET)
+    if not auto_small['converged']:
+        fails.append(
+            f"at F = {CORR_F} the corrector did not decide a trial the "
+            f"viscoplastic loop left at its ceiling: {auto_small['exit_reason']!r}, "
+            f"{len(auto_small.get('corrector_attempts') or [])} attempt(s)")
+    else:
+        fails += _gates(auto_small, f"F = {CORR_F} at the rule exit")
+        at = (auto_small.get('corrector') or {}).get('checkpoint')
+        if at != 'rule:inconclusive':
+            fails.append(
+                f"at F = {CORR_F} with a {CORR_SMALL_BUDGET}-iteration ceiling the "
+                f"corrector is meant to be reached by the RULE exit, and the "
+                f"evidence says {at!r}")
+
+    # --- the checkpoint ladder ------------------------------------------------
+    vp_full = _solve(CORR_F, 'viscoplastic', CORR_BUDGET)
+    if vp_full['converged']:
+        fails.append(
+            f"the fixture has moved: at F = {CORR_F} the viscoplastic loop is meant "
+            f"to spend its whole {CORR_BUDGET}-iteration budget undecided, and it "
+            f"converged in {vp_full['iterations']}")
+    auto_full = _solve(CORR_F, 'auto', CORR_BUDGET)
+    if not auto_full['converged']:
+        fails.append(
+            f"at F = {CORR_F} the corrector did not decide the trial from any "
+            f"checkpoint: {auto_full['exit_reason']!r}")
+    else:
+        fails += _gates(auto_full, f"F = {CORR_F} on the ladder")
+        at = (auto_full.get('corrector') or {}).get('checkpoint')
+        if at != f"vp{_fem._CORRECTOR_CHECKPOINTS[0]}":
+            fails.append(
+                f"at F = {CORR_F} the trial is meant to be finished from the FIRST "
+                f"checkpoint seed, and the evidence says {at!r}")
+        if auto_full['iterations'] > CORR_LADDER_MAX_ITERS:
+            fails.append(
+                f"at F = {CORR_F} the certified trial cost "
+                f"{auto_full['iterations']} iterations against the viscoplastic "
+                f"loop's {vp_full['iterations']}: the corrector is meant to finish "
+                f"it from a short seed, not to ride the whole budget")
+
+    # --- a refusal is not a verdict -------------------------------------------
+    vp_ref = _solve(CORR_REFUSED_F, 'viscoplastic', CORR_BUDGET)
+    auto_ref = _solve(CORR_REFUSED_F, 'auto', CORR_BUDGET)
+    n_att = len(auto_ref.get('corrector_attempts') or [])
+    if n_att == 0:
+        fails.append(
+            f"the fixture has moved: at F = {CORR_REFUSED_F} the corrector is meant "
+            f"to be ASKED and to refuse, and it was never asked — the identity "
+            f"below would then be measuring nothing")
+    if any(a.get('certified') for a in (auto_ref.get('corrector_attempts') or ())):
+        fails.append(
+            f"the fixture has moved: at F = {CORR_REFUSED_F} an attempt was "
+            f"certified, so this trial no longer measures what a refusal does")
+    elif _fingerprint(vp_ref) != _fingerprint(auto_ref):
+        fails.append(
+            f"at F = {CORR_REFUSED_F} the {n_att} refused corrector attempt(s) "
+            f"changed the trial: the viscoplastic loop reports "
+            f"{vp_ref['exit_reason']!r} in {vp_ref['iterations']} iterations and "
+            f"the default path {auto_ref['exit_reason']!r} in "
+            f"{auto_ref['iterations']} — a refusal decides nothing and must leave "
+            f"the trial exactly as it found it")
+
+    # ... and the same, forced: with the yield gate made unreachable no state can
+    # be certified, so the default path has to be the viscoplastic loop again.
+    saved = _fem._CORRECTOR_YIELD_TOL
+    try:
+        _fem._CORRECTOR_YIELD_TOL = -1.0
+        auto_gated = _solve(CORR_F, 'auto', CORR_BUDGET)
+    finally:
+        _fem._CORRECTOR_YIELD_TOL = saved
+    if not (auto_gated.get('corrector_attempts') or ()):
+        fails.append(
+            "with the yield gate made unreachable the corrector was never asked, "
+            "so the refusal path is untested")
+    elif _fingerprint(vp_full) != _fingerprint(auto_gated):
+        fails.append(
+            f"with the yield gate made unreachable at F = {CORR_F} the default path "
+            f"reports {auto_gated['exit_reason']!r} in {auto_gated['iterations']} "
+            f"iterations against the viscoplastic loop's {vp_full['exit_reason']!r} "
+            f"in {vp_full['iterations']}: a state the gate refuses may not end a "
+            f"trial")
+
+    # --- the escape hatch, and a trial that never needs a corrector ------------
+    for sol, name in ((vp_small, f"F = {CORR_F} at the ceiling"),
+                      (vp_full, f"F = {CORR_F} on the full budget"),
+                      (vp_ref, f"F = {CORR_REFUSED_F}")):
+        if sol.get('corrector') is not None or (sol.get('corrector_attempts') or ()):
+            fails.append(
+                f"fem_solver='viscoplastic' ran a corrector at {name}: the escape "
+                f"hatch is meant to be the loop with nothing wrapped around it")
+    settles = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET)
+    if not settles['converged'] or settles['iterations'] != CORR_SETTLES_ITERS:
+        fails.append(
+            f"at F = {CORR_SETTLES_F} the loop settles before the first checkpoint, "
+            f"so the default path must report the shipped "
+            f"{CORR_SETTLES_ITERS} iterations, and it reports "
+            f"{settles['iterations']} (converged={settles['converged']})")
+    if settles.get('corrector_attempts'):
+        fails.append(
+            f"at F = {CORR_SETTLES_F} the loop converges in "
+            f"{settles['iterations']} iterations, before the first checkpoint at "
+            f"{_fem._CORRECTOR_CHECKPOINTS[0]}, and a corrector was asked anyway")
+
+    # --- the admissibility reading is on every result, on both drivers ---------
+    for sol, name in ((vp_full, 'the viscoplastic loop'), (auto_full, 'the default path')):
+        for key in ('max_yield_violation', 'n_yield_above_1pct', 'yield_flagged'):
+            if key not in sol:
+                fails.append(f"{name} does not report {key!r}: the force gate "
+                             f"cannot see a yield violation, so the reading has to "
+                             f"be carried on every result")
+    return fails
+
+
 def check_factorization(fem_data):
     """The cached ordering is the same factorization, and the refresh rule is measured.
 
@@ -2891,7 +3105,12 @@ def main():
           "and where it is on it changes what the driver spends and no verdict. The "
           "tangent's cached column ordering is the same factorization bit for bit, "
           "and the refresh rule that decides how often that factorization is paid "
-          "for is measured and wired.")
+          "for is measured and wired. The Newton corrector finishes the trials the "
+          "viscoplastic loop leaves at its ceiling — from the rule exit and from "
+          "the first checkpoint seed alike — certifies each one in force, in yield "
+          "and in displacement, charges the seed's work to the trial that used it, "
+          "and where no state passes those gates it leaves the trial exactly as the "
+          "loop left it, down to the displacement field.")
 
 
 if __name__ == '__main__':

@@ -149,7 +149,14 @@ _SSRM_RUN_OPTION_KEYS = ("tolerance", "F_min", "F_max", "ssr_exclude")
 # how long it took on one machine, not what the answer is.
 _SSRM_TRIAL_COST_KEYS = frozenset((
     "wall", "bracket", "nr_cold_wall", "nr_cold_iterations", "nr_cold_force_evals",
-    "nr_rungs", "nr_cold_skipped"))
+    "nr_rungs", "nr_cold_skipped",
+    # ... and the corrector round's evidence and admissibility reading (SPIKE.md,
+    # "THE CORRECTOR"). They are held out of a committed sidecar for now so that a
+    # regenerated file is byte-identical to one written before this round; whether
+    # a certified edge should CARRY its evidence into the saved record is a
+    # decision about the artifact, not about the solver, and it is the owner's.
+    "corrector", "corrector_attempts", "max_yield_violation",
+    "n_yield_above_1pct", "yield_flagged"))
 
 
 def _jsonable(value):
@@ -4975,6 +4982,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             "wall": _wall,
             "attempts": list(_corr_attempts),
         }
+        _sol["corrector_attempts"] = list(_corr_attempts)
         return _sol
 
     if debug_level >= 1:
@@ -6359,6 +6367,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         "n_yield_above_1pct": int(_n_above_y),
         "max_tension_violation": _mvt,
         "yield_flagged": bool(converged and _n_above_y > 0),
+        # Every corrector attempt this trial made and what it read, including the
+        # ones that refused — a refusal decides nothing, but it is the measurement
+        # that says whether the corrector is earning its cost. Empty on the plain
+        # viscoplastic path, where none is made.
+        "corrector_attempts": list(_corr_attempts),
+        "corrector": None,
         "verdict": verdict,
         "u_ratio": u_ratio,
         "u_growth": u_growth,
@@ -11184,6 +11198,15 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "nr_cold_force_evals": int(sol.get("nr_cold_force_evals", 0) or 0),
             "nr_rungs": list(sol.get("nr_rungs", []) or []),
             "nr_cold_skipped": bool(sol.get("_nr_cold_skipped", False)),
+            # The corrector's evidence where a corrector decided this trial, and
+            # every attempt it made either way (SPIKE.md, "THE CORRECTOR"). None /
+            # empty on the plain viscoplastic path and on the Newton driver.
+            "corrector": sol.get("corrector"),
+            "corrector_attempts": list(sol.get("corrector_attempts", []) or []),
+            # The state's own admissibility, on every trial and on both drivers.
+            "max_yield_violation": sol.get("max_yield_violation"),
+            "n_yield_above_1pct": sol.get("n_yield_above_1pct"),
+            "yield_flagged": bool(sol.get("yield_flagged", False)),
         })
         if _stable(sol):
             _carried[0] = (float(F) if _carried[0] is None

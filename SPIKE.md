@@ -9075,3 +9075,105 @@ can be dropped without paying for it twice.
 >    saves nothing worth having — because the cost migrates to the viscoplastic
 >    loop rather than disappearing — that is the result, and it is written as the
 >    answer to the owner's cost question rather than worked around.
+
+### THE LADDER — results
+
+Every number below was measured on this checkout on 2026-09-03 under the settings
+the corrector round measured its own column on: the `nr-ssrm-spike` worktree first
+on `sys.path` with `xslope.__file__` asserted under it, all 191 `fem_ssrm` tags
+built by `run_tests.py`'s own `build_fem_ssrm_case`, eight worker processes, one
+model per process, every numerical library pinned to a single thread,
+`capture_failure_state=False`, the pure-NumPy reference kernel, the profiler off.
+
+#### The candidate ladders
+
+Scored on the corrector round's per-attempt records: which rung certified what, at
+what cost, on which trial. "Deciding trials" are the certified, stable trials
+standing above the shipped viscoplastic answer on the 57 rows that moved — the
+conversions that can move a lock. The wall column prices a dropped rung honestly:
+the attempts it no longer makes, MINUS the viscoplastic passes its trials then
+spend running on to the loop's own exit, at the row's own seconds per pass.
+
+| ladder | certified | deciding trials | rows keeping their move | wall |
+|---|---|---|---|---|
+| 300/1000/3000 + all four rule exits (shipped) | 513 | 79/79 (100%) | 57/57 | 35,104 s measured |
+| 300/1000/3000 + runaway | 509 | 76/79 (96.2%) | 55/57 predicted | 34,200 s |
+| 300/1000 + all four rule exits | 498 | 73/79 (92.4%) | 54/57 | 34,418 s |
+| 300/1000/3000, no rule exits | 503 | 70/79 (88.6%) | 54/57 | 32,789 s |
+| 300/1000 + runaway | 494 | 70/79 (88.6%) | 51/57 | 33,514 s |
+| 300 + runaway | 451 | 60/79 (75.9%) | 45/57 | 34,500 s |
+| 300 alone | 445 | 54/79 (68.4%) | 44/57 | 33,089 s |
+
+Only one candidate clears the 95% bar the criterion set, and it is the one the
+review's E.1 argued for on its own grounds: keep the checkpoint ladder whole and
+cut the rule exits back to the runaway rule, the one exit that is not a budget
+accident. So that is the ladder that was built and run on the whole corpus.
+
+#### What the corpus said about it
+
+| | shipped ladder | 300/1000/3000 + runaway |
+|---|---|---|
+| corpus wall | 35,104 s | 34,907 s |
+| against the viscoplastic driver's 42,449 s | 0.827x | 0.822x |
+| corrector wall | 10,729 s | 9,957 s |
+| corrector attempts | 2,962 | 2,783 |
+| trials certified | 513 | 513 |
+| INCONCLUSIVE trials | 3 | 3 |
+| rows reading higher than the viscoplastic driver | 57 | 54 |
+| rows reading lower | 0 | 0 |
+
+The trim buys 772 s of corrector work — 2% of the run — and costs three rows their
+certified move. RS2-4-zone falls from 1.89375 back to 1.84375, RS2-40-d20 from
+1.41797 back to 1.34922, and RS2-66d-deep from 1.06875 back to 1.05625, each of
+them landing exactly on the value the stopping rule had been holding it at.
+
+The corpus wall barely moves, and the reason is measurable rather than inferred: on
+the 97 rows whose corrector attempts were identical between the two runs the
+trimmed run was 6.9% slower at the median, so the machine was not the same machine
+twice and the 197 s between the two totals is inside that. The 772 s of corrector
+work is the part that can be attributed to the trim, and it is 1.8% of the
+viscoplastic driver's corpus.
+
+**Three certified moves are worth more than 2% of a run, so the trim is not taken.**
+`_CORRECTOR_RULE_EXITS` now names every exit and exists to carry this measurement.
+
+#### Why trimming cannot pay, stated as the finding it is
+
+The cost round read the trigger table — the ladder converts 503 trials for 8,414 s
+and the rule exits 10 for 2,315 s — and located the cost in the later rungs: 4,630 s
+for 58 conversions. That prices a rung by what its attempts cost. What matters is
+what DROPPING it costs, and the two are different numbers, because a conversion
+given up hands its trial back to the viscoplastic loop, which then spends the passes
+the corrector was standing in for. Priced that way, dropping `vp1000` and `vp3000`
+removes 4,630 s of attempts and adds back about 5,000 s of viscoplastic iteration on
+the same trials. The rung is not where the money is.
+
+Three more levers were measured on the same records and none of them is worth
+building:
+
+* **Skipping a checkpoint on a trial whose residual is about to converge anyway.**
+  The whole pot is 90 attempts and 388 s — 1.1% of the corrector's wall — because
+  that is all the attempts made on trials the loop went on to converge by itself.
+  A perfect predictor would save 388 s.
+* **Escalating to the next rung only when the previous refusal looked promising.**
+  It does not separate. After a `diverging` refusal at `vp300` with fewer than 100
+  Newton iterations, `vp1000` still certifies 6.3%; after the same refusal at
+  `vp1000`, `vp3000` certifies 4.9%. Those are the rungs' own rates.
+* **Capping the corrector's iterations.** The cost is all in refusals: the 513
+  certified attempts cost 745 s of the 10,729 and the 2,449 refusals cost 9,983 s.
+  But a cap at 60 iterations saves only about 1,693 s of that and gives up 32
+  certified attempts, because certified attempts run to 145 iterations at the far
+  end of their distribution.
+
+#### A rung's conversions cannot be scored one at a time
+
+The per-attempt accounting predicted that trimming the rule exits would cost
+RS2-4-zone and RS2-66d-deep their moves. It cost RS2-40-d20 its move as well, and
+the reason is worth recording, because it limits every offline ladder estimate
+above. On that row the corrector certified F = 1.375 at the ceiling exit, and the
+bisection then walked UP and certified F = 1.409375 at `vp3000`. Score the rungs
+independently and `vp3000` looks like it carries the row on its own; take the
+ceiling exit away and the bisection never reaches 1.409375 at all, so the `vp3000`
+conversion that was going to save the row never happens. Conversions are conditional
+on the bisection path that produced their trial, and only a corpus run measures
+them.

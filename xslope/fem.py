@@ -7660,6 +7660,8 @@ def _nr_factorize_tangent(K, cache):
     if _NR_FACTOR_SYMMETRIC:
         return splu(K, permc_spec="MMD_AT_PLUS_A", diag_pivot_thresh=0.0,
                     options=dict(SymmetricMode=True))
+    if not _NR_FACTOR_CACHED_ORDER:
+        return splu(K)                  # the pre-cache call, for measuring against
     ipc = cache.get("ipc")
     if ipc is not None and cache["sig"] != (K.shape, K.nnz):
         # The pattern this cache was built on is not the pattern in hand. Nothing
@@ -7756,6 +7758,10 @@ _NR_REFORM_EVERY = None
 # stiffness. It is 1.8x faster to factorize and 1.5x faster to back-substitute and
 # it is NOT bit-identical, so it is a measurement knob and ships off.
 _NR_FACTOR_SYMMETRIC = False
+# The cached column ordering (see _nr_factorize_tangent). It IS bit-identical, so it
+# ships on; the knob exists so a run can be measured against the plain splu call it
+# replaces without editing the driver.
+_NR_FACTOR_CACHED_ORDER = True
 
 # Admissibility of the ANSWER, not a control on the solve. Reaching equilibrium is
 # only half of what "the slope stands at F" means; the other half is that the state

@@ -8397,3 +8397,174 @@ P4 alone is in the table for one reason: it reproduces every verdict on all thir
 rows, and the cost round already measured it moving five on 191. Thirteen rows are
 not evidence that a cost policy is safe. That is the same lesson twice and it is why
 nothing fitted is adopted here.
+
+### The full 191-row sweep
+
+The adopted configuration — L2a on, every other knob off, which is what the driver
+now ships — was run on all 191 `fem_ssrm` tags, same harness, eight workers, one
+model per process, `capture_failure_state=False`, the pure-NumPy reference kernel.
+
+**182 of the 191 rows reproduce the Sweep 1 Newton factor of safety exactly. Zero
+errors and zero inconclusive trials.** The nine that differ are all `min_slip_depth`
+rows — `vp077b` at six depths, and `rs2_66a`, `rs2_66b` and `rs2_66d` — and they are
+the rows the depth-filter fix committed after that sweep already moved (`19b55e17`,
+"the depth filter reaches the verdict, not just the reading"); the cost round
+measured five of them moving for the same reason. Run against each other on the
+depth-filtered rows, the cached ordering and the plain `splu` call it replaces return
+the same factor of safety, the same interval, the same per-trial verdicts, the same
+iteration and force-evaluation counts and the same converged field.
+
+The sweep's wall time is 61,528 s against Sweep 1's 53,975 s. That is not a
+measurement of L2a and is not read as one: the counts on the 182 unchanged rows are
+identical, so no more work was done, and the machine was demonstrably slower through
+this round — Phase 0's own baseline ran the representative set 15% to 30% above the
+Sweep 1 walls on identical iteration, force-evaluation and predictor counts. **A
+cross-run wall comparison on this box does not resolve a 6% effect**, which is why
+L2a's speed is measured one process at a time, alternating, and reported that way
+above.
+
+
+### The criterion, line by line
+
+1. **Verdict bit-identity — MET by the one lever adopted, FAILED by every other.**
+   L2a reproduces the baseline exactly on all thirteen representative rows: same
+   factor of safety, same final interval, same per-trial F sequence and verdict, the
+   same 37,631 Newton iterations and 264,241 force evaluations, and the same hash of
+   the converged displacement field. On the full 191 it reproduces the Sweep 1 Newton
+   column on 182 rows, the nine exceptions being the depth-filtered rows a fix
+   committed after that sweep already moved. L1 moves two verdicts in thirteen. L2b
+   and L4 hold every verdict on thirteen rows and are rejected on the field clause
+   below and on cost respectively.
+2. **The same root, not the same path — the criterion is not satisfiable and the
+   reason is the finding.** L2a satisfies it trivially by taking the same path. Every
+   lever that changes the path fails it by orders of magnitude, not by a little:
+   SuperLU's symmetric mode perturbs one linear solve by 1e-13 and moves Griffiths &
+   Lane 6 dry's converged displacement field by a factor of 3.3, on an identical
+   factor of safety and an identical verdict for every trial. The last standing trial
+   sits one bisection cell below the limit load, where the load-displacement curve is
+   flat, and `_NR_REL_TOL` bounds the residual at 1e-8 without bounding the
+   displacement at all. No lever can assert a 1e-10 field, because the driver does not
+   determine one.
+3. **Work — FAILED.** The Newton bisection runs the corpus at 1.27x the viscoplastic
+   driver's wall (53,975 s against 42,449 s) and the adopted lever takes 6% to 7% off
+   a factorization-bound trial. Nothing measured here closes a 27% gap. Removing the
+   entire cost of every assembly and factorization in the driver would take it to
+   about 0.7x, which says a solver three to four times faster than SuperLU would meet
+   the clause — and none is installable on this machine, none would be bit-identical,
+   and what a non-bit-identical factorization costs is measured in clause 2.
+4. **Inconclusive trials: 0.** Met on every configuration measured.
+5. **The default viscoplastic path is untouched.** Griffiths & Lane 6 dry, quad8 at 2,
+   no `fem_solver` argument, built by `run_tests.py`'s own `build_fem_ssrm_case` with
+   the tag's `max_iter` dropped so the solver default of 12,000 is in force, returns
+   **FS 2.421875** on per-trial iteration counts
+
+       147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777
+
+   value for value. No viscoplastic-side gain was pursued: the one candidate,
+   `_factorize_free_stiffness`, already factorizes once per trial and reuses it, so
+   there is no repeated analysis to cache.
+6. **Locks — met.** `check_factorization` holds that the measurement knobs ship as the
+   numbers were taken, that a cached-ordering factorization of a tangent taken out of a
+   real trial returns splu's own vector bit for bit, that the driver re-forms on at
+   least 90% of iterations on the fixture, and that holding the tangent for three
+   iterations cuts the factorization count — the last being what makes the third mean
+   anything. Three mutations were verified to fail it: shipping the symmetric mode on,
+   returning a differently ordered factorization from the cached path, and a refresh
+   knob wired to nothing. The whole of `test/nr_ssrm_check.py` passes.
+7. **The honest negative is the result**, and it is written below.
+
+### Verdict
+
+**The Newton driver is factorization-bound, the premise is confirmed, and the door it
+was supposed to open is not there.**
+
+The attribution is unambiguous. Linear algebra is 61% of Newton's own work across the
+representative set and 79% of it on the largest mesh; a factorization costs 29.7 ms
+against a 2.3 ms viscoplastic iteration, so **one Newton iteration is twenty-six
+viscoplastic ones**; and the tangent is re-formed on 96% of iterations and used for
+exactly one triangular solve. That is the arithmetic the calibration sweep's "Newton
+does 69% of the constitutive passes" was hiding, and it is what the ramp round's
+"72% less work, 13% longer" was measuring without the means to say so.
+
+**What the profile also says is that the factorization cannot be given up, and this
+is the round's finding.** On Griffiths & Lane 1 the line search exhausts all nine of
+its backtracks on **half** the iterations, takes the full Newton step on 6.6% of them,
+and accepts a mean step of **0.110** of the correction. The tangent is expensive and
+the direction it buys is barely usable, and those are the same fact: a direction that
+must already be cut to a ninth has no margin to lose. Hold the tangent for three
+iterations and two thirds of the factorizations disappear — 504 s of measured linear
+algebra on the eleven representative rows whose verdict survived — and the line search
+takes 287 s of it straight back, force evaluations rise 11%, predictor iterations rise
+6%, and the net is inside the noise. Two verdicts in thirteen move. Linear algebra and
+constitutive work are not two budgets that can be traded; the first is what keeps the
+second small.
+
+**One lever is adopted and it is small by construction.** Caching the column ordering
+takes the same factorization without re-deriving an ordering that cannot have changed:
+0.78x per factorization at 2,788 unknowns and 0.87x at 12,600, which is 6% to 7% of a
+factorization-bound trial. It is bit-identical — the same fill, the same solution, the
+same converged displacement field down to its hash on every row measured, and 182 of
+191 corpus rows reproducing the Sweep 1 column with the other nine moved by a
+depth-filter fix that predates this round. It is worth having because it costs nothing
+and risks nothing. It is not a cost solution.
+
+**Criterion 3 is not met and nothing measured here can meet it.** The Newton bisection
+runs the corpus at 1.27x the viscoplastic driver. Removing the entire cost of every
+assembly and factorization would take it to about 0.7x, so a direct solver three to
+four times faster than SuperLU would close the gap — and pypardiso needs an MKL with
+no arm64 macOS build, scikit-umfpack and CHOLMOD need a SuiteSparse that is not
+installed, and the viscoplastic driver's own CHOLMOD preference is already dormant
+here for that reason. More to the point, none of them would be bit-identical.
+
+**And what a non-bit-identical factorization costs is measured rather than assumed,
+which is the result to carry out of this round.** SuperLU's symmetric mode perturbs
+one linear solve by 1e-13 and holds every verdict on all thirteen rows — and moves
+Griffiths & Lane 6 dry's converged displacement field by a factor of **3.3**, max|u|
+0.402 against 0.126, on an identical factor of safety and an identical verdict at
+every strength. The last standing trial sits one bisection cell below the limit load
+where the load-displacement curve is flat, and `_NR_REL_TOL` bounds the residual at
+1e-8 without bounding the displacement at all. **Criterion 2 is not a criterion any
+lever can satisfy, because the driver does not determine a converged field to 1e-10 in
+the first place.** The factor of safety is robust there; the displacement figure is
+not, and that is a statement about every near-limit field this solver reports, not
+about the levers.
+
+**Three levers are refused for three different reasons and that is the shape of the
+answer.** L1 is refused because it moves verdicts and buys nothing. L2b is refused
+because the field it moves is a field the driver publishes. L3 is refused because the
+profile puts constitutive work at 39% and falling with mesh size, and because every
+lock in this repository is defined on the reference path a compiled kernel would not
+be on. L4 — the cost round's own verdict-safe pre-filter — is refused because it is
+1.20x the baseline's work rather than the 5% saving its slice priced, since a failing
+trial now pays the coarse attempt AND the chain AND the full attempt.
+
+**The honest negative, stated plainly: the Newton driver's 1.27x is bought by the
+consistent tangent, and the consistent tangent is what makes its verdicts binary.**
+The cost round showed the rescue chain cannot be made cheap without moving a verdict;
+this round shows the tangent cannot either. Both halves of the driver's expense are
+load-bearing. What is left is not a cost policy but a different iteration — one whose
+line search does not have to cut the step to a ninth — and that is a solver question
+rather than a budgeting one.
+
+### What this round left in the tree
+
+- **Per-phase profiling under `XSLOPE_NR_PROFILE`**, off by default: the Newton
+  tangent's assembly, factorization and triangular solves, its tangent-forming and
+  line-search constitutive passes, the accepted step fraction and the exhausted-search
+  count, and the viscoplastic driver's own factorization, constitutive pass and solve.
+  A profiled run reproduces the Sweep 1 Newton column value for value.
+- **The cached column ordering**, on by default because it is bit-identical, with
+  `_NR_FACTOR_CACHED_ORDER` to pin the plain `splu` call it replaces.
+- **Three measurement knobs, all off**: `_NR_REFORM_EVERY` (a fixed modified-Newton
+  hold), `_NR_FACTOR_SYMMETRIC` (SuperLU's symmetric mode) and `_NR_COLD_FALLBACK`
+  (the cost round's pre-filter, on top of `_NR_COLD_CHEAP`).
+- **`check_factorization`**, with three mutations verified to fail it.
+
+**Reproducing this.** Every measurement was made on the `nr-ssrm-spike` worktree with
+the worktree first on `sys.path` and `xslope.__file__` asserted under it, eight worker
+processes for the sweeps and ONE process for every speed comparison, every numerical
+library pinned to a single thread, `capture_failure_state=False`, and each model built
+by `run_tests.py`'s own `build_fem_ssrm_case`. The compiled Mohr-Coulomb kernel is not
+built in this checkout, so everything ran the pure-NumPy reference path. Rows are named
+by their index in the 191-tag enumeration, which is `parse_test_tags` over
+`sorted(glob('docs/**/*.md'))`.

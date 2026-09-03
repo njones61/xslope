@@ -1838,6 +1838,32 @@ residual over 2000 iterations while the field gains a whole elastic displacement
 failed at that point rather than spending the rest of its budget (`exit_reason = 'diverging'`;
 `early_failure=False` turns it off).
 
+**How a trial is decided.** The viscoplastic loop drives the solve and builds the plastic history.
+At 300, 1,000 and 3,000 iterations, and again wherever one of the stopping rules above would end
+the trial, a bounded Newton corrector attempts to finish it from the state the loop has reached.
+A trial stands only on a state that is in force equilibrium at full gravity, inside the yield
+surface, and under a tenth of the model height in displacement — and that applies to a viscoplastic
+state too, so a trial that settles in force while a Gauss point sits far outside the yield surface
+does not stand on it. A corrector refusal decides nothing: the loop carries on untouched. Each
+solution therefore carries a yield reading (`max_yield_violation`, `n_yield_above_1pct`,
+`max_yield_at`), and a trial the corrector decided carries a `corrector` record naming the
+checkpoint and the three readings.
+
+Two things follow for a user. First, an inconclusive trial is now rare, because a trial still
+improving at the ceiling is exactly the one the corrector can finish. Second, when a run reports a
+large `max_yield_violation` on the state it stands on, look at the material at `max_yield_at` — the
+violation is a fraction of the strength available there, floored at 1e-4 of the model's overburden
+scale so a near-free-surface point cannot report round-off as a gross violation. A material with
+real cohesion sitting far outside its surface usually wants a declared tension cap (`t_cut`); a
+cohesionless material already has zero tensile capacity, so writing `t_cut = 0` on it changes
+nothing.
+
+**The escape hatch.** `fem_solver='viscoplastic'` on `solve_fem()`/`solve_ssrm()` runs the plain
+viscoplastic loop with no corrector and no yield check — the driver every locked and published
+factor of safety was produced on before the corrector. `XSLOPE_FEM_SOLVER` sets it for a whole
+process and prints a warning when it does. Use it to reproduce an older number; leave it alone
+otherwise.
+
 **FEM-only models still need one starting circle.** `load_slope_data()` requires a failure
 surface definition unless the file has seepage BCs or a pre-built mesh; a pure FEM input with
 neither will raise "Input must include either circular or non-circular surface data". Add one

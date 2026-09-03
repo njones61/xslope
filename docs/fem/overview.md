@@ -410,7 +410,7 @@ $K_0 = 1$ and beyond.
 
 **At-rest initialization** states the in-situ stress directly instead of inferring it from the
 stiffness: the vertical stress is the weight of the soil column above the point, the lateral stress
-is $K_0$ times it, and $K_0$ is a modelling input carrying the soil's stress history.
+is $K_0$ times it, and $K_0$ is a modeling input carrying the soil's stress history.
 
 ![fem_ov_k0_initial.png](images/fem_ov_k0_initial.png){width=700}
 
@@ -525,7 +525,7 @@ a checkbox and a value. Blank everywhere means the gravity turn-on.
 $K_0$ initialization is **off by default**. Every SSRM row on the
 [RS2 corpus page](../verification/rs2.md) runs with it, because RS2 authors its verification
 models at $K_x = K_z = 1$; the rest of the verification suite is computed without it. It is a
-modelling choice, not a correction.
+modeling choice, not a correction.
 
 How much it changes is a property of the model, and the pattern is **cohesion**. Raising the
 confinement raises the initial deviatoric demand as well as the frictional capacity, so a slope
@@ -677,7 +677,11 @@ FS = 1.3633 from a 3000-iteration budget and from a 12000-iteration one. A trial
 **not** falling at the budget stops there and is failed exactly as before.
 
 **Inconclusive trials.** A trial that reaches `max_iterations_ceiling` while still improving is
-neither settled nor failed, and it is reported as `exit_reason = 'inconclusive'`. The bisection does
+neither settled nor failed, and it is reported as `exit_reason = 'inconclusive'`. This is where the
+[Newton corrector](#finishing-a-trial-with-the-newton-corrector) does most of its work — a trial
+still improving at the ceiling is exactly the one a locally quadratic iteration can finish — so on
+the default driver an inconclusive trial is rare, and it survives only where the corrector also
+refuses. The bisection does
 not count it as a failure — that is what biases a factor of safety low. It carries on below the
 inconclusive $F$, and the factor of safety is the final bracket's midpoint, exactly as on any other
 run. What the inconclusive trial changes is the meaning of the bracket's upper edge: an undecided
@@ -706,7 +710,10 @@ that trial's own elastic displacement and still growing, or the out-of-balance f
 it off; the at-failure capture solve always runs to its own budget). Both thresholds are measured in
 the trial's own elastic response, and both sit far outside the range occupied by trials that go on
 to reach equilibrium — which near the critical factor grow past five times elastic with a flat
-residual — so the rule catches only gross runaways and no verdict moves.
+residual — so the rule catches only gross runaways. On the default driver the runaway signal
+triggers a [corrector](#finishing-a-trial-with-the-newton-corrector) attempt before it ends
+anything: a displacement ratio read on an iterate is weaker evidence than an equilibrium the
+corrector can certify, so the rule stands only where that attempt is refused.
 
 The **displacement limit** (`max_disp_factor`) is disabled on the default criterion, and
 deliberately so: its yardstick is the height of the *mesh*, not of the *slope*, so it loosens as a
@@ -721,6 +728,102 @@ essentially elastic strain field, and if it does not, suspect the inputs — loa
 boundary pore pressures — rather than the solver knobs. Quadratic **triangles** (tri6) are preferred
 over quad8 for this problem class, because the 2×2 reduced-integration quad has a zero-energy
 hourglass mode that persistent near-surface forcing can excite.
+
+### Finishing a trial with the Newton corrector
+
+The viscoplastic iteration approaches equilibrium from outside the yield surface, and its
+convergence rate is linear, so a trial near the critical strength can spend tens of thousands of
+iterations still improving and still undecided. XSLOPE runs a second, locally quadratic iteration on
+top of it. The viscoplastic loop drives the solve and builds the plastic history; at a short ladder
+of checkpoints — 300, 1,000 and 3,000 viscoplastic passes — and again wherever one of the stopping
+rules above would end the trial, the current displacement field and plastic strains are handed to a
+single bounded Newton-Raphson solve at full gravity and this trial's reduced strengths. That solve
+uses the consistent tangent of the Mohr-Coulomb return map, and from a seed that has already walked
+the load path it reaches equilibrium in tens of iterations where the viscoplastic loop needs
+thousands.
+
+A state the corrector returns ends the trial as standing only when it passes three checks:
+
+>- **Force equilibrium** — the per-node Dawson measure described above, below `force_tol`, read on
+>  the true residual at full gravity.<br>
+>- **Yield** — the largest Mohr-Coulomb violation anywhere in the mesh, as a fraction of the local
+>  strength, at or below $10^{-6}$. A field can be in force balance and still carry stress the
+>  material cannot hold.<br>
+>- **Displacement** — the translational movement below a tenth of the model height, read on the deep
+>  degrees of freedom wherever a `min_slip_depth` filter is in force.
+
+**A corrector refusal is not a verdict.** Where any of the three fails, or the Newton solve does not
+converge, the attempt is recorded and control returns to the viscoplastic loop with nothing about
+its state changed — the corrector works on a copy of the displacement field and of every plastic
+strain, so a refused attempt leaves no mark on the iteration that continues. The loop then runs on
+to its next checkpoint or to its own exit exactly as it would have. So the corrector can convert a
+trial the stopping rules would have closed into one that is certified standing; it cannot fail a
+trial the loop would have carried.
+
+A trial the corrector decides carries a record of how, under `corrector`: which checkpoint produced
+the certified state, how many viscoplastic passes seeded it, the corrector's iterations and force
+evaluations, the three readings against their limits, and every attempt made along the way.
+`iterations` counts the seed's passes plus the corrector's, so a trial is charged for all the work
+that produced it.
+
+### The yield check
+
+Every solved field carries an admissibility reading taken in invariant form: the largest
+Mohr-Coulomb violation as a fraction of the local strength (`max_yield_violation`), the count of
+Gauss points more than 1% of their strength outside the surface (`n_yield_above_1pct`), the same
+pair for the Rankine tension surface, and where in the mesh the worst violation sits
+(`max_yield_at`). It is one pass over the Gauss points and costs no solve.
+
+The strength scale the violation is divided by, $c\cos\phi + |\sigma_m|\sin\phi$, carries an
+**absolute floor** of $10^{-4}$ of the model's own overburden scale — the largest unit weight times
+the mesh height, so the floor is in the model's stress units whatever they are. The floor matters
+because both terms of that scale vanish together in a cohesionless material near a free surface. A
+Gauss point there can carry a fraction of a millipascal of numerical residue over a strength scale
+of a few tens of micropascals and read as several times its own strength outside the surface, which
+is a statement about the denominator rather than about the slope. The floor is orders of magnitude
+below any stress a mechanism is carried at, so it leaves a real violation exactly where it was.
+
+That reading is also a check. A viscoplastic state that satisfies both convergence conditions but
+sits more than $10^{-2}$ of the local strength outside the yield surface does not end the trial: it
+is handed to the corrector, and where no admissible field is reached at that strength — by the
+corrector or by the loop's own exit — the trial is failed. The force test cannot see this on its
+own, because the viscoplastic scheme is in force balance at every iteration and yield is precisely
+what it relaxes.
+
+The threshold comes from where the two populations separate, not from the corrector's own limit.
+A Newton state solves the equations the reading is taken from and measures $10^{-8}$ or better; a
+viscoplastic state approaches the surface along the relaxation and stops when the *displacement*
+increment settles, so its yield residual is set by a displacement tolerance rather than a yield one.
+Across the verification corpus, converged viscoplastic readings are dense and continuous up to about
+$10^{-2}$ — that residual — and above it they thin by an order of magnitude before a tail running to
+many times the local strength, which is unrelaxed yield rather than residual. $10^{-2}$ is also the
+fraction the reported Gauss-point count is taken against, so the check and the number printed beside
+it say the same thing about the same state.
+
+Where a state is condemned, the material at `max_yield_at` is where to look. In a material with
+$c = 0$ the Mohr-Coulomb surface passes through the origin, so any tensile mean stress there is
+outside it — a cohesionless soil carries no tensile capacity whether or not a Rankine cap is written
+beside it, which is why declaring `t_cut = 0` on such a material changes nothing about the surface.
+On a material with real cohesion, a tensile cap is a genuine restriction and declaring one is the
+modeling answer; see [Tensile strength in the SSRM](#tensile-strength-in-ssrm).
+
+### Choosing the driver
+
+`fem_solver` names the per-trial driver on both `solve_fem()` and `solve_ssrm()`:
+
+>- **`'auto'`** (the default) — the viscoplastic loop with the corrector and the yield check
+>  described above.<br>
+>- **`'viscoplastic'`** — that loop on its own: no corrector, no ladder, no yield check. A trial ends
+>  on the stopping rules and on nothing else.
+
+Setting `XSLOPE_FEM_SOLVER` selects the driver for a whole process. When the environment rather than
+a call argument selects a non-default driver, one warning line is printed, because a shell variable
+left from an earlier session otherwise changes every factor of safety in a run without saying so.
+
+The at-failure capture solve that `solve_ssrm()` makes past the critical strength runs the
+viscoplastic loop with the corrector off. That solve exists to let the failure mechanism develop for
+the deformation figure, and a certified equilibrium there would replace the field the figure is
+drawn to show.
 
 ### Surficial (skin) failures and the minimum-slip-depth filter
 
@@ -737,8 +840,12 @@ searches, **off by default** — excludes any failure shallower than the given d
 surface. In the FEM it acts on the **failure verdict**, not on the strength: nodes shallower than
 the cutoff are left out of the per-node out-of-balance maximum, so a shallow skin can no longer
 declare the slope failing on its own, while a deep-seated mechanism still trips the criterion
-through its deep nodes. Nothing is held at full strength and no element is masked — the skin still
-yields, it simply stops casting the deciding vote. It is a **run option rather than a file setting**:
+through its deep nodes. The filter reaches both readings a trial is decided on: the
+[corrector](#finishing-a-trial-with-the-newton-corrector) measures its displacement bound on the
+same deep degrees of freedom, so a skin that is sliding while the mass beneath it stands cannot
+refuse an otherwise admissible state either. Nothing is held at full strength and no element is
+masked — the skin still yields, it simply stops casting the deciding vote. It is a
+**run option rather than a file setting**:
 pass `min_slip_depth=` to a solve or to a `circular_search()` / `noncircular_search()` call, or set
 **Min slip depth** in Studio's Run FEM dialog. A depth deeper than the mesh is refused rather than
 answered.
@@ -817,6 +924,8 @@ Its principal arguments:
 >  mesh height. The SSRM's default path disables it.<br>
 >- **`early_exit`** (default `True`): watch the residual for the no-progress plateau described
 >  above and report it. The plateau does not end the solve.<br>
+>- **`fem_solver`** (default `'auto'`): the per-trial driver — see
+>  [Choosing the driver](#choosing-the-driver).<br>
 >- **`k0`**, **`min_slip_depth`**, **`tension_cutoff`**, **`elastic_mask`**,
 >  **`suction_phi_b`** / **`suction_cap`**: the options described in their own
 >  sections; all default to off or to what the input file declares.<br>
@@ -825,7 +934,9 @@ Its principal arguments:
 The returned dictionary carries `converged` and `stable`, the verdict metadata (`verdict`,
 `u_ratio`, `u_growth`, `exit_reason`), `iterations`, the nodal `displacements` and
 `displacements_elastic`, element `stresses` and `strains`, `plastic_elements`, and the 1D structural
-element forces — everything `plot_fem_results()` and `export_fem_solution()` need.
+element forces — everything `plot_fem_results()` and `export_fem_solution()` need. It also carries
+the [yield reading](#the-yield-check) (`max_yield_violation`, `n_yield_above_1pct`,
+`max_yield_at`, `yield_flagged`) and, where a corrector decided the trial, the `corrector` record.
 
 ## Shear strength reduction method (SSRM)
 
@@ -998,6 +1109,9 @@ Its principal arguments:
 >- **`dt_scale`** (1.0): multiplier on the viscoplastic pseudo-time step. **Do not lower it to make
 >  a model converge** — it shrinks the residual without making the slope any more stable, and can push
 >  a failing state under an absolute `force_tol`.<br>
+>- **`fem_solver`** (`'auto'`): the per-trial driver, passed to every trial — see
+>  [Choosing the driver](#choosing-the-driver). The at-failure capture solve below always runs the
+>  viscoplastic loop with the corrector off.<br>
 >- **`k0`**, **`min_slip_depth`**,
 >  **`ssr_exclude`** / **`ssr_zone`**, **`tension_cutoff_by_material`** / **`tension_srf`**,
 >  **`elastic_materials`**, **`suction_phi_b`** / **`suction_cap`**: as described in

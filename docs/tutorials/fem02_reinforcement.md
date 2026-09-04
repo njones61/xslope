@@ -502,19 +502,16 @@ Spencer's 1.587 and the elastic-perfectly-plastic 1.559.
 
 <!-- test: file=files/xslope_reinforced_slope.xlsx, type=fem_ssrm, expected_fs=1.535, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-2-ssrm -->
 
-Where the cost comes from is visible in the two converged states. The
-elastic-perfectly-plastic slope reaches equilibrium at every trial up to
-*F* = 1.5547, and at that state lines 3, 4 and 5 are standing at their full
-800 lb/ft. With the residual entered, the highest trial that reaches equilibrium
-is *F* = 1.5312, and at that state no line reaches 800 at all: every one of the
-six is held by its bond rather than by its rupture strength, the largest force
-anywhere on them being 781 lb/ft on line 2.
-
-Declaring a residual does not make the layers weaker. It changes which
-equilibrium states the model admits, because an element asked for more than its
-peak may shed instead of holding, and the shed load has to go somewhere. The
-states that survive that are ones carrying less bar force, and the highest
-strength reduction factor at which one exists is 0.023 lower.
+Where the cost comes from is plain in the two solutions. Without a residual, a
+layer that reaches its 800 lb/ft keeps carrying it, and at the
+elastic-perfectly-plastic answer lines 3, 4 and 5 are doing exactly that. With a
+residual, a layer that reaches 800 lb/ft drops to 600 and the slope loses part
+of it, so the slope only stands as long as no layer has reached capacity. At the
+peak-residual answer none has: the largest force on any line is 781 lb/ft, on
+line 2, and every layer is held by its bond. One step stronger reduction and the
+first layer would reach 800, drop, and end the run. That is the whole 0.023: the
+residual does not weaken the layers, it ends the slope's standing at the first
+rupture instead of letting ruptured layers keep working.
 
 ### What changed in the results, and what did not
 

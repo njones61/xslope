@@ -37,14 +37,14 @@ solve and a solution reloaded from its sidecars produce the same figures.
 
 import os
 
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import QTimer, Qt, QSize
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog,
                                QHBoxLayout, QLabel, QListWidget,
                                QListWidgetItem, QMessageBox, QPushButton,
                                QSplitter, QVBoxLayout, QWidget)
 
-from .canvas import MplCanvas
+from .canvas import MplCanvas, BASE_DPI
 
 # Badge colours, keyed by the band names fem_details assigns.
 _BADGE_RGB = {
@@ -316,6 +316,28 @@ class FemDetailsDialog(QDialog):
         read this)."""
         return getattr(self, "_mapped", None)
 
+    def _fit_window_to_profile(self):
+        """Size the window to the profile figure, not the figure to the window.
+
+        The profile keeps the printed-strip rule (its height follows its width),
+        so a window taller than that strip shows blank canvas below the plot.
+        After the first render, any surplus viewport height is taken off the
+        window; the layout's own minimums (the member list and the map on the
+        left) bound how far it can shrink, so nothing is clipped.
+        """
+        if not self.isVisible():
+            return
+        try:
+            self.canvas.render_now()
+            fig_h_px = float(self.canvas.figure.get_size_inches()[1]) * BASE_DPI
+            vp_h = float(self.canvas.view.viewport().height())
+        except Exception:
+            return
+        surplus = int(vp_h - fig_h_px)
+        if surplus > 8:
+            self.resize(self.width(), max(self.minimumSizeHint().height(),
+                                          self.height() - surplus))
+
     def _rerender(self, *_):
         prof = self._profile
         if prof is None:
@@ -324,14 +346,13 @@ class FemDetailsDialog(QDialog):
         show_bond = self.bond_chk.isChecked()
 
         def _draw(fig):
-            # The canvas hands in a figure sized to its viewport; the panels fill
-            # it. The printed-strip height rule is for the report page, not here.
             if prof["kind"] == "reinforcement":
-                plot_detail(prof, fig=fig, show_bond=show_bond, fit_height=False)
+                plot_detail(prof, fig=fig, show_bond=show_bond)
             else:
-                plot_detail(prof, fig=fig, fit_height=False)
+                plot_detail(prof, fig=fig)
 
         self.canvas.render_figure(_draw)
+        QTimer.singleShot(0, self._fit_window_to_profile)
         # The verdict, with what it means one hover away: the panel is where a
         # reader meets these words, and a word with no gloss beside it is a
         # word they have to go and look up.

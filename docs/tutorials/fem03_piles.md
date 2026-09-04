@@ -328,12 +328,12 @@ translations are held there, but its rotation is not, so the tip is a pin and
 the shaft swings about it. **Results → 1D Details** on the upper row, on its
 default **At failure** field, shows exactly that:
 
-![The upper row's 1D Details at failure with the tip pinned: a straight-line rotation about the toe, moment zero at both ends and peaking mid-shaft at 44% of capacity](images/fem03_piles_profile_pinned.png){width=1000}
+![The upper row's 1D Details at failure with the tip pinned: a straight-line rotation about the toe, moment zero at both ends and peaking mid-shaft at 43% of capacity](images/fem03_piles_profile_pinned.png){width=1000}
 
 The lateral displacement is a straight line from the head to zero at the toe —
 the shaft is rotating as a rigid bar about its pin, not bending. The moment is
 zero at both ends, as it must be with neither end held, and peaks at 16 ft
-below the head: 4,427 lb·ft per foot of slope, 26,562 lb·ft per shaft, 44% of
+below the head: 4,291 lb·ft per foot of slope, 25,746 lb·ft per shaft, 43% of
 the 60,000 lb·ft capacity, with the Mcap lines well outside the curve. The
 shear is largest at the toe, the pin reaction. A drilled shaft that stops at
 the top of the rock and bears on it behaves that way. One
@@ -358,44 +358,58 @@ Open **Piles**, set `Tip` to `fixed` on both rows, and **OK** — the mesh
 survives a fixity change, as it survived the spacing change. We run the same
 bracket again.
 
-**FS = 1.410**, from [1.4063, 1.4141]. Holding both toes is worth 0.047 here,
+**FS = 1.418**, from [1.4141, 1.4219]. Holding both toes is worth 0.055 here,
 and what keeps it from being worth more is the shafts' own capacity: with the
-toes held both rows reach the full 60,000 lb·ft, and six of the 18 beam
-elements stand at their moment capacity, none at their shear capacity.
+toes held both rows reach the full 60,000 lb·ft, and seven of the 18 beam
+elements stand at their moment capacity, one of them also at its shear capacity.
 
-This run reports no state at failure, and the results panels say so. With both
-ends of both rows held, the first trial that cannot reach equilibrium does not
-settle into a mechanism: it keeps moving, to displacements no slope of this size
-could develop. The engine will not draw a field like that, so every panel below
-carries the **last converged state** instead and names it in its title.
+The at-failure state this run reports is a shorter one than the pinned run's,
+and its title says so: **capture stopped at iteration 38 (runaway)**. Past the
+critical strength the engine keeps solving to develop the mechanism its figures
+are drawn from, and it stops as soon as the section is unmistakably running
+away — here after 38 iterations, with the largest movement in the slope at
+0.47 ft. The pinned run needs no such stop: its collapse develops steadily and
+that solve runs its whole budget. With both ends of both rows held, this one
+never settles, and what is kept is the state the mechanism can be read in rather
+than what the arithmetic reaches later.
 
-![The pile rows with both tips fixed, at the last converged state: a weak strain field through the body of the slope, with its one concentration just downslope of the upper row's head](images/fem03_fem_shear_piles_fixed.png){width=1000}
+![The pile rows with both tips fixed, at the captured mechanism: a compact band of shear strain around and below the two socketed toes](images/fem03_fem_shear_piles_fixed.png){width=1000}
 
-At the factor of safety the run reports, the slope has barely moved. The deep
-band that ran from the flat ground beyond the toe down to the pile tips is not
-there. The strain reaches 0.07 at its highest, just downslope of the upper row's
-head, and the rest of the slope is well below that. The rows hold their ground,
-and what shearing there is happens in the soil above the upper row rather than
-in soil carrying the rows along with it.
+The failure has moved. Where the shipped file's mechanism peaked near the upper
+row's head, at (10.5, 9.0), the shearing here is a compact concentration between
+the two rows and below them, from about elevation −3 down to −9, peaking at 0.10
+in the element centered on (8.9, −5.9), with 14 of the 1,521 elements above half
+of that. Light shearing still reaches up the face, but the slope no longer fails
+by carrying the rows along with it: held at both ends, the shafts stay where they
+are and what mass moves has to pass under them.
 
-Open **Results → 1D Details** on the upper row again:
+Open **Results → 1D Details** on the upper row again, and switch **Field state**
+to **Last converged**:
 
-![The upper row's 1D Details with the tip fixed, at the last converged state: bending against the restraint, the moment at capacity from 14 ft down to the toe](images/fem03_piles_profile_fixed.png){width=1000}
+![The upper row's 1D Details with the tip fixed, at the last converged state: bending against the restraint, the moment at capacity from 16 ft down to the toe](images/fem03_piles_profile_fixed.png){width=1000}
 
-Every panel has changed. The head moves 0.19 ft, and the displacement profile is
+The panel opens on **At failure**, and on this run that field is the stopped
+capture above. Its member forces are the elastic demand in a section that is no
+longer in equilibrium — tens of millions of lb·ft per foot, alternating from one
+element to the next, hundreds of times the capacity those sections are allowed to
+carry. That is a picture of the collapse, not a reading of the shaft, so the
+shaft is read at the last converged state: the figure above, and where every
+number below comes from.
+
+Every panel has changed. The head moves 0.12 ft, and the displacement profile is
 curved rather than straight — the shaft is bending now, not rotating about a
 pin. The moment is zero at the head, which is
 still free, reaches the 10,000 lb·ft per foot that is M<sub>cap</sub> ÷ S about
-14 ft below the head, and holds it to the toe: those sections have hinged, and
-they turn without carrying any more moment. The largest shear is 1,062 lb/ft at
+16 ft below the head, and holds it to the toe: those sections have hinged, and
+they turn without carrying any more moment. The largest shear is 1,056 lb/ft at
 9 ft below the head, and of the opposite sign to the pinned run's: the shaft is
 being bent against its toe rather than swung about it.
 
 The soil reaction panel reports the lateral pressure the soil is putting on the
 shaft against the Ito & Matsui limit — the largest pressure the theory says soil
 can exert on a pile in a row before it squeezes between the piles. The pinned
-run's panel above puts the peak at 42% of that limit; this one quotes no
-percentage, because there is no state at failure here to read one from. In plane
+run's panel puts the peak at 70% of that limit at its captured mechanism; this
+one, at the state the slope last stood at, reads 30%. In plane
 strain there is no gap for soil to squeeze through, so nothing in the model would
 hold that pressure under the limit; the panel reports the ratio so that a row
 smeared into a wall can be checked against the theory that does describe the gap.
@@ -419,12 +433,12 @@ is its own Spencer search, because spacing changes which surface governs.
 ![Factor of safety against pile spacing: the limit equilibrium curve and the two strength reduction lines](images/fem03_spacing_sweep.png){width=800}
 
 The limit equilibrium answer falls from 2.193 to 1.409 over that range, 36%.
-With the tips pinned the strength reduction answer barely moves: 1.363 at 3 ft
-and again at 6 ft, on the same bracket [1.3594, 1.3672] and with the same
-verdict at every trial, and 1.324 at 12 ft.
+With the tips pinned the strength reduction answer barely moves: 1.371 at 3 ft,
+1.363 at 6 ft and 1.332 at 12 ft — a 2.8% spread where the limit equilibrium
+answer falls by 36% over the same range.
 
 The tip-fixed rows of the last section, swept the same way, do not hold still —
-1.543, 1.410 and 1.238, the upper line on the plot. Spacing reaches the finite
+1.543, 1.418 and 1.238, the upper line on the plot. Spacing reaches the finite
 element model as the divisor on M<sub>cap</sub> as well as on the stiffness, so
 the wider the shafts are set the less moment the smeared row can carry per foot
 of slope, and the sooner its sections hinge. At 12 ft the tip restraint has
@@ -436,16 +450,16 @@ with it. Each row below is read at that spacing's captured mechanism:
 
 | S (ft) | *EI*/S (lb·ft²) | Peak moment per unit width (lb·ft/ft) | Peak moment per shaft (lb·ft) | Fraction of M<sub>cap</sub> |
 | :---: | :---: | :---: | :---: | :---: |
-| 3 | 1.357 × 10<sup>8</sup> | 4,752 | 14,257 | 24% |
-| 6 | 6.786 × 10<sup>7</sup> | 4,752 | 28,514 | 48% |
-| 12 | 3.393 × 10<sup>7</sup> | 5,093 | 61,116 | 102% |
+| 3 | 1.357 × 10<sup>8</sup> | 4,701 | 14,102 | 24% |
+| 6 | 6.786 × 10<sup>7</sup> | 4,751 | 28,503 | 48% |
+| 12 | 3.393 × 10<sup>7</sup> | 5,000 | 60,000 | 100% |
 
-At 3 and 6 ft the moment *per unit width of slope* does not move at all, which
-is the quantity the smear holds constant, so the moment *per shaft* is that
-number times the spacing and doubles when the spacing does. At 12 ft the shafts
-run into their ceiling instead: M<sub>cap</sub> ÷ S is 5,000 lb·ft per foot
-there, six of the 18 beam elements have hinged at the captured mechanism, and
-each shaft is carrying the whole 60,000 lb·ft it has. Every quantity a designer
+At 3 and 6 ft the moment *per unit width of slope* barely moves — 4,701 against
+4,751 lb·ft per foot — which is the quantity the smear holds constant, so the
+moment *per shaft* is that number times the spacing and doubles when the spacing
+does. At 12 ft the shafts run into their ceiling instead: M<sub>cap</sub> ÷ S is
+5,000 lb·ft per foot there, five of the 18 beam elements have hinged at the
+captured mechanism, and each shaft is carrying the whole 60,000 lb·ft it has. Every quantity a designer
 would check responds to
 spacing. The factor of safety follows only once the capacity binds.
 
@@ -458,8 +472,8 @@ capacity at the failure surface — it has no way to say otherwise. The finite
 element run computes how much of that capacity the toe restraint actually lets
 the shaft develop. At the 6 ft spacing the model was built with, a shaft that
 can turn on its toe develops 48% of it and the run answers 1.363; socketing the
-toe puts both rows on their capacity and the run answers 1.410. So the choice
-between 1.36 and 1.41 is a question about the shaft — bearing on the rock, or
+toe puts both rows on their capacity and the run answers 1.418. So the choice
+between 1.36 and 1.42 is a question about the shaft — bearing on the rock, or
 socketed into it — and it is one cell in the file. Both answers stay well under
 Spencer's 1.842.
 

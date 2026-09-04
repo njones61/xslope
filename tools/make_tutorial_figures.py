@@ -5284,18 +5284,26 @@ def fem03_tip():
     from xslope import fem_details
     from xslope.plot_fem_details import plot_pile_detail
 
-    #: (label, model change, shear-strain figure, upper-row profile figure)
+    #: (label, model change, shear-strain figure, upper-row profile figure, the
+    #: field that profile is read at).  The pinned row is read at failure, which is
+    #: the panel's own default and a developed mechanism on that run.  The tip-fixed
+    #: row is read at the last CONVERGED state: its capture is stopped a few
+    #: iterations into a runaway (the state the mechanism figure beside it is drawn
+    #: from), and the member forces there are the elastic demand in a field that is
+    #: coming apart — a sawtooth of tens of millions of lb·ft per foot, hundreds of
+    #: times the section's capacity, which is not a reading of the shaft.  The page
+    #: says so where it shows the two.
     cases = [
         ("tips pinned (as entered)", dict(tip="pinned"), None,
-         "fem03_piles_profile_pinned.png"),
-        ("pile E ×100", dict(pile_E=E0 * 100.0), None, None),
-        ("pile E ÷100", dict(pile_E=E0 / 100.0), None, None),
-        ("Vcap and Mcap cleared", dict(caps=False), None, None),
-        ("heads fixed, tips pinned", dict(head="fixed"), None, None),
+         "fem03_piles_profile_pinned.png", "failure"),
+        ("pile E ×100", dict(pile_E=E0 * 100.0), None, None, "failure"),
+        ("pile E ÷100", dict(pile_E=E0 / 100.0), None, None, "failure"),
+        ("Vcap and Mcap cleared", dict(caps=False), None, None, "failure"),
+        ("heads fixed, tips pinned", dict(head="fixed"), None, None, "failure"),
         ("tips fixed", dict(tip="fixed"), "fem03_fem_shear_piles_fixed.png",
-         "fem03_piles_profile_fixed.png"),
+         "fem03_piles_profile_fixed.png", "converged"),
     ]
-    for label, kwargs, figure, prof_fig in cases:
+    for label, kwargs, figure, prof_fig, prof_state in cases:
         sd = _fem03_piles_model(**kwargs)
         mesh = _fem03_mesh(sd)
         fem_data, result, solution, seconds = _fem03_solve(sd, mesh)
@@ -5305,10 +5313,10 @@ def fem03_tip():
                     failure_solution=solution.get("failure_solution"),
                     field_state="failure")
         if prof_fig:
-            # The upper row's 1D Details, at failure — the field the panel opens
-            # on, and the one the page's 44% / at-capacity readings come from.
+            # The upper row's 1D Details, at the field this case is read at (see the
+            # case table above).
             prof = fem_details.pile_profile(
-                fem_data, solution, 1, slope_data=sd, field_state="failure",
+                fem_data, solution, 1, slope_data=sd, field_state=prof_state,
                 failure_solution=solution.get("failure_solution"))
             capture(prof_fig, plot_pile_detail, prof)
         _fem03_report(label, sd, mesh, fem_data, result, solution, seconds)
@@ -5361,27 +5369,33 @@ def _fem03_spacing_figure(lem, fixed, free, _u):
     strength-reduction lines (tips pinned by the base, tips fixed), each point
     labeled with its own answer.
 
-    The labels sit above the limit equilibrium curve and below both flat lines,
-    which is what keeps the 6 ft column readable: the limit equilibrium point and
-    the tip-fixed point are 0.05 apart there, and a label above each would print
-    one over the other.
+    Each label sits on the side of its own point that the other lines are not on:
+    at a spacing where the nearest other answer is below this one the label goes
+    above, and vice versa. The three lines cross and close on each other across
+    the sweep — at 6 ft the two strength-reduction answers are 0.055 apart — so a
+    fixed side per line prints one label over another wherever they converge, and
+    which side has room is a question about the numbers, not about the line.
     """
     def _draw(with_fixed=True):
         fig, ax = plt.subplots(figsize=(7.0, 4.6))
         xs = list(FEM03_SPACINGS)
         series = [
-            (lem, "LEM (Spencer, Ito & Matsui)", "#1f77b4", "o-", 9),
-            (fixed, "FEM (SSRM, pile tips fixed)", "#9467bd", "^-", -16),
-            (free, "FEM (SSRM, pile tips pinned)", "#d62728", "s-", -16),
+            (lem, "LEM (Spencer, Ito & Matsui)", "#1f77b4", "o-"),
+            (fixed, "FEM (SSRM, pile tips fixed)", "#9467bd", "^-"),
+            (free, "FEM (SSRM, pile tips pinned)", "#d62728", "s-"),
         ]
         if not with_fixed:
             series = [series[0], series[2]]
-        for data, label, color, style, dy in series:
+        for data, label, color, style in series:
             ax.plot(xs, [data[s] for s in xs], style, color=color,
                     linewidth=2.0, markersize=7, label=label)
             for s in xs:
+                others = [d[s] for d, *_ in series if d is not data]
+                nearest = min(others, key=lambda v: abs(v - data[s]), default=None)
+                above = nearest is not None and nearest < data[s]
                 ax.annotate("%.3f" % data[s], (s, data[s]),
-                            textcoords="offset points", xytext=(0, dy),
+                            textcoords="offset points",
+                            xytext=(0, 9 if above else -16),
                             ha="center", fontsize=9, color=color)
         ax.set_xlabel("Pile spacing S (%s)" % _u["length"])
         ax.set_ylabel("Factor of safety")

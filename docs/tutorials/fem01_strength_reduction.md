@@ -320,24 +320,20 @@ Click **Run → Run FEM…** again.
 
 ![Run FEM on the completed model](images/fem01_studio_run_fem.png)
 
-**Model checks — 1 warning**, and **Run** is enabled. The warning is about
-`t_cut`, the tensile cutoff left blank on the materials table, and it is
-expected here. A Mohr-Coulomb envelope extended into the tensile quadrant closes
-at an apex of *c*/tan φ, which for this soil is 312.5 / tan 20° = **858.6 psf**,
-and with no cutoff entered that is the tensile strength the material implicitly
-carries. Griffiths and Lane's example has no cutoff and this model transcribes
-it, so the run proceeds as posed. On a real soil, and especially where a
-mechanism has to open a tension crack at the crest to develop, that implicit
-capacity acts like a member holding the crack shut and raises the factor of
-safety silently — enter a `t_cut` on the materials table, or `0` for a
-no-tension soil.
+**Model checks — 1 warning**, and **Run** is enabled. The warning says the
+materials table has no tensile cutoff (`t_cut` is blank). Left blank, the soil
+is allowed to carry tension — up to *c*/tan φ, which for this soil is
+312.5 / tan 20° = **858.6 psf** — and on a real slope that hidden tensile
+strength can hold a crest crack shut and raise the factor of safety. Griffiths
+and Lane's example has no cutoff, this model reproduces it, so here the warning
+is expected and the run proceeds as posed. For your own models, enter a
+`t_cut`, or `0` for a soil that carries no tension; new materials in Studio
+start at 0.
 [Tensile strength in the SSRM](../fem/overview.md#tensile-strength-in-ssrm)
-is where the cap and its effects are worked through. The **Reduce the tensile
-cap with F (Tension SRF)** checkbox above is on, and on this model it has
-nothing to act on: with no cap entered there is nothing to reduce. Turned off,
-it holds each authored cap fixed through the bisection instead of reducing it
-along with the strength — so the choice only starts to matter once a real cap is
-entered.
+works through the cap and its effects. The **Reduce the tensile cap with F
+(Tension SRF)** checkbox above decides whether the tensile cutoff is divided by
+the trial factor along with *c* and tan φ (on), or held at the value you
+entered (off). With no cutoff entered it has nothing to act on.
 
 The rest of the dialog opens on the defaults this run wants. **Analysis** is
 **SSRM (find FS)**. **F min** and **F max** are 1.00 and 2.00, the ends of the

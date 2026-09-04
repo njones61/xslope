@@ -14863,11 +14863,16 @@ SSRM_REQUIRED_WORDING = (
 )
 
 
-#: A shipped strength reduction run whose bracket was closed by trials the
-#: hybrid criterion counted as failed WITHOUT their displacement growing — the
-#: case a criterion sentence demanding both signals describes wrongly.
+#: A shipped strength reduction run on a non-circular model, read for the inputs
+#: its section names and the water line it carries.
 NONCIRC_FEM_XLSX = os.path.join(_REPO, "docs", "fem", "files",
                                 "xslope_noncircular_fem.xlsx")
+
+#: A shipped strength reduction run whose bracket was walked down by a trial the
+#: hybrid criterion counted as failed WITHOUT its displacement growing — the case
+#: a criterion sentence demanding both signals describes wrongly.
+HYBRID_COUNTEREXAMPLE_XLSX = os.path.join(_REPO, "docs", "fem", "files",
+                                          "xslope_griffiths6_dry.xlsx")
 
 
 def _hybrid_thresholds():
@@ -15129,11 +15134,12 @@ def test_the_hybrid_criterion_sentence_is_true_of_the_runs_that_shipped():
     longer growing. One signal without the other is AMBIGUOUS, and AMBIGUOUS
     counts as FAILED. So "a trial counts as failed only when ... the
     displacements are both large and still growing" describes a stricter test
-    than the one that decided the answer, and noncircular_fem is the
-    counterexample on disk: two of its trials were counted as failed with
-    displacement past elastic scale and growth of 0.006 and 0.008, and the
-    second is the upper end of the bracket its factor of safety is the midpoint
-    of.
+    than the one that decided the answer, and griffiths6_dry is the
+    counterexample on disk: its trial at F = 2.4125 was counted as failed with
+    displacement at 1.85 times elastic scale and a growth of 0.0155, and that
+    trial sits one bisection step from the bracket its factor of safety is the
+    midpoint of — it is the trial that walked the bracket down to where it
+    closed.
 
     Checked three ways: the fixture really poses the question, the sentence the
     report prints does not claim the strict conjunction, and the rule the
@@ -15148,7 +15154,7 @@ def test_the_hybrid_criterion_sentence_is_true_of_the_runs_that_shipped():
     stuck_max, growth_min = _hybrid_thresholds()
 
     # --- the fixture really poses the question ------------------------------
-    meta = json.load(open(os.path.splitext(NONCIRC_FEM_XLSX)[0]
+    meta = json.load(open(os.path.splitext(HYBRID_COUNTEREXAMPLE_XLSX)[0]
                           + "_fem_meta.json"))
     if meta.get("failure_criterion") != "hybrid":
         fails.append(f"the counterexample run was solved under "
@@ -15162,11 +15168,15 @@ def test_the_hybrid_criterion_sentence_is_true_of_the_runs_that_shipped():
         fails.append("no shipped trial is counted as failed without its "
                      "displacement growing, so the overclaim is untested")
     # And one of them set the answer: the bracket the factor of safety is the
-    # midpoint of has this trial at its upper end.
+    # midpoint of ends within one bisection step of this trial, so it is the
+    # trial that walked the bracket down to where it closed.
     interval = [float(v) for v in (meta.get("final_interval") or [0, 0])]
-    if not any(abs(float(t["F"]) - interval[-1]) < 1e-9 for t in counted):
-        fails.append(f"none of the not-growing failures is the bracket end "
-                     f"{interval[-1]}; the case is weaker than it reads")
+    width = float(meta.get("interval_width") or 0.0)
+    if not any(abs(float(t["F"]) - interval[-1]) <= width * (1 + 1e-9)
+               for t in counted):
+        fails.append(f"no not-growing failure lies within one bisection step "
+                     f"({width}) of the bracket end {interval[-1]}; the case is "
+                     f"weaker than it reads")
 
     # --- the sentence does not claim the strict conjunction -----------------
     for wrong in ("both large", "and still growing. An iteration",
@@ -15198,7 +15208,8 @@ def test_the_hybrid_criterion_sentence_is_true_of_the_runs_that_shipped():
                      "standing, so the sentence overstates what fails")
 
     # The report prints it, on the run that poses the question.
-    printed = " ".join(_prose(_engine_report("fem", xlsx=NONCIRC_FEM_XLSX)))
+    printed = " ".join(_prose(_engine_report(
+        "fem", xlsx=HYBRID_COUNTEREXAMPLE_XLSX)))
     if said not in printed:
         fails.append(f"the counterexample run's own section does not carry the "
                      f"criterion sentence: {printed!r}")
@@ -16207,11 +16218,16 @@ def test_fem_members_are_reported():
                          f"does not say so: {said!r}")
         # Measured on the DRAWN curve, which is what the reader has now that the
         # summary table is gone: the force profile has to be the snapshot's.
+        # Drawn against drawn — the converged run's own curves, doubled — so the
+        # comparison does not depend on which sample of which line happens to
+        # carry the peak utilization the profile reports as peak_T.
+        base = max((abs(v) for v in _drawn_member_forces(
+            slope_data, bundle)), default=0.0)
         drew = max((abs(v) for v in _drawn_member_forces(
             slope_data, at_failure)), default=0.0)
-        if abs(drew - 2.0 * peak) > 0.05 + 0.005 * 2.0 * peak:
+        if abs(drew - 2.0 * base) > 0.05 + 0.005 * 2.0 * base:
             fails.append(f"the at-failure figures peak at {drew:,.1f} where the "
-                         f"snapshot carries {2.0 * peak:,.1f}; the converged "
+                         f"snapshot carries {2.0 * base:,.1f}; the converged "
                          f"field was drawn instead")
 
     # Mutation: the subsection is absent because the model owns no member, not

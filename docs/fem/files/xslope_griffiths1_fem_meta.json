@@ -2,8 +2,8 @@
   "failure_criterion": "hybrid",
   "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
   "final_interval": [
-    1.3562499999999997,
-    1.3624999999999998
+    1.36875,
+    1.375
   ],
   "interval_width": 0.006250000000000089,
   "iterations_ssrm": 7,
@@ -17,8 +17,13 @@
       "u_ratio": null,
       "growth": null,
       "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
-      "iterations": 49
+      "iterations": 49,
+      "nr_force_evals": 0,
+      "nr_predictor_iterations": 0
     },
     {
       "F": 1.8,
@@ -26,11 +31,16 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 43.26594583093824,
-      "growth": 10.583611681353208,
-      "exit_reason": "no_progress",
+      "u_ratio": 8.083180569766732,
+      "growth": 1.7181353444524032,
+      "exit_reason": "diverging",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": 270,
       "ee_suppressed": false,
-      "iterations": 1503
+      "iterations": 271,
+      "nr_force_evals": 0,
+      "nr_predictor_iterations": 0
     },
     {
       "F": 1.4,
@@ -38,11 +48,16 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 20.57811125795706,
-      "growth": 4.8332773457493365,
-      "exit_reason": "iteration_cap",
+      "u_ratio": 8.007437182502589,
+      "growth": 1.7958496840027074,
+      "exit_reason": "diverging",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": 5720,
       "ee_suppressed": false,
-      "iterations": 16000
+      "iterations": 5721,
+      "nr_force_evals": 0,
+      "nr_predictor_iterations": 0
     },
     {
       "F": 1.2,
@@ -53,8 +68,13 @@
       "u_ratio": null,
       "growth": null,
       "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
-      "iterations": 85
+      "iterations": 85,
+      "nr_force_evals": 0,
+      "nr_predictor_iterations": 0
     },
     {
       "F": 1.2999999999999998,
@@ -65,8 +85,13 @@
       "u_ratio": null,
       "growth": null,
       "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
-      "iterations": 203
+      "iterations": 203,
+      "nr_force_evals": 0,
+      "nr_predictor_iterations": 0
     },
     {
       "F": 1.3499999999999999,
@@ -74,11 +99,16 @@
       "converged": true,
       "stable": true,
       "verdict": "CONVERGED",
-      "u_ratio": null,
+      "u_ratio": 1.5170610083979108,
       "growth": null,
       "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
-      "iterations": 4319
+      "iterations": 319,
+      "nr_force_evals": 76,
+      "nr_predictor_iterations": 0
     },
     {
       "F": 1.375,
@@ -86,50 +116,65 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 6.430459487258299,
-      "growth": 1.213812166272295,
+      "u_ratio": 6.430459487214239,
+      "growth": 1.2138121662554129,
       "exit_reason": "iteration_cap",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
-      "iterations": 16000
+      "iterations": 16000,
+      "nr_force_evals": 0,
+      "nr_predictor_iterations": 0
     },
     {
       "F": 1.3624999999999998,
       "role": "bisect",
-      "converged": false,
-      "stable": false,
-      "verdict": "FAILED",
-      "u_ratio": 2.405147775517622,
-      "growth": 0.08496727398788707,
-      "exit_reason": "iteration_cap",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": 3.6261723376911936,
+      "growth": null,
+      "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
-      "iterations": 16000
+      "iterations": 329,
+      "nr_force_evals": 143,
+      "nr_predictor_iterations": 0
     },
     {
-      "F": 1.3562499999999997,
+      "F": 1.36875,
       "role": "bisect",
       "converged": true,
       "stable": true,
       "verdict": "CONVERGED",
-      "u_ratio": null,
+      "u_ratio": 21.756524163321696,
       "growth": null,
       "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
-      "iterations": 6318
+      "iterations": 360,
+      "nr_force_evals": 333,
+      "nr_predictor_iterations": 0
     }
   ],
   "tolerance": 0.01,
   "F_min": 1.0,
   "F_max": 1.8,
   "analysis_type": "ssrm",
-  "FS": 1.3593749999999998,
-  "F": 1.3562499999999997,
+  "FS": 1.371875,
+  "F": 1.36875,
   "element_type": "quad8",
   "target_size": 3.5,
   "max_iter": 16000,
   "benchmark": "SSRM-1",
   "unit_system": "imperial",
   "converged": true,
-  "iterations": 6318,
-  "residual": 2.519126747127606e-06,
-  "max_displacement": 0.09672339063989814
+  "iterations": 360,
+  "residual": 0.00019056853420881025,
+  "max_displacement": 1.2338999150141952
 }

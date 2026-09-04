@@ -653,15 +653,14 @@ class RunFemDialog(QDialog):
         # Tension SRF (v19). A no-op on a model with no tensile cap anywhere.
         self.tension_srf = QCheckBox("Reduce the tensile cap with F (Tension SRF)")
         self.tension_srf.setChecked(bool(defaults.get("tension_srf", True)))
-        self.tension_srf.setToolTip(
+        self._tension_srf_tip = (
             "Divide each material's tensile-strength cap by the trial F alongside c "
             "and tan(phi), so the factor of safety is the factor on the WHOLE "
             "strength envelope — shear and tensile.\n\n"
             "This is RS2's tensilestrength_SRF = 1 (the setting behind its published "
             "verification set) and what Plaxis does. Off holds each cap at its "
-            "authored value through the bisection.\n\n"
-            "No-op without a cap: on a model that sets no t_cut there is nothing to "
-            "reduce and the two settings solve identically.")
+            "authored value through the bisection.")
+        self.tension_srf.setToolTip(self._tension_srf_tip)
         form.addRow("", self.tension_srf)
 
         self.failure_criterion = QComboBox()
@@ -822,6 +821,19 @@ class RunFemDialog(QDialog):
         self._ok.setEnabled(reason is None)
         self._ok.setToolTip(reason or "")
 
+    def _model_has_tensile_cap(self):
+        """Whether any strength-bearing material on the model declares a t_cut."""
+        for m in (self._sd or {}).get("materials") or []:
+            if str(m.get("option") or "").strip().lower() in ("", "elastic"):
+                continue
+            v = m.get("t_cut")
+            try:
+                if v is not None and float(v) == float(v):   # finite, not NaN
+                    return True
+            except (TypeError, ValueError):
+                continue
+        return False
+
     def _sync_enabled(self):
         a = self.analysis.currentData()
         single = a == "single"
@@ -833,8 +845,15 @@ class RunFemDialog(QDialog):
         self.tolerance.setEnabled(a == "ssrm")
         # K0 initialization applies to both a single trial and the SSRM.
         self.k0.setEnabled(self.k0_on.isChecked())
-        # The tensile cap is only reduced during a strength reduction.
-        self.tension_srf.setEnabled(not single)
+        # The tensile cap is only reduced during a strength reduction, and only
+        # exists on a model whose materials declare one: with every t_cut blank
+        # the box has nothing to act on, so it is dimmed rather than offered.
+        has_cap = self._model_has_tensile_cap()
+        self.tension_srf.setEnabled((not single) and has_cap)
+        self.tension_srf.setToolTip(self._tension_srf_tip + (
+            "" if has_cap else
+            "\n\nDimmed: no material on this model declares a t_cut, so there is "
+            "no cap to reduce."))
         # Surficial-failure filter applies to the SSRM criterion only.
         self.min_slip_on.setEnabled(a == "ssrm")
         self.min_slip_depth.setEnabled(a == "ssrm" and self.min_slip_on.isChecked())

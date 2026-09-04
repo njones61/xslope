@@ -4112,6 +4112,14 @@ _CORRECTOR_YIELD_TOL = 1e-6
 # is also the threshold `_YIELD_FLAG_FRAC` already counts points against, so the gate
 # and the reading beside it say the same thing about the same state.
 _VP_YIELD_GATE = 1e-2
+# How often the tension cap's own progress is read, and the reduction in a Gauss
+# point's overshoot that counts as progress, for `_release_stalled_tension_caps`.
+_TENSION_STALL_WINDOW = 500
+_TENSION_STALL_FRAC = 0.01
+# ... and how many consecutive windows a point must fail that test before its cap
+# is released. Two, so a single flat window during a redistribution is not read as
+# a crack.
+_TENSION_STALL_WINDOWS = 2
 # The displacement bound the at-failure capture solve is held inside, as a multiple of
 # the mesh height (see `_finite_guard`). That solve is the one place the displacement
 # cap and the early exit are both off, so its runaway has nothing to stop it before the
@@ -4162,6 +4170,108 @@ _YIELD_FLAG_FRAC = 0.01
 # depend on the unit system. It is far below any stress a mechanism is carried at
 # and far above the round-off a near-free-surface point accumulates.
 _YIELD_ABS_FLOOR_FRAC = 1e-4
+
+
+def _release_stalled_tension_caps(gp_groups, u, t_cap_by_elem, floor=0.0):
+    """Release the tension cap on elements where it cannot be enforced.
+
+    A zero-tension material has no admissible state at a sharp free-surface tip —
+    the toe of an embankment, a re-entrant corner — because the discretization
+    cannot open the crack that would relieve it. Such a Gauss point relaxes for a
+    while and then STOPS: its overshoot sigma_1 - T stops falling while its Rankine
+    flow keeps running at full rate, so it accrues plastic strain forever, holds the
+    per-node out-of-balance rate above the force tolerance for the whole model, and
+    leaves the Newton corrector no equilibrium to find. Measured on the seepage dam
+    of Tutorial COMBO-1 with ``t_cut = 0``, four of its 3,923 elements at the
+    downstream toe behave that way while the other 7,871 of 7,881 nodes settle to
+    1e-8 and the displacement field is frozen to seven digits over 33,000
+    iterations — and the bisection then reports 0.696 for a slope that stands at
+    1.230.
+
+    So the cap is released exactly there: on the element of any Gauss point whose
+    overshoot is above ``floor`` and has fallen by less than ``_TENSION_STALL_FRAC``
+    over each of ``_TENSION_STALL_WINDOWS`` consecutive windows of
+    ``_TENSION_STALL_WINDOW`` iterations. The element keeps its full Mohr-Coulomb
+    strength and every Gauss point keeps the plastic strain it has accrued; what it
+    loses is a surface the mesh cannot satisfy. Nothing is released while the cap is
+    being enforced normally: on that dam the overshoot falls by 92%, 7.5% and then
+    1.4% per window at the tip that does relax, three orders of magnitude clear of
+    the test.
+
+    The release is by ELEMENT rather than by Gauss point because the Newton
+    corrector carries a per-element cap (``t_cap_by_elem``, updated here in place),
+    and a corrector still enforcing the cap on a tip the loop has released would
+    keep refusing the trial the release exists to save.
+
+    Called every ``_TENSION_STALL_WINDOW`` iterations from the viscoplastic loop on
+    the default 'auto' driver only — ``fem_solver='viscoplastic'`` never reaches it.
+    Returns the element indices released on this call.
+    """
+    released = []
+    for grp in gp_groups:
+        if not grp.get('has_cap'):
+            continue
+        cap = grp['t_cap']
+        finite = np.isfinite(cap)
+        if not np.any(finite):
+            continue
+        # sigma_1 on the state the loop is carrying, in the same in-plane form and
+        # on the same effective stress the loop's own cap test uses.
+        evpg = grp['evp']
+        eps = np.einsum('gij,gj->gi', grp['B'], u[grp['dof']])
+        eps4 = np.empty((len(grp['w']), 4))
+        eps4[:, :3] = eps - evpg[:, :3]
+        eps4[:, 3] = -evpg[:, 3]
+        sig4 = np.einsum('gij,gj->gi', grp['D4'], eps4)
+        _sig0 = grp.get('sig0')
+        if _sig0 is not None:
+            sig4 = sig4 + _sig0
+        sx = sig4[:, 0] + grp['u_gp']
+        sy = sig4[:, 1] + grp['u_gp']
+        txy = sig4[:, 2]
+        ctr = 0.5 * (sx + sy)
+        rad = np.sqrt((0.5 * (sx - sy)) ** 2 + txy ** 2)
+        over = np.where(finite, ctr + rad - cap, -np.inf)
+        if grp.get('has_elastic'):
+            over = np.where(grp['elastic'], -np.inf, over)
+        ref = grp.get('_t_over_ref')
+        count = grp.get('_t_stall_n')
+        if ref is None:
+            ref = np.full(len(over), np.nan)
+            count = np.zeros(len(over), dtype=np.int32)
+            grp['_t_over_ref'] = ref
+            grp['_t_stall_n'] = count
+        # An overshoot below the model's own stress floor is round-off, not a crack
+        # (the floor is `_YIELD_ABS_FLOOR_FRAC` of the overburden, the same one the
+        # admissibility reading is normalized against). Such a point is not holding
+        # anything up and must not spend a release.
+        violating = over > max(floor, 0.0)
+        stalled = (violating & np.isfinite(ref)
+                   & (over > (1.0 - _TENSION_STALL_FRAC) * ref))
+        count[stalled] += 1
+        count[~stalled] = 0
+        take = stalled & (count >= _TENSION_STALL_WINDOWS)
+        ref[:] = np.where(violating, over, np.nan)
+        if not np.any(take):
+            continue
+        # ... and the whole element with it, so the loop and the corrector are
+        # enforcing the same surface.
+        e_of_gp = grp.get('_release_e_idx')
+        if e_of_gp is None:
+            e_of_gp = np.array([e for e, _g in grp['pairs']], dtype=int)
+            grp['_release_e_idx'] = e_of_gp
+        elems = np.unique(e_of_gp[take])
+        member = np.isin(e_of_gp, elems)
+        cap[member] = np.inf
+        count[member] = 0
+        ref[member] = np.nan
+        _c = grp.get('_tcap_c')
+        if _c is not None and _c is not cap:
+            _c[member] = np.inf
+        grp['has_cap'] = bool(np.isfinite(cap).any())
+        t_cap_by_elem[elems] = np.inf
+        released.extend(int(e) for e in elems)
+    return released
 
 
 def _yield_reading(gp_groups, u, sq3=None, floor=0.0):
@@ -4833,6 +4943,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         t_cap_by_elem = t_cap_by_elem.copy()
         _red = np.isfinite(t_cap_by_elem) & (t_cap_by_elem > 0.0)
         t_cap_by_elem[_red] = t_cap_by_elem[_red] / F_by_elem[_red]
+    elif np.isfinite(t_cap_by_elem).any():
+        # `_release_stalled_tension_caps` writes into this array, and without the
+        # SRF division above it IS the prepared model's own, shared by every trial.
+        t_cap_by_elem = t_cap_by_elem.copy()
 
     # ---- Solver switch (INTERNAL, spike; see SPIKE.md) ----------------------
     # The only place fem_solver is read. 'viscoplastic' falls straight through and
@@ -5128,6 +5242,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         _sol["nr_iterations"] = int(_sol.get("iterations", 0) or 0)
         _sol["iterations"] = int(vp_iterations) + _sol["nr_iterations"]
         _sol["failure_criterion"] = failure_criterion
+        # The releases the viscoplastic passes that grew this seed made are the
+        # trial's, whichever driver finished it.
+        _sol["tension_cap_released"] = len(tension_cap_released)
+        _sol["tension_cap_released_elements"] = list(tension_cap_released)
         _sol["corrector"] = {
             "driver_of_record": "corrector",
             "checkpoint": where,
@@ -5395,6 +5513,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     u_elastic_scale = 0.0
     exit_reason = 'iteration_cap'
     gate_failed = False            # a force-settled state the yield gate refused
+    # Elements whose tension cap was released because it could not be enforced (see
+    # `_release_stalled_tension_caps`), and the switch that decides whether the
+    # reading is taken at all: the default 'auto' driver, and only while a finite cap
+    # is still standing somewhere.
+    tension_cap_released = []
+    _release_caps = (_solver == 'auto'
+                     and any(g.get('has_cap') for g in gp_groups))
     plateau_iter = None            # iteration at which the residual plateaued
     plateau_ratio = None           # the out-of-balance ratio it plateaued at
     diverging_iter = None          # iteration at which the early-failure rule fired
@@ -5846,6 +5971,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
 
             if _PROF_ON:
                 _prof_add("vp_const", _tp)
+
+            # The tension cap's own progress (see _release_stalled_tension_caps).
+            # Read on the default driver only, on a window boundary, and only while
+            # some Gauss point still carries a finite cap.
+            if _release_caps and (iteration + 1) % _TENSION_STALL_WINDOW == 0:
+                _rel = _release_stalled_tension_caps(gp_groups, u, t_cap_by_elem,
+                                                     _yield_floor)
+                if _rel:
+                    tension_cap_released.extend(_rel)
+                    _release_caps = any(g.get('has_cap') for g in gp_groups)
+                    if debug_level >= 1:
+                        print(f"  tension cap released at {len(_rel)} element(s) "
+                              f"where it could not be enforced (free-surface tip); "
+                              f"{len(tension_cap_released)} in this solve")
 
             # ---- 1D Truss element body-force corrections ----
             if has_1d_elements:
@@ -6702,6 +6841,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # it settled on, and the corrector could not reach an admissible one either
         # (see _VP_YIELD_GATE). The trial is FAILED, and this is why.
         "gate_failed": bool(gate_failed),
+        # Elements whose tension cap was released because it could not be enforced
+        # (see `_release_stalled_tension_caps`): how many, and which. Zero and empty
+        # on every model that sets no cap, on every capped model whose cap is being
+        # enforced normally, and on `fem_solver='viscoplastic'`.
+        "tension_cap_released": len(tension_cap_released),
+        "tension_cap_released_elements": list(tension_cap_released),
         # Every corrector attempt this trial made and what it read, including the
         # ones that refused — a refusal decides nothing, but it is the measurement
         # that says whether the corrector is earning its cost. Empty on the plain
@@ -11773,6 +11918,12 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "max_yield_at": sol.get("max_yield_at"),
             "yield_flagged": bool(sol.get("yield_flagged", False)),
             "gate_failed": bool(sol.get("gate_failed", False)),
+            # Elements whose tension cap this trial released because it could not
+            # be enforced (see `_release_stalled_tension_caps`); 0 on every model
+            # that sets no cap and on every cap that is enforced normally.
+            "tension_cap_released": int(sol.get("tension_cap_released", 0) or 0),
+            "tension_cap_released_elements": list(
+                sol.get("tension_cap_released_elements", []) or []),
         })
         if _stable(sol):
             _carried[0] = (float(F) if _carried[0] is None
@@ -12058,6 +12209,14 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         # growth, exit_reason, iterations. Populated on every criterion so an A/B
         # between criteria costs no extra solves.
         "trials": trials,
+        # Elements whose tension cap was released across the whole bisection
+        # because it could not be enforced there (see
+        # `_release_stalled_tension_caps`), summed over the trials, with the
+        # elements of the last standing trial beside them. Zero on models with no
+        # cap.
+        "tension_cap_released": sum(t.get("tension_cap_released", 0) for t in trials),
+        "tension_cap_released_elements": list(
+            last_converged_solution.get("tension_cap_released_elements", []) or []),
         # Trials the iteration ceiling could not decide (empty on a clean run). When
         # this is non-empty the reported FS is still the bracket midpoint, but the
         # bracket's upper edge is an UNCERTAINTY rather than a measured failure, and

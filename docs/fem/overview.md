@@ -1282,6 +1282,20 @@ $c/\tan\phi \approx 28$ kPa holds the crest entry cut shut and the model equilib
 $F \ge 1.3$; run with the vendor caps and the tension SRF, the band mechanism mobilizes as limit
 equilibrium predicts and the factor of safety is 0.781, against RS2's 0.81 and Plaxis' 0.82.
 
+**Where the cap cannot be enforced.** A material with no tensile strength has no admissible state at
+a sharp free-surface tip — the toe of an embankment, a re-entrant corner — because the mesh cannot
+open the crack that would relieve the tension the elastic solution puts there. Such a Gauss point
+relaxes for a while, stops, and then flows on at unchanged stress: the slope around it is standing
+still, but the point holds the equilibrium test above its tolerance for the whole model and leaves
+the Newton corrector no equilibrium to reach. So the solver releases the cap exactly there. Every
+500 iterations it reads each capped Gauss point's overshoot $\sigma_1' - T$, and where that overshoot
+has fallen by less than 1% over each of two consecutive readings, the cap is released on that
+point's element — which keeps its full Mohr-Coulomb strength and the plastic strain it has already
+accrued, and loses only a surface the discretization cannot satisfy. A cap that is being enforced
+normally is never touched: its overshoot falls by tens of percent per reading, orders of magnitude
+clear of the test. Every run reports the count as `tension_cap_released`, and the run log names it
+at debug level 1.
+
 ### Fast kernel
 
 The cost of an SSRM run is dominated by the per–Gauss-point constitutive update, evaluated for every

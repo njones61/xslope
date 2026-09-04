@@ -12,8 +12,10 @@ tip, and the Newton corrector has no equilibrium to find. Left to decide the
 trial, four elements out of 3,923 walk the bisection down from 1.230 to 0.696.
 
 The model is the seepage dam of Tutorial COMBO-1 (`xslope_johnson_res.xlsx`) at
-the mesh, bracket and tolerance the page's own tag pins, with `t_cut = 0`
-declared on its three materials in memory. That cap is very nearly inert on this
+the mesh, bracket and tolerance the page's own tag pins. The workbook declares
+`t_cut = 0` on its three materials; both legs below set the column in memory
+anyway, so the comparison holds whatever the file carries. That cap is very
+nearly inert on this
 section: the shell's Mohr-Coulomb apex already limits tension to 143 psf, the
 same run on a coarser mesh moves by 0.002, and Spencer reads 1.248 on the same
 geometry. So the capped answer has to be the blank-cap answer, and this check
@@ -52,10 +54,13 @@ DEFECT_FS = 0.696
 
 
 def _case(capped):
-    """The COMBO-1 case, with ``t_cut`` set to 0 on every material or left as the
-    file has it. Built through the suite's own ``build_fem_ssrm_case`` so the
-    mesh, the seepage staging and the solver options are the tag's, and through a
-    patched loader so the workbook itself is never touched."""
+    """The COMBO-1 case, with ``t_cut`` set to 0 on every material or cleared on
+    every material. Both legs are stated here rather than taken from the file,
+    because the shipped workbook declares the cutoff and a leg that inherited it
+    would compare the capped run against itself. Built through the suite's own
+    ``build_fem_ssrm_case`` so the mesh, the seepage staging and the solver
+    options are the tag's, and through a patched loader so the workbook itself is
+    never touched."""
     import run_tests
     import xslope.fileio as fileio
 
@@ -69,9 +74,8 @@ def _case(capped):
 
     def patched(*a, **k):
         sd = orig(*a, **k)
-        if capped:
-            for m in sd['materials']:
-                m['t_cut'] = 0.0
+        for m in sd['materials']:
+            m['t_cut'] = 0.0 if capped else None
         return sd
 
     fileio.load_slope_data = patched

@@ -515,24 +515,17 @@ because a residual is capped by the bond the embedment can develop at that
 point. An element near the end of a layer cannot hold 600 lb/ft after rupturing
 when its embedment could only ever develop 200.
 
-Nothing on this line has dropped to it.
-Reaching capacity is not what triggers the drop. Once a trial has settled into
-equilibrium, the solver asks each element whether the stretch the soil imposes
-on it demands *more* than its capacity; only an element asked for more than 800
-lb/ft drops to its residual, and the trial is then re-solved, because the load
-it sheds can push its neighbors over the same limit. An element sitting at 800
-lb/ft with no excess demand stays there. In this converged state, at
-*F* = 1.531, no element on line 5 was asked for more than it could carry: the
-interior peak is 767 lb/ft, under the 800 the envelope allows, the tip at s = 19
-is on its 200 lb/ft bond limit — which is why the panel now titles the line
-**pullout** rather than yielded — and there is no purple *Softened* square,
-which is how the panel marks an element that has shed. The drops happened at
-the higher trial values the run failed at. Nothing carries between trials: each
-trial *F* is a separate solve from the same starting model, with every element
-back at its full 800 lb/ft, so the elements that dropped at the failed trials
-above and the ones holding 767 here are independent solves at different
-strengths, not one element going down and coming back. That is why the factor
-of safety is lower even though this state looks like the run before.
+Nothing on this line has dropped to it, and nothing should have. A layer drops
+only when a converged trial asks an element for more than its 800 lb/ft, and
+this trial did not: line 5's interior peak is 767 lb/ft, its tip at s = 19 is
+on the 200 lb/ft bond limit — which is why the panel calls the line pullout
+rather than yielded — and there is no purple Softened square, the panel's mark
+for an element that has shed. The drops happened in the trials above this one,
+the ones that failed. Each trial is a separate solve from the same starting
+model with every element back at its full 800 lb/ft, so what dropped in a
+failed trial does not carry into this one. This state looks like the
+elastic-perfectly-plastic one because no layer has ruptured in either; the
+residual lowers the answer by deciding the trial above, not this one.
 
 That shows in the other five lines. All six now read **pullout**: each has an
 element at its bond limit, slipping there rather than carrying more, and none of

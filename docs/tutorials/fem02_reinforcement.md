@@ -252,8 +252,8 @@ by ticking the box or by shrinking the whole mesh, and the model begins to find
 a second, real mechanism: shallow sloughing of the sand face, the same one a
 tiny starting circle on the face would find in the limit equilibrium search.
 The reported factor of safety then drifts down toward the sloughing answer
-(from 1.51 at this page's mesh to 1.43 at 1 ft elements, on the run with a
-residual) — a different failure, not a better estimate of this one. We are after
+(from 1.54 at this page's mesh to 1.46 with the box ticked and 1.44 at 1 ft
+elements, on the run with a residual) — a different failure, not a better estimate of this one. We are after
 the general mechanism through the reinforced block, the one Spencer's circle
 finds, so we stay on the published sample's mesh, where that mechanism
 governs. To study a fine mesh and still hold the search on the general

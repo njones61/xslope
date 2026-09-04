@@ -1409,7 +1409,275 @@ def test_the_pile_is_read_at_every_node_it_stands_on():
     return fails
 
 
+# --------------------------------------------------------------------------
+# G. the at-failure capture's finite guard
+# --------------------------------------------------------------------------
+#
+# The capture solve solve_ssrm makes for the mechanism figures is the one solve
+# in a run with neither the displacement cap nor the early divergence exit to
+# bound it: it is asked to run past the failure strength until the mechanism
+# dominates the elastic field. On a model whose mechanism accelerates hard
+# enough that is a numerical runaway with nothing to stop it, and the field it
+# returned was NaN — which the engine handed on in silence, so the figures drew
+# an empty slope and the pile panel annotated it "peak nan% of limit".
+#
+# The specimen was FEM-3's tip-fixed pile configuration. The sample below is the
+# same defect on a model the suite can afford: the shipped FEM piles file with
+# both rows' toes fixed, which turns the same runaway on and reaches a non-finite
+# field inside the capture's own default iteration budget.
+
+_RUNAWAY = {}
+
+#: The trial strength and iteration budget the runaway is measured at. The
+#: strength is well past the sample's own factor of safety, as the capture's
+#: always is; the budget is half the capture's own default of 3,000, which is
+#: where this model's unguarded field first goes non-finite.
+_RUNAWAY_F = 2.0
+_RUNAWAY_ITERS = 1600
+
+
+def _runaway():
+    """``(slope_data, fem_data)`` for the sample whose capture runs away.
+
+    The shipped piles model with ``tip_fixity`` set to fixed on both rows —
+    nothing else is changed, and the mesh is the file's own. Socketing the toes
+    is what makes the mechanism swing about a restrained point instead of
+    rotating out, and past critical that is the runaway the capture solve has
+    nothing to stop.
+    """
+    if "model" not in _RUNAWAY:
+        from xslope.fem import build_fem_data
+        from xslope.fileio import load_slope_data
+        slope_data = load_slope_data(PILES_XLSX)
+        for row in slope_data.get("pile_lines", []):
+            row["tip_fixity"] = "fixed"
+        _RUNAWAY["model"] = (slope_data,
+                             build_fem_data(slope_data, slope_data.get("mesh")))
+    return _RUNAWAY["model"]
+
+
+def _capture_solve(guard, iterations=_RUNAWAY_ITERS):
+    """One capture-shaped solve on the runaway sample: the displacement cap off,
+    the early exit off, the early-failure rule off, and a generous budget — the
+    settings solve_ssrm gives its at-failure capture, with the finite guard the
+    only thing that differs between the two legs."""
+    import warnings
+    from xslope.fem import solve_fem
+    _slope_data, fem_data = _runaway()
+    with warnings.catch_warnings():
+        # The unguarded leg overflows on purpose; its warnings are the defect
+        # being measured and not something to print over the suite.
+        warnings.simplefilter("ignore")
+        with np.errstate(all="ignore"):
+            with contextlib.redirect_stdout(io.StringIO()):
+                return solve_fem(fem_data, F=_RUNAWAY_F, debug_level=0,
+                                 max_iterations=iterations,
+                                 max_iterations_ceiling=iterations,
+                                 max_disp_factor=None, early_exit=False,
+                                 early_failure=False, _finite_guard=guard)
+
+
+def _non_finite_fields(solution):
+    """The names of the solution's numeric fields carrying NaN or inf."""
+    bad = []
+    for key in ("displacements", "stresses", "strains", "vp_shear_strain",
+                "forces_1d", "forces_pile_axial", "forces_pile_lateral",
+                "forces_pile_moment", "max_displacement"):
+        val = solution.get(key)
+        if val is None:
+            continue
+        arr = np.asarray(val, dtype=float)
+        if arr.size and not np.all(np.isfinite(arr)):
+            bad.append(key)
+    return bad
+
+
+def test_the_capture_stops_before_it_stops_being_a_number():
+    """A capture solve on a runaway model returns the last finite state it
+    reached, says it stopped early, and never returns NaN.
+
+    Both legs are the same solve on the same model at the same strength; the
+    only difference is the guard. The unguarded leg is the defect as it shipped:
+    run to the capture's own budget it returns a field that is not a number,
+    which every figure and every label downstream then reads.
+    """
+    fails = []
+    from xslope.fem import _FINITE_GUARD_U_FACTOR
+    _slope_data, fem_data = _runaway()
+    height = float(np.max(np.asarray(fem_data["nodes"], float)[:, 1])
+                   - np.min(np.asarray(fem_data["nodes"], float)[:, 1]))
+    bound = _FINITE_GUARD_U_FACTOR * height
+
+    loose = _capture_solve(guard=False)
+    if not _non_finite_fields(loose):
+        fails.append(
+            f"the unguarded capture on the runaway sample stayed finite at "
+            f"{_RUNAWAY_ITERS} iterations (max|u| "
+            f"{np.nanmax(np.abs(np.asarray(loose['displacements']))):.3g}) — "
+            f"this check no longer measures the defect it was written for")
+
+    held = _capture_solve(guard=True)
+    bad = _non_finite_fields(held)
+    if bad:
+        fails.append(f"the guarded capture returned non-finite {', '.join(bad)}")
+    if not held.get("capture_truncated"):
+        fails.append("the guarded capture does not report that it stopped early")
+    if held.get("capture_truncated_at") is None:
+        fails.append("the guarded capture does not say which iteration it "
+                     "stopped at")
+    if not held.get("capture_truncated_reason"):
+        fails.append("the guarded capture does not say why it stopped")
+    peak = float(np.nanmax(np.abs(np.asarray(held["displacements"], float))))
+    if peak > bound:
+        fails.append(f"the guarded capture returned a field at max|u| = "
+                     f"{peak:.3g}, past its own bound of {bound:.3g} "
+                     f"({_FINITE_GUARD_U_FACTOR:g} x the mesh height)")
+    if held["iterations"] >= _RUNAWAY_ITERS:
+        fails.append(f"the guarded capture ran its whole budget "
+                     f"({held['iterations']} iterations): it did not stop at "
+                     f"the state it could still report")
+    return fails
+
+
+def test_capture_guard_mutation():
+    """A mutation that lifts the guard's bound must be caught.
+
+    The bound is the leg that fires on the specimen: the field is still finite
+    when it is crossed, and the arithmetic overflows some hundreds of iterations
+    later. With it lifted the solve runs on into the overflow, and what it can
+    still return is a field many orders of magnitude past the model — which is
+    what the size test above exists to refuse.
+    """
+    fails = []
+    import xslope.fem as fem
+    real = fem._FINITE_GUARD_U_FACTOR
+    fem._FINITE_GUARD_U_FACTOR = float("inf")
+    try:
+        # A raise counts as caught: with the bound lifted this model's field
+        # grows until the post-processing's own scalar arithmetic overflows, and
+        # a capture that dies in an exception is as unusable as one that returns
+        # NaN. Either way the mutation did not slip through.
+        try:
+            caught = bool(test_the_capture_stops_before_it_stops_being_a_number())
+        except Exception:
+            caught = True
+        if not caught:
+            fails.append("the capture check passes with the guard's "
+                         "displacement bound lifted — it does not actually "
+                         "hold the returned field to the model's own scale")
+    finally:
+        fem._FINITE_GUARD_U_FACTOR = real
+    return fails
+
+
+def test_the_guard_does_not_touch_a_solve_that_behaves():
+    """A solve that never goes near the guard is bit-identical with it on.
+
+    The guard costs one snapshot an iteration and reads two tests; it may not
+    move a single digit of a field that never trips them. Asserted on the
+    equality of the arrays themselves, not on a tolerance: the two solves are
+    the same arithmetic in the same order.
+    """
+    fails = []
+    from xslope.fem import solve_fem
+    _slope_data, fem_data, _solution = _solved(PILES_XLSX)
+    fields = ("displacements", "stresses", "strains", "vp_shear_strain",
+              "forces_1d", "forces_pile_lateral", "forces_pile_moment")
+
+    def solve(guard):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=60,
+                             _finite_guard=guard)
+
+    off, on = solve(False), solve(True)
+    if on.get("capture_truncated"):
+        fails.append("the guard stopped a solve that never ran away")
+    for key in ("converged", "iterations", "exit_reason"):
+        if off[key] != on[key]:
+            fails.append(f"the guard changed {key}: {off[key]!r} -> {on[key]!r}")
+    for key in fields:
+        a, b = np.asarray(off[key], float), np.asarray(on[key], float)
+        if a.shape != b.shape or not np.array_equal(a, b):
+            fails.append(f"the guard changed {key} on a solve it should not "
+                         f"have touched")
+    return fails
+
+
+def test_a_truncated_capture_is_stated_and_not_quoted():
+    """The panels drawn from a truncated capture say so and quote no number
+    off it.
+
+    A capture stopped mid-runaway carries whatever forces the field had reached
+    at that iteration. They are finite and the profile is drawn — the shape of
+    the mechanism is what the panel is for — but a utilization, a capacity
+    verdict, or a percentage of the Ito & Matsui limit read off them would be a
+    reading the run never made. And nowhere, on any field, may a label print the
+    word nan.
+    """
+    fails = []
+    from xslope import fem_details as fd
+    from xslope.plot_fem_details import CAPTURE_TRUNCATED_NOTE
+
+    slope_data, fem_data, solution = _solved(PILES_XLSX)
+    held = _capture_solve(guard=True)
+    profile = fd.pile_profile(fem_data, solution, 0, slope_data=slope_data,
+                              field_state="failure", failure_solution=held)
+    if not profile.get("capture_truncated"):
+        fails.append("a profile read from a truncated capture does not carry "
+                     "the flag saying so")
+    fig = _drawn(profile, figsize=(11.0, 6.0))
+    said = " ".join(t.get_text() for ax in fig.axes for t in ax.texts)
+    said += " " + " ".join(t.get_text() for t in fig.texts)
+    if CAPTURE_TRUNCATED_NOTE not in said:
+        fails.append(f"nothing on the figure says the capture stopped early: "
+                     f"{said!r}")
+    if "of limit" in said:
+        fails.append(f"the soil-reaction panel quotes a mobilization off a "
+                     f"capture that was cut short: {said!r}")
+    if "nan" in said.lower():
+        fails.append(f"a label printed nan: {said!r}")
+
+    # The converged field, on the same model, is unaffected: it says nothing
+    # about a capture and states its percentage as it always has.
+    plain = fd.pile_profile(fem_data, solution, 0, slope_data=slope_data)
+    if plain.get("capture_truncated"):
+        fails.append("a profile read from the converged field claims a "
+                     "truncated capture")
+    plain_said = " ".join(t.get_text() for ax in _drawn(plain, figsize=(11.0, 6.0)).axes
+                          for t in ax.texts)
+    if CAPTURE_TRUNCATED_NOTE in plain_said:
+        fails.append("the converged profile is labeled as a stopped capture")
+
+    # And a field that somehow arrives with a hole in it states no percentage
+    # rather than printing one that is not a number.
+    holed = dict(plain)
+    reaction = np.asarray(plain["reaction"], float).copy()
+    if reaction.size:
+        reaction[0] = np.nan
+        holed["reaction"] = reaction
+        holed["reaction_ratio"] = fd._reaction_ratio(
+            reaction, plain["reaction_depth"], plain["limit_depth"],
+            plain["limit_p"])
+        ratio = holed["reaction_ratio"]
+        if ratio is not None and not np.isfinite(ratio):
+            fails.append("a mobilization read off a field with a hole in it is "
+                         "reported as nan")
+        holed_said = " ".join(t.get_text() for ax in _drawn(holed, figsize=(11.0, 6.0)).axes
+                              for t in ax.texts)
+        if "nan" in holed_said.lower():
+            fails.append(f"a label printed nan: {holed_said!r}")
+    return fails
+
+
+
 CHECKS = [
+    ("the capture stops before it stops being a number",
+     test_the_capture_stops_before_it_stops_being_a_number),
+    ("the capture guard is load-bearing", test_capture_guard_mutation),
+    ("the guard leaves a well-behaved solve alone",
+     test_the_guard_does_not_touch_a_solve_that_behaves),
+    ("a truncated capture is stated, not quoted",
+     test_a_truncated_capture_is_stated_and_not_quoted),
     ("the reaction panel says where its limit is",
      test_the_reaction_panel_says_where_its_limit_is),
     ("the inset follows the selection", test_the_inset_follows_the_selection),

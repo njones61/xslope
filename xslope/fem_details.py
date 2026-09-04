@@ -109,6 +109,21 @@ def has_failure_state(solution, failure_solution=None):
     return failure_snapshot(solution, failure_solution) is not None
 
 
+def capture_truncated(solution, failure_solution=None):
+    """True when the at-failure snapshot was cut short of its iteration ceiling.
+
+    The capture solve is the one solve in a strength reduction run with neither
+    the displacement cap nor the early exit to bound it, so on a model whose
+    mechanism accelerates hard enough it is stopped at the last state that was
+    still finite (see :func:`xslope.fem.solve_fem`'s ``_finite_guard``). The
+    field it returns is a real, finite state of the model and the profiles read
+    from it are real, but it is not the fully developed mechanism the capture set
+    out to reach, and every panel that quotes a number off it says so.
+    """
+    snap = failure_snapshot(solution, failure_solution)
+    return bool(snap.get("capture_truncated")) if snap else False
+
+
 def field_solution(solution, field_state="converged", failure_solution=None):
     """The solution dict a profile's member forces and displacements come from.
 
@@ -797,6 +812,11 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "mechanism": mech, "mechanism_s": mech_s,
         "band_lo": band_lo, "band_hi": band_hi, "band_peak": band_peak,
         "band_state": band_state(solution, failure_solution),
+        # Set where the field above is an at-failure capture the finite guard
+        # stopped early: what the panel reads is a real state of the model, but
+        # not the developed mechanism, and the figure says so beside the numbers.
+        "capture_truncated": (state == "failure"
+                              and capture_truncated(solution, failure_solution)),
         "peak_s": float(s[peak_i]) if peak_i is not None else None,
         "peak_T": float(T[peak_i]) if peak_i is not None else None,
         "peak_utilization": peak_util,
@@ -1212,6 +1232,11 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         "max_shear": None, "max_shear_depth": None,
         "band_lo": None, "band_hi": None, "band_depth": None,
         "band_state": band_state(solution, failure_solution),
+        # Set where the field above is an at-failure capture the finite guard
+        # stopped early: what the panel reads is a real state of the model, but
+        # not the developed mechanism, and the figure says so beside the numbers.
+        "capture_truncated": (state == "failure"
+                              and capture_truncated(solution, failure_solution)),
         "peak_utilization": None,
         "badge": "none", "status": "no results", "utilization_basis": None,
         "units": units,
@@ -1371,6 +1396,11 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         "band_hi": band_hi,
         "band_depth": band_depth,
         "band_state": band_state(solution, failure_solution),
+        # Set where the field above is an at-failure capture the finite guard
+        # stopped early: what the panel reads is a real state of the model, but
+        # not the developed mechanism, and the figure says so beside the numbers.
+        "capture_truncated": (state == "failure"
+                              and capture_truncated(solution, failure_solution)),
         "peak_utilization": util,
         "utilization_basis": basis,
         "badge": _badge(util),
@@ -1385,10 +1415,14 @@ def _reaction_ratio(reaction, reaction_depth, limit_depth, limit_p):
     if limit_p is None or len(reaction) == 0:
         return None
     p_at = np.interp(reaction_depth, limit_depth, limit_p)
-    ok = np.isfinite(p_at) & (p_at > 1e-12)
+    ok = np.isfinite(p_at) & (p_at > 1e-12) & np.isfinite(reaction)
     if not np.any(ok):
         return None
-    return float(np.max(np.abs(reaction[ok]) / p_at[ok]))
+    ratio = float(np.max(np.abs(reaction[ok]) / p_at[ok]))
+    # A ratio that is not a number is not a reading. It cannot arise from a field
+    # the finite guard has passed, and where it does arise the panel states no
+    # percentage rather than printing 'nan% of limit'.
+    return ratio if np.isfinite(ratio) else None
 
 
 def _pile_utilization(shear, moment, V_cap, M_cap, reaction_ratio):
@@ -1400,12 +1434,16 @@ def _pile_utilization(shear, moment, V_cap, M_cap, reaction_ratio):
     to measure and the badge stays neutral rather than guessing at one.
     """
     best, basis = None, None
+    # Each candidate is checked for being a number as well as for having a capacity
+    # to divide by: a utilization of nan sets a badge color, prints in a title, and
+    # compares false against every threshold, so it is not reported as a reading.
     if V_cap and np.isfinite(V_cap) and V_cap > 0 and len(shear):
         r = float(np.max(np.abs(shear)) / V_cap)
-        best, basis = r, "shear vs Vcap"
+        if np.isfinite(r):
+            best, basis = r, "shear vs Vcap"
     if M_cap and np.isfinite(M_cap) and M_cap > 0 and len(moment):
         r = float(np.max(np.abs(moment)) / M_cap)
-        if best is None or r > best:
+        if np.isfinite(r) and (best is None or r > best):
             best, basis = r, "moment vs Mcap"
     if best is None and reaction_ratio is not None:
         best, basis = reaction_ratio, "soil reaction vs Ito-Matsui limit"

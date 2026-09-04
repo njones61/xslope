@@ -219,6 +219,14 @@ def _annotate_inside(ax, xy, text, color, fontsize=8.5, fontweight="bold",
 #: Which field the figure was drawn from is in its title.
 BAND_LABEL = "Shear band crossing"
 
+#: What a figure says in place of a number it read from an at-failure capture the
+#: finite guard cut short (see :func:`xslope.fem_details.capture_truncated`). The
+#: profiles drawn from such a field are real and are still drawn — the shape of
+#: the mechanism is the point of the panel — but the forces on them are wherever
+#: the runaway had reached when it was stopped, so no utilization, no percentage
+#: of a limit and no capacity verdict is quoted off them.
+CAPTURE_TRUNCATED_NOTE = "capture stopped early"
+
 
 
 
@@ -249,6 +257,17 @@ def _peak_label(profile):
     return "At capacity" if at_capacity else "Peak utilization"
 
 
+def _drawable(value):
+    """True when a number can be marked and printed: present and finite.
+
+    Every peak a panel rings and labels comes off the solved field, and a field
+    that ran away carries whatever the arithmetic left in it. A marker at nan
+    lands nowhere and its label prints the word, so both are skipped together
+    and the panel simply carries no peak mark.
+    """
+    return value is not None and np.isfinite(value)
+
+
 def _title(profile):
     util = profile.get("peak_utilization")
     bits = [profile["label"]]
@@ -257,6 +276,16 @@ def _title(profile):
     # what a plain title has always meant.
     if profile.get("field_state") == "failure":
         bits.append("at failure")
+    # An at-failure capture the finite guard stopped early is a state the model
+    # passed through on its way out, not the mechanism the capture set out to
+    # reach, and the forces on it are whatever the runaway had reached at that
+    # iteration. So the title says the capture stopped instead of quoting a
+    # utilization and a verdict off it: a percentage carries no caveat, and
+    # "at capacity" read from a field that never settled would be a finding the
+    # run did not make.
+    if profile.get("capture_truncated"):
+        bits.append(CAPTURE_TRUNCATED_NOTE)
+        return " — ".join(b for b in bits if b)
     if util is not None and np.isfinite(util):
         bits.append(f"peak {util:.0%}")
     bits.append(profile.get("status", ""))
@@ -541,7 +570,18 @@ def plot_pile_detail(profile, fig=None, fit_height=True):
             # Two series in the panel, and neither is named by the axis label.
             ax_p.legend(loc="lower right", fontsize=7.5, framealpha=0.85)
         ratio = profile.get("reaction_ratio")
-        if ratio is not None:
+        if profile.get("capture_truncated"):
+            # The mobilized profile is drawn — where the soil pushes on the pile
+            # is the reading this panel exists for — but it was read off a
+            # capture that was stopped mid-runaway, so the peak it reaches is not
+            # a mobilization the model ever settled at and is not stated as a
+            # percentage of anything.
+            ax_p.text(0.5, 0.985, CAPTURE_TRUNCATED_NOTE,
+                      transform=ax_p.transAxes, fontsize=7.5, color=C_LIMIT,
+                      ha="center", va="top", zorder=8, linespacing=1.4,
+                      bbox=dict(facecolor="white", edgecolor="none", alpha=0.75,
+                                pad=1))
+        elif ratio is not None and np.isfinite(ratio):
             # The peak mobilization is the reading the comparison exists to
             # give, and it does not depend on the scale. Where the envelope it
             # is measured against did not land on the panel, the note says so
@@ -578,17 +618,17 @@ def plot_pile_detail(profile, fig=None, fit_height=True):
     # said nothing the shear-strain field did not say better (Norm 2026-08-25:
     # the band mark is drawn on neither reinforcement nor piles).
     for ax in axes:
-        if profile.get("max_moment_depth") is not None:
+        if _drawable(profile.get("max_moment_depth")):
             ax.axhline(profile["max_moment_depth"], color=C_PEAK, linewidth=0.8,
                        alpha=0.35, zorder=2)
-    if profile.get("max_moment") is not None:
+    if _drawable(profile.get("max_moment")):
         mm, md = profile["max_moment"], profile["max_moment_depth"]
         ax_m.plot([mm], [md], "o", color=C_PEAK, markersize=6,
                   markerfacecolor="none", markeredgewidth=1.6, zorder=7)
     # The largest shear is ringed on its own panel, at its own depth: the two
     # peaks a pile is checked at are read the same way or one of them is read
     # off the eye.
-    if profile.get("max_shear") is not None:
+    if _drawable(profile.get("max_shear")):
         vm, vd = profile["max_shear"], profile["max_shear_depth"]
         ax_v.plot([vm], [vd], "o", color=C_PEAK, markersize=6,
                   markerfacecolor="none", markeredgewidth=1.6, zorder=7)
@@ -599,14 +639,14 @@ def plot_pile_detail(profile, fig=None, fit_height=True):
     # The labels go on last, on the final layout: the moment panel is one of
     # four sharing a depth axis and is narrow, so where a label fits is a
     # question about the drawn panel and not about the moment.
-    if profile.get("max_shear") is not None:
+    if _drawable(profile.get("max_shear")):
         _annotate_inside(ax_v, (profile["max_shear"],
                                 profile["max_shear_depth"]),
                          f"Vmax {profile['max_shear']:,.0f}\n"
                          f"at {profile['max_shear_depth']:,.2f}"
                          f"{(' ' + u['length']) if u.get('length') else ''}",
                          C_PEAK, fontsize=8.0)
-    if profile.get("max_moment") is not None:
+    if _drawable(profile.get("max_moment")):
         _annotate_inside(ax_m, (profile["max_moment"],
                                 profile["max_moment_depth"]),
                          f"Mmax {profile['max_moment']:,.0f}\n"

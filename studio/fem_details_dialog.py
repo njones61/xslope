@@ -357,10 +357,23 @@ class FemDetailsDialog(QDialog):
         # reader meets these words, and a word with no gloss beside it is a
         # word they have to go and look up.
         from xslope.fem_details import reinforcement_state_meaning
-        self.status.setText(prof.get("status", ""))
-        meaning = reinforcement_state_meaning(prof.get("status_key"))
-        self.status.setToolTip(f"This {prof['kind']} line {meaning}."
-                               if meaning else "")
+        if prof.get("capture_truncated"):
+            # The at-failure field this panel is reading was stopped mid-runaway
+            # (see xslope.fem_details.capture_truncated), so the forces on it are
+            # not a state the model settled at and the verdict drawn from them is
+            # not one the run made. The figure says the same thing in its title;
+            # the two must not disagree over one field.
+            from xslope.plot_fem_details import CAPTURE_TRUNCATED_NOTE
+            self.status.setText(CAPTURE_TRUNCATED_NOTE)
+            self.status.setToolTip(
+                "The at-failure capture stopped before the mechanism finished "
+                "developing, so no utilization is stated for it. The converged "
+                "field is the one to read a verdict from.")
+        else:
+            self.status.setText(prof.get("status", ""))
+            meaning = reinforcement_state_meaning(prof.get("status_key"))
+            self.status.setToolTip(f"This {prof['kind']} line {meaning}."
+                                   if meaning else "")
 
     # --- export ----------------------------------------------------------
     def default_export_stem(self):

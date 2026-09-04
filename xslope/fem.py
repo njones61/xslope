@@ -114,6 +114,11 @@ def _extract_nodal_theta(disp, fem_data):
 _FEM_FAILURE_META_KEYS = (
     "F", "converged", "iterations", "max_displacement", "algorithm",
     "residual", "unbalanced_force_ratio", "plastic_fraction",
+    # Whether the capture was cut short of its iteration ceiling by the finite guard
+    # (see solve_fem's `_finite_guard`), and where and why. Carried across the file so
+    # a reloaded snapshot still discloses it: the panels that read a number off this
+    # field say the capture stopped early instead of quoting it flat.
+    "capture_truncated", "capture_truncated_at", "capture_truncated_reason",
 )
 
 # What a solve knows about itself that the node/element CSVs do not carry: did it
@@ -4102,6 +4107,24 @@ _CORRECTOR_YIELD_TOL = 1e-6
 # is also the threshold `_YIELD_FLAG_FRAC` already counts points against, so the gate
 # and the reading beside it say the same thing about the same state.
 _VP_YIELD_GATE = 1e-2
+# The displacement bound the at-failure capture solve is held inside, as a multiple of
+# the mesh height (see `_finite_guard`). That solve is the one place the displacement
+# cap and the early exit are both off, so its runaway has nothing to stop it before the
+# arithmetic overflows. Ten mesh heights is far past anything a mechanism figure can
+# use — the deformed mesh is drawn on a scaled field, and a slip surface is already
+# unmistakable at a fraction of one height — so a field beyond it carries no more
+# information about the mechanism and is only the last stop before NaN. The bound is
+# NOT a failure criterion and nothing reads a factor of safety off it; it is the point
+# past which the capture stops drawing.
+_FINITE_GUARD_U_FACTOR = 10.0
+# Iterations below which a truncated capture is treated as having shown nothing. The
+# capture starts from the elastic field and needs tens of iterations before the
+# plastic band is drawn at all — the converged trials on these models settle in ~300 —
+# so a capture the guard stops inside the first two dozen is an elastic picture with a
+# failure title, and solve_ssrm tries once more at half the margin instead.
+_CAPTURE_MIN_DEVELOPED = 25
+
+
 # The count reported beside the reading: Gauss points whose violation exceeds 1% of
 # the local strength available there. A CONVERGED viscoplastic state with points over
 # this is FLAGGED — the force gate cannot see a yield violation, because the
@@ -4237,7 +4260,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               fast_kernel='auto', failure_criterion="hybrid", k0=None,
               max_iterations_ceiling=50000, early_failure=True, _init_state=None,
               _softened_seed=None, fem_solver=None, _nr_export=None,
-              _nr_rescue_rungs=None, _nr_seed_first=False, _corrector=True):
+              _nr_rescue_rungs=None, _nr_seed_first=False, _corrector=True,
+              _finite_guard=False):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -4313,6 +4337,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             equilibrium has been observed to occupy, so no verdict moves; see
             `_early_failure`. Off for the at-failure capture solve, whose whole
             purpose is to let the mechanism develop.
+        _finite_guard (bool): INTERNAL, for the at-failure capture solve only.
+            That solve runs past the failure strength with the displacement cap and
+            the early exit deliberately off, so nothing else bounds its runaway: on
+            a model whose mechanism accelerates hard enough the arithmetic overflows
+            and the field it returns is NaN/inf, which no figure and no label can be
+            drawn from. With this on, the loop keeps the last finite iterate and
+            stops the moment the next one is not usable — a non-finite load vector,
+            a non-finite displacement solve, or a displacement past
+            `_FINITE_GUARD_U_FACTOR` times the mesh height, which no mechanism
+            figure needs to be bolder than. The state returned is the last finite
+            one, and the solution carries `capture_truncated`,
+            `capture_truncated_at` and `capture_truncated_reason` saying so. Off
+            (the default) the loop is exactly as it was, so every trial on every
+            other path is untouched.
         tolerance (float): Convergence tolerance ||du|| / ||u|| (default 1e-3).
             Normalized by the current displacement (Smith & Griffiths CHECON-style),
             so steady benign viscoplastic creep is accepted as converged; false
@@ -5353,6 +5391,22 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     budget = int(max_iterations)
     sq3 = np.sqrt(3.0)   # loop-invariant constant (hoisted out of the VP iteration)
 
+    # ---- the finite guard's state (see `_finite_guard`; off, all of this is dead) ----
+    # The displacement field and the accumulated viscoplastic strain are the whole
+    # state (the same pair `_k0_state` carries), so keeping one iteration's worth of
+    # both is enough to hand the post-processing a consistent field to report. The
+    # buffers are allocated once and written with np.copyto, so a snapshot costs one
+    # memcpy against an iteration that already does a sparse back-substitution.
+    guard_on = bool(_finite_guard)
+    guard_u_bound = (_FINITE_GUARD_U_FACTOR * mesh_height
+                     if guard_on and mesh_height > 0 else None)
+    u_safe = np.zeros(n_dof) if guard_on else None
+    evp_safe = ([np.zeros_like(grp['evp']) for grp in gp_groups]
+                if guard_on else None)
+    guard_have_safe = False        # a snapshot has been taken at least once
+    truncated_at = None            # iteration the guard stopped the solve at
+    truncated_reason = None        # which of its three tests fired
+
     for stage_idx, (base_loads, u_gp_active, u_gp_signed_active, stage_label) in enumerate(stage_list):
         if debug_level >= 1 and stage_label is not None:
             print(f"  {stage_label}")
@@ -5531,6 +5585,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     converged = False
                     iteration -= 1          # the last iteration actually performed
                     break
+            # The finite guard's snapshot of the state this iteration starts from.
+            # It is taken HERE, before the group loop mutates grp['evp'] in place, so
+            # the pair kept is (u, evp) as of the same iteration; a displacement from
+            # one iteration beside a plastic strain from the next would report a
+            # stress field neither of them has.
+            if guard_on:
+                np.copyto(u_safe, u)
+                for _buf, _grp in zip(evp_safe, gp_groups):
+                    np.copyto(_buf, _grp['evp'])
+                guard_have_safe = True
+
             # Build body load correction from accumulated viscoplastic strains
             _tp = time.perf_counter() if _PROF_ON else None
             loads = base_loads.copy()
@@ -5948,6 +6013,25 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                       f"p90={np.quantile(oob_node, 0.90):.2e} "
                       f"n>tol={n_hot}/{oob_node.size} ({100*n_hot/oob_node.size:.2f}%)")
 
+            # The finite guard, on the body load the runaway feeds itself with. The
+            # load vector is assembled from the stresses this iteration's group loop
+            # just read, so it is where an overflowing state shows up FIRST — before
+            # it reaches the factorization, which on a non-finite right-hand side
+            # either returns a non-finite field or raises out of the solve entirely.
+            if guard_on and not np.all(np.isfinite(loads)):
+                _guard_reason = 'non-finite internal load vector'
+                u = u_safe.copy()
+                for _buf, _grp in zip(evp_safe, gp_groups):
+                    np.copyto(_grp['evp'], _buf)
+                converged = False
+                exit_reason = 'nonfinite'
+                truncated_at = iteration
+                truncated_reason = _guard_reason
+                if debug_level >= 1:
+                    print(f"  At-failure capture stopped at iteration {iteration}: "
+                          f"{_guard_reason}; the last finite state is kept")
+                break
+
             # Solve K * u_new = loads
             loads_free = loads[free_dofs]
             _tp = time.perf_counter() if _PROF_ON else None
@@ -5957,6 +6041,36 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
 
             u_new = np.zeros(n_dof)
             u_new[free_dofs] = u_free_new
+
+            # The finite guard, on the field the solve just returned. Read BEFORE the
+            # convergence norms and before the displacement history is sampled, so no
+            # non-finite value ever enters a norm, a history or a verdict.
+            if guard_on and guard_have_safe:
+                _guard_reason = None
+                if not np.all(np.isfinite(u_free_new)):
+                    _guard_reason = 'non-finite displacement field'
+                elif guard_u_bound is not None and u_free_new.size:
+                    _peak = float(np.max(np.abs(u_free_new - u_datum_free)))
+                    if _peak > guard_u_bound:
+                        _guard_reason = (
+                            f"displacement {_peak:.3g} past "
+                            f"{_FINITE_GUARD_U_FACTOR:g} x mesh height "
+                            f"({guard_u_bound:.3g})")
+                if _guard_reason is not None:
+                    # Back to the state this iteration started from: that pair is
+                    # finite, and it is the last one both halves of the state agree on.
+                    u = u_safe.copy()
+                    for _buf, _grp in zip(evp_safe, gp_groups):
+                        np.copyto(_grp['evp'], _buf)
+                    converged = False
+                    exit_reason = 'nonfinite'
+                    truncated_at = iteration
+                    truncated_reason = _guard_reason
+                    if debug_level >= 1:
+                        print(f"  At-failure capture stopped at iteration "
+                              f"{iteration}: {_guard_reason}; the last finite state "
+                              f"is kept")
+                    break
 
             # Convergence check: max|du| / max|u| < tolerance — Smith & Griffiths'
             # CHECON test (infinity norms), exactly as in p62.f90. The max-norm
@@ -6547,6 +6661,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # what tells a reader the residual had stopped moving before the cap.
         "plateau_iteration": plateau_iter,
         "plateau_ratio": plateau_ratio,
+        # The finite guard (at-failure capture only, see `_finite_guard`): whether it
+        # stopped this solve, at which iteration, and on which of its tests. False and
+        # None on every other path, where the guard does not run.
+        "capture_truncated": bool(truncated_at is not None),
+        "capture_truncated_at": truncated_at,
+        "capture_truncated_reason": truncated_reason,
         # The early-failure rule: the iteration at which it fired and which of its
         # two tests fired, or None on any other exit (see _early_failure).
         "diverging_iteration": diverging_iter,
@@ -10536,6 +10656,35 @@ def _compose_ssr_zone_masks(fem_data, zones):
     return exclusion_mask, elastic_mask
 
 
+def _fields_finite(solution):
+    """True when every numeric field of a solve is free of NaN and inf.
+
+    The check a captured field has to pass before anything is drawn or measured from
+    it: one non-finite entry anywhere propagates through every peak, ratio and label
+    read off the field, and prints as 'nan' in the middle of a sentence about a pile.
+    """
+    if not isinstance(solution, dict):
+        return False
+    for key, val in solution.items():
+        if key.startswith("_") or isinstance(val, (bool, str, type(None))):
+            continue
+        if isinstance(val, dict):          # plastic_strains, keyed by element
+            vals = val.values()
+        elif isinstance(val, (list, tuple)):
+            vals = val
+        else:
+            vals = (val,)
+        for item in vals:
+            if isinstance(item, (bool, str, type(None))):
+                continue
+            arr = np.asarray(item)
+            if arr.dtype.kind not in "fc":
+                continue
+            if arr.size and not np.all(np.isfinite(arr)):
+                return False
+    return True
+
+
 def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, force_tol=1e-3,
                oob_window=10,
                max_iterations=12000, max_iterations_ceiling=50000,
@@ -10802,6 +10951,17 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             results are bit-identical to before. Default True (the figure path); pass
             False on bulk paths that never render the field (reliability, sensitivity)
             to skip the extra solve. Costs one additional non-converging solve per SSRM.
+
+            The capture is the one solve with nothing bounding it, so it is the one
+            that can run away numerically. It is made under solve_fem's
+            `_finite_guard`: the field returned is always finite, and where the guard
+            had to stop it the field carries `capture_truncated` (with
+            `capture_truncated_at` / `capture_truncated_reason`), which the detail
+            panels read and disclose in place of quoting a utilization off it. A
+            capture stopped in its first iterations has shown nothing, and is retried
+            ONCE at half the margin. Where no usable field comes back at all, the key
+            is ABSENT and result['capture_failed'] is set: every reader already falls
+            back to the last converged field and labels it as that.
         capture_margin (float): Proportional strength margin above the critical factor
             of safety at which the failure-state field is captured: F = FS x (1 +
             capture_margin), floored at the bracket's failed edge. A margin is needed
@@ -11218,53 +11378,116 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             and result.get("final_interval") is not None
             and result.get("FS") is not None):
         F_edge = result["final_interval"][1]
-        F_fail = max(F_edge, result["FS"] * (1.0 + capture_margin))
         cap_iters = capture_max_iterations or max(max_iterations, 3000)
-        if debug_level >= 1:
-            print(f"  Capturing at-failure mechanism: solve at F={F_fail:.3f} "
-                  f"(FS x {1.0 + capture_margin:.2f}, failed edge {F_edge:.3f}; cap off, "
-                  f"early-exit off, up to {cap_iters} iters)…")
-        try:
-            failure_solution = solve_fem(
-                fem_data_trials, F=F_fail, debug_level=max(0, debug_level - 1),
-                force_tol=force_tol, oob_window=oob_window, dt_scale=dt_scale,
-                max_iterations=cap_iters,
-                max_iterations_ceiling=cap_iters, tolerance=convergence_tol,
-                max_disp_factor=None,
-                tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
-                early_exit=False, early_failure=False,
-                ssr_exclude_mask=ssr_exclude_mask,
-                tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
-                elastic_mask=elastic_mask,
-                suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
-                _prepared=prep, _init_state=init_state,
-                # The corrector is OFF here and must stay off. This solve runs past
-                # the failure strength with the displacement cap and the early exit
-                # deliberately disabled, so that the mechanism develops for the
-                # figure; it is not asking whether the slope stands, and nothing may
-                # ever read a factor of safety off it. A corrector that certified an
-                # equilibrium on this path would replace the runaway field the figure
-                # exists to show.
-                _corrector=False,
-                _softened_seed=result.get("failed_edge_softened"))
-            result["failure_solution"] = failure_solution
+
+        def _capture_at(margin):
+            """One capture solve at FS x (1 + margin), floored at the failed edge.
+
+            Returns the field, or None where the solve raised. The finite guard is
+            ON: this is the only solve in the run with neither the displacement cap
+            nor the early exit to bound it, and on a model whose mechanism runs away
+            hard enough the arithmetic overflows partway through. What the figures
+            need is the developed mechanism, which is reached long before that; what
+            they cannot use is a NaN field.
+            """
+            F_try = max(F_edge, result["FS"] * (1.0 + margin))
             if debug_level >= 1:
-                print(f"    at-failure field: converged={failure_solution['converged']} "
-                      f"iters={failure_solution['iterations']} "
-                      f"max_disp={failure_solution['max_displacement']:.3g}")
+                print(f"  Capturing at-failure mechanism: solve at F={F_try:.3f} "
+                      f"(FS x {1.0 + margin:.2f}, failed edge {F_edge:.3f}; cap off, "
+                      f"early-exit off, up to {cap_iters} iters)…")
+            try:
+                sol = solve_fem(
+                    fem_data_trials, F=F_try, debug_level=max(0, debug_level - 1),
+                    force_tol=force_tol, oob_window=oob_window, dt_scale=dt_scale,
+                    max_iterations=cap_iters,
+                    max_iterations_ceiling=cap_iters, tolerance=convergence_tol,
+                    max_disp_factor=None,
+                    tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
+                    early_exit=False, early_failure=False,
+                    ssr_exclude_mask=ssr_exclude_mask,
+                    tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
+                    elastic_mask=elastic_mask,
+                    suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
+                    _prepared=prep, _init_state=init_state,
+                    # The corrector is OFF here and must stay off. This solve runs past
+                    # the failure strength with the displacement cap and the early exit
+                    # deliberately disabled, so that the mechanism develops for the
+                    # figure; it is not asking whether the slope stands, and nothing may
+                    # ever read a factor of safety off it. A corrector that certified an
+                    # equilibrium on this path would replace the runaway field the figure
+                    # exists to show.
+                    _corrector=False, _finite_guard=True,
+                    _softened_seed=result.get("failed_edge_softened"))
+            except Exception as exc:
+                # A failed capture must never sink a good FS result; the figure path
+                # simply falls back to last_solution when failure_solution is absent.
+                # (KeyboardInterrupt is a BaseException and still propagates.) The
+                # exception is NAMED: a capture that dies inside the linear solve on a
+                # non-finite right-hand side and one that dies on a missing key are
+                # different defects, and a bare "failed" line cannot tell them apart.
+                if debug_level >= 1:
+                    print(f"    at-failure capture failed ({type(exc).__name__}: "
+                          f"{exc}); continuing without it.")
+                return None
+            sol["capture_F"] = float(F_try)
+            sol["capture_margin"] = float(margin)
+            if debug_level >= 1:
+                print(f"    at-failure field: converged={sol['converged']} "
+                      f"iters={sol['iterations']} "
+                      f"max_disp={sol['max_displacement']:.3g}")
                 # The at-failure title no longer names the trial F (see _fs_title in
                 # plot_fem.py — "at Failure" already discloses the unconverged state);
                 # this line carries that detail into the log instead.
-                print(f"    failure snapshot: trial F={F_fail:.3f} "
-                      f"(margin {capture_margin:.2f}), "
-                      f"{failure_solution['iterations']} iterations, "
-                      f"max disp {failure_solution['max_displacement']:.3g}")
-        except Exception:
-            # A failed capture must never sink a good FS result; the figure path
-            # simply falls back to last_solution when failure_solution is absent.
-            # (KeyboardInterrupt is a BaseException and still propagates.)
+                print(f"    failure snapshot: trial F={F_try:.3f} "
+                      f"(margin {margin:.2f}), "
+                      f"{sol['iterations']} iterations, "
+                      f"max disp {sol['max_displacement']:.3g}")
+                if sol.get("capture_truncated"):
+                    print(f"    capture stopped early at iteration "
+                          f"{sol['capture_truncated_at']}: "
+                          f"{sol['capture_truncated_reason']}")
+            return sol
+
+        # A capture cut short in its first iterations has not shown a mechanism — the
+        # field is barely off the elastic seed it started from, and drawing it would
+        # say less than the converged field does. That is the one case worth a second
+        # attempt, at half the margin: the runaway is driven by how far past critical
+        # the trial strength sits, so a nearer trial develops the same mechanism more
+        # slowly and gets further before the guard stops it. Once, and no further —
+        # halving forever walks back to the critical strength, where the mechanism
+        # never develops at all.
+        failure_solution = _capture_at(capture_margin)
+        if (failure_solution is None
+                or (failure_solution.get("capture_truncated")
+                    and (failure_solution.get("capture_truncated_at") or 0)
+                    < _CAPTURE_MIN_DEVELOPED)):
             if debug_level >= 1:
-                print("    at-failure capture failed; continuing without it.")
+                print(f"    retrying the capture at half the margin "
+                      f"({0.5 * capture_margin:.3f})")
+            retry = _capture_at(0.5 * capture_margin)
+            if retry is not None and (failure_solution is None
+                                      or not retry.get("capture_truncated")
+                                      or ((retry.get("capture_truncated_at") or 0)
+                                          > (failure_solution.get(
+                                              "capture_truncated_at") or 0))):
+                failure_solution = retry
+
+        # Nothing may leave here holding a non-finite field. The guard above makes
+        # that unreachable by construction; this is the assertion that says so, and
+        # the one place a future path that skipped the guard would be caught. A
+        # capture that cannot be trusted is ABSENT, and absent is a state every
+        # reader already handles — the figures fall back to the last converged field
+        # and label it as that, which is true, where a snapshot titled "at failure"
+        # that is not the failure field would not be.
+        if failure_solution is not None and not _fields_finite(failure_solution):
+            if debug_level >= 1:
+                print("    at-failure capture returned a non-finite field; "
+                      "continuing without it.")
+            failure_solution = None
+        if failure_solution is not None:
+            result["failure_solution"] = failure_solution
+        else:
+            result["capture_failed"] = True
 
     elapsed = time.perf_counter() - t_start
     result["elapsed_time"] = elapsed

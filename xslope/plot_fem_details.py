@@ -227,6 +227,15 @@ BAND_LABEL = "Shear band crossing"
 #: of a limit and no capacity verdict is quoted off them.
 CAPTURE_TRUNCATED_NOTE = "capture stopped early"
 
+#: What a figure says when there is no at-failure capture to draw at all and the
+#: panel is standing on the last converged field instead (see
+#: :func:`xslope.fem_details.capture_failed`). The commonest cause is a capture
+#: that ran away — displacements marching out of the model — which is not a
+#: mechanism and is not published as one. The panel is honest about which field it
+#: is: the converged one, with no failure reading quoted off it.
+CAPTURE_FALLBACK_NOTE = "at-failure capture not available (runaway)"
+CAPTURE_FALLBACK_STATE = "last converged state"
+
 
 
 
@@ -274,6 +283,14 @@ def _title(profile):
     # Which field the profile was read from, disclosed the way the result plots
     # disclose it. Only the at-failure state is named: the converged field is
     # what a plain title has always meant.
+    # No capture to draw: the panel is the converged field, and says so in place of
+    # the failure state it was asked for. Nothing else is quoted — a utilization and
+    # a capacity verdict belong to the converged panel, which is one switch away and
+    # states them there without the reader having to know which field they came off.
+    if profile.get("capture_failed"):
+        bits.append(CAPTURE_FALLBACK_STATE)
+        bits.append(CAPTURE_FALLBACK_NOTE)
+        return " — ".join(b for b in bits if b)
     if profile.get("field_state") == "failure":
         bits.append("at failure")
     # An at-failure capture the finite guard stopped early is a state the model
@@ -570,7 +587,17 @@ def plot_pile_detail(profile, fig=None, fit_height=True):
             # Two series in the panel, and neither is named by the axis label.
             ax_p.legend(loc="lower right", fontsize=7.5, framealpha=0.85)
         ratio = profile.get("reaction_ratio")
-        if profile.get("capture_truncated"):
+        if profile.get("capture_failed"):
+            # The panel is the converged field standing in for a capture that could
+            # not be published; the title says which field this is, and the note
+            # here says the same rather than stating a mobilization the reader would
+            # take for the failure state's.
+            ax_p.text(0.5, 0.985, CAPTURE_FALLBACK_NOTE,
+                      transform=ax_p.transAxes, fontsize=7.5, color=C_LIMIT,
+                      ha="center", va="top", zorder=8, linespacing=1.4,
+                      bbox=dict(facecolor="white", edgecolor="none", alpha=0.75,
+                                pad=1))
+        elif profile.get("capture_truncated"):
             # The mobilized profile is drawn — where the soil pushes on the pile
             # is the reading this panel exists for — but it was read off a
             # capture that was stopped mid-runaway, so the peak it reaches is not

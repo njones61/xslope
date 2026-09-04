@@ -119,6 +119,11 @@ _FEM_FAILURE_META_KEYS = (
     # a reloaded snapshot still discloses it: the panels that read a number off this
     # field say the capture stopped early instead of quoting it flat.
     "capture_truncated", "capture_truncated_at", "capture_truncated_reason",
+    "capture_truncated_kind",
+    # And the other outcome: no capture was publishable at all, so this field is the
+    # last CONVERGED one standing in for it. Carried across the file for the same
+    # reason — a reloaded snapshot must not present itself as the failure state.
+    "capture_failed", "capture_failed_reason",
 )
 
 # What a solve knows about itself that the node/element CSVs do not carry: did it
@@ -5405,7 +5410,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 if guard_on else None)
     guard_have_safe = False        # a snapshot has been taken at least once
     truncated_at = None            # iteration the guard stopped the solve at
-    truncated_reason = None        # which of its three tests fired
+    truncated_reason = None        # which of its three tests fired, in words
+    truncated_kind = None          # 'non_finite' or 'displacement_bound'
 
     for stage_idx, (base_loads, u_gp_active, u_gp_signed_active, stage_label) in enumerate(stage_list):
         if debug_level >= 1 and stage_label is not None:
@@ -6020,6 +6026,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # either returns a non-finite field or raises out of the solve entirely.
             if guard_on and not np.all(np.isfinite(loads)):
                 _guard_reason = 'non-finite internal load vector'
+                _guard_kind = 'non_finite'
                 u = u_safe.copy()
                 for _buf, _grp in zip(evp_safe, gp_groups):
                     np.copyto(_grp['evp'], _buf)
@@ -6027,6 +6034,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 exit_reason = 'nonfinite'
                 truncated_at = iteration
                 truncated_reason = _guard_reason
+                truncated_kind = _guard_kind
                 if debug_level >= 1:
                     print(f"  At-failure capture stopped at iteration {iteration}: "
                           f"{_guard_reason}; the last finite state is kept")
@@ -6046,16 +6054,24 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # convergence norms and before the displacement history is sampled, so no
             # non-finite value ever enters a norm, a history or a verdict.
             if guard_on and guard_have_safe:
-                _guard_reason = None
+                _guard_reason = _guard_kind = None
                 if not np.all(np.isfinite(u_free_new)):
+                    # The field overflowed from a state that was still inside the
+                    # bound: the mechanism developed and the arithmetic gave out
+                    # late, so what is kept is a picture of that mechanism.
                     _guard_reason = 'non-finite displacement field'
+                    _guard_kind = 'non_finite'
                 elif guard_u_bound is not None and u_free_new.size:
                     _peak = float(np.max(np.abs(u_free_new - u_datum_free)))
                     if _peak > guard_u_bound:
+                        # The other kind: displacements marching out of the model
+                        # entirely. Nothing here is a mechanism anyone can read, and
+                        # solve_ssrm does not publish what this leg returns.
                         _guard_reason = (
                             f"displacement {_peak:.3g} past "
                             f"{_FINITE_GUARD_U_FACTOR:g} x mesh height "
                             f"({guard_u_bound:.3g})")
+                        _guard_kind = 'displacement_bound'
                 if _guard_reason is not None:
                     # Back to the state this iteration started from: that pair is
                     # finite, and it is the last one both halves of the state agree on.
@@ -6066,6 +6082,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     exit_reason = 'nonfinite'
                     truncated_at = iteration
                     truncated_reason = _guard_reason
+                    truncated_kind = _guard_kind
                     if debug_level >= 1:
                         print(f"  At-failure capture stopped at iteration "
                               f"{iteration}: {_guard_reason}; the last finite state "
@@ -6667,6 +6684,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         "capture_truncated": bool(truncated_at is not None),
         "capture_truncated_at": truncated_at,
         "capture_truncated_reason": truncated_reason,
+        # WHICH test stopped it, as a word a caller can decide on: 'non_finite' (the
+        # state overflowed from inside the bound — the mechanism is developed and the
+        # field is worth drawing) or 'displacement_bound' (the displacements left the
+        # model — a runaway, and not a mechanism anyone can read off).
+        "capture_truncated_kind": truncated_kind,
         # The early-failure rule: the iteration at which it fired and which of its
         # two tests fired, or None on any other exit (see _early_failure).
         "diverging_iteration": diverging_iter,
@@ -10656,6 +10678,49 @@ def _compose_ssr_zone_masks(fem_data, zones):
     return exclusion_mask, elastic_mask
 
 
+def _capture_publishable(solution):
+    """Whether a captured at-failure field may be drawn as the failure state.
+
+    A capture the finite guard did not have to stop is publishable, and so is one
+    it stopped on a NON-FINITE value: that field was still inside the displacement
+    bound when the arithmetic gave out, which means the mechanism had developed and
+    what is kept is a picture of it, merely stopped short.
+
+    A capture stopped on the DISPLACEMENT BOUND is not. Those displacements are
+    marching out of the model — hundreds of feet on a thirty-foot slope, with member
+    forces to match — and no figure drawn from that state and no number read off it
+    describes a mechanism. Ruled 2026-09-04: a runaway is not published as the
+    failure state; the panels fall back to the last converged field and say so.
+    """
+    if solution is None:
+        return False
+    if not solution.get("capture_truncated"):
+        return True
+    return solution.get("capture_truncated_kind") != "displacement_bound"
+
+
+def _capture_fallback(last_solution, reason):
+    """The last converged field, marked as standing in for a capture that failed.
+
+    The failure panels have to draw something and say what it is. This is that
+    something: the converged field itself, carrying ``capture_failed`` and the
+    reason, which every renderer and every detail panel reads to title itself the
+    last converged state rather than the failure state. Returns None where there is
+    no converged field to stand in — then the key is simply absent, which is the
+    state every reader already handles.
+    """
+    if not isinstance(last_solution, dict):
+        return None
+    field = dict(last_solution)
+    field["capture_failed"] = True
+    field["capture_failed_reason"] = str(reason)
+    # Never both: this field is not a truncated capture, it is the converged one.
+    for key in ("capture_truncated", "capture_truncated_at",
+                "capture_truncated_reason", "capture_truncated_kind"):
+        field.pop(key, None)
+    return field
+
+
 def _fields_finite(solution):
     """True when every numeric field of a solve is free of NaN and inf.
 
@@ -10956,12 +11021,21 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             that can run away numerically. It is made under solve_fem's
             `_finite_guard`: the field returned is always finite, and where the guard
             had to stop it the field carries `capture_truncated` (with
-            `capture_truncated_at` / `capture_truncated_reason`), which the detail
-            panels read and disclose in place of quoting a utilization off it. A
-            capture stopped in its first iterations has shown nothing, and is retried
-            ONCE at half the margin. Where no usable field comes back at all, the key
-            is ABSENT and result['capture_failed'] is set: every reader already falls
-            back to the last converged field and labels it as that.
+            `capture_truncated_at`, `capture_truncated_reason` and
+            `capture_truncated_kind`). A capture stopped in its first iterations has
+            shown nothing, and is retried ONCE at half the margin.
+
+            What is PUBLISHED as the failure state is then a decision, not whatever
+            came back (see `_capture_publishable`). A capture the guard stopped on a
+            non-finite value is published — it was inside the displacement bound, so
+            the mechanism had developed and the field is a picture of it — and the
+            panels disclose that it stopped early. A capture stopped on the
+            DISPLACEMENT BOUND is a runaway and is NOT published. In that case, and
+            wherever no capture came back at all, result['capture_failed'] and
+            result['capture_failed_reason'] are set and result['failure_solution']
+            carries the LAST CONVERGED field flagged `capture_failed`: the failure
+            panels draw it and title themselves the last converged state, rather than
+            presenting a runaway, or nothing, as the failure of the slope.
         capture_margin (float): Proportional strength margin above the critical factor
             of safety at which the failure-state field is captured: F = FS x (1 +
             capture_margin), floored at the bracket's failed edge. A margin is needed
@@ -11474,20 +11548,41 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
 
         # Nothing may leave here holding a non-finite field. The guard above makes
         # that unreachable by construction; this is the assertion that says so, and
-        # the one place a future path that skipped the guard would be caught. A
-        # capture that cannot be trusted is ABSENT, and absent is a state every
-        # reader already handles — the figures fall back to the last converged field
-        # and label it as that, which is true, where a snapshot titled "at failure"
-        # that is not the failure field would not be.
+        # the one place a future path that skipped the guard would be caught.
+        capture_reason = None
         if failure_solution is not None and not _fields_finite(failure_solution):
+            capture_reason = "the at-failure capture returned a field that is not a number"
             if debug_level >= 1:
                 print("    at-failure capture returned a non-finite field; "
-                      "continuing without it.")
+                      "falling back to the last converged state.")
             failure_solution = None
+        elif failure_solution is None:
+            capture_reason = "the at-failure capture solve did not complete"
+        elif not _capture_publishable(failure_solution):
+            # A runaway. It is finite, and the guard did its job stopping it, but
+            # the state it stopped at is displacements marching out of the model —
+            # not a mechanism, and not something to draw under a failure title.
+            capture_reason = (
+                f"the at-failure capture ran away and was stopped at iteration "
+                f"{failure_solution.get('capture_truncated_at')} "
+                f"({failure_solution.get('capture_truncated_reason')})")
+            if debug_level >= 1:
+                print(f"    at-failure capture ran away "
+                      f"({failure_solution.get('capture_truncated_reason')}); it is "
+                      f"NOT published — the failure panels fall back to the last "
+                      f"converged state and say so.")
+            failure_solution = None
+
         if failure_solution is not None:
             result["failure_solution"] = failure_solution
         else:
+            # The failure panels still have a field to draw, and it is the converged
+            # one, flagged and named as such wherever it is drawn or measured.
             result["capture_failed"] = True
+            result["capture_failed_reason"] = capture_reason
+            fallback = _capture_fallback(result.get("last_solution"), capture_reason)
+            if fallback is not None:
+                result["failure_solution"] = fallback
 
     elapsed = time.perf_counter() - t_start
     result["elapsed_time"] = elapsed

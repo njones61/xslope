@@ -357,7 +357,16 @@ class FemDetailsDialog(QDialog):
         # reader meets these words, and a word with no gloss beside it is a
         # word they have to go and look up.
         from xslope.fem_details import reinforcement_state_meaning
-        if prof.get("capture_truncated"):
+        if prof.get("capture_failed"):
+            # There is no at-failure field: this panel is the last converged one,
+            # standing in because the capture ran away or never finished. The figure
+            # title says exactly that; this line does not contradict it with a
+            # verdict the failure state never produced.
+            from xslope.plot_fem_details import (CAPTURE_FALLBACK_NOTE,
+                                                 CAPTURE_FALLBACK_STATE)
+            self.status.setText(f"{CAPTURE_FALLBACK_STATE} — {CAPTURE_FALLBACK_NOTE}")
+            self.status.setToolTip(str(prof.get("capture_failed")))
+        elif prof.get("capture_truncated"):
             # The at-failure field this panel is reading was stopped mid-runaway
             # (see xslope.fem_details.capture_truncated), so the forces on it are
             # not a state the model settled at and the verdict drawn from them is

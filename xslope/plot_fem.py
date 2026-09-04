@@ -46,6 +46,24 @@ def _fem_cbar_label(fem_data, base, unit_key):
 _DENSE_TANGLE_EDGE_PX = 9.0
 
 
+#: What a result panel says when it was asked for the at-failure field and there is
+#: none to draw — the capture ran away, or did not complete — so the panel is the
+#: last converged field instead. Named on the panel because a figure that quietly
+#: substitutes one field for another is a figure a reader cannot check.
+CAPTURE_FALLBACK_TITLE = "last converged state — at-failure capture not available (runaway)"
+
+
+def _fallback_clause(solution, title):
+    """``title``, naming the field where a failure panel stands on the converged one.
+
+    Panels drawing the real at-failure capture are untouched — the clause is added
+    only where ``plot_fem_results`` marked the field a stand-in.
+    """
+    if solution.get("_capture_fallback", False):
+        return f"{title} — {CAPTURE_FALLBACK_TITLE}"
+    return title
+
+
 def _fs_title(base, F, fs=None, at_failure=False):
     """Result-panel title that keeps the SSRM factor of safety and the rendered
     viscoplastic state unambiguous.
@@ -803,7 +821,15 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     # captured field there's nothing to switch to — ``solution`` (the converged field)
     # serves as both states, so field_state becomes a no-op (automatic fallback).
     if failure_solution is not None:
-        failure_field = {**failure_solution, "_at_failure": True}
+        # A field carrying `capture_failed` is NOT the failure state: it is the last
+        # converged field, standing in because the capture could not be published —
+        # the usual reason being that it ran away, which is not a mechanism (see
+        # xslope.fem.solve_ssrm). It is drawn, and every panel titles it for what it
+        # is rather than "at Failure".
+        _fallback = bool(failure_solution.get("capture_failed"))
+        failure_field = {**failure_solution,
+                         "_at_failure": not _fallback,
+                         "_capture_fallback": _fallback}
         if fs is not None:
             failure_field["_ssrm_fs"] = fs
     else:
@@ -1171,7 +1197,7 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
     title = 'Displacement Magnitude Contours'
     if solution.get("_at_failure", False):
         title += ' at Failure'
-    ax.set_title(title)
+    ax.set_title(_fallback_clause(solution, title))
 
 
 def _get_mesh_boundary(fem_data):
@@ -1465,7 +1491,8 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
              else 'Displacement Vectors')
     # at_failure when the panel is drawing the captured unconverged field (routed here
     # by plot_fem_results): leads with FS; "at Failure" already discloses the state.
-    title = _fs_title(title, F, solution.get("_ssrm_fs"),
+    title = _fs_title(_fallback_clause(solution, title), F,
+                      solution.get("_ssrm_fs"),
                       at_failure=solution.get("_at_failure", False))
     ax.set_title(title, fontsize=12, pad=15)
 
@@ -1573,7 +1600,7 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
     title = 'von Mises Stress (Red outline = Yielding/Plastic Elements)'
     if solution.get("_at_failure", False):
         title += ' at Failure'
-    ax.set_title(title)
+    ax.set_title(_fallback_clause(solution, title))
 
 
 def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
@@ -1706,7 +1733,8 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     # The at-failure field is the UNCONVERGED state, solved a margin beyond critical to
     # develop the mechanism; _fs_title(at_failure=...) leads with FS — "at Failure"
     # already carries the disclosure, so no trial-F clause.
-    title = _fs_title(base, F, solution.get("_ssrm_fs"), at_failure=at_failure)
+    title = _fs_title(_fallback_clause(solution, base), F,
+                      solution.get("_ssrm_fs"), at_failure=at_failure)
     ax.set_title(title, fontsize=12, pad=15)
 
 
@@ -2522,7 +2550,8 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     # at_failure when plot_fem_results routed this panel onto the at-failure field
     # (field_state='failure', the default): leads with FS, matching the
     # deformation/displace_vector panels so the figure tells one story.
-    title = _fs_title(title, F, solution.get("_ssrm_fs"), at_failure=at_failure)
+    title = _fs_title(_fallback_clause(solution, title), F,
+                      solution.get("_ssrm_fs"), at_failure=at_failure)
     ax.set_title(title, fontsize=12, pad=15)
     return mappable, reinf_cbar_specs
 
@@ -2694,7 +2723,7 @@ def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_re
     title = 'Yield Function (Red: F>0 Yielding/Plastic, Blue: F<0 Elastic)'
     if solution.get("_at_failure", False):
         title += ' at Failure'
-    ax.set_title(title, fontsize=12, pad=15)
+    ax.set_title(_fallback_clause(solution, title), fontsize=12, pad=15)
     
     # Add statistics to the plot
     n_yielding = np.sum(yield_function > 0)

@@ -105,8 +105,16 @@ def failure_snapshot(solution, failure_solution=None):
 
 
 def has_failure_state(solution, failure_solution=None):
-    """True when there is an at-failure snapshot to read profiles from."""
-    return failure_snapshot(solution, failure_solution) is not None
+    """True when there is an at-failure snapshot to read profiles from.
+
+    A snapshot flagged ``capture_failed`` does not count: it is the last CONVERGED
+    field standing in for a capture that could not be published (see
+    :func:`capture_failed`), so a run carrying one has no failure state, and
+    everything that gates on this — the results view's field-state control, the
+    report's sentence about which field its plots are drawn from — says so.
+    """
+    snap = failure_snapshot(solution, failure_solution)
+    return snap is not None and not snap.get("capture_failed")
 
 
 def capture_truncated(solution, failure_solution=None):
@@ -122,6 +130,22 @@ def capture_truncated(solution, failure_solution=None):
     """
     snap = failure_snapshot(solution, failure_solution)
     return bool(snap.get("capture_truncated")) if snap else False
+
+
+def capture_failed(solution, failure_solution=None):
+    """The reason no at-failure capture could be published, or None.
+
+    Where the capture solve ran away — displacements marching out of the model
+    rather than a mechanism — or did not complete at all, what is carried under
+    ``failure_solution`` is the LAST CONVERGED field standing in for it (see
+    :func:`xslope.fem.solve_ssrm`). It is a real field and it is drawn, but it is
+    not the failure state, and every panel that draws it says so instead of
+    titling itself "at failure".
+    """
+    snap = failure_snapshot(solution, failure_solution)
+    if not snap or not snap.get("capture_failed"):
+        return None
+    return snap.get("capture_failed_reason") or "the at-failure capture is not available"
 
 
 def field_solution(solution, field_state="converged", failure_solution=None):
@@ -817,6 +841,14 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         # not the developed mechanism, and the figure says so beside the numbers.
         "capture_truncated": (state == "failure"
                               and capture_truncated(solution, failure_solution)),
+        # Set where the "failure" selection is standing on the last CONVERGED field
+        # because no capture could be published: the panel is drawn, and titled for
+        # what it is.
+        # Read on the state the caller ASKED for, not the one it got: a panel that
+        # was asked for the failure state and is showing the converged field is
+        # exactly the case that has to be named on the figure.
+        "capture_failed": (capture_failed(solution, failure_solution)
+                           if field_state == "failure" else None),
         "peak_s": float(s[peak_i]) if peak_i is not None else None,
         "peak_T": float(T[peak_i]) if peak_i is not None else None,
         "peak_utilization": peak_util,
@@ -1237,6 +1269,14 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         # not the developed mechanism, and the figure says so beside the numbers.
         "capture_truncated": (state == "failure"
                               and capture_truncated(solution, failure_solution)),
+        # Set where the "failure" selection is standing on the last CONVERGED field
+        # because no capture could be published: the panel is drawn, and titled for
+        # what it is.
+        # Read on the state the caller ASKED for, not the one it got: a panel that
+        # was asked for the failure state and is showing the converged field is
+        # exactly the case that has to be named on the figure.
+        "capture_failed": (capture_failed(solution, failure_solution)
+                           if field_state == "failure" else None),
         "peak_utilization": None,
         "badge": "none", "status": "no results", "utilization_basis": None,
         "units": units,
@@ -1401,6 +1441,14 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         # not the developed mechanism, and the figure says so beside the numbers.
         "capture_truncated": (state == "failure"
                               and capture_truncated(solution, failure_solution)),
+        # Set where the "failure" selection is standing on the last CONVERGED field
+        # because no capture could be published: the panel is drawn, and titled for
+        # what it is.
+        # Read on the state the caller ASKED for, not the one it got: a panel that
+        # was asked for the failure state and is showing the converged field is
+        # exactly the case that has to be named on the figure.
+        "capture_failed": (capture_failed(solution, failure_solution)
+                           if field_state == "failure" else None),
         "peak_utilization": util,
         "utilization_basis": basis,
         "badge": _badge(util),

@@ -505,13 +505,15 @@ Spencer's 1.587 and the elastic-perfectly-plastic 1.559.
 Where the cost comes from is plain in the two solutions. Without a residual, a
 layer that reaches its 800 lb/ft keeps carrying it, and at the
 elastic-perfectly-plastic answer lines 3, 4 and 5 are doing exactly that. With a
-residual, a layer that reaches 800 lb/ft drops to 600 and the slope loses part
-of it, so the slope only stands as long as no layer has reached capacity. At the
-peak-residual answer none has: the largest force on any line is 781 lb/ft, on
-line 2, and every layer is held by its bond. One step stronger reduction and the
-first layer would reach 800, drop, and end the run. That is the whole 0.023: the
-residual does not weaken the layers, it ends the slope's standing at the first
-rupture instead of letting ruptured layers keep working.
+residual, a layer that reaches 800 lb/ft drops to 600 and its lost load has to
+be picked up by the soil and the other layers; the solver redistributes it and
+checks whether the slope still stands. At the peak-residual answer no layer has
+ruptured yet: the largest force on any line is 781 lb/ft, on line 2, and every
+layer is held by its bond. One step stronger reduction and the first layer
+reaches 800 and drops — and on this slope the redistribution cannot be carried:
+lines 3, 4 and 5 follow it down and the trial fails. That cascade is the whole
+0.023. The residual does not weaken the layers; it means the first rupture is
+the last one this slope can afford.
 
 ### What changed in the results, and what did not
 

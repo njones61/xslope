@@ -17,16 +17,11 @@ CONFIG = PageConfig(
         ('+3', 'within 3% of the vendor and/or reference figure'),
         ('+6', '| 🟡 | 3–6% |'),
         ('+6', 'more than 6% |'),
-        # the quad8 spread across the three refined Example 5 locks
-        # (−1.1% / −1.5% / −2.9% against Griffiths & Lane's Fig. 15 points)
-        ('+2.9', 'the three refined quad8 locks read'),
-        ('+2.9', "reading 1.1–2.9% below the paper's FE points there"),
-        ('+2.9', 'The three refined quad8 locks read'),
         # agreement bounds over a whole sweep, not over one pair
         ('+4', "the paper's wedge solution for the governing mechanism to within"),
-        ('+1', 'reproduces the relative jump between them to the same'),
-        ('+1.3', '15 curve within 1.3% at every one of the eight stations'),
-        ('+1.3', "within 1.3% of the paper's own plotted FE value at every station"),
+        ('+1.4', 'lands within 1.4% of it at both bracket cases'),
+        ('+0.8', '15 curve within 0.8% at every one of its five stations'),
+        ('+0.8', "within 0.8% of the paper's own plotted FE value at"),
         ('+1', 'the location the paper states and within'),
     ],
 

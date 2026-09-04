@@ -1159,16 +1159,13 @@ def build_fem_ssrm_case(test):
     # every lock on this corpus was produced before the corrector shipped. Absent
     # -> the solver's own default, 'auto'.
     #
-    # This exists for one situation and should not be reached for any other. A
-    # verification section states measurements BESIDE its locked value that no tag
-    # covers — a mesh sweep, a depth-cutoff sweep, a variant transcription, a
-    # comparison on the vendor's own mesh — and those move with the answer. Where
-    # such a companion has no committed producer, re-locking the row alone would
-    # leave the section printing companions that no longer belong to the value
-    # beside them. Pinning the row keeps the page true to the driver it was
-    # measured on, bit for bit, until a producer exists for its companions and the
-    # section can be re-measured whole. Every pinned row is listed with its blocker
-    # in SPIKE.md, "HELD ROWS — producers needed".
+    # NO ROW IN THE CORPUS USES THIS, and adding one needs a reason that is not
+    # "the answer moved". It exists as an escape hatch for reproducing a value the
+    # plain viscoplastic loop produced — an investigation, a bisection against the
+    # old driver — not as a way to hold a page still. Twenty-two rows were pinned
+    # with it during the hybrid solver's application round, because their sections
+    # printed companion measurements no tag covered; the standing rule is that such
+    # companions are trimmed or given tags of their own, and the rows re-locked.
     if 'solver' in test:
         kwargs['fem_solver'] = str(test['solver']).strip()
     if 'char_x' in test and 'char_y' in test:

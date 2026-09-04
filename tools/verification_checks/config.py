@@ -119,6 +119,16 @@ class PageConfig:
     #: fires is reported, like a dead delta exemption.
     tag_exempt: List[Tuple[str, str]] = field(default_factory=list)
 
+    # -------------------------------------------------------------- untagged
+    #: Factor-of-safety-shaped numbers a section prints that no tag locks and
+    #: no source column carries, and that are legitimate anyway: a strength
+    #: ratio, a stability number, a published quantity quoted only in prose.
+    #: Each entry is ``(the number as printed, distinctive substring of its
+    #: line)``, so the allowance names the line it excuses, and one that never
+    #: fires is reported dead like every other exemption.  It is NOT the place
+    #: to park a companion measurement — those are trimmed, or given a tag.
+    untagged_allow: List[Tuple[str, str]] = field(default_factory=list)
+
     #: Regex naming the values a summary row presents as locked, for the
     #: reverse sweep (every locked value must have a tag behind it).  ``None``
     #: disables the reverse sweep on pages that carry no dotted summary table.

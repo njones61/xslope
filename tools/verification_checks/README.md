@@ -67,6 +67,25 @@ citation URL cannot fire. Where a page genuinely needs a banned phrase,
 `voice_allow` names it — `(phrase, distinctive substring of the line)`, both
 required, and an allowance that never fires is reported dead.
 
+**Untagged numbers** (`untagged.py`). A section prints three kinds of number
+that carry an argument: the factor of safety a tag locks, the value the source
+published, and the comparison between them. Anything else shaped like a factor
+of safety — a mesh-sweep row, a depth-cutoff row, a with/without variant, a
+reading taken off a field at the critical strength — is a companion measurement
+that nothing regenerates and nothing defends when a lock moves. The check reads
+each section and reports every factor-of-safety-shaped number that is neither
+within the tolerance of a tag the section carries (its own, a page-level bank
+tag naming a file the section links, or another page's tag on that same file)
+nor printed in a column whose header names the source. Inputs, dimensions,
+percentages, figure and section numbers, code, math and link targets are taken
+out of the running first.
+
+It **reports and returns zero** while `untagged.ENFORCING` is False. Each flag
+is a sentence someone has to read — a companion measurement to trim, a number
+worth a tag of its own, or a quantity that only looks like a factor of safety
+and belongs in `untagged_allow`. Enforcing it before that reading is done would
+push the pages toward blanket allowances, which is the opposite of the point.
+
 **Figures** (`figures.py`). Two modes, chosen per page.
 
 * `panel` — the panel layout is read directly off the PNG (an ink-profile test
@@ -97,6 +116,7 @@ python -m tools.verification_checks.deltas docs/verification/rs2.md
 python -m tools.verification_checks.tags docs/verification/rs2.md
 python -m tools.verification_checks.figures docs/verification/rs2.md
 python -m tools.verification_checks.voice docs/verification/rs2.md
+python -m tools.verification_checks.untagged docs/verification/rs2.md
 ```
 
 ## The recertify workflow
@@ -140,6 +160,11 @@ the page, not a way to silence the checker, so:
   banned word. Say which of the four groups the phrase is in and why this line
   is not that. Adding one because the lint complained, without reading the
   sentence, is the failure the dead-allowance report exists to prevent.
+* **`untagged_allow` names a number that only looks like a factor of safety** —
+  a strength ratio, a stability number, a published quantity quoted in prose
+  rather than tabulated. `(the number as printed, distinctive substring of its
+  line)`. It is not a place to park a companion measurement: those are trimmed,
+  or given a tag of their own.
 * **`tag_exempt` names a coverage lock the page deliberately does not print** —
   a tag that exercises a code path rather than backing a published number. The
   page normally says so in prose; quote that reason in the comment.

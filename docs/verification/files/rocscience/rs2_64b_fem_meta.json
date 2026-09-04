@@ -1,12 +1,12 @@
 {
   "benchmark": "RS2-64b",
   "analysis": "ssrm",
-  "FS": 6.486328125,
-  "expected_fs": "6.486",
+  "FS": 6.564453125,
+  "expected_fs": "6.564",
   "file": "files/rocscience/rs2_64b.xlsx",
   "unit_system": "si",
-  "converged": false,
-  "iterations": 16000,
-  "residual": 3.3300383746062443e-06,
-  "max_displacement": 0.007226701083648255
+  "converged": true,
+  "iterations": 339,
+  "residual": 5.6929435275222816e-06,
+  "max_displacement": 0.2195875090757002
 }

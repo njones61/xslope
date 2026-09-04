@@ -1,12 +1,12 @@
 {
   "benchmark": "RS2-40-deep",
   "analysis": "ssrm",
-  "FS": 1.45234375,
-  "expected_fs": "1.452",
+  "FS": 1.5210937500000001,
+  "expected_fs": "1.521",
   "file": "files/rocscience/vp077b.xlsx",
   "unit_system": "imperial",
   "converged": true,
-  "iterations": 14432,
-  "residual": 5.371814639057907e-05,
-  "max_displacement": 3.5617328524686402
+  "iterations": 397,
+  "residual": 0.000405362303218104,
+  "max_displacement": 1.6713088323196281
 }

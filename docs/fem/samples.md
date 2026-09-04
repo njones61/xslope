@@ -48,18 +48,13 @@ FEM mesh with boundary conditions and reinforcement elements (red lines):
 
 ![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.50**. The companion LEM analysis
+SSRM results. The computed factor of safety is **FS = 1.53**. The companion LEM analysis
 gives **FS = 1.59** by Spencer's method (see [LEM sample problem 9](../lem/samples.md)),
 and the FEM reads below it. This is a *peak-residual* run: $T_{res}$ = 600 lb/ft is filled
 in, so a reinforcement element that reaches its full tensile capacity sheds to that
 residual, while the LEM has no strain compatibility and simply applies the full envelope
 value at each crossing (it ignores $T_{res}$ entirely — see
 [LEM Reinforcement](../lem/reinforcement.md)).
-
-Blank out $T_{res}$ and the same model runs elastic-perfectly-plastic at **FS = 1.559**, so
-post-peak behavior accounts for 0.062 of the 0.090 that separates the two engines here. The
-rest is the difference between prescribing the reinforcement force at one crossing point and
-letting it emerge from displacement compatibility along the whole line.
 
 The plots below show the solution at the computed factor of safety. The
 top plot shows the deformed mesh with original and deformed reinforcement positions. The
@@ -77,22 +72,7 @@ and how many have dropped to the residual capacity — together with the line's 
 vocabulary [The state of a line](reinforcement.md#the-state-of-a-line) sets out and the
 Studio panel and the report use.
 
-<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.497, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.1, f_max=1.9, max_iter=16000, solver=viscoplastic -->
-
-At the last trial that reaches equilibrium, $F$ = 1.494, the reinforcement is heavily
-mobilized but has not yet lost anything. Every line has one element inside a
-pullout ramp ($L_p$ = 4 ft from each end) sitting at the 200 lb/ft its embedment can develop
-and slipping there, which is what makes all six lines read **pullout**. The greatest force
-anywhere is 783 lb/ft, just short of $T_{max}$, and nothing has softened.
-
-One trial higher, at $F$ = 1.500, the slope never finds equilibrium again: elements reach
-$T_{max}$ = 800 lb/ft and shed to $T_{res}$ = 600 lb/ft, hand their load to their neighbors,
-more of them yield, and the run ends in non-convergence. Six elements make that drop — two
-each on lines 3 and 4, 11 and 13 ft along them, one on line 5 at 11 ft and one on line 6 at
-9 ft — and the at-failure field above carries them, drawn magenta on the residual. That is
-the mechanism the factor of safety brackets — not the pullout
-zones, which go on carrying what they were carrying, but the loss of tensile capacity in the
-middle of lines 3 through 6 where the failure surface crosses them.
+<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.534, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.1, f_max=1.9, max_iter=16000 -->
 
 ### 2. Slope Stabilized with Drilled Shaft Piles
 

@@ -39,8 +39,6 @@ CONFIG = PageConfig(
         ('+3.0', 'one count in the last place', '0.34', '0.33'),
         ('+23.2', 'GEO FEM reads 23.2% above', '1.17', '0.95'),
         ('+11.3', 'above PLAXIS on #58 case 3', '0.59', '0.53'),
-        ('+11.6', 'overshoots all', '7.836', '7.02'),
-        ('+12.6', 'overshoots all', '7.836', '6.96'),
         ('+4.2', "the paper's 2.5 × 10⁻⁵", '2.605', '2.5'),
     ],
 
@@ -63,7 +61,6 @@ CONFIG = PageConfig(
     # factors: no pair exists to re-derive, so each is named here explicitly.
     bounds=[
         ('+7', 'the two published factors differ by up to 7%'),
-        ('+5', 'neither mesh is within 5%'),
         ('−2.0', '`RS2 SSRM 1.33'),
         ('+4.2', 'lighter by section area'),
         ('+1.8', "the polygon's area is within"),
@@ -74,7 +71,6 @@ CONFIG = PageConfig(
         ('+25', 'by 25% at 5 kPa'),
         ('+43', 'by 43% at 1 kPa'),
         ('+3', 'worth ~2–3% here'),
-        ('+0.25', 'to within 0.25%'),
         ('+39.2', 'larger than the Mohr-Coulomb corridor'),
         ('+3.5', 'Every case lands within 3.5% of unity'),
         ('+1.6', 'stages land within 1.6%'),

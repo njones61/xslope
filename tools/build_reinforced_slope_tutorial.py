@@ -128,10 +128,17 @@ def _bases():
 
 def _model():
     """The tutorial model: the LEM-8 slope carrying the FEM sample's elastic
-    constants, with the FEM-only reinforcement columns still blank."""
+    constants and tensile cutoff, with the FEM-only reinforcement columns still
+    blank.
+
+    ``t_cut`` travels with E and nu because it is the third FEM-only material
+    property, and it is carried onto the STARTER as well as the completed file:
+    the reader enters E and nu, never a cutoff, so leaving it blank there would
+    put the unbounded-tension warning back on the first run of the page.
+    """
     lem, fem = _bases()
     for m, fm in zip(lem["materials"], fem["materials"]):
-        m["E"], m["nu"] = fm["E"], fm["nu"]
+        m["E"], m["nu"], m["t_cut"] = fm["E"], fm["nu"], fm["t_cut"]
     for r in lem["reinforcement_lines"]:
         r["t_res"] = float("nan")
         r["E"] = float("nan")

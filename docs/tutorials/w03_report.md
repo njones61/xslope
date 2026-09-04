@@ -136,7 +136,7 @@ records that each searched for a surface of its own.
 | Seepage | attached to the file | 1.925 ft³/day per ft |
 | Bishop's Simplified Method | searched by the report | 1.222 |
 | Spencer's method | the search we ran | 1.248 |
-| Strength reduction | attached to the file | 1.230 |
+| Strength reduction | attached to the file | 1.233 |
 
 <!-- test: file=files/xslope_johnson_res_solved.xlsx, type=circular_search, method=bishop, num_slices=40, expected_fs=1.222, tolerance=0.005 -->
 
@@ -171,7 +171,7 @@ sums, 475756 and 389345, and prints the 1.222 they give.
   1.248, with §4.4 *Factors of Safety* comparing them. A method missing means its
   box was never ticked.
 - **The seepage and finite element sections state the attached solutions'
-  numbers**, 1.925 ft³/day per ft and 1.230. Numbers that differ mean something
+  numbers**, 1.925 ft³/day per ft and 1.233. Numbers that differ mean something
   was solved again.
 - **The traceability stamp names the file the numbers came from**, with its
   SHA-256 digest. A digest that does not match the workbook means the report

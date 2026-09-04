@@ -227,6 +227,25 @@ BAND_LABEL = "Shear band crossing"
 #: of a limit and no capacity verdict is quoted off them.
 CAPTURE_TRUNCATED_NOTE = "capture stopped early"
 
+
+def capture_stop_note(profile):
+    """What a panel says about the capture it is drawing, or "".
+
+    A capture the guard stopped is the mechanism — the state the slope was in a
+    few iterations into coming apart — so its readings are quoted as readings.
+    What the note adds is where that state was taken: the iteration, and whether
+    the solve was stopped because the section was running away or because the
+    arithmetic gave out. Both are facts about the state, not caveats around it.
+    """
+    stop = profile.get("capture_stop")
+    if not stop:
+        return CAPTURE_TRUNCATED_NOTE if profile.get("capture_truncated") else ""
+    at, kind, _max_u = stop
+    why = "runaway" if kind == "runaway" else "not a number"
+    if at is None:
+        return CAPTURE_TRUNCATED_NOTE
+    return f"capture stopped at iteration {at} ({why})"
+
 #: What a figure says when there is no at-failure capture to draw at all and the
 #: panel is standing on the last converged field instead (see
 #: :func:`xslope.fem_details.capture_failed`). The commonest cause is a capture
@@ -293,16 +312,14 @@ def _title(profile):
         return " — ".join(b for b in bits if b)
     if profile.get("field_state") == "failure":
         bits.append("at failure")
-    # An at-failure capture the finite guard stopped early is a state the model
-    # passed through on its way out, not the mechanism the capture set out to
-    # reach, and the forces on it are whatever the runaway had reached at that
-    # iteration. So the title says the capture stopped instead of quoting a
-    # utilization and a verdict off it: a percentage carries no caveat, and
-    # "at capacity" read from a field that never settled would be a finding the
-    # run did not make.
+    # Where the capture was stopped, named right after the state it names. The
+    # readings follow it: the mechanism is what the panel is drawing, and its
+    # forces are the forces at the state the guard stopped on — quoted, with the
+    # iteration they belong to standing beside them.
     if profile.get("capture_truncated"):
-        bits.append(CAPTURE_TRUNCATED_NOTE)
-        return " — ".join(b for b in bits if b)
+        note = capture_stop_note(profile)
+        if note:
+            bits.append(note)
     if util is not None and np.isfinite(util):
         bits.append(f"peak {util:.0%}")
     bits.append(profile.get("status", ""))
@@ -597,17 +614,6 @@ def plot_pile_detail(profile, fig=None, fit_height=True):
                       ha="center", va="top", zorder=8, linespacing=1.4,
                       bbox=dict(facecolor="white", edgecolor="none", alpha=0.75,
                                 pad=1))
-        elif profile.get("capture_truncated"):
-            # The mobilized profile is drawn — where the soil pushes on the pile
-            # is the reading this panel exists for — but it was read off a
-            # capture that was stopped mid-runaway, so the peak it reaches is not
-            # a mobilization the model ever settled at and is not stated as a
-            # percentage of anything.
-            ax_p.text(0.5, 0.985, CAPTURE_TRUNCATED_NOTE,
-                      transform=ax_p.transAxes, fontsize=7.5, color=C_LIMIT,
-                      ha="center", va="top", zorder=8, linespacing=1.4,
-                      bbox=dict(facecolor="white", edgecolor="none", alpha=0.75,
-                                pad=1))
         elif ratio is not None and np.isfinite(ratio):
             # The peak mobilization is the reading the comparison exists to
             # give, and it does not depend on the scale. Where the envelope it
@@ -619,6 +625,11 @@ def plot_pile_detail(profile, fig=None, fit_height=True):
             said = f"peak {ratio:.0%} of limit"
             if not in_frame and np.isfinite(lo_lim):
                 said += f"\nIto & Matsui limit off scale (≥ {lo_lim:,.0f})"
+            # The mobilization is a reading of the state the panel is drawing, and
+            # that state has a name: the iteration the capture was stopped at.
+            _stop = capture_stop_note(profile)
+            if _stop:
+                said += f"\n{_stop}"
             ax_p.text(0.5, 0.985, said,
                       transform=ax_p.transAxes, fontsize=7.5, color=C_LIMIT,
                       ha="center", va="top", zorder=8, linespacing=1.4,

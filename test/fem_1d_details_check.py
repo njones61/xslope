@@ -1428,12 +1428,20 @@ def test_the_pile_is_read_at_every_node_it_stands_on():
 
 _RUNAWAY = {}
 
-#: The trial strength and iteration budget the runaway is measured at. The
-#: strength is well past the sample's own factor of safety, as the capture's
-#: always is; the budget is half the capture's own default of 3,000, which is
-#: where this model's unguarded field first goes non-finite.
-_RUNAWAY_F = 2.0
+#: The trial strength and iteration budget the runaway is measured at. The strength
+#: is the capture's own — a 15% margin past this sample's factor of safety, which is
+#: what solve_ssrm captures at — so what the checks below read is the solve the
+#: figures are actually drawn from. The budget is half the capture's own default of
+#: 3,000, which is where this model's unguarded field first goes non-finite.
+_RUNAWAY_F = 1.55
 _RUNAWAY_ITERS = 1600
+#: How far past the last converged field the stopped capture may stand, on this
+#: sample. The band is wide because the number is a property of the model and not of
+#: the rule: the classifier stops on the SHAPE of the runaway, and how far the
+#: section has moved by the time that shape is unmistakable depends on how fast this
+#: slope comes apart. Measured here at 24x, and on FEM-3's tip-fixed rows — the
+#: specimen this stands in for — at 44x the field at full strength.
+_RUNAWAY_U_RATIO_MAX = 60.0
 
 
 def _runaway():
@@ -1460,7 +1468,12 @@ def _capture_solve(guard, iterations=_RUNAWAY_ITERS):
     """One capture-shaped solve on the runaway sample: the displacement cap off,
     the early exit off, the early-failure rule off, and a generous budget — the
     settings solve_ssrm gives its at-failure capture, with the finite guard the
-    only thing that differs between the two legs."""
+    only thing that differs between the two legs.
+
+    The guarded leg is the capture as solve_ssrm makes it: the runaway classifier
+    armed, which is what ends it, with the guard underneath. The unguarded leg is
+    the capture as it shipped — neither — which is the defect being measured.
+    """
     import warnings
     from xslope.fem import solve_fem
     _slope_data, fem_data = _runaway()
@@ -1474,7 +1487,27 @@ def _capture_solve(guard, iterations=_RUNAWAY_ITERS):
                                  max_iterations=iterations,
                                  max_iterations_ceiling=iterations,
                                  max_disp_factor=None, early_exit=False,
-                                 early_failure=False, _finite_guard=guard)
+                                 early_failure=bool(guard),
+                                 _finite_guard=guard)
+
+
+def _mesh_height():
+    """The runaway sample's mesh height."""
+    _slope_data, fem_data = _runaway()
+    nodes = np.asarray(fem_data["nodes"], float)
+    return float(np.max(nodes[:, 1]) - np.min(nodes[:, 1]))
+
+
+def _converged_field():
+    """A converged solve on the runaway sample — the field the capture's bound is
+    measured against, standing in for solve_ssrm's last converged trial."""
+    if "converged" not in _RUNAWAY:
+        from xslope.fem import solve_fem
+        _slope_data, fem_data = _runaway()
+        with contextlib.redirect_stdout(io.StringIO()):
+            _RUNAWAY["converged"] = solve_fem(fem_data, F=1.0, debug_level=0,
+                                              max_iterations=400)
+    return _RUNAWAY["converged"]
 
 
 def _non_finite_fields(solution):
@@ -1527,13 +1560,19 @@ def test_the_capture_stops_before_it_stops_being_a_number():
                      "stopped at")
     if not held.get("capture_truncated_reason"):
         fails.append("the guarded capture does not say why it stopped")
+    if held.get("capture_truncated_kind") is None:
+        fails.append("the guarded capture does not say WHICH test stopped it")
+    if held.get("capture_truncated_max_u") is None:
+        fails.append("the guarded capture does not say how far the section had "
+                     "moved when it was stopped")
     peak = float(np.nanmax(np.abs(np.asarray(held["displacements"], float))))
     if peak > bound:
         fails.append(f"the guarded capture returned a field at max|u| = "
-                     f"{peak:.3g}, past its own bound of {bound:.3g} "
-                     f"({_FINITE_GUARD_U_FACTOR:g} x the mesh height)")
-    if held.get("capture_truncated_kind") is None:
-        fails.append("the guarded capture does not say WHICH test stopped it")
+                     f"{peak:.3g}, past the mesh-height fence {bound:.3g}")
+    if held.get("capture_truncated_kind") != "runaway":
+        fails.append(f"the capture was stopped on "
+                     f"{held.get('capture_truncated_kind')!r}, not by the runaway "
+                     f"classifier that is supposed to end it")
     if held["iterations"] >= _RUNAWAY_ITERS:
         fails.append(f"the guarded capture ran its whole budget "
                      f"({held['iterations']} iterations): it did not stop at "
@@ -1541,34 +1580,50 @@ def test_the_capture_stops_before_it_stops_being_a_number():
     return fails
 
 
-def test_capture_guard_mutation():
-    """A mutation that lifts the guard's bound must be caught.
+def test_the_non_finite_backstop_holds_on_its_own():
+    """With every displacement bound lifted, the guard still returns a number.
 
-    The bound is the leg that fires on the specimen: the field is still finite
-    when it is crossed, and the arithmetic overflows some hundreds of iterations
-    later. With it lifted the solve runs on into the overflow, and what it can
-    still return is a field many orders of magnitude past the model — which is
-    what the size test above exists to refuse.
+    The displacement bound is what stops a capture at the state its mechanism is
+    readable in, and on every model it fires first. Underneath it sits the reason
+    the guard exists at all: the tests on the load vector and on the solved field,
+    which catch a solve whose arithmetic gives out. This runs the same capture with
+    both bounds removed, so only that backstop is left holding it.
     """
     fails = []
     import xslope.fem as fem
-    real = fem._FINITE_GUARD_U_FACTOR
+    real_signal, real_factor = fem._early_failure, fem._FINITE_GUARD_U_FACTOR
+    fem._early_failure = lambda *a, **k: None
     fem._FINITE_GUARD_U_FACTOR = float("inf")
+    held = None
     try:
-        # A raise counts as caught: with the bound lifted this model's field
-        # grows until the post-processing's own scalar arithmetic overflows, and
-        # a capture that dies in an exception is as unusable as one that returns
-        # NaN. Either way the mutation did not slip through.
-        try:
-            caught = bool(test_the_capture_stops_before_it_stops_being_a_number())
-        except Exception:
-            caught = True
-        if not caught:
-            fails.append("the capture check passes with the guard's "
-                         "displacement bound lifted — it does not actually "
-                         "hold the returned field to the model's own scale")
+        held = _capture_solve(guard=True)
+    except Exception as exc:
+        # Allowed, and it is why the displacement bound is the operative one: a
+        # state kept this deep into the overflow carries stresses the reporting
+        # pass cannot cube, so the solve raises on its way out. solve_ssrm already
+        # handles a capture that raises — it falls back to the converged field and
+        # says so. What must never happen is the other thing.
+        raised = f"{type(exc).__name__}: {exc}"
+    else:
+        raised = None
     finally:
-        fem._FINITE_GUARD_U_FACTOR = real
+        fem._early_failure = real_signal
+        fem._FINITE_GUARD_U_FACTOR = real_factor
+    if held is not None:
+        bad = _non_finite_fields(held)
+        if bad:
+            fails.append(f"with the displacement bounds lifted the guard returned "
+                         f"non-finite {', '.join(bad)}: the backstop is not "
+                         f"holding, and this is the defect it exists for")
+        if not held.get("capture_truncated"):
+            fails.append("with the displacement bounds lifted the capture ran its "
+                         "whole budget and reported nothing about it")
+        elif held.get("capture_truncated_kind") != "non_finite":
+            fails.append(f"the backstop reports "
+                         f"{held.get('capture_truncated_kind')!r}, not the "
+                         f"arithmetic it caught")
+    elif raised is None:
+        fails.append("the solve neither returned a field nor raised")
     return fails
 
 
@@ -1605,53 +1660,31 @@ def test_the_guard_does_not_touch_a_solve_that_behaves():
     return fails
 
 
-def test_a_truncated_capture_is_stated_and_not_quoted():
-    """The panels drawn from a truncated capture say so and quote no number
-    off it.
+def test_no_label_prints_nan():
+    """No panel prints the word nan, on any field it can be handed.
 
-    A capture stopped mid-runaway carries whatever forces the field had reached
-    at that iteration. They are finite and the profile is drawn — the shape of
-    the mechanism is what the panel is for — but a utilization, a capacity
-    verdict, or a percentage of the Ito & Matsui limit read off them would be a
-    reading the run never made. And nowhere, on any field, may a label print the
-    word nan.
+    The guard makes a non-finite capture unreachable; this is the sweep that says
+    the labels do not depend on it. A converged profile states its readings and
+    says nothing about a capture; a profile with a hole knocked in the series
+    states no mobilization rather than one that is not a number.
     """
     fails = []
     from xslope import fem_details as fd
-    from xslope.plot_fem_details import CAPTURE_TRUNCATED_NOTE
+    from xslope.plot_fem_details import capture_stop_note
 
     slope_data, fem_data, solution = _solved(PILES_XLSX)
-    held = _capture_solve(guard=True)
-    profile = fd.pile_profile(fem_data, solution, 0, slope_data=slope_data,
-                              field_state="failure", failure_solution=held)
-    if not profile.get("capture_truncated"):
-        fails.append("a profile read from a truncated capture does not carry "
-                     "the flag saying so")
-    fig = _drawn(profile, figsize=(11.0, 6.0))
-    said = " ".join(t.get_text() for ax in fig.axes for t in ax.texts)
-    said += " " + " ".join(t.get_text() for t in fig.texts)
-    if CAPTURE_TRUNCATED_NOTE not in said:
-        fails.append(f"nothing on the figure says the capture stopped early: "
-                     f"{said!r}")
-    if "of limit" in said:
-        fails.append(f"the soil-reaction panel quotes a mobilization off a "
-                     f"capture that was cut short: {said!r}")
-    if "nan" in said.lower():
-        fails.append(f"a label printed nan: {said!r}")
-
-    # The converged field, on the same model, is unaffected: it says nothing
-    # about a capture and states its percentage as it always has.
     plain = fd.pile_profile(fem_data, solution, 0, slope_data=slope_data)
-    if plain.get("capture_truncated"):
-        fails.append("a profile read from the converged field claims a "
-                     "truncated capture")
-    plain_said = " ".join(t.get_text() for ax in _drawn(plain, figsize=(11.0, 6.0)).axes
+    if plain.get("capture_truncated") or capture_stop_note(plain):
+        fails.append("a profile read from the converged field claims a capture")
+    plain_said = " ".join(t.get_text()
+                          for ax in _drawn(plain, figsize=(11.0, 6.0)).axes
                           for t in ax.texts)
-    if CAPTURE_TRUNCATED_NOTE in plain_said:
-        fails.append("the converged profile is labeled as a stopped capture")
+    if "capture stopped" in plain_said:
+        fails.append(f"the converged profile is labeled as a stopped capture: "
+                     f"{plain_said!r}")
+    if "nan" in plain_said.lower():
+        fails.append(f"a label printed nan: {plain_said!r}")
 
-    # And a field that somehow arrives with a hole in it states no percentage
-    # rather than printing one that is not a number.
     holed = dict(plain)
     reaction = np.asarray(plain["reaction"], float).copy()
     if reaction.size:
@@ -1664,79 +1697,126 @@ def test_a_truncated_capture_is_stated_and_not_quoted():
         if ratio is not None and not np.isfinite(ratio):
             fails.append("a mobilization read off a field with a hole in it is "
                          "reported as nan")
-        holed_said = " ".join(t.get_text() for ax in _drawn(holed, figsize=(11.0, 6.0)).axes
+        holed_said = " ".join(t.get_text()
+                              for ax in _drawn(holed, figsize=(11.0, 6.0)).axes
                               for t in ax.texts)
         if "nan" in holed_said.lower():
             fails.append(f"a label printed nan: {holed_said!r}")
     return fails
 
 
+def test_a_stopped_capture_is_published_and_named():
+    """A capture the guard stopped IS the mechanism, and the panels name where it
+    was stopped.
 
-def _fallback_field():
-    """``(converged solution, the fallback field solve_ssrm would attach)``.
-
-    Built through the shipping code — :func:`xslope.fem._capture_fallback` is what
-    solve_ssrm calls when no capture may be published — so the checks below read
-    the same field the panels will.
-    """
-    from xslope.fem import _capture_fallback
-    _slope_data, _fem_data, solution = _solved(PILES_XLSX)
-    held = _capture_solve(guard=True)
-    reason = (f"the at-failure capture ran away and was stopped at iteration "
-              f"{held.get('capture_truncated_at')} "
-              f"({held.get('capture_truncated_reason')})")
-    return solution, _capture_fallback(solution, reason)
-
-
-def test_a_runaway_capture_is_not_published():
-    """A capture the guard stopped on the displacement bound is not drawn as the
-    failure state, and what stands in its place says which field it is.
-
-    The specimen's runaway reaches hundreds of feet of displacement on a
-    thirty-foot slope, with member forces to match. It is finite — the guard sees
-    to that — but it is not a mechanism, and a figure titled "at Failure" drawn
-    from it would state a collapse the run never computed. So the failure panels
-    fall back to the last converged field and are titled for it, in the results
-    view and in the 1D detail panels alike (ruled 2026-09-04).
+    The bound is a multiple of what the section moved at the last strength it
+    stood at, so the state kept is a few iterations into the collapse — measured
+    on FEM-3's tip-fixed rows, a coherent toe mechanism at 11x the converged
+    displacement, two iterations before the same solve blows up. So it is drawn,
+    its readings are quoted, and every panel says which iteration they were read
+    at (ruled 2026-09-04, revised).
     """
     fails = []
     import xslope.fem as fem
+    from xslope import fem_details as fd
+    from xslope.plot_fem_details import capture_stop_note
+
+    converged = _converged_field()
+    held = _capture_solve(guard=True)
+    u_conv = float(np.max(np.abs(np.asarray(converged["displacements"], float))))
+    u_held = float(np.max(np.abs(np.asarray(held["displacements"], float))))
+
+    if not fem._capture_publishable(held):
+        fails.append("a capture the guard stopped is refused; only a capture that "
+                     "came back with nothing should be")
+    if held.get("capture_truncated_kind") != "runaway":
+        fails.append(f"the runaway sample's capture was stopped on "
+                     f"{held.get('capture_truncated_kind')!r}, not on the "
+                     f"displacement bound — the specimen has moved")
+    # The band the mechanism is readable in: past the converged field, and nowhere
+    # near the arithmetic. Both halves matter — a capture that stops AT the
+    # converged displacement has not shown a collapse, and one at a tenth of the
+    # model's height is no longer showing this model.
+    if not (u_conv < u_held <= _RUNAWAY_U_RATIO_MAX * u_conv):
+        fails.append(f"the stopped capture stands at max|u| {u_held:.3g} against a "
+                     f"converged {u_conv:.3g} ({u_held / max(u_conv, 1e-30):.1f}x), "
+                     f"past {_RUNAWAY_U_RATIO_MAX:g}x: outside the band the "
+                     f"mechanism is readable in")
+    if u_held > 0.1 * _mesh_height():
+        fails.append(f"the stopped capture stands at max|u| {u_held:.3g}, past a "
+                     f"tenth of the mesh height ({0.1 * _mesh_height():.3g})")
+
+    slope_data, fem_data, solution = _solved(PILES_XLSX)
+    profile = fd.pile_profile(fem_data, solution, 0, slope_data=slope_data,
+                              field_state="failure", failure_solution=held)
+    note = capture_stop_note(profile)
+    if "capture stopped at iteration" not in note or "runaway" not in note:
+        fails.append(f"the panel's note does not name the stop: {note!r}")
+    if str(held.get("capture_truncated_at")) not in note:
+        fails.append(f"the note does not carry the iteration the capture was "
+                     f"stopped at: {note!r}")
+    fig = _drawn(profile, figsize=(11.0, 6.0))
+    said = " ".join(t.get_text() for ax in fig.axes for t in ax.texts)
+    said += " " + " ".join(t.get_text() for t in fig.texts)
+    if note not in said:
+        fails.append(f"the pile panel does not say where its state was taken: "
+                     f"{said!r}")
+    if "at failure" not in said.lower():
+        fails.append(f"the pile panel does not name the state it is drawing: "
+                     f"{said!r}")
+    if "of limit" not in said:
+        fails.append(f"the pile panel quotes no mobilization off a state it is "
+                     f"drawing: {said!r}")
+    if "nan" in said.lower():
+        fails.append(f"a label printed nan: {said!r}")
+
+    # The results view carries the same clause, and still names the failure state.
+    import matplotlib.figure as mplfig
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from xslope.plot_fem import plot_fem_results
+    fig = mplfig.Figure(figsize=(5.0, 3.0))
+    FigureCanvasAgg(fig)
+    with contextlib.redirect_stdout(io.StringIO()):
+        plot_fem_results(fem_data, solution, plot_type=["shear_strain"], fig=fig,
+                         fs=1.0, failure_solution=held, field_state="failure")
+    titles = " | ".join(ax.get_title() for ax in fig.axes if ax.get_title())
+    if "capture stopped at iteration" not in titles:
+        fails.append(f"the result panel does not say where its state was taken: "
+                     f"{titles!r}")
+    if "at Failure" not in titles:
+        fails.append(f"the result panel no longer names the failure state: "
+                     f"{titles!r}")
+    return fails
+
+
+def test_a_capture_that_came_back_with_nothing_falls_back():
+    """The one refusal left: no usable field at all.
+
+    Then the failure panels stand on the last converged field, flagged, and say
+    so rather than presenting a mechanism the run never computed.
+    """
+    fails = []
+    from xslope.fem import _capture_fallback, _capture_publishable
     from xslope import fem_details as fd
     from xslope.plot_fem import CAPTURE_FALLBACK_TITLE
     from xslope.plot_fem_details import (CAPTURE_FALLBACK_NOTE,
                                          CAPTURE_FALLBACK_STATE)
 
-    held = _capture_solve(guard=True)
-    if held.get("capture_truncated_kind") != "displacement_bound":
-        fails.append(f"the runaway sample's capture was stopped on "
-                     f"{held.get('capture_truncated_kind')!r}, not on the "
-                     f"displacement bound — the specimen has moved")
-    if fem._capture_publishable(held):
-        fails.append("a capture stopped on the displacement bound is published as "
-                     "the failure state")
-    # The other kind stays publishable: a field that overflowed from inside the
-    # bound is a developed mechanism, stopped short.
-    if not fem._capture_publishable(dict(held, capture_truncated_kind="non_finite")):
-        fails.append("a capture stopped on a non-finite value is refused; only a "
-                     "runaway is")
-
-    solution, fallback = _fallback_field()
+    if _capture_publishable(None):
+        fails.append("a capture that never came back is published")
+    slope_data, fem_data, solution = _solved(PILES_XLSX)
+    fallback = _capture_fallback(solution, "the at-failure capture solve did not "
+                                           "complete")
     if fallback is None or not fallback.get("capture_failed"):
         return fails + ["the stand-in field does not carry capture_failed"]
-    if not fallback.get("capture_failed_reason"):
-        fails.append("the stand-in field does not say why there is no capture")
-    if fallback.get("capture_truncated"):
-        fails.append("the stand-in field presents itself as a truncated capture")
     if not np.array_equal(np.asarray(fallback["displacements"], float),
                           np.asarray(solution["displacements"], float)):
         fails.append("the stand-in field is not the last converged field")
+    if fd.has_failure_state(solution, fallback):
+        fails.append("a stand-in field counts as an at-failure state")
 
-    # The 1D panels: titled for the field they are, quoting nothing off a capture.
-    profile = fd.pile_profile(fem_data_of(PILES_XLSX), solution, 0,
-                              slope_data=slope_data_of(PILES_XLSX),
+    profile = fd.pile_profile(fem_data, solution, 0, slope_data=slope_data,
                               field_state="failure", failure_solution=fallback)
-    if not profile.get("capture_failed"):
-        fails.append("a profile read from the stand-in field does not know it")
     fig = _drawn(profile, figsize=(11.0, 6.0))
     said = " ".join(t.get_text() for ax in fig.axes for t in ax.texts)
     said += " " + " ".join(t.get_text() for t in fig.texts)
@@ -1744,77 +1824,62 @@ def test_a_runaway_capture_is_not_published():
         fails.append(f"the pile panel does not say which field it is drawing: "
                      f"{said!r}")
     if "at failure" in said.lower():
-        fails.append(f"the pile panel calls the converged field the failure state: "
-                     f"{said!r}")
-    if "of limit" in said or "peak " in said.lower():
-        fails.append(f"the pile panel quotes a failure-state reading it does not "
-                     f"have: {said!r}")
-    if "nan" in said.lower():
-        fails.append(f"a label printed nan: {said!r}")
+        fails.append(f"the pile panel calls the converged field the failure "
+                     f"state: {said!r}")
 
-    # The results view: the same field, the same disclosure, on the panel titles.
     import matplotlib.figure as mplfig
     from matplotlib.backends.backend_agg import FigureCanvasAgg
     from xslope.plot_fem import plot_fem_results
-    for panel in ("shear_strain", "deformation"):
-        fig = mplfig.Figure(figsize=(5.0, 3.0))
-        FigureCanvasAgg(fig)
-        with contextlib.redirect_stdout(io.StringIO()):
-            plot_fem_results(fem_data_of(PILES_XLSX), solution, plot_type=[panel],
-                             fig=fig, fs=1.0, failure_solution=fallback,
-                             field_state="failure")
-        titles = [ax.get_title() for ax in fig.axes if ax.get_title()]
-        joined = " | ".join(titles)
-        if CAPTURE_FALLBACK_TITLE not in joined:
-            fails.append(f"the {panel} panel does not say it is the last converged "
-                         f"state: {joined!r}")
-        if "at Failure" in joined:
-            fails.append(f"the {panel} panel is titled at Failure over the "
-                         f"converged field: {joined!r}")
+    fig = mplfig.Figure(figsize=(5.0, 3.0))
+    FigureCanvasAgg(fig)
+    with contextlib.redirect_stdout(io.StringIO()):
+        plot_fem_results(fem_data, solution, plot_type=["shear_strain"], fig=fig,
+                         fs=1.0, failure_solution=fallback, field_state="failure")
+    titles = " | ".join(ax.get_title() for ax in fig.axes if ax.get_title())
+    if CAPTURE_FALLBACK_TITLE not in titles or "at Failure" in titles:
+        fails.append(f"the result panel does not say it is the last converged "
+                     f"state: {titles!r}")
     return fails
 
 
-def test_runaway_publication_mutation():
-    """A mutation that publishes the runaway must be caught."""
+def test_early_stop_mutation():
+    """Disarming the early stop must be caught.
+
+    The runaway classifier is what ends a capture. With it disarmed the solve runs
+    on into the arithmetic, and what it can still return stands orders of magnitude
+    past the section — which is what the band above exists to refuse.
+    """
     fails = []
     import xslope.fem as fem
-    real = fem._capture_publishable
-    fem._capture_publishable = lambda solution: True
+    real = fem._early_failure
+    fem._early_failure = lambda *a, **k: None
     try:
         try:
-            caught = bool(test_a_runaway_capture_is_not_published())
+            caught = bool(test_a_stopped_capture_is_published_and_named())
         except Exception:
             caught = True
         if not caught:
-            fails.append("the runaway check passes with every capture declared "
-                         "publishable — it does not actually hold the decision")
+            fails.append("the stopped-capture check passes with the early stop "
+                         "disarmed — it does not actually hold the state the "
+                         "panels are drawn from")
     finally:
-        fem._capture_publishable = real
+        fem._early_failure = real
     return fails
 
 
-def fem_data_of(path):
-    """The prepared model for one sample (the cached solve's own)."""
-    return _solved(path)[1]
-
-
-def slope_data_of(path):
-    """The slope data for one sample (the cached solve's own)."""
-    return _solved(path)[0]
-
-
 CHECKS = [
-    ("a runaway capture is not published as the failure state",
-     test_a_runaway_capture_is_not_published),
-    ("the runaway publication decision is load-bearing",
-     test_runaway_publication_mutation),
+    ("a stopped capture is published and named",
+     test_a_stopped_capture_is_published_and_named),
+    ("a capture that came back with nothing falls back",
+     test_a_capture_that_came_back_with_nothing_falls_back),
+    ("the early stop is load-bearing", test_early_stop_mutation),
     ("the capture stops before it stops being a number",
      test_the_capture_stops_before_it_stops_being_a_number),
-    ("the capture guard is load-bearing", test_capture_guard_mutation),
+    ("the non-finite backstop holds on its own",
+     test_the_non_finite_backstop_holds_on_its_own),
     ("the guard leaves a well-behaved solve alone",
      test_the_guard_does_not_touch_a_solve_that_behaves),
-    ("a truncated capture is stated, not quoted",
-     test_a_truncated_capture_is_stated_and_not_quoted),
+    ("no label prints nan", test_no_label_prints_nan),
     ("the reaction panel says where its limit is",
      test_the_reaction_panel_says_where_its_limit_is),
     ("the inset follows the selection", test_the_inset_follows_the_selection),

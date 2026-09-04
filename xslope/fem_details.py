@@ -118,18 +118,34 @@ def has_failure_state(solution, failure_solution=None):
 
 
 def capture_truncated(solution, failure_solution=None):
-    """True when the at-failure snapshot was cut short of its iteration ceiling.
+    """True when the at-failure snapshot was stopped short of its iteration ceiling.
 
-    The capture solve is the one solve in a strength reduction run with neither
-    the displacement cap nor the early exit to bound it, so on a model whose
-    mechanism accelerates hard enough it is stopped at the last state that was
-    still finite (see :func:`xslope.fem.solve_fem`'s ``_finite_guard``). The
-    field it returns is a real, finite state of the model and the profiles read
-    from it are real, but it is not the fully developed mechanism the capture set
-    out to reach, and every panel that quotes a number off it says so.
+    The capture solve runs past the failure strength with nothing but the finite
+    guard to bound it, and on a slope that is coming apart the guard stops it a
+    few iterations in — at a multiple of what the slope moved at the last
+    strength it stood at, which is where the mechanism is readable (see
+    :func:`xslope.fem.solve_fem`'s ``_finite_guard``). That state IS the
+    mechanism the figure exists to show. What it is not is a state the slope
+    settled at, so every panel drawn from it names the iteration it was stopped
+    at and why, beside the numbers rather than instead of them.
     """
     snap = failure_snapshot(solution, failure_solution)
     return bool(snap.get("capture_truncated")) if snap else False
+
+
+def capture_stop(solution, failure_solution=None):
+    """``(iteration, kind, max_u)`` for a stopped capture, or None.
+
+    The three facts a panel needs to name the state it is drawing: the iteration
+    the guard stopped the solve at, which of its tests fired, and how far the
+    section had moved by then.
+    """
+    snap = failure_snapshot(solution, failure_solution)
+    if not snap or not snap.get("capture_truncated"):
+        return None
+    return (snap.get("capture_truncated_at"),
+            snap.get("capture_truncated_kind") or "runaway",
+            snap.get("capture_truncated_max_u"))
 
 
 def capture_failed(solution, failure_solution=None):
@@ -841,6 +857,11 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         # not the developed mechanism, and the figure says so beside the numbers.
         "capture_truncated": (state == "failure"
                               and capture_truncated(solution, failure_solution)),
+        # Where it was stopped and why, so the panel can name it rather than
+        # gesturing at it: iteration, kind ('runaway' or 'non_finite'), and the
+        # displacement the kept state stood at.
+        "capture_stop": (capture_stop(solution, failure_solution)
+                         if state == "failure" else None),
         # Set where the "failure" selection is standing on the last CONVERGED field
         # because no capture could be published: the panel is drawn, and titled for
         # what it is.
@@ -1269,6 +1290,11 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         # not the developed mechanism, and the figure says so beside the numbers.
         "capture_truncated": (state == "failure"
                               and capture_truncated(solution, failure_solution)),
+        # Where it was stopped and why, so the panel can name it rather than
+        # gesturing at it: iteration, kind ('runaway' or 'non_finite'), and the
+        # displacement the kept state stood at.
+        "capture_stop": (capture_stop(solution, failure_solution)
+                         if state == "failure" else None),
         # Set where the "failure" selection is standing on the last CONVERGED field
         # because no capture could be published: the panel is drawn, and titled for
         # what it is.
@@ -1441,6 +1467,11 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         # not the developed mechanism, and the figure says so beside the numbers.
         "capture_truncated": (state == "failure"
                               and capture_truncated(solution, failure_solution)),
+        # Where it was stopped and why, so the panel can name it rather than
+        # gesturing at it: iteration, kind ('runaway' or 'non_finite'), and the
+        # displacement the kept state stood at.
+        "capture_stop": (capture_stop(solution, failure_solution)
+                         if state == "failure" else None),
         # Set where the "failure" selection is standing on the last CONVERGED field
         # because no capture could be published: the panel is drawn, and titled for
         # what it is.

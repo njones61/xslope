@@ -367,17 +367,19 @@ class FemDetailsDialog(QDialog):
             self.status.setText(f"{CAPTURE_FALLBACK_STATE} — {CAPTURE_FALLBACK_NOTE}")
             self.status.setToolTip(str(prof.get("capture_failed")))
         elif prof.get("capture_truncated"):
-            # The at-failure field this panel is reading was stopped mid-runaway
-            # (see xslope.fem_details.capture_truncated), so the forces on it are
-            # not a state the model settled at and the verdict drawn from them is
-            # not one the run made. The figure says the same thing in its title;
-            # the two must not disagree over one field.
-            from xslope.plot_fem_details import CAPTURE_TRUNCATED_NOTE
-            self.status.setText(CAPTURE_TRUNCATED_NOTE)
+            # The at-failure field this panel is reading is a capture the guard
+            # stopped: the mechanism, taken at a named iteration rather than at an
+            # equilibrium. The verdict is stated, with where it was read from
+            # standing beside it — the same words the figure's title carries.
+            from xslope.plot_fem_details import capture_stop_note
+            note = capture_stop_note(prof)
+            verdict = prof.get("status", "")
+            self.status.setText(f"{verdict} — {note}" if verdict and note
+                                else (verdict or note))
             self.status.setToolTip(
-                "The at-failure capture stopped before the mechanism finished "
-                "developing, so no utilization is stated for it. The converged "
-                "field is the one to read a verdict from.")
+                "Read from the at-failure capture, which the solver stopped at "
+                "that iteration: the section was running away and this is the "
+                "state it was in. The converged field is one switch away.")
         else:
             self.status.setText(prof.get("status", ""))
             meaning = reinforcement_state_meaning(prof.get("status_key"))

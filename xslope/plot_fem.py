@@ -54,13 +54,24 @@ CAPTURE_FALLBACK_TITLE = "last converged state — at-failure capture not availa
 
 
 def _fallback_clause(solution, title):
-    """``title``, naming the field where a failure panel stands on the converged one.
+    """``title``, naming the state a failure panel is actually drawing.
 
-    Panels drawing the real at-failure capture are untouched — the clause is added
-    only where ``plot_fem_results`` marked the field a stand-in.
+    Two cases, and a panel drawing a capture that ran to its own ceiling gets
+    neither. A capture the finite guard STOPPED is the mechanism — the state the
+    section was in a few iterations into coming apart — and the clause names the
+    iteration it was taken at, so the reader knows the field is a moment and not
+    an equilibrium. A panel standing on the converged field because there was no
+    capture at all says that instead.
     """
     if solution.get("_capture_fallback", False):
         return f"{title} — {CAPTURE_FALLBACK_TITLE}"
+    if solution.get("capture_truncated"):
+        at = solution.get("capture_truncated_at")
+        why = ("runaway" if (solution.get("capture_truncated_kind") or "runaway")
+               == "runaway" else "not a number")
+        if at is not None:
+            return f"{title} — capture stopped at iteration {at} ({why})"
+        return f"{title} — capture stopped early"
     return title
 
 

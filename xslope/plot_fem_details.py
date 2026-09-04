@@ -267,7 +267,7 @@ def _title(profile):
 # reinforcement
 # --------------------------------------------------------------------------
 
-def plot_reinforcement_detail(profile, fig=None, show_bond=True):
+def plot_reinforcement_detail(profile, fig=None, show_bond=True, fit_height=True):
     """Draw the detail figure for one reinforcement line onto ``fig``.
 
     Upper panel: mobilized axial force along the bar, over the dashed capacity
@@ -437,7 +437,9 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     else:
         ax.set_xlabel(_axis_label("Position along line", u.get("length")))
 
-    _fit_stacked_panels(fig, DETAIL_BANDS if has_bond else DETAIL_BANDS[:1])
+    if fit_height:
+
+        _fit_stacked_panels(fig, DETAIL_BANDS if has_bond else DETAIL_BANDS[:1])
     return fig
 
 
@@ -445,7 +447,7 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
 # piles
 # --------------------------------------------------------------------------
 
-def plot_pile_detail(profile, fig=None):
+def plot_pile_detail(profile, fig=None, fit_height=True):
     """Draw the detail figure for one pile onto ``fig``.
 
     Four panels sharing one depth axis, pile head at the top: lateral
@@ -736,8 +738,14 @@ def plot_member_map(fem_data, slope_data=None, kind="reinforcement",
     return fig
 
 
-def plot_detail(profile, fig=None, **kwargs):
-    """Dispatch to the figure builder for this profile's member kind."""
+def plot_detail(profile, fig=None, fit_height=True, **kwargs):
+    """Dispatch to the figure builder for this profile's member kind.
+
+    ``fit_height`` keeps the printed-strip rule (the figure's height follows its
+    width so a report page spends a strip on each member). A screen viewer that
+    hands in a figure already sized to its window passes ``False`` so the panels
+    fill the space they were given.
+    """
     if profile.get("kind") == "pile":
-        return plot_pile_detail(profile, fig=fig)
-    return plot_reinforcement_detail(profile, fig=fig, **kwargs)
+        return plot_pile_detail(profile, fig=fig, fit_height=fit_height)
+    return plot_reinforcement_detail(profile, fig=fig, fit_height=fit_height, **kwargs)

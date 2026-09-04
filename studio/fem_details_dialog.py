@@ -324,10 +324,12 @@ class FemDetailsDialog(QDialog):
         show_bond = self.bond_chk.isChecked()
 
         def _draw(fig):
+            # The canvas hands in a figure sized to its viewport; the panels fill
+            # it. The printed-strip height rule is for the report page, not here.
             if prof["kind"] == "reinforcement":
-                plot_detail(prof, fig=fig, show_bond=show_bond)
+                plot_detail(prof, fig=fig, show_bond=show_bond, fit_height=False)
             else:
-                plot_detail(prof, fig=fig)
+                plot_detail(prof, fig=fig, fit_height=False)
 
         self.canvas.render_figure(_draw)
         # The verdict, with what it means one hover away: the panel is where a

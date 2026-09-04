@@ -1755,7 +1755,7 @@ cross-bearings for the *deep* mechanism only:
 | Spencer | 1.659 | 1.648 |
 | Morgenstern-Price | 1.670 | — |
 
-The filtered SSRM's 1.487 sits below them by the usual SSRM-below-LEM margin. The apparent
+The filtered SSRM's 1.521 sits below them by the usual SSRM-below-LEM margin. The apparent
 LEM/SSRM disagreement on this dam is a mechanism-representation artifact, not a discrepancy.
 
 *The FE-seepage sub-case (vp077a: pore pressures from a finite-element seepage solve

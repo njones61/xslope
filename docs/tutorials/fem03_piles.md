@@ -118,9 +118,8 @@ file declares **Quadratic triangles (tri6)** with **Auto-size from geometry** of
 at `2`, and the mesh comes out at **3,154 nodes and 1,509 triangles** with no
 beam elements. Then **Run → Run FEM…** — the file declares the bracket too, so
 **F min (SSRM)** and **F max (SSRM)** open on `1.00` and `2.00` — and **Run**.
-This is one of the slower runs on the page — noticeably longer than the piled
-runs that follow — because a slope closer to failing takes more iterations at
-each trial to decide.
+It takes longer than the piled runs that follow, because a slope closer to
+failing takes more iterations at each trial to decide.
 **FS = 1.137**, from [1.1328, 1.1406].
 
 ![The strength-reduction mechanism at failure on the bare slope](images/fem03_fem_shear_bare.png){width=1000}
@@ -362,39 +361,47 @@ bracket again.
 **FS = 1.410**, from [1.4063, 1.4141]. Holding both toes is worth 0.047 here,
 and what keeps it from being worth more is the shafts' own capacity: with the
 toes held both rows reach the full 60,000 lb·ft, and six of the 18 beam
-elements stand at their moment capacity, none at their shear capacity. And the
-failure the run finds is a different one:
+elements stand at their moment capacity, none at their shear capacity.
 
-![The mechanism with both pile tips fixed: a weak strain field spread through the slope, with its one concentration just downslope of the upper row's head](images/fem03_fem_shear_piles_fixed.png){width=1000}
+This run reports no state at failure, and the results panels say so. With both
+ends of both rows held, the first trial that cannot reach equilibrium does not
+settle into a mechanism: it keeps moving, to displacements no slope of this size
+could develop. The engine will not draw a field like that, so every panel below
+carries the **last converged state** instead and names it in its title.
 
-The deep band that ran up from the flat ground beyond the toe is gone. What is
-left is a much weaker field spread through the body of the slope, with its one
-concentration just downslope of the upper row's head, where the strain reaches
-0.13 against the pinned-tip run's 0.80. The collapse the run captured is barely
-developed: the rows hold their ground and the soil shears past the upper one
-instead of carrying it along.
+![The pile rows with both tips fixed, at the last converged state: a weak strain field through the body of the slope, with its one concentration just downslope of the upper row's head](images/fem03_fem_shear_piles_fixed.png){width=1000}
+
+At the factor of safety the run reports, the slope has barely moved. The deep
+band that ran from the flat ground beyond the toe down to the pile tips is not
+there. The strain reaches 0.07 at its highest, just downslope of the upper row's
+head, and the rest of the slope is well below that. The rows hold their ground,
+and what shearing there is happens in the soil above the upper row rather than
+in soil carrying the rows along with it.
 
 Open **Results → 1D Details** on the upper row again:
 
-![The upper row's 1D Details at failure with the tip fixed: bending against the restraint, the moment at capacity from 16 ft down to the toe](images/fem03_piles_profile_fixed.png){width=1000}
+![The upper row's 1D Details with the tip fixed, at the last converged state: bending against the restraint, the moment at capacity from 14 ft down to the toe](images/fem03_piles_profile_fixed.png){width=1000}
 
-Every panel has changed. The head moves 0.40 ft instead of feet, and the
-displacement curves — the shaft is bending now, not rotating. The moment is zero
-at the head, which is still free, and it reaches the 10,000 lb·ft per foot that
-is M<sub>cap</sub> ÷ S at 16 ft below the head and holds it from there to the
-toe: those sections have hinged, and they turn without carrying any more
-moment. The largest shear is 1,124 lb/ft at 9 ft below the head, against the
-pinned run's 1,481 lb/ft at the toe, and of the opposite sign: the shaft is
-being bent against its toe rather than swung about it. The soil reaction panel
-reports the lateral pressure the soil is putting on the shaft against the Ito &
-Matsui limit — the largest pressure the theory says soil can exert on a pile in
-a row before it squeezes between the piles — and here the peak is 38% of that
-limit, where the pinned run reached 78%. In plane strain there is no gap for
-soil to squeeze through, so nothing in the model would hold that pressure under
-the limit; the panel reports the ratio so that a row smeared into a wall can be
-checked against the theory that does describe the gap. Held at its toe, the
-shaft develops the full moment capacity the limit equilibrium method assumed all
-along.
+Every panel has changed. The head moves 0.19 ft, and the displacement profile is
+curved rather than straight — the shaft is bending now, not rotating about a
+pin. The moment is zero at the head, which is
+still free, reaches the 10,000 lb·ft per foot that is M<sub>cap</sub> ÷ S about
+14 ft below the head, and holds it to the toe: those sections have hinged, and
+they turn without carrying any more moment. The largest shear is 1,062 lb/ft at
+9 ft below the head, and of the opposite sign to the pinned run's: the shaft is
+being bent against its toe rather than swung about it.
+
+The soil reaction panel reports the lateral pressure the soil is putting on the
+shaft against the Ito & Matsui limit — the largest pressure the theory says soil
+can exert on a pile in a row before it squeezes between the piles. The pinned
+run's panel above puts the peak at 42% of that limit; this one quotes no
+percentage, because there is no state at failure here to read one from. In plane
+strain there is no gap for soil to squeeze through, so nothing in the model would
+hold that pressure under the limit; the panel reports the ratio so that a row
+smeared into a wall can be checked against the theory that does describe the gap.
+
+Held at its toe, the shaft develops the full moment capacity the limit
+equilibrium method assumed all along.
 
 Set `Tip` back to `pinned` on both rows before the next section.
 
@@ -667,8 +674,7 @@ with the soil reaction's second sign change near the toe and its rise to about
 1,600 lb/ft per ft against the toe resolved. Refine the 1D size when the profile
 shapes are the deliverable — a section check down the member, a soil reaction
 distribution — and read the factor of safety off the refined run too: on this
-wall it moved by 0.047, and it was the beam's own discretization that moved it,
-not the finer soil that came with it.
+wall refining the beam moved it by 0.047.
 
 ---
 

@@ -452,6 +452,12 @@ def _fem_slope_data(base, piezo_y, phi_b=None, s_cap=None, extra_c=0.0):
     polys = [{"polygon": Polygon(_SOIL_POLY), "mat_id": 0}]
     gs, dom = build_ground_surface_from_polygons(polys)
     sd = dict(base)
+    # The base workbook (xslope_acads_simple, an RS2 transcription) declares a K0
+    # initial stress in main!D16. This synthetic model borrows only its materials
+    # and globals: its single hand-built polygon carries no zone geometry the K0
+    # overburden integral can use, and the suction guard is about the strength
+    # law, not the in-situ state — so the K0 is dropped here deliberately.
+    sd["k0"] = None
     sd["materials"] = [m]
     sd["polygons"] = polys
     sd["ground_surface"] = gs

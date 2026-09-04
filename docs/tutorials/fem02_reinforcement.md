@@ -30,7 +30,7 @@ envelope and pullout lengths, all of which we lean on here. Strength reduction,
 meshing for a stability run and the controls that decide whether a trial is
 allowed to finish are covered in [FEM-1](fem01_strength_reduction.md). Neither is
 repeated here. We start from a **starter file** that carries the whole
-LEM-8 model and nothing else, so the inputs we add are the ones the finite
+LEM-8 model, so the inputs we add are the ones the finite
 element engine needs and the limit equilibrium engine does not: the soils' two
 elastic properties, and three columns on every reinforcement line.
 
@@ -48,7 +48,7 @@ much the post-peak assumption costs.
 <p><span class="tg-pill">two materials</span><span class="tg-pill">reinforcement lines</span><span class="tg-pill">capacity envelope</span><span class="tg-pill">pullout length</span><span class="tg-pill">bar elements</span><span class="tg-pill">axial stiffness</span><span class="tg-pill">elastic-perfectly-plastic</span><span class="tg-pill">residual capacity</span><span class="tg-pill">strength reduction</span><span class="tg-pill">quadratic triangles</span><span class="tg-pill">thin zones</span><span class="tg-pill">iteration budget</span><span class="tg-pill">overburden pullout</span><span class="tg-pill">1D details</span><span class="tg-pill">shear strain</span></p>
 <div class="tgm-model" markdown>
 **Starter file** — [xslope_reinforced_slope_start.xlsx](files/xslope_reinforced_slope_start.xlsx),
-the LEM-8 model with every finite element input blank: Young's modulus and
+the LEM-8 model with the finite element inputs blank: Young's modulus and
 Poisson's ratio on both soils, and `Tres`, `E (psf)` and `Area` on all six
 reinforcement lines; this is the file the page starts from
 
@@ -283,8 +283,8 @@ are the 240 psf surcharge.
 ## The stiffnesses the run needs
 
 The mesh exists, but the run cannot start on it yet. The starter carries the
-limit equilibrium model and nothing beyond it, so every input the continuum
-needs is still blank: the two elastic properties on each soil, and two of the
+limit equilibrium model, so the inputs the continuum
+needs are still blank: the two elastic properties on each soil, and two of the
 three finite element columns on each reinforcement line. Opening **Run → Run
 FEM…** now would show the same refusal we walked through in
 [FEM-1](fem01_strength_reduction.md#youngs-modulus-and-poissons-ratio) — errors

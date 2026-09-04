@@ -303,10 +303,11 @@ toe — the mechanism the Spencer search found, arrived at without a surface bei
 prescribed.
 
 The Log pane reports the tensile cutoff being released on a few elements at the
-downstream toe, at most 20 of the 3,923 in any one trial. Soil with no tensile
-strength has no admissible state in the sharp corner where the embankment meets
-the foundation, so the cutoff is dropped on those elements — which keep their
-full Mohr-Coulomb strength — and held everywhere else.
+downstream toe, at most 20 of the 3,923 in any one trial. In the sharp corner
+where the embankment meets the foundation there is no stress state that both
+respects a zero tensile strength and holds the corner in equilibrium, so the
+engine drops the cutoff on those elements — they keep their full Mohr-Coulomb
+strength — and holds it everywhere else.
 
 <!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.2334, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=COMBO-1-ssrm -->
 

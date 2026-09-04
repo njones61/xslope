@@ -77,7 +77,7 @@ and how many have dropped to the residual capacity — together with the line's 
 vocabulary [The state of a line](reinforcement.md#the-state-of-a-line) sets out and the
 Studio panel and the report use.
 
-<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.497, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.1, f_max=1.9, max_iter=16000 -->
+<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.497, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.1, f_max=1.9, max_iter=16000, solver=viscoplastic -->
 
 At the last trial that reaches equilibrium, $F$ = 1.494, the reinforcement is heavily
 mobilized but has not yet lost anything. Every line has one element inside a

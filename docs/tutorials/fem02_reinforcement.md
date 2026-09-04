@@ -491,8 +491,9 @@ residual, a layer that reaches 800 lb/ft drops to 600 and its lost load has to
 be picked up by the soil and the other layers; the solver redistributes it and
 checks whether the slope still stands. At the peak-residual answer no layer has
 ruptured yet: the largest force on any line is 781 lb/ft, on line 2, and every
-layer is held by its bond. One step stronger reduction and the first layer
-reaches 800 and drops — and on this slope the redistribution cannot be carried:
+layer is held by its bond. Reduce the soil strength a little further, to the
+next trial in the search, and the first layer reaches 800 and drops — and on
+this slope the redistribution cannot be carried:
 lines 3, 4 and 5 follow it down and the trial fails. That cascade is the whole
 0.023. The residual does not weaken the layers; it means the first rupture is
 the last one this slope can afford.

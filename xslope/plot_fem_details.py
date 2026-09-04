@@ -241,7 +241,9 @@ def capture_stop_note(profile):
     if not stop:
         return CAPTURE_TRUNCATED_NOTE if profile.get("capture_truncated") else ""
     at, kind, _max_u = stop
-    why = "runaway" if kind == "runaway" else "not a number"
+    # Every stop but one is the section running away; the exception is the
+    # arithmetic giving out, and it is the only one named differently.
+    why = "not a number" if kind == "non_finite" else "runaway"
     if at is None:
         return CAPTURE_TRUNCATED_NOTE
     return f"capture stopped at iteration {at} ({why})"

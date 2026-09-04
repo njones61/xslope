@@ -4130,6 +4130,36 @@ _TENSION_STALL_WINDOWS = 2
 # NOT a failure criterion and nothing reads a factor of safety off it; it is the point
 # past which the capture stops drawing.
 _FINITE_GUARD_U_FACTOR = 10.0
+# What ends the at-failure capture: the runaway itself, read off how fast the section
+# is moving from one iteration to the next.
+#
+# Two tests, both on the TRANSLATIONAL max|u| (see `_trans_dofs`). COMPOUNDING GROWTH
+# is the ratio staying above `_CAPTURE_RUNAWAY_RATIO` for `_CAPTURE_RUNAWAY_WINDOW`
+# iterations running, which is what a section coming apart does and what a developed
+# mechanism does not. A single-step JUMP by more than `_CAPTURE_JUMP_FACTOR` is the
+# backstop, for a field that leaves in one step.
+#
+# The numbers are set from the captures that are HEALTHY, measured over their whole
+# 12,000-iteration budgets. The largest single-iteration growth any of them shows is
+# 1.0821 (Griffiths & Lane 6 dry, quad8 at 2 ft), then 1.0484 (FEM-1's embankment)
+# and 1.0312 (FEM-2's reinforced slope) — each at the first viscoplastic step, and
+# all three end on a plateau: G&L6's last eight samples are 5.884, 5.885, 5.885,
+# 5.886, 5.886, 5.887, 5.887, 5.888. So 1.30 stands 20% above the worst of them and
+# 2.0 stands 85% above, and none of the three is touched — their captures run their
+# full budget and their fields are unchanged to the last digit.
+#
+# On the runaway they are set against — FEM-3's tip-fixed pile rows — growth compounds
+# at 1.2 to 1.4 per iteration for twenty iterations together, so the compounding test
+# ends that capture at iteration 38 and the state kept is the mechanism: max|u| 0.445
+# ft, peak viscoplastic shear strain 0.098 in a band between and below the two rows.
+# Left alone the same solve reaches 594 ft. A single-step test cannot find that state:
+# the growth through it is smooth (1.407, 1.364, 1.332, 1.304, 1.281 over the
+# iterations either side of 1 ft) and the first step past 2.0 comes twenty iterations
+# later, at 110 ft. That is why the compounding test is what ends a capture and the
+# jump is only the backstop under it.
+_CAPTURE_RUNAWAY_RATIO = 1.30
+_CAPTURE_RUNAWAY_WINDOW = 5
+_CAPTURE_JUMP_FACTOR = 2.0
 # Iterations below which a truncated capture is treated as having shown nothing. The
 # capture starts from the elastic field and needs tens of iterations before the
 # plastic band is drawn at all — the converged trials on these models settle in ~300 —
@@ -4461,9 +4491,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             stops the moment the next one is not usable — a non-finite load vector,
             a non-finite displacement solve, or a displacement past
             `_finite_guard_u_max` (or, failing that, `_FINITE_GUARD_U_FACTOR`
-            times the mesh height — a fence against NaN, not the stop that normally
-            ends a capture; that is the runaway classifier, which solve_ssrm leaves
-            ARMED on this solve). The state returned is the last finite one, and
+            times the mesh height — a fence, not the stop that normally ends a
+            capture; that is the compounding-growth test, `_CAPTURE_RUNAWAY_RATIO`).
+            The state returned is the last finite one, and
             the solution carries `capture_truncated`, `capture_truncated_at`,
             `capture_truncated_reason`, `capture_truncated_kind` and
             `capture_truncated_max_u` saying so. Off (the default) the loop is
@@ -4471,8 +4501,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         _finite_guard_u_max (float or None): INTERNAL. The displacement the guarded
             solve may reach, measured from its datum, before it is stopped. None (the
             default, and what solve_ssrm passes) falls back to the mesh-height fence:
-            what normally ends a capture is the runaway classifier, and this is the
-            backstop under it.
+            what normally ends a capture is the growth of the field, and this is one
+            of the backstops under it.
         tolerance (float): Convergence tolerance ||du|| / ||u|| (default 1e-3).
             Normalized by the current displacement (Smith & Griffiths CHECON-style),
             so steady benign viscoplastic creep is accepted as converged; false
@@ -5563,6 +5593,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     else:
         _trans_dofs = np.arange(n_dof)
     guard_have_safe = False        # a snapshot has been taken at least once
+    _u_prev = None                 # the previous iterate's translational max|u|
+    _run_n = 0                     # iterations of compounding growth so far
+    # What this capture's growth actually looked like, kept whether or not either
+    # test fires: the largest single-iteration step, the longest run of consecutive
+    # compounding steps, and where each happened. They are the measurement that says
+    # whether the thresholds are general — every capture in the benchmark corpus
+    # reports them, so the distribution over all of them can be read off a suite run
+    # rather than argued about. A healthy capture whose longest run comes near
+    # `_CAPTURE_RUNAWAY_WINDOW` is a finding, not a pass.
+    _g_max_ratio = 0.0
+    _g_max_ratio_at = None
+    _g_run_max = 0
+    _g_run_max_at = None
     truncated_at = None            # iteration the guard stopped the solve at
     truncated_reason = None        # which of its three tests fired, in words
     truncated_kind = None          # 'non_finite' or 'runaway'
@@ -6227,22 +6270,47 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             if guard_on and guard_have_safe:
                 _guard_reason = _guard_kind = None
                 if not np.all(np.isfinite(u_free_new)):
-                    # The field overflowed from a state that was still inside the
-                    # bound: the mechanism developed and the arithmetic gave out
-                    # late, so what is kept is a picture of that mechanism.
+                    # The arithmetic gave out before the growth tests below could
+                    # read the state it gave out from. Rare, and the backstop.
                     _guard_reason = 'non-finite displacement field'
                     _guard_kind = 'non_finite'
-                elif guard_u_bound is not None and u_new.size:
+                elif u_new.size:
+                    # How far the SECTION moved this iteration, and how that compares
+                    # with last iteration. This is the reading both runaway tests are
+                    # made on (see `_CAPTURE_RUNAWAY_RATIO`).
                     _peak = float(np.max(np.abs(u_new[_trans_dofs]
                                                 - u_datum[_trans_dofs])))
-                    if _peak > guard_u_bound:
-                        # The other kind: the slope is running away. The state kept
-                        # is the one before this, which is where the mechanism is
-                        # readable — it is published, and it is flagged.
-                        _guard_reason = (
-                            f"max|u| {_peak:.3g} past the capture bound "
-                            f"{guard_u_bound:.3g}")
-                        _guard_kind = 'runaway'
+                    _ratio = (_peak / _u_prev
+                              if (_u_prev is not None and _u_prev > 0.0) else None)
+                    if _ratio is not None and _ratio > _g_max_ratio:
+                        _g_max_ratio, _g_max_ratio_at = _ratio, iteration
+                    if _ratio is not None and _ratio > _CAPTURE_JUMP_FACTOR:
+                        _guard_reason = (f"max|u| multiplied by {_ratio:.2f} in one "
+                                         f"iteration ({_u_prev:.4g} -> {_peak:.4g})")
+                        _guard_kind = 'runaway_jump'
+                    elif _ratio is not None:
+                        # Compounding growth: the test that ends a capture. One fast
+                        # iteration is not a runaway — a mechanism forming has them —
+                        # so what is read is a RUN of them.
+                        _run_n = _run_n + 1 if _ratio > _CAPTURE_RUNAWAY_RATIO else 0
+                        if _run_n > _g_run_max:
+                            _g_run_max, _g_run_max_at = _run_n, iteration
+                        if _run_n >= _CAPTURE_RUNAWAY_WINDOW:
+                            _guard_reason = (
+                                f"max|u| grew by more than "
+                                f"{_CAPTURE_RUNAWAY_RATIO:.2f}x for "
+                                f"{_CAPTURE_RUNAWAY_WINDOW} iterations running "
+                                f"(now {_peak:.4g})")
+                            _guard_kind = 'runaway_jump'
+                    _u_prev = _peak
+                    if _guard_kind is None and guard_u_bound is not None:
+                        if _peak > guard_u_bound:
+                            # The fence: displacements marching out of the model
+                            # entirely, on a capture neither growth test caught.
+                            _guard_reason = (
+                                f"max|u| {_peak:.3g} past the capture bound "
+                                f"{guard_u_bound:.3g}")
+                            _guard_kind = 'runaway'
                 if _guard_reason is not None:
                     # Back to the state this iteration started from: that pair is
                     # finite, and it is the last one both halves of the state agree on.
@@ -6811,9 +6879,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # yield surface somewhere.
     _mvy, _n_above_y, _mvt, _worst_y = _yield_reading(gp_groups, u, sq3, _yield_floor)
 
-    # A guarded solve ended by the runaway classifier is reported the same way the
-    # guard's own stops are: the capture was stopped, at this iteration, because the
-    # section was running away. One vocabulary, whichever test fired.
+    # A guarded solve ended by the early-failure rule — which the capture does not
+    # arm, but a caller could — is reported in the same vocabulary as the guard's own
+    # stops: the capture was stopped, at this iteration, because the section was
+    # running away.
     if guard_on and truncated_at is None and exit_reason == 'diverging':
         truncated_at = diverging_iter
         truncated_kind = 'runaway'
@@ -6874,12 +6943,21 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         "capture_truncated": bool(truncated_at is not None),
         "capture_truncated_at": truncated_at,
         "capture_truncated_reason": truncated_reason,
-        # WHICH test stopped it, and where the field stood when it did: 'runaway'
-        # (the displacement bound — the slope was coming apart, and this is the state
-        # it was in a few iterations in) or 'non_finite' (the arithmetic gave out
-        # first). Both are published; the panels name the iteration and the reason.
+        # WHICH test stopped it, and where the field stood when it did:
+        # 'runaway_jump' (the growth tests — the section was coming apart, and this is
+        # the state it was in a few iterations in), 'runaway' (the mesh-height fence
+        # or the early-failure rule) or 'non_finite' (the arithmetic gave out first).
+        # All are published; the panels name the iteration and the reason.
         "capture_truncated_kind": truncated_kind,
         "capture_truncated_max_u": truncated_max_u,
+        # The growth this capture showed, whether or not it was stopped: the largest
+        # single-iteration multiple of max|u| and where it happened, and the longest
+        # run of consecutive iterations above `_CAPTURE_RUNAWAY_RATIO` and where that
+        # run ended. None on every solve the guard did not watch.
+        "capture_growth_max_step": _g_max_ratio if guard_on else None,
+        "capture_growth_max_step_at": _g_max_ratio_at,
+        "capture_growth_longest_run": _g_run_max if guard_on else None,
+        "capture_growth_longest_run_at": _g_run_max_at,
         # The early-failure rule: the iteration at which it fired and which of its
         # two tests fired, or None on any other exit (see _early_failure).
         "diverging_iteration": diverging_iter,
@@ -10874,8 +10952,8 @@ def _capture_publishable(solution):
 
     Any FINITE field may. A capture the guard stopped is still the mechanism the
     figure exists to show — stopped at the state the slope was in a few iterations
-    into its collapse, which is where the picture is — the runaway classifier ends
-    the solve there — not at the arithmetic that follows. What it is NOT is a state the slope settled at,
+    into its collapse, which is where the picture is — the growth tests end the solve
+    there — not at the arithmetic that follows. What it is NOT is a state the slope settled at,
     so it is published flagged: the iteration it was stopped at, why, and how far it
     had moved, in the panel titles and beside every number read off it.
 
@@ -11212,16 +11290,19 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             `capture_truncated_kind`). A capture stopped in its first iterations has
             shown nothing, and is retried ONCE at half the margin.
 
-            What ends the capture is the runaway classifier (`_early_failure`),
-            armed on this solve alone among the ones that render nothing: it reads
-            the displacement growth against the model's own elastic response, so it
-            stops on the SHAPE of the runaway and needs no length of its own. That
-            is where the mechanism is readable — measured on FEM-3's tip-fixed pile
-            rows, it fires at iteration 41 with the section 11 x past its converged
-            displacement and the field there is a coherent toe mechanism, and with
-            it disarmed the same solve has blown up two iterations later. A capture
-            stopped there IS the picture, and it is published flagged rather than
-            run to a budget that only takes it further from the slope.
+            What ends the capture is the runaway itself, read on how fast the
+            section is moving: growth above `_CAPTURE_RUNAWAY_RATIO` for
+            `_CAPTURE_RUNAWAY_WINDOW` iterations running, with a single-step jump
+            past `_CAPTURE_JUMP_FACTOR` as the backstop. Both are set well outside
+            anything a healthy capture does — the largest single-iteration growth
+            over the whole 12,000-iteration budget is 1.08 on Griffiths & Lane 6 dry,
+            1.05 on FEM-1's embankment and 1.03 on FEM-2's reinforced slope, all
+            three of which run their budget out and are unchanged by this. On FEM-3's
+            tip-fixed pile rows, where growth compounds at 1.2 to 1.4 an iteration,
+            the capture ends at iteration 38 on a coherent mechanism at 0.445 ft; the
+            same solve left alone reaches 594 ft. A capture stopped there IS the
+            picture, and it is published flagged rather than run to a budget that
+            only takes it further from the slope.
 
             The one refusal is a capture that came back with nothing usable: a solve
             that raised, or a field that is not a number. Then
@@ -11634,8 +11715,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     # the UNCONVERGED runaway at the failure strength — a rotational mechanism. Re-solve
     # ONCE just beyond critical with the displacement cap OFF, letting the mechanism
     # iterate until it dominates the elastic baseline — and no further than that: the
-    # runaway classifier is left armed and ends the solve where the mechanism is
-    # readable, before the runaway stops being arithmetic.
+    # finite guard reads the growth of the field and ends the solve where the
+    # mechanism is readable, before the runaway stops being arithmetic.
     # The capture F is FS x (1 + capture_margin),
     # floored at the bracket's failed edge: bisection narrows the failed edge to within
     # `tolerance` of critical, where the runaway is too slow to develop the mechanism
@@ -11672,20 +11753,18 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                     max_iterations_ceiling=cap_iters, tolerance=convergence_tol,
                     max_disp_factor=None,
                     tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
-                    # The runaway classifier stays ARMED here, and it is what ends
-                    # this solve. The capture is asked for the mechanism, and the
-                    # mechanism is the state the section is in a few iterations into
-                    # coming apart — not the end of a 12,000-iteration budget, by
-                    # which point the field is orders of magnitude past anything the
-                    # model describes. Measured on FEM-3's tip-fixed pile rows: the
-                    # classifier stops the solve at iteration 41 with the section
-                    # 11x past its converged displacement, and the field there is a
-                    # coherent toe mechanism under both rows; with the classifier off
-                    # the same solve has blown up two iterations later. The early
-                    # EXIT (the no-progress plateau watch) stays off — a plateau is
-                    # not a runaway, and stopping on one would cut the mechanism
-                    # short of developing.
-                    early_exit=False, early_failure=True,
+                    # Both of the rules that end a TRIAL stay off here. The early
+                    # exit is the no-progress plateau watch, and a plateau is not a
+                    # runaway — stopping on one would cut the mechanism short of
+                    # developing. The early-failure classifier reads a displacement
+                    # ratio against the elastic response, which every capture is
+                    # meant to exceed: FEM-2's reaches 100x elastic by design and
+                    # G&L6 dry's runs its whole budget to a plateau, and arming it
+                    # here truncated both. What ends this solve instead is the
+                    # runaway itself, read on the growth of the field from iteration
+                    # to iteration by the finite guard (`_CAPTURE_RUNAWAY_RATIO`),
+                    # which no healthy capture comes near.
+                    early_exit=False, early_failure=False,
                     ssr_exclude_mask=ssr_exclude_mask,
                     tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
                     elastic_mask=elastic_mask,
@@ -11724,6 +11803,17 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                       f"(margin {margin:.2f}), "
                       f"{sol['iterations']} iterations, "
                       f"max disp {sol['max_displacement']:.3g}")
+                # The line the corpus is read from: one per capture, on every model
+                # the suite captures, so the thresholds can be checked against the
+                # whole distribution instead of the handful they were set on.
+                print(f"    capture growth: largest single step "
+                      f"{sol.get('capture_growth_max_step') or 0.0:.4f} at iteration "
+                      f"{sol.get('capture_growth_max_step_at')}, longest run above "
+                      f"{_CAPTURE_RUNAWAY_RATIO:.2f}x = "
+                      f"{sol.get('capture_growth_longest_run')} ending at iteration "
+                      f"{sol.get('capture_growth_longest_run_at')} "
+                      f"(stops at {_CAPTURE_RUNAWAY_WINDOW} steps, or one step past "
+                      f"{_CAPTURE_JUMP_FACTOR:.2f}x)")
                 if sol.get("capture_truncated"):
                     print(f"    capture stopped at iteration "
                           f"{sol['capture_truncated_at']} "

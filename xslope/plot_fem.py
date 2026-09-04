@@ -67,8 +67,11 @@ def _fallback_clause(solution, title):
         return f"{title} — {CAPTURE_FALLBACK_TITLE}"
     if solution.get("capture_truncated"):
         at = solution.get("capture_truncated_at")
-        why = ("runaway" if (solution.get("capture_truncated_kind") or "runaway")
-               == "runaway" else "not a number")
+        # Every stop but one is the section running away; the exception is the
+        # arithmetic giving out, and it is the only one named differently.
+        why = ("not a number"
+               if solution.get("capture_truncated_kind") == "non_finite"
+               else "runaway")
         if at is not None:
             return f"{title} — capture stopped at iteration {at} ({why})"
         return f"{title} — capture stopped early"

@@ -1470,9 +1470,10 @@ def _capture_solve(guard, iterations=_RUNAWAY_ITERS):
     settings solve_ssrm gives its at-failure capture, with the finite guard the
     only thing that differs between the two legs.
 
-    The guarded leg is the capture as solve_ssrm makes it: the runaway classifier
-    armed, which is what ends it, with the guard underneath. The unguarded leg is
-    the capture as it shipped — neither — which is the defect being measured.
+    The guarded leg is the capture as solve_ssrm makes it: the trial rules off, the
+    finite guard on, so what ends it is the growth of the field itself
+    (`_CAPTURE_RUNAWAY_RATIO`). The unguarded leg is the capture as it shipped, which
+    is the defect being measured.
     """
     import warnings
     from xslope.fem import solve_fem
@@ -1487,8 +1488,7 @@ def _capture_solve(guard, iterations=_RUNAWAY_ITERS):
                                  max_iterations=iterations,
                                  max_iterations_ceiling=iterations,
                                  max_disp_factor=None, early_exit=False,
-                                 early_failure=bool(guard),
-                                 _finite_guard=guard)
+                                 early_failure=False, _finite_guard=guard)
 
 
 def _mesh_height():
@@ -1569,10 +1569,10 @@ def test_the_capture_stops_before_it_stops_being_a_number():
     if peak > bound:
         fails.append(f"the guarded capture returned a field at max|u| = "
                      f"{peak:.3g}, past the mesh-height fence {bound:.3g}")
-    if held.get("capture_truncated_kind") != "runaway":
+    if held.get("capture_truncated_kind") != "runaway_jump":
         fails.append(f"the capture was stopped on "
-                     f"{held.get('capture_truncated_kind')!r}, not by the runaway "
-                     f"classifier that is supposed to end it")
+                     f"{held.get('capture_truncated_kind')!r}, not by the growth "
+                     f"tests that are supposed to end it")
     if held["iterations"] >= _RUNAWAY_ITERS:
         fails.append(f"the guarded capture ran its whole budget "
                      f"({held['iterations']} iterations): it did not stop at "
@@ -1583,16 +1583,18 @@ def test_the_capture_stops_before_it_stops_being_a_number():
 def test_the_non_finite_backstop_holds_on_its_own():
     """With every displacement bound lifted, the guard still returns a number.
 
-    The displacement bound is what stops a capture at the state its mechanism is
-    readable in, and on every model it fires first. Underneath it sits the reason
-    the guard exists at all: the tests on the load vector and on the solved field,
-    which catch a solve whose arithmetic gives out. This runs the same capture with
-    both bounds removed, so only that backstop is left holding it.
+    The growth tests are what stop a capture at the state its mechanism is readable
+    in, and on every model they fire first. Underneath them sits the reason the guard
+    exists at all: the tests on the load vector and on the solved field, which catch
+    a solve whose arithmetic gives out. This runs the same capture with every
+    displacement rule lifted, so only that backstop is left holding it.
     """
     fails = []
     import xslope.fem as fem
-    real_signal, real_factor = fem._early_failure, fem._FINITE_GUARD_U_FACTOR
-    fem._early_failure = lambda *a, **k: None
+    real = (fem._CAPTURE_RUNAWAY_RATIO, fem._CAPTURE_JUMP_FACTOR,
+            fem._FINITE_GUARD_U_FACTOR)
+    fem._CAPTURE_RUNAWAY_RATIO = float("inf")
+    fem._CAPTURE_JUMP_FACTOR = float("inf")
     fem._FINITE_GUARD_U_FACTOR = float("inf")
     held = None
     try:
@@ -1607,16 +1609,16 @@ def test_the_non_finite_backstop_holds_on_its_own():
     else:
         raised = None
     finally:
-        fem._early_failure = real_signal
-        fem._FINITE_GUARD_U_FACTOR = real_factor
+        (fem._CAPTURE_RUNAWAY_RATIO, fem._CAPTURE_JUMP_FACTOR,
+         fem._FINITE_GUARD_U_FACTOR) = real
     if held is not None:
         bad = _non_finite_fields(held)
         if bad:
-            fails.append(f"with the displacement bounds lifted the guard returned "
+            fails.append(f"with every displacement rule lifted the guard returned "
                          f"non-finite {', '.join(bad)}: the backstop is not "
                          f"holding, and this is the defect it exists for")
         if not held.get("capture_truncated"):
-            fails.append("with the displacement bounds lifted the capture ran its "
+            fails.append("with every displacement rule lifted the capture ran its "
                          "whole budget and reported nothing about it")
         elif held.get("capture_truncated_kind") != "non_finite":
             fails.append(f"the backstop reports "
@@ -1647,6 +1649,16 @@ def test_the_guard_does_not_touch_a_solve_that_behaves():
                              _finite_guard=guard)
 
     off, on = solve(False), solve(True)
+    # This solve converges through the Newton corrector, which returns its own
+    # field; the growth series belongs to the viscoplastic loop, so it is reported
+    # only when the loop is what finished. The healthy end of the distribution comes
+    # from the suite's captures, one line each (see `_CAPTURE_RUNAWAY_RATIO`).
+    if on.get("capture_growth_longest_run") is not None:
+        from xslope.fem import _CAPTURE_RUNAWAY_RATIO
+        print("    CAPTURE-GROWTH healthy solve: largest single step %.4f, longest "
+              "run above %.2fx = %s"
+              % (on.get("capture_growth_max_step") or 0.0, _CAPTURE_RUNAWAY_RATIO,
+                 on["capture_growth_longest_run"]))
     if on.get("capture_truncated"):
         fails.append("the guard stopped a solve that never ran away")
     for key in ("converged", "iterations", "exit_reason"):
@@ -1726,13 +1738,22 @@ def test_a_stopped_capture_is_published_and_named():
     u_conv = float(np.max(np.abs(np.asarray(converged["displacements"], float))))
     u_held = float(np.max(np.abs(np.asarray(held["displacements"], float))))
 
+    # The same line the engine writes per capture, so a suite log carries the
+    # runaway end of the distribution beside the healthy end.
+    print("    CAPTURE-GROWTH runaway sample: largest single step %.4f, longest run "
+          "above %.2fx = %s, stopped at iteration %s (%s), max|u| %.4g against a "
+          "converged %.4g"
+          % (held.get("capture_growth_max_step") or 0.0,
+             fem._CAPTURE_RUNAWAY_RATIO, held.get("capture_growth_longest_run"),
+             held.get("capture_truncated_at"), held.get("capture_truncated_kind"),
+             u_held, u_conv))
     if not fem._capture_publishable(held):
         fails.append("a capture the guard stopped is refused; only a capture that "
                      "came back with nothing should be")
-    if held.get("capture_truncated_kind") != "runaway":
+    if held.get("capture_truncated_kind") != "runaway_jump":
         fails.append(f"the runaway sample's capture was stopped on "
-                     f"{held.get('capture_truncated_kind')!r}, not on the "
-                     f"displacement bound — the specimen has moved")
+                     f"{held.get('capture_truncated_kind')!r}, not by the growth "
+                     f"tests that are supposed to end it — the specimen has moved")
     # The band the mechanism is readable in: past the converged field, and nowhere
     # near the arithmetic. Both halves matter — a capture that stops AT the
     # converged displacement has not shown a collapse, and one at a tenth of the
@@ -1845,14 +1866,15 @@ def test_a_capture_that_came_back_with_nothing_falls_back():
 def test_early_stop_mutation():
     """Disarming the early stop must be caught.
 
-    The runaway classifier is what ends a capture. With it disarmed the solve runs
-    on into the arithmetic, and what it can still return stands orders of magnitude
-    past the section — which is what the band above exists to refuse.
+    The growth tests are what end a capture. With them lifted the solve runs on into
+    the arithmetic, and what it can still return stands orders of magnitude past the
+    section — which is what the band above exists to refuse.
     """
     fails = []
     import xslope.fem as fem
-    real = fem._early_failure
-    fem._early_failure = lambda *a, **k: None
+    real = (fem._CAPTURE_RUNAWAY_RATIO, fem._CAPTURE_JUMP_FACTOR)
+    fem._CAPTURE_RUNAWAY_RATIO = float("inf")
+    fem._CAPTURE_JUMP_FACTOR = float("inf")
     try:
         try:
             caught = bool(test_a_stopped_capture_is_published_and_named())
@@ -1863,11 +1885,73 @@ def test_early_stop_mutation():
                          "disarmed — it does not actually hold the state the "
                          "panels are drawn from")
     finally:
-        fem._early_failure = real
+        (fem._CAPTURE_RUNAWAY_RATIO, fem._CAPTURE_JUMP_FACTOR) = real
+    return fails
+
+
+#: The capture the growth thresholds are held against: Griffiths & Lane 6 dry, the
+#: model the FEM benchmark corpus is anchored on, at the mesh its own row uses. Its
+#: capture runs the full 12,000-iteration budget and ends on a plateau, and this is
+#: the value it ends at — measured before the growth tests existed (5ad7748d) and
+#: asserted here to the last digit, because a rule that moved it would move every
+#: at-failure figure in the documentation with it.
+_HEALTHY_MODEL = os.path.join(_REPO, "docs", "fem", "files",
+                              "xslope_griffiths6_dry.xlsx")
+_HEALTHY_MAX_U = 5.88764437275831
+_HEALTHY_ITERS = 12000
+
+
+def test_a_healthy_capture_is_untouched():
+    """The rule that stops a runaway may not touch a capture that is not one.
+
+    Griffiths & Lane 6 dry, run as the corpus runs it: its capture is a developed
+    mechanism that takes its whole budget to get there, growing a few percent an
+    iteration and flattening at the end. Nothing about it is a runaway, and the
+    field it returns is asserted to the last digit against the value it had before
+    the growth tests existed. The growth reading is printed beside it — that is the
+    healthy end of the distribution the thresholds were set from.
+    """
+    fails = []
+    from xslope.fem import (_CAPTURE_RUNAWAY_RATIO, _CAPTURE_RUNAWAY_WINDOW,
+                            build_fem_data, solve_ssrm)
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import build_mesh_from_polygons, get_material_polygons
+
+    slope_data = load_slope_data(_HEALTHY_MODEL)
+    with contextlib.redirect_stdout(io.StringIO()):
+        mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
+                                        target_size=2.0, element_type="quad8")
+        result = solve_ssrm(build_fem_data(slope_data, mesh), F_min=2.0, F_max=2.8)
+    capture = result.get("failure_solution")
+    if capture is None:
+        return ["the healthy model captured no at-failure field at all"]
+    print("    CAPTURE-GROWTH healthy capture: largest single step %.4f, longest run "
+          "above %.2fx = %s (stops at %d), %d iterations, max|u| %.14g"
+          % (capture.get("capture_growth_max_step") or 0.0, _CAPTURE_RUNAWAY_RATIO,
+             capture.get("capture_growth_longest_run"), _CAPTURE_RUNAWAY_WINDOW,
+             capture["iterations"], capture["max_displacement"]))
+    if capture.get("capture_truncated"):
+        fails.append(f"the healthy capture was stopped at iteration "
+                     f"{capture.get('capture_truncated_at')}: "
+                     f"{capture.get('capture_truncated_reason')}")
+    if capture["iterations"] != _HEALTHY_ITERS:
+        fails.append(f"the healthy capture ran {capture['iterations']} iterations, "
+                     f"not the {_HEALTHY_ITERS} it took before")
+    if float(capture["max_displacement"]) != _HEALTHY_MAX_U:
+        fails.append(f"the healthy capture ends at max|u| "
+                     f"{float(capture['max_displacement']):.14g}, not the "
+                     f"{_HEALTHY_MAX_U:.14g} it ended at before the growth tests "
+                     f"existed — every at-failure figure in the docs moves with this")
+    run = capture.get("capture_growth_longest_run")
+    if run is not None and run >= _CAPTURE_RUNAWAY_WINDOW - 2:
+        fails.append(f"the healthy capture's longest compounding run is {run}, "
+                     f"within 2 of the {_CAPTURE_RUNAWAY_WINDOW} that stops a "
+                     f"capture: the threshold is too close to normal growth")
     return fails
 
 
 CHECKS = [
+    ("a healthy capture is untouched", test_a_healthy_capture_is_untouched),
     ("a stopped capture is published and named",
      test_a_stopped_capture_is_published_and_named),
     ("a capture that came back with nothing falls back",

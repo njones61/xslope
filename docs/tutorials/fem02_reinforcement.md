@@ -388,7 +388,11 @@ The rest of the dialog opens on the defaults this run wants: **SSRM (find FS)**,
 a bracket of 1.00 to 2.00, a tolerance of 0.0100, **Rollers** on the sides, and
 **Non-convergence** as the failure criterion — the plain reading, that a trial
 which cannot reach equilibrium has failed. In FEM-1 we compare it against the
-three other criteria the list offers. Click **Run**.
+three other criteria the list offers. The **Reduce the tensile cap with F
+(Tension SRF)** checkbox, dimmed in FEM-1 because that model entered no cutoff,
+is live here and ticked: each trial divides `t_cut` by its own factor along with
+*c* and tan φ. A cutoff of zero divides to zero, so on this model the setting
+has nothing to act on. Click **Run**.
 
 **FS = 1.566**, from a final bracket of [1.5625, 1.5703], in seven bisection
 steps. This is **1.3% below** Spencer's 1.587. The two engines solve the
@@ -404,8 +408,8 @@ captures by re-solving once at 1.15 times the factor of safety so the collapse
 develops far enough to draw. The contours are viscoplastic shear strain — the
 shearing left after the elastic response is subtracted — and the band they draw
 runs from the toe, up behind the reinforced block, and out onto the crest near
-**x = 48**. Spencer's circle came out at x = 36.2. The two mechanisms start in
-the same place and end about 12 ft apart: the finite element band passes
+**x = 49**. Spencer's circle came out at x = 36.2. The two mechanisms start in
+the same place and end about 13 ft apart: the finite element band passes
 *behind* the reinforced block, while Spencer's circle cuts through the back of
 it. The two engines treat the layers differently — the limit equilibrium run
 applies each layer's full capacity at the crossing, the finite element run lets
@@ -650,7 +654,7 @@ understates what changed:
 ![The mechanism at failure under the overburden law](images/fem02_shear_strain_law.png){width=1000}
 
 The band is where it was — from the toe up behind the buried tips to the
-crest, its center within half a foot of the stated-length run's — and the
+crest, its center within a foot of the stated-length run's — and the
 strain in it is more concentrated, 52 elements above half the peak against 117.
 The story is in the colors on the layers. Under the stated lengths every layer
 faded from red to white over its last 4 ft, because the ramp allowed less and
@@ -712,7 +716,7 @@ The difference is where the force is decided. Spencer takes the envelope value
 at one crossing point and hands the sliding mass 800 lb/ft, five times over, as
 a known force on a surface it chose. The finite element run lets the force
 emerge along the whole of each layer from displacement compatibility, so a layer
-contributes what the soil around it actually mobilized: line 1 carries 521 lb/ft
+contributes what the soil around it actually mobilized: line 1 carries 545 lb/ft
 at its most-worked point against the 800 the envelope allows, all six lines are
 held at their bond limits once the residual is in play, and the
 force in every layer tapers away from the shear band instead of standing at its
@@ -789,7 +793,7 @@ post-peak branch is never entered. Below that the answer keeps falling, in uneve
 Two things follow for a real design. The first is that the size of the residual
 matters as much as its presence: the step from holding capacity to shedding to
 three quarters of it is 2.0% of factor of safety, and the whole way down to a
-brittle zero costs three times that again. The second is that the
+brittle zero costs two and a half times that again. The second is that the
 whole range, from a blank cell to a brittle zero, spans 0.109, about 7%. Leaving `Tres` blank claims the geogrid
 holds its capacity once it yields, which is what the mainstream codes assume and
 what most published capacities describe; entering zero claims it snaps. Neither

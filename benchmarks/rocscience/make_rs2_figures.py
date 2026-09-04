@@ -160,19 +160,19 @@ EXPECTED_NO_FIGURE = {
     'RS2-64c': 'same unconstrained deep rotation as C1 (RS2-64a.png); only the profile differs',
     'RS2-64e': 'same unconstrained deep rotation as C1 (RS2-64a.png); only the profile differs',
 
-    # RS2-66 filter-off — the face skin is surface-parallel and depth-independent:
-    # the page measures 1.056 at every h1, so the mechanism cannot vary with the
-    # soft-band thickness. Both ends of the family are figured.
-    'RS2-66b': 'depth-independent face skin, identical at every h1; figured at both ends (RS2-66a.png, RS2-66e.png)',
-    'RS2-66c': 'depth-independent face skin, identical at every h1; figured at both ends (RS2-66a.png, RS2-66e.png)',
-    'RS2-66d': 'depth-independent face skin, identical at every h1; figured at both ends (RS2-66a.png, RS2-66e.png)',
+    # RS2-66 filter-off — the face skin is surface-parallel and does not depend on
+    # the soft-band thickness (the values are the page's tags, not repeated here).
+    # Both ends of the family are figured.
+    'RS2-66b': 'depth-independent face skin (values per the page tags); figured at both ends (RS2-66a.png, RS2-66e.png)',
+    'RS2-66c': 'depth-independent face skin (values per the page tags); figured at both ends (RS2-66a.png, RS2-66e.png)',
+    'RS2-66d': 'depth-independent face skin (values per the page tags); figured at both ends (RS2-66a.png, RS2-66e.png)',
 
     # RS2-66 filtered — one deep basal squeeze through the soft band, figured at the
     # thinnest band where it separates furthest from the skin.
     'RS2-66b-deep': 'same deep basal squeeze as RS2-66a-deep.png, through a thicker soft band',
     'RS2-66c-deep': 'same deep basal squeeze as RS2-66a-deep.png, through a thicker soft band',
     'RS2-66d-deep': 'same deep basal squeeze as RS2-66a-deep.png, through a thicker soft band',
-    'RS2-66e-deep': 'at h1 = 10 m the filter changes nothing (1.056 both ways) — RS2-66e.png IS this run',
+    'RS2-66e-deep': 'at h1 = 10 m the filtered run selects the same mechanism as the unfiltered one (values per the page tags) — RS2-66e.png IS this run',
 
     # RS2-67 — six drawdown stages of one dam, two mechanisms between them: the
     # unconstrained downstream face, and the upstream face when RS2's Search Area

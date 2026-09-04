@@ -121,7 +121,7 @@ beam elements. Then **Run → Run FEM…** — the file declares the bracket too
 This is one of the slower runs on the page — noticeably longer than the piled
 runs that follow — because a slope closer to failing takes more iterations at
 each trial to decide.
-**FS = 1.168**, from [1.1641, 1.1719].
+**FS = 1.137**, from [1.1328, 1.1406].
 
 ![The strength-reduction mechanism at failure on the bare slope](images/fem03_fem_shear_bare.png){width=1000}
 
@@ -130,9 +130,10 @@ the body of the slope and comes out on the crest 10 to 15 ft behind its edge —
 the same surface Spencer found, drawn as a band of strain rather than a line,
 and reaching a few feet farther back.
 
-<!-- test: file=files/xslope_pile_wall_start.xlsx, type=fem_ssrm, expected_fs=1.168, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-bare-ssrm -->
+<!-- test: file=files/xslope_pile_wall_start.xlsx, type=fem_ssrm, expected_fs=1.137, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-bare-ssrm -->
 
-The two engines are 0.019 apart on the bare slope. Every larger difference
+The two engines are 0.012 apart on the bare slope, the strength reduction run
+reading the lower of the two. Every larger difference
 between them on the rest of this page comes from how each engine models the
 piles or the wall, not from how it models the soil. Both halves below measure
 against these two numbers.
@@ -253,14 +254,15 @@ Click **Run → Run FEM…**
 
 ![Run FEM on the meshed pile model](images/fem03_studio_run_fem_piles.png)
 
-**Model checks — 1 warning**, and **Run** is enabled. The warning is the blank
-tensile cutoff `t_cut` on the clay, which lets it carry tension up to its
-Mohr-Coulomb apex, c/tan(φ) = 549.5 psf; what that means and when to enter a cap
-are covered in
-[FEM-1](fem01_strength_reduction.md#running-the-strength-reduction). The note
-below it says that the two pile
-rows carry a diameter with no `Area` or `I`, so the engine is deriving the solid
-circular section — the derivation described above, reported rather than assumed.
+**Model checks** finds no problems, and **Run** is enabled. Two notes sit under
+that line. The first says that **Tension SRF** is blank, so the clay's tensile
+cutoff — `t_cut` = 0 on this file, a soil that carries no tension at all — is
+divided by the trial factor along with *c* and tan φ, which is the engine
+default and is the setting
+[FEM-1](fem01_strength_reduction.md#running-the-strength-reduction) works
+through. The second says that the two pile rows carry a diameter with no `Area`
+or `I`, so the engine is deriving the solid circular section — the derivation
+described above, reported rather than assumed.
 
 Set **F min (SSRM)** to `1.00` and **F max (SSRM)** to `2.00`. A bracket has to
 contain the answer, and the runs on this page range from 1.17 on the bare slope
@@ -268,11 +270,11 @@ to 1.79 on the wall of the second half, so every one of them uses the same 1.0 t
 2.0 and the answers stay comparable.
 Leave everything else as it is and click **Run**.
 
-**FS = 1.379**, from a final bracket of [1.3750, 1.3828] in nine trials — two
+**FS = 1.363**, from a final bracket of [1.3594, 1.3672] in nine trials — two
 bracket checks and seven bisections. Spencer's method gave 1.842 on the same
 file.
 
-<!-- test: file=../lem/files/xslope_piles.xlsx, type=fem_ssrm, expected_fs=1.379, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-piles-ssrm -->
+<!-- test: file=../lem/files/xslope_piles.xlsx, type=fem_ssrm, expected_fs=1.363, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-piles-ssrm -->
 
 ![The mechanism at failure, with the pile rows colored by shear force](images/fem03_fem_shear_piles.png){width=1000}
 
@@ -294,28 +296,28 @@ shaft is free to rotate about it.
 
 ### What decides the finite element answer
 
-Four runs locate what is holding that answer at 1.379. Each changes one thing on
+Four runs locate what is holding that answer at 1.363. Each changes one thing on
 both rows, on the same mesh and the same bracket, so the numbers are comparable
-to the 1.379 above.
+to the 1.363 above.
 
 | Change | FS |
 | --- | :---: |
-| the file as it stands | 1.379 |
-| shaft modulus `E` × 100 | 1.379 |
-| shaft modulus `E` ÷ 100 | 1.379 |
-| `Vcap` and `Mcap` cleared | 1.379 |
-| `Head` set to `fixed`, tips still pinned | 1.504 |
+| the file as it stands | 1.363 |
+| shaft modulus `E` × 100 | 1.363 |
+| shaft modulus `E` ÷ 100 | 1.363 |
+| `Vcap` and `Mcap` cleared | 1.363 |
+| `Head` set to `fixed`, tips still pinned | 1.496 |
 
 Stiffness is not what holds it: a hundredfold stiffer shaft and a hundredfold
 softer one both return the same answer to four figures, and the soft shaft's head
-moves 1.24 ft to do it against the shipped section's 0.19 ft. The structural
+moves 1.40 ft to do it against the shipped section's 0.21 ft. The structural
 capacities are not what holds it either. Where a beam element's moment reaches `Mcap` ÷ S the
 engine releases a plastic hinge: that section turns freely at the capacity and
 carries no more moment however far the shaft bends. Where its shear reaches
 `Vcap` ÷ S the element delivers the capacity and no more. With both cells blank
 the shaft stays elastic at any moment or shear, with no limit at all. Clearing
 them leaves the answer unchanged, because with the rows as shipped nothing
-reaches capacity anyway — the shafts peak at 47% of M<sub>cap</sub> at the
+reaches capacity anyway — the shafts peak at 48% of M<sub>cap</sub> at the
 captured mechanism, so a limit they never meet cannot be what is holding them.
 What moves the answer is restraining rotation at an end, and once an end is held
 the capacities are no longer spare.
@@ -327,12 +329,12 @@ translations are held there, but its rotation is not, so the tip is a pin and
 the shaft swings about it. **Results → 1D Details** on the upper row, on its
 default **At failure** field, shows exactly that:
 
-![The upper row's 1D Details at failure with the tip pinned: a straight-line rotation about the toe, moment zero at both ends and peaking mid-shaft at 40% of capacity](images/fem03_piles_profile_pinned.png){width=1000}
+![The upper row's 1D Details at failure with the tip pinned: a straight-line rotation about the toe, moment zero at both ends and peaking mid-shaft at 44% of capacity](images/fem03_piles_profile_pinned.png){width=1000}
 
 The lateral displacement is a straight line from the head to zero at the toe —
 the shaft is rotating as a rigid bar about its pin, not bending. The moment is
 zero at both ends, as it must be with neither end held, and peaks at 16 ft
-below the head: 3,960 lb·ft per foot of slope, 23,800 lb·ft per shaft, 40% of
+below the head: 4,427 lb·ft per foot of slope, 26,562 lb·ft per shaft, 44% of
 the 60,000 lb·ft capacity, with the Mcap lines well outside the curve. The
 shear is largest at the toe, the pin reaction. A drilled shaft that stops at
 the top of the rock and bears on it behaves that way. One
@@ -357,7 +359,7 @@ Open **Piles**, set `Tip` to `fixed` on both rows, and **OK** — the mesh
 survives a fixity change, as it survived the spacing change. We run the same
 bracket again.
 
-**FS = 1.434**, from [1.4297, 1.4375]. Holding both toes is worth 0.055 here,
+**FS = 1.410**, from [1.4063, 1.4141]. Holding both toes is worth 0.047 here,
 and what keeps it from being worth more is the shafts' own capacity: with the
 toes held both rows reach the full 60,000 lb·ft, and six of the 18 beam
 elements stand at their moment capacity, none at their shear capacity. And the
@@ -410,12 +412,12 @@ is its own Spencer search, because spacing changes which surface governs.
 ![Factor of safety against pile spacing: the limit equilibrium curve and the two strength reduction lines](images/fem03_spacing_sweep.png){width=800}
 
 The limit equilibrium answer falls from 2.193 to 1.409 over that range, 36%.
-With the tips pinned the strength reduction answer barely moves: 1.379 at 3 ft
-and again at 6 ft, on the same bracket [1.3750, 1.3828] and with the same
-verdict at every trial, and 1.348 at 12 ft.
+With the tips pinned the strength reduction answer barely moves: 1.363 at 3 ft
+and again at 6 ft, on the same bracket [1.3594, 1.3672] and with the same
+verdict at every trial, and 1.324 at 12 ft.
 
 The tip-fixed rows of the last section, swept the same way, do not hold still —
-1.559, 1.434 and 1.238, the upper line on the plot. Spacing reaches the finite
+1.543, 1.410 and 1.238, the upper line on the plot. Spacing reaches the finite
 element model as the divisor on M<sub>cap</sub> as well as on the stiffness, so
 the wider the shafts are set the less moment the smeared row can carry per foot
 of slope, and the sooner its sections hinge. At 12 ft the tip restraint has
@@ -427,16 +429,17 @@ with it. Each row below is read at that spacing's captured mechanism:
 
 | S (ft) | *EI*/S (lb·ft²) | Peak moment per unit width (lb·ft/ft) | Peak moment per shaft (lb·ft) | Fraction of M<sub>cap</sub> |
 | :---: | :---: | :---: | :---: | :---: |
-| 3 | 1.357 × 10<sup>8</sup> | 4,651 | 13,953 | 23% |
-| 6 | 6.786 × 10<sup>7</sup> | 4,651 | 27,906 | 47% |
-| 12 | 3.393 × 10<sup>7</sup> | 4,852 | 58,220 | 97% |
+| 3 | 1.357 × 10<sup>8</sup> | 4,752 | 14,257 | 24% |
+| 6 | 6.786 × 10<sup>7</sup> | 4,752 | 28,514 | 48% |
+| 12 | 3.393 × 10<sup>7</sup> | 5,093 | 61,116 | 102% |
 
 At 3 and 6 ft the moment *per unit width of slope* does not move at all, which
 is the quantity the smear holds constant, so the moment *per shaft* is that
 number times the spacing and doubles when the spacing does. At 12 ft the shafts
 run into their ceiling instead: M<sub>cap</sub> ÷ S is 5,000 lb·ft per foot
-there, three elements have hinged at the captured mechanism, and each shaft is
-carrying 97% of what it has. Every quantity a designer would check responds to
+there, six of the 18 beam elements have hinged at the captured mechanism, and
+each shaft is carrying the whole 60,000 lb·ft it has. Every quantity a designer
+would check responds to
 spacing. The factor of safety follows only once the capacity binds.
 
 ### Which answer is right
@@ -447,9 +450,9 @@ The limit equilibrium force assumes each shaft develops its full moment
 capacity at the failure surface — it has no way to say otherwise. The finite
 element run computes how much of that capacity the toe restraint actually lets
 the shaft develop. At the 6 ft spacing the model was built with, a shaft that
-can turn on its toe develops 47% of it and the run answers 1.379; socketing the
-toe puts both rows on their capacity and the run answers 1.434. So the choice
-between 1.38 and 1.43 is a question about the shaft — bearing on the rock, or
+can turn on its toe develops 48% of it and the run answers 1.363; socketing the
+toe puts both rows on their capacity and the run answers 1.410. So the choice
+between 1.36 and 1.41 is a question about the shaft — bearing on the rock, or
 socketed into it — and it is one cell in the file. Both answers stay well under
 Spencer's 1.842.
 
@@ -475,11 +478,11 @@ pile's surface. XSLOPE runs the same slope through both of its engines in
 | Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
 | --- | :---: | :---: |
 | No pile | 1.136 | 1.14 (−0.4%) |
-| Pile at D<sub>1</sub>/D = 3, free head | 1.472 | 1.36 (+8.2%) |
+| Pile at D<sub>1</sub>/D = 3, free head | 1.497 | 1.36 (+10.1%) |
 | Pile, head rotation restrained | 1.587 | 1.45 (+9.4%) |
 
 The unpiled row agrees to 0.4%, which is what makes the other two readable. With
-the row in place the plane-strain model credits it ×1.296, where the
+the row in place the plane-strain model credits it ×1.318, where the
 three-dimensional model credits ×1.193. On the same slope a Bishop search reads
 1.143 with no pile and 1.451 with it, a credit of ×1.269. Both two-dimensional
 routes sit above the three-dimensional answer by a comparable amount, and
@@ -579,21 +582,22 @@ Click **Run → Run FEM…**
 
 ![Run FEM on the meshed wall model](images/fem03_studio_run_fem_wall.png)
 
-**Model checks — 1 warning**, the same blank `t_cut` on the clay, and no note
-this time: the wall states its own `I` and `Area`, so nothing is derived. The
-bracket is already `1.00` to `2.00`. Click **Run**.
+**Model checks** finds no problems, and carries the same **Tension SRF** note as
+the pile run. There is no second note this time: the wall states its own `I` and
+`Area`, so nothing is derived. The bracket is already `1.00` to `2.00`. Click
+**Run**.
 
-**FS = 1.793**, from [1.7891, 1.7969]. The wall takes the slope from 1.168 to
-1.793, a credit of ×1.54.
+**FS = 1.723**, from [1.7188, 1.7266]. The wall takes the slope from 1.137 to
+1.723, a credit of ×1.52.
 
-<!-- test: file=files/xslope_pile_wall.xlsx, type=fem_ssrm, expected_fs=1.793, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-wall-ssrm -->
+<!-- test: file=files/xslope_pile_wall.xlsx, type=fem_ssrm, expected_fs=1.723, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-wall-ssrm -->
 
 ![The mechanism with the wall in place](images/fem03_wall_shear_fixed.png){width=1000}
 
-The band follows the same path the pile model's did — up from the flat ground
-beyond the toe, over the wall, and out at the face just above its head — and it
-concentrates in two places, at the toe and just above the wall's head, where the
-strain reaches 0.47 against the pile model's 0.80.
+The band takes much the route the pile model's did — up from the toe, over the
+wall, and out on the crest behind it — and it concentrates in two places, at the
+toe and on the uphill side of the wall's head. The strain peaks at the toe, at
+0.36 against the pile model's 0.80.
 
 ### What the wall carries
 
@@ -609,27 +613,28 @@ Four profiles, all plotted against depth below the pile head, which is at
 elevation 10 — so a depth of 14.00 ft on these axes is elevation −4.00.
 
 The **bending moment** is zero at the head, which is free, and largest at the
-toe — **90,600 lb·ft/ft**, the whole of what the section can carry — which is the
+toe — **82,430 lb·ft/ft**, 91% of what the section can carry — which is the
 shape of a member cantilevered from its base. The dashed M<sub>cap</sub> lines on
-the moment panel are the capacity, and the curve reaches the positive one at the
-toe: this wall stands at its first-yield moment at the answer itself, not
-somewhere past it. The panel draws those lines whenever the capacity is within
-about three times the peak. The **shear** holds one sign the whole length, peaking at 6,584 lb/ft at
-13 ft, and the **soil reaction** changes sign once, near 15 ft: the clay drives
-the wall downslope over its upper length and the base pushes back below. The
-**lateral displacement** is 0.310 ft at the head and decays smoothly to zero at
+the moment panel are the capacity, and the curve runs up to just inside the
+positive one at the toe; the panel's title reads *near capacity* and gives that
+91%. The panel draws those lines whenever the capacity is within about three
+times the peak. The **shear** holds one sign the whole length, peaking at
+5,969 lb/ft at 13 ft. The **soil reaction** changes sign near 12 ft — the clay
+drives the wall downslope over its upper length and the soil below pushes back —
+and swings positive again over the last 2 ft, where the fixed toe is held. The
+**lateral displacement** is 0.255 ft at the head and decays smoothly to zero at
 the toe.
 
 Switch **Field state** to **At failure**, which is the state the panel opens on:
 
 ![The wall's profiles at failure: the moment at the toe on its capacity](images/fem03_wall_profiles_fixed_failure.png){width=1000}
 
-The moment profile is the one above — the toe on the dashed M<sub>cap</sub> line,
-one beam element yielded in bending, the title reading *at capacity* — because
-the wall was already there at the last converged trial. What the extra movement
-adds is shear: the peak grows from 6,584 to 7,958 lb/ft and moves down to the
-toe. A wall that stands at its capacity at the answer is one to check the section
-of.
+The extra movement takes the toe the last 9% to its capacity: the moment there
+reaches the whole 90,600 lb·ft/ft, one beam element has yielded in bending, and
+the title now reads *at capacity*. The shear grows with it, from 5,969 to
+7,124 lb/ft, and its peak moves from 13 ft down to the toe. A wall that carries
+91% of its section at the answer and the whole of it at the collapse the run
+captured is one to check the section of.
 
 ### A finer beam
 
@@ -648,23 +653,22 @@ wall is now **40 beam elements**, and the soil mesh refines with it, from 1,510
 to **2,418 triangles**, because the constraint line's nodes are the soil mesh's
 nodes. Run the same bracket: it takes noticeably longer than the run above.
 
-**FS = 1.746**, from [1.7422, 1.7500], and the peak moment 84,212 lb·ft/ft
-against 90,600. Both moved: the answer came down 0.047, and the toe section that
-reached its capacity on ten elements stops at 93% of it on forty, so the wall no
-longer hinges at the last converged trial. The profiles say where the rest of the
-run time went:
+**FS = 1.676**, from [1.6719, 1.6797], and the peak moment 74,546 lb·ft/ft
+against 90,600. Both moved: the answer came down 0.047, and the toe moment that
+stood at 91% of capacity on ten beam elements stands at 82% on forty. The
+profiles say where the rest of the run time went:
 
 ![The same profiles on 40 beam elements](images/fem03_wall_profiles_refined.png){width=1000}
 
-The moment curve is the same shape, stopping just short of the capacity line
-instead of on it. The shear and soil reaction curves are the ones that change: at
+The moment curve is the same shape, stopping farther short of the capacity line.
+The shear and soil reaction curves are the ones that change: at
 ten elements they are kinked polylines, and at forty they are continuous curves,
 with the soil reaction's second sign change near the toe and its rise to about
 1,600 lb/ft per ft against the toe resolved. Refine the 1D size when the profile
 shapes are the deliverable — a section check down the member, a soil reaction
 distribution — and read the factor of safety off the refined run too: on this
-wall the finer beam moved it by 0.047, because it changed whether the toe section
-hinges at all.
+wall it moved by 0.047, and it was the beam's own discretization that moved it,
+not the finer soil that came with it.
 
 ---
 

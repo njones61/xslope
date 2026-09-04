@@ -1956,15 +1956,19 @@ PILE_MODEL = (Path(__file__).resolve().parents[1] / 'docs' / 'tutorials' / 'file
               / 'xslope_pile_wall.xlsx')
 PILE_SIZE = 2.0
 # The FEM pile sample: two pile rows, both capacities finite, both ends free. Its
-# published lock is FS 1.380 (docs/fem/samples.md), and the two drivers bracket it
-# identically — trial for trial, verdict for verdict, over the whole bisection. The
-# pair below is that bracket, which holds the same fact as the bisection for four
-# solves instead of two whole runs.
+# published lock is FS 1.370 (docs/fem/samples.md). The pair below is a bracket
+# around that lock measured COLD — a bare solve_fem at each strength, which is what
+# this check runs — and both drivers agree on both ends of it: they stand at
+# 1.35625 and fail at 1.375. Four solves instead of two whole bisections, for the
+# same statement. The bracket is deliberately wider than the shipped run's own
+# [1.365625, 1.375]: the sidecar's trials are warm-started through solve_ssrm, and
+# at 1.365625 a cold viscoplastic solve fails where the warm one converges, so a
+# shipped trial's verdict is not a cold solve's verdict and cannot be quoted as one.
 PILES_MODEL = (Path(__file__).resolve().parents[1] / 'docs' / 'fem' / 'files'
                / 'xslope_piles_fem.xlsx')
 PILES_SIZE = 2.0
-PILES_LOCKED_FS = 1.380
-PILES_STANDS, PILES_FAILS = 1.375, 1.384375
+PILES_LOCKED_FS = 1.370
+PILES_STANDS, PILES_FAILS = 1.35625, 1.375
 
 
 def _pile_fem_data(path=None, target_size=PILE_SIZE, element_size_1d=None):
@@ -2012,6 +2016,20 @@ def _nr_translational_max(u, tidx):
     """max|u| over the translational degrees of freedom, for the checks."""
     v = u if tidx is None else np.asarray(u)[tidx]
     return float(np.max(np.abs(v))) if np.size(v) else 0.0
+
+
+def _nr_translational_norm(u, tidx):
+    """‖u‖₂ over the translational degrees of freedom, for the checks.
+
+    The size of the whole displacement FIELD, where :func:`_nr_translational_max`
+    is one node's reading of it. Capping a member relocates where the soil moves as
+    well as how much — releasing rotational continuity at a hinge lets the wall kink
+    — so the peak of the field can fall while the field as a whole grows. The Newton
+    driver's own displacement bound reads the max and must keep reading it; a check
+    asking whether the slope moved farther reads the field.
+    """
+    v = u if tidx is None else np.asarray(u)[tidx]
+    return float(np.linalg.norm(v)) if np.size(v) else 0.0
 
 
 def check_pile_element():
@@ -2247,17 +2265,20 @@ def check_piles():
     equilibrium carries — must sit at the capacity and not above it; the hinged ends
     must carry a plastic rotation; at most ONE element end per pile node may carry
     it, since a hinge is one release at one section; and the slope must MOVE, and
-    move FARTHER, because a member that can deliver less moment cannot hold the soil
-    back better. The last two are what a nodal moment applied at the shared
-    rotational degree of freedom cannot do: it is equal and opposite on the two
+    move FARTHER — measured on the norm of the displacement field over the
+    translational degrees of freedom, not on its peak node, because a hinge
+    relocates where the soil moves as well as how much — because a member that can
+    deliver less moment cannot hold the soil back better. The last two are what a
+    nodal moment applied at the shared rotational degree of freedom cannot do: it is
+    equal and opposite on the two
     elements meeting there and cancels, so the state does not move at all while the
     reported moments read as capped. That is the form this round removed, and it is
     the mutation.
 
     **The factor of safety.** The FEM pile sample at its own tagged mesh stands at a
     strength below its published lock and fails at one above it, on BOTH drivers —
-    the two agree trial for trial over the whole bisection there, so the bracket
-    holds the same fact for four solves instead of two whole runs.
+    the two agree on both ends of that bracket, so it holds the same fact for four
+    solves instead of two whole runs.
     """
     from xslope.fem import (_nr_build_piles, _nr_pile_force,
                             _nr_translational_dofs, _prepare_fem_model)
@@ -2311,7 +2332,7 @@ def check_piles():
             fails.append(f"the pile {what} is held but moved "
                          f"{sol_free['displacements'][dof]:.3e} in the solution")
     V_free = float(np.max(np.abs(sol_free['forces_pile_lateral'])))
-    u_free = _nr_translational_max(sol_free['displacements'], tidx)
+    u_free = _nr_translational_norm(sol_free['displacements'], tidx)
     cap = 0.25 * V_free
     saved = fem_data['V_cap_by_pile_elem']
     try:
@@ -2320,7 +2341,7 @@ def check_piles():
                             max_disp_factor=None)
     finally:
         fem_data['V_cap_by_pile_elem'] = saved
-    u_cap = _nr_translational_max(sol_cap['displacements'], tidx)
+    u_cap = _nr_translational_norm(sol_cap['displacements'], tidx)
     if int(np.count_nonzero(sol_cap['yielded_pile_V'])) == 0:
         fails.append(f"a shear cap at a quarter of the free shear ({cap:.1f} against "
                      f"{V_free:.1f}) binds on no element, so the capacity leg is not "
@@ -2339,10 +2360,11 @@ def check_piles():
     elif not u_cap > u_free:
         fails.append(
             f"capping the pile shear at {cap:.1f} where the uncapped pile carries "
-            f"{V_free:.1f} made the slope move LESS, not more: max|u| went from "
-            f"{u_free:.6g} to {u_cap:.6g}. A member that can deliver less force "
-            f"cannot hold the soil back better — that is the signature of a "
-            f"correction applied with the wrong sign (SPIKE.md, \"PILES\").")
+            f"{V_free:.1f} made the slope move LESS, not more: the displacement "
+            f"field's norm went from {u_free:.6g} to {u_cap:.6g}. A member that "
+            f"can deliver less force cannot hold the soil back better — that is "
+            f"the signature of a correction applied with the wrong sign "
+            f"(SPIKE.md, \"PILES\").")
 
     # ---- the moment capacity, which is a hinge -----------------------------
     M_free = float(np.max(np.abs(sol_free['forces_pile_moment'])))
@@ -2354,7 +2376,7 @@ def check_piles():
                           max_disp_factor=None)
     finally:
         fem_data['M_cap_by_pile_elem'] = saved_M
-    u_M = _nr_translational_max(sol_M['displacements'], tidx)
+    u_M = _nr_translational_norm(sol_M['displacements'], tidx)
     p_rot = np.abs(np.asarray(sol_M.get('pile_plastic_rotation',
                                         np.zeros((n_pile, 2)))))
     if int(np.count_nonzero(sol_M['yielded_pile_M'])) == 0:
@@ -2416,9 +2438,10 @@ def check_piles():
     elif not u_M > u_free:
         fails.append(
             f"capping the pile moment at {m_cap:.1f} where the uncapped pile "
-            f"carries {M_free:.1f} made the slope move LESS, not more: max|u| went "
-            f"from {u_free:.6g} to {u_M:.6g}. A member that can deliver less moment "
-            f"cannot hold the soil back better.")
+            f"carries {M_free:.1f} made the slope move LESS, not more: the "
+            f"displacement field's norm went from {u_free:.6g} to {u_M:.6g}. A "
+            f"member that can deliver less moment cannot hold the soil back "
+            f"better.")
 
     # ---- the factor of safety, both drivers --------------------------------
     # The FEM pile sample brackets its published lock on BOTH drivers: it stands at

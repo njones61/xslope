@@ -357,10 +357,14 @@ trial that spends it while still converging — its out-of-balance force still
 falling, or its displacements standing still — is given another budget's
 worth, and another, up to the **Iteration ceiling**, which opens at 50,000. A
 trial whose displacements are growing stops at its budget and is recorded as
-failed; that is the non-convergence the method reads as failure. A trial that
-reaches the ceiling still converging is reported **inconclusive**: the search
-treats it as the undecided edge of the bracket rather than a failure, the
-factor of safety is the bracket's midpoint as usual, and the log says so.
+failed; that is the non-convergence the method reads as failure. Along the way,
+at 300, 1,000 and 3,000 iterations, the solver hands the trial's current state
+to its Newton corrector, which finishes most slow trials in a few dozen steps
+and records the result with the evidence that decided it. A trial that neither
+the corrector nor the budget can settle by the ceiling is reported
+**inconclusive**: the search treats it as the undecided edge of the bracket
+rather than a failure, the factor of safety is the bracket's midpoint as
+usual, and the log says so.
 
 Because the budget extends itself, the factor of safety on this model does not
 depend on it. Both runs below return the same answer from a budget of 3,000 as

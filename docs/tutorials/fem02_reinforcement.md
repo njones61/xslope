@@ -348,41 +348,19 @@ under a name of your own.
 
 ## The iteration budget
 
-Two controls on the Run FEM dialog decide how long each trial is allowed to
-iterate. Neither needs changing here; what they do matters on the first run.
-
-**Max iterations per trial**, which opens at **12,000**, is the budget each
-trial reduction factor starts with. It is a budget rather than a limit: a
-trial that spends it while still converging — its out-of-balance force still
-falling, or its displacements standing still — is given another budget's
-worth, and another, up to the **Iteration ceiling**, which opens at 50,000. A
-trial whose displacements are growing stops at its budget and is recorded as
-failed; that is the non-convergence the method reads as failure. Along the way,
-at 300, 1,000 and 3,000 iterations, the solver hands the trial's current state
-to its Newton corrector, which finishes most slow trials in a few dozen steps
-and records the result with the evidence that decided it. A trial that neither
-the corrector nor the budget can settle by the ceiling is reported
-**inconclusive**: the search treats it as the undecided edge of the bracket
-rather than a failure, the factor of safety is the bracket's midpoint as
-usual, and the log says so.
-
-Because the budget extends itself, the factor of safety on this model does not
-depend on it. Both runs below return the same answer from a budget of 3,000 as
-from 12,000 — 1.559 elastic-perfectly-plastic and 1.535 with the residual —
-from the same bracket, in the same seven bisection steps, with the same
-converged field to six decimals; the trials near the critical factor simply
-run past the smaller budget until they settle (4,647 iterations at *F* = 1.547,
-1,048 at *F* = 1.555).
-
-What a small budget does change is the **captured failure state**, because the
-capture is one more solve and it stops at its budget. From a budget of 3,000
-the elastic-perfectly-plastic run's failure field has moved 1.78 ft, 29 times
-its elastic response; from 12,000 the same field has moved 6.55 ft, 106 times.
-The factor of safety is the same either way, but the mechanism figure drawn
-from the smaller budget shows a collapse that has barely started.
-
-Leave both boxes as they open. Each run takes a few minutes on an ordinary
-laptop.
+Two controls on the Run FEM dialog decide how long each trial may iterate:
+**Max iterations per trial**, which opens at 12,000, and the **Iteration
+ceiling**, which opens at 50,000. Leave both as they open. The budget extends
+itself while a trial is still converging, the Newton corrector finishes most
+slow trials at its 300, 1,000 and 3,000-iteration checkpoints, and a trial that
+neither settles by the ceiling is reported **inconclusive** and treated as the
+undecided edge of the bracket. On this model the answer does not depend on the
+budget: a budget of 3,000 returns the same 1.559 and 1.535 as 12,000, from the
+same bracket. What a smaller budget does change is the captured failure
+picture, because the capture is one more solve that stops at its budget: from
+3,000 the elastic-perfectly-plastic mechanism has moved 1.78 ft, from 12,000
+6.55 ft, and the smaller one shows a collapse that has barely started. Each run
+takes a few minutes on an ordinary laptop.
 
 ---
 

@@ -336,9 +336,9 @@ For a **discrete row** the limit equilibrium route is the one whose mechanism is
 | | Without piles | With piles | Credit for the row |
 |---|---|---|---|
 | **LEM** (Spencer) | 1.149 | 1.842 | ×1.60 |
-| **FEM** (SSRM) | 1.164 | 1.380 | ×1.19 |
+| **FEM** (SSRM) | 1.136 | 1.370 | ×1.21 |
 
-Without the piles the two engines agree to 1.3%, so nothing structural separates them and what the second column adds is the pile row alone. With the row in place they credit it by a factor of 1.60 and 1.19 — a disagreement on the quantity being designed, not a rounding.
+Without the piles the two engines agree to 1.1%, so nothing structural separates them and what the second column adds is the pile row alone. With the row in place they credit it by a factor of 1.60 and 1.21 — a disagreement on the quantity being designed, not a rounding.
 
 Neither of those is a three-dimensional answer, and the direction of the error is only known where a three-dimensional reference exists. Cai & Ugai (2000) analyzed a pile-stabilized slope with a shear-strength-reduction finite element model that meshes the individual piles, the soil between them and the slip interfaces on each pile's surface. XSLOPE runs the same slope through both of its own engines:
 

@@ -500,6 +500,11 @@ slope_data['materials'] = [
         #     state and the FS reads high (preflight warns on a blank t_cut for exactly this).
         #     Leave it blank only deliberately: to reproduce a published plain-M-C benchmark
         #     that assumes unbounded tension, or when matching a vendor model that has no cap.
+        #     MEASURED EXCEPTION: on some models a zero cap prevents the FEM from reaching
+        #     equilibrium at all — a dam with a phreatic surface (COMBO-1's model) fell from
+        #     FS 1.23 to 0.70 under t_cut = 0 while Spencer reads 1.25 on the same section.
+        #     A drop like that is a solver limitation to check against the LEM answer, not a
+        #     result: leave the cap blank (or small and nonzero) on that model and say so.
         't_cut': 0,
         # --- matric-suction strength (v17): opt-in Fredlund extended Mohr-Coulomb apparent
         #     cohesion, read by BOTH solvers (LEM via generate_slices' suction_phi_b/

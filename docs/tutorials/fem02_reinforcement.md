@@ -681,12 +681,13 @@ resistance — which is what FHWA directs for a live load.
 
 ---
 
-## Why the two answers differ
+## The three answers together
 
-Our three runs are finished and no two of them agree. The disagreement has two
-separate sources: the post-peak assumption, which the section above already
-measured, and the different ways the two engines decide what force a
-reinforcement line carries.
+Our three runs are finished, and all three land within 3% of one another —
+close, for two engines and two assumptions about the layers. What separates
+them is still worth knowing, and it has two sources: the post-peak assumption,
+which the section above already measured, and the different ways the two
+engines decide what force a reinforcement line carries.
 
 Three readings of the same slope, from the same file:
 
@@ -772,8 +773,6 @@ which is brittle rupture — measures how much the answer depends on that choice
 | 600 | 1.5352 |
 | 400 | 1.5117 |
 | 0 | 1.4727 |
-
-![Factor of safety against the residual capacity entered](images/fem02_tres_sweep.png){width=800}
 
 The answer steps down once for each drop in the residual. `Tres` = 800
 reproduces the blank run exactly — the same factor of safety, the same bracket,

@@ -4973,33 +4973,9 @@ def fem02_tres_sweep():
               % ("blank" if t_res is None else "%g" % t_res, result["FS"],
                  result["final_interval"][0], result["final_interval"][1]))
 
-    def _draw():
-        _u = declared_unit_labels(done)
-        numeric = sorted((v, f) for v, f in zip(values, factors) if v is not None)
-        blank = [f for v, f in zip(values, factors) if v is None]
-        fig, ax = plt.subplots(figsize=(7.2, 4.4))
-        # The measured answer lands on three tiers, not on a curve: sloped
-        # connectors between the points would draw a gradient the runs do not
-        # have.  Steps hold each measured factor of safety flat between its
-        # neighbors and put the change where the answer actually changes.
-        ax.plot([v for v, _ in numeric], [f for _, f in numeric],
-                drawstyle="steps-mid", marker="o", color="#1f4e79",
-                linewidth=1.8, label="Tres entered")
-        if blank:
-            ax.axhline(blank[0], color="#7a5195", linestyle="--", linewidth=1.5,
-                       label="Tres blank (elastic-perfectly-plastic)")
-        ax.axhline(lem_fs, color="#c0392b", linestyle=":", linewidth=1.5,
-                   label="Spencer (limit equilibrium)")
-        ax.set_xlabel("Residual capacity Tres (%s)" % _u["force_per_len"])
-        ax.set_ylabel("Factor of safety")
-        ax.grid(True, alpha=0.3)
-        # The measured curve steps twice and leaves a clear corner, so the legend
-        # goes inside where matplotlib finds room for it rather than eating a
-        # third of the figure width in a reserved column beside the axes.
-        ax.legend(loc="best", fontsize=9, framealpha=0.9)
-        fig.tight_layout()
-
-    capture("fem02_tres_sweep.png", _draw)
+    # The page prints these as a table; the sweep produces no figure (Norm
+    # 2026-09-04: five tested values do not need a chart).
+    return
 
 
 # --------------------------------------------------------------------------- #

@@ -45,10 +45,22 @@ UNIT_AFTER = re.compile(
     r"times\b|per\b|elements?\b|nodes?\b)")
 
 #: ... and what it is not one when it is preceded by: a figure or table number,
-#: a version, an equation.  Matched against the 24 characters before the token.
+#: a version, an equation, or the name of a dimensionless INPUT the model is
+#: given.  A pore-pressure ratio, a seismic coefficient, a Poisson's ratio and a
+#: power-curve exponent are all written the way a factor of safety is; they are
+#: not measurements of anything and no tag would ever guard them.  Matched
+#: against the 24 characters before the token.
 LABEL_BEFORE = re.compile(
     r"(?:Fig\.?|Figure|Table|Eq\.?|Equation|Problem|§|v|version|"
-    r"Part|item|no\.?)\s*(?:\d+(?:\.\d+)?\s*[-–]\s*)?$", re.I)
+    r"Part|item|no\.?)\s*(?:\d+(?:\.\d+)?\s*[-–]\s*)?$|"
+    r"\b(?:r_?u|r<sub>u</sub>|k_?c|k_?h|K0|A|n|ν|nu|ψ|psi|β|beta|σ_?F|"
+    r"Poisson[’']?s ratio|coefficient|exponent)\s*[=≈]\s*$", re.I)
+
+#: A coordinate pair reads as two factor-of-safety-shaped numbers and is
+#: neither.  Both halves of ``(16.453, 5.178)`` are recognised by what sits
+#: beside them.
+COORD_FIRST = re.compile(r"^\s*,\s*[-−(]?\d")
+COORD_SECOND = re.compile(r"\(\s*[-−]?\d+(?:\.\d+)?\s*,\s*$")
 
 #: Spans whose numbers are not prose: inline code, math, link targets, image
 #: paths, HTML comments (a test tag is one).  Masked to spaces so every offset
@@ -233,7 +245,12 @@ def run(path, cfg, report=print):
                     continue
                 if UNIT_AFTER.match(line[m.end():m.end() + 12]):
                     continue
-                if LABEL_BEFORE.search(line[max(0, m.start() - 24):m.start()]):
+                before = line[max(0, m.start() - 24):m.start()]
+                after = line[m.end():m.end() + 12]
+                if LABEL_BEFORE.search(before):
+                    continue
+                if COORD_SECOND.search(before) or (
+                        before.rstrip().endswith("(") and COORD_FIRST.match(after)):
                     continue
                 scanned += 1
                 if any(abs(v - lv) <= tol for lv, tol in locks):

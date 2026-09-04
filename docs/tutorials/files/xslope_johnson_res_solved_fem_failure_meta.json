@@ -1,10 +1,15 @@
 {
-  "F": 1.4150390625,
+  "F": 1.4184082031249998,
   "converged": false,
-  "iterations": 12000,
-  "max_displacement": 42.339320659856305,
+  "iterations": 2241,
+  "max_displacement": 9.439333990784673,
   "algorithm": "Griffiths & Lane (1999) Viscoplastic",
-  "residual": 8.165286830702637e-05,
-  "unbalanced_force_ratio": 2.6527262449127775,
-  "plastic_fraction": 0.17410145296966606
+  "residual": 0.0003775880096781122,
+  "unbalanced_force_ratio": 2.7273426317847442,
+  "plastic_fraction": 0.1761407086413459,
+  "capture_truncated": true,
+  "capture_truncated_at": 2240,
+  "capture_truncated_reason": "the runaway signal fired (runaway)",
+  "capture_truncated_kind": "runaway",
+  "capture_truncated_max_u": 9.439333990784673
 }

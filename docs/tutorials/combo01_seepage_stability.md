@@ -271,11 +271,13 @@ immediately.
 
 ![Run FEM, at its defaults](images/combo01_studio_run_fem.png)
 
-**Model checks — 1 warning**, and **Run** is enabled. The warning is about
-`t_cut`, the tensile cutoff left blank on all three materials, which lets each
-one carry tension up to its Mohr-Coulomb apex; in
-[FEM-1](fem01_strength_reduction.md#running-the-strength-reduction) we work
-through what that cap is and when it matters.
+**Model checks** finds no problems, and **Run** is enabled. One note sits under
+that line. It says that **Tension SRF** is blank, so each material's tensile
+cutoff — `t_cut` = 0 on all three rows of this file, soils that carry no tension
+at all — is divided by the trial factor along with *c* and tan φ, which is the
+engine default and is the setting
+[FEM-1](fem01_strength_reduction.md#running-the-strength-reduction) works
+through.
 
 Everything else opens on the defaults this run wants. **Analysis** is **SSRM
 (find FS)**, the strength reduction: it divides both Mohr-Coulomb strength
@@ -290,8 +292,8 @@ solve and the search before it.
 
 ![Shear strain at failure](images/combo01_fem_shear.png){width=1000}
 
-**Strength reduction gives FS = 1.2305**, the midpoint of the final bracket
-[1.2266, 1.2344] after seven bisection steps. The shear strain field above is the
+**Strength reduction gives FS = 1.2334**, the midpoint of the final bracket
+[1.2285, 1.2383] after seven bisection steps. The shear strain field above is the
 mechanism the run found, and nothing about a surface was assumed to find it: the
 band of straining soil is wherever the model put it.
 
@@ -300,7 +302,13 @@ the core and the downstream shell into the foundation, and comes out beyond the
 toe — the mechanism the Spencer search found, arrived at without a surface being
 prescribed.
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.2305, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=COMBO-1-ssrm -->
+The Log pane reports the tensile cutoff being released on a few elements at the
+downstream toe, at most 20 of the 3,923: soil with no tensile strength has no
+admissible state in the sharp corner where the embankment meets the foundation,
+so the cutoff is dropped on those elements — which keep their full Mohr-Coulomb
+strength — and held everywhere else.
+
+<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.2334, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=COMBO-1-ssrm -->
 
 The pore pressures reached this run the same way they reached the search: off the
 materials' `u` column, interpolated from the same mesh nodes to each Gauss point,
@@ -328,7 +336,7 @@ will read it again. [Stale results and the mesh](../studio/editing.md#stale-resu
 states the rule in full. The practical effect is that the three answers on this
 page cannot silently belong to three different models.
 
-The two factors of safety are 1.248 and 1.2305, 1.4% apart, on the same
+The two factors of safety are 1.248 and 1.2334, 1.2% apart, on the same
 mechanism: a deep surface from the upstream face just below the crest, down
 through the core and the downstream shell, into the foundation and out beyond the
 toe. They are independent routes to it — the search prescribes a circular surface
@@ -347,7 +355,7 @@ This tutorial covered:
 - A seepage run that leaves a pore pressure at every mesh node.
 - The materials table's `u` column: `seep` reads that field, `none` ignores it
   (Spencer 1.618 instead of 1.248).
-- Spencer 1.248 and strength reduction 1.2305 from the same model and field,
+- Spencer 1.248 and strength reduction 1.2334 from the same model and field,
   with nothing exported or retyped.
 - Results go stale when the inputs they depend on change.
 

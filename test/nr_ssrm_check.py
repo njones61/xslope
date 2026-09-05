@@ -1955,8 +1955,8 @@ def check_k0_initial_stress():
 PILE_MODEL = (Path(__file__).resolve().parents[1] / 'docs' / 'tutorials' / 'files'
               / 'xslope_pile_wall.xlsx')
 PILE_SIZE = 2.0
-# The FEM pile sample: two pile rows, both capacities finite, both ends free. Its
-# published lock is FS 1.370 (docs/fem/samples.md). The pair below is a bracket
+# The FEM pile model: two pile rows, both capacities finite, both ends free. The
+# tutorial lock is FS 1.363 (docs/tutorials/fem03_piles.md). The pair below is a bracket
 # around that lock measured COLD — a bare solve_fem at each strength, which is what
 # this check runs — and both drivers agree on both ends of it: they stand at
 # 1.35625 and fail at 1.375. Four solves instead of two whole bisections, for the

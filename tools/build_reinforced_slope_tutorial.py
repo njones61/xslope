@@ -2,10 +2,10 @@
 
 The model is the six-layer geogrid slope that Tutorial LEM-8 builds and that
 [LEM Sample Problem 9](../docs/lem/samples.md#9-reinforced-slope) locks Spencer's
-answer for.  Its finite element counterpart is
-[FEM Sample Problem 1](../docs/fem/samples.md).  This builder DERIVES both
-tutorial files from those two committed models rather than restating a number
-from either:
+answer for.  Its finite element counterpart is the committed model
+``docs/fem/files/xslope_reinforce_fem.xlsx`` (its sample section was retired in
+favor of FEM-2).  This builder DERIVES both tutorial files from those two
+committed models rather than restating a number from either:
 
     docs/lem/files/xslope_reinforce.xlsx        (the section, soil, surcharge,
                                                  circles and the six geogrid

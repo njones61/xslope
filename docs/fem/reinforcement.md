@@ -434,8 +434,8 @@ together. The panel is non-modal and reads the solution it was opened
 with, so it can stay open beside the results view; it works the same on a solution reloaded from its saved
 sidecar files as on a fresh solve.
 
-The screenshot above is the reinforcement sample's own strength reduction run, $FS = 1.50$, read at the mechanism
-it developed (see [FEM sample problems](samples.md)).
+The screenshot above is a strength reduction run on the reinforced slope built in
+[FEM-2](../tutorials/fem02_reinforcement.md), read at the mechanism it developed.
 
 ### The state of a line
 

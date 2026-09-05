@@ -340,7 +340,7 @@ specified by hand:
 4. **Force boundary conditions** from the distributed loads, integrated edge by edge as above. Where
    a loaded node also carries a displacement constraint, both are kept.
 
-The figure below shows the result for the reinforced slope of [FEM Samples](samples.md) Problem 1:
+The figure below shows the result for the reinforced slope built in [FEM-2](../tutorials/fem02_reinforcement.md):
 fixed supports (triangles) along the base, x-rollers (circles) on the sides, a free ground surface,
 arrows for the 240 psf surcharge on the crest, and reinforcement elements in red.
 

@@ -374,8 +374,8 @@ field state, with that state also recorded in the CSV's header.
 The panel is non-modal and reads the solution it was opened with, and works the same on a solution reloaded from
 its saved sidecar files as on a fresh solve.
 
-The screenshot above is the piles sample's own strength reduction run, $FS = 1.370$, read at the mechanism it
-developed (see [FEM sample problems](samples.md)).
+The screenshot above is a strength reduction run on the two pile rows built in
+[FEM-3](../tutorials/fem03_piles.md), read at the mechanism it developed.
 
 ## References
 

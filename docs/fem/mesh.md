@@ -430,7 +430,7 @@ stated 1D size only refines the stretches of a line that are coarser than it.
 `element_materials_1d` numbers the lines 1, 2, 3, … in the order they were passed, so
 each line's elements can be given their own properties.
 
-On the pile sample (`docs/fem/files/xslope_piles_fem.xlsx`, tri6 at a target size of 2,
+On the pile model (`docs/fem/files/xslope_piles_fem.xlsx`, tri6 at a target size of 2,
 two pile lines totaling 35 ft) the two lines carry 18 elements at their default spacing;
 `element_size_1d=0.5` brings them to 70, and the mesh grows from 3,180 nodes / 1,521
 elements to 6,029 / 2,928.

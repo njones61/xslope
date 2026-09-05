@@ -284,7 +284,7 @@ are the 240 psf surcharge.
 ## The stiffnesses the run needs
 
 The mesh exists, but the run cannot start on it yet. The starter carries the
-limit equilibrium model, so the inputs the continuum
+limit equilibrium model, so the inputs the finite element run
 needs are still blank: the two elastic properties on each soil, and two of the
 three finite element columns on each reinforcement line. Opening **Run → Run
 FEM…** now would show the same refusal we walked through in

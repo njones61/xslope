@@ -366,8 +366,8 @@ the picture:
 | shaft modulus `E` × 100 | 1.363 |
 | shaft modulus `E` ÷ 100 | 1.363 |
 | `Vcap` and `Mcap` cleared | 1.363 |
-| `Tip` set to `fixed` | 1.410 |
 | `Head` set to `fixed`, tips still pinned | 1.496 |
+| `Tip` set to `fixed` | 1.410 |
 
 Shaft stiffness does not decide the answer: a hundredfold stiffer shaft and a
 hundredfold softer one return the same number. Shaft capacity does not decide it

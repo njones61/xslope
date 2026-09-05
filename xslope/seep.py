@@ -816,6 +816,7 @@ _CYCLE_EXTRA_SWEEPS = 600
 #: but is done doing so early: the latest last-revisit measured over the corpus is
 #: sweep 41 (vp077a), and earth_dam2 is still revisiting at sweep 992.
 _SET_REVISIT_SWEEP = 100
+_WET_FACE_FORCE_MAX = 3      # times an inactive exit node under pressure is joined to the face at set stability
 
 
 def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
@@ -940,6 +941,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     _seen = {np.packbits(exit_face_active).tobytes(): 0}
     _flip_sweep = np.zeros(n_nodes, dtype=np.int64)   # last sweep each node flipped
     _free_edges = set()      # quadratic exit-face edges the veto no longer governs
+    _wet_forced = np.zeros(n_nodes, dtype=int)   # times a wet inactive node was joined
     _revisit_fired_at = None
 
     budget = max_iter        # raised once, and only where the floor drops
@@ -1048,6 +1050,10 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         new_exit_face_active = np.zeros(n_nodes, dtype=bool)
         new_exit_face_active[_exit_linear_corners] = corner_candidate[_exit_linear_corners]
 
+        # A specified-head corner on an exit edge (the toe; see _exit_face_topology)
+        # is a Dirichlet row already: it counts as saturated in the edge test and is
+        # never switched by it.
+        _corner_ok = corner_candidate | (bc_type == 1)
         for c1, mid, c2 in _exit_quadratic_edges:
             if exit_face_active[mid]:
                 mid_candidate = not (h_new[mid] < y[mid] - hyst
@@ -1070,11 +1076,11 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                     new_exit_face_active[c2] = True
                 continue
 
-            edge_active = bool(corner_candidate[c1] and mid_candidate and corner_candidate[c2])
+            edge_active = bool(_corner_ok[c1] and mid_candidate and _corner_ok[c2])
             if edge_active:
-                new_exit_face_active[c1] = True
-                new_exit_face_active[mid] = True
-                new_exit_face_active[c2] = True
+                for _nd in (c1, mid, c2):
+                    if bc_type[_nd] == 2:
+                        new_exit_face_active[_nd] = True
 
         # Rescue against a SINGULAR full collapse of a quadratic exit face. The
         # edge-based rule above keeps a tri6/quad8 seepage side all-or-nothing,
@@ -1106,6 +1112,41 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         stranded = is_corner & corner_candidate & ~new_exit_face_active
         if not has_fixed_head and not face_active and np.any(stranded):
             new_exit_face_active[stranded] = True
+
+        # A SEEPAGE FACE WITH THE HEAD ABOVE THE GROUND IS NOT A SOLUTION. The set
+        # may only be called stable while every inactive exit node stands at or below
+        # its elevation. Where it does not, the active-set tests above have finished
+        # damping and still leave pressure on a free face, and the face is resolved
+        # by hand: the node joins the face, and any quadratic edge it lies on is
+        # updated per node from here (`_free_edges`), which is the representation a
+        # partly wet edge needs — the all-or-nothing rule sheds the whole edge when
+        # its upper corner dries, and the corner below then reads inflow from the
+        # midside it just released.
+        #
+        # Measured on the Johnson Reservoir dam (tri6, 100 divisions): the toe edges
+        # cycled on and off four times, the relaxation floor then damped the cycle
+        # with the face DRY, and the solve reported converged with 0.66 to 1.77 ft of
+        # pressure head on the last 10 ft of the downstream face — 41 to 110 psf of
+        # pore pressure that a stress analysis must then hold as tension at a free
+        # surface. Read only when the set would otherwise be judged stable, so the
+        # ordinary damping is untouched while the set is still moving; capped per
+        # node (`_WET_FACE_FORCE_MAX`) so a node the tests keep shedding cannot hold
+        # the solve open forever — after that the old behaviour stands and the
+        # pressure is reported by the closure check.
+        if np.array_equal(new_exit_face_active, _prev_active):
+            _wet_free = ((bc_type == 2) & ~new_exit_face_active
+                         & (h_new >= y + hyst) & (_wet_forced < _WET_FACE_FORCE_MAX))
+            if np.any(_wet_free):
+                _wet_forced[_wet_free] += 1
+                new_exit_face_active[_wet_free] = True
+                _freed_now = {e for e in _exit_quadratic_edges
+                              if _wet_free[e[0]] or _wet_free[e[1]] or _wet_free[e[2]]}
+                _free_edges = _free_edges | _freed_now
+                _wet_idx = np.flatnonzero(_wet_free)
+                print(f"Iteration {iteration}: {len(_wet_idx)} inactive exit-face "
+                      f"node(s) stand above the ground (max {float(np.max(h_new[_wet_idx] - y[_wet_idx])):.3f} "
+                      f"of head) — joined to the seepage face; "
+                      f"{len(_freed_now)} quadratic edge(s) updated per node from here")
 
         newly_active = new_exit_face_active & ~exit_face_active
         h_new[newly_active] = y[newly_active]
@@ -3147,16 +3188,49 @@ def _exit_face_topology(elements, element_types, bc_type):
                           all-or-nothing so a seepage-face transition lands on a
                           corner, never in the middle of a curved edge.
 
-    An exit edge is one whose BOTH corners are exit-face nodes. This is the single
-    source of the exit-face edge topology used by BOTH the steady unconfined solver
-    (``solve_unsaturated``) and the transient stepper (``run_transient_seepage``);
-    the transient rebuilds it per step because a series-head boundary moves the
-    exit-face set as the water level changes."""
+    An exit edge is one whose BOTH corners are exit-face nodes, or a BOUNDARY edge
+    with one exit-face corner and one specified-head corner. The second kind is the
+    last edge of a seepage face where it meets a head line at a shared corner — the
+    downstream toe, which the specified head claims (see build_seep_data). Without
+    it that edge belongs to no exit edge at all: its midside node has no state to be
+    given, its upper corner is tied to the dry edge above, and the face ends one
+    edge short of the toe with the head standing above the ground there. Measured on
+    the Johnson Reservoir dam (tri6): 0.66 to 1.77 ft of pressure head ON the face
+    over the last 10 ft above the toe, 41 to 110 psf of pore pressure that the stress
+    analysis then has to hold as effective tension at a free surface. The fixed
+    corner is Dirichlet already, so in the active-set test it counts as saturated
+    and is never itself switched (see the edge loops in the two solvers).
+
+    This is the single source of the exit-face edge topology used by BOTH the steady
+    unconfined solver (``solve_unsaturated``) and the transient stepper
+    (``run_transient_seepage``); the transient rebuilds it per step because a
+    series-head boundary moves the exit-face set as the water level changes."""
     n = len(bc_type)
     is_corner = np.zeros(n, dtype=bool)
     linear_corners = np.zeros(n, dtype=bool)
     quadratic_edges = []
     seen = set()
+    # Element-edge multiplicity, so an exit/head edge is admitted only where it is
+    # a boundary edge (one element on it). Two exit-face corners are on the face by
+    # definition; an exit corner and a head corner can also be joined by an INTERIOR
+    # edge of a sliver element spanning the toe, and that edge must not become a
+    # seepage face.
+    edge_count = {}
+    for idx, en in enumerate(elements):
+        et = element_types[idx]
+        if et == 3:
+            _le = [(0, 1), (1, 2), (2, 0)]
+        elif et == 6:
+            _le = [(0, 1), (1, 2), (2, 0)]
+        elif et == 4:
+            _le = [(0, 1), (1, 2), (2, 3), (3, 0)]
+        elif et in (8, 9):
+            _le = [(0, 1), (1, 2), (2, 3), (3, 0)]
+        else:
+            continue
+        for a, b in _le:
+            key = tuple(sorted((int(en[a]), int(en[b]))))
+            edge_count[key] = edge_count.get(key, 0) + 1
     for idx, en in enumerate(elements):
         et = element_types[idx]
         if et == 3:
@@ -3175,15 +3249,20 @@ def _exit_face_topology(elements, element_types, bc_type):
             key = tuple(sorted((int(c1), int(c2))))
             if key in seen:
                 continue
-            if bc_type[c1] == 2 and bc_type[c2] == 2:
+            both_exit = bc_type[c1] == 2 and bc_type[c2] == 2
+            exit_to_head = ({int(bc_type[c1]), int(bc_type[c2])} == {1, 2}
+                            and edge_count.get(key, 0) == 1)
+            if both_exit or exit_to_head:
                 seen.add(key)
-                is_corner[c1] = True
-                is_corner[c2] = True
+                for c in (c1, c2):
+                    if bc_type[c] == 2:
+                        is_corner[c] = True
                 if len(gnodes) == 3:  # quadratic edge: has a midside node
                     quadratic_edges.append((int(c1), int(gnodes[1]), int(c2)))
                 else:
-                    linear_corners[c1] = True
-                    linear_corners[c2] = True
+                    for c in (c1, c2):
+                        if bc_type[c] == 2:
+                            linear_corners[c] = True
     return is_corner, linear_corners, quadratic_edges
 
 
@@ -3584,6 +3663,7 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 new_act[exit_linear_corners] = corner_candidate[exit_linear_corners]
                 # quadratic exit edges: all-or-nothing on (corner, midside, corner)
                 mid_cands = []
+                _corner_ok = corner_candidate | (bt == 1)
                 for _c1, _mid, _c2 in exit_quadratic_edges:
                     if act[_mid]:
                         mid_candidate = not (h_new[_mid] < y[_mid] - hyst
@@ -3592,10 +3672,10 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                         mid_candidate = (h_new[_mid] >= y[_mid] + hyst
                                          and q[_mid] <= q_offered[_mid])
                     mid_cands.append(bool(mid_candidate))
-                    if corner_candidate[_c1] and mid_candidate and corner_candidate[_c2]:
-                        new_act[_c1] = True
-                        new_act[_mid] = True
-                        new_act[_c2] = True
+                    if _corner_ok[_c1] and mid_candidate and _corner_ok[_c2]:
+                        for _nd in (_c1, _mid, _c2):
+                            if bt[_nd] == 2:
+                                new_act[_nd] = True
                 # Rescue a singular full collapse of a quadratic exit face when NO
                 # fixed head anchors the step (steady issue #51): fall back to
                 # per-corner activation for any corner that passes its own h/q test.
@@ -3612,6 +3692,20 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 if pinned.any():
                     new_act[pinned] = pinned_state[pinned]
                 set_stable = np.array_equal(new_act, act)
+                # A seepage face with the head above the ground is not a solution
+                # (same rule as the steady solver's; see solve_unsaturated). A set
+                # about to be called stable with an inactive exit node under
+                # pressure is resolved by hand: the node joins the face and is
+                # pinned there for the rest of the step, the representation a partly
+                # wet quadratic edge needs and the one the cycle breaker below hands
+                # out when it catches the cycle.
+                if set_stable:
+                    _wet_free = (bt == 2) & ~new_act & (h_new >= y + hyst) & ~pinned
+                    if np.any(_wet_free):
+                        new_act[_wet_free] = True
+                        pinned[_wet_free] = True
+                        pinned_state[_wet_free] = True
+                        set_stable = False
 
                 # Break a limit cycle in the active set by giving the offending edge
                 # the PARTIAL state the all-or-nothing rule cannot express. A set that

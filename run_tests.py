@@ -3981,6 +3981,9 @@ PREFLIGHT_NONCIRC_ONE_ZONE = _repo('docs/verification/files/rocscience/vp047.xls
 #: advisory, because its mitigation is already in the file — the control can be the
 #: model as shipped, and the mutation is taking the mitigation away.
 PREFLIGHT_BASE_THIN = _repo('docs/fem/files/xslope_griffiths3_r0p2_thin.xlsx')
+# A solved seepage field on a tri6 mesh whose exit face drains at atmospheric
+# pressure: the negative control for the free-surface pressure rule.
+PREFLIGHT_BASE_SEEP_FIELD = _repo('docs/verification/files/rocscience/vp046b.xlsx')
 
 
 def _pf_set(d, **kw):
@@ -3991,6 +3994,26 @@ def _pf_set(d, **kw):
 def _pf_mats(sd, **kw):
     for m in sd['materials']:
         m.update(kw)
+    return sd
+
+
+def _pf_wet_face(sd, u=500.0):
+    """Put pore pressure ``u`` on every ground-surface node that lies on no
+    specified-head polyline -- the field the exit-face defect used to hand the
+    stress analysis (pressure standing on a free face)."""
+    import numpy as _np
+    from xslope.seep import _min_distance_to_polyline as _dist
+    nodes = _np.asarray(sd['mesh']['nodes'], dtype=float)
+    gs = _np.asarray(list(sd['ground_surface'].coords), dtype=float)
+    tol = 1e-6 * float(_np.ptp(nodes[:, 0]))
+    on_ground = _dist(nodes, gs) <= tol
+    for h in (sd.get('seepage_bc') or {}).get('specified_heads', []):
+        pts = _np.asarray(h['coords'], dtype=float)
+        if len(pts) >= 2:
+            on_ground &= ~(_dist(nodes, pts) <= tol)
+    seep_u = _np.asarray(sd['seep_u'], dtype=float).copy()
+    seep_u[on_ground] = u
+    sd['seep_u'] = seep_u
     return sd
 
 
@@ -4444,6 +4467,14 @@ PREFLIGHT_RULE_SPECS = [
          analysis='fem',
          mutation=lambda sd: _pf_set(sd, seep_u=[0.0, 1.0, 2.0]),
          expect='computed on a different mesh'),
+    # Pressure standing on a free ground surface: the field the tri6 exit-face
+    # defect produced (pore pressure on the last edges of a seepage face above a
+    # tailwater toe). The base carries a clean solved field, so the control is the
+    # field as solved.
+    dict(rule='water.seep_pressure_on_free_surface', base=PREFLIGHT_BASE_SEEP_FIELD,
+         mode='dict', analysis='fem',
+         mutation=lambda sd: _pf_wet_face(sd),
+         expect='pore pressure on'),
     dict(rule='seep_field.missing', base=PREFLIGHT_BASE_LEM, mode='dict',
          mutation=lambda sd: _pf_mats(sd, u='seep'),
          expect='carries no mesh'),

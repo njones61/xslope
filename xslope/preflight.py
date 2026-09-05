@@ -2004,6 +2004,80 @@ def _auto_derivation_empty(ctx):
             f"analysis (the main sheet's Water loads row).")
 
 
+@rule("water.seep_pressure_on_free_surface", WARNING, ("lem", "fem"),
+      "A staged seepage field must not carry pore pressure on a free ground surface.")
+def _seep_pressure_on_free_surface(ctx):
+    """Pore pressure on the ground surface, away from every specified head.
+
+    A free surface drains at atmospheric pressure: a seepage face has u = 0 and a
+    dry surface u <= 0, so the only ground-surface nodes that may carry pressure are
+    the submerged ones on a specified-head line. A field that puts pressure anywhere
+    else on the surface asks the stress analysis to hold effective TENSION equal to
+    that pressure at a traction-free boundary -- a Mohr-Coulomb apex can carry a
+    little of it, a tensile cutoff none, and a strength-reduction run with a cutoff
+    then fails at every strength because no equilibrium exists there. Measured on
+    the Johnson Reservoir dam before the exit-face fix in seep.py: 41 to 110 psf on
+    the last 10 ft of the downstream face, and the SSRM fell from 1.23 to 0.70 with
+    ``t_cut = 0``.
+
+    Read on the staged field only (``seep_u`` on the mesh the run uses), so a model
+    with no seepage, or one whose field has not been staged yet, says nothing. The
+    threshold is a thousandth of the water column over the model height, so a
+    round-off pressure on a seepage-face node is not reported.
+    """
+    if not ctx.uses_seep_u:
+        return None
+    sd = ctx.sd
+    mesh = ctx.mesh
+    u = sd.get("seep_u")
+    if mesh is None or u is None:
+        return None
+    import numpy as np
+    from .seep import _min_distance_to_polyline
+    try:
+        nodes = np.asarray(mesh["nodes"], dtype=float)
+        u = np.asarray(u, dtype=float)
+    except (KeyError, TypeError, ValueError):
+        return None
+    if nodes.ndim != 2 or nodes.shape[0] != u.shape[0] or nodes.shape[0] == 0:
+        return None
+    gs = ctx.ground
+    if len(gs) < 2:
+        return None
+    gw = _num(sd.get("gamma_water"))
+    ys = nodes[:, 1]
+    height = float(np.max(ys) - np.min(ys))
+    width = float(np.max(nodes[:, 0]) - np.min(nodes[:, 0]))
+    if not gw or gw <= 0.0 or height <= 0.0 or width <= 0.0:
+        return None
+    tol = 1e-6 * max(width, height)
+    on_ground = _min_distance_to_polyline(nodes, np.asarray(gs, dtype=float)) <= tol
+    if not np.any(on_ground):
+        return None
+    # The submerged reach: every node on a specified-head polyline of the staged
+    # set is allowed its pressure (a head below the node reads u <= 0 anyway).
+    bc = sd.get("seepage_bc") or {}
+    allowed = np.zeros(len(nodes), dtype=bool)
+    for h in bc.get("specified_heads", []) or []:
+        pts = _coords(h.get("coords"))
+        if len(pts) >= 2:
+            allowed |= _min_distance_to_polyline(nodes, np.asarray(pts, dtype=float)) <= tol
+    floor = 1e-3 * gw * height
+    bad = on_ground & ~allowed & (u > floor)
+    if not np.any(bad):
+        return None
+    k = int(np.argmax(np.where(bad, u, -np.inf)))
+    n_bad = int(np.count_nonzero(bad))
+    return (f"The seepage field carries pore pressure on {n_bad} ground-surface "
+            f"node{'s' if n_bad != 1 else ''} away from any specified head -- up to "
+            f"{u[k]:.3g} (a piezometric level {u[k] / gw:.3g} above the surface) at "
+            f"x = {nodes[k, 0]:.6g}, y = {nodes[k, 1]:.6g}. A free surface drains at "
+            f"atmospheric pressure, and a stress analysis has to hold this pressure as "
+            f"effective tension at a traction-free boundary: with a tensile cutoff no "
+            f"equilibrium exists there and a strength reduction fails at every "
+            f"strength. Check the seepage exit face over that reach.")
+
+
 @rule("water.sources_disagree", WARNING, ("lem", "rapid"),
       "Seepage head boundaries and a piezometric line must describe the same pool.")
 def _water_sources_disagree(ctx):

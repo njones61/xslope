@@ -42,13 +42,29 @@ docs/seep/seep_slope.md
                             failure surface.
   seep_sl_piezo_vs_seep.png The same circle's base pore pressures from a
                             piezometric line and from the seepage solution.
+  seep_slope_seep_inputs.png  The Johnson Reservoir dam in the seepage view:
+                            the section, its material zones and its boundary
+                            conditions, before the mesh is built.
+  seep_slope_seep_results.png The flow net of that section, solved on the mesh
+                            committed beside the model at the settings its
+                            committed field was written under, so the flow rate
+                            on the figure is the one in the shipped
+                            ``_seep.csv``.
+  seep_slope_lem_inputs.png The same section in the stability view, where the
+                            seepage mesh shows through and the starting circle
+                            is drawn.
+  seep_slope_lem_search.png The circles the critical-surface search evaluated
+                            and the path its nine-point grid took.
+  seep_slope_lem_results.png The critical surface that search lands on, with the
+                            slice base stresses and the pore pressures read off
+                            the seepage field.
   seep_slope_fem_results.png The SSRM results panels of the Johnson Reservoir
                             dam, drawn from the run committed beside the model
                             (``xslope_johnson_res_fem_*``) rather than solved
                             here. The picture this replaces was a hand grab from
                             a session that read F = 1.29 on a linear-triangle
                             mesh, where the page, its tag and the committed run
-                            all say 1.25 on the 3,362-node quadratic mesh.
+                            all say 1.258 on the 3,362-node quadratic mesh.
 
 Deterministic: fixed meshes, fixed solves, fixed frames. Run from the repo root:
 
@@ -82,8 +98,11 @@ from xslope.seep import (build_seep_data, build_tseep_data,             # noqa: 
                          KR_LF, KR_VG, KR_GARD)
 from xslope.plot_seep import plot_seep_data, plot_seep_solution         # noqa: E402
 from xslope.plot_fem import plot_fem_results                            # noqa: E402
-from xslope.plot import declared_unit_labels, get_material_color        # noqa: E402
+from xslope.plot import (declared_unit_labels, get_material_color,      # noqa: E402
+                         plot_circular_search_results, plot_inputs,
+                         plot_solution)
 from xslope.report import solutions_from_sidecars                       # noqa: E402
+from xslope.search import circular_search                               # noqa: E402
 from xslope.slice import generate_slices                                # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -525,6 +544,154 @@ def fig_seep_slope_fem():
     _save(plt.gcf(), "seep_slope_fem_results.png")
 
 
+#: The worked example's stability run, exactly as the page's ``circular_search``
+#: tag states it: Spencer's method, 50 slices, the seeded search from the file's
+#: own starting circle. Nothing else is passed, so the figures and the lock are
+#: one run.
+JOHNSON_METHOD = "spencer"
+JOHNSON_SLICES = 50
+
+#: The solve settings the committed ``xslope_johnson_res_seep.csv`` was written
+#: under (``tools/make_seep_sidecars.py``'s DOCS). The seepage figure re-solves on
+#: the model's own committed mesh at these settings, so its flow rate is the
+#: shipped field's flow rate rather than a second answer beside it.
+JOHNSON_SEEP = dict(tol=1e-4, max_iter=1000)
+
+#: The Johnson section is wide and shallow (750 ft by 180 ft), so a figure at the
+#: plotting defaults would frame it inside a tall empty box. Width is fixed and
+#: height follows the content's own aspect at equal scale, plus the headroom the
+#: title and the below-axes legend need — the sizing rule
+#: ``tools/make_seep_sample_figures.py`` uses, for the same reason. The stability
+#: plots hold their equal aspect with ``adjustable="datalim"``, so an axes box
+#: taller than the content is filled by padding the x limits rather than by
+#: cropping: the height has to be asked for correctly, not trimmed afterwards.
+JOHNSON_FIG_W = 12.0
+JOHNSON_AXES_W_FRAC = 0.86
+#: Figure height a panel spends on things that are not the axes: the title, the
+#: axis labels and the legend below. Measured off the rendered panels.
+JOHNSON_OVERHEAD = 1.05
+
+
+def _johnson_span(data):
+    """The section's own extents: (x span, ground-to-max-depth y span)."""
+    gs = np.asarray(data["ground_surface"].coords)
+    y0 = float(data.get("max_depth", gs[:, 1].min()))
+    return (float(np.ptp(gs[:, 0])), float(gs[:, 1].max()) - y0)
+
+
+def _johnson_figsize(data, y_span=None, overhead=JOHNSON_OVERHEAD):
+    x_span, y_default = _johnson_span(data)
+    axes_w = JOHNSON_FIG_W * JOHNSON_AXES_W_FRAC
+    y = y_default if y_span is None else y_span
+    return (JOHNSON_FIG_W, axes_w * y / x_span + overhead)
+
+
+def _committed_flowrate(stem):
+    """The flow rate recorded in the footer of a committed ``_seep.csv``."""
+    path = os.path.join(FILES, f"{stem}_seep.csv")
+    with open(path) as fh:
+        for line in fh:
+            if line.startswith("# Total Flowrate:"):
+                return float(line.split(":", 1)[1])
+    raise RuntimeError(f"{path} records no total flow rate")
+
+
+def fig_seep_slope_worked_example():
+    """The five panels of the worked example: the same dam, three analyses.
+
+    One model is loaded once. ``load_slope_data`` picks up the mesh and the nodal
+    field committed beside it, which is the workflow the page describes, so every
+    panel below is drawn on the section the reader downloads.
+
+    * The **seepage inputs** are the section with its material zones and its
+      boundary conditions, drawn without the mesh so the head line and the exit
+      face read clearly — the state the reader is in at Build Mesh.
+    * The **seepage results** are a re-solve on the model's own committed mesh at
+      the settings its companion was written under, so the flow rate on the
+      figure is the flow rate in ``xslope_johnson_res_seep.csv``. The two are
+      compared here and a drift stops the run rather than shipping a figure that
+      disagrees with the file beside it.
+    * The **stability inputs** are the same section in the LEM view, where the
+      mesh the seepage run left behind shows through and the starting circle is
+      drawn.
+    * The **search** and the **critical surface** come from one
+      ``circular_search`` — the run the page's tag locks — so the factor of
+      safety on the two figures, in the prose and in the tag is one number.
+    """
+    data = _quiet(load_slope_data, os.path.join(FILES, DAM_FEM))
+    mesh = data.get("mesh")
+    if mesh is None:
+        raise RuntimeError(f"{DAM_FEM}: no mesh committed beside the model")
+    print(f"  {DAM_FEM}: {len(mesh['nodes'])} nodes, "
+          f"{len(mesh['elements'])} elements (tri{max(mesh['element_types'])})")
+
+    # --- seepage inputs -----------------------------------------------------
+    # frame="content" holds the axes box to the section's true proportions and
+    # the surplus figure height becomes an outer margin the tight bbox crops, so
+    # these two panels only need a generous height to start from.
+    fig = plt.figure(figsize=_johnson_figsize(data, overhead=2.2))
+    _quiet(plot_inputs, data, fig=fig, mode="seep", show_mesh=False,
+           frame="content", pad_frac=0.04)
+    _save(fig, "seep_slope_seep_inputs.png")
+
+    # --- seepage results ----------------------------------------------------
+    seep_data = _quiet(build_seep_data, mesh, data)
+    solution = _quiet(run_seepage_analysis, seep_data, **JOHNSON_SEEP)
+    if not solution.get("converged", True):
+        raise RuntimeError(f"{DAM_FEM}: seepage solve did not converge")
+    q = float(solution["flowrate"])
+    q_file = _committed_flowrate(os.path.splitext(DAM_FEM)[0])
+    print(f"  seepage: q = {q:.6f} (companion records {q_file:.6f})")
+    if abs(q - q_file) > 5e-4:
+        raise RuntimeError(
+            f"{DAM_FEM}: this solve gives q = {q:.6f}, the committed field "
+            f"records {q_file:.6f} — re-run tools/make_seep_sidecars.py so the "
+            f"figure and the file agree")
+    fig = plt.figure(figsize=_johnson_figsize(data, overhead=1.6))
+    # base_mat=3 (the foundation) is the reference zone the same dam's flow net is
+    # drawn against on docs/seep/samples.md: it carries the through-flow, where the
+    # near-cutoff core would ask for hundreds of flow lines. mesh=False for the
+    # reason every flow net in the docs is drawn without it — element edges chop
+    # the contour and flow lines into a dashed look. The mesh has its own showing
+    # on the stability inputs panel below.
+    _quiet(plot_seep_solution, seep_data, solution, fig=fig, levels=20,
+           base_mat=3, fill_contours=True, phreatic=True, mesh=False)
+    _save(fig, "seep_slope_seep_results.png", pad=0.3)
+
+    # --- stability inputs ---------------------------------------------------
+    fig = plt.figure(figsize=_johnson_figsize(data, overhead=2.2))
+    _quiet(plot_inputs, data, fig=fig, mode="lem", frame="content", pad_frac=0.04)
+    _save(fig, "seep_slope_lem_inputs.png")
+
+    # --- the search, and the surface it lands on ----------------------------
+    fs_cache, converged, search_path, circle_cache = _quiet(
+        circular_search, data, JOHNSON_METHOD, num_slices=JOHNSON_SLICES)
+    if not fs_cache or fs_cache[0]["FS"] >= 9999:
+        raise RuntimeError(f"{DAM_FEM}: the search found no valid surface")
+    crit = fs_cache[0]
+    print(f"  {JOHNSON_METHOD} search: FS = {crit['FS']:.4f} at "
+          f"Xo = {crit['Xo']:.1f}, Yo = {crit['Yo']:.1f}, "
+          f"Depth = {crit['Depth']:.1f} "
+          f"({len(circle_cache)} circles, converged={converged})")
+
+    # The search panel's content reaches well above the crest — the grid of trial
+    # centers sits above the dam — so its height is asked for against the centers,
+    # not against the section.
+    _, y_section = _johnson_span(data)
+    y_top = max(c["Yo"] for c in circle_cache)
+    y_base = float(data.get("max_depth", 0.0))
+    fig = plt.figure(figsize=_johnson_figsize(
+        data, y_span=1.08 * (y_top - y_base), overhead=0.9))
+    _quiet(plot_circular_search_results, data, fs_cache, search_path,
+           circle_cache=circle_cache, fig=fig)
+    _save(fig, "seep_slope_lem_search.png")
+
+    fig = plt.figure(figsize=_johnson_figsize(data, y_span=1.12 * y_section))
+    _quiet(plot_solution, data, crit["slices"], crit["failure_surface"],
+           crit["solver_result"], fig=fig)
+    _save(fig, "seep_slope_lem_results.png")
+
+
 # =========================================================================== #
 
 def main(which):
@@ -539,6 +706,7 @@ def main(which):
     if which in ("all", "seep_slope"):
         print("seep_slope.md figures")
         fig_seep_slope()
+        fig_seep_slope_worked_example()
         fig_seep_slope_fem()
 
 

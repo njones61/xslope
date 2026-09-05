@@ -184,7 +184,11 @@ three analyses on one input file:
 
 ![seep_slope_seep_inputs.png](images/seep_slope_seep_inputs.png){width=1200px}
 
-The inputs build a quadratic (`tri6`) mesh, and the seepage solution is:
+The reservoir stands at elevation 160 ft against the upstream face and the foundation beyond
+it, entered as a specified head; the downstream slope is an exit face, free to find its own
+seepage point. The inputs build a quadratic (`tri6`) mesh, and the steady solution on it
+passes 1.955 ft³/day per foot of dam, with the phreatic surface dropping through the core to
+daylight at the downstream toe:
 
 ![seep_slope_seep_results.png](images/seep_slope_seep_results.png){width=1200px}
 
@@ -199,21 +203,23 @@ appears behind the inputs plot:
 ![seep_slope_lem_inputs.png](images/seep_slope_lem_inputs.png){width=1200px}
 
 All three materials use the `seep` option, so every slice base reads the field. A
-critical-circle search with Spencer's method gives **FS = 1.26**:
+critical-circle search with Spencer's method settles on a circle centered above the downstream
+slope, one that cuts more than 20 ft into the foundation and daylights some 50 ft beyond the
+toe, at **FS = 1.258**:
 
 ![seep_slope_lem_results.png](images/seep_slope_lem_results.png){width=1200px}
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, expected_fs=1.25, num_slices=50, tolerance=0.02 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, expected_fs=1.258, num_slices=50, tolerance=0.02 -->
 
 The same workbook, mesh and solution then run an SSRM analysis with the default
 non-convergence criterion. The pore pressures reach the Gauss points through the effective
 stress formulation and the reservoir water above the submerged upstream face is applied as a
 consistent boundary pressure, so the FEM sees exactly the same water as the LEM. The result is
-**FS = 1.26**:
+**FS = 1.258**:
 
 ![seep_slope_fem_results.png](images/seep_slope_fem_results.png){width=1200px}
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, expected_fs=1.25, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, expected_fs=1.258, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
 
 The shear strain band and displacement vectors show a mechanism through the downstream shell
 that daylights at the toe, with only faint strain reaching into the foundation. The critical

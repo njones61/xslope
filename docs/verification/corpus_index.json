@@ -1281,216 +1281,6 @@
         "dloads": 0,
         "element_type": null,
         "hoek_brown": false,
-        "homogeneous": true,
-        "k0": null,
-        "line_loads": 0,
-        "material_options": [
-          "mc"
-        ],
-        "n_materials": 1,
-        "non_circular": false,
-        "piezo_line": false,
-        "pile_fixities": [
-          "free"
-        ],
-        "piles": 2,
-        "polygon_geometry": true,
-        "probabilistic": false,
-        "rapid_drawdown": false,
-        "reinforcement": {
-          "appls": [],
-          "count": 0,
-          "dirs": [],
-          "discrete_spacing": false,
-          "end_anchorage": false,
-          "pullout": false,
-          "residual_drop": false,
-          "types": []
-        },
-        "ru": false,
-        "seepage_coupled": false,
-        "seepage_problem": false,
-        "seismic_k": 0.0,
-        "sigmas": [],
-        "ssr_zones": 0,
-        "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": true,
-        "tension_crack": false,
-        "tension_crack_water": false,
-        "transient_seepage": false,
-        "unit_system": "imperial",
-        "unsaturated_models": [
-          "lf"
-        ]
-      },
-      "model": "docs/fem/files/xslope_piles_fem.xlsx",
-      "references": [
-        {
-          "anchor": "2-slope-stabilized-with-drilled-shaft-piles",
-          "checks": [
-            "fem_ssrm"
-          ],
-          "level": 3,
-          "page": "fem/samples/",
-          "resolution": "input-link",
-          "source_md": "docs/fem/samples.md",
-          "title": "2. Slope Stabilized with Drilled Shaft Piles",
-          "url": "https://xslope.readthedocs.io/en/latest/fem/samples/#2-slope-stabilized-with-drilled-shaft-piles"
-        }
-      ],
-      "topics": [
-        "piles",
-        "homogeneous"
-      ]
-    },
-    {
-      "features": {
-        "circular": true,
-        "cutoff_walls": 0,
-        "dloads": 0,
-        "element_type": null,
-        "hoek_brown": false,
-        "homogeneous": true,
-        "k0": null,
-        "line_loads": 0,
-        "material_options": [
-          "mc"
-        ],
-        "n_materials": 1,
-        "non_circular": false,
-        "piezo_line": false,
-        "pile_fixities": [],
-        "piles": 0,
-        "polygon_geometry": true,
-        "probabilistic": false,
-        "rapid_drawdown": false,
-        "reinforcement": {
-          "appls": [],
-          "count": 0,
-          "dirs": [],
-          "discrete_spacing": false,
-          "end_anchorage": false,
-          "pullout": false,
-          "residual_drop": false,
-          "types": []
-        },
-        "ru": false,
-        "seepage_coupled": false,
-        "seepage_problem": false,
-        "seismic_k": 0.0,
-        "sigmas": [],
-        "ssr_zones": 0,
-        "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": true,
-        "tension_crack": false,
-        "tension_crack_water": false,
-        "transient_seepage": false,
-        "unit_system": "imperial",
-        "unsaturated_models": [
-          "lf"
-        ]
-      },
-      "model": "docs/fem/files/xslope_piles_fem_nopile.xlsx",
-      "references": [
-        {
-          "anchor": "2-slope-stabilized-with-drilled-shaft-piles",
-          "checks": [
-            "fem_ssrm"
-          ],
-          "level": 3,
-          "page": "fem/samples/",
-          "resolution": "input-link",
-          "source_md": "docs/fem/samples.md",
-          "title": "2. Slope Stabilized with Drilled Shaft Piles",
-          "url": "https://xslope.readthedocs.io/en/latest/fem/samples/#2-slope-stabilized-with-drilled-shaft-piles"
-        }
-      ],
-      "topics": [
-        "homogeneous"
-      ]
-    },
-    {
-      "features": {
-        "circular": true,
-        "cutoff_walls": 0,
-        "dloads": 1,
-        "element_type": null,
-        "hoek_brown": false,
-        "homogeneous": false,
-        "k0": null,
-        "line_loads": 0,
-        "material_options": [
-          "mc"
-        ],
-        "n_materials": 2,
-        "non_circular": false,
-        "piezo_line": false,
-        "pile_fixities": [],
-        "piles": 0,
-        "polygon_geometry": true,
-        "probabilistic": false,
-        "rapid_drawdown": false,
-        "reinforcement": {
-          "appls": [
-            "active"
-          ],
-          "count": 6,
-          "dirs": [
-            "tangent"
-          ],
-          "discrete_spacing": false,
-          "end_anchorage": false,
-          "pullout": true,
-          "residual_drop": true,
-          "types": [
-            "generic"
-          ]
-        },
-        "ru": false,
-        "seepage_coupled": false,
-        "seepage_problem": false,
-        "seismic_k": 0.0,
-        "sigmas": [],
-        "ssr_zones": 0,
-        "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": true,
-        "tension_crack": false,
-        "tension_crack_water": false,
-        "transient_seepage": false,
-        "unit_system": "imperial",
-        "unsaturated_models": [
-          "lf"
-        ]
-      },
-      "model": "docs/fem/files/xslope_reinforce_fem.xlsx",
-      "references": [
-        {
-          "anchor": "1-reinforced-slope-with-geogrid-reinforcement",
-          "checks": [
-            "fem_ssrm"
-          ],
-          "level": 3,
-          "page": "fem/samples/",
-          "resolution": "input-link",
-          "source_md": "docs/fem/samples.md",
-          "title": "1. Reinforced Slope with Geogrid Reinforcement",
-          "url": "https://xslope.readthedocs.io/en/latest/fem/samples/#1-reinforced-slope-with-geogrid-reinforcement"
-        }
-      ],
-      "topics": [
-        "reinforcement"
-      ]
-    },
-    {
-      "features": {
-        "circular": true,
-        "cutoff_walls": 0,
-        "dloads": 0,
-        "element_type": null,
-        "hoek_brown": false,
         "homogeneous": false,
         "k0": null,
         "line_loads": 0,
@@ -2140,7 +1930,7 @@
           ],
           "level": 3,
           "page": "lem/samples/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/lem/samples.md",
           "title": "1. Simple Embankment",
           "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#1-simple-embankment"
@@ -3018,7 +2808,7 @@
           ],
           "level": 3,
           "page": "lem/samples/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/lem/samples.md",
           "title": "12. Rapid Drawdown (Johnson Reservoir Dam)",
           "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#12-rapid-drawdown-johnson-reservoir-dam"
@@ -3087,7 +2877,7 @@
           ],
           "level": 3,
           "page": "lem/samples/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/lem/samples.md",
           "title": "5. Slope with Multiple Materials and Piezometric Line",
           "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#5-slope-with-multiple-materials-and-piezometric-line"
@@ -3221,7 +3011,7 @@
           ],
           "level": 3,
           "page": "lem/samples/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/lem/samples.md",
           "title": "13. Multiple Local Minima",
           "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#13-multiple-local-minima"
@@ -3286,7 +3076,7 @@
           ],
           "level": 3,
           "page": "lem/samples/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/lem/samples.md",
           "title": "7. Non-Circular Failure Surface",
           "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#7-non-circular-failure-surface"
@@ -3350,16 +3140,16 @@
       "model": "docs/lem/files/xslope_piles.xlsx",
       "references": [
         {
-          "anchor": "10-slope-stabilized-with-piles",
+          "anchor": "lem-vs-fem-comparison",
           "checks": [
             "circular_search"
           ],
-          "level": 3,
+          "level": 4,
           "page": "lem/samples/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/lem/samples.md",
-          "title": "10. Slope Stabilized with Piles",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#10-slope-stabilized-with-piles"
+          "title": "LEM vs. FEM Comparison",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#lem-vs-fem-comparison"
         },
         {
           "anchor": "opening-the-model-and-reading-the-pile-rows",
@@ -3441,7 +3231,7 @@
           ],
           "level": 3,
           "page": "lem/samples/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/lem/samples.md",
           "title": "15. Reliability Analysis (Submerged Slope)",
           "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#15-reliability-analysis-submerged-slope"
@@ -3515,7 +3305,7 @@
           ],
           "level": 3,
           "page": "lem/samples/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/lem/samples.md",
           "title": "9. Reinforced Slope",
           "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#9-reinforced-slope"
@@ -3657,7 +3447,7 @@
           ],
           "level": 3,
           "page": "lem/samples/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/lem/samples.md",
           "title": "1. Simple Embankment",
           "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#1-simple-embankment"
@@ -3859,7 +3649,7 @@
           ],
           "level": 3,
           "page": "lem/samples/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/lem/samples.md",
           "title": "3. Simple Slope with Multiple Layers",
           "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#3-simple-slope-with-multiple-layers"
@@ -3924,7 +3714,7 @@
           ],
           "level": 3,
           "page": "lem/samples/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/lem/samples.md",
           "title": "11. Polygon Input with a Sloping Bottom",
           "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#11-polygon-input-with-a-sloping-bottom"
@@ -24007,7 +23797,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 339,
+    "models": 336,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -24033,16 +23823,16 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 574,
+    "tags": 571,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 159,
+      "homogeneous": 157,
       "non-circular": 32,
-      "piles": 16,
+      "piles": 15,
       "probabilistic": 15,
       "rapid-drawdown": 8,
-      "reinforcement": 24,
+      "reinforcement": 23,
       "seepage-coupled": 73,
       "seismic": 10,
       "soil-nails": 5,
@@ -24091,8 +23881,6 @@
       "docs/fem/files/xslope_griffiths5_m0p2.xlsx",
       "docs/fem/files/xslope_griffiths6_dry.xlsx",
       "docs/fem/files/xslope_griffiths6_full.xlsx",
-      "docs/fem/files/xslope_piles_fem.xlsx",
-      "docs/fem/files/xslope_piles_fem_nopile.xlsx",
       "docs/fem/files/xslope_torggler_3a_nopile.xlsx",
       "docs/fem/files/xslope_torggler_3a_plate.xlsx",
       "docs/lem/files/xslope_acads_simple.xlsx",
@@ -24277,7 +24065,6 @@
       "docs/verification/files/rocscience/vp103d.xlsx"
     ],
     "piles": [
-      "docs/fem/files/xslope_piles_fem.xlsx",
       "docs/fem/files/xslope_torggler_3a_plate.xlsx",
       "docs/fem/files/xslope_torggler_3b_plate.xlsx",
       "docs/lem/files/xslope_hassiotis_p1.xlsx",
@@ -24322,7 +24109,6 @@
       "docs/verification/files/rocscience/vp099.xlsx"
     ],
     "reinforcement": [
-      "docs/fem/files/xslope_reinforce_fem.xlsx",
       "docs/lem/files/xslope_reinforce.xlsx",
       "docs/tutorials/files/xslope_reinforced_slope.xlsx",
       "docs/tutorials/files/xslope_reinforced_slope_start.xlsx",

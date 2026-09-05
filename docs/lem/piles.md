@@ -331,14 +331,14 @@ A pile row can be put into either of XSLOPE's engines, but the two are not alter
 
 For a **continuous member** the beam formulation is an exact description rather than an idealization, its $EA$ and $EI$ already are per unit width, and it returns internal actions that a limit equilibrium analysis cannot produce at all. That path is measured end to end against GeoStudio's SIGMA/W sheet pile wall example, where XSLOPE reads 1.020 without the wall against their about 1.025 and recovers the published moment and shear distributions in shape and turning point; with the wall in place it reads 1.647 against their about 1.4 — see [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) and [Applicability](../fem/piles.md#applicability-continuous-walls-and-discrete-pile-rows) in the FEM pile documentation.
 
-For a **discrete row** the limit equilibrium route is the one whose mechanism is the real one. The size of the difference is measured on [the pile sample problem](samples.md#10-slope-stabilized-with-piles) — a 1:1 slope in c = 200 psf, $\phi$ = 20° soil with two rows of 2 ft drilled shafts at 6 ft spacing — which is solved by both engines on the same section, soil and pile rows:
+For a **discrete row** the limit equilibrium route is the one whose mechanism is the real one. The size of the difference is measured on the pile model of [the sample problem](samples.md#10-slope-stabilized-with-piles) and [FEM-3](../tutorials/fem03_piles.md) — a 1:1 slope in c = 200 psf, $\phi$ = 20° soil with two rows of 2 ft drilled shafts at 6 ft spacing — which is solved by both engines on the same section, soil and pile rows:
 
 | | Without piles | With piles | Credit for the row |
 |---|---|---|---|
 | **LEM** (Spencer) | 1.149 | 1.842 | ×1.60 |
-| **FEM** (SSRM) | 1.136 | 1.370 | ×1.21 |
+| **FEM** (SSRM) | 1.137 | 1.363 | ×1.20 |
 
-Without the piles the two engines agree to 1.1%, so nothing structural separates them and what the second column adds is the pile row alone. With the row in place they credit it by a factor of 1.60 and 1.21 — a disagreement on the quantity being designed, not a rounding.
+Without the piles the two engines agree to about 1%, so nothing structural separates them and what the second column adds is the pile row alone. With the row in place they credit it by a factor of 1.60 and 1.20 — a disagreement on the quantity being designed, not a rounding.
 
 Neither of those is a three-dimensional answer, and the direction of the error is only known where a three-dimensional reference exists. Cai & Ugai (2000) analyzed a pile-stabilized slope with a shear-strength-reduction finite element model that meshes the individual piles, the soil between them and the slip interfaces on each pile's surface. XSLOPE runs the same slope through both of its own engines:
 

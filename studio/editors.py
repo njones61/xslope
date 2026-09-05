@@ -3899,8 +3899,8 @@ MATERIALS_HELP = {
               "is NOT 'no tension': Mohr-Coulomb grants c/tanφ (28 kPa at c=20, φ=35°; "
               "unbounded at φ=0), which strength reduction never touches — enough to "
               "hold a steep crest cut shut and inflate SSRM FS. A cap you set IS reduced "
-              "with F, like c and tanφ (RS2/Plaxis do the same). 0 = no tension (can "
-              "block reinforced-fill equilibrium)."),
+              "with F, like c and tanφ (RS2/Plaxis do the same). 0 = the material "
+              "carries no tension at all."),
     "E": "FEM elastic (Young's) modulus — with ν, the only mechanical property read for an elastic material.",
     "nu": "FEM Poisson's ratio — with E, the only mechanical property read for an elastic material.",
     "u": "Pore-pressure model: none, piezo (piezometric line), seep (seepage solution), or ru.",

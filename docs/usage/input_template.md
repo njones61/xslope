@@ -278,12 +278,6 @@ RS2 model imported with `xslope.rs2.read_fez` (or Studio's
 automatically. See
 [Tensile Strength in SSRM](../fem/overview.md#tensile-strength-in-ssrm) for the mechanics and a worked case.
 
-!!! warning "Reinforced fills"
-    In a reinforced fill (e.g. a geotextile-wrapped wall), the reinforcement carries most of the tension, but the
-    soil between layers still needs some tensile tolerance to reach equilibrium. Setting `t_cut = 0` on a
-    reinforced-fill material can prevent the FEM from converging. Leave `t_cut` blank, or use a small nonzero
-    value, for reinforced-fill materials.
-
 See [Tension cutoff](../fem/overview.md#elastic-plastic-behavior-viscoplastic-algorithm) in the FEM overview for
 how the FEM applies the cutoff during the viscoplastic solve.
 

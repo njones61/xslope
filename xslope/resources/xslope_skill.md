@@ -500,14 +500,6 @@ slope_data['materials'] = [
         #     state and the FS reads high (preflight warns on a blank t_cut for exactly this).
         #     Leave it blank only deliberately: to reproduce a published plain-M-C benchmark
         #     that assumes unbounded tension, or when matching a vendor model that has no cap.
-        #     MEASURED CORNER CASE: where a fill tapers to nothing against its foundation, a
-        #     material with no tensile strength has no stress state at the tip that both
-        #     carries no tension and stays in equilibrium, and the strength reduction stalls
-        #     well below the limit equilibrium answer — COMBO-1's dam reads 0.70 under
-        #     t_cut = 0 against Spencer's 1.248 on the same section. Leave the cap blank on
-        #     such a model on purpose: the material's own Mohr-Coulomb apex c/tan(phi) still
-        #     limits tension there (about 140 psf for that shell), and check the FS against
-        #     the LEM answer.
         't_cut': 0,
         # --- matric-suction strength (v17): opt-in Fredlund extended Mohr-Coulomb apparent
         #     cohesion, read by BOTH solvers (LEM via generate_slices' suction_phi_b/

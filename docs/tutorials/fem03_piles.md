@@ -286,14 +286,22 @@ shaft is at its tip, which the rigid base holds in place while the soil above
 drags the shaft — the shear there is the reaction at that pinned toe, and the
 shaft is free to rotate about it.
 
-### Tip fixity
+### Head and tip fixity
 
-The `Tip` setting is a physical statement about the shaft. Both rows run from
-the face down to the rigid base, and their bottom nodes sit on it. With `Tip` on
+The `Head` and `Tip` settings are physical statements about how each end of
+the shaft is held. As shipped, `Head` is `free`: nothing holds the top of the
+shaft, and it moves with the soil around it. A head held in place and against
+rotation is a shaft tied into a stiff cap beam or a restrained deck. Setting
+`Head` to `fixed` on both rows, with the tips still pinned, gives 1.496, the
+largest change any single setting makes on this model. These shafts have no cap
+beam, so the head stays `free`, and the end that can be held is the tip.
+
+Both rows run from the face down to the rigid base, and their bottom nodes sit
+on it. With `Tip` on
 `pinned` the base holds the tip in place but lets it rotate: a drilled shaft that
 stops at the top of the rock and bears on it. With `Tip` on `fixed` the base
 holds its rotation too: a shaft socketed some distance into the rock, which grips
-its lower length. The cell offers the same four settings as `Head`:
+its lower length. Both cells offer the same four settings:
 
 | Setting | Translation | Rotation | At a tip, this is |
 | --- | --- | --- | --- |
@@ -361,12 +369,13 @@ the picture:
 | shaft modulus `E` ÷ 100 | 1.363 |
 | `Vcap` and `Mcap` cleared | 1.363 |
 | `Tip` set to `fixed` | 1.410 |
+| `Head` set to `fixed`, tips still pinned | 1.496 |
 
 Shaft stiffness does not decide the answer: a hundredfold stiffer shaft and a
 hundredfold softer one return the same number. Shaft capacity does not decide it
 either: with `Vcap` and `Mcap` blank the shaft stays elastic at any moment or
 shear, and the answer does not move, because as shipped the shafts never reach
-capacity. What moves the answer is holding the tip.
+capacity. What moves the answer is holding an end of the shaft.
 
 ### What spacing does to each engine
 

@@ -9,7 +9,7 @@ The following examples illustrate how to use XSLOPE to perform limit equilibrium
 
 The notebook allows the user to select a variety of analysis options using simple form inputs and then runs the analysis using the selected method and plots the results.
 
-For each problem below, the solution figure shows the critical surface and factor of safety for Spencer's method, and a **Factor of safety by method** table reports the result for every applicable method. A few things to keep in mind when reading those tables:
+For each problem below, the solution figure shows the critical surface and factor of safety for Spencer's method, and a **Factor of safety by method** table reports the result for every applicable method. On a solution figure, the green bars on the base of each slice are the effective stress there, the red bars are tension, and the red dashed line is the line of thrust computed with Spencer's method. A few things to keep in mind when reading those tables:
 
 - Each value is that method's **own** critical surface — every method runs its own search, so the surfaces (and therefore the factors of safety) are not identical between methods.
 - The Ordinary Method of Slices (OMS) and Bishop's method apply only to **circular** surfaces, so they show "—" for non-circular problems.
@@ -18,22 +18,7 @@ For each problem below, the solution figure shows the critical surface and facto
 
 ### 1. Simple Embankment
 
-This problem features a simple slope with a single material. It is built from
-scratch — assistant, Excel, or Studio — in
-[Tutorial LEM-1](../tutorials/lem01_simple_embankment.md), which also walks
-through reading its warnings and adding the tension crack.
-
-![simple_embankment.png](sample_images/simple_embankment.png){width=700}
-
-Excel input file: [xslope_simple_embankment.xlsx](files/xslope_simple_embankment.xlsx)
-
-Inputs plotted with the XSLOPE plot_inputs() function:
-
-![simple_embankment_inputs1.png](sample_images/simple_embankment_inputs1.png){width=700}
-
-Solution (critical surface and factor of safety). The green bars on the base of each slice represent the effective 
-stress on the base of the slice. The red bars correspond to tension at the base of the slice. The red dashed line 
-represents the line of thrust computed using Spencer's method.
+Built and run step by step in [LEM-1](../tutorials/lem01_simple_embankment.md).
 
 ![simple_embankment_results1.png](sample_images/simple_embankment_results1.png){width=700}
 
@@ -47,7 +32,7 @@ represents the line of thrust computed using Spencer's method.
 
 <!-- test: file=files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, fs_oms=1.215, fs_bishop=1.215, fs_janbu=1.335, fs_corps=1.319, fs_lowe=1.263, fs_spencer=1.276, fs_mprice=1.260 -->
 
-Here is copy of the input file with the following variations/changes:
+Here is a copy of the model with the following variations/changes:
 
 a) Distributed load on top of slope. q = 750 psf<br>
 b) Tension crack. Depth = 3 ft. <br>
@@ -74,26 +59,10 @@ Solution (critical surface and factor of safety):
 
 <!-- test: file=files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.985, fs_bishop=0.985, fs_janbu=0.969, fs_corps=1.050, fs_lowe=1.039, fs_spencer=0.986, fs_mprice=0.985 -->
 
-And here is a copy carrying variation (a) alone — a 750 psf distributed load over
-the 10 ft strip of crest between x = 25 and x = 35, with no tension crack and no
-submergence. It is the model built in
-[Tutorial LEM-2](../tutorials/lem02_loads_on_the_crest.md), which takes the load
-further: the same resultant as a line load, the same intensity read as a normal
-pressure and as a dead weight, a seismic coefficient, and the cohesion that would
-carry it all at FS = 1.5.
-
-Excel input file: [xslope_crest_surcharge.xlsx](files/xslope_crest_surcharge.xlsx)
-
-Inputs:
-
-![crest_surcharge_inputs.png](../tutorials/images/lem02_inputs.png){width=700}
-
-Solution (critical surface and factor of safety):
+The crest-surcharge variant is built and run step by step in
+[LEM-2](../tutorials/lem02_loads_on_the_crest.md).
 
 ![crest_surcharge_results.png](../tutorials/images/lem02_solution_load.png){width=700}
-
-The critical circle exits the crest at the far edge of the loaded strip: it
-carries the whole surcharge and no soil beyond it.
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -133,25 +102,7 @@ Solution (critical surface and factor of safety):
 
 ### 3. Simple Slope with Multiple Layers
 
-This problem involves a simple slope with multiple layers of material. 
-
-![simple_mult_layers.png](sample_images/simple_mult_layers.png){width=700}
-
-Excel input file: [xslope_simple_mult_layers.xlsx](files/xslope_simple_mult_layers.xlsx)
-
-Inputs plotted with the XSLOPE plot_inputs() function. Note that in this case we use two starting circles - one at 
-the base each of each of the two materials - to ensure that the search algorithm finds the critical surface 
-corresponding to a global and not a local minimum. 
-
-![simple_mult_layers_inputs.png](sample_images/simple_mult_layers_inputs.png){width=900}
-
-Search results. Each gray line represent each circle used in the search. The dots represent the center of the 
-circles used in the nine-point search algorithm, and the green arrows represent the path of grid centers taken to 
-reach the critical surface. The red circle represents the critical surface.
-
-![simple_mult_layers_search_results.png](sample_images/simple_mult_layers_search_results.png){width=900}
-
-Solution (critical surface and factor of safety):
+Built and run step by step in [LEM-3](../tutorials/lem03_layered_slope.md).
 
 ![simple_mult_layers_results.png](sample_images/simple_mult_layers_results.png){width=900}
 
@@ -200,21 +151,7 @@ Solution (critical surface and factor of safety):
 
 ### 5. Slope with Multiple Materials and Piezometric Line
 
-This problem features three layers of material with an effective stress analysis where pore pressures are derived 
-from a piezometric line. 
-
-![method_slices_problem.png](sample_images/method_slices_problem.png){width=900}
-
-| Material | Layer | γ (pcf) | γ_sat (pcf) | c′ (psf) | φ′ (deg) | u |
-|---|---|---:|---:|---:|---:|---|
-| soil 1 | Upper, 20 ft | 125 | 130 | 400 | 30 | `piezo` |
-| soil 2 | Middle, 24 ft | 122 | 127 | 600 | 28 | `piezo` |
-| soil 3 | Foundation, 40 ft | 115 | 118 | 900 | 12 | `piezo` |
-
-A firm embankment and middle layer sit on a soft foundation clay, and the critical surface is a deep circle cutting 
-into that clay rather than anything on the face. Every material states both unit weights, so each slice's weight is 
-split at the piezometric line — γ above it, γ_sat below — the behavior [Problem 16](#16-saturated-vs-moist-unit-weight-_sat) 
-isolates.
+Built and run step by step in [LEM-4](../tutorials/lem04_water_in_the_slope.md).
 
 This problem is similar to one used in two exercises in a graduate course on slope stability analysis
 (CE 544 - Slope Stability Analysis) at Brigham Young University, where limit equilibrium problems are solved
@@ -224,21 +161,10 @@ with the method of slices in an Excel spreadsheet. The exercise descriptions are
 [Bishop Simplified Procedure Homework](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_hw/)
 
 This sample shares the exercises' geometry but carries a different set of material properties, including both
-moist and saturated unit weights. In the exercises, a single circular surface was analyzed. The following Excel
-input file illustrates the problem:
-
-Excel input file: [xslope_method_slices_problem.xlsx](files/xslope_method_slices_problem.xlsx)
-
-Inputs plotted with the XSLOPE plot_inputs() function:
-
-![method_slices_problem_inputs.png](sample_images/method_slices_problem_inputs.png){width=900}
-
-Here is the solution for just the starting circle (to match the problem description), solved with Spencer's method:
+moist and saturated unit weights. In the exercises, a single circular surface was analyzed, which is the surface
+solved below with Spencer's method:
 
 ![method_slices_problem_results.png](sample_images/method_slices_problem_results.png){width=900}
-
-The specified circle enters the crest at x = 80.8 and exits on the flat ground at x = 267.8, 215 ft of base carrying 
-696,000 lb/ft. It is not the critical surface — the search below finds one 11% lower.
 
 <!-- fs-table -->
 **Factor of safety by method** (each method on the same specified circle):
@@ -321,36 +247,7 @@ Solution (critical surface and factor of safety):
 
 ### 7. Non-Circular Failure Surface
 
-This problem features a thin weak layer in the foundation of a slope. In such cases, a non-circular failure surface 
-constrained to fit in the weak layer often corresponds to the critical failure surface. This can be modeled with 
-non-circular options in XSLOPE. This problem is also featured in the user manual for the UTEXASED slope stability 
-analysis software developed by Stephen G. Wright at the University of Texas at Austin.
-
-![noncircular.png](sample_images/noncircular.png){width=900}
-
-The non-circular failure surface is modeled with the following Excel input file. The failure surface is defined by 
-four points — the surface the weak-zone generator builds on this section: a track running just above the base of the 
-clay seam at elevation −5.8, entering the ground at the toe and ramping up to the back of the crest. The first and 
-last point are assigned the "Free" option, which causes them to be automatically calculated based on the slope 
-geometry. The two middle points are assigned the "Horiz" option, which causes them to be moved horizontally inside 
-the weak layer.
-
-Excel input file: [xslope_noncircular.xlsx](files/xslope_noncircular.xlsx)
-
-Inputs plotted with the XSLOPE plot_inputs() function:
-
-![noncircular_inputs.png](sample_images/noncircular_inputs.png){width=900}
-
-Search results:
-
-![noncircular_search_results.png](sample_images/noncircular_search_results.png){width=900}
-
-!!! note
-    The search algorithm for non-circular failure surfaces is highly sensitive to the starting location. It the 
-    angle of the wedge at the toe of the slope is too steep, there will be tension at the toe of the slope and the search 
-    will fail to find a correct solution.
-
-Solution (critical surface and factor of safety):
+Built and run step by step in [LEM-5](../tutorials/lem05_weak_layer_noncircular.md).
 
 ![noncircular_results.png](sample_images/noncircular_results.png){width=900}
 
@@ -443,24 +340,7 @@ Solution (critical surface and factor of safety):
 
 ### 9. Reinforced Slope
 
-This problem features an engineered slope with six layers of geogrid reinforcement. This problem was featured in the 
-user manual for the UTEXASED slope stability analysis software developed by Stephen G. Wright at the University of Texas 
-at Austin.
-
-![reinforce.png](sample_images/reinforce.png){width=900}
-
-A 240 psf surcharge is applied along the slope crest from x = 30 to x = 100. For each line of reinforcement, the full tensile force develops over a length of 4 ft. The toe of the slope corresponds
-to (0, 0) and the top of the slope corresponds to (30, 24). The six reinforcement lines are horizontal at elevations y = 0, 4, 8, 12, 16, and 20 ft (the lowest at the toe elevation); each starts on the slope face and is 20 ft long. 
-
-The following Excel input file illustrates the problem. The soil reinforcement is entered in the "reinforce" sheet.
-
-Excel input file: [xslope_reinforce.xlsx](files/xslope_reinforce.xlsx)
-
-Inputs plotted with the XSLOPE plot_inputs() function:
-
-![reinforce_inputs.png](sample_images/reinforce_inputs.png){width=900}
-
-Solution (critical surface and factor of safety):
+Built and run step by step in [LEM-8](../tutorials/lem08_reinforced_slope.md).
 
 ![reinforce_results.png](sample_images/reinforce_results.png){width=900}
 
@@ -496,31 +376,9 @@ values below pin the axial + passive path on a right-facing slope.
 
 ### 10. Slope Stabilized with Piles
 
-This problem features a 1:1 slope in a medium-stiff clay stabilized by two rows of drilled shafts.
-
-![piles_inputs.png](sample_images/piles_inputs.png){width=900}
-
-Excel input file: [xslope_piles.xlsx](files/xslope_piles.xlsx)
-
-| Property | Value |
-|----------|-------|
-| Cohesion, $c$ | 200 psf |
-| Friction angle, $\phi$ | 20 degrees |
-| Unit weight, $\gamma$ | 120 pcf |
-| Pile diameter, $D$ | 2.0 ft |
-| Pile spacing, $S$ | 6.0 ft |
-| $V_{\text{cap}}$ | 46,000 lb |
-| $M_{\text{cap}}$ | 60,000 ft·lb |
-
-#### Results Without Piles (FS = 1.15)
-
-![piles_results_no_pile.png](sample_images/piles_results_no_pile.png){width=900}
-
-#### Results With Piles (FS = 1.85)
+Built and run step by step in [LEM-12](../tutorials/lem12_piles.md).
 
 ![piles_results.png](sample_images/piles_results.png){width=900}
-
-The two rows of piles increase the factor of safety from 1.15 to 1.85.
 
 #### Ito & Matsui Summary
 
@@ -574,21 +432,14 @@ unconservatively high factor of safety.
 #### LEM vs. FEM Comparison
 
 The same model solved with the finite element engine (see
-[FEM Samples](../fem/samples.md#2-slope-stabilized-with-drilled-shaft-piles)) reads FS = 1.370 with the
-piles and 1.136 without them, where Spencer reads 1.842 with them and 1.149 without. The two engines
-credit the same row by factors of 1.21 and 1.60. That gap is an idealization, not a numerical difference:
+[Tutorial FEM-3](../tutorials/fem03_piles.md)) reads FS = 1.363 with the
+piles and 1.137 without them, where Spencer reads 1.842 with them and 1.149 without. The two engines
+credit the same row by factors of 1.20 and 1.60. That gap is an idealization, not a numerical difference:
 a plane-strain finite element model has no space between the piles, so it represents the row as a
 continuous wall carrying one pile's stiffness smeared over the spacing, while the Ito & Matsui force is
 a theory of the soil flowing between them. For a discrete row at spacing the limit equilibrium result is the applicable one,
 and the finite element run is read for the pile's internal forces rather than for its factor of safety —
 see [LEM vs. FEM Pile Modeling](piles.md#lem-vs-fem-pile-modeling).
-
-One more caution this problem teaches: the tabulated values are the deep-surface results the Ito & Matsui
-walkthrough analyzes, found by the search seeded from the circles sheet. A grid-seeded global search
-(`seed='grid'`) finds a *shallower* surface at FS ≈ 1.70 for the complete-equilibrium methods — the
-pile forces make the deep basin locally attractive while a shallower mechanism governs. See the
-[Multiple Local Minima](#13-multiple-local-minima) discussion; checking the shallow bypass is part of
-pile design.
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -602,30 +453,7 @@ pile design.
 
 ### 11. Polygon Input with a Sloping Bottom
 
-This problem demonstrates two features together: **polygon-based geometry input** and a
-**sloping (non-horizontal) bottom boundary**. Rather than profile lines and a horizontal
-`max_depth`, the cross-section is defined directly on the `polygon` sheet as two
-material-zone polygons — an embankment over a foundation — whose shared base dips from
-left to right (elevation −15 on the left to −5 on the right). With polygon input there is
-no `max_depth`; the union of the polygons forms the **domain polygon**, and its lower
-boundary is the dipping base shown by the hatched line.
-
-The failure surface is constrained to stay within the domain polygon. During the search,
-trial circles that would dip below the sloping base are automatically rejected, so the
-critical surface follows the dipping foundation rather than a fictitious flat cutoff.
-
-Excel input file: [xslope_sloping_bottom.xlsx](files/xslope_sloping_bottom.xlsx)
-
-Inputs plotted with the XSLOPE plot_inputs() function (filled material zones and a hatched
-sloping base, instead of profile lines and a horizontal max-depth line):
-
-![sloping_bottom_inputs.png](sample_images/sloping_bottom_inputs.png){width=900}
-
-Search results:
-
-![sloping_bottom_search_results.png](sample_images/sloping_bottom_search_results.png){width=900}
-
-Solution (critical surface and factor of safety):
+Built and run step by step in [LEM-6](../tutorials/lem06_polygon_geometry.md).
 
 ![sloping_bottom_results.png](sample_images/sloping_bottom_results.png){width=900}
 
@@ -647,53 +475,9 @@ automated regression suite. See also the [Verification](../verification/index.md
 
 ### 12. Rapid Drawdown (Johnson Reservoir Dam)
 
-This sample exercises XSLOPE's **rapid drawdown** capability — the three-stage
-procedure (Duncan, Wright and Wong (1990)) for the *upstream* slope of an earth dam
-after the reservoir is lowered faster than the low-permeability zones can drain.
-The Johnson Reservoir dam is analyzed on its upstream design circle:
-
-- **Stage 1** — pre-drawdown stability with drained strengths and full-pool
-  (El. 160 ft) pore pressures.
-- **Stage 2** — post-drawdown stability with the interpolated undrained
-  strengths. Only the compacted-clay core carries the bilinear $d$, $\psi$
-  envelope ($d = 250$ psf, $\psi = 14°$); the sand shell and the silty-sand
-  foundation drain freely and stay drained through the drawdown.
-- **Stage 3** — post-drawdown check with drained strengths and the residual-pool
-  (El. 110 ft) pore pressures.
-
-The governing factor of safety is the **minimum of Stage 2 and Stage 3**. Each
-pool is stated as its own **steady seepage problem** — boundary set 1 holds the
-reservoir at El. 160, set 2 the residual pool at El. 110 — and every material reads
-its pore pressure from the solved fields (`u = seep`), which ship beside the
-workbook as `_seep.csv` and `_seep2.csv` on the committed `_mesh.json`. Water loads
-are left on `auto`, so the reservoir's weight on the upstream face follows whichever
-pool the stage is standing at. The two other ways of supplying the same drawdown's
-pore pressures are worked on this same dam elsewhere: a **piezometric pair** in
-Part 1 of [Tutorial COMBO-2](../tutorials/combo02_rapid_drawdown.md), and a
-**transient** solution the stages are cut from in
-[Rapid Drawdown Analysis](rapid.md), which also carries the methodology.
-
-Excel input file: [xslope_johnson_rapid_KEY.xlsx](files/xslope_johnson_rapid_KEY.xlsx)
-(the seepage mesh and the two seep solutions are bundled alongside it).
-
-Inputs plotted with the XSLOPE plot_inputs() function:
-
-![johnson_rapid_inputs1.png](sample_images/johnson_rapid_inputs1.png){width=900}
-
-Solution (governing rapid-drawdown surface and factor of safety, Spencer's method):
+Built and run step by step in [COMBO-2](../tutorials/combo02_rapid_drawdown.md).
 
 ![johnson_rapid_results1.png](sample_images/johnson_rapid_results1.png){width=900}
-
-The table reports the governing rapid-drawdown FS on the upstream circle by
-method. The two complete-equilibrium methods agree to within 1% (Spencer 1.498,
-Morgenstern-Price 1.510). Bishop reads 1.439 and Janbu 1.366, both below the
-rigorous value, and the Ordinary Method of Slices reads 1.247 — 17% below Spencer,
-the conservative margin the most approximate of the methods carries on a surface
-this deep beneath pore pressures this large. The two force-equilibrium methods
-land above Spencer, Lowe-Karafiath at 1.548 and the Corps of Engineers at 1.719,
-for the reason given in the introduction: each assumes an interslice-force
-inclination rather than solving for it, and the pore pressures retained through
-the post-drawdown stages amplify what that assumption costs.
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -707,27 +491,20 @@ the post-drawdown stages amplify what that assumption costs.
 
 ### 13. Multiple Local Minima
 
-A two-layer slope — a **cohesionless embankment** ($c' = 0$, $\phi' = 30°$) over a
-**soft clay foundation** ($c = 450$ psf, $\phi = 0$) — with two competing failure
-mechanisms that a single automated search can easily confuse.
+Built and run step by step in [LEM-10](../tutorials/lem10_global_minimum.md).
 
-Because the embankment is cohesionless, a free search collapses onto the
-**degenerate infinite-slope limit**: a vanishingly shallow, near-planar sliver high
-on the slope face with $F = \tan\phi'/\tan\beta \approx 1.30$. The search figure
-below shows it — every tested circle shrinks toward the face and the "critical"
-surface (red) is a tiny sliver carrying essentially no sliding mass. It is a
-mathematical artifact, not a design-relevant failure.
+Degenerate infinite-slope search — a free search collapses to a near-planar sliver
+near the crest (critical circle in red, $FS \approx 1.30$):
 
-The engineering-critical mechanism is the **deep foundation failure**. Seeding a
-circle **tangent to the limiting depth** (the base of the soft foundation,
-$y = -20$) finds it: a deep circle through the clay with $FS \approx 1.43$. This is
-the global minimum among physical surfaces — and it is *lower* than any shallow
-embankment circle, so a search that stops at the sliver is both non-physical and
-unconservative for the foundation. The lesson: on a cohesionless-over-soft-foundation
-profile, never trust a single free search — seed circles tangent to each candidate
-failure depth and compare.
+![mult_min_degenerate.png](sample_images/mult_min_degenerate.png){width=900}
 
-**Single-seed searches can also trap on problems with concentrated forces.** The
+Global minimum — the deep foundation failure found from a circle tangent to the
+limiting depth (Spencer's method). All methods are evaluated on this same deep
+circle:
+
+![mult_min_results1.png](sample_images/mult_min_results1.png){width=900}
+
+**Single-seed searches can trap on problems with concentrated forces.** The
 pile-stabilized sample ([Problem 10](#10-slope-stabilized-with-piles)) is a measured
 example: seeded from its circles sheet, the search converges to the deep surface
 tabulated there (Spencer 1.842, Lowe 1.978), but the grid-seeded global search
@@ -743,26 +520,9 @@ degenerate slivers this section warns about (Janbu collapsing to near-zero on a
 few-foot sliver, Corps dropping below OMS), because the global sweep finds the
 mathematical minimum of each method's equation with no regard for physical sense.
 The tabulated sample values therefore remain single-seed by deliberate choice, and
-the working practice is the same as above: run the free search, then cross-check
+the working practice is this: run the free search, then cross-check
 with `seed='grid'` and with tangent-seeded circles at each candidate depth, and
 judge the surfaces — not just the numbers — before accepting any of them.
-
-Excel input file: [xslope_mult_min_KEY.xlsx](files/xslope_mult_min_KEY.xlsx)
-
-Inputs plotted with the XSLOPE plot_inputs() function:
-
-![mult_min_inputs1.png](sample_images/mult_min_inputs1.png){width=900}
-
-Degenerate infinite-slope search — a free search collapses to a near-planar sliver
-near the crest (critical circle in red, $FS \approx 1.30$):
-
-![mult_min_degenerate.png](sample_images/mult_min_degenerate.png){width=900}
-
-Global minimum — the deep foundation failure found from a circle tangent to the
-limiting depth (Spencer's method). All methods are evaluated on this same deep
-circle:
-
-![mult_min_results1.png](sample_images/mult_min_results1.png){width=900}
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -809,27 +569,7 @@ Solution (critical surface with the tension crack, Spencer's method):
 
 ### 15. Reliability Analysis (Submerged Slope)
 
-XSLOPE can run a **reliability analysis** with any of the limit equilibrium methods
-(see [Taylor Series Probability Method](../reliability/taylor.md)). Instead of a single factor of safety,
-each uncertain input is given a most-likely value (MLV) and a standard deviation
-($\sigma$) on the **mat** sheet. XSLOPE perturbs each variable to estimate the
-standard deviation of the factor of safety ($\sigma_F$) and its coefficient of
-variation ($COV_F = \sigma_F / F_{MLV}$), then forms the **lognormal reliability
-index**
-
-$$\beta_{LN} = \frac{\ln\!\left(F_{MLV} / \sqrt{1 + COV_F^2}\right)}{\sqrt{\ln\!\left(1 + COV_F^2\right)}},$$
-
-from which the reliability $R$ and probability of failure $P_f = 1 - R$ follow.
-
-This sample is a submerged slope in undrained clay; the unit weight and the
-undrained strength are the uncertain inputs, and the water standing above the slope
-is modeled as a distributed load.
-
-Excel input file: [xslope_prob_submerged_KEY.xlsx](files/xslope_prob_submerged_KEY.xlsx)
-
-Inputs plotted with the XSLOPE plot_inputs() function:
-
-![prob_submerged_inputs1.png](sample_images/prob_submerged_inputs1.png){width=900}
+Built and run step by step in [LEM-11](../tutorials/lem11_reliability.md).
 
 Reliability result — the $F_{MLV}$ critical surface (Spencer's method) with the
 analysis summary:

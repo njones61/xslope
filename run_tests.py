@@ -2913,19 +2913,21 @@ def run_editor_roundtrip_test(test):
     app.processEvents()
 
     # (5b) The Tension SRF checkbox is offered only where the trial factor has a
-    #      cap to reduce. Three model states, one control each: a positive cutoff
+    #      cap to reduce. Four model states, one control each: a positive cutoff
     #      (live), every cutoff 0 (dimmed — 0/F is 0, so the box would change no
-    #      number), and every cutoff blank (dimmed — there is no cap at all). The
+    #      number), every cutoff blank (dimmed — there is no cap at all), and a
+    #      mix of blank and 0 (dimmed — no material has a cutoff above zero). The
     #      dimming reads xslope.preflight.has_reducible_tensile_cap, the same
     #      predicate main.tension_srf_unset reads, so this row and the preflight
     #      row for that rule are the two halves of one guarantee.
     _tsd = _editor_fixture()
     for _caps, _live, _why in ((50.0, True, "a positive cutoff"),
                                (0.0, False, "every cutoff 0"),
-                               (None, False, "every cutoff blank")):
+                               (None, False, "every cutoff blank"),
+                               ("mixed", False, "cutoffs mixing blank and 0")):
         _m = copy.deepcopy(_tsd)
-        for _mat in _m["materials"]:
-            _mat["t_cut"] = _caps
+        for _k, _mat in enumerate(_m["materials"]):
+            _mat["t_cut"] = (None if _k % 2 else 0.0) if _caps == "mixed" else _caps
         _fd = RunFemDialog(defaults={"analysis": "ssrm"}, slope_data=_m)
         _got = _fd.tension_srf.isEnabled()
         if _got != _live:

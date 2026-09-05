@@ -3426,20 +3426,6 @@ def has_reducible_tensile_cap(material):
     return v is not None and v > 0.0
 
 
-def declares_tensile_cap(material):
-    """True where this material states a tensile cutoff AT ALL, a zero included.
-
-    The weaker half of the pair: a declared ``0`` is a no-tension soil and a
-    blank cell is an unbounded one, and the two are worth telling apart even
-    where neither gives the trial factor anything to reduce. Studio's dimmed
-    tooltip says which of the two it is looking at.
-    """
-    opt = str(material.get("option") or "").strip().lower()
-    if opt in ("", "elastic"):
-        return False
-    return _num(material.get("t_cut")) is not None
-
-
 @rule("mat.nu_unusable", ERROR, ("fem",),
       "Poisson's ratio nu must be in (0, 0.5); a blank one reads as 0.0.")
 def _mat_nu_unusable(ctx):

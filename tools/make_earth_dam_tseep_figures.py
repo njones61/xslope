@@ -2,7 +2,7 @@
 (docs/seep/samples.md).
 
 One deterministic script serves both transient samples — each is solved once
-(serial) and rendered into two figures in docs/seep/images/:
+(serial) and rendered into the figures its page carries, in docs/seep/images/:
 
   <sample>_flownet.png   The time-stamped transient series: a handful of panels
                          stacked vertically (full pool, early / mid / late
@@ -27,7 +27,8 @@ One deterministic script serves both transient samples — each is solved once
                          shipped figure is rebuilt by its own generator beside
                          the image, docs/seep/images/tseep_history.py. One
                          producer per figure.
-  <sample>_inputs.png    The plot_inputs() view of the model: geometry, material
+  <sample>_inputs.png    Drawn only for a sample whose page carries one. The
+                         plot_inputs() view of the model: geometry, material
                          zones, and the seep boundary conditions with the v18
                          reservoir symbology -- the submerged-only reservoir face is
                          drawn distinctly from a fixed-head boundary, and its
@@ -86,6 +87,9 @@ SAMPLES = {
         panels=[(0, "full pool"), (15, "early drawdown"), (30, "mid drawdown"),
                 (47, "end of drawdown (max lag)"), (120, "recovery"),
                 (360, "quasi-equilibrium")],
+        # SEEP-3 builds this model input by input, so the sample entry carries
+        # the solved series alone and no inputs panel of its own.
+        inputs=False,
     ),
     "johnson": dict(
         xlsx="xslope_johnson_res_tseep.xlsx",
@@ -197,7 +201,8 @@ def main(argv):
         sd, seep, sol = _solve(cfg)
         print(f"  {len(seep['nodes'])} nodes, {len(sol['frames'])} saved frames, "
               f"converged={sol['converged']}")
-        fig_inputs(cfg, sd)
+        if cfg.get("inputs", True):
+            fig_inputs(cfg, sd)
         fig_flownet(cfg, sd, seep, sol)
     print("done")
 

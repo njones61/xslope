@@ -1,18 +1,17 @@
-"""Regenerate the transient history figures for docs/seep/samples.md.
+"""Regenerate the transient history figure for docs/seep/samples.md.
 
-Both transient samples are drawn the same way and by the same function: the run
-is marched once and :func:`xslope.plot_seep.plot_transient_history` draws it —
-the reservoir level, the water table at an interior station and the top of the
-seepage face above, the boundary inflow and outflow below, with the drawdown
-shaded across both.
+The run is marched once and :func:`xslope.plot_seep.plot_transient_history`
+draws it — the reservoir level, the water table at an interior station and the
+top of the seepage face above, the boundary inflow and outflow below, with the
+drawdown shaded across both.
 
 What this script adds to that figure is what belongs to the documentation rather
-than to the plot: the station each sample is read at, the elevation window, and
+than to the plot: the station the sample is read at, the elevation window, and
 the two sentence titles that say what the sample shows. The station is a choice —
-the function's own default is the column that lags the reservoir most — so each
+the function's own default is the column that lags the reservoir most — so the
 sample names the one its text is written about.
 
-    PYTHONPATH=. python3 docs/seep/images/tseep_history.py            # both
+    PYTHONPATH=. python3 docs/seep/images/tseep_history.py            # every sample
     PYTHONPATH=. python3 docs/seep/images/tseep_history.py johnson    # one
 """
 import contextlib
@@ -41,19 +40,6 @@ FILES = os.path.join(HERE, "..", "files")
 #: ``sat_tol`` is how far below zero a node's pressure head may sit and still
 #: count as saturated — a tenth of a foot, well inside one element on either mesh.
 SAMPLES = {
-    "earth_dam": dict(
-        xlsx="xslope_earth_dam_tseep.xlsx",
-        stem="earth_dam_tseep",
-        target=110.0 / 64.0,
-        station=30.0,
-        station_halfwidth=2.5,
-        sat_tol=0.1,
-        elev_lim=(0, 20),
-        titles=("Phreatic surface lags the reservoir; the exit point migrates "
-                "down the face",
-                "Inflow → 0 as the face drains; outflow spikes on released "
-                "storage, then decays"),
-    ),
     "johnson": dict(
         xlsx="xslope_johnson_res_tseep.xlsx",
         stem="johnson_res_tseep",

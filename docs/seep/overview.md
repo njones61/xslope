@@ -239,6 +239,26 @@ edge** rather than per node: a quadratic side is active only when both corners a
 node satisfy the criterion. This keeps the seepage transition at element corners and keeps the
 quadratic head solution consistent with the flow net near the exit point.
 
+An exit edge is a boundary edge whose corners are both exit-face nodes — **or** one exit-face
+corner and one specified-head corner. The second kind is the last edge of a seepage face where
+it meets a head line at a shared corner, which is what the downstream toe of a dam under
+tailwater looks like: the toe node belongs to the tailwater head boundary, and the edge above
+it belongs to the seepage face. Counting that edge is what makes the face run **to** the head
+line. Left out, it would belong to no exit edge at all — its midside node given no state, its
+upper corner tied to the dry edge above — and the face would end one edge short of the toe with
+the head standing above the ground over that reach. The fixed corner is a Dirichlet row
+already, so in the edge test it counts as saturated and is never itself switched by it.
+
+The set is called stable only while every **inactive** seepage-face node stands at or below
+its own elevation. A free face carrying pressure is not a solution of the problem posed:
+either the face is there and the pressure is atmospheric, or the pressure is atmospheric
+because the face is there. So an inactive exit node whose head reaches its elevation is taken
+into the face and the iteration continues rather than closing on that state, and on a
+quadratic mesh the edges it lies on are resolved per node from that point — the state a partly
+wet edge needs, which all-or-nothing cannot express. A node the ordinary tests keep shedding
+is forced a bounded number of times, so a face that will not settle leaves the run reporting
+`converged = False` instead of holding it open.
+
 ### Specified flux (Neumann) {#specified-flux-boundary-conditions-neumann}
 
 A specified-flux boundary prescribes the rate at which water crosses a boundary instead of the
@@ -348,8 +368,10 @@ Convergence is a **hybrid** test — all three conditions must hold at once:
    mass balance on the reported flowrate — so a run does not stop until the conductivity field
    has stopped lagging the head field to within `closure_tol` of the inflow, which is what
    makes the converged discharge tolerance-independent.
-3. **Exit-face stability.** The active set unchanged from the previous iteration — the
-   flowrate is not meaningful while exit nodes are still switching.
+3. **Exit-face stability.** The active set unchanged from the previous iteration, and no
+   inactive exit node standing above its own elevation — the flowrate is not meaningful while
+   exit nodes are still switching, and a seepage face with pressure on it is not a free
+   boundary.
 
 A run that hits `max_iter` (default 400) without satisfying all three returns
 `converged = False` and says so.

@@ -294,7 +294,10 @@ pressure unless the head would fall below its elevation or the boundary reaction
 push water *into* the domain, in which case it is released to no-flow. On quadratic meshes each
 seepage-face edge is tracked all-or-nothing across its corner and midside nodes — the same edge
 treatment the steady solver applies — so the transition lands cleanly on a corner and the
-element order of a transient run is unrestricted.
+element order of a transient run is unrestricted. The step's set-stability test carries the
+steady solver's rule with it: a set about to be called stable with an inactive exit node
+standing at or above its own elevation is not accepted, and that node joins the face and is
+held there for the rest of the step.
 
 **Partly wet quadratic edges.** All-or-nothing has one state it cannot express: the edge the
 exit point is passing *through*, wet below and dry above. Both available states are

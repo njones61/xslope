@@ -192,7 +192,7 @@ severity and one-line summary.
 
 | Family | What it looks at |
 |--------|------------------|
-| **Water** | The unit weight of water; a material reading a piezometric line that does not exist or stops short of the section; a line no material reads; standing water above the ground surface with no distributed load carrying its weight; and, on a model with [automatic water loads](#automatic-water-loads), a transcribed block the engine would derive a second time, a pool the derivation could not measure, and two water definitions that disagree |
+| **Water** | The unit weight of water; a material reading a piezometric line that does not exist or stops short of the section; a line no material reads; standing water above the ground surface with no distributed load carrying its weight; and, on a model with [automatic water loads](#automatic-water-loads), a transcribed block the engine would derive a second time, a pool the derivation could not measure, and two water definitions that disagree; and, on a run fed by a staged seepage field, pore pressure standing on a free ground surface |
 | **Materials** | The pore-pressure, unsaturated-model and strength-model vocabularies; a material inside the geometry with no strength model, no unit weight, or no strength at all; `u = ru` with no ratio; `option = cp` with no undrained strength; a Hoek-Brown material under the Corps of Engineers or Lowe & Karafiath method, which fix the interslice force inclination rather than solving for it and stop converging at the friction angles a curved envelope reaches near a slope face |
 | **Global parameters** | A blank seismic coefficient; a coefficient outside the plausible range, or entered with a sign the limit-equilibrium engine cannot use; water in the crack deeper than the crack that holds it |
 | **Surfaces** | A model with no failure surface at all; a method that cannot use the selected surface family; a model carrying both families where the run did not say which; a circle whose **Depth** sits below the base of the model and that cuts no failure surface inside it; and a circle that meets the ground surface *above its own center*, whose arc between the two daylight points would be longer than a semicircle and whose end slices would overhang, so no failure surface can be built from it at all — both are reported against a search, whose refinement moves off its seeds and reaches the critical surface anyway, and raised to an error where that circle *is* the run's surface, so the Run dialog refuses it. A model that states a tension crack is not reported for the second: the crack resolves the uphill end, and the arc exits at it. Beneath those two sits a catch-all on the **first** circle: whatever the cause, a circle 1 that yields no slices is reported with the slicer's own reason quoted — an arc that never reaches the ground, or one that leaves through a vertical edge of a section too narrow to hold it. It follows the same ladder (an error where that circle is the run's surface, a warning where a search is only seeded from it) and drops to **INFO** where no stability analysis is selected: a seepage or finite element run never reads the Circles sheet, so nothing about that run is wrong — but the file still carries a circle no limit-equilibrium run could use. The question is asked with pore pressure set aside, so a model whose seepage field is built at run time is never blamed for a circle that is sound |
@@ -226,6 +226,19 @@ input, and they are the ones easiest to miss by reading a single result:
   a continuum code analyses both faces at once and cannot know which one you are
   checking — so preflight states the convention of the engine you are running rather
   than trying to choose for you.
+- A **seepage field** is handed to the stability and stress engines as computed, and a
+  pressure the flow problem tolerates can be one the stress problem cannot hold.
+  `water.seep_pressure_on_free_surface` — a **WARNING**, on `lem` and `fem` runs — reads the
+  staged field and reports pore pressure on ground-surface nodes away from every specified
+  head. That is the reach where the surface drains to the atmosphere, so a seepage face
+  carries zero pressure and a dry surface carries suction; anything positive there asks the
+  stress analysis to hold effective *tension* at a traction-free boundary. A Mohr-Coulomb apex
+  carries a little of it, a tensile cutoff none, and a strength reduction under a cutoff then
+  fails at every strength because no equilibrium exists on that reach. The threshold is a
+  thousandth of the water column over the height of the model, so round-off on a seepage-face
+  node is not reported. The finding is about the seepage run rather than the stability model:
+  check the [exit face](../seep/overview.md#exit-face-seepage-face) over that reach, since a
+  face that stops short of the discharge point leaves the head standing above the ground there.
 - **Reinforcement** complete for one engine can be incomplete for the other. The
   limit-equilibrium engine applies the `Tmax`/`Lp` capacity envelope directly; the
   finite element engine models each line as a bar element and needs `E` and `Area`.

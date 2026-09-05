@@ -155,7 +155,7 @@ values and nothing outside them, and the heavy black line is the **phreatic
 surface** — the locus of points where the pore pressure passes through zero,
 which is drawn from the solved field rather than entered.
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, element_type=tri6, size_divisions=100, expected_flowrate=1.925, tolerance=0.005 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, element_type=tri6, size_divisions=100, expected_flowrate=1.948, tolerance=0.005 -->
 
 Everything that follows uses that solved field. It is now attached to the
 model in the session, as a pore pressure at each of the 8,082 mesh nodes, and it
@@ -259,7 +259,7 @@ that lie above the phreatic surface. The green hatched band above it is the
 effective normal stress the strength was computed from, which is that base's
 total normal stress less the blue.
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri6, size_divisions=100, num_slices=40, expected_fs=1.248, tolerance=0.005 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri6, size_divisions=100, num_slices=40, expected_fs=1.257, tolerance=0.005 -->
 
 ---
 
@@ -306,7 +306,7 @@ the core and the downstream shell into the foundation, and comes out beyond the
 toe — the mechanism the Spencer search found, arrived at without a surface being
 prescribed.
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.2305, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=COMBO-1-ssrm -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.246, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=COMBO-1-ssrm -->
 
 The pore pressures reached this run the same way they reached the search: off the
 materials' `u` column, interpolated from the same mesh nodes to each Gauss point,

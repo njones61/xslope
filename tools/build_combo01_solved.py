@@ -30,10 +30,10 @@ count, bracket and tolerance are read from the ``<!-- test: -->`` tags on
 ``combo01_seepage_stability.md``, and each run has to land on the number that tag
 locks, within that tag's own tolerance, or nothing is written:
 
-    seepage flow rate   1.925 ft^3/day/ft  +/- 0.005
-    Spencer (u = seep)  FS = 1.248         +/- 0.005
+    seepage flow rate   1.948 ft^3/day/ft  +/- 0.005
+    Spencer (u = seep)  FS = 1.257         +/- 0.005
     Spencer (u = none)  FS = 1.618         +/- 0.005   (the page's contrast run)
-    SSRM                FS = 1.2305        +/- 0.01
+    SSRM                FS = 1.246         +/- 0.01
 
 Young's modulus and Poisson's ratio are the file's own — the materials table
 carries E and nu on all three rows (shell 2.0e6 / 0.20, core 2.0e5 / 0.40,

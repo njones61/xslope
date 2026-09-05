@@ -5372,7 +5372,7 @@ def _fem03_spacing_figure(lem, fixed, free, _u):
     Each label sits on the side of its own point that the other lines are not on:
     at a spacing where the nearest other answer is below this one the label goes
     above, and vice versa. The three lines cross and close on each other across
-    the sweep — at 6 ft the two strength-reduction answers are 0.055 apart — so a
+    the sweep — at 6 ft the two strength-reduction answers are 0.047 apart — so a
     fixed side per line prints one label over another wherever they converge, and
     which side has room is a question about the numbers, not about the line.
     """

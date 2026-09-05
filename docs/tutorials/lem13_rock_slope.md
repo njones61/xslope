@@ -221,21 +221,18 @@ Now click **Run → Run FEM…**
 
 ![Run FEM on the meshed model](images/lem13_studio_run_fem.png)
 
-**Model checks — 1 warning**, and **Run** is enabled. The warning names the blank
-tensile cutoff `t_cut`, which lets the rock carry tension up to its Mohr-Coulomb
-cone apex; in [FEM-1](fem01_strength_reduction.md#running-the-strength-reduction)
-we cover what that means and when to enter a cap. The dialog opens on **SSRM (find
-FS)** with the bracket the file declares, **F min (SSRM)** = 0.80 and **F max
-(SSRM)** = 1.60, a **Tolerance (SSRM)** of 0.0100, the iteration budget and ceiling
-at their own 12,000 and 50,000, **Rollers** on the sides, **K0 initial stress**
-ticked at 1.000, and **Non-convergence** as the failure criterion. Click **Run**.
-This is the long run of Part A, taking far longer than the search above.
+The dialog opens on **SSRM (find FS)** with the bracket the file declares, **F min
+(SSRM)** = 0.80 and **F max (SSRM)** = 1.60, a **Tolerance (SSRM)** of 0.0100, the
+iteration budget and ceiling at their own 12,000 and 50,000, **Rollers** on the
+sides, **K0 initial stress** ticked at 1.000, and **Non-convergence** as the
+failure criterion. Click **Run**. This is the long run of Part A, taking far longer
+than the search above.
 
-**FS = 1.166**. Hammah et al. report 1.15 for the same slope,
+**FS = 1.153**. Hammah et al. report 1.15 for the same slope,
 solved both with the generalized criterion and with an equivalent Mohr-Coulomb
 fit.
 
-<!-- test: file=files/xslope_rock_slope.xlsx, type=fem_ssrm, expected_fs=1.166, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.8, f_max=1.6, k0=1, benchmark=LEM-13-ssrm -->
+<!-- test: file=files/xslope_rock_slope.xlsx, type=fem_ssrm, expected_fs=1.153, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.8, f_max=1.6, k0=1, benchmark=LEM-13-ssrm -->
 
 ![The mechanism at failure](images/lem13_shear_strain.png){width=1000}
 
@@ -258,10 +255,10 @@ Three readings of one file:
 | --- | :---: | :---: |
 | Bishop's simplified | 1.150 | 1.153 |
 | Spencer's method | 1.152 | 1.152 |
-| Strength reduction | 1.166 | 1.15 |
+| Strength reduction | 1.153 | 1.15 |
 
-The two engines agree to 1.2% on a slope whose strength is nonlinear everywhere,
-and each lands within 1.4% of the value the paper published for it. They get there
+The two engines agree to 0.1% on a slope whose strength is nonlinear everywhere,
+and each lands within 0.3% of the value the paper published for it. They get there
 from completely different discretizations of the same curve: the limit equilibrium
 run linearizes the envelope at the base normal stress on each of 40 slices, and the
 finite element run linearizes it at every Gauss point on every viscoplastic

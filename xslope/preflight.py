@@ -3400,6 +3400,46 @@ def _seep_bc_short(ctx):
 # which is the transcription defect the RS2 campaign traced a 2x factor to.
 # ---------------------------------------------------------------------------
 
+
+def has_reducible_tensile_cap(material):
+    """True where this material declares a tensile cutoff the trial factor can
+    actually reduce -- a cutoff that is present, a number, and above zero.
+
+    The three states of ``t_cut`` are not two. A BLANK cell is no cap at all: the
+    material carries tension without limit, which is what ``mat.tensile_cap_missing``
+    is about. A cutoff of ``0`` is a no-tension material, a real modelling
+    statement -- but ``0 / F`` is ``0`` at every trial factor, so the Tension SRF
+    setting cannot move it either way. Only a POSITIVE cutoff is something a
+    strength reduction reduces.
+
+    Every reader of "does this model have a cap to reduce" asks through this
+    function -- the ``main.tension_srf_unset`` note below and Studio's Run FEM
+    dialog, which dims its Tension SRF checkbox on exactly the models this
+    returns False for -- so the silent note and the dimmed control cannot come
+    apart. ``xslope.fem`` needs no such test: dividing a zero cap is already the
+    no-op this predicate describes.
+    """
+    opt = str(material.get("option") or "").strip().lower()
+    if opt in ("", "elastic"):
+        return False              # no strength model, so no tensile cutoff either
+    v = _num(material.get("t_cut"))
+    return v is not None and v > 0.0
+
+
+def declares_tensile_cap(material):
+    """True where this material states a tensile cutoff AT ALL, a zero included.
+
+    The weaker half of the pair: a declared ``0`` is a no-tension soil and a
+    blank cell is an unbounded one, and the two are worth telling apart even
+    where neither gives the trial factor anything to reduce. Studio's dimmed
+    tooltip says which of the two it is looking at.
+    """
+    opt = str(material.get("option") or "").strip().lower()
+    if opt in ("", "elastic"):
+        return False
+    return _num(material.get("t_cut")) is not None
+
+
 @rule("mat.nu_unusable", ERROR, ("fem",),
       "Poisson's ratio nu must be in (0, 0.5); a blank one reads as 0.0.")
 def _mat_nu_unusable(ctx):
@@ -3466,15 +3506,19 @@ def _mat_tensile_cap_missing(ctx):
 def _tension_srf_unset(ctx):
     if ctx.sd.get("tension_srf") is not None:
         return None
+    # Only a POSITIVE cutoff is something the setting decides. On a model whose
+    # every t_cut is blank there is no cap, and on one whose every t_cut is 0
+    # there is nothing to divide -- 0/F is 0 at every trial factor -- so the note
+    # would be telling the reader about a control that changes no number.
     capped = [ctx.mat_label(i) for i, m in ctx.fem_materials()
-              if _num(m.get("t_cut")) is not None]
+              if has_reducible_tensile_cap(m)]
     if not capped:
         return None
     return (f"Tension SRF (FEM) is blank, so the engine default applies: the "
             f"tensile cap is divided by the trial strength-reduction factor "
-            f"alongside c and tan(φ). {len(capped)} material(s) carry a t_cut. Set "
-            f"it to NO to hold the cap at its entered value instead "
-            f"{_at_global('D17')}.")
+            f"alongside c and tan(φ). {len(capped)} material(s) carry a tensile "
+            f"cutoff above zero. Set it to NO to hold the cap at its entered "
+            f"value instead {_at_global('D17')}.")
 
 
 # ---------------------------------------------------------------------------

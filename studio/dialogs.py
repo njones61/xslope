@@ -650,7 +650,8 @@ class RunFemDialog(QDialog):
                            "(sigma_h = K0·sigma_v).")
         form.addRow("K0", self.k0)
 
-        # Tension SRF (v19). A no-op on a model with no tensile cap anywhere.
+        # Tension SRF (v19). A no-op wherever no material declares a cutoff above
+        # zero — see _tensile_cap_state, which is what dims it.
         self.tension_srf = QCheckBox("Reduce the tensile cap with F (Tension SRF)")
         self.tension_srf.setChecked(bool(defaults.get("tension_srf", True)))
         self._tension_srf_tip = (
@@ -821,18 +822,25 @@ class RunFemDialog(QDialog):
         self._ok.setEnabled(reason is None)
         self._ok.setToolTip(reason or "")
 
-    def _model_has_tensile_cap(self):
-        """Whether any strength-bearing material on the model declares a t_cut."""
-        for m in (self._sd or {}).get("materials") or []:
-            if str(m.get("option") or "").strip().lower() in ("", "elastic"):
-                continue
-            v = m.get("t_cut")
-            try:
-                if v is not None and float(v) == float(v):   # finite, not NaN
-                    return True
-            except (TypeError, ValueError):
-                continue
-        return False
+    def _tensile_cap_state(self):
+        """What this model gives the Tension SRF setting to act on: ``"reducible"``
+        where some material declares a cutoff above zero, ``"zero"`` where every
+        declared cutoff is 0, and ``"none"`` where no material declares one.
+
+        The rule lives in :func:`xslope.preflight.has_reducible_tensile_cap`, so
+        the control this dims and the ``main.tension_srf_unset`` note beside it in
+        the checks column read the same model the same way. The three states are
+        here rather than there because only the tooltip needs to tell the last two
+        apart: a no-tension model (every cap 0) and an unbounded one (every cap
+        blank) both leave the trial factor nothing to divide, but they are
+        opposite modelling statements and the reason given should say which.
+        """
+        from xslope.preflight import (declares_tensile_cap,
+                                      has_reducible_tensile_cap)
+        mats = (self._sd or {}).get("materials") or []
+        if any(has_reducible_tensile_cap(m) for m in mats):
+            return "reducible"
+        return "zero" if any(declares_tensile_cap(m) for m in mats) else "none"
 
     def _sync_enabled(self):
         a = self.analysis.currentData()
@@ -846,14 +854,20 @@ class RunFemDialog(QDialog):
         # K0 initialization applies to both a single trial and the SSRM.
         self.k0.setEnabled(self.k0_on.isChecked())
         # The tensile cap is only reduced during a strength reduction, and only
-        # exists on a model whose materials declare one: with every t_cut blank
-        # the box has nothing to act on, so it is dimmed rather than offered.
-        has_cap = self._model_has_tensile_cap()
-        self.tension_srf.setEnabled((not single) and has_cap)
-        self.tension_srf.setToolTip(self._tension_srf_tip + (
-            "" if has_cap else
-            "\n\nDimmed: no material on this model declares a t_cut, so there is "
-            "no cap to reduce."))
+        # where some material declares a cutoff ABOVE ZERO: a blank t_cut is no
+        # cap at all, and a cutoff of 0 divides to 0 at every trial factor. In
+        # both cases the box changes no number, so it is dimmed rather than
+        # offered, with the reason in its tooltip.
+        cap = self._tensile_cap_state()
+        self.tension_srf.setEnabled((not single) and cap == "reducible")
+        self.tension_srf.setToolTip(self._tension_srf_tip + {
+            "reducible": "",
+            "zero": "\n\nDimmed: every tensile cutoff on this model is 0 — a soil "
+                    "that carries no tension — and 0 divided by the trial factor "
+                    "is still 0, so there is nothing here to reduce.",
+            "none": "\n\nDimmed: no material on this model declares a t_cut, so "
+                    "there is no cap to reduce.",
+        }[cap])
         # Surficial-failure filter applies to the SSRM criterion only.
         self.min_slip_on.setEnabled(a == "ssrm")
         self.min_slip_depth.setEnabled(a == "ssrm" and self.min_slip_on.isChecked())

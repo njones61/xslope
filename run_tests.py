@@ -2912,6 +2912,41 @@ def run_editor_roundtrip_test(test):
         _fd.deleteLater()
     app.processEvents()
 
+    # (5b) The Tension SRF checkbox is offered only where the trial factor has a
+    #      cap to reduce. Three model states, one control each: a positive cutoff
+    #      (live), every cutoff 0 (dimmed — 0/F is 0, so the box would change no
+    #      number), and every cutoff blank (dimmed — there is no cap at all). The
+    #      dimming reads xslope.preflight.has_reducible_tensile_cap, the same
+    #      predicate main.tension_srf_unset reads, so this row and the preflight
+    #      row for that rule are the two halves of one guarantee.
+    _tsd = _editor_fixture()
+    for _caps, _live, _why in ((50.0, True, "a positive cutoff"),
+                               (0.0, False, "every cutoff 0"),
+                               (None, False, "every cutoff blank")):
+        _m = copy.deepcopy(_tsd)
+        for _mat in _m["materials"]:
+            _mat["t_cut"] = _caps
+        _fd = RunFemDialog(defaults={"analysis": "ssrm"}, slope_data=_m)
+        _got = _fd.tension_srf.isEnabled()
+        if _got != _live:
+            problems.append(f"RunFemDialog Tension SRF: with {_why} the box is "
+                            f"{'enabled' if _got else 'dimmed'}, expected "
+                            f"{'enabled' if _live else 'dimmed'}")
+        _tip = _fd.tension_srf.toolTip()
+        if not _live and "Dimmed" not in _tip:
+            problems.append(f"RunFemDialog Tension SRF: dimmed with {_why} and the "
+                            f"tooltip does not say why")
+        # A single trial dims it whatever the model carries: there is no bracket
+        # to reduce anything over.
+        _fd.analysis.setCurrentIndex(
+            [_fd.analysis.itemData(_i) for _i in range(_fd.analysis.count())]
+            .index("single"))
+        if _fd.tension_srf.isEnabled():
+            problems.append(f"RunFemDialog Tension SRF: live on a single trial "
+                            f"with {_why}")
+        _fd.deleteLater()
+    app.processEvents()
+
     from studio.editors import MaterialsDialog, _new_material
     sd = _editor_fixture()
     style = {"materials": {"0": {"color": "#123456"},
@@ -4579,6 +4614,16 @@ PREFLIGHT_RULE_SPECS = [
          analysis='ssrm',
          mutation=lambda sd: _pf_mats(_pf_set(sd, tension_srf=None), t_cut=50.0),
          control=lambda sd: _pf_mats(_pf_set(sd, tension_srf=True), t_cut=50.0),
+         expect='Tension SRF'),
+    # The same rule against the OTHER thing a blank Tension SRF can be blank
+    # over: a model whose every t_cut is 0. The setting decides nothing there —
+    # 0/F is 0 at every trial factor — so the note has to stay silent, exactly as
+    # Studio dims the checkbox. The mutation is the positive cap that makes it
+    # speak; the control is the same model with the caps at zero.
+    dict(rule='main.tension_srf_unset', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_mats(_pf_set(sd, tension_srf=None), t_cut=50.0),
+         control=lambda sd: _pf_mats(_pf_set(sd, tension_srf=None), t_cut=0.0),
          expect='Tension SRF'),
 
     # --- finite element initial stress and SSR zones -----------------------

@@ -1630,6 +1630,50 @@ def _populated(rows, key):
     return False
 
 
+def _declared(rows, key):
+    """True when any row STATES a value under ``key``, a zero included.
+
+    The weaker test of the two, for a property whose zero is a statement rather
+    than an absence. ``_populated`` reads a zero as "nothing here", which is right
+    for a c/p ratio or an r_u that was simply never entered, and wrong for a
+    tensile cutoff: ``σ_t = 0`` is a soil that carries no tension, a decision the
+    analysis was run under and the reader has to be able to see. Under
+    ``_populated`` that decision printed as no column at all, indistinguishable
+    from a model that left the cutoff blank.
+    """
+    for r in rows:
+        v = r.get(key)
+        if isinstance(v, str):
+            if v.strip():
+                return True
+            continue
+        if _num(v) is not None:
+            return True
+    return False
+
+
+#: The fourth element of a field tuple, for a column shown wherever any row
+#: DECLARES a value — see :func:`_declared`. ``True`` shows the column always,
+#: ``False`` shows it where some row populates it with a nonzero value, and this
+#: shows it where some row states a value at all.
+DECLARED = "declared"
+
+
+def _keep_columns(rows, fields):
+    """The fields that earn a column against ``rows``, in order."""
+    keep = []
+    for f in fields:
+        when = f[3]
+        if when is True:
+            keep.append(f)
+        elif when == DECLARED:
+            if _declared(rows, f[0]):
+                keep.append(f)
+        elif _populated(rows, f[0]):
+            keep.append(f)
+    return keep
+
+
 def _join(items):
     """``"a, b and c"`` — a list of things, read out.
 
@@ -1876,17 +1920,19 @@ def _traceability_section(slope_data, solutions, opts):
 def _property_table(slope_data, fields, caption, counter):
     """One row per referenced material, one column per property that is real.
 
-    ``fields`` is ``(key, header, formatter, always-shown)``. A column marked
-    always-shown is printed whether or not the materials carry a value for it —
-    it is part of what the analysis is — and every other column is printed only
-    where some material populates it, so a table never rules off a column of
-    blanks. Each engine's table is this function with its own field list.
+    ``fields`` is ``(key, header, formatter, when-shown)``. A column marked
+    ``True`` is printed whether or not the materials carry a value for it — it is
+    part of what the analysis is — one marked :data:`DECLARED` is printed wherever
+    some material states a value, a zero included, and every other column is
+    printed only where some material populates it with a nonzero one, so a table
+    never rules off a column of blanks. Each engine's table is this function with
+    its own field list.
     """
     rows_src = referenced_materials(slope_data)
     if not rows_src:
         return None
     mats = [m for _i, m in rows_src]
-    keep = [f for f in fields if f[3] or _populated(mats, f[0])]
+    keep = _keep_columns(mats, fields)
     headers = [f[1] for f in keep]
     rows = []
     for idx, m in rows_src:
@@ -1928,7 +1974,9 @@ def _materials_table(slope_data, counter):
         ("r_elev", f"r elev.{unit('length')}", lambda m: _fmt(m.get("r_elev"), "{:.1f}"), False),
         ("d", f"d{unit('stress')}", lambda m: _fmt(m.get("d"), "{:.1f}"), False),
         ("psi", "ψ (deg)", lambda m: _fmt(m.get("psi"), "{:.1f}"), False),
-        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt(m.get("t_cut"), "{:.1f}"), False),
+        # A DECLARED cutoff prints even where every material's is 0: that is a
+        # no-tension soil, and the analysis was run under it.
+        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt(m.get("t_cut"), "{:.1f}"), DECLARED),
         ("ru", "r_u", lambda m: _fmt(m.get("ru"), "{:.3f}"), False),
         ("u", "Pore pressure", lambda m: str(m.get("u") or "none"), True),
     ]
@@ -1998,7 +2046,8 @@ def _fem_materials_table(slope_data, counter):
         ("phi", "φ (deg)", lambda m: _fmt(m.get("phi"), "{:.1f}"), True),
         ("E", f"E{unit('stress')}", lambda m: _fmt(m.get("E"), "{:,.0f}"), True),
         ("nu", "ν", lambda m: _fmt(m.get("nu"), "{:.2f}"), True),
-        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt(m.get("t_cut"), "{:.1f}"), False),
+        # As on the strength table: a stated 0 is a no-tension material and prints.
+        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt(m.get("t_cut"), "{:.1f}"), DECLARED),
     ]
     return _property_table(slope_data, fields, "Finite element material properties",
                            counter)
@@ -2454,8 +2503,8 @@ def _member_table(rows_src, fields, caption, counter):
     """
     if not rows_src:
         return None
-    keep = [f for f in fields if f[3] or _populated(rows_src, f[0])]
-    rows = [[fmt(m) for _key, _h, fmt, _always in keep] for m in rows_src]
+    keep = _keep_columns(rows_src, fields)
+    rows = [[fmt(m) for _key, _h, fmt, _when in keep] for m in rows_src]
     return Table([f[1] for f in keep], rows, caption, counter.next_table())
 
 

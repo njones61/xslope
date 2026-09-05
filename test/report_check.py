@@ -360,6 +360,47 @@ def test_tables_carry_the_model():
     return fails
 
 
+def test_a_declared_zero_cutoff_prints():
+    """σ_t is a column wherever a material STATES a cutoff, a zero included.
+
+    A tensile cutoff of 0 is a no-tension soil — a modelling decision the analysis
+    was run under, and one the finite element answer moves with. Judged by "is any
+    value nonzero", as every other optional column still is, that decision printed
+    as no column at all, indistinguishable in the submittal from a model that left
+    the cutoff blank. Both material tables are read, since both carry the column,
+    and the blank model is the control that keeps the rule from becoming "always".
+    """
+    from xslope.report import (_Counter, _fem_materials_table, _materials_table)
+
+    fails = []
+    slope_data, _solutions = _solved()
+
+    def _tables(t_cut):
+        sd = copy.deepcopy(slope_data)
+        for m in sd["materials"]:
+            m["t_cut"] = t_cut
+        return (_materials_table(sd, _Counter()),
+                _fem_materials_table(sd, _Counter()))
+
+    for table, where in zip(_tables(0.0), ("materials", "finite element materials")):
+        if "σ_t" not in " ".join(table.headers):
+            fails.append(f"the {where} table omits σ_t on a model whose every "
+                         f"cutoff is a declared 0")
+            continue
+        col = [h for h in table.headers if "σ_t" in h][0]
+        i = table.headers.index(col)
+        printed = {row[i] for row in table.rows}
+        if printed != {"0.0"}:
+            fails.append(f"the {where} table's σ_t column reads {sorted(printed)} "
+                         f"for materials whose cutoff is 0")
+
+    for table, where in zip(_tables(None), ("materials", "finite element materials")):
+        if "σ_t" in " ".join(table.headers):
+            fails.append(f"the {where} table prints σ_t on a model where no "
+                         f"material declares a cutoff")
+    return fails
+
+
 def test_figures_rendered():
     """Every figure block points at a real, non-trivial PNG."""
     fails = []
@@ -20123,6 +20164,7 @@ def test_report_solutions_carry_every_engine():
 CHECKS = [
     ("the content tree and its section order", test_tree),
     ("the tables carry the model's numbers", test_tables_carry_the_model),
+    ("a declared zero tensile cutoff prints", test_a_declared_zero_cutoff_prints),
     ("every figure is rendered to a file", test_figures_rendered),
     ("the traceability stamp", test_traceability),
     ("the content toggles remove what they name", test_toggles),

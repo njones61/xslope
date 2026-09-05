@@ -330,13 +330,7 @@ is expected and the run proceeds as posed. For your own models, enter a
 `t_cut`, or `0` for a soil that carries no tension; new materials in Studio
 start at 0.
 [Tensile strength in the SSRM](../fem/overview.md#tensile-strength-in-ssrm)
-works through the cap and its effects. The **Reduce the tensile cap with F
-(Tension SRF)** checkbox above decides whether the tensile cutoff is divided by
-the trial factor along with *c* and tan φ (on), or held at the value you
-entered (off). It is offered only where some material declares a cutoff **above
-zero**: a blank cutoff is no cap at all, and a cutoff of `0` is still `0`
-however it is divided, so a model whose materials are each blank or `0` — this
-one included — leaves the setting nothing to reduce and it is dimmed.
+works through the cap and its effects.
 
 The rest of the dialog opens on the defaults this run wants. **Analysis** is
 **SSRM (find FS)**. **F min** and **F max** are 1.00 and 2.00, the ends of the

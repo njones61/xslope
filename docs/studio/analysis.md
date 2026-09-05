@@ -656,6 +656,14 @@ zero, a mesh that references a material the table does not define, and — above
 material with no tensile cap, which grants it unbounded tension and raises the factor
 of safety with nothing else on screen to show it.
 
+**Reduce the tensile cap with F (Tension SRF)** decides whether each material's
+tensile cutoff is divided by the trial factor along with *c* and tan φ, or held at the
+value entered. It is offered only where some material declares a cutoff above zero. A
+blank cutoff is no cap at all, and a cutoff of 0 is still 0 however it is divided, so on
+a model whose materials are each blank or 0 the setting has nothing to reduce and the
+checkbox is dimmed, with the reason in its tooltip. It is also dimmed for a single
+trial, which has no bracket to reduce anything over.
+
 When the seismic coefficient is nonzero the checks also carry a note about what its
 **sign** means here, because it does not mean the same thing in both engines. The
 finite-element engine reads `main!D13` as a vector: `+k` pushes in `+x` and `−k` in

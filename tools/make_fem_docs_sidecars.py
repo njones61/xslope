@@ -21,11 +21,12 @@ What a solved finite element model carries, written for each:
     {stem}_fem_reinf.csv (+failure) the per-bar forces, where the model has bars
     {stem}_fem_piles.csv (+failure) the per-pile-element forces, where it has piles
 
-The mesh is the one the page's tag names, so the sidecar, the page and the
-regression lock describe one run. Two of the three had drifted off it: the
-non-circular sample's saved companions were a 6,649-node mesh reading FS = 1.684
-while its page and its tag both say 1.53, and the reinforcement sample shipped a
-field with no factor of safety and no bar forces at all.
+The mesh is the one the run's specification names — the page's tag where the
+model is still written up, ``RETIRED`` where the write-up has gone — so the
+sidecar and that specification describe one run. Two of the three had drifted off
+it: the non-circular sample's saved companions were a 6,649-node mesh reading
+FS = 1.684 while its page and its tag both say 1.53, and the reinforced slope
+shipped a field with no factor of safety and no bar forces at all.
 
 ``griffiths1_load`` is on no page and carries no tag. It is solved on its OWN
 committed mesh companion — the mesh its shipped fields were produced on, which is
@@ -64,18 +65,40 @@ from xslope.mesh import (build_mesh_from_polygons, export_mesh_to_json,  # noqa:
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAMPLES_MD = os.path.join(REPO_ROOT, "docs", "fem", "samples.md")
 
-#: The tagged models: the page's own ``fem_ssrm`` tag is the single source of
-#: truth for element type, mesh size, bracket and tolerance, and for the factor
-#: of safety the run has to land on.
+#: The models solved from a specification rather than from a saved session: for
+#: the ones still written up on the page, its own ``fem_ssrm`` tag is the single
+#: source of truth for element type, mesh size, bracket and tolerance, and for
+#: the factor of safety the run has to land on; for the rest, ``RETIRED`` below
+#: carries the same specification.
 TAGGED = {
     "noncircular": "xslope_noncircular_fem.xlsx",
     "reinforce": "xslope_reinforce_fem.xlsx",
     "piles": "xslope_piles_fem.xlsx",
     # The pile sample's unstabilized twin — the same model with its two pile rows
-    # cleared. The page reports the pair as a before and after, so the before has
-    # to be a committed model with a solved run of its own rather than a picture
-    # of a model nobody could rebuild.
+    # cleared, run as the before of a before and after, so it is a committed model
+    # with a solved run of its own rather than a picture of a model nobody could
+    # rebuild.
     "piles_nopile": "xslope_piles_fem_nopile.xlsx",
+}
+
+#: Models whose sample section is gone from the page but whose companions are
+#: still fixtures. The reinforced slope and the two pile models were written up
+#: on ``docs/fem/samples.md`` until the tutorials FEM-2 and FEM-3 built and ran
+#: the same models step by step; the sections went, the workbooks stayed —
+#: ``ROUNDTRIP_FILES``, the FEM preflight bases, ``report_check``,
+#: ``fem_1d_details_check`` and ``nr_ssrm_check`` all open them by path — and so
+#: their companions still have to be rebuildable. What the retired tags specified
+#: is kept here in the same shape a parsed tag has, so ``build_tagged`` reads one
+#: or the other and solves the same run either way. These are no longer
+#: regression locks: FEM-2 and FEM-3 lock the same models at their own brackets,
+#: and the factors of safety below are what these brackets produced.
+RETIRED = {
+    "reinforce": {"expected_fs": 1.534, "element_type": "tri6", "target_size": 2.0,
+                  "tolerance": 0.01, "f_min": 1.1, "f_max": 1.9, "max_iter": 16000},
+    "piles": {"expected_fs": 1.370, "element_type": "tri6", "target_size": 2.0,
+              "tolerance": 0.01, "f_min": 1.0, "f_max": 1.6, "max_iter": 16000},
+    "piles_nopile": {"expected_fs": 1.136, "element_type": "tri6", "target_size": 2.0,
+                     "tolerance": 0.01, "f_min": 1.0, "f_max": 1.6, "max_iter": 16000},
 }
 
 #: The untagged model and the search it is solved by. Solved on the mesh
@@ -186,8 +209,8 @@ def _write(fem_data, result, stem, mesh, extra):
 def build_tagged(name):
     xlsx = TAGGED[name]
     path = os.path.join(REPO_ROOT, "docs", "fem", "files", xlsx)
-    tag = _tag(SAMPLES_MD,
-               lambda t: os.path.basename(t["file"]) == xlsx)
+    tag = RETIRED.get(name) or _tag(
+        SAMPLES_MD, lambda t: os.path.basename(t["file"]) == xlsx)
     t0 = time.time()
     slope_data, mesh = _mesh_for(tag, path)
     fem_data = _quiet(build_fem_data, slope_data, mesh)

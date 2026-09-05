@@ -112,8 +112,10 @@ UNTAGGED = {
 #: The Johnson Reservoir dam of docs/seep/seep_slope.md is here because its
 #: companions were saved from a Studio session in July 2026 and then went stale:
 #: they read FS = 1.691 at F = 1.6875, outside the bracket its tag names, while the
-#: page and the tag both say 1.25. Studio attaches them the moment the workbook
-#: opens, so the stale answer was the first thing a reader saw.
+#: page and the tag both say 1.25. The mesh was not the problem — those fields sat
+#: on the same 3,362-node companion this route solves on — so what had drifted was
+#: the run, not the discretization. Studio attaches the companions the moment the
+#: workbook opens, so the stale answer was the first thing a reader saw.
 COMMITTED_MESH = {
     "johnson_res": (os.path.join(REPO_ROOT, "docs", "seep", "seep_slope.md"),
                     os.path.join(REPO_ROOT, "docs", "seep", "files",

@@ -818,6 +818,13 @@ _CYCLE_EXTRA_SWEEPS = 600
 _SET_REVISIT_SWEEP = 100
 _WET_FACE_FORCE_MAX = 3      # times an inactive exit node under pressure is joined to the face at set stability
 
+#: TEST-ONLY switch, and the only thing that reads it is run_tseep_exit_cycle_test.
+#: Set True to run the transient stepper WITHOUT the free-surface rule -- the set is
+#: then allowed to be called stable with the head standing above an inactive exit
+#: node, which is how the guard measures the limit cycle the rule prevents. Library
+#: code never sets it: the rule is the behavior, not an option.
+_TSEEP_NO_WET_FACE_RULE = False
+
 
 def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                       k1_vals=1.0, k2_vals=1.0, angles=0.0,
@@ -3562,6 +3569,17 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     #: can increment them as closures.
     n_cycles = [0]
     n_damped = [0]
+    #: Nodes the free-surface rule has joined to the seepage face over the march, and
+    #: the pressure head it is there to prevent: the largest ``h - y`` left standing on
+    #: an INACTIVE exit node at the end of an accepted step. The second is a property
+    #: of the delivered field, not of the solver's path -- a free surface drains at
+    #: atmospheric pressure, so anything above the hysteresis band is pore pressure the
+    #: stress analysis would have to hold as tension at a traction-free boundary (the
+    #: water.seep_pressure_on_free_surface preflight rule reads the same quantity off
+    #: the staged field).
+    n_wet = [0]
+    wet_probe = [0.0]      # the last attempt's reading, recorded when a step is kept
+    max_free_p = [0.0]
 
     def attempt(h_old, dt, t_new, warm_active, force=False, damp=False):
         """One theta-scheme step with Picard + exit-face active set. Returns
@@ -3699,13 +3717,14 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 # pinned there for the rest of the step, the representation a partly
                 # wet quadratic edge needs and the one the cycle breaker below hands
                 # out when it catches the cycle.
-                if set_stable:
+                if set_stable and not _TSEEP_NO_WET_FACE_RULE:
                     _wet_free = (bt == 2) & ~new_act & (h_new >= y + hyst) & ~pinned
                     if np.any(_wet_free):
                         new_act[_wet_free] = True
                         pinned[_wet_free] = True
                         pinned_state[_wet_free] = True
                         set_stable = False
+                        n_wet[0] += int(np.count_nonzero(_wet_free))
 
                 # Break a limit cycle in the active set by giving the offending edge
                 # the PARTIAL state the all-or-nothing rule cannot express. A set that
@@ -3762,6 +3781,11 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         if (not force and np.any(free)
                 and float(np.max(np.abs((h_it - h_old)[free]))) > dh_limit):
             return False, h_it, act, pic, 0.0, cycling
+        # The pressure this step would deliver on the free part of its exit face.
+        # Every accepted step returns through here, force-accepted ones included.
+        _free_exit = (bt == 2) & ~act if has_exit else None
+        wet_probe[0] = (float(np.max(h_it[_free_exit] - y[_free_exit]))
+                        if _free_exit is not None and np.any(_free_exit) else 0.0)
         return True, h_it, act, pic, _tsc(), cycling
 
     t = 0.0
@@ -3811,6 +3835,7 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
             t += dt_try
             h = h_new
             active = new_active
+            max_free_p[0] = max(max_free_p[0], wet_probe[0])
             cum_inflow += tsc
             dt_history.append(dt_try)
             # Progress + cancellation: report the simulated-time fraction and honor an
@@ -3870,6 +3895,14 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         # set wobbles.
         "exit_face_cycles": n_cycles[0],
         "exit_face_damped": n_damped[0],
+        # How many times the free-surface rule joined an inactive exit node standing
+        # under pressure to the seepage face, and the worst pressure head left on the
+        # free part of an exit face at the end of an accepted step. The second should
+        # not exceed the hysteresis band: above it, the field carries pore pressure on
+        # a surface that drains at atmospheric.
+        "exit_face_wet_joined": n_wet[0],
+        "exit_face_free_pressure": max_free_p[0],
+        "exit_face_hyst": 1e-3 * char_h,
         "theta": theta,
         "lumped": lumped,
         "duration": duration,

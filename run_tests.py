@@ -12625,14 +12625,38 @@ def run_tseep_exit_cycle_test(test):
       the midside node. Pinning the whole edge either way (the two states that were
       already available) is what the fix exists to stop.
 
-    * it stays BEHIND A FAILED STEP. The fallback runs only on the retry of a step
-      that has already failed with the set cycling, which is what keeps every march
-      that converges the ordinary way on exactly the path it followed before the
-      rule existed — and every locked transient trajectory with it. That gating is
+    * the FREE SURFACE never carries pressure. GW18 no longer reaches that cycle at
+      all: the exit-face fix in seep.py resolves the wet face at the first set the
+      step would otherwise call stable — the inactive exit node standing above its own
+      elevation joins the face and is pinned there for the rest of the step, which is
+      the partly-wet state, handed out before the set can start alternating. Measured
+      on GW18 at target 3.0: 2765 joins over the march, 0 cycles detected, 0 damped,
+      and the worst pressure head left on the free part of an exit face at the end of
+      an accepted step is 0.0119 m against a 0.012 m hysteresis band — nothing above
+      the band anywhere in the march.
+
+      The mutation is that rule alone (``seep._TSEEP_NO_WET_FACE_RULE``, a switch this
+      guard is the only reader of). With it off, GW18 goes back to what it used to do:
+      72 cycles detected, 36 resolved on the retry of a failed step, and 1.20 m of
+      pressure head standing on a free seepage face — 100x the hysteresis band, and
+      the field the stress analysis would then have to hold as tension at a
+      traction-free boundary.
+
+    * it stays BEHIND A FAILED STEP. The cycle breaker runs only on the retry of a
+      step that has already failed with the set cycling, which is what keeps every
+      march that converges the ordinary way on exactly the path it followed before
+      the rule existed — and every locked transient trajectory with it. That gating is
       visible in the counters: a resolution is preceded by a detection on the failed
-      sweep AND another on the retry, so ``2 * damped <= cycles`` whenever the rule
-      engages at all. Resolving on first detection instead makes the two counts
-      equal. A tri6 model that never cycles must report neither.
+      sweep AND another on the retry, so ``2 * damped <= cycles`` whenever the breaker
+      engages at all. Resolving on first detection instead makes the two counts equal.
+      This is measured on the mutated run, the one place the breaker still engages.
+      A tri6 model that never cycles must report neither counter, with the rule on or
+      off: gs2_pond is that control, and is bit-for-bit the same march either way.
+
+    The free-surface rule changes a march only where the face was carrying pressure it
+    should not have been. That claim is the whole ``--tseep`` slice, not an argument:
+    all 53 transient locks reproduce on the merged engine, unchanged, alongside this
+    guard.
 
     Returns (0.0, None) on success, else (None, message)."""
     import io
@@ -12691,7 +12715,8 @@ def run_tseep_exit_cycle_test(test):
             return run_transient_seepage(build_seep_data(mesh, sd),
                                          build_tseep_data(sd), verbose=False)
 
-    # A march whose exit set never revisits a state must see neither counter move.
+    # A march whose exit set never revisits a state must see neither counter move,
+    # and must not need the free-surface rule at all.
     quiet = _march(('docs', 'verification', 'files', 'geostudio', 'gs2_pond.xlsx'), 3.0)
     if not quiet.get('converged'):
         problems.append("the quiet tri6 march did not converge")
@@ -12701,18 +12726,62 @@ def run_tseep_exit_cycle_test(test):
             f"cycles={quiet.get('exit_face_cycles')}, "
             f"damped={quiet.get('exit_face_damped')} — the detector is firing on an "
             f"exit set that is merely settling")
-
-    # A march that DOES cycle must resolve only on the retry of a failed step.
-    cyc = _march(('docs', 'verification', 'files', 'rocscience_gw', 'gw018.xlsx'), 3.0)
-    if not cyc.get('converged'):
-        problems.append("the cycling tri6 march did not converge")
-    n_cyc, n_damp = cyc.get('exit_face_cycles', 0), cyc.get('exit_face_damped', 0)
-    if not n_damp:
-        problems.append(f"the cycling fixture no longer exercises the rule "
-                        f"(cycles={n_cyc}, damped={n_damp}) — it guards nothing")
-    elif 2 * n_damp > n_cyc:
+    if quiet.get('exit_face_wet_joined'):
         problems.append(
-            f"the anti-cycling rule resolved {n_damp} edge(s) against {n_cyc} detected "
+            f"the quiet march joined {quiet['exit_face_wet_joined']} node(s) to its "
+            f"seepage face by the free-surface rule — a march whose face is already "
+            f"resolved must not be touched by it")
+
+    # GW18: the fixture that used to cycle. The free-surface rule now resolves its
+    # face at the first set the step would call stable, so the cycle never forms, and
+    # the field it delivers carries no pressure on a free exit face.
+    gw018 = ('docs', 'verification', 'files', 'rocscience_gw', 'gw018.xlsx')
+    cyc = _march(gw018, 3.0)
+    if not cyc.get('converged'):
+        problems.append("the GW18 tri6 march did not converge")
+    n_cyc, n_damp = cyc.get('exit_face_cycles', 0), cyc.get('exit_face_damped', 0)
+    n_wet, hyst = cyc.get('exit_face_wet_joined', 0), cyc.get('exit_face_hyst', 0.0)
+    free_p = cyc.get('exit_face_free_pressure', 0.0)
+    if not n_wet:
+        problems.append(
+            f"GW18 never engaged the free-surface rule (joined={n_wet}, "
+            f"cycles={n_cyc}) — this fixture is here because its exit face goes "
+            f"partly wet, and it no longer exercises the rule that resolves it")
+    if free_p > hyst:
+        problems.append(
+            f"GW18 left {free_p:.4g} of pressure head on the free part of an exit "
+            f"face against a {hyst:.4g} hysteresis band: the march delivered a field "
+            f"with pore pressure on a surface that drains at atmospheric")
+    if n_cyc or n_damp:
+        problems.append(
+            f"GW18 reported cycles={n_cyc}, damped={n_damp}: its face is supposed to "
+            f"be resolved at the first stable set, before the all-or-nothing edge "
+            f"rule can start alternating across it")
+
+    # The mutation: the same march with the free-surface rule off. The cycle comes
+    # back, the field it delivers stands above its own exit face, and the cycle
+    # breaker — the only thing left to catch it — is still gated behind a failed step.
+    from xslope import seep as _seep
+    try:
+        _seep._TSEEP_NO_WET_FACE_RULE = True
+        raw = _march(gw018, 3.0)
+    finally:
+        _seep._TSEEP_NO_WET_FACE_RULE = False
+    r_cyc, r_damp = raw.get('exit_face_cycles', 0), raw.get('exit_face_damped', 0)
+    r_free = raw.get('exit_face_free_pressure', 0.0)
+    if not r_cyc:
+        problems.append(
+            f"with the free-surface rule off GW18 reported cycles={r_cyc}: the cycle "
+            f"the rule prevents is gone for some other reason, so this fixture no "
+            f"longer measures what the rule is worth")
+    if r_free <= hyst:
+        problems.append(
+            f"with the free-surface rule off GW18 left only {r_free:.4g} of pressure "
+            f"head on its free exit face, inside the {hyst:.4g} band — the pressure "
+            f"the rule exists to clear is not being produced here any more")
+    if r_damp and 2 * r_damp > r_cyc:
+        problems.append(
+            f"the cycle breaker resolved {r_damp} edge(s) against {r_cyc} detected "
             f"cycle(s): it is firing on FIRST detection instead of on the retry of a "
             f"step that has already failed, so every march that cycles and recovers by "
             f"itself — and every locked trajectory with it — moves")

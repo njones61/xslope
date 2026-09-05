@@ -134,22 +134,22 @@ seepage dialog. Click **Run → Run Seep…**
 The **Model checks** panel carries the preflight report for this run, and on this
 model it reports **No problems found for this run.** Leave **Convergence tol** at
 `0.0001` and **Max iterations** at `400`, and click **Run**. The unconfined
-iteration settles in **26 sweeps**, and the run is over almost as soon as it
+iteration settles in **27 sweeps**, and the run is over almost as soon as it
 starts. The Log pane's closing lines carry the last sweep and the convergence it
 reached:
 
 ```text
-Iteration 25: residual = 9.822325e-04, closure = 1.038e-03, relax = 0.500, 0/52 exit face active
-Converged in 26 iterations (residual = 6.971e-04, closure = 6.404e-04, exit face stable)
-Flow closure check: inflow = 1.525146e-08, outflow = -0.000000e+00, error = 1.525146e-08
+Iteration 25: residual = 1.068477e-03, closure = 1.361e-03, relax = 0.500, 1/52 exit face active
+Converged in 27 iterations (residual = 6.151e-04, closure = 2.995e-04, exit face stable)
+Flow closure check: inflow = 6.480799e-01, outflow = 6.480799e-01, error = 2.801829e-08
 ```
 
 ![The seepage solution](images/combo01_seepage.png){width=1000}
 
-**The total discharge is 1.925 ft³/day per ft** — per foot of dam measured along
+**The total discharge is 1.948 ft³/day per ft** — per foot of dam measured along
 its axis, the convention every quantity a two-dimensional analysis reports
 carries. (In [SEEP-2](seep02_johnson_dam.md#running-the-analysis) the same model
-on a linear mesh at 6.25 ft gives 1.9546; the 1.5% between the two is the mesh,
+on a linear mesh at 6.25 ft gives 1.9546; the 0.3% between the two is the mesh,
 not the physics.) The head runs from 100.000 ft to 160.000 ft, the two boundary
 values and nothing outside them, and the heavy black line is the **phreatic
 surface** — the locus of points where the pore pressure passes through zero,
@@ -194,7 +194,7 @@ Leaving a material on anything else costs a measurable amount, because the
 seepage run computes the same field either way and says nothing about who reads
 it. With all three materials set to `none` instead, on this same mesh and this
 same solved field, the Spencer search below returns **FS = 1.618** against the
-1.248 it returns at `seep` — 29.7% higher, on a shallower circle the search
+1.257 it returns at `seep` — 28.7% higher, on a shallower circle the search
 prefers once the water is gone. The seepage analysis still ran, converged and
 reported its discharge; the stability run never read it, and every slice base
 took zero pore pressure.
@@ -233,16 +233,16 @@ The Log pane follows the search. Its last two refinement steps and its closing
 lines read:
 
 ```text
-[🔁 iteration 11] center=(508.96, 262.80), FS=1.2481, grid=1.4927
-[🔁 iteration 12] center=(508.96, 262.80), FS=1.2481, grid=0.7463
-[✅ converged] Iter=12, FS=1.2481 (ΔFS<0.0005) at (x=508.96, y=262.80, depth=77.28)
-Critical FS = 1.248
+[🔁 iteration 11] center=(508.96, 262.80), FS=1.2571, grid=1.4927
+[🔁 iteration 12] center=(508.96, 262.80), FS=1.2571, grid=0.7463
+[✅ converged] Iter=12, FS=1.2571 (ΔFS<0.0005) at (x=508.96, y=262.80, depth=77.28)
+Critical FS = 1.257
 Sliding mass = 1,284,328.7 lb/ft over 290.62 ft of failure surface
 ```
 
 ![Spencer's critical circle](images/combo01_lem_solution.png){width=1000}
 
-**Spencer's method gives FS = 1.248** on a circle centered at (508.96, 262.80)
+**Spencer's method gives FS = 1.257** on a circle centered at (508.96, 262.80)
 with a radius of 185.52 ft. It enters the upstream face at x = 346.5, elevation
 173.2 — above the reservoir and 6.8 ft below the crest — cuts down through the
 core, crosses into the foundation where the core pinches out at x = 420, bottoms
@@ -253,9 +253,9 @@ the 12 refinement steps the log counts.
 The seepage solution shows up twice on this figure. The thin gray contours
 behind the section are the solved total head, and the pale blue band under the
 failure surface is the **pore pressure on each slice base**, interpolated from
-that field: read off the slice table's `u` column it runs from 0 to 2,044 psf
-across the 40 slices, largest where the surface is deepest and zero on the slices
-that lie above the phreatic surface. The green hatched band above it is the
+that field: read off the slice table's `u` column it runs from 0 to 2,002 psf
+across the 40 slices, largest where the surface is deepest and zero on the one
+slice that lies above the phreatic surface. The green hatched band above it is the
 effective normal stress the strength was computed from, which is that base's
 total normal stress less the blue.
 
@@ -276,12 +276,11 @@ immediately.
 one carry tension up to its Mohr-Coulomb apex; in
 [FEM-1](fem01_strength_reduction.md#running-the-strength-reduction) we work
 through what that cap is and when it matters. The column is left blank on this
-model on purpose: with a zero cutoff the toe of the downstream shell, where the
-fill tapers to nothing against the foundation, has no stress state that both
-carries no tension and stays in equilibrium, so the shell's own Mohr-Coulomb
-envelope limits the tension there instead — the 142.8 psf the warning names —
-and the answer the run gives is checked against Spencer's 1.248 on the same
-section.
+model, and on this dam that choice does not move the answer: the solved field
+leaves the free downstream face at zero pore pressure, so no part of the section
+needs tension to stay in equilibrium, and a zero cutoff entered on all three
+materials returns the same factor of safety. What the run gives is checked
+against Spencer's 1.257 on the same section.
 
 Everything else opens on the defaults this run wants. **Analysis** is **SSRM
 (find FS)**, the strength reduction: it divides both Mohr-Coulomb strength
@@ -296,8 +295,8 @@ solve and the search before it.
 
 ![Shear strain at failure](images/combo01_fem_shear.png){width=1000}
 
-**Strength reduction gives FS = 1.2305**, the midpoint of the final bracket
-[1.2266, 1.2344] after seven bisection steps. The shear strain field above is the
+**Strength reduction gives FS = 1.2461**, the midpoint of the final bracket
+[1.2422, 1.2500] after seven bisection steps. The shear strain field above is the
 mechanism the run found, and nothing about a surface was assumed to find it: the
 band of straining soil is wherever the model put it.
 
@@ -334,7 +333,7 @@ will read it again. [Stale results and the mesh](../studio/editing.md#stale-resu
 states the rule in full. The practical effect is that the three answers on this
 page cannot silently belong to three different models.
 
-The two factors of safety are 1.248 and 1.2305, 1.4% apart, on the same
+The two factors of safety are 1.257 and 1.2461, 0.9% apart, on the same
 mechanism: a deep surface from the upstream face just below the crest, down
 through the core and the downstream shell, into the foundation and out beyond the
 toe. They are independent routes to it — the search prescribes a circular surface
@@ -352,8 +351,8 @@ This tutorial covered:
 - One quadratic mesh for all three analyses, chosen for the strictest of them.
 - A seepage run that leaves a pore pressure at every mesh node.
 - The materials table's `u` column: `seep` reads that field, `none` ignores it
-  (Spencer 1.618 instead of 1.248).
-- Spencer 1.248 and strength reduction 1.2305 from the same model and field,
+  (Spencer 1.618 instead of 1.257).
+- Spencer 1.257 and strength reduction 1.2461 from the same model and field,
   with nothing exported or retyped.
 - Results go stale when the inputs they depend on change.
 

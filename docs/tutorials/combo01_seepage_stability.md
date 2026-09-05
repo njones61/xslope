@@ -271,15 +271,15 @@ immediately.
 
 ![Run FEM, at its defaults](images/combo01_studio_run_fem.png)
 
-**Model checks — 1 warning**, and **Run** is enabled. The warning is about
-`t_cut`, the tensile cutoff left blank on all three materials, which lets each
-one carry tension up to its Mohr-Coulomb apex; in
+**Model checks** reports **No problems found for this run**, with one note
+folded beneath it, and **Run** is enabled. The note is about **Tension SRF**: the
+main sheet leaves that cell blank, so the engine default applies and the tensile
+cap is reduced by the trial factor along with `c` and `tan φ`. The checkbox is
+live rather than dimmed because this model declares a cap — `t_cut` = 0 on the
+shell, the core and the foundation, three materials that carry no tension at all
+— and a model with no cap anywhere gives it nothing to act on; in
 [FEM-1](fem01_strength_reduction.md#running-the-strength-reduction) we work
-through what that cap is and when it matters. The column is left blank on this
-model, and on this dam that choice does not move the answer: the solved field
-leaves the free downstream face at zero pore pressure, so no part of the section
-needs tension to stay in equilibrium, and a zero cutoff entered on all three
-materials returns the same factor of safety. What the run gives is checked
+through what that cutoff is and when it matters. What the run gives is checked
 against Spencer's 1.257 on the same section.
 
 Everything else opens on the defaults this run wants. **Analysis** is **SSRM

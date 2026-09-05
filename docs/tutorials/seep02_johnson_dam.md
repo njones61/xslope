@@ -933,13 +933,13 @@ The one thing that has to be decided before the seepage run, rather than after, 
 the element type. A finite element stability analysis requires quadratic elements,
 so a mesh built at `tri3` for a fast seepage solve has to be rebuilt at `tri6`
 before it can carry one. That is why the sample page's shipped mesh is quadratic —
-3,362 nodes and 1,605 `tri6` elements — and why its discharge of 1.9391 differs
-slightly from the 1.9546 of the linear tri3 mesh built above.
+3,362 nodes and 1,605 `tri6` elements — and it returns 1.9555 ft³/day per ft
+against the 1.9546 of the linear tri3 mesh built above.
 
 [Seepage and Slope Stability](../seep/seep_slope.md#worked-example) carries this
 same dam through the rest of the workflow: a Spencer search on the seepage-derived
-pore pressures at **FS = 1.25**, and a finite element strength-reduction analysis on
-the same mesh and the same field at **FS = 1.25** as well.
+pore pressures at **FS = 1.26**, and a finite element strength-reduction analysis on
+the same mesh and the same field at **FS = 1.26** as well.
 
 ---
 

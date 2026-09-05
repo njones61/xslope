@@ -289,8 +289,8 @@ shaft is free to rotate about it.
 ### Head and tip fixity
 
 The `Head` and `Tip` settings are physical statements about how each end of
-the shaft is held. As shipped, `Head` is `free`: nothing holds the top of the
-shaft, and it moves with the soil around it. A head held in place and against
+the shaft is held, and both can be set. The head is typically `free`, as it is
+here: nothing holds the top of the shaft, and it moves with the soil around it. A head held in place and against
 rotation is a shaft tied into a stiff cap beam or a restrained deck. Setting
 `Head` to `fixed` on both rows, with the tips still pinned, gives 1.496, the
 largest change any single setting makes on this model. These shafts have no cap

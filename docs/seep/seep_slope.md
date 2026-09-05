@@ -215,11 +215,12 @@ consistent boundary pressure, so the FEM sees exactly the same water as the LEM.
 
 <!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, expected_fs=1.25, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
 
-The deformed mesh and displacement vectors show a deep-seated mechanism through the embankment
-and into the foundation, consistent with the critical circle the LEM search found. Neither
-method depends on the other — the LEM prescribes a circular surface, the FEM develops the
-mechanism from the stress field — so the agreement is a mutual check on the combined seepage
-and stability workflow.
+The shear strain band and displacement vectors show a mechanism through the downstream shell
+that daylights at the toe, with only faint strain reaching into the foundation. The critical
+circle the LEM search found passes deeper, into the foundation, yet the two factors of safety
+agree. Neither method depends on the other — the LEM prescribes a circular surface, the FEM
+develops the mechanism from the stress field — so the agreement is a mutual check on the
+combined seepage and stability workflow.
 
 ## Piezometric line vs. seepage-derived pore pressures
 

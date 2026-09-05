@@ -199,7 +199,7 @@ appears behind the inputs plot:
 ![seep_slope_lem_inputs.png](images/seep_slope_lem_inputs.png){width=1200px}
 
 All three materials use the `seep` option, so every slice base reads the field. A
-critical-circle search with Spencer's method gives **FS = 1.25**:
+critical-circle search with Spencer's method gives **FS = 1.26**:
 
 ![seep_slope_lem_results.png](images/seep_slope_lem_results.png){width=1200px}
 
@@ -209,7 +209,7 @@ The same workbook, mesh and solution then run an SSRM analysis with the default
 non-convergence criterion. The pore pressures reach the Gauss points through the effective
 stress formulation and the reservoir water above the submerged upstream face is applied as a
 consistent boundary pressure, so the FEM sees exactly the same water as the LEM. The result is
-**FS = 1.25**:
+**FS = 1.26**:
 
 ![seep_slope_fem_results.png](images/seep_slope_fem_results.png){width=1200px}
 

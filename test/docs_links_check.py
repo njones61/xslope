@@ -2537,6 +2537,10 @@ def _lem12_pile_force_labels(mw):
         fails.append("LEM-12's model states a pile force on some row; the page's "
                      "whole subject is that both rows leave H blank")
     dlg = PilesEditor().build(data, None)
+    # The quoted labels belong to the list view's grouped form. Which view the
+    # editor opens in is a session setting the last dialog left behind, so it is
+    # set here rather than assumed.
+    dlg.set_view_mode("list")
     labels = [lab.text() for lab in dlg.findChildren(QLabel)]
     for field in LEM12_PILE_FIELDS:
         if field not in labels:

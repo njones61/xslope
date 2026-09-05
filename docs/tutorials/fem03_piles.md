@@ -288,9 +288,8 @@ shaft is free to rotate about it.
 
 ### What decides the finite element answer
 
-Four runs locate what is holding that answer at 1.363. Each changes one thing on
-both rows, on the same mesh and the same bracket, so the numbers are comparable
-to the 1.363 above.
+Five runs on the same mesh show what holds the answer at 1.363. Each changes one
+thing on both rows.
 
 | Change | FS |
 | --- | :---: |
@@ -298,42 +297,20 @@ to the 1.363 above.
 | shaft modulus `E` × 100 | 1.363 |
 | shaft modulus `E` ÷ 100 | 1.363 |
 | `Vcap` and `Mcap` cleared | 1.363 |
-| `Head` set to `fixed`, tips still pinned | 1.496 |
+| `Tip` set to `fixed` | 1.410 |
 
-Stiffness is not what holds it: a hundredfold stiffer shaft and a hundredfold
-softer one both return the same answer to four figures, and the soft shaft's head
-moves 1.40 ft to do it against the shipped section's 0.21 ft. The structural
-capacities are not what holds it either. Where a beam element's moment reaches `Mcap` ÷ S the
-engine releases a plastic hinge: that section turns freely at the capacity and
-carries no more moment however far the shaft bends. Where its shear reaches
-`Vcap` ÷ S the element delivers the capacity and no more. With both cells blank
-the shaft stays elastic at any moment or shear, with no limit at all. Clearing
-them leaves the answer unchanged, because with the rows as shipped nothing
-reaches capacity anyway — the shafts peak at 48% of M<sub>cap</sub> at the
-captured mechanism, so a limit they never meet cannot be what is holding them.
-What moves the answer is restraining rotation at an end, and once an end is held
-the capacities are no longer spare.
+Shaft stiffness does not decide it: a hundredfold stiffer shaft and a hundredfold
+softer one return the same answer. Shaft capacity does not decide it either: with
+`Vcap` and `Mcap` blank the shaft stays elastic at any moment or shear, and the
+answer does not move, because as shipped the shafts never reach capacity. What
+moves the answer is holding the tip.
 
-That is a physical question about the shafts rather than a modeling knob. Both
-rows run from the face down to the rigid base with `Tip` on `pinned`, as
-entered above. Each row's bottom node lands on that fixed base. Its
-translations are held there, but its rotation is not, so the tip is a pin and
-the shaft swings about it. **Results → 1D Details** on the upper row, on its
-default **At failure** field, shows exactly that:
-
-![The upper row's 1D Details at failure with the tip pinned: a straight-line rotation about the toe, moment zero at both ends and peaking mid-shaft at 44% of capacity](images/fem03_piles_profile_pinned.png){width=1000}
-
-The lateral displacement is a straight line from the head to zero at the toe —
-the shaft is rotating as a rigid bar about its pin, not bending. The moment is
-zero at both ends, as it must be with neither end held, and peaks at 16 ft
-below the head: 4,427 lb·ft per foot of slope, 26,562 lb·ft per shaft, 44% of
-the 60,000 lb·ft capacity, with the Mcap lines well outside the curve. The
-shear is largest at the toe, the pin reaction. A drilled shaft that stops at
-the top of the rock and bears on it behaves that way. One
-that is drilled or driven some distance *into* the rock — a rock socket, in
-which the rock grips the shaft's lower length and holds it against rotation as
-well as translation — does not, and the `Tip` field in the pile properties is
-the cell that says which it is. The cell offers four settings, the same four `Head` offers:
+The `Tip` setting is a physical statement about the shaft. Both rows run from
+the face down to the rigid base, and their bottom nodes sit on it. With `Tip` on
+`pinned` the base holds the tip in place but lets it rotate: a drilled shaft that
+stops at the top of the rock and bears on it. With `Tip` on `fixed` the base
+holds its rotation too: a shaft socketed some distance into the rock, which grips
+its lower length. The cell offers the same four settings as `Head`:
 
 | Setting | Translation | Rotation | At a tip, this is |
 | --- | --- | --- | --- |
@@ -342,70 +319,47 @@ the cell that says which it is. The cell offers four settings, the same four `He
 | `unrotated` | free | held | little use at a tip; offered so the two ends read alike |
 | `fixed` | held | held | a shaft socketed into rock |
 
-On this model the tip node sits on the base boundary, which already holds its
-translations, so `free` and `pinned` give the same answer. Setting `fixed` is
-the only setting that changes anything, and it is the one that models the
-socketed shaft.
+Here the tip node sits on the base boundary, which already holds its
+translations, so `free` and `pinned` give the same answer and `fixed` is the
+only setting that changes anything.
 
-Open **Piles**, set `Tip` to `fixed` on both rows, and **OK** — the mesh
-survives a fixity change, as it survived the spacing change. We run the same
-bracket again.
+**Results → 1D Details** on the upper row shows what the pinned shaft is doing:
 
-**FS = 1.410**. Holding both toes is worth 0.047 here,
-and what keeps it from being worth more is the shafts' own capacity: with the
-toes held both rows reach the full 60,000 lb·ft, and six of the 18 beam
-elements stand at their moment capacity, none at their shear capacity.
+![The upper row's 1D Details at failure with the tip pinned: a straight-line rotation about the toe, moment zero at both ends and peaking mid-shaft at 44% of capacity](images/fem03_piles_profile_pinned.png){width=1000}
 
-The at-failure state this run reports is a shorter one than the pinned run's,
-and its title says so: **capture stopped at iteration 38 (runaway)**. Past the
-critical strength the engine keeps solving to develop the mechanism its figures
-are drawn from, and it stops as soon as the section is unmistakably running
-away — here after 38 iterations, with the largest movement in the slope at
-0.51 ft. The pinned run needs no such stop: its collapse develops steadily and
-that solve runs its whole budget. With both ends of both rows held, this one
-never settles, and what is kept is the state the mechanism can be read in rather
-than what the arithmetic reaches later.
+The lateral displacement is a straight line from the head to zero at the toe: the
+shaft swings about its pin as a rigid bar. The moment is zero at both ends and
+peaks 16 ft below the head at 4,427 lb·ft per foot of slope, 26,562 lb·ft per
+shaft, 44% of the 60,000 lb·ft capacity. The shear is largest at the toe, the pin
+reaction.
+
+Open **Piles**, set `Tip` to `fixed` on both rows, and **OK**. The mesh survives
+a fixity change, as it survived the spacing change. Run the same bracket again.
+
+**FS = 1.410**. Holding both toes is worth 0.047, and what keeps it from being
+worth more is the shafts' own capacity: six of the 18 beam elements now stand at
+their moment capacity, none at their shear capacity.
 
 ![The pile rows with both tips fixed, at the captured mechanism: a compact band of shear strain around and below the two socketed toes](images/fem03_fem_shear_piles_fixed.png){width=1000}
 
-The failure has moved. Where the shipped file's mechanism peaked near the upper
-row's head, at (10.5, 9.0), the shearing here is a compact concentration between
-the two rows and below them, from about elevation −3 down to −9, peaking at 0.10
-in the element centered on (8.9, −5.9), with 14 of the 1,521 elements above half
-of that. Light shearing still reaches up the face, but the slope no longer fails
-by carrying the rows along with it: held at both ends, the shafts stay where they
-are and what mass moves has to pass under them.
+The failure has moved. The shipped file's mechanism peaked near the upper row's
+head, at (10.5, 9.0). Here the shearing is a compact band between the two rows
+and below them, from about elevation −3 down to −9, peaking at 0.10 in the
+element centered on (8.9, −5.9). Held at both ends, the shafts stay where they
+are, and what moves has to pass under them.
 
-Open **Results → 1D Details** on the upper row again, and switch **Field state**
-to **Last converged**:
+Open **Results → 1D Details** on the upper row again and set **Field state** to
+**Last converged**, the last state at which the slope stood in equilibrium:
 
 ![The upper row's 1D Details with the tip fixed, at the last converged state: bending against the restraint, the moment at capacity from 16 ft down to the toe](images/fem03_piles_profile_fixed.png){width=1000}
 
-The panel opens on **At failure**, and on this run that field is the stopped
-capture above. Its member forces are the elastic demand in a section that is no
-longer in equilibrium — tens of millions of lb·ft per foot, alternating from one
-element to the next, hundreds of times the capacity those sections are allowed to
-carry. That is a picture of the collapse, not a reading of the shaft, so the
-shaft is read at the last converged state: the figure above, and where every
-number below comes from.
-
-Every panel has changed. The head moves 0.19 ft, and the displacement profile is
-curved rather than straight — the shaft is bending now, not rotating about a
-pin. The moment is zero at the head, which is
-still free, reaches the 10,000 lb·ft per foot that is M<sub>cap</sub> ÷ S about
-16 ft below the head, and holds it to the toe: those sections have hinged, and
-they turn without carrying any more moment. The largest shear is 1,062 lb/ft at
-9 ft below the head, and of the opposite sign to the pinned run's: the shaft is
-being bent against its toe rather than swung about it.
-
-The soil reaction panel reports the lateral pressure the soil is putting on the
-shaft against the Ito & Matsui limit — the largest pressure the theory says soil
-can exert on a pile in a row before it squeezes between the piles. The pinned
-run's panel puts the peak at 42% of that limit at its captured mechanism; this
-one, at the state the slope last stood at, reads 32%. In plane
-strain there is no gap for soil to squeeze through, so nothing in the model would
-hold that pressure under the limit; the panel reports the ratio so that a row
-smeared into a wall can be checked against the theory that does describe the gap.
+The head moves 0.19 ft and the displacement profile is curved: the shaft is
+bending, not rotating about a pin. The moment is zero at the free head, reaches
+the 10,000 lb·ft per foot that is M<sub>cap</sub> ÷ S about 16 ft below the
+head, and holds it to the toe: those sections have hinged and carry no more
+moment however far the shaft bends. The largest shear is 1,062 lb/ft at 9 ft
+below the head, of the opposite sign to the pinned run's, because the shaft is
+now bent against its toe rather than swung about it.
 
 Held at its toe, the shaft develops the full moment capacity the limit
 equilibrium method assumed all along.

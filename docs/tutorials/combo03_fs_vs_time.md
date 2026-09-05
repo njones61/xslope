@@ -307,11 +307,11 @@ has just started down. Reopen **Run → Run LEM…**, set **Saved frame** to
 ```text
 Applying the file's search window: min_slip_depth.
 Searching for the critical circular surface with SPENCER…
-[🔁 iteration 9] center=(5.20, 65.90), FS=1.5132, grid=0.2996
-[🔁 iteration 10] center=(5.20, 65.90), FS=1.5132, grid=0.1498
-[✅ converged] Iter=10, FS=1.5132 (ΔFS<0.0005) at (x=5.20, y=65.90, depth=0.02)
+[🔁 iteration 9] center=(5.20, 65.90), FS=1.5134, grid=0.2996
+[🔁 iteration 10] center=(5.20, 65.90), FS=1.5134, grid=0.1498
+[✅ converged] Iter=10, FS=1.5134 (ΔFS<0.0005) at (x=5.20, y=65.90, depth=0.02)
 Critical FS = 1.513
-Sliding mass = 6,237.2 kN/m over 60.20 m of failure surface
+Sliding mass = 6,237.1 kN/m over 60.20 m of failure surface
 ```
 
 **1.513, and the circle has crossed to the other side of the dam** — center
@@ -355,16 +355,16 @@ Click **Run**. Nineteen searches report their factors of safety to the Log:
 Factor of safety vs time (lem): 19 instant(s) of the transient solution, spencer, re-searching at each…
   t = 0 day      spencer   FS = 1.5311
   t = 2 day      spencer   FS = 1.5311
-  t = 5 day      spencer   FS = 1.5132
+  t = 5 day      spencer   FS = 1.5134
   t = 10 day     spencer   FS = 1.4572
   ...
-Lowest factor of safety 1.3313 at t = 35 day (19 instant(s), 0 without a result).
+Lowest factor of safety 1.3312 at t = 35 day (19 instant(s), 0 without a result).
 ```
 
 The run opens an **FS vs Time** tab with the curve, its lowest instant ringed and
 the pool schedule drawn faintly behind.
 
-**Day 0 and day 5 repeat the two single runs, at 1.5311 and 1.5132** — the
+**Day 0 and day 5 repeat the two single runs, at 1.5311 and 1.5134** — the
 sweep reads the same minimum slip depth and searches from the same two circles as
 the dialog runs. An instant that produces no result comes back as a row carrying
 its reason rather than as a gap in the curve.
@@ -390,17 +390,17 @@ and the face it sits on, read from the tab's **Table** sub-tab:
 | :---: | :---: | :---: | :---: | :---: | --- |
 | 0 | 18.00 | 1.5311 | (103.00, 56.79) | 56.79 | downstream |
 | 2 | 18.00 | 1.5311 | (103.00, 56.79) | 56.79 | downstream |
-| 5 | 16.93 | 1.5132 | (5.20, 65.90) | 65.88 | upstream |
+| 5 | 16.93 | 1.5134 | (5.20, 65.90) | 65.88 | upstream |
 | 10 | 15.16 | 1.4572 | (5.20, 65.90) | 65.88 | upstream |
-| 15 | 13.38 | 1.4128 | (5.20, 65.90) | 65.88 | upstream |
-| 20 | 11.60 | 1.3773 | (6.25, 60.58) | 60.58 | upstream |
-| 25 | 9.82 | 1.3509 | (7.00, 57.81) | 57.75 | upstream |
-| 30 | 8.04 | 1.3344 | (7.00, 56.91) | 56.91 | upstream |
-| 35 | 6.27 | **1.3313** | (7.00, 56.91) | 56.91 | upstream |
+| 15 | 13.38 | 1.4132 | (5.20, 65.90) | 65.88 | upstream |
+| 20 | 11.60 | 1.3779 | (6.40, 60.06) | 60.04 | upstream |
+| 25 | 9.82 | 1.3510 | (7.00, 57.81) | 57.75 | upstream |
+| 30 | 8.04 | 1.3343 | (7.00, 56.91) | 56.91 | upstream |
+| 35 | 6.27 | **1.3312** | (7.00, 56.91) | 56.91 | upstream |
 | 40 | 4.49 | 1.3436 | (7.00, 56.91) | 56.91 | upstream |
-| 47 | 2.00 | 1.3813 | (7.00, 57.16) | 57.16 | upstream |
-| 55 | 2.00 | 1.4386 | (7.00, 57.16) | 57.16 | upstream |
-| 65 | 2.00 | 1.4828 | (7.00, 57.16) | 57.16 | upstream |
+| 47 | 2.00 | 1.3812 | (7.00, 57.16) | 57.16 | upstream |
+| 55 | 2.00 | 1.4385 | (7.00, 57.16) | 57.16 | upstream |
+| 65 | 2.00 | 1.4827 | (7.00, 57.16) | 57.16 | upstream |
 | 80 | 2.00 | 1.5187 | (7.00, 57.16) | 57.16 | upstream |
 | 100 | 2.00 | 1.5482 | (103.00, 56.79) | 56.79 | downstream |
 | 130 | 2.00 | 1.5516 | (103.00, 56.79) | 56.79 | downstream |
@@ -411,16 +411,16 @@ and the face it sits on, read from the tab's **Table** sub-tab:
 **Day 2 repeats day 0 exactly**, at 1.5311 on the same downstream circle, because
 the pool has not moved and neither has the field.
 
-**The lowest of the nineteen is 1.3313, on day 35** — 13% below the full-pool
+**The lowest of the nineteen is 1.3312, on day 35** — 13% below the full-pool
 1.5311, and **12 days before the drawdown ends**, with the pool at elevation 6.27
 and 4.3 m of the 16 m drawdown still to come.
 
-**Day 47, the end of the drawdown, reads 1.3813** — 0.05 *above* the minimum and
+**Day 47, the end of the drawdown, reads 1.3812** — 0.05 *above* the minimum and
 still upstream. The instant the pool stops falling is not the instant the dam is
 weakest.
 
-**After the fall the curve climbs, then flattens.** From 1.3813 it rises to
-1.4386 by day 55, 1.4828 by day 65 and 1.5187 by day 80, all upstream; the answer
+**After the fall the curve climbs, then flattens.** From 1.3812 it rises to
+1.4385 by day 55, 1.4827 by day 65 and 1.5187 by day 80, all upstream; the answer
 passes to the downstream mechanism at day 100 and levels out at 1.5482, 1.5516,
 1.5550, 1.5566 and 1.5572 through day 300.
 
@@ -433,8 +433,8 @@ press the upstream slope into the dam.
 
 **From the first frame of the drawdown the upstream face governs, and it holds
 the answer for two thirds of the run.** By day 5 the pool has dropped about a
-meter and the critical circle is already at (5.20, 65.90) at 1.5132; it stays
-upstream through the fall, the minimum and the recovery, down to 1.3313 on day 35
+meter and the critical circle is already at (5.20, 65.90) at 1.5134; it stays
+upstream through the fall, the minimum and the recovery, down to 1.3312 on day 35
 and back to 1.5187 on day 80.
 
 **At day 100 the downstream face takes it back**, at 1.5482, and keeps it to the
@@ -482,7 +482,7 @@ The factor of safety falls while the load is ahead of the drainage and rises onc
 the drainage catches up, so day 35 marks that crossover rather than the end of
 the drawdown. Over the next 12 days the pool gives up its last 4.3 m while the
 shell keeps draining, and the strength recovers faster than the load falls —
-1.3436 by day 40, 1.3813 by day 47, 1.5187 by day 80.
+1.3436 by day 40, 1.3812 by day 47, 1.5187 by day 80.
 
 ---
 

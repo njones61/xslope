@@ -19,7 +19,7 @@ A 10 m, 45 degree slope in a badly broken rock mass: sigma_ci = 30 MPa entered a
 nu = 0.3 for the strength-reduction half of the page. GSI = 5 puts the exponent
 a at 0.619, far from the classical 0.5, which is what makes the case a test of
 the criterion rather than of the geometry. Locked at Bishop 1.150 / Spencer 1.152
-in the LEM and SSRM 1.159 on tri6 elements at a 0.9 m target size.
+in the LEM and SSRM 1.153 on tri6 elements at a 0.9 m target size.
 
 What the tutorial file changes from the corpus, and why
 -------------------------------------------------------
@@ -34,6 +34,10 @@ What the tutorial file changes from the corpus, and why
 * **gamma_sat is cleared.** The model has no water table, and a saturated
   unit weight that can never apply raises a model check on a page whose runs are
   meant to open clean.
+* **The tensile cutoff is declared at zero**, the value the rest of the shipped
+  files carry, so Run FEM does not open on an unbounded-tension warning. The rock's
+  own Hoek-Brown tensile strength is 11.6 kPa, so the cap has next to nothing to
+  trim and the strength reduction answers the same.
 * **The file declares the finite element run it is solved on** — tri6 at a 0.9 m
   target size, the strength-reduction bracket 0.8 to 1.6, and K0 = 1 — so
   Studio's Build Mesh and Run FEM dialogs open on the tutorial's own run instead
@@ -72,10 +76,17 @@ TARGET_SIZE = 0.9
 SSRM_F_MIN, SSRM_F_MAX = 0.8, 1.6
 K0 = 1.0
 
+#: The tensile cutoff every shipped tutorial file declares. The rock's own
+#: Hoek-Brown tensile strength is s*sigma_ci/mb = 11.6 kPa, so a zero cap trims
+#: little; declaring it keeps Run FEM's unbounded-tension check quiet on a page
+#: whose runs are meant to open clean.
+TENSILE_CUTOFF = 0.0
+
 
 def _base(path):
-    """The corpus model with the one change both tutorial files share: no saturated
-    unit weight on a section that has no water in it."""
+    """The corpus model with the two changes the tutorial file makes: no saturated
+    unit weight on a section that has no water in it, and a declared tensile
+    cutoff."""
     sd = load_slope_data(path)
     sd.pop("mesh", None)
     sd.pop("seep_u", None)
@@ -86,6 +97,7 @@ def _base(path):
     if str(mat.get("option", "")).strip().lower() != "hb":
         raise SystemExit(f"{os.path.basename(path)} is not a Hoek-Brown model")
     mat["gamma_sat"] = None
+    mat["t_cut"] = TENSILE_CUTOFF
     sd["materials"] = [mat]
     sd["circular"] = True
     if len(sd["circles"]) != 1:

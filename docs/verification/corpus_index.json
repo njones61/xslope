@@ -6208,7 +6208,7 @@
         "ssr_zones": 0,
         "suction_strength": false,
         "template_version": 25,
-        "tensile_cutoff": false,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,

@@ -286,24 +286,7 @@ shaft is at its tip, which the rigid base holds in place while the soil above
 drags the shaft — the shear there is the reaction at that pinned toe, and the
 shaft is free to rotate about it.
 
-### What decides the finite element answer
-
-Five runs on the same mesh show what holds the answer at 1.363. Each changes one
-thing on both rows.
-
-| Change | FS |
-| --- | :---: |
-| the file as it stands | 1.363 |
-| shaft modulus `E` × 100 | 1.363 |
-| shaft modulus `E` ÷ 100 | 1.363 |
-| `Vcap` and `Mcap` cleared | 1.363 |
-| `Tip` set to `fixed` | 1.410 |
-
-Shaft stiffness does not decide it: a hundredfold stiffer shaft and a hundredfold
-softer one return the same answer. Shaft capacity does not decide it either: with
-`Vcap` and `Mcap` blank the shaft stays elastic at any moment or shear, and the
-answer does not move, because as shipped the shafts never reach capacity. What
-moves the answer is holding the tip.
+### Tip fixity
 
 The `Tip` setting is a physical statement about the shaft. Both rows run from
 the face down to the rigid base, and their bottom nodes sit on it. With `Tip` on
@@ -364,7 +347,26 @@ now bent against its toe rather than swung about it.
 Held at its toe, the shaft develops the full moment capacity the limit
 equilibrium method assumed all along.
 
-Set `Tip` back to `pinned` on both rows before the next section.
+Set `Tip` back to `pinned` on both rows before going on.
+
+### What decides the finite element answer
+
+Three more runs on the same mesh, each changing one thing on both rows, complete
+the picture:
+
+| Change | FS |
+| --- | :---: |
+| the file as it stands | 1.363 |
+| shaft modulus `E` × 100 | 1.363 |
+| shaft modulus `E` ÷ 100 | 1.363 |
+| `Vcap` and `Mcap` cleared | 1.363 |
+| `Tip` set to `fixed` | 1.410 |
+
+Shaft stiffness does not decide the answer: a hundredfold stiffer shaft and a
+hundredfold softer one return the same number. Shaft capacity does not decide it
+either: with `Vcap` and `Mcap` blank the shaft stays elastic at any moment or
+shear, and the answer does not move, because as shipped the shafts never reach
+capacity. What moves the answer is holding the tip.
 
 ### What spacing does to each engine
 

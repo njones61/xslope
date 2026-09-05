@@ -117,16 +117,17 @@ benchmark against an established code: it was exported to a SEEP2D input file
 with the **exact same tri3 mesh topology, boundary conditions, and material
 parameters** (`benchmarks/run_seep2d_compare.py`) and solved with the original
 USACE/WES SEEP2D Fortran program (Tracy, USACE Waterways Experiment Station).
-Identical-mesh comparison over all 2,604 nodes:
+Identical-mesh comparison over all 2,913 nodes:
 
 | Quantity | XSLOPE | SEEP2D | Diff |
 |---|---|---|---|
-| Total discharge q (ft³/day per ft) | 1.9575 | 1.9603 | -0.14% |
-| Nodal heads | RMS Δh = 0.105 ft | (60-ft head range) | 0.18% |
+| Total discharge q (ft³/day per ft) | 1.9546 | 1.9544 | +0.01% |
+| Nodal heads | RMS Δh = 0.037 ft | (60-ft head range) | 0.06% |
 
-The largest local head difference (~2 ft) occurs adjacent to the free surface,
+The largest local head difference (0.56 ft) occurs adjacent to the free surface,
 where the two codes' unsaturated relative-permeability treatments differ in
-detail; the bulk flow field agrees to about 0.1 ft. See the
+detail. Both codes release the free surface from the downstream face at the same
+elevation, el. 102.58. See the
 [Verification](../verification/seep.md) page.
 
 <!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.955, tolerance=0.05, benchmark=SEEP-2 -->

@@ -4666,3 +4666,4 @@ node_id,head,u,v_x,v_y,v_mag,i_x,i_y,i_mag,q,phi
 # Unconfined: True
 # Converged: True
 # Closure Error: 3.344758e-15
+# Closure Fraction: 3.227686e-09

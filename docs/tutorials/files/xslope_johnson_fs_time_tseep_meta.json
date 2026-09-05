@@ -1664,9 +1664,9 @@
     3.4837548677593304
   ],
   "mass_balance": {
-    "cumulative_inflow": -1474.559708125831,
-    "final_stored_change": -1537.1370742339705,
-    "final_closure": 0.04243800082376816,
+    "cumulative_inflow": -1474.5596968709208,
+    "final_stored_change": -1537.1370742021277,
+    "final_closure": 0.04243800875881715,
     "per_frame": [
       {
         "time": 0.0,
@@ -1682,117 +1682,117 @@
       },
       {
         "time": 10.0,
-        "stored_change": -40.347731894044614,
-        "cumulative_inflow": -29.525382671349284,
-        "closure": 0.36654391047730855
+        "stored_change": -40.347727701622034,
+        "cumulative_inflow": -29.525363421967338,
+        "closure": 0.36654465941654374
       },
       {
         "time": 15.0,
-        "stored_change": -97.99768445224333,
-        "cumulative_inflow": -80.7545809107091,
-        "closure": 0.21352477280019644
+        "stored_change": -97.99768171199389,
+        "cumulative_inflow": -80.75456347114046,
+        "closure": 0.21352500093713797
       },
       {
         "time": 20.0,
-        "stored_change": -148.50609179528738,
-        "cumulative_inflow": -144.6125504686921,
-        "closure": 0.026923951717719104
+        "stored_change": -148.50609146911154,
+        "cumulative_inflow": -144.6125339010586,
+        "closure": 0.02692406711244567
       },
       {
         "time": 25.0,
-        "stored_change": -243.16701337489326,
-        "cumulative_inflow": -217.00593422471098,
-        "closure": 0.120554671666685
+        "stored_change": -243.1670121974604,
+        "cumulative_inflow": -217.0059181889861,
+        "closure": 0.12055474904463721
       },
       {
         "time": 30.0,
-        "stored_change": -300.9936923703682,
-        "cumulative_inflow": -294.5697588844334,
-        "closure": 0.021807851254870565
+        "stored_change": -300.9936922232516,
+        "cumulative_inflow": -294.5697432553353,
+        "closure": 0.02180790496988684
       },
       {
         "time": 35.0,
-        "stored_change": -402.89073187308645,
-        "cumulative_inflow": -375.0772002048839,
-        "closure": 0.07415415187329312
+        "stored_change": -402.89073156831466,
+        "cumulative_inflow": -375.0771848836977,
+        "closure": 0.07415419493787989
       },
       {
         "time": 40.0,
-        "stored_change": -468.1365449298182,
-        "cumulative_inflow": -456.4794371138952,
-        "closure": 0.02553698341731547
+        "stored_change": -468.13654254213816,
+        "cumulative_inflow": -456.47942206396823,
+        "closure": 0.02553701199818022
       },
       {
         "time": 45.0,
-        "stored_change": -576.3050927176592,
-        "cumulative_inflow": -537.234010842147,
-        "closure": 0.07272637451650907
+        "stored_change": -576.3050905362308,
+        "cumulative_inflow": -537.2339960376707,
+        "closure": 0.07272640001698691
       },
       {
         "time": 50.0,
-        "stored_change": -657.5820473634775,
-        "cumulative_inflow": -615.455108131935,
-        "closure": 0.06844843543407833
+        "stored_change": -657.5820469318226,
+        "cumulative_inflow": -615.4550935514968,
+        "closure": 0.06844846004479589
       },
       {
         "time": 60.0,
-        "stored_change": -790.9843160093618,
-        "cumulative_inflow": -733.8829853292677,
-        "closure": 0.07780713250147732
+        "stored_change": -790.984313882509,
+        "cumulative_inflow": -733.8829711576784,
+        "closure": 0.0778071504163054
       },
       {
         "time": 70.0,
-        "stored_change": -871.7797822358774,
-        "cumulative_inflow": -821.522980018153,
-        "closure": 0.06117516300836024
+        "stored_change": -871.7797795610335,
+        "cumulative_inflow": -821.5229661898537,
+        "closure": 0.061175177614651646
       },
       {
         "time": 80.0,
-        "stored_change": -953.1083241574147,
-        "cumulative_inflow": -892.3636438208549,
-        "closure": 0.06807166647496733
+        "stored_change": -953.1083222966664,
+        "cumulative_inflow": -892.3636303200956,
+        "closure": 0.06807168054886033
       },
       {
         "time": 100.0,
-        "stored_change": -1052.1568975407827,
-        "cumulative_inflow": -1005.0401011937232,
-        "closure": 0.04688051381342604
+        "stored_change": -1052.1568955247872,
+        "cumulative_inflow": -1005.040088211046,
+        "closure": 0.04688052533069423
       },
       {
         "time": 130.0,
-        "stored_change": -1158.882042084835,
-        "cumulative_inflow": -1124.900286231255,
-        "closure": 0.030208682733496958
+        "stored_change": -1158.8820408364777,
+        "cumulative_inflow": -1124.9002738435356,
+        "closure": 0.03020869296869659
       },
       {
         "time": 170.0,
-        "stored_change": -1229.094559304361,
-        "cumulative_inflow": -1228.7854771552331,
-        "closure": 0.0002515346696995043
+        "stored_change": -1229.094559128326,
+        "cumulative_inflow": -1228.785465222705,
+        "closure": 0.0002515442397139615
       },
       {
         "time": 220.0,
-        "stored_change": -1360.0268632011298,
-        "cumulative_inflow": -1311.9834738080895,
-        "closure": 0.03661889829571732
+        "stored_change": -1360.026862674746,
+        "cumulative_inflow": -1311.9834621816676,
+        "closure": 0.036618907080725085
       },
       {
         "time": 300.0,
-        "stored_change": -1469.1357231855463,
-        "cumulative_inflow": -1389.8904066509328,
-        "closure": 0.057015514428624826
+        "stored_change": -1469.135722846373,
+        "cumulative_inflow": -1389.890395251309,
+        "closure": 0.0570155228540417
       },
       {
         "time": 400.0,
-        "stored_change": -1521.042467130735,
-        "cumulative_inflow": -1442.5630446099601,
-        "closure": 0.05440276791645818
+        "stored_change": -1521.042467056021,
+        "cumulative_inflow": -1442.5630333107183,
+        "closure": 0.0544027761235434
       },
       {
         "time": 500.0,
-        "stored_change": -1537.1370742339705,
-        "cumulative_inflow": -1474.559708125831,
-        "closure": 0.04243800082376816
+        "stored_change": -1537.1370742021277,
+        "cumulative_inflow": -1474.5596968709208,
+        "closure": 0.04243800875881715
       }
     ]
   },
@@ -1810,97 +1810,97 @@
     {
       "time": 10.0,
       "inflow": 0.0,
-      "outflow": 7.908336356680946
+      "outflow": 7.908336625008903
     },
     {
       "time": 15.0,
       "inflow": 0.0,
-      "outflow": 11.428825752043
+      "outflow": 11.428826024349528
     },
     {
       "time": 20.0,
       "inflow": 0.0,
-      "outflow": 13.690485345752794
+      "outflow": 13.690485454777807
     },
     {
       "time": 25.0,
       "inflow": 0.0,
-      "outflow": 14.908131601460862
+      "outflow": 14.908131697257257
     },
     {
       "time": 30.0,
       "inflow": 0.0,
-      "outflow": 15.57573437081939
+      "outflow": 15.575734449674215
     },
     {
       "time": 35.0,
       "inflow": 0.0,
-      "outflow": 16.185889745279372
+      "outflow": 16.185889802212653
     },
     {
       "time": 40.0,
       "inflow": 0.0,
-      "outflow": 16.17219806909222
+      "outflow": 16.172198123385392
     },
     {
       "time": 45.0,
       "inflow": 0.0,
-      "outflow": 15.746448330704123
+      "outflow": 15.746448381650726
     },
     {
       "time": 50.0,
       "inflow": 0.0,
-      "outflow": 15.250793215055078
+      "outflow": 15.250793269078724
     },
     {
       "time": 60.0,
       "inflow": 0.0,
-      "outflow": 9.839289518393805
+      "outflow": 9.83928955946283
     },
     {
       "time": 70.0,
       "inflow": 0.0,
-      "outflow": 7.784988539351698
+      "outflow": 7.784988574170453
     },
     {
       "time": 80.0,
       "inflow": 0.0,
-      "outflow": 6.545180765257112
+      "outflow": 6.545180790766586
     },
     {
       "time": 100.0,
       "inflow": 0.0,
-      "outflow": 4.848571648397368
+      "outflow": 4.848571671992735
     },
     {
       "time": 130.0,
       "inflow": 0.0,
-      "outflow": 3.275313314644578
+      "outflow": 3.275313329941144
     },
     {
       "time": 170.0,
       "inflow": 0.0,
-      "outflow": 2.092621121684514
+      "outflow": 2.092621130081658
     },
     {
       "time": 220.0,
       "inflow": 0.0,
-      "outflow": 1.3226390272225763
+      "outflow": 1.322639031672987
     },
     {
       "time": 300.0,
-      "inflow": 0.001904344553204318,
-      "outflow": 0.7139244003381684
+      "inflow": 0.0019043443931039405,
+      "outflow": 0.7139244018403335
     },
     {
       "time": 400.0,
-      "inflow": 0.08918756529816374,
-      "outflow": 0.4960747346644454
+      "inflow": 0.08918756494469449,
+      "outflow": 0.496074734960132
     },
     {
       "time": 500.0,
-      "inflow": 0.1552067774980621,
-      "outflow": 0.40968597305619747
+      "inflow": 0.15520677735339117,
+      "outflow": 0.409685973211132
     }
   ],
   "provenance": {

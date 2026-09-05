@@ -1024,8 +1024,15 @@ def _rs2_67_drawdown_solve(target_size):
     polygons = get_material_polygons(sd)
     mesh = build_mesh_from_polygons(polygons, target_size=target_size,
                                     element_type='tri6')
-    solution = run_seepage_analysis(build_seep_data(mesh, sd), tol=1e-6,
-                                    max_iter=4000, closure_tol=1e-3)
+    # check_inputs=False, and this is the one model in the corpus it is right for:
+    # both benches are held at total head 7.3, so `seep.no_gradient` is CORRECT that
+    # the boundary set drives no flow -- that is what "fully drained, 1500 h after
+    # drawdown" means. The rule reads a zero gradient as a model with no solution to
+    # find, and here the zero gradient IS the answer: the flat water table at el 7.3
+    # the assertion below insists on. Solving it is how the hydrostatic u field under
+    # rs2_67e/f gets written.
+    solution = run_seepage_analysis(build_seep_data(mesh, sd, check_inputs=False),
+                                    tol=1e-6, max_iter=4000, closure_tol=1e-3)
     h = solution['head']
     # The drained equilibrium is a flat WT at 7.3 (both faces held at 7.3); the exit-face
     # active set never "stabilizes" on this zero-flow problem, so gate on the head field

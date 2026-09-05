@@ -177,7 +177,8 @@ analyses share one mesh, the element type has to be chosen for the FEM's require
 
 ## Worked example
 
-Built and run step by step in [COMBO-1](../tutorials/combo01_seepage_stability.md).
+The Johnson Reservoir dam, built and run step by step in
+[COMBO-1](../tutorials/combo01_seepage_stability.md).
 
 [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx)
 

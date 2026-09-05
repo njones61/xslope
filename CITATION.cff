@@ -10,8 +10,8 @@ authors:
   - family-names: Jones
     given-names: Norman L.
     affiliation: Brigham Young University
-version: 0.2.1
-date-released: '2026-08-06'
+version: 0.5.0
+date-released: '2026-09-05'
 license: Apache-2.0
 repository-code: "https://github.com/njones61/xslope"
 url: "https://xslope.org"

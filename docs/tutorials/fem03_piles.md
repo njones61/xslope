@@ -523,24 +523,19 @@ use.
 
 Enter the geometry — `x1` 10, `y1` 10, `x2` 10, `y2` −10 — then `E`
 `4176000000`, which the cell redisplays as `4.176e+09`, `I` `0.00888` and `Area`
-`0.0551` from the table above, `Mcap` `90600`, and `S` `1`. Leave `H`, `D` and
+`0.0551` from the table above, `Mcap` `90600`, and `S` `1`. Leave `D` and
 `Vcap` empty.
 
 Each of those follows from the member being continuous. A sheet pile wall has no
 out-of-plane gap, so its section constants already are per foot of wall, and a
-spacing of 1 passes them into the beam elements unchanged instead of smearing one
-member's stiffness over a spacing. `D` is blank because there is no circular
-shaft to derive a section from — `I` and `Area` are given directly, which is the
-other way the engine accepts a section — and because there is no gap for soil to
-squeeze through, so no arching theory applies. `Vcap` is blank because this run
-checks the wall in bending only. `H` is blank because a strength reduction run
-never uses a stated pile force.
+spacing of 1 passes them into the beam elements unchanged. `D` is blank because
+there is no circular shaft to derive a section from; `I` and `Area` are given
+directly instead. `Vcap` is blank because this run checks the wall in bending
+only.
 
-A new row also opens with **Appl** on `active` and both **Head** and **Tip** on
-`free`. `Appl` is inert here: it is a limit equilibrium input, and a strength
-reduction run never reads it. `Head` `free` is a driven sheet pile with no
-capping beam. Set `Tip` to `fixed`: a sheet pile is driven into the base, not
-stood on it, and the first half measured what that restraint does.
+A new row opens with both **Head** and **Tip** on `free`. `Head` `free` is a
+driven sheet pile with no capping beam. Set `Tip` to `fixed`: a sheet pile is
+driven into the base, not stood on it.
 
 Click **OK**.
 

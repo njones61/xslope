@@ -2578,18 +2578,14 @@ def fem03_wall_row():
     endpoints, its axial and bending section constants entered directly, spacing
     1, a moment capacity, and D and Vcap left empty.
 
-    Both usage bands are shown rather than the FEM band alone, because the row's
-    subject is which cells a continuous member fills and which it leaves blank,
-    and those cells sit in both bands.  The table reaches Tip, which is the cell
-    the page's second run changes.
+    FEM band only: this section runs the strength reduction and nothing else, so
+    the limit equilibrium cells (H, Appl) are not shown.  D, S, Vcap and Mcap
+    apply to both engines and stay.  The table reaches Tip, which is the cell the
+    page's second run changes.
     """
     from studio.editors import PilesEditor
 
-    dlg = PilesEditor().build(_load(FEM03_WALL_DONE), None)
-    # Both bands ticked, explicitly: which band is shown is a session setting, so
-    # a shot that does not set it photographs whatever the last dialog left.
-    for _tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
-        cb.setChecked(True)
+    dlg = _fem_only(PilesEditor().build(_load(FEM03_WALL_DONE), None))
     return _grab(_line_table(dlg, through="tip_fixity"),
                  "fem03_studio_wall_row.png")
 

@@ -389,11 +389,7 @@ The rest of the dialog opens on the defaults this run wants: **SSRM (find FS)**,
 a bracket of 1.00 to 2.00, a tolerance of 0.0100, **Rollers** on the sides, and
 **Non-convergence** as the failure criterion — the plain reading, that a trial
 which cannot reach equilibrium has failed. In FEM-1 we compare it against the
-three other criteria the list offers. The **Reduce the tensile cap with F
-(Tension SRF)** checkbox, dimmed in FEM-1 because that model entered no cutoff,
-is live here and ticked: each trial divides `t_cut` by its own factor along with
-*c* and tan φ. A cutoff of zero divides to zero, so on this model the setting
-has nothing to act on. Click **Run**.
+three other criteria the list offers. Click **Run**.
 
 **FS = 1.566**, from a final bracket of [1.5625, 1.5703], in seven bisection
 steps. This is **1.3% below** Spencer's 1.587. The two engines solve the

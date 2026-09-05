@@ -271,18 +271,10 @@ immediately.
 
 ![Run FEM, at its defaults](images/combo01_studio_run_fem.png)
 
-**Model checks** reports **No problems found for this run**, with one note
-folded beneath it, and **Run** is enabled. The note is about **Tension SRF**: the
-main sheet leaves that cell blank, so the engine default applies and the tensile
-cap is reduced by the trial factor along with `c` and `tan φ`. The checkbox is
-live rather than dimmed because this model declares a cap — `t_cut` = 0 on the
-shell, the core and the foundation, three materials that carry no tension at all
-— and a model with no cap anywhere gives it nothing to act on; in
-[FEM-1](fem01_strength_reduction.md#running-the-strength-reduction) we work
-through what that cutoff is and when it matters. What the run gives is checked
-against Spencer's 1.257 on the same section.
+**Model checks** reports **No problems found for this run**, and **Run** is
+enabled.
 
-Everything else opens on the defaults this run wants. **Analysis** is **SSRM
+The dialog opens on the defaults this run wants. **Analysis** is **SSRM
 (find FS)**, the strength reduction: it divides both Mohr-Coulomb strength
 parameters by a trial factor *F*, solves the whole slope for equilibrium under
 its own weight, and reports the largest *F* the slope still stands at.

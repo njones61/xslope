@@ -253,15 +253,10 @@ Click **Run → Run FEM…**
 
 ![Run FEM on the meshed pile model](images/fem03_studio_run_fem_piles.png)
 
-**Model checks** finds no problems, and **Run** is enabled. Two notes sit under
-that line. The first says that **Tension SRF** is blank, so the clay's tensile
-cutoff — `t_cut` = 0 on this file, a soil that carries no tension at all — is
-divided by the trial factor along with *c* and tan φ, which is the engine
-default and is the setting
-[FEM-1](fem01_strength_reduction.md#running-the-strength-reduction) works
-through. The second says that the two pile rows carry a diameter with no `Area`
-or `I`, so the engine is deriving the solid circular section — the derivation
-described above, reported rather than assumed.
+**Model checks** finds no problems, and **Run** is enabled. One note sits under
+that line: the two pile rows carry a diameter with no `Area` or `I`, so the
+engine is deriving the solid circular section — the derivation described above,
+reported rather than assumed.
 
 Set **F min (SSRM)** to `1.00` and **F max (SSRM)** to `2.00`. A bracket has to
 contain the answer, and the runs on this page range from 1.17 on the bare slope
@@ -603,9 +598,9 @@ Click **Run → Run FEM…**
 
 ![Run FEM on the meshed wall model](images/fem03_studio_run_fem_wall.png)
 
-**Model checks** finds no problems, and carries the same **Tension SRF** note as
-the pile run. There is no second note this time: the wall states its own `I` and
-`Area`, so nothing is derived. The bracket is already `1.00` to `2.00`. Click
+**Model checks** finds no problems, and carries no note this time: the wall
+states its own `I` and `Area`, so nothing is derived. The bracket is
+already `1.00` to `2.00`. Click
 **Run**.
 
 **FS = 1.723**, from [1.7188, 1.7266]. The wall takes the slope from 1.137 to

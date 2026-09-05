@@ -1260,10 +1260,12 @@ shear and tensile, is reduced (right panel above). With `tension_srf=False` the 
 authored value through the whole bisection. This is RS2's `tensilestrength_SRF` switch, and matching
 it matters when the target is an RS2 answer: on a tension-controlled mechanism the two settings do
 not converge to the same factor of safety. The default is on because it only ever acts *where a cap
-exists* — a model with no `t_cut` and no global cutoff has no $T$ to reduce, so every cap-less run
-(including all the Griffiths & Lane anchors) is identical either way. It is reachable three ways:
-the `tension_srf` keyword, the **Tension SRF** cell on the main sheet, and the matching checkbox in
-Studio's Run FEM dialog.
+exists and is positive* — a model with no `t_cut` and no global cutoff has no $T$ to reduce, so
+every cap-less run (including all the Griffiths & Lane anchors) is identical either way, and a
+cutoff of $T = 0$ is left where it is for the same reason, since $0/F$ is $0$ at every trial factor.
+It is reachable three ways: the `tension_srf` keyword, the **Tension SRF** cell on the main sheet,
+and the matching checkbox in Studio's Run FEM dialog, which is dimmed on both of those kinds of
+model.
 
 **Which convention to run.** XSLOPE's default is *no cutoff*, the Griffiths & Lane convention, and
 every [Griffiths & Lane anchor](../verification/ssrm.md) in the verification suite is locked under

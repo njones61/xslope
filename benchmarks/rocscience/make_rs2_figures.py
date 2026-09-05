@@ -183,8 +183,8 @@ EXPECTED_NO_FIGURE = {
     'RS2-67f': 'same Search-Area-confined upstream mechanism as RS2-67d.png, at the drained limit',
 
     # RS2 Part IV VP102 — the drawdown mechanism is one downstream-face wedge at every
-    # frame of a monotone sequence. One frame of each case is figured: the phi_b = 0
-    # frame the page reports as its worst, and the phi_b = 37 frame that sets the dot.
+    # frame of a monotone sequence. One frame of each case is figured: the mid-sequence
+    # phi_b = 0 baseline frame, and the phi_b = 37 frame that sets the dot.
     'RS2-P4-VP102-t-60-c2': 'same downstream-face wedge as RS2-P4-VP102-t-300-c2.png, at an earlier frame',
     'RS2-P4-VP102-t-1500-c2': 'same downstream-face wedge as RS2-P4-VP102-t-300-c2.png, at a later frame',
     'RS2-P4-VP102-t-60-c3': 'same downstream-face wedge as RS2-P4-VP102-t-1500-c3.png, at an earlier frame',

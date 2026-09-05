@@ -921,7 +921,7 @@ def rs2_67b(target_size=3.0):
     unconfined seepage from the vendor #067_02 GW boundary conditions (upstream head 24.4,
     tailwater 7.3, downstream seepage face) and feeds the result through u='seep'. Published:
     RS2 SSR 1.70 | Slide2 Bishop 1.64 / Janbu 1.55 / Spencer 1.73 / GLE-MP 1.71 | ref LEM 1.70
-    / FEM 1.78. On the authored section the own-flow SSRM lands at 1.680, -1.2% from RS2's own
+    / FEM 1.78. On the authored section the own-flow SSRM lands at 1.695, -0.3% from RS2's own
     SSR and inside the Slide2 method spread — see rs2.md."""
     from xslope.mesh import get_material_polygons, build_mesh_from_polygons
     from xslope.seep import build_seep_data, run_seepage_analysis

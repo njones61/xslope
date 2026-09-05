@@ -1,6 +1,6 @@
 """Render the figures for the seepage documentation pages.
 
-Three pages are served, each figure prefixed by the page it belongs to. Every
+Four pages are served, each figure prefixed by the page it belongs to. Every
 figure is built from a committed sample input in ``docs/seep/files/`` and from
 the same solver and plotting code the package ships, so a figure cannot drift
 from the behaviour it illustrates.
@@ -66,6 +66,16 @@ docs/seep/seep_slope.md
                             mesh, where the page, its tag and the committed run
                             all say 1.258 on the 3,362-node quadratic mesh.
 
+docs/seep/samples.md
+  levee_inputs.png       Sample 7, the levee with a grouted foundation: its
+                         polygon-sheet material zones and boundary conditions,
+                         over the mesh the run below builds.
+  levee_results.png      The flow net of that levee, at the mesh and solve its
+                         ``type=seep`` tag is computed on. The problem drawing
+                         and the coordinate sketch on that page are hand-drawn
+                         statements of the problem rather than results, and have
+                         no producer here.
+
 Deterministic: fixed meshes, fixed solves, fixed frames. Run from the repo root:
 
     PYTHONPATH=. python3 tools/make_seep_docs_figures.py          # all
@@ -91,7 +101,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from xslope.fileio import load_slope_data                              # noqa: E402
 from xslope.mesh import (build_polygons, build_mesh_from_polygons,      # noqa: E402
-                         get_material_polygons, interpolate_at_point)
+                         extract_size_regions, get_material_polygons,
+                         interpolate_at_point)
 from xslope.seep import (build_seep_data, build_tseep_data,             # noqa: E402
                          run_seepage_analysis, run_transient_seepage,
                          transient_frame_index, kr_relative_vec,
@@ -693,6 +704,68 @@ def fig_seep_slope_worked_example():
 
 
 # =========================================================================== #
+#  docs/seep/samples.md
+# =========================================================================== #
+
+#: Sample 7, the levee with a grouted foundation. Its flow net is the one figure
+#: on that page whose model is entered on the ``polygon`` sheet, and it is drawn
+#: the way every other flow net on the page is: the mesh and the solve of
+#: ``run_tests.py::run_seep_test``, so the flow rate printed on the figure is the
+#: value the page's ``type=seep`` tag locks. The coordinate sketch beside it
+#: (``levee_coords.png``) and the problem drawing (``levee.png``) are hand-drawn
+#: statements of the problem, not results, and are not produced here.
+LEVEE = "xslope_levee_poly.xlsx"
+LEVEE_DIVISIONS = 120     # run_seep_test's default: section width / 120
+#: The flow net's reference zone. The number of flow channels scales as
+#: 1/k_base, so the choice sets how nearly the cells read as curvilinear squares
+#: — and it is a material of this model, never a tuned number. The levee
+#: (k1 = 0.5 m/day) is the zone the head drop concentrates in, between the pool
+#: and the grout curtain, and its k draws about twenty channels: square through
+#: the embankment and the curtain, and legible in the foundation. The curtain's
+#: own k = 0.2 would ask for two and a half times as many, which closes the net
+#: to a wash, and the foundation's k = 2 for a quarter as many, which leaves too
+#: few to read.
+LEVEE_BASE_MAT = 1
+
+
+def fig_levee():
+    """The levee sample's inputs and flow net, on the mesh its lock is computed on.
+
+    One meshing serves both panels. The inputs view shows the mesh because the
+    page's model has been run and the mesh a seepage run builds is part of what
+    it leaves behind; drawing it from the same mesh the flow net is solved on is
+    what keeps the two panels one model rather than two.
+    """
+    data = _quiet(load_slope_data, os.path.join(FILES, LEVEE))
+    xs = [x for x, _ in data["ground_surface"].coords]
+    target = (max(xs) - min(xs)) / LEVEE_DIVISIONS
+    polygons = _quiet(get_material_polygons, data)
+    mesh = _quiet(build_mesh_from_polygons, polygons, target, "tri3",
+                  size_regions=extract_size_regions(data))
+    seep_data = _quiet(build_seep_data, mesh, data)
+    solution = _quiet(run_seepage_analysis, seep_data, tol=1e-4, max_iter=400)
+    if not solution.get("converged", True):
+        raise RuntimeError(f"{LEVEE}: seepage solve did not converge")
+    print(f"  {LEVEE}: {len(mesh['nodes'])} nodes, "
+          f"q = {float(solution['flowrate']):.6f}")
+
+    nodes = np.asarray(mesh["nodes"])
+    w = float(np.ptp(nodes[:, 0]))
+    h = float(np.ptp(nodes[:, 1]))
+
+    data["mesh"] = mesh
+    fig = plt.figure(figsize=(12.0, max(3.4, 12.0 * 0.82 * h / w + 2.4)))
+    _quiet(plot_inputs, data, fig=fig, mode="seep", frame="content",
+           pad_frac=0.04)
+    _save(fig, "levee_inputs.png")
+
+    fig = plt.figure(figsize=(12.0, max(3.0, 12.0 * 0.82 * h / w + 1.4)))
+    _quiet(plot_seep_solution, seep_data, solution, fig=fig, levels=20,
+           base_mat=LEVEE_BASE_MAT, fill_contours=True, phreatic=True, mesh=False)
+    _save(fig, "levee_results.png", pad=0.3)
+
+
+# =========================================================================== #
 
 def main(which):
     if which in ("all", "overview"):
@@ -708,6 +781,9 @@ def main(which):
         fig_seep_slope()
         fig_seep_slope_worked_example()
         fig_seep_slope_fem()
+    if which in ("all", "samples"):
+        print("samples.md figures")
+        fig_levee()
 
 
 if __name__ == "__main__":

@@ -235,8 +235,7 @@ factor of safety that is too high; the
 in the FEM overview shows how much.
 
 Untick **Auto-size from geometry** and set **Target element size** to `2`. That
-is the size the [FEM sample problem](../fem/samples.md) for this model uses, and
-it puts 10 elements on each 20 ft geogrid, which is enough to draw the force
+puts 10 elements on each 20 ft geogrid, which is enough to draw the force
 profile along a layer. Auto-sizing would divide the 130 ft section width by 100
 divisions for a 1.3 ft element instead, which is finer than this mechanism needs
 and, as the next two paragraphs show, is not a neutral choice on a reinforced
@@ -256,7 +255,7 @@ The reported factor of safety then drifts down toward the sloughing answer
 elements, on the run with a residual) — a different failure, not a better
 estimate of this one. We are after
 the general mechanism through the reinforced block, the one Spencer's circle
-finds, so we stay on the published sample's mesh, where that mechanism
+finds, so we stay on the 2 ft mesh set above, where that mechanism
 governs. To study a fine mesh and still hold the search on the general
 mechanism, the Run FEM dialog has the tools: **Ignore surficial (skin)
 failures** with a **Min slip depth**, or an **SSR exclusion** over the face

@@ -55,8 +55,7 @@ carries.
 <p><span class="tg-pill">piles</span><span class="tg-pill">Ito &amp; Matsui</span><span class="tg-pill">pile spacing</span><span class="tg-pill">head and tip fixity</span><span class="tg-pill">beam elements</span><span class="tg-pill">smeared stiffness</span><span class="tg-pill">plane strain</span><span class="tg-pill">sheet pile wall</span><span class="tg-pill">continuous member</span><span class="tg-pill">strength reduction</span><span class="tg-pill">quadratic triangles</span><span class="tg-pill">1D element size</span><span class="tg-pill">shear strain</span><span class="tg-pill">moment and shear profiles</span></p>
 <div class="tgm-model" markdown>
 **Pile row model** — [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx), the
-completed model from [LEM-12](lem12_piles.md), which is also
-[FEM sample problem 2](../fem/samples.md). It already carries both engines'
+completed model from [LEM-12](lem12_piles.md). It already carries both engines'
 inputs, so we enter nothing in the first half
 
 **Bare slope** — [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx),
@@ -229,9 +228,8 @@ first with **Run → Build Mesh…**
 Set **Element type** to **Quadratic triangles (tri6)** — a stability mesh has to
 be quadratic, and in [FEM-1](fem01_strength_reduction.md#building-the-mesh) we
 measure what linear elements cost. Untick **Auto-size from geometry** and set
-**Target element size** to `2`, which is what the
-[FEM sample problem](../fem/samples.md) for this model uses. Leave the rest of
-the dialog alone and click **Build**.
+**Target element size** to `2`. Leave the rest of the dialog alone and click
+**Build**.
 
 The mesh comes out at **3,180 nodes and 1,521 triangles**, with the two pile
 rows carried in as constraints and discretized into **18 beam elements** — 8 on

@@ -356,19 +356,14 @@ under a name of your own.
 
 ## The iteration budget
 
-Two controls on the Run FEM dialog decide how long each trial may iterate:
-**Max iterations per trial**, which opens at 12,000, and the **Iteration
-ceiling**, which opens at 50,000. Leave both as they open. The budget extends
-itself while a trial is still converging, the Newton corrector finishes most
-slow trials at its 300, 1,000 and 3,000-iteration checkpoints, and a trial that
-neither settles by the ceiling is reported **inconclusive** and treated as the
-undecided edge of the bracket. On this model the answer does not depend on the
-budget: a budget of 3,000 returns the same 1.566 and 1.535 as 12,000, from the
-same bracket. What a smaller budget does change is the captured failure
-picture, because the capture is one more solve that stops at its budget: from
-3,000 the elastic-perfectly-plastic mechanism has moved 1.92 ft, from 12,000
-7.05 ft, and the smaller one shows a collapse that has barely started. Each run
-takes a few minutes on an ordinary laptop.
+Two controls on the Run FEM dialog set how long each trial may iterate: **Max
+iterations per trial**, which opens at 12,000, and the **Iteration ceiling**,
+which opens at 50,000. Leave both as they open. A trial that has not settled
+when its budget runs out is given more, up to the ceiling, so the factor of
+safety does not depend on the budget: a budget of 3,000 returns the same 1.566
+and 1.535 as 12,000. What a smaller budget shortens is the failure picture
+captured after the answer, because that capture is one more solve that stops at
+its budget. Each run takes a few minutes on an ordinary laptop.
 
 ---
 

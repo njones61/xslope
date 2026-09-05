@@ -369,7 +369,7 @@ sweep reads the same minimum slip depth and searches from the same two circles a
 the dialog runs. An instant that produces no result comes back as a row carrying
 its reason rather than as a gap in the curve.
 
-<!-- test: file=files/xslope_earth_dam_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, expected_first=1.5311, critical_time=35, min_fs=1.3313, tolerance=0.005, benchmark=COMBO-3-drained -->
+<!-- test: file=files/xslope_earth_dam_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, expected_first=1.5311, critical_time=35, min_fs=1.3312, tolerance=0.005, benchmark=COMBO-3-drained -->
 
 ### The factor of safety vs time curve
 

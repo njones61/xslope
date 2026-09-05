@@ -418,10 +418,10 @@ This tutorial covered:
 **Where to go next:** [Tutorial LEM-4](lem04_water_in_the_slope.md) adds the
 input every layer here went without — a piezometric line through a three-layer
 section, and a measure of what the pore pressure it produces costs on the
-critical circle. The sample problems carry the layering further —
+critical circle. The series carries the layering further —
 [three layers with a piezometric line](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)
 through them, a section whose
-[layers are polygons](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)
+[layers are polygons](lem06_polygon_geometry.md)
 rather than profile lines because its base dips, and
 [the two-basin slope](../lem/samples.md#13-multiple-local-minima) where the
 starting circles decide the answer.

@@ -35,9 +35,9 @@ CONFIG = PageConfig(
         # paragraph (and reachable from the summary row through its #gw5 link)
         ('+1.8', 'on the closed form at the finest', '8.140', '8.0'),
         ('+1.8', 'on the finest mesh', '8.140', '8.0'),
-        # the 3.5–4.4% van Genuchten band, quoted ahead of the two case pairs
-        # it summarises (gw009a 2.307 against SEEP2D's 2.412)
-        ('+4.4', 'the total discharge reads 3.5–4.4% below SEEP2D', '2.307', '2.412'),
+        # the 3.5–4.7% van Genuchten band, quoted ahead of the two case pairs
+        # it summarises (gw009a 2.307 against SEEP2D's 2.421)
+        ('+4.7', 'the total discharge reads 3.5–4.7% below SEEP2D', '2.307', '2.421'),
     ],
 
     # Percentages expressed as a share of a reference quantity

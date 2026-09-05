@@ -29,9 +29,9 @@ CONFIG = PageConfig(
 
     whitelist=[
         # the 3.5–4.7% band is quoted ahead of the two case pairs it summarises;
-        # 4.7% is gw009a 2.299e-5 against SEEP2D's 2.412e-5 (3.5% is gw010,
+        # 4.7% is gw009a 2.307e-5 against SEEP2D's 2.421e-5 (3.5% is gw010,
         # 6.07 against 6.29, and reconciles in scope)
-        ('+4.7', "reads 3.5–4.7% below SEEP2D", '2.299', '2.412'),
+        ('+4.7', "reads 3.5–4.7% below SEEP2D", '2.307', '2.421'),
     ],
 
     # Percentages expressed as a share of a head range or a total drop

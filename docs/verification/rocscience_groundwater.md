@@ -1276,7 +1276,7 @@ not an XSLOPE defect, so those problems are locked on XSLOPE's own values with t
 offset reported.
 
 One difference remains between the two codes. On the **van Genuchten** problems the total
-discharge reads 3.5–4.4% below SEEP2D (gw009a 2.307×10⁻⁵ vs 2.412×10⁻⁵; gw010
+discharge reads 3.5–4.7% below SEEP2D (gw009a 2.307×10⁻⁵ vs 2.421×10⁻⁵; gw010
 6.070×10⁻⁵ vs 6.294×10⁻⁵) even though the heads agree to 10⁻⁴ — while the linear-front
 problems agree on discharge to better than 0.15%. The split follows the unsaturated law
 exactly, and it is *not* XSLOPE's kr floor: dropping `kr_min` from 10⁻⁴ to zero leaves

@@ -115,23 +115,24 @@ The Johnson Reservoir zoned earth dam (permeable shell, low-permeability core,
 foundation; reservoir at el. 160 ft, tailwater at el. 100 ft) was exported to a
 SEEP2D input file — the **exact same tri3 mesh topology, boundary conditions,
 and material parameters** — and solved with the original USACE/WES SEEP2D
-Fortran program. Identical-mesh comparison over all 2,604 nodes:
+Fortran program. Identical-mesh comparison over all 2,913 nodes:
 
 | Quantity | XSLOPE | SEEP2D | Note |
 |---|---|---|---|
-| Total discharge q (ft³/day per ft) | 1.9575 | 1.9603 (−0.1%) | |
-| Nodal heads | RMS Δh = 0.105 ft | — | 0.2% of a 60-ft head range |
+| Total discharge q (ft³/day per ft) | 1.9546 | 1.9544 (+0.0%) | |
+| Nodal heads | RMS Δh = 0.037 ft | — | 0.1% of a 60-ft head range |
 
-The largest local head difference (~2 ft) occurs adjacent to the free surface,
+The largest local head difference (0.56 ft) occurs adjacent to the free surface,
 where the two codes' unsaturated relative-permeability treatments differ in
-detail; the bulk flow field agrees to about 0.1 ft.
+detail. Both codes release the free surface from the downstream face at the same
+elevation, el. 102.58.
 
 ![Johnson Reservoir: inputs and SEEP2D cross-check solution](images/johnson_res.png)
 
 **Van Genuchten discharge vs SEEP2D — a reporting difference, not a solver
 difference.** On problems with van Genuchten conductivity, XSLOPE's total
 discharge reads 3.5–4.7% below SEEP2D's self-reported flow (gw009a
-2.299×10⁻⁵ vs 2.412×10⁻⁵; gw010 6.07×10⁻⁵ vs 6.29×10⁻⁵) even though the head
+2.307×10⁻⁵ vs 2.421×10⁻⁵; gw010 6.07×10⁻⁵ vs 6.29×10⁻⁵) even though the head
 fields agree to a relative RMS of ~10⁻⁴ and the linear-front problems above
 agree to better than 0.15%. The difference lies in SEEP2D's flow *reporting*,
 not in either code's physics: both codes integrate the relative conductivity

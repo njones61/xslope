@@ -1387,12 +1387,11 @@ inverse-squared-distance probe over the four nearest nodes that reads XSLOPE's.
 | station (x, y) | state | XSLOPE h | SEEP/W h (Δ head) |
 |---|---|---:|---:|
 | (5, 2) | IC (pre-fill) | 4.000 m | 4.000 m (0.00 m) |
-| (5, 2) | t = 24 d (filling) | 4.054 m | 4.133 m (−0.08 m) |
-| (3, 5) | t = 24 d (filling) | 4.113 m | 4.251 m (−0.14 m) |
+| (5, 2) | t = 24 d (filling) | 4.055 m | 4.133 m (−0.08 m) |
+| (3, 5) | t = 24 d (filling) | 4.112 m | 4.251 m (−0.14 m) |
 | (5, 2) | t = 240 d (near-steady) | 6.476 m | 6.463 m (+0.01 m) |
 | (10, 3) | t = 240 d (near-steady) | 5.901 m | 5.900 m (+0.00 m) |
 | (15, 4) | t = 240 d (near-steady) | 5.252 m | 5.238 m (+0.01 m) |
-| (20, 4) | t = 240 d (near-steady) | 4.409 m | 4.424 m (−0.02 m) |
 
 The initial condition is exact (uniform head 4) and the fully developed leaking state
 tracks SEEP/W to **±0.02 m** at every station — 0.3% of the 6.5 m pond head, at the limit of

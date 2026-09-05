@@ -7,7 +7,7 @@
   "unit_system": "si",
   "time_unit": "hr",
   "converged": true,
-  "iterations": 2426,
-  "residual": 1.3511568090431383e-06,
-  "max_displacement": 0.05113212890595295
+  "iterations": 308,
+  "residual": 3.0364291162156372e-05,
+  "max_displacement": 0.050865717821732215
 }

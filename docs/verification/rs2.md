@@ -3031,7 +3031,7 @@ this dam (`benchmarks/rocscience/make_rs2_67_fielddiff.py`): starting from the s
 (el 24.4), the reservoir is stepped to the tailwater (el 7.3) at *t* = 0 and the dam drains with
 RS2's own hydraulics (k = 1 × 10⁻⁷ m/s, m_v = 2 × 10⁻⁴). The run covers the same 90 h section
 as the field it is compared against, so what the comparison measures is flow, not geometry. At 90 h the computed phreatic surface
-overlays RS2's own imported 90 h field to a mean 0.02 m (max 0.28 m) on the upstream face — a
+overlays RS2's own imported 90 h field to a mean 0.01 m (max 0.14 m) on the upstream face — a
 direct fidelity check of the transient *flow* solver against the vendor's solved field — parting
 only in the thin crest/core (whole-section RMS 3.4 m). With RS2's slow conductivity the same run
 is still far from drained at 1500 h (crest head ≈ 23 m of the 24.4 → 7.3 span), which is exactly

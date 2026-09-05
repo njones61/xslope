@@ -7514,12 +7514,19 @@ def run_seep_cycle_test(test):
     to an exit-face set already visited past sweep 100 — so a model that converges on
     its own must be untouched by both.
 
-    The check itself lives in test/seep_cycle_check.py, which re-solves the four
-    rescued models and seven that converge without help on their COMMITTED meshes, at
+    The fourth model, earth_dam2, no longer cycles: the exit-face fix in seep.py gave
+    its seepage face the edge that runs to the toe, and it now converges in 600 sweeps
+    with neither escape firing. The exit-face escape therefore rescues nothing anywhere
+    in the corpus, and the check records that rather than hiding it — it drives the
+    escape at a lowered gate instead, where the orbit is still reachable, and requires
+    it to land on the answer the ungated solve reaches.
+
+    The check itself lives in test/seep_cycle_check.py, which re-solves the three
+    rescued models and eight that converge without help on their COMMITTED meshes, at
     the settings their companions are recorded under. Inertness is locked on the sweep
     count as well as the flow rate: a trajectory that has been nudged shows there
-    first. The file also carries the one-line mutation for each gate and the row it
-    breaks.
+    first. The file also carries the one-line mutation for each gate and what it now
+    moves.
 
     Returns (0.0, None) on success, else (None, message) — a pass/fail test.
     """

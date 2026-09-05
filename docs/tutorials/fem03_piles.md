@@ -289,30 +289,28 @@ shaft is free to rotate about it.
 ### Head and tip fixity
 
 The `Head` and `Tip` settings are physical statements about how each end of
-the shaft is held, and both can be set. The head is typically `free`, as it is
-here: nothing holds the top of the shaft, and it moves with the soil around it. A head held in place and against
-rotation is a shaft tied into a stiff cap beam or a restrained deck. Setting
-`Head` to `fixed` on both rows, with the tips still pinned, gives 1.496, the
-largest change any single setting makes on this model. These shafts have no cap
-beam, so the head stays `free`, and the end that can be held is the tip.
+the shaft is held, and both can be set. Each cell offers the same four settings:
+
+| Setting | Translation | Rotation | What it models |
+| --- | --- | --- | --- |
+| `free` | free | free | an end nothing holds; it moves with the soil around it |
+| `pinned` | held | free | an end held in place that can still rotate: a tip bearing on a hard stratum |
+| `unrotated` | free | held | an end that can move but not rotate; little use at a tip |
+| `fixed` | held | held | an end held in place and against rotation: a tip socketed into rock, or a head tied into a stiff cap beam |
+
+The head is typically `free`, as it is here: nothing holds the top of the shaft,
+and it moves with the soil. Setting `Head` to `fixed` on both rows, with the
+tips still pinned, gives 1.496, the largest change any single setting makes on
+this model. These shafts have no cap beam, so the head stays `free`, and the end
+that can be held is the tip.
 
 Both rows run from the face down to the rigid base, and their bottom nodes sit
-on it. With `Tip` on
-`pinned` the base holds the tip in place but lets it rotate: a drilled shaft that
-stops at the top of the rock and bears on it. With `Tip` on `fixed` the base
-holds its rotation too: a shaft socketed some distance into the rock, which grips
-its lower length. Both cells offer the same four settings:
-
-| Setting | Translation | Rotation | At a tip, this is |
-| --- | --- | --- | --- |
-| `free` | free | free | a shaft floating in the soil, or resting on the model boundary |
-| `pinned` | held | free | a shaft bearing on a hard stratum inside the mesh |
-| `unrotated` | free | held | little use at a tip; offered so the two ends read alike |
-| `fixed` | held | held | a shaft socketed into rock |
-
-Here the tip node sits on the base boundary, which already holds its
-translations, so `free` and `pinned` give the same answer and `fixed` is the
-only setting that changes anything.
+on it. With `Tip` on `pinned` the base holds the tip in place but lets it
+rotate: a drilled shaft that stops at the top of the rock and bears on it. With
+`Tip` on `fixed` the base holds its rotation too: a shaft socketed some distance
+into the rock, which grips its lower length. Because the tip node sits on the
+base boundary, which already holds its translations, `free` and `pinned` give
+the same answer here, and `fixed` is the only setting that changes anything.
 
 **Results → 1D Details** on the upper row shows what the pinned shaft is doing:
 

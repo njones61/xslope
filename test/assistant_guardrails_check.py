@@ -1575,12 +1575,62 @@ def check_the_brief_ships():
     return out
 
 
-def check_skill_body_is_not_in_the_prompt():
-    """No part of the Claude Code skill reaches the Studio system prompt.
+#: Window used to decide that a run of text is shared rather than coincidental.
+#: Well past any phrase two documents about the same package would hit on by
+#: chance, and short enough that a single pasted paragraph is caught.
+SHARED_WINDOW = 120
 
-    Sampled rather than spot-checked on a phrase: a named sentence stops proving
-    anything the moment the skill is edited, whereas a spread of slices of whatever
-    the skill says today cannot go stale.
+#: The documentation page index is the one span the skill and the brief are
+#: allowed to share: both answer questions by pointing at the same real pages, so
+#: both carry the same table of them. Measured 2026-09-05 against the shipped
+#: pair: one contiguous run of 1,221 characters, 0.9% of the skill, and nothing
+#: else of the skill's 134,515 characters occurs in either prompt.
+PAGE_INDEX_BOUND = 1600
+
+
+def _shared_runs(skill, prompt):
+    """Every maximal span of the skill that also occurs verbatim in the prompt.
+
+    Exhaustive: every SHARED_WINDOW-character window of the skill is looked up in
+    the set of the prompt's own windows, so the answer does not depend on where a
+    sampling grid lands. Returns (start, end) slices of `skill`.
+    """
+    windows = {prompt[i:i + SHARED_WINDOW]
+               for i in range(max(len(prompt) - SHARED_WINDOW, 0) + 1)}
+    runs = []
+    for i in range(max(len(skill) - SHARED_WINDOW, 0) + 1):
+        if skill[i:i + SHARED_WINDOW] not in windows:
+            continue
+        if runs and i == runs[-1][1] + 1:
+            runs[-1][1] = i
+        else:
+            runs.append([i, i])
+    return [(a, b + SHARED_WINDOW) for a, b in runs]
+
+
+def _is_the_page_index(text):
+    """True for the shared table of documentation pages, false for skill prose."""
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    rows = sum(1 for ln in lines if ln.lstrip().startswith("|"))
+    return bool(lines) and "xslope.readthedocs.io" in text and rows >= 0.6 * len(lines)
+
+
+def check_skill_body_is_not_in_the_prompt():
+    """No part of the Claude Code skill body reaches the Studio system prompt.
+
+    Measured over the whole skill rather than sampled from it. It used to be forty
+    evenly spaced slices, and the spacing was a function of the file's length: a
+    247-character reword of an unrelated paragraph (17b42c74) slid the whole grid
+    and dropped one slice into the documentation page index, which the skill and
+    the brief carry independently and on purpose -- so the check reported the skill
+    body back in the prompt over a table of doc URLs. Whether it fired depended on
+    the skill's byte count, which is no evidence about the prompt at all.
+
+    What is asserted now is every shared span, not forty guesses at one: the page
+    index may be shared, up to PAGE_INDEX_BOUND characters of it, and nothing else
+    of the skill may appear in either prompt in a run as long as SHARED_WINDOW.
+    Paste a paragraph of skill prose into the brief, or hand the model the skill
+    again, and the run that shows up is not a table of pages.
     """
     from importlib import resources
     out = []
@@ -1589,13 +1639,18 @@ def check_skill_body_is_not_in_the_prompt():
                  / "xslope_skill.md").read_text(encoding="utf-8")
     except Exception:
         return ["the shipped skill could not be read, so its absence is unproven"]
-    slices = [skill[i:i + 120]
-              for i in range(0, max(len(skill) - 120, 1), max(len(skill) // 40, 1))]
     for tier, prompt in _prompts().items():
-        hits = [sl for sl in slices if sl and sl in prompt]
-        if hits:
+        for a, b in _shared_runs(skill, prompt):
+            span = skill[a:b]
+            if _is_the_page_index(span):
+                if len(span) > PAGE_INDEX_BOUND:
+                    out.append(f"{tier}: the shared page index runs {len(span):,} "
+                               f"characters, over the {PAGE_INDEX_BOUND:,} bound — "
+                               f"skill body has grown onto the end of it")
+                continue
             out.append(f"{tier}: the skill body is still in the prompt "
-                       f"({len(hits)} of {len(slices)} sampled slices matched)")
+                       f"({len(span):,} characters at skill[{a}:{b}]: "
+                       f"{span[:80]!r})")
     return out
 
 

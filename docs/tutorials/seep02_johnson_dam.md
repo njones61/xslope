@@ -467,9 +467,9 @@ through what that control does and why the other two choices fail here:
 
 **The total discharge is 1.9546 ft³/day per ft** — per foot of dam measured along
 its axis, the convention every quantity a two-dimensional analysis reports carries.
-The [sample page](../seep/samples.md#johnson-reservoir) reports 1.9575 for the same
-model on the 2,604-node mesh it exported to SEEP2D; the 0.15% between them is the
-mesh, not the physics.
+The [sample page](../seep/samples.md#johnson-reservoir) cross-checks this same
+mesh against the USACE SEEP2D program, which solves the identical topology and
+returns 1.9544.
 
 The head ranges from **100.000 ft to 160.000 ft**, which is the two boundary values
 and nothing outside them, because a region with no sources or sinks inside it can

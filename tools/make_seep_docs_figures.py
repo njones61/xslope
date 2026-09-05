@@ -42,6 +42,13 @@ docs/seep/seep_slope.md
                             failure surface.
   seep_sl_piezo_vs_seep.png The same circle's base pore pressures from a
                             piezometric line and from the seepage solution.
+  seep_slope_fem_results.png The SSRM results panels of the Johnson Reservoir
+                            dam, drawn from the run committed beside the model
+                            (``xslope_johnson_res_fem_*``) rather than solved
+                            here. The picture this replaces was a hand grab from
+                            a session that read F = 1.29 on a linear-triangle
+                            mesh, where the page, its tag and the committed run
+                            all say 1.25 on the 3,362-node quadratic mesh.
 
 Deterministic: fixed meshes, fixed solves, fixed frames. Run from the repo root:
 
@@ -74,7 +81,9 @@ from xslope.seep import (build_seep_data, build_tseep_data,             # noqa: 
                          transient_frame_index, kr_relative_vec,
                          KR_LF, KR_VG, KR_GARD)
 from xslope.plot_seep import plot_seep_data, plot_seep_solution         # noqa: E402
+from xslope.plot_fem import plot_fem_results                            # noqa: E402
 from xslope.plot import declared_unit_labels, get_material_color        # noqa: E402
+from xslope.report import solutions_from_sidecars                       # noqa: E402
 from xslope.slice import generate_slices                                # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -482,6 +491,40 @@ def fig_seep_slope():
     _save(fig, "seep_sl_piezo_vs_seep.png")
 
 
+DAM_FEM = "xslope_johnson_res.xlsx"
+
+
+def fig_seep_slope_fem():
+    """The SSRM results panels of the Johnson Reservoir dam.
+
+    Nothing is solved. The strength reduction run is read back from the
+    companions committed beside the model — the same bundle a fresh run emits —
+    so the picture and the page's ``fem_ssrm`` tag report one run, and rebuilding
+    the companions is followed by rebuilding the picture. The panels are drawn by
+    ``plot_fem_results``, the function every other FEM results figure in the docs
+    is drawn by, at its own defaults: the styling of an SSRM results panel is a
+    package convention and not this script's to restate.
+    """
+    path = os.path.join(FILES, DAM_FEM)
+    data = _quiet(load_slope_data, path)
+    notes = []
+    bundle = _quiet(solutions_from_sidecars, path, data, notes).get("fem")
+    if not bundle:
+        raise RuntimeError(
+            f"{DAM_FEM}: no solved run beside the model — run "
+            f"tools/make_fem_docs_sidecars.py first" +
+            ("\n  " + "\n  ".join(notes) if notes else ""))
+    mesh = data.get("mesh") or {}
+    print(f"  {DAM_FEM}: FS = {bundle['FS']:.4f} at F = "
+          f"{bundle['solution'].get('F'):.4f}, {len(mesh.get('nodes', []))} "
+          f"nodes, {len(mesh.get('elements', []))} elements "
+          f"(tri{max(mesh.get('element_types', [0]))})")
+
+    _quiet(plot_fem_results, bundle["fem_data"], bundle["solution"],
+           fs=bundle["FS"], failure_solution=bundle["failure_solution"])
+    _save(plt.gcf(), "seep_slope_fem_results.png")
+
+
 # =========================================================================== #
 
 def main(which):
@@ -496,6 +539,7 @@ def main(which):
     if which in ("all", "seep_slope"):
         print("seep_slope.md figures")
         fig_seep_slope()
+        fig_seep_slope_fem()
 
 
 if __name__ == "__main__":

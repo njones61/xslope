@@ -120,7 +120,7 @@ beam elements. Then **Run → Run FEM…** — the file declares the bracket too
 **F min (SSRM)** and **F max (SSRM)** open on `1.00` and `2.00` — and **Run**.
 It takes longer than the piled runs that follow, because a slope closer to
 failing takes more iterations at each trial to decide.
-**FS = 1.137**, from [1.1328, 1.1406].
+**FS = 1.137**.
 
 ![The strength-reduction mechanism at failure on the bare slope](images/fem03_fem_shear_bare.png){width=1000}
 
@@ -264,9 +264,7 @@ to 1.79 on the wall of the second half, so every one of them uses the same 1.0 t
 2.0 and the answers stay comparable.
 Leave everything else as it is and click **Run**.
 
-**FS = 1.363**, from a final bracket of [1.3594, 1.3672] in nine trials — two
-bracket checks and seven bisections. Spencer's method gave 1.842 on the same
-file.
+**FS = 1.363**. Spencer's method gave 1.842 on the same file.
 
 <!-- test: file=../lem/files/xslope_piles.xlsx, type=fem_ssrm, expected_fs=1.363, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-piles-ssrm -->
 
@@ -353,7 +351,7 @@ Open **Piles**, set `Tip` to `fixed` on both rows, and **OK** — the mesh
 survives a fixity change, as it survived the spacing change. We run the same
 bracket again.
 
-**FS = 1.410**, from [1.4063, 1.4141]. Holding both toes is worth 0.047 here,
+**FS = 1.410**. Holding both toes is worth 0.047 here,
 and what keeps it from being worth more is the shafts' own capacity: with the
 toes held both rows reach the full 60,000 lb·ft, and six of the 18 beam
 elements stand at their moment capacity, none at their shear capacity.
@@ -429,8 +427,7 @@ is its own Spencer search, because spacing changes which surface governs.
 
 The limit equilibrium answer falls from 2.193 to 1.409 over that range, 36%.
 With the tips pinned the strength reduction answer barely moves: 1.363 at 3 ft
-and again at 6 ft, on the same bracket [1.3594, 1.3672] and with the same
-verdict at every trial, and 1.324 at 12 ft.
+and again at 6 ft, and 1.324 at 12 ft.
 
 The tip-fixed rows of the last section, swept the same way, do not hold still —
 1.543, 1.410 and 1.238, the upper line on the plot. Spacing reaches the finite
@@ -603,8 +600,7 @@ states its own `I` and `Area`, so nothing is derived. The bracket is
 already `1.00` to `2.00`. Click
 **Run**.
 
-**FS = 1.723**, from [1.7188, 1.7266]. The wall takes the slope from 1.137 to
-1.723, a credit of ×1.52.
+**FS = 1.723**. The wall takes the slope from 1.137 to 1.723.
 
 <!-- test: file=files/xslope_pile_wall.xlsx, type=fem_ssrm, expected_fs=1.723, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-wall-ssrm -->
 
@@ -669,7 +665,7 @@ wall is now **40 beam elements**, and the soil mesh refines with it, from 1,510
 to **2,418 triangles**, because the constraint line's nodes are the soil mesh's
 nodes. Run the same bracket: it takes noticeably longer than the run above.
 
-**FS = 1.676**, from [1.6719, 1.6797], and the peak moment 74,546 lb·ft/ft
+**FS = 1.676**, and the peak moment 74,546 lb·ft/ft
 against 90,600. Both moved: the answer came down 0.047, and the toe moment that
 stood at 91% of capacity on ten beam elements stands at 82% on forty. The
 profiles say where the rest of the run time went:

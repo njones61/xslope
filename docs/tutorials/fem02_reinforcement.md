@@ -356,14 +356,11 @@ under a name of your own.
 
 ## The iteration budget
 
-Two controls on the Run FEM dialog set how long each trial may iterate: **Max
-iterations per trial**, which opens at 12,000, and the **Iteration ceiling**,
-which opens at 50,000. Leave both as they open. A trial that has not settled
-when its budget runs out is given more, up to the ceiling, so the factor of
-safety does not depend on the budget: a budget of 3,000 returns the same 1.566
-and 1.535 as 12,000. What a smaller budget shortens is the failure picture
-captured after the answer, because that capture is one more solve that stops at
-its budget. Each run takes a few minutes on an ordinary laptop.
+**Max iterations per trial** and **Iteration ceiling** open at 12,000 and
+50,000. Leave them as they are. They only set how long a slow trial may run
+before the program gives up on it; they do not decide the answer, and this
+model returns the same factors of safety with a budget of 3,000. Each run takes
+a few minutes on an ordinary laptop.
 
 ---
 
@@ -386,8 +383,7 @@ a bracket of 1.00 to 2.00, a tolerance of 0.0100, **Rollers** on the sides, and
 which cannot reach equilibrium has failed. In FEM-1 we compare it against the
 three other criteria the list offers. Click **Run**.
 
-**FS = 1.566**, from a final bracket of [1.5625, 1.5703], in seven bisection
-steps. This is **1.3% below** Spencer's 1.587. The two engines solve the
+**FS = 1.566**, **1.3% below** Spencer's 1.587. The two engines solve the
 problem in completely different ways, so agreement within a couple of percent
 is a good check on both.
 
@@ -478,7 +474,7 @@ A residual of 600 lb/ft against a peak of 800 is a ratio of 0.75, a little above
 the 0.3 to 0.7 usually quoted for geosynthetics. Click **OK**, then
 **Run → Run FEM…** and **Run**, with nothing else on the dialog touched.
 
-**FS = 1.535**, from a bracket of [1.5312, 1.5391]. Post-peak behavior cost
+**FS = 1.535**. Post-peak behavior cost
 **0.031** of factor of safety, 2.0% — half again the 0.021 between
 Spencer's 1.587 and the elastic-perfectly-plastic 1.566.
 

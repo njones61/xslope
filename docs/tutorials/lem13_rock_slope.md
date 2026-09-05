@@ -231,8 +231,7 @@ at their own 12,000 and 50,000, **Rollers** on the sides, **K0 initial stress**
 ticked at 1.000, and **Non-convergence** as the failure criterion. Click **Run**.
 This is the long run of Part A, taking far longer than the search above.
 
-**FS = 1.166**, from a final bracket of [1.1625, 1.1688] in
-seven bisection steps. Hammah et al. report 1.15 for the same slope,
+**FS = 1.166**. Hammah et al. report 1.15 for the same slope,
 solved both with the generalized criterion and with an equivalent Mohr-Coulomb
 fit.
 

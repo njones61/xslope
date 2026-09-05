@@ -287,8 +287,7 @@ solve and the search before it.
 
 ![Shear strain at failure](images/combo01_fem_shear.png){width=1000}
 
-**Strength reduction gives FS = 1.2461**, the midpoint of the final bracket
-[1.2422, 1.2500] after seven bisection steps. The shear strain field above is the
+**Strength reduction gives FS = 1.2461**. The shear strain field above is the
 mechanism the run found, and nothing about a surface was assumed to find it: the
 band of straining soil is wherever the model put it.
 

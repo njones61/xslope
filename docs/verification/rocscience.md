@@ -2342,7 +2342,7 @@ Slide #102 / Huang & Jia (2008): a homogeneous earth dam (c' = 13.8 kPa, φ' = 3
 
 ![vp102a: inputs and representative solution](images/vp102a.png)
 ![vp102b: inputs and representative solution](images/vp102b.png)
-![VP102 transient rapid-drawdown: factor of safety vs time, XSLOPE Spencer vs Slide2 Table 102.3](images/vp102t_curve.png)
+![VP102 transient rapid-drawdown: factor of safety vs time, XSLOPE Spencer vs Slide2 Table 102.3](images/vp102t_curve.png){width=600px}
 
 <!-- test: file=files/rocscience/vp102t_60.xlsx, type=circular_search, num_slices=40, fs_spencer=1.761, benchmark=VP102-t-60 -->
 <!-- test: file=files/rocscience/vp102t_100.xlsx, type=circular_search, num_slices=40, fs_spencer=1.814, benchmark=VP102-t-100 -->

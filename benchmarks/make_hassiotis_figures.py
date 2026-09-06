@@ -1,7 +1,8 @@
 """Render the figures for the Hassiotis et al. (1997) sample on docs/lem/samples.md.
 
-Four figures into docs/lem/sample_images/, all through the production plot path
-at its defaults:
+Four figures into docs/lem/sample_images/, all through the production plot path,
+framed to their content the way the rest of that page is framed (equal aspect,
+the axes box at the model's true proportions, one uniform cushion):
 
   hassiotis_inputs.png      plot_inputs: the slope, the two pile stations drawn
                             together so one picture places both rows.
@@ -65,7 +66,7 @@ def solution(stem, out):
             **file_search_window(sd))
     crit = fs_cache[0]
     capture(os.path.join(IMG, out), plot_solution, sd, crit['slices'],
-            crit['failure_surface'], crit['solver_result'])
+            crit['failure_surface'], crit['solver_result'], frame='content')
     print('   %s: Spencer FS = %.3f' % (stem, crit['solver_result']['FS']))
 
 
@@ -76,7 +77,8 @@ def main():
     sd = load_slope_data(os.path.join(FILES, 'xslope_hassiotis_p1.xlsx'))
     sd2 = load_slope_data(os.path.join(FILES, 'xslope_hassiotis_p2.xlsx'))
     sd['pile_lines'] = sd['pile_lines'] + sd2['pile_lines']
-    capture(os.path.join(IMG, 'hassiotis_inputs.png'), plot_inputs, sd, mode='lem')
+    capture(os.path.join(IMG, 'hassiotis_inputs.png'), plot_inputs, sd,
+            mode='lem', frame='content')
 
     solution('xslope_hassiotis', 'hassiotis_results.png')
     solution('xslope_hassiotis_p1', 'hassiotis_p1_results.png')

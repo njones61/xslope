@@ -214,7 +214,7 @@ The sweep ends past the last slice, where there is likewise no soil left to push
 
 >>$Z_{n+1}(F) = 0$
 
-**xslope** finds the root by a secant iteration started at $F = 1.5$ and stopped when successive estimates of $F$ agree to $10^{-6}$, in at most 50 iterations. A root at $F \le 0$ is rejected as unphysical, as is a solution in which more than half the slices carry base tension or more than half the interior side forces are tensile.
+**xslope** finds the root by a secant iteration started at $F = 1.5$ and stopped when successive estimates of $F$ agree to $10^{-6}$, in at most 50 iterations. A root at $F \le 0$ is rejected as unphysical, as is a solution in which more than half the slices carry base tension — past that extent the answer rests on Mohr-Coulomb strength the base cannot mobilize. Tension in the side forces themselves is reported rather than refused; see [Interslice tension](overview.md#interslice-tension).
 
 **The whole-mass force balance.** Summing equation (6) over all $n$ slices telescopes the side force terms: the force $Z_i \cos\theta_i$ that leaves one slice enters the next, so every interior pair cancels, leaving only $Z_1 \cos\theta_1$ and $Z_{n+1} \cos\theta_{n+1}$. The first is zero by definition; the second is zero when the trial $F$ is the solution. What survives is horizontal force equilibrium of the entire sliding mass. As with equations (6) and (7), the support forces $P$ and $H$ below are written for Appl = Active, so they stand at full value; support designated Passive mobilizes with the soil and is divided by $F$, which moves those terms alongside $c_m$ and $\tan\phi_m$:
 

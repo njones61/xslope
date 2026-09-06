@@ -367,11 +367,13 @@ calculate $y_{t,i+1}$. We repeat this process for all slices until we reach the 
 
 ## Interpreting the Admissibility Warnings
 
-Spencer's method (and Morgenstern–Price, which shares this machinery) returns a list of
-admissibility notes in `results['warnings']` when the accepted solution carries base
-tension on a cohesionless slice, significant interslice tension, or a line of thrust
-that leaves the slices. The warnings never change the factor of safety — they describe
-the internal force distribution — and they are not all equally alarming.
+Every method that carries interslice forces — Spencer, Morgenstern–Price, Corps of
+Engineers and Lowe-Karafiath — returns a list of admissibility notes in
+`results['warnings']` when the accepted solution carries base tension on a
+cohesionless slice, interslice tension, or a line of thrust that leaves the slices
+(the last only from Spencer and Morgenstern–Price, the two that reconstruct one).
+The warnings never change the factor of safety — they describe the internal force
+distribution — and they are not all equally alarming.
 
 A thrust line running outside the slices near the crest is common and natural wherever
 the top of the slope is cohesive: that soil is in tension, the interslice forces
@@ -383,11 +385,14 @@ problem being solved. A deep-seated case like the Talbingo dam
 ([VP5](../verification/rocscience.md#vp5)) shows exactly this signature while its
 factor of safety matches the moment methods and the published values.
 
-By contrast, large interslice tension transmitting a concentrated force, or base
-tension on a cohesionless slice, are signs the constant-$\theta$ solution itself is
-strained — see the VP30 discussion in the
+Base tension on a cohesionless slice is a sharper signal: that slice has no strength
+at all under the solution it is part of. See the VP30 discussion in the
 [verification corpus](../verification/rocscience.md#vp30) for a worked case where the
 warnings flag a root that is arithmetic rather than mechanics.
+
+The interslice-tension note is measured and worded identically by all four methods,
+and it is a report, not a verdict — [Interslice tension](overview.md#interslice-tension)
+gives the measure and says why nothing is refused on it.
 
 
 

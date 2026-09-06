@@ -259,18 +259,18 @@ to Approach A's bracketed crossing. Each evaluation of (16) costs one sweep, whi
 is why the Newton path runs about three times faster than root-finding $h(\lambda)$,
 where a full $F_f$ solve is nested inside every step.
 
-**Admissibility guard.** Because Morgenstern–Price optimizes $\lambda$ to satisfy
-both equilibrium conditions, an unconstrained search can occasionally settle on a
-surface that balances only with partly *tensile* interslice forces — a non-physical
-mechanism that an automated critical-surface search would otherwise report as a
-spuriously low factor of safety. XSLOPE rejects a solution when more than 50% of the
-base normals are in tension or more than 30% of the interior interslice resultants
-are tensile,
+**Admissibility guard.** An unconstrained search can drive any method onto a
+surface whose solution contradicts the strength model it was solved with. XSLOPE
+rejects a solution when more than half the base normals are in tension,
 
->>$\dfrac{\# \left\{ N'_i < 0 \right\}}{n} > 0.5 \quad \text{or} \quad \dfrac{\# \left\{ Z_j < 0 \right\}}{n - 1} > 0.30, \quad 0 < j < n   \qquad (20)$
+>>$\dfrac{\# \left\{ N'_i < 0 \right\}}{n} > 0.5   \qquad (20)$
 
-returning failure so the search simply skips the surface (physical critical surfaces
-run at or below about 18% interslice tension).
+returning failure so the search skips the surface. A base in tension mobilizes no
+Mohr-Coulomb strength, so past that extent the answer rests on a strength the model
+does not have; valid critical surfaces across the verification corpus run at 0 to
+15%. Tension in the *interslice* forces is reported rather than refused — see
+[Interslice tension](overview.md#interslice-tension), the one rule Spencer,
+Morgenstern–Price and the force-equilibrium methods share.
 
 ## Insensitivity to f(x)
 

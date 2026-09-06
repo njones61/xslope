@@ -27,10 +27,10 @@ Built and run step by step in [LEM-1](../tutorials/lem01_simple_embankment.md).
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.215 | 1.215 | 1.335 | 1.319 | 1.263 | 1.276 | 1.260 |
+| 1.215 | 1.215 | 1.335 | 1.319 | 1.263 | 1.276 | 1.226 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, fs_oms=1.215, fs_bishop=1.215, fs_janbu=1.335, fs_corps=1.319, fs_lowe=1.263, fs_spencer=1.276, fs_mprice=1.260 -->
+<!-- test: file=files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, fs_oms=1.215, fs_bishop=1.215, fs_janbu=1.335, fs_corps=1.319, fs_lowe=1.263, fs_spencer=1.276, fs_mprice=1.226 -->
 
 Here is a copy of the model with the following variations/changes:
 
@@ -370,7 +370,7 @@ Passive application), is included as a regression guard on the v12 support mecha
 the same factor of safety on the mirrored geometry as on the original for each Dir/Appl combination, and the
 values below pin the axial + passive path on a right-facing slope.
 
-<!-- test: file=files/xslope_reinforce_rface.xlsx, type=circular_search, num_slices=40, fs_oms=1.282, fs_bishop=1.475, fs_janbu=1.420, fs_spencer=1.471, fs_corps=1.091, fs_lowe=1.477, fs_mprice=1.471 -->
+<!-- test: file=files/xslope_reinforce_rface.xlsx, type=circular_search, num_slices=40, fs_oms=1.282, fs_bishop=1.475, fs_janbu=1.420, fs_spencer=1.471, fs_corps=0.696, fs_lowe=1.477, fs_mprice=1.471 -->
 <!-- test: file=files/xslope_reinforce_rface.xlsx, type=mp_spencer -->
 <!-- test: file=files/xslope_reinforce_rface.xlsx, type=roundtrip -->
 
@@ -446,10 +446,10 @@ see [LEM vs. FEM Pile Modeling](piles.md#lem-vs-fem-pile-modeling).
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.617 | 1.852 | 1.648 | 1.369 | 1.978 | 1.842 | 1.843 |
+| 1.617 | 1.852 | 1.648 | 1.061 | 1.978 | 1.842 | 1.843 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.617, fs_bishop=1.852, fs_janbu=1.648, fs_corps=1.369, fs_lowe=1.978, fs_spencer=1.842, fs_mprice=1.843 -->
+<!-- test: file=files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.617, fs_bishop=1.852, fs_janbu=1.648, fs_corps=1.061, fs_lowe=1.978, fs_spencer=1.842, fs_mprice=1.843 -->
 
 ### 11. Polygon Input with a Sloping Bottom
 

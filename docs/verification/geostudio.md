@@ -62,7 +62,7 @@ from this manual.
 | [2.23](#gs-2-23) | 🟢 | Li & Lumb – Reliability Index | Bishop 1.333 vs Hassan & Wolff 1.334 (−0.1%) · β_ln 2.263 vs Hassan & Wolff 2.336 (−3.1%) | **built**; SLOPE/W instead searches for the minimum β across surfaces, so its β and FS are not on this surface |
 | [2.24](#gs-2-24) | 🟢 | Tandjiria – Geosynthetic Reinforced Emb. | On SLOPE/W's own circles the imported geosynthetic reproduces its factor of safety to −0.27% (clay) and −0.64% (sand) | **built**; the reinforcement benchmark for the importer |
 | [2.25](#gs-2-25) | 🟢 | Baker & Leshchinsky – Earth Dam | On Slide's circle Spencer 1.926 vs Slide 1.925 (+0.1%) · on Baker's surface 1.882 vs Baker & Leshchinsky 1.91 (−1.5%) | *covered* — [Slide2 VP42](rocscience.md#vp42) |
-| [2.26](#gs-2-26) | 🟢 | Baker – Planar Homogeneous | Spencer / Janbu 1.352 vs SLOPE/W's own solve of the identical toe plane 1.352 (0.0%) · vs Baker ≈ 1.35 (+0.1%) | **built**; the fixed crest offset controls the answer |
+| [2.26](#gs-2-26) | 🟢 | Baker – Planar Homogeneous | Spencer / Janbu / M-P 1.352 vs SLOPE/W's own solve of the identical toe plane 1.352 (0.0%) · vs Baker ≈ 1.35 (+0.1%) | **built**; the fixed crest offset controls the answer |
 | [2.27](#gs-2-27) | 🟢 | Sheahan – Amherst Soil Nails | Janbu 0.899 vs Slide 0.890 (+1.0%) · vs Sheahan & Ho's trial wedge 0.887 (+1.4%) | *covered* — [Slide2 VP47](rocscience.md#vp47) |
 | [2.28](rocscience.md#vp48) | 🟢 | Sheahan – Clouterre Test Wall | On the 55° plane Janbu 0.991 vs Slide 0.989 (+0.2%) · vs Sheahan 0.989 (+0.2%) | *covered* |
 | [2.29](rocscience.md#vp49) | 🟢 | Snailz – Reinforced Slope | Janbu (corrected) 1.469 vs Slide 1.479 (−0.7%) | *covered* |
@@ -586,25 +586,22 @@ the reference cluster.
 
 | Method | XSLOPE | SLOPE/W | Baker & Leshchinsky (2001) |
 |---|---|---|---|
-| Spencer / Janbu | 1.352 | 1.352 (0.0%) | ≈ 1.35 (+0.1%) |
+| Spencer / Janbu / Morgenstern-Price | 1.352 | 1.352 (0.0%) | ≈ 1.35 (+0.1%) |
 
-XSLOPE's Spencer and Janbu match SLOPE/W's own solved value (1.352, on the identical
-toe-to-(8.5, 10) plane; sliding-mass weight 600 kN/m agrees exactly) to within 0.01%,
-and the Baker & Leshchinsky reference to 0.15%. XSLOPE's Morgenstern-Price declines
-this surface, and so do the Corps and Lowe-Karafiath methods. On a single straight
-plane α is constant for every slice, so all four methods pose the same equilibrium, and
-it is satisfied with about 70% of the interslice forces in tension. That belongs to
-the 76° plane rather than to any one method's side-force
-assumption: Spencer's own accepted solution carries the same interslice state, reported
-as a warning instead of a refusal, and with the guard lifted Morgenstern-Price returns
-Spencer's factor of safety to ten significant figures. The three methods that refuse it
-do so because their admissibility guards treat that much interslice tension as
-unphysical, which leaves Spencer as the rigorous method that returns a value here.
+XSLOPE's Spencer, Janbu and Morgenstern-Price match SLOPE/W's own solved value (1.352,
+on the identical toe-to-(8.5, 10) plane; sliding-mass weight 600 kN/m agrees exactly)
+to within 0.01%, and the Baker & Leshchinsky reference to 0.15%. The Corps and
+Lowe-Karafiath methods return the same value. On a single straight plane α is constant
+for every slice, so all of them pose the same equilibrium and reach the same root, and
+the agreement runs to ten significant figures. That equilibrium is satisfied with much
+of the interslice force field in tension — a property of the 76° plane rather than of
+any one method's side-force assumption, and each method
+[reports it](../lem/overview.md#interslice-tension) alongside its answer.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.26; Baker (2001); Baker &
 Leshchinsky (2001).
 
-<!-- test: file=files/geostudio/gs2_26.xlsx, type=single_noncirc, num_slices=50, fs_spencer=1.352, fs_janbu=1.352, benchmark=GS-2.26 -->
+<!-- test: file=files/geostudio/gs2_26.xlsx, type=single_noncirc, num_slices=50, fs_spencer=1.352, fs_janbu=1.352, fs_mprice=1.352, benchmark=GS-2.26 -->
 
 ### 2.27 — Sheahan – Amherst Soil Nails {#gs-2-27}
 

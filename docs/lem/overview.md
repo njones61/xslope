@@ -465,6 +465,56 @@ The primary features of the limit equilibrium methods supported in XSLOPE are su
 
 For design, use a method that satisfies all conditions of equilibrium: **Spencer's method** is the recommended choice in XSLOPE and applies to both circular and non-circular surfaces. The **Morgenstern–Price method** is its more general form and is equally suitable — the two agree very closely, and Morgenstern–Price is preferred when you need to match a particular interslice force function (such as SLOPE/W's half-sine). **Bishop's Simplified Method** is a dependable alternative on circular surfaces — it usually agrees closely with Spencer — and a convenient check on it. The remaining methods are best treated as comparisons rather than the basis for design: the **Ordinary Method of Slices** is a conservative, largely educational baseline; **Simplified Janbu** and the **force-equilibrium methods** (Corps of Engineers, Lowe-Karafiath) are approximate and, because they do not satisfy moment equilibrium, can be inaccurate — the force-equilibrium result is especially sensitive to the assumed side-force inclination. This mirrors the guidance in the USACE *Slope Stability* manual (EM 1110-2-1902), which cautions that methods not satisfying all conditions of equilibrium "may involve significant inaccuracies and should be used only under the restricted conditions described herein."
 
+## Interslice Tension
+
+The four methods that carry interslice forces — Spencer, Morgenstern–Price, Corps of
+Engineers and Lowe-Karafiath — all solve for a side force $Z_j$ at each slice
+boundary, and on some surfaces some of those come out **tensile**. Soil has no
+tensile strength, so a tensile side force is a departure from the Mohr-Coulomb
+model the solution was obtained with, and it is worth knowing about.
+
+XSLOPE measures it one way for all four methods: the **fraction of interior slice
+boundaries** ($j = 1 \ldots n-1$; the two end boundaries carry no force by
+definition) whose resultant is tensile, with $Z$ taken in the physical convention,
+tension negative. The measure applies only where the field is *mixed* — some
+boundaries compressive, some tensile. Where every interior boundary carries the same
+sign, the fraction saturates at 0 or 1 and reads the sign convention rather than the
+mechanics, and no reading is offered.
+
+The reading is **reported, never refused**. It appears in `results['warnings']`
+alongside the base-tension and line-of-thrust notes, in the same words from every
+method, and it changes no factor of safety:
+
+```
+interslice tension on 69% of interior boundaries (min Z = -51.4 vs max compression 21.3)
+```
+
+The threshold for reporting is any tension at all, because no larger number
+separates a right answer from a wrong one. The
+[tension crack sample](samples.md#14-tension-crack) run with its crack removed —
+the crest tension a crack exists to handle — reads 10%, and its factor of safety
+is 8% above the same model with the crack modeled. Baker's planar benchmark
+([GS-2.26](../verification/geostudio.md#gs-2-26)) reads 69 to 71% and every method
+returns SLOPE/W's own 1.352 on that plane. On a $\phi = 0$ embankment, where moment
+equilibrium fixes the factor of safety whatever the side forces do, a smooth family
+of circles sweeps 26 to 36% and every solution in it reproduces Bishop's exact
+answer. The case that most needs the engineer's attention sits at the bottom of the
+scale and the top of it is correct answers, so a refusal threshold anywhere on it
+would discard right answers and keep the wrong one.
+
+This is also what the reference tools do. SLOPE/W reports its interslice forces and
+flags the negative ones; Slide2 and RS2 apply no such test. Duncan and Wright treat
+interslice tension as a check the engineer makes on a reported solution, whose usual
+remedy is to model the tension crack the tension zone implies — and that is a change
+to the problem, not to the solver.
+
+What XSLOPE does refuse is a solution that contradicts its own strength model: a
+non-positive factor of safety, and base tension on more than half the slices. A base
+in tension mobilizes no Mohr-Coulomb strength, so past that extent the answer rests
+on strength the model does not have. Spencer applies a second base-tension test
+inside its own search, refusing a root whose base tension exceeds twice what
+cohesion could carry on any slice.
+
 ## Automated Search for the Critical Factor of Safety 
 
 For each of the solution methods, the factor of safety can be computed either for a single failure surface or XSLOPE can perform an exhaustive search where a large number of candidate failure surfaces are considered until the surface with the minimum or critical factor of safety is found. This process is described in more detail in the [search documentation](search.md).

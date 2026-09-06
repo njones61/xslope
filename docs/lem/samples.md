@@ -54,10 +54,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 0.985 | 0.985 | 0.969 | 1.050 | 1.039 | 0.986 | 0.985 |
+| 0.986 | 0.986 | 0.969 | 1.050 | 1.039 | 0.986 | 0.986 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.985, fs_bishop=0.985, fs_janbu=0.969, fs_corps=1.050, fs_lowe=1.039, fs_spencer=0.986, fs_mprice=0.985 -->
+<!-- test: file=files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.986, fs_bishop=0.986, fs_janbu=0.969, fs_corps=1.050, fs_lowe=1.039, fs_spencer=0.986, fs_mprice=0.986 -->
 
 The crest-surcharge variant is built and run step by step in
 [LEM-2](../tutorials/lem02_loads_on_the_crest.md).
@@ -111,10 +111,10 @@ Built and run step by step in [LEM-3](../tutorials/lem03_layered_slope.md).
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |
+| 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_simple_mult_layers.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.313, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244, fs_mprice=1.244 -->
+<!-- test: file=files/xslope_simple_mult_layers.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.314, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244, fs_mprice=1.244 -->
 
 This geometry is reused (with elastic properties added and the strength retuned to a
 marginally-stable c–φ profile) for a finite-element **reliability** example — see
@@ -256,10 +256,10 @@ Built and run step by step in [LEM-5](../tutorials/lem05_weak_layer_noncircular.
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| — | — | 1.575 | 1.523 | 1.315 | 1.656 | 1.634 |
+| — | — | 1.575 | 1.523 | 1.321 | 1.656 | 1.634 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_noncircular.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.575, fs_corps=1.523, fs_lowe=1.315, fs_spencer=1.656, fs_mprice=1.634 -->
+<!-- test: file=files/xslope_noncircular.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.575, fs_corps=1.523, fs_lowe=1.321, fs_spencer=1.656, fs_mprice=1.634 -->
 
 ### 8. Earth Dam 
 
@@ -349,10 +349,10 @@ Built and run step by step in [LEM-8](../tutorials/lem08_reinforced_slope.md).
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.480 | 1.593 | 1.524 | 1.377 | 1.597 | 1.587 | 1.587 |
+| 1.480 | 1.594 | 1.524 | 1.381 | 1.598 | 1.587 | 1.587 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.480, fs_bishop=1.593, fs_janbu=1.524, fs_corps=1.377, fs_lowe=1.597, fs_spencer=1.587, fs_mprice=1.587 -->
+<!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.480, fs_bishop=1.594, fs_janbu=1.524, fs_corps=1.381, fs_lowe=1.598, fs_spencer=1.587, fs_mprice=1.587 -->
 
 !!! note
     This problem is UTEXASED's Example 5 (Wright), whose reported solution is FS = 1.646 (Spencer) on a critical
@@ -446,10 +446,10 @@ see [LEM vs. FEM Pile Modeling](piles.md#lem-vs-fem-pile-modeling).
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.622 | 1.854 | 1.649 | 1.369 | 1.978 | 1.842 | 1.842 |
+| 1.617 | 1.852 | 1.648 | 1.369 | 1.978 | 1.842 | 1.843 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.622, fs_bishop=1.854, fs_janbu=1.649, fs_corps=1.369, fs_lowe=1.978, fs_spencer=1.842, fs_mprice=1.842 -->
+<!-- test: file=files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.617, fs_bishop=1.852, fs_janbu=1.648, fs_corps=1.369, fs_lowe=1.978, fs_spencer=1.842, fs_mprice=1.843 -->
 
 ### 11. Polygon Input with a Sloping Bottom
 
@@ -462,10 +462,10 @@ Built and run step by step in [LEM-6](../tutorials/lem06_polygon_geometry.md).
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |
+| 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_sloping_bottom.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.313, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244, fs_mprice=1.244 -->
+<!-- test: file=files/xslope_sloping_bottom.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.314, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244, fs_mprice=1.244 -->
 
 ---
 
@@ -562,10 +562,10 @@ Solution (critical surface with the tension crack, Spencer's method):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.413 | 1.414 | 1.453 | 1.673 | 1.544 | 1.414 | 1.414 |
+| 1.413 | 1.414 | 1.448 | 1.673 | 1.544 | 1.414 | 1.414 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_tension_KEY.xlsx, type=circular_search, num_slices=40, fs_oms=1.413, fs_bishop=1.414, fs_janbu=1.453, fs_corps=1.673, fs_lowe=1.544, fs_spencer=1.414, fs_mprice=1.414 -->
+<!-- test: file=files/xslope_tension_KEY.xlsx, type=circular_search, num_slices=40, fs_oms=1.413, fs_bishop=1.414, fs_janbu=1.448, fs_corps=1.673, fs_lowe=1.544, fs_spencer=1.414, fs_mprice=1.414 -->
 
 ### 15. Reliability Analysis (Submerged Slope)
 

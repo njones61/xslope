@@ -1644,10 +1644,15 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
     ll_b  = np.radians(_c12('ll_beta'))
     ll_x  = _c12('ll_x'); ll_y = _c12('ll_y')
 
-    # For now, we assume that reinforcement is flexible and therefore is parallel to the failure surface
-    # at the bottom of the slice. Therefore, the psi value used in the derivation is set to alpha, 
-    # and the point of action is the center of the base of the slice.
-    psi = alpha  # psi is the angle of the reinforcement force from the horizontal
+    # psi/x_r/y_r below carry the TANGENT-direction reinforcement only — the 'p'
+    # column (Dir = tangent, Appl = active) and its passive twin 'p_pt'. A tangent
+    # line is treated as flexible: its force turns to lie along the failure surface
+    # at the slice base, so psi is the base angle alpha and the force acts at the
+    # center of the base. Reinforcement declared Dir = axial never reaches this
+    # branch: slice.py resolves it at the line's OWN inclination into the pa_*
+    # (active) and pp_* (passive) component and first-moment sums read above
+    # (slice.py, "Reinforcement lines"), which each method adds separately.
+    psi = alpha  # psi is the angle of the tangent reinforcement force from the horizontal
     y_r = y_cb  # y_r is the y-coordinate of the point of action of the reinforcement
     x_r = x_c  # x_r is the x-coordinate of the point of action of the reinforcement
 
@@ -2494,7 +2499,8 @@ def _mp_line_of_thrust(slice_df, Z, theta_rad, right_facing, FS=1.0):
     theta_pile = slice_df['theta_p'].values if 'theta_p' in slice_df.columns else np.zeros(n)
     x_pile = slice_df['x_pile'].values if 'x_pile' in slice_df.columns else np.zeros(n)
     y_pile = slice_df['y_pile'].values if 'y_pile' in slice_df.columns else np.zeros(n)
-    psi = alpha; y_r = y_b; x_r = x_b           # reinforcement ∥ base, acts at base center
+    psi = alpha; y_r = y_b; x_r = x_b           # TANGENT reinforcement ∥ base, acts at base center
+                                                # (axial arrives pre-resolved in pa_*/pp_* below)
 
     # v12 support/load terms (zeros when the columns are absent)
     def _c12(name):

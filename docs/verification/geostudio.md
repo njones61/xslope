@@ -591,11 +591,15 @@ the reference cluster.
 XSLOPE's Spencer and Janbu match SLOPE/W's own solved value (1.352, on the identical
 toe-to-(8.5, 10) plane; sliding-mass weight 600 kN/m agrees exactly) to within 0.01%,
 and the Baker & Leshchinsky reference to 0.15%. XSLOPE's Morgenstern-Price declines
-this surface: on a single straight plane α is constant for every slice, and the
-unconstrained λ-search reaches equilibrium only by driving ~70% of the interslice
-forces into tension — the solver's admissibility guard rejects that as unphysical
-(Corps and Lowe-Karafiath hit the same guard), leaving Spencer as the rigorous method
-that converges.
+this surface, and so do the Corps and Lowe-Karafiath methods. On a single straight
+plane α is constant for every slice, so all four methods pose the same equilibrium, and
+it is satisfied with about 70% of the interslice forces in tension. That belongs to
+the 76° plane rather than to any one method's side-force
+assumption: Spencer's own accepted solution carries the same interslice state, reported
+as a warning instead of a refusal, and with the guard lifted Morgenstern-Price returns
+Spencer's factor of safety to ten significant figures. The three methods that refuse it
+do so because their admissibility guards treat that much interslice tension as
+unphysical, which leaves Spencer as the rigorous method that returns a value here.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.26; Baker (2001); Baker &
 Leshchinsky (2001).

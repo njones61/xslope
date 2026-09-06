@@ -1111,11 +1111,16 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
 
     A geometric admissibility guard (`max_base_angle`) rejects trial surfaces with
     an over-steep base segment. Without it the coordinate-descent search drives the
-    points into a near-vertical base running up to the toe, which the rigorous
-    methods (Spencer especially) score as a spurious low minimum. Capping the base
-    inclination keeps the search on physically realistic surfaces. (The convergence
-    criterion itself is kept absolute, but the guard removes the degeneracy that
-    blocked refining it.)
+    points into a near-vertical base running up to the toe, which the FORCE-
+    EQUILIBRIUM methods score as a spurious low minimum -- Lowe & Karafiath above
+    all, since its interslice inclination follows the base slope. Spencer and
+    Morgenstern-Price do not follow it there: on the non-circular sample both
+    return the same factor of safety at a 65-degree cap and at 89 degrees, on a
+    surface whose steepest segment is about 50 degrees, while Lowe & Karafiath's
+    minimum falls with every relaxation and its winning surface rides the limit.
+    Capping the base inclination keeps the search on physically realistic surfaces.
+    (The convergence criterion itself is kept absolute, but the guard removes the
+    degeneracy that blocked refining it.)
 
     Parameters:
     -----------

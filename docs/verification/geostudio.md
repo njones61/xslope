@@ -1058,7 +1058,7 @@ t > 0 the top steps to the ponded head.
 
 **Input:** [gs2_infil.xlsx](files/geostudio/gs2_infil.xlsx)
 
-![SEEPW-T02: infiltration front vs SEEP/W](images/gs2_infil.png){width=800px}
+![SEEPW-T02: infiltration front vs SEEP/W](images/gs2_infil.png){width=700px}
 
 The comparison is against SEEP/W's own `node.csv` pressure field at the final time; the
 published external reference is the [Warrick, Lomen & Yates (1985)](https://doi.org/10.2136/sssaj1985.03615995004900010006x)
@@ -1106,7 +1106,7 @@ at 8 m.
 **Input:** [gs2_rdd_inst.xlsx](files/geostudio/gs2_rdd_inst.xlsx) (instantaneous),
 [gs2_rdd_slow.xlsx](files/geostudio/gs2_rdd_slow.xlsx) (slow)
 
-![SEEPW-T03: the dam with its seepage boundary conditions, the same section for both drawdown rates](images/gs2_rdd_inst_inputs.png){width=800px}
+![SEEPW-T03: the dam with its seepage boundary conditions, the same section for both drawdown rates](images/gs2_rdd_inst_inputs.png){width=1000px}
 
 ![SEEPW-T03: interior total head vs time, XSLOPE vs SEEP/W](images/gs2_rdd.png)
 
@@ -1250,7 +1250,7 @@ Dirichlet head and the pond leaks — the same submerged-only reservoir series a
 
 **Input:** [gs2_pond.xlsx](files/geostudio/gs2_pond.xlsx)
 
-![SEEPW-T04: the clay-lined pond with its seepage boundary conditions](images/gs2_pond_inputs.png){width=800px}
+![SEEPW-T04: the clay-lined pond with its seepage boundary conditions](images/gs2_pond_inputs.png){width=1000px}
 
 ![SEEPW-T04: water-table rise vs time, XSLOPE vs SEEP/W](images/gs2_pond.png){width=800px}
 

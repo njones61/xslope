@@ -126,11 +126,15 @@ FE_FS_SCAN = 200
 FE_MIN_BASE_FACTOR = 0.05
 
 #: Largest interslice resultant a force-equilibrium root may carry, as a multiple
-#: of the weight of the sliding mass. The interslice forces are internal to that
-#: mass and are equilibrated by it, so a boundary transmitting more than the whole
-#: column of soil above the surface is describing a numerical branch of the
-#: recurrence rather than a state of stress. Roots on the physical branch across
-#: the corpus run well under half the weight.
+#: of the total driving load on the sliding mass (`_driving_load`: its weight plus
+#: the distributed, line, seismic and tension-crack-water loads applied to it). The
+#: interslice forces are internal to that mass and are equilibrated by it, so a
+#: boundary transmitting more than everything driving the mass is describing a
+#: numerical branch of the recurrence rather than a state of stress. Roots on the
+#: physical branch across the corpus run well under half that load. The denominator
+#: is the whole driving load rather than the weight alone so that a bearing-capacity
+#: section carried by a surcharge at a nominal unit weight is judged on the load it
+#: actually carries.
 FE_MAX_Z_OVER_W = 1.0
 
 
@@ -171,6 +175,40 @@ def _c_eff(slice_df):
     if 'c_suction' in slice_df.columns:
         return c + slice_df['c_suction'].values
     return c
+
+
+#: Per-slice columns that carry an applied load into the equilibrium equations,
+#: alongside the slice weight. Each is a force resultant on one slice in the same
+#: units as ``w``: the distributed surface load, the line-load resultant, the
+#: horizontal seismic force and the tension-crack water force. Reinforcement,
+#: pile and passive-support terms are deliberately absent — they resist the
+#: motion rather than drive it, and a resisting force scaled into the denominator
+#: would let a stronger section carry larger spurious interslice forces.
+_DRIVING_LOAD_COLUMNS = ('dload', 'lload', 'kw', 't')
+
+
+def _driving_load(slice_df):
+    """Total driving load on the sliding mass: its own weight plus every applied load.
+
+    The force-equilibrium root finder judges an interslice resultant against the
+    load the mass carries, and on most models that load is the soil itself. It is
+    not always: a bearing-capacity section built at a nominal unit weight is driven
+    entirely by a surcharge, and dividing a real side force by a weight of 10^-4
+    makes every root look like millions of times the mass. The measure is therefore
+    the sum of the magnitudes of every driving term the march itself sums —
+    ``|w|`` plus the distributed load, the line load, the seismic force and the
+    tension-crack water force — so a weightless model is not a special case.
+
+    Returns 0.0 for an empty slice set; callers substitute their own floor.
+    """
+    n = len(slice_df)
+    if not n:
+        return 0.0
+    total = float(np.abs(np.asarray(slice_df['w'].values, dtype=float)).sum())
+    for col in _DRIVING_LOAD_COLUMNS:
+        if col in slice_df.columns:
+            total += float(np.abs(np.asarray(slice_df[col].values, dtype=float)).sum())
+    return total
 
 
 def solve_selected(method_name, slice_df, rapid=False):
@@ -1557,8 +1595,8 @@ def _force_closure_root(residual, Z, N, det, poles, slice_df):
       a pole is a discontinuity in the closure rather than a state of the mass, and
       the march that produced it is ill-conditioned;
     * the largest interslice resultant stays within `FE_MAX_Z_OVER_W` times the
-      weight of the sliding mass — bounded interslice forces, no boundary carrying
-      more than the soil above the surface;
+      total driving load on the sliding mass (`_driving_load`) — bounded interslice
+      forces, no boundary carrying more than everything driving the mass;
     * base tension does not saturate (`MAX_BASE_TENSION_EXTENT`, the same extent
       test the caller applies to the returned solution).
 
@@ -1574,8 +1612,12 @@ def _force_closure_root(residual, Z, N, det, poles, slice_df):
     """
     from scipy.optimize import brentq
 
-    W_sum = float(np.abs(np.asarray(slice_df['w'].values, dtype=float)).sum())
-    scale = W_sum if W_sum > 0 else 1.0
+    # The load the interslice forces are judged against: the mass's own weight
+    # plus every load applied to it. On a bearing-capacity section built at a
+    # nominal unit weight the weight alone is numerically zero, and no root could
+    # pass a test divided by it. See `_driving_load`.
+    load_sum = _driving_load(slice_df)
+    scale = load_sum if load_sum > 0 else 1.0
 
     # A uniform sweep of the window, cut either side of every pole so that no
     # bracket spans one and no root between two close poles is stepped over.
@@ -1621,9 +1663,9 @@ def _force_closure_root(residual, Z, N, det, poles, slice_df):
             rejected.append((r, "the march does not close here"))
         elif min_det < FE_MIN_BASE_FACTOR:
             rejected.append((r, f"base factor {min_det:.3f}"))
-        elif max_Z > FE_MAX_Z_OVER_W * W_sum:
+        elif max_Z > FE_MAX_Z_OVER_W * load_sum:
             rejected.append((r, f"interslice force {max_Z / scale:.0f}x the "
-                                f"weight of the mass"))
+                                f"load on the mass"))
         elif frac_neg > MAX_BASE_TENSION_EXTENT:
             rejected.append((r, f"{100 * frac_neg:.0f}% of bases in tension"))
         else:

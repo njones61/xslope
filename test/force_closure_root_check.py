@@ -32,8 +32,13 @@ shipped corpus produces on its own surfaces:
     while the roots wedged between two poles sit at 0.003 to 0.022 — the
     residual sweeps the whole real line between consecutive poles, so a root
     always exists there, and it is always this spurious branch.
-  * the largest side force stays within the weight of the sliding mass
-    (solve.FE_MAX_Z_OVER_W). Accepted corpus solutions run 0.11 to 0.61 of it.
+  * the largest side force stays within the total driving load on the sliding
+    mass (solve.FE_MAX_Z_OVER_W over solve._driving_load: the mass's own weight
+    plus the distributed, line, seismic and tension-crack-water loads applied to
+    it). Accepted corpus solutions run 0.11 to 0.61 of it. The denominator is the
+    whole driving load rather than the weight alone because a bearing-capacity
+    section built at a nominal unit weight is driven by its surcharge, and a test
+    divided by a weight of 10^-4 refuses every root there.
   * base tension does not saturate (solve.MAX_BASE_TENSION_EXTENT), the same
     extent test applied to the reported solution.
 
@@ -58,6 +63,9 @@ WHAT IS CHECKED
   the moment answer: the nearer is reported, not the smaller;
 * the roots passed over are named in results['warnings'] with the measure each
   failed;
+* the two surcharge-driven bearing benchmarks solve, at the factors of safety
+  their verification pages publish, and a mutation restoring the weight-only
+  denominator refuses them;
 * on each model's own Corps critical surface, Corps reads within 5% of Spencer
   on the identical slices — the agreement every other model in the corpus shows;
 * the two no-root failures classify as no_admissible_solution and the base
@@ -123,6 +131,25 @@ CRITICAL = {
     ),
 }
 
+#: The two bearing-capacity benchmarks whose driving load is a strip surcharge
+#: rather than the soil's own weight: both are built at a nominal unit weight, so
+#: the weight of the sliding mass is numerically zero and a side-force test
+#: divided by it can never be passed. Each carries its own prescribed surface, and
+#: the factors of safety pinned here are the ones the verification pages publish.
+WEIGHTLESS = {
+    'vp025': dict(
+        model=os.path.join(REPO, 'docs', 'verification', 'files', 'rocscience',
+                           'vp025.xlsx'),
+        corps=0.972, lowe=1.020,
+    ),
+    'vp026': dict(
+        model=os.path.join(REPO, 'docs', 'verification', 'files', 'rocscience',
+                           'vp026.xlsx'),
+        right_facing=True,      # the facing its verification tag sets
+        corps=0.981, lowe=1.017,
+    ),
+}
+
 #: How far a force-equilibrium factor of safety may stand from Spencer's on the
 #: same slices before it is a different branch rather than a different side-force
 #: assumption. Corps runs above Spencer by construction — the ground-parallel
@@ -136,6 +163,16 @@ ROOT_NOTE = 'force closure has other roots'
 def _slices(model, circle):
     sd = load_slope_data(model)
     ok, res = generate_slices(sd, circle=dict(circle), num_slices=NUM_SLICES)
+    if not ok:
+        raise AssertionError(f"could not slice {os.path.basename(model)}: {res}")
+    return res[0]
+
+
+def _prescribed_slices(model, num_slices=60, right_facing=None):
+    """The slices of a model's own prescribed non-circular surface."""
+    sd = load_slope_data(model)
+    ok, res = generate_slices(sd, non_circ=sd['non_circ'], num_slices=num_slices,
+                              debug=False, right_facing=right_facing)
     if not ok:
         raise AssertionError(f"could not slice {os.path.basename(model)}: {res}")
     return res[0]
@@ -185,14 +222,14 @@ def _brackets(residual, poles):
     return out
 
 
-def _classify(residual, Z, N, det, poles, W_sum):
+def _classify(residual, Z, N, det, poles, load_sum):
     """(admissible, rejected) over the bracketed roots, by the shipped measures."""
     admissible, rejected = [], []
     for r in _brackets(residual, poles):
         residual(r)
         if float(np.abs(det).min()) < solve.FE_MIN_BASE_FACTOR:
             rejected.append(r)
-        elif float(np.abs(Z).max()) > solve.FE_MAX_Z_OVER_W * W_sum:
+        elif float(np.abs(Z).max()) > solve.FE_MAX_Z_OVER_W * load_sum:
             rejected.append(r)
         elif float(np.mean(N < 0)) > solve.MAX_BASE_TENSION_EXTENT:
             rejected.append(r)
@@ -207,8 +244,8 @@ def leg_the_closure_has_several_roots():
     for name, spec in PATHOLOGICAL.items():
         df = _slices(spec['model'], spec['circle'])
         residual, N, Z, det, poles = _corps_closure(df)
-        W_sum = float(np.abs(df['w'].values).sum())
-        admissible, rejected = _classify(residual, Z, N, det, poles, W_sum)
+        load_sum = solve._driving_load(df)
+        admissible, rejected = _classify(residual, Z, N, det, poles, load_sum)
         total = len(admissible) + len(rejected)
         if total < spec['roots']:
             fails.append(f"{name}: the closure brackets {total} root(s), fewer than "
@@ -236,13 +273,13 @@ def leg_the_low_branch_is_not_reported():
             fails.append(f"{name}: corps still reports the secant's branch "
                          f"{res['FS']:.4f}")
         Z = np.asarray(df['z'].values, dtype=float)
-        W_sum = float(np.abs(df['w'].values).sum())
-        if float(np.abs(Z).max()) > solve.FE_MAX_Z_OVER_W * W_sum:
+        load_sum = solve._driving_load(df)
+        if float(np.abs(Z).max()) > solve.FE_MAX_Z_OVER_W * load_sum:
             fails.append(f"{name}: the reported root carries side forces of "
-                         f"{np.abs(Z).max() / W_sum:.1f} times the weight of the mass")
+                         f"{np.abs(Z).max() / load_sum:.1f} times the load on the mass")
         else:
             print(f"  {name:16s} corps {res['FS']:.4f} (was {spec['secant_fs']}), "
-                  f"max|Z| = {np.abs(Z).max() / W_sum:.2f} of the mass")
+                  f"max|Z| = {np.abs(Z).max() / load_sum:.2f} of the load")
     return fails
 
 
@@ -262,13 +299,13 @@ def leg_the_moment_answer_breaks_the_tie():
     ref = res_b['FS']
     lo, hi = ref - 0.28, ref + 0.12          # the nearer root is the larger one
     n = len(df)
-    W_sum = float(np.abs(df['w'].values).sum())
+    load_sum = solve._driving_load(df)
     Z = np.zeros(n + 1)
     N = np.zeros(n)
     det = np.zeros(n)
 
     def residual(F):
-        Z[:] = 0.01 * W_sum
+        Z[:] = 0.01 * load_sum
         Z[0] = 0.0
         N[:] = 1.0
         det[:] = 1.0
@@ -316,6 +353,42 @@ def leg_discarded_roots_are_reported():
         print(f"  {name:16s} {len(named)} root(s) named: "
               + ", ".join(f"{fs} ({why})" for fs, why in named[:3])
               + (" ..." if len(named) > 3 else ""))
+    return fails
+
+
+def leg_a_weightless_mass_is_not_a_special_case():
+    """A section driven by a surcharge is judged on the load it carries.
+
+    The Prandtl bearing benchmarks are built at a unit weight of 10^-6, so the
+    weight of the sliding mass is about 10^-4 against a surcharge resultant of
+    several hundred. Dividing a real side force by that weight makes every root
+    read as millions of times the mass, and both force-equilibrium methods used to
+    refuse the very factors of safety the verification pages publish. The measure
+    is the whole driving load, so these models solve like any other.
+    """
+    fails = []
+    for name, spec in WEIGHTLESS.items():
+        df = _prescribed_slices(spec['model'],
+                                right_facing=spec.get('right_facing'))
+        w_sum = float(np.abs(df['w'].values).sum())
+        load_sum = solve._driving_load(df)
+        if not load_sum > 1e3 * max(w_sum, 1e-30):
+            fails.append(f"{name}: the driving load {load_sum:.4g} is not dominated "
+                         f"by the applied load (weight {w_sum:.4g}); this model no "
+                         f"longer exercises the weightless case")
+            continue
+        for method_name, expected in (('corps', spec['corps']), ('lowe', spec['lowe'])):
+            ok, res = getattr(solve, method_name)(df.copy())
+            if not ok:
+                fails.append(f"{name}: {method_name} refused a surcharge-driven "
+                             f"section ({res})")
+            elif abs(res['FS'] - expected) > 5e-4:
+                fails.append(f"{name}: {method_name} reads {res['FS']:.4f}, not the "
+                             f"published {expected:.3f}")
+            else:
+                print(f"  {name:16s} {method_name} {res['FS']:.4f} "
+                      f"(published {expected:.3f}), driving load {load_sum:.4g} "
+                      f"against a weight of {w_sum:.2g}")
     return fails
 
 
@@ -387,6 +460,19 @@ def leg_mutations():
               lambda: setattr(solve, '_force_closure_root', secant),
               lambda: setattr(solve, '_force_closure_root', original),
               leg_the_low_branch_is_not_reported, fails)
+
+    original_load = solve._driving_load
+
+    def weight_only(slice_df):
+        """The denominator as it stood: the weight of the mass and nothing else."""
+        if not len(slice_df):
+            return 0.0
+        return float(np.abs(np.asarray(slice_df['w'].values, dtype=float)).sum())
+
+    _mutation("the weight-only denominator",
+              lambda: setattr(solve, '_driving_load', weight_only),
+              lambda: setattr(solve, '_driving_load', original_load),
+              leg_a_weightless_mass_is_not_a_special_case, fails)
     return fails
 
 
@@ -395,6 +481,8 @@ LEGS = [
     ("the low branch is not reported", leg_the_low_branch_is_not_reported),
     ("the moment answer breaks the tie", leg_the_moment_answer_breaks_the_tie),
     ("the discarded roots are reported", leg_discarded_roots_are_reported),
+    ("a weightless mass is not a special case",
+     leg_a_weightless_mass_is_not_a_special_case),
     ("corps reads Spencer's branch on its critical surface",
      leg_corps_tracks_spencer_on_its_critical_surface),
     ("failures are classified", leg_failures_are_classified),

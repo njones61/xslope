@@ -147,6 +147,16 @@ def main():
                     f"does not match the applied pressure resultant "
                     f"(0, {inward_y * expected_total:+.3f})")
 
+    return failures
+
+
+def run():
+    """Failures as a list, for run_tests.py."""
+    return main()
+
+
+def _cli():
+    failures = main()
     if failures:
         print("\nFAILURES:")
         for f in failures:
@@ -156,4 +166,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    _cli()

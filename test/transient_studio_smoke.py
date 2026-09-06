@@ -530,6 +530,16 @@ def main():
             fs = [f"{name} raised: {exc!r}"]
         print(f"  {name:44s} {'ok' if not fs else f'FAIL ({len(fs)})'}")
         failures += fs
+    return failures
+
+
+def run():
+    """Failures as a list, for run_tests.py."""
+    return main()
+
+
+def _cli():
+    failures = main()
     if failures:
         print("\nFAILURES:")
         for f in failures:
@@ -539,4 +549,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    _cli()

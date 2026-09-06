@@ -1012,6 +1012,37 @@ def build_composite_surface(slope_data, circle, x_min, x_max, n=2000):
     return CompositeSurface(circle, fx, fy, crossings, x_min, x_max)
 
 
+def _corner_claim_is_this_slice(x_cross, x_l, x_r, i, n_slices, right_facing):
+    """Whether this slice claims a crossing that lands on a shared slice corner.
+
+    A pile or reinforcement line crossing a base exactly at a slice corner is
+    returned by shapely to BOTH adjacent bases, so one of them has to be chosen or
+    the line's force is counted twice. Choosing "whichever base sees it first"
+    makes the answer depend on the order the slices happen to be built in, which
+    is left to right in real x — and that is not a property of the slope. Mirror
+    the model and the same crossing is credited to the slice on the other side of
+    the boundary, half a slice width away in the sliding direction. On the pile
+    sample at sixty slices, where both piles land exactly on a boundary, that
+    moved Corps of Engineers by 0.72% and Lowe & Karafiath by 0.16% between a
+    model and its mirror image, against 0.0005% for Bishop.
+
+    The crossing is therefore claimed by the base on a fixed side in the
+    SLIDING-DIRECTION frame: the base the crossing ends (its right corner) on a
+    left-facing slope, and the base it begins (its left corner) on a right-facing
+    one. The two are mirror images of each other, so a model and its reflection
+    credit the crossing to corresponding slices. At the two ends of the surface
+    there is no neighbour to hand it to, so the end slice keeps it.
+    """
+    tol = 1e-9 * max(1.0, abs(x_l), abs(x_r))
+    if right_facing:
+        if abs(x_cross - x_r) <= tol and i < n_slices - 1:
+            return False        # the next base, upslope in the sliding frame
+    else:
+        if abs(x_cross - x_l) <= tol and i > 0:
+            return False        # the previous base already claimed it
+    return True
+
+
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True,
                     composite=False, right_facing=None,
                     suction_phi_b=None, suction_cap=None, check_inputs=True,
@@ -1942,10 +1973,15 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             # A crossing that lands exactly on a shared slice corner is returned
             # by shapely to BOTH adjacent bases; without a claim check the line's
             # tension is counted twice (measured: Bishop 1.679 -> 1.998 on vp030a
-            # with the geosynthetic moved onto the corner). First base to see the
-            # point keeps it.
+            # with the geosynthetic moved onto the corner). Which base keeps it
+            # is fixed in the sliding-direction frame rather than by build order,
+            # so a model and its mirror image credit it to corresponding slices
+            # (see _corner_claim_is_this_slice).
             pt_key = (round(intersec.x, 9), round(intersec.y, 9))
             if pt_key in rl["claimed"]:
+                continue
+            if not _corner_claim_is_this_slice(intersec.x, x_l, x_r, i,
+                                               len(all_xs) - 1, right_facing):
                 continue
             rl["claimed"].add(pt_key)
 
@@ -2000,9 +2036,14 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if isinstance(intersec, Point):
                 # Same shared-corner claim check as the reinforcement lines
                 # above: a crossing exactly on a slice corner is returned to
-                # both adjacent bases and would count the pile force twice.
+                # both adjacent bases and would count the pile force twice, and
+                # which base keeps it is fixed in the sliding-direction frame so
+                # a model and its mirror image agree.
                 pt_key = (round(intersec.x, 9), round(intersec.y, 9))
                 if pt_key in pl["claimed"]:
+                    continue
+                if not _corner_claim_is_this_slice(intersec.x, x_l, x_r, i,
+                                                   len(all_xs) - 1, right_facing):
                     continue
                 pl["claimed"].add(pt_key)
                 pile_H = pl["H"]

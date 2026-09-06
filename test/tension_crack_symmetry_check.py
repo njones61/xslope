@@ -125,6 +125,16 @@ def main():
     failures += check_symmetry(0.0, "DRY")
     failures += check_symmetry(TCRACK_WATER, "WATER")
     failures += check_water_lowers_fs()
+    return failures
+
+
+def run():
+    """Failures as a list, for run_tests.py."""
+    return main()
+
+
+def _cli():
+    failures = main()
     if failures:
         print("\nFAILURES:")
         for f in failures:
@@ -134,4 +144,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    _cli()

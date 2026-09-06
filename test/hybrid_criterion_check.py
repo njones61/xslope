@@ -345,7 +345,16 @@ def check_real_solve():
 
 def check_budget_extension():
     """The budget is extended while the residual is still falling, and the hard
-    ceiling produces 'inconclusive' rather than a failure."""
+    ceiling produces 'inconclusive' rather than a failure.
+
+    The extension is the VISCOPLASTIC driver's contract: it marches a fixed
+    number of steps, so running out of them is a statement about the budget and
+    not about the slope. The Newton-Raphson driver reaches equilibrium by a
+    different route and reports `budget_extensions` of zero on every trial, so
+    the driver is named here rather than left to the default — on this model at
+    F = 1.35 the default converges in 303 iterations and never extends, which
+    tests nothing about the rule.
+    """
     print("\n5. budget extension — reaching the budget is not a verdict either")
     from xslope.fem import solve_fem
 
@@ -355,10 +364,11 @@ def check_budget_extension():
         return
 
     # Just below this slope's factor of safety (~1.37), where equilibrium takes
-    # thousands of iterations. A budget far below what the trial needs: the residual
+    # hundreds of iterations. A budget below what the trial needs: the residual
     # is still falling when it runs out, so the solve is extended rather than failed.
     sol = solve_fem(fem_data, F=1.35, debug_level=0, max_iterations=300,
-                    max_iterations_ceiling=8000, max_disp_factor=None)
+                    max_iterations_ceiling=8000, max_disp_factor=None,
+                    fem_solver='viscoplastic')
     check("a too-small budget is extended, not failed",
           sol['budget_extensions'] > 0 and sol['iterations'] > 300,
           f"extensions={sol['budget_extensions']} iterations={sol['iterations']}")
@@ -368,7 +378,8 @@ def check_budget_extension():
     # The same trial with the ceiling at the budget: nothing may be extended, and
     # stopping while still improving is INCONCLUSIVE, not failure.
     sol = solve_fem(fem_data, F=1.35, debug_level=0, max_iterations=300,
-                    max_iterations_ceiling=300, max_disp_factor=None)
+                    max_iterations_ceiling=300, max_disp_factor=None,
+                    fem_solver='viscoplastic')
     check("the ceiling stops the extension", sol['budget_extensions'] == 0,
           f"iterations={sol['iterations']}")
     check("a solve still improving at the ceiling is inconclusive",
@@ -535,6 +546,13 @@ def main():
         return 1
     print("All hybrid failure-criterion checks passed.")
     return 0
+
+
+def run():
+    """Failures as a list, for run_tests.py."""
+    del FAILURES[:]
+    main()
+    return list(FAILURES)
 
 
 # ===================== recorded fixtures =====================

@@ -7527,6 +7527,44 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
+    'pile_symmetry': (
+        'pile_symmetry_check.py',
+        "A slope and its mirror image must give the same factor of safety. The "
+        "pile model is where the reflection touches the most machinery — the "
+        "pile geometry, its horizontal force, and the arms every method takes it "
+        "on — and it is where a crossing landing exactly on a slice boundary was "
+        "credited to slices half a width apart between the two."),
+    'indep_bishop': (
+        'indep_bishop_check.py',
+        "Bishop's method against an implementation written from the published "
+        "equations and nothing else, so the shipped solver is scored on "
+        "something other than itself."),
+    'tension_crack_symmetry': (
+        'tension_crack_symmetry_check.py',
+        "A tension crack and its mirror image: the crack water thrust flips with "
+        "the sliding direction, and every method must read the pair the same."),
+    'dload_pass2b': (
+        'dload_direction_check.py',
+        "The FEM's lumped surface-load fallback must take the direction a "
+        "pressure pushes from the mesh it is applied to, not from the order the "
+        "load line's points were typed in."),
+    'hybrid_criterion': (
+        'hybrid_criterion_check.py',
+        "The opt-in strength-reduction criterion that requires displacement "
+        "evidence before a non-converged trial is counted as a failed slope."),
+    'units_check': (
+        'units_check.py',
+        "xslope.units, the single source of truth for the unit systems: the "
+        "canonical constants, the loud no-default reads that replaced the "
+        "scattered 9.81 / 62.4 fallbacks, and the selector semantics."),
+    'transient_studio_smoke': (
+        'transient_studio_smoke.py',
+        "Transient seepage driven through the Studio panels, headless, as a user "
+        "reaches it rather than through the solver alone."),
+    'assistant_capture': (
+        'assistant_capture_check.py',
+        "The recorded-assistant-session harness: every session makes billed "
+        "provider calls, so this proves --dry-run really is the whole path."),
     'base_normal_sign': (
         'base_normal_sign_check.py',
         "Bishop and Janbu divide every base normal by m_alpha, which vanishes at "
@@ -13393,7 +13431,10 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'noncircular_search': 2, 'circular_search': 2,
               'spencer_disclosure': 3, 'interslice_admissibility': 3,
               'force_closure_root': 3,
-              'spencer_root': 3, 'base_normal_sign': 3,
+              'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
+              'indep_bishop': 3, 'tension_crack_symmetry': 2,
+              'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
+              'transient_studio_smoke': 4, 'assistant_capture': 2,
               'circle_vertex': 2,
               'circle_above_center': 2}
 
@@ -13615,6 +13656,12 @@ def main():
         tests.append({'type': 'transient_seep',
                       'file': 'transient seepage solver (12 locks)',
                       'method': '-', 'source': 'transient_seep'})
+        # The same solver driven through the Studio panels, headless: the run
+        # dialog, the runner and its cancel, the transient view and its playback,
+        # the inputs editor, the mainwindow sidecar and the water-level overlay.
+        tests.append({'type': 'transient_studio_smoke',
+                      'file': 'transient seepage through the Studio panels',
+                      'method': '-', 'source': 'transient_studio_smoke'})
 
     # docs/seep/samples.md carries the steady seep sample locks AND (Problems 8-9)
     # the transient tseep_head locks — route each by type so --tseep picks up the
@@ -13808,6 +13855,23 @@ def main():
         tests.append({'type': 'base_normal_sign',
                       'file': 'the sign of the base normal (oms/bishop/janbu)',
                       'method': '-', 'source': 'base_normal_sign'})
+        # A slope and its mirror image must read the same. The pile model is
+        # where the reflection touches the most machinery, and where a pile
+        # landing exactly on a slice boundary used to be credited to slices half
+        # a width apart between the two (Corps 0.72% at sixty slices).
+        tests.append({'type': 'pile_symmetry',
+                      'file': 'xslope_piles.xlsx and its mirror image',
+                      'method': 'all methods', 'source': 'pile_symmetry'})
+        # The same for a tension crack, whose water thrust flips with the
+        # sliding direction.
+        tests.append({'type': 'tension_crack_symmetry',
+                      'file': 'a tension crack and its mirror image',
+                      'method': 'all methods', 'source': 'tension_crack_symmetry'})
+        # Bishop scored against an implementation written from the published
+        # equations and nothing else.
+        tests.append({'type': 'indep_bishop',
+                      'file': "Bishop against an independent implementation",
+                      'method': 'bishop', 'source': 'indep_bishop'})
         # A circle daylighting exactly on a ground-surface vertex reported that
         # vertex once per adjoining segment, and the extra point sent the
         # count-and-prune to two copies of it — a zero-length "surface" that was
@@ -13927,6 +13991,16 @@ def main():
         # Guard that no English-unit FEM corpus file carries the metric inherited
         # elastic default (E=100,000 psf ~ 4.8 MPa, ~10x too soft) — the unit-blind
         # bug that corrupts displacements and the RS2 displacement-vector panels.
+        # A pressure's direction comes from the mesh it is applied to, not from
+        # the order its load line's points were typed in.
+        tests.append({'type': 'dload_pass2b',
+                      'file': 'surface load direction (FEM lumped fallback)',
+                      'method': '-', 'source': 'dload_pass2b'})
+        # The opt-in strength-reduction criterion that wants displacement
+        # evidence before calling a non-converged trial a failed slope.
+        tests.append({'type': 'hybrid_criterion',
+                      'file': 'the hybrid failure criterion',
+                      'method': '-', 'source': 'hybrid_criterion'})
         tests.append({'type': 'fem_elastic_units', 'file': 'docs/verification/files (FEM corpus)',
                       'method': '-', 'source': 'fem_units'})
         # Guard that no corpus distributed-load line comes back from the loader
@@ -14176,6 +14250,15 @@ def main():
         # to pass it and one built to fail it), replay determinism, and that a
         # --dry-run reaches no provider. Same reason this rides here as the two
         # above: offscreen Qt, no network, nothing billed.
+        # The recorded-assistant-session harness itself: every real session makes
+        # billed provider calls, so what is checked is that --dry-run is the
+        # whole path with none of them.
+        tests.append({'type': 'assistant_capture',
+                      'file': 'recorded assistant sessions (dry run)',
+                      'method': '-', 'source': 'assistant_capture'})
+        # xslope.units, the single source of truth for the unit systems.
+        tests.append({'type': 'units_check', 'file': 'xslope.units',
+                      'method': '-', 'source': 'units_check'})
         tests.append({'type': 'assistant_suite',
                       'file': 'assistant scenario suite (scored)',
                       'method': '-', 'source': 'assistant_suite'})

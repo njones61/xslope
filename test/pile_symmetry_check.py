@@ -1,9 +1,12 @@
-"""Pile mirror-symmetry regression test.
+"""A slope and its mirror image must give the same factor of safety.
+
 
 A stabilizing pile must resist the sliding mass regardless of which way the
 slope faces, so reflecting a model left-to-right (and reflecting the pile with
-it) must leave every method's factor of safety unchanged. This guards the
-right-facing pile-moment sign fix in oms()/bishop()/spencer().
+it) must leave every method's factor of safety unchanged. The pile model is
+where a reflection touches the most machinery — the pile geometry, its
+horizontal force, the arms every method takes it on, and the ground lookup the
+Ito & Matsui capacity reads — so it is the model this is checked on.
 
 Background: an earlier bug applied the pile's vertical-component moment with the
 wrong sign on right-facing slopes (a real ~3-5% asymmetry for battered piles).
@@ -56,7 +59,7 @@ def mirror_slope_data(d):
 
 
 def _solve_all(d, ns=40):
-    ok, res = generate_slices(d, circle=d["circles"][0], num_slices=ns)
+    ok, res = generate_slices(d, circle=d["circles"][0], num_slices=ns, debug=False)
     assert ok, f"generate_slices failed: {res}"
     slice_df, _ = res
     out = {}
@@ -66,46 +69,145 @@ def _solve_all(d, ns=40):
     return out, slice_df
 
 
-def check(theta_p, expect_pile=True):
+def check(theta_p, expect_pile=True, ns=40, quiet=False):
     base = load_slope_data(PILE_MODEL)
-    for p in base["pile_lines"]:
-        p["theta_p"] = theta_p
-        if not expect_pile:
-            p["H"] = 0.0  # control: no pile force
-    left, sdf_l = _solve_all(base)
-    right, sdf_r = _solve_all(mirror_slope_data(base))
+    if expect_pile:
+        for p in base["pile_lines"]:
+            p["theta_p"] = theta_p
+    else:
+        # The control is the model with no pile at all. It used to be the model
+        # with H = 0, which preflight now rejects — H is a capacity, and a
+        # capacity of zero is an input error rather than a pile that does
+        # nothing — so the pile lines are removed instead. Same control, stated
+        # honestly.
+        base["pile_lines"] = []
+    left, sdf_l = _solve_all(base, ns)
+    right, sdf_r = _solve_all(mirror_slope_data(base), ns)
     rf_l = bool(sdf_l["y_lt"].iat[0] > sdf_l["y_rt"].iat[-1])
     rf_r = bool(sdf_r["y_lt"].iat[0] > sdf_r["y_rt"].iat[-1])
     assert not rf_l and rf_r, f"expected left right_facing=False, mirror=True (got {rf_l}, {rf_r})"
 
     failures = []
+    worst = (0.0, None)
     for name, _ in METHODS:
         fl, fr = left[name], right[name]
         if fl is None or fr is None:
             failures.append(f"{name}: solve failed (left={fl}, right={fr})")
             continue
         asym = abs(fl - fr) / fl * 100
-        flag = "ok" if asym < TOL_PCT else "FAIL"
-        print(f"    {name:8s} left={fl:.6f} mirror={fr:.6f}  asym={asym:.4f}%  {flag}")
+        if asym > worst[0]:
+            worst = (asym, name)
         if asym >= TOL_PCT:
-            failures.append(f"{name}: asym {asym:.3f}% >= {TOL_PCT}% (left={fl:.5f}, mirror={fr:.5f})")
+            failures.append(f"{name} at {ns} slices: asym {asym:.3f}% >= {TOL_PCT}% "
+                            f"(left={fl:.5f}, mirror={fr:.5f})")
+    if not quiet and worst[1] is not None:
+        print(f"    {ns:3d} slices: worst {worst[1]} {worst[0]:.4f}%")
     return failures
 
 
-def test_pile_mirror_symmetry():
-    all_failures = []
-    print("  control (no pile force), theta_p=0:")
-    all_failures += check(0.0, expect_pile=False)
+#: Slice counts the pair is checked at. Which slice a pile is credited to used to
+#: depend on the order the slices were built in, so the asymmetry appeared only
+#: where a pile landed exactly on a slice boundary — at 30 and 60 slices on this
+#: model, where Corps of Engineers moved 1.44% and 0.72% between the model and
+#: its mirror, and nowhere else. A single slice count would have missed it.
+SLICE_COUNTS = (30, 40, 50, 60, 80)
+
+
+def leg_the_mirror_pair_agrees():
+    """Every method, both facings, at every slice count."""
+    failures = []
+    print("  control (no pile):")
+    for ns in SLICE_COUNTS:
+        failures += check(0.0, expect_pile=False, ns=ns)
     for theta in (0.0, 30.0, -20.0):
-        print(f"  pile, theta_p={theta:+.0f}:")
-        all_failures += check(theta, expect_pile=True)
-    assert not all_failures, "Pile mirror-symmetry violations:\n  " + "\n  ".join(all_failures)
+        print(f"  pile, theta_p = {theta:+.0f}:")
+        for ns in SLICE_COUNTS:
+            failures += check(theta, expect_pile=True, ns=ns)
+    return failures
+
+
+def leg_a_pile_lands_on_a_boundary():
+    """The case only bites where a pile sits exactly on a slice corner.
+
+    If no slice count in SLICE_COUNTS puts a pile on a boundary any more, the
+    leg above is no longer testing what it was written for and says so.
+    """
+    base = load_slope_data(PILE_MODEL)
+    on_boundary = []
+    for ns in SLICE_COUNTS:
+        ok, res = generate_slices(base, circle=base["circles"][0], num_slices=ns,
+                                  debug=False)
+        if not ok:
+            continue
+        df = res[0]
+        rows = df[df["h_pile"] != 0]
+        for i in rows.index:
+            x = float(df["x_pile"][i])
+            tol = 1e-9 * max(1.0, abs(x))
+            if abs(x - float(df["x_r"][i])) <= tol or abs(x - float(df["x_l"][i])) <= tol:
+                on_boundary.append(ns)
+                break
+    if not on_boundary:
+        return ["no slice count in SLICE_COUNTS puts a pile on a slice boundary, "
+                "so the corner-claim case is no longer exercised"]
+    print(f"  a pile lands on a slice boundary at {sorted(set(on_boundary))} slices")
+    return []
+
+
+def _mutation(label, apply, restore, leg, fails):
+    apply()
+    try:
+        caught = leg()
+    finally:
+        restore()
+    if not caught:
+        fails.append(f"{label}: the leg passed with the defect in place")
+    else:
+        print(f"  mutation  {label} -> caught ({len(caught)} failure(s))")
+
+
+def leg_mutations():
+    """Claiming a corner crossing by build order must put the asymmetry back."""
+    from xslope import slice as xslice
+    fails = []
+    original = xslice._corner_claim_is_this_slice
+
+    def first_seen_wins(x_cross, x_l, x_r, i, n_slices, right_facing):
+        """The rule as it stood: whichever base is built first keeps it."""
+        return True
+
+    _mutation("the corner claimed by build order",
+              lambda: setattr(xslice, '_corner_claim_is_this_slice', first_seen_wins),
+              lambda: setattr(xslice, '_corner_claim_is_this_slice', original),
+              leg_the_mirror_pair_agrees, fails)
+    return fails
+
+
+LEGS = [
+    ("a pile lands on a slice boundary", leg_a_pile_lands_on_a_boundary),
+    ("the mirror pair agrees", leg_the_mirror_pair_agrees),
+    ("mutations", leg_mutations),
+]
+
+
+def run():
+    failures = []
+    for label, fn in LEGS:
+        print(f"[{label}]")
+        try:
+            failures.extend(fn())
+        except Exception as e:
+            failures.append(f"{label}: raised {type(e).__name__}: {e}")
+    return failures
 
 
 if __name__ == "__main__":
-    try:
-        test_pile_mirror_symmetry()
-    except AssertionError as e:
-        print(f"\nFAILED:\n{e}")
-        raise SystemExit(1)
-    print("\nPASS: pile forces are mirror-symmetric across all methods.")
+    import sys
+    fails = run()
+    if fails:
+        print("\nFAILURES:")
+        for f in fails:
+            print("  -", f)
+        sys.exit(1)
+    print("\nPASS: a pile model and its mirror image read the same, "
+          "at every slice count.")

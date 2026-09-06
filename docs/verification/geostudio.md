@@ -657,9 +657,9 @@ The wider spread is confined to the Lowe-Karafiath and Corps side-force assumpti
 
 The Zhu & Lee heterogeneous benched slope (four materials, water table, tension crack), verifying that an unconstrained circular search lands in the governing deep failure family.
 
-**Input:** [vp052a.xlsx](files/rocscience/vp052a.xlsx) · **Rocscience detail:** [VP52](rocscience.md#vp52)
+**Input:** [vp052b.xlsx](files/rocscience/vp052b.xlsx) · **Rocscience detail:** [VP52](rocscience.md#vp52)
 
-![vp052a: inputs and representative solution](images/vp052a.png)
+![vp052b: inputs and representative solution](images/vp052b.png)
 
 | Method | XSLOPE | Slide | SLOPE/W |
 |---|---|---|---|

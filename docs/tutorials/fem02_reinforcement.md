@@ -738,15 +738,11 @@ layers' modulus scaled separately:
 | ×10 | ×10 | 1.5352 |
 
 The result does not carry over. Ten times the soil's modulus, with the geogrid
-left as it is, costs **0.305 of factor of safety — 20%**. Two things act in that
-row. A stiffer soil strains less under the same load, so the layers are stretched
-less and give less of their tension. And a stiff cohesionless fill between the
-layers is pulled into tension that a soil with a tensile cutoff of zero cannot
-carry; that second effect is the larger of the two here, since with the cutoff
-left blank the same row reads 1.4102. One tenth of the modulus costs one
-bisection cell, next to nothing, because at that stiffness the layers are
-already carrying close to everything the envelope allows and there is little
-further to mobilize.
+left as it is, costs **0.305 of factor of safety — 20%**. A stiffer soil strains
+less under the same load, so the layers are stretched less and give less of
+their tension. One tenth of the modulus costs one bisection cell, next to
+nothing, because at that stiffness the layers are already carrying close to
+everything the envelope allows and there is little further to mobilize.
 
 Scale the layers by the same ten as the soil and the answer returns to 1.5352, to
 the printed digit and from the same bracket. What a reinforced finite element

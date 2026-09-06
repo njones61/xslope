@@ -1019,7 +1019,7 @@ kPa.
 
 **Input:** [gs2_cons.xlsx](files/geostudio/gs2_cons.xlsx)
 
-![SEEPW-T01: Terzaghi consolidation isochrones](images/gs2_cons.png){width=600px}
+![SEEPW-T01: Terzaghi consolidation isochrones](images/gs2_cons.png){width=800px}
 
 | t (s) | U (Terzaghi) | XSLOPE center | Terzaghi center $u_e$ | SEEP/W center |
 |---:|---:|---:|---:|---:|
@@ -1057,7 +1057,7 @@ t > 0 the top steps to the ponded head.
 
 **Input:** [gs2_infil.xlsx](files/geostudio/gs2_infil.xlsx)
 
-![SEEPW-T02: infiltration front vs SEEP/W](images/gs2_infil.png){width=600px}
+![SEEPW-T02: infiltration front vs SEEP/W](images/gs2_infil.png){width=800px}
 
 The comparison is against SEEP/W's own `node.csv` pressure field at the final time; the
 published external reference is the [Warrick, Lomen & Yates (1985)](https://doi.org/10.2136/sssaj1985.03615995004900010006x)
@@ -1247,7 +1247,7 @@ Dirichlet head and the pond leaks — the same submerged-only reservoir series a
 
 **Input:** [gs2_pond.xlsx](files/geostudio/gs2_pond.xlsx)
 
-![SEEPW-T04: water-table rise vs time, XSLOPE vs SEEP/W](images/gs2_pond.png){width=600px}
+![SEEPW-T04: water-table rise vs time, XSLOPE vs SEEP/W](images/gs2_pond.png){width=800px}
 
 The example's *published* answer is a water-table-rise-vs-time graph with no closed form,
 so the comparison is against SEEP/W's own solved `node.csv`, read station by station with
@@ -1305,7 +1305,7 @@ condition would return a dry hydrostatic column and the front would never advanc
 
 **Input:** [gs2_heap.xlsx](files/geostudio/gs2_heap.xlsx)
 
-![SEEPW-T05: pressure-head profile vs time, XSLOPE vs SEEP/W](images/gs2_heap.png){width=600px}
+![SEEPW-T05: pressure-head profile vs time, XSLOPE vs SEEP/W](images/gs2_heap.png){width=800px}
 
 The published answer is a graphical volumetric-water-content / flow-rate response (no
 closed form), so the seepage comparison is SEEP/W's own solved `node.csv`:

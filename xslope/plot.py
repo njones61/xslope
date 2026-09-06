@@ -3501,6 +3501,28 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
     return leg
 
 
+def _frame_content(ax, bounds, pad_frac):
+    """Frame `ax` on `bounds` = (x0, x1, y0, y1) the way the docs figures are framed.
+
+    Box-adjust equal aspect — the axes box shrinks to the content's true
+    proportions instead of padding the data out to fill an arbitrary figure
+    aspect, so there is no interior dead-space slab and the excess figure area
+    becomes an outer margin that ``bbox_inches="tight"`` crops away — with a
+    single uniform cushion in DATA units on BOTH axes, so under equal aspect the
+    visual margins are equal and the geometry never touches the frame.
+    """
+    x0, x1, y0, y1 = bounds
+    if x1 > x0 and y1 > y0:
+        pad = pad_frac * max(x1 - x0, y1 - y0)
+        ax.set_xlim(x0 - pad, x1 + pad)
+        ax.set_ylim(y0 - pad, y1 + pad)
+    ax.set_aspect('equal', adjustable='box')
+
+
+def _frame_data_limits(ax):
+    """The (x0, x1, y0, y1) box of everything drawn on `ax` — the model's extent."""
+    bb = ax.dataLim
+    return (bb.intervalx[0], bb.intervalx[1], bb.intervaly[0], bb.intervaly[1])
 
 
 def plot_inputs(
@@ -3842,19 +3864,9 @@ def plot_inputs(
                         ax.set_ylim(y_min_curr, y_max_new)
 
     if frame == "content":
-        # Frame the panel to its CONTENT: box-adjust equal aspect (the axes box
-        # shrinks to the data's true proportions instead of padding the data out
-        # to fill an arbitrary figure aspect — no interior dead-space slab), with a
-        # single uniform cushion in DATA units on BOTH axes so the visual margins
-        # are equal under equal aspect and the geometry never touches the frame.
-        bb = ax.dataLim
-        cx0, cx1 = bb.intervalx
-        cy0, cy1 = bb.intervaly
-        if cx1 > cx0 and cy1 > cy0:
-            pad = pad_frac * max(cx1 - cx0, cy1 - cy0)
-            ax.set_xlim(cx0 - pad, cx1 + pad)
-            ax.set_ylim(cy0 - pad, cy1 + pad)
-        ax.set_aspect('equal', adjustable='box')
+        # Frame the panel to its CONTENT: the model's extent, box-adjusted equal
+        # aspect, one uniform cushion. See _frame_content().
+        _frame_content(ax, _frame_data_limits(ax), pad_frac)
     else:
         ax.set_aspect('equal', adjustable='datalim')  # ✅ Equal aspect
         # Add a bit of headroom so plotted lines/markers don't touch the top border
@@ -3928,11 +3940,15 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
         slice_numbers: Label each slice with its 1-indexed number, sized to fit
             inside the slice it names.
         frame: "fill" (default) frames the whole model, as the results view does.
+            "content" frames the model's extent with the axes box at its true
+            proportions and one uniform cushion around it, so a wide-thin section
+            fills the panel instead of sitting in a band of empty ground.
             "slices" frames the SLICED MASS — the slices, the failure surface and
             the base-stress bars — with a uniform cushion, which is what makes a
             slice-key figure readable beside its slice table.
-        pad_frac: Cushion for frame="slices", as a fraction of the larger of the
-            sliced mass's two dimensions. Ignored for frame="fill".
+        pad_frac: Cushion for frame="content" and frame="slices", as a fraction of
+            the larger of the framed content's two dimensions. Ignored for
+            frame="fill".
         fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
             GUI canvas). When None (default) a new pyplot figure is created and shown;
             when provided, the figure is cleared and reused and plt.show() is skipped.
@@ -4069,19 +4085,25 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     ymin, ymax = compute_ylim(slope_data, slice_df, pad_fraction=0.05)
     ax.set_ylim(ymin, ymax)
 
-    if frame == "slices":
-        # Frame the sliced mass: box-adjust equal aspect (the axes box takes the
-        # data's true proportions instead of padding the mass out to fill the
-        # figure) with one uniform cushion in DATA units on both axes, so the
-        # margins read equal and nothing touches the frame.
+    if frame == "content":
+        # Frame the model's extent, the way plot_inputs(frame="content") frames the
+        # same section: box-adjusted equal aspect and one uniform cushion, so the
+        # y-range above is replaced rather than padded out to fill the figure.
+        # The bounds are what is DRAWN (ax.dataLim), clipped to the model's own
+        # y-window — the same window the default framing uses, taken here without
+        # its pad because the cushion is added once, uniformly, below. The line of
+        # thrust is why the clip is there: on a slope whose interslice force passes
+        # through zero it runs to an asymptote hundreds of feet off the section,
+        # and a frame taken from it draws the model as a sliver.
+        wy0, wy1 = compute_ylim(slope_data, slice_df, pad_fraction=0.0)
+        bx0, bx1, by0, by1 = _frame_data_limits(ax)
+        _frame_content(ax, (bx0, bx1, max(by0, wy0), min(by1, wy1)), pad_frac)
+    elif frame == "slices":
+        # Frame the sliced mass by the same recipe, on the slices, the failure
+        # surface and the base-stress bars alone.
         bounds = sliced_mass_bounds(ax)
         if bounds is not None:
-            bx0, bx1, by0, by1 = bounds
-            if bx1 > bx0 and by1 > by0:
-                pad = pad_frac * max(bx1 - bx0, by1 - by0)
-                ax.set_xlim(bx0 - pad, bx1 + pad)
-                ax.set_ylim(by0 - pad, by1 + pad)
-                ax.set_aspect('equal', adjustable='box')
+            _frame_content(ax, bounds, pad_frac)
 
     # Axis length units, only when the model declares a unit system (units plan
     # phase 4); undeclared models get no axis label — pixel-identical to today.
@@ -4152,7 +4174,7 @@ def plot_search_path(ax, search_path):
                  head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True,
                  gid='SEARCH_PATH')
 
-def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
+def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None, frame="fill", pad_frac=0.035):
     """
     Creates a plot showing the results of a circular failure surface search.
 
@@ -4163,6 +4185,12 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
         circle_cache: List of dictionaries containing all tested circles (for plotting)
         highlight_fs: Boolean indicating whether to highlight the critical failure surface
         figsize: Tuple of (width, height) in inches for the plot
+        frame: "fill" (default) pads the data out to fill the figure aspect;
+            "content" frames what is drawn — the section and the trial circles —
+            with the axes box at its true proportions and one uniform cushion, so
+            a wide-thin model fills the panel instead of a band across its middle.
+        pad_frac: Cushion for frame="content", as a fraction of the larger of the
+            content's two dimensions. Ignored for frame="fill".
         fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
             GUI canvas). When None (default) a new pyplot figure is created and shown;
             when provided, the figure is cleared and reused and plt.show() is skipped.
@@ -4210,7 +4238,10 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
     if search_path:
         plot_search_path(ax, search_path)
 
-    ax.set_aspect('equal', adjustable='datalim')
+    if frame == "content":
+        _frame_content(ax, _frame_data_limits(ax), pad_frac)
+    else:
+        ax.set_aspect('equal', adjustable='datalim')
     ax.grid(False)
     if show_title and highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
@@ -4229,7 +4260,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
         plt.show()
     return fig
 
-def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
+def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None, frame="fill", pad_frac=0.035):
     """
     Creates a plot showing the results of a non-circular failure surface search.
 
@@ -4239,6 +4270,12 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         search_path: List of dictionaries containing search path coordinates
         highlight_fs: Boolean indicating whether to highlight the critical failure surface
         figsize: Tuple of (width, height) in inches for the plot
+        frame: "fill" (default) pads the data out to fill the figure aspect;
+            "content" frames what is drawn — the section and the trial surfaces —
+            with the axes box at its true proportions and one uniform cushion, so
+            a wide-thin model fills the panel instead of a band across its middle.
+        pad_frac: Cushion for frame="content", as a fraction of the larger of the
+            content's two dimensions. Ignored for frame="fill".
         fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
             GUI canvas). When None (default) a new pyplot figure is created and shown;
             when provided, the figure is cleared and reused and plt.show() is skipped.
@@ -4293,7 +4330,10 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
                             head_width=1, head_length=2, fc='green', ec='green',
                             length_includes_head=True, alpha=0.6, gid='SEARCH_PATH')
 
-    ax.set_aspect('equal', adjustable='datalim')
+    if frame == "content":
+        _frame_content(ax, _frame_data_limits(ax), pad_frac)
+    else:
+        ax.set_aspect('equal', adjustable='datalim')
     ax.grid(False)
     if show_title and highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
@@ -4312,7 +4352,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         plt.show()
     return fig
 
-def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
+def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None, frame="fill", pad_frac=0.035):
     """
     Creates a plot showing the results of reliability analysis.
 
@@ -4320,6 +4360,12 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
         slope_data: Dictionary containing plot data
         reliability_data: Dictionary containing reliability analysis results
         figsize: Tuple of (width, height) in inches for the plot
+        frame: "fill" (default) pads the data out to fill the figure aspect;
+            "content" frames what is drawn — the section and the F+/F- surfaces —
+            with the axes box at its true proportions and one uniform cushion, so
+            a wide-thin model fills the panel instead of a band across its middle.
+        pad_frac: Cushion for frame="content", as a fraction of the larger of the
+            content's two dimensions. Ignored for frame="fill".
         fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
             GUI canvas). When None (default) a new pyplot figure is created and shown;
             when provided, the figure is cleared and reused and plt.show() is skipped.
@@ -4384,7 +4430,10 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
 
 
     # Standard finalization
-    ax.set_aspect('equal', adjustable='datalim')
+    if frame == "content":
+        _frame_content(ax, _frame_data_limits(ax), pad_frac)
+    else:
+        ax.set_aspect('equal', adjustable='datalim')
     ax.grid(False)
 
     # Title with reliability statistics using mathtext

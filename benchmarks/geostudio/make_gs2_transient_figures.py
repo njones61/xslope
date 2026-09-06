@@ -377,6 +377,36 @@ def fig_pond():
     return 'gs2_pond.png'
 
 
+_INPUT_STEMS = (('gs2_cons', 'SEEPW-T01 — consolidation column'),
+                ('gs2_infil', 'SEEPW-T02 — infiltration column'),
+                ('gs2_rdd_inst', 'SEEPW-T03 — dam, instantaneous drawdown'),
+                ('gs2_rdd_slow', 'SEEPW-T03 — dam, slow drawdown'),
+                ('gs2_pond', 'SEEPW-T04 — clay-lined pond'),
+                ('gs2_heap', 'SEEPW-T05 — leach column'),
+                ('gs2_mso', 'SEEPW-T07 — multistep outflow column'))
+
+
+def fig_inputs():
+    """One inputs figure per transient workbook: the section, its materials and
+    the seepage boundary conditions the march is run under, framed on the
+    domain like every other engine-section inputs plot."""
+    from xslope.plot import plot_inputs
+    names = []
+    for stem, label in _INPUT_STEMS:
+        path = os.path.join(SRC, f'{stem}.xlsx')
+        if not os.path.exists(path):
+            continue
+        sd = load_slope_data(path)
+        with contextlib.redirect_stdout(io.StringIO()):
+            fig = plot_inputs(sd, mode='seep', frame='content', show_mesh=False,
+                              title=f'{label}: inputs and seepage boundary conditions')
+        name = f'{stem}_inputs.png'
+        fig.savefig(os.path.join(OUT, name), dpi=150, bbox_inches='tight')
+        plt.close(fig)
+        names.append(name)
+    return ', '.join(names)
+
+
 if __name__ == '__main__':
-    for fn in (fig_cons, fig_infil, fig_rdd, fig_rdd_fs, fig_heap, fig_pond):
+    for fn in (fig_inputs, fig_cons, fig_infil, fig_rdd, fig_rdd_fs, fig_heap, fig_pond):
         print('ok  ', fn(), flush=True)

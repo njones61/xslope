@@ -52,6 +52,7 @@ MUTATIONS = [
      "SSRM 0.986 vs RS2 SSRM 0.99 (−0.4%)", "SSRM 0.986 vs RS2 SSRM 0.99 (+0.4%)"),
     ("rs2", "deltas", "M3 last digit, summary row",
      "SSRM 1.280 vs RS2 SSRM 1.26 (+1.6%)", "SSRM 1.280 vs RS2 SSRM 1.26 (+1.7%)"),
+    # RS2-31, the Hoek-Brown reading against RS2's own
     ("rs2", "deltas", "M4 prose delta",
      "**1.115** against RS2's 1.11 (+0.5%)",
      "**1.115** against RS2's 1.11 (+0.7%)"),
@@ -161,7 +162,8 @@ MUTATIONS = [
     ("geostudio", "deltas", "H1 unhedged two-decimal signed delta",
      "| Clay fill, reinforced (imported geosynthetic) | −0.3% |",
      "| Clay fill, reinforced (imported geosynthetic) | −0.27% |"),
-    # the magnitude stays correct; only the printed precision moves
+    # VP1's method table: the magnitude stays correct, only the printed
+    # precision moves
     ("rocscience", "deltas", "H2 unhedged integer signed delta",
      "| Corps of Engineers | 0.990 | 1.00 (−1.0%) |",
      "| Corps of Engineers | 0.990 | 1.00 (−1%) |"),

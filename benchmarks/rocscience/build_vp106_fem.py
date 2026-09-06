@@ -35,8 +35,10 @@ What the FE variants add:
     pi D^2/4 = 0.5026548 m2, the paper's own section constants. The spacing
     S = 3D = 2.4 m divides both, which is the plane-strain smear the diagnostic
     is about.
-  * the third file sets the pile head fixity to 'fixed', which restrains the head
-    ROTATION only -- the paper's "unrotated" pile.
+  * the third file sets the pile head fixity to 'unrotated', which holds the head
+    ROTATION and leaves its translations free -- the paper's "unrotated" pile.
+    ('fixed' holds the rotation AND both translations, which is a different
+    support and a different problem.)
 
 The Ito & Matsui force (the LEM path's H) is NOT set on these files: in a finite
 element analysis the pile carries what the soil pushes onto it, and setting a
@@ -118,8 +120,9 @@ def vp106c_fem():
 
 
 def vp106c_fem_fix():
-    """D1/D = 3, head rotation restrained. Cai & Ugai 3D FE: 1.45."""
-    save_slope_data_to_xlsx(_slope_data(True, 'fixed'),
+    """D1/D = 3, head rotation restrained, translations free. Cai & Ugai 3D FE:
+    1.45."""
+    save_slope_data_to_xlsx(_slope_data(True, 'unrotated'),
                             os.path.join(OUT, 'vp106c_fem_fix.xlsx'))
     return 'vp106c_fem_fix.xlsx'
 

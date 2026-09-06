@@ -1247,7 +1247,7 @@ Dirichlet head and the pond leaks — the same submerged-only reservoir series a
 
 **Input:** [gs2_pond.xlsx](files/geostudio/gs2_pond.xlsx)
 
-![SEEPW-T04: water-table rise vs time, XSLOPE vs SEEP/W](images/gs2_pond.png)
+![SEEPW-T04: water-table rise vs time, XSLOPE vs SEEP/W](images/gs2_pond.png){width=600px}
 
 The example's *published* answer is a water-table-rise-vs-time graph with no closed form,
 so the comparison is against SEEP/W's own solved `node.csv`, read station by station with

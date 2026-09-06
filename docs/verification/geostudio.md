@@ -1019,7 +1019,7 @@ kPa.
 
 **Input:** [gs2_cons.xlsx](files/geostudio/gs2_cons.xlsx)
 
-![SEEPW-T01: Terzaghi consolidation isochrones](images/gs2_cons.png)
+![SEEPW-T01: Terzaghi consolidation isochrones](images/gs2_cons.png){width=600px}
 
 | t (s) | U (Terzaghi) | XSLOPE center | Terzaghi center $u_e$ | SEEP/W center |
 |---:|---:|---:|---:|---:|
@@ -1057,7 +1057,7 @@ t > 0 the top steps to the ponded head.
 
 **Input:** [gs2_infil.xlsx](files/geostudio/gs2_infil.xlsx)
 
-![SEEPW-T02: infiltration front vs SEEP/W](images/gs2_infil.png)
+![SEEPW-T02: infiltration front vs SEEP/W](images/gs2_infil.png){width=600px}
 
 The comparison is against SEEP/W's own `node.csv` pressure field at the final time; the
 published external reference is the [Warrick, Lomen & Yates (1985)](https://doi.org/10.2136/sssaj1985.03615995004900010006x)

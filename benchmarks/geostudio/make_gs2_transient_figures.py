@@ -67,6 +67,28 @@ _SW_INF_PSI = [-7.9976, -7.9991, -7.9998, -8.0, -8.0, -8.0, -7.9997, -7.4188,
                -0.0372, -0.0197, -0.0090, -0.0033, -0.0011, 0.0]
 
 
+def _legend_below(fig, handles, ncol, title=None, labels=None):
+    """Put the legend in reserved space under the axes, never over the data.
+
+    The reserve is measured from the legend's own rendered height, so a
+    two-row legend and a four-row legend both clear the axes without a
+    hand-tuned margin; the column count is capped so the legend never runs
+    past the figure's width.
+    """
+    kw = dict(loc='lower center', ncol=ncol, fontsize=8.5, frameon=False)
+    if title:
+        kw['title'] = title
+    leg = fig.legend(handles, labels, **kw) if labels is not None \
+        else fig.legend(handles=handles, **kw)
+    fig.canvas.draw()
+    bb = leg.get_window_extent().transformed(fig.transFigure.inverted())
+    if bb.width > 0.98:               # too wide: halve the columns and re-measure
+        leg.remove()
+        return _legend_below(fig, handles, max(1, ncol // 2), title, labels)
+    fig.tight_layout(rect=(0, bb.height + 0.02, 1, 1))
+    return leg
+
+
 def _solve(stem, target_size, frac, refine=None):
     sd = load_slope_data(os.path.join(SRC, f'{stem}.xlsx'))
     ts = build_tseep_data(sd)
@@ -96,7 +118,7 @@ def fig_cons():
         Tv = cv * t / (C._H * C._H)
         ax.plot(C._U0 * C.terzaghi_ue(ys / C._H, Tv), ys, '-', color=c, lw=1.7,
                 label=f't = {t:g} s  ($T_v$ = {Tv:.2f})')
-        ax.plot(_SW_CONS[t], _SW_CONS_Y, ':', color=c, lw=1.2, marker='.', ms=5)
+        ax.plot(_SW_CONS[t], _SW_CONS_Y, '.', color=c, ms=7)
         h = np.asarray(sol['frames'][transient_frame_index(sol, t)]['head'])
         ue = np.array([C._GW * (_sample(nodes, h, C._WIDTH / 2, y) - C._H_REF)
                        for y in ys_s])
@@ -110,10 +132,8 @@ def fig_cons():
     handles = ax.get_legend_handles_labels()[0]
     handles += [Line2D([], [], marker='o', color='0.3', ls='none', mfc='white',
                        mew=1.3, ms=6, label='XSLOPE'),
-                Line2D([], [], color='0.3', ls=':', marker='.', label='SEEP/W')]
-    ax.legend(handles=handles, loc='upper left', fontsize=8.5,
-              title='Terzaghi Eq 17.3 (lines)')
-    fig.tight_layout()
+                Line2D([], [], marker='.', color='0.3', ls='none', ms=8, label='SEEP/W')]
+    _legend_below(fig, handles, ncol=5, title='Terzaghi Eq 17.3 (lines)')
     fig.savefig(os.path.join(OUT, 'gs2_cons.png'), dpi=150)
     plt.close(fig)
     return 'gs2_cons.png'
@@ -135,8 +155,7 @@ def fig_infil():
     ax.set_title('SEEPW-T02 — infiltration into dry soil, t = 46 800 s',
                  fontsize=11)
     ax.grid(alpha=0.3)
-    ax.legend(loc='upper left', fontsize=9)
-    fig.tight_layout()
+    _legend_below(fig, ax.get_legend_handles_labels()[0], ncol=2)
     fig.savefig(os.path.join(OUT, 'gs2_infil.png'), dpi=150)
     plt.close(fig)
     return 'gs2_infil.png'
@@ -191,15 +210,17 @@ def fig_rdd():
         ax.grid(alpha=0.3)
         ax.set_xlim(-1, 31)
     axes[0].set_ylabel('total head  h  (m)   at interior stations')
-    handles = axes[0].get_legend_handles_labels()[0]
-    handles += [Line2D([], [], color='0.3', ls='-', label='XSLOPE'),
-                Line2D([], [], marker='o', color='0.3', ls='none', mfc='white',
-                       mew=1.2, ms=6, label='SEEP/W (node.csv)')]
-    axes[0].legend(handles=handles, loc='lower left', fontsize=8.5,
-                   title='station (x, y)')
+    handles = []
+    for c, st in zip(_RDD_COLORS, _RDD_STATIONS):
+        handles.append(Line2D([], [], color=c, lw=1.6,
+                              label=f'XSLOPE at ({st[0]}, {st[1]})'))
+        handles.append(Line2D([], [], marker='o', color=c, ls='none', mfc='white',
+                              mew=1.2, ms=5, label=f'SEEP/W at ({st[0]}, {st[1]})'))
+    fig.legend(handles=handles, loc='lower center', ncol=len(_RDD_STATIONS),
+               fontsize=9, frameon=False)
     fig.suptitle('SEEPW-T03 — reservoir drawdown: interior total head vs time',
                  fontsize=12)
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    fig.tight_layout(rect=(0, 0.10, 1, 0.96))
     fig.savefig(os.path.join(OUT, 'gs2_rdd.png'), dpi=150)
     plt.close(fig)
     return 'gs2_rdd.png'
@@ -301,12 +322,12 @@ def fig_heap():
     ax.set_title('SEEPW-T05 — leach column, irrigation stepped low → high',
                  fontsize=11)
     ax.grid(alpha=0.3)
-    handles = ax.get_legend_handles_labels()[0]
-    handles += [Line2D([], [], marker='o', color='0.3', ls='none', mfc='white',
-                       mew=1.2, ms=6, label='XSLOPE'),
-                Line2D([], [], color='0.3', ls='-', label='SEEP/W (node.csv)')]
-    ax.legend(handles=handles, loc='upper left', fontsize=8.5)
-    fig.tight_layout()
+    handles = ([Line2D([], [], marker='o', color=c, ls='none', mfc='white', mew=1.2,
+                       ms=6, label=f'XSLOPE, t = {t:g} s')
+                for c, t in zip(_HEAP_COLORS, times)]
+               + [Line2D([], [], color=c, lw=1.6, label=f'SEEP/W, t = {t:g} s')
+                  for c, t in zip(_HEAP_COLORS, times)])
+    _legend_below(fig, handles, ncol=4)
     fig.savefig(os.path.join(OUT, 'gs2_heap.png'), dpi=150)
     plt.close(fig)
     return 'gs2_heap.png'
@@ -345,13 +366,12 @@ def fig_pond():
     ax.set_title('SEEPW-T04 — clay-lined pond leakage: water-table rise vs time',
                  fontsize=11)
     ax.grid(alpha=0.3)
-    handles = ax.get_legend_handles_labels()[0]
-    handles += [Line2D([], [], color='0.3', ls='-', label='XSLOPE'),
-                Line2D([], [], marker='o', color='0.3', ls='none', mfc='white',
-                       mew=1.2, ms=6, label='SEEP/W (node.csv)')]
-    ax.legend(handles=handles, loc='upper left', fontsize=8.5,
-              title='station (x, y)')
-    fig.tight_layout()
+    handles = ([Line2D([], [], color=c, lw=1.6, label=f'XSLOPE at ({st[0]}, {st[1]})')
+                for c, st in zip(_POND_COLORS, _POND_STATIONS)]
+               + [Line2D([], [], marker='o', color=c, ls='none', mfc='white', mew=1.2,
+                         ms=6, label=f'SEEP/W at ({st[0]}, {st[1]})')
+                  for c, st in zip(_POND_COLORS, _POND_STATIONS)])
+    _legend_below(fig, handles, ncol=4, title='station (x, y)')
     fig.savefig(os.path.join(OUT, 'gs2_pond.png'), dpi=150)
     plt.close(fig)
     return 'gs2_pond.png'

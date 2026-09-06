@@ -1994,7 +1994,7 @@ Like VP71 and VP76, pore pressures are modeled two ways: XSLOPE's own FE seepage
 | Morgenstern–Price | 1.734 | — | 1.670 | — |
 | Ordinary | 1.506 | — | 1.477 | — |
 
-*Values on Slide's printed circles; the free-search values in parentheses are slightly deeper circles of the same family. D&W's four-program Spencer spread for the FE case is 1.67–1.72, and XSLOPE's 1.724 sits at its top edge, equal to Slide's own manual value. Two numerical notes from the seepage run: the unsaturated front width must scale with the dam (h0 = −5 ft ≈ one element, the sharpest the mesh resolves; the VP76-style −1 ft is sub-grid here and the fixed-point iteration never converges), and the sidecar is generated on a tri3 mesh because tri6 midside kr sampling oscillates.*
+*Values on Slide's printed circles; the free-search values in parentheses are slightly deeper circles of the same family. D&W's four-program Spencer spread for the FE case is 1.67–1.72, and XSLOPE's 1.724 sits at its top edge, equal to Slide's own manual value. One numerical note from the seepage run: the unsaturated front width must scale with the dam (h0 = −5 ft ≈ one element, the sharpest the mesh resolves; the VP76-style −1 ft is sub-grid here and the fixed-point iteration never converges).*
 
 ![vp077a: inputs and representative solution](images/vp077a.png)
 ![vp077b: inputs and representative solution](images/vp077b.png)

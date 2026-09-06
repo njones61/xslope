@@ -122,9 +122,8 @@ their own.
 blank. The one *no lock possible* row is RS2-8, whose pore pressures are construction-induced
 values read off equal-pressure lines drawn on the manual's figure, with no flow field behind them;
 its companion [RS2-9](#rs2-9) prints the same kind of data as a coordinate table together with the
-interpolation method RS2 applied to it, and is built. Each *blocked* row names its gap; some
-FE-seepage cases do not converge on the high-contrast tri6 mesh. XSLOPE's uncoupled
-transient-seepage solver carries the RS2 Part IV VP102 rapid-drawdown series, and
+interpolation method RS2 applied to it, and is built. Each *blocked* row names its gap.
+XSLOPE's uncoupled transient-seepage solver carries the RS2 Part IV VP102 rapid-drawdown series, and
 [RS2-67](#rs2-67) needs no literal-time transient analysis at all: its steady stage and its
 fully-drained drawn-down stage are each reconstructed by an own steady-seepage solve from the
 vendor BC block, built and locked, within 1.2% of RS2's own SSR, while the transient solver
@@ -200,7 +199,7 @@ verifiable.
 | [37](#rs2-37) | <span class="nodata">⊘</span> | Embankment with layered foundation (D&W Fig 6.39) | | *reported, no lock* — the two programs find different mechanisms: RS2's is the artesian downstream-toe slide, XSLOPE's a deeper surface. |
 | [38](#rs2-38) | 🟢 | Cohesionless embankment on saturated clay foundation (D&W Fig 7.12) | SSRM 1.190 vs RS2 SSRM 1.17 (+1.7%) | Part 2's own SSRM is 1.21; RS2 re-ran the problem between the two manuals. |
 | [39](#rs2-39) | <span class="nodata">⊘</span> | Homogeneous embankment dam, FE seepage (D&W Fig 7.19) | | *deferred* with the other FE-seepage cases — the third member of the [RS2-41/43](#rs2-39) family; the LEM build is Slide2 [VP76](rocscience.md#vp76). |
-| [40](#rs2-40) | 🟢 | Dam with impermeable foundation (D&W Fig 7.24) | Filter off: SSRM 1.160 vs closed form 1.190 (−2.5%) · `min_slip_depth` = 30 ft: SSRM 1.521 vs RS2 SSRM 1.53 (−0.6%) | **built** (piezo case). Two mechanisms, both locked; the deep one settles from a 50 ft cutoff up, and it follows the element size as the skin does, so both are regression locks at the tagged mesh. FE-seepage case blocked. |
+| [40](#rs2-40) | 🟢 | Dam with impermeable foundation (D&W Fig 7.24) | Filter off: SSRM 1.160 vs closed form 1.190 (−2.5%) · `min_slip_depth` = 30 ft: SSRM 1.521 vs RS2 SSRM 1.53 (−0.6%) | **built** (piezo case). Two mechanisms, both locked; the deep one settles from a 50 ft cutoff up, and it follows the element size as the skin does, so both are regression locks at the tagged mesh. RS2 publishes an SSR for the finite-element seepage case too; only the piezometric case is built here. |
 | [41](#rs2-39) | 🟢 | Earth embankment, infinite-slope mechanism (D&W Fig 14.4) | SSRM 1.431 vs D&W referee 1.44 (−0.6%) | **built** (caveat) — the unconstrained skin is the mechanism, and it lands inside RS2's own 1.43–1.47 band. |
 | [42](#rs2-42) | 🟢 | James dike | SSRM 1.214 vs RS2 SSRM 1.19 (+2.0%) | Scored against the Part IV VP75 model this file is built from; the input-identical native twin, which differs only in its SRF tensile setting and a coarser mesh, publishes 1.26. |
 | [43](#rs2-39) | 🟢 | Earth embankment, infinite-slope mechanism (D&W Fig 14.7) | SSRM 1.209 vs RS2 Part IV VP81 case 1 SSR 1.23 (−1.7%) | **built** (caveat) — run under the vendor model's own SSR Exclusion Area; unconstrained the c = 0 skin localizes at 1.116. |
@@ -209,13 +208,13 @@ verifiable.
 | [46](#rs2-46) | 🟢 | Varying undrained strength profiles II (D&W Fig 15.9, c<sub>u</sub> = 300 + c<sub>z</sub>·z) | a: SSRM 0.787 vs RS2 SSRM 0.78 (+0.9%) · b: SSRM 0.929 vs RS2 SSRM 0.93 (−0.1%) · c: SSRM 1.057 vs RS2 SSRM 1.05 (+0.7%) · d: SSRM 1.145 vs RS2 SSRM 1.15 (−0.4%) | |
 | [47](#rs2-47) | 🟢 | Purely cohesive slope, varying thickness (D&W Fig 14.3) | 30 ft: SSRM 1.061 vs RS2 SSRM 1.06 (+0.1%) · 46.5 ft: SSRM 1.045 vs RS2 SSRM 1.06 (−1.4%) · 60 ft: SSRM 1.045 vs RS2 SSRM 1.07 (−2.3%) | **built** (all 3 thicknesses); scored against the Part IV VP78 case-(a) models these files are built from. |
 | [48](#rs2-48) | <span class="nodata">⊘</span> | Multi-tiered geotextile wall, baseline (Leshchinsky & Han 2004) | | *blocked* — RS2 splits the mesh along the geotextile layers and joins the halves with frictional slip interfaces, an element type XSLOPE does not have, so the SSR row is not attempted. RS2 SSR 1.05 published; Leshchinsky & Han's FDM referee 0.99, their Bishop 1.00. |
-| [49](#rs2-49) | <span class="nodata">⊘</span> | Geotextile wall, fill-quality variant | | *reported, no lock* — converges, but the c = 0 fill localization makes the value track the mesh, so no comparison is derived. |
-| [50](#rs2-50) | <span class="nodata">⊘</span> | Geotextile wall, 4.2 m reinforcement variant | | *reported, no lock* — refinement-sensitive, not converged. |
-| [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type | | *reported, no lock* — refinement-sensitive, not converged. |
+| [49](#rs2-49) | <span class="nodata">⊘</span> | Geotextile wall, fill-quality variant | | *reported, no lock* — brackets, but the c = 0 fill localization makes the value follow the mesh, so no comparison is derived. |
+| [50](#rs2-50) | <span class="nodata">⊘</span> | Geotextile wall, 4.2 m reinforcement variant | | *reported, no lock* — steady under refinement, but RS2's factor comes from the split-interface wall [RS2-48](#rs2-48) describes, so there is nothing to score against. |
+| [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type | | *reported, no lock* — as [RS2-50](#rs2-50): steady under refinement, with no comparable vendor factor to score against. |
 | [52](#rs2-52) | <span class="nodata">⊘</span> | Geotextile wall, weak-foundation variant |  | *reported, no lock* — bearing failure on the c = 0 / φ = 18° foundation, on the LEM file's 30 m section and on the vendor's own 24 m section alike, recorded beside RS2's own SSR 0.84 and the L&H FLAC referee 0.86. Those come from the split-interface wall [RS2-48](#rs2-48) describes, so they are not scored against XSLOPE's bonded continuum, and neither reading is locked. |
-| [53](#rs2-53) | <span class="nodata">⊘</span> | Geotextile wall, water variant | | *reported, no lock* — converges, but the c = 0 fill localization makes the value track the mesh, so no comparison is derived. |
-| [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant | | *reported, no lock* — refinement-sensitive, not converged. |
-| [55](#rs2-55) | <span class="nodata">⊘</span> | Geotextile wall, tier-count variant | | *reported, no lock* — converges, but the c = 0 fill localization makes the value track the mesh, so no comparison is derived. |
+| [53](#rs2-53) | <span class="nodata">⊘</span> | Geotextile wall, water variant | | *reported, no lock* — brackets, but the c = 0 fill localization makes the value follow the mesh, so no comparison is derived. |
+| [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant | | *reported, no lock* — the most refinement-sensitive member of the family. |
+| [55](#rs2-55) | <span class="nodata">⊘</span> | Geotextile wall, tier-count variant | | *reported, no lock* — brackets, but the c = 0 fill localization makes the value follow the mesh, so no comparison is derived. |
 | [56](#rs2-56) | 🟢 | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) | Case 2 (weakest): SSRM 0.664 vs RS2 SSRM 0.67 (−0.9%) · Case 5 (strongest): SSRM 2.096 vs RS2 SSRM 2.14 (−2.1%) | The two locks bracket the family; case 5 is the wider of them and sets the dot. Published columns for all five cases in [the Pruska section](#pruska). |
 | [57](#rs2-57) | 🟢 | Pruska H = 10.5 m, 6 cases | Case 1 (weakest): SSRM 0.439 vs RS2 SSRM 0.44 (−0.2%) · Case 6 (strongest): SSRM 1.401 vs RS2 SSRM 1.42 (−1.3%) | The two locks bracket the family; case 6 is the wider of them and sets the dot. Published columns for all six cases in [the Pruska section](#pruska). |
 | [58](#rs2-58) | 🟢 | Pruska H = 14 m, 6 cases | Case 1: SSRM 0.339 vs RS2 SSRM 0.33 (+2.7%) · Case 5: SSRM 0.714 vs RS2 SSRM 0.72 (−0.8%) · Case 6: SSRM 1.066 vs RS2 SSRM 1.06 (+0.6%) | **built** (6 of 6) — the three locks within ±2.7%; case 1 is the widest and sets the dot. |
@@ -1457,15 +1456,10 @@ fills are cohesionless with no tensile cap, so a cap-less run is bit-identical w
 tension-SRF flag is set; the initial stress is the page's K0 = 1 field and the flow rule is
 ψ = 0.
 
-*The FE-seepage sub-case (vp077a: pore pressures from a finite-element seepage solve rather than a
-drawn piezometric line) is blocked by the downstream seepage face. The seepage sidecar is
-node-aligned to the SSRM mesh, so seepage and SSRM share one mesh: the solve converges cleanly on
-tri3, but SSRM requires tri6, on which the quadratic midside relative-conductivity sampling whips
-the daylighting front. The seepage-face active set never settles — it cycles among a handful of
-exit-face nodes at the daylighting toe, every toggle restarting the residual decay — and the
-flow-closure ratio never reaches its tolerance, which is not relaxed to obtain a solution. This is
-the tri3/tri6 trade at its sharpest: a converged seepage field needs tri3 while a trustworthy SSRM
-needs tri6, and one shared mesh cannot be both.*
+*RS2 runs this problem twice, once with a finite-element seepage field and once with the drawn
+piezometric line, and publishes an SSR for each. The piezometric case is the one built and locked
+here; the FE-seepage sub-case (vp077a) is built on the limit-equilibrium side only
+([VP77](rocscience.md#vp77)), where its Spencer factor is locked against Slide2's.*
 
 <!-- test: file=files/rocscience/vp077b.xlsx, type=mesh_elements, element_type=tri6, target_size=12.4, expected_elements=2223, benchmark=RS2-40-mesh -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=mesh_elements, element_type=tri6, target_size=8.0, expected_elements=5220, benchmark=RS2-40-mesh-fine -->
@@ -1656,34 +1650,35 @@ never scored against each other.
 
 **Input files:** [vp087.xlsx](files/rocscience/vp087.xlsx) (baseline) through
 [vp094.xlsx](files/rocscience/vp094.xlsx). Geotextile modeled as an FEM truss with the vendor
-`.fez` stiffness EA = 6300 kN/m (cbeam1). The corpus files also carry the vendor's tensile caps
-(T = 0 on the reinforced granular fill, 10 on the foundation, 2.5 on the blocks), its E = 50,000
-kPa and ν = 0.4 on all three materials, and the isotropic at-rest stress state every SSRM row on
-this page uses. Those caps decide which convergence criterion can bracket the wall: a T = 0 fill
-settles into a stationary state at elastic displacement scale, which a pure non-convergence
-criterion would read as collapse, where the default hybrid criterion requires displacement
-evidence before calling a trial failed. On the water variant (vp092) the reinforced fill is
+`.fez` stiffness EA = 6300 kN/m (cbeam1). The baseline and the vendor-section weak-foundation file
+(vp091_fem) carry the vendor's tensile caps (T = 0 on the reinforced granular fill, 10 on the
+foundation, 2.5 on the blocks) and its E = 50,000 kPa and ν = 0.4; the seven variant files leave
+the cutoff blank, which on a c = 0 fill is the same cap, since the Mohr-Coulomb apex c/tan φ that
+bounds a blank cutoff is itself zero there. Every row runs the isotropic at-rest stress state the
+SSRM rows on this page use. A fill that admits no tension decides which convergence criterion can
+bracket the wall: it settles into a stationary state at elastic displacement scale, which a pure
+non-convergence criterion would read as collapse, where the default hybrid criterion requires
+displacement evidence before calling a trial failed. On the water variant (vp092) the reinforced fill is
 modeled free-draining, pore pressure on the foundation only, following Leshchinsky & Han and
 Slide2's own model, which the LEM side of the file is locked against.
 
 Across the seven parametric variants (vp088–vp094 — fill quality, reinforcement length and type,
-foundation soil, water, surcharge, tier count), the SSRM reaches equilibrium on four. The other
-three — vp089, vp090 and vp093 — drop to the auto-bracket floor on the corpus mesh, and with
-feature-aware refinement near the reinforcement lines (`refine_factor`) they do equilibrate, but at
-refinement-sensitive rather than mesh-converged factors. The reinforcement is not what holds them
-back: on these wished-in-place walls the geotextile bars are not mobilized to their pull-out
-capacity at the incipient failure state.
+foundation soil, water, surcharge, tier count) the strength reduction brackets a factor on the
+corpus mesh in every case. On these wished-in-place walls the geotextile bars are not mobilized to
+their pull-out capacity at the incipient failure state, so the pull-out envelope is not what sets
+those factors.
 
-Nor is the difference in element order, the facing or the tension model. RS2 meshes these walls
-with `lst_element`, the same 6-node quadratic triangle XSLOPE uses; its `Blocks` material is
-ordinary Mohr-Coulomb with `Apply_SSR` on rather than a linear-elastic "can't-fail" zone, so the
-facing is not holding the mechanism up; and applying the vendor's Rankine cutoff T = c faithfully
-(`tension_cutoff_by_material`) leaves the three variants lower still and no less
-refinement-dependent. What governs is a **shear localization through the c = 0 reinforced granular
-fill**: a cohesionless mass has no intrinsic length scale, so the failing band collapses onto the
-element size and the factor tracks the mesh rather than converging. Any lock would be a lock on the
-mesh choice, so no row in the family carries one, and the baseline carries the same sensitivity in
-milder form.
+Neither the element order, the facing nor the tension model is what those factors follow. RS2
+meshes these walls with `lst_element`, the same 6-node quadratic triangle XSLOPE uses; its `Blocks`
+material is ordinary Mohr-Coulomb with `Apply_SSR` on rather than a linear-elastic "can't-fail"
+zone, so the facing is not holding the mechanism up; and declaring the vendor's Rankine cutoff
+T = c on every material (`tension_cutoff_by_material`) leaves the fill's cap where the apex already
+puts it and moves no variant by more than one cell of the bisection's own tolerance. What remains
+is a **shear localization through the c = 0 reinforced granular fill**: a cohesionless mass has no
+intrinsic length scale, so on several of the variants the failing band collapses onto the element
+size and the factor follows the mesh instead of settling. Together with the split-interface wall
+RS2 publishes its own factors from, that is why no row in the family carries a lock, and the
+baseline carries the same sensitivity in milder form.
 
 #### The seven parametric variants, one by one
 
@@ -1693,27 +1688,28 @@ treatment; what follows is only what distinguishes each one and where it ended u
 
 #### RS2-49: Geotextile wall, fill quality (vp088) {#rs2-49}
 
-The reinforced fill's strength is reduced relative to the baseline. The SSRM reaches equilibrium,
-but the c = 0 fill localization described above means the value tracks the mesh rather than
-converging, so no comparison is derived and the variant is reported without a lock.
+The reinforced fill's strength is reduced relative to the baseline. The strength reduction
+brackets a factor, but the c = 0 fill localization described above means the value follows the mesh
+rather than settling, so no comparison is derived and the variant is reported without a lock.
 
 ![RS2-49: reduced-strength fill (vp088, φ = 25°, Ta = 22 kN/m) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The mechanism stays inside the reinforced mass, as on the baseline](images/RS2-49.png)
 
 #### RS2-50: Geotextile wall, 4.2 m reinforcement (vp089) {#rs2-50}
 
-The geotextile layers are shortened. No equilibrium is reached on the corpus mesh; with
-feature-aware refinement near the reinforcement lines the run does equilibrate, but at two levels
-far enough apart to be refinement sensitivity rather than convergence, so the variant is reported
-without a lock.
+The geotextile layers are shortened. The strength reduction brackets a factor on the corpus mesh,
+and — unlike the fill-quality, water and tier-count variants — that factor is unchanged by a step of
+refinement. The vendor's own factor comes from the split-interface wall, so nothing is scored
+against it and the variant is reported without a lock.
 
-![RS2-50: shortened 4.2 m geotextile layers (vp089, Ta = 11.4 kN/m) — FEM inputs. The strength reduction reaches no equilibrium on the corpus mesh, so there is no failure mechanism to plot; the panel shows the model the reported refinement runs were made on](images/RS2-50.png)
+![RS2-50: shortened 4.2 m geotextile layers (vp089, Ta = 11.4 kN/m) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. Shortening the sheets pulls the mechanism back into the reinforced mass behind their ends](images/RS2-50.png)
 
 #### RS2-51: Geotextile wall, dual reinforcement type (vp090) {#rs2-51-wall}
 
-Two geotextile grades in one wall. Same behavior as RS2-50 and more pronounced — the finer of the
-two refinements returns a collapse rather than a factor of safety. Reported without a lock.
+Two geotextile grades in one wall. Same behavior as RS2-50: it brackets on the corpus mesh and a
+step of refinement moves it by well under the spread the mesh-following variants show. Reported
+without a lock.
 
-![RS2-51: two geotextile grades in one wall (vp090, Ta = 11.0 kN/m on the lower seven layers, 7.5 kN/m above) — FEM inputs. The geometry is the baseline's; the two grades differ in tensile capacity and anchorage length, not in layout. No equilibrium is reached on the corpus mesh, so no failure mechanism is plotted](images/RS2-51-wall.png)
+![RS2-51: two geotextile grades in one wall (vp090, Ta = 11.0 kN/m on the lower seven layers, 7.5 kN/m above) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The geometry is the baseline's; the two grades differ in tensile capacity and anchorage length, not in layout](images/RS2-51-wall.png)
 
 #### RS2-52: Geotextile wall, weak foundation (vp091) {#rs2-52}
 
@@ -1736,9 +1732,8 @@ x = −1.6, can be seated for the LEM comparison. RS2's own #052 and the seven s
 are all the 24 m section, and it is built here too
 ([vp091_fem.xlsx](files/rocscience/vp091_fem.xlsx)). A bearing mechanism is sensitive to the run of
 ground in front of the toe, so the two sections could have been expected to differ widely; they do
-not, and the shorter one reads the lower of the two. The bearing capacity of a cohesionless
-foundation under a strength-reduced wall is mesh-dependent in XSLOPE, which is why neither reading
-is locked.
+not, and the shorter one reads the lower of the two. Neither is locked, because RS2's own factor
+comes from the split-interface wall and there is nothing to score against.
 
 ![RS2-52: cohesionless foundation (vp091, c = 0, φ = 18°), recorded beside RS2's own SSR 0.84 and Leshchinsky & Han's FLAC referee 0.86 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The strain band leaves the reinforced mass and runs down through the foundation to daylight beyond the toe: the bearing mechanism both codes find on this variant](images/RS2-52.png)
 
@@ -1746,23 +1741,23 @@ is locked.
 
 A pond against the wall. The reinforced granular fill is modeled free-draining, pore pressure on
 the foundation only, following Leshchinsky & Han and Slide2's own model rather than the vendor's
-whole-mesh alternative. It converges, to the highest factor in the family, but the same c = 0 fill
-localization makes the value track the mesh, so no comparison is derived and the variant is
+whole-mesh alternative. It brackets the highest factor in the family, but the same c = 0 fill
+localization makes the value follow the mesh, so no comparison is derived and the variant is
 reported without a lock.
 
 ![RS2-53: pond against the wall (vp092, piezometric line at y = 9 with a 3 m pond on the lower tier, Ta = 9.25 kN/m) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The reinforced fill is modeled free-draining, so pore pressure acts on the foundation only and the pond enters as a distributed load on the lower tier](images/RS2-53.png)
 
 #### RS2-54: Geotextile wall, crest surcharge (vp093) {#rs2-54}
 
-A surcharge on the wall crest. No equilibrium on the corpus mesh, and refinement recovers one only
-at the coarser of the two levels. Reported without a lock.
+A surcharge on the wall crest. It brackets on the corpus mesh, and it is the most
+refinement-sensitive member of the family. Reported without a lock.
 
-![RS2-54: 20 kPa surcharge on the uppermost tier (vp093, Ta = 10.0 kN/m) — FEM inputs. No equilibrium is reached on the corpus mesh, so there is no failure mechanism to plot; the panel shows the surcharge and the model the reported refinement run was made on](images/RS2-54.png)
+![RS2-54: 20 kPa surcharge on the uppermost tier (vp093, Ta = 10.0 kN/m) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The surcharge drives the band through the upper tiers of the reinforced mass](images/RS2-54.png)
 
 #### RS2-55: Geotextile wall, tier count (vp094) {#rs2-55}
 
-The number of wall tiers is varied. It converges, and as with RS2-49 and RS2-53 no comparison is
-derived, so it is reported without a lock.
+The number of wall tiers is varied. It brackets, and as with RS2-49 and RS2-53 the value follows
+the mesh, so no comparison is derived and it is reported without a lock.
 
 ![RS2-55: five 1.8 m tiers offset 0.6 m (vp094, Ta = 10.1 kN/m) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. Spreading the same 9 m of height over five tiers instead of three leaves the mechanism where the baseline puts it](images/RS2-55.png)
 

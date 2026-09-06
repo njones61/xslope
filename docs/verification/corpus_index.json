@@ -17550,7 +17550,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": false,
-        "k0": null,
+        "k0": 1.0,
         "line_loads": 0,
         "material_options": [
           "mc"
@@ -17580,8 +17580,8 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 25,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -17604,6 +17604,19 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP77: Thick-core dam, FE seepage vs. piezometric line (D&W Fig. 7.24)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp77"
+        },
+        {
+          "anchor": "rs2-40",
+          "checks": [
+            "RS2-40-seep",
+            "RS2-40-seep-d30"
+          ],
+          "level": 3,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-40: Dam with impermeable foundation (D&W Fig 7.24)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-40"
         }
       ],
       "topics": [
@@ -19039,7 +19052,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": false,
-        "k0": null,
+        "k0": 1.0,
         "line_loads": 0,
         "material_options": [
           "mc"
@@ -19075,8 +19088,8 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 25,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -19098,6 +19111,18 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
+        },
+        {
+          "anchor": "rs2-49",
+          "checks": [
+            "RS2-49"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "nearest-heading",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-49: Geotextile wall, fill quality (vp088)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-49"
         }
       ],
       "topics": [
@@ -19148,8 +19173,8 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 25,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -19185,7 +19210,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": false,
-        "k0": null,
+        "k0": 1.0,
         "line_loads": 0,
         "material_options": [
           "mc"
@@ -19221,8 +19246,8 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 25,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -19244,6 +19269,18 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
+        },
+        {
+          "anchor": "rs2-51-wall",
+          "checks": [
+            "RS2-51-wall"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "nearest-heading",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-51: Geotextile wall, dual reinforcement type (vp090)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-51-wall"
         }
       ],
       "topics": [
@@ -19294,8 +19331,8 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 25,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -19367,8 +19404,8 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 25,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -19441,8 +19478,8 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 25,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -19514,8 +19551,8 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 25,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -23823,7 +23860,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 572,
+    "tags": 576,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

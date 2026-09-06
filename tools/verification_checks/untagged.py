@@ -61,7 +61,7 @@ FS_LO, FS_HI = Decimal("0.10"), Decimal("10")
 #: What a number is NOT a factor of safety when it is followed by: a unit, a
 #: dimension, a scale.  Matched against the text immediately after the token.
 UNIT_AFTER = re.compile(
-    r"^\s*(?:%|°|″|'|\"|:|/|×|x\b|m\b|mm\b|cm\b|m²|m³|ft\b|ft²|ft³|in\b|s\b|"
+    r"^(?:\s*[-–]\s*\d+(?:\.\d+)?)?\s*(?:%|°|″|'|\"|:|/|×|x\b|m\b|mm\b|cm\b|m²|m³|ft\b|ft²|ft³|in\b|s\b|"
     r"kPa|MPa|psf|psi|pcf|ksi|kN|kNm|lb|kip|H\b|D\b|g\b|degrees?\b|"
     r"times\b|per\b|elements?\b|nodes?\b)")
 
@@ -72,8 +72,10 @@ UNIT_AFTER = re.compile(
 #: not measurements of anything and no tag would ever guard them.  Matched
 #: against the 24 characters before the token.
 LABEL_BEFORE = re.compile(
-    r"(?:Figs?\.?|Figures?|Table|Eq\.?|Equation|Problem|§|v|version|"
+    r"(?:Figs?\.?|Figures?|Table|Eq\.?|Equation|Problem|Examples?|ex\.|§|v|version|"
     r"Part|item|no\.?)\s*(?:\d+(?:\.\d+)?\s*[-–]\s*)?$|"
+    r"/\s*$|"
+    r"\b(?:coefficient of|equal to|exactly)\s*$|"
     r"\b(?:r_?u|r<sub>u</sub>|k_?c|k_?h|K0|A|n|ν|nu|ψ|psi|β|beta|σ_?F|"
     r"Poisson[’']?s ratio|coefficient|exponent)\s*[=≈]\s*$", re.I)
 
@@ -104,7 +106,7 @@ QUANTITY_HDR = re.compile(
     r"\b(?:heads?|pressures?|elevations?|el\.|suctions?|water table|phreatic|"
     r"water content|flow ?rates?|flows?|discharges?|fluxe?s?|inflow|outflow|"
     r"seepage|release point|conductivit(?:y|ies)|permeabilit(?:y|ies)|"
-    r"transmissivity|drawdown|isochrones?)\b", re.I)
+    r"transmissivity|drawdown|isochrones?|critical k|k꜀|k_?c|k_?h|seismic coefficient)\b", re.I)
 
 #: A column header that gives a unit instead of a name.  A column headed
 #: ``Z (ft)`` holds lengths whatever else the table is about.  Column headers

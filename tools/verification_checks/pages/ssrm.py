@@ -32,6 +32,9 @@ CONFIG = PageConfig(
     ],
 
     untagged_allow=[
+        # A dimensionless displacement E'*delta/(gamma*H^2) quoted from
+        # Griffiths & Lane's Example 1, not a factor of safety.
+        ('0.544', 'jumps from'),
         # Published values quoted in prose rather than tabulated in a source
         # column.  Griffiths & Lane's Table 2 trial grid (Example 1 reads their
         # iteration counts at F = 1.30 and 1.35); Taylor's (1937) classical

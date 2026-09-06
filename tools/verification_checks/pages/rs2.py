@@ -13,25 +13,17 @@ CONFIG = PageConfig(
 
     # Cross-scope comparisons: the two numbers live in different sentences, or
     # in a table the sentence refers to.  Each entry spells both out and is
-    # re-derived.  Eleven are deliberate vendor-against-vendor statements the
+    # re-derived.  Several are deliberate vendor-against-vendor statements the
     # page makes in its own voice rather than XSLOPE-against-source.
     #   (printed, distinctive substring of the line, value-for, value-against)
     whitelist=[
         ('+2.1', '[RS2-63](#rs2-63)', '1.409', '1.38'),
         ('+4.8', 'the other φ = 0 foundation problem', '1.477', '1.41'),
-        ('−1.7', 'All six cases land within', '1.091', '1.11'),
-        ('−2.3', 'is the widest of the five', '1.026', '1.05'),
         ('+9.0', 'is not a search that stopped early', '0.169', '0.155'),
-        ('+2.9', 'measurement of its zone here is', '1.07', '1.04'),
-        ('−2.3', 'case 4 (−2.3%) is the widest', '1.026', '1.05'),
-        ('−1.7', 'case 4 (−1.7%) is the widest', '1.091', '1.11'),
-        ('+2.7', 'all six within ±2.7%', '0.339', '0.33'),
+        ('+2.7', 'the three locks within ±2.7%', '0.339', '0.33'),
         ('−1.3', 'which XSLOPE sits', '1.323', '1.34'),
         ('+1.8', 'The same uncapped machinery is within 1.8%', '1.669', '1.64'),
         ('+3.2', 'baseline is within 3.2% at every frame', '1.713', '1.77'),
-        ('+7.7', '| Ordinary (OMS) |', '1.568', '1.456'),
-        ('+7.3', '| Bishop simplified |', '1.601', '1.492'),
-        ('+7.3', '| Spencer | 1.600', '1.600', '1.491'),
         ('+1.1', 'The two vendor numbers landing within', '1.9', '1.88'),
         ('+2.5', 'the three answers agree within', '1.25', '1.219'),
         ('+1.9', 'that rounding is worth', '0.997', '0.978'),
@@ -78,15 +70,14 @@ CONFIG = PageConfig(
         ('+0.8', 'land within 0.8%'),
         ('+2.2', 'that still lands within 2.2%'),
         ('+1.2', "locked, within 1.2% of RS2's own SSR"),
-        ('+2.3', "land within ±2.3% of RS2's M-C"),
-        ('+1.7', "land within ±1.7% of RS2's M-C"),
         ('+2.1', 'lands within 2.1% of'),
-        ('+2.3', "All five within ±2.3% of RS2's M-C"),
-        ('+1.7', "All six within ±1.7% of RS2's M-C"),
-        ('+2.7', 'all 17 cases land within ±2.7% of RS2'),
         ('+6', 'about 6% apart on cases 1 and 2'),
         ('+20', 'runs about 20% low'),
     ],
+
+    # Flac3D is one of the four programs the RS2-62 tables carry as published
+    # columns; the base authority vocabulary does not name it.
+    auth_hdr_extra=["Flac3D"],
 
     locked_value_re=r"(?:SSRM|Spencer|Bishop|k꜀|FS)\s+\**(\d+\.\d{3})",
 

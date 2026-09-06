@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "xslope"
 dynamic = ["version"]
-description = "Slope stability analysis (limit equilibrium and FEM) in Python."
+description = "Python package for seepage and slope stability analysis"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "Apache-2.0" }
 requires-python = ">=3.9"

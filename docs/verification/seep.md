@@ -26,7 +26,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 |---:|:-:|---|---|---|
 | [1](#verification-confined-radial) | 🟢 | Confined radial flow (quarter annulus) | Discharge q 28.5961 vs the exact Thiem solution 28.5960 (<0.01%) · max nodal head error 0.004 (0.02% of the total drop) | mesh-converged; quad8 and tri3 agree |
 | [2](#verification-sheetpile) | 🟢 | Partially penetrating sheetpile | s/T = 0.50: q 5.010 vs Pavlovsky's exact 5.000 (+0.2%) · s/T = 0.75: q 3.412 vs exact 3.403 (+0.3%) · wall-plane head below the tip 25.0000 vs exact 25 (0.0%) | error halves with refinement, converging from above |
-| [3](#verification-seep2d-johnson) | 🟢 | SEEP2D cross-check — Johnson Reservoir | Total discharge 1.9575 vs SEEP2D 1.9603 ft³/day per ft (−0.1%) · nodal-head RMS Δh 0.105 ft (0.2% of the 60 ft head range) | identical-mesh cross-check |
+| [3](#verification-seep2d-johnson) | 🟢 | SEEP2D cross-check — Johnson Reservoir | Total discharge 1.9546 vs SEEP2D 1.9544 ft³/day per ft (+0.0%) · nodal-head RMS Δh 0.037 ft (0.1% of the 60 ft head range) | identical-mesh cross-check |
 
 </div>
 

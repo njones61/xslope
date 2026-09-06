@@ -24,6 +24,7 @@ Run directly:  PYTHONPATH=. python3 test/tension_crack_symmetry_check.py
 
 import contextlib
 import copy
+import os
 import io
 
 from shapely.affinity import scale
@@ -33,7 +34,8 @@ from xslope.fileio import load_slope_data
 from xslope.slice import generate_slices
 from xslope.solve import oms, bishop, spencer, janbu, corps, lowe
 
-MODEL = "docs/lem/files/xslope_acads_simple.xlsx"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL = os.path.join(_REPO, "docs/lem/files/xslope_acads_simple.xlsx")
 TCRACK_DEPTH = 4.0
 TCRACK_WATER = 3.0
 METHODS = [("oms", oms), ("bishop", bishop), ("janbu", janbu),

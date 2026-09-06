@@ -20,6 +20,7 @@ Run directly:  PYTHONPATH=. python3 test/pile_symmetry_check.py
 """
 
 import copy
+import os
 
 import numpy as np
 from shapely.affinity import scale
@@ -29,7 +30,8 @@ from xslope.fileio import load_slope_data
 from xslope.slice import generate_slices
 from xslope.solve import oms, bishop, spencer, janbu, corps, lowe
 
-PILE_MODEL = "docs/lem/files/xslope_piles.xlsx"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PILE_MODEL = os.path.join(_REPO, "docs/lem/files/xslope_piles.xlsx")
 METHODS = [("oms", oms), ("bishop", bishop), ("spencer", spencer),
            ("janbu", janbu), ("corps", corps), ("lowe", lowe)]
 TOL_PCT = 0.05  # mirror asymmetry must be below this (well under arc-discretization noise)

@@ -21,49 +21,8 @@ value, never an SSR result in disguise.
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
 
-**Match to the published value**
+**Match to the published value** — the dots follow the corpus-wide [scoring convention](index.md#how-the-match-dots-are-scored), which defines the three bands and the same-method pairing rule.
 
-| Symbol | Meaning |
-|---|---|
-| 🟢 | within 3% of the vendor and/or reference figure |
-| 🟡 | 3–6% |
-| 🔴 | more than 6% |
-| 🟣 | in progress |
-| <span class="nodata">⊘</span> | insufficient data or out of scope |
-
-The dot scores the **match quality of what is locked**, not how much of a problem is built: a
-partly built problem is scored on the stages that are built, and the partial or blocked detail is
-in the row text. **Only same-method pairings derive a dot.** Most rows here are strength-reduction
-rows, and their pairing is XSLOPE's SSRM against RS2's own SSR column — the same method under two
-names; another program's strength-reduction factor (PLAXIS, Z-Soil, GEO FEM, a published FEM/FDM
-referee) pairs the same way. On the rows verified with limit equilibrium instead
-([#51](#p4-vp51), [#60](#rs2-60), [#61](#rs2-61) cases 1 and 3, [#68](#rs2-68)) the method the
-source itself names governs, and where the source names no method the fallback is XSLOPE's Spencer
-or Morgenstern-Price against the published headline value. A pairing whose two sides are different
-methods is reported as information only and never governs a dot; neither does an unconstrained
-XSLOPE search against an unconstrained search of the vendor's, since two programs' searches may
-settle on different mechanisms, nor a band stitched together from several programs' answers. A
-comparison is scored at the source's own precision, so a difference smaller than the source's
-printed or figure resolution counts as a match. The problem's *published* answer — the
-referee/consensus value, or the source author's own factor — is a reference authority in its own
-right whatever engine produced it, as is a closed form, which governs only where XSLOPE is itself
-within band of it. Where a row has more than one valid pairing the dot takes the **best of them**;
-where a row locks several cases, the worst locked case sets it. These conventions apply to every
-summary table on this page.
-
-**How the tables show it.** Every valid pairing carries its difference inline, in parentheses,
-computed source-relative, (XSLOPE − source) / source, to one decimal. Where a table gives each
-authority a column of its own the difference sits beside the value it is measured against —
-`RS2 SSRM 1.33 (−2.0%)`; where a table gives the authority one column and the readings several, it
-sits beside each reading instead. So a column carries a percentage exactly when it is a pairing the
-dot could rest on, and a column that is **cross-method** for the row shows bare values, because it
-is context rather than a pairing. Against a published *range* the entry reads `(inside)` where
-XSLOPE falls within it and otherwise carries the difference to the nearer bound. A source author's
-numbers fall on either side of that line depending on how the source published them: a single
-headline factor for the problem is the published answer and takes a percentage whatever engine
-produced it (Low's factor at [#19](#rs2-19), Perry's at [#30](#rs2-30)), while a per-method table
-from the same author is a set of method-specific values, so each entry stays bare (Yamagami &
-Ueta's Bishop, Fredlund & Krahn's four methods).
 
 **Which published number a row is scored against.** Rocscience ships *two* RS2 models for many of
 these problems: an RS2-native rebuild, published in Parts I–III and numbered by the RS2 problem

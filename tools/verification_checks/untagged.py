@@ -146,7 +146,7 @@ LOCK_KEYS = ("expected_fs", "expected", "fs_", "points")
 #: ``untagged_allow``.  Turning this on before that reading is done would push
 #: the pages toward blanket allowances, which is the opposite of what the check
 #: is for.  Flip it to True once each page's residue has been adjudicated.
-ENFORCING = False
+ENFORCING = True
 
 
 def _mask(text):

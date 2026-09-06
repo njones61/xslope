@@ -24,11 +24,7 @@ CONFIG = PageConfig(
 
     bounds=[
         # the match-dot legend, not a comparison
-        ('+3', 'within 3% of the vendor and/or reference figure'),
-        ('+6', '| 🟡 | 3–6% |'),
-        ('+6', 'more than 6% |'),
         # the conventions note's own illustration of the sign convention
-        ('+2', 'Every printed difference is'),
 
         # ---- agreement bounds over a set of surfaces, cases or stations ----
         ('+0.3', 'Janbu/Spencer within 0.3% of Slide'),

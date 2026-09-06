@@ -53,12 +53,8 @@ CONFIG = PageConfig(
     # factors: no pair exists to re-derive, so each is named here explicitly.
     bounds=[
         ('+7', 'the two published factors differ by up to 7%'),
-        ('−2.0', '`RS2 SSRM 1.33'),
         ('+4.2', 'lighter by section area'),
         ('+1.8', "the polygon's area is within"),
-        ('+3', 'within 3% of the vendor and/or reference figure'),
-        ('+6', '| 🟡 | 3–6% |'),
-        ('+6', 'more than 6% |'),
         ('+14', 'by 14% at 12.5 kPa'),
         ('+25', 'by 25% at 5 kPa'),
         ('+43', 'by 43% at 1 kPa'),

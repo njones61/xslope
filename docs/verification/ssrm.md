@@ -736,6 +736,8 @@ Cross-bearing against the paper's own limit-equilibrium solution:
 |---|---|---|---|
 | Spencer, full reservoir | 1.915 | 1.90 (+0.8%) | p. 400 |
 
+<!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.915, tolerance=0.005, benchmark=SSRM-2 -->
+
 *The dot is scored FE against FE, on the first two rows. Griffiths & Lane print their FE
 factors of safety for this example to 0.1.*
 
@@ -823,9 +825,8 @@ lower lobe is the branch Torggler's Fig. 14 reads, so it is the one paired above
 
 *The dot is scored on the two SSRM rows — FE against FE on the mechanism each
 engine finds for itself. The plate variant compared is the one without interfaces,
-because a plate sharing nodes with the soil is exactly XSLOPE's beam formulation;
-the interface variant reads 1.168 and Torggler reports the internal forces of the
-two as almost identical.*
+because a plate sharing nodes with the soil is exactly XSLOPE's beam formulation,
+and Torggler reports the internal forces of the two variants as almost identical.*
 
 Torggler's SLIDE Janbu row is the uncorrected simplified method and XSLOPE's Janbu
 carries the correction factor, so those two are not a pair and no delta is taken;
@@ -873,11 +874,10 @@ Excel input files: [xslope_torggler_3a_nopile.xlsx](../fem/files/xslope_torggler
 
 **Mesh convergence.** Torggler publishes his own mesh study (his Table 2: 1.106 at
 560 elements rising to 1.111 at 33,581), so the same question is answered here at
-three element sizes rather than at one:
+two element sizes rather than at one:
 
 | Target size | tri6 elements | SSRM FS, unsupported | SSRM FS, with plate |
 |---|---:|---:|---:|
-| 2.0 m | 860 | 1.155 | — |
 | 1.0 m | 3,345 | 1.136 | 1.195 |
 | 0.7 m | 6,793 | 1.129 | 1.195 |
 

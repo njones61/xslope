@@ -165,7 +165,7 @@ verifiable.
 <!-- test: file=files/rocscience/vp072b.xlsx, type=single_circle, num_slices=60, fs_oms=1.348, fs_bishop=1.572, fs_spencer=1.563, fs_mprice=1.564, benchmark=VP72-piezo-tan197 -->
 <!-- test: file=files/rocscience/vp073.xlsx, type=circular_search, num_slices=40, fs_bishop=1.766, fs_spencer=1.766, fs_janbu=1.733, benchmark=VP73 -->
 <!-- test: file=files/rocscience/vp102a.xlsx, type=circular_search, num_slices=40, fs_bishop=2.452, fs_spencer=2.451, benchmark=VP102-dry -->
-<!-- test: file=files/rocscience/vp102b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.720, fs_spencer=1.729, benchmark=VP102-steady -->
+<!-- test: file=files/rocscience/vp102b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.722, fs_spencer=1.731, benchmark=VP102-steady -->
 <!-- test: file=files/rocscience/vp103a.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.221, benchmark=VP103a-deep -->
 <!-- test: file=files/rocscience/vp103b.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.298, benchmark=VP103b-deep -->
 <!-- test: file=files/rocscience/vp103c.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.374, benchmark=VP103c-deep -->
@@ -207,17 +207,8 @@ verifiable.
 <!-- test: file=files/rocscience/vp022a.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.297, fs_bishop=1.380, fs_spencer=1.379, fs_mprice=1.370, benchmark=VP22-dry -->
 <!-- test: file=files/rocscience/vp022b.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.037, fs_bishop=1.121, fs_spencer=1.122, fs_mprice=1.112, benchmark=VP22-ru -->
 
-**Match to the published value**
+**Match to the published value** — the dots follow the corpus-wide [scoring convention](index.md#how-the-match-dots-are-scored), which defines the three bands and the same-method pairing rule.
 
-| Symbol | Meaning |
-|---|---|
-| 🟢 | within 3% of the vendor and/or reference figure |
-| 🟡 | 3–6% |
-| 🔴 | more than 6% |
-| 🟣 | in progress |
-| <span class="nodata">⊘</span> | insufficient data or out of scope |
-
-The dot scores the **match quality of what is locked**, not how much of a problem is built — a partly built problem is scored on the stages that are built, and the partial/blocked detail is in the row text. Where a row reports several limit-equilibrium methods, the comparison behind the dot is XSLOPE's Spencer or Morgenstern-Price value against the published one, unless the source itself names a method — then that method is compared like-for-like. **Only same-method pairings derive a dot.** Slide2's GLE and XSLOPE's Morgenstern-Price are different methods of the same family, not the same method, so an M-P-vs-GLE pairing (and any other pairing whose two sides are different methods) is reported as information only and never governs a dot; where the source names a method XSLOPE does not run, the fallback is XSLOPE's Spencer or Morgenstern-Price against the source's headline value. A closed-form or theoretical value is a first-class reference authority in its own right — same-method logic does not apply to it — so where a problem has both, the dot takes the **best of the valid pairings**: same-method vendor/reference pairings and the theory anchor. Where XSLOPE and the vendor each ran their *own* free search, the two searches are not an anchor for one another — the dot goes to the originating source's published value and, where the vendor prints its critical surface, to the vendor value on that surface. A comparison is scored at the source's own precision: where a value is printed rounded or read from a figure at a stated resolution, a difference smaller than that resolution counts as a match, and no dot rests on precision the source does not have. A source's single headline factor of safety is its published answer and takes a delta whatever engine produced it — carrying a delta is a separate question from governing the dot; where the same source prints a per-method table, each value is read like any other column — same-method entries pair and carry a delta, cross-method entries stay bare. Every printed difference is **relative to the source**, (XSLOPE − source) / source, so a −2.0% row reads "2% below the published value" whichever way the pair is written. Where a problem has more than one published vendor model, a row is scored against the number produced by the model its corpus file was built from; the [RS2 corpus page](rs2.md) works through the case that arises most often here.
 
 <div class="corpus-summary match" markdown>
 
@@ -324,7 +315,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [99](#vp99) | 🟢 | Embankment dam, (3) materials, rapid drawdown, water table | Spencer 1.527 vs Slide 1.534 (−0.5%) · Spencer 1.527 vs DWW 1.56 (−2.1%) | geometry re-pinned from the vendor GeoStudio model |
 | [100](#vp100) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Bishop 1.201 vs Morgenstern chart 1.20 (+0.1%) · Bishop 1.201 vs Slide 1.212 (−0.9%) | runs single-stage |
 | [101](#vp101) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Bishop 1.416 vs Slide 1.417 (−0.1%) · Bishop 1.416 vs Morgenstern chart 1.41 (+0.4%) |  |
-| [102](#vp102) | 🟢 | Embankment dam, homogenous, rapid drawdown | dry: Spencer 2.451 vs Slide 2.455 (−0.2%) · steady state (t = 0): Spencer 1.729 vs Slide 1.745 (−0.9%) · drawdown at 100 h: Spencer 1.814 vs Slide 1.867 (−2.8%) | the 100 h frame is the widest of the 60–1500 h transient series, which runs from −2.8% to +0.2% against the Slide2 Spencer column, and sets the dot. The unsaturated band width was tested as the cause of the early-frame shortfall and is worth a small fraction of it. |
+| [102](#vp102) | 🟢 | Embankment dam, homogenous, rapid drawdown | dry: Spencer 2.451 vs Slide 2.455 (−0.2%) · steady state (t = 0): Spencer 1.731 vs Slide 1.745 (−0.8%) · drawdown at 100 h: Spencer 1.814 vs Slide 1.867 (−2.8%) | the 100 h frame is the widest of the 60–1500 h transient series, which runs from −2.8% to +0.2% against the Slide2 Spencer column, and sets the dot. The unsaturated band width was tested as the cause of the early-frame shortfall and is worth a small fraction of it. |
 | [103](#vp103) | 🟢 | Undrained slope, multi-model optimization (MMO) | deep, P = 1.4: Spencer 1.221 vs Slide2 1.215 (+0.5%) · P = 1.5: Spencer 1.298 vs Slide2 1.290 (+0.6%) · P = 1.6: Spencer 1.374 vs Slide2 1.366 (+0.6%) · shallow: Spencer 1.322 vs Slide2 1.324 (−0.2%) | **built** (4 files, both mechanisms); the deep→shallow switch lands in Slide2's own interval |
 | [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.144 vs Slide2 uni-modal 0.140 (+2.9%) | **built** (3 of 4 scenarios); the Newmark displacement is reproduced by a benchmark diagnostic (−0.5% at Slide2's K<sub>y</sub>), not an XSLOPE mode |
 | [105](#vp105) | <span class="nodata">⊘</span> | Anisotropic surface, multi-modal optimization (MMO) |  | *blocked* — needs an orientation-dependent strength model |
@@ -2330,7 +2321,7 @@ Slide #102 / Huang & Jia (2008): a homogeneous earth dam (c' = 13.8 kPa, φ' = 3
 | Case | Method | XSLOPE | Slide | Huang & Jia |
 |---|---|---|---|---|
 | Dry | Bishop / Spencer | 2.452 / 2.451 | 2.455 (−0.1% / −0.2%) | 2.43 (+0.9% / +0.9%) |
-| Steady state (t = 0) | Bishop / Spencer | 1.720 / 1.729 | 1.745 (−1.4% / −0.9%) | 1.70 (+1.2% / +1.7%) |
+| Steady state (t = 0) | Bishop / Spencer | 1.722 / 1.731 | 1.745 (−1.3% / −0.8%) | 1.70 (+1.3% / +1.8%) |
 
 *Both critical surfaces are shallow wedges on the downstream face, the face whose slope the rounded labels change. Both sit about 1–2% above Huang & Jia's own values.*
 

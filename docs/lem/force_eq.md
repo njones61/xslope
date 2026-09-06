@@ -294,8 +294,10 @@ methods satisfy only horizontal force equilibrium, they are unreliable on $\phi 
 vertical load (for example a submerged slope with ponded water modeled as a distributed load). In that
 configuration the horizontal force balance can be satisfied at a factor of safety several times larger than the
 true value — the method returns a genuine but grossly non-conservative root, not a numerical failure, so it is not
-caught by convergence checks. On a submerged $\phi = 0$ test slope the Corps and Lowe & Karafiath factors of safety
-exceed the moment-method value (Ordinary = Bishop = Spencer) by a factor of three to five. Use a moment-satisfying
+caught by convergence checks. On the submerged $\phi = 0$ sample, evaluated on the model's own specified circle, the
+Corps and Lowe & Karafiath factors of safety are three and nearly six times the moment-method value (Ordinary = Bishop
+= Spencer, which coincide on a $\phi = 0$ circle); each searching for its own critical circle they still read well
+above it — see [sample problem 4](samples.md#4-submerged-slope). Use a moment-satisfying
 method (Bishop, Spencer, Morgenstern-Price) for undrained or heavily surcharged slopes; the force-equilibrium
 methods are appropriate for drained, frictional materials.
 

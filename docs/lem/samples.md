@@ -516,10 +516,13 @@ attractive while a shallower mechanism governs. Checking that a stabilized slope
 cannot fail *around* its piles on a shallower surface is part of pile design.
 
 Grid seeding is not a universal upgrade, however: swept across the whole sample
-library, it drives the simplified and force-only methods onto exactly the
-degenerate slivers this section warns about (Janbu collapsing to near-zero on a
-few-foot sliver, Corps dropping below OMS), because the global sweep finds the
-mathematical minimum of each method's equation with no regard for physical sense.
+library it lands the **force-equilibrium** methods on circles where their own
+factor of safety drops far below every other method's on the identical slices —
+below the Ordinary method's on the eight-layer slope, the earth dam and the
+tension-crack model, on full-size surfaces rather than slivers. The force
+equilibrium closure has one root between every pair of its poles (see
+[Force Equilibrium Methods](force_eq.md#solving-for-the-factor-of-safety)), and the wider a sweep
+searches the more of them it reaches.
 The tabulated sample values therefore remain single-seed by deliberate choice, and
 the working practice is this: run the free search, then cross-check
 with `seed='grid'` and with tangent-seeded circles at each candidate depth, and

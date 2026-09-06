@@ -272,7 +272,7 @@ verifiable.
 | [56](#vp56) | 🟢 | Slope, homogenous, water table, tension crack | Spencer 1.288 vs Slide 1.290 (−0.2%) · Bishop 1.283 vs Slide 1.285 (−0.2%) |  |
 | [57](#vp57) | 🟢 | Slope, (2) materials, water table, tension crack, composite surfaces | composite: Spencer 1.396 vs Slide 1.400 (−0.3%) · circles-only: Spencer 1.419 vs Slide 1.422 (−0.2%) |  |
 | [58](#vp58) | 🟢 | Retaining wall, (8) materials, water table, grouted tieback | Spencer 1.140 vs Slide 1.145 (−0.4%) · Spencer 1.140 vs UTEXAS4 1.14 (0.0%) |  |
-| [59](#vp59) | 🟢 | Retaining wall, homogenous, water table, grouted tieback | Corps / Lowe 0.577 vs Slide 0.588 (−1.9%) | **built** (Janbu/Corps); Spencer/M-P are inadmissible on this surface |
+| [59](#vp59) | 🟢 | Retaining wall, homogenous, water table, grouted tieback | Corps / Lowe 0.577 vs Slide 0.588 (−1.9%) | **built** (Janbu/Corps); Spencer has no solution on this surface |
 | [60](#vp60) | 🟢 | Retaining wall, (2) materials, tension crack, distributed load, soil nails | Spencer 1.010 vs Slide 1.009 (+0.1%) |  |
 | [61](#vp61) | 🟢 | Slope, homogenous, composite surfaces | power curve: Spencer 1.466 vs Slide 1.468 (−0.1%) · Mohr-Coulomb: Spencer 1.367 vs Slide 1.366 (+0.1%) |  |
 | [62](#vp62) | 🟢 | Slope, homogenous, ru pore pressure, seismic | dry, k<sub>c</sub> = 0.432: Spencer 1.001 vs Loukidis 1.000 (+0.1%) · r<sub>u</sub> = 0.5, k<sub>c</sub> = 0.132: Spencer 1.001 vs Loukidis 1.000 (+0.1%) | FS should be 1.0 at k<sub>c</sub> |
@@ -281,7 +281,7 @@ verifiable.
 | [65](#vp65) | 🟢 | Embankment, (4) materials, water table, ponded water | Bishop 2.725 vs Slide 2.716 (+0.3%) · Spencer 2.748 vs Slide 2.736 (+0.4%) |  |
 | [66](#vp66) | 🟢 | Embankment, (4) materials, water table, ponded water | Spencer 2.258 vs Slide 2.307 (−2.1%) · Spencer 2.258 vs USACE 2.30 (−1.8%) |  |
 | [67](#vp67) | 🟢 | Embankment, (2) materials | Spencer 1.316 vs Slide 1.328 (−0.9%) · Spencer 1.316 vs USACE 1.33 (−1.1%) |  |
-| [68](#vp68) | 🟢 | Embankment, (3) materials, ponded water | Bishop 1.234 vs Slide 1.241 (−0.6%) | Spencer's admissibility guard declines this surface |
+| [68](#vp68) | 🟢 | Embankment, (3) materials, ponded water | Bishop 1.234 vs Slide 1.241 (−0.6%) | Spencer's base-tension guard declines this surface |
 | [69](#vp69) | 🟢 | Embankment, (2) materials, water table, ponded water | Spencer 2.013 vs Slide 2.026 (−0.6%) · Bishop 1.999 vs USACE 2.01 (−0.5%) |  |
 | [70](#vp70) | 🟢 | Submerged slope, homogenous, water table, ponded water | pool +30 ft: Spencer 1.593 vs Slide 1.599 (−0.4%) · pool +60 ft: Spencer 1.593 vs Slide 1.599 (−0.4%) | identical FS at both pools — the depth-independence reproduces exactly |
 | [71](#vp71) | 🟢 | Slope, homogenous, finite element groundwater seepage analysis, water table | FE seepage: Spencer 1.132 vs Slide 1.141 (−0.8%) · piezometric line: Spencer 1.132 vs Slide 1.142 (−0.9%) | the two pore-pressure models agree with each other |
@@ -1095,9 +1095,9 @@ published probabilities themselves differ by 13× — W&H's point estimate 4.55�
 Monte-Carlo 3.55×10⁻³ — so at a COV of 124% the sampling treatment of the φ ≥ 0 bound dwarfs the
 estimator choice. `reliability_mc` carries the case past that boundary, truncating the negative φ
 draws at zero as the published samplers do, and lands inside the band the three published
-estimates span. It is reported rather than locked, because at that COV the admissible subset
-shifts with solver convergence on the pathological draws; the deterministic factor of safety is
-the locked benchmark.*
+estimates span. It is reported rather than locked because the two published probabilities are
+13× apart, so there is no single target to lock a sampled probability against; the deterministic
+factor of safety is the locked benchmark.*
 
 ![vp034: inputs and representative solution](images/vp034.png)
 
@@ -1667,8 +1667,9 @@ phreatic-inclination correction Slide and XSTABL apply on steeply inclined water
 | Ordinary | — | 0.859 | — | — | — |
 
 *This problem was built to stress reinforced-slope codes and it shows: the published Bishop
-values alone span 0.56–0.74. On this surface XSLOPE's Spencer and Morgenstern–Price refuse the
-solution as inadmissible — base normals near the wall go into tension — and Bishop and the Ordinary
+values alone span 0.56–0.74. Spencer finds no solution on this surface: its force and moment
+residuals stay bounded away from zero over the whole admissible range of F and θ, so the single
+constant interslice inclination admits no equilibrium here. Bishop and the Ordinary
 method do not apply to a non-circular polyline, so the force-equilibrium family carries the lock.
 The four sources publish Janbu simplified where XSLOPE reports the f₀-corrected value, so that row
 is a cross-method bearing.*
@@ -1836,7 +1837,7 @@ Slide #68 / USACE EM 1110-2-1902 example E-10: an undrained three-layer slope (c
 | Bishop | 1.234 | 1.241 (−0.6%) | 1.33 (−7.2%) |
 | Morgenstern-Price | 1.234 | 1.244 (GLE — cross-method) | — |
 
-*Slide notes the same offset against the USACE chart solution. Spencer's admissibility guard declines this surface (base tension at the φ=0 crest slices); M-P carries the complete-equilibrium comparison.*
+*Slide notes the same offset against the USACE chart solution. Spencer's base-tension guard declines this surface (base tension at the φ=0 crest slices); the root it declines is the 1.234 Bishop and Morgenstern-Price return, so M-P carries the complete-equilibrium comparison.*
 
 ![vp068: inputs and representative solution](images/vp068.png)
 

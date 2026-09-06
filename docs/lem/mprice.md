@@ -277,11 +277,13 @@ Morgenstern–Price and the force-equilibrium methods share.
 A hallmark of the Morgenstern–Price method is that the factor of safety is nearly
 independent of the assumed interslice force function. On a smooth circular surface
 the spread between `constant` and `half_sine` is typically a few hundredths of a
-percent. The spread is somewhat larger — around 1 to 1.5% — on **non-circular
+percent. The spread is somewhat larger — up to about 2% — on **non-circular
 surfaces that run along a thin weak layer**, where the sharp kinks in the slip
 surface make the interslice force distribution matter more. This is expected
-behavior, not a defect: it reflects genuine sensitivity of the mechanism, and even
-there the factor of safety stays within about 1% of Spencer's value. The interslice
+behavior, not a defect: it reflects genuine sensitivity of the mechanism, and it
+does not shrink under refinement — on the shipped weak-layer models the spread is
+unchanged from 30 slices to 240. `constant` reproduces Spencer exactly, so the
+spread against Spencer is the same number. The interslice
 distribution itself (captured by $\lambda$) is more sensitive to $f(x)$ than the
 factor of safety is.
 

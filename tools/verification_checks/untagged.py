@@ -19,6 +19,27 @@ after the section's own inputs, geometry, dimensions and percentages are taken
 out of the running.  A companion measurement that is worth keeping earns its
 own tag; the rest is trimmed with the prose that exists to carry it.
 
+Two of the pages verify the seepage solver, whose published quantities are
+heads, pressures and flow rates.  A solved head of 4.054 m and a factor of
+safety of 1.054 are the same shape, so those pages would otherwise be read as
+one long companion measurement.  Two rules keep the check on the quantity it is
+named for, and both are general — a property of the section or of the table, not
+a list of numbers:
+
+* **A section whose locks are all seepage locks guards no factor of safety.**
+  The tag types a section carries (its own, a page-level bank tag naming a file
+  it links, or another page's tag on that same file) say what its numbers are.
+  Where every one of them is a seepage type — ``seep``, ``seep_head``,
+  ``tseep_head``, ``seep_elements`` — there is no factor of safety in the
+  section to be untagged, and its head-shaped numbers are heads.  One LEM or FEM
+  lock anywhere in the section puts it back in the running.
+* **A table cell the page has labeled as a head, a pressure or a flow rate is
+  not a factor of safety.**  A column header, or a row's leading label, names
+  what the numbers under or beside it are; where that name is a seepage
+  quantity or a physical unit, its cells are read as that quantity.  A column or
+  a table that also names a factor of safety keeps every cell in the running, so
+  a mesh-sweep or depth-cutoff row cannot exempt itself by its own label.
+
 Usage: python -m tools.verification_checks.untagged <page.md>
 """
 import re
@@ -61,6 +82,49 @@ LABEL_BEFORE = re.compile(
 #: beside them.
 COORD_FIRST = re.compile(r"^\s*,\s*[-−(]?\d")
 COORD_SECOND = re.compile(r"\(\s*[-−]?\d+(?:\.\d+)?\s*,\s*$")
+
+#: Tag types whose locked quantity is a head, a pressure or a flow rate.  A
+#: section that carries only these locks nothing shaped like a factor of safety,
+#: because the solver under test does not compute one.
+SEEPAGE_TYPES = {"seep", "seep_head", "tseep_head", "seep_elements"}
+
+#: A physical unit, and a unit expression built from one: ``m``, ``kPa``,
+#: ``m³/(s·m)``, ``ft³/day per ft``.  A number carrying one of these is a
+#: measurement of something dimensional, which a factor of safety is not.
+_UNIT = (r"(?:mm|cm|km|m[²³]?|ft[²³]?|in|s|min|hr|h|d|day|yr|"
+         r"kPa|MPa|psf|psi|pcf|decades)")
+_UNIT_EXPR = (rf"{_UNIT}(?:\s*[/·]\s*\(?\s*{_UNIT}(?:\s*[/·]\s*{_UNIT})?\s*\)?)*"
+              rf"(?:\s+per\s+{_UNIT})?")
+
+#: A table header cell, or a row's leading label, that NAMES its numbers as a
+#: head, a pressure, a flow rate or a related seepage quantity.  Read only in a
+#: header or a label — never in prose — so it says what a column or a row IS,
+#: not what a sentence happens to mention.
+QUANTITY_HDR = re.compile(
+    r"\b(?:heads?|pressures?|elevations?|el\.|suctions?|water table|phreatic|"
+    r"water content|flow ?rates?|flows?|discharges?|fluxe?s?|inflow|outflow|"
+    r"seepage|release point|conductivit(?:y|ies)|permeabilit(?:y|ies)|"
+    r"transmissivity|drawdown|isochrones?)\b", re.I)
+
+#: A column header that gives a unit instead of a name.  A column headed
+#: ``Z (ft)`` holds lengths whatever else the table is about.  Column headers
+#: only: a ROW label ending in a unit is normally the row's own input — the
+#: "depth cutoff 20 m" of a sweep — and says nothing about the cells beside it.
+#: The unit must be the whole of a parenthetical or the end of the header, so
+#: "(measured, not locked)" is not read as metres.
+UNIT_HDR = re.compile(rf"\(\s*{_UNIT_EXPR}\s*\)|[,\s]{_UNIT_EXPR}\s*$", re.I)
+
+#: ... and a header or label that names a factor of safety, which overrides it.
+#: A "depth cutoff" or "mesh sweep" row of factors of safety is exactly the
+#: companion measurement this check exists to find, so no label may exempt one,
+#: and one such column withdraws the row-label reading for the whole table.
+FS_HDR = re.compile(
+    r"\b(?:FS|F\.?S\.?|FOS|SRF|SSRM?|SF|factors? of safety|"
+    r"strength reduction)\b")
+
+#: A markdown table's rule line, which is what separates a header row from the
+#: body rows beneath it.
+TABLE_SEP = re.compile(r"^\s*\|[\s:|-]*-{2,}[\s:|-]*\|\s*$")
 
 #: Spans whose numbers are not prose: inline code, math, link targets, image
 #: paths, HTML comments (a test tag is one).  Masked to spaces so every offset
@@ -157,16 +221,17 @@ def source_values(lines, sec, auth_hdr):
 
 
 def corpus_locks():
-    """Every verification page's locks, keyed by the input file they name.
+    """Every verification page's locks and tag types, keyed by the input file.
 
     A page routinely restates a value another page locks — geostudio's ACADS
     rows are Rocscience's models, and the same workbook is tagged there.  The
     number is tag-guarded either way, so a section that names the file gets the
-    benefit of its lock wherever the tag lives.
+    benefit of its lock wherever the tag lives.  The tag's ``type`` travels with
+    it, because it is what says whether the quantity is a factor of safety.
     """
     import glob
     import os
-    out = {}
+    locks, types = {}, {}
     here = os.path.dirname(os.path.abspath(__file__))
     repo = os.path.dirname(os.path.dirname(here))
     for page in glob.glob(os.path.join(repo, "docs", "verification", "*.md")):
@@ -174,14 +239,60 @@ def corpus_locks():
             kv = _tag_kv(line)
             if not kv or "file" not in kv:
                 continue
-            out.setdefault(os.path.basename(kv["file"]), []).extend(_locked(kv))
-    return out
+            base = os.path.basename(kv["file"])
+            locks.setdefault(base, []).extend(_locked(kv))
+            types.setdefault(base, set()).add(kv.get("type", ""))
+    return locks, types
+
+
+def _cells(line):
+    """(text, start, end) for each pipe-delimited cell of a table row."""
+    bars = [i for i, ch in enumerate(line) if ch == "|"]
+    return [(line[a + 1:b], a + 1, b) for a, b in zip(bars, bars[1:])]
+
+
+def quantity_spans(lines, sec):
+    """Character spans of table cells the page has labeled as a seepage quantity.
+
+    A column header, or a row's leading label, names what the numbers under or
+    beside it are.  Where that name is a head, a pressure or a flow rate — or,
+    for a column, a physical unit — the cells hold no factor of safety however
+    they are written.  A column whose header names a factor of safety is never
+    exempt, and one such column anywhere in the table also withdraws the
+    row-label reading, so a mesh-sweep or depth-cutoff row of factors of safety
+    stays in the running whatever its own label says.
+    """
+    spans, i = {}, sec[0]
+    while i < sec[1] - 1:
+        if "|" not in lines[i] or not TABLE_SEP.match(lines[i + 1]):
+            i += 1
+            continue
+        hdr = _cells(lines[i])
+        j = i + 2
+        rows = []
+        while j < sec[1] and lines[j].lstrip().startswith("|"):
+            rows.append(j)
+            j += 1
+        fs_cols = {k for k, (t, _, _) in enumerate(hdr) if FS_HDR.search(t)}
+        q_cols = {k for k, (t, _, _) in enumerate(hdr)
+                  if k not in fs_cols
+                  and (QUANTITY_HDR.search(t) or UNIT_HDR.search(t))}
+        for r in rows:
+            cells = _cells(lines[r])
+            label = cells[0][0] if cells else ""
+            whole = (not fs_cols and not FS_HDR.search(label)
+                     and QUANTITY_HDR.search(label))
+            for k, (_, a, b) in enumerate(cells):
+                if k not in fs_cols and (whole or k in q_cols):
+                    spans.setdefault(r, []).append((a, b))
+        i = max(j, i + 1)
+    return spans
 
 
 def run(path, cfg, report=print):
     raw = open(path).read().replace(MINUS, "-")
     lines = raw.split("\n")
-    corpus = corpus_locks()
+    corpus, corpus_types = corpus_locks()
     auth_hdr = re.compile(
         AUTH_HDR_BASE + ("|" + "|".join(cfg.auth_hdr_extra)
                          if cfg.auth_hdr_extra else ""), re.I)
@@ -209,25 +320,37 @@ def run(path, cfg, report=print):
         if kv is None or any(s[0] <= i < s[1] and s[2] != "(preamble)"
                              for s in secs):
             continue
-        page_locks.append((kv.get("file", ""), _locked(kv)))
+        page_locks.append((kv.get("file", ""), _locked(kv), kv.get("type", "")))
 
     allow = list(cfg.untagged_allow)
     fired, flags, scanned = set(), [], 0
 
     for sec in secs:
-        locks = []
+        locks, types = [], set()
         for i in range(sec[0], sec[1]):
             kv = _tag_kv(lines[i])
             if kv:
                 locks += _locked(kv)
+                types.add(kv.get("type", ""))
         body_text = "\n".join(lines[sec[0]:sec[1]])
-        for f, ls in page_locks:
+        for f, ls, t in page_locks:
             if f and f in body_text:
                 locks += ls
+                types.add(t)
         for f, ls in corpus.items():
             if f in body_text:
                 locks += ls
+                types |= corpus_types.get(f, set())
+
+        # A section whose every lock is a seepage lock guards no factor of
+        # safety: the solver under test computes heads, pressures and flow
+        # rates, which are written the way a factor of safety is.  One LEM or
+        # FEM lock in the section puts it back in the running.
+        if types and types <= SEEPAGE_TYPES:
+            continue
+
         srcs = source_values(lines, sec, auth_hdr)
+        qspans = quantity_spans(lines, sec)
 
         for i in range(sec[0], sec[1]):
             line = lines[i]
@@ -252,6 +375,9 @@ def run(path, cfg, report=print):
                 if COORD_SECOND.search(before) or (
                         before.rstrip().endswith("(") and COORD_FIRST.match(after)):
                     continue
+                if any(a <= m.start() and m.end() <= b
+                       for a, b in qspans.get(i, ())):
+                    continue      # the column or the row label says what it is
                 scanned += 1
                 if any(abs(v - lv) <= tol for lv, tol in locks):
                     continue

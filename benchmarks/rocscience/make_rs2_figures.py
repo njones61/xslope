@@ -103,13 +103,14 @@ TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 # reported-not-locked row still gets a figure instead of silently having none.
 #
 # The multi-tiered geotextile wall family (RS2-48–55, Leshchinsky & Han 2004) is the
-# case in point: no row in it is locked. The baseline's SSR row is not attempted (RS2
-# splits that mesh at the sheets and joins it with slip interfaces, so the page carries
-# no figure for it), and the seven parametric variants are reported. All eight share
-# what was the baseline's model settings — 1.0 m tri6 mesh, the
-# vendor's isotropic at-rest field stress (k0 = 1) and static tensile caps
-# (tension_srf off) — but the variants run the auto bracket rather than the baseline's
-# narrow one, because the family spans 0.76–1.10.
+# case in point. The baseline's SSR row is not attempted (RS2 splits that mesh at the
+# sheets and joins it with slip interfaces, so the page carries no figure for it); of
+# the seven parametric variants, the two that hold their factor across a refinement
+# step are locked and reach this script through their tags, and the five that follow
+# the mesh are reported and registered below. All eight share what was the baseline's
+# model settings — 1.0 m tri6 mesh, the vendor's isotropic at-rest field stress
+# (k0 = 1) and static tensile caps (tension_srf off) — but the variants run the auto
+# bracket rather than the baseline's narrow one, because the family spans 0.74–1.16.
 #
 _WALL = dict(element_type='tri6', target_size='1.0', tolerance='0.02',
              f_min='0.5', f_max='3.0', max_iter='16000',
@@ -123,9 +124,7 @@ EXTRA_CASES = [
      'element_type': 'tri6', 'target_size': '6.0', 'tolerance': '0.02',
      'f_min': '1.4', 'f_max': '2.8', 'max_iter': '16000',
      'tension_srf': 'true', 'k0': '1'},
-    {**_WALL, 'file': 'files/rocscience/vp088.xlsx', 'benchmark': 'RS2-49'},
     {**_WALL, 'file': 'files/rocscience/vp089.xlsx', 'benchmark': 'RS2-50'},
-    {**_WALL, 'file': 'files/rocscience/vp090.xlsx', 'benchmark': 'RS2-51-wall'},
     {**_WALL, 'file': 'files/rocscience/vp091.xlsx', 'benchmark': 'RS2-52'},
     {**_WALL, 'file': 'files/rocscience/vp092.xlsx', 'benchmark': 'RS2-53'},
     {**_WALL, 'file': 'files/rocscience/vp093.xlsx', 'benchmark': 'RS2-54'},
@@ -148,6 +147,11 @@ EXTRA_CASES = [
 # both ways: an entry naming a row that is not registered, or a row that HAS a PNG,
 # is reported as a DEAD exemption and fails the audit exactly like a missing figure.
 EXPECTED_NO_FIGURE = {
+    # RS2-40's FE-seepage case under the depth filter: the filtered run reads one cell
+    # of its own bracket above the unconstrained one and selects the same mechanism,
+    # which RS2-40-seep.png already draws (values per the page tags).
+    'RS2-40-seep-d30': 'same mechanism as the unconstrained run in RS2-40-seep.png; the depth filter has no skin to remove',
+
     # RS2-64 — C3 and C5 are the second and third short-term Original slopes. All
     # three lock unconstrained on a simple convex profile and fail by the same deep
     # rotation; C1 is figured.
@@ -195,6 +199,10 @@ EXPECTED_NO_FIGURE = {
 SIDECAR_STEM = {
     'RS2-4-zone': 'vp005_zone',
     'RS2-40-deep': 'vp077b_deep',
+    # vp077a ships the tri3 seepage mesh and field its LEM locks read; the SSRM row
+    # solves the seepage again on its own tri6 mesh, so its sidecars — the mesh json
+    # included — go under a stem of their own rather than over the committed ones.
+    'RS2-40-seep': 'vp077a_ssrm',
     'RS2-66a-deep': 'rs2_66a_deep',
     'RS2-P4-VP68-zone': 'vp068_zone',
     'RS2-P4-VP102-t-300-c2': 'vp102t_300_c2',
@@ -293,6 +301,19 @@ def _build(tag):
     # tag paths are relative to docs/verification/
     path = os.path.normpath(os.path.join(ROOT, 'docs', 'verification', tag['file']))
     sd = load_slope_data(path)
+
+    # A tag carrying seep=steady runs the model's own seepage first, on the mesh the
+    # tag describes, and reduces the strengths on that same mesh — the route of a row
+    # whose field is not shipped beside the workbook. run_tests owns that staging, and
+    # it is called here rather than copied so the figure cannot be drawn on a
+    # different field than the lock was measured on. It leaves the solved mesh on the
+    # model, which the seep branch below then keeps.
+    if str(tag.get('seep', '')).strip():
+        sys.path.insert(0, ROOT)
+        import run_tests
+        err = run_tests._stage_seep_fields(sd, tag)
+        if err:
+            raise RuntimeError(f"{os.path.basename(path)}: {err}")
 
     # seepage-coupled models must reuse the stored mesh (nodal seep_u)
     if _uses_seep(sd) and sd.get('mesh') is not None:

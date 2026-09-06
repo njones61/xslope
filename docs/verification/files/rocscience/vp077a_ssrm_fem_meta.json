@@ -1,0 +1,12 @@
+{
+  "benchmark": "RS2-40-seep",
+  "analysis": "ssrm",
+  "FS": 1.5898437500000002,
+  "expected_fs": "1.590",
+  "file": "files/rocscience/vp077a.xlsx",
+  "unit_system": "imperial",
+  "converged": true,
+  "iterations": 322,
+  "residual": 4.7489261335960974e-05,
+  "max_displacement": 1.8257835561591362
+}

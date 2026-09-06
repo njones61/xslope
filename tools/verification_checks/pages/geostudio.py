@@ -60,12 +60,6 @@ CONFIG = PageConfig(
         ('+0.4', 'the two formulations differ by', '1.118', '1.113'),
     ],
 
-    worded_ok=[
-        # a qualitative characterisation of the USACE benchmark agreement, not a
-        # comparison of two printed factors
-        "to within about half a percent",
-    ],
-
     # Percentages expressed as a share of a reference quantity
     not_a_comparison_extra=[
         r"consolidation",

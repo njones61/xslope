@@ -210,6 +210,10 @@ with $a_S = x_r \sin \alpha - y_r \cos \alpha$ and $a_N = x_r \cos \alpha + y_r 
 
 One difference from OMS: $N'$ in Bishop comes from vertical equilibrium and so depends on $F$, which means the normal-force moment $\sum (N' + u \Delta \ell)\, a_N$ is itself part of the iteration. It is recomputed inside the fixed-point loop rather than once up front. The expression for $N'$ (equation 8) is unaffected — it comes from vertical equilibrium of a single slice, which knows nothing about the shape of the surface as a whole.
 
+### When the base normal reverses
+
+Bishop's base normal divides by $m_\alpha = \cos\alpha + \sin\alpha\tan\phi'/F$, which vanishes at $\tan\alpha = -F/\tan\phi'$; past that base inclination $m_\alpha$ is negative and $N'$ has reversed, while the fixed-point iteration converges as usual and returns a factor of safety. **xslope** tests the converged $m_\alpha$ before reporting one, and refuses an answer whose $m_\alpha$ reaches zero on any slice, naming the value and the count of slices past it — the same bar, on the same quantity, that the [force-equilibrium](force_eq.md) methods keep their own base factor clear of. Base tension short of half the slices is reported on the solution rather than refused, as it is by every other method here; past that extent the answer contradicts the strength model it was solved with over most of the surface and is refused. Across the verification corpus no accepted Bishop answer comes within five times the bar, so on any surface a circular search reaches this changes nothing.
+
 ---
 
 ## Summary

@@ -7527,6 +7527,12 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
+    'base_normal_sign': (
+        'base_normal_sign_check.py',
+        "Bishop and Janbu divide every base normal by m_alpha, which vanishes at "
+        "its own factor of safety on a steep enough base. Nothing tested for it: "
+        "Janbu returned 0.8152 on a surface where four of forty-one slices sat "
+        "past the singularity and Spencer read 4.38 on the same slices."),
     'spencer_root': (
         'spencer_root_check.py',
         "Spencer's equations have a root outside the pole-free band on many "
@@ -13387,7 +13393,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'noncircular_search': 2, 'circular_search': 2,
               'spencer_disclosure': 3, 'interslice_admissibility': 3,
               'force_closure_root': 3,
-              'spencer_root': 3,
+              'spencer_root': 3, 'base_normal_sign': 3,
               'circle_vertex': 2,
               'circle_above_center': 2}
 
@@ -13794,6 +13800,14 @@ def main():
         tests.append({'type': 'spencer_root',
                       'file': "Spencer: which (F, theta) root is the answer",
                       'method': 'spencer', 'source': 'spencer_root'})
+        # The Ordinary, Bishop and Janbu methods reported whatever their base
+        # normals had done. Bishop's and Janbu's divide by m_alpha, which
+        # vanishes at its own factor of safety on a steep enough base, and past
+        # it the normal has reversed: Janbu read 0.8152 against Spencer's 4.38 on
+        # the identical slices.
+        tests.append({'type': 'base_normal_sign',
+                      'file': 'the sign of the base normal (oms/bishop/janbu)',
+                      'method': '-', 'source': 'base_normal_sign'})
         # A circle daylighting exactly on a ground-surface vertex reported that
         # vertex once per adjoining segment, and the extra point sent the
         # count-and-prune to two copies of it — a zero-length "surface" that was

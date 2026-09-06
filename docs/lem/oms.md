@@ -235,3 +235,11 @@ The new term is $\sum (N' + u \Delta \ell)\, a_N$, the moment of the **total** b
     problem reports OMS as *n/a*. Use a method whose base normal comes from vertical
     equilibrium — Bishop, Janbu, or a complete-equilibrium method such as Spencer — for
     such cases.
+
+The Fellenius normal is not iterative and has no $m_\alpha$ to pass through, so the
+only test **xslope** applies to it is on the extent of base tension: an answer with
+more than half its base normals in tension is refused, since past that point the
+mobilized strength has been computed from normals the strength model does not admit
+over most of the surface. Fewer than half are reported on the solution and not
+refused, the same treatment [Bishop](bishop.md), [Janbu](janbu.md) and the
+complete-equilibrium methods give them.

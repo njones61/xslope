@@ -78,6 +78,12 @@ MPRICE_INADMISSIBLE = "Morgenstern-Price: inadmissible solution "
 #: root at all, or it holds roots and none of them describes a body of soil (both
 #: no-admissible-root facts), or the root it reports is refused afterwards on the
 #: base tension it implies.
+#: The simplified methods' one. OMS, Bishop and Janbu each return a single
+#: factor of safety from a converged iteration, so "no root" is not one of their
+#: outcomes; what they can do is converge on a state that is not a body of soil,
+#: and until now nothing tested for it. See `_base_normal_admissibility`.
+SIMPLIFIED_INADMISSIBLE = ": inadmissible solution "
+
 FORCE_EQ_NO_ROOT = "force_equilibrium: the force closure has no root in FS = "
 FORCE_EQ_NO_ADMISSIBLE_ROOT = ("force_equilibrium: no admissible force-closure "
                                "root on this surface")
@@ -97,6 +103,9 @@ _FAILURE_KINDS = (
     (FORCE_EQ_NO_ROOT, "no_admissible_solution"),
     (FORCE_EQ_NO_ADMISSIBLE_ROOT, "no_admissible_solution"),
     (FORCE_EQ_INADMISSIBLE, "inadmissible"),
+    ("the Ordinary Method of Slices" + SIMPLIFIED_INADMISSIBLE, "inadmissible"),
+    ("Bishop's Simplified Method" + SIMPLIFIED_INADMISSIBLE, "inadmissible"),
+    ("Janbu's Simplified Method" + SIMPLIFIED_INADMISSIBLE, "inadmissible"),
 )
 
 #: How far above the residual the solver ACCEPTS the reachable floor must stand
@@ -140,6 +149,16 @@ FE_FS_SCAN = 200
 #: Lowe solution the shipped corpus produces on its own surfaces, the answers that
 #: agree with the moment methods keep this factor above 0.2 on every slice, while
 #: the between-poles roots sit at 0.003 to 0.022.
+#:
+#: The same bar gates Bishop's and Janbu's m_alpha, which is the same quantity
+#: under the horizontal-interslice assumption: `N' = num / m_alpha`, so a slice
+#: whose m_alpha has reached zero has a base normal that runs to infinity and then
+#: reverses, and a factor of safety computed from it is not a state of the mass.
+#: Measured over every Bishop and Janbu solution the corpus produces on its own
+#: surfaces (570 solves), the nearest any accepted answer comes to it is 0.2439 —
+#: five times the bar — while the root the guard refuses on
+#: `xslope_noncircular`'s deep surface reaches -0.2507 on four of forty-one
+#: slices.
 FE_MIN_BASE_FACTOR = 0.05
 
 #: Largest interslice resultant a force-equilibrium root may carry, as a multiple
@@ -619,6 +638,13 @@ def oms(slice_df, debug=False):
     # 8) Store effective normal forces in the DataFrame
     slice_df['n_eff'] = N_eff
 
+    # The Fellenius normal does not divide by m_alpha, so only the extent of base
+    # tension is tested here; see _base_normal_admissibility.
+    reason, warns = _base_normal_admissibility(
+        "the Ordinary Method of Slices", N_eff)
+    if reason:
+        return False, reason
+
     if debug==True:
         print(f'numerator = {numerator:.4f}')
         print(f'denominator = {denominator:.4f}')
@@ -632,7 +658,7 @@ def oms(slice_df, debug=False):
         print('N_eff =', np.array2string(N_eff, precision=4, separator=', '))
 
     # 9) Return success and the FS
-    return True, {'method': 'oms', 'FS': FS}
+    return True, {'method': 'oms', 'FS': FS, 'warnings': warns}
 
 def bishop(slice_df, debug=False, tol=1e-6, max_iter=100, fs_seed=None):
     """
@@ -800,6 +826,10 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100, fs_seed=None):
 
         if abs(F_new - F) < tol:
             slice_df['n_eff'] = N_eff
+            reason, warns = _base_normal_admissibility(
+                "Bishop's Simplified Method", N_eff, m_alpha=denom_N)
+            if reason:
+                return False, reason
             if debug:
                 print(f"FS = {F_new:.6f}")
                 print(f"Numerator = {numerator:.6f}")
@@ -807,7 +837,8 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100, fs_seed=None):
                 if np.any(H_pile > 0):
                     print(f"sum_pile_moment = {sum_pile_moment:.6f}")
                 print("N_eff =", np.array2string(N_eff, precision=4, separator=', '))
-            return True, {'method': 'bishop', 'FS': F_new}
+            return True, {'method': 'bishop', 'FS': F_new,
+                          'warnings': warns}
 
         F = F_new
 
@@ -950,6 +981,14 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     if not converged:
         return False, "Janbu method did not converge within the maximum number of iterations."
 
+    # The converged m_alpha and base normals, tested before the correction factor
+    # is applied: f0 scales the answer and cannot rescue a reversed base normal.
+    janbu_reason, janbu_warns = _base_normal_admissibility(
+        "Janbu's Simplified Method", N_eff,
+        m_alpha=cos_alpha + sin_alpha * tan_phi / F)
+    if janbu_reason:
+        return False, janbu_reason
+
     FS_base = F
 
     # === Compute Janbu correction factor ===
@@ -1023,6 +1062,7 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
         'FS': FS,
         'fo': fo,
         'FS_base': FS_base,
+        'warnings': janbu_warns,
     }
 
 
@@ -1411,6 +1451,60 @@ def _admissibility_warnings(c, N_eff, Z, y_lt=None, y_lb=None, yt_l=None):
                 warns.append(f"line of thrust outside the slice on {frac_out:.0%} "
                              f"of boundaries")
     return warns
+
+
+def _base_normal_admissibility(method_name, N_eff, m_alpha=None):
+    """Whether a simplified method's converged answer is a state of the mass.
+
+    The Ordinary, Bishop and Janbu methods each converge on a single factor of
+    safety and, until this test, reported it whatever the base normals underneath
+    it had done. Two things can have gone wrong, and they are the two the
+    force-equilibrium closure already tests for:
+
+    * Bishop and Janbu divide every slice's base normal by
+      ``m_alpha = cos(alpha) + sin(alpha) tan(phi) / F``, which vanishes at
+      ``tan(alpha) = -F / tan(phi)``. Past that inclination m_alpha is negative,
+      the base normal has reversed, and the "solution" is the far side of a
+      singularity rather than a slower slide. On `xslope_noncircular`'s deep
+      surface four of forty-one slices sit past it, m_alpha reaches -0.2507, the
+      least base normal is -963.6, and Janbu reports 0.8152 where Spencer reads
+      4.3825 on the identical slices. The bar is `FE_MIN_BASE_FACTOR`, the same
+      one the force-equilibrium closure keeps its own base factor clear of; the
+      corpus's own answers stay five times above it. The Ordinary method's normal
+      does not divide by m_alpha and is not tested on it.
+    * A base in tension mobilizes no Mohr-Coulomb strength, so past
+      `MAX_BASE_TENSION_EXTENT` of the slices the answer contradicts the strength
+      model it was solved with over most of the surface. Below that extent it is
+      reported and not refused, exactly as `force_equilibrium` and `mprice` treat
+      it. No accepted corpus answer carries any.
+
+    Returns ``(reason, warnings)``: `reason` is a refusal message when the answer
+    is not admissible and None when it is, and `warnings` are the report-only
+    notes to carry on the results dict.
+    """
+    N_eff = np.asarray(N_eff, dtype=float)
+    n = N_eff.size
+    if not n:
+        return None, []
+    if m_alpha is not None:
+        m_alpha = np.asarray(m_alpha, dtype=float)
+        min_m = float(m_alpha.min())
+        if min_m < FE_MIN_BASE_FACTOR:
+            past = int(np.count_nonzero(m_alpha < FE_MIN_BASE_FACTOR))
+            return (f"{method_name}{SIMPLIFIED_INADMISSIBLE}"
+                    f"(m_alpha down to {min_m:.4f} on {past} of {n} slices, so the "
+                    f"base normal has passed through its own singularity; least "
+                    f"N' = {float(N_eff.min()):.1f})"), []
+    tension = N_eff < 0
+    frac = float(tension.mean())
+    if frac > MAX_BASE_TENSION_EXTENT:
+        return (f"{method_name}{SIMPLIFIED_INADMISSIBLE}"
+                f"({100 * frac:.0f}% of base normals in tension)"), []
+    if frac > 0:
+        worst = int(np.argmin(N_eff))
+        return None, [f"base tension on {int(tension.sum())} of {n} slices "
+                      f"(worst N' = {float(N_eff[worst]):.1f} at slice {worst + 1})"]
+    return None, []
 
 
 def spencer_theta_bounds(alpha, tan_p, F_val, margin_deg=5.0):

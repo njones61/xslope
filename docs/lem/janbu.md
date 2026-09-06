@@ -97,6 +97,12 @@ The direction of the reinforcement force follows the line's **Dir** setting. For
 
 Once again, the correction factor $f_o$ is applied to account for the neglect of inter-slice shear as shown in equation (5) above.
 
+## When the base normal reverses
+
+Equation (1) divides by $m_\alpha = \cos\alpha + \sin\alpha\tan\phi'/F$, which vanishes at $\tan\alpha = -F/\tan\phi'$. Past that base inclination $m_\alpha$ is negative and the base normal has reversed, but the iteration converges all the same and returns a number. **xslope** therefore tests the converged $m_\alpha$ before reporting: an answer with $m_\alpha$ at or near zero on any slice is refused, naming the value it reached and how many slices are past it, because it comes from the far side of a singularity rather than from a slower slide. The bar is the one the [force-equilibrium](force_eq.md) methods keep their own base factor clear of, and it is the same quantity under a different interslice assumption; across the verification corpus no accepted Bishop or Janbu answer comes within five times it. Base normals that are merely in tension are a different matter and are reported rather than refused, up to the extent — half the slices — past which the answer would contradict the strength model it was solved with over most of the surface.
+
+The reach of this is narrow and worth stating: on a shipped non-circular sample, a search allowed past the default 65° base-inclination limit reaches a surface whose entry ramp stands at 60° in a $\phi = 33°$ material. Four of its forty-one slices sit past the singularity, $m_\alpha$ falls to $-0.25$, and the uncorrected Janbu factor of safety reads 0.815 where Spencer reads 4.38 on the identical slices.
+
 ---
 
 ## Summary

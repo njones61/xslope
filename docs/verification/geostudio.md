@@ -1110,9 +1110,9 @@ at 8 m.
 **Input:** [gs2_rdd_inst.xlsx](files/geostudio/gs2_rdd_inst.xlsx) (instantaneous),
 [gs2_rdd_slow.xlsx](files/geostudio/gs2_rdd_slow.xlsx) (slow)
 
-![SEEPW-T03: the dam with its seepage boundary conditions for instantaneous drawdown](images/gs2_rdd_inst_inputs.png)
+![SEEPW-T03: the dam with its seepage boundary conditions for instantaneous drawdown](images/gs2_rdd_inst_inputs.png){width=800px}
 
-![SEEPW-T03: the dam with its seepage boundary conditions for slow drawdown](images/gs2_rdd_slow_inputs.png)
+![SEEPW-T03: the dam with its seepage boundary conditions for slow drawdown](images/gs2_rdd_slow_inputs.png){width=800px}
 
 ![SEEPW-T03: interior total head vs time, XSLOPE vs SEEP/W](images/gs2_rdd.png)
 
@@ -1256,7 +1256,7 @@ Dirichlet head and the pond leaks — the same submerged-only reservoir series a
 
 **Input:** [gs2_pond.xlsx](files/geostudio/gs2_pond.xlsx)
 
-![SEEPW-T04: the clay-lined pond with its seepage boundary conditions](images/gs2_pond_inputs.png)
+![SEEPW-T04: the clay-lined pond with its seepage boundary conditions](images/gs2_pond_inputs.png){width=800px}
 
 ![SEEPW-T04: water-table rise vs time, XSLOPE vs SEEP/W](images/gs2_pond.png){width=800px}
 

@@ -18,23 +18,11 @@ CONFIG = PageConfig(
         ('+3', 'within 3% of the vendor and/or reference figure'),
         ('+6', '| 🟡 | 3–6% |'),
         ('+6', 'more than 6% |'),
-        # gw4: the Q spread across the six-step target_size ladder; the
-        # individual discharges are not printed, only the y₁ readings are
-        ('+0.6', 'while Q moves'),
-        # gw5: the same ladder's discharge spread (8.197 / 8.165 / 8.140)
-        ('+0.7', 'a 0.7% spread, and'),
-        # gw5: the render calibration, an agreement between two image scales
-        ('+0.1', 'scales agree to'),
         # van Genuchten vs SEEP2D on the linear-front problems, as a set
         ('+0.15', 'agree on discharge to better than'),
     ],
 
     whitelist=[
-        # gw5: "+1.8% on the closed form at the finest" — the finest-mesh
-        # discharge 8.140 against the closed form 8.0, both printed in the
-        # paragraph (and reachable from the summary row through its #gw5 link)
-        ('+1.8', 'on the closed form at the finest', '8.140', '8.0'),
-        ('+1.8', 'on the finest mesh', '8.140', '8.0'),
         # the 3.5–4.7% van Genuchten band, quoted ahead of the two case pairs
         # it summarises (gw009a 2.307 against SEEP2D's 2.421)
         ('+4.7', 'the total discharge reads 3.5–4.7% below SEEP2D', '2.307', '2.421'),

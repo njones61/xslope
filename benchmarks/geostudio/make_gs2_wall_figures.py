@@ -128,9 +128,11 @@ def composite(stem):
 def _profile(fem_data, solution):
     """The wall's actions against elevation.
 
-    Each beam element carries a shear and a moment at each of its two ends; the
-    moment profile is the end moments in order down the wall, which is continuous
-    because adjacent elements share a node.
+    Each beam element carries a moment at each of its two ends and one shear,
+    read at the element center. The moment profile is the end moments in order
+    down the wall, continuous because adjacent elements share a node; the shear
+    profile is the center values at the element midpoints, joined -- the same
+    convention as ``plot_fem_details.plot_pile_detail``.
     """
     nodes = np.asarray(fem_data['nodes'])
     pairs = list(fem_data['pile_node_pairs'])
@@ -153,8 +155,8 @@ def _profile(fem_data, solution):
         # convention's nodal moment at end 1, and the nodal moment at end 2
         y_m += [ya, yb]
         m_vals += [-m1, m2]
-        y_v += [ya, yb]
-        v_vals += [V[p], V[p]]
+        y_v.append(0.5 * (ya + yb))
+        v_vals.append(V[p])
     return (np.array(y_m), np.array(m_vals), np.array(y_v), np.array(v_vals))
 
 
@@ -184,6 +186,9 @@ def forces(stem='gs2_wall'):
         ax.axhspan(5.0, 6.0, color='#f39c12', alpha=0.18, zorder=0,
                    label='weak clay band')
         ax.plot(vals, yy, '-', color='#1f4e79', lw=1.8, label='XSLOPE')
+        # both panels span the wall, though the shear samples stop half an
+        # element short of either end
+        ax.set_ylim(float(y_m.min()), float(y_m.max()))
         ax.axvline(0.0, color='0.6', lw=0.8)
         for xv, lb in pubs:
             ax.axvline(xv, color='#c0392b', ls='--', lw=1.2,

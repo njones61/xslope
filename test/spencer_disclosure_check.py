@@ -66,9 +66,9 @@ WHAT IS CHECKED
   Morgenstern-Price's two are mapped and pinned by fixtures here, an unmapped
   message suppresses the taxonomy entirely, and neither may ever be reported as
   an iteration failing to converge. Its phrases name no method's mechanism —
-  every one of M-P's 28 refusals on this model trips its INTERSLICE-tension
-  guard (31-38%, base normals at 5-8%), so "anomalous base tension" would
-  misreport all of them;
+  Spencer refuses on base tension beyond what cohesion can carry while
+  Morgenstern-Price refuses on base tension by extent, so "anomalous base
+  tension" would misreport the second as the first;
 * the line the docs quote, against the line the search prints, byte for byte;
 * four mutations: the silent skip restored, a classifier that calls the refused
   circle an iteration failure, a verdict that claims absolute insolubility, and
@@ -125,7 +125,7 @@ GENERAL_INSOLUBLE = {'Xo': -8.0, 'Yo': 48.0, 'R': 45.0}
 #: produce them. Neither is an iteration failure and neither may be reported as
 #: one; the first is M-P's own no-admissible-root condition.
 MP_NO_CROSSING = {'Xo': 4.0, 'Yo': 30.0, 'R': 30.0}
-MP_INADMISSIBLE = {'Xo': 4.0, 'Yo': 42.0, 'R': 42.0}
+MP_INADMISSIBLE = {'Xo': -8.0, 'Yo': 28.0, 'R': 28.0}
 
 NUM_SLICES = 40
 
@@ -545,26 +545,22 @@ def leg_breakdown_only_from_read_messages():
     else:
         print(f"  M-P line     {line[0].strip()}")
 
-    # The phrase must be neutral because the refusals behind it are not Spencer's
-    # mechanism: every M-P refusal on this model is interslice tension, with base
-    # normals nowhere near M-P's own 50% base-normal threshold.
-    if out['inadmissible']:
-        worst_base = 0.0
-        for spec in (MP_INADMISSIBLE, {'Xo': 6.0, 'Yo': 42.0, 'R': 42.0}):
-            try:
-                ok_m, msg_m = solve.mprice(_slices(MODEL, spec))
-            except AssertionError:
-                continue
-            if ok_m or solve.failure_kind(msg_m) != 'inadmissible':
-                continue
-            pct = str(msg_m).split('(')[-1].split('%')[0]
-            worst_base = max(worst_base, float(pct))
-        if worst_base >= 50.0:
-            fails.append(f"M-P's refusals here reach {worst_base:.0f}% base normals "
-                         f"in tension; the neutral phrase is no longer the reason")
+    # The phrase must be neutral because the two methods refuse on different
+    # measures of the same quantity: Spencer on base tension as a multiple of
+    # cohesive capacity, M-P on the extent of base tension over the surface.
+    ok_m, msg_m = solve.mprice(_slices(MODEL, MP_INADMISSIBLE))
+    if ok_m or solve.failure_kind(msg_m) != 'inadmissible':
+        fails.append(f"the M-P inadmissible fixture no longer refuses: {msg_m}")
+    elif 'interslice' in str(msg_m):
+        fails.append(f"M-P refuses a solution on interslice tension, which is "
+                     f"reported and never refused: {msg_m}")
+    else:
+        pct = float(str(msg_m).split('(')[-1].split('%')[0])
+        if pct <= 100 * solve.MAX_BASE_TENSION_EXTENT:
+            fails.append(f"M-P's refusal quotes {pct:.0f}% base normals in tension, "
+                         f"at or under its own extent threshold")
         else:
-            print(f"  M-P guard    base normals at most {worst_base:.0f}% in tension "
-                  f"— the refusals are interslice, not base")
+            print(f"  M-P guard    refuses at {pct:.0f}% base normals in tension")
 
     # An unmapped message must leave the taxonomy off the line entirely.
     tally = xsearch.UnsolvedTrials('bishop')

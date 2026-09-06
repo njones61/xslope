@@ -80,6 +80,13 @@ NO_SOLUTION_MARGIN = 1e3
 #: the tolerance-relative bar would sit in float noise.
 NO_SOLUTION_FLOOR = 1e-6
 
+#: How far the extent of base tension may go before a solution is refused: more
+#: than half the slices. A base in tension mobilizes no Mohr-Coulomb strength, so
+#: past that point the solution contradicts the strength model it was solved with
+#: on most of the surface. Shared by force_equilibrium (corps, lowe) and mprice.
+#: Valid criticals across the corpus run 0-15%.
+MAX_BASE_TENSION_EXTENT = 0.5
+
 
 def failure_kind(message):
     """Which kind of failure this message reports, or None if it is unmapped.
@@ -1198,21 +1205,76 @@ def _mp_march(slice_df, lam, f_vals, FS, right_facing=False):
     return _mp_residuals(_mp_extract(slice_df, right_facing), f_vals, lam, FS)
 
 
+def interslice_tension_note(Z):
+    """The interslice-tension state of an accepted solution, as one note or None.
+
+    ONE RULE, for spencer, mprice, corps and lowe alike.
+
+    MEASURE — the fraction of INTERIOR slice boundaries (j = 1 … n-1; the two end
+    boundaries carry no force by definition) whose interslice resultant is
+    tensile, with ``Z`` in the physical convention (tension < 0). The measure is
+    only defined on a MIXED field: where every interior boundary carries the same
+    sign the fraction saturates at 0 or 1, the sign convention itself is what is
+    being read, and no verdict is offered.
+
+    THRESHOLD — any tension at all. Soil carries no tension, so a tensile
+    interslice resultant is already a departure from the Mohr-Coulomb model the
+    method was solved with. No larger number has a source. Duncan & Wright treat
+    interslice tension as a check the engineer makes on a reported solution;
+    SLOPE/W reports its interslice forces and flags the negative ones; Slide2 and
+    RS2 impose no such test at all.
+
+    CONSEQUENCE — report. The factor of safety is never decided by this measure,
+    and no solution is ever refused for it, because across the shipped corpus the
+    measure carries no information about whether a factor of safety is right:
+
+      * the tension-crack sample (docs/lem/files/xslope_tension_KEY.xlsx) run with
+        its crack removed — the crest tension a crack exists to remove — reports
+        10% and its factor of safety is 8% HIGH (4.960 against 4.588 with the
+        crack modeled);
+      * GS-2.26's toe plane reports 69-71% on all four methods and every one of
+        them returns 1.35199772881, which is SLOPE/W's own answer on the same
+        plane;
+      * the tutorial embankment's phi = 0 circles report 26-36% across a smooth
+        family, and every solution in it — reported and refused alike — returns
+        Bishop's exact phi = 0 moment factor of safety to four decimals, since at
+        phi = 0 moment equilibrium fixes the answer whatever the interslice
+        forces do;
+      * VP47, VP48 and VP60 report 100% and all four methods agree with each
+        other and with the vendor.
+
+    So the case that most needs the engineer's attention sits lowest on the
+    measure and the highest readings are all correct: any refusal threshold is
+    anti-correlated with correctness. What IS refused is base tension by extent
+    (MAX_BASE_TENSION_EXTENT) and a non-positive factor of safety — quantities
+    that contradict the strength model rather than describe the internal forces.
+    """
+    Z = np.asarray(Z, dtype=float)
+    Z_int = Z[1:-1]
+    if Z_int.size == 0:
+        return None
+    tensile = Z_int < 0
+    if not tensile.any() or not (Z_int > 0).any():
+        return None
+    z_min = float(np.min(Z_int))
+    z_max = float(np.max(Z_int))
+    return (f"interslice tension on {float(tensile.mean()):.0%} of interior "
+            f"boundaries (min Z = {z_min:.1f} vs max compression {z_max:.1f})")
+
+
 def _admissibility_warnings(c, N_eff, Z, y_lt=None, y_lb=None, yt_l=None):
     """Report-only admissibility screen shared by spencer/mprice/corps/lowe.
 
     Returns a list of Duncan & Wright admissibility notes for an ALREADY-ACCEPTED
-    solution — it never affects FS, convergence, or acceptance. The tension guard
-    in each solver normalizes base tension by cohesive capacity, so a c=0 slice
-    can carry unbounded base tension without tripping it (VP30: -71 kN/m on the
-    cohesionless crack-face sliver scores 0.0 and passes). These report the
-    signatures that guard cannot see. Deliberately narrow — every accepted
-    solution already satisfies the guard on cohesive slices, so re-flagging their
-    tension would be noise:
+    solution — it never affects FS, convergence, or acceptance. Spencer's base
+    tension gate normalizes by cohesive capacity, so a c=0 slice can carry
+    unbounded base tension without tripping it (VP30: -71 kN/m on the
+    cohesionless crack-face sliver scores 0.0 and passes), and the extent gate
+    force_equilibrium and mprice apply misses the same slice. The first note
+    below reports what those cannot see:
       - base tension only on COHESIONLESS slices (the guard's blind spot);
-      - interslice tension only against a clearly compressive field (when every
-        Z is negative the sign convention itself is ambiguous, e.g. right-facing
-        nailed walls, and no verdict is offered);
+      - interslice tension by :func:`interslice_tension_note`, the one measure
+        all four methods report from;
       - thrust line outside the slice on >10% of interior boundaries, with
         NaN/inf ratios counting as outside — skipped when no thrust line is
         supplied (corps/lowe expose no line of thrust).
@@ -1231,13 +1293,9 @@ def _admissibility_warnings(c, N_eff, Z, y_lt=None, y_lb=None, yt_l=None):
         worst = int(bad_n[np.argmin(N_eff[bad_n])])
         warns.append(f"base tension on {bad_n.size} cohesionless slice(s), "
                      f"worst N' = {float(N_eff[worst]):.1f} at slice {worst + 1}")
-    Z_int = Z[1:-1]
-    if Z_int.size:
-        z_min = float(np.min(Z_int))
-        z_max = float(np.max(Z_int))
-        if z_min < 0 and z_max > 0 and -z_min > 0.10 * z_max:
-            warns.append(f"interslice tension (min Z = {z_min:.1f} vs max "
-                         f"compression {z_max:.1f})")
+    note = interslice_tension_note(Z)
+    if note:
+        warns.append(note)
     if yt_l is not None and y_lt is not None and y_lb is not None:
         y_lt_arr = np.asarray(y_lt, dtype=float)
         y_lb_arr = np.asarray(y_lb, dtype=float)
@@ -1370,27 +1428,22 @@ def force_equilibrium(slice_df, theta_list, tol=1e-6, max_iter=50, debug=False, 
     residual(FS_opt)
 
     # Admissibility guard. A free search can drive the force-equilibrium solver onto
-    # grossly non-physical surfaces (a large fraction of slices in base tension, or
-    # pervasive interslice tension) and report a spurious low FS. Reject those by
-    # EXTENT only — a few negative base normals or a non-monotonic thrust line occur
-    # in valid solutions and are NOT rejected (valid benchmark criticals run ~0-4%
-    # negative normals, <=20% interslice tension).
+    # grossly non-physical surfaces and report a spurious low FS. What is refused is
+    # base tension by EXTENT — a few negative base normals occur in valid solutions
+    # and are not rejected, but past half the slices the solution contradicts the
+    # Mohr-Coulomb strength it was solved with over most of the surface. Interslice
+    # tension is reported below and never refused; see interslice_tension_note.
     frac_N_neg = float(np.mean(N < 0)) if n else 0.0
-    # Interslice "tension" sign is convention-dependent: on right-facing slopes the
-    # caller negates theta_list, which flips the sign of Z, so there tension is Z>0.
-    Z_int = Z[1:n]
-    z_tension = (Z_int > 0) if right_facing else (Z_int < 0)
-    frac_Z_tension = float(np.mean(z_tension)) if n > 1 else 0.0
-    if frac_N_neg > 0.5 or frac_Z_tension > 0.5:
+    if frac_N_neg > MAX_BASE_TENSION_EXTENT:
         return False, (
             "force_equilibrium: inadmissible solution "
-            f"({100*frac_N_neg:.0f}% of base normals in tension, "
-            f"{100*frac_Z_tension:.0f}% interslice tension)")
+            f"({100*frac_N_neg:.0f}% of base normals in tension)")
 
     slice_df['n_eff'] = N  # store effective normal forces in slice_df
     slice_df['z'] = Z[:-1]  # store interslice forces in slice_df, adjust length to n slices
 
-    # Report-only admissibility screen (corps/lowe inherit it). The parallel-force
+    # Report-only admissibility screen (corps/lowe inherit it), carrying the same
+    # interslice-tension measure spencer and mprice report. The parallel-force
     # march exposes no line of thrust, so only the base-tension and interslice-
     # tension signatures apply; the third is skipped. On right-facing slopes the
     # caller negates theta_list, flipping Z's sign, so tension there is Z>0 — pass
@@ -2738,24 +2791,15 @@ def mprice(slice_df, f_type='half_sine', tol=1e-6,
     N, Z, force_res, moment_res = _mp_residuals(A, f_vals, lam_star, FS)
     theta_deg = np.degrees(np.arctan(lam_star * f_vals))   # per boundary, length n+1
 
-    # Admissibility guard. M-P's λ-optimisation actively seeks the lowest FS, so —
-    # unlike the fixed-θ methods — it can exploit surfaces that balance only with
-    # partly TENSILE interslice forces (non-physical: soil cannot pull slices apart),
-    # giving a spuriously low FS on a surface Spencer's solver simply fails to
-    # converge on. We reject those. force_equilibrium's own note is that valid
-    # criticals run ≤20% interslice tension; our physical M-P criticals are ≤18%,
-    # while spurious ones (e.g. simple_embankment) hit ~33%, so a 30% INTERSLICE cap
-    # cleanly separates them. Base-normal tension keeps the looser 50% extent
-    # backstop (it is not what the λ-optimisation exploits). Interslice tension is
-    # Z<0 here: M-P keeps the un-negated θ convention for BOTH facings (unlike
-    # force_equilibrium, which negates theta_list for right-facing and flips Z).
+    # Admissibility guard, the same one force_equilibrium applies: base tension by
+    # EXTENT, and nothing else. Interslice tension is reported below and never
+    # refused — the measure is the same one every other method reports from, and
+    # on this surface M-P's λ-optimisation reads exactly what Spencer's constant θ
+    # reads (see interslice_tension_note).
     frac_N_neg = float(np.mean(N < 0))
-    Z_int = Z[1:-1]
-    frac_Z_tension = float(np.mean(Z_int < 0)) if len(Z_int) else 0.0
-    if frac_N_neg > 0.5 or frac_Z_tension > 0.30:
+    if frac_N_neg > MAX_BASE_TENSION_EXTENT:
         return False, (MPRICE_INADMISSIBLE +
-                       f"({100*frac_N_neg:.0f}% of base normals in tension, "
-                       f"{100*frac_Z_tension:.0f}% interslice tension)")
+                       f"({100*frac_N_neg:.0f}% of base normals in tension)")
 
     slice_df['n_eff'] = N
     slice_df['z'] = Z[:-1]
@@ -2765,8 +2809,9 @@ def mprice(slice_df, f_type='half_sine', tol=1e-6,
     # Report-only admissibility screen (never affects FS/λ or acceptance). M-P
     # keeps the un-negated θ convention for both facings, so its Z is already
     # physical (tension < 0); the thrust line just stored gives the third
-    # signature. On VP30 this fires interslice tension and thrust-outside — the
-    # inadmissibility the λ-optimisation exploits, silent until now.
+    # signature. On VP30 this reports interslice tension and a thrust line outside
+    # the slices, the two signatures that describe how the λ-optimisation is
+    # holding the mass together on that surface.
     warns = _admissibility_warnings(
         slice_df['c'].values, N, Z,
         y_lt=slice_df['y_lt'].values,

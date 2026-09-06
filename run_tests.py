@@ -7484,6 +7484,44 @@ def run_spencer_disclosure_test(test):
     return 0.0, None
 
 
+def run_interslice_admissibility_test(test):
+    """Interslice tension: one measure, reported by every method, refusing nothing.
+
+    Spencer, Morgenstern-Price, Corps and Lowe all carry interslice forces, and
+    each used to judge the tension in them on its own severity — M-P refused
+    above 30% of interior boundaries in tension, force_equilibrium above 50%,
+    Spencer's path only warned — so a surface could be answered by one method and
+    declined by another for a reason that was not about the surface. On GS-2.26's
+    toe plane that cost the correct answer: M-P declined the root Spencer
+    accepted, and it is SLOPE/W's own 1.352.
+
+    The rule is one measure — the fraction of interior boundaries in tension, in
+    the physical sign convention, on a mixed field — reported and never refused,
+    because the extent carries no information about whether the factor of safety
+    is right: the tension-cracked crest with no crack modeled reads 10% and is
+    8% high, while every reading above 60% in the corpus is a correct answer.
+
+    The check lives in test/interslice_admissibility_check.py: the plane answered
+    by all six methods to nine figures, the counter-case reported by all four,
+    no refusal anywhere naming interslice tension, the phi = 0 family scored
+    against Bishop's exact answer, both facings, and three mutations.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'interslice_admissibility_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('interslice_admissibility_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_circle_vertex_test(test):
     """A circle that daylights exactly on a ground-surface vertex.
 
@@ -13064,6 +13102,8 @@ def _dispatch_test(test):
         return run_flow_recovery_test(test)
     if test_type == 'spencer_disclosure':
         return run_spencer_disclosure_test(test)
+    if test_type == 'interslice_admissibility':
+        return run_interslice_admissibility_test(test)
     if test_type == 'circle_vertex':
         return run_circle_vertex_test(test)
     if test_type == 'circle_above_center':
@@ -13238,7 +13278,8 @@ def _expected_and_tol(test, default_tolerance):
                        'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'piezo_u_guard',
-                       'spencer_disclosure', 'circle_vertex', 'circle_above_center',
+                       'spencer_disclosure', 'interslice_admissibility',
+                       'circle_vertex', 'circle_above_center',
                        'gsat_pair', 'seep_head',
                        'tseep_head', 'design_callable', 'kernel_xcheck'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
@@ -13257,7 +13298,8 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'fs_vs_time_mode': 4,
               'transient_seep': 4, 'seep_elements': 3, 'seep': 3,
               'noncircular_search': 2, 'circular_search': 2,
-              'spencer_disclosure': 3, 'circle_vertex': 2,
+              'spencer_disclosure': 3, 'interslice_admissibility': 3,
+              'circle_vertex': 2,
               'circle_above_center': 2}
 
 
@@ -13638,6 +13680,15 @@ def main():
         tests.append({'type': 'spencer_disclosure',
                       'file': 'Spencer insoluble surfaces + search disclosure',
                       'method': 'spencer', 'source': 'spencer_disclosure'})
+        # Interslice tension used to be judged on three severities — refused
+        # above 30% by Morgenstern-Price, above 50% by force_equilibrium, only
+        # warned about by Spencer — so the same interslice state could be an
+        # answer from one method and a refusal from another. One measure now,
+        # reported by all four and refusing nothing, with the plane, the
+        # uncracked crest and the phi = 0 family scored against known answers.
+        tests.append({'type': 'interslice_admissibility',
+                      'file': 'interslice tension: one measure, four methods',
+                      'method': '-', 'source': 'interslice_admissibility'})
         # A circle daylighting exactly on a ground-surface vertex reported that
         # vertex once per adjoining segment, and the extra point sent the
         # count-and-prune to two copies of it — a zero-length "surface" that was

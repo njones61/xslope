@@ -493,8 +493,9 @@ Built and run step by step in [COMBO-2](../tutorials/combo02_rapid_drawdown.md).
 
 Built and run step by step in [LEM-10](../tutorials/lem10_global_minimum.md).
 
-Degenerate infinite-slope search — a free search collapses to a near-planar sliver
-near the crest (critical circle in red, $FS \approx 1.30$):
+Degenerate infinite-slope search — seeded from the generated embankment circles, the
+search collapses to a near-planar sliver near the crest (critical circle in red,
+$FS \approx 1.30$):
 
 ![mult_min_degenerate.png](sample_images/mult_min_degenerate.png){width=900}
 

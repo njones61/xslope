@@ -381,10 +381,9 @@ However you built it, you now hold the same model:
 
 ![The finished model](images/lem09_inputs.png){width=1000}
 
-The two gray lines run back and down from the wall face, each with a red tension
-point where its envelope reaches full capacity; the green bar at x = 0.5 is the
-soldier pile, labeled with its 5,900 lb/ft; and the red dashed polyline from the
-wall toe is the failure surface as entered.
+The two gray lines run back and down from the wall face; the green bar at x = 0.5
+is the soldier pile, labeled with its 5,900 lb/ft; and the red dashed polyline
+from the wall toe is the failure surface as entered.
 
 Now we search it. Click **Run LEM…** and choose **Method** =
 `Janbu (Corrected)` — the method both of this problem's references report their

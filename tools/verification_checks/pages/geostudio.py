@@ -122,12 +122,8 @@ CONFIG = PageConfig(
         # The transient problems' inputs figures: a section with its seepage
         # boundary conditions and a legend below, which the quadrant ink test
         # reads as a two-panel gutter; the caption claims no panel layout.
-        "images/gs2_cons_inputs.png",
-        "images/gs2_infil_inputs.png",
         "images/gs2_rdd_inst_inputs.png",
         "images/gs2_pond_inputs.png",
-        "images/gs2_heap_inputs.png",
-        "images/gs2_mso_inputs.png",
         "images/gs2_cons.png",
         "images/gs2_infil.png",
         "images/gs2_rdd.png",

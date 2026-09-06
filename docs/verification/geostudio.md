@@ -1020,8 +1020,6 @@ kPa.
 
 **Input:** [gs2_cons.xlsx](files/geostudio/gs2_cons.xlsx)
 
-![SEEPW-T01: the consolidation column with its seepage boundary conditions](images/gs2_cons_inputs.png){width=800px}
-
 ![SEEPW-T01: Terzaghi consolidation isochrones](images/gs2_cons.png){width=800px}
 
 | t (s) | U (Terzaghi) | XSLOPE center | Terzaghi center $u_e$ | SEEP/W center |
@@ -1059,8 +1057,6 @@ top and bottom at ψ = −8 at t = 0 makes the steady initial solve return it, a
 t > 0 the top steps to the ponded head.
 
 **Input:** [gs2_infil.xlsx](files/geostudio/gs2_infil.xlsx)
-
-![SEEPW-T02: the infiltration column with its seepage boundary conditions](images/gs2_infil_inputs.png){width=800px}
 
 ![SEEPW-T02: infiltration front vs SEEP/W](images/gs2_infil.png){width=800px}
 
@@ -1314,8 +1310,6 @@ condition would return a dry hydrostatic column and the front would never advanc
 
 **Input:** [gs2_heap.xlsx](files/geostudio/gs2_heap.xlsx)
 
-![SEEPW-T05: the leach column with its seepage boundary conditions](images/gs2_heap_inputs.png){width=800px}
-
 ![SEEPW-T05: pressure-head profile vs time, XSLOPE vs SEEP/W](images/gs2_heap.png){width=800px}
 
 The published answer is a graphical volumetric-water-content / flow-rate response (no
@@ -1377,8 +1371,6 @@ orders of magnitude less permeable than the sand, so it meters the outflow), and
 base **suction** is stepped progressively more negative in five stages over ~61 hours.
 It exercises the unsaturated storage term C(ψ) under a stepped specified-pressure-head
 boundary.
-
-![SEEPW-T07: the multistep-outflow column with its seepage boundary conditions](images/gs2_mso_inputs.png){width=800px}
 
 The base head is a *suction* — a specified **pressure head that is negative at every
 stage** (IC −0.073 m, stepping to −0.093 … −0.175 m). Because the base polyline sits at

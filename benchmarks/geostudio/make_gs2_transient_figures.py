@@ -377,12 +377,11 @@ def fig_pond():
     return 'gs2_pond.png'
 
 
-_INPUT_STEMS = (('gs2_cons', 'SEEPW-T01 — consolidation column'),
-                ('gs2_infil', 'SEEPW-T02 — infiltration column'),
-                ('gs2_rdd_inst', 'SEEPW-T03 — dam (both drawdown rates)'),
-                ('gs2_pond', 'SEEPW-T04 — clay-lined pond'),
-                ('gs2_heap', 'SEEPW-T05 — leach column'),
-                ('gs2_mso', 'SEEPW-T07 — multistep outflow column'))
+# Only the two-dimensional sections get an inputs figure. The column problems
+# (T01, T02, T05, T07) are one-dimensional: a section plot of a column is a
+# needle, and their geometry and boundary conditions are stated in the text.
+_INPUT_STEMS = (('gs2_rdd_inst', 'SEEPW-T03 — dam (both drawdown rates)'),
+                ('gs2_pond', 'SEEPW-T04 — clay-lined pond'))
 
 
 def fig_inputs():

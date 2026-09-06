@@ -21,7 +21,7 @@ import pandas as pd
 from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
 
 from .mesh import find_element_containing_point, interpolate_at_point
-from .water import seep_water_table_profile
+from .water import water_table_source
 from .hoekbrown import hb_tangent
 
 _ito_matsui_warned = False  # module-level flag: warn once about large H
@@ -1685,17 +1685,17 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     any_gamma_sat = any(m.get('gamma_sat') is not None for m in materials)
     water_table_y_all = np.full(len(slice_centers), np.nan)
     if any_gamma_sat:
-        if has_seep_data:
-            had_cache = slope_data.get('_water_table_profile') is not None
-            cache = seep_water_table_profile(slope_data)
+        had_cache = slope_data.get('_water_table_profile') is not None
+        wt_kind, wt_src = water_table_source(slope_data)
+        if wt_kind == 'seep':
             if not had_cache and piezo_line:
                 print("gamma_sat weight split: using the seepage solution's u = 0 "
                       "contour as the water table; the piezometric line is NOT "
                       "used for unit weight (it may still supply pore pressure "
                       "and plotting).")
-            xs_grid, wt = cache
+            xs_grid, wt = wt_src
             water_table_y_all = np.interp(slice_centers, xs_grid, wt)
-        elif piezo_line:
+        elif wt_kind == 'piezo':
             water_table_y_all = np.asarray(piezo_y_all, dtype=float)
         # gamma_sat with no water table is reported once, before the run, by
         # preflight (mat.gamma_sat_without_water); a warning here would repeat

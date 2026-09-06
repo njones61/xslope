@@ -988,25 +988,51 @@ def seep_water_table_profile(slope_data):
     return cache
 
 
-def water_table_y(slope_data, x):
-    """Water-table elevation at x (scalar or array), NaN where the model does
-    not define one there.
+def water_table_source(slope_data):
+    """Which surface this model's water table is read from, and the samples to
+    read it from: ``('seep', (xs, ys))``, ``('piezo', (xs, ys))``, or
+    ``(None, None)`` when the model defines no water table at all.
 
-    Follows the precedence above: the seepage solution's u = 0 contour first,
-    the piezometric line second. Off the ends of a piezometric line the answer
-    is NaN rather than the nearest endpoint, so a column outside the line's own
-    extent is treated as undefined instead of silently flooded or drained.
+    ONE water table per problem, and this is the one place its source is chosen.
+    The seepage solution's u = 0 contour wins over a hand-drawn piezometric line
+    whenever the model carries one; the choice is independent of any material's
+    pore-pressure option, because the water table governs unit weight while the u
+    option governs pore pressure. Both engines call it — the limit equilibrium
+    slicer to split each slice's weight, the finite element engine to split the
+    gravity load and the overburden — so the two can never disagree about where
+    the water table is.
+
+    The x samples come back sorted ascending, ready for ``np.interp``.
     """
     import numpy as np
-    x = np.asarray(x, dtype=float)
     prof = seep_water_table_profile(slope_data)
     if prof is not None:
-        xs_grid, wt = prof
-        return np.interp(x, xs_grid, wt)
+        return 'seep', prof
     piezo = slope_data.get('piezo_line') or []
     if len(piezo) >= 2:
         pts = np.asarray(piezo, dtype=float)
         order = np.argsort(pts[:, 0])
-        return np.interp(x, pts[order, 0], pts[order, 1],
-                         left=np.nan, right=np.nan)
+        return 'piezo', (pts[order, 0], pts[order, 1])
+    return None, None
+
+
+def water_table_y(slope_data, x):
+    """Water-table elevation at x (scalar or array), NaN where the model does
+    not define one there.
+
+    Follows the precedence in :func:`water_table_source`: the seepage solution's
+    u = 0 contour first, the piezometric line second. Off the ends of a
+    piezometric line the answer is NaN rather than the nearest endpoint, so a
+    column outside the line's own extent is treated as undefined instead of
+    silently flooded or drained.
+    """
+    import numpy as np
+    x = np.asarray(x, dtype=float)
+    kind, src = water_table_source(slope_data)
+    if kind == 'seep':
+        xs_grid, wt = src
+        return np.interp(x, xs_grid, wt)
+    if kind == 'piezo':
+        xs, ys = src
+        return np.interp(x, xs, ys, left=np.nan, right=np.nan)
     return np.full(x.shape, np.nan)

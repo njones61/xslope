@@ -18,9 +18,12 @@ opened to 75 degrees, reaches a surface whose entry ramp is a single straight
 segment at alpha = -59.96 degrees in a phi = 33 material. Four of its forty-one
 slices sit past the singularity: m_alpha falls to -0.2507 and the least base
 normal is -963.6. Janbu reports 0.8152 there. On the identical slices Spencer
-reads 4.3825, Morgenstern-Price 3.4116, Lowe & Karafiath 1.6107 and Corps of
-Engineers 1.4036 — Janbu is a factor of five below the complete-equilibrium
-answer, not a few percent below it.
+reads 4.3825 and Morgenstern-Price 3.4116 — Janbu is a factor of five below the
+complete-equilibrium answer, not a few percent below it. Corps of Engineers and
+Lowe & Karafiath refuse the surface on their own measure, their roots standing 3
+to 16 times below Spencer's answer, so this is a pathological surface for every
+method that solves the base normal slice by slice; what isolated Janbu is that it
+alone reported a number.
 
 The default 65-degree `max_base_angle` cap kept the search off that basin, but
 only incidentally: the winning surface's own steepest base is 59.96 degrees, well
@@ -47,8 +50,9 @@ methods to their own converged answer:
 WHAT IS CHECKED
 
 * the surface the defect was found on: Janbu refused with a reason that names
-  m_alpha and the count of slices past it, where it used to report 0.8152, and
-  the four complete-equilibrium methods still answer on the same slices;
+  m_alpha and the count of slices past it, where it used to report 0.8152, while
+  Spencer and Morgenstern-Price still answer on the same slices and the
+  force-equilibrium pair refuses it on its own measure;
 * the refusal classifies as `inadmissible`, so a search reports it by class;
 * every shipped sample's own surfaces still solve under all three methods, and
   the closest any of them comes to the bar is far above it;
@@ -90,11 +94,19 @@ DEFECT_POINTS = [
     (24.22341144119898, 8.074470480399661),
 ]
 
-#: What Janbu used to report there, and what the four complete-equilibrium
-#: methods read on the identical slices.
+#: What Janbu used to report there, and what the complete-equilibrium methods read
+#: on the identical slices. Corps of Engineers and Lowe & Karafiath are absent by
+#: measurement rather than oversight: on this surface their closure's roots stand
+#: 3, 3 and 16 times below Spencer's answer, past `solve.FE_MAX_BELOW_MOMENT`, so
+#: they refuse it too. The surface is pathological for every method that takes its
+#: base normal from a slice-by-slice solve; what isolates Janbu is that it alone
+#: used to report a number there.
 DEFECT_JANBU = 0.8152
-DEFECT_COMPANIONS = {'corps': 1.4036, 'lowe': 1.6107,
-                     'spencer': 4.3825, 'mprice': 3.4116}
+DEFECT_COMPANIONS = {'spencer': 4.3825, 'mprice': 3.4116}
+
+#: The force-equilibrium methods on the same surface: both refuse, and the reason
+#: names the moment answer they stand below.
+DEFECT_REFUSED = ('corps', 'lowe')
 
 
 def _poly(points):
@@ -145,10 +157,21 @@ def leg_the_singular_surface_is_refused():
         elif abs(res_c['FS'] - expected) > 5e-3:
             fails.append(f"{method}: {res_c['FS']:.4f} against the {expected:.4f} "
                          f"this surface is pinned at")
+    # And the force-equilibrium pair refuses it too, on its own measure.
+    for method in DEFECT_REFUSED:
+        ok_f, res_f = getattr(solve, method)(df.copy())
+        if ok_f:
+            fails.append(f"{method}: reports {res_f['FS']:.4f} on the defect "
+                         f"surface, where its roots stand several times below the "
+                         f"moment answer")
+        elif 'below the moment factor of safety' not in str(res_f):
+            fails.append(f"{method}: refused for a different reason than the one "
+                         f"this surface is pinned on ({res_f})")
     if not fails:
         print("  companions " + ", ".join(
             f"{m} {v:.3f}" for m, v in sorted(DEFECT_COMPANIONS.items()))
-            + f" — against Janbu's old {DEFECT_JANBU}")
+            + f" — against Janbu's old {DEFECT_JANBU}; "
+            + " and ".join(DEFECT_REFUSED) + " refuse it as well")
     return fails
 
 

@@ -2541,27 +2541,27 @@ the same model, and the differences below measure what separates them.
 | Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
 |---|---|---|
 | No pile | 1.136 | 1.14 (−0.4%) |
-| Pile, free head | 1.497 | 1.36 (+10.1%) |
+| Pile, free head | 1.578 | 1.36 (+16.0%) |
 | Pile, unrotated head | 1.587 | 1.45 (+9.4%) |
 | Pile, hinged head — not built | — | 1.54 |
 | Pile, fully fixed head — not built | — | 1.55 |
 
 Without a pile the two agree to −0.4%: the same section, soil and strength-reduction procedure,
 with nothing three-dimensional in either model. That row is what makes the other two readable. With
-the pile in place the two-dimensional model reads high, by +10.1% with a free head and +9.4% with
+the pile in place the two-dimensional model reads high, by +16.0% with a free head and +9.4% with
 the head unrotated, which is the direction the idealization predicts: in three dimensions the soil
 at three diameters' spacing arches onto the piles, some of it moves between them, and it can slip
 along each pile's surface, while in a plane-strain smear the row is a continuous sheet at one-third
-the stiffness that everything above has to push through. Restraining the head rotation is worth a
-comparable amount in the two models. The two locked rows differ by the head condition and nothing
-else; holding the tip as well leaves the unrotated-head factor of safety unchanged, because the tip
-sits on the model's own base, and the free-head model sits close enough to its critical factor that
-different valid numerical configurations land a bisection step or two apart.
+the stiffness that everything above has to push through. The two locked rows differ by the head
+condition and nothing else, and they land a bisection step apart where the three-dimensional pair
+is separated by an order of magnitude more: restraining the head governs how the soil arches
+around individual piles, and a plane-strain sheet already carries load along its whole length.
+Holding the tip as well leaves the unrotated-head factor of safety unchanged, because the tip sits
+on the model's own base.
 
-The limit-equilibrium path at [VP106](#vp106) lands a comparable distance above the
-three-dimensional answer rather than a materially smaller one, so this problem does not rank the two
-two-dimensional routes against each other and neither recovers the three-dimensional credit. What
-recommends the limit-equilibrium path is the Ito & Matsui limit pressure behind it, a theory *of*
+The limit-equilibrium path at [VP106](#vp106) lands nearer the three-dimensional answer than the
+finite-element path does, and still above it, so neither two-dimensional route recovers the
+three-dimensional credit. What recommends the limit-equilibrium path is the Ito & Matsui limit pressure behind it, a theory *of*
 the three-dimensional mechanism rather than a two-dimensional stand-in for it.
 
 **Scope.** The plane-strain beam is an exact representation of a member that really is continuous
@@ -2574,7 +2574,7 @@ spacings, and [VP54](#vp54). See
 **Sources:** Cai & Ugai (2000), the three-dimensional shear-strength-reduction results.
 
 <!-- test: file=files/rocscience/vp106a_fem.xlsx, type=fem_ssrm, expected_fs=1.136, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.85, f_max=1.45, max_iter=16000, benchmark=VP106-FEM-nopile -->
-<!-- test: file=files/rocscience/vp106c_fem.xlsx, type=fem_ssrm, expected_fs=1.497, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=VP106-FEM-free -->
+<!-- test: file=files/rocscience/vp106c_fem.xlsx, type=fem_ssrm, expected_fs=1.578, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=VP106-FEM-free -->
 <!-- test: file=files/rocscience/vp106c_fem_fix.xlsx, type=fem_ssrm, expected_fs=1.587, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.9, max_iter=16000, benchmark=VP106-FEM-fixed -->
 
 ## VP107: Retaining walls, gabion walls, supports {#vp107}

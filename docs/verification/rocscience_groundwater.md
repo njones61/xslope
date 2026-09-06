@@ -850,7 +850,7 @@ Slide and SEEP/W use. Here the two coefficients differ by a factor of about 27, 
 vendor's retention line is nearly flat over the suction the dam reaches, so which of the two
 acts above the water table governs the drainage time-scale outright.
 
-![gw018: toe-slope total head, XSLOPE vs digitized Fig 20.5](images/gw018.png){width=600px}
+![gw018: toe-slope total head, XSLOPE vs digitized Fig 20.5](images/gw018.png){width=800px}
 
 <!-- test: file=files/rocscience_gw/gw018.xlsx, type=tseep_head, target_size=1.5, time=0.6, max_head_change_frac=0.25, points=30:11:2.756;35:8.5:2.460;40:6:2.107;45:3.5:1.707, tolerance=0.15, benchmark=GW18-t0.6 -->
 <!-- test: file=files/rocscience_gw/gw018.xlsx, type=tseep_head, target_size=1.5, time=19656, max_head_change_frac=0.25, points=30:11:7.718;35:8.5:6.823;40:6:5.540;45:3.5:3.422, tolerance=0.15, benchmark=GW18-t19656 -->
@@ -898,7 +898,7 @@ on the Gardner split: a single $(\alpha, n)$ fitted to the conductivity table wo
 to supply the capacity, which costs a factor of two to four in rms at every frame. The residual
 lead is what remains once both curves are the vendor's own.
 
-![gw019: pressure head along the top boundary as the lagoon fills](images/gw019.png){width=600px}
+![gw019: pressure head along the top boundary as the lagoon fills](images/gw019.png){width=800px}
 
 <!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=73, max_head_change_frac=0.25, points=1:8:6.088;3:8:5.417;1:5:5.033, tolerance=0.15, benchmark=GW19-t73 -->
 <!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=416, max_head_change_frac=0.25, points=1:8:7.706;3:8:6.960;1:5:5.924, tolerance=0.15, benchmark=GW19-t416 -->
@@ -950,7 +950,7 @@ mound fills but not the state it fills to, which is what the table measures. XSL
 solved heads at four interior stations are locked at the three report times as a regression
 guard; the vendor-facing lock for this geometry is GW7's.
 
-![gw020: total head along the query line as rainfall perches on the lens](images/gw020.png){width=600px}
+![gw020: total head along the query line as rainfall perches on the lens](images/gw020.png){width=800px}
 
 <!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=4.6, max_head_change_frac=0.25, points=2.2:0.95:0.357;2:0.85:0.305;2:0.75:0.300;1.6:0.72:0.300, tolerance=0.15, benchmark=GW20-t4.6 -->
 <!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=31, max_head_change_frac=0.25, points=2.2:0.95:0.490;2:0.85:0.412;2:0.75:0.375;1.6:0.72:0.337, tolerance=0.15, benchmark=GW20-t31 -->
@@ -973,7 +973,7 @@ Case 1 starts from zero head; case 2 from a uniform 5 ft steady head and steps t
 XSLOPE reproduces the erfc profile at 600 hr to within **0.015 ft** across the domain (below).
 The tags lock the closed-form head at five stations, tolerance 0.05 ft.
 
-![gw021: Ferris confined-aquifer profile, erfc vs XSLOPE](images/gw021.png){width=600px}
+![gw021: Ferris confined-aquifer profile, erfc vs XSLOPE](images/gw021.png){width=800px}
 
 <!-- test: file=files/rocscience_gw/gw021a.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:103.592;20:2.5:102.354;30:2.5:101.397;40:2.5:100.746;50:2.5:100.357, tolerance=0.05, benchmark=GW21a -->
 <!-- test: file=files/rocscience_gw/gw021b.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:108.592;20:2.5:107.354;30:2.5:106.397;40:2.5:105.746;50:2.5:105.357, tolerance=0.05, benchmark=GW21b -->

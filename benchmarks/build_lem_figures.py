@@ -16,8 +16,9 @@ the panel's height in empty ground below the model and another third above it.
 Mapping: the file is split on test tags; the figures named ``*_inputs*.png``,
 ``*_results*.png`` and ``*_search_results*.png`` in the text segment preceding
 each tag belong to that problem (so base vs *_mods variants land in separate
-segments). A figure that another page shows but no sample section does is listed
-in ``EXTRA_FIGURES`` below and drawn from that entry instead.
+segments). A figure the mapping cannot reach — one no sample section shows any
+more, or one whose run is not the run its section's tag describes — is listed in
+``EXTRA_FIGURES`` below and drawn from that entry instead.
 
     PYTHONPATH=. python3 benchmarks/build_lem_figures.py            # every figure
     PYTHONPATH=. python3 benchmarks/build_lem_figures.py gsat_      # names matching
@@ -41,7 +42,8 @@ from xslope.search import (circular_search, noncircular_search, file_search_wind
                            noncircular_search_opts)
 from xslope.solve import solve_selected
 from xslope.plot import (plot_inputs, plot_solution, plot_circular_search_results,
-                         plot_noncircular_search_results)
+                         plot_noncircular_search_results, plot_reliability_results)
+from xslope.advanced import reliability
 
 SAMPLES_MD = "docs/lem/samples.md"
 IMG_DIR = "docs/lem"
@@ -64,22 +66,59 @@ INPUTS_RE = re.compile(r'sample_images/([a-z0-9_]*?_inputs\d*)\.png')
 OTHER_OWNERS = {"hassiotis_inputs", "hassiotis_results",
                 "hassiotis_p1_results", "hassiotis_p2_results"}
 
-#: Figures in sample_images/ that no sample section shows any more but another
-#: page still does. They have no test tag to be read off, so they are drawn from
-#: an explicit entry here rather than losing their producer: a figure nothing can
+#: Figures in sample_images/ that the segment mapping cannot reach: a figure no
+#: sample section shows any more, and a figure whose section shows it but whose
+#: run is not the one that section's test tag describes. They are drawn from an
+#: explicit entry here rather than losing their producer: a figure nothing can
 #: rebuild goes stale the first time the solver moves and nobody can tell.
-#: Each entry is (figure name, workbook, test type, num_slices, kind, rapid),
-#: where kind is "inputs", "results" or "search_results" — the same three the
-#: page-driven pass draws, with the same styling.
+#:
+#: Each entry is a dict with a figure ``name``, the ``xlsx`` it is drawn from and
+#: a ``kind`` — "inputs", "results", "search_results" (the three the page-driven
+#: pass draws, with the same styling) or "reliability". The solved kinds also
+#: take ``ttype`` ("circular_search", "noncircular_search" or "single_circle"),
+#: ``num_slices``, ``rapid``, and ``circles`` to re-seed the search.
 #:
 #: noncircular_search_results is the non-circular coordinate-descent search on
 #: the weak-layer model. It was sample section 7's search figure until that
 #: section shrank to its solution and table; docs/lem/search.md shows it as the
 #: illustration of plot_noncircular_search_results().
+#:
+#: mult_min_degenerate is section 13's first figure — the degenerate near-planar
+#: sliver that section warns about. It is not the run behind that section's tag,
+#: which solves the deep foundation circle the file carries, so it is drawn here
+#: instead: the same search LEM-10 draws for the same model
+#: (docs/tutorials/images/lem10_search_shallow.png), seeded with the generated
+#: embankment circles — the starting circles tangent to the top of the
+#: foundation. That seed is what collapses onto the sliver at FS = 1.299, the
+#: "FS ~ 1.30" the section's caption names. A search seeded with the deep circle
+#: on the file's own circles sheet no longer reaches the sliver at all.
+#:
+#: prob_submerged_reliability is section 15's figure: the Taylor-series run its
+#: first test tag locks (Spencer, searched), drawn with the F_MLV surface the
+#: page's summary table is read off.
 EXTRA_FIGURES = [
-    ("noncircular_search_results", "files/xslope_noncircular.xlsx",
-     "noncircular_search", 40, "search_results", False),
+    dict(name="noncircular_search_results", xlsx="files/xslope_noncircular.xlsx",
+         kind="search_results", ttype="noncircular_search"),
+    dict(name="mult_min_degenerate", xlsx="files/xslope_mult_min_KEY.xlsx",
+         kind="search_results", ttype="circular_search",
+         circles="generated_embankment"),
+    dict(name="prob_submerged_reliability",
+         xlsx="files/xslope_prob_submerged_KEY.xlsx", kind="reliability"),
 ]
+
+
+def embankment_circles(sd):
+    """The generated starting circles tangent to the top of the foundation.
+
+    ``generate_starting_circles`` returns one circle per material boundary plus a
+    surficial skim; ``Depth == 0`` picks the embankment set. The skim circle is
+    left out because its center sits hundreds of feet above the section, which
+    would push the model into a corner of the search figure's frame.
+    """
+    from xslope.generators import generate_starting_circles
+    with contextlib.redirect_stdout(io.StringIO()):
+        generated = generate_starting_circles(sd)
+    return [c for c in generated if abs(c["Depth"]) < 1e-9]
 
 
 def capture(path, fn, *args, **kwargs):
@@ -192,15 +231,34 @@ def main(only=()):
                     crit["solver_result"], frame="content")
             n += 1
 
-    for name, xlsx, ttype, num_slices, kind, rapid in EXTRA_FIGURES:
+    for entry in EXTRA_FIGURES:
+        name = entry["name"]
         if not wanted([name]):
             continue
-        sd = load_slope_data(os.path.join(IMG_DIR, xlsx))
+        kind = entry["kind"]
+        ttype = entry.get("ttype", "circular_search")
+        num_slices = entry.get("num_slices", 40)
+        rapid = entry.get("rapid", False)
+        sd = load_slope_data(os.path.join(IMG_DIR, entry["xlsx"]))
         out = f"{IMG_DIR}/sample_images/{name}.png"
         if kind == "inputs":
             capture(out, plot_inputs, sd, frame="content")
             n += 1
             continue
+        if kind == "reliability":
+            # The suite's own reliability call (run_tests.py::run_reliability_test):
+            # the Taylor series over a searched critical surface, so the F_MLV the
+            # figure's title carries is the number the section's tag locks.
+            with contextlib.redirect_stdout(io.StringIO()):
+                ok, res = reliability(sd, METHOD, circular=True, debug_level=0,
+                                      search=True)
+            if not ok:
+                raise SystemExit(f"{name}: reliability failed — {res}")
+            capture(out, plot_reliability_results, sd, res, frame="content")
+            n += 1
+            continue
+        if entry.get("circles") == "generated_embankment":
+            sd = dict(sd, circles=embankment_circles(sd))
         crit, fs_cache, path, circ = search(sd, ttype, num_slices, rapid)
         if kind == "search_results":
             if ttype == "noncircular_search":

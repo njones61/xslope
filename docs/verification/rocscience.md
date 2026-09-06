@@ -95,7 +95,7 @@ verifiable.
 <!-- test: file=files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
 <!-- test: file=files/rocscience/vp042.xlsx, type=single_circle, num_slices=60, fs_oms=1.773, fs_bishop=1.882, fs_spencer=1.926, fs_mprice=1.925, benchmark=VP42-circle -->
 <!-- test: file=files/rocscience/vp042.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.882, fs_mprice=1.869, benchmark=VP42-noncirc -->
-<!-- test: file=files/rocscience/vp043.xlsx, type=single_noncirc, num_slices=50, fs_spencer=1.352, fs_janbu=1.352, benchmark=VP43 -->
+<!-- test: file=files/rocscience/vp043.xlsx, type=single_noncirc, num_slices=50, fs_spencer=1.352, fs_janbu=1.352, fs_mprice=1.352, fs_corps=1.352, fs_lowe=1.352, benchmark=VP43 -->
 <!-- test: file=files/rocscience/vp044a.xlsx, type=circular_search, num_slices=40, fs_spencer=0.958, benchmark=VP44-pow -->
 <!-- test: file=files/rocscience/vp044b.xlsx, type=circular_search, num_slices=40, fs_spencer=1.518, benchmark=VP44-mc -->
 <!-- test: file=files/rocscience/vp044c.xlsx, type=circular_search, num_slices=40, fs_spencer=0.980, benchmark=VP44-lla -->
@@ -1321,9 +1321,12 @@ The manual's figure is unlabeled and the geometry it implies controls the answer
 | Method | XSLOPE | RocPlane | Baker (Culmann) | Slide |
 |---|---|---|---|---|
 | Spencer | 1.352 | 1.351 (+0.1%) | ≈ 1.35 | 1.329 (circular search — a different surface) |
+| Morgenstern-Price | 1.352 | — | — | — |
 | Janbu (corrected) | 1.352 | — | — | 1.329 (circular search — a different surface) |
+| Corps of Engineers | 1.352 | — | — | — |
+| Lowe-Karafiath | 1.352 | — | — | — |
 
-Spencer and Janbu both read 1.352 on that plane, matching SLOPE/W's own solve of the identical plane and the RocPlane and Baker references. Morgenstern-Price, Corps and Lowe-Karafiath decline a single straight plane: α is constant for every slice, so reaching equilibrium drives most interslice forces into tension and the admissibility guard rejects them, the same behavior as [SLOPE/W §2.26](geostudio.md#gs-2-26).
+Every method that applies to a non-circular surface reads 1.352 on the plane, agreeing to ten significant figures and matching SLOPE/W's own solve of the identical plane along with the RocPlane and Baker references. A single straight plane holds α constant on every slice, and reaching equilibrium on it leaves most of the interior boundaries in interslice tension; the four side-force methods report that state alongside the factor of safety rather than declining the surface. [SLOPE/W §2.26](geostudio.md#gs-2-26) is the same problem and reads the same way.
 
 **Sources:** Slide Slope Stability Verification Manual §43; GeoStudio SLOPE/W Verification Manual §2.26; Baker (2001); Baker & Leshchinsky (2001).
 

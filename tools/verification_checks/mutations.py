@@ -12,17 +12,17 @@ upper-bound percentages, scientific notation, thousands separators, share
 lists, share rows, prefix-qualified quantities, the hedged-precision escape,
 rounded tag restatements, scientific-notation tag values, list-valued locks
 (one element of a printed row, one element of the tag, a partly published probe
-set), and the structural figure mode.
+set), and the structural figure mode.  The tag block also covers the
+restatement pass: a section that prints its lock twice must agree with it both
+times.
 
 `NEGATIVE` runs the other way: edits that must NOT be flagged, so that a check
 tightened against a defect cannot quietly start demanding that pages print tag
-values verbatim rather than at the precision each comparison is read at.  Its
-last entry is a control on a planted mutation: it plants the same table with the
-delta the page's own numbers imply, so that M5 beside it tests the pairing rule
-it names rather than the absence of any pairing at all.
-
-One fixture stands MISSED: G1, which is a gap in the tag audit rather than a
-stale fixture.  Its comment carries the mechanism and the evidence.
+values verbatim rather than at the precision each comparison is read at.  Two of
+its entries are controls on planted mutations: N4 plants M5's table with the
+delta the page's own numbers imply, and N5 plants a correct third statement of
+the lock G1 and G1b corrupt, so that each pair tests the rule it names rather
+than the absence of any pairing or of any second statement at all.
 
 Every fixture is a temporary copy — the pages themselves are never written.
 
@@ -176,18 +176,18 @@ MUTATIONS = [
      "| 1.80 | the proprietary slip-circle program's **1.7** (0%) |"),
 
     # -------------------------------------------------------------- tags ---
-    # STANDING MISS.  The forward tag audit is existential — it asks whether the
-    # locked value is printed in the section, not whether every restatement of
-    # it is right — and Example 2 prints its 1.341 lock twice, as `| 1.34 |` in
-    # the results table and as "this model's 1.34" in the note below it.  Either
-    # one can drift with the other left standing and the audit still finds the
-    # value.  The table cell is caught by the delta check, because its row also
-    # carries `FE FOS 1.4 (−4.3%)`; the note carries no comparison, so a drift
-    # there is caught by nothing.  Left planted rather than moved: it is the
-    # only fixture holding the gap open, and no section on any page publishes a
-    # rounded lock exactly once for it to be re-anchored to.
+    # Example 2 prints its 1.341 lock twice — as `| 1.34 |` in the results table
+    # and as "this model's 1.34" in the note below it — so the existential
+    # forward pass finds the value however either one drifts.  The restatement
+    # pass reads both: the table cell sits in the XSLOPE column of a row labeled
+    # SSRM, which is what the lock's own `type` names, and the note attributes
+    # its number to "this model's".  `NEGATIVE`'s N5 plants a correct third
+    # restatement in the same section and requires silence, so this fixture
+    # tests the agreement and not the mere presence of a second number.
     ("ssrm", "tags", "G1 rounded tag restatement is a different value",
      "equilibrium criterion) | 1.34 |", "equilibrium criterion) | 1.44 |"),
+    ("ssrm", "tags", "G1b the same lock drifts in the note instead",
+     "against this model's 1.34", "against this model's 1.44"),
     ("geostudio", "tags", "G2 tagged value dropped from its section",
      "| Janbu | 1.330 | 1.233 |", "| Janbu | — | 1.233 |"),
     ("rocscience_groundwater", "tags", "G3 scientific-notation tag mantissa drifts",
@@ -274,6 +274,16 @@ NEGATIVE = [
      "### Confined Radial Flow {#verification-confined-radial}\n\n"
      "The `us` column and [the note](https://example.org/our/we/us.html) "
      "record it; the firm base now sits at depth D.\n"),
+    # G1's control: a THIRD statement of Example 2's 1.341 lock, correct, in a
+    # sentence of its own.  Without it, G1 and G1b would be satisfied by a check
+    # that flagged every restatement rather than by one that reads whether the
+    # restatement agrees.  The sentence names the mesh as well as the method, so
+    # it also exercises the narrowing that picks the quad8 lock out of the four
+    # the section carries.
+    ("ssrm", "tags", "N5 a correct restatement in a sentence of its own",
+     "*The dot is scored on the first row.",
+     "XSLOPE's SSRM on the same quad8 mesh reads 1.34 there too.\n\n"
+     "*The dot is scored on the first row."),
     # M5's control: the same planted table with the delta its authority column
     # implies, (0.781 − 0.81) / 0.81 = −3.6%.  Without this, M5 would be
     # satisfied by the check finding no pair at all rather than by the

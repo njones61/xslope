@@ -8,6 +8,14 @@ Forward : every locked value in a test tag (`expected_fs`, `expected_kc`,
           ``points=20:5:7.166;...`` (a solved head per station) — locks one
           value per element, and each element is checked the same way, so a
           wrong digit in one printed cell of an eleven-row table fails.
+Restate: the forward pass is existential — it asks whether the lock is printed,
+          not whether every printing of it is right.  A section that states its
+          locked factor of safety twice (a results-table cell and a note under
+          it) could therefore drift in one place with the other left standing.
+          So every number the section ATTRIBUTES TO ITSELF — a results-table
+          cell in an XSLOPE column of a row whose label names the locked method,
+          or a number introduced in prose by "XSLOPE's" / "this model's" — must
+          agree with one of the locks that attribution reaches.
 Reverse : every value the page PRESENTS AS LOCKED must have a tag behind it.
           A value is presented as locked when it appears in the Results column
           of a summary row whose Match cell carries a colour dot (a dot scores
@@ -256,6 +264,368 @@ def forward(path, cfg, report=print):
     return len(problems) + len(dead) + len(dead_decl)
 
 
+#: An XSLOPE-side attributor: the sentence says the number that follows is this
+#: program's own result.  A number with no attributor before it in its sentence
+#: is not claimed by the page as a restatement of anything, and belongs to the
+#: untagged sweep rather than to this one.
+XSIDE = re.compile(
+    r"\bXSLOPE(?:'s|’s)?\b|\bthis model(?:'s|’s)?\b|"
+    r"\bthe model(?:'s|’s)?\b|\bthis run(?:'s|’s)?\b", re.I)
+
+#: ... and a source-side attributor, which withdraws it: what follows belongs to
+#: the source until an XSLOPE-side marker takes the sentence back.  The page's
+#: own authority vocabulary (the column headers its tables use for the source)
+#: plus the generic ways prose names one.
+SOURCE_EXTRA = (
+    r"\bthe (?:paper|source|authors?|chart|charts|vendor|program|reference)"
+    r"(?:'s|’s)?\b|\btheir\b|\bpublished\b|\breported\b|\bquotes?\b|"
+    r"\bFE (?:FOS|FS)\b|\bSLOPE/W\b|\bSEEP/W\b|\bGMS\b|\bSEEP2D\b")
+
+#: Ends a sentence, and with it the attribution the sentence carried.  Matched
+#: only where a period is followed by space, so a decimal point never resets;
+#: an abbreviation ("p. 394", "Fig. 5") resets early, which only ever makes the
+#: sweep read fewer numbers.
+SENT_END = re.compile(r"[.;:!?](?=\s|$)")
+
+#: The words a tag's own fields put into the label of the row that publishes it.
+#: Each slot is a tuple of alternatives; a row label (or a sentence) names a
+#: lock when every slot the lock declares is named in it.
+METHOD_WORDS = {
+    "spencer": ("spencer",),
+    "bishop": ("bishop",),
+    "janbu": ("janbu",),
+    "oms": ("oms", "ordinary method", "fellenius"),
+    "corps": ("corps",),
+    "lowe": ("lowe", "karafiath"),
+    "mprice": ("morgenstern", "m-p", "m–p", "mprice"),
+}
+
+#: A parenthetical aside inside a table cell — `1.415 *(search 1.411)*`, `1.34
+#: (quad8)`.  The row's result is what the cell states outright; a number the
+#: cell puts in parentheses is a second quantity the page names there, and the
+#: row label does not describe it.
+PAREN = re.compile(r"\([^)]*\)")
+
+
+def _identity(key, kv):
+    """Identity slots of one locked value: what its row label must name.
+
+    The method is normally in the KEY — a LEM tag locks one value per method
+    as ``fs_bishop=0.985, fs_spencer=…`` — and otherwise in ``method=``.  The
+    engine, the element type and a constrained search add their own slot, so
+    two SSRM locks on the same model are told apart by the mesh they name and a
+    tangency-constrained search by the word "tangent".
+    """
+    slots = []
+    t = kv.get("type", "").lower()
+    if "ssrm" in t or t == "fem_elements":
+        slots.append(("ssrm", "srf", "strength reduction"))
+    m = kv.get("method", "").lower()
+    km = re.fullmatch(r"fs_(\w+)", key)
+    if km:
+        m = km.group(1).lower()
+    if m:
+        slots.append(METHOD_WORDS.get(m, (m,)))
+    et = kv.get("element_type", "").lower()
+    if et:
+        slots.append((et,))
+    if "tangent_depth" in kv:
+        slots.append(("tangent",))
+    return slots
+
+
+def _names(slots, text):
+    """True when `text` names every slot of a lock's identity."""
+    return bool(slots) and all(any(a in text for a in slot) for slot in slots)
+
+
+def _agrees(tok, lock, dp):
+    """True when a printed number restates `lock` at a precision it allows.
+
+    Either the printed string is one of the forms the lock may be rounded to
+    (the same rule the forward pass matches with), or it is inside the tag's own
+    tolerance — which is the tag's own statement of what counts as this value.
+    """
+    value, tol = lock[0], lock[1]
+    if tok in _forms(value, dp):
+        return True
+    try:
+        return abs(Decimal(tok) - Decimal(value)) <= tol
+    except Exception:
+        return False
+
+
+#: A cross-page reference to another verification section: `(rocscience.md#vp52)`.
+XREF = re.compile(r"\(([a-z_0-9]+\.md)#([\w.:-]+)\)")
+
+
+def _corpus_tags():
+    """Every verification page's tags, keyed by input file and by anchor.
+
+    A page routinely restates a value another page locks — geostudio's ACADS
+    rows are Rocscience's models, tagged there — so a section that names the
+    file gets the benefit of the lock wherever the tag lives.  Same scope the
+    untagged sweep gives a corpus lock, and the same reason: the number is
+    tag-guarded either way, and it is the restatement that can drift.
+
+    A section also gets the locks of the section it cross-references by anchor
+    ("**Rocscience detail:** [VP52](rocscience.md#vp52)"), because that link is
+    the page saying the two present the same problem.  A pair of sections that
+    tabulate the same model under different variants normally links only one of
+    the input files, and the variant it publishes is locked in the other's.
+    """
+    import glob
+    import os
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo = os.path.dirname(os.path.dirname(here))
+    by_file, by_anchor = {}, {}
+    for page in sorted(glob.glob(os.path.join(repo, "docs", "verification",
+                                              "*.md"))):
+        name = os.path.basename(page)
+        lines = open(page).read().split("\n")
+        heads = [i for i, l in enumerate(lines) if re.match(r"^#{2,3} ", l)]
+        secs = [(i, heads[k + 1] if k + 1 < len(heads) else len(lines))
+                for k, i in enumerate(heads)]
+        tagged = [(i, kv) for i, l in enumerate(lines) if (kv := _tag_kv(l))
+                  and "file" in kv]
+        bank = [(i, kv) for i, kv in tagged
+                if not any(a <= i < b for a, b in secs)]
+        for i, kv in tagged:
+            by_file.setdefault(os.path.basename(kv["file"]), []).append(
+                (kv, f"{name}:{i + 1}"))
+        for a, b in secs:
+            m = re.search(r"\{#([\w.:-]+)\}", lines[a])
+            if not m:
+                continue
+            body = "\n".join(lines[a:b])
+            here_tags = [(kv, f"{name}:{i + 1}") for i, kv in tagged
+                         if a <= i < b]
+            here_tags += [(kv, f"{name}:{i + 1}") for i, kv in bank
+                          if kv["file"] in body]
+            by_anchor[f"{name}#{m.group(1)}"] = here_tags
+    return by_file, by_anchor
+
+
+def _section_locks(lines, sec, page_bank, corpus):
+    """Every lock in scope for one section, with its identity and its tag line.
+
+    A section's own tags, a page-level bank tag whose input file the section
+    links, any other page's tag on a file this section links, and the tags of a
+    section this one cross-references by anchor.
+    """
+    by_file, by_anchor = corpus
+    out = []
+    seen = set()
+
+    def add(kv, ln):
+        if id(kv) in seen:
+            return
+        seen.add(id(kv))
+        tol = kv.get("tolerance", "0.01")
+        try:
+            tol = Decimal(str(tol))
+        except Exception:
+            tol = Decimal("0.01")
+        for k, v in kv.items():
+            if not _wanted(k, ("expected_fs*", "fs_*", "expected")):
+                continue
+            slots = _identity(k, kv)
+            for part in str(v).split(";"):
+                part = part.split(":")[-1].strip()
+                try:
+                    Decimal(part)
+                except Exception:
+                    continue
+                out.append((part, tol, slots, ln, kv.get("benchmark", "?"), k))
+
+    body = "\n".join(lines[sec[0]:sec[1]])
+    for i in range(sec[0], sec[1]):
+        kv = _tag_kv(lines[i])
+        if kv:
+            add(kv, i + 1)
+    for kv, ln in page_bank:
+        if kv.get("file") and kv["file"] in body:
+            add(kv, ln)
+    for base, tagged in by_file.items():
+        if base in body:
+            for kv, ln in tagged:
+                add(kv, ln)
+    for page, anchor in XREF.findall(body):
+        for kv, ln in by_anchor.get(f"{page}#{anchor}", ()):
+            add(kv, ln)
+    return out
+
+
+def _table_rows(lines, sec):
+    """(row line, label, [(cell text, start, end)]) for XSLOPE columns.
+
+    A results table is one with a column headed XSLOPE; those are the cells that
+    hold what the page computed, and the row's first cell says what quantity.
+
+    Read only where the table has ONE such column.  A table with several —
+    `XSLOPE composite` beside `XSLOPE circles-only`, `XSLOPE FE seepage` beside
+    `XSLOPE piezo line` — publishes a row's method under several variants, and
+    the row label names none of them; which lock belongs to which column is a
+    reading of the header, not something the row states.  Those tables are left
+    to the delta check, which pairs each column against the source beside it.
+    """
+    from .deltas import XCOL
+    out, i = [], sec[0]
+    while i < sec[1] - 1:
+        if not lines[i].lstrip().startswith("|") or \
+                not re.match(r"^\s*\|[\s:|-]+\|\s*$", lines[i + 1]):
+            i += 1
+            continue
+        hdr = [c.strip() for c in lines[i].strip().strip("|").split("|")]
+        xk = [k for k, c in enumerate(hdr) if XCOL.search(c)]
+        j = i + 2
+        while j < sec[1] and lines[j].lstrip().startswith("|"):
+            if len(xk) == 1:
+                bars = [p for p, ch in enumerate(lines[j]) if ch == "|"]
+                cells = [(lines[j][a + 1:b], a + 1, b)
+                         for a, b in zip(bars, bars[1:])]
+                if len(cells) > xk[0]:
+                    out.append((j, cells[0][0].lower(), [cells[xk[0]]]))
+            j += 1
+        i = max(j, i + 1)
+    return out
+
+
+def restatements(path, cfg, report=print):
+    """Every number a section attributes to itself must agree with a lock.
+
+    The forward pass is existential.  This one is universal over the numbers the
+    section CLAIMS as its own results, which is a narrower set than "every
+    number shaped like a factor of safety": a cell in the XSLOPE column of a row
+    whose label names a locked method, or a number a sentence introduces with
+    "XSLOPE's" / "this model's".  Anything the page attributes to a source, and
+    anything it attributes to nobody, is left where it already is — to the
+    delta check and to the untagged sweep.
+    """
+    from .deltas import AUTH_HDR_BASE, mask_sci
+    from .untagged import (COORD_FIRST, COORD_SECOND, FS_HI, FS_LO, FS_SHAPED,
+                           LABEL_BEFORE, SEEPAGE_TYPES, UNIT_AFTER, _mask)
+
+    source = re.compile(
+        SOURCE_EXTRA + "|" + AUTH_HDR_BASE
+        + ("|" + "|".join(cfg.auth_hdr_extra) if cfg.auth_hdr_extra else ""),
+        re.I)
+    raw = open(path).read().replace(MINUS, "-")
+    lines = raw.split("\n")
+    heads = [(i, l) for i, l in enumerate(lines) if re.match(r"^#{2,3} ", l)]
+    bounds = [(i, heads[k + 1][0] if k + 1 < len(heads) else len(lines), l)
+              for k, (i, l) in enumerate(heads)]
+    page_bank = [(kv, i + 1) for i, l in enumerate(lines)
+                 if (kv := _tag_kv(l)) and not any(b[0] <= i < b[1]
+                                                   for b in bounds)]
+    corpus = _corpus_tags()
+
+    #: One scan for the four things the prose arm reacts to, in priority order:
+    #: an XSLOPE-side attributor, a source, the end of the sentence carrying
+    #: them, and a number.  Each alternative is wrapped, so the combined pattern
+    #: has exactly one group whichever alternative fired.
+    prose = re.compile("|".join(f"(?:{p})" for p in (
+        XSIDE.pattern, source.pattern, SENT_END.pattern, FS_SHAPED.pattern)),
+        re.I)
+
+    def candidate(line, tok, start, end):
+        """The standard reasons a factor-of-safety-shaped token is not one."""
+        try:
+            v = Decimal(tok)
+        except Exception:
+            return False
+        if not (FS_LO <= v <= FS_HI):
+            return False
+        after = line[end:end + 12]
+        before = line[max(0, start - 24):start]
+        if UNIT_AFTER.match(after) or LABEL_BEFORE.search(before):
+            return False
+        if COORD_SECOND.search(before) or (
+                before.rstrip().endswith("(") and COORD_FIRST.match(after)):
+            return False
+        return True
+
+    problems, checked = [], 0
+    for sec in bounds:
+        locks = _section_locks(lines, sec, page_bank, corpus)
+        if not locks:
+            continue
+        types = {kv.get("type", "") for i in range(sec[0], sec[1])
+                 if (kv := _tag_kv(lines[i]))}
+        types |= {kv.get("type", "") for kv, _ in page_bank
+                  if kv.get("file", "\x00") in "\n".join(lines[sec[0]:sec[1]])}
+        if types and types <= SEEPAGE_TYPES:
+            continue          # heads and flow rates, not factors of safety
+
+        def flag(i, tok, why, bound):
+            near = min(bound, key=lambda l: abs(Decimal(tok) - Decimal(l[0])))
+            problems.append((i + 1, tok, why, near[0], near[3], near[4],
+                             near[5]))
+
+        # -- results-table cells: the XSLOPE column of a row the locks name ---
+        table_rows = _table_rows(lines, sec)
+        for j, label, cells in table_rows:
+            bound = [l for l in locks if _names(l[2], label)]
+            if not bound:
+                continue
+            for text, a, _b in cells:
+                masked = PAREN.sub(lambda p: " " * len(p.group(0)),
+                                   mask_sci(_mask(text)))
+                for m in FS_SHAPED.finditer(masked):
+                    tok = m.group(1)
+                    if not candidate(text, tok, m.start(1), m.end(1)):
+                        continue
+                    checked += 1
+                    if not any(_agrees(tok, l, cfg.tag_round_dp)
+                               for l in bound):
+                        flag(j, tok, f"row {label.strip()!r}", bound)
+
+        # -- prose: a number the sentence attributes to XSLOPE ---------------
+        rows = {j for j, _, _ in table_rows}
+        side, sent = None, ""
+        for i in range(sec[0], sec[1]):
+            line = lines[i]
+            if not line.strip() or line.lstrip().startswith("<!-- ") \
+                    or line.startswith("#") or line.lstrip().startswith("|"):
+                side, sent = None, ""
+                continue
+            if i in rows:
+                continue
+            masked = mask_sci(_mask(line))
+            pos = 0
+            for m in prose.finditer(masked):
+                sent += masked[pos:m.start()]
+                pos = m.end()
+                tok = m.group(0)
+                if SENT_END.fullmatch(tok):
+                    side, sent = None, ""
+                    continue
+                if XSIDE.fullmatch(tok):
+                    side, sent = "x", sent + tok
+                    continue
+                if source.fullmatch(tok):
+                    side, sent = None, sent + tok
+                    continue
+                sent += tok
+                if side != "x" or m.group(1) is None \
+                        or not candidate(line, tok, m.start(), m.end()):
+                    continue
+                low = sent.lower()
+                narrowed = [l for l in locks if _names(l[2], low)]
+                bound = narrowed or locks
+                checked += 1
+                if not any(_agrees(tok, l, cfg.tag_round_dp) for l in bound):
+                    flag(i, tok, "prose attributed to XSLOPE", bound)
+            sent += masked[pos:]
+
+    report(f"restatements: {checked} attributed numbers read; "
+           f"disagreeing with their lock: {len(problems)}")
+    for ln, tok, why, val, tagln, bench, key in problems:
+        report(f"  L{ln} prints {tok} ({why}) but the lock is {key}={val} "
+               f"[{bench}], tagged at L{tagln}")
+    return len(problems)
+
+
 def reverse(path, cfg, report=print):
     """Values presented as locked that no tag backs."""
     if not cfg.locked_value_re:
@@ -301,7 +671,8 @@ def reverse(path, cfg, report=print):
 
 
 def run(path, cfg, report=print):
-    return forward(path, cfg, report) + reverse(path, cfg, report)
+    return (forward(path, cfg, report) + restatements(path, cfg, report)
+            + reverse(path, cfg, report))
 
 
 def _cli():

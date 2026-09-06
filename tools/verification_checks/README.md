@@ -24,11 +24,40 @@ Percentages that are not comparisons — a share of the mesh, a probability of
 failure, a degree of consolidation — are excluded by named phrases, never by a
 bare word, so a real comparison cannot hide behind an incidental noun.
 
-**Tags** (`tags.py`). Both directions. Forward: every value a `<!-- test: -->`
-tag locks must be printed in the section that carries the tag. Reverse: every
-value the page presents as locked — a factor of safety in the Results column of
-a summary row whose Match cell carries a colour dot — must have a tag behind it.
+**Tags** (`tags.py`). Three passes. Forward: every value a `<!-- test: -->`
+tag locks must be printed in the section that carries the tag. Restatements:
+every number a section attributes to XSLOPE must agree with a lock that
+attribution reaches. Reverse: every value the page presents as locked — a factor
+of safety in the Results column of a summary row whose Match cell carries a
+colour dot — must have a tag behind it.
 The tag is truth: when a tag and the text disagree, the text is what changes.
+
+The forward pass is existential — it asks whether the lock is printed, not
+whether every printing of it is right — so a section that states its locked
+factor of safety twice could drift in one place with the other left standing.
+The restatement pass is universal over the numbers the section claims as its
+own results, which is a narrower set than "every number shaped like a factor of
+safety":
+
+* a cell in a results table's XSLOPE column, where the row's label names the
+  locked method — the method a tag names in its key (`fs_bishop`), in
+  `method=`, or in a `type=` that says SSRM, narrowed further by the element
+  type it meshes on and by a tangency constraint on the search;
+* a number a sentence introduces with "XSLOPE's" or "this model's", up to the
+  next sentence boundary or the next mention of a source.
+
+A number the page attributes to a source, and a number it attributes to nobody,
+are left where they already are — to the delta check and to the untagged sweep.
+A table with several XSLOPE columns (`XSLOPE composite` beside `XSLOPE
+circles-only`) publishes a row's method under variants the row label does not
+name, and a number a cell puts in parentheses (`1.415 *(search 1.411)*`) is a
+second quantity stated there; neither is read. The locks in scope are the
+section's own, a page-level bank tag whose input file the section links, any
+page's tag on a file the section links, and the tags of a section this one
+cross-references by anchor — the link being the page's own statement that the
+two present the same problem. A restatement passes when it is the lock rounded
+to a precision the page allows (`tag_round_dp`) or inside the tag's own
+tolerance.
 
 A tag value that is a semicolon **list** locks one value per element, and every
 element is checked the same way — `expected=1.686;0.941;…` (a factor of safety

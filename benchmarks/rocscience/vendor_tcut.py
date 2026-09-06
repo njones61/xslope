@@ -331,7 +331,14 @@ VENDOR_T_CUT = {
     # RS2-40 — vendor models 'slope stability #040_01/02.fez' state T: 0 on both
     #   materials (C: 0 phi: 38 for the Shell, C: 0 phi: 20 for the Core).
     #   vp077b is authored from the Slide2 manual's figures rather than from a .fez,
-    #   so the vendor-first pass never reached it.
+    #   so the vendor-first pass never reached it. #040_01 is the finite-element
+    #   seepage case (vp077a) and #040_02 the piezometric one (vp077b); both state
+    #   the same caps, and both fills being c = 0 the cap coincides with the
+    #   Mohr-Coulomb apex either way.
+    'vp077a.xlsx': {
+        'Shell': 0.0,
+        'Core': 0.0,
+    },
     'vp077b.xlsx': {
         'Shell': 0.0,
         'Core': 0.0,
@@ -361,6 +368,55 @@ VENDOR_T_CUT = {
     'vp091_fem.xlsx': {
         'Reinforced and retained fill': 0.0,
         'Foundation soil': 0.0,
+        'Blocks': 2.5,
+    },
+    # RS2-49 through RS2-55 — the seven parametric variants of the Leshchinsky & Han
+    #   multi-tiered wall, vendor models 'slope stability #049.fez' through '#055.fez'
+    #   (RS2 Slope Stability Verification Manual Part II, problems 49-55, pp. 134-153).
+    #   Every one of them states T = 0 on the c = 0 reinforced and retained fill,
+    #   T = 10 on the c = 10 foundation and T = 2.5 on the blocks, i.e. T = c
+    #   throughout, with tensilestrength_SRF: 0 (so the tags run tension_srf=false).
+    #   Only #052's foundation departs, because that variant's foundation is itself
+    #   c = 0 (see vp091 below). The seven files were written uncapped until the
+    #   entries below were transcribed; on a c = 0 fill a blank cutoff coincides with
+    #   the vendor's T = 0, since the Mohr-Coulomb apex c/tan(phi) that bounds an
+    #   uncapped material is zero there, so the fill's cap is inert either way and
+    #   the live cap on every variant is the blocks'.
+    'vp088.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+        'Blocks': 2.5,
+    },
+    'vp089.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+        'Blocks': 2.5,
+    },
+    'vp090.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+        'Blocks': 2.5,
+    },
+    # RS2-52's LEM/figure file. #052 gives the weak foundation c = 0, so its T = 0 too
+    # — the same row vp091_fem carries above, on the 30 m section.
+    'vp091.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 0.0,
+        'Blocks': 2.5,
+    },
+    'vp092.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+        'Blocks': 2.5,
+    },
+    'vp093.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+        'Blocks': 2.5,
+    },
+    'vp094.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
         'Blocks': 2.5,
     },
     # RS2-56a
@@ -1040,6 +1096,45 @@ VENDOR_E_NU = {
     },
     # RS2-52 — #052 gives all three materials the same pair, as #048 does.
     'vp091_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    # RS2-49 through RS2-55 — '#049' through '#055' each give all three materials the
+    #   same pair, nu = 0.4 / E = 50000 kPa, as #048 and #052 do. The seven files took
+    #   the soil-type classifier's constants (17 000 / 32 000 / 137 000 kPa at
+    #   nu = 0.3 / 0.4) until these entries were transcribed.
+    'vp088.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp089.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp090.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp091.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp092.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp093.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp094.xlsx': {
         'Reinforced and retained fill': (0.4, 50000.0),
         'Foundation soil': (0.4, 50000.0),
         'Blocks': (0.4, 50000.0),

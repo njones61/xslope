@@ -10,6 +10,16 @@ caption makes no layout claim, so it is named in ``caption_exempt``.
 from ..config import PageConfig
 
 CONFIG = PageConfig(
+    # Strength-envelope coefficients written the way a factor of safety is:
+    # Baker's power-curve tau = A * sigma'^b on VP44/VP45 and the London-clay
+    # offset inside (sigma' + 0.152) on VP61 are inputs, not measurements.
+    untagged_allow=[
+        ('1.107', 'power curve'),
+        ('0.86', 'power curve'),
+        ('1.107', 'Power-curve case'),
+        ('0.86', 'Power-curve case'),
+        ('0.152', 'power curve'),
+    ],
     name="rocscience",
 
     bounds=[

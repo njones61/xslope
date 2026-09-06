@@ -61,7 +61,7 @@ FS_LO, FS_HI = Decimal("0.10"), Decimal("10")
 #: What a number is NOT a factor of safety when it is followed by: a unit, a
 #: dimension, a scale.  Matched against the text immediately after the token.
 UNIT_AFTER = re.compile(
-    r"^\s*(?:%|°|″|'|\"|:|/|×|x\b|m\b|mm\b|m²|m³|ft\b|ft²|ft³|in\b|s\b|"
+    r"^\s*(?:%|°|″|'|\"|:|/|×|x\b|m\b|mm\b|cm\b|m²|m³|ft\b|ft²|ft³|in\b|s\b|"
     r"kPa|MPa|psf|psi|pcf|ksi|kN|kNm|lb|kip|H\b|D\b|g\b|degrees?\b|"
     r"times\b|per\b|elements?\b|nodes?\b)")
 
@@ -72,7 +72,7 @@ UNIT_AFTER = re.compile(
 #: not measurements of anything and no tag would ever guard them.  Matched
 #: against the 24 characters before the token.
 LABEL_BEFORE = re.compile(
-    r"(?:Fig\.?|Figure|Table|Eq\.?|Equation|Problem|§|v|version|"
+    r"(?:Figs?\.?|Figures?|Table|Eq\.?|Equation|Problem|§|v|version|"
     r"Part|item|no\.?)\s*(?:\d+(?:\.\d+)?\s*[-–]\s*)?$|"
     r"\b(?:r_?u|r<sub>u</sub>|k_?c|k_?h|K0|A|n|ν|nu|ψ|psi|β|beta|σ_?F|"
     r"Poisson[’']?s ratio|coefficient|exponent)\s*[=≈]\s*$", re.I)

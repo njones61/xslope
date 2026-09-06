@@ -125,7 +125,6 @@ CONFIG = PageConfig(
         "images/gs2_cons_inputs.png",
         "images/gs2_infil_inputs.png",
         "images/gs2_rdd_inst_inputs.png",
-        "images/gs2_rdd_slow_inputs.png",
         "images/gs2_pond_inputs.png",
         "images/gs2_heap_inputs.png",
         "images/gs2_mso_inputs.png",

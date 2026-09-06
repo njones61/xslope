@@ -379,8 +379,7 @@ def fig_pond():
 
 _INPUT_STEMS = (('gs2_cons', 'SEEPW-T01 — consolidation column'),
                 ('gs2_infil', 'SEEPW-T02 — infiltration column'),
-                ('gs2_rdd_inst', 'SEEPW-T03 — dam, instantaneous drawdown'),
-                ('gs2_rdd_slow', 'SEEPW-T03 — dam, slow drawdown'),
+                ('gs2_rdd_inst', 'SEEPW-T03 — dam (both drawdown rates)'),
                 ('gs2_pond', 'SEEPW-T04 — clay-lined pond'),
                 ('gs2_heap', 'SEEPW-T05 — leach column'),
                 ('gs2_mso', 'SEEPW-T07 — multistep outflow column'))

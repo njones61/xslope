@@ -2968,7 +2968,8 @@ TENSION_SRF_HELP = (
     "strength envelope, shear and tensile — RS2's tensilestrength_SRF = 1 and what "
     "Plaxis does. NO holds each cap at its authored value through the bisection. "
     "Blank leaves it to the solver, which reduces. Either way this is a no-op on a "
-    "model that sets no t_cut and no global cutoff: there is no cap to reduce.")
+    "model that states no t_cut and no global cutoff: there is no stated cap to "
+    "reduce, and the envelope's own apex c/tan(phi) is the same at every F.")
 
 
 class GlobalParamsDialog(QDialog):
@@ -3119,9 +3120,11 @@ def _new_material():
             "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
             "Ss": None, "Sy": None,
             # t_cut starts at 0 (Rankine cutoff ON, no-tension soil) rather than
-            # blank: blank means unbounded tension, which is the trap the
-            # mat.tensile_cap_missing preflight rule warns about. A user who
-            # wants the unbounded plain-M-C convention clears the cell and gets
+            # blank: blank leaves the material the tension its own envelope admits
+            # — c/tan(phi) on Mohr-Coulomb, unbounded at phi = 0 — which on a
+            # cohesive soil is real tensile strength the user may not intend, and
+            # is the trap the mat.tensile_cap_missing preflight rule warns about.
+            # A user who wants the plain-M-C convention clears the cell and gets
             # that warning — the alarm fires on turning the cutoff OFF, not on
             # every new material. (Norm's ruling, 2026-09-01.)
             "t_cut": 0.0, "phi_b": None, "s_cap": None,
@@ -3895,12 +3898,11 @@ MATERIALS_HELP = {
     # 393 chars — MEASURED to wrap in exactly two lines at the dialog's natural width
     # (the strip is fixed at two lines and clips beyond). Keep any edit at or under
     # this length.
-    "t_cut": ("Tensile-strength cap (Rankine, major principal stress). FEM only. Blank "
-              "is NOT 'no tension': Mohr-Coulomb grants c/tanφ (28 kPa at c=20, φ=35°; "
-              "unbounded at φ=0), which strength reduction never touches — enough to "
-              "hold a steep crest cut shut and inflate SSRM FS. A cap you set IS reduced "
-              "with F, like c and tanφ (RS2/Plaxis do the same). 0 = the material "
-              "carries no tension at all."),
+    "t_cut": ("Tensile-strength cap (Rankine, major principal stress). FEM only. Blank leaves it "
+              "to the envelope: Mohr-Coulomb grants c/tanφ (28 kPa at c=20, φ=35°; unbounded "
+              "at φ=0), enforced but never reduced by F — enough to hold a steep crest cut "
+              "shut and inflate SSRM FS. At c=0, blank and 0 are the same. A cap you set IS "
+              "reduced with F, like c and tanφ (RS2/Plaxis do the same). 0 = no tension at all."),
     "E": "FEM elastic (Young's) modulus — with ν, the only mechanical property read for an elastic material.",
     "nu": "FEM Poisson's ratio — with E, the only mechanical property read for an elastic material.",
     "u": "Pore-pressure model: none, piezo (piezometric line), seep (seepage solution), or ru.",

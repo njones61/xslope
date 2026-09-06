@@ -93,7 +93,7 @@ A choice you make in a Studio dialog always wins over the value in the file.
 - **LEM method** (`oms`, `janbu`, `bishop`, `corps`, `lowe`, `spencer`, `mprice`, or `all`) — **[–]**: the limit-equilibrium method this model is built for. `all` means "run every method" and is used by the batch drivers; the Studio run dialog, which solves one method at a time, leaves its own default in place for it. An unrecognized value is an error at load time, never a silent fallback to some other method.
 - **Number of slices** — **[–]**: the slice count for limit-equilibrium runs. Minimum 2; blank uses the solver default.
 - **K0 initial stress (FEM)** — **[–]**: at-rest lateral earth pressure coefficient for the FEM's **initial stress state**. Blank starts from zero stress and switches gravity on in one step, so the initial lateral stress is whatever elasticity produces — σ<sub>h</sub> = ν/(1−ν)·σ<sub>v</sub>, about 0.43·σ<sub>v</sub> at ν = 0.3, a number set by the stiffness rather than by the soil. Enter a value and the initial stress is built from the overburden instead, σ<sub>h</sub> = K0·σ<sub>v</sub> both in-plane and out-of-plane, and then iterated to equilibrium — in an SSRM run as a separate full-strength step, so that establishing the in-situ state is not charged to the strength reduction. Normally consolidated sand sits near Jaky's 1 − sin φ′; compacted fills and overconsolidated clays run at 1.0 and above. Set **1.0** to reproduce an RS2 result, whose models are authored with an isotropic K = 1 field stress. The effect is small on a cohesive slope and worth several percent on a reinforced or near-cohesionless one, always in the direction of a higher factor of safety. A value here must be positive; leave the cell blank for the gravity turn-on. See [K0 initial stress](../fem/overview.md#k0-initial-stress) for the formulation, how to choose a value, and the measured sensitivity.
-- **Tension SRF (FEM)** (`YES` or `NO`) — **[–]**: whether the tensile-strength cap (`t_cut`) is reduced along with c and tan φ during a strength reduction. `YES` (what the template ships with) makes the factor of safety the factor on the whole strength envelope, shear and tensile. `NO` holds each cap at its authored value through the bisection. The setting changes nothing unless some material declares a cutoff **above zero**: a blank `t_cut` is no cap at all, and a cutoff of `0` — a soil that carries no tension — is still `0` however it is divided. Studio's Run FEM dialog dims the matching checkbox on both kinds of model.
+- **Tension SRF (FEM)** (`YES` or `NO`) — **[–]**: whether the tensile-strength cap (`t_cut`) is reduced along with c and tan φ during a strength reduction. `YES` (what the template ships with) makes the factor of safety the factor on the whole strength envelope, shear and tensile. `NO` holds each cap at its authored value through the bisection. The setting changes nothing unless some material declares a cutoff **above zero**: a blank `t_cut` leaves the material its envelope's own apex, which strength reduction never moves, and a cutoff of `0` — a soil that carries no tension — is still `0` however it is divided. Studio's Run FEM dialog dims the matching checkbox on both kinds of model.
 - **Mesh element type** (`tri3`, `tri6`, `quad4`, `quad8`, or `quad9`) — **[–]**: the element type the Build Mesh dialog opens on. Quadratic elements (`tri6`, `quad8`, `quad9`) are strongly preferred for FEM/SSRM; the linear ones lock volumetrically and overestimate the factor of safety.
 - **Mesh target size** — **[L]**: the target element size the Build Mesh dialog opens on. Setting it also turns auto-sizing off, since a size in the file means the file meant that size.
 - **1D element size** — **[L]**: the target element size along the model's 1D members — the pile and reinforcement lines — where it should differ from the mesh target size above. Blank means the members follow the mesh target size; a value here must be positive.
@@ -241,10 +241,12 @@ principal stress, **[F/L²]**, honored by the **FEM only** — the LEM ignores i
 [tension crack](#worksheet-main) global parameters instead if that is the effect wanted in LEM). It layers on top
 of whichever shear envelope the material's `option` defines and never changes the envelope itself:
 
-- **Blank**: no cutoff — unbounded tension. Blank is what an empty template cell means and what every
-  pre-v16 file carries, but it is the *deliberate* choice, not the recommended one: a material added in
-  Studio starts at **0**, and the [model checks](preflight.md) warn whenever a strength-bearing material
-  leaves the cell blank.
+- **Blank**: the material's own envelope decides, and the engine enforces it. On `mc` that is the
+  apex $c/\tan\phi$ — the most tension Mohr-Coulomb admits — so a **cohesionless** material carries
+  no tension whether the cell is blank or `0`, while a cohesive one is allowed a tensile strength
+  that may be far above anything it really has. On `cp` ($\phi = 0$) there is no apex and nothing
+  bounds the tension. A material added in Studio starts at **0**, and the
+  [model checks](preflight.md) warn whenever a cohesive material leaves the cell blank.
 - **0**: the material carries no tension at all.
 - **A positive value**: the major principal stress is capped at that value.
 
@@ -264,12 +266,9 @@ the material is allowed the full implicit tensile strength $c/\tan\phi$ of its o
 $c = 20$, $\phi = 35°$), which the strength-reduction factor never reduces. In SSRM that fictitious tension can hold
 a steep crest cut shut and push the factor of safety up. Set **t_cut** whenever the mechanism has to open a tension
 zone. A **cohesionless** (c = 0) `mc`
-material deserves special care: its envelope's own apex sits at zero, but with **t_cut** blank a zone
-pulled into tension — under a reinforced fill, a steep face, a footing edge — has no mechanism that
-removes that tension from the solution, and an SSRM run can report convergence while carrying tensile
-stress the material cannot hold, reading the factor of safety high. Enter **t_cut = 0** for such a
-material unless the model is a deliberate reproduction of a source that assumes unbounded tension.
-And set it always when the target is an **RS2 or Plaxis** comparison: those codes cap tension by default, so the
+material needs nothing: its envelope's own apex sits at zero, so blank and **0** are the same entry
+and the material carries no tension either way.
+And set **t_cut** always when the target is an **RS2 or Plaxis** comparison: those codes cap tension by default, so the
 vendor model carries a tensile strength that must be transcribed for the two answers to mean the same thing. Once
 set, the cap is reduced along with $c$ and $\tan\phi$ during strength reduction — XSLOPE's default, and RS2's and
 Plaxis' — so the factor of safety is the factor by which the whole envelope, shear and tensile, is reduced. An

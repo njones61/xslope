@@ -653,13 +653,15 @@ The [model checks](#model-checks-before-a-run) in the dialog's second column are
 finite-element ones: a blank Poisson's ratio (which reads as 0.0 and moved the
 strength-reduction factor of safety by a third on the reference model), a modulus of
 zero, a mesh that references a material the table does not define, and — above — a
-material with no tensile cap, which grants it unbounded tension and raises the factor
-of safety with nothing else on screen to show it.
+cohesive material with no tensile cap, which leaves it the tension its own envelope
+admits — up to the Mohr-Coulomb apex c/tan φ — and raises the factor of safety with
+nothing else on screen to show it.
 
 **Reduce the tensile cap with F (Tension SRF)** decides whether each material's
 tensile cutoff is divided by the trial factor along with *c* and tan φ, or held at the
 value entered. It is offered only where some material declares a cutoff above zero. A
-blank cutoff is no cap at all, and a cutoff of 0 is still 0 however it is divided, so on
+blank cutoff leaves the envelope's own apex, which is the same at every trial factor,
+and a cutoff of 0 is still 0 however it is divided, so on
 a model whose materials are each blank or 0 the setting has nothing to reduce and the
 checkbox is dimmed, with the reason in its tooltip. It is also dimmed for a single
 trial, which has no bracket to reduce anything over.

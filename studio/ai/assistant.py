@@ -160,7 +160,8 @@ the canvas re-renders automatically.
   infinite strength, cannot fail; ignores every strength key below, uses only
   gamma/gamma_sat/E/nu (+ seepage); LEM
   treats it as impenetrable), c, phi, cp, r_elev, d, psi, t_cut (Rankine tensile-strength
-  cutoff, stress units; None/blank = no cutoff (pre-v16 default), 0 = no tension; FEM only,
+  cutoff, stress units; None/blank = no stated cutoff, so the material's own envelope decides
+  and the FEM enforces it (mc: the apex c/tan(phi); unbounded only at phi=0), 0 = no tension; FEM only,
   LEM ignores it), phi_b, s_cap (v17 matric-suction apparent cohesion, LEM & FEM — Fredlund
   extended MC (in the FEM/SSRM the suction term is reduced by F alongside tan phi');
   phi_b = unsaturated friction angle phi^b in degrees, None/blank = no suction

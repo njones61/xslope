@@ -592,9 +592,9 @@ in mild effective tension beneath reservoir loading; the smaller value is in the
 per-iteration displacement increment scales with $\Delta t$, so the convergence tolerance and the
 failure criterion are calibrated jointly with it — see the warning on `dt_scale` below.
 
-A **tension cutoff** is available as a second viscoplastic yield surface acting through the same
-mechanism; because it decides SSRM answers rather than ordinary stress analyses, it is described
-under [Tensile strength in the SSRM](#tensile-strength-in-ssrm).
+A **tension cutoff** runs as a second viscoplastic yield surface through the same mechanism; because
+it decides SSRM answers rather than ordinary stress analyses, it is described under
+[Tensile strength in the SSRM](#tensile-strength-in-ssrm).
 
 ### Convergence criterion
 
@@ -1243,15 +1243,28 @@ are converged, force-balanced and budget-independent. The factor of safety simpl
 **Rankine cutoff** $F_t = \sigma_1' - T$ that caps the major (most-tensile) principal effective
 stress — a second viscoplastic yield surface driven by the same damped mechanism as the
 Mohr-Coulomb surface, the two combined by Koiter's rule where both are active. It layers on top of
-the shear envelope and never alters it. Blank (the default) means no cutoff; `t_cut = 0` means the
-material carries no tension at all. The column is read automatically by `solve_fem()` and
-`solve_ssrm()`; a script can override it per element with `tension_cap_by_elem`, per material with
-`tension_cutoff_by_material`, or globally with the `tension_cutoff` flag, which is simply the
-$T = 0$ case applied everywhere.
+the shear envelope and never alters it. `t_cut = 0` means the material carries no tension at all; a
+positive value caps the major principal stress there. The column is read automatically by
+`solve_fem()` and `solve_ssrm()`; a script can override it per element with `tension_cap_by_elem`,
+per material with `tension_cutoff_by_material`, or globally with the `tension_cutoff` flag, which is
+simply the $T = 0$ case applied everywhere.
 
-The cutoff also covers a limitation of the flow rule: $\psi = 0$ Mohr-Coulomb flow is purely
-deviatoric and cannot on its own return a stress state near or beyond the apex. Griffiths & Lane
-(1999) include no tension treatment, which is why XSLOPE's default is no cutoff.
+**A blank cutoff means the envelope alone.** Where the cell is blank the material's own envelope
+decides how much tension it carries, and the engine enforces what the envelope says: every
+Mohr-Coulomb element runs a Rankine cap at its own apex $c/\tan\phi$, the most tension Mohr-Coulomb
+admits. The working cap is the smaller of the two, so a stated $T$ below the apex governs and the
+apex governs where nothing is stated. It takes no state away from the shear envelope — every state
+it can act on is one Mohr-Coulomb already forbids — and what it adds is a **return path**. The
+$\psi = 0$ flow is purely deviatoric: it can shrink a stress circle but cannot move the circle's
+center, so a Gauss point pulled to mean tension is inadmissible with no direction of flow that
+returns it, and the iteration cannot settle. The Rankine flow is volumetric at the biaxial apex and
+supplies exactly that return.
+
+Two consequences follow. A **cohesionless** material carries no tension whether its cell is blank or
+`0`: its apex sits at the origin, so the two entries describe the same admissible set and now give
+the same answer. And at $\phi = 0$ — a `cp` material, or `mc` entered with $\phi = 0$ — the apex is
+at infinity, so only a stated $T$ bounds the tension there. Power-curve and Hoek-Brown elements are
+left to their own envelopes, which carry a tensile strength of their own.
 
 **Reducing the cap with $F$.** `tension_srf` decides whether the cap shrinks with the trial factor.
 With `tension_srf=True` (**the default**) the solver divides it, $T_r = T/F$, exactly as it divides
@@ -1263,12 +1276,15 @@ not converge to the same factor of safety. The default is on because it only eve
 exists and is positive* — a model with no `t_cut` and no global cutoff has no $T$ to reduce, so
 every cap-less run (including all the Griffiths & Lane anchors) is identical either way, and a
 cutoff of $T = 0$ is left where it is for the same reason, since $0/F$ is $0$ at every trial factor.
-It is reachable three ways: the `tension_srf` keyword, the **Tension SRF** cell on the main sheet,
-and the matching checkbox in Studio's Run FEM dialog, which is dimmed on both of those kinds of
-model.
+The apex cap is never divided either: $(c/F)/(\tan\phi/F) = c/\tan\phi$ is the same number at every
+trial factor, which is the invariance the left panel above shows. The switch is reachable three
+ways: the `tension_srf` keyword, the **Tension SRF** cell on the main sheet, and the matching
+checkbox in Studio's Run FEM dialog, which is dimmed on both of those kinds of model.
 
-**Which convention to run.** XSLOPE's default is *no cutoff*, the Griffiths & Lane convention, and
-every [Griffiths & Lane anchor](../verification/ssrm.md) in the verification suite is locked under
+**Which convention to run.** XSLOPE's default is *the envelope's own limit* — the Griffiths & Lane
+convention, since those analyses state no separate tensile strength and a plain Mohr-Coulomb
+material admits tension to its apex and no further. Every
+[Griffiths & Lane anchor](../verification/ssrm.md) in the verification suite is locked under
 it. RS2 and Plaxis cap tension as a matter of course, writing an explicit per-material tensile
 strength into the model (in Rocscience's own published verification models it is almost always
 $T = c$, well below the apex). Neither convention is wrong, but they are not interchangeable, and

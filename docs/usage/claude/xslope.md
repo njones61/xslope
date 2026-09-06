@@ -492,14 +492,17 @@ slope_data['materials'] = [
         'psi':   0.0,            # friction angle
         # --- tensile-strength cutoff (v16): Rankine cap on the major principal stress, stress
         #     units. Read by mc/cp/pow/hb (NOT 'elastic', which cannot fail regardless). None/
-        #     blank = no cutoff — unbounded tension, exactly pre-v16 behavior; 0 = soil carries
-        #     no tension. FEM only; LEM ignores it (model a tension crack instead). On 'mc', a
-        #     t_cut at or above the cone apex c/tan(phi) never binds (inert). START NEW
-        #     MATERIALS AT 0 (Studio's new-material default): blank is the trap, not the safe
-        #     choice — with c = 0 the solver can freeze illegal tension into a "converged"
-        #     state and the FS reads high (preflight warns on a blank t_cut for exactly this).
-        #     Leave it blank only deliberately: to reproduce a published plain-M-C benchmark
-        #     that assumes unbounded tension, or when matching a vendor model that has no cap.
+        #     blank = the material's own envelope decides and the engine enforces it: on 'mc'
+        #     every element is capped at its apex c/tan(phi), all Mohr-Coulomb admits, so a
+        #     c = 0 soil carries no tension whether the cell is blank or 0. Tension is
+        #     unbounded only where phi = 0 ('cp', or 'mc' at phi = 0), where there is no apex.
+        #     0 = soil carries no tension. FEM only; LEM ignores it (model a tension crack
+        #     instead). A t_cut at or above the cone apex never binds (inert). START NEW
+        #     MATERIALS AT 0 (Studio's new-material default): on a COHESIVE material blank
+        #     grants c/tan(phi) of tensile strength that strength reduction never reduces,
+        #     usually far above anything the soil has, and it can hold a steep crest cut shut
+        #     and raise the FS (preflight warns on exactly that). Leave it blank to reproduce
+        #     a published plain-M-C benchmark, or when matching a vendor model with no cap.
         't_cut': 0,
         # --- matric-suction strength (v17): opt-in Fredlund extended Mohr-Coulomb apparent
         #     cohesion, read by BOTH solvers (LEM via generate_slices' suction_phi_b/
@@ -552,7 +555,8 @@ Common strength setups:
   gamma/gamma_sat/E/nu (+ seepage columns, if the zone still conducts water) matter; every strength
   key is ignored, and the LEM search treats the zone as impenetrable.
 - **Tension-limited slope:** add `t_cut=<stress value>` (or `t_cut=0` for no tension at all) to
-  any mc/cp/pow/hb material; leave `t_cut=None` for the pre-v16 unbounded-tension default.
+  any mc/cp/pow/hb material; leave `t_cut=None` to let the material's own envelope decide (on mc
+  the apex c/tan(phi), which the engine enforces; unbounded only at phi = 0).
 - **Unsaturated apparent cohesion (matric suction):** add `phi_b=<deg>` to an mc/pow/hb
   material with `u='piezo'` or `u='seep'` (read by both the LEM and FEM/SSRM solvers; the
   SSRM reduces the suction term by F alongside c' and tan(phi')); set `s_cap=<stress value>` too — mandatory in

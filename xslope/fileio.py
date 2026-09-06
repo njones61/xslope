@@ -1739,8 +1739,10 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                     "lie in [0, 1] (0 = undisturbed, 1 = heavily blast-damaged).")
 
         # Tensile-strength cutoff (v16). Rankine cap on the major principal stress,
-        # in stress units. BLANK -> None (no cutoff, unbounded tension -- exactly the
-        # pre-v16 behavior); 0 -> the soil carries no tension. FEM only; the LEM
+        # in stress units. BLANK -> None (no STATED cutoff: the FEM then caps each
+        # Mohr-Coulomb element at its own apex c/tan(phi), all that envelope admits --
+        # see xslope.fem._mc_apex_tension_cap); 0 -> the soil carries no tension at
+        # all, which on a c = 0 material is what BLANK already means. FEM only; the LEM
         # ignores it (a tension crack is modeled separately). Read by header name
         # ('t_cut' normalizes to 'tcut'), so pre-v16 sheets without the column load
         # as None.

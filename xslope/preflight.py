@@ -3396,8 +3396,9 @@ def _seep_bc_short(ctx):
 # The asymmetry these rules exist to close: a blank E is caught at assembly with
 # a clear message, a blank nu is NOT -- it reads as 0.0, passes the [0, 0.5)
 # range check, and moves the strength-reduction factor by a third. And a blank
-# t_cut is silent in both engines while granting the material unbounded tension,
-# which is the transcription defect the RS2 campaign traced a 2x factor to.
+# t_cut is silent in both engines while leaving a cohesive material the tension
+# its own envelope admits, c/tan(phi), which strength reduction never reduces --
+# the transcription defect the RS2 campaign traced a 2x factor to.
 # ---------------------------------------------------------------------------
 
 
@@ -3405,12 +3406,14 @@ def has_reducible_tensile_cap(material):
     """True where this material declares a tensile cutoff the trial factor can
     actually reduce -- a cutoff that is present, a number, and above zero.
 
-    The three states of ``t_cut`` are not two. A BLANK cell is no cap at all: the
-    material carries tension without limit, which is what ``mat.tensile_cap_missing``
-    is about. A cutoff of ``0`` is a no-tension material, a real modelling
-    statement -- but ``0 / F`` is ``0`` at every trial factor, so the Tension SRF
-    setting cannot move it either way. Only a POSITIVE cutoff is something a
-    strength reduction reduces.
+    The three states of ``t_cut`` are not two. A BLANK cell states no cap and
+    leaves the material the tension its own envelope admits -- on Mohr-Coulomb the
+    apex c/tan(phi), which strength reduction never moves because (c/F)/(tan(phi)/F)
+    is c/tan(phi) -- so there is nothing here for the Tension SRF setting to divide.
+    That is what ``mat.tensile_cap_missing`` is about. A cutoff of ``0`` is a
+    no-tension material, a real modelling statement -- but ``0 / F`` is ``0`` at
+    every trial factor, so the setting cannot move it either way. Only a POSITIVE
+    cutoff is something a strength reduction reduces.
 
     Every reader of "does this model have a cap to reduce" asks through this
     function -- the ``main.tension_srf_unset`` note below and Studio's Run FEM
@@ -3450,32 +3453,44 @@ def _mat_nu_unusable(ctx):
 
 
 @rule("mat.tensile_cap_missing", WARNING, ("fem",),
-      "A blank tensile strength t_cut grants the material unbounded tension.")
+      "A blank tensile strength t_cut leaves the material the tension its own "
+      "envelope admits, which on a cohesive soil is c/tan(phi).")
 def _mat_tensile_cap_missing(ctx):
+    """A blank ``t_cut`` hands the material's tensile strength to its own envelope.
+
+    The engine enforces what that envelope says: every Mohr-Coulomb element runs a
+    Rankine cap at its apex c/tan(phi) whether or not the model states a cutoff
+    (see ``xslope.fem._mc_apex_tension_cap``). So the question this rule asks is
+    not "can the solver hold the tension back" -- it can -- but "is the tension the
+    envelope admits tension the user meant to grant". Which is a question only
+    where the envelope admits some:
+
+    * **c = 0, phi > 0** -- the apex sits at the origin, so blank and ``0`` are the
+      same entry and the material carries no tension either way. Nothing to warn
+      about, and asking for a value that changes no number would be noise.
+    * **phi <= 0** (``cp``, or ``mc`` at phi = 0) -- no apex, nothing bounds the
+      tension, and only a stated cutoff can. Warned.
+    * **c > 0, phi > 0** -- a real tensile strength, invariant under strength
+      reduction, and usually far above what the soil has. Warned, with the number.
+
+    ``pow`` and ``hb`` are left alone: their tensile strength comes from their own
+    envelope (the ``pow_d`` intercept, the Hoek-Brown tensile limit), not from the
+    c/phi columns, so a Mohr-Coulomb apex says nothing about them.
+    """
     for i, m in ctx.fem_materials():
         opt = str(m.get("option") or "").strip().lower()
-        if opt in ("", "elastic"):
-            continue                  # no strength model, or t_cut is meaningless
+        if opt in ("", "elastic", "pow", "hb"):
+            continue                  # t_cut meaningless, or a different envelope
         raw = m.get("t_cut")
         if raw is not None and _num(raw) is not None:
             continue
         phi = _num(m.get("phi")) or 0.0
         c = _num(m.get("c")) or 0.0
+        if phi > 0 and c <= 0:
+            continue                  # apex at the origin: blank IS a no-tension soil
         if phi <= 0:
             what = ("without limit -- with φ = 0 the Mohr-Coulomb cone has no apex, "
                     "so nothing bounds the tensile stress the material can carry")
-        elif c <= 0:
-            # The apex bound is 0 here, but a blank t_cut is NOT equivalent to a
-            # no-tension material: the viscoplastic flow rule (ψ = 0) is purely
-            # deviatoric, so it cannot relieve mean stress, and a zone pulled into
-            # tension freezes there while the convergence measure still falls to
-            # zero. The solver then reports a converged state that carries tension
-            # a cohesionless soil cannot hold, and the factor of safety reads high.
-            # Only the Rankine cutoff (t_cut = 0) actually removes the tension.
-            what = ("that the solver cannot shed: with c = 0 any tensile stress is "
-                    "outside the yield surface, but the flow rule cannot relieve "
-                    "it, so a zone pulled into tension is carried as if the soil "
-                    "gripped it and the factor of safety reads high")
         else:
             apex = c / math.tan(math.radians(phi)) if phi < 90 else 0.0
             what = (f"up to the Mohr-Coulomb cone apex, c/tan(φ) = {apex:.4g}, which "

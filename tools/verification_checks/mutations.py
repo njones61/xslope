@@ -16,7 +16,15 @@ set), and the structural figure mode.
 
 `NEGATIVE` runs the other way: edits that must NOT be flagged, so that a check
 tightened against a defect cannot quietly start demanding that pages print tag
-values verbatim rather than at the precision each comparison is read at.
+values verbatim rather than at the precision each comparison is read at.  Its
+last entry is a control on a planted mutation: it plants the same table with the
+delta the page's own numbers imply, so that M5 beside it tests the pairing rule
+it names rather than the absence of any pairing at all.
+
+One fixture stands MISSED: G1, which is a gap in the tag audit rather than a
+stale fixture.  Its comment carries the mechanism and the evidence.
+
+Every fixture is a temporary copy — the pages themselves are never written.
 
 Usage: python -m tools.verification_checks.mutations
 """
@@ -28,6 +36,13 @@ import tempfile
 from . import certify, deltas, figures, tags, voice
 from .pages import PAGES
 
+#: A table with no XSLOPE column whose header names an authority: the delta in
+#: a value cell pairs against that column.  Planted by M5 (wrong delta, must be
+#: caught) and by N4 (the delta the pair implies, must pass).
+AUTH_HEAD = "### RS2-26: Clarence Cannon dam (Wolff & Harr 1987) {#rs2-26}"
+AUTH_TABLE = ("\n\n| Analysis | Reading | RS2 SSR |\n|---|---|---|\n"
+              "| III (12 m) | 0.781 ({}%) | 0.81 |\n")
+
 #: (page, check, name, old, new).  `check` selects which check must catch it.
 MUTATIONS = [
     # ------------------------------------------------------------------ rs2
@@ -38,13 +53,20 @@ MUTATIONS = [
     ("rs2", "deltas", "M3 last digit, summary row",
      "SSRM 1.280 vs RS2 SSRM 1.26 (+1.6%)", "SSRM 1.280 vs RS2 SSRM 1.26 (+1.7%)"),
     ("rs2", "deltas", "M4 prose delta",
-     "1.844**, −2.9% on", "1.844**, −2.7% on"),
+     "**1.115** against RS2's 1.11 (+0.5%)",
+     "**1.115** against RS2's 1.11 (+0.7%)"),
+    # No table on any of the pages is currently laid out with the authority in
+    # a column of its own and the delta in a value cell, so this plants one —
+    # the same device M10 and M16 use.  `NEGATIVE`'s N4 plants the identical
+    # table with the delta the authority column actually implies and requires
+    # it to pass, which is what makes this a test of the authority-column
+    # pairing rather than of "no pair exists".
     ("rs2", "deltas", "M5 authority-column table",
-     "| 2 | 1.13 | 1.194 (+5.7%)", "| 2 | 1.13 | 1.194 (+5.8%)"),
+     AUTH_HEAD, AUTH_HEAD + AUTH_TABLE.format("−3.9")),
     ("rs2", "deltas", "M6 range bound",
      "1.24–1.27 (+0.8%)", "1.24–1.27 (+0.9%)"),
     ("rs2", "deltas", "M7 whitelisted cross-ref",
-     "cf. [RS2-63](#rs2-63)\n+2.1%)", "cf. [RS2-63](#rs2-63)\n+2.4%)"),
+     "cf. [RS2-63](#rs2-63) +2.1%)", "cf. [RS2-63](#rs2-63) +2.4%)"),
     ("rs2", "deltas", "M8 XSLOPE value moved",
      "| SSRM | 1.347 |", "| SSRM | 1.357 |"),
     # The triage of 2026-08-03 removed every absolute-FS-difference claim rs2 had,
@@ -61,16 +83,20 @@ MUTATIONS = [
     ("rs2", "deltas", "M13 unsigned integer % in a table cell",
      "| SSRM | 1.409 | RS2 SSRM 1.38 (+2.1%) |",
      "| SSRM | 1.409 (44%) | RS2 SSRM 1.38 (+2.1%) |"),
+    # The delta is read from the LOWER bound of the printed range (−2.5% against
+    # 1.528); the upper bound would read −3.4%.  −3.0% is neither, and no other
+    # number in the row produces it.
     ("rs2", "deltas", "M15 range end that matches no operand",
-     "is +1.9 / +1.9 /\n+2.9%", "is +1.9 / +1.9 /\n+3.4%"),
+     "| 1.532 / 1.541 | 1.528–1.542 (−2.5%) |",
+     "| 1.532 / 1.541 | 1.528–1.542 (−3.0%) |"),
     ("rs2", "deltas", "M16 percent whose operand the page never prints",
      "### RS2-21: Bearing capacity test prism (Prandtl II) {#rs2-21}",
      "### RS2-21: Bearing capacity test prism (Prandtl II) {#rs2-21}\n\n"
      "Under the alternative construction the same prism reads −3.7% on that value.\n"),
     ("rs2", "deltas", "N21a whitelist-operand drift (RS2-22 load direction)",
      "1.534", "1.499", "all"),
-    ("rs2", "deltas", "N21d whitelist-operand drift (RS2-62 Spencer)",
-     "on the same mechanism (0.784)", "on the same mechanism (0.794)"),
+    ("rs2", "deltas", "N21d whitelist-operand drift (RS2-29 toe rounding)",
+     "+1.9% (0.978 → 0.997)", "+1.9% (0.988 → 0.997)"),
     ("rs2", "figures", "M14 two-panel caption in the 'other' bucket",
      "![RS2-1: FEM inputs, mesh, max shear strain and displacement vectors at the "
      "critical SRF](images/RS2-1.png)",
@@ -106,24 +132,28 @@ MUTATIONS = [
      "| Sliding-mass weight, SLOPE/W's own circle | ≈ 56,020 | 56,127 (−0.4%) |"),
 
     # ------------------------------------------------------- share lists ---
-    ("rocscience_groundwater", "deltas", "L1 share list loses its 'of u₀' tail",
-     "within 0.13%, 0.31% and 0.14% of $u_0$",
-     "within 0.13%, 0.31% and 0.14% of the analytical series"),
+    ("rocscience_groundwater", "deltas",
+     "L1 share list loses its 'of the 45 m dam' tail",
+     "1.7% and 2.7% of the 45 m dam",
+     "1.7% and 2.7% of the digitized profile"),
     ("rocscience_groundwater", "deltas", "L2 a real delta beside a share list",
-     "within 0.13%, 0.31% and 0.14% of $u_0$",
-     "within 0.13%, 0.31% and 0.14% of $u_0$; Bishop 1.351 vs 1.349 (+7.7%)"),
+     "1.7% and 2.7% of the 45 m dam.",
+     "1.7% and 2.7% of the 45 m dam; Bishop 1.351 vs 1.349 (+7.7%)."),
 
     # -------------------------------------------------------- share rows ---
     ("rocscience", "deltas", "R1 a declared value row is renamed",
      "| ΔFS over the A range (±15%) — **sweep result** |",
      "| FS change over the A range (±15%) — **sweep result** |"),
+    # VP40's two ΔFS rows are declared percent-change rows in `share_rows`; the
+    # FS row above them in the same table is not, and its delta is re-derived.
     ("rocscience", "deltas", "R2 the value-row exemption does not blanket its table",
-     "0.944 (−1.5% against XSLOPE's simplified",
-     "0.944 (−1.9% against XSLOPE's simplified"),
+     "| 0.98 (+2.3%) | Perry's value pairs",
+     "| 0.98 (+2.7%) | Perry's value pairs"),
 
     # ------------------------------------------- prefix-qualified values ---
     ("rocscience", "deltas", "P1 a COV loses its qualifier",
-     "on a COV 124% variable", "on a 124% variable"),
+     "at a COV of 124% the sampling treatment",
+     "at a spread of 124% the sampling treatment"),
     ("geostudio", "deltas", "P2 a probability of failure loses its qualifier",
      "**PF 0 → 1.45%**", "**0 → 1.45%**"),
 
@@ -131,9 +161,10 @@ MUTATIONS = [
     ("geostudio", "deltas", "H1 unhedged two-decimal signed delta",
      "| Clay fill, reinforced (imported geosynthetic) | −0.3% |",
      "| Clay fill, reinforced (imported geosynthetic) | −0.27% |"),
+    # the magnitude stays correct; only the printed precision moves
     ("rocscience", "deltas", "H2 unhedged integer signed delta",
-     "brings the residuals from −42.7% / +83.7%",
-     "brings the residuals from −43% / +83.7%"),
+     "| Corps of Engineers | 0.990 | 1.00 (−1.0%) |",
+     "| Corps of Engineers | 0.990 | 1.00 (−1%) |"),
 
     # ------------------------------------------------- zero at zero digits ---
     ("ssrm", "deltas", "Z1 a zero percentage that is not zero",
@@ -143,6 +174,16 @@ MUTATIONS = [
      "| 1.80 | the proprietary slip-circle program's **1.7** (0%) |"),
 
     # -------------------------------------------------------------- tags ---
+    # STANDING MISS.  The forward tag audit is existential — it asks whether the
+    # locked value is printed in the section, not whether every restatement of
+    # it is right — and Example 2 prints its 1.341 lock twice, as `| 1.34 |` in
+    # the results table and as "this model's 1.34" in the note below it.  Either
+    # one can drift with the other left standing and the audit still finds the
+    # value.  The table cell is caught by the delta check, because its row also
+    # carries `FE FOS 1.4 (−4.3%)`; the note carries no comparison, so a drift
+    # there is caught by nothing.  Left planted rather than moved: it is the
+    # only fixture holding the gap open, and no section on any page publishes a
+    # rounded lock exactly once for it to be re-anchored to.
     ("ssrm", "tags", "G1 rounded tag restatement is a different value",
      "equilibrium criterion) | 1.34 |", "equilibrium criterion) | 1.44 |"),
     ("geostudio", "tags", "G2 tagged value dropped from its section",
@@ -171,9 +212,8 @@ MUTATIONS = [
      "| XSLOPE, $t=0.6$ h | 2.862 | 2.766 |"),
     ("rocscience_groundwater", "tags",
      "G10 a probe set publishes one more than it declares",
-     "Sampling the 15 h frame at five\nelevations,",
-     "Sampling the 15 h frame at five\nelevations (the crest station reads "
-     "2.103 m),"),
+     "Sampled at five elevations, XSLOPE's",
+     "Sampled at five elevations (the crest station reads 2.103 m), XSLOPE's"),
 
     # ----------------------------------------------------------- figures ---
     ("rocscience_groundwater", "figures", "F1 two-panel caption on a one-panel figure",
@@ -232,6 +272,12 @@ NEGATIVE = [
      "### Confined Radial Flow {#verification-confined-radial}\n\n"
      "The `us` column and [the note](https://example.org/our/we/us.html) "
      "record it; the firm base now sits at depth D.\n"),
+    # M5's control: the same planted table with the delta its authority column
+    # implies, (0.781 − 0.81) / 0.81 = −3.6%.  Without this, M5 would be
+    # satisfied by the check finding no pair at all rather than by the
+    # authority-column pairing reading the wrong one.
+    ("rs2", "deltas", "N4 authority-column table, delta correct",
+     AUTH_HEAD, AUTH_HEAD + AUTH_TABLE.format("−3.6")),
 ]
 
 #: Exemptions planted to prove that an exemption which never fires is itself a

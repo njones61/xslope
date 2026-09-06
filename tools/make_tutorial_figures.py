@@ -4444,7 +4444,7 @@ def fem01_plots():
     fs_cache, _path, _circles = _fem01_search(start)
     crit = fs_cache[0]
     capture("fem01_lem_solution.png", plot_solution, start, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
     xs, ys = zip(*list(crit["failure_surface"].coords))
     print("   LEM         %s FS %.4f on Xo %.4f Yo %.4f R %.4f (tangent depth "
           "%.4f) · entry (%.3f, %.3f) exit (%.3f, %.3f) · %d candidates"
@@ -4708,7 +4708,7 @@ def fem02_plots():
             **file_search_window(start))
     crit = fs_cache[0]
     capture("fem02_lem_solution.png", plot_solution, start, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
     xs, ys = zip(*list(crit["failure_surface"].coords))
     print("   LEM         %s FS %.4f on Xo %.4f Yo %.4f R %.4f · entry "
           "(%.3f, %.3f) exit (%.3f, %.3f) · %d candidates"
@@ -4862,7 +4862,8 @@ def fem02_pullout_law():
             # the page drew first: the page says it daylights beyond the toe
             # and clips line 1 near the face, and the reader should see it.
             capture("fem02_lem_solution_law.png", plot_solution, model,
-                    crit["slices"], crit["failure_surface"], crit["solver_result"])
+                    crit["slices"], crit["failure_surface"], crit["solver_result"],
+                    frame="content")
         print("   LEM %-9s %s FS %.4f on Xo %.4f Yo %.4f R %.4f · entry "
               "(%.3f, %.3f) exit (%.3f, %.3f) · ΣP %.0f %s"
               % (tag, FEM02_METHOD, crit["FS"], crit["Xo"], crit["Yo"],
@@ -5222,6 +5223,58 @@ def _fem03_profiles(model, fem_data, solution, state="converged"):
     return out
 
 
+def fem_lem_figures():
+    """The five limit-equilibrium figures on the FEM tutorials, redrawn without
+    their strength-reduction runs: the searches take seconds, the SSRM groups
+    they normally ride with take hours. Same models, same searches, same
+    captures as fem01_plots, fem02_plots, fem02_pullout_law, fem03_piles and
+    fem03_wall.
+    """
+    from xslope.fileio import ensure_reinforce_pullout
+
+    start = load_slope_data(FEM01_START)
+    fs_cache, _path, _circles = _fem01_search(start)
+    crit = fs_cache[0]
+    capture("fem01_lem_solution.png", plot_solution, start, crit["slices"],
+            crit["failure_surface"], crit["solver_result"], frame="content")
+    print("   FEM-1 LEM   FS %.4f" % crit["FS"])
+
+    start = load_slope_data(FEM02_START)
+
+    def _search(model):
+        with contextlib.redirect_stdout(io.StringIO()):
+            fs_cache, _, _p, _c = circular_search(
+                model, FEM02_METHOD, num_slices=FEM02_SLICES, diagnostic=False,
+                **file_search_window(model))
+        return fs_cache[0]
+
+    crit = _search(start)
+    capture("fem02_lem_solution.png", plot_solution, start, crit["slices"],
+            crit["failure_surface"], crit["solver_result"], frame="content")
+    print("   FEM-2 LEM   FS %.4f" % crit["FS"])
+    law_start = copy.deepcopy(start)
+    for line in law_start["reinforcement_lines"]:
+        line["adhesion"] = FEM02_LAW_ADHESION
+        line["delta"] = FEM02_LAW_DELTA
+    ensure_reinforce_pullout(law_start)
+    crit = _search(law_start)
+    capture("fem02_lem_solution_law.png", plot_solution, law_start,
+            crit["slices"], crit["failure_surface"], crit["solver_result"],
+            frame="content")
+    print("   FEM-2 law   FS %.4f" % crit["FS"])
+
+    sd = _fem03_piles_model()
+    crit = _fem03_search(sd)
+    capture("fem03_lem_solution_piles.png", plot_solution, sd, crit["slices"],
+            crit["failure_surface"], crit["solver_result"], frame="content")
+    print("   FEM-3 piles %s" % _fem03_reading(crit))
+    start = load_slope_data(FEM03_WALL_START)
+    crit = _fem03_search(start)
+    capture("fem03_lem_solution_bare.png", plot_solution, start, crit["slices"],
+            crit["failure_surface"], crit["solver_result"], frame="content")
+    print("   FEM-3 bare  %s" % _fem03_reading(crit))
+
+
 def fem03_piles():
     """The discrete row: the section both engines are given, the limit
     equilibrium answer with the two rows crossing the critical circle, the mesh
@@ -5250,7 +5303,7 @@ def fem03_piles():
 
     crit = _fem03_search(sd)
     capture("fem03_lem_solution_piles.png", plot_solution, sd, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
     print("   LEM         %s" % _fem03_reading(crit))
     for rec in (crit["slices"].attrs.get("pile_report") or []):
         print("      row %-9s crosses at y %.3f · Ito & Matsui %.0f per pile · "
@@ -5463,7 +5516,7 @@ def fem03_wall():
     # against, drawn so the reader sees the two mechanisms before any member.
     crit = _fem03_search(start)
     capture("fem03_lem_solution_bare.png", plot_solution, start, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
     print("   LEM (bare)  %s" % _fem03_reading(crit))
     mesh = _fem03_mesh(start)
     fem_data, result, solution, seconds = _fem03_solve(start, mesh)
@@ -6769,6 +6822,7 @@ GROUPS = {
     "seep03_plots": seep03_plots,
     "seep04_plots": seep04_plots,
     "fem01_plots": fem01_plots,
+    "fem_lem_figures": fem_lem_figures,
     "fem02_plots": fem02_plots,
     "fem02_pullout_law": fem02_pullout_law,
     "fem02_tres_sweep": fem02_tres_sweep,

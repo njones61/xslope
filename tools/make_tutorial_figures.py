@@ -247,16 +247,16 @@ def lem01_plots():
     fs_cache, path, circles = search(sd, "spencer")
     crit_sp = fs_cache[0]
     capture("lem01_search.png", plot_circular_search_results, sd, fs_cache, path,
-            circle_cache=circles)
+            circle_cache=circles, frame="content")
     capture("lem01_solution_search.png", plot_solution, sd, crit_sp["slices"],
-            crit_sp["failure_surface"], crit_sp["solver_result"])
+            crit_sp["failure_surface"], crit_sp["solver_result"], frame="content")
 
     # Bishop's lower answer on the same crackless model — the crest tension zone
     # (red bars) is drawn by the plot itself and is the anomaly the page reads.
     fs_cache_b, _, _ = search(sd, "bishop")
     crit_b = fs_cache_b[0]
     capture("lem01_solution_bishop.png", plot_solution, sd, crit_b["slices"],
-            crit_b["failure_surface"], crit_b["solver_result"])
+            crit_b["failure_surface"], crit_b["solver_result"], frame="content")
 
     # The cracked model: tension crack at the theoretical depth 2c/gamma = 8 ft,
     # dry. Spencer solves every trial and the methods stop disagreeing.
@@ -266,7 +266,7 @@ def lem01_plots():
     fs_cache_c, path_c, circles_c = search(sc, "spencer")
     crit_c = fs_cache_c[0]
     capture("lem01_solution_cracked.png", plot_solution, sc, crit_c["slices"],
-            crit_c["failure_surface"], crit_c["solver_result"])
+            crit_c["failure_surface"], crit_c["solver_result"], frame="content")
 
     print("   spencer %.4f · bishop %.4f · cracked spencer %.4f (%d slices)"
           % (crit_sp["FS"], crit_b["FS"], crit_c["FS"], LEM01_SLICES))
@@ -408,7 +408,7 @@ def lem02_plots():
     fs_cache, _, _ = _lem02_search(sd)
     crit = fs_cache[0]
     capture("lem02_solution_load.png", plot_solution, sd, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
 
     # The same resultant as a line load: one point instead of a 10 ft strip.
     ll = copy.deepcopy(sd)
@@ -417,7 +417,7 @@ def lem02_plots():
     fs_ll, _, _ = _lem02_search(ll)
     crit_ll = fs_ll[0]
     capture("lem02_solution_lload.png", plot_solution, ll, crit_ll["slices"],
-            crit_ll["failure_surface"], crit_ll["solver_result"])
+            crit_ll["failure_surface"], crit_ll["solver_result"], frame="content")
 
     # Direction, where it bites: the same load on the 1:1 face, read both ways.
     face = {}
@@ -428,7 +428,8 @@ def lem02_plots():
         fs_f, _, _ = _lem02_search(fd)
         face[word] = fs_f[0]
         capture("lem02_face_%s.png" % word, plot_solution, fd, face[word]["slices"],
-                face[word]["failure_surface"], face[word]["solver_result"])
+                face[word]["failure_surface"], face[word]["solver_result"],
+                frame="content")
 
     # A second kind of demand on the same model.
     sk = copy.deepcopy(sd)
@@ -436,7 +437,7 @@ def lem02_plots():
     fs_k, _, _ = _lem02_search(sk)
     crit_k = fs_k[0]
     capture("lem02_solution_seismic.png", plot_solution, sk, crit_k["slices"],
-            crit_k["failure_surface"], crit_k["solver_result"])
+            crit_k["failure_surface"], crit_k["solver_result"], frame="content")
 
     # The design sweep: the cohesion that would hold the target under the load.
     # Drawn from the same run the page quotes, so the crossing on the figure is
@@ -524,9 +525,9 @@ def lem03_plots():
     fs_cache, path, circles = _lem03_search(sd)
     crit = fs_cache[0]
     capture("lem03_search.png", plot_circular_search_results, sd, fs_cache, path,
-            circle_cache=circles)
+            circle_cache=circles, frame="content")
     capture("lem03_solution.png", plot_solution, sd, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
 
     # The what-if: the foundation weaker than the fill it carries. Everything else
     # is the delivered model, so the only thing that moved is which layer is weak.
@@ -535,7 +536,7 @@ def lem03_plots():
     fs_weak, _, _ = _lem03_search(weak)
     crit_w = fs_weak[0]
     capture("lem03_solution_weak.png", plot_solution, weak, crit_w["slices"],
-            crit_w["failure_surface"], crit_w["solver_result"])
+            crit_w["failure_surface"], crit_w["solver_result"], frame="content")
 
     print("   as delivered %.4f (tangent depth %.3f) · foundation at c = %g psf "
           "%.4f (tangent depth %.3f)"
@@ -620,9 +621,10 @@ def lem05_plots():
     if not fs_cache:
         raise SystemExit("LEM-5: the non-circular search found no valid surface")
     crit = fs_cache[0]
-    capture("lem05_search.png", plot_noncircular_search_results, sd, fs_cache, path)
+    capture("lem05_search.png", plot_noncircular_search_results, sd, fs_cache,
+            path, frame="content")
     capture("lem05_solution.png", plot_solution, sd, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
 
     # The generator's proposal, solved as entered — the audit the Studio path asks
     # the reader to make, and the page's evidence that a generated surface is a
@@ -633,7 +635,8 @@ def lem05_plots():
         raise SystemExit("LEM-5: the weak-zone generator built nothing — %s"
                          % (gen["reason"],))
     gs, gsurf, gres = _lem05_solve(sd, gen["surface"])
-    capture("lem05_solution_generated.png", plot_solution, sd, gs, gsurf, gres)
+    capture("lem05_solution_generated.png", plot_solution, sd, gs, gsurf, gres,
+            frame="content")
 
     # What a circle gets on the same section — search against search, which is the
     # only fair pairing. The file defines no circles (it is a non-circular model),
@@ -649,7 +652,7 @@ def lem05_plots():
                                            diagnostic=False)
     best = fs_circ[0]
     capture("lem05_solution_circle.png", plot_solution, circ, best["slices"],
-            best["failure_surface"], best["solver_result"])
+            best["failure_surface"], best["solver_result"], frame="content")
 
     print("   searched %.4f · generated as entered %.4f · best circle %.4f "
           "(depth %.3f)"
@@ -735,13 +738,13 @@ def lem04_plots():
                                                      num_slices=LEM04_SLICES)
     crit = fs_cache[0]
     capture("lem04_search.png", plot_circular_search_results, sd, fs_cache, path,
-            circle_cache=circles)
+            circle_cache=circles, frame="content")
 
     # The found circle wet — the model exactly as the build leaves it, on the
     # surface the page has the reader enter after reading it off the search.
     w_slices, w_surface, w_result = _lem04_solve(sd)
     capture("lem04_solution_wet.png", plot_solution, sd, w_slices, w_surface,
-            w_result)
+            w_result, frame="content")
 
     # The same circle dry: every material's pore-pressure option set to none —
     # the reader's three-cell edit, made in memory here. Nothing else moves, so
@@ -751,7 +754,7 @@ def lem04_plots():
         m["u"] = "none"
     d_slices, d_surface, d_result = _lem04_solve(dry)
     capture("lem04_solution_dry.png", plot_solution, dry, d_slices, d_surface,
-            d_result)
+            d_result, frame="content")
 
     # What the γ_sat column is worth on this circle: the same surface with the
     # saturated weights withheld, which is the comparison the weight-split step
@@ -858,9 +861,9 @@ def lem06_plots():
     fs_cache, path, circles = _lem06_search(sd)
     crit = fs_cache[0]
     capture("lem06_search.png", plot_circular_search_results, sd, fs_cache, path,
-            circle_cache=circles)
+            circle_cache=circles, frame="content")
     capture("lem06_solution.png", plot_solution, sd, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
 
     # The circle that will not fit, truncated at the base. The same circle with
     # composite off is the page's refusal, and it produces no figure.
@@ -868,7 +871,7 @@ def lem06_plots():
     built, _ = _lem06_solve(sd, LEM06_DEEP, composite=True)
     c_slices, c_surface, c_result = built
     capture("lem06_solution_composite.png", plot_solution, sd, c_slices,
-            c_surface, c_result)
+            c_surface, c_result, frame="content")
 
     # The what-if: the foundation weaker than the fill it carries, which is what
     # sends the critical surface down to the base the rest of the page describes.
@@ -877,7 +880,7 @@ def lem06_plots():
     fs_weak, _, _ = _lem06_search(weak)
     crit_w = fs_weak[0]
     capture("lem06_solution_weak.png", plot_solution, weak, crit_w["slices"],
-            crit_w["failure_surface"], crit_w["solver_result"])
+            crit_w["failure_surface"], crit_w["solver_result"], frame="content")
 
     print("   as delivered %.4f (Xo %.2f Yo %.2f depth %.3f) · circle at depth %g "
           "refused (%s) / truncated %.4f · foundation at c = %g psf %.4f "
@@ -943,9 +946,9 @@ def lem08_plots():
     fs_cache, path, circles = _lem08_search(sd)
     crit = fs_cache[0]
     capture("lem08_search.png", plot_circular_search_results, sd, fs_cache, path,
-            circle_cache=circles)
+            circle_cache=circles, frame="content")
     capture("lem08_solution.png", plot_solution, sd, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
 
     # The comparison: the same section, the same search, no reinforcement.
     bare = copy.deepcopy(sd)
@@ -953,7 +956,7 @@ def lem08_plots():
     fs_bare, _, _ = _lem08_search(bare)
     crit_b = fs_bare[0]
     capture("lem08_solution_bare.png", plot_solution, bare, crit_b["slices"],
-            crit_b["failure_surface"], crit_b["solver_result"])
+            crit_b["failure_surface"], crit_b["solver_result"], frame="content")
 
     print("   reinforced %.4f (Xo %.2f Yo %.2f depth %.3f, ΣP %.0f) · "
           "unreinforced %.4f (Xo %.2f Yo %.2f depth %.3f)"
@@ -1033,11 +1036,11 @@ def lem08_lengths():
         if length == LEM08_LENGTHS[0]:
             capture("lem08_solution_short.png", plot_solution, model,
                     crit["slices"], crit["failure_surface"],
-                    crit["solver_result"])
+                    crit["solver_result"], frame="content")
         if length == LEM08_LENGTHS[-1]:
             capture("lem08_solution_long.png", plot_solution, model,
                     crit["slices"], crit["failure_surface"],
-                    crit["solver_result"])
+                    crit["solver_result"], frame="content")
 
 
 # --------------------------------------------------------------------------- #
@@ -1127,12 +1130,14 @@ def lem09_plots():
 
     fs_cache, path = _lem09_search(sd)
     crit = fs_cache[0]
-    capture("lem09_search.png", plot_noncircular_search_results, sd, fs_cache, path)
+    capture("lem09_search.png", plot_noncircular_search_results, sd, fs_cache,
+            path, frame="content")
     capture("lem09_solution.png", plot_solution, sd, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
 
     ws, wsurf, wres = _lem09_wedge(sd)
-    capture("lem09_solution_wedge.png", plot_solution, sd, ws, wsurf, wres)
+    capture("lem09_solution_wedge.png", plot_solution, sd, ws, wsurf, wres,
+            frame="content")
 
     # The comparison: the same wall, the same search, no tiebacks.
     bare = copy.deepcopy(sd)
@@ -1140,7 +1145,7 @@ def lem09_plots():
     fs_bare, _ = _lem09_search(bare)
     crit_b = fs_bare[0]
     capture("lem09_solution_bare.png", plot_solution, bare, crit_b["slices"],
-            crit_b["failure_surface"], crit_b["solver_result"])
+            crit_b["failure_surface"], crit_b["solver_result"], frame="content")
 
     # The circular cross-check: the wedge family is a modeling choice, and the
     # page tests it — one generated seed, the same Janbu, on circles.
@@ -1152,7 +1157,7 @@ def lem09_plots():
                                         diagnostic=False)
     crit_c = fs_c[0]
     capture("lem09_solution_circle.png", plot_solution, circ, crit_c["slices"],
-            crit_c["failure_surface"], crit_c["solver_result"])
+            crit_c["failure_surface"], crit_c["solver_result"], frame="content")
 
     print("   searched %.4f (ΣW %.0f, ΣT_x %.0f, pile %.0f) · manual's wedge "
           "%.4f · no tiebacks %.4f"
@@ -1209,12 +1214,12 @@ def lem10_plots():
     fs_gen, path_gen, circles_gen = _lem10_search(sd, shallow)
     crit_g = fs_gen[0]
     capture("lem10_search_shallow.png", plot_circular_search_results, sd,
-            fs_gen, path_gen, circle_cache=circles_gen)
+            fs_gen, path_gen, circle_cache=circles_gen, frame="content")
 
     fs_deep, _, _ = _lem10_search(sd)
     crit_d = fs_deep[0]
     capture("lem10_solution_deep.png", plot_solution, sd, crit_d["slices"],
-            crit_d["failure_surface"], crit_d["solver_result"])
+            crit_d["failure_surface"], crit_d["solver_result"], frame="content")
 
     # The tools section's middle answer: the embankment seed with the 5 ft
     # surficial filter on — the search stays in the fill and returns the 33 ft
@@ -1222,7 +1227,7 @@ def lem10_plots():
     fs_f5, _, _ = _lem10_search(sd, shallow, min_slip_depth=5.0)
     crit_f = fs_f5[0]
     capture("lem10_solution_filter5.png", plot_solution, sd, crit_f["slices"],
-            crit_f["failure_surface"], crit_f["solver_result"])
+            crit_f["failure_surface"], crit_f["solver_result"], frame="content")
 
     # The second slope: VP75, the James Bay dyke — the corpus's local-minimum
     # showcase. The generated per-layer seeds settle in the fill; the grid
@@ -1249,10 +1254,10 @@ def lem10_plots():
     crit_1, crit_all, crit_grid = fs_1[0], fs_all[0], fs_grid[0]
     capture("lem10_vp75_single.png", plot_solution, vp75,
             crit_1["slices"], crit_1["failure_surface"],
-            crit_1["solver_result"])
+            crit_1["solver_result"], frame="content")
     capture("lem10_vp75_grid.png", plot_solution, vp75,
             crit_grid["slices"], crit_grid["failure_surface"],
-            crit_grid["solver_result"])
+            crit_grid["solver_result"], frame="content")
     print("   vp75 single-seed %.4f · full set+filter %.4f · grid %.4f"
           % (crit_1["FS"], crit_all["FS"], crit_grid["FS"]))
 
@@ -1299,7 +1304,7 @@ def _lem07_search(model, method, num_slices, **kwargs):
 
 def _lem07_solution(name, model, crit):
     capture(name, plot_solution, model, crit["slices"], crit["failure_surface"],
-            crit["solver_result"])
+            crit["solver_result"], frame="content")
 
 
 def _lem07_reading(crit, model=None, mat=None):
@@ -1449,10 +1454,10 @@ def lem11_plots():
             **file_search_window(sd))
     crit = fs_cache[0]
     capture("lem11_solution.png", plot_solution, sd, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
 
     taylor = _lem11_reliability(sd, "taylor")
-    capture("lem11_taylor.png", plot_reliability_results, sd, taylor)
+    capture("lem11_taylor.png", plot_reliability_results, sd, taylor, frame="content")
 
     with contextlib.redirect_stdout(io.StringIO()):
         ok, var = variance_contribution(copy.deepcopy(sd), method=LEM11_METHOD)
@@ -1610,29 +1615,30 @@ def lem12_plots():
             diagnostic=False, **file_search_window(sd))
     crit = fs_cache[0]
     capture("lem12_search.png", plot_circular_search_results, sd, fs_cache, path,
-            circle_cache=cache)
+            circle_cache=cache, frame="content")
     capture("lem12_solution.png", plot_solution, sd, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
     deep = {"Xo": crit["Xo"], "Yo": crit["Yo"], "Depth": crit["Depth"],
             "R": crit["Yo"] - crit["Depth"]}
 
     bare = _lem12_search(dict(sd, pile_lines=[]))
     capture("lem12_solution_nopiles.png", plot_solution, dict(sd, pile_lines=[]),
-            bare["slices"], bare["failure_surface"], bare["solver_result"])
+            bare["slices"], bare["failure_surface"], bare["solver_result"],
+            frame="content")
 
     wide = _lem12_piles(sd, S=LEM12_S)
     crit_w = _lem12_search(wide)
     capture("lem12_solution_wide.png", plot_solution, wide, crit_w["slices"],
-            crit_w["failure_surface"], crit_w["solver_result"])
+            crit_w["failure_surface"], crit_w["solver_result"], frame="content")
 
     stated = _lem12_piles(sd, H=LEM12_H)
     crit_h = _lem12_search(stated)
     capture("lem12_solution_statedh.png", plot_solution, stated, crit_h["slices"],
-            crit_h["failure_surface"], crit_h["solver_result"])
+            crit_h["failure_surface"], crit_h["solver_result"], frame="content")
 
     grid = _lem12_search(sd, seed="grid")
     capture("lem12_solution_bypass.png", plot_solution, sd, grid["slices"],
-            grid["failure_surface"], grid["solver_result"])
+            grid["failure_surface"], grid["solver_result"], frame="content")
 
     print("   auto      %s" % _lem12_reading(crit))
     print("   no piles  %s" % _lem12_reading(bare))
@@ -1917,7 +1923,7 @@ def lem13_plots():
     crit_b = _lem13_search(a, "bishop")
     crit_s = _lem13_search(a, "spencer")
     capture("lem13_spencer.png", plot_solution, a, crit_s["slices"],
-            crit_s["failure_surface"], crit_s["solver_result"])
+            crit_s["failure_surface"], crit_s["solver_result"], frame="content")
     print("   A bishop   %s" % _lem13_reading(crit_b))
     print("   A spencer  %s" % _lem13_reading(crit_s))
     print("   A spencer  %s" % _lem13_daylight(crit_s))
@@ -5650,7 +5656,7 @@ def combo01_plots():
     # search, the same mesh, the same solved field, with only the u column changed.
     crit = _combo01_search(model)[0]
     capture("combo01_lem_solution.png", plot_solution, model, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
+            crit["failure_surface"], crit["solver_result"], frame="content")
     sl = crit["slices"]
     print("   LEM         %s %s · %d candidates"
           % (COMBO01_METHOD, _combo01_reading(crit), len(_combo01_search(model))))
@@ -6106,7 +6112,7 @@ def combo02_plots():
             print("     %s" % _line.strip())
     capture("combo02_solution_piezo.png", plot_solution, start,
             piezo_crit["slices"], piezo_crit["failure_surface"],
-            piezo_crit["solver_result"])
+            piezo_crit["solver_result"], frame="content")
     piezo_full = drained("piezo, full pool", start)
     piezo_down = drained("piezo, drawn down",
                          _combo02_drawn_down(start, line2=start["piezo_line2"]))
@@ -6167,7 +6173,7 @@ def combo02_plots():
              steady_raw["u"].max(), steady_raw["u2"].max(), _u["stress"]))
     capture("combo02_solution_steady.png", plot_solution, model,
             steady_crit["slices"], steady_crit["failure_surface"],
-            steady_crit["solver_result"])
+            steady_crit["solver_result"], frame="content")
     steady_full = drained("set 1, full pool", model)
     steady_down = drained("set 2, drawn down",
                           _combo02_drawn_down(model, u2=sol2["u"]))
@@ -6210,7 +6216,7 @@ def combo02_plots():
              trans_raw["u"].max(), trans_raw["u2"].max(), _u["stress"]))
     capture("combo02_solution_transient.png", plot_solution, staged,
             trans_crit["slices"], trans_crit["failure_surface"],
-            trans_crit["solver_result"])
+            trans_crit["solver_result"], frame="content")
 
     ts = model["tseep"]
     day50 = _combo02_cleared_bc2(load_slope_data(COMBO02))
@@ -6533,13 +6539,13 @@ def combo03_plots():
     full, full_crit = single[COMBO03_FULL_POOL]
     capture("combo03_solution_full.png", plot_solution, full,
             full_crit["slices"], full_crit["failure_surface"],
-            _combo03_results(full_crit))
+            _combo03_results(full_crit), frame="content")
     # The second single run, drawn the same way. The name carries the instant, so
     # moving COMBO03_SECOND renames the file rather than relabelling this one.
     second, second_crit = single[COMBO03_SECOND]
     capture("combo03_solution_t%g.png" % COMBO03_SECOND, plot_solution, second,
             second_crit["slices"], second_crit["failure_surface"],
-            _combo03_results(second_crit))
+            _combo03_results(second_crit), frame="content")
 
     # ---- the curve ---------------------------------------------------------- #
     t0 = _time.time()
@@ -6582,7 +6588,7 @@ def combo03_plots():
             print("     %s" % line.rstrip())
     capture("combo03_solution_min.png", plot_solution, worst,
             worst_crit["slices"], worst_crit["failure_surface"],
-            _combo03_results(worst_crit))
+            _combo03_results(worst_crit), frame="content")
 
 
 # --------------------------------------------------------------------------- #

@@ -4285,6 +4285,71 @@ def _yield_reading(gp_groups, u, sq3=None, floor=0.0):
     return max_viol, n_above, max_tens, worst
 
 
+def _mc_apex_tension_cap(c_by_elem, phi_by_elem, exclude=None):
+    """The Mohr-Coulomb apex tensile cap ``c/tan(phi)``, per element.
+
+    THE RULE. Every Mohr-Coulomb element carries a Rankine tensile cap at its own
+    apex, always, whether or not the model states a ``t_cut``. The working cap is
+
+        T_element = min(stated cap after tension_srf, c_elem / tan(phi_elem))
+
+    with ``inf`` (no cap) wherever ``phi <= 0`` or the element is excluded here.
+
+    **Why it removes nothing.** Mohr-Coulomb in principal stresses (tension
+    positive, sigma_1 >= sigma_3) is
+
+        sigma_1 (1 + sin phi) <= sigma_3 (1 - sin phi) + 2 c cos phi.
+
+    Substituting the largest sigma_3 the ordering permits, sigma_3 = sigma_1, gives
+    2 sigma_1 sin phi <= 2 c cos phi, i.e. **sigma_1 <= c/tan(phi) for every
+    admissible state of every Mohr-Coulomb material**. A Rankine surface placed at
+    the apex is therefore inert as a yield surface: it can only fire on a state
+    Mohr-Coulomb already forbids, so it never takes an admissible state away from
+    any element, interior or boundary.
+
+    **Why it is needed anyway.** The viscoplastic Mohr-Coulomb flow here is
+    associated in the deviatoric plane with psi = 0 — no volumetric component. It
+    can shrink a stress circle; it cannot move the circle's center. A Gauss point
+    pulled to mean tension is inadmissible with no direction of flow that returns
+    it, so the iteration cannot settle and the strength-reduction bisection lands
+    wherever the non-settling path happens to stop. The Rankine surface's flow IS
+    volumetric (isotropic in-plane at the biaxial apex) and supplies exactly the
+    missing return path. Consequence, before this rule: on a c = 0 material the
+    apex sits at the origin, so ``t_cut = 0`` and a blank ``t_cut`` describe the
+    SAME admissible set — and the engine returned two different factors of safety
+    for them (measured 1.2305 against 1.4102 on the FEM-2 stiffness table's
+    soil x10 row). The same defect showed as non-monotonicity: raising a band's
+    stated cap from 150 to 250 psf, which can only enlarge the admissible set,
+    LOWERED the reported factor of safety by 0.27. With the apex cap in place that
+    sweep is flat.
+
+    **F-invariance.** Under strength reduction c -> c/F and tan(phi) -> tan(phi)/F,
+    so the apex (c/F)/(tan(phi)/F) = c/tan(phi) is unchanged. The apex cap is
+    therefore NEVER divided by the trial F, unlike a stated ``t_cut`` — which keeps
+    its own ``tension_srf`` behavior, is F-scaled where that flag says so, and is
+    then min'd with the apex.
+
+    **Exclusions.** ``exclude`` marks elements whose ``c_by_elem`` / ``phi_by_elem``
+    are not a real cohesion and friction angle: power-curve (``option='pow'``) and
+    Hoek-Brown (``option='hb'``) elements carry a tangent LINEARIZATION seed there,
+    re-derived per Gauss point inside the loop, and those envelopes have their own
+    tensile strength (the Hoek-Brown envelope's is sigma_ci*s/mb, not c/tan(phi)).
+    The derivation above does not apply to them and they get ``inf``. Undrained
+    ``option='cp'`` elements need no explicit exclusion: they are Mohr-Coulomb with
+    phi = 0, where sigma_1 is genuinely unbounded and the ``phi <= 0`` branch
+    already returns ``inf``. Elements declared ``elastic`` are held out downstream,
+    by the same masks that hold a stated cap out of them (``_nr_group_tension_cap``
+    and the viscoplastic ``tm & ~grp['elastic']``): an element that cannot fail
+    cannot crack either.
+    """
+    tanphi = np.tan(np.radians(np.asarray(phi_by_elem, dtype=float)))
+    ok = tanphi > 1e-12
+    if exclude is not None:
+        ok = ok & ~np.asarray(exclude, dtype=bool)
+    return np.where(ok, np.asarray(c_by_elem, dtype=float)
+                    / np.where(ok, tanphi, 1.0), np.inf)
+
+
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, dt_scale=1.0,
               force_tol=1e-3, oob_window=10,
@@ -4471,8 +4536,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             two. A per-element cap overrides the global value element by element. It
             is the principal-stress (Rankine) tensile cutoff of RS2/PLAXIS/FLAC
             (solve_ssrm builds this array from a material-name -> T dict). None
-            (default) = cutoff governed solely by ``tension_cutoff`` (bit-identical
-            to the pre-existing path when that is also False).
+            (default) = cutoff governed solely by ``tension_cutoff``.
+            Whatever this argument says, EVERY Mohr-Coulomb element additionally
+            carries a cap at its own Mohr-Coulomb apex c/tan(phi), which is the
+            tightest tensile state Mohr-Coulomb itself permits; the working cap is
+            the smaller of the two. It removes no admissible state — it supplies
+            the return path the psi = 0 deviatoric flow lacks. See
+            ``_mc_apex_tension_cap`` for the derivation and the exclusions.
         tension_srf (bool): If True (DEFAULT), the tensile cap T is divided by the
             trial strength-reduction factor each solve, exactly as c and tan(phi)
             are, so the factor of safety is the factor by which the WHOLE strength
@@ -4864,6 +4934,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         _red = np.isfinite(t_cap_by_elem) & (t_cap_by_elem > 0.0)
         t_cap_by_elem[_red] = t_cap_by_elem[_red] / F_by_elem[_red]
 
+    # The Mohr-Coulomb APEX cap, always on, min'd with the stated cap above. It is
+    # F-INVARIANT and so is applied AFTER the tension_srf scaling, never through it.
+    # Power-curve and Hoek-Brown elements are excluded: their c/phi arrays are
+    # tangent linearization seeds, not a cohesion and a friction angle. The whole
+    # derivation, and what it is for, is in _mc_apex_tension_cap.
+    _t_apex = _mc_apex_tension_cap(c_by_elem, phi_by_elem,
+                                   exclude=(pow_flag_by_elem | hb_flag_by_elem))
+    _has_apex = bool(np.any(np.isfinite(_t_apex)))
+    if _has_apex:
+        t_cap_by_elem = np.minimum(np.asarray(t_cap_by_elem, dtype=float), _t_apex)
+
     # ---- Solver switch (INTERNAL, spike; see SPIKE.md) ----------------------
     # The only place fem_solver is read. 'viscoplastic' falls straight through and
     # the rest of this function is the loop exactly as it stood before the corrector
@@ -4895,6 +4976,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     tc_new = tc_new.copy()
                     _rr = np.isfinite(tc_new) & (tc_new > 0.0)
                     tc_new[_rr] = tc_new[_rr] / Fb[_rr]
+                # The apex cap rides up the ramp with the stated cap. It is
+                # F-invariant, so unlike everything else re-derived in this closure
+                # it does not depend on F_new — but it still has to be re-applied,
+                # because tc_new is rebuilt from the F-independent base each step.
+                # Without this the ramp would carry no apex cap past its foot.
+                if _has_apex:
+                    tc_new = np.minimum(np.asarray(tc_new, dtype=float), _t_apex)
                 for grp in groups:
                     e = grp['e_idx']
                     cc = c_r_new[e]
@@ -7108,8 +7196,9 @@ def mc_return_map(sig_tr4, c, snph, csph, mu, t_cap=None, lam=None):
 
     ``t_cap`` is the per-point Rankine tensile cap T (``inf`` = none) and ``lam``
     the Lame constant the associated Rankine flow needs; both ``None`` — the
-    default, and every call on a model that sets no ``t_cut`` — skips that code
-    entirely, so the plain Mohr-Coulomb path is untouched arithmetic for
+    default, and every call on a group nothing caps (phi <= 0, power-curve,
+    Hoek-Brown or elastic throughout; see ``_mc_apex_tension_cap``) — skips that
+    code entirely, so the plain Mohr-Coulomb path is untouched arithmetic for
     untouched arithmetic. See :func:`_nr_rankine_return`.
 
     Returns ``(sig4, branch)`` — the returned stress and a per-point branch code
@@ -8118,8 +8207,10 @@ def _nr_group_tension_cap(grp, t_cap_by_elem):
     """Attach (or refresh) one group's Rankine tensile cap.
 
     The keys are set ONLY where the group actually carries a finite cap, so
-    ``grp.get('t_cap')`` is None on every model that sets no ``t_cut`` and the
-    return map's cap code is never entered there. A material declared ``elastic``
+    ``grp.get('t_cap')`` is None wherever nothing caps the group — which since the
+    Mohr-Coulomb apex cap (see ``_mc_apex_tension_cap``) means a group that is
+    entirely phi <= 0, power-curve, Hoek-Brown or elastic, not merely one whose
+    model states no ``t_cut``. A material declared ``elastic``
     is held out of the cap exactly as the viscoplastic path holds it out
     (``tm & ~grp['elastic']``): it cannot fail, so it cannot crack either.
     """

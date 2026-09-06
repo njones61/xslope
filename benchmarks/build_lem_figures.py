@@ -16,7 +16,8 @@ another third above it.
 Mapping: the file is split on test tags; the figures named ``*_inputs*.png``,
 ``*_results*.png`` and ``*_search_results*.png`` in the text segment preceding
 each tag belong to that problem (so base vs *_mods variants land in separate
-segments).
+segments). A figure that another page shows but no sample section does is listed
+in ``EXTRA_FIGURES`` below and drawn from that entry instead.
 
     PYTHONPATH=. python3 benchmarks/build_lem_figures.py            # every figure
     PYTHONPATH=. python3 benchmarks/build_lem_figures.py gsat_      # names matching
@@ -57,6 +58,23 @@ INPUTS_RE = re.compile(r'sample_images/([a-z0-9_]*?_inputs\d*)\.png')
 #: figure is drawn beside its three pile-row solutions by
 #: benchmarks/make_hassiotis_figures.py, which is where that set belongs.
 OTHER_OWNERS = {"hassiotis_inputs"}
+
+#: Figures in sample_images/ that no sample section shows any more but another
+#: page still does. They have no test tag to be read off, so they are drawn from
+#: an explicit entry here rather than losing their producer: a figure nothing can
+#: rebuild goes stale the first time the solver moves and nobody can tell.
+#: Each entry is (figure name, workbook, test type, num_slices, kind, rapid),
+#: where kind is "inputs", "results" or "search_results" — the same three the
+#: page-driven pass draws, with the same styling.
+#:
+#: noncircular_search_results is the non-circular coordinate-descent search on
+#: the weak-layer model. It was sample section 7's search figure until that
+#: section shrank to its solution and table; docs/lem/search.md shows it as the
+#: illustration of plot_noncircular_search_results().
+EXTRA_FIGURES = [
+    ("noncircular_search_results", "files/xslope_noncircular.xlsx",
+     "noncircular_search", 40, "search_results", False),
+]
 
 
 def capture(path, fn, *args, **kwargs):
@@ -159,6 +177,26 @@ def main(only=()):
             out = f"{IMG_DIR}/sample_images/{name}.png"
             capture(out, plot_solution, sd, crit["slices"], crit["failure_surface"], crit["solver_result"])
             n += 1
+
+    for name, xlsx, ttype, num_slices, kind, rapid in EXTRA_FIGURES:
+        if not wanted([name]):
+            continue
+        sd = load_slope_data(os.path.join(IMG_DIR, xlsx))
+        out = f"{IMG_DIR}/sample_images/{name}.png"
+        if kind == "inputs":
+            capture(out, plot_inputs, sd, frame="content")
+            n += 1
+            continue
+        crit, fs_cache, path, circ = search(sd, ttype, num_slices, rapid)
+        if kind == "search_results":
+            if ttype == "noncircular_search":
+                capture(out, plot_noncircular_search_results, sd, fs_cache, path)
+            else:
+                capture(out, plot_circular_search_results, sd, fs_cache, path, circle_cache=circ)
+        else:
+            capture(out, plot_solution, sd, crit["slices"], crit["failure_surface"], crit["solver_result"])
+        n += 1
+
     print(f"\nregenerated {n} sample figures")
 
 

@@ -12070,7 +12070,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 25,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12440,7 +12440,7 @@
           ],
           "level": 2,
           "page": "verification/rocscience/",
-          "resolution": "asset-link",
+          "resolution": "input-link",
           "source_md": "docs/verification/rocscience.md",
           "title": "VP29: Duncan's LASH terminal — TSPM reliability vs Monte Carlo",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp29"
@@ -19021,7 +19021,7 @@
           ],
           "level": 2,
           "page": "verification/rocscience/",
-          "resolution": "asset-link",
+          "resolution": "input-link",
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
@@ -19094,7 +19094,7 @@
           ],
           "level": 2,
           "page": "verification/rocscience/",
-          "resolution": "asset-link",
+          "resolution": "input-link",
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
@@ -19167,7 +19167,7 @@
           ],
           "level": 2,
           "page": "verification/rocscience/",
-          "resolution": "asset-link",
+          "resolution": "input-link",
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
@@ -19240,7 +19240,7 @@
           ],
           "level": 2,
           "page": "verification/rocscience/",
-          "resolution": "asset-link",
+          "resolution": "input-link",
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
@@ -19313,7 +19313,7 @@
           ],
           "level": 2,
           "page": "verification/rocscience/",
-          "resolution": "asset-link",
+          "resolution": "input-link",
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
@@ -19386,7 +19386,7 @@
           ],
           "level": 2,
           "page": "verification/rocscience/",
-          "resolution": "asset-link",
+          "resolution": "input-link",
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
@@ -19460,7 +19460,7 @@
           ],
           "level": 2,
           "page": "verification/rocscience/",
-          "resolution": "asset-link",
+          "resolution": "input-link",
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
@@ -19533,7 +19533,7 @@
           ],
           "level": 2,
           "page": "verification/rocscience/",
-          "resolution": "asset-link",
+          "resolution": "input-link",
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
@@ -19785,7 +19785,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 25,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21280,7 +21280,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 25,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23823,7 +23823,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 571,
+    "tags": 572,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

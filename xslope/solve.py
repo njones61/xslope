@@ -173,6 +173,23 @@ FE_MIN_BASE_FACTOR = 0.05
 #: actually carries.
 FE_MAX_Z_OVER_W = 1.0
 
+#: How far BELOW the moment-equilibrium factor of safety on the same slices a
+#: force-equilibrium root may stand before it is refused, as a ratio. The measure
+#: is one-sided on purpose. Corps of Engineers and Lowe & Karafiath read ABOVE the
+#: moment methods by construction, and on a submerged phi = 0 section they read
+#: far above — 5.7 times on `xslope_submerged`'s own circle, which
+#: `docs/lem/force_eq.md` documents as the method's behavior rather than a
+#: defect. Reading far below is the other thing: it is what the spurious branch of
+#: the closure does, and the tie-break can only choose among roots that survive,
+#: so on a surface whose ONLY surviving root is that branch nothing caught it.
+#:
+#: Measured over the 588 Corps and Lowe answers the corpus produces on its own
+#: surfaces: 540 stand at or above the moment answer, and of the 48 that stand
+#: below, the furthest is 1.21 times below. The next three are 8.1, 97.5 and 109
+#: times below — `gw012` and `vp046b`, which are this same defect, unrecognized —
+#: so the bar sits in a factor of seven of clear air.
+FE_MAX_BELOW_MOMENT = 2.0
+
 
 def failure_kind(message):
     """Which kind of failure this message reports, or None if it is unmapped.
@@ -1744,10 +1761,14 @@ def _force_closure_root(residual, Z, N, det, poles, slice_df):
     * base tension does not saturate (`MAX_BASE_TENSION_EXTENT`, the same extent
       test the caller applies to the returned solution).
 
-    Among the roots that pass, the one nearest the moment-equilibrium factor of
-    safety on the same slices is returned — Bishop's method on a circular surface,
-    Spencer's otherwise, and nearness measured as a ratio, since a factor of safety
-    is one — and the smallest admissible root when neither solves. The
+    The moment-equilibrium answer on the same slices — Bishop's method on a
+    circular surface, Spencer's otherwise — is then solved once and used twice: a
+    root standing more than `FE_MAX_BELOW_MOMENT` below it is refused, since that
+    is what the spurious branch does even where it looks clean on the three
+    measures above, and among the roots that remain the one nearest it is returned,
+    nearness measured as a ratio since a factor of safety is one. The screen is
+    one-sided: these methods read above the moment answer by construction. Where
+    the reference does not solve, the smallest surviving root is returned. The
     roots that were passed over are named in `results['warnings']` with the measure
     each failed. When no root passes, the failure says so; no other method's factor
     of safety is ever substituted.
@@ -1815,19 +1836,12 @@ def _force_closure_root(residual, Z, N, det, poles, slice_df):
         else:
             admissible.append(r)
 
-    named = ", ".join(f"FS={r:.3f} ({why})" for r, why in sorted(rejected))
-    if not admissible:
-        if rejected:
-            return None, (FORCE_EQ_NO_ADMISSIBLE_ROOT + f"; rejected {named}")
-        return None, (FORCE_EQ_NO_ROOT +
-                      f"{FE_FS_MIN:g} to {FE_FS_MAX:g}")
-
-    # Tie-break: the root nearest the moment-equilibrium answer, which is the branch
-    # every other method reads on the same slices. Only needed when more than one
-    # root survives, so the reference solve is not paid for on ordinary surfaces.
-    FS_opt = admissible[0]
-    if len(admissible) > 1:
-        ref = None
+    # The moment-equilibrium answer on the same slices — Bishop's method on a
+    # circular surface, Spencer's otherwise. It does two jobs: it screens out a
+    # root that stands far below it, and it breaks the tie among the roots that
+    # survive. Solved once, and only when there is something left to judge.
+    ref = None
+    if admissible:
         ref_method = bishop if _has_circle_center(slice_df) else spencer
         try:
             ok_r, res_r = ref_method(slice_df.copy())
@@ -1835,6 +1849,32 @@ def _force_closure_root(residual, Z, N, det, poles, slice_df):
                 ref = float(res_r['FS'])
         except Exception:
             ref = None
+
+    # A root that reads far BELOW the moment answer is the spurious branch, even
+    # where it looks clean on the three measures above: on the eight-layer slope's
+    # grid-seeded Corps critical the surviving root is 0.121 against Bishop's
+    # 9.115, on a march whose base factor never falls under 0.94 and whose side
+    # forces stay at 0.72 of the load. Reading far ABOVE is not the same thing and
+    # is not screened; see FE_MAX_BELOW_MOMENT.
+    if ref is not None and admissible:
+        kept = []
+        for r in admissible:
+            if r * FE_MAX_BELOW_MOMENT < ref:
+                rejected.append((r, f"{ref / r:.0f}x below the moment factor of "
+                                    f"safety ({ref:.3f}) on these slices"))
+            else:
+                kept.append(r)
+        admissible = kept
+
+    named = ", ".join(f"FS={r:.3f} ({why})" for r, why in sorted(rejected))
+    if not admissible:
+        if rejected:
+            return None, (FORCE_EQ_NO_ADMISSIBLE_ROOT + f"; rejected {named}")
+        return None, (FORCE_EQ_NO_ROOT +
+                      f"{FE_FS_MIN:g} to {FE_FS_MAX:g}")
+
+    FS_opt = admissible[0]
+    if len(admissible) > 1:
         if ref is not None:
             # Distance measured as a RATIO, not a difference: a factor of safety is
             # strength over demand, so a root at a fifth of the moment answer is

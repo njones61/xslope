@@ -515,18 +515,20 @@ complete-equilibrium method — the pile forces make the deep basin locally
 attractive while a shallower mechanism governs. Checking that a stabilized slope
 cannot fail *around* its piles on a shallower surface is part of pile design.
 
-Grid seeding is not a universal upgrade, however: swept across the whole sample
-library it lands the **force-equilibrium** methods on circles where their own
-factor of safety drops far below every other method's on the identical slices —
-below the Ordinary method's on the eight-layer slope, the earth dam and the
-tension-crack model, on full-size surfaces rather than slivers. The force
-equilibrium closure has one root between every pair of its poles (see
-[Force Equilibrium Methods](force_eq.md#solving-for-the-factor-of-safety)), and the wider a sweep
-searches the more of them it reaches.
-The tabulated sample values therefore remain single-seed by deliberate choice, and
-the working practice is this: run the free search, then cross-check
-with `seed='grid'` and with tangent-seeded circles at each candidate depth, and
-judge the surfaces — not just the numbers — before accepting any of them.
+A grid sweep also reaches circles no single-seed search visits, and on some of
+them the **force-equilibrium** closure carries no root that describes a body of
+soil. On the eight-layer slope it finds one such circle: the closure's ten roots
+there run from 0.12 to 2.55 while Bishop, Spencer and Morgenstern-Price all read
+about 9.1 on the identical slices, so Corps of Engineers refuses the surface and
+says why rather than reporting the 0.12 (see
+[Force Equilibrium Methods](force_eq.md#solving-for-the-factor-of-safety)). The
+factor of safety the grid-seeded Corps search reports on that model is 1.240, the
+same answer its single-seed search gives.
+
+The tabulated sample values remain single-seed by deliberate choice, and the
+working practice is this: run the free search, then cross-check with `seed='grid'`
+and with tangent-seeded circles at each candidate depth, and judge the surfaces —
+not just the numbers — before accepting any of them.
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):

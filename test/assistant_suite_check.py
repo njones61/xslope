@@ -549,8 +549,10 @@ def check_corpus_scorers():
     engine_said_no = _session(
         prose="Spencer has no admissible solution on this circle.",
         code="run_lem(search=False)",
-        output="RuntimeError: No solution: Spencer's method: only solutions "
-               "with anomalous base tension found (96.0x cohesive capacity)")
+        output="RuntimeError: No solution: Spencer's method: no admissible "
+               "interslice inclination and factor of safety on this surface; "
+               "rejected FS=0.459 at \u03b8=-76.5\u00b0 (interslice inclination "
+               "-76.5 deg outside the admissible band [-59.6, -21.1] deg)")
     snippet_broke = _session(
         prose="Here is the surface.",
         code="xslope.solve.generate_failure_surface(sd)",

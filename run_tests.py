@@ -7522,6 +7522,47 @@ def run_interslice_admissibility_test(test):
     return 0.0, None
 
 
+#: Checks that live entirely in one test/ module and need no arguments: the type
+#: name the suite knows them by, the module file, and the one-line reason the row
+#: prints. Each module exposes ``run()`` returning a list of failure strings, so
+#: one runner serves them all rather than a near-identical function each.
+MODULE_CHECKS = {
+    'spencer_root': (
+        'spencer_root_check.py',
+        "Spencer's equations have a root outside the pole-free band on many "
+        "surfaces, and an unbounded descent reported one: 0.459 at an interslice "
+        "inclination of -76 degrees, where the same equations under "
+        "Morgenstern-Price read 5.87. Theta is bounded to the band, the roots "
+        "passed over are named, and the two benchmarks whose answers stand past "
+        "45 degrees are pinned so no fixed cap can come back."),
+}
+
+
+def run_module_check(test):
+    """Run a self-contained check module from test/ and report its failures.
+
+    The module owns the whole story — what went wrong, what decides the answer
+    now, and what each leg proves — in its own docstring; MODULE_CHECKS carries
+    only the one line this suite prints. Every module exposes ``run()`` returning
+    a list of failure strings, empty when it passes.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    filename, _why = MODULE_CHECKS[test['type']]
+    path = Path(__file__).parent / 'test' / filename
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(str(f) for f in failures)
+    return 0.0, None
+
+
 def run_force_closure_root_test(test):
     """Which root of the force-equilibrium closure is the answer.
 
@@ -13146,6 +13187,8 @@ def _dispatch_test(test):
         return run_interslice_admissibility_test(test)
     if test_type == 'force_closure_root':
         return run_force_closure_root_test(test)
+    if test_type in MODULE_CHECKS:
+        return run_module_check(test)
     if test_type == 'circle_vertex':
         return run_circle_vertex_test(test)
     if test_type == 'circle_above_center':
@@ -13322,6 +13365,7 @@ def _expected_and_tol(test, default_tolerance):
                        'submerged_oracle', 'no_void', 'suction_guard', 'piezo_u_guard',
                        'spencer_disclosure', 'interslice_admissibility',
                        'force_closure_root',
+                       *MODULE_CHECKS,
                        'circle_vertex', 'circle_above_center',
                        'gsat_pair', 'seep_head',
                        'tseep_head', 'design_callable', 'kernel_xcheck'):
@@ -13343,6 +13387,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'noncircular_search': 2, 'circular_search': 2,
               'spencer_disclosure': 3, 'interslice_admissibility': 3,
               'force_closure_root': 3,
+              'spencer_root': 3,
               'circle_vertex': 2,
               'circle_above_center': 2}
 
@@ -13741,6 +13786,14 @@ def main():
         tests.append({'type': 'force_closure_root',
                       'file': 'force-equilibrium: which root is the answer',
                       'method': '-', 'source': 'force_closure_root'})
+        # Spencer's two equations have roots outside the band where m_alpha keeps
+        # its sign, and an unbounded descent reported one on a refined
+        # non-circular surface: 0.577 where the same equations under
+        # Morgenstern-Price read 2.690. Theta is bounded to the band and the
+        # roots passed over are named.
+        tests.append({'type': 'spencer_root',
+                      'file': "Spencer: which (F, theta) root is the answer",
+                      'method': 'spencer', 'source': 'spencer_root'})
         # A circle daylighting exactly on a ground-surface vertex reported that
         # vertex once per adjoining segment, and the extra point sent the
         # count-and-prune to two copies of it — a zero-length "surface" that was

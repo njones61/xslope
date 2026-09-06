@@ -36,8 +36,8 @@ THE BAND IS THE WHOLE CLAIM
 
 Outside that band, roots of h are COMMON — and they are not solutions. Past a
 pole a slice's m_alpha has changed sign, so its base normal has reversed; the
-solver's own theta bounds exclude them, and where its unbounded scipy stage lands
-on one it refuses it as anomalous base tension. Circle (8, 36, R=36) below is the
+solver bounds theta to the band at every stage and discards any root reached
+outside it, naming the band it fell outside of. Circle (8, 36, R=36) below is the
 pinned case: no root inside the band, roots outside it, and the shipped cascade
 reaches one of them and refuses it. So the verdict is scoped — no admissible
 solution — and a message claiming the surface admits no solution AT ALL is a
@@ -66,9 +66,9 @@ WHAT IS CHECKED
   Morgenstern-Price's two are mapped and pinned by fixtures here, an unmapped
   message suppresses the taxonomy entirely, and neither may ever be reported as
   an iteration failing to converge. Its phrases name no method's mechanism —
-  Spencer refuses on base tension beyond what cohesion can carry while
-  Morgenstern-Price refuses on base tension by extent, so "anomalous base
-  tension" would misreport the second as the first;
+  Spencer refuses a root for lying outside its admissible band of interslice
+  inclinations while Morgenstern-Price refuses on base tension by extent, so
+  "anomalous base tension" would misreport either as the other;
 * the line the docs quote, against the line the search prints, byte for byte;
 * four mutations: the silent skip restored, a classifier that calls the refused
   circle an iteration failure, a verdict that claims absolute insolubility, and
@@ -111,7 +111,7 @@ SOLVABLE = {'Xo': 10.0, 'Yo': 40.0, 'R': 40.0}
 
 #: The pinned band case: no root inside the admissible band, 33 roots outside it
 #: (all at F = F_m = 1.235922, theta -88.3 to +110.7 deg), and the shipped
-#: cascade reaches one and refuses it as 25.8x cohesive capacity. A verdict of
+#: cascade reaches one and refuses it for lying outside the band. A verdict of
 #: "admits no solution" would be false here; "no ADMISSIBLE solution" is the fact.
 BAND_CASE = {'Xo': 8.0, 'Yo': 36.0, 'R': 36.0}
 

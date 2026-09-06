@@ -45,8 +45,25 @@ SPENCER_NO_ADMISSIBLE_SOLUTION = (
     "solution on this surface")
 SPENCER_NO_CONVERGENCE = ("Spencer's method did not converge within the maximum "
                           "number of iterations.")
-SPENCER_INADMISSIBLE = ("Spencer's method: only solutions with anomalous base "
-                        "tension found")
+SPENCER_INADMISSIBLE = ("Spencer's method: no admissible interslice inclination "
+                        "and factor of safety on this surface")
+
+#: Spencer's interslice inclination is bounded by the surface's own geometry
+#: rather than by a fixed angle. Spencer (1973) and Duncan & Wright place the
+#: interslice-force inclination between the inclination of the ground surface and
+#: that of the slip surface, and the equations give that bound exactly: theta must
+#: stay within a right angle of every slice base, less the friction the base
+#: mobilizes, or that slice's m_alpha changes sign and its base normal reverses.
+#: That is the pole-free band `safe_theta_bounds` computes, and it is Spencer's
+#: form of the base factor `FE_MIN_BASE_FACTOR` keeps clear of zero for the
+#: force-equilibrium closure.
+#:
+#: A FIXED cap was measured and does not hold: 45 degrees, the angle a real
+#: section's geometry rarely passes, refuses the planar-surface benchmark whose
+#: answer every other method confirms (VP43 / GS-2.26, 1.352 at theta = 49.6
+#: degrees) and the wedge benchmark VP48 (0.991 at -56.1 degrees). Both sit
+#: comfortably inside the band their own geometry allows, so the band is the
+#: bound and no fixed angle is applied on top of it.
 
 #: Morgenstern-Price's two, which are the same two facts under its own
 #: assumption: no crossing of F_f and F_m anywhere in the lambda range it
@@ -1396,6 +1413,39 @@ def _admissibility_warnings(c, N_eff, Z, y_lt=None, y_lb=None, yt_l=None):
     return warns
 
 
+def spencer_theta_bounds(alpha, tan_p, F_val, margin_deg=5.0):
+    """The pole-free band of interslice inclinations for one slice set and F.
+
+    Spencer's equations divide every slice by
+    ``m_alpha = 1 / [cos(alpha - theta) + sin(alpha - theta) tan(phi) / F]``.
+    Writing the denominator as ``sqrt(1 + k^2) cos(alpha - theta - arctan(k))``
+    with ``k = tan(phi)/F``, it keeps its sign exactly while
+    ``|alpha_i - theta - arctan(k_i)| < pi/2`` on every slice, which gives the
+    band returned here. Outside it a slice's base normal has reversed, so a root
+    found there is a discontinuity of the equations rather than a state of the
+    mass.
+
+    This is the geometric bound Spencer (1973) and Duncan & Wright describe — the
+    interslice inclination lies between the inclinations of the ground surface and
+    the slip surface — in the form the equations give, and it is Spencer's
+    counterpart of the base factor `FE_MIN_BASE_FACTOR` keeps clear of zero for
+    the force-equilibrium closure. `alpha` and `tan_p` arrive in the solver's
+    own frame (both negated on a right-facing slope).
+
+    `margin_deg` narrows the band at both ends, which is what keeps an iteration
+    off the poles; the acceptance test uses the band itself, at margin 0. Module
+    level rather than a closure so a check can replace it.
+    """
+    margin = np.radians(margin_deg)
+    offset = np.asarray(alpha, dtype=float) - np.arctan(
+        np.asarray(tan_p, dtype=float) / F_val)
+    lo = float(np.max(offset)) - np.pi / 2 + margin
+    hi = float(np.min(offset)) + np.pi / 2 - margin
+    if lo >= hi:
+        lo, hi = -np.pi / 2, np.pi / 2      # fallback if no valid range
+    return max(lo, -np.pi / 2), min(hi, np.pi / 2)
+
+
 def force_equilibrium(slice_df, theta_list, tol=1e-6, max_iter=50, debug=False, right_facing=False):
     """
     Limit‐equilibrium by force equilibrium in X & Y with variable interslice angles.
@@ -2142,19 +2192,8 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
         return dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta
 
     
-    # Compute safe theta bounds to avoid m_alpha singularity.
-    # m_alpha = 1/(cos(α-θ) + sin(α-θ)·tan(φ)/F)
-    # Rewrite denominator as √(1+k²)·cos(α-θ-arctan(k)), k=tan_p/F.
-    # Positive when |α - θ - arctan(k)| < π/2, giving per-slice θ bounds.
     def safe_theta_bounds(F_val, margin_deg=5):
-        margin = np.radians(margin_deg)
-        k = tan_p / F_val
-        offset = alpha - np.arctan(k)  # per-slice offset
-        lo = np.max(offset) - np.pi/2 + margin
-        hi = np.min(offset) + np.pi/2 - margin
-        if lo >= hi:
-            lo, hi = -np.pi/2, np.pi/2  # fallback if no valid range
-        return max(lo, -np.pi/2), min(hi, np.pi/2)
+        return spencer_theta_bounds(alpha, tan_p, F_val, margin_deg)
 
     def newton_solve(F0, theta0_rad, max_iter, tol, debug_level):
         """Run Newton iteration with backtracking line search. Returns (converged, F, theta_rad, iteration)."""
@@ -2247,38 +2286,128 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
 
         return False, F, theta_rad, max_iter - 1
 
-    def max_tension_ratio(F_val, theta_val):
-        """Compute max base tension as a multiple of cohesive capacity (c*dl) per slice.
-        Tension beyond what cohesion can sustain is physically anomalous."""
-        _, _, Q_val, _ = compute_residuals(F_val, theta_val)
-        N_eff_val = -Fv * cos_a + Fh * sin_a + Q_val * np.sin(alpha - theta_val) - u * dl
-        tension_mask = N_eff_val < 0
-        if not np.any(tension_mask):
-            return 0.0
-        cohesive_capacity = np.abs(c) * dl  # use abs(c) in case of right_facing sign flip
-        safe_capacity = np.where(cohesive_capacity > 0, cohesive_capacity, 1.0)
-        ratios = np.where(
-            tension_mask & (cohesive_capacity > 0),
-            np.abs(N_eff_val) / safe_capacity,
-            0.0
-        )
-        return np.max(ratios)
+    # ------------------------------------------------------------------
+    # Which (F, theta) pairs are a state of the mass
+    # ------------------------------------------------------------------
+    # Spencer's system has more than one root on many surfaces, and the ones
+    # outside the pole-free band are not equilibrium states: past a pole a
+    # slice's m_alpha has changed sign, so its base normal has reversed and the
+    # slice solution that produced the root is meaningless. The band is the same
+    # quantity `_force_closure_root` calls the base factor, written for this
+    # method's interslice assumption, and the two share their remaining measures.
 
-    MAX_TENSION_RATIO = 2.0  # reject if tension exceeds 2x cohesive capacity on any slice
-    best_candidate = None  # (F, theta_rad, tension_ratio) — fallback if no clean solution
+    def theta_band(F_val, margin_deg=0.0):
+        """The interslice inclinations admissible at this factor of safety.
+
+        The pole-free band `max(alpha) - pi/2 < theta - arctan(tan(phi)/F) <
+        min(alpha) + pi/2`: theta within a right angle of every slice base, less
+        the friction that base mobilizes. Outside it a slice's m_alpha has changed
+        sign and its base normal has reversed, so the root is a discontinuity of
+        the equations rather than a state of the mass. This is the geometric bound
+        Spencer (1973) and Duncan & Wright describe — the interslice inclination
+        lies between the inclinations of the ground surface and the slip surface —
+        written in the form the equations themselves give.
+        """
+        return safe_theta_bounds(F_val, margin_deg)
+
+    def _state_at(F_val, theta_val):
+        """Base normals, interslice resultants and base factors at one root."""
+        _, _, Q_val, _ = compute_residuals(F_val, theta_val)
+        Fv_f = Fv + Fv_pas / F_val
+        Fh_f = Fh + Fh_pas / F_val
+        N_val = (-Fv_f * cos_a + Fh_f * sin_a
+                 + Q_val * np.sin(alpha - theta_val) - u * dl)
+        Z_val = np.concatenate(([0.0], -np.cumsum(Q_val)))
+        base = (np.cos(alpha - theta_val)
+                + np.sin(alpha - theta_val) * tan_p / F_val)
+        return N_val, Z_val, base
+
+    #: The load the interslice resultants are judged against, as in
+    #: `_force_closure_root`: the mass's own weight plus every load applied to it.
+    load_scale = _driving_load(slice_df)
+    if not load_scale > 0:
+        load_scale = 1.0
+
+    #: Every root the cascade reached and would not report, with its reason.
+    rejected_roots = []
+
+    def why_inadmissible(F_val, theta_val):
+        """The measure this root fails, or None when it describes the mass.
+
+        The three measures are `_force_closure_root`'s, in Spencer's variables.
+        The base factor is the band: m_alpha's denominator keeps its sign on every
+        slice exactly inside it, and a root outside it has reversed a base normal.
+        A MAGNITUDE bar on that factor, the force-equilibrium closure's
+        `FE_MIN_BASE_FACTOR`, is deliberately not applied here — it was measured
+        and refuses answers the corpus confirms (VP104b's own circle solves at a
+        base factor of 0.048, against Bishop's 1.518 and Morgenstern-Price's
+        1.519 on the same slices), because Spencer's roots are not wedged between
+        poles the way the march's are: the band already excludes those. The
+        remaining two are the closure's unchanged — interslice resultants bounded
+        by the driving load, and base tension short of the extent past which the
+        solution contradicts the strength it was solved with over most of the
+        surface.
+        """
+        if not (np.isfinite(F_val) and np.isfinite(theta_val)) or F_val <= 0:
+            return "the equations do not close here"
+        lo, hi = theta_band(F_val)
+        if not (lo - 1e-9 <= theta_val <= hi + 1e-9):
+            return (f"interslice inclination {np.degrees(theta_val):.1f} deg "
+                    f"outside the admissible band "
+                    f"[{np.degrees(lo):.1f}, {np.degrees(hi):.1f}] deg")
+        N_val, Z_val, _base = _state_at(F_val, theta_val)
+        if not np.all(np.isfinite(N_val)):
+            return "the equations do not close here"
+        max_Z = float(np.abs(Z_val).max())
+        if max_Z > FE_MAX_Z_OVER_W * load_scale:
+            return (f"interslice force {max_Z / max(load_scale, 1e-30):.0f}x the "
+                    f"load on the mass")
+        frac_neg = float(np.mean(N_val < 0)) if len(N_val) else 0.0
+        if frac_neg > MAX_BASE_TENSION_EXTENT:
+            return f"{100 * frac_neg:.0f}% of bases in tension"
+        return None
 
     def accept_or_save(F_val, theta_val, label=""):
-        """Accept solution if tension magnitude is reasonable; otherwise save as fallback."""
-        nonlocal best_candidate
-        tr = max_tension_ratio(F_val, theta_val)
-        if tr <= MAX_TENSION_RATIO:
+        """Report this root, or record why it is not one and keep looking."""
+        why = why_inadmissible(F_val, theta_val)
+        if why is None:
             return True
-        if best_candidate is None or tr < best_candidate[2]:
-            best_candidate = (F_val, theta_val, tr)
+        if not any(abs(F_val - f) < 1e-9 and abs(theta_val - t) < 1e-12
+                   for f, t, _ in rejected_roots):
+            rejected_roots.append((float(F_val), float(theta_val), why))
         if debug_level >= 1:
             print(f"  {label}F={F_val:.3f}, θ={np.degrees(theta_val):.1f}° → "
-                  f"max tension {tr:.1f}x cohesive capacity — continuing search")
+                  f"{why} — continuing search")
         return False
+
+    def name_rejected():
+        """The discarded roots, in one phrase, with the measure each failed."""
+        return ", ".join(
+            f"FS={f:.3f} at θ={np.degrees(t):.1f}° ({why})"
+            for f, t, why in sorted(rejected_roots))
+
+    def pick_by_moment_answer(found):
+        """Among admissible roots, the one nearest the moment-equilibrium answer.
+
+        The same tie-break `_force_closure_root` applies, and for the same
+        reason: a factor of safety is strength over demand, so nearness is a
+        ratio. Bishop's method is the moment-only answer on a circular surface;
+        on a non-circular one Janbu's is the closest thing to it, and where
+        neither solves the smallest admissible root is taken.
+        """
+        if len(found) == 1:
+            return found[0]
+        ref = None
+        ref_method = bishop if _has_circle_center(slice_df) else janbu
+        try:
+            ok_r, res_r = ref_method(slice_df.copy())
+            if ok_r and np.isfinite(res_r['FS']) and res_r['FS'] > 0:
+                ref = float(res_r['FS'])
+        except Exception:
+            ref = None
+        if ref is None:
+            return min(found, key=lambda ft: ft[0])
+        return min(found, key=lambda ft: (abs(np.log(ft[0] / ref)), ft[0]))
 
     # ---------------------------------------------------------------------
     # Does an ADMISSIBLE solution exist at all?
@@ -2625,7 +2754,11 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
         theta_starts = np.radians(np.array([0, 5, -5, 10, -10, 15, -15, 20, -20, 25, -25], dtype=float))
 
         for F_try in F_starts:
-            for theta_try in theta_starts:
+            # scipy_root is unbounded, so a start outside the admissible band
+            # walks to a root outside it. Each start is brought into the band at
+            # its own trial factor of safety, and the result is tested there too.
+            t_lo, t_hi = theta_band(F_try, margin_deg=1.0)
+            for theta_try in np.clip(theta_starts, t_lo, t_hi):
                 try:
                     sol = scipy_root(residual_vec, [F_try, float(theta_try)],
                                      jac=jac_mat, method='hybr')
@@ -2644,15 +2777,74 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
             if converged:
                 break
 
+    # Strategy 4: sweep the admissible band. The three strategies above descend
+    # from a handful of starting guesses, and on a surface whose system carries
+    # more than one root they reach whichever basin they were dropped into — on
+    # the refined non-circular surfaces of the seismic benchmarks that was a root
+    # raked 76 degrees below horizontal, reading a third of what the same
+    # equations give under Morgenstern-Price. The band is therefore swept: every
+    # crossing reachable from a start inside it is collected, the three measures
+    # are applied to each, and the survivors are tie-broken against the moment
+    # answer exactly as the force-equilibrium closure's roots are.
     if not converged:
-        if best_candidate is not None:
-            # A root WAS found and refused on the base tension it implies. That is
-            # a more specific fact than "no admissible solution" — it names the
-            # root and how far out of bounds its normals are — so it keeps its own
+        from scipy.optimize import least_squares
+
+        # The band's width and position both move with F, so the sweep is run in
+        # (F, s) with s the position across the band, 0 at its lower edge and 1
+        # at its upper. A bounded least-squares descent in those coordinates
+        # cannot leave the band, which an unbounded root finder started inside it
+        # regularly does.
+        w_scale = float(np.sum(np.abs(Fv))) or 1.0
+        l_scale = float(max(np.ptp(x_b), np.ptp(y_b), 1e-12))
+
+        def _theta_of(F_val, s_val):
+            t_lo, t_hi = theta_band(float(F_val), margin_deg=0.5)
+            return t_lo + float(s_val) * (t_hi - t_lo)
+
+        def _band_residual(x):
+            th = _theta_of(x[0], x[1])
+            R1_v, R2_v, _, _ = compute_residuals(float(x[0]), th)
+            if not (np.isfinite(R1_v) and np.isfinite(R2_v)):
+                return np.array([1e12, 1e12])
+            return np.array([R1_v / w_scale, R2_v / (w_scale * l_scale)])
+
+        crossings = []
+        for F_try in np.geomspace(FE_FS_MIN, FE_FS_MAX, 18):
+            for s_try in np.linspace(0.1, 0.9, 7):
+                try:
+                    sol = least_squares(_band_residual, [float(F_try), float(s_try)],
+                                        bounds=([FE_FS_MIN, 0.0], [FE_FS_MAX, 1.0]),
+                                        xtol=1e-12, ftol=1e-12, max_nfev=200)
+                except Exception:
+                    continue
+                F_c = float(sol.x[0])
+                th_c = _theta_of(F_c, sol.x[1])
+                R1_c, R2_c, _, _ = compute_residuals(F_c, th_c)
+                if not (abs(R1_c) < tol and abs(R2_c) < tol):
+                    continue
+                if any(abs(F_c - f) < 1e-6 and abs(th_c - t) < 1e-9
+                       for f, t in crossings):
+                    continue
+                crossings.append((F_c, th_c))
+
+        admissible = [(f, t) for f, t in crossings if why_inadmissible(f, t) is None]
+        for f, t in crossings:
+            accept_or_save(f, t, "band sweep: ")
+        if admissible:
+            F, theta_rad = pick_by_moment_answer(admissible)
+            converged = True
+            if debug_level >= 1:
+                print(f"Band sweep: {len(crossings)} crossing(s), "
+                      f"{len(admissible)} admissible → F={F:.4f}, "
+                      f"θ={np.degrees(theta_rad):.2f}°")
+
+    if not converged:
+        if rejected_roots:
+            # Roots WERE found and none of them describes a state of the mass.
+            # That is a more specific fact than "no admissible solution" — it
+            # names each root and the measure it failed — so it keeps its own
             # message, ahead of the residual sweep below.
-            return False, (f"{SPENCER_INADMISSIBLE} "
-                           f"({best_candidate[2]:.1f}x cohesive capacity, "
-                           f"θ={np.degrees(best_candidate[1]):.1f}°)")
+            return False, f"{SPENCER_INADMISSIBLE}; rejected {name_rejected()}"
         if _residual_floor_bounded_away():
             return False, f"{SPENCER_NO_ADMISSIBLE_SOLUTION}: {_no_solution_detail[0]}."
         return False, SPENCER_NO_CONVERGENCE
@@ -2735,6 +2927,11 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
         y_lt=slice_df['y_lt'].values,
         y_lb=slice_df['y_lb'].values,
         yt_l=yt_l)
+    # Every root the cascade reached and passed over, with the measure it
+    # failed, so the answer carries the alternatives it was chosen against.
+    if rejected_roots:
+        warns.append("Spencer's system has other roots on these slices: "
+                     + name_rejected())
     if warns and debug_level >= 1:
         print("Spencer admissibility warnings: " + "; ".join(warns))
 

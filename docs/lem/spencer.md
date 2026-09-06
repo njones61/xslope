@@ -324,6 +324,14 @@ This iterative solution continues until the residuals $R_1$ and $R_2$ converge t
 
 In **xslope** the Newton direction of equations (31) and (32) is formed from the four first-order partial derivatives — equations (35), (36), (40) and (41). The second-order derivatives are given above for completeness and are not currently evaluated by the solver.
 
+### Which root is the answer
+
+Equations (27) and (28) have more than one root on many surfaces, and only one of them is a body of soil. The reason is $m_\alpha$: its denominator $\cos(\alpha - \theta) + \sin(\alpha - \theta)\tan\phi'/F$ vanishes when $\theta$ falls a right angle away from a slice's own base inclination, less the friction that base mobilizes, and past that point the slice's base normal has reversed. Roots on the far side of it are common, and they read low: on a refined non-circular surface of the seismic benchmark VP104 an unbounded descent reached $F = 0.459$ at $\theta = -76°$, where Morgenstern-Price with $f(x) = 1$ — the same equations — reads 5.87 on the identical slices.
+
+**xslope** therefore holds $\theta$ inside the band where $m_\alpha$ keeps its sign on every slice, which is the geometric bound Spencer and Duncan & Wright describe (the interslice inclination lies between the inclinations of the ground surface and the slip surface) written in the form the equations give. A root reached outside that band is discarded rather than reported. No fixed cap is applied on top of it: the band is set by the surface's own geometry, and the corpus contains answers every other method confirms at $\theta = 49.6°$ (the planar benchmark VP43) and $\theta = -56.1°$ (the wedge benchmark VP48).
+
+Each root that survives the band is tested on the two remaining measures the [force-equilibrium](force_eq.md) closure applies to its own roots — the largest interslice resultant within the total driving load on the mass, and base tension short of half the slices — and where the cascade above reaches none, the band is swept and every crossing in it collected. Among the survivors the one nearest the moment-equilibrium factor of safety on the same slices is reported, nearness measured as a ratio, and the roots passed over are named in the solution's warnings with the measure each failed. Where none survives, the method reports that it has no admissible answer on the surface rather than substituting another method's.
+
 ## Effective Normal Forces and Interslice Forces
 
 After solving for the factor of safety $F$ and the inclination angle $\theta$, we can calculate the normal force $N$ on the base of each slice. The normal force is calculated using equation (18). The effective normal force $N'$ can be calculated as:

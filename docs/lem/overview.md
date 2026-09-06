@@ -103,7 +103,7 @@ same restriction applies — Hoek-Brown materials are not supported in rapid dra
     Table 1 exactly. The same slope is solved by the FEM in
     [SSRM](../fem/overview.md#curved-failure-envelopes).
 
-Two consequences of the envelope's shape are worth knowing before running rock slopes. A Hoek-Brown envelope is
+The envelope's shape has two consequences for rock slopes. A Hoek-Brown envelope is
 very steep at low confinement: the instantaneous friction angle on a shallow, lightly-loaded slice near the crest
 routinely exceeds 60°. The Corps of Engineers and Lowe & Karafiath methods, which fix the interslice-force
 inclination up front rather than solving for it, can fail to converge at friction angles that high. This is a
@@ -471,7 +471,7 @@ The four methods that carry interslice forces — Spencer, Morgenstern–Price, 
 Engineers and Lowe-Karafiath — all solve for a side force $Z_j$ at each slice
 boundary, and on some surfaces some of those come out **tensile**. Soil has no
 tensile strength, so a tensile side force is a departure from the Mohr-Coulomb
-model the solution was obtained with, and it is worth knowing about.
+model the solution was obtained with.
 
 XSLOPE measures it one way for all four methods: the **fraction of interior slice
 boundaries** ($j = 1 \ldots n-1$; the two end boundaries carry no force by
@@ -489,18 +489,11 @@ method, and it changes no factor of safety:
 interslice tension on 69% of interior boundaries (min Z = -51.4 vs max compression 21.3)
 ```
 
-The threshold for reporting is any tension at all, because no larger number
-separates a right answer from a wrong one. The
-[tension crack sample](samples.md#14-tension-crack) run with its crack removed —
-the crest tension a crack exists to handle — reads 10%, and its factor of safety
-is 8% above the same model with the crack modeled. Baker's planar benchmark
-([GS-2.26](../verification/geostudio.md#gs-2-26)) reads 69 to 71% and every method
-returns SLOPE/W's own 1.352 on that plane. On a $\phi = 0$ embankment, where moment
-equilibrium fixes the factor of safety whatever the side forces do, a smooth family
-of circles sweeps 26 to 36% and every solution in it reproduces Bishop's exact
-answer. The case that most needs the engineer's attention sits at the bottom of the
-scale and the top of it is correct answers, so a refusal threshold anywhere on it
-would discard right answers and keep the wrong one.
+Any tension at all is reported, because no threshold separates a right answer from
+a wrong one: a slope solved without the tension crack it needs shows tension at the
+crest, and an undrained slope, where moment equilibrium fixes the factor of safety
+whatever the side forces do, can show it on a third of its boundaries while every
+method returns the same answer.
 
 This is also what the reference tools do. SLOPE/W reports its interslice forces and
 flags the negative ones; Slide2 and RS2 apply no such test. Duncan and Wright treat
@@ -511,9 +504,10 @@ to the problem, not to the solver.
 What XSLOPE does refuse is a solution that contradicts its own strength model: a
 non-positive factor of safety, and base tension on more than half the slices. A base
 in tension mobilizes no Mohr-Coulomb strength, so past that extent the answer rests
-on strength the model does not have. Spencer applies a second base-tension test
-inside its own search, refusing a root whose base tension exceeds twice what
-cohesion could carry on any slice.
+on strength the model does not have. Bishop and Janbu also refuse an answer on which
+$m_\alpha$ reaches zero, and the force-equilibrium and complete-equilibrium methods
+test each root of their equations before reporting one; the method pages describe
+each test.
 
 ## Automated Search for the Critical Factor of Safety 
 

@@ -212,7 +212,7 @@ One difference from OMS: $N'$ in Bishop comes from vertical equilibrium and so d
 
 ### When the base normal reverses
 
-Bishop's base normal divides by $m_\alpha = \cos\alpha + \sin\alpha\tan\phi'/F$, which vanishes at $\tan\alpha = -F/\tan\phi'$; past that base inclination $m_\alpha$ is negative and $N'$ has reversed, while the fixed-point iteration converges as usual and returns a factor of safety. **xslope** tests the converged $m_\alpha$ before reporting one, and refuses an answer whose $m_\alpha$ reaches zero on any slice, naming the value and the count of slices past it — the same bar, on the same quantity, that the [force-equilibrium](force_eq.md) methods keep their own base factor clear of. Base tension short of half the slices is reported on the solution rather than refused, as it is by every other method here; past that extent the answer contradicts the strength model it was solved with over most of the surface and is refused. Across the verification corpus no accepted Bishop answer comes within five times the bar, so on any surface a circular search reaches this changes nothing.
+Equation (8) divides by $m_\alpha = \cos\alpha + \sin\alpha\tan\phi'/F$, which is zero at $\tan\alpha = -F/\tan\phi'$ and negative beyond it. On a slice past that base inclination $N'$ points the wrong way, yet the fixed-point iteration still converges and returns a factor of safety. **xslope** checks the converged $m_\alpha$ on every slice and refuses the answer if it reaches zero on any of them; the warning names the value and the number of slices past it. Base normals in tension are reported in the solution warnings rather than refused, unless more than half the slices carry them, in which case the answer is refused as well.
 
 ---
 

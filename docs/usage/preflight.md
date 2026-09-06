@@ -333,8 +333,7 @@ whichever one the rule happened to name first. A repair whose conditions are not
 produces no proposal and no button at all — the weak-zone generator on an ambiguous
 model is that case — while its siblings still stand.
 
-Four properties hold for all of them, and each is worth knowing because it decides
-what you can rely on.
+Four properties hold for all of them, and they decide what you can rely on.
 
 **What it will do is computed before it does it.** A proposal states the change in
 the words the interface uses — *"Add 1 block to Distributed loads, 4680 peak, over

@@ -292,7 +292,7 @@ a caveat so you know what to re-create on the GeoStudio side.
 ### Exporting a seepage field
 
 Where the model's pore pressure is a finite-element **seepage field**, the *pressures*
-cross and the *seepage model* does not — and the difference is worth being precise about.
+cross and the *seepage model* does not.
 
 SLOPE/W accepts pore pressure as a **spatial function**: a set of discrete points, each
 carrying a pressure head, which it interpolates between. That is a data input, not a

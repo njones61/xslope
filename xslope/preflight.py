@@ -45,7 +45,7 @@ The severity contract
     The run proceeds and the answer may well be fine, but the model matches a
     pattern that has produced wrong answers before. Never blocks in the library.
 ``INFO``
-    A default was applied, or an input is inert. Worth stating in a report; never
+    A default was applied, or an input is inert. Belongs in a report; never
     interrupts.
 
 Two properties follow, and both are load-bearing:
@@ -4520,7 +4520,7 @@ def _crack_theoretical(ctx):
     return (f"Tension crack depth = {d:g}, against a theoretical depth "
             f"2c/gamma = {theo:.4g} for {label} -- {d / theo:.1f} times it. That is "
             f"legitimate when the crack is a stated feature of the problem rather "
-            f"than a Rankine estimate; it is worth checking that the depth is the "
+            f"than a Rankine estimate; check that the depth is the "
             f"one intended {_at_global('D11')}.")
 
 

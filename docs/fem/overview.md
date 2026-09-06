@@ -638,7 +638,7 @@ slope with a non-associated flow rule it can close entirely. The
 [hybrid criterion](#2-hybrid-hybrid-default), the default, is what asks the displacement field
 directly in that case.
 
-Four dependencies are worth knowing, because the tolerance is absolute:
+Because the tolerance is absolute, four things affect it:
 
 >- **The yield-surface limit cycle (why `oob_window` exists).** A *one-iteration* increment does not
 >  decay on a settled slope: Gauss points resting exactly on the yield surface flip their flow

@@ -164,7 +164,7 @@ if success:
 
 It is a sweep like every other mode on this page — run the model N times and tabulate —
 and it returns the same tidy long-format DataFrame, so `plot_sensitivity` draws it with no
-special handling. One difference is worth naming: **no input is modified at any step.**
+special handling. One difference: **no input is modified at any step.**
 Each point solves the same model against a different *computed* field, so there is no
 substituted value to validate and no base case to compare against. The axis is time, and
 the `param` column reads `time`.
@@ -208,7 +208,7 @@ rows carry `stage1_FS`, `stage2_FS`, `stage3_FS`, `stage3_run` and `governs` bes
 `plot_fs_vs_time` draws the reported curve alone; the stage values are in the run's printed
 table and in `result['df']`.
 
-Two consequences follow from the construction and are worth stating:
+Two consequences follow from the construction:
 
 * every point is an **auto search from the model's starting circle**, never the stored
   circle, so `search` is not consulted on this branch — a drawdown's critical surface is not

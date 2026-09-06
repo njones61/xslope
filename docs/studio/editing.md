@@ -356,7 +356,7 @@ jumps straight to that point in one action (an Office/Photoshop-style history).
 
 ![Undo history dropdown](images/editing_undo_history.png)
 
-A few behaviors worth knowing:
+A few behaviors to know:
 
 - **Assistant edits are undoable** just like manual ones — if the assistant changes
   something you didn't want, undo reverts it. A failed assistant snippet rolls back

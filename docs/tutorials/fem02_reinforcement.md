@@ -681,7 +681,7 @@ resistance — which is what FHWA directs for a live load.
 
 Our three runs are finished, and all three land within 4% of one another —
 close, for two engines and two assumptions about the layers. What separates
-them is still worth knowing, and it has two sources: the post-peak assumption,
+them has two sources: the post-peak assumption,
 which the section above already measured, and the different ways the two
 engines decide what force a reinforcement line carries.
 

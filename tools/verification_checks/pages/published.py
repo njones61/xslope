@@ -26,6 +26,19 @@ CONFIG = PageConfig(
         ('+0.1', 'reproduced within 0.1% of the manual'),
     ],
 
+    untagged_allow=[
+        # FHWA's own capacity-demand ratios, quoted in prose rather than
+        # tabulated: Step 7.8's rupture ratios for the eleven layers, and
+        # Step 7.9's connection ratios on the five lower layers.  Each is a
+        # published quantity that only looks like a factor of safety — the
+        # example's ratio of a capacity to a demand, not a factor of safety
+        # XSLOPE computes — and none is deleted, so each is named here.
+        ('1.00', 'ratios run 11.4 to 31.1'),
+        ('2.82', 'ratios run 11.4 to 31.1'),
+        ('1.00', 'Step 7.9 checks the connection'),
+        ('1.03', 'on five of the lower layers'),
+    ],
+
     tag_value_keys=['expected_fs*', 'fs_*', 'expected_pullout',
                     'expected_envelope', 'expected_beta', 'expected_kc',
                     'points', 'expected'],

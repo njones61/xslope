@@ -1020,7 +1020,7 @@ kPa.
 
 **Input:** [gs2_cons.xlsx](files/geostudio/gs2_cons.xlsx)
 
-![SEEPW-T01 inputs: the consolidation column with its seepage boundary conditions](images/gs2_cons_inputs.png){width=800px}
+![SEEPW-T01: the consolidation column with its seepage boundary conditions](images/gs2_cons_inputs.png){width=800px}
 
 ![SEEPW-T01: Terzaghi consolidation isochrones](images/gs2_cons.png){width=800px}
 
@@ -1060,7 +1060,7 @@ t > 0 the top steps to the ponded head.
 
 **Input:** [gs2_infil.xlsx](files/geostudio/gs2_infil.xlsx)
 
-![SEEPW-T02 inputs: the infiltration column with its seepage boundary conditions](images/gs2_infil_inputs.png){width=800px}
+![SEEPW-T02: the infiltration column with its seepage boundary conditions](images/gs2_infil_inputs.png){width=800px}
 
 ![SEEPW-T02: infiltration front vs SEEP/W](images/gs2_infil.png){width=800px}
 
@@ -1110,9 +1110,9 @@ at 8 m.
 **Input:** [gs2_rdd_inst.xlsx](files/geostudio/gs2_rdd_inst.xlsx) (instantaneous),
 [gs2_rdd_slow.xlsx](files/geostudio/gs2_rdd_slow.xlsx) (slow)
 
-![SEEPW-T03 inputs: the dam with its seepage boundary conditions for instantaneous drawdown](images/gs2_rdd_inst_inputs.png)
+![SEEPW-T03: the dam with its seepage boundary conditions for instantaneous drawdown](images/gs2_rdd_inst_inputs.png)
 
-![SEEPW-T03 inputs: the dam with its seepage boundary conditions for slow drawdown](images/gs2_rdd_slow_inputs.png)
+![SEEPW-T03: the dam with its seepage boundary conditions for slow drawdown](images/gs2_rdd_slow_inputs.png)
 
 ![SEEPW-T03: interior total head vs time, XSLOPE vs SEEP/W](images/gs2_rdd.png)
 
@@ -1256,7 +1256,7 @@ Dirichlet head and the pond leaks — the same submerged-only reservoir series a
 
 **Input:** [gs2_pond.xlsx](files/geostudio/gs2_pond.xlsx)
 
-![SEEPW-T04 inputs: the clay-lined pond with its seepage boundary conditions](images/gs2_pond_inputs.png)
+![SEEPW-T04: the clay-lined pond with its seepage boundary conditions](images/gs2_pond_inputs.png)
 
 ![SEEPW-T04: water-table rise vs time, XSLOPE vs SEEP/W](images/gs2_pond.png){width=800px}
 
@@ -1316,7 +1316,7 @@ condition would return a dry hydrostatic column and the front would never advanc
 
 **Input:** [gs2_heap.xlsx](files/geostudio/gs2_heap.xlsx)
 
-![SEEPW-T05 inputs: the leach column with its seepage boundary conditions](images/gs2_heap_inputs.png){width=800px}
+![SEEPW-T05: the leach column with its seepage boundary conditions](images/gs2_heap_inputs.png){width=800px}
 
 ![SEEPW-T05: pressure-head profile vs time, XSLOPE vs SEEP/W](images/gs2_heap.png){width=800px}
 
@@ -1380,7 +1380,7 @@ base **suction** is stepped progressively more negative in five stages over ~61 
 It exercises the unsaturated storage term C(ψ) under a stepped specified-pressure-head
 boundary.
 
-![SEEPW-T07 inputs: the multistep-outflow column with its seepage boundary conditions](images/gs2_mso_inputs.png){width=800px}
+![SEEPW-T07: the multistep-outflow column with its seepage boundary conditions](images/gs2_mso_inputs.png){width=800px}
 
 The base head is a *suction* — a specified **pressure head that is negative at every
 stage** (IC −0.073 m, stepping to −0.093 … −0.175 m). Because the base polyline sits at

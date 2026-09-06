@@ -7522,6 +7522,46 @@ def run_interslice_admissibility_test(test):
     return 0.0, None
 
 
+def run_force_closure_root_test(test):
+    """Which root of the force-equilibrium closure is the answer.
+
+    Corps and Lowe drive the side force left over past the last slice to zero.
+    That march divides by a per-slice base factor which vanishes at its own
+    factor of safety on every slice whose base is inclined more than ninety
+    degrees from its side force, and between each consecutive pair of those poles
+    the residual sweeps the whole real line and so carries a root. A single
+    secant from F = 1.5 took whichever of them it reached: on the pile model's
+    Corps critical surface that was 1.061, against 6.55 from Spencer, Bishop,
+    Morgenstern-Price and Lowe on the identical slices, and it was published.
+
+    The window is now scanned, every sign change bracketed, and each root tested
+    on three measures — the base factor clear of zero, the largest side force
+    within the weight of the sliding mass, base tension not saturated — with the
+    root nearest the moment-equilibrium answer reported when more than one
+    survives and the rest named in the solution's warnings.
+
+    The check lives in test/force_closure_root_check.py: the two surfaces the
+    defect was found on and their root structure, the low branch refused, the
+    tie-break, the warnings, Corps against Spencer on each model's own critical
+    surface, the failure classes a search reports, and the secant restored as a
+    mutation.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'force_closure_root_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('force_closure_root_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_circle_vertex_test(test):
     """A circle that daylights exactly on a ground-surface vertex.
 
@@ -13104,6 +13144,8 @@ def _dispatch_test(test):
         return run_spencer_disclosure_test(test)
     if test_type == 'interslice_admissibility':
         return run_interslice_admissibility_test(test)
+    if test_type == 'force_closure_root':
+        return run_force_closure_root_test(test)
     if test_type == 'circle_vertex':
         return run_circle_vertex_test(test)
     if test_type == 'circle_above_center':
@@ -13279,6 +13321,7 @@ def _expected_and_tol(test, default_tolerance):
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'piezo_u_guard',
                        'spencer_disclosure', 'interslice_admissibility',
+                       'force_closure_root',
                        'circle_vertex', 'circle_above_center',
                        'gsat_pair', 'seep_head',
                        'tseep_head', 'design_callable', 'kernel_xcheck'):
@@ -13299,6 +13342,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'transient_seep': 4, 'seep_elements': 3, 'seep': 3,
               'noncircular_search': 2, 'circular_search': 2,
               'spencer_disclosure': 3, 'interslice_admissibility': 3,
+              'force_closure_root': 3,
               'circle_vertex': 2,
               'circle_above_center': 2}
 
@@ -13689,6 +13733,14 @@ def main():
         tests.append({'type': 'interslice_admissibility',
                       'file': 'interslice tension: one measure, four methods',
                       'method': '-', 'source': 'interslice_admissibility'})
+        # The force-equilibrium closure has a root between every consecutive pair
+        # of its poles, and a single secant from F = 1.5 reported whichever one it
+        # reached — 1.061 on a surface where every other method read 6.55. The
+        # window is scanned and the roots judged on three measures; the two
+        # surfaces the defect was found on are pinned with their root structure.
+        tests.append({'type': 'force_closure_root',
+                      'file': 'force-equilibrium: which root is the answer',
+                      'method': '-', 'source': 'force_closure_root'})
         # A circle daylighting exactly on a ground-surface vertex reported that
         # vertex once per adjoining segment, and the extra point sent the
         # count-and-prune to two copies of it — a zero-length "surface" that was

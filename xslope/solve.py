@@ -55,6 +55,17 @@ SPENCER_INADMISSIBLE = ("Spencer's method: only solutions with anomalous base "
 MPRICE_NO_CROSSING = "Morgenstern-Price: no F_f/F_m crossing found in "
 MPRICE_INADMISSIBLE = "Morgenstern-Price: inadmissible solution "
 
+#: The force-equilibrium family's three, under its own assumption. The closure is
+#: scanned over a fixed window rather than iterated from a guess, so "the
+#: iteration ran out" is no longer one of its outcomes: either the window holds no
+#: root at all, or it holds roots and none of them describes a body of soil (both
+#: no-admissible-root facts), or the root it reports is refused afterwards on the
+#: base tension it implies.
+FORCE_EQ_NO_ROOT = "force_equilibrium: the force closure has no root in FS = "
+FORCE_EQ_NO_ADMISSIBLE_ROOT = ("force_equilibrium: no admissible force-closure "
+                               "root on this surface")
+FORCE_EQ_INADMISSIBLE = "force_equilibrium: inadmissible solution "
+
 #: message prefix -> class. ONLY messages whose meaning has been read off the
 #: code that emits them appear here. Anything else is unmapped, and a caller that
 #: tallies failures must say so rather than guess: the fallback that used to be
@@ -66,6 +77,9 @@ _FAILURE_KINDS = (
     (SPENCER_NO_CONVERGENCE, "not_converged"),
     (MPRICE_NO_CROSSING, "no_admissible_solution"),
     (MPRICE_INADMISSIBLE, "inadmissible"),
+    (FORCE_EQ_NO_ROOT, "no_admissible_solution"),
+    (FORCE_EQ_NO_ADMISSIBLE_ROOT, "no_admissible_solution"),
+    (FORCE_EQ_INADMISSIBLE, "inadmissible"),
 )
 
 #: How far above the residual the solver ACCEPTS the reachable floor must stand
@@ -86,6 +100,38 @@ NO_SOLUTION_FLOOR = 1e-6
 #: on most of the surface. Shared by force_equilibrium (corps, lowe) and mprice.
 #: Valid criticals across the corpus run 0-15%.
 MAX_BASE_TENSION_EXTENT = 0.5
+
+#: The factor-of-safety window the force-equilibrium closure is scanned over, and
+#: how finely. `Z_{n+1}(F) = 0` is not single-valued: the per-slice determinant
+#: `cos(alpha-theta) + tan(phi)/F * sin(alpha-theta)` vanishes at its own factor of
+#: safety on every slice where `alpha - theta` is obtuse, and each of those poles
+#: separates one root of the closure from the next. A slip surface can therefore
+#: carry a dozen roots between 0.05 and 10, only one of which describes a body of
+#: soil. The scan brackets them all; `_force_closure_root` selects among them.
+FE_FS_MIN = 0.05
+FE_FS_MAX = 10.0
+FE_FS_SCAN = 200
+
+#: How close to zero the force-equilibrium base factor may come at a root. The
+#: factor `cos(alpha-theta) + tan(phi)/F * sin(alpha-theta)` is this march's
+#: counterpart of Bishop's `m_alpha`: it divides every per-slice solve, so a root
+#: where it vanishes on any slice sits on the pole rather than describing a state
+#: of the mass. Between each consecutive pair of poles the residual sweeps the
+#: whole real line and so always has a root; those are the spurious branch, and
+#: they are the ones that read a low factor of safety against side forces of
+#: several times the weight of the sliding mass. Measured over every Corps and
+#: Lowe solution the shipped corpus produces on its own surfaces, the answers that
+#: agree with the moment methods keep this factor above 0.2 on every slice, while
+#: the between-poles roots sit at 0.003 to 0.022.
+FE_MIN_BASE_FACTOR = 0.05
+
+#: Largest interslice resultant a force-equilibrium root may carry, as a multiple
+#: of the weight of the sliding mass. The interslice forces are internal to that
+#: mass and are equilibrated by it, so a boundary transmitting more than the whole
+#: column of soil above the surface is describing a numerical branch of the
+#: recurrence rather than a state of stress. Roots on the physical branch across
+#: the corpus run well under half the weight.
+FE_MAX_Z_OVER_W = 1.0
 
 
 def failure_kind(message):
@@ -1332,20 +1378,88 @@ def force_equilibrium(slice_df, theta_list, tol=1e-6, max_iter=50, debug=False, 
             'h_pile' (pile force, optional), 'theta_p' (pile inclination, RADIANS, optional)
         theta_list (array-like): slice‐boundary force inclinations (degrees),
                                  length must be n+1 if there are n slices
-        tol (float): convergence tolerance on residual
-        max_iter (int): maximum number of Newton (secant) iterations
+        tol, max_iter: accepted for backward compatibility; the root is now
+                       bracketed rather than iterated from a seed, so neither is
+                       used (see `_force_closure_root`)
         debug (bool): print residuals during iteration
 
     Returns:
         (bool, dict or str):
-           - If converged: (True, {'method':'force_equilibrium','FS':<value>})
-           - If failed:   (False, "error message")
+           - If solved: (True, {'FS': <value>, 'warnings': [...]})
+           - If failed: (False, "error message")
+
+    The closure `Z[n](FS) = 0` has several roots on many surfaces; which one is
+    reported is decided by `_force_closure_root`, and any others are named in
+    `warnings`.
     """
     import numpy as np
 
     n = len(slice_df)
     if len(theta_list) != n+1:
         return False, f"theta_list length ({len(theta_list)}) must be n+1 ({n+1})"
+
+    residual, N, Z, det, poles = _force_closure(slice_df, theta_list, right_facing)
+
+    if debug:
+        r0 = residual(1.5)
+        print(f"FS_guess=1.500000 → residual={r0:.4g}")
+
+    FS_opt, root_notes = _force_closure_root(residual, Z, N, det, poles, slice_df)
+    if FS_opt is None:
+        return False, root_notes
+
+    # A non-positive factor of safety is unphysical. The scan only admits roots
+    # above FE_FS_MIN, so this is a belt-and-braces check on the returned root.
+    if not np.isfinite(FS_opt) or FS_opt <= 0:
+        return False, f"force_equilibrium: non-physical factor of safety ({FS_opt})"
+
+    # Re-evaluate at the root so N and Z hold the values at FS_opt.
+    residual(FS_opt)
+
+    # Admissibility guard. A free search can drive the force-equilibrium solver onto
+    # grossly non-physical surfaces and report a spurious low FS. What is refused is
+    # base tension by EXTENT — a few negative base normals occur in valid solutions
+    # and are not rejected, but past half the slices the solution contradicts the
+    # Mohr-Coulomb strength it was solved with over most of the surface. Interslice
+    # tension is reported below and never refused; see interslice_tension_note.
+    frac_N_neg = float(np.mean(N < 0)) if n else 0.0
+    if frac_N_neg > MAX_BASE_TENSION_EXTENT:
+        return False, (FORCE_EQ_INADMISSIBLE +
+                       f"({100*frac_N_neg:.0f}% of base normals in tension)")
+
+    slice_df['n_eff'] = N  # store effective normal forces in slice_df
+    slice_df['z'] = Z[:-1]  # store interslice forces in slice_df, adjust length to n slices
+
+    # Report-only admissibility screen (corps/lowe inherit it), carrying the same
+    # interslice-tension measure spencer and mprice report. The parallel-force
+    # march exposes no line of thrust, so only the base-tension and interslice-
+    # tension signatures apply; the third is skipped. On right-facing slopes the
+    # caller negates theta_list, flipping Z's sign, so tension there is Z>0 — pass
+    # the physical-convention Z (tension < 0) the helper expects.
+    Z_phys = -Z if right_facing else Z
+    warns = _admissibility_warnings(_c_eff(slice_df), N, Z_phys)
+    warns.extend(root_notes)
+
+    if debug:
+        r_opt = residual(FS_opt)
+        print(f" Converged FS = {FS_opt:.6f}, residual = {r_opt:.4g}")
+
+    return True, {'FS': FS_opt, 'warnings': warns}
+
+
+def _force_closure(slice_df, theta_list, right_facing=False):
+    """Build the force-closure residual `Z[n](FS)` for one slice set.
+
+    Extracted from `force_equilibrium` so the root finder, the diagnostics and the
+    checks all evaluate the same closure. Returns `(residual, N, Z, det, poles)`: calling
+    `residual(FS)` marches the slices at that trial factor of safety, fills the
+    persistent `N` (effective base normals), `Z` (interslice resultants at each
+    boundary, `Z[0] = 0`) and `det` (the per-slice base factor) arrays in place, and
+    returns the right-end interslice force, whose root in `FS` is the
+    force-equilibrium solution. `poles` are the factors of safety at which the base
+    factor vanishes, in closed form.
+    """
+    n = len(slice_df)
 
     # extract and convert to radians
     alpha   = np.radians(slice_df['alpha'].values)
@@ -1385,6 +1499,23 @@ def force_equilibrium(slice_df, theta_list, tol=1e-6, max_iter=50, debug=False, 
 
     N = np.zeros(n)  # normal forces on slice bases (filled by each march)
     Z = np.zeros(n+1)  # interslice forces, Z[0] = 0 by definition (no force entering leftmost slice)
+    # The march's base factor, the force-equilibrium counterpart of Bishop's
+    # m_alpha: the 2x2 determinant per slice reduces to
+    #   det_i = cos(alpha_i - theta_{i+1}) + tan(phi_i)/FS * sin(alpha_i - theta_{i+1}),
+    # so it is a closed-form function of the trial factor of safety. Where it
+    # passes through zero the recurrence has a pole, and the closure a spurious
+    # sign change; `_force_closure_root` reads it to reject those.
+    d_ang = alpha - theta[1:]
+    cos_d, sin_d = np.cos(d_ang), np.sin(d_ang)
+    tan_phi = np.tan(phi)
+    det = np.zeros(n)
+    # Where each slice's base factor vanishes, in closed form: det_i = 0 at
+    # FS = -tan(phi_i) * tan(alpha_i - theta_{i+1}). The scan is cut at these so
+    # that every bracket it forms holds at most one pole, and a root wedged
+    # between two close poles cannot fall through the grid.
+    with np.errstate(divide='ignore', invalid='ignore'):
+        poles = -tan_phi * np.tan(d_ang)
+    poles = np.sort(poles[np.isfinite(poles) & (poles > 0.0)])
 
     def residual(FS):
         """Right-side interslice force Z[n] for a given FS (force-closure residual).
@@ -1400,62 +1531,141 @@ def force_equilibrium(slice_df, theta_list, tol=1e-6, max_iter=50, debug=False, 
             H_pas=H_pas, LL=LL, ll_b=ll_b)
         N[:] = N_march
         Z[:] = Z_march
+        det[:] = cos_d + tan_phi / FS * sin_d
         return Z[n]
 
-    fs_guess = 1.5      # secant seed
+    return residual, N, Z, det, poles
 
-    if debug:
-        r0 = residual(fs_guess)
-        print(f"FS_guess={fs_guess:.6f} → residual={r0:.4g}")
 
-    # Root-find FS such that the right-end interslice force Z[n] = 0, by Newton-
-    # secant from fs_guess. (A bracketed brentq solver was tried to also catch the
-    # genuinely-low-FS surfaces where the single-guess secant diverges, but it
-    # resurrects non-physical over-strength roots near FS->0 on surfaces where the
-    # secant correctly fails, which the admissibility check below does not reliably
-    # separate from legitimate low-FS solutions. Deferred.)
-    try:
-        FS_opt = newton(residual, fs_guess, tol=tol, maxiter=max_iter)
-    except Exception as e:
-        return False, f"force_equilibrium failed to converge: {e}"
+def _force_closure_root(residual, Z, N, det, poles, slice_df):
+    """Bracket every root of the force-closure residual and return the physical one.
 
-    # A non-positive factor of safety is unphysical: the secant has converged onto a
-    # spurious root (it happens on some steep right-facing surfaces). Reject it.
-    if not np.isfinite(FS_opt) or FS_opt <= 0:
-        return False, f"force_equilibrium: non-physical factor of safety ({FS_opt})"
+    `residual(F)` is `Z[n]`, the interslice force left over at the right end of the
+    march. Its root in `F` is the force-equilibrium factor of safety — but the march
+    is a linear recurrence whose per-slice determinant
+    ``cos(alpha - theta) + tan(phi)/F * sin(alpha - theta)`` vanishes at
+    ``F = -tan(phi) * tan(alpha - theta)``, so on any surface with obtuse
+    ``alpha - theta`` the residual has poles, and a root of its own between each
+    consecutive pair. A single-guess secant lands on whichever of them it happens to
+    reach, which on some surfaces is a branch where the interslice forces run to
+    hundreds of times the weight of the sliding mass.
 
-    # Re-evaluate at the root so N and Z reflect FS_opt (newton's last call may differ).
-    residual(FS_opt)
+    The window ``[FE_FS_MIN, FE_FS_MAX]`` is scanned, every sign change is bracketed
+    with `brentq`, and each bracketed value is tested against three measures:
 
-    # Admissibility guard. A free search can drive the force-equilibrium solver onto
-    # grossly non-physical surfaces and report a spurious low FS. What is refused is
-    # base tension by EXTENT — a few negative base normals occur in valid solutions
-    # and are not rejected, but past half the slices the solution contradicts the
-    # Mohr-Coulomb strength it was solved with over most of the surface. Interslice
-    # tension is reported below and never refused; see interslice_tension_note.
-    frac_N_neg = float(np.mean(N < 0)) if n else 0.0
-    if frac_N_neg > MAX_BASE_TENSION_EXTENT:
-        return False, (
-            "force_equilibrium: inadmissible solution "
-            f"({100*frac_N_neg:.0f}% of base normals in tension)")
+    * the base factor stays clear of zero (`FE_MIN_BASE_FACTOR`) — a root sitting on
+      a pole is a discontinuity in the closure rather than a state of the mass, and
+      the march that produced it is ill-conditioned;
+    * the largest interslice resultant stays within `FE_MAX_Z_OVER_W` times the
+      weight of the sliding mass — bounded interslice forces, no boundary carrying
+      more than the soil above the surface;
+    * base tension does not saturate (`MAX_BASE_TENSION_EXTENT`, the same extent
+      test the caller applies to the returned solution).
 
-    slice_df['n_eff'] = N  # store effective normal forces in slice_df
-    slice_df['z'] = Z[:-1]  # store interslice forces in slice_df, adjust length to n slices
+    Among the roots that pass, the one nearest the moment-equilibrium factor of
+    safety on the same slices is returned — Bishop's method on a circular surface,
+    Spencer's otherwise, and nearness measured as a ratio, since a factor of safety
+    is one — and the smallest admissible root when neither solves. The
+    roots that were passed over are named in `results['warnings']` with the measure
+    each failed. When no root passes, the failure says so; no other method's factor
+    of safety is ever substituted.
 
-    # Report-only admissibility screen (corps/lowe inherit it), carrying the same
-    # interslice-tension measure spencer and mprice report. The parallel-force
-    # march exposes no line of thrust, so only the base-tension and interslice-
-    # tension signatures apply; the third is skipped. On right-facing slopes the
-    # caller negates theta_list, flipping Z's sign, so tension there is Z>0 — pass
-    # the physical-convention Z (tension < 0) the helper expects.
-    Z_phys = -Z if right_facing else Z
-    warns = _admissibility_warnings(c, N, Z_phys)
+    Returns `(FS, warnings)` on success and `(None, message)` when no root passes.
+    """
+    from scipy.optimize import brentq
 
-    if debug:
-        r_opt = residual(FS_opt)
-        print(f" Converged FS = {FS_opt:.6f}, residual = {r_opt:.4g}")
+    W_sum = float(np.abs(np.asarray(slice_df['w'].values, dtype=float)).sum())
+    scale = W_sum if W_sum > 0 else 1.0
 
-    return True, {'FS': FS_opt, 'warnings': warns}
+    # A uniform sweep of the window, cut either side of every pole so that no
+    # bracket spans one and no root between two close poles is stepped over.
+    edge = 1e-7 * (FE_FS_MAX - FE_FS_MIN)
+    inside = poles[(poles > FE_FS_MIN + edge) & (poles < FE_FS_MAX - edge)]
+    grid = np.unique(np.concatenate([
+        np.linspace(FE_FS_MIN, FE_FS_MAX, FE_FS_SCAN),
+        inside - edge, inside + edge]))
+    at_pole = np.isin(grid, inside - edge)      # bracket [g, g+1] holds a pole
+    vals = np.empty(grid.size)
+    for i, F in enumerate(grid):
+        try:
+            vals[i] = residual(float(F))
+        except Exception:
+            vals[i] = np.nan
+
+    brackets = []
+    for i in range(grid.size - 1):
+        a, b = vals[i], vals[i + 1]
+        if not (np.isfinite(a) and np.isfinite(b)):
+            continue
+        if a == 0.0:
+            brackets.append(float(grid[i]))
+        elif a * b < 0.0 and not at_pole[i]:
+            try:
+                brackets.append(float(brentq(residual, grid[i], grid[i + 1],
+                                             xtol=1e-9, maxiter=100)))
+            except Exception:
+                pass
+    if np.isfinite(vals[-1]) and vals[-1] == 0.0:
+        brackets.append(float(grid[-1]))
+
+    admissible, rejected = [], []
+    for r in brackets:
+        try:
+            res_r = residual(r)
+        except Exception:
+            continue
+        min_det = float(np.abs(det).min()) if len(det) else 1.0
+        max_Z = float(np.abs(Z).max())
+        frac_neg = float(np.mean(N < 0)) if len(N) else 0.0
+        if not np.isfinite(res_r):
+            rejected.append((r, "the march does not close here"))
+        elif min_det < FE_MIN_BASE_FACTOR:
+            rejected.append((r, f"base factor {min_det:.3f}"))
+        elif max_Z > FE_MAX_Z_OVER_W * W_sum:
+            rejected.append((r, f"interslice force {max_Z / scale:.0f}x the "
+                                f"weight of the mass"))
+        elif frac_neg > MAX_BASE_TENSION_EXTENT:
+            rejected.append((r, f"{100 * frac_neg:.0f}% of bases in tension"))
+        else:
+            admissible.append(r)
+
+    named = ", ".join(f"FS={r:.3f} ({why})" for r, why in sorted(rejected))
+    if not admissible:
+        if rejected:
+            return None, (FORCE_EQ_NO_ADMISSIBLE_ROOT + f"; rejected {named}")
+        return None, (FORCE_EQ_NO_ROOT +
+                      f"{FE_FS_MIN:g} to {FE_FS_MAX:g}")
+
+    # Tie-break: the root nearest the moment-equilibrium answer, which is the branch
+    # every other method reads on the same slices. Only needed when more than one
+    # root survives, so the reference solve is not paid for on ordinary surfaces.
+    FS_opt = admissible[0]
+    if len(admissible) > 1:
+        ref = None
+        ref_method = bishop if _has_circle_center(slice_df) else spencer
+        try:
+            ok_r, res_r = ref_method(slice_df.copy())
+            if ok_r and np.isfinite(res_r['FS']) and res_r['FS'] > 0:
+                ref = float(res_r['FS'])
+        except Exception:
+            ref = None
+        if ref is not None:
+            # Distance measured as a RATIO, not a difference: a factor of safety is
+            # strength over demand, so a root at a fifth of the moment answer is
+            # further from it than one at twice, and an arithmetic distance calls
+            # those two a tie.
+            FS_opt = min(admissible, key=lambda r: (abs(np.log(r / ref)), r))
+        else:
+            FS_opt = min(admissible)
+
+    warns = []
+    passed_over = [f"FS={r:.3f} (admissible)" for r in sorted(admissible) if r != FS_opt]
+    passed_over += [f"FS={r:.3f} ({why})" for r, why in sorted(rejected)]
+    if passed_over:
+        warns.append("force closure has other roots on these slices: "
+                     + "; ".join(passed_over))
+    return FS_opt, warns
+
 
 def corps(slice_df, variant=2, debug=False):
     """

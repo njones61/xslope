@@ -1305,7 +1305,7 @@ condition would return a dry hydrostatic column and the front would never advanc
 
 **Input:** [gs2_heap.xlsx](files/geostudio/gs2_heap.xlsx)
 
-![SEEPW-T05: pressure-head profile vs time, XSLOPE vs SEEP/W](images/gs2_heap.png)
+![SEEPW-T05: pressure-head profile vs time, XSLOPE vs SEEP/W](images/gs2_heap.png){width=600px}
 
 The published answer is a graphical volumetric-water-content / flow-rate response (no
 closed form), so the seepage comparison is SEEP/W's own solved `node.csv`:

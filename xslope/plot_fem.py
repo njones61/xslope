@@ -62,9 +62,16 @@ def _fallback_clause(solution, title):
     iteration it was taken at, so the reader knows the field is a moment and not
     an equilibrium. A panel standing on the converged field because there was no
     capture at all says that instead.
+
+    The clause goes on a SECOND LINE rather than after a dash. A panel title is
+    laid out from its own axes' center, so a clause appended inline grows the
+    title sideways until it runs over whatever sits beside the panel — the
+    neighbouring panel's title in a composite, or its own colorbar's exponent
+    label. Wrapping keeps the title inside the panel's width however long the
+    clause is, which is what a self-adjusting layout means here.
     """
     if solution.get("_capture_fallback", False):
-        return f"{title} — {CAPTURE_FALLBACK_TITLE}"
+        return f"{title}\n{CAPTURE_FALLBACK_TITLE}"
     if solution.get("capture_truncated"):
         at = solution.get("capture_truncated_at")
         # Every stop but one is the section running away; the exception is the
@@ -73,8 +80,8 @@ def _fallback_clause(solution, title):
                if solution.get("capture_truncated_kind") == "non_finite"
                else "runaway")
         if at is not None:
-            return f"{title} — capture stopped at iteration {at} ({why})"
-        return f"{title} — capture stopped early"
+            return f"{title}\ncapture stopped at iteration {at} ({why})"
+        return f"{title}\ncapture stopped early"
     return title
 
 

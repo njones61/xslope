@@ -457,7 +457,7 @@ to the same 0.018 ft whether its base is drawn at elevation 0 or at 1000. Asking
 for the tolerance as a fraction of the model's own scale rather than as a length
 is what lets one default work on a 10 m sheetpile section and on a 180 ft dam.
 
-The run finishes in **28 iterations**. In the **Display** panel, tick
+The run finishes in **47 iterations**. In the **Display** panel, tick
 **Filled contours** — useful on a zoned section, where the wash shows the
 core carrying the drop. **Base material** already reads `3: foundation`: the
 selector opens on the zone whose conductivity makes the flow lines legible; in
@@ -804,9 +804,9 @@ point, and where it bottoms out is most of the answer.
 ## What the unsaturated parameters cost in convergence
 
 Pushing the floor down cost iterations as well as discharge: the runs at
-*kr<sub>0</sub>* = 3×10<sup>−4</sup> and 10<sup>−4</sup> took 145 and 148 sweeps
-against the shipped model's 23, far enough into the run for the solver to have
-dropped its step to a hundredth of each new solve. That cost is what stands
+*kr<sub>0</sub>* = 3×10<sup>−4</sup> and 10<sup>−4</sup> took 103 and 83 sweeps
+against the shipped model's 47, and are the only two in the sweep on which the
+solver dropped its step to a hundredth of each new solve. That cost is what stands
 between a plausible set of unsaturated parameters and a run that finishes.
 
 ### The three conditions
@@ -814,10 +814,10 @@ between a plausible set of unsaturated parameters and a run that finishes.
 An unconfined run stops when all three of these hold at once, and reports
 `converged = False` if it runs out of iterations first.
 
-**Head change.** The largest change in head at any node between sweeps, divided by
-the largest head in the field, below the tolerance from the **Run Seepage** dialog
-scaled by the domain height — 0.018 here, a ratio rather than a length. This
-measures whether the head field has stopped moving.
+**Head change.** The largest change in head at any node between sweeps, below the
+tolerance from the **Run Seepage** dialog scaled by the model's head scale — 0.018 ft
+here. Both sides of the test are lengths, so the gate does not move with the elevation
+datum. This measures whether the head field has stopped moving.
 
 **Flow closure.** Water in equals water out at every node, to within 0.1% of
 the total inflow.
@@ -829,14 +829,14 @@ belongs to no one set of boundary conditions.
 The head tolerance is the only one of the three the dialog exposes, and it turns
 out to control the iteration count rather than the answer:
 
-| Convergence tol | Scaled to | q | Iterations |
+| Convergence tol | Scaled to (ft) | q | Iterations |
 | :---: | :---: | :---: | :---: |
-| 0.001 | 0.18 | 1.954617 | 23 |
-| 0.0001 | 0.018 | 1.954617 | 23 |
-| 0.00001 | 0.0018 | 1.954618 | 24 |
-| 0.000001 | 0.00018 | 1.954616 | 28 |
+| 0.001 | 0.18 | 1.954617 | 44 |
+| 0.0001 | 0.018 | 1.954616 | 47 |
+| 0.00001 | 0.0018 | 1.954616 | 49 |
+| 0.000001 | 0.00018 | 1.954616 | 55 |
 
-A thousandfold tightening moves the discharge in the sixth figure and costs five
+A thousandfold tightening moves the discharge in the seventh figure and costs eleven
 extra sweeps. The reason is the flow-closure condition: whichever head tolerance is
 asked for, the run does not stop until the conductivity field has stopped lagging
 the head field to within 0.1% of the inflow, and by then the head has stopped
@@ -855,7 +855,7 @@ and run it. The solver uses all 400 sweeps its default ceiling allows and then
 stops:
 
 ```text
-Iteration 400: residual = 1.378519e-04, closure = 6.779e-01, relax = 0.010, 1/31 exit face active
+Iteration 400: residual = 9.826698e-03, closure = 2.287e-01, relax = 0.010, 1/31 exit face active
 Warning: Did not converge in 400 iterations
 …
 WARNING: seepage solution did not converge — flowrate is unreliable (solution['converged'] is False).
@@ -866,10 +866,10 @@ more iterations than the default allows. A steep conductivity curve converges
 slowly: each sweep computes conductivities from heads and heads from
 conductivities, and the steeper the curve, the harder the two chase each other.
 Set **Max iterations** on the **Run Seepage** dialog to `1000` and the same run
-converges, in **963 iterations**, at *q* = **1.9755**.
+converges, in **900 iterations**, at *q* = **1.9755**.
 
 Two habits come out of that. Check `converged` before quoting a flowrate: a run
-that hits the ceiling still returns one — 1.9706 here, only 0.25% from the
+that hits the ceiling still returns one — 1.9733 here, only 0.11% from the
 converged answer, with nothing about the number to say so. And prefer a gentler
 relative-conductivity curve when nothing about the result depends on its shape,
 which on a stability model is the usual case.

@@ -356,8 +356,8 @@ Iteration 3: residual = 4.241461e+00, closure = 1.432e+01, relax = 1.000, 3/30 e
 Iteration 4: residual = 4.136706e+00, closure = 9.756e+00, relax = 1.000, 1/30 exit face active
 Iteration 5: residual = 3.224142e+00, closure = 5.469e+00, relax = 1.000, 0/30 exit face active
 ...
-Iteration 55: residual = 1.882158e-03, closure = 2.452e-03, relax = 0.200, 0/30 exit face active
-Converged in 59 iterations (residual = 8.625e-04, closure = 9.100e-04, exit face stable)
+Iteration 35: residual = 3.168099e-03, closure = 1.311e-03, relax = 0.500, 0/30 exit face active
+Converged in 36 iterations (residual = 1.753e-03, closure = 6.346e-04, exit face stable)
 ```
 
 The last column is the exit face reporting its own answer, and on this dam that

@@ -237,7 +237,26 @@ def gw007():
     head profiles) with no tabulated value, so - as the methodology note allows for
     GW6/GW7 - only the flowrate is locked (Q=q*L=1.68e-4, exact by construction),
     with a head regression guarding the field. xslope reproduces the stated water
-    table (daylights at el 0.30 at the toe) and the perched zone above the lens."""
+    table (daylights at el 0.30 at the toe) and the perched zone above the lens.
+
+    THE FIT, and why this row does not turn on it.  Where a vendor ships a
+    conductivity table and xslope ships a two-parameter law, the law is fitted to
+    the CONDUCTIVITY table, by least squares in log10 kr, over the suction range
+    the shipped run visits (SEEPW-T04, SEEPW-T05 and GW#20 are built on that
+    rule).  Here the rule has nothing to bite on.  The vendor's 4-point table is
+    flat at kr = 1 out to psi = 0.30581 m -- an air-entry value -- and the whole
+    steady field sits inside psi <= 0.132 m in the medium sand and 0.118 m in the
+    fine lens, measured node by node on the shipped solve, so the fit range lies
+    entirely on the plateau: every curve that stays flat there reproduces the
+    table exactly, and the least-squares problem over that range is degenerate.
+    The field is insensitive to match.  Re-solved with kr held at the vendor's
+    table exactly in place of the shipped Mualem-vG pair, the eight locked
+    stations move by at most 0.003 m of head against the 0.02 m tag tolerance and
+    the flowrate is unchanged at 1.68e-4 m3/s per m.  So the shipped pair stands
+    and no lock moves.  What it costs is a 0.07-decade rms dip below the plateau
+    across that range (0.14 at worst), which is the whole of its fit error where
+    the model lives; the 0.21 decades it reads over the whole table sit at psi =
+    1.33 and 3.06 m, suctions this model never reaches."""
     sd = _base_sd(time_unit='sec')
     med = dict(sd['materials'][0])
     med.update(name='Medium sand', k1=0.0014, k2=0.0014, alpha=0.0,

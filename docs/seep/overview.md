@@ -77,8 +77,11 @@ input columns, `a` and `n`.
 ![seep_ov_kr_models.png](images/seep_ov_kr_models.png){width=1000px}
 
 *The three relative-conductivity models, evaluated by the solver's own `kr_relative_vec`
-(log scale). The van Genuchten and Gardner curves are floored at
-$k_{r,\min} = 10^{-4}$; the linear front is floored at its own $kr_0$.*
+(log scale, one ordinate per panel). The linear front stops at the $kr_0$ it is given;
+the van Genuchten and Gardner curves run on down to $k_{r,\min} = 10^{-8}$, a numerical
+guard that keeps the conduction matrix nonsingular where a dry element would otherwise
+carry nothing, and low enough that the head field no longer moves when it is lowered
+further. The sand curve is the one that reaches it here.*
 
 #### Linear front (`lf`)
 
@@ -147,7 +150,8 @@ Gardner's name. There is no $m = 1 - 1/n$ coupling, so $n$ need only be positive
 **Fitted parameters** by USDA soil-texture class. Gardner has no published texture table of
 its own — its parameters normally arrive with an imported SEEP/W or Slide model, or from
 fitted measurements. The values below are least-squares fits (in $\log_{10} k_r$ over 0.01
-to 100 ft of suction, with $k_r$ floored at $10^{-4}$) to each texture's van Genuchten curve
+to 100 ft of suction, with both curves clipped at $k_r = 10^{-4}$ so the dry tail does not
+dominate the misfit) to each texture's van Genuchten curve
 from the Carsel & Parrish table above, so the underlying dataset is the same; the RMS column
 is the misfit of the power form to that curve — small for coarse textures, about a quarter
 of a decade for the clays. They are produced by `tools/fit_gardner_table.py`:

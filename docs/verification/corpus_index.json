@@ -12130,7 +12130,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 25,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12145,7 +12145,8 @@
         {
           "anchor": "vp23",
           "checks": [
-            "VP23"
+            "VP23",
+            "VP23-circle"
           ],
           "level": 2,
           "page": "verification/rocscience/",
@@ -24222,7 +24223,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 586,
+    "tags": 587,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

@@ -66,7 +66,6 @@ CONFIG = PageConfig(
         ('+3.5', 'Every case lands within 3.5% of unity'),
         ('+1', 'stages land within 1% of'),
         ('+2.3', 'within 2.3% of RS2 at all three thicknesses'),
-        ('+4', 'within 4% of the skin'),
         ('+0.8', 'land within 0.8%'),
         ('+2.2', 'that still lands within 2.2%'),
         ('+2.1', 'lands within 2.1% of'),

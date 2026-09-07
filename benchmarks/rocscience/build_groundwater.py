@@ -1530,11 +1530,24 @@ def gw020():
         printed m_v = 0.002 /kPa on both sides of the phreatic surface.
       * conductivity -- its 4-point Custom table (abscissae in metres of head:
         -3.0581 / -1.3252 / -0.30581 / 0, i.e. 30 / 13 / 3 / 0 kPa) is fitted by
-        Gardner kr = 1/(1 + a*psi^n): medium a=146.88069, n=4.45352, fine
-        a=115.81091, n=4.18902.  Over the three tabulated points that fit is
-        0.24 decades rms against 0.40 for the Mualem-vG pair GW#7 carries, and
-        the two give the same steady field (0.003 vs 0.004 m rms against the
-        Fig 22.7 208 s markers).
+        Gardner kr = 1/(1 + a*psi^n).  The table is flat at kr = 1 out to
+        psi = 0.30581 m -- an air-entry value -- and drops three decades over the
+        next metre; a Gardner power law carries no air-entry parameter, so one
+        (a, n) cannot hold both the plateau and the drop, and where the fit is
+        placed decides which part of the curve is right.  It is placed over the
+        suctions this model reaches.  The initial field is no-flow at total head
+        0.3 with the crest at y = 1.0, so the largest suction anywhere is
+        0.700 m at t = 0 and infiltration only wets the mesh from there
+        (0.583 / 0.366 / 0.137 m at the three report times); psi = 1.3252 and
+        3.0581 m are never sampled.  The least-squares fit in log10 kr therefore
+        weights psi = 0.30581 m -- the one tabulated point inside that range --
+        five-fold against the two outside it: medium a=74.678, n=5.3056, fine
+        a=57.986, n=5.0598.  That holds the table to 0.07 decades rms over
+        psi <= 0.700 m, against 0.24 for the unweighted optimum, which sags
+        0.24-0.33 decades below the table across the whole plateau shoulder.
+        Over all three tabulated points the weighted fit reads 0.33 (medium) and
+        0.35 (fine) decades rms against the unweighted 0.24 and 0.26, the excess
+        sitting at psi = 1.3252 and 3.0581 m.
 
     Published target: total head along a query line (Fig 22.7, vs Ref [1]) +
     total-head contours at the three times — chart-only.  XSLOPE's own solved heads
@@ -1544,9 +1557,9 @@ def gw020():
     ss = 9.81 * 0.002
     _H_RET = -100.0 / 9.81          # the water-content table's 100 kPa range
     med = _tseep_material(sd['materials'][0], 'Medium sand', 0.0014, ss=ss, sy=0.2)
-    med.update(kr0=0.0, h0=_H_RET, unsat='gard', vg_a=146.88069, vg_n=4.45352)
+    med.update(kr0=0.0, h0=_H_RET, unsat='gard', vg_a=74.678, vg_n=5.3056)
     fin = _tseep_material(sd['materials'][0], 'Fine sand', 5.5e-5, ss=ss, sy=0.2)
-    fin.update(kr0=0.0, h0=_H_RET, unsat='gard', vg_a=115.81091, vg_n=4.18902)
+    fin.update(kr0=0.0, h0=_H_RET, unsat='gard', vg_a=57.986, vg_n=5.0598)
     sd['materials'] = [med, fin]                 # mat 0 = medium, mat 1 = fine lens
     sd['profile_lines'] = []
     sd['polygons'] = [

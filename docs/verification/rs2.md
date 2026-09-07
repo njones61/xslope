@@ -175,7 +175,7 @@ why rather than leaving a blank; everything else is built and locked at its tagg
 | [61](#rs2-34) | 🟢 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | M-C: SSRM 1.373 vs RS2 SSRM 1.38 (−0.5%) · power curve: SSRM 1.497 vs RS2 SSRM 1.47 (+1.8%) | Piggyback on [RS2-34](#rs2-34). Part IV publishes RS2 SSRM 1.34 / 1.45; Baker 1.35 / 1.48. |
 | [62](#rs2-68) | 🟢 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) | Piggyback on [RS2-68](#rs2-68), Case 1. RS2 SSRM 0.96. |
 | [63](#rs2-68) | 🔴 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | Bishop: k꜀ 0.169 vs Slide2 Bishop 0.155 (+9.0%) · Spencer: k꜀ 0.167 vs Loukidis Spencer 0.155 (+7.7%) | Piggyback on [RS2-68](#rs2-68), Case 3. The paper's Table 3 publishes Spencer 0.155 and no Bishop value for this example, so Slide2 is the Bishop authority. RS2's own SSRM k꜀ is 0.161, a cross-bearing here; Part IV's 0.99 is the SSR factor of safety RS2 reports at the paper's fixed k = 0.155, not a k꜀. |
-| [64](#p4-vp64) | 🟢 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | SSRM 2.394 vs RS2 SSRM 2.37 (+1.0%) | Own SSRM build; Spencer 2.44 [USACE]. The vendor's 65-vertex SSR corridor is documented, not carried — it is thinner than the corpus mesh. |
+| [64](#p4-vp64) | 🟢 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | SSRM 2.406 vs RS2 SSRM 2.37 (+1.5%) | Own SSRM build; Spencer 2.44 [USACE]. The vendor's 65-vertex SSR corridor is documented, not carried — it is thinner than the corpus mesh. |
 | [65](#p4-vp65) | <span class="nodata">⊘</span> | Embankment, water table, ponded (USACE 2003 Fig 4-2) |  | *reported, no lock* — own SSRM build, unconstrained, at 1.909 on an upstream mechanism; RS2's 2.60 is constrained to the published circle by an SSR corridor the corpus mesh cannot resolve, so the two are not a pairing. Ref 2.71. |
 | [66](#p4-vp66) | 🟢 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | SSRM 2.172 vs RS2 SSRM 2.22 (−2.2%) | Own SSRM build, ponded on both faces as the vendor model is. USACE 2.30. |
 | [67](#p4-vp67) | 🟢 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | SSR Exclusion Area: SSRM 1.303 vs RS2 SSRM 1.33 (−2.0%) | Own SSRM build; unconstrained it finds the true global minimum at 1.076. Ref 1.33. |
@@ -2819,15 +2819,16 @@ cutting through the sand to the clay.
 
 | Method | XSLOPE | RS2 SSRM | Slide2 Spencer | USACE Spencer | XSLOPE LEM Spencer |
 |---|---|---|---|---|---|
-| SSRM (6 ft mesh) | 2.394 | 2.37 (+1.0%) | 2.445 | 2.44 | 2.488 |
+| SSRM (6 ft mesh) | 2.406 | 2.37 (+1.5%) | 2.445 | 2.44 | 2.488 |
 
 The core trench pinches the sand blanket to zero thickness, splitting it into an upstream and a
 downstream wedge, so the blanket is laid as two explicit polygons rather than as a stacked profile
 line: polygon extraction from a stacked profile keeps only the upstream wedge and leaves a ~10-ft
 void under the downstream shell that collapses under gravity at any strength. With the domain
-tiling as a closed continuum the SSRM converges to **2.394**, +1.0% on RS2's SSRM 2.37. The
-geometry follows USACE's 4H:1V Fig 4-1 and the source's moist/saturated unit weights, not the
-steeper single-bulk Slide2-Import conversion of the same problem.
+tiling as a closed continuum the SSRM converges to **2.406**, +1.5% on RS2's SSRM 2.37. The
+geometry follows USACE's 4H:1V Fig 4-1 and the source's moist/saturated unit weights, moist above
+the piezometric line and saturated below it in both engines, not the steeper single-bulk
+Slide2-Import conversion of the same problem.
 
 **The vendor zone here is a mechanism-selection corridor, and it is documented rather than
 carried.** `#064.fez` holds a 65-vertex SSR *search area* that is not a region but a ~6 ft ribbon
@@ -2847,9 +2848,9 @@ crest — with a twin of the embankment carrying a **tensile-strength cutoff T =
 imports Slide's 7-ft crest crack. This file states the same 7 ft of crack through `tcrack_depth`
 instead, so the crack is carried as geometry rather than as a second material.
 
-<!-- test: file=files/rocscience/vp064.xlsx, type=fem_ssrm, expected_fs=2.394, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=2.0, f_max=2.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP64 -->
+<!-- test: file=files/rocscience/vp064.xlsx, type=fem_ssrm, expected_fs=2.406, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=2.0, f_max=2.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP64 -->
 
-![RS2 Part IV VP64: USACE Fig 4-1 end-of-construction dam, SSRM 2.394 vs RS2 SSRM 2.37 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP64.png)
+![RS2 Part IV VP64: USACE Fig 4-1 end-of-construction dam, SSRM 2.406 vs RS2 SSRM 2.37 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP64.png)
 
 ### ⊘ RS2 Part IV VP65 / VP66: USACE upstream-pool dams (Fig 4-2, Fig 4-3) {#p4-vp65}
 

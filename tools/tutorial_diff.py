@@ -10,13 +10,25 @@ as themselves, images as a gray "[figure: name]" line, and the lock comments are
 dropped. Unchanged text is plain, removed words are red and struck through,
 added words are green, bold and underlined. The PDF is produced by LibreOffice
 headless (never Word).
+
+Every page named on the command line gets its own HTML and its own PDF, named
+for the page. Two pages whose file names match -- docs/api/seep.md beside
+docs/verification/seep.md -- take as much of their path as it takes to tell
+them apart (api-seep, verification-seep), so N pages always leave N files.
+A page whose PDF did not appear is named on stdout and the exit status is 1;
+the rest of the batch still runs.
 """
-import datetime, difflib, html, os, re, subprocess, sys
+import datetime, difflib, html, os, re, subprocess, sys, tempfile
 
 import markdown
 
 SOFFICE = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
 OUT_DIR = "/Users/njones/python_projects/xslope_private/reports/tutorial_diffs"
+
+# A conversion that cannot be finished in this long is stuck, not slow.
+SOFFICE_TIMEOUT = 300
+# Used only after the ordinary conversion has failed twice; see convert().
+SOFFICE_PROFILE = os.path.join(tempfile.gettempdir(), "xslope_tutorial_diff_lo")
 
 # LibreOffice's HTML import ignores <style> element rules (and leaks del/ins
 # decoration into the rest of the document when it half-reads them), so every
@@ -492,6 +504,70 @@ def git_show(rev, path):
     return r.stdout if r.returncode == 0 else ""
 
 
+# --------------------------------------------------------------- output names
+
+def stems(pages, base, head):
+    """One output name per page, in the order given.
+
+    The name is the page's file name, which is what a batch of tutorials wants.
+    Pages that share a file name across directories would otherwise write the
+    same PDF twice and leave only the last one, so those -- and only those --
+    take one more leading directory each until the names differ."""
+    parts = [os.path.splitext(p)[0].replace(os.sep, "/").strip("/").split("/")
+             for p in pages]
+    depth = [1] * len(parts)
+    for _ in range(max((len(p) for p in parts), default=1)):
+        names = ["-".join(p[-d:]) for p, d in zip(parts, depth)]
+        dup = {n for n in names if names.count(n) > 1}
+        if not dup:
+            break
+        grew = False
+        for i, n in enumerate(names):
+            if n in dup and depth[i] < len(parts[i]):
+                depth[i] += 1; grew = True
+        if not grew:                      # the same page named twice
+            break
+    names, seen = [], {}
+    for p, d in zip(parts, depth):
+        n = "-".join(p[-d:])
+        seen[n] = seen.get(n, 0) + 1
+        names.append(n if seen[n] == 1 else f"{n}-{seen[n]}")
+    suffix = f"_{base}_to_{head}".replace("/", "-")
+    return [n + suffix for n in names]
+
+
+def convert(hp, out_dir):
+    """Render one HTML to PDF beside it. Returns (ok, note).
+
+    `soffice --convert-to` does not necessarily do the conversion itself: when a
+    LibreOffice is already running under the same user profile it hands the job
+    to that instance, and it exits 0 either way -- so the exit status says
+    nothing and the PDF has to be looked for. A busy or wedged instance drops
+    the job silently, and a profile it cannot open leaves soffice hanging, which
+    is why the call is bounded and the result is checked.
+
+    The first retry stays on the default profile, which is what renders the
+    page the way every earlier diff was rendered. Only if that fails as well
+    does the last attempt run on a private profile: that one cannot be handed
+    off or dropped, at the cost of slightly different table wrapping."""
+    pdf = os.path.splitext(hp)[0] + ".pdf"
+    if os.path.exists(pdf):
+        os.remove(pdf)
+    for attempt, profile in enumerate((None, None, SOFFICE_PROFILE)):
+        cmd = [SOFFICE]
+        if profile:
+            cmd.append(f"-env:UserInstallation=file://{profile}")
+        cmd += ["--headless", "--convert-to", "pdf", "--outdir", out_dir, hp]
+        try:
+            subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=SOFFICE_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            pass
+        if os.path.exists(pdf) and os.path.getsize(pdf) > 0:
+            return True, ("  [private LibreOffice profile]" if profile else "")
+    return False, ""
+
+
 def main(argv):
     out_dir = OUT_DIR
     changes_only = False
@@ -503,19 +579,29 @@ def main(argv):
         print(__doc__); return 1
     base, head, pages = argv[0], argv[1], argv[2:]
     os.makedirs(out_dir, exist_ok=True)
-    for page in pages:
-        doc, n = page_diff(base, head, page, changes_only)
-        stem = (os.path.splitext(os.path.basename(page))[0]
-                + f"_{base}_to_{head}".replace("/", "-"))
+    failed = []
+    for page, stem in zip(pages, stems(pages, base, head)):
+        try:
+            doc, n = page_diff(base, head, page, changes_only)
+        except Exception as e:                     # one bad page, not the batch
+            print(f"{page}: not rendered ({type(e).__name__}: {e})")
+            failed.append(page)
+            continue
         hp = os.path.join(out_dir, stem + ".html")
         with open(hp, "w") as f:
             f.write(doc)
         pdf = os.path.join(out_dir, stem + ".pdf")
-        if os.path.exists(pdf):
-            os.remove(pdf)
-        subprocess.run([SOFFICE, "--headless", "--convert-to", "pdf",
-                        "--outdir", out_dir, hp], capture_output=True, text=True)
-        print(f"{page}: {n} changed block(s) -> {pdf}")
+        ok, note = convert(hp, out_dir)
+        if ok:
+            print(f"{page}: {n} changed block(s) -> {pdf}{note}")
+        else:
+            print(f"{page}: {n} changed block(s) -> no PDF; LibreOffice wrote "
+                  f"nothing. The HTML is at {hp}")
+            failed.append(page)
+    if failed:
+        print(f"{len(failed)} of {len(pages)} page(s) produced no PDF: "
+              + ", ".join(failed))
+        return 1
     return 0
 
 

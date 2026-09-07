@@ -27,39 +27,44 @@ optimizer is out of scope -- only the forward seepage solve is ported.)
 Model (from the vendor .gsz, read-only oracle -- never committed):
     1-D column, base at y = 0.  Porous plate  y = 0..0.007 m (7 mm); sample
     y = 0.007..0.1234 m.
-    Sample = coarse sand: Ksat = 9.009e-4 m/s, theta_s = 0.348, theta_r = 0.029
-    -> Sy = 0.319.  The vendor carries an 80-point retention spline and an
-    80-point conductivity spline for the sample, PEST-calibrated together.  The
+    Sample = coarse sand: Ksat = 9.009e-4 m/s, theta_s = 0.348,
+    theta_r = 0.0290384 -> Sy = 0.3189616.  The vendor carries an 80-point
+    retention spline and an 80-point conductivity spline for the sample,
+    PEST-calibrated together.  The
     sample desaturates sharply across the operating band (suction 0.9->1.7 kPa
     gives Se 0.89->0.02), so the moisture-capacity storage term drives the
     outflow.  Porous plate: Ksat = 5.833e-6 m/s, high air-entry -> stays
     saturated (kr = 1) over the whole suction range; it is the rate-limiting
     element.
 
-    THE FIT.  Where a vendor ships a conductivity table and XSLOPE ships a
-    two-parameter law, the law is fitted to the CONDUCTIVITY table, by least
-    squares in log10 kr, over the suction range the shipped run actually visits
-    (SEEPW-T04, SEEPW-T05 and GW#20 are built on the same rule).  The column is
-    hydrostatic above a base held at the stage suction, so the largest suction
-    it reaches is the deepest stage plus the sample height, 0.1749 + 0.1234 =
-    0.298 m.  The vendor's own kr falls below 1e-4 at psi = 0.165 m and its
-    table is set to 1e-28 beyond psi = 0.4 m, so the live part of the curve --
-    the 54 tabulated points above kr = 1e-4 -- lies entirely inside the visited
-    range, and fitting over the visited range and over the live curve give the
-    same pair: vg_a = 8.8157 /m, vg_n = 9.7144.
-    It reads 0.0033 decades rms and 0.011 worst against the table there, where
-    the retention fit it replaces reads 0.055 rms and 0.291 worst.  There is no
-    meaningful whole-table figure: past psi = 0.4 m the vendor writes a hard
-    zero that no continuous law reaches.
+    THE CURVES ARE NOT FITTED -- they are read back.  Both of the vendor's
+    80-point splines are van Genuchten-Mualem closed forms tabulated at 80
+    points, and the three parameters behind them are recovered from the tables
+    themselves:
 
-    The same pair sets the moisture capacity, so the conductivity fit is paid
-    for in water content: theta rms against the vendor's retention table is
-    0.0023 over the visited range and 0.0020 over the whole table, with the
-    worst single point 0.0104 in water content at psi = 0.12 m, inside the
-    drainage band.  A pair fitted to the retention table instead (vg_a = 8.9125,
-    vg_n = 10.1875) reproduces it to 0.00005 and costs the conductivity error
-    above.  The locked heads are hydrostatic profiles set by the base Dirichlet
-    and do not move between the two (see the docs section).
+      1. Read the sample's VolWCFn and KFn point lists out of the .gsz XML.
+         The abscissa is pore-water pressure in kPa; divide by the file's own
+         <UnitWaterWeight> 9.7893660333 to get suction head in metres.
+         theta_s = 0.348 and theta_r = 0.0290384 are the retention table's own
+         plateaus, and Ksat = 9.00916e-4 m/s is the conductivity table's.
+      2. Least-squares van Genuchten (alpha, n) against all 80 retention
+         points, with theta_s/theta_r held at those plateaus.  It closes to
+         2.3e-10 rms in water content, three orders below the table's own last
+         printed digit: alpha = 8.893966 /m, n = 10.190410.
+      3. Hold that pair and least-squares the Mualem exponent l against log10
+         of the conductivity table, over the 56 points above kr = 1e-6 (the
+         remaining 24 are the file's hard 1e-25 clip, which no continuous law
+         reaches).  It closes to 1.9e-7 rms in decades: l = 0.295141.  Fitting
+         alpha, n and l to the conductivity table together returns the same
+         three numbers, so one triple carries both of the vendor's curves.
+
+    That third number is why the row needs an l column.  Under Mualem's own
+    l = 0.5 the two tables are mutually inconsistent and every choice is a
+    trade: the retention pair reads 0.094 decades rms against the conductivity
+    table, and the best (alpha, n) fitted to the conductivity table with l
+    pinned to 0.5 costs 0.0017 rms in water content and 0.009 at its worst
+    point.  With l free both tables are reproduced exactly, and the head field
+    follows -- see the docs section for the measured departures.
 
 Boundary + initial conditions:
     Base (y = 0): specified PRESSURE head stepped in five stages --
@@ -78,15 +83,12 @@ is the PWP field.  The locked heads are XSLOPE's own solved values at three
 elevations at representative save times; the docs tabulate the SEEP/W comparison
 and report the achieved deltas honestly.
 
-    Both columns carry a gradient through the sample at every reporting time.
-    They agree at the base, where the same specified head fixes them, and part
-    company toward the top of the sample, where XSLOPE's column drains a little
-    further within each stage: 0.001 m of head at the first reported stage,
-    0.005 m at the second and 0.007 m at the last, against the 0.102 m the base
-    suction is stepped through over the test.  The comparison is made against
-    the vendor's own saved frames, the nearest of which to t = 132000 s is at
-    133130 s -- 130 s past the fourth step -- which is where the 0.004 m at that
-    stage's base station comes from.
+    Both columns carry a gradient through the sample at every reporting time,
+    and with the vendor's own three curve parameters they carry the same one.
+    The comparison is made against the vendor's own saved frames, the nearest of
+    which to t = 132000 s is at 133130 s -- 130 s past the fourth step -- so at
+    that stage the two codes are compared 130 s apart across a step, which is
+    the whole of the departure there.
 
 Run:  PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_mso.py
       PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_mso.py --locks
@@ -119,11 +121,14 @@ _Y_PLATE = 0.007                 # top of porous plate [m]
 _Y_TOP = 0.1234                  # top of sample [m]
 _K_SAMPLE = 9.009e-4            # sample saturated conductivity [m/s]
 _K_PLATE = 5.8333e-6            # porous-plate conductivity [m/s]
-_THETA_S = 0.348
-_THETA_R = 0.029
-_SY = _THETA_S - _THETA_R        # 0.319
-_VG_A = 8.8157                   # van Genuchten alpha [1/m]  (fit to the sample k table)
-_VG_N = 9.7144                   # van Genuchten n [-]
+_THETA_S = 0.348                 # retention table plateau (wet)
+_THETA_R = 0.0290384             # retention table plateau (dry)
+_SY = _THETA_S - _THETA_R        # 0.3189616
+# The vendor's own PEST-calibrated triple, recovered from its two 80-point
+# tables (see "THE CURVES ARE NOT FITTED" above).
+_VG_A = 8.893966                 # van Genuchten alpha [1/m]
+_VG_N = 10.190410                # van Genuchten n [-]
+_VG_L = 0.295141                 # Mualem pore-connectivity exponent [-]
 _SS = 1e-5                       # small saturated storage [1/m]
 _H_IC = -0.072801                # uniform initial total head [m]
 _DURATION = 219600.0            # total time [s]
@@ -149,7 +154,7 @@ def _base_sd():
     sample.update(name='Sample (coarse sand)', c=1.0, phi=30.0, gamma=20.0,
                   gamma_sat=20.0, option='mc', u='seep', k1=_K_SAMPLE,
                   k2=_K_SAMPLE, alpha=0.0, unsat='vg', vg_a=_VG_A, vg_n=_VG_N,
-                  kr0=1e-3, h0=-0.4, Ss=_SS, Sy=_SY)
+                  vg_l=_VG_L, kr0=1e-3, h0=-0.4, Ss=_SS, Sy=_SY)
     plate = donor_material(sd)
     plate.update(name='Porous plate', c=1.0, phi=30.0, gamma=20.0,
                  gamma_sat=20.0, option='mc', u='seep', k1=_K_PLATE, k2=_K_PLATE,

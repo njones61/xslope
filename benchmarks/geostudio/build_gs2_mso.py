@@ -42,11 +42,11 @@ Model (from the vendor .gsz, read-only oracle -- never committed):
     (SEEPW-T04, SEEPW-T05 and GW#20 are built on the same rule).  The column is
     hydrostatic above a base held at the stage suction, so the largest suction
     it reaches is the deepest stage plus the sample height, 0.1749 + 0.1234 =
-    0.298 m.  The vendor's own kr falls below XSLOPE's 1e-4 conductivity floor
-    at psi = 0.165 m and its table is set to 1e-28 beyond psi = 0.4 m, so the
-    live part of the curve -- the 54 tabulated points above kr = 1e-4 -- lies
-    entirely inside the visited range, and fitting over the visited range and
-    over the live curve give the same pair: vg_a = 8.8157 /m, vg_n = 9.7144.
+    0.298 m.  The vendor's own kr falls below 1e-4 at psi = 0.165 m and its
+    table is set to 1e-28 beyond psi = 0.4 m, so the live part of the curve --
+    the 54 tabulated points above kr = 1e-4 -- lies entirely inside the visited
+    range, and fitting over the visited range and over the live curve give the
+    same pair: vg_a = 8.8157 /m, vg_n = 9.7144.
     It reads 0.0033 decades rms and 0.011 worst against the table there, where
     the retention fit it replaces reads 0.055 rms and 0.291 worst.  There is no
     meaningful whole-table figure: past psi = 0.4 m the vendor writes a hard
@@ -78,20 +78,15 @@ is the PWP field.  The locked heads are XSLOPE's own solved values at three
 elevations at representative save times; the docs tabulate the SEEP/W comparison
 and report the achieved deltas honestly.
 
-    XSLOPE's sample reaches the stage suction uniformly at each reporting time,
-    where SEEP/W's still carries a gradient at the two later stages, and that is
-    where the departure sits: 0.001 m of head at the first reported stage, up to
-    0.046 m at the last.  The mechanism is the CONDUCTIVITY FLOOR, not the fit.
-    XSLOPE clamps kr at 1e-4 (``kr_min`` in xslope/seep.py, a solver-wide
-    numerical guard), and the vendor's own conductivity curve passes 1e-4 at
-    psi = 0.165 m, well inside the 0.298 m this column reaches, so above that
-    suction the sample conducts at the floor instead of at the vendor's value and
-    drains to equilibrium within the stage.  Re-solved with the floor lowered to
-    1e-8, the same three stations read -0.1341 / -0.1325 / -0.1134 at t = 132000
-    and -0.1732 / -0.1505 / -0.1222 at t = 219600, and the largest departure from
-    SEEP/W falls from 0.046 to 0.007 m.  That is a MEASUREMENT, not a shipped
-    configuration: no default is changed here, and the locked values above are
-    the shipped floor's.
+    Both columns carry a gradient through the sample at every reporting time.
+    They agree at the base, where the same specified head fixes them, and part
+    company toward the top of the sample, where XSLOPE's column drains a little
+    further within each stage: 0.001 m of head at the first reported stage,
+    0.005 m at the second and 0.007 m at the last, against the 0.102 m the base
+    suction is stepped through over the test.  The comparison is made against
+    the vendor's own saved frames, the nearest of which to t = 132000 s is at
+    133130 s -- 130 s past the fourth step -- which is where the 0.004 m at that
+    stage's base station comes from.
 
 Run:  PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_mso.py
       PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_mso.py --locks

@@ -65,6 +65,9 @@ CONFIG = PageConfig(
         r"of the 8 m drawdown",
         r"of the 8 m column",
         r"of the 6\.5 m pond head",
+        # T07's departure is a share of the suction the base is stepped through
+        # over the test, from the initial condition to the deepest stage
+        r"of the 0\.102 m the base suction is stepped through",
         r"of the interslice forces",
     ],
     # Quantities identified by what PRECEDES them: a probability of failure and

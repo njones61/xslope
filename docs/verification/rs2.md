@@ -63,7 +63,7 @@ why rather than leaving a blank; everything else is built and locked at its tagg
 | [15](#rs2-15) | 🟢 | Layered slope II (Greco ex. 4 / Yamagami & Ueta) | SSRM 1.372 vs RS2 SSRM 1.38 (−0.6%) | Scored against the Part IV VP19 model this file is built from. |
 | [16](#rs2-16) | 🟢 | Layered slope and water table with weak seam (Greco ex. 5 / Chen & Shao) | SSRM 0.978 inside Greco 0.973–1.1 · vs RS2 SSRM 1.02 (−4.1%) | Greco's own published range is the source author's and governs. Nearly mesh-invariant (0.997 at 4.0 m). |
 | [17](#rs2-17) | 🟢 | Slope with three pore pressure conditions (Fredlund & Krahn) | Dry: SSRM 1.987 vs RS2 SSRM 1.98 (+0.4%) · r<sub>u</sub> = 0.25: SSRM 1.692 vs RS2 SSRM 1.68 (+0.7%) | **built** (dry + r<sub>u</sub>); the water-table case is not built. |
-| [18](#rs2-18) | 🔴 | Three pore pressure conditions and a weak seam (Fredlund & Krahn) | Dry: SSRM 1.334 vs RS2 SSRM 1.26 (+5.9%) · r<sub>u</sub> = 0.25: SSRM 1.058 vs RS2 SSRM 0.99 (+6.9%) | **built** (dry + r<sub>u</sub>). Both files are the Slide2 VP22 model, so the Part IV values are the pairing. RS2 solved this problem twice, unconstrained both times, and its two answers differ by ~6%; its native rebuild publishes 1.34 / 1.05, which XSLOPE sits −0.4% and +0.8% from. |
+| [18](#rs2-18) | 🔴 | Three pore pressure conditions and a weak seam (Fredlund & Krahn) | Dry: SSRM 1.334 vs RS2 SSRM 1.26 (+5.9%) · r<sub>u</sub> = 0.25: SSRM 1.058 vs RS2 SSRM 0.99 (+6.9%) | **built** (dry + r<sub>u</sub>). Scored against RS2's Part IV solution of the Slide2 VP22 model the files reproduce. RS2's own rebuild of the same geometry publishes 1.34 / 1.05, −0.4% and +0.8% from XSLOPE; the two vendor answers differ by about 6%. |
 | [19](#rs2-19) | 🟡 | Undrained layered slope (Low 1989) | SSRM 1.488 vs Low 1.44 (+3.3%) · vs RS2 SSRM 1.41 (+5.5%) | **built** (caveat) — Low's own factor governs; quoted at the tagged mesh, and the two SSRM values straddle the LEM. |
 | [20](#rs2-20) | 🟢 | Slope with vertical load (Prandtl's wedge) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Prandtl theory 1.0 is a reference authority in its own right here. |
 | [21](#rs2-21) | 🟢 | Bearing capacity test prism (Prandtl II) | SSRM 1.011 vs RS2 SSRM 1.01 (+0.1%) | Converging on Prandtl theory 1.0. One trial is undecided at the iteration ceiling. |
@@ -608,12 +608,13 @@ weak seam, a geometric feature, so it does not move with mesh refinement, unlike
 [RS2-14](#rs2-14), where no feature fixes the failure band. Case 3, with the water table, is not
 built.
 
-**RS2 solved this problem twice, and both runs are unconstrained.** The Part IV `.fez` files for
-cases 1 and 2 carry no SSR polygon (only the unbuilt case 3, water table, does), and the native
-rebuild is unconstrained as well over identical geometry, which makes the native column an
-informative second reading rather than a second pairing. The two vendor answers are about 6%
-apart on cases 1 and 2 — the same order as the distance from the Part IV column to XSLOPE — and
-the dot follows the Part IV pairing, so this row is scored at the wider of the two.
+**RS2 publishes two solutions of this problem.** The Part IV chapter solves the Slide2 VP22
+model, which is the model these two files are built from; that is the Part IV column above. RS2's
+own rebuild of the same geometry is the native column. Neither run restricts the search with an
+SSR polygon; only case 3, the water-table case, carries one, and that case is not built. The two
+vendor answers differ from each other by about 6%. XSLOPE is −0.4% and +0.8% from the native
+values and +5.9% and +6.9% from the Part IV values. The row is scored against Part IV, because
+that is the solution of the model the files reproduce.
 
 <!-- test: file=files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-18-m2.0 -->
 <!-- test: file=files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-18 -->

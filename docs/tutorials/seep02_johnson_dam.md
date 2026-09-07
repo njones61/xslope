@@ -737,10 +737,13 @@ Between zero and one foot of suction it stays much wetter: at half a
 foot it is halfway down its straight line, at
 *k<sub>r</sub>* = 0.01 + 0.99 × 0.5 = 0.505, an order of magnitude above the other
 two. Below one foot it stops falling entirely and holds its floor of 0.01, while
-the other two continue down to the solver's own floor of 10<sup>−4</sup> and stay
-there. Over most of the unsaturated zone of this dam — where suctions of ten to
-forty feet are ordinary — the linear front leaves the soil a hundred times more
-conductive than the other two models do.
+the other two keep falling — the shell's van Genuchten curve runs all the way onto
+the solver's own 10<sup>−8</sup> guard at the right edge of the plot. Over the ten
+to forty feet of suction that are ordinary in this dam the two curved laws reach
+10<sup>−4</sup> to 10<sup>−7</sup> — the shell's steep curve
+furthest down, the core's flattest one least — which leaves the linear front from
+fifteen times more conductive in the core to tens of thousands of times in the
+shell.
 
 ### Running all three
 
@@ -752,11 +755,11 @@ surface changes.
 | Model | q (ft³/day per ft) | Iterations | Flow above the phreatic surface at x = 500 |
 | --- | :---: | :---: | :---: |
 | `lf` | 1.9546 | 23 | 10.3% |
-| `vg` | 1.8649 | 28 | 8.3% |
-| `gard` | 1.8661 | 27 | 8.6% |
+| `vg` | 1.8641 | 36 | 8.2% |
+| `gard` | 1.8655 | 28 | 8.6% |
 
-The two calibrated models agree with each other to **0.06%** in discharge, and
-both sit **4.5 to 4.6% below** the linear front. That gap is the whole of what the
+The two calibrated models agree with each other to **0.08%** in discharge, and
+both sit **4.6% below** the linear front. That gap is the whole of what the
 choice of model changes in this dam's total discharge.
 
 On the phreatic surface it changes less still:
@@ -764,9 +767,9 @@ On the phreatic surface it changes less still:
 ![The phreatic surface under each model](images/seep02_phreatic_models.png){width=1000}
 
 At section scale the three surfaces are one line. Read station by station, the
-linear front and van Genuchten differ by at most **0.40 ft** anywhere, the linear
-front and Gardner by at most **0.35 ft**, and van Genuchten and Gardner by at most
-**0.08 ft** — on a dam 80 ft tall, under a 60 ft head, on a mesh whose elements are
+linear front and van Genuchten differ by at most **0.46 ft** anywhere, the linear
+front and Gardner by at most **0.36 ft**, and van Genuchten and Gardner by at most
+**0.15 ft** — on a dam 80 ft tall, under a 60 ft head, on a mesh whose elements are
 6.25 ft.
 
 These are differences between three runs on one mesh, so the discretization error
@@ -785,11 +788,11 @@ tailwater flow — a 4.6% spread matters, and the model whose parameters can be
 defended from measurements is the one to use.
 
 The 4.6% gap itself is the floor's doing. The linear front holds *k<sub>r</sub>* at its
-floor of 0.01 through the deep unsaturated zone — a hundred times the
-conductivity the other two models leave there — and rerunning it with
-*kr<sub>0</sub>* lowered to the 10<sup>−4</sup> they bottom out at brings its
-discharge to 1.8707, against van Genuchten's 1.8649 and Gardner's 1.8661: 93% of
-the gap closes on that one parameter. The curve's shape barely matters by
+floor of 0.01 through the deep unsaturated zone, far above the conductivity the
+other two models leave there — and rerunning it with *kr<sub>0</sub>* lowered to
+10<sup>−4</sup>, which the other two are already below by five feet of suction,
+brings its discharge to 1.8707, against van Genuchten's 1.8641 and Gardner's
+1.8655: 93% of the gap closes on that one parameter. The curve's shape barely matters by
 comparison — sweeping *h<sub>0</sub>* twentyfold moves the discharge by the same
 4.6% — because on a dam whose unsaturated zone stands tens of feet above the
 water inside it, what the curve does in its first foot of suction is beside the

@@ -1414,7 +1414,7 @@ KR_VG = 1    # van Genuchten (parameters a = alpha, n)
 KR_GARD = 2  # Gardner       (parameters a, n — the SAME two template columns)
 
 
-def kr_gardner_vec(p, a, n, kr_min=1e-4):
+def kr_gardner_vec(p, a, n, kr_min=1e-8):
     """Vectorized Gardner (1958) relative permeability.
 
         kr = 1 / (1 + a * psi^n),   psi = -p (suction, positive when unsaturated)
@@ -1423,6 +1423,12 @@ def kr_gardner_vec(p, a, n, kr_min=1e-4):
     SEEP/W and Slide — not Gardner's exponential form kr = exp(alpha*psi), which
     is a different function used mainly to linearize Richards' equation for
     analytical work. Saturated (p >= 0) gives kr = 1.
+
+    ``kr_min`` is a numerical guard, not a material property: it keeps the
+    conduction matrix nonsingular where a dry element would otherwise contribute
+    nothing. At 1e-8 it sits below the conductivity any element in the
+    verification corpus carries, and the fields are converged with respect to it
+    — a floor of 1e-10 returns the same answer.
 
     Shares the a/n parameter columns with van Genuchten: the two laws never apply
     to the same material, and the template selects between them with `unsat`.
@@ -1435,15 +1441,18 @@ def kr_gardner_vec(p, a, n, kr_min=1e-4):
     return np.clip(kr, kr_min, 1.0)
 
 
-def kr_vg_vec(p, vg_a, vg_n, kr_min=1e-4):
+def kr_vg_vec(p, vg_a, vg_n, kr_min=1e-8):
     """Vectorized van Genuchten–Mualem relative permeability (steady-state form).
 
     Depends only on alpha (``vg_a``) and n (``vg_n``): the residual/saturated water
     contents scale storage, not kr, and a steady-state solve carries no storage
     term. ``p`` is the pressure head (negative in the unsaturated zone) and
-    broadcasts with vg_a/vg_n. A ``kr_min`` floor plus saturation at p>=0 keep the
-    function numerically tame near the wet end; because suction is conservatively
-    neglected in stability, the floor does not affect stability results.
+    broadcasts with vg_a/vg_n. Saturation at p>=0 caps the function at 1 and the
+    ``kr_min`` floor holds it away from 0 in the dry limit — a numerical guard
+    that keeps the conduction matrix nonsingular, not a material property. At
+    1e-8 the floor lies below the conductivity any element in the verification
+    corpus carries, and the fields are converged with respect to it (a floor of
+    1e-10 returns the same answer).
 
         Se = [1 + (alpha|psi|)^n]^(-m),  m = 1 - 1/n
         kr = Se^(1/2) [1 - (1 - Se^(1/m))^m]^2
@@ -1457,13 +1466,13 @@ def kr_vg_vec(p, vg_a, vg_n, kr_min=1e-4):
     return np.clip(kr, kr_min, 1.0)
 
 
-def kr_relative_vec(p, kr0, h0, vg_a=None, vg_n=None, model=None, kr_min=1e-4):
+def kr_relative_vec(p, kr0, h0, vg_a=None, vg_n=None, model=None, kr_min=1e-8):
     """Per-element relative permeability dispatching on the unsaturated model.
 
     ``model`` is a per-element code array (``KR_LF``/``KR_VG``/``KR_GARD``)
     broadcasting with ``p``. With ``model`` None or all linear-front this returns
-    exactly ``kr_frontal_vec`` — so the linear-front path is bit-identical to
-    before."""
+    exactly ``kr_frontal_vec`` — the linear-front law carries its own floor in
+    ``kr0`` and ``kr_min`` never reaches it."""
     lf = kr_frontal_vec(p, kr0, h0)
     if model is None or not np.any(model):
         return lf
@@ -1476,7 +1485,7 @@ def kr_relative_vec(p, kr0, h0, vg_a=None, vg_n=None, model=None, kr_min=1e-4):
     return out
 
 
-def kr_relative(p, kr0, h0, vg_a=None, vg_n=None, model=KR_LF, kr_min=1e-4):
+def kr_relative(p, kr0, h0, vg_a=None, vg_n=None, model=KR_LF, kr_min=1e-8):
     """Scalar relative permeability with model dispatch (linear front, van
     Genuchten or Gardner), for the per-edge flow-potential integration."""
     if model == KR_VG:

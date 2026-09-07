@@ -221,11 +221,16 @@ def fig_kr_models():
     ax.set_title("van Genuchten / Gardner (unsat = vg, gard)", fontsize=10)
     ax.legend(fontsize=8, frameon=False, loc="upper left")
 
+    # Each panel is drawn over the decades its own models occupy: the linear front
+    # stops at the kr0 it is given, the other two run on down to the solver's
+    # kr_min, and one shared ordinate would either flatten the fronts into the top
+    # of the axes or cut the sand curve off where it reaches the floor.
+    axes[0].set_ylim(5e-4, 2.0)
+    axes[1].set_ylim(5e-9, 2.0)
     for ax in axes:
         ax.axvline(0.0, color="0.4", lw=0.8, ls=":")
         ax.set_xlabel("pressure head $\\psi$  (suction to the left)")
         ax.set_ylabel("relative conductivity $k_r$")
-        ax.set_ylim(5e-5, 2.0)
         ax.set_xlim(psi[0], psi[-1])
         ax.grid(alpha=0.25, lw=0.5)
     fig.tight_layout()

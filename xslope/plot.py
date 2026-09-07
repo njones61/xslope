@@ -204,6 +204,16 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
     return ax
 
 
+#: How far down a drawn kr curve goes: four decades of decline, which is as much
+#: as a reader can place on a log ordinate before the curve is a vertical line
+#: against the axis. The panels are framed on where the law reaches this value.
+#: It is a display rule read off the curve itself and is deliberately NOT the
+#: solver's ``kr_min``: that floor is a numerical guard on the conduction matrix
+#: and sits decades lower, so tying the axis to it would stretch every panel into
+#: dead space and make the drawn extent move whenever the guard moves.
+_KR_CURVE_MIN = 1e-4
+
+
 def _kr_curve(material, n=200):
     """One material's unsaturated relative-conductivity curve, or why it has none.
 
@@ -220,10 +230,9 @@ def _kr_curve(material, n=200):
       - ``gard`` Gardner power form — seep.kr_gardner_vec (params vg_a=a, vg_n=n).
 
     The suction range is self-scaled to each model so the full wet→dry decline is
-    sampled. Pure — a material dict in, arrays out.
+    sampled, down to ``_KR_CURVE_MIN``. Pure — a material dict in, arrays out.
     """
     from .seep import kr_frontal_vec, kr_vg_vec, kr_gardner_vec
-    kr_min = 1e-4
     unsat = str(material.get("unsat", "lf") or "lf").strip().lower()
 
     def g(key):
@@ -246,16 +255,16 @@ def _kr_curve(material, n=200):
             return None, "enter vg_a > 0 and vg_n > 1", "van Genuchten (vg)"
         smax = 20.0 / a
         psi = np.linspace(0.0, smax, n)
-        kr = kr_vg_vec(-psi, a, nn)
+        kr = kr_vg_vec(-psi, a, nn, _KR_CURVE_MIN)
         title = f"van Genuchten   (α={a:g}, n={nn:g})"
     elif unsat == "gard":
         a, nn = g("vg_a"), g("vg_n")
         if not (a > 0 and nn > 0):
             return None, "enter vg_a > 0 and vg_n > 0", "Gardner (gard)"
-        # Suction at which kr reaches the floor: a·ψⁿ = 1/kr_min − 1.
-        smax = 1.1 * (max(1.0 / kr_min - 1.0, 1.0) / a) ** (1.0 / nn)
+        # Suction at which the law itself reaches _KR_CURVE_MIN: a·ψⁿ = 1/kr − 1.
+        smax = 1.1 * (max(1.0 / _KR_CURVE_MIN - 1.0, 1.0) / a) ** (1.0 / nn)
         psi = np.linspace(0.0, smax, n)
-        kr = kr_gardner_vec(-psi, a, nn)
+        kr = kr_gardner_vec(-psi, a, nn, _KR_CURVE_MIN)
         title = f"Gardner   (a={a:g}, n={nn:g})"
     else:
         return None, "no unsaturated model", ""
@@ -326,10 +335,10 @@ def _kr_extent(psi, kr):
     """Where a kr curve's x axis should end: the suction at which it reaches its
     floor, and no further.
 
-    kr is monotone-decreasing, so the last sampled value is the asymptotic floor
-    — kr0 for the linear front, the solver's kr_min for the others. Framing on
-    where that floor is first reached keeps a sharp curve out of a sea of dead
-    space.
+    kr is monotone-decreasing, so the last sampled value is the smallest the
+    curve carries — kr0 for the linear front, ``_KR_CURVE_MIN`` for the others.
+    Framing on where that value is first reached keeps a sharp curve out of a sea
+    of dead space.
     """
     floor = float(kr[-1])
     reached = np.where(kr <= floor * 1.02 + 1e-12)[0]

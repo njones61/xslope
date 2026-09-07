@@ -2487,9 +2487,15 @@ SEEP02_VG = ((1.798, 1.48), (0.244, 1.09), (0.579, 1.31))
 #: three-model comparison a comparison of models rather than of soils. The producer
 #: prints the misfit of these pinned pairs, so the calibration claim is measured.
 SEEP02_GARD = ((115.5, 2.29), (128.2, 1.03), (52.8, 1.61))
+#: The kr the pairs were fitted over, and the same clip the printed misfit is read
+#: at: it bounds the band the two laws are matched in so the dry tail, where both are
+#: decades below anything that carries water, does not dominate a least-squares fit in
+#: log kr. A property of the fit, not of the solver — seep.kr_min sits far below it.
+SEEP02_FIT_CLIP = 1e-4
 #: The linear front's floor, swept down from its shipped 0.01 toward the 1e-4 the
-#: other two models floor at. This is the test of the page's explanation for why the
-#: linear front passes more water than the other two.
+#: other two laws are already below at a few feet of suction on this dam. This is the
+#: test of the page's explanation for why the linear front passes more water than the
+#: other two.
 SEEP02_KR0_SWEEP = (0.1, 0.03, 0.01, 0.003, 0.001, 0.0003, 0.0001)
 #: The linear-front pair that makes this dam hard: a floor four decades down reached
 #: over 10 ft of suction, which is the shape of a van Genuchten curve drawn with
@@ -2825,16 +2831,19 @@ def _seep02_kr_curves(materials, vg, gard):
         ax.loglog(suction, kr_frontal_vec(psi, mat["kr0"], mat["h0"]),
                   color="#1f6fb4", lw=2.0,
                   label="lf  kr₀ = %g, h₀ = %g ft" % (mat["kr0"], mat["h0"]))
-        ax.loglog(suction, kr_vg_vec(psi, a, n, 1e-4), color="#c1663a", lw=1.6,
+        ax.loglog(suction, kr_vg_vec(psi, a, n), color="#c1663a", lw=1.6,
                   label="vg  a = %g, n = %g" % (a, n))
-        ax.loglog(suction, kr_gardner_vec(psi, ga, gn, 1e-4), color="#3f8f5a",
+        ax.loglog(suction, kr_gardner_vec(psi, ga, gn), color="#3f8f5a",
                   lw=1.6, ls="--", label="gard  a = %g, n = %g" % (ga, gn))
         ax.set_xlabel("suction −ψ (ft)")
         ax.set_title(mat["name"])
         ax.grid(True, which="both", color="#e8ebee", lw=0.5)
         ax.legend(loc="lower left", frameon=False, fontsize=8)
     axes[0].set_ylabel("relative conductivity $k_r$")
-    axes[0].set_ylim(5e-5, 2.0)
+    # Down to the solver's own kr_min, which the two curved laws reach on this dam
+    # and the linear front never does — where each model bottoms out is the page's
+    # whole comparison.
+    axes[0].set_ylim(5e-9, 2.0)
     fig.suptitle("The three unsaturated models on this dam's three soils")
     fig.tight_layout()
 
@@ -3039,8 +3048,8 @@ def seep02_plots():
     print("   -- Gardner fitted to van Genuchten, per material")
     for mat, (a, n), (ga, gn) in zip(sd["materials"], SEEP02_VG, SEEP02_GARD):
         misfit = float(np.sqrt(np.mean(
-            (np.log10(kr_gardner_vec(-suction, ga, gn, 1e-4))
-             - np.log10(kr_vg_vec(-suction, a, n, 1e-4))) ** 2)))
+            (np.log10(kr_gardner_vec(-suction, ga, gn, SEEP02_FIT_CLIP))
+             - np.log10(kr_vg_vec(-suction, a, n, SEEP02_FIT_CLIP))) ** 2)))
         print("   %-11s vg a %-6g n %-5g · gard a %-6g n %-5g · rms log10 kr %.3f"
               % (mat["name"], a, n, ga, gn, misfit))
     capture("seep02_kr_models.png", _seep02_kr_curves, sd["materials"],
@@ -3057,8 +3066,8 @@ def seep02_plots():
     for label, values in (
             ("lf", kr_frontal_vec(probe, sd["materials"][0]["kr0"],
                                   sd["materials"][0]["h0"])),
-            ("vg", kr_vg_vec(probe, *SEEP02_VG[0], 1e-4)),
-            ("gard", kr_gardner_vec(probe, *SEEP02_GARD[0], 1e-4))):
+            ("vg", kr_vg_vec(probe, *SEEP02_VG[0])),
+            ("gard", kr_gardner_vec(probe, *SEEP02_GARD[0]))):
         print("   %-6s %s" % (label, " ".join("%9.5f" % v for v in values)))
 
     models = [

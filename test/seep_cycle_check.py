@@ -94,20 +94,20 @@ stands, and each mutable in one line if a reader wants to see the other side of 
   detection with ``relax = min(relax, 1e-3)`` for every sweep past 120 and all four
   models the class A gate touches lose their convergence: vp046b runs its 600 sweeps
   without closing where it took 207, vp077a its 1000 where it took 501,
-  earth_dam1_vg its 1000 where it took 345, and johnson_rapid_KEY its 1000 where the
+  earth_dam1_vg its 1000 where it took 316, and johnson_rapid_KEY its 1000 where the
   escape closes it at 901.
 * Neither is a repeat that never left -- a solve creeping monotonically sits inside
   the repeat tolerance at every lag and reads as an orbit unless the iterate is
   required to have gone somewhere in between. That false positive is the ``_cyc_away``
   term's whole job, and NO corpus model exhibits it any more: delete the term and
   earth_dam2 and earth_dam1_vg both come back bit for bit (600 sweeps at 1.2734375,
-  345 at 37.720727), because the exit-face fix closes earth_dam2 before its creep gets
+  316 at 37.716649), because the exit-face fix closes earth_dam2 before its creep gets
   fine enough to be mistaken for a period-2 orbit. The term guards a property of the
   detector that this corpus no longer witnesses.
 * Revisiting sets is normal EARLY. Every converging model in the corpus revisits
   exit-face sets while its seepage face is still finding its extent, and all of them
   are done by sweep 41 (vp077a, the latest). Set ``_SET_REVISIT_SWEEP = 0`` and
-  earth_dam1_vg is untouched (345 sweeps, 37.720727), while earth_dam2 fires the
+  earth_dam1_vg is untouched (316 sweeps, 37.716649), while earth_dam2 fires the
   escape at sweep 11 and closes at 1.2734376 in 587 sweeps -- the same answer to 8e-8,
   reached along a different path. The gate now costs the corpus a trajectory, not an
   answer.
@@ -154,14 +154,14 @@ RESCUED = [
 #:
 #: Five of these rows carry the exit-face fix (a seepage face ends at the toe, and a
 #: set leaving the head above the ground is not stable), which moved the field on
-#: every model whose face meets a specified-head line: earth_dam1_vg 37.711830 ->
-#: 37.720727, johnson_res 1.939071 -> 1.955451, earth_dam2 out of RESCUED at
+#: every model whose face meets a specified-head line: earth_dam1_vg to 37.716649,
+#: johnson_res to 1.955451, earth_dam2 out of RESCUED at
 #: 1.2734375, and vp046b and vp077a in their seventh digit. earth_dam1 and
 #: earth_dam_bc2 are unchanged.
 INERT = [
     ("docs/verification/files/rocscience/vp046b", 1, VENDOR, 1.2787498e-03, 207),
     ("docs/verification/files/rocscience/vp077a", 1, DOCS, 8.2210726e-06, 501),
-    ("docs/seep/files/xslope_earth_dam1_vg", 1, DOCS, 37.720727, 345),
+    ("docs/seep/files/xslope_earth_dam1_vg", 1, DOCS, 37.716649, 316),
     ("docs/seep/files/xslope_earth_dam1", 1, DOCS, 38.781841, 115),
     ("docs/inputs/seep/xslope_earth_dam_bc2", 1, DOCS, 42.437178, 111),
     ("docs/inputs/seep/xslope_earth_dam_bc2", 2, DOCS, 11.587548, 13),

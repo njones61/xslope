@@ -300,6 +300,10 @@ Engineers).
   along a proposed highway (Ankara clay, E90). *Environmental Geology* 45,
   963–977. [doi:10.1007/s00254-003-0954-3](https://doi.org/10.1007/s00254-003-0954-3). *(Cited
   in the RS2 manual as "Topal & Isik (2004)".)*
+- Terzaghi, K. (1943). *Theoretical Soil Mechanics*. John Wiley & Sons, New
+  York. [doi:10.1002/9780470172766](https://doi.org/10.1002/9780470172766).
+  *(Source of the one-dimensional consolidation closed form, Eq. 17.3, the
+  SEEP/W and Slide2 groundwater consolidation rows are scored against.)*
 - Torggler, N. (2016). *Numerical Studies of Embedded Beam Row in Safety Analysis
   in PLAXIS 2D*. MSc thesis, Institut für Bodenmechanik und Grundbau, Graz
   University of Technology.

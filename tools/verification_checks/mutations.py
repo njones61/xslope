@@ -118,10 +118,18 @@ MUTATIONS = [
     ("rs2", "dots", "D3 dot changed on a multi-row section",
      "### \U0001F7E2 RS2-39/41/43:", "### \U0001F534 RS2-39/41/43:"),
 
-    ("rs2", "figures", "M17 four-panel caption on the inputs-only figure",
-     "![RS2-50: shortened 4.2 m geotextile layers (vp089, Ta = 11.4 kN/m) — FEM inputs.",
-     "![RS2-50: shortened 4.2 m geotextile layers (vp089, Ta = 11.4 kN/m) — FEM inputs, "
-     "mesh, max shear strain and displacement vectors at the critical SRF."),
+    # A caption claiming all four panels of a composite on a figure that is a
+    # single axes.  M14 runs the other way (a four-panel figure captioned as
+    # two), and neither reaches the four-panel caption branch on an image that
+    # cannot support it.  The figure here is rs2's one single-axes plot, a
+    # diagnostic named in `caption_exempt` because its own caption claims no
+    # panel form: the exemption excuses a caption the classifier cannot read,
+    # never a caption it can read and that is wrong about the image.
+    ("rs2", "figures", "M17 four-panel caption on a single-axes figure",
+     "![RS2-67 90 h phreatic surface: own transient flow vs RS2 imported field]"
+     "(images/rs2_67_fielddiff.png)",
+     "![RS2-67 90 h phreatic surface: FEM inputs, mesh, max shear strain and "
+     "displacement vectors at the critical SRF](images/rs2_67_fielddiff.png)"),
 
     # ------------------------------------------- upper-bound percentages ---
     ("seep", "deltas", "U1 operand drift breaks a `<` bound",

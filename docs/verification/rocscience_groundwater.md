@@ -447,6 +447,17 @@ band and sheds laterally to daylight as a slope-face spring — the physical res
 Freeze observed. XSLOPE reproduces the perched saturated zone above the lens, the free
 surface daylighting on the slope, and the main water table exiting at the toe.
 
+Where a vendor ships a conductivity table against a two-parameter law, the law is fitted to
+the **conductivity**, by least squares in log₁₀ k<sub>r</sub>, over the suction range the run
+reaches — the rule [GW20](#gw20) is built on. On this row that rule has nothing to bite on.
+The vendor's four-point table is flat at k<sub>r</sub> = 1 out to ψ = 0.306 m, an air-entry
+value, and the whole steady field sits inside ψ ≤ 0.132 m in the medium sand and 0.118 m in
+the fine lens, so the fit range lies entirely on the plateau: every curve that stays flat
+there reproduces the table exactly. The field is insensitive to match. Solved with
+k<sub>r</sub> held at the vendor's table in place of the van Genuchten pair, the locked
+stations move by at most 0.003 m of head against the 0.02 m tolerance and the flowrate is
+unchanged, so the pair below is the one that ships.
+
 | Quantity | XSLOPE | Both manuals' problem statement (after Rulon & Freeze) | Mass balance on the flux boundary |
 |---|---|---|---|
 | water table at the toe | el 0.30 | 0.3 m stated (0.00 m) | — |

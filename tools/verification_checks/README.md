@@ -68,6 +68,18 @@ each is the same number read the way the comparison is made: the value rounded
 to the page's own precision (`tag_round_dp`), and, for a `points` element, the
 pressure head ψ = h − y at that station.
 
+Most locks are factors of safety, and two are not. A `slip_depth` tag locks
+`expected_depth`, the depth of the critical slip surface below a stated point,
+in length units; a `support_force` tag locks `expected_force`, the horizontal
+support force per meter that holds a slope at a target factor of safety. Both
+keys are read exactly like `expected_fs`: the value must be printed in the
+section carrying the tag, at a precision `tag_round_dp` allows, and the untagged
+sweep treats a number printed under one of them as guarded. Neither is read by
+the restatement pass, which is about factors of safety; a depth or a force
+printed in an XSLOPE column belongs to the forward pass and to the delta check.
+The delta check reads no tag keys at all, so the two need nothing from it — a
+percentage beside a depth is re-derived from the two depths the row prints.
+
 A page may publish only part of a probe set — a table of the stations that carry
 the argument, or none of a set that guards a field's shape while the section
 publishes something else. `tag_list_published` declares how many elements the
@@ -243,7 +255,8 @@ entries for text that no longer exists.
 sign, an operand moved out from under a certified claim, a caption that no
 longer matches its figure, a section heading whose dot disagrees with its summary
 row, a tagged value dropped from its section, one element
-of an eleven-value row corrupted on the page or in the tag, a planted dead
+of an eleven-value row corrupted on the page or in the tag, a slip-surface
+depth or a support force moved on the page or in the tag, a planted dead
 exemption — and requires the checks to catch every one. It also plants edits
 that must **not** be flagged (a value reprinted at a different, correct
 precision), because a check that fails on those would push the pages toward

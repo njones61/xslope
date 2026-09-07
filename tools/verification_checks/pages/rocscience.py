@@ -121,7 +121,7 @@ CONFIG = PageConfig(
 
     tag_value_keys=['expected_fs*', 'fs_*', 'expected_beta', 'expected_kc',
                     'expected_flowrate*', 'expected_head*', 'points',
-                    'expected'],
+                    'expected', 'expected_depth', 'expected_force'],
     tag_round_dp=2,
     locked_value_re=None,
 

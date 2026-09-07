@@ -137,8 +137,15 @@ SPANS = re.compile(
 
 TAG = re.compile(r"<!-- test:(.*?)-->")
 
-#: Tag keys whose value is a locked factor of safety.
-LOCK_KEYS = ("expected_fs", "expected", "fs_", "points")
+#: Tag keys whose value is a locked measurement.  Mostly a factor of safety,
+#: and — since a section that publishes one of these publishes it in the same
+#: prose and the same tables — also the two quantities that are read off a
+#: solved surface rather than being one: ``expected_depth`` (a slip-surface
+#: depth) and ``expected_force`` (a back-analyzed support force).  A number the
+#: page prints under one of those locks is guarded, so the sweep leaves it
+#: alone; an unlocked one beside it is still reported.
+LOCK_KEYS = ("expected_fs", "expected", "expected_depth", "expected_force",
+             "fs_", "points")
 
 #: The check REPORTS; it does not yet fail a page.  Every finding is a sentence
 #: someone has to read — a companion measurement to trim, a number to tag, or a

@@ -95,7 +95,8 @@ CERTIFIED_PAGES = ["geostudio", "published", "rocscience",
                    "rocscience_groundwater", "rs2", "seep", "ssrm"]
 CHECKER_KEYS = ["expected_fs*", "fs_*", "expected_beta", "expected_kc",
                 "expected_flowrate*", "expected_head*", "expected_pullout",
-                "expected_envelope", "points", "expected"]
+                "expected_envelope", "expected_depth", "expected_force",
+                "points", "expected"]
 CHECKER_TOTAL = 803     # as reported by tools/verification_checks/tags.py
 
 
@@ -153,7 +154,8 @@ def tally(kv):
         n = n_methods(kv)
         return n, n, n
     if t in ("fem_ssrm", "fem_elements", "fem_reliability", "seep",
-             "seep_elements", "critical_kc", "reliability"):
+             "seep_elements", "critical_kc", "reliability",
+             "slip_depth", "support_force"):
         return 1, 1, 1
     if t in ("seep_head", "tseep_head"):
         n = len([p for p in kv.get("points", "").split(";") if p.strip()])

@@ -15,6 +15,8 @@ docs/parametric/ and docs/tutorials/ for test tags of the form:
     <!-- test: file=files/foo.xlsx, type=fem_elements, expected_fs=1.36, target_size=3.5, tolerance=0.04, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
     <!-- test: file=files/foo.xlsx, type=mesh_elements, element_type=tri6, target_size=6.5, expected_elements=3166, expected_nodes=6555, benchmark=RS2-4-mesh -->
     <!-- test: file=files/foo.xlsx, type=pullout_envelope, expected_pullout=10.28:5378;9.22:7488, tolerance=0.002, benchmark=FHWA-E1 -->
+    <!-- test: file=files/foo.xlsx, type=slip_depth, method=bishop, num_slices=40, depth_x=17.5, expected_depth=3.142, tolerance=0.05 -->
+    <!-- test: file=files/foo.xlsx, type=support_force, method=bishop, target_fs=1.5, force_elev=9.0, toe=5;5, center_box=-20;15;12;45, expected_force=351.4, tolerance=0.01 -->
     <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.248 -->
     <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, rapid=true, seep=transient, size_divisions=100, expected_fs=1.016 -->
     <!-- test: file=files/foo.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, expected_first=1.4563, critical_time=50, min_fs=1.0157 -->
@@ -39,6 +41,20 @@ own discretization beside the vendor's to say which comparison is the finer, and
 nothing else checks those numbers: the SSRM locks beside them are tolerant to a
 percent or two of mesh drift, so a mesher change moves every printed count and
 leaves every page asserting a stale one.
+
+The slip_depth type locks a published SLIP-SURFACE DEPTH — the depth of the
+critical surface below a stated point, which is how a source that tabulates a
+surface rather than drawing it publishes one. It runs the same search (or the
+same stored circle) the factor-of-safety tag on the file runs and reads the
+returned surface, so the two lock one mechanism; ``tolerance`` is ABSOLUTE, in
+length units. See run_slip_depth_test.
+
+The support_force type locks a published REQUIRED SUPPORT FORCE — the horizontal
+force per meter that holds a slope at a target factor of safety, back-analyzed
+by the procedure XSTABL's reference manual states and Slide2 reproduces: the
+base normals taken at the target factor, the moment deficit that leaves, and the
+maximum of that force over a family of trial surfaces. ``tolerance`` is
+RELATIVE. See run_support_force_test.
 
 The seep_elements / fem_elements types solve ONE problem with every supported
 element type (seep: tri3/tri6/quad4/quad8/quad9; FEM: the quadratic tri6/quad8/
@@ -447,10 +463,14 @@ def parse_test_tags(md_path):
         # Convert numeric fields
         for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'beta', 'k0',
                     'expected_kc', 'k_min', 'k_max', 'fs_tol', 'kc_tol', 'refine_factor',
-                    'expected_pf', 'pf_tol']:
+                    'expected_pf', 'pf_tol',
+                    'expected_depth', 'depth_x', 'depth_datum',
+                    'expected_force', 'target_fs', 'force_elev', 'grid',
+                    'refine_grid', 'min_depth']:
             if key in params:
                 params[key] = float(params[key])
         for key in ['num_slices', 'n_samples', 'rng_seed', 'circle_index',
+                    'refine_slices',
                     'expected_elements', 'expected_nodes']:
             if key in params:
                 params[key] = int(params[key])
@@ -918,6 +938,283 @@ def run_pullout_envelope_test(test):
         return None, (f"{len(problems)} station(s) off: "
                       + "; ".join(problems[:6]))
     return 0.0, None
+
+
+def _tag_surface_run(test):
+    """The slip surface a tag names, solved: ``(slope_data, entry, None)``.
+
+    Shared by the tag types that lock a property of the surface rather than the
+    factor of safety. ``surface=search`` (the default) runs the circular search
+    the LEM types run and takes its critical circle; ``surface=circle`` solves
+    the file's stored circle ``circle_index`` (default 0) without searching, the
+    way ``single_circle`` does. The entry is a dict with the same keys the
+    search's cache carries — ``Xo``, ``Yo``, ``Depth``, ``FS``, ``slices``,
+    ``failure_surface`` — so a caller reads one shape either way.
+    """
+    from xslope.fileio import load_slope_data
+    from xslope.search import circular_search
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    method = test['method']
+    num_slices = int(test.get('num_slices', 40))
+    mode = str(test.get('surface', 'search')).strip().lower()
+    slope_data = load_slope_data(test['file'])
+
+    if mode == 'search':
+        fs_cache, _conv, _path, _cc = circular_search(
+            slope_data, method, num_slices=num_slices)
+        if not fs_cache or fs_cache[0]['FS'] >= 9999:
+            return None, None, "the circular search found no valid surface"
+        return slope_data, fs_cache[0], None
+
+    if mode != 'circle':
+        return None, None, (f"surface={mode!r} is not a surface; use 'search' "
+                            f"(the circular search) or 'circle' (the file's "
+                            f"stored circle)")
+
+    ci = int(test.get('circle_index', 0))
+    circles = slope_data['circles']
+    if not 0 <= ci < len(circles):
+        return None, None, (f"circle_index={ci} out of range: the file has "
+                            f"{len(circles)} circle(s)")
+    circle = circles[ci]
+    ok, res = generate_slices(slope_data, circle=circle, num_slices=num_slices)
+    if not ok:
+        return None, None, f"generate_slices failed: {res}"
+    slice_df, failure_surface = res
+    solver_result = solve_selected(method, slice_df)
+    if isinstance(solver_result, str):
+        return None, None, f"solve failed: {solver_result}"
+    entry = {'Xo': circle['Xo'], 'Yo': circle['Yo'],
+             'Depth': circle.get('Depth'), 'FS': solver_result['FS'],
+             'slices': slice_df, 'failure_surface': failure_surface}
+    return slope_data, entry, None
+
+
+def _surface_depth(slope_data, failure_surface, x, datum=None):
+    """Depth of a slip surface below a stated point, at the station ``x``.
+
+    The quantity a paper tabulates as the "depth of slip surface" at a pile, a
+    tension crack or a borehole: the reference elevation minus the elevation of
+    the surface at that station. The reference is ``datum`` when the tag states
+    one and otherwise the GROUND SURFACE there, which is what a depth below
+    ground means.
+
+    Both curves are interpolated in x, so a station between vertices is read
+    from the two either side of it. A station outside the failure surface's own
+    horizontal span is clamped to its nearer end, and that end lies ON the
+    ground surface — the surface enters and exits there — so a surface that does
+    not reach the station reads a depth of zero, which is what it develops
+    there.
+    """
+    import numpy as np
+
+    def _interp(coords, xq):
+        xs = [float(p[0]) for p in coords]
+        ys = [float(p[1]) for p in coords]
+        if xs[0] > xs[-1]:
+            xs, ys = xs[::-1], ys[::-1]
+        return float(np.interp(xq, xs, ys))
+
+    ref = (float(datum) if datum is not None
+           else _interp(list(slope_data['ground_surface'].coords), x))
+    return ref - _interp(list(failure_surface.coords), x)
+
+
+def run_slip_depth_test(test):
+    """Lock the DEPTH of the critical slip surface below a stated point.
+
+    A published surface comparison, where the source tabulates a depth rather
+    than printing a figure: Cai & Ugai (2000) give the depth of the slip surface
+    at the pile for each pile spacing, and that depth is what their pile
+    equation integrates the lateral force over. Comparing it says whether two
+    programs that report the same factor of safety found the same mechanism,
+    which the factor alone cannot say.
+
+    Tag keys:
+
+    ``depth_x``
+        the horizontal station the depth is read at (the pile position, the
+        borehole, whatever the source's table is keyed on).
+    ``depth_datum``
+        optional reference elevation. Absent, the reference is the ground
+        surface at ``depth_x`` — the ordinary "below ground" reading.
+    ``surface``
+        ``search`` (default) runs the circular search and reads its critical
+        circle; ``circle`` reads the file's stored circle ``circle_index``.
+    ``expected_depth`` / ``tolerance``
+        the source's depth and the band, both in the model's LENGTH units.
+        ``tolerance`` is ABSOLUTE here (default 0.05), because a depth of zero
+        is a real reading — a surface that grazes the station — and no relative
+        band can express it.
+
+    ``method`` and ``num_slices`` are the surface's, and should match the tag
+    that locks the same run's factor of safety, so the two lock one surface.
+    """
+    if test.get('depth_x') is None:
+        return None, "a slip_depth tag needs depth_x (the station the depth is read at)"
+    slope_data, entry, err = _tag_surface_run(test)
+    if err:
+        return None, err
+    return _surface_depth(slope_data, entry['failure_surface'],
+                          float(test['depth_x']),
+                          test.get('depth_datum')), None
+
+
+def run_support_force_test(test):
+    """Back-analyze the SUPPORT FORCE that holds a slope at a target factor.
+
+    The quantity a reinforcement design problem publishes: the horizontal force,
+    per meter of slope, that a structure must carry for the slope to stand at a
+    stated factor of safety. XSTABL's reference manual (Sharma 1996, Appendix
+    D.5, Eqs D.40-D.42) states the procedure Slide2 reproduces, and it is this:
+
+    1. Take the effective base normal N' from Bishop's normal-force equation
+       evaluated at the TARGET factor of safety, not at the surface's own.
+    2. Compute the factor of safety F_calculated that those normals give.
+    3. The deficit is a moment, dM = (target - F_calculated) x M_driving, and
+       the force is dF = dM / y, where y is the vertical distance from the
+       center of rotation to the elevation the resultant acts at.
+    4. Report the MAXIMUM over a family of trial surfaces: the surface that
+       needs the most support is the one the design is sized on.
+
+    The force is credited as an external resisting moment and nothing else. It
+    does not raise the base normal, so it earns no friction back — which is why
+    this force is larger than the one a limit-equilibrium reinforcement line
+    needs on the same slope, and why the two are separate comparisons.
+
+    Because N' is held at the target, the factor of safety is LINEAR in the
+    applied moment, so the crossing at step 3 is solved in closed form instead
+    of being interpolated from a sweep.
+
+    Tag keys:
+
+    ``target_fs``       the factor of safety the force is sized for (default 1.5).
+    ``force_elev``      elevation the resultant acts at (required).
+    ``toe``             ``x;y`` of the point every trial circle passes through —
+                        the toe, for the toe-surface family both manuals search.
+    ``center_box``      ``x_min;x_max;y_min;y_max`` of the swept centers.
+    ``grid``            coarse center spacing (default 0.5).
+    ``refine_grid``     refined spacing, swept +/- one coarse cell about the
+                        coarse maximum (default 0.1; 0 skips the refinement).
+    ``min_depth``       least maximum depth a trial surface may have (default 0).
+    ``num_slices``      slices on the coarse pass (default 50).
+    ``refine_slices``   slices on the refined pass (default: ``num_slices``).
+    ``expected_force`` / ``tolerance``
+                        the published force and the band. ``tolerance`` is
+                        RELATIVE here (default 0.01), the convention the other
+                        types whose value is a large dimensional quantity use.
+
+    ``method`` must be ``bishop``: the procedure is stated on Bishop's
+    normal-force equation, and it is that equation the run evaluates.
+    """
+    import math
+
+    import numpy as np
+
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+    from xslope.solve import bishop, _c_eff
+
+    method = str(test.get('method', 'bishop')).strip().lower()
+    if method != 'bishop':
+        return None, ("support_force runs the procedure on Bishop's normal-force "
+                      f"equation; method={method!r} is not available")
+    if test.get('force_elev') is None:
+        return None, "a support_force tag needs force_elev (the resultant's elevation)"
+
+    def _list(key, n):
+        raw = test.get(key)
+        if raw is None or str(raw).strip() == '':
+            return None
+        parts = [float(v) for v in str(raw).split(';') if v.strip() != '']
+        if len(parts) != n:
+            raise ValueError(f"{key} needs {n} ';'-separated numbers, got {raw!r}")
+        return parts
+
+    toe = _list('toe', 2)
+    box = _list('center_box', 4)
+    if toe is None or box is None:
+        return None, ("a support_force tag needs toe=x;y and "
+                      "center_box=x_min;x_max;y_min;y_max")
+    target = float(test.get('target_fs', 1.5))
+    y_res = float(test['force_elev'])
+    grid = float(test.get('grid', 0.5))
+    refine_grid = float(test.get('refine_grid', 0.1))
+    min_depth = float(test.get('min_depth', 0.0))
+    n_coarse = int(test.get('num_slices', 50))
+    n_fine = int(test.get('refine_slices', n_coarse))
+
+    slope_data = load_slope_data(test['file'])
+    # The split below reads the resisting moment off the base shear alone, so a
+    # model that carries its own support would have that support counted twice.
+    for key in ('reinforcement_lines', 'pile_lines', 'line_loads'):
+        if slope_data.get(key):
+            return None, (f"the model carries {key}; the support-force procedure "
+                          f"sizes the ONLY support on the slope")
+
+    def trial(Xo, Yo, num_slices):
+        """Required support force on one toe circle, or None if inadmissible."""
+        arm = Yo - y_res
+        if arm <= 0:
+            return None
+        R = math.hypot(Xo - toe[0], Yo - toe[1])
+        try:
+            ok, res = generate_slices(
+                slope_data, circle={'Xo': Xo, 'Yo': Yo, 'R': R, 'Depth': Yo - R},
+                num_slices=num_slices)
+        except Exception:
+            return None
+        if not ok:
+            return None
+        slice_df = res[0]
+        if min_depth > 0:
+            depth = float(np.max(slice_df['y_ct'].values - slice_df['y_cb'].values))
+            if depth < min_depth:
+                return None
+        # One evaluation of Bishop's equation at the TARGET factor: the seed is
+        # the target and the loop is stopped after that pass, so N' and the
+        # factor it gives are step 1 and step 2 of the procedure exactly.
+        ok, result = bishop(slice_df, tol=float('inf'), max_iter=1,
+                            fs_seed=target)
+        if not ok:
+            return None            # an inadmissible base normal on this surface
+        f_calc = float(result['FS'])
+        if f_calc >= target:
+            return None            # already stands at the target: no force needed
+        # The resisting moment those normals give, about the center: the
+        # mobilized base shear on its arm, which on a true circle is R. The
+        # driving moment follows from it, because F_calculated is their ratio.
+        R_s = float(slice_df['r'].iloc[0])
+        base_shear = (_c_eff(slice_df) * slice_df['dl'].values
+                      + slice_df['n_eff'].values
+                      * np.tan(np.radians(slice_df['phi'].values)))
+        m_driving = float(np.sum(base_shear * R_s)) / f_calc
+        return (target - f_calc) * m_driving / arm
+
+    def sweep(x0, x1, y0, y1, step, num_slices):
+        best = None
+        n_x = int(round((x1 - x0) / step)) + 1
+        n_y = int(round((y1 - y0) / step)) + 1
+        for i in range(n_x):
+            for j in range(n_y):
+                Xo, Yo = x0 + i * step, y0 + j * step
+                f = trial(Xo, Yo, num_slices)
+                if f is not None and (best is None or f > best[0]):
+                    best = (f, Xo, Yo)
+        return best
+
+    best = sweep(box[0], box[1], box[2], box[3], grid, n_coarse)
+    if best is None:
+        return None, ("no admissible trial surface in the swept center box "
+                      "(widen center_box, or lower min_depth)")
+    if refine_grid > 0:
+        fine = sweep(best[1] - grid, best[1] + grid,
+                     best[2] - grid, best[2] + grid, refine_grid, n_fine)
+        if fine is not None and fine[0] > best[0]:
+            best = fine
+    return best[0], None
 
 
 def run_critical_kc_test(test):
@@ -5282,6 +5579,11 @@ PREFLIGHT_TAG_ANALYSIS = {
     'gsat_pair': ('lem', {}),
     'design_search': ('lem', {'surface': 'circular', 'search': True}),
     'critical_kc': ('lem', {'surface': 'circular', 'search': True}),
+    # Both lock a property of a circular surface the same LEM run produces —
+    # its depth at a station, or the support force it needs — so they preflight
+    # as the circular run they are.
+    'slip_depth': ('lem', {'surface': 'circular', 'search': True}),
+    'support_force': ('lem', {'surface': 'circular', 'search': True}),
     'sensitivity': ('sensitivity', {}),
     'reliability': ('reliability', {}),
     'reliability_mc': ('reliability', {}),
@@ -13426,6 +13728,10 @@ def _dispatch_test(test):
         return run_design_callable_test(test)
     elif test_type == 'critical_kc':
         return run_critical_kc_test(test)
+    elif test_type == 'slip_depth':
+        return run_slip_depth_test(test)
+    elif test_type == 'support_force':
+        return run_support_force_test(test)
     elif test_type == 'sensitivity':
         return run_sensitivity_test(test)
     else:
@@ -13445,6 +13751,17 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type == 'critical_kc':
         expected = test.get('expected_kc')
         tol = test.get('kc_tol', 0.01)
+    elif test_type == 'slip_depth':
+        # ABSOLUTE, in the model's length units: a depth of zero is a real
+        # reading (a surface that grazes the station) and no relative band
+        # can express it.
+        expected = test.get('expected_depth')
+        tol = test.get('tolerance', 0.05)
+    elif test_type == 'support_force':
+        # RELATIVE, like the other types whose locked value is a large
+        # dimensional quantity (seep's discharge, pullout_envelope's capacity).
+        expected = test.get('expected_force')
+        tol = test.get('tolerance', 0.01) * abs(expected) if expected else 0
     elif test_type == 'sensitivity':
         # the runner checks base/low/high internally; the framework-level
         # comparison re-checks the base row
@@ -13495,6 +13812,7 @@ def _expected_and_tol(test, default_tolerance):
 _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'fem_ssrm': 5, 'fem_elements': 5,
               'preflight_corpus': 5, 'preflight_rules': 4, 'corpus_circles': 5,
               'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'fs_vs_time': 5,
+              'support_force': 4, 'slip_depth': 2,
               'fs_vs_time_mode': 4,
               'transient_seep': 4, 'seep_elements': 3, 'seep': 3,
               'noncircular_search': 2, 'circular_search': 2,

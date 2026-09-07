@@ -92,6 +92,12 @@ CONFIG = PageConfig(
         # case 1 (row 62) 🟢 and case 3 (row 63) 🔴.  The worst locked case sets
         # the dot, here and in the summary table.
         ('rs2-68', '🔴'),
+        # "RS2 Part IV VP65 / VP66" carries the two upstream-pool dams of one
+        # family in a single section, because what separates them is one
+        # argument about how each is watered.  VP66 (row 66) is the section's
+        # locked comparison, 🟢; VP65 (row 65) is reported against a
+        # zone-constrained vendor factor and carries no lock, which is its ⊘.
+        ('p4-vp65', '🟢'),
     ],
 
     figure_mode="panel",

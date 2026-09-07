@@ -5470,11 +5470,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # required divergence fence that keeps 'auto' safe.
     _mc_kernel = None
     _kernel_required = (fast_kernel is True)
-    # The compiled Step-6 kernel computes sigma = D(Bu - evp) + u*m internally and
-    # has no slot for a per-Gauss-point INITIAL stress, so a K0 run stays entirely on
-    # the NumPy reference — which is the oracle anyway. Runs without k0 are untouched.
-    if sv0_gp is not None:
-        fast_kernel = False
+    # The compiled Step-6 kernel takes the per-Gauss-point K0 initial stress as its
+    # own argument (sig0, has_sig0) and adds it in the reference's order, so a K0 run
+    # is no longer held off it. It used to be: the kernel computed
+    # sigma = D(Bu - evp) + u*m with no slot for an initial stress, and 148 of the
+    # corpus's 193 fem_ssrm rows carry k0, so the accelerator was inert on three
+    # quarters of the FEM benchmarks it was built for.
     if fast_kernel:
         try:
             from xslope import _fem_kernel as _mc_kernel
@@ -5496,6 +5497,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             _G = grp['dof'].shape[0]
             grp['_dof_intp'] = np.ascontiguousarray(grp['dof'], dtype=np.intp)
             grp['_zeroG'] = np.zeros(_G, dtype=np.float64)
+            # Stand-in for the K0 initial stress on a run that has none; the stage
+            # loop overwrites _sig0_c with the real field where sv0_gp exists.
+            grp['_zeroG4'] = np.zeros((_G, 4), dtype=np.float64)
+            grp['_sig0_c'] = grp['_zeroG4']
             grp['_B_c'] = np.ascontiguousarray(grp['B'], dtype=np.float64)
             grp['_D4_c'] = np.ascontiguousarray(grp['D4'], dtype=np.float64)
             grp['_w_c'] = np.ascontiguousarray(grp['w'], dtype=np.float64)
@@ -5660,6 +5665,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 z = np.zeros_like(sv_eff)
                 sig0 = np.stack([sh_eff, sv_eff, z, sh_eff], axis=1)
                 grp['sig0'] = sig0
+                if grp.get('_fast'):
+                    grp['_sig0_c'] = np.ascontiguousarray(sig0, dtype=np.float64)
                 contrib = np.einsum('gij,gi->gj', grp['B'], sig0[:, :3]) * grp['w'][:, None]
                 np.add.at(F_sig0, grp['dof'].ravel(), contrib.ravel())
 
@@ -5821,7 +5828,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         grp['snph'], grp['csph'], grp['_tcap_c'],
                         grp['u_gp'], grp['_elastic_u8'], grp['evp'],
                         dt, 1 if grp['has_cap'] else 0,
-                        1 if grp.get('has_elastic') else 0)
+                        1 if grp.get('has_elastic') else 0,
+                        grp['_sig0_c'], 1 if sv0_gp is not None else 0)
                     continue
                 Bg, D4g, wg = grp['B'], grp['D4'], grp['w']
                 dofg, evpg = grp['dof'], grp['evp']

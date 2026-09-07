@@ -98,7 +98,9 @@ def mc_step6(double[::1] u,
              double[:, ::1] evp,
              double dt,
              int has_cap,
-             int has_elastic):
+             int has_elastic,
+             double[:, ::1] sig0,
+             int has_sig0):
     """Run one iteration's Mohr-Coulomb Step-6 update for ONE Gauss-point group.
 
     Mutates `evp` (G,4) in place and scatters the viscoplastic body-load
@@ -112,7 +114,13 @@ def mc_step6(double[::1] u,
     F-reduced suction apparent cohesion (zeros if inactive); t_cap (G,) per-GP
     tensile cap (inf where none); u_gp (G,) effective-normal pore pressure added
     to sx,sy,sz (already zeroed under the 'effective' formulation); elastic (G,)
-    uint8 pure-elastic flag.
+    uint8 pure-elastic flag; sig0 (G,4) K0 initial stress added to the trial
+    stress before the pore pressure, ignored when has_sig0 is 0.
+
+    The K0 term joins in the reference's own order -- sigma = D4 (eps - evp) +
+    sigma_0, and only then + u on the three normal components -- so a K0 run
+    reaches the yield function through the same two additions the NumPy path
+    makes.
     """
     cdef Py_ssize_t G = B.shape[0]
     cdef Py_ssize_t ndof = B.shape[2]
@@ -163,6 +171,14 @@ def mc_step6(double[::1] u,
         s1 = D4[g, 1, 0] * x0 + D4[g, 1, 1] * x1 + D4[g, 1, 2] * x2 + D4[g, 1, 3] * x3
         s2 = D4[g, 2, 0] * x0 + D4[g, 2, 1] * x1 + D4[g, 2, 2] * x2 + D4[g, 2, 3] * x3
         s3 = D4[g, 3, 0] * x0 + D4[g, 3, 1] * x1 + D4[g, 3, 2] * x2 + D4[g, 3, 3] * x3
+
+        # K0 initial stress, on all four components, BEFORE the pore pressure --
+        # the reference does sig4 = sig4 + sig0 and then adds u to 0, 1 and 3.
+        if has_sig0:
+            s0 += sig0[g, 0]
+            s1 += sig0[g, 1]
+            s2 += sig0[g, 2]
+            s3 += sig0[g, 3]
 
         # sig_eff: add pore pressure to sx, sy, sz (indices 0,1,3); NOT txy (2)
         ug = u_gp[g]

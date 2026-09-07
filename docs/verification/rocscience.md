@@ -2518,13 +2518,13 @@ the same model, and the differences below measure what separates them.
 |---|---|---|
 | No pile | 1.136 | 1.14 (−0.4%) |
 | Pile, free head | 1.578 | 1.36 (+16.0%) |
-| Pile, unrotated head | 1.587 | 1.45 (+9.4%) |
+| Pile, unrotated head | 1.594 | 1.45 (+9.9%) |
 | Pile, hinged head — not built | — | 1.54 |
 | Pile, fully fixed head — not built | — | 1.55 |
 
 Without a pile the two agree to −0.4%: the same section, soil and strength-reduction procedure,
 with nothing three-dimensional in either model. That row is what makes the other two readable. With
-the pile in place the two-dimensional model reads high, by +16.0% with a free head and +9.4% with
+the pile in place the two-dimensional model reads high, by +16.0% with a free head and +9.9% with
 the head unrotated, which is the direction the idealization predicts: in three dimensions the soil
 at three diameters' spacing arches onto the piles, some of it moves between them, and it can slip
 along each pile's surface, while in a plane-strain smear the row is a continuous sheet at one-third
@@ -2551,7 +2551,7 @@ spacings, and [VP54](#vp54). See
 
 <!-- test: file=files/rocscience/vp106a_fem.xlsx, type=fem_ssrm, expected_fs=1.136, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.85, f_max=1.45, max_iter=16000, benchmark=VP106-FEM-nopile -->
 <!-- test: file=files/rocscience/vp106c_fem.xlsx, type=fem_ssrm, expected_fs=1.578, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=VP106-FEM-free -->
-<!-- test: file=files/rocscience/vp106c_fem_fix.xlsx, type=fem_ssrm, expected_fs=1.587, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.9, max_iter=16000, benchmark=VP106-FEM-fixed -->
+<!-- test: file=files/rocscience/vp106c_fem_fix.xlsx, type=fem_ssrm, expected_fs=1.594, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.9, max_iter=16000, benchmark=VP106-FEM-fixed -->
 
 ## 🟢 VP107: Retaining walls, gabion walls, supports {#vp107}
 

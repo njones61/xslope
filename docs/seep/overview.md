@@ -359,13 +359,36 @@ recomputes the pressure head, evaluates $k_r$ at the element's Gauss points, sca
 element's saturated stiffness by the quadrature-weighted average, solves, and updates the
 exit-face active set. (Averaging $k_r$ over the element's integration points, rather than
 switching it node by node, is what smears the phreatic transition over one element instead of
-snapping it.) The iteration is under-relaxed progressively if it needs many sweeps.
+snapping it.) The iteration is under-relaxed when it needs to be, and **how much is
+decided by the head change, not by the sweep number**. The relaxation factor starts at 1
+and walks a fixed ladder — 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01 — on this rule:
+
+- **Step down** one rung after five consecutive sweeps on which the largest head change
+  set no new low for the rung. A solve that is stalling or oscillating sets no new lows;
+  one that is merely noisy on its way down keeps setting them, which is why the test is a
+  new low and not simply a fall.
+- **Hold** while it keeps setting new lows.
+- **Step back up** one rung after ten consecutive new lows — twenty the second time that
+  rung is tried, forty the third. A rung that was too coarse for the field early on may be
+  right for it later, and the doubling is what keeps the ladder from thrashing between two
+  rungs while still letting it climb back to the coarsest one that works.
+
+An under-relaxed sweep is a small step, so a factor finer than the problem needs costs
+sweeps rather than accuracy. Feeding the ladder the head change is what stops it paying
+that cost: the tall unsaturated column of the heap model closes in 337 sweeps where a
+fixed schedule that reached 0.01 by sweep 121 and stayed there took 739, and lands on the
+same field.
 
 Convergence is a **hybrid** test — all three conditions must hold at once:
 
-1. **Head change.** $||h_{new} - h_{old}||_\infty$ below a tolerance scaled to the domain
-   height. This alone is not sufficient: how a given head tolerance maps to mass-balance error
-   varies from problem to problem.
+1. **Head change.** $||h_{new} - h_{old}||_\infty$ — a head, in the model's own length units —
+   below `tol` times the model's **head scale**: the larger of the mesh height and the range of
+   the specified heads. Both of those are differences, so the gate is the same length wherever
+   the elevation datum is put: one physical problem is held to one head tolerance whether its
+   ground line is drawn at elevation 0 or at 1000. Asking for the tolerance as a fraction of
+   the model's own scale rather than as a length is what lets one default work on a 10 m
+   sheetpile section and on a 180 ft dam. This condition alone is not sufficient: how a given
+   head tolerance maps to mass-balance error varies from problem to problem.
 2. **Flow closure.** The unsigned nodal flow residual at the free nodes, evaluated with the
    conductivity rebuilt from the current unrelaxed heads, below `closure_tol` (default 0.1%)
    of the inflow. This measures the remaining $k_r$ lag directly in flow units — it is not a

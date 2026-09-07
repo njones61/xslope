@@ -3,7 +3,7 @@ and the threshold the switch measures an apparent inflow against.
 
 Four corpus models used to run to their iteration ceiling and stop, reporting a flow
 rate off a field that was still moving. Neither was diverging: each had settled into
-an exact periodic orbit that the relaxation ladder's terminal 0.01 made invisible.
+an exact periodic orbit that the relaxation ladder's bottom rung made invisible.
 
 CLASS A -- the HEAD FIELD cycles. Four or five interior nodes on a
 high-conductivity-contrast interface oscillate with a period of 8 to 12 sweeps. The
@@ -25,19 +25,19 @@ THE CLASS B ESCAPE NOW GUARDS NOTHING IN THE CORPUS, and this file says so rathe
 than pretending otherwise. The exit-face fix in ``seep.py`` -- a seepage face runs to
 the toe where a specified head claims the corner, and a set with the head standing
 above the ground is not a stable set -- removed the cycle that produced it. earth_dam2
-now converges in 600 sweeps with NEITHER escape firing, so it has moved to the inert
+now converges in 195 sweeps with NEITHER escape firing, so it has moved to the inert
 table below, and the escape has no rescued model left. Measured over every steady
 seepage model the suite solves (28 tagged models, plus the 11 committed-mesh solves
 this file makes): the revisit line is printed on none of them. On earth_dam2 the
 mechanism is direct -- the wet-face rule joins the last free node to the face at sweep
-14, which populates ``_free_edges``, and the class B gate is written ``not
+15, which populates ``_free_edges``, and the class B gate is written ``not
 _free_edges``, so it can no longer be reached on that model at all.
 
 The escape is kept because it is still correct and still reachable, and the leg below
 proves the second half rather than asserting it: with ``_SET_REVISIT_SWEEP`` lowered
 to 0 the escape fires on earth_dam2 at sweep 11, ahead of the wet-face rule, and the
-solve lands on the same answer it reaches without it (1.2734376 in 587 sweeps against
-1.2734375 in 600, agreeing to 8e-8 of themselves). What has no fixture is the DEFECT,
+solve lands on the same answer it reaches without it (1.2734384 in 313 sweeps against
+1.2734362 in 195, agreeing to 1.7e-6 of themselves). What has no fixture is the DEFECT,
 not the code path.
 
 AN EXIT FACE OVER A FLUX BOUNDARY -- the switch's threshold. An exit-face node's
@@ -78,10 +78,10 @@ WHAT THIS CHECK LOCKS
 MEASURED DURING THE ROUND, NOT LOCKED HERE
 
 The rescued flow rates are the MODELs' and not the settings': re-solved at relaxation
-floors of 1e-3 and 3e-4 the fields agree to 0.04 psf (0.012 psf on earth_dam_rapid),
-and tightening the head tolerance from 1e-4 to 1e-6 changes neither field nor sweep
-count on any of the three -- the closure test, not the head test, is what closes these
-solves. No leg re-solves them at a second setting to prove it: that would double the
+floors of 1e-3 and 3e-4 the fields agree to 5.2e-04 ft of head (2.3e-04 ft on
+earth_dam_rapid), and tightening the head tolerance from 1e-4 to 1e-6 changes neither
+field nor sweep count on any of the three -- the closure test, not the head test, is
+what closes these solves. No leg re-solves them at a second setting to prove it: that would double the
 runtime for a property the trajectory pins above already constrain, since a solve
 whose answer had become a function of its settings would have to reach it along a
 different path, and the escape sweeps and sweep counts locked below are that path.
@@ -91,29 +91,32 @@ stands, and each mutable in one line if a reader wants to see the other side of 
 
 * A period of 1 is NOT a cycle. vp046b and vp077a creep toward their answers for
   hundreds of sweeps, each repeating its previous sweep within tolerance. Replace the
-  detection with ``relax = min(relax, 1e-3)`` for every sweep past 120 and all four
-  models the class A gate touches lose their convergence: vp046b runs its 600 sweeps
-  without closing where it took 207, vp077a its 1000 where it took 501,
-  earth_dam1_vg its 1000 where it took 316, and johnson_rapid_KEY its 1000 where the
-  escape closes it at 901.
+  detection with a blanket ``relax = min(relax, 1e-3)`` on the ladder's bottom rung and
+  two of the four models the class A gate touches lose their convergence: vp077a runs
+  its 1000 sweeps without closing where it took 393, and johnson_rapid_KEY its 1000
+  where the escape closes it at 826. A third, earth_dam_rapid, closes without the escape
+  in 285 sweeps but on 183.9589 rather than 183.95867. vp046b and earth_dam1_vg are
+  untouched, because the progress-fed ladder no longer drives either of them to the
+  bottom rung at all.
 * Neither is a repeat that never left -- a solve creeping monotonically sits inside
   the repeat tolerance at every lag and reads as an orbit unless the iterate is
   required to have gone somewhere in between. That false positive is the ``_cyc_away``
-  term's whole job, and NO corpus model exhibits it any more: delete the term and
-  earth_dam2 and earth_dam1_vg both come back bit for bit (600 sweeps at 1.2734375,
-  316 at 37.716649), because the exit-face fix closes earth_dam2 before its creep gets
-  fine enough to be mistaken for a period-2 orbit. The term guards a property of the
-  detector that this corpus no longer witnesses.
+  term's whole job, and vp077a witnesses it: delete the term and vp077a's creep reads
+  as an orbit at sweep 344, the escape floors its relaxation, and it takes 805 sweeps to
+  reach 8.2210996e-06 where it took 393 to reach 8.2210891e-06. earth_dam2 and
+  earth_dam1_vg come back bit for bit (195 sweeps at 1.2734362, 163 at 37.716990),
+  because the exit-face fix closes earth_dam2 before its creep gets fine enough to be
+  mistaken for a period-2 orbit.
 * Revisiting sets is normal EARLY. Every converging model in the corpus revisits
   exit-face sets while its seepage face is still finding its extent, and all of them
   are done by sweep 41 (vp077a, the latest). Set ``_SET_REVISIT_SWEEP = 0`` and
-  earth_dam1_vg is untouched (316 sweeps, 37.716649), while earth_dam2 fires the
-  escape at sweep 11 and closes at 1.2734376 in 587 sweeps -- the same answer to 8e-8,
+  earth_dam1_vg is untouched (163 sweeps, 37.716990), while earth_dam2 fires the
+  escape at sweep 11 and closes at 1.2734384 in 313 sweeps -- the same answer to 1.7e-6,
   reached along a different path. The gate now costs the corpus a trajectory, not an
   answer.
 * Removing the Class B gate leaves earth_dam2 exactly where it was: with
-  ``_SET_REVISIT_SWEEP`` set past any reachable sweep it converges in 600 sweeps at
-  1.2734375, bit for bit the run with the gate in place -- which is the same fact as
+  ``_SET_REVISIT_SWEEP`` set past any reachable sweep it converges in 195 sweeps at
+  1.2734362, bit for bit the run with the gate in place -- which is the same fact as
   the escape's inertness above, read from the other side.
 
 Run directly:  PYTHONPATH=. python3 test/seep_cycle_check.py
@@ -139,10 +142,13 @@ VENDOR = dict(tol=1e-5, max_iter=600)
 #: Rescued by an escape: (stem, bc, settings, flow rate, sweeps, which escape).
 #: All class A. earth_dam2 was the one class B row and no longer cycles; it is in
 #: INERT below, and leg_class_b_reachable covers the escape it used to exercise.
+# Progress-fed relaxation ladder: every sweep count and flow rate in this table and
+# in INERT below is re-recorded at the ladder that steps on the head change instead
+# of the sweep number. The escapes are unchanged and all three rows still fire one.
 RESCUED = [
-    ("docs/lem/files/xslope_earth_dam_rapid", 1, DOCS, 183.958670, 463, "A"),
-    ("docs/lem/files/xslope_gsat_seep", 1, DOCS, 183.958670, 463, "A"),
-    ("docs/lem/files/xslope_johnson_rapid_KEY", 1, DOCS, 1.871900, 901, "A"),
+    ("docs/lem/files/xslope_earth_dam_rapid", 1, DOCS, 183.9586689, 474, "A"),
+    ("docs/lem/files/xslope_gsat_seep", 1, DOCS, 183.9586689, 474, "A"),
+    ("docs/lem/files/xslope_johnson_rapid_KEY", 1, DOCS, 1.8718996, 826, "A"),
 ]
 
 #: Converging without either escape, and required to stay that way, sweep for sweep.
@@ -155,18 +161,18 @@ RESCUED = [
 #: Five of these rows carry the exit-face fix (a seepage face ends at the toe, and a
 #: set leaving the head above the ground is not stable), which moved the field on
 #: every model whose face meets a specified-head line: earth_dam1_vg to 37.716649,
-#: johnson_res to 1.955451, earth_dam2 out of RESCUED at
+#: johnson_res to 1.9554193, earth_dam2 out of RESCUED at
 #: 1.2734375, and vp046b and vp077a in their seventh digit. earth_dam1 and
 #: earth_dam_bc2 are unchanged.
 INERT = [
-    ("docs/verification/files/rocscience/vp046b", 1, VENDOR, 1.2787498e-03, 207),
-    ("docs/verification/files/rocscience/vp077a", 1, DOCS, 8.2210726e-06, 501),
-    ("docs/seep/files/xslope_earth_dam1_vg", 1, DOCS, 37.716649, 316),
-    ("docs/seep/files/xslope_earth_dam1", 1, DOCS, 38.781841, 115),
-    ("docs/inputs/seep/xslope_earth_dam_bc2", 1, DOCS, 42.437178, 111),
+    ("docs/verification/files/rocscience/vp046b", 1, VENDOR, 1.2786864e-03, 82),
+    ("docs/verification/files/rocscience/vp077a", 1, DOCS, 8.2210891e-06, 393),
+    ("docs/seep/files/xslope_earth_dam1_vg", 1, DOCS, 37.716990, 163),
+    ("docs/seep/files/xslope_earth_dam1", 1, DOCS, 38.781675, 142),
+    ("docs/inputs/seep/xslope_earth_dam_bc2", 1, DOCS, 42.436634, 84),
     ("docs/inputs/seep/xslope_earth_dam_bc2", 2, DOCS, 11.587548, 13),
-    ("docs/seep/files/xslope_johnson_res", 1, DOCS, 1.955451, 24),
-    ("docs/seep/files/xslope_earth_dam2", 1, DOCS, 1.2734375, 600),
+    ("docs/seep/files/xslope_johnson_res", 1, DOCS, 1.9554198, 38),
+    ("docs/seep/files/xslope_earth_dam2", 1, DOCS, 1.2734362, 195),
 ]
 
 #: earth_dam2's exit face settles on 8 of its 97 exit-face nodes.
@@ -174,11 +180,11 @@ EDAM2_ACTIVE = 8
 #: The sweep the wet-face rule resolves earth_dam2's face on, which is also what puts
 #: the class B escape out of reach on this model (the escape is gated ``not
 #: _free_edges``, and the wet-face rule is the other writer of that set).
-EDAM2_WET_SWEEP = 14
+EDAM2_WET_SWEEP = 15
 #: earth_dam2 with the class B gate lowered to 0, the one setting on this corpus that
 #: still reaches the escape: the sweep it fires on, the sweeps the solve then takes,
 #: and the flow rate it lands on -- the same answer as the ungated run, to 8e-8.
-EDAM2_B_FIRES_AT, EDAM2_B_SWEEPS, EDAM2_B_Q = 11, 587, 1.2734376
+EDAM2_B_FIRES_AT, EDAM2_B_SWEEPS, EDAM2_B_Q = 11, 313, 1.2734384
 
 #: The dam-infiltration tutorial model: a rain flux over the whole exposed surface,
 #: draining to a 12 m toe drain that is the file's only exit face.
@@ -204,7 +210,8 @@ INFIL_NODES, INFIL_FACE_NODES = 473, 35
 #: where one node ponds under the flux BC alone; 3x and 4x are past it, and are the two
 #: rates whose active set used to cycle to the sweep ceiling instead of converging.
 INFIL_ROWS = [
-    (1.0, 0, 4.915513796099751e-07, 4.915514596217149e-07, False),
+    # Datum-independent head gate: the 1x rows are the two the tighter gate reaches.
+    (1.0, 0, 4.915525799188735e-07, 4.91552423346594e-07, False),
     (2.8, 1, 8.823960999866383e-07, 8.874008969783335e-07, True),
     (3.0, 3, 9.202226475422334e-07, 9.411714513832222e-07, True),
     (4.0, 12, 1.0583269792370564e-06, 1.246222222222292e-06, True),

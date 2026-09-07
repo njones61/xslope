@@ -134,14 +134,14 @@ seepage dialog. Click **Run → Run Seep…**
 The **Model checks** panel carries the preflight report for this run, and on this
 model it reports **No problems found for this run.** Leave **Convergence tol** at
 `0.0001` and **Max iterations** at `400`, and click **Run**. The unconfined
-iteration settles in **27 sweeps**, and the run is over almost as soon as it
+iteration settles in **23 sweeps**, and the run is over almost as soon as it
 starts. The Log pane's closing lines carry the last sweep and the convergence it
 reached:
 
 ```text
-Iteration 25: residual = 1.068477e-03, closure = 1.361e-03, relax = 0.500, 1/52 exit face active
-Converged in 27 iterations (residual = 6.151e-04, closure = 2.995e-04, exit face stable)
-Flow closure check: inflow = 6.480799e-01, outflow = 6.480799e-01, error = 2.801829e-08
+Iteration 20: residual = 9.393752e-02, closure = 2.573e-04, relax = 0.500, 1/52 exit face active
+Converged in 23 iterations (residual = 1.252e-02, closure = 5.766e-05, exit face stable)
+Flow closure check: inflow = 6.480843e-01, outflow = 6.480843e-01, error = 1.239909e-09
 ```
 
 ![The seepage solution](images/combo01_seepage.png){width=1000}

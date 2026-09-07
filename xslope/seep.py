@@ -818,6 +818,47 @@ _CYCLE_EXTRA_SWEEPS = 600
 _SET_REVISIT_SWEEP = 100
 _WET_FACE_FORCE_MAX = 3      # times an inactive exit node under pressure is joined to the face at set stability
 
+#: PROGRESS-FED RELAXATION LADDER. The under-relaxation factor walks this ladder, and
+#: it moves on what the head change is DOING, never on the sweep number:
+#:
+#:   * STEP DOWN one rung after :data:`_LADDER_PATIENCE` consecutive sweeps on which
+#:     the head change set no new low for the rung, or the iterate returned to a recent
+#:     one -- the solve is stalling or orbiting at this relaxation and will not close
+#:     at it;
+#:   * HOLD while it keeps setting new lows;
+#:   * STEP BACK UP one rung after a run of consecutive new lows -- :data:`_LADDER_RECOVER`
+#:     of them the first time a rung is climbed into, doubled at each later attempt on
+#:     that same rung.
+#:
+#: _LADDER_RECOVER is twice _LADDER_PATIENCE: it takes twice the evidence to decide a
+#: rung is finer than the solve needs as it takes to decide it is too coarse, which is
+#: the asymmetry that keeps a coarse rung from being re-entered on a lucky run.
+#:
+#: NEW LOW, NOT "FELL SINCE LAST SWEEP". An oscillating solve falls on half its sweeps
+#: and would hold a rung forever under the simpler reading: measured on the heap column
+#: of SEEPW-T05, whose head change bounces between 0.9 and 5.7 ft at relax = 1, the
+#: ladder sat at 1.0 for 600 sweeps before a run of five rises finally happened to
+#: occur. A best-so-far test reads that same trajectory as the stall it is and steps
+#: down within a dozen sweeps.
+#:
+#: The doubling on the way up is what bounds the ladder. A rung too coarse for the
+#: field as it stands now may be right for the field fifty sweeps later, so it is not
+#: shut out for good; but each failed attempt costs twice the evidence of the last, so
+#: a solve can only spend a logarithmic number of sweeps re-testing a rung instead of
+#: thrashing between two of them.
+#:
+#: Sweep count is not a measure of how hard a problem is. The fixed schedule this
+#: replaces stepped to 0.01 by sweep 121 on every model that got that far and then held
+#: it, and the heap column then spent about seven times the sweeps it needed, arriving
+#: at the field its own coarsest workable rung reaches in a fraction of them.
+#:
+#: The limit-cycle escape's floor still caps the factor from below (see
+#: :data:`_CYCLE_RELAX_FLOOR`): a solve in an orbit is not progressing by any reading,
+#: and that floor is what damps it.
+_RELAX_LADDER = (1.0, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01)
+_LADDER_PATIENCE = 5      # sweeps without a new low before stepping down
+_LADDER_RECOVER = 10      # new lows in a row before the first attempt at the rung above
+
 #: TEST-ONLY switch, and the only thing that reads it is run_tseep_exit_cycle_test.
 #: Set True to run the transient stepper WITHOUT the free-surface rule -- the set is
 #: then allowed to be called stable with the head standing above an inactive exit
@@ -836,9 +877,15 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     Supports triangular and quadrilateral elements with both linear and quadratic shape functions.
 
     Convergence is a HYBRID test of three things, all of which must hold on the same
-    sweep: the relative head change (max-norm, scaled by domain height x tol), the
-    nonlinear residual ``rel_closure`` below closure_tol, and an exit-face active set
-    that did not change on this sweep.
+    sweep: the head change (max-norm, an absolute head), the nonlinear residual
+    ``rel_closure`` below closure_tol, and an exit-face active set that did not
+    change on this sweep.
+
+    THE HEAD-CHANGE GATE IS DATUM-INDEPENDENT: ``max|h_new - h| < tol * head_scale``,
+    where ``head_scale`` is the larger of the mesh height and the range of the
+    specified heads (floored at 1, as the transient stepper's ``char_h`` is). Both are
+    differences, so the gate is the same length wherever the elevation datum is put,
+    and one physical problem is held to one head tolerance at every datum.
 
     WHAT ``rel_closure`` IS: the L1 nodal residual of the UN-RELAXED step over the
     free rows, divided by the inflow — how far the kr matrix lags the head field it
@@ -850,6 +897,12 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     balances to closure_tol. A model with no flow through it has no such ratio to
     form — both sides of it are round-off — and its closure is 0 (see the no-flow
     rule at the gate).
+
+    THE RELAXATION LADDER MOVES ON PROGRESS, NOT ON THE SWEEP NUMBER: it steps down a
+    rung after five consecutive sweeps that made none -- a head change setting no new
+    low for the rung, or an iterate returning to a recent one -- holds while progress
+    continues, and steps back up a rung after a run of ten consecutive progressing
+    sweeps, doubled at each later attempt on that rung (see :data:`_RELAX_LADDER`).
 
     Two escapes act on a solve that is caught in a cycle rather than converging; both
     are inert on a solve that is not (see :data:`_CYCLE_PERSIST` and
@@ -914,9 +967,34 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     if model is not None and np.isscalar(model):
         model = np.full(len(elements), model)
 
-    # Set convergence tolerance based on domain height
+    # HEAD-CHANGE GATE: AN ABSOLUTE HEAD, AGAINST A HEAD SCALE BUILT ONLY FROM
+    # DIFFERENCES. The sweep-to-sweep head change is compared as a length,
+    # max|h_new - h| < tol * head_scale, and the scale is the LARGER of the mesh
+    # height and the range of the specified heads. Both are differences, so neither
+    # moves when the elevation datum moves, and one physical problem is therefore held
+    # to one head tolerance wherever its ground line is drawn. Measured on the heap
+    # model of SEEPW-T05, run to the head gate alone: translated up 1000 ft it used to
+    # stop 140x further from its answer than it did at the datum it was drawn on, and
+    # the two fields differed by 0.73 ft; they now differ by 5.5e-04 ft.
+    #
+    # This is the scale the TRANSIENT stepper in this file already builds for the same
+    # purpose -- ``char_h``, the larger of the head range its series drive and the mesh
+    # height, floored at 1, against which its inner Picard's absolute head change is
+    # tested. The steady gate now reads the same way, so a model does not change
+    # convergence criterion when it is marched instead of solved once.
+    #
+    # The scale takes the head range as well as the height because the head test is
+    # a statement about the head field, and a model can drive far more head across
+    # itself than its own mesh is tall (a pressurized confined layer) or far less (a
+    # tall column at unit gradient). Taking the larger of the two makes the gate the
+    # looser of the two readings rather than the stricter, which is the reading the
+    # rest of the solver already uses: `hyst` and the limit-cycle tolerance are both
+    # scaled by the mesh height and never by an absolute head.
     ymin, ymax = np.min(y), np.max(y)
-    eps = (ymax - ymin) * tol
+    head_span = (float(np.max(fixed_heads) - np.min(fixed_heads))
+                 if len(fixed_heads) > 0 else 0.0)
+    head_scale = max(float(ymax - ymin), head_span, 1.0)
+    eps = head_scale * tol
 
     print("Starting unsaturated flow iteration...")
     print(f"Convergence tolerance: {eps:.6e}")
@@ -924,8 +1002,18 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     # Track convergence history
     residuals = []
     converged = False
-    relax = 1.0  # Initial relaxation factor
+    relax = _RELAX_LADDER[0]   # un-relaxed until the head change argues otherwise
     prev_residual = float('inf')
+
+    # Relaxation ladder state. _rung indexes _RELAX_LADDER; _rung_best is the lowest
+    # head change seen SINCE THIS RUNG WAS ENTERED, which is what "progress" is
+    # measured against; _up_tries counts the attempts already made at each rung from
+    # below, and sets the price of the next one.
+    _rung = 0
+    _rung_best = float('inf')
+    _no_low = 0                # consecutive sweeps with no new low
+    _new_lows = 0              # consecutive sweeps with one
+    _up_tries = [0] * len(_RELAX_LADDER)
 
     # Precompute the saturated element matrices, kr sampling operators, and
     # COO index arrays once; each iteration below reduces to a vectorized kr
@@ -967,19 +1055,9 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         h_solved = spsolve(A, b)
         h_new = h_solved
 
-        # FORTRAN-style relaxation strategy
-        if iteration > 20:
-            relax = 0.5
-        if iteration > 40:
-            relax = 0.2
-        if iteration > 60:
-            relax = 0.1
-        if iteration > 80:
-            relax = 0.05
-        if iteration > 100:
-            relax = 0.02
-        if iteration > 120:
-            relax = 0.01
+        # Relaxation: the rung the head change has argued for (see _RELAX_LADDER),
+        # never above the limit-cycle escape's floor.
+        relax = _RELAX_LADDER[_rung]
         if _cycle_floor is not None:
             relax = min(relax, _cycle_floor)
 
@@ -1163,9 +1241,13 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
         n_active_after = np.sum(exit_face_active)
 
-        # Compute relative residual
-        residual = np.max(np.abs(h_new - h)) / (np.max(np.abs(h)) + 1e-10)
+        # The sweep-to-sweep head change, as a HEAD — the quantity `eps` above is a
+        # threshold for. Dividing it by max|h| would make it a ratio measured against
+        # a number that carries the elevation datum, so the same physical problem
+        # would be held to a different real strictness at every datum.
+        residual = float(np.max(np.abs(h_new - h)))
         residuals.append(residual)
+
 
         # Flow-closure probe, measured on the UNRELAXED iterate: q_chk =
         # A(kr(h_solved)) . h_solved. The free rows of A(kr_prev) . h_solved
@@ -1227,8 +1309,8 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         # reads as a period-2 repeat and is nothing of the kind. Requiring a shorter
         # lag to be FURTHER away is what separates the two — distance grows with lag
         # under a creep, and collapses at the period under an orbit.
+        repeats = False
         if _cycle_floor is None:
-            repeats = False
             _cyc_eps = _CYCLE_TOL * (ymax - ymin)
             _cyc_away = float('inf')     # the CLOSEST any shorter lag came
             for k in range(1, min(_CYCLE_LOOKBACK, len(_cyc_h)) + 1):
@@ -1253,6 +1335,37 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 if len(_cyc_h) > _CYCLE_LOOKBACK:
                     _cyc_h.pop(0)
                     _cyc_a.pop(0)
+
+        # LADDER FEEDBACK. Two things count as progress at this rung, and both have to
+        # hold: the head change set a new low for the rung, AND the iterate did not
+        # RETURN to a recent one. The second term is the same repeat the class A escape
+        # above is built on, and it is here because a shrinking orbit satisfies the
+        # first term while going nowhere: johnson_res at relax = 1 swings 2.3 ft a sweep
+        # and comes back to where it was, with each swing a little smaller, so its head
+        # change sets a new low nearly every sweep. Reading that as progress holds the
+        # ladder at 1.0 until the escape fires at sweep 64 and floors the relaxation at
+        # 1e-3, which is far finer than the model needs and does not close in the budget.
+        # Reading a repeat as the stall it is steps the ladder down while the orbit is
+        # still forming, which damps it — the escape then never fires, and the solve
+        # closes in tens of sweeps.
+        if residual < _rung_best and not repeats:
+            _rung_best = residual
+            _new_lows += 1
+            _no_low = 0
+        else:
+            _no_low += 1
+            _new_lows = 0
+        _step = 0
+        if _no_low >= _LADDER_PATIENCE and _rung + 1 < len(_RELAX_LADDER):
+            _step = 1
+        elif (_rung > 0 and _new_lows
+                >= _LADDER_RECOVER * (2 ** _up_tries[_rung - 1])):
+            _up_tries[_rung - 1] += 1
+            _step = -1
+        if _step:
+            _rung += _step
+            _rung_best = float('inf')
+            _no_low = _new_lows = 0
 
         # ESCAPE 2 (Class B): the exit-face active set is in a limit cycle — it has
         # LEFT a set and come back to it, past the sweep by which every converging
@@ -2805,7 +2918,9 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
             here rather than at the build because building a seep_data is not always
             a run: :func:`import_seep_solution` takes one purely as the shape of the
             mesh it needs to read a stored field back.
-        tol: relative head-change tolerance (scaled by domain height)
+        tol: head-change tolerance, as a fraction of the model's head scale (the
+            larger of the mesh height and the range of the specified heads), so the
+            gate it sets does not move with the elevation datum
         closure_tol: nonlinear-residual tolerance for unconfined problems —
             iteration continues until the L1 nodal residual of the un-relaxed step
             over the free rows, relative to the inflow, falls below this. It is a

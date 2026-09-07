@@ -107,8 +107,10 @@ def _set_material_field(sd, idx, field, value, couple_gamma=True):
         if gsat is not None and gsat < m['gamma']:
             raise ValueError(
                 f"Material '{m.get('name', idx + 1)}': sweeping {field} to {value} "
-                f"puts the saturated unit weight ({gsat}) below the moist one "
-                f"({m['gamma']}). Narrow the range, or sweep the other one.")
+                f"leaves gamma_sat = {gsat} below gamma = {m['gamma']}, and "
+                f"gamma_sat >= gamma is required — the same soil cannot weigh less "
+                f"saturated than it does moist. Narrow the range to keep "
+                f"{field} within that bound, or sweep the other unit weight.")
     return sd
 
 

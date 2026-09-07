@@ -1121,7 +1121,7 @@ One difference remains between the two codes. On the **van Genuchten** problems 
 discharge reads 3.5–4.7% below SEEP2D (gw009a 2.307×10⁻⁵ vs 2.421×10⁻⁵; gw010
 6.070×10⁻⁵ vs 6.294×10⁻⁵) even though the heads agree to 10⁻⁴, while the linear-front
 problems agree on discharge to better than 0.15%. The split follows the unsaturated law
-exactly and is not XSLOPE's kr floor — dropping `kr_min` from 10⁻⁴ to zero leaves the
+exactly and is not XSLOPE's kr floor — removing the floor altogether leaves the
 discharge unchanged to six figures — which points to where each code evaluates the strongly
 nonlinear kr(ψ) in forming an element's conductivity. It does not affect pore pressures or
 stability, which read the head field.

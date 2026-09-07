@@ -12640,7 +12640,7 @@ def run_vg_kr_test(test):
     import numpy as np
     from xslope.seep import (kr_vg_vec, kr_relative_vec, kr_relative,
                              kr_frontal_vec, KR_LF, KR_VG)
-    KR_MIN = 1e-4
+    KR_MIN = 1e-8
 
     def vg_scalar(p, a, n):
         # Independent scalar reference for Mualem-van Genuchten kr.

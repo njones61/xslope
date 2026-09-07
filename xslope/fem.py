@@ -5834,8 +5834,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 _sig0 = grp.get('sig0')
                 if _sig0 is not None:
                     sig4 = sig4 + _sig0        # K0 initial stress (see the stage loop)
-                sig_eff = sig4.copy()
-                sig_eff[:, [0, 1, 3]] += grp['u_gp'][:, None]
+                # sig4 is this iteration's own temporary and is read nowhere after
+                # this point, so the pore pressure goes into it directly. Three
+                # column adds rather than one fancy-index read-modify-write: the
+                # same three additions, without the (G,3) gather, the (G,1)
+                # broadcast, the scatter back and the (G,4) copy.
+                sig_eff = sig4
+                _ugp = grp['u_gp']
+                sig_eff[:, 0] += _ugp
+                sig_eff[:, 1] += _ugp
+                sig_eff[:, 3] += _ugp
 
                 sx, sy, txy, sz = sig_eff.T
 

@@ -313,6 +313,28 @@ element,
 
 >>$\{F\}_b = \sum_{e} \int_{A_e} [N]^T \{b\} \, dA$
 
+**Moist and saturated unit weight.** Soil below the water table weighs more than the same soil above
+it, and the **mat** sheet holds both weights: $\gamma$ is the moist unit weight, $\gamma_{sat}$ the
+saturated one. When a material carries both, $\gamma$ is not a constant over the element — it is
+evaluated at every Gauss point of the body-force integral, $\gamma_{sat}$ at a point at or below the
+water table and $\gamma$ at one above it. An element the water table cuts through therefore carries
+the weight it really has, part saturated and part moist, rather than one compromise weight for the
+whole element. Leave $\gamma_{sat}$ blank and the soil weighs $\gamma$ everywhere.
+
+The water table itself is a property of the **problem**, not of any material: there is one per model,
+and it is read from the seepage solution's $u = 0$ contour when the model carries one and from the
+piezometric line otherwise. That is the same surface, chosen the same way, that the
+[LEM slicer](../lem/overview.md) splits slice weights at. It is independent of each material's
+pore-pressure option, so a total-stress material (`u = none`) standing below the water table still
+weighs $\gamma_{sat}$, and a piezometric line drawn on a model whose materials read no pore pressure
+from it still locates the water table. A model that declares $\gamma_{sat}$ but no water table has no
+elevation to split at, and is weighed $\gamma$ throughout.
+
+Two other quantities are weighed from the same split: the vertical overburden integral behind the
+[K0 initial stress](#k0-initial-stress) and the soil column the `ru`
+pore-pressure option reads. Both are integrated $\gamma_{sat}$ over the part of the column below the
+water table and $\gamma$ over the part above it.
+
 Prescribed displacements are imposed on the assembled system by direct modification of the
 constrained rows; applied forces enter $\{F\}$ directly and leave $[K]$ unchanged.
 
@@ -367,7 +389,8 @@ credit can use it.
 
 The `ru` overburden is the soil column only, integrated by intersecting a vertical ray with the
 material zones, which is the definition the LEM slicer uses (Bishop & Morgenstern): distributed
-loads and crack water are excluded, and moist unit weights are used throughout.
+loads and crack water are excluded, and the column is weighed $\gamma_{sat}$ below the water table
+and $\gamma$ above it — moist throughout on the usual `ru` model, which carries no water table.
 
 A piezometric line assigns pore pressure only over its own horizontal extent, exactly as in the
 [LEM](../lem/overview.md#pore-pressures); nothing is extrapolated past either end. Because the FEM
@@ -431,8 +454,9 @@ from the overburden instead:
   \sigma'_h = \sigma'_z = K_0\,\sigma'_v \qquad \tau_{xy} = 0$
 
 (tension-positive, effective; the vertical integral is the weight of the soil column directly above
-the point, obtained by intersecting a vertical ray with the material zones — the same definition the
-`ru` pore-pressure option uses). $\sigma_h$ is set both **in-plane and out-of-plane**: the
+the point, obtained by intersecting a vertical ray with the material zones and weighing it
+$\gamma_{sat}$ below the water table and $\gamma$ above — the same definition the `ru` pore-pressure
+option uses). $\sigma_h$ is set both **in-plane and out-of-plane**: the
 out-of-plane stress is no longer $\nu(\sigma_x+\sigma_y)$ but the same $K_0\sigma'_v$, which is what
 makes the state genuinely at-rest rather than plane-strain elastic.
 
@@ -775,8 +799,9 @@ pair for the Rankine tension surface, and where in the mesh the worst violation 
 (`max_yield_at`). It is one pass over the Gauss points and costs no solve.
 
 The strength scale the violation is divided by, $c\cos\phi + |\sigma_m|\sin\phi$, carries an
-**absolute floor** of $10^{-4}$ of the model's own overburden scale — the largest unit weight times
-the mesh height, so the floor is in the model's stress units whatever they are. The floor matters
+**absolute floor** of $10^{-4}$ of the model's own overburden scale — the largest unit weight in the
+model, $\gamma_{sat}$ included, times the mesh height, so the floor is in the model's stress units
+whatever they are. The floor matters
 because both terms of that scale vanish together in a cohesionless material near a free surface. A
 Gauss point there can carry a fraction of a millipascal of numerical residue over a strength scale
 of a few tens of micropascals and read as several times its own strength outside the surface, which

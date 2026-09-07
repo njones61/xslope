@@ -141,8 +141,24 @@ The sheet is wide, so it is shown here in three views, each re-showing the **mat
 
 **Strength Properties** (for LEM and FEM analysis):
 
-- **$\gamma$** — **[F/L³]**: Unit weight of the soil. This is the *total* unit weight — moist above the water table. It is used to calculate the weight of the soil in each slice.
-- **$\gamma_{sat}$** — **[F/L³]**: Saturated unit weight, used for the portion of each slice below the water table. Leave blank to use $\gamma$ throughout (the pre-v12 behavior). When both are given, $\gamma_{sat} \geq \gamma$ is required.
+- **$\gamma$** — **[F/L³]**: Unit weight of the soil above the water table. It is a *total* (moist) unit
+  weight, never a buoyant or submerged one: XSLOPE weighs the soil and takes the water off as pore
+  pressure separately, so a buoyant weight entered here removes the water twice. Both engines weigh
+  the soil with it — the LEM to build each slice's weight, the FEM to build the body-force load,
+  the overburden behind the K0 initial stress, and the soil column the `ru` option reads.
+- **$\gamma_{sat}$** — **[F/L³]**: Saturated unit weight, applied to the soil below the water table. In
+  the LEM it splits each slice's weight at the water table; in the FEM it is applied Gauss point by
+  Gauss point, so an element the water table cuts through carries part saturated and part moist weight.
+  It is a total unit weight too, and $\gamma_{sat} \geq \gamma$ is required.
+  Leave it blank to weigh the material $\gamma$ everywhere.
+
+  The water table both engines split at belongs to the **problem**, not to the material: one per
+  model, read from the seepage solution's $u = 0$ contour when the model carries one and from the
+  piezometric line otherwise. It is independent of the **u** option below, so a total-stress material
+  (`u = none`) below the water table still weighs $\gamma_{sat}$, and a piezometric line drawn purely
+  to locate the water table does its job without any material reading pore pressure from it. A model
+  with $\gamma_{sat}$ but no water table has no elevation to split at and is weighed $\gamma$
+  throughout.
 - **option**: Strength model to use for this layer. `mc` = Mohr-Coulomb; `cp` = undrained strength that increases
   with depth below a reference elevation; `pow` = nonlinear power-curve envelope; `hb` = generalized Hoek-Brown
   (rock); `elastic` = elastic / infinite strength — the material cannot fail (see

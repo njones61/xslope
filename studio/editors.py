@@ -3877,8 +3877,9 @@ class _MaterialListView(QWidget):
 # control. Kept concise so the two-line strip never clips.
 MATERIALS_HELP = {
     "name": "Material name — identity only; also labels this material's zone on the Inputs plot.",
-    "gamma": "Moist/total unit weight (above the piezometric line).",
-    "gamma_sat": "Saturated unit weight (below the piezometric line; blank = use g).",
+    "gamma": "Moist/total unit weight (above the water table). LEM & FEM.",
+    "gamma_sat": ("Saturated unit weight (below the water table — the seepage "
+                  "surface, else the piezo line; blank = use γ). LEM & FEM."),
     "option": "Strength model — determines which strength columns apply.",
     "c": "Cohesion intercept (mc: Mohr-Coulomb c; cp: undrained strength at r-elev).",
     "phi": "Friction angle φ, degrees (mc option).",

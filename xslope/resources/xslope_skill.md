@@ -459,11 +459,19 @@ slope_data['materials'] = [
     {
         'name':  'clay',
         'gamma': 120.0,
-        'gamma_sat': None,       # saturated unit weight (v12), used for the part of each slice
-                                 #   BELOW the water table. None = gamma throughout. When both
-                                 #   are given, gamma_sat >= gamma. Never model buoyancy by
-                                 #   entering a submerged unit weight — enter both weights and
-                                 #   let the water definition do it.
+        'gamma_sat': None,       # saturated unit weight (v12), used for the soil BELOW the water
+                                 #   table by BOTH engines: the LEM splits each slice's weight at
+                                 #   the water table, the FEM splits the body-force load Gauss
+                                 #   point by Gauss point (and the K0 overburden and the 'ru' soil
+                                 #   column the same way). None = gamma throughout. When both are
+                                 #   given, gamma_sat >= gamma. Never model buoyancy by entering a
+                                 #   submerged unit weight — enter both weights and let the water
+                                 #   definition do it.
+                                 #   The water table is the PROBLEM's, not the material's: one per
+                                 #   model, from the seepage solution's u = 0 contour if there is
+                                 #   one, else the piezo line, independent of this material's 'u'.
+                                 #   So u='none' soil below the water table still weighs gamma_sat,
+                                 #   and gamma_sat with no water anywhere is weighed gamma.
         'option': 'mc',          # strength model: 'mc' (Mohr-Coulomb c, phi), 'cp' (c/p ratio),
                                  #   'pow' (power curve), 'hb' (generalized Hoek-Brown), or
                                  #   'elastic' (infinite strength, cannot fail — see below)

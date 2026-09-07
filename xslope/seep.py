@@ -836,9 +836,15 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     Supports triangular and quadrilateral elements with both linear and quadratic shape functions.
 
     Convergence is a HYBRID test of three things, all of which must hold on the same
-    sweep: the relative head change (max-norm, scaled by domain height x tol), the
-    nonlinear residual ``rel_closure`` below closure_tol, and an exit-face active set
-    that did not change on this sweep.
+    sweep: the head change (max-norm, an absolute head), the nonlinear residual
+    ``rel_closure`` below closure_tol, and an exit-face active set that did not
+    change on this sweep.
+
+    THE HEAD-CHANGE GATE IS DATUM-INDEPENDENT: ``max|h_new - h| < tol * head_scale``,
+    where ``head_scale`` is the larger of the mesh height and the range of the
+    specified heads (floored at 1, as the transient stepper's ``char_h`` is). Both are
+    differences, so the gate is the same length wherever the elevation datum is put,
+    and one physical problem is held to one head tolerance at every datum.
 
     WHAT ``rel_closure`` IS: the L1 nodal residual of the UN-RELAXED step over the
     free rows, divided by the inflow — how far the kr matrix lags the head field it
@@ -914,9 +920,34 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     if model is not None and np.isscalar(model):
         model = np.full(len(elements), model)
 
-    # Set convergence tolerance based on domain height
+    # HEAD-CHANGE GATE: AN ABSOLUTE HEAD, AGAINST A HEAD SCALE BUILT ONLY FROM
+    # DIFFERENCES. The sweep-to-sweep head change is compared as a length,
+    # max|h_new - h| < tol * head_scale, and the scale is the LARGER of the mesh
+    # height and the range of the specified heads. Both are differences, so neither
+    # moves when the elevation datum moves, and one physical problem is therefore held
+    # to one head tolerance wherever its ground line is drawn. Measured on the heap
+    # model of SEEPW-T05, run to the head gate alone: translated up 1000 ft it used to
+    # stop 140x further from its answer than it did at the datum it was drawn on, and
+    # the two fields differed by 0.73 ft; they now differ by 5.5e-04 ft.
+    #
+    # This is the scale the TRANSIENT stepper in this file already builds for the same
+    # purpose -- ``char_h``, the larger of the head range its series drive and the mesh
+    # height, floored at 1, against which its inner Picard's absolute head change is
+    # tested. The steady gate now reads the same way, so a model does not change
+    # convergence criterion when it is marched instead of solved once.
+    #
+    # The scale takes the head range as well as the height because the head test is
+    # a statement about the head field, and a model can drive far more head across
+    # itself than its own mesh is tall (a pressurized confined layer) or far less (a
+    # tall column at unit gradient). Taking the larger of the two makes the gate the
+    # looser of the two readings rather than the stricter, which is the reading the
+    # rest of the solver already uses: `hyst` and the limit-cycle tolerance are both
+    # scaled by the mesh height and never by an absolute head.
     ymin, ymax = np.min(y), np.max(y)
-    eps = (ymax - ymin) * tol
+    head_span = (float(np.max(fixed_heads) - np.min(fixed_heads))
+                 if len(fixed_heads) > 0 else 0.0)
+    head_scale = max(float(ymax - ymin), head_span, 1.0)
+    eps = head_scale * tol
 
     print("Starting unsaturated flow iteration...")
     print(f"Convergence tolerance: {eps:.6e}")
@@ -1163,8 +1194,11 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
         n_active_after = np.sum(exit_face_active)
 
-        # Compute relative residual
-        residual = np.max(np.abs(h_new - h)) / (np.max(np.abs(h)) + 1e-10)
+        # The sweep-to-sweep head change, as a HEAD — the quantity `eps` above is a
+        # threshold for. Dividing it by max|h| would make it a ratio measured against
+        # a number that carries the elevation datum, so the same physical problem
+        # would be held to a different real strictness at every datum.
+        residual = float(np.max(np.abs(h_new - h)))
         residuals.append(residual)
 
         # Flow-closure probe, measured on the UNRELAXED iterate: q_chk =
@@ -2805,7 +2839,9 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
             here rather than at the build because building a seep_data is not always
             a run: :func:`import_seep_solution` takes one purely as the shape of the
             mesh it needs to read a stored field back.
-        tol: relative head-change tolerance (scaled by domain height)
+        tol: head-change tolerance, as a fraction of the model's head scale (the
+            larger of the mesh height and the range of the specified heads), so the
+            gate it sets does not move with the elevation datum
         closure_tol: nonlinear-residual tolerance for unconfined problems —
             iteration continues until the L1 nodal residual of the un-relaxed step
             over the free rows, relative to the inflow, falls below this. It is a

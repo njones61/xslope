@@ -350,14 +350,14 @@ Number of fixed-head nodes: 33
 Number of exit face nodes: 30
 Starting unsaturated flow iteration...
 Convergence tolerance: 2.200000e-03
-Iteration 1: residual = 6.156139e-01, closure = 2.308e+02, relax = 1.000, 12/30 exit face active
-Iteration 2: residual = 3.454960e-01, closure = 6.006e+00, relax = 1.000, 7/30 exit face active
-Iteration 3: residual = 2.356367e-01, closure = 1.432e+01, relax = 1.000, 3/30 exit face active
-Iteration 4: residual = 2.298170e-01, closure = 9.756e+00, relax = 1.000, 1/30 exit face active
-Iteration 5: residual = 1.791190e-01, closure = 5.469e+00, relax = 1.000, 0/30 exit face active
+Iteration 1: residual = 1.354351e+01, closure = 2.308e+02, relax = 1.000, 12/30 exit face active
+Iteration 2: residual = 7.600912e+00, closure = 6.006e+00, relax = 1.000, 7/30 exit face active
+Iteration 3: residual = 4.241461e+00, closure = 1.432e+01, relax = 1.000, 3/30 exit face active
+Iteration 4: residual = 4.136706e+00, closure = 9.756e+00, relax = 1.000, 1/30 exit face active
+Iteration 5: residual = 3.224142e+00, closure = 5.469e+00, relax = 1.000, 0/30 exit face active
 ...
-Iteration 55: residual = 1.045643e-04, closure = 2.452e-03, relax = 0.200, 0/30 exit face active
-Converged in 59 iterations (residual = 4.791e-05, closure = 9.100e-04, exit face stable)
+Iteration 55: residual = 1.882158e-03, closure = 2.452e-03, relax = 0.200, 0/30 exit face active
+Converged in 59 iterations (residual = 8.625e-04, closure = 9.100e-04, exit face stable)
 ```
 
 The last column is the exit face reporting its own answer, and on this dam that

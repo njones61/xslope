@@ -363,9 +363,14 @@ snapping it.) The iteration is under-relaxed progressively if it needs many swee
 
 Convergence is a **hybrid** test — all three conditions must hold at once:
 
-1. **Head change.** $||h_{new} - h_{old}||_\infty$ below a tolerance scaled to the domain
-   height. This alone is not sufficient: how a given head tolerance maps to mass-balance error
-   varies from problem to problem.
+1. **Head change.** $||h_{new} - h_{old}||_\infty$ — a head, in the model's own length units —
+   below `tol` times the model's **head scale**: the larger of the mesh height and the range of
+   the specified heads. Both of those are differences, so the gate is the same length wherever
+   the elevation datum is put: one physical problem is held to one head tolerance whether its
+   ground line is drawn at elevation 0 or at 1000. Asking for the tolerance as a fraction of
+   the model's own scale rather than as a length is what lets one default work on a 10 m
+   sheetpile section and on a 180 ft dam. This condition alone is not sufficient: how a given
+   head tolerance maps to mass-balance error varies from problem to problem.
 2. **Flow closure.** The unsigned nodal flow residual at the free nodes, evaluated with the
    conductivity rebuilt from the current unrelaxed heads, below `closure_tol` (default 0.1%)
    of the inflow. This measures the remaining $k_r$ lag directly in flow units — it is not a

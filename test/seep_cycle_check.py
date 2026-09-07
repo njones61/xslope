@@ -155,7 +155,7 @@ RESCUED = [
 #: Five of these rows carry the exit-face fix (a seepage face ends at the toe, and a
 #: set leaving the head above the ground is not stable), which moved the field on
 #: every model whose face meets a specified-head line: earth_dam1_vg to 37.716649,
-#: johnson_res to 1.955451, earth_dam2 out of RESCUED at
+#: johnson_res to 1.9554193, earth_dam2 out of RESCUED at
 #: 1.2734375, and vp046b and vp077a in their seventh digit. earth_dam1 and
 #: earth_dam_bc2 are unchanged.
 INERT = [
@@ -165,7 +165,9 @@ INERT = [
     ("docs/seep/files/xslope_earth_dam1", 1, DOCS, 38.781841, 115),
     ("docs/inputs/seep/xslope_earth_dam_bc2", 1, DOCS, 42.437178, 111),
     ("docs/inputs/seep/xslope_earth_dam_bc2", 2, DOCS, 11.587548, 13),
-    ("docs/seep/files/xslope_johnson_res", 1, DOCS, 1.955451, 24),
+    # Datum-independent head gate: this is the one corpus model the head-change test
+    # decides, so the absolute gate is what moved it from 24 sweeps to 43.
+    ("docs/seep/files/xslope_johnson_res", 1, DOCS, 1.9554193, 43),
     ("docs/seep/files/xslope_earth_dam2", 1, DOCS, 1.2734375, 600),
 ]
 
@@ -204,7 +206,8 @@ INFIL_NODES, INFIL_FACE_NODES = 473, 35
 #: where one node ponds under the flux BC alone; 3x and 4x are past it, and are the two
 #: rates whose active set used to cycle to the sweep ceiling instead of converging.
 INFIL_ROWS = [
-    (1.0, 0, 4.915513796099751e-07, 4.915514596217149e-07, False),
+    # Datum-independent head gate: the 1x rows are the two the tighter gate reaches.
+    (1.0, 0, 4.915525799188735e-07, 4.91552423346594e-07, False),
     (2.8, 1, 8.823960999866383e-07, 8.874008969783335e-07, True),
     (3.0, 3, 9.202226475422334e-07, 9.411714513832222e-07, True),
     (4.0, 12, 1.0583269792370564e-06, 1.246222222222292e-06, True),

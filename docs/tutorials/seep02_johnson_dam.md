@@ -448,15 +448,16 @@ Convergence tolerance: 1.800000e-02
 
 The 31 exit-face nodes are what make this problem unconfined. The tolerance
 printed on the last line is not the 0.0001 that was typed: it is scaled by the
-height of the domain, 180 ft here, to 0.0001 × 180 = 0.018. What that 0.018 is
-compared against is the **relative** head change — the largest change in head at
-any node between sweeps, divided by the largest head in the field — so both sides
-of the test are dimensionless. The largest head here is 160 ft, so the loosest
-head change the test admits is 0.018 × 160 = 2.9 ft at the node that moved most.
-Asking for the tolerance as a fraction of the domain rather than as a length is
-what lets one default work on a 10 m sheetpile section and on a 180 ft dam.
+model's head scale — the larger of the height of the domain, 180 ft here, and the
+range of the specified heads — to 0.0001 × 180 = 0.018 ft. That 0.018 ft is
+compared against the head change itself: the largest change in head at any node
+between sweeps, in feet. Both sides of the test are lengths measured across the
+model, so neither depends on where the elevation datum is put — this dam is held
+to the same 0.018 ft whether its base is drawn at elevation 0 or at 1000. Asking
+for the tolerance as a fraction of the model's own scale rather than as a length
+is what lets one default work on a 10 m sheetpile section and on a 180 ft dam.
 
-The run finishes in **23 iterations**. In the **Display** panel, tick
+The run finishes in **28 iterations**. In the **Display** panel, tick
 **Filled contours** — useful on a zoned section, where the wash shows the
 core carrying the drop. **Base material** already reads `3: foundation`: the
 selector opens on the zone whose conductivity makes the flow lines legible; in

@@ -240,6 +240,17 @@ MUTATIONS = [
      "Sampled at five elevations, XSLOPE's",
      "Sampled at five elevations (the crest station reads 2.103 m), XSLOPE's"),
 
+    # ---------------------------------------- slip-surface depth locks -----
+    # A slip-surface depth is locked the way a factor of safety is — the tag
+    # holds the value, the section prints it — so both directions of drift must
+    # be caught on `expected_depth` too.  G12 moves the D1/D = 4 depth, which
+    # the page prints once: the forward pass is existential, so a value the
+    # section states twice would still be found on the other statement.
+    ("rocscience", "tags", "G11 a slip-surface depth drifts in the tag",
+     "expected_depth=3.142", "expected_depth=3.242"),
+    ("rocscience", "tags", "G12 a printed slip-surface depth drifts from its tag",
+     "| D1/D = 4 | 3.261 |", "| D1/D = 4 | 3.361 |"),
+
     # ----------------------------------------------------------- figures ---
     ("rocscience_groundwater", "figures", "F1 two-panel caption on a one-panel figure",
      "![gw017: steady total-head field vs Fig 19-5](images/gw017.png)",

@@ -127,6 +127,10 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp106c.xlsx, type=circular_search, num_slices=40, fs_bishop=1.451, benchmark=VP106c -->
 <!-- test: file=files/rocscience/vp106d.xlsx, type=circular_search, num_slices=40, fs_bishop=1.341, benchmark=VP106d -->
 <!-- test: file=files/rocscience/vp106e.xlsx, type=circular_search, num_slices=40, fs_bishop=1.260, benchmark=VP106e -->
+<!-- test: file=files/rocscience/vp106b.xlsx, type=slip_depth, method=bishop, num_slices=40, depth_x=17.5, expected_depth=0.000, tolerance=0.05, benchmark=VP106b-depth -->
+<!-- test: file=files/rocscience/vp106c.xlsx, type=slip_depth, method=bishop, num_slices=40, depth_x=17.5, expected_depth=3.142, tolerance=0.05, benchmark=VP106c-depth -->
+<!-- test: file=files/rocscience/vp106d.xlsx, type=slip_depth, method=bishop, num_slices=40, depth_x=17.5, expected_depth=3.261, tolerance=0.05, benchmark=VP106d-depth -->
+<!-- test: file=files/rocscience/vp106e.xlsx, type=slip_depth, method=bishop, num_slices=40, depth_x=17.5, expected_depth=3.462, tolerance=0.05, benchmark=VP106e-depth -->
 <!-- test: file=files/rocscience/vp107a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.382, fs_spencer=1.398, benchmark=VP107a -->
 <!-- test: file=files/rocscience/vp107b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.382, benchmark=VP107b -->
 <!-- test: file=files/rocscience/vp108a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.790, fs_spencer=1.797, benchmark=VP108a -->
@@ -2508,13 +2512,30 @@ resisting moment and divided by the factor of safety — which is how Slide appl
 At the closest spacing (D1/D = 2) all three programs report the same factor, but not on
 the same surface. XSLOPE's critical circle passes through the pile head, so it develops no
 pile force at all: the reinforcement is strong enough that the cheapest mechanism is one
-that misses it. Cai & Ugai's own slip-depth table puts their Bishop surface 2.84 m below
-the ground at the pile at that spacing, which does cross the pile and does carry a
+that misses it. Cai & Ugai's surface at that spacing crosses the pile and carries a
 reaction, so the agreement at 1.54 is between two different mechanisms. At D1/D = 3 the published
 values themselves spread — Slide sits 4.4% above the paper, a search-method difference the
 manual acknowledges — and XSLOPE lands 1.5% above Slide but 5.9% above Cai & Ugai's own
 value, the widest gap among this section's references. Every other case agrees with
 Slide within 0.8% and with the originating paper within 2.4%.
+
+**Depth of the critical surface at the pile.** Cai & Ugai tabulate the depth of their slip
+surface at the pile position, the depth their pile equation integrates the lateral force
+down to. XSLOPE's searched Bishop surface is read the same way, below the ground surface at
+the pile station x = 17.5 m.
+
+| Case | XSLOPE depth at the pile (m) | Cai & Ugai (Bishop, m) |
+|---|---|---|
+| D1/D = 2 | 0.000 | 2.84 |
+| D1/D = 3 | 3.142 | 3.18 (−1.2%) |
+| D1/D = 4 | 3.261 | 3.34 (−2.4%) |
+| D1/D = 6 | 3.462 | 3.50 (−1.1%) |
+
+Three of the four spacings match, and the trend the paper reports — a shallower surface as
+the piles close up — comes out at the same rate: 3.462 m at six diameters to 3.142 m at
+three, against 3.50 m to 3.18 m. At D1/D = 2 the two readings are two different mechanisms
+rather than a pairing, so no difference is given. The row's match dot is set by the factors
+of safety; the depths say which surface each factor belongs to.
 
 ![vp106a: inputs and representative solution](images/vp106a.png)
 ![vp106b: inputs and representative solution](images/vp106b.png)

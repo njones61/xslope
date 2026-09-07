@@ -21476,7 +21476,8 @@
         {
           "anchor": "vp106",
           "checks": [
-            "VP106b"
+            "VP106b",
+            "VP106b-depth"
           ],
           "level": 2,
           "page": "verification/rocscience/",
@@ -21546,7 +21547,8 @@
         {
           "anchor": "vp106",
           "checks": [
-            "VP106c"
+            "VP106c",
+            "VP106c-depth"
           ],
           "level": 2,
           "page": "verification/rocscience/",
@@ -21766,7 +21768,8 @@
         {
           "anchor": "vp106",
           "checks": [
-            "VP106d"
+            "VP106d",
+            "VP106d-depth"
           ],
           "level": 2,
           "page": "verification/rocscience/",
@@ -21836,7 +21839,8 @@
         {
           "anchor": "vp106",
           "checks": [
-            "VP106e"
+            "VP106e",
+            "VP106e-depth"
           ],
           "level": 2,
           "page": "verification/rocscience/",
@@ -24223,7 +24227,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 587,
+    "tags": 591,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

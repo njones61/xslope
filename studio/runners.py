@@ -48,6 +48,15 @@ THIN_ZONE_ELEMS = 4
 #: had the triangular path reading 4.7 rows while it was in fact delivering 3.
 REFINE_THIN_ZONES_DEFAULT = True
 
+#: Sweep budget the Run Seepage dialog opens on for a TRANSIENT run, and the
+#: fallback this runner forwards when a caller supplies none. It buys the steady
+#: solve that builds the t = 0 initial condition, not the time steps, and mirrors
+#: ``run_transient_seepage``'s own default: the initial condition is spent once,
+#: so it can afford several times the 400 sweeps a steady run opens on, and a tall
+#: unsaturated column converging monotonically but slowly is the model that needs
+#: them (docs/seep/transient.md, Initial conditions).
+TRANSIENT_IC_MAX_ITER_DEFAULT = 2000
+
 
 def _len_unit(slope_data):
     """`` m``/`` ft`` for a model that declares a unit system, ``''`` for one that
@@ -452,7 +461,15 @@ class SeepRunner(RunnerThread):
         ``options['extra_save_times']`` adds instants to the save schedule for this
         march only, without touching the model. That is how a stability run asks for
         a time the previous solution never saved: the instant is COMPUTED here rather
-        than interpolated between frames afterwards."""
+        than interpolated between frames afterwards.
+
+        ``options['max_iter']`` is the sweep budget for the steady solve that builds
+        the t = 0 initial condition — the one convergence parameter of it
+        ``run_transient_seepage`` takes, spent once before the march and with no
+        bearing on the time steps. It is the only numeric the run dialog collects
+        that a transient march reads: the march sets its own step and Picard
+        controls, and the initial condition solves at its own head tolerance rather
+        than the dialog's steady one."""
         from xslope.seep import (build_seep_data, build_tseep_data,
                                   run_transient_seepage, _transient_frame_solution,
                                   SeepInputError)
@@ -470,7 +487,10 @@ class SeepRunner(RunnerThread):
                     set(tseep_data.get("save_times") or []) | set(extra))
                 print("Re-running the transient seepage analysis with extra save time(s): "
                       + ", ".join(f"{t:g}" for t in extra))
-            print("Running transient seepage analysis…")
+            ic_max_iter = int(self._options.get("max_iter")
+                              or TRANSIENT_IC_MAX_ITER_DEFAULT)
+            print(f"Running transient seepage analysis… "
+                  f"(initial condition: up to {ic_max_iter} sweeps)")
             time_unit = sd.get("time_unit")
 
             def _progress(t, duration):
@@ -484,7 +504,8 @@ class SeepRunner(RunnerThread):
                 return not self._cancel.is_set()
 
             solution = run_transient_seepage(seep_data, tseep_data, verbose=True,
-                                             progress_callback=_progress)
+                                             progress_callback=_progress,
+                                             max_iter=ic_max_iter)
             if solution.get("cancelled"):
                 print("Transient seepage cancelled.")
                 self.cancelled.emit()

@@ -6,7 +6,9 @@ Covers the transient Studio surface after the inputs-editor redesign:
   A. RunSeepDialog (simplified) — a Transient run-type choice appears only with a
      tseep sheet; the dialog carries NO rapid-drawdown stage widgets (stage times are
      model inputs, edited under Inputs → Transient) but shows a caption saying so;
-     options() returns {mode, bc, tol} only; steady is byte-unchanged without tseep.
+     options() returns {mode, bc, max_iter} only — the sweep budget for the t = 0
+     initial condition, live in this mode and opening on its own default, and no
+     tolerance, which a march does not read; steady is byte-unchanged without tseep.
   B. SeepRunner transient path — builds seep + tseep data, runs the solver, and emits
      a bundle of plottable per-frame solution dicts; the run reports DETERMINATE
      progress (simulated-time fraction, monotonic 0→1, reaching 100%) and is
@@ -64,7 +66,7 @@ from xslope.mesh import get_material_polygons, build_mesh_from_polygons
 from xslope.seep import (build_seep_data, build_tseep_data, run_transient_seepage,
                          _transient_frame_solution)
 from studio.dialogs import RunSeepDialog
-from studio.runners import SeepRunner
+from studio.runners import SeepRunner, TRANSIENT_IC_MAX_ITER_DEFAULT
 from studio.transient import TransientSeepView
 from studio.editors import TransientDialog, CATEGORY_EDITORS
 from studio.display_panels import SeepDisplayPanel
@@ -124,8 +126,21 @@ def test_dialog():
     o = dlg.options()
     if o.get("mode") != "transient" or o.get("bc") != 1:
         fails.append(f"transient options wrong: {o}")
-    if set(o) != {"mode", "bc", "tol"}:
-        fails.append(f"transient options carry stage keys (should not): {o}")
+    if set(o) != {"mode", "bc", "max_iter"}:
+        fails.append(f"transient options are not {{mode, bc, max_iter}}: {o}")
+    # The budget the dialog hands over has to be the initial condition's, not the
+    # steady box's 400 — forwarding that would quietly cut the IC budget by five.
+    if o.get("max_iter") != TRANSIENT_IC_MAX_ITER_DEFAULT:
+        fails.append(f"transient max_iter is not the IC default: {o.get('max_iter')}")
+    import inspect
+    solver_ic = inspect.signature(run_transient_seepage).parameters["max_iter"].default
+    if TRANSIENT_IC_MAX_ITER_DEFAULT != solver_ic:
+        fails.append(f"the dialog opens on {TRANSIENT_IC_MAX_ITER_DEFAULT} sweeps and "
+                     f"the solver defaults to {solver_ic}")
+    if dlg.tol.isEnabled():
+        fails.append("Convergence tol is live on a transient run, which never reads it")
+    if not dlg.max_iter.isEnabled():
+        fails.append("Max iterations is dimmed on a transient run, which does read it")
     if hasattr(dlg, "seep_bc"):
         fails.append("run dialog exposes a BC selector; a steady run solves every set")
     # No stage widgets anywhere on the dialog.

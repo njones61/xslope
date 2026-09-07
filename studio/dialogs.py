@@ -32,7 +32,7 @@ from .preflight_panel import (
 )
 # The thin-zone toggle's default is declared beside the code that acts on it, so
 # the checkbox and the mesh build can never disagree about what "off" means.
-from .runners import REFINE_THIN_ZONES_DEFAULT
+from .runners import REFINE_THIN_ZONES_DEFAULT, TRANSIENT_IC_MAX_ITER_DEFAULT
 
 LEM_METHODS = [
     ("oms", "Ordinary Method of Slices (OMS)"),
@@ -948,7 +948,22 @@ class RunSeepDialog(QDialog):
     and the time-series table — are model INPUTS, edited under **Inputs → Transient**
     (the :class:`~studio.editors.TransientEditor`), not here. The runner reads the
     stage times from the document's ``tseep`` data, so this dialog carries no stage
-    fields; a caption points the user to the editor."""
+    fields; a caption points the user to the editor.
+
+    Of the two solve parameters, **Max iterations** applies to both run types and
+    **Convergence tol** to the steady one only. A transient march begins from a
+    steady solve at the t = 0 boundary configuration, and that solve carries the same
+    sweep budget every steady run carries — the one convergence parameter of the
+    initial condition ``run_transient_seepage`` takes, at its own tolerance. The two
+    modes keep separate budgets (400 steady, 2000 for an initial condition), so
+    switching Run type shows the budget that mode spends rather than carrying the
+    other one over."""
+
+    #: What **Max iterations** opens on in each run type. The steady figure is the
+    #: unconfined solver's own; the transient one is the initial condition's, held
+    #: with the runner that forwards it.
+    _MAX_ITER_DEFAULT = {"steady": 400,
+                         "transient": TRANSIENT_IC_MAX_ITER_DEFAULT}
 
     def __init__(self, parent=None, defaults=None, has_bc2=False, has_tseep=False,
                  slope_data=None, document=None):
@@ -981,13 +996,18 @@ class RunSeepDialog(QDialog):
         self.tol.setValue(float(defaults.get("tol", 1e-4)))
         form.addRow("Convergence tol", self.tol)
 
+        # One box, two budgets: the steady unconfined iteration and the steady solve
+        # that builds a transient run's t = 0 initial condition are the same solve on
+        # the same model, but the initial condition is spent once and defaults five
+        # times higher. A remembered value belongs to the mode it was entered for.
+        self._iter_budget = dict(self._MAX_ITER_DEFAULT)
+        _dmode = defaults.get("mode", "transient") if self.has_tseep else "steady"
+        if defaults.get("max_iter") is not None and _dmode in self._iter_budget:
+            self._iter_budget[_dmode] = int(defaults["max_iter"])
+        self._iter_mode = None
         self.max_iter = QSpinBox()
         self.max_iter.setRange(50, 100000)
-        self.max_iter.setValue(int(defaults.get("max_iter", 400)))
-        self.max_iter.setToolTip(
-            "Sweep ceiling for the unconfined iteration. A run that hits it stops "
-            "and reports converged = False; steep unsaturated-conductivity curves "
-            "can need more than the default.")
+        self.max_iter.setValue(int(self._iter_budget["steady"]))
         form.addRow("Max iterations", self.max_iter)
 
         layout.addLayout(form)
@@ -1043,18 +1063,38 @@ class RunSeepDialog(QDialog):
         # Transient adds its own requirements (a declared time base, storage per
         # material) on top of every steady rule, so the findings follow the mode.
         self.preflight.refresh()
-        # Both solve-parameter fields belong to the STEADY unconfined iteration;
-        # the transient march runs its own step and iteration controls. Dim them
-        # rather than leave live controls the run ignores.
+        # The tolerance belongs to the STEADY unconfined iteration alone: a transient
+        # march sets its own step and Picard controls, and its initial condition
+        # solves at its own (tighter) head tolerance. Dim it rather than leave a live
+        # control the run ignores. The sweep budget is read in both modes — by the
+        # steady iteration, or by the steady solve that builds the t = 0 initial
+        # condition — so it stays live, showing the budget of the mode selected.
         steady = not self._transient()
         self.tol.setEnabled(steady)
-        self.max_iter.setEnabled(steady)
+        mode = "steady" if steady else "transient"
+        if mode != self._iter_mode:
+            if self._iter_mode is not None:
+                self._iter_budget[self._iter_mode] = self.max_iter.value()
+            self.max_iter.setValue(int(self._iter_budget[mode]))
+            self._iter_mode = mode
+        self.max_iter.setToolTip(
+            "Sweep ceiling for the unconfined iteration. A run that hits it stops "
+            "and reports converged = False; steep unsaturated-conductivity curves "
+            "can need more than the default."
+            if steady else
+            "Sweep ceiling for the steady solve that builds the t = 0 initial "
+            "condition. It is spent once, before the march, and has no bearing on "
+            "the time steps; an initial condition that does not close within it "
+            "leaves converged = False on the result.")
 
     def options(self):
         if self._transient():
             # Stage times are NOT carried here — the runner reads them from the
-            # document's tseep data (edited under Inputs → Transient).
-            return {"mode": "transient", "bc": 1, "tol": self.tol.value()}
+            # document's tseep data (edited under Inputs → Transient). The
+            # tolerance is not carried either: the march has no use for it, and a
+            # key nothing reads is a control the user believes they set.
+            return {"mode": "transient", "bc": 1,
+                    "max_iter": self.max_iter.value()}
         # Steady solves every set the file defines (see the class docstring).
         return {"mode": "steady", "bc": "both" if self._has_bc2 else 1,
                 "tol": self.tol.value(), "max_iter": self.max_iter.value()}

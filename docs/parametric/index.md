@@ -95,6 +95,8 @@ read the value, and the sweep would silently report zero sensitivity.
 Note that `gamma` and `gamma_sat` are the same soil weighed two ways, so sweeping
 `gamma` moves `gamma_sat` by the same absolute delta (the same coupling the reliability
 module applies); `gamma_sat` remains separately addressable when that is what you mean.
+A sweep that would put `gamma_sat` below `gamma` stops with an error rather than
+weighing soil that gets lighter as it floods.
 
 ## Discovering and specifying parameters
 

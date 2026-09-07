@@ -1437,7 +1437,8 @@ ok, res = sensitivity(slope_data, param="mat:Clay:c", rel_range=0.5, n=9,
   default (`use_file_window=True`), which is how a sweep stays on one mechanism instead of
   jumping families. Explicit `search_opts` win; pass `use_file_window=False` to ignore the file.
 - Sweeping `gamma` co-moves `gamma_sat` by the same absolute delta (same coupling as
-  reliability); sweep `gamma_sat` directly when that is what you mean.
+  reliability); sweep `gamma_sat` directly when that is what you mean. A sweep that
+  would put `gamma_sat` below `gamma` raises instead of running.
 
 #### Design: find the value that hits a target FS
 

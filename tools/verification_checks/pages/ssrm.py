@@ -37,13 +37,9 @@ CONFIG = PageConfig(
         ('0.544', 'jumps from'),
         # Published values quoted in prose rather than tabulated in a source
         # column.  Griffiths & Lane's Table 2 trial grid (Example 1 reads their
-        # iteration counts at F = 1.30 and 1.35); Taylor's (1937) classical
-        # phi_u = 0 stability-number solution, which Example 3 quotes twice —
-        # once in the dot note, once in the cross-check against Example 4;
-        # and Torggler's own published mesh study (his Table 2).
+        # iteration counts at F = 1.30 and 1.35), and Torggler's own published
+        # mesh study (his Table 2).
         ('1.30', 'against 41 at F ='),
-        ('1.47', "stability-number solution, FOS ="),
-        ('1.47', "below Taylor's 1.47"),
         ('1.106', 'Torggler publishes his own mesh study'),
         # Example 6's reservoir effect is a RATIO of the section's own two
         # locked factors of safety — 1.867 wet over 2.422 dry, both printed in

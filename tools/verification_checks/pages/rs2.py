@@ -36,6 +36,12 @@ CONFIG = PageConfig(
 
     # Absolute factor-of-safety differences whose partner value the page does
     # not print (a measurement stated on its own).
+    # Published values quoted in prose beside the row's own lock: RS2's native
+    # shallow rebuild of problem 43 is a different model's number.
+    untagged_allow=[
+        ('1.19', 'The 1.19 published for this problem'),
+    ],
+
     abs_bounds=[
     ],
 

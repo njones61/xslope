@@ -323,7 +323,10 @@ The unconfined branch is an iteration and carries a sweep budget, `max_iter`, wh
 steady runners take for the same solve. It is spent once, before the march, and has nothing to do
 with the time steps. Raising it is the remedy for a model whose steady state is slow to reach; a
 tall unsaturated column draining at unit gradient is the usual such model, and it converges
-monotonically, just slowly. The outcome of that solve belongs to the run: an initial condition that
+monotonically, just slowly. What that solve spends its sweeps on is the ordinary
+[unconfined iteration](overview.md#confined-and-unconfined-problems), relaxation ladder and all,
+at the tighter head tolerance the initial condition uses — 1e-6 of the model's head scale, against
+the 1e-4 a steady run takes. The outcome of that solve belongs to the run: an initial condition that
 does not close within the budget leaves `converged` False on the returned dictionary, the same flag
 a force-accepted time step clears, so a march begun from a field that is not a steady state says so
 in its result.

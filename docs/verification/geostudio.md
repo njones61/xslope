@@ -78,7 +78,7 @@ is not fully built and verified one of the [shared status terms](index.md#status
 | [T04](#seepw-t04) | 🟢 | SEEP/W – Leakage from pond with clay liner | Interior head within ±0.02 m of SEEP/W at the near-steady leaking state (0.3% of the 6.5 m pond head) · 0.08–0.14 m low mid-fill (2.1% at worst) | **built**; the residual is in the filling *rate*, on a problem whose timing the saturated-only storage convention governs outright |
 | [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within 0.003 m of SEEP/W at the initial frame and 0.07 m at the high-rate near-steady, over the locked stations | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column, the van Genuchten pair fitted to the vendor's conductivity table over the suctions the column reaches |
 | [T06](#seepw-t06) | <span class="nodata">⊘</span> | SEEP/W – Infiltration into multi-layered system | Two gates on the 14-layer infiltration leg: a measured, non-steady per-layer initial condition no steady solve returns, and a unit-gradient (free-drainage) base boundary that is not in the solver's boundary-condition set. The drainage leg is hysteretic, and XSLOPE carries one retention curve per material. | *blocked* |
-| [T07](#seepw-t07) | 🟢 | SEEP/W – GeoStudio-PEST Multistep Outflow | Column total head −0.093 / −0.134 / −0.175 m at the three stages, reproducing SEEP/W's −0.07 … −0.22 m pressure field to the published read-off precision | **built**; stepped base suction through a time-varying head (plain-Dirichlet) series |
+| [T07](#seepw-t07) | 🟢 | SEEP/W – GeoStudio-PEST Multistep Outflow | Column total head −0.093 / −0.134 / −0.175 m at the three stages: within 0.001 m of SEEP/W's `node.csv` at the first, up to 0.046 m at the last, where XSLOPE's 10⁻⁴ conductivity floor lets the sample equilibrate to the base suction and SEEP/W's column still carries a gradient | **built**; stepped base suction through a time-varying head (plain-Dirichlet) series, the van Genuchten pair fitted to the vendor's conductivity table |
 | [SRS](#sigmaw-wall) | 🔴 | SIGMA/W – Slope stabilization with a sheet pile wall | No wall: SSRM 1.048 vs SIGMA/W SRS 1.025 (+2.2%) — with the same project's FE stability 1.035 (+1.3%) and Morgenstern-Price 1.033 (+1.5%) · with the wall: SSRM 1.691 vs SIGMA/W SRS 1.4 (+20.8%) | **built**; the like-for-like case without the wall agrees. Both published factors are interpretations of an SRS sweep rather than solver outputs, and the wall case is read off a still-rising curve that the sweep never brackets from above. The wall's moment and shear reproduce the published shape and turning point at about four-fifths of the published peaks |
 
 </div>
@@ -1358,12 +1358,11 @@ field / HYDRUS-1D references (Zettl 2011, Huang 2011).
 
 ### 🟢 SEEPW-T07 — GeoStudio-PEST Multistep Outflow {#seepw-t07}
 
-A multistep-outflow laboratory experiment: a coarse-sand sample (van Genuchten
-a = 8.91 /m, n = 10.19, S_y = 0.319) sits on a saturated porous ceramic plate (two
-orders of magnitude less permeable than the sand, so it meters the outflow), and the
-base **suction** is stepped progressively more negative in five stages over ~61 hours.
-It exercises the unsaturated storage term C(ψ) under a stepped specified-pressure-head
-boundary.
+A multistep-outflow laboratory experiment: a coarse-sand sample (S_y = 0.319) sits on a
+saturated porous ceramic plate (two orders of magnitude less permeable than the sand, so
+it meters the outflow), and the base **suction** is stepped progressively more negative in
+five stages over ~61 hours. It exercises the unsaturated storage term C(ψ) under a stepped
+specified-pressure-head boundary.
 
 The base head is a *suction* — a specified **pressure head that is negative at every
 stage** (IC −0.073 m, stepping to −0.093 … −0.175 m). Because the base polyline sits at
@@ -1372,21 +1371,40 @@ y = 0 its total head equals its pressure head, and it is carried by a time-varyi
 Dirichlet is applied faithfully where the submerged-only *reservoir* series would flip an
 unsubmerged node to a pressure-head-0 exit face and drop the suction.
 
+The vendor carries an 80-point retention spline and an 80-point conductivity spline for the
+sample, PEST-calibrated together, and XSLOPE carries one van Genuchten pair per material
+that sets both kr(ψ) and the moisture capacity. Where a vendor ships a conductivity table
+against a two-parameter law, the law is fitted to the **conductivity**, by least squares in
+log₁₀ kr, over the suction range the run reaches — the rule [SEEPW-T04](#seepw-t04),
+[SEEPW-T05](#seepw-t05) and [GW20](rocscience_groundwater.md#gw20) are built on. This column
+is hydrostatic above a base held at the stage suction, so the largest suction it reaches is
+the deepest stage plus the sample height, 0.175 + 0.123 m, and the live part of the vendor's
+conductivity curve — its 54 tabulated points above kr = 10⁻⁴ — lies entirely inside that, so
+the fit spans the whole of it: **α = 8.8157 /m, n = 9.7144**, holding the table to 0.0033
+decades rms and 0.011 at worst. The same pair reproduces the vendor's retention table to
+0.0023 in water content over that range.
+
 The published external answer is the lab outflow curve the example's PEST loop fits, not a
 seepage headline number, so the lock is XSLOPE's own solved total-head field and the
-SEEP/W `node.csv` pore-water pressures are read as the comparison. The high-conductivity
-sample equilibrates in seconds, so at each reporting time the column has drained to the
-current base suction and the total head is uniform at that stage value; the hydrostatic
-profile ψ(y) = h − y then matches SEEP/W's stepped-suction field to the read-off precision
-of the published `node.csv`.
+SEEP/W `node.csv` pore-water pressures are read as the comparison.
 
 **Input:** [gs2_mso.xlsx](files/geostudio/gs2_mso.xlsx)
 
-| t (s) | Stage base suction (m) | XSLOPE total head (m) | ψ at y = 0.02 … 0.10 m |
+| t (s) | Stage base suction (m) | XSLOPE total head at y = 0.02 / 0.06 / 0.10 m | Δ vs SEEP/W `node.csv` |
 |---|---|---|---|
-| 46 000 | −0.093 | −0.0932 | −0.113 … −0.193 |
-| 132 000 | −0.134 | −0.1341 | −0.154 … −0.234 |
-| 219 600 | −0.175 | −0.1749 | −0.195 … −0.275 |
+| 46 000 | −0.093 | −0.0932 / −0.0932 / −0.0932 | within 0.001 m of head |
+| 132 000 | −0.134 | −0.1341 / −0.1341 / −0.1341 | 0.004 / 0.001 / 0.016 m |
+| 219 600 | −0.175 | −0.1749 / −0.1749 / −0.1749 | 0.001 / 0.019 / 0.046 m |
+
+XSLOPE's sample reaches the stage suction uniformly at every reporting time, so its
+hydrostatic profile is ψ(y) = h − y; SEEP/W's still carries a gradient through the column at
+the two later stages, and that is where the departure sits. The **conductivity floor** is
+what separates them. XSLOPE clamps k<sub>r</sub> at 10⁻⁴ as a solver-wide numerical guard,
+and the vendor's own conductivity curve passes 10⁻⁴ at ψ = 0.165 m — well inside the 0.298 m
+this column reaches — so above that suction the sample conducts at the floor rather than at
+the vendor's value, and drains to equilibrium within the stage where the real sample does
+not. The floor is a property of the solver, not of this model, and it is the one row in the
+corpus that reaches suctions deep enough to sit on it.
 
 <!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, target_size=0.004, time=46000, points=0.003:0.02:-0.0932;0.003:0.06:-0.0932;0.003:0.1:-0.0932, tolerance=0.01, benchmark=SEEPW-T07-t46000 -->
 <!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, target_size=0.004, time=132000, points=0.003:0.02:-0.1341;0.003:0.06:-0.1341;0.003:0.1:-0.1341, tolerance=0.01, benchmark=SEEPW-T07-t132000 -->

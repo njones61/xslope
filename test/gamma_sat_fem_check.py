@@ -202,21 +202,6 @@ def _total_weight(F_gravity, fem_data):
     return -float(np.sum(np.asarray(F_gravity)[ydofs]))
 
 
-def _element_constant_weight(fem_data, y_w):
-    """What the same model would weigh if the unit weight were one number per
-    element, chosen at the element centroid — the split this implementation
-    deliberately does not take."""
-    nodes, elements = fem_data['nodes'], fem_data['elements']
-    et = fem_data['element_types']
-    total = 0.0
-    for e in range(len(elements)):
-        xy = nodes[elements[e][:3]]
-        area = 0.5 * abs(np.dot(xy[:, 0], np.roll(xy[:, 1], -1))
-                         - np.dot(xy[:, 1], np.roll(xy[:, 0], -1)))
-        total += area * (GAMMA_SAT if xy[:, 1].mean() <= y_w else GAMMA)
-    return total
-
-
 def _gauss_point_reference(fem_data, y_w):
     """The total weight the Gauss-point rule gives, written from the quadrature
     and nothing else — an independent reading of what the engine should produce.

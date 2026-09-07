@@ -94,7 +94,7 @@ why rather than leaving a blank; everything else is built and locked at its tagg
 | [37](#rs2-37) | <span class="nodata">⊘</span> | Embankment with layered foundation (D&W Fig 6.39) | | *reported, no lock* — the two programs find different mechanisms: RS2's is the artesian downstream-toe slide, XSLOPE's a deeper surface. |
 | [38](#rs2-38) | 🟢 | Cohesionless embankment on saturated clay foundation (D&W Fig 7.12) | SSRM 1.201 vs RS2 SSRM 1.17 (+2.6%) | Part 2's own SSRM is 1.21; RS2 re-ran the problem between the two manuals. |
 | [39](#rs2-39) | <span class="nodata">⊘</span> | Homogeneous embankment dam, FE seepage (D&W Fig 7.19) | | *deferred* with the other FE-seepage cases — the third member of the [RS2-41/43](#rs2-39) family; the LEM build is Slide2 [VP76](rocscience.md#vp76). |
-| [40](#rs2-40) | 🟡 | Dam with impermeable foundation (D&W Fig 7.24) | Piezometric, filter off: SSRM 1.143 vs closed form 1.190 (−3.9%) · Piezometric, `min_slip_depth` = 30 ft: SSRM 1.521 vs RS2 SSRM 1.53 (−0.6%) · FE seepage: SSRM 1.590 vs RS2 SSRM 1.52 (+4.6%) | **built** (both seepage cases). The piezometric case carries two mechanisms, both locked; the deep one settles from a 50 ft cutoff up, and it follows the element size as the skin does, so both are regression locks at the tagged mesh. The FE-seepage case is the widest of the three and sets the dot. |
+| [40](#rs2-40) | 🟡 | Dam with impermeable foundation (D&W Fig 7.24) | Piezometric, filter off: SSRM 1.109 vs closed form 1.190 (−6.8%) · Piezometric, `min_slip_depth` = 30 ft: SSRM 1.521 vs RS2 SSRM 1.53 (−0.6%) · FE seepage: SSRM 1.590 vs RS2 SSRM 1.52 (+4.6%) | **built** (both seepage cases). The piezometric case carries two mechanisms, both locked; the deep one holds from a 30 ft cutoff to a 50 ft one, and it follows the element size as the skin does, so both are regression locks at the tagged mesh. A closed form governs a dot only where XSLOPE sits within band of it, and the skin does not, so the FE-seepage case sets this row's dot. |
 | [41](#rs2-39) | 🟢 | Earth embankment, infinite-slope mechanism (D&W Fig 14.4) | SSRM 1.431 vs D&W referee 1.44 (−0.6%) | **built** (caveat) — the unconstrained skin is the mechanism, and it lands inside RS2's own 1.43–1.47 band. |
 | [42](#rs2-42) | 🟢 | James dike | SSRM 1.214 vs RS2 SSRM 1.19 (+2.0%) | Scored against the Part IV VP75 model this file is built from; the input-identical native twin, which differs only in its SRF tensile setting and a coarser mesh, publishes 1.26. |
 | [43](#rs2-39) | 🟢 | Earth embankment, infinite-slope mechanism (D&W Fig 14.7) | SSRM 1.228 vs RS2 Part IV VP81 case 1 SSR 1.23 (−0.2%) | **built** (caveat) — run under the vendor model's own SSR Exclusion Area; unconstrained the c = 0 skin localizes at 1.116. |
@@ -1293,7 +1293,7 @@ each; both are built here.
 
 | Case | XSLOPE SSRM | Published |
 |---|---|---|
-| Piezometric, filter off (true global minimum) | 1.143 | saturated seepage-parallel infinite slope **1.190** (−3.9%) |
+| Piezometric, filter off (true global minimum) | 1.109 | saturated seepage-parallel infinite slope **1.190** (−6.8%) |
 | Piezometric, `min_slip_depth` = 30 ft (deep) | 1.521 | RS2 SSRM **1.53** (−0.6%) |
 | Finite-element seepage | 1.590 | RS2 SSRM **1.52** (+4.6%) |
 
@@ -1302,9 +1302,9 @@ shell can fail as a surface-parallel skin rather than a deep rotation, and here 
 line daylights on that face near the toe, so the skin is *saturated*: its closed form is the
 seepage-parallel infinite slope, (140 − 62.4)/140 × tan 38° / tan 20° = **1.190**. With the depth
 filter off the SSRM finds exactly that mechanism, the shear strain concentrating 1–8 ft below the
-downstream 2.75:1 face between the piezometric daylight and the toe. The FEM reads 1.143, 3.9%
-below the idealized value because the finite, partially saturated toe geometry softens it, and a
-shell-φ sweep tracks the anchor law at a *constant* ratio across φ = 30–42°.
+downstream 2.75:1 face between the piezometric daylight and the toe. The FEM reads 1.109 against
+that 1.190, −6.8%: the closed form is an infinite slope of uniform saturation, while the band the
+model localizes on is finite and saturated only between the daylight and the toe.
 
 RS2 reports the other one, and its manual draws it: a surface that starts at the crest, cuts down
 through the clay core, reaches the foundation contact at el 127 and continues as a basal shear
@@ -1317,16 +1317,17 @@ question.
 
 | `min_slip_depth` (ft) | off | 15 | 20 | 30 | 50 | 80 |
 |---|---|---|---|---|---|---|
-| XSLOPE SSRM | 1.143 | 1.246 | 1.418 | **1.521** | 1.555 | 1.555 |
+| XSLOPE SSRM | 1.109 | 1.229 | 1.452 | **1.521** | 1.521 | 1.583 |
 
-The 50 and 80 ft values are identical to seven decimals — the plateau test the filter's
-documentation prescribes — so the deep-seated answer is the 1.555 they agree on, +1.6% on RS2's
-1.53. The 30 ft cutoff the tag pins is the first one clear of the skin and reads 1.521; the
-reading is still rising at that cutoff and settles from 50 ft up.
+The 30 and 50 ft cutoffs return the same 1.521 — the plateau test the filter's documentation
+prescribes — so the deep-seated answer is the one they agree on, −0.6% on RS2's 1.53, and 30 ft is
+the cutoff the tag pins because it is the first one clear of the skin. At 80 ft the reading rises
+again, to 1.583: the filter reads the out-of-balance only at nodes deeper than the cutoff, so a
+cutoff that deep excludes the upper reach of the basal band along with the skin.
 
 **Mesh, and what the deep lock is.** A deep mechanism's factor follows the element size until the
 zone that carries it is resolved, and this dam's still does: the same filtered run gives 1.521 at
-the tagged 12.4 ft mesh (2 223 tri6) and 1.487 at the 8 ft mesh (5 220 tri6). The skin drifts under
+the tagged 12.4 ft mesh (2 223 tri6) and 1.470 at the 8 ft mesh (5 220 tri6). The skin drifts under
 refinement as well, so both rows are **regression locks at the tagged mesh**.
 
 **What the vendor model states.** RS2 models this dam natively rather than by import — the
@@ -1334,7 +1335,10 @@ Slide2-import set runs #076 straight to #078 — as `#040_01` for the finite-ele
 `#040_02` for the piezometric one. Both give the shell and the core a tensile strength of zero,
 held static through the strength reduction, and both fills being cohesionless that cap stands where
 the Mohr-Coulomb apex already does, so the run is the same whichever way the tension-SRF flag is
-set. The initial stress is the page's K0 = 1 field and the flow rule is ψ = 0.
+set. Both also give the shell and the core one elastic pair, Poisson's ratio 0.4 and a single
+modulus for the two zones, and the files carry it rather than a stiffness classified from soil
+type, which would give the two fills an eight-to-one modulus contrast. The initial stress is the page's
+K0 = 1 field and the flow rule is ψ = 0.
 
 **The finite-element seepage case.** [vp077a.xlsx](files/rocscience/vp077a.xlsx) is the same file
 the limit-equilibrium side of the problem is locked on ([VP77](rocscience.md#vp77)). Its row here
@@ -1342,27 +1346,26 @@ runs the route the case names: mesh the dam at the tagged 12.4 ft in tri6, solve
 boundary set on that mesh — specified head 315 on the submerged upstream face, the downstream face
 an exit face, the foundation impervious — and reduce the strengths on that same mesh and that same
 field. It brackets **1.590**, +4.6% on RS2's 1.52 for its Case 1. Unlike the piezometric case there
-is no shallow skin to exclude: excluding everything shallower than 30 ft returns **1.607**, one cell
-of the row's own bracket above the unconstrained minimum, so the mechanism the filter leaves is the
-mechanism the unconstrained run already finds. With the phreatic surface solved on the mesh rather
+is no shallow skin to exclude: excluding everything shallower than 30 ft returns the same 1.590,
+so the mechanism the filter leaves is the mechanism the unconstrained run already finds. With the phreatic surface solved on the mesh rather
 than drawn across it, the downstream face does not carry the saturated skin the piezometric case
 localizes on.
 
 <!-- test: file=files/rocscience/vp077b.xlsx, type=mesh_elements, element_type=tri6, target_size=12.4, expected_elements=2223, benchmark=RS2-40-mesh -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=mesh_elements, element_type=tri6, target_size=8.0, expected_elements=5220, benchmark=RS2-40-mesh-fine -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.143, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, benchmark=RS2-40 -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.487, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep-m8 -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.246, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=15, k0=1, benchmark=RS2-40-d15 -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.418, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=20, k0=1, benchmark=RS2-40-d20 -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.555, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=50, k0=1, benchmark=RS2-40-d50 -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.555, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=80, k0=1, benchmark=RS2-40-d80 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.109, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, benchmark=RS2-40 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.470, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep-m8 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.229, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=15, k0=1, benchmark=RS2-40-d15 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.452, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=20, k0=1, benchmark=RS2-40-d20 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.521, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=50, k0=1, benchmark=RS2-40-d50 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.583, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=80, k0=1, benchmark=RS2-40-d80 -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.521, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep -->
 <!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, seep=steady, benchmark=RS2-40-seep -->
-<!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.607, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, seep=steady, benchmark=RS2-40-seep-d30 -->
+<!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, seep=steady, benchmark=RS2-40-seep-d30 -->
 
 **Filter off — the saturated downstream face skin (vp077b)**
 
-![RS2-40: piezometric case (vp077b) solved with the depth filter off, SSRM 1.143 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the strain in a shallow band under the downstream face between the piezometric daylight and the toe](images/RS2-40.png)
+![RS2-40: piezometric case (vp077b) solved with the depth filter off, SSRM 1.109 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the strain in a shallow band under the downstream face between the piezometric daylight and the toe](images/RS2-40.png)
 
 **`min_slip_depth` = 30 ft — the basal band RS2 draws (vp077b)**
 

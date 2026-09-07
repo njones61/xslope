@@ -6,7 +6,7 @@
   "file": "files/rocscience/vp077b.xlsx",
   "unit_system": "imperial",
   "converged": true,
-  "iterations": 397,
-  "residual": 0.000405362303218104,
-  "max_displacement": 1.6713088323196281
+  "iterations": 8168,
+  "residual": 1.6251687152421634e-05,
+  "max_displacement": 9.494240623244892
 }

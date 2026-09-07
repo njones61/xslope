@@ -1076,6 +1076,23 @@ VENDOR_E_NU = {
         'Embankment': (0.4, 1000000.0),
         'Foundation': (0.4, 1000000.0),
     },
+    # RS2-40 — 'slope stability #040_01.fez' (the finite-element seepage case, vp077a)
+    #   and '#040_02.fez' (the piezometric one, vp077b) give both zones the same pair,
+    #   nu 0.4 / E 1e6 kPa: rock1 is the Core (C: 0 phi: 20) and rock2 the Shell
+    #   (C: 0 phi: 38). The RS2 verification manual's Table 1 for problem 40 (Part 2,
+    #   printed page 104) prints only c', phi', gamma and k, so the stiffness is
+    #   readable in the .fez alone. Both files carried the soil-type classifier's
+    #   nu 0.3 with an 8:1 modulus contrast (Shell 2 861 300, Core 355 100) where the
+    #   vendor model gives the two zones one modulus; the contrast, not the magnitude,
+    #   is what the saturated downstream skin reads.
+    'vp077a.xlsx': {
+        'Shell': (0.4, 1000000.0),
+        'Core': (0.4, 1000000.0),
+    },
+    'vp077b.xlsx': {
+        'Shell': (0.4, 1000000.0),
+        'Core': (0.4, 1000000.0),
+    },
     # RS2-47
     'vp078.xlsx': {
         'Material 1': (0.4, 1000000.0),

@@ -1,12 +1,12 @@
 {
   "benchmark": "RS2-18b",
   "analysis": "ssrm",
-  "FS": 1.0578125,
-  "expected_fs": "1.058",
+  "FS": 1.0421875,
+  "expected_fs": "1.042",
   "file": "files/rocscience/vp022b.xlsx",
   "unit_system": "imperial",
   "converged": true,
-  "iterations": 346,
-  "residual": 3.0671076593163462e-06,
-  "max_displacement": 0.04207140607495738
+  "iterations": 343,
+  "residual": 1.4852166807583412e-07,
+  "max_displacement": 0.01927908842295517
 }

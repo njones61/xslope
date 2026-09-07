@@ -3049,7 +3049,7 @@ def seep02_plots():
     for mat, (a, n), (ga, gn) in zip(sd["materials"], SEEP02_VG, SEEP02_GARD):
         misfit = float(np.sqrt(np.mean(
             (np.log10(kr_gardner_vec(-suction, ga, gn, SEEP02_FIT_CLIP))
-             - np.log10(kr_vg_vec(-suction, a, n, SEEP02_FIT_CLIP))) ** 2)))
+             - np.log10(kr_vg_vec(-suction, a, n, kr_min=SEEP02_FIT_CLIP))) ** 2)))
         print("   %-11s vg a %-6g n %-5g · gard a %-6g n %-5g · rms log10 kr %.3f"
               % (mat["name"], a, n, ga, gn, misfit))
     capture("seep02_kr_models.png", _seep02_kr_curves, sd["materials"],

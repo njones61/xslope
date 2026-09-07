@@ -47,7 +47,7 @@ SUCTION_M = np.logspace(np.log10(0.01 * 0.3048), np.log10(100 * 0.3048), 200)
 
 def fit_texture(alpha_cm, n_vg):
     psi = -SUCTION_M
-    y = np.log10(kr_vg_vec(psi, alpha_cm * 100.0, n_vg, FIT_CLIP))
+    y = np.log10(kr_vg_vec(psi, alpha_cm * 100.0, n_vg, kr_min=FIT_CLIP))
     logs = np.log10(SUCTION_M)
 
     def model(ls, a, n):

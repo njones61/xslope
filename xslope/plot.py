@@ -226,7 +226,7 @@ def _kr_curve(material, n=200):
     re-derived), dispatched on the material's ``unsat`` model:
 
       - ``lf``   linear front — seep.kr_frontal_vec (params kr0, h0).
-      - ``vg``   van Genuchten–Mualem — seep.kr_vg_vec (params vg_a, vg_n).
+      - ``vg``   van Genuchten–Mualem — seep.kr_vg_vec (params vg_a, vg_n, vg_l).
       - ``gard`` Gardner power form — seep.kr_gardner_vec (params vg_a=a, vg_n=n).
 
     The suction range is self-scaled to each model so the full wet→dry decline is
@@ -253,10 +253,13 @@ def _kr_curve(material, n=200):
         a, nn = g("vg_a"), g("vg_n")
         if not (a > 0 and nn > 1):
             return None, "enter vg_a > 0 and vg_n > 1", "van Genuchten (vg)"
+        # The Mualem exponent is optional on the sheet; blank is Mualem's 0.5.
+        _l = material.get("vg_l")
+        ll = 0.5 if _l in (None, "") else float(_l)
         smax = 20.0 / a
         psi = np.linspace(0.0, smax, n)
-        kr = kr_vg_vec(-psi, a, nn, _KR_CURVE_MIN)
-        title = f"van Genuchten   (α={a:g}, n={nn:g})"
+        kr = kr_vg_vec(-psi, a, nn, ll, _KR_CURVE_MIN)
+        title = f"van Genuchten   (α={a:g}, n={nn:g}, l={ll:g})"
     elif unsat == "gard":
         a, nn = g("vg_a"), g("vg_n")
         if not (a > 0 and nn > 0):

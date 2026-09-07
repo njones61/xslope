@@ -211,11 +211,11 @@ def fig_kr_models():
     for label, a, n, c in vg:
         kr = kr_relative_vec(psi, np.zeros_like(psi), np.full_like(psi, -1.0),
                              np.full_like(psi, a), np.full_like(psi, n),
-                             np.full(psi.shape, KR_VG))
+                             model=np.full(psi.shape, KR_VG))
         ax.semilogy(psi, kr, color=c, lw=1.8, label=label)
     kr = kr_relative_vec(psi, np.zeros_like(psi), np.full_like(psi, -1.0),
                          np.full_like(psi, 1.0), np.full_like(psi, 2.0),
-                         np.full(psi.shape, KR_GARD))
+                         model=np.full(psi.shape, KR_GARD))
     ax.semilogy(psi, kr, color="#b2562b", lw=1.8, ls="--",
                 label="Gardner (a = 1, n = 2)")
     ax.set_title("van Genuchten / Gardner (unsat = vg, gard)", fontsize=10)

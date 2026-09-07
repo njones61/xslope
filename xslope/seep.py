@@ -281,6 +281,9 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
     unsat_by_mat = np.zeros(n_materials, dtype=int)   # KR_LF / KR_VG per material
     vg_a_by_mat = np.zeros(n_materials)               # van Genuchten alpha
     vg_n_by_mat = np.zeros(n_materials)               # van Genuchten n
+    # v26 Mualem pore-connectivity exponent. Blank on the sheet, and every file
+    # written before the column existed, reads as Mualem's own 0.5.
+    vg_l_by_mat = np.full(n_materials, 0.5)
     ss_by_mat = np.zeros(n_materials)                 # v18 specific storage [1/len]
     sy_by_mat = np.zeros(n_materials)                 # v18 specific yield [-]
     material_names = []
@@ -295,6 +298,8 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
         unsat_by_mat[i] = {"vg": KR_VG, "gard": KR_GARD}.get(_u, KR_LF)
         vg_a_by_mat[i] = material.get("vg_a", 0.0)
         vg_n_by_mat[i] = material.get("vg_n", 0.0)
+        _l = material.get("vg_l")
+        vg_l_by_mat[i] = 0.5 if _l is None else float(_l)
         # v18 transient storage: None (blank) -> 0 here; the transient path
         # validates presence at load time (fileio), so a 0 only survives on the
         # steady path where it is never read. Never affects steady behavior.
@@ -497,6 +502,7 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
         "unsat_by_mat": unsat_by_mat,
         "vg_a_by_mat": vg_a_by_mat,
         "vg_n_by_mat": vg_n_by_mat,
+        "vg_l_by_mat": vg_l_by_mat,
         # v18 transient storage (per material). Unused by the steady solver.
         "ss_by_mat": ss_by_mat,
         "sy_by_mat": sy_by_mat,
@@ -870,7 +876,7 @@ _TSEEP_NO_WET_FACE_RULE = False
 def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                       k1_vals=1.0, k2_vals=1.0, angles=0.0,
                       max_iter=400, tol=1e-6, element_types=None,
-                      closure_tol=1e-3, vg_a=None, vg_n=None, model=None,
+                      closure_tol=1e-3, vg_a=None, vg_n=None, vg_l=None, model=None,
                       flux_nodal=None):
     """
     Iterative FEM solver for unconfined flow using linear kr frontal function.
@@ -964,6 +970,8 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         vg_a = np.full(len(elements), vg_a)
     if vg_n is not None and np.isscalar(vg_n):
         vg_n = np.full(len(elements), vg_n)
+    if vg_l is not None and np.isscalar(vg_l):
+        vg_l = np.full(len(elements), vg_l)
     if model is not None and np.isscalar(model):
         model = np.full(len(elements), model)
 
@@ -1019,7 +1027,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     # COO index arrays once; each iteration below reduces to a vectorized kr
     # average, a per-element scaling, and one coo_matrix construction.
     asm = _build_assembly(nodes, elements, element_types, k1_vals, k2_vals, angles)
-    data = _assembly_data(asm, p_nodes=h - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, model=model)
+    data = _assembly_data(asm, p_nodes=h - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
     _prev_active = exit_face_active.copy()
     _n_stable = 0   # consecutive iterations with an unchanged exit-face set
 
@@ -1259,7 +1267,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         # cancel to ~0 at any head field (zero row sums) and are useless.
         # The free-node residual is A.h - f_ext (zero without flux BCs), so the
         # applied flux must be subtracted or a flux node reads as pure imbalance.
-        data_chk = _assembly_data(asm, p_nodes=h_solved - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, model=model)
+        data_chk = _assembly_data(asm, p_nodes=h_solved - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
         q_chk = _coo_matvec(asm, data_chk, h_solved)
         # One runtime Dirichlet mask for BOTH sides of the ratio. The numerator sums
         # the residual over the free rows, so the denominator must count the flux
@@ -1392,7 +1400,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
             _seen[key] = iteration
 
         # Matrix for the next iteration, from the relaxed head field
-        data = _assembly_data(asm, p_nodes=h_new - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, model=model)
+        data = _assembly_data(asm, p_nodes=h_new - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
 
         # Print detailed iteration info
         if iteration <= 3 or iteration % 5 == 0 or n_active_before != n_active_after:
@@ -1463,7 +1471,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     total_inflow += _flux_inflow(f_ext, free_final)
 
     # Closure report: kr-consistent imbalance at the converged state
-    data_chk = _assembly_data(asm, p_nodes=h_new - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, model=model)
+    data_chk = _assembly_data(asm, p_nodes=h_new - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
     q_chk = _coo_matvec(asm, data_chk, h_new)
     react_chk = q_chk - f_eff
     net_inflow = (float(np.sum(react_chk[bc_type == 1]))
@@ -1572,55 +1580,76 @@ def kr_gardner_vec(p, a, n, kr_min=1e-8):
     return np.clip(kr, kr_min, 1.0)
 
 
-def kr_vg_vec(p, vg_a, vg_n, kr_min=1e-8):
-    """Vectorized van Genuchten–Mualem relative permeability (steady-state form).
+def kr_vg_vec(p, vg_a, vg_n, vg_l=None, kr_min=1e-8):
+    """Vectorized relative permeability: van Genuchten retention with Mualem
+    conductivity (steady-state form).
 
-    Depends only on alpha (``vg_a``) and n (``vg_n``): the residual/saturated water
-    contents scale storage, not kr, and a steady-state solve carries no storage
-    term. ``p`` is the pressure head (negative in the unsaturated zone) and
-    broadcasts with vg_a/vg_n. Saturation at p>=0 caps the function at 1 and the
-    ``kr_min`` floor holds it away from 0 in the dry limit — a numerical guard
-    that keeps the conduction matrix nonsingular, not a material property. At
-    1e-8 the floor lies below the conductivity any element in the verification
-    corpus carries, and the fields are converged with respect to it (a floor of
-    1e-10 returns the same answer).
+    Retention is van Genuchten in alpha (``vg_a``) and n (``vg_n``); conductivity
+    is Mualem's capillary-bundle integral of it, whose pore-connectivity exponent
+    ``vg_l`` scales the tortuosity factor Se^l. Mualem's own value is 0.5, which
+    is what ``vg_l`` None means; a fitted curve (HYDRUS, and the PEST calibrations
+    SEEP/W ships) carries its own, and negative values are admissible. The
+    residual/saturated water contents scale storage, not kr, and a steady-state
+    solve carries no storage term. ``p`` is the pressure head (negative in the
+    unsaturated zone) and broadcasts with vg_a/vg_n/vg_l. Saturation at p>=0 caps
+    the function at 1 and the ``kr_min`` floor holds it away from 0 in the dry
+    limit — a numerical guard that keeps the conduction matrix nonsingular, not a
+    material property. At 1e-8 the floor lies below the conductivity any element
+    in the verification corpus carries, and the fields are converged with respect
+    to it (a floor of 1e-10 returns the same answer).
 
         Se = [1 + (alpha|psi|)^n]^(-m),  m = 1 - 1/n
-        kr = Se^(1/2) [1 - (1 - Se^(1/m))^m]^2
+        kr = Se^l [1 - (1 - Se^(1/m))^m]^2
     """
     n = np.maximum(vg_n, 1.0 + 1e-6)             # guard m = 1 - 1/n away from 0
     m = 1.0 - 1.0 / n
     ah = vg_a * np.abs(np.minimum(p, 0.0))       # |alpha*psi|, 0 in the saturated zone
     Se = (1.0 + ah ** n) ** (-m)
-    kr = np.sqrt(Se) * (1.0 - (1.0 - Se ** (1.0 / m)) ** m) ** 2
+    l = 0.5 if vg_l is None else vg_l
+    # The half power is taken as a square root: it is the exponent every material
+    # but a fitted one carries, and numpy's sqrt is correctly rounded where a
+    # general power is not, so the default curve is exact to the last bit.
+    if np.all(l == 0.5):
+        se_l = np.sqrt(Se)
+    else:
+        with np.errstate(divide='ignore', invalid='ignore'):
+            se_l = np.where(l == 0.5, np.sqrt(Se), Se ** l)
+    kr = se_l * (1.0 - (1.0 - Se ** (1.0 / m)) ** m) ** 2
+    # Se underflows to 0 in the far dry tail, where the bracket is 0 as well: at
+    # l >= 0 that product is 0 and the floor below takes it, but a negative l
+    # sends Se^l to infinity and the product to NaN. Both are the same dry limit.
+    kr = np.where(Se > 0.0, kr, kr_min)
     kr = np.where(p >= 0.0, 1.0, kr)
     return np.clip(kr, kr_min, 1.0)
 
 
-def kr_relative_vec(p, kr0, h0, vg_a=None, vg_n=None, model=None, kr_min=1e-8):
+def kr_relative_vec(p, kr0, h0, vg_a=None, vg_n=None, vg_l=None, model=None,
+                    kr_min=1e-8):
     """Per-element relative permeability dispatching on the unsaturated model.
 
     ``model`` is a per-element code array (``KR_LF``/``KR_VG``/``KR_GARD``)
     broadcasting with ``p``. With ``model`` None or all linear-front this returns
     exactly ``kr_frontal_vec`` — the linear-front law carries its own floor in
-    ``kr0`` and ``kr_min`` never reaches it."""
+    ``kr0`` and ``kr_min`` never reaches it. ``vg_l`` is the Mualem exponent of
+    the van Genuchten branch; None means Mualem's 0.5 for every element."""
     lf = kr_frontal_vec(p, kr0, h0)
     if model is None or not np.any(model):
         return lf
     out = lf
     model = np.asarray(model)
     if np.any(model == KR_VG):
-        out = np.where(model == KR_VG, kr_vg_vec(p, vg_a, vg_n, kr_min), out)
+        out = np.where(model == KR_VG, kr_vg_vec(p, vg_a, vg_n, vg_l, kr_min), out)
     if np.any(model == KR_GARD):
         out = np.where(model == KR_GARD, kr_gardner_vec(p, vg_a, vg_n, kr_min), out)
     return out
 
 
-def kr_relative(p, kr0, h0, vg_a=None, vg_n=None, model=KR_LF, kr_min=1e-8):
+def kr_relative(p, kr0, h0, vg_a=None, vg_n=None, vg_l=None, model=KR_LF,
+                kr_min=1e-8):
     """Scalar relative permeability with model dispatch (linear front, van
-    Genuchten or Gardner), for the per-edge flow-potential integration."""
+    Genuchten–Mualem or Gardner), for the per-edge flow-potential integration."""
     if model == KR_VG:
-        return float(kr_vg_vec(float(p), vg_a, vg_n, kr_min))
+        return float(kr_vg_vec(float(p), vg_a, vg_n, vg_l, kr_min))
     if model == KR_GARD:
         return float(kr_gardner_vec(float(p), vg_a, vg_n, kr_min))
     return kr_frontal(p, kr0, h0)
@@ -1975,14 +2004,14 @@ def _build_assembly(nodes, elements, element_types, k1_vals, k2_vals, angles,
 
 
 def _assembly_data(asm, p_nodes=None, kr0=None, h0=None, mode='head',
-                   vg_a=None, vg_n=None, model=None):
+                   vg_a=None, vg_n=None, vg_l=None, model=None):
     """Concatenated COO data for the global matrix.
 
     p_nodes=None -> saturated assembly. Otherwise each element's ke is scaled
     by factor(kr_avg) with kr averaged at the type-specific sampling points
     (mode='head': kr_avg; mode='stream': 1/kr_avg, guarded). ``model``/``vg_a``/
-    ``vg_n`` (per-element) select the unsaturated model; with ``model`` None the kr
-    is the linear-front function exactly as before."""
+    ``vg_n``/``vg_l`` (per-element) select the unsaturated model; with ``model``
+    None the kr is the linear-front function exactly as before."""
     parts = []
     for g in asm['groups']:
         if p_nodes is None:
@@ -1994,6 +2023,7 @@ def _assembly_data(asm, p_nodes=None, kr0=None, h0=None, mode='head',
             p_gp, kr0[idx][:, None], h0[idx][:, None],
             None if vg_a is None else vg_a[idx][:, None],
             None if vg_n is None else vg_n[idx][:, None],
+            None if vg_l is None else vg_l[idx][:, None],
             None if model is None else model[idx][:, None])
         kr_avg = (kr @ g['w_kr']) / g['wsum']
         if mode == 'head':
@@ -2207,7 +2237,8 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                                            k1_vals, k2_vals, angles,
                                            kr0=None, h0=None, total_flow=None,
                                            bc_type=None, exit_face_active=None,
-                                           vg_a=None, vg_n=None, model=None):
+                                           vg_a=None, vg_n=None, vg_l=None,
+                                           model=None):
     """
     Generates Dirichlet BCs for flow potential φ by integrating the Darcy
     velocity flux along each boundary edge from the owning element's shape
@@ -2322,8 +2353,9 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
             h0_e0 = h0[elem_idx] if hasattr(h0, '__len__') else h0
             vga_e0 = vg_a[elem_idx] if hasattr(vg_a, '__len__') else vg_a
             vgn_e0 = vg_n[elem_idx] if hasattr(vg_n, '__len__') else vg_n
+            vgl_e0 = vg_l[elem_idx] if hasattr(vg_l, '__len__') else vg_l
             mdl_e0 = model[elem_idx] if hasattr(model, '__len__') else (model or KR_LF)
-            kr_elem = kr_relative(p_elem, kr_e0, h0_e0, vga_e0, vgn_e0, mdl_e0)
+            kr_elem = kr_relative(p_elem, kr_e0, h0_e0, vga_e0, vgn_e0, vgl_e0, mdl_e0)
 
         # Edge tangent
         dx = nodes[c2, 0] - nodes[c1, 0]
@@ -2384,6 +2416,7 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
             h0_e0 = h0[elem_idx] if hasattr(h0, '__len__') else h0
             vga_e0 = vg_a[elem_idx] if hasattr(vg_a, '__len__') else vg_a
             vgn_e0 = vg_n[elem_idx] if hasattr(vg_n, '__len__') else vg_n
+            vgl_e0 = vg_l[elem_idx] if hasattr(vg_l, '__len__') else vg_l
             mdl_e0 = model[elem_idx] if hasattr(model, '__len__') else (model or KR_LF)
             gp = [0.5 - 0.5 / np.sqrt(3), 0.5 + 0.5 / np.sqrt(3)]
 
@@ -2396,7 +2429,7 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                     N = np.array([L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
                                   4*L1*L2, 4*L2*L3, 4*L3*L1])
                     p_gp = N @ p_elem_nodes
-                    kr_gp = kr_relative(p_gp, kr_e0, h0_e0, vga_e0, vgn_e0, mdl_e0) if kr0 is not None else 1.0
+                    kr_gp = kr_relative(p_gp, kr_e0, h0_e0, vga_e0, vgn_e0, vgl_e0, mdl_e0) if kr0 is not None else 1.0
                     dN_dL1 = np.array([4*L1-1, 0, 0, 4*L2, 0, 4*L3])
                     dN_dL2 = np.array([0, 4*L2-1, 0, 4*L1, 4*L3, 0])
                     dN_dL3 = np.array([0, 0, 4*L3-1, 0, 4*L2, 4*L1])
@@ -2582,7 +2615,7 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
     phi = spsolve(A, b)
     return phi
 
-def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, angles, kr0, h0, dirichlet_nodes, element_types=None, vg_a=None, vg_n=None, model=None):
+def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, angles, kr0, h0, dirichlet_nodes, element_types=None, vg_a=None, vg_n=None, vg_l=None, model=None):
     """
     Solves the stream function (flow function) Phi for unsaturated flow.
 
@@ -2612,6 +2645,8 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
         vg_a = np.broadcast_to(np.asarray(vg_a, dtype=float), (len(elements),))
     if vg_n is not None:
         vg_n = np.broadcast_to(np.asarray(vg_n, dtype=float), (len(elements),))
+    if vg_l is not None:
+        vg_l = np.broadcast_to(np.asarray(vg_l, dtype=float), (len(elements),))
     if model is not None:
         model = np.broadcast_to(np.asarray(model), (len(elements),))
 
@@ -2620,7 +2655,7 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
     asm = _build_assembly(nodes, elements, element_types, k1_vals, k2_vals,
                           angles, flow=True)
     data = _assembly_data(asm, p_nodes=p_nodes, kr0=kr0, h0=h0, mode='stream',
-                          vg_a=vg_a, vg_n=vg_n, model=model)
+                          vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
 
     dir_mask = np.zeros(n_nodes, dtype=bool)
     dir_values = np.zeros(n_nodes)
@@ -2633,7 +2668,7 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
     return phi
 
 
-def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, h0=None, element_types=None, vg_a=None, vg_n=None, model=None):
+def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, h0=None, element_types=None, vg_a=None, vg_n=None, vg_l=None, model=None):
     """
     Compute nodal velocities by averaging element-wise Darcy velocities.
     If kr0 and h0 are provided, compute kr_elem using kr_frontal; otherwise, kr_elem = 1.0.
@@ -2673,6 +2708,8 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
             vg_a = np.broadcast_to(np.asarray(vg_a, dtype=float), (n_el,))
         if vg_n is not None:
             vg_n = np.broadcast_to(np.asarray(vg_n, dtype=float), (n_el,))
+        if vg_l is not None:
+            vg_l = np.broadcast_to(np.asarray(vg_l, dtype=float), (n_el,))
         if model is not None:
             model = np.broadcast_to(np.asarray(model), (n_el,))
     p_all = head - nodes[:, 1]
@@ -2696,7 +2733,7 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
             grad = np.stack([beta, gamma], axis=1) / (2 * a_safe)[:, None, None]
             grad_h = np.einsum('exn,en->ex', grad, h_el)
             if use_kr:
-                kr_e = kr_relative_vec(p_all[conn].mean(axis=1), kr0[idx], h0[idx], _idx_or_none(vg_a, idx), _idx_or_none(vg_n, idx), _idx_or_none(model, idx))
+                kr_e = kr_relative_vec(p_all[conn].mean(axis=1), kr0[idx], h0[idx], _idx_or_none(vg_a, idx), _idx_or_none(vg_n, idx), _idx_or_none(vg_l, idx), _idx_or_none(model, idx))
             else:
                 kr_e = np.ones(len(idx))
             v_e = -kr_e[:, None] * np.einsum('exy,ey->ex', K, grad_h)
@@ -2724,7 +2761,7 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
                 # the tri6 answer on the same geometry (sheetpile 40.100 / 39.886
                 # against 40.058; earth dam 38.673 / 38.672 against 38.695), which
                 # is inside the 5% tolerance those rows lock at.
-                kr_e = kr_relative_vec(p_all[conn[:, :4]].mean(axis=1), kr0[idx], h0[idx], _idx_or_none(vg_a, idx), _idx_or_none(vg_n, idx), _idx_or_none(model, idx))
+                kr_e = kr_relative_vec(p_all[conn[:, :4]].mean(axis=1), kr0[idx], h0[idx], _idx_or_none(vg_a, idx), _idx_or_none(vg_n, idx), _idx_or_none(vg_l, idx), _idx_or_none(model, idx))
             else:
                 kr_e = np.ones(len(idx))
             v_sum = np.zeros((len(idx), 2))
@@ -2762,7 +2799,7 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
                 # kr at the element centroid via quadratic shape functions
                 Nc = np.array([1/3*(2/3-1)]*3 + [4/9]*3)
                 p_c = (p_all[conn] * Nc[None, :]).sum(axis=1)
-                kr_e = kr_relative_vec(p_c, kr0[idx], h0[idx], _idx_or_none(vg_a, idx), _idx_or_none(vg_n, idx), _idx_or_none(model, idx))
+                kr_e = kr_relative_vec(p_c, kr0[idx], h0[idx], _idx_or_none(vg_a, idx), _idx_or_none(vg_n, idx), _idx_or_none(vg_l, idx), _idx_or_none(model, idx))
             else:
                 kr_e = np.ones(len(idx))
             w_total = np.zeros(len(idx))
@@ -3064,6 +3101,7 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     unsat_by_mat = seep_data.get("unsat_by_mat")
     vg_a_by_mat = seep_data.get("vg_a_by_mat")
     vg_n_by_mat = seep_data.get("vg_n_by_mat")
+    vg_l_by_mat = seep_data.get("vg_l_by_mat")
     unit_weight = seep_data["unit_weight"]
     
     # Determine if unconfined flow
@@ -3090,6 +3128,7 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
         model_per_element = None if unsat_by_mat is None else unsat_by_mat[mat_ids]
         vg_a_per_element = None if vg_a_by_mat is None else vg_a_by_mat[mat_ids]
         vg_n_per_element = None if vg_n_by_mat is None else vg_n_by_mat[mat_ids]
+        vg_l_per_element = None if vg_l_by_mat is None else vg_l_by_mat[mat_ids]
 
         head, A, q, total_flow, exit_face_active, converged, closure_error = solve_unsaturated(
             nodes=nodes,
@@ -3107,6 +3146,7 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
             closure_tol=closure_tol,
             vg_a=vg_a_per_element,
             vg_n=vg_n_per_element,
+            vg_l=vg_l_per_element,
             model=model_per_element,
             flux_nodal=flux_nodal,
         )
@@ -3115,12 +3155,13 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
             nodes, elements, element_types, head, k1, k2, angle,
             kr0=kr0_per_element, h0=h0_per_element, total_flow=total_flow,
             bc_type=bc_type, exit_face_active=exit_face_active,
-            vg_a=vg_a_per_element, vg_n=vg_n_per_element, model=model_per_element)
+            vg_a=vg_a_per_element, vg_n=vg_n_per_element, vg_l=vg_l_per_element,
+            model=model_per_element)
         phi = solve_flow_function_unsaturated(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, dirichlet_phi_bcs, element_types,
-                                              vg_a=vg_a_per_element, vg_n=vg_n_per_element, model=model_per_element)
+                                              vg_a=vg_a_per_element, vg_n=vg_n_per_element, vg_l=vg_l_per_element, model=model_per_element)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, element_types,
-                                    vg_a=vg_a_per_element, vg_n=vg_n_per_element, model=model_per_element)
+                                    vg_a=vg_a_per_element, vg_n=vg_n_per_element, vg_l=vg_l_per_element, model=model_per_element)
     else:
         # Confined analysis is a single direct linear solve — always "converged".
         converged, closure_error = True, 0.0
@@ -3554,9 +3595,11 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     _unsat = seep_data.get("unsat_by_mat")
     _vga = seep_data.get("vg_a_by_mat")
     _vgn = seep_data.get("vg_n_by_mat")
+    _vgl = seep_data.get("vg_l_by_mat")
     model = None if _unsat is None else _unsat[mat_ids]
     vg_a = None if _vga is None else _vga[mat_ids]
     vg_n = None if _vgn is None else _vgn[mat_ids]
+    vg_l = None if _vgl is None else _vgl[mat_ids]
     gamma_w = seep_data["unit_weight"]
 
     base_bc_type = np.asarray(seep_data["bc_type"]).copy()
@@ -3628,7 +3671,7 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
 
     def kdata(p):
         return _assembly_data(asm, p_nodes=p, kr0=kr0, h0=h0, mode='head',
-                              vg_a=vg_a, vg_n=vg_n, model=model)
+                              vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
 
     def mdiag(p, dt):
         S = _mass_storage_by_group(masm, p, ss, sy, h0, vg_a, vg_n, model)
@@ -3664,7 +3707,7 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     else:
         h, ic_converged = _transient_steady_ic(
             nodes, elements, element_types, bt0, bv0,
-            k1, k2, angle, kr0, h0, vg_a, vg_n, model, flux0, verbose,
+            k1, k2, angle, kr0, h0, vg_a, vg_n, vg_l, model, flux0, verbose,
             max_iter=max_iter)
         if not ic_converged:
             # Reported the way the steady path reports the same failure: the march
@@ -4106,8 +4149,8 @@ def _nodal_from_elem(masm, elem_vals, n_nodes, mode='mean'):
 
 
 def _transient_steady_ic(nodes, elements, element_types, bc_type, bc_values,
-                         k1, k2, angle, kr0, h0, vg_a, vg_n, model, flux_nodal,
-                         verbose, max_iter=2000):
+                         k1, k2, angle, kr0, h0, vg_a, vg_n, vg_l, model,
+                         flux_nodal, verbose, max_iter=2000):
     """Initial condition = a steady solve at the t=0 BC configuration (plan IC rule).
     Confined (no exit face) -> one linear solve; unconfined -> the steady
     exit-face Picard solver. Reuses the existing steady solvers unchanged.
@@ -4125,7 +4168,7 @@ def _transient_steady_ic(nodes, elements, element_types, bc_type, bc_values,
         head, _A, _q, _tf, _efa, conv, _ce = solve_unsaturated(
             nodes, elements, bc_type, bc_values, kr0=kr0, h0=h0,
             k1_vals=k1, k2_vals=k2, angles=angle, element_types=element_types,
-            vg_a=vg_a, vg_n=vg_n, model=model, flux_nodal=flux_nodal,
+            vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model, flux_nodal=flux_nodal,
             max_iter=max_iter)
         return head, bool(conv)
     bcs = [(i, bc_values[i]) for i in range(len(bc_type)) if bc_type[i] == 1]
@@ -4357,7 +4400,7 @@ def _transient_base(path):
 
 
 def _elem_props(seep_data):
-    """Per-element (k1, k2, angle, kr0, h0, vg_a, vg_n, model) arrays from the
+    """Per-element (k1, k2, angle, kr0, h0, vg_a, vg_n, vg_l, model) arrays from the
     per-material tables in ``seep_data`` — the inputs compute_velocity /
     solve_flow_function_* expect. Shared by the solve-time flow net and the
     derive-on-load frame reconstruction."""
@@ -4375,10 +4418,12 @@ def _elem_props(seep_data):
     _u = seep_data.get("unsat_by_mat")
     _a = seep_data.get("vg_a_by_mat")
     _n = seep_data.get("vg_n_by_mat")
+    _l = seep_data.get("vg_l_by_mat")
     model = None if _u is None else _u[mat_ids]
     vg_a = None if _a is None else _a[mat_ids]
     vg_n = None if _n is None else _n[mat_ids]
-    return elements, element_types, k1, k2, angle, kr0, h0, vg_a, vg_n, model
+    vg_l = None if _l is None else _l[mat_ids]
+    return elements, element_types, k1, k2, angle, kr0, h0, vg_a, vg_n, vg_l, model
 
 
 def _transient_frame_solution(seep_data, head, u, phi, inflow, outflow,
@@ -4397,11 +4442,11 @@ def _transient_frame_solution(seep_data, head, u, phi, inflow, outflow,
     differ under transient storage exchange) and ``time`` drive the title variant."""
     nodes = seep_data["nodes"]
     (elements, element_types, k1, k2, angle, kr0, h0,
-     vg_a, vg_n, model) = _elem_props(seep_data)
+     vg_a, vg_n, vg_l, model) = _elem_props(seep_data)
     if unconfined:
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle,
                                     kr0=kr0, h0=h0, element_types=element_types,
-                                    vg_a=vg_a, vg_n=vg_n, model=model)
+                                    vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
     else:
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle,
                                     element_types=element_types)

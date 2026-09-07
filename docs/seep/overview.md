@@ -72,7 +72,7 @@ carries a relative conductivity $k_r(\psi)$ that depends on the pressure head $\
 
 Three models for $k_r$ are available, selected per material through the `unsat` column
 (`lf`, `vg`, `gard`). The van Genuchten and Gardner models share one pair of law-agnostic
-input columns, `a` and `n`.
+input columns, `a` and `n`; van Genuchten reads a third, `l`.
 
 ![seep_ov_kr_models.png](images/seep_ov_kr_models.png){width=1000px}
 
@@ -106,16 +106,25 @@ models imported from other software, and for user preference.
 
 #### van Genuchten (`vg`) {#van-genuchten-model}
 
-The van Genuchten–Mualem function, the standard model in unsaturated soil mechanics, from
-$\alpha$ (the `a` column) and $n$:
+The standard model in unsaturated soil mechanics: van Genuchten's retention curve, from
+$\alpha$ (the `a` column) and $n$, carried into Mualem's capillary-bundle expression for the
+conductivity, whose pore-connectivity exponent $l$ is the `l` column:
 
 >>$S_e = \left[\,1 + (\alpha\,|\psi|)^{\,n}\,\right]^{-m}, \qquad m = 1 - \dfrac{1}{n}$
 
->>$k_r(\psi) = \begin{cases} 1.0 & \psi \geq 0 \\ S_e^{\,1/2}\left[\,1 - \left(1 - S_e^{\,1/m}\right)^{m}\,\right]^{2} & \psi < 0 \end{cases}$
+>>$k_r(\psi) = \begin{cases} 1.0 & \psi \geq 0 \\ S_e^{\,l}\left[\,1 - \left(1 - S_e^{\,1/m}\right)^{m}\,\right]^{2} & \psi < 0 \end{cases}$
 
-Only $\alpha$ and $n$ are needed for a steady solve: the residual and saturated water contents
-affect storage, not relative conductivity. (They matter for [transient](transient.md) runs,
-which take $S_y$ as the drainable water content.)
+Mualem derived $l = 1/2$ from a bundle of capillary tubes of varying radius, and a blank `l`
+cell is that value. Where the conductivity curve was fitted to measurements rather than
+estimated from the retention curve, $l$ is one of the fitted parameters and runs well away
+from a half — published values span roughly $-6$ to $3$ — so it is entered rather than
+assumed. [SEEPW-T07](../verification/geostudio.md#seepw-t07) is a worked case: one
+$(\alpha, n)$ pair reproduces both of the vendor's tabulated curves only once its fitted
+$l = 0.295$ comes with them.
+
+Only $\alpha$, $n$ and $l$ are needed for a steady solve: the residual and saturated water
+contents affect storage, not relative conductivity. (They matter for
+[transient](transient.md) runs, which take $S_y$ as the drainable water content.)
 
 **Typical parameters** by USDA soil-texture class, after
 **[Carsel & Parrish (1988)](https://doi.org/10.1029/WR024i005p00755)** — the standard
@@ -427,6 +436,7 @@ properties used for stability:
 | `unsat` | Relative-conductivity model: `lf` (linear front, the default), `vg` (van Genuchten), `gard` (Gardner) |
 | `kr0`, `h0` | Linear-front parameters: the relative conductivity `kr0` (> 0) at the reference suction head `h0` (< 0) |
 | `a`, `n` | van Genuchten α and n (n > 1), or Gardner a and n (both > 0) — read according to `unsat` |
+| `l` | van Genuchten only: the Mualem pore-connectivity exponent. Blank is Mualem's 0.5 |
 | `Ss`, `Sy` | Specific storage and specific yield, used only by a [transient](transient.md#storage) run |
 
 An unconfined problem needs valid unsaturated parameters for the selected model on every

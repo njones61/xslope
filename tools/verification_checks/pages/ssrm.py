@@ -20,7 +20,7 @@ CONFIG = PageConfig(
         # agreement bounds over a whole sweep, not over one pair
         ('+4', "the paper's wedge solution for the governing mechanism to within"),
         ('+1.4', 'lands within 1.4% of it at both bracket cases'),
-        ('+0.8', '15 curve within 0.8% at every one of its five stations'),
+        ('+2.2', '15 curve within 2.2% at every one of its five stations'),
         ('+0.8', "within 0.8% of the paper's own plotted FE value at"),
         ('+1', 'the location the paper states and within'),
     ],

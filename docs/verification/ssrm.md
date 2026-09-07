@@ -47,13 +47,13 @@ alongside a SLIDE limit-equilibrium table read the same way.
 | # | Match | Problem | Results | Notes |
 |---:|:-:|---|---|---|
 | [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | Displacement-vs-$F$ upturn $F \approx 1.40$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.37 vs their FE 1.4 (−2.1%) | criterion-matched FE-vs-FE reading is the basis of the dot |
-| [2](#verification-griffiths2) | 🟢 | Example 2 — homogeneous slope with a foundation layer | Upturn $F \approx 1.4$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.34 vs their FE 1.4 (−4.3%) · Spencer toe circle 1.37 vs the paper's "correct" 1.4 (−2.1%) | the foundation leaves the factor of safety unchanged, as the paper argues |
+| [2](#verification-griffiths2) | 🟢 | Example 2 — homogeneous slope with a foundation layer | Upturn $F \approx 1.4$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.35 vs their FE 1.4 (−3.6%) · Spencer toe circle 1.37 vs the paper's "correct" 1.4 (−2.1%) | the foundation leaves the factor of safety unchanged, as the paper argues |
 | [3](#verification-griffiths3) | 🟢 | Example 3 — undrained clay slope with a thin weak layer | Worst station $c_{u2}/c_{u1} = 0.2$: Janbu 0.462 vs the paper's own Janbu three-line wedge 0.45–0.50 (inside the band) · Spencer 0.462 on the same surface · circular search 1.244 vs the paper's stated ≈1.3 (−4.3%) | scored at the source's own 0.05 read-off resolution |
 | [4](#verification-griffiths4) | 🟢 | Example 4 — undrained clay slope over a weak foundation | SSRM 1.45 vs Griffiths & Lane FE 1.45 (0.0%) · SSRM 2.058 vs their FE 2.03 (+1.4%) · relative jump ×1.42 vs their ×1.40 (+1.4%) | the critical mechanism flips base → toe, as in the paper's Fig. 11 |
-| [5](#verification-griffiths5) | 🟢 | Example 5 — "slow" drawdown sweep | Submerged plateau 1.86 vs Griffiths & Lane FE 1.85 (+0.5%) · minimum 1.31 vs their FE 1.30 at $L/H = 0.7$ (+0.8%) · drained end 1.39 vs their FE 1.40 (−0.7%) | two of the three refined quad8 locks read below the printed FE values and the third lands on one |
+| [5](#verification-griffiths5) | 🟢 | Example 5 — "slow" drawdown sweep | Submerged plateau 1.89 vs Griffiths & Lane FE 1.85 (+2.2%) · minimum 1.31 vs their FE 1.30 at $L/H = 0.7$ (+0.8%) · drained end 1.39 vs their FE 1.40 (−0.7%) | two of the three refined quad8 locks read below the printed FE values and the third lands on one |
 | [6](#verification-griffiths6) | 🟢 | Example 6 — two-sided earth dam | Full reservoir 1.87 vs Griffiths & Lane FE 1.9 (−1.6%) · before filling 2.42 vs their FE 2.4 (+0.8%) | FE against FE, both printed to 0.1 |
 | [7](#verification-torggler3a) | 🟢 | Torggler §3 — homogeneous slope with a 7.5 m plate | Unsupported 1.129 vs Torggler PLAXIS 1.111 (+1.6%) · with plate 1.195 vs his 1.175 (+1.7%) · plate shear in the lower lobe 25.8 kN/m vs his 21 kN (+22.9%) | the plate variant without interfaces is XSLOPE's shared-node beam; the factors of safety pair closely and the plate's internal forces run above his |
-| [8](#verification-torggler3b) | 🟢 | Torggler §4 — weak-layer slope with a 15 m plate | Unsupported 1.055 vs Torggler PLAXIS 1.045 (+1.0%) · with plate 1.743 vs his 1.725 (+1.0%) | both factors of safety pair with his to 1.0%; the weak band still shears where his supported mechanism leaves it |
+| [8](#verification-torggler3b) | 🟢 | Torggler §4 — weak-layer slope with a 15 m plate | Unsupported 1.064 vs Torggler PLAXIS 1.045 (+1.8%) · with plate 1.743 vs his 1.725 (+1.0%) | both factors of safety pair closely with his; the weak band still shears where his supported mechanism leaves it |
 
 </div>
 
@@ -139,9 +139,9 @@ quad9 agreeing to within 0.04 of it, so the answer does not turn on which one is
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.372, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-1 -->
 <!-- Element-type coverage: SSRM on each quadratic type (tri6, quad8, quad9). Slower (SSRM x3), so benchmark-gated. -->
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_elements, expected_fs=1.36, tolerance=0.04, target_size=3.5, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
-<!-- SSRM auto-bracketing: a deliberately-wrong [F_min,F_max] must still find the FS. Coarse tri6 mesh (~1.39, fast) so these run un-gated. -->
+<!-- SSRM auto-bracketing: a deliberately-wrong [F_min,F_max] must still find the FS. Coarse tri6 mesh (1.39 and 1.42, fast) so these run un-gated; the two windows widen onto adjacent intervals of the same 0.05 bisection. -->
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.39, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.5, f_max=1.9, max_iter=4000 -->
-<!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.39, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.5, f_max=0.9, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.42, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.5, f_max=0.9, max_iter=4000 -->
 
 ### 🟢 Griffiths & Lane (1999) Example 2 — Homogeneous Slope with a Foundation Layer {#verification-griffiths2}
 
@@ -152,7 +152,7 @@ can be misled.
 | Quantity | XSLOPE | Griffiths & Lane (1999) | Note |
 |---|---|---|---|
 | Displacement-vs-$F$ upturn (their criterion) | $F \approx 1.4$ | FE FOS **1.4** (0.0%) | "essentially unchanged from example 1" (p. 392, their Fig. 2) |
-| SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.34 | FE FOS 1.4 (−4.3%) | |
+| SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.35 | FE FOS 1.4 (−3.6%) | |
 | Spencer, unconstrained circular search (toe circle) | 1.37 | the paper's "correct" FOS of **1.4** (−2.1%) | which it obtains only by forcing the circle through the toe (p. 394) |
 
 Cross-bearings on the false base circle — context, not the basis of the dot:
@@ -163,9 +163,9 @@ Cross-bearings on the false base circle — context, not the basis of the dot:
 | — same, against the classical chart | 1.70 | Bishop & Morgenstern (1960) base-circle chart 1.752 (−3.0%) | which the paper quotes as "one possible solution" |
 
 *The dot is scored on the first row. Example 1, without the foundation, reads 1.37 on the same
-quad8 mesh against this model's 1.34 — adding the layer leaves the factor of safety essentially
+quad8 mesh against this model's 1.35 — adding the layer leaves the factor of safety essentially
 unchanged, which is the paper's point. A coarse tri6 run of this model is locked separately at
-1.36 on its own mesh.*
+1.39 on its own mesh.*
 
 This is Example 2 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
 (their Fig. 5): the Example 1 slope with a foundation layer of the **same soil** added
@@ -239,9 +239,9 @@ search is confined to circles tangent to the foundation base (the assumption beh
 chart value), it returns the paper's false base-circle result. XSLOPE's default search is
 not misled: left free, it finds the toe.
 
-<!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=fem_ssrm, expected_fs=1.341, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G2 -->
+<!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=fem_ssrm, expected_fs=1.347, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G2 -->
 <!-- Coarse tri6 quick SSRM (ungated): confirms the foundation layer leaves the toe-failure FS unchanged. -->
-<!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=fem_ssrm, expected_fs=1.36, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=fem_ssrm, expected_fs=1.39, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000 -->
 <!-- LEM teaching point: the unconstrained global search finds the TOE circle (true mechanism, ~1.37); forcing tangency to the foundation base reproduces the paper's false base circle (~1.70). -->
 <!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.366, tolerance=0.02 -->
 <!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, tangent_depth=-25;-23, expected_fs=1.702, tolerance=0.02 -->
@@ -254,11 +254,11 @@ strength ratio $c_{u2}/c_{u1}$ to reproduce the paper's Fig. 7.
 | Case | XSLOPE | Griffiths & Lane (1999), Fig. 7 | Note |
 |---|---|---|---|
 | SSRM, $c_{u2}/c_{u1} = 1.0$ | **1.45** quad8 | FE 1.50 (−3.3%) | |
-| SSRM, $0.8$ | 1.41 tri6 | FE 1.45 (−2.8%) | |
+| SSRM, $0.8$ | 1.44 tri6 | FE 1.45 (−0.7%) | |
 | SSRM, $0.6$ (transition) | 1.38 tri6 | FE 1.40 (−1.4%) | transition |
 | SSRM, $0.5$ | 1.19 tri6 | FE 1.25 (−4.8%) | |
 | SSRM, $0.4$ | 0.96 tri6 | FE 1.05 (−8.6%) | |
-| SSRM, $0.2$ | 0.51 tri6 · **0.45** quad8 | FE 0.60 (−15.0% / −25.0%) | |
+| SSRM, $0.2$ | 0.51 tri6 · **0.50** quad8 | FE 0.60 (−15.0% / −16.7%) | |
 | **Non-circular Spencer / Janbu at $0.2$** | **0.462 / 0.462** | **Janbu three-line wedge, 0.45–0.50 (inside the band)** | Fig. 7 at the paper's 0.05 resolution |
 | Circular search at $0.2$ (wrong mechanism family) | 1.244 | circular mechanism ≈1.3 (−4.3%) | stated in the text, p. 396 |
 
@@ -379,7 +379,7 @@ Both results figures are titled with the **critical factor of safety** — the v
 verge of failure — and show the fully developed **post-failure mechanism** the slope
 collapses into once its strength is reduced to that value: the shear-strain concentration
 and the displacement field of the slide. The $c_{u2}/c_{u1} = 1$ figure above is titled
-**FS = 1.45**; the $c_{u2}/c_{u1} = 0.2$ figure below is titled **FS = 0.45** (the 0.4531
+**FS = 1.45**; the $c_{u2}/c_{u1} = 0.2$ figure below is titled **FS = 0.50** (the 0.4969
 bracket midpoint). Both mechanism figures show the refined quad8 solutions, not the coarser
 tri6 sweep — whose $c_{u2}/c_{u1} = 0.2$ station reads 0.51 in the summary table above.
 
@@ -406,7 +406,7 @@ Griffiths & Lane's own mesh, read from their Fig. 8, is roughly uniform 5 ft —
 eight-node quadrilaterals with about two elements across the band — coarser through the band than
 the model built here.
 
-The remaining difference between the XSLOPE value ($\approx 0.45$) and the graphically read FE
+The remaining difference between the XSLOPE value ($\approx 0.50$) and the graphically read FE
 point ($\approx 0.60$) is a **convergence-criterion** difference, not a geometry or mesh
 difference. XSLOPE's convergence test requires *both* a displacement-change (CHECON) test *and*
 a nodal force-equilibrium test, iterating up to a high ceiling (16000 iterations); Griffiths &
@@ -426,9 +426,9 @@ rather than a circle search. Seeded on the paper's own three-line wedge — down
 parallel to the face, along the horizontal foundation reach, and up the 45-degree outcrop,
 laid on the band centerline — the search settles on a surface that stays inside the $c_{u2}$
 band over its entire length, entering at the crest daylight ($x \approx 30$) and exiting
-within the band's own outcrop span ($260 \le x \le 270$). Both methods land on
-the refined quad8 SSRM value of $\approx 0.45$ and just below the paper's own Janbu wedge
-$\approx 0.48$, so the limit-equilibrium and continuum solutions agree on this mechanism. An
+within the band's own outcrop span ($260 \le x \le 270$). Both methods return 0.462, just
+below the paper's own Janbu wedge $\approx 0.48$ and below the refined quad8 SSRM value of
+$\approx 0.50$, so the limit-equilibrium and continuum solutions agree on this mechanism. An
 unconstrained *circular* search on the same model returns 1.244 — nearly three times the
 non-circular value, and close to the $\approx 1.3$ the paper itself quotes for a circular
 mechanism at this ratio (p. 396). That is the exact failure Griffiths & Lane use this
@@ -444,12 +444,12 @@ times the failure-path length rather than by the exact band thickness.
      on the observed value; the weak ratio (cu2/cu1=0.2, layer-following) figure-read with
      a wide tolerance, since both the ~0.6 published FE point and the schematic band geometry
      are read off the figures. -->
-<!-- test: file=../fem/files/xslope_griffiths3_r1.xlsx, type=fem_ssrm, expected_fs=1.4469, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G3 -->
-<!-- test: file=../fem/files/xslope_griffiths3_r0p2.xlsx, type=fem_ssrm, expected_fs=0.45, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=0.3, f_max=1.0, max_iter=16000, benchmark=SSRM-G3 -->
+<!-- test: file=../fem/files/xslope_griffiths3_r1.xlsx, type=fem_ssrm, expected_fs=1.4531, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G3 -->
+<!-- test: file=../fem/files/xslope_griffiths3_r0p2.xlsx, type=fem_ssrm, expected_fs=0.50, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=0.3, f_max=1.0, max_iter=16000, benchmark=SSRM-G3 -->
 <!-- Coarse tri6 quick SSRM (ungated, wide figure-read tolerance): the Fig. 7 sweep — the
      base-circle plateau (>=0.6), the transition at ~0.6, and the roughly linear fall as the
      weak-layer mechanism takes over. -->
-<!-- test: file=../fem/files/xslope_griffiths3_r0p8.xlsx, type=fem_ssrm, expected_fs=1.41, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths3_r0p8.xlsx, type=fem_ssrm, expected_fs=1.44, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000 -->
 <!-- test: file=../fem/files/xslope_griffiths3_r0p6.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.9, f_max=1.7, max_iter=4000 -->
 <!-- test: file=../fem/files/xslope_griffiths3_r0p5.xlsx, type=fem_ssrm, expected_fs=1.19, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.8, f_max=1.6, max_iter=4000 -->
 <!-- test: file=../fem/files/xslope_griffiths3_r0p4.xlsx, type=fem_ssrm, expected_fs=0.96, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.6, f_max=1.4, max_iter=4000 -->
@@ -459,7 +459,7 @@ times the failure-path length rather than by the exact band thickness.
 <!-- test: file=../fem/files/xslope_griffiths3_r0p2_thin.xlsx, type=fem_ssrm, expected_fs=0.56, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.3, f_max=1.1, max_iter=4000 -->
 <!-- LEM companion at the weak ratio: the mechanism is NON-circular, so the cross-check is a
      non-circular search seeded on the paper's own three-line wedge (the band centerline, carried
-     in the file's non-circ sheet). Both methods land on the converged SSRM ~0.45 and just under
+     in the file's non-circ sheet). Both methods return 0.462, under the converged SSRM ~0.50 and
      the paper's Janbu wedge ~0.47, on a surface that stays inside the cu2 band end to end. -->
 <!-- test: file=../fem/files/xslope_griffiths3_r0p2.xlsx, type=noncircular_search, num_slices=40, fs_spencer=0.462, fs_janbu=0.462, tolerance=0.02 -->
 <!-- The wrong mechanism family, locked so the contrast the example is built on is defended
@@ -474,8 +474,8 @@ straddle a change of failure mechanism.
 
 | Case | XSLOPE | Griffiths & Lane (1999), Fig. 10 |
 |---|---|---|
-| SSRM, $c_{u2}/c_{u1} = 1$ — deep base circle | 1.44 tri6 · **1.45** quad8 | **FE 1.45** (−0.7% / 0.0%) |
-| SSRM, $c_{u2}/c_{u1} = 2$ — shallow toe circle | 2.075 tri6 · **2.058** quad8 | **FE 2.03** (+2.2% / +1.4%) |
+| SSRM, $c_{u2}/c_{u1} = 1$ — deep base circle | 1.46 tri6 · **1.45** quad8 | **FE 1.45** (+0.7% / 0.0%) |
+| SSRM, $c_{u2}/c_{u1} = 2$ — shallow toe circle | 2.112 tri6 · **2.058** quad8 | **FE 2.03** (+4.0% / +1.4%) |
 | Relative jump, ratio 1 → ratio 2 | ×1.42 | FE ×1.40 (+1.4%) |
 | Spencer circular search, $c_{u2}/c_{u1} = 1$ (base circle) | 1.47 | their base-circle limit-equilibrium curve, 1.46 (+0.7%) |
 | Spencer circular search, $c_{u2}/c_{u1} = 2$ (toe circle) | 2.02 | their toe-circle limit-equilibrium curve, 2.04 (−1.0%) |
@@ -567,11 +567,11 @@ bottoming at $y \approx 50$ (the toe elevation), confined to the upper clay. The
 limit-equilibrium method finds the correct mechanism family on its own here, and the SSRM
 and Spencer results agree on both the factor of safety and the base→toe transition.
 
-<!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=fem_ssrm, expected_fs=1.447, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G4 -->
+<!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=fem_ssrm, expected_fs=1.453, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G4 -->
 <!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=fem_ssrm, expected_fs=2.058, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.8, f_max=2.4, max_iter=16000, benchmark=SSRM-G4 -->
-<!-- Coarse tri6 quick SSRM (ungated): base case (cu2=cu1) and toe case (cu2=2cu1); confirms the mechanism flip lifts the FS from ~1.44 to ~2.0. -->
-<!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=fem_ssrm, expected_fs=1.44, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000 -->
-<!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=fem_ssrm, expected_fs=2.075, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.6, f_max=2.4, max_iter=4000 -->
+<!-- Coarse tri6 quick SSRM (ungated): base case (cu2=cu1) and toe case (cu2=2cu1); confirms the mechanism flip lifts the FS from ~1.46 to ~2.1. -->
+<!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=fem_ssrm, expected_fs=1.46, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=fem_ssrm, expected_fs=2.112, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.6, f_max=2.4, max_iter=4000 -->
 <!-- LEM companions: the unconstrained global search finds the BASE circle (~1.47, tangent to the firm base) at cu2=cu1 and the TOE circle (~2.02, confined to the upper clay) at cu2=2cu1 — the same base->toe flip as the SSRM and Taylor's charts. -->
 <!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.468, tolerance=0.02 -->
 <!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=2.022, tolerance=0.02 -->
@@ -584,14 +584,14 @@ the sweep figure below runs three more between them.
 
 | $L/H$ | XSLOPE SSRM (coarse tri6) | quad8 (refined) | Griffiths & Lane FE (Fig. 15) | Note |
 |---|---|---|---|---|
-| −0.2 | 1.86 | — | 1.85 (+0.5%) | submerged plateau |
-| 0.0 | 1.86 | 1.85 | 1.85 (+0.5% / 0.0%) | |
+| −0.2 | 1.89 | — | 1.85 (+2.2%) | submerged plateau |
+| 0.0 | 1.89 | 1.85 | 1.85 (+2.2% / 0.0%) | |
 | 0.4 | 1.41 | — | 1.40 (+0.7%) | |
 | 0.7 | 1.31 | 1.29 | 1.30 (+0.8% / −0.8%) | **minimum** |
-| 1.0 | 1.39 | 1.36 | 1.40 (−0.7% / −2.9%) | |
+| 1.0 | 1.39 | 1.37 | 1.40 (−0.7% / −2.1%) | |
 
 *The dot is scored FE against FE, on the coarse-tri6 sweep, which tracks Griffiths & Lane's
-own Fig. 15 curve within 0.8% at every one of its five stations. Two of the three refined quad8
+own Fig. 15 curve within 2.2% at every one of its five stations. Two of the three refined quad8
 locks read below the printed FE values and the third lands on one — the criterion offset
 documented in Example 1, where XSLOPE's equilibrium-based bisection settles inside the paper's
 own trial bracket rather than on the trial it reports as failing. The paper's FE points fall on a 0.05 grid; its stated
@@ -692,7 +692,7 @@ quad8 mesh, and the table above carries each difference: the drained end and the
 below the paper's FE points, the submerged anchor lands on one. That is the same
 convergence-criterion offset documented in Example 1, where the finer quad8 results sit below the
 tolerant-convergence FE curve that the coarse tri6 sweep happens to track. The drained
-anchor ($L/H = 1$) is the Example 1 dry slope and returns 1.36 against Example 1's own 1.37,
+anchor ($L/H = 1$) is the Example 1 dry slope and returns 1.37, Example 1's own value,
 so the criterion comparison made there carries over intact — XSLOPE's bisection settles
 inside Griffiths & Lane's own trial bracket, and its displacement upturn on the 1.40 they
 report. The reservoir-loaded stations converge on quad8 under the consistently integrated
@@ -712,10 +712,10 @@ slide over the loaded face:
 
 <!-- test: file=../fem/files/xslope_griffiths5_0.xlsx, type=fem_ssrm, expected_fs=1.853, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=16000, benchmark=SSRM-G5 -->
 <!-- test: file=../fem/files/xslope_griffiths5_0p7.xlsx, type=fem_ssrm, expected_fs=1.291, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=0.9, f_max=1.7, max_iter=16000, benchmark=SSRM-G5 -->
-<!-- test: file=../fem/files/xslope_griffiths5_1.xlsx, type=fem_ssrm, expected_fs=1.361, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=0.9, f_max=1.8, max_iter=16000, benchmark=SSRM-G5 -->
-<!-- Coarse tri6 quick SSRM (ungated): the drawdown sweep reproducing Fig. 15 — submerged plateau (~1.86), the ~0.7 minimum (~1.31), and the drained end (~1.39). -->
-<!-- test: file=../fem/files/xslope_griffiths5_m0p2.xlsx, type=fem_ssrm, expected_fs=1.86, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.5, f_max=2.3, max_iter=4000 -->
-<!-- test: file=../fem/files/xslope_griffiths5_0.xlsx, type=fem_ssrm, expected_fs=1.86, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.5, f_max=2.3, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths5_1.xlsx, type=fem_ssrm, expected_fs=1.368, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=0.9, f_max=1.8, max_iter=16000, benchmark=SSRM-G5 -->
+<!-- Coarse tri6 quick SSRM (ungated): the drawdown sweep reproducing Fig. 15 — submerged plateau (~1.89), the ~0.7 minimum (~1.31), and the drained end (~1.39). -->
+<!-- test: file=../fem/files/xslope_griffiths5_m0p2.xlsx, type=fem_ssrm, expected_fs=1.89, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.5, f_max=2.3, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths5_0.xlsx, type=fem_ssrm, expected_fs=1.89, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.5, f_max=2.3, max_iter=4000 -->
 <!-- test: file=../fem/files/xslope_griffiths5_0p4.xlsx, type=fem_ssrm, expected_fs=1.41, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.9, max_iter=4000 -->
 <!-- test: file=../fem/files/xslope_griffiths5_0p7.xlsx, type=fem_ssrm, expected_fs=1.31, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.9, f_max=1.7, max_iter=4000 -->
 <!-- test: file=../fem/files/xslope_griffiths5_1.xlsx, type=fem_ssrm, expected_fs=1.39, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.9, f_max=1.8, max_iter=4000 -->
@@ -899,7 +899,7 @@ Both factors of safety pair with his to 1.0%.
 
 | Quantity | XSLOPE | Torggler PLAXIS | Note |
 |---|---|---|---|
-| SSRM FS, unsupported | 1.055 | **1.045** (+1.0%) | his Table 11 / Table 12 |
+| SSRM FS, unsupported | 1.064 | **1.045** (+1.8%) | his Table 11 / Table 12 |
 | SSRM FS, plate without interfaces | 1.743 | **1.725** (+1.0%) | his §4.2 |
 
 Same-method limit-equilibrium pairing on his own published failure line:
@@ -963,7 +963,7 @@ out of the failure entirely, XSLOPE's leaves a band that still shears along its
 length — and they arrive at the same factor of safety to 1.0%, the margin the
 unsupported section lands within as well.
 
-<!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=fem_ssrm, expected_fs=1.055, element_type=tri6, target_size=1.0, tolerance=0.01, f_min=0.9, f_max=1.2, max_iter=6000, benchmark=SSRM-TORGGLER -->
+<!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=fem_ssrm, expected_fs=1.064, element_type=tri6, target_size=1.0, tolerance=0.01, f_min=0.9, f_max=1.2, max_iter=6000, benchmark=SSRM-TORGGLER -->
 <!-- test: file=../fem/files/xslope_torggler_3b_plate.xlsx, type=fem_ssrm, expected_fs=1.743, element_type=tri6, target_size=1.0, tolerance=0.01, f_min=1.45, f_max=1.95, max_iter=8000, benchmark=SSRM-TORGGLER -->
 <!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=single_noncirc, method=spencer, num_slices=40, expected_fs=1.121, tolerance=0.01, benchmark=SSRM-TORGGLER -->
 <!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=single_noncirc, method=mprice, num_slices=40, expected_fs=1.093, tolerance=0.01, benchmark=SSRM-TORGGLER -->

@@ -17,11 +17,11 @@ CONFIG = PageConfig(
     # page makes in its own voice rather than XSLOPE-against-source.
     #   (printed, distinctive substring of the line, value-for, value-against)
     whitelist=[
-        ('+2.1', '[RS2-63](#rs2-63)', '1.409', '1.38'),
-        ('+4.8', 'the other φ = 0 foundation problem', '1.477', '1.41'),
+        ('+0.8', '[RS2-63](#rs2-63)', '1.391', '1.38'),
+        ('+5.5', 'the other φ = 0 foundation problem', '1.488', '1.41'),
         ('+9.0', 'is not a search that stopped early', '0.169', '0.155'),
         ('+2.7', 'the three locks within ±2.7%', '0.339', '0.33'),
-        ('−1.3', 'which XSLOPE sits', '1.323', '1.34'),
+        ('−0.4', 'which XSLOPE sits', '1.334', '1.34'),
         ('+1.8', 'The same uncapped machinery is within 1.8%', '1.669', '1.64'),
         ('+3.2', 'baseline is within 3.2% at every frame', '1.713', '1.77'),
         ('+1.1', 'The two vendor numbers landing within', '1.9', '1.88'),
@@ -58,12 +58,12 @@ CONFIG = PageConfig(
         ('+3', 'worth ~2–3% here'),
         ('+39.2', 'larger than the Mohr-Coulomb corridor'),
         ('+3.5', 'Every case lands within 3.5% of unity'),
-        ('+1.6', 'stages land within 1.6%'),
-        ('+1', 'and five of the six within 1%'),
+        ('+1', 'stages land within 1% of'),
+        ('+2.3', 'within 2.3% of RS2 at all three thicknesses'),
+        ('+4', 'within 4% of the skin'),
         ('+0.8', 'land within 0.8%'),
         ('+2.2', 'that still lands within 2.2%'),
         ('+2.1', 'lands within 2.1% of'),
-        ('+6', 'about 6% apart on cases 1 and 2'),
         ('+20', 'runs about 20% low'),
     ],
 

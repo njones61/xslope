@@ -1,12 +1,12 @@
 {
   "benchmark": "RS2-5",
   "analysis": "ssrm",
-  "FS": 1.274609375,
-  "expected_fs": "1.280",
+  "FS": 1.2855468749999999,
+  "expected_fs": "1.286",
   "file": "../lem/files/xslope_acads_weak_layer.xlsx",
   "unit_system": "si",
   "converged": true,
-  "iterations": 12089,
-  "residual": 1.6950054564117126e-06,
-  "max_displacement": 0.026372970767118947
+  "iterations": 326,
+  "residual": 5.209456652337768e-06,
+  "max_displacement": 0.08623345980449855
 }

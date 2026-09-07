@@ -1,13 +1,13 @@
 {
   "benchmark": "RS2-P4-VP102",
   "analysis": "ssrm",
-  "FS": 2.4554687499999996,
-  "expected_fs": "2.455",
+  "FS": 2.4695312499999993,
+  "expected_fs": "2.470",
   "file": "files/rocscience/vp102a.xlsx",
   "unit_system": "si",
   "time_unit": "hr",
   "converged": true,
-  "iterations": 658,
-  "residual": 1.892477772917953e-06,
-  "max_displacement": 0.025132436949612615
+  "iterations": 3112,
+  "residual": 0.0006282026583396248,
+  "max_displacement": 2.5458619088434493
 }

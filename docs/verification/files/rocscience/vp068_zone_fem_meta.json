@@ -1,12 +1,12 @@
 {
   "benchmark": "RS2-P4-VP68-zone",
   "analysis": "ssrm",
-  "FS": 1.203125,
-  "expected_fs": "1.203",
+  "FS": 1.2218749999999998,
+  "expected_fs": "1.222",
   "file": "files/rocscience/vp068.xlsx",
   "unit_system": "imperial",
   "converged": true,
-  "iterations": 10948,
-  "residual": 2.028543575935977e-06,
-  "max_displacement": 0.04545795420626736
+  "iterations": 323,
+  "residual": 3.2170914100285027e-06,
+  "max_displacement": 0.17738261270626332
 }

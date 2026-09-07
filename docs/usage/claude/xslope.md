@@ -1632,7 +1632,7 @@ input_path = Path(input_file)
 slope_data = load_slope_data(input_file)
 
 # Plot inputs
-plot_inputs(slope_data, figsize=(12, 6), mode='seep', mat_table=False, tab_loc='top', save_png=True)
+plot_inputs(slope_data, figsize=(12, 6), mode='seep', save_png=True)
 
 # Build mesh. IMPORTANT: use get_material_polygons(), the unified entry point that
 # handles BOTH the profile sheet and the polygon sheet (build_polygons() raises
@@ -1786,7 +1786,7 @@ from xslope.plot_fem import plot_fem_results, plot_fem_data
 input_file = "inputs/my_problem.xlsx"
 input_path = Path(input_file)
 slope_data = load_slope_data(input_file)
-plot_inputs(slope_data, mode='fem', tab_loc='top', save_png=True)
+plot_inputs(slope_data, mode='fem', save_png=True)
 
 # Element choice: quadratic ONLY — never tri3/quad4 for FEM/SSRM. See "Meshing" above for
 # the reason, the quad_style option, and the thin-zone rule (~4 element rows through a weak

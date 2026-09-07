@@ -4887,6 +4887,21 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     node_has_free = prep["node_has_free"]
     g_node_den = prep["g_node_den"]
     _deep_free_mask = prep["deep_free_mask"]
+    # ---- constants and scratch for the per-iteration out-of-balance reading ----
+    # The reading is elementwise from the body-load increment to the per-node
+    # resultant, and every node the `node_has_free` selection drops is computed and
+    # then discarded. Gathering the free nodes' dof indices, their free-dof mask and
+    # their weight denominator ONCE lets the loop take the same numbers on that
+    # subset alone, into buffers it owns, instead of building full-length
+    # temporaries every iteration and selecting at the end.
+    _oob_ix = node_dof_x[node_has_free]
+    _oob_iy = node_dof_y[node_has_free]
+    _oob_mx = free_dof_mask[_oob_ix].astype(np.float64)
+    _oob_my = free_dof_mask[_oob_iy].astype(np.float64)
+    _oob_gfree = np.ascontiguousarray(g_node_den[node_has_free], dtype=np.float64)
+    _oob_dload = np.empty(n_dof)
+    _oob_bx = np.empty(_oob_ix.size)
+    _oob_by = np.empty(_oob_ix.size)
     suction_active = prep["suction_active"]
     suction_tanphib_by_elem = prep["suction_tanphib_by_elem"]
     suction_scap_by_elem = prep["suction_scap_by_elem"]
@@ -6181,13 +6196,29 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # iteration — so this rejects a specific numerical mode, it is not a tuning knob.
             # Locality, and hence padding immunity, is unaffected: elastic material contributes
             # exactly zero over any window.
-            loads_hist.append(loads.copy())
+            # `loads` is a fresh array on every iteration (base_loads.copy() at the
+            # top of the group loop) and nothing writes to it after this point, so
+            # the window holds the array itself. The copy this replaces allocated
+            # and filled a second n_dof vector per iteration for a value that could
+            # not change.
+            loads_hist.append(loads)
             if len(loads_hist) > oob_window + 1:
                 loads_hist.pop(0)
-            d_load = ((loads - loads_hist[0])
-                      / min(oob_window, len(loads_hist) - 1)) * free_dof_mask
-            r_node = np.sqrt(d_load[node_dof_x] ** 2 + d_load[node_dof_y] ** 2)
-            oob_node = (r_node / g_node_den)[node_has_free]
+            # Elementwise from the increment to the per-node resultant, so the whole
+            # reading is taken on the FREE NODES ONLY -- the same operations on the
+            # same values in the same order, into the buffers gathered above.
+            np.subtract(loads, loads_hist[0], out=_oob_dload)
+            _oob_dload /= min(oob_window, len(loads_hist) - 1)
+            np.take(_oob_dload, _oob_ix, out=_oob_bx)
+            np.take(_oob_dload, _oob_iy, out=_oob_by)
+            _oob_bx *= _oob_mx
+            _oob_by *= _oob_my
+            _oob_bx *= _oob_bx
+            _oob_by *= _oob_by
+            _oob_bx += _oob_by
+            np.sqrt(_oob_bx, out=_oob_bx)
+            _oob_bx /= _oob_gfree
+            oob_node = _oob_bx
             # min_slip_depth filter: take the maximum only over nodes deep enough to
             # count. With no filter (_deep_free_mask is None) this is the full set.
             _oob_for_max = oob_node if _deep_free_mask is None else oob_node[_deep_free_mask]

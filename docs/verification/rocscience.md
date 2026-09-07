@@ -1044,12 +1044,17 @@ exercised on a published benchmark.
 lowest everywhere — applying each of Slide's lines in turn brackets the factor of safety within
 1–3%, well inside the digitizing tolerance. The clayey till's properties are not printed in the
 manual, so the geometry and material zonation follow the RS2 vendor `.fez`. The published
-probability of failure (1.5–1.6×10⁻³ by Monte Carlo) is reported without a lock: it rests on the
-paper's spatial-averaging variance treatment, which a single slope-scale σ does not reproduce. Run
-on the point-scale σ, the Taylor series and a 10,000-sample Monte Carlo agree with each other and
-both sit roughly twenty times above El-Ramly et al.'s value — the variance reduction they obtain
-by averaging φ along the slip surface — so the missing ingredient is a correlation-length
-treatment, not the estimator.*
+probability of failure (1.5–1.6×10⁻³ by Monte Carlo) is reported without a lock. Slide2's manual
+states that this example does not consider the spatial variation of soil properties — it is the
+paper's simplified analysis — so the published probabilities and XSLOPE's rest on the same
+variance model, one standard deviation per material and no averaging along the slip surface. Run
+on it, the Taylor series and a 10,000-sample Monte Carlo agree with each other and both sit
+roughly twenty times above El-Ramly et al.'s value. The disagreement is in the spread rather than
+in the estimator: on the same two random variables with the same input standard deviations, the
+standard deviation XSLOPE computes on the factor of safety is about 1.5 to 1.7 times the one the
+published probability implies, and essentially all of it comes from the clay-shale friction angle.
+What makes this model's factor of safety that much more sensitive to that angle is not identified,
+which is why the probability is reported rather than locked.*
 
 ![vp033: inputs and representative solution](images/vp033.png)
 

@@ -7571,6 +7571,13 @@ MODULE_CHECKS = {
         "its own factor of safety on a steep enough base. Nothing tested for it: "
         "Janbu returned 0.8152 on a surface where four of forty-one slices sat "
         "past the singularity and Spencer read 4.38 on the same slices."),
+    'gamma_sat_fem': (
+        'gamma_sat_fem_check.py',
+        "A material carrying a saturated unit weight and the same slope hand-zoned "
+        "at the water table are the same soil described twice, so the FEM must "
+        "weigh them identically: same gravity load, same overburden, same factor of "
+        "safety, same displaced mesh. Only a split taken Gauss point by Gauss point "
+        "at the water table makes the two agree."),
     'spencer_root': (
         'spencer_root_check.py',
         "Spencer's equations have a root outside the pole-free band on many "
@@ -13434,6 +13441,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'indep_bishop': 3, 'tension_crack_symmetry': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
+              'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'circle_vertex': 2,
               'circle_above_center': 2}
@@ -14015,6 +14023,14 @@ def main():
         # no-op there. File-less (builds a 20 x 10 m block).
         tests.append({'type': 'k0_level_ground', 'file': 'K0 level-ground equilibrium',
                       'method': '-', 'source': 'k0_level_ground'})
+        # Guard the saturated unit weight in the FEM: one material carrying gamma
+        # and gamma_sat against the same slope hand-zoned at the water table, on a
+        # mesh the two share element for element, so the pair must agree exactly —
+        # gravity load, K0 overburden, ru column stress, factor of safety and
+        # displacement field. File-less (it meshes a small slope).
+        tests.append({'type': 'gamma_sat_fem',
+                      'file': 'saturated unit weight (sidecar vs zoned)',
+                      'method': '-', 'source': 'gamma_sat_fem'})
         # Guard that the two SSRM drivers — the default viscoplastic iteration and
         # the Newton-Raphson one behind fem_solver='newton' — reproduce the same
         # locked factor of safety, and that the Newton run leaves no trial

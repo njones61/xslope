@@ -98,6 +98,17 @@ def _set_material_field(sd, idx, field, value, couple_gamma=True):
         delta = value - m['gamma']
         m['gamma_sat'] = m['gamma_sat'] + delta
     m[field] = value
+    # The loader admits only gamma_sat >= gamma; a sweep sets the pair in memory
+    # and would otherwise walk a saturated weight below the moist one, which is
+    # soil that gets lighter as it floods. Both engines weigh it, so both would
+    # return an answer for a soil that does not exist.
+    if field in ('gamma', 'gamma_sat'):
+        gsat = m.get('gamma_sat')
+        if gsat is not None and gsat < m['gamma']:
+            raise ValueError(
+                f"Material '{m.get('name', idx + 1)}': sweeping {field} to {value} "
+                f"puts the saturated unit weight ({gsat}) below the moist one "
+                f"({m['gamma']}). Narrow the range, or sweep the other one.")
     return sd
 
 

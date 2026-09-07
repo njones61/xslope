@@ -2216,7 +2216,7 @@ def _nearest_material_field(key):
     return near[0] if near else None
 
 
-@rule("mat.gamma_sat_without_water", INFO, ("lem",),
+@rule("mat.gamma_sat_without_water", INFO, ("lem", "fem"),
       "A saturated unit weight is set but the model has no water table, so it "
       "never applies.", fields=("gamma_sat",))
 def _mat_gamma_sat_without_water(ctx):

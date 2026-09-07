@@ -1411,7 +1411,12 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             - phi_by_mat: np.ndarray (n_materials,) of friction angle values (degrees)
             - E_by_mat: np.ndarray (n_materials,) of Young's modulus values
             - nu_by_mat: np.ndarray (n_materials,) of Poisson's ratio values
-            - gamma_by_mat: np.ndarray (n_materials,) of unit weight values
+            - gamma_by_mat: np.ndarray (n_materials,) of moist unit weight values
+            - gamma_sat_by_mat: np.ndarray (n_materials,) of saturated unit weight
+              values, NaN on a material that splits nothing (no gamma_sat, or a
+              gamma_sat equal to gamma)
+            - water_table: (xs, ys, ends_nan) sample of the water table the weight
+              split is measured from, or None when the model defines none
             - u: np.ndarray (n_nodes,) of pore pressures (if applicable)
             - elements_1d: np.ndarray (n_1d_elements, 3) of 1D element node indices
             - element_types_1d: np.ndarray (n_1d_elements,) indicating 2 for linear elements and 3 for quadratic elements
@@ -1489,6 +1494,11 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     E_by_mat = np.zeros(n_materials)
     nu_by_mat = np.zeros(n_materials)
     gamma_by_mat = np.zeros(n_materials)
+    # Saturated unit weight, NaN where the material splits nothing: no gamma_sat at
+    # all, or a gamma_sat equal to gamma. NaN is what every consumer below tests, so
+    # a material that weighs the same wet and dry takes the single-weight path and
+    # its answers are the ones it always had.
+    gamma_sat_by_mat = np.full(n_materials, np.nan)
     material_names = []
     
     # Check for consistent pore pressure options
@@ -1566,8 +1576,50 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             raise ValueError(f"Material {i+1} ({material.get('name', f'Material {i+1}')}): Poisson's ratio (nu) must be in range [0, 0.5), got {nu_by_mat[i]}")
         if gamma_by_mat[i] <= 0:
             raise ValueError(f"Material {i+1} ({material.get('name', f'Material {i+1}')}): Unit weight (gamma) must be positive, got {gamma_by_mat[i]}")
+
+        # Saturated unit weight (template v12). Soil below the water table weighs
+        # gamma_sat, above it gamma; the loader admits only gamma_sat >= gamma, and
+        # this repeats the test because a sweep or a reliability draw can set the
+        # pair in memory without going back through the loader, and a saturated
+        # weight BELOW the moist one is soil that gets lighter as it floods.
+        _gsat = material.get("gamma_sat")
+        if _gsat is not None and not (isinstance(_gsat, float) and np.isnan(_gsat)):
+            _gsat = float(_gsat)
+            if _gsat <= 0:
+                raise ValueError(
+                    f"Material {i+1} ({material.get('name', f'Material {i+1}')}): "
+                    f"saturated unit weight (gamma_sat) must be positive, got {_gsat}")
+            if _gsat < gamma_by_mat[i]:
+                raise ValueError(
+                    f"Material {i+1} ({material.get('name', f'Material {i+1}')}): "
+                    f"saturated unit weight (gamma_sat = {_gsat}) is below the moist "
+                    f"unit weight (gamma = {gamma_by_mat[i]}). The same soil cannot "
+                    f"weigh less saturated than it does moist.")
+            if _gsat != gamma_by_mat[i]:
+                gamma_sat_by_mat[i] = _gsat
         material_names.append(material.get("name", f"Material {i+1}"))
     
+    # The water table the gamma/gamma_sat split is measured from, sampled once and
+    # carried as plain arrays so every consumer downstream (the gravity loads, the
+    # overburden integral, the 'ru' column stress) reads the same surface without
+    # needing slope_data back. Source and precedence are water_table_source's, the
+    # same function the limit equilibrium slicer calls: a seepage solution's u = 0
+    # contour first, a piezometric line second. Sampled only when some material
+    # actually splits, so a model without gamma_sat pays nothing for it.
+    _water_table = None
+    if np.any(np.isfinite(gamma_sat_by_mat)):
+        from .water import water_table_source
+        _wt_kind, _wt_src = water_table_source(slope_data)
+        if _wt_kind is not None:
+            _wt_xs, _wt_ys = _wt_src
+            # Off the ends of a PIEZOMETRIC line the water table is undefined (NaN),
+            # not the nearest endpoint, so soil beyond the line's own span is weighed
+            # moist rather than silently flooded or drained. The seepage contour is
+            # sampled across the whole mesh, so its ends need no such fence.
+            _water_table = (np.asarray(_wt_xs, dtype=float),
+                            np.asarray(_wt_ys, dtype=float),
+                            _wt_kind == 'piezo')
+
     # Handle c/p strength option - compute actual cohesion per element
     c_by_elem = np.zeros(n_elements)
     phi_by_elem = np.zeros(n_elements)
@@ -1769,9 +1821,10 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         # u = ru * sum(gamma_i * h_i); distributed loads and crack water are
         # excluded by definition, Bishop & Morgenstern). The overburden is
         # integrated by intersecting a vertical ray from each node with the
-        # material polygons, which handles multi-band zones exactly; moist
-        # gamma throughout, matching the LEM's no-water-table path (ru models
-        # carry no piezometric surface). ru itself is PER MATERIAL, so the
+        # material polygons, which handles multi-band zones exactly, and weighed
+        # the way the slicer weighs a slice: gamma_sat below the water table,
+        # gamma above it, and moist throughout on the usual ru model, which
+        # carries no water table at all. ru itself is PER MATERIAL, so the
         # shared nodal u array (ambiguous on material boundaries) stays zero
         # here; the Gauss-point precompute applies the element material's ru
         # to sigma_v interpolated from the nodes.
@@ -1782,16 +1835,30 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             _mid = _pd.get('mat_id')
             _midx = _mid if (_mid is not None and 0 <= _mid < len(materials)) else _pi
             _ray_polys.append((_RayPoly(_pd['coords']),
-                               float(materials[_midx].get('gamma', 0.0))))
+                               float(materials[_midx].get('gamma', 0.0)),
+                               float(gamma_sat_by_mat[_midx])
+                               if _midx < n_materials else float('nan')))
         _y_top = float(np.max(nodes[:, 1])) + 1.0
         sigma_v = np.zeros(n_nodes)
         for i, node in enumerate(nodes):
             _x0, _y0 = float(node[0]), float(node[1])
             _ray = _RayLS([(_x0, _y0), (_x0, _y_top)])
+            _yw = float(water_table_elevation(_water_table, _x0))
             _sv = 0.0
-            for _poly, _g in _ray_polys:
+            for _poly, _g, _gs in _ray_polys:
                 _minx, _miny, _maxx, _maxy = _poly.bounds
                 if _x0 < _minx or _x0 > _maxx or _y0 >= _maxy:
+                    continue
+                if np.isfinite(_gs) and np.isfinite(_yw):
+                    _ysplit = min(max(_yw, _y0), _y_top)
+                    if _ysplit > _y0:
+                        _wet = _RayLS([(_x0, _y0), (_x0, _ysplit)]).intersection(_poly)
+                        if not _wet.is_empty:
+                            _sv += _gs * _wet.length
+                    if _y_top > _ysplit:
+                        _dry = _RayLS([(_x0, _ysplit), (_x0, _y_top)]).intersection(_poly)
+                        if not _dry.is_empty:
+                            _sv += _g * _dry.length
                     continue
                 _inter = _ray.intersection(_poly)
                 if not _inter.is_empty:
@@ -2704,7 +2771,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                       f"F = ({_ll['P'] * np.cos(_ang):.1f}, {_ll['P'] * np.sin(_ang):.1f})")
 
     # Material-zone columns for the vertical-overburden integral (K0 option). Built
-    # from the same zone polygons and the same moist unit weight the 'ru' option
+    # from the same zone polygons and the same pair of unit weights the 'ru' option
     # integrates, so the two definitions of "the soil column above this point" can
     # never drift apart.
     try:
@@ -2715,11 +2782,13 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             _midx = _mid if (_mid is not None and 0 <= _mid < len(materials)) else _pi
             _overburden_columns.append(
                 ([(float(x), float(y)) for x, y in _pd['coords']],
-                 float(materials[_midx].get('gamma', 0.0))))
+                 float(materials[_midx].get('gamma', 0.0)),
+                 float(gamma_sat_by_mat[_midx]) if _midx < n_materials else float('nan')))
     except Exception as _e:
         # A model with no usable zone geometry simply cannot offer K0 initialization;
         # solve_fem raises there rather than silently initializing to zero stress.
         _overburden_columns = []
+
 
     # Get other parameters
     unit_weight = require_gamma_water(slope_data, "FEM analysis")
@@ -2748,6 +2817,11 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "E_by_mat": E_by_mat,
         "nu_by_mat": nu_by_mat,
         "gamma_by_mat": gamma_by_mat,
+        # Saturated unit weight per material (NaN = nothing to split) and the water
+        # table that decides which of the two applies at a point. Together they are
+        # the whole of the weight split: no consumer reads gamma_sat any other way.
+        "gamma_sat_by_mat": gamma_sat_by_mat,
+        "water_table": _water_table,
         "material_names": material_names,
         # v16 template-carried run-option defaults. solve_ssrm / solve_fem fall
         # back to these when their tension_cutoff_by_material / elastic_materials
@@ -3026,9 +3100,11 @@ def _gauss_point_overburden(fem_data, elem_gp_data):
     stress carried by the soil column directly above that Gauss point, integrated by
     intersecting a vertical ray with the material-zone polygons carried on
     ``fem_data["overburden_columns"]``. Multi-band zones are handled exactly, and
-    moist gamma is used throughout — the same definition (and the same code shape)
-    as the 'ru' option's nodal ``sigma_v``, so the two can never disagree about what
-    "the column above this point" means.
+    the column is weighed the way the gravity load weighs the soil itself: gamma_sat
+    over the part of it below the water table, gamma over the part above. That is
+    the same definition (and the same code shape) as the 'ru' option's nodal
+    ``sigma_v``, so the two can never disagree about what "the column above this
+    point" means.
 
     DELIBERATELY EXCLUDED, matching that definition (Bishop & Morgenstern): applied
     surface tractions (a reservoir load, a distributed load, a footing) and water
@@ -3045,7 +3121,10 @@ def _gauss_point_overburden(fem_data, elem_gp_data):
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
-    polys = [(Polygon(coords), gamma) for coords, gamma in cols]
+    # A column entry is (coords, gamma) on a model built before saturated unit
+    # weights, (coords, gamma, gamma_sat) now; a NaN gamma_sat splits nothing.
+    polys = [(Polygon(c[0]), c[1], c[2] if len(c) > 2 else np.nan) for c in cols]
+    water_table = fem_data.get("water_table")
     y_top = float(np.max(nodes[:, 1])) + 1.0
 
     sv0 = []
@@ -3058,10 +3137,27 @@ def _gauss_point_overburden(fem_data, elem_gp_data):
             x_gp = float(N @ elem_coords[:, 0])
             y_gp = float(N @ elem_coords[:, 1])
             ray = LineString([(x_gp, y_gp), (x_gp, y_top)])
+            y_w = float(water_table_elevation(water_table, x_gp))
             sv = 0.0
-            for poly, gamma in polys:
+            for poly, gamma, gamma_sat in polys:
                 minx, _miny, maxx, maxy = poly.bounds
                 if x_gp < minx or x_gp > maxx or y_gp >= maxy:
+                    continue
+                if np.isfinite(gamma_sat) and np.isfinite(y_w):
+                    # Weigh the column in two pieces, split at the water table: the
+                    # part of it that stands below the table saturated, the part
+                    # above it moist. A table below the point or above the whole
+                    # column collapses one piece to zero length and the other to the
+                    # whole ray, which is the single-weight answer.
+                    y_split = min(max(y_w, y_gp), y_top)
+                    if y_split > y_gp:
+                        wet = LineString([(x_gp, y_gp), (x_gp, y_split)]).intersection(poly)
+                        if not wet.is_empty:
+                            sv += gamma_sat * wet.length
+                    if y_top > y_split:
+                        dry = LineString([(x_gp, y_split), (x_gp, y_top)]).intersection(poly)
+                        if not dry.is_empty:
+                            sv += gamma * dry.length
                     continue
                 inter = ray.intersection(poly)
                 if not inter.is_empty:
@@ -3217,6 +3313,12 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     E_by_mat = fem_data["E_by_mat"]
     nu_by_mat = fem_data["nu_by_mat"]
     gamma_by_mat = fem_data["gamma_by_mat"]
+    # Saturated unit weight and the water table it is keyed to. A model built
+    # before saturated unit weights carries neither, and splits nothing.
+    gamma_sat_by_mat = fem_data.get("gamma_sat_by_mat")
+    if gamma_sat_by_mat is None:
+        gamma_sat_by_mat = np.full(len(gamma_by_mat), np.nan)
+    water_table = fem_data.get("water_table")
     k_seismic = fem_data.get("k_seismic", 0.0)
 
     n_nodes = len(nodes)
@@ -3630,7 +3732,13 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         _xy = nodes[_corners]
         _area = 0.5 * abs(np.dot(_xy[:, 0], np.roll(_xy[:, 1], -1))
                           - np.dot(_xy[:, 1], np.roll(_xy[:, 0], -1)))
-        _gam = float(gamma_by_mat[int(element_materials[_e]) - 1])
+        _mi = int(element_materials[_e]) - 1
+        # The scale is the gravity load this element really carries, so an element
+        # standing below the water table is weighed saturated, exactly as the
+        # gravity load vector weighs it. The element centroid decides.
+        _gam = gamma_at_point(float(np.mean(_xy[:, 0])), float(np.mean(_xy[:, 1])),
+                              float(gamma_by_mat[_mi]),
+                              float(gamma_sat_by_mat[_mi]), water_table)
         _w = _gam * _area * _k_fac / len(_en)
         for _nd in _en:
             _elem_w[_nd] += _w
@@ -3695,7 +3803,14 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         "gp_groups_static": gp_groups_static,
         "n_total_gp": n_total_gp,
         "mesh_height": mesh_height,
-        "yield_floor": _YIELD_ABS_FLOOR_FRAC * float(np.max(gamma_by_mat)) * mesh_height,
+        # The strength scale the yield reading is floored against is a stress the
+        # model could plausibly reach, so the heaviest unit weight in it counts —
+        # a saturated weight included, since that is what the soil below the water
+        # table actually weighs.
+        "yield_floor": (_YIELD_ABS_FLOOR_FRAC * mesh_height
+                        * float(np.nanmax(np.concatenate(
+                            [np.asarray(gamma_by_mat, dtype=float),
+                             np.asarray(gamma_sat_by_mat, dtype=float)])))),
         "node_dof_x": node_dof_x,
         "node_dof_y": node_dof_y,
         "free_dof_mask": free_dof_mask,
@@ -12739,6 +12854,35 @@ def _piezo_cos2(xq, px, py):
     return np.where(outside, 1.0, cos2)
 
 
+def water_table_elevation(water_table, x):
+    """Water-table elevation at x (scalar or array) from a sampled water table,
+    NaN where the model does not define one there.
+
+    ``water_table`` is the ``(xs, ys, ends_nan)`` triple ``build_fem_data`` puts on
+    ``fem_data["water_table"]``, or None on a model with no water table at all.
+    """
+    if water_table is None:
+        return np.full(np.shape(x), np.nan)
+    xs, ys, ends_nan = water_table
+    if ends_nan:
+        return np.interp(x, xs, ys, left=np.nan, right=np.nan)
+    return np.interp(x, xs, ys)
+
+
+def gamma_at_point(x, y, gamma, gamma_sat, water_table):
+    """The unit weight of one material at one point: gamma_sat below the water
+    table, gamma above it.
+
+    A NaN gamma_sat (the material weighs the same wet and dry) and a point where
+    the water table is undefined both give gamma, so soil outside a piezometric
+    line's span and soil in a model with no water table are weighed moist.
+    """
+    if not np.isfinite(gamma_sat):
+        return gamma
+    y_w = float(water_table_elevation(water_table, float(x)))
+    return gamma_sat if (np.isfinite(y_w) and y <= y_w) else gamma
+
+
 def build_gravity_loads(nodes, elements, element_types, element_materials, gamma_by_mat, k_seismic, fem_data=None):
     """
     Build gravity load vector using Griffiths & Lane (1999) approach.
@@ -12747,8 +12891,21 @@ def build_gravity_loads(nodes, elements, element_types, element_materials, gamma
     This integrates shape functions over each element to properly distribute gravity loads.
 
     Uses dof_offset from fem_data when available to support mixed DOF systems.
+
+    UNIT WEIGHT IS A GAUSS-POINT QUANTITY. A material carrying a saturated unit
+    weight is weighed gamma_sat at every Gauss point at or below the water table and
+    gamma at every one above it, so an element straddling the water table carries
+    the right weight instead of one element-constant compromise. The split is read
+    from ``fem_data["gamma_sat_by_mat"]`` and ``fem_data["water_table"]``; a material
+    that splits nothing (NaN gamma_sat) keeps the single-weight integration it always
+    had, arithmetic and all.
     """
     n_nodes = len(nodes)
+
+    gamma_sat_by_mat = fem_data.get("gamma_sat_by_mat") if fem_data is not None else None
+    water_table = fem_data.get("water_table") if fem_data is not None else None
+    if gamma_sat_by_mat is None or water_table is None:
+        gamma_sat_by_mat = np.full(len(gamma_by_mat), np.nan)
 
     # Get DOF offset map from fem_data if available
     dof_offset = fem_data.get("dof_offset", None) if fem_data is not None else None
@@ -12769,11 +12926,41 @@ def build_gravity_loads(nodes, elements, element_types, element_materials, gamma
         elem_type = element_types[elem_idx]
         mat_id = element_materials[elem_idx] - 1
         gamma = gamma_by_mat[mat_id]
+        gamma_sat = gamma_sat_by_mat[mat_id]
+        splits = bool(np.isfinite(gamma_sat))
 
         elem_nodes = element[:elem_type]
         elem_coords = nodes[elem_nodes]
 
-        if elem_type == 3:  # 3-node triangle
+        def _gamma_gp(N, _coords=elem_coords, _g=gamma, _gs=gamma_sat):
+            """The unit weight at the Gauss point shape functions N evaluate at."""
+            return gamma_at_point(float(N @ _coords[:, 0]), float(N @ _coords[:, 1]),
+                                  _g, _gs, water_table)
+
+        if elem_type == 3 and splits:
+            # A linear triangle distributes its weight 1/3 to each node when the
+            # weight is uniform, which is why the branch below never integrates.
+            # A split element is not uniform, so it is integrated on the same
+            # 3-point rule the quadratic triangle uses.
+            gauss_pts_tri, gauss_wts_tri = get_gauss_points_tri3()
+            elem_loads = np.zeros(2 * 3)
+            x1, y1 = elem_coords[0]
+            x2, y2 = elem_coords[1]
+            x3, y3 = elem_coords[2]
+            det_J = (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3)
+            for gp_idx in range(3):
+                N = np.array(gauss_pts_tri[gp_idx])
+                w = gauss_wts_tri[gp_idx]
+                integration_weight = 0.5 * abs(det_J) * w
+                g_gp = _gamma_gp(N)
+                for k in range(3):
+                    elem_loads[2*k + 1] -= integration_weight * g_gp * N[k]
+                    elem_loads[2*k] += integration_weight * g_gp * k_seismic * N[k]
+            for i, node in enumerate(elem_nodes):
+                F_gravity[_node_dof_x(node)] += elem_loads[2*i]
+                F_gravity[_node_dof_y(node)] += elem_loads[2*i + 1]
+
+        elif elem_type == 3:  # 3-node triangle
             # For linear triangles, shape function integration gives equal distribution (1/3 each)
             x1, y1 = elem_coords[0]
             x2, y2 = elem_coords[1]
@@ -12814,9 +13001,10 @@ def build_gravity_loads(nodes, elements, element_types, element_materials, gamma
                     det_J = np.linalg.det(J)
 
                     # Accumulate load contribution: w * det(J) * gamma * N
+                    g_gp = _gamma_gp(N) if splits else gamma
                     for k in range(8):
-                        elem_loads[2*k + 1] -= w * det_J * gamma * N[k]  # Vertical
-                        elem_loads[2*k] += w * det_J * gamma * k_seismic * N[k]  # Horizontal
+                        elem_loads[2*k + 1] -= w * det_J * g_gp * N[k]  # Vertical
+                        elem_loads[2*k] += w * det_J * g_gp * k_seismic * N[k]  # Horizontal
 
             # Add element loads to global vector
             for i, node in enumerate(elem_nodes):
@@ -12835,9 +13023,10 @@ def build_gravity_loads(nodes, elements, element_types, element_materials, gamma
                 x2, y2 = elem_coords[2]
                 det_J = (x0 - x2) * (y1 - y2) - (x1 - x2) * (y0 - y2)
                 integration_weight = 0.5 * abs(det_J) * w
+                g_gp = _gamma_gp(N) if splits else gamma
                 for k in range(6):
-                    elem_loads[2*k + 1] -= integration_weight * gamma * N[k]
-                    elem_loads[2*k] += integration_weight * gamma * k_seismic * N[k]
+                    elem_loads[2*k + 1] -= integration_weight * g_gp * N[k]
+                    elem_loads[2*k] += integration_weight * g_gp * k_seismic * N[k]
             for i, node in enumerate(elem_nodes):
                 F_gravity[_node_dof_x(node)] += elem_loads[2*i]
                 F_gravity[_node_dof_y(node)] += elem_loads[2*i + 1]
@@ -12850,9 +13039,10 @@ def build_gravity_loads(nodes, elements, element_types, element_materials, gamma
                 w = gauss_wts[gp_idx]
                 N = compute_quad4_shape_functions(xi, eta)
                 _, det_J = _compute_B_and_detJ_quad4(elem_coords, xi, eta)
+                g_gp = _gamma_gp(N) if splits else gamma
                 for k in range(4):
-                    elem_loads[2*k + 1] -= w * abs(det_J) * gamma * N[k]
-                    elem_loads[2*k] += w * abs(det_J) * gamma * k_seismic * N[k]
+                    elem_loads[2*k + 1] -= w * abs(det_J) * g_gp * N[k]
+                    elem_loads[2*k] += w * abs(det_J) * g_gp * k_seismic * N[k]
             for i, node in enumerate(elem_nodes):
                 F_gravity[_node_dof_x(node)] += elem_loads[2*i]
                 F_gravity[_node_dof_y(node)] += elem_loads[2*i + 1]
@@ -12865,9 +13055,10 @@ def build_gravity_loads(nodes, elements, element_types, element_materials, gamma
                 w = gauss_wts[gp_idx]
                 N = compute_quad9_shape_functions(xi, eta)
                 _, det_J = _compute_B_and_detJ_quad9(elem_coords, xi, eta)
+                g_gp = _gamma_gp(N) if splits else gamma
                 for k in range(9):
-                    elem_loads[2*k + 1] -= w * abs(det_J) * gamma * N[k]
-                    elem_loads[2*k] += w * abs(det_J) * gamma * k_seismic * N[k]
+                    elem_loads[2*k + 1] -= w * abs(det_J) * g_gp * N[k]
+                    elem_loads[2*k] += w * abs(det_J) * g_gp * k_seismic * N[k]
             for i, node in enumerate(elem_nodes):
                 F_gravity[_node_dof_x(node)] += elem_loads[2*i]
                 F_gravity[_node_dof_y(node)] += elem_loads[2*i + 1]

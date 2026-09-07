@@ -1364,13 +1364,15 @@ def _run_fem_ssrm(test):
         ``solve_ssrm``'s bisection stopping width AND the lock's comparison
         tolerance. The closing bracket is therefore never wider than the tolerance,
         so two paths that bisect to ADJACENT intervals differ by at most the
-        tolerance — and a tolerance-width Tier 1 gate can never see it. Measured, on
-        ``RS2-40-d20`` (``vp077b.xlsx``): the reference returns 1.41796875 and the
-        kernel 1.43515625, one closing-bracket width apart, against a lock of 1.418
-        with a tolerance of 0.02. Under a tolerance-width gate that row passed on
-        the kernel, printed 1.4352, and never ran the oracle. Under the exact gate
-        it falls through, the reference decides it at 1.4180, and the annotation
-        carries the kernel's number and the gap so the divergence is visible.
+        tolerance — and a tolerance-width Tier 1 gate can never see it. Such a
+        row is a knife-edge model: the two paths' rounding lands one trial on
+        either side of a verdict. ``RS2-40-d20`` (``vp077b.xlsx``) did that
+        while it carried an 8:1 modulus contrast the vendor model does not; under
+        the vendor's stiffness pair the kernel reproduces the reference there
+        too. Under a tolerance-width gate such a row passes on the kernel and
+        never runs the oracle. Under the exact gate it falls through, the
+        reference decides it, and the annotation carries the kernel's number and
+        the gap so the divergence is visible.
 
         FAST-FIRST IS STILL SOUND, and still cheap, because ~95% of the SSRM
         pipeline (mesh, assembly, BCs, the bisection driver, the plasticity

@@ -113,7 +113,7 @@ ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
                         'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
 
 # --- model constants --------------------------------------------------------
-_GW = 9.81
+_GW = 9.7893660333      # the vendor file's unit weight of water (kN/m^3)
 _WIDTH = 0.006                   # column width (arbitrary; 1-D) [m]
 _Y_PLATE = 0.007                 # top of porous plate [m]
 _Y_TOP = 0.1234                  # top of sample [m]

@@ -81,7 +81,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [T04](#seepw-t04) | 🟢 | SEEP/W – Leakage from pond with clay liner | Interior head within ±0.02 m of SEEP/W at the near-steady leaking state (0.3% of the 6.5 m pond head) · 0.08–0.14 m low mid-fill (2.1% at worst) | **built**; the residual is in the filling *rate*, on a problem whose timing the saturated-only storage convention governs outright |
 | [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within 0.003 m of SEEP/W at the initial frame and 0.07 m at the high-rate near-steady, over the locked stations | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column, the van Genuchten pair fitted to the vendor's conductivity table over the suctions the column reaches |
 | [T06](#seepw-t06) | <span class="nodata">⊘</span> | SEEP/W – Infiltration into multi-layered system | Two gates on the 14-layer infiltration leg: a measured, non-steady per-layer initial condition no steady solve returns, and a unit-gradient (free-drainage) base boundary that is not in the solver's boundary-condition set. The drainage leg is hysteretic, and XSLOPE carries one retention curve per material. | *blocked* |
-| [T07](#seepw-t07) | 🔴 | SEEP/W – GeoStudio-PEST Multistep Outflow | Column total head within 0.001 m of SEEP/W's `node.csv` at the first stage, 0.005 m at the second and 0.007 m at the last — 6.6% of the 0.102 m the base suction is stepped through — XSLOPE's column draining a little further than SEEP/W's toward the top of the sample | **built**; stepped base suction through a time-varying head (plain-Dirichlet) series, the van Genuchten pair fitted to the vendor's conductivity table |
+| [T07](#seepw-t07) | 🔴 | SEEP/W – GeoStudio-PEST Multistep Outflow | Column total head within 0.001 m of SEEP/W's `node.csv` at the first stage, 0.005 m at the second and 0.0072 m at the last — 7.1% of the 0.102 m the base suction is stepped through — XSLOPE's column draining less far than SEEP/W's toward the top of the sample | **built**; stepped base suction through a time-varying head (plain-Dirichlet) series, the van Genuchten pair fitted to the vendor's conductivity table |
 | [SRS](#sigmaw-wall) | 🔴 | SIGMA/W – Slope stabilization with a sheet pile wall | No wall: SSRM 1.048 vs SIGMA/W SRS 1.025 (+2.2%) — with the same project's FE stability 1.035 (+1.3%) and Morgenstern-Price 1.033 (+1.5%) · with the wall: SSRM 1.691 vs SIGMA/W SRS 1.4 (+20.8%) | **built**; the like-for-like case without the wall agrees. Both published factors are interpretations of an SRS sweep rather than solver outputs, and the wall case is read off a still-rising curve that the sweep never brackets from above. The wall's moment and shear reproduce the published shape and turning point at about four-fifths of the published peaks |
 
 </div>
@@ -1401,9 +1401,9 @@ SEEP/W `node.csv` pore-water pressures are read as the comparison.
 
 Both columns carry a gradient through the sample at every reporting time. They agree at the
 base, where the same specified head fixes them, and part company toward the top, where
-XSLOPE's column drains a little further within each stage: 0.005 m of head at t = 132 000 s
-and 0.007 m at t = 219 600 s, against the 0.102 m the base suction is stepped through over
-the test. At the first reported stage the two agree to 0.001 m at every station.
+XSLOPE's column drains less far within each stage: 0.005 m of head at t = 132 000 s and
+0.0072 m at t = 219 600 s, against the 0.102 m the base suction is stepped through over the
+test. At the first reported stage the two agree to 0.001 m at every station.
 
 The vendor's saved frames do not fall on XSLOPE's reporting times: the nearest to
 t = 132 000 s is at 133 130 s, 130 s past the fourth step, which is where the 0.004 m at

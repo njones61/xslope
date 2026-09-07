@@ -180,6 +180,17 @@ GROUPS = {
                      corpus='docs/fem/files',
                      builders=lambda m: list(m.BUILDERS),
                      slow=False),
+    # The worked design-manual problems of docs/verification/published.md: the
+    # FHWA MSE wall examples.  They only WRITE files -- no solve -- so they are
+    # cheap.  build_fhwa_e1 exposes one builder, build_fhwa_e3_e7 a BUILDERS
+    # list of five.
+    'published': dict(module=['benchmarks.published.build_fhwa_e1',
+                              'benchmarks.published.build_fhwa_e3_e7'],
+                      outattr='OUT',
+                      corpus='docs/verification/files/published',
+                      builders=lambda mods: ([mods[0].build_fhwa_e1]
+                                             + list(mods[1].BUILDERS)),
+                      slow=False),
     'seep': dict(module='benchmarks.build_seep', outattr='OUTDIR',
                  corpus='docs/seep/files',
                  builders=lambda m: [m.build_confined_radial,
@@ -224,6 +235,13 @@ def _norm(v):
         return [_norm(x) for x in v]
     if hasattr(v, 'wkt'):                      # shapely geometry
         return v.wkt
+    # A reinforcement line's integrated pullout profile: an object with no
+    # __eq__, so an identity comparison would report every rebuilt line as
+    # different.  Its sampled integral is the thing worth comparing -- it is
+    # derived from the line, the material zones and the water, so a geometry
+    # difference the primitives somehow hid would still show up here.
+    if v.__class__.__name__ == 'PulloutProfile':
+        return {'length': _norm(v.length), 's': _norm(v.s), 'cum': _norm(v.cum)}
     return v
 
 

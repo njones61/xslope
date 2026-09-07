@@ -79,7 +79,11 @@ from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(ROOT, 'docs', 'verification', 'files', 'published')
 SEED = os.path.join(ROOT, 'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
-DEST = os.path.join(OUT, 'fhwa_e1.xlsx')
+#: Output file name.  The directory is read from OUT at CALL time, not
+#: bound here: benchmarks/verify_rebuild.py rebuilds into a scratch
+#: directory by pointing OUT at it, and a path frozen at import would
+#: keep writing over the corpus copy instead.
+NAME = 'fhwa_e1.xlsx'
 
 # --- Step 1-3: geometry -----------------------------------------------------
 H = 20.0                 # design height, ft (18 ft exposed + 2 ft embedment)
@@ -237,8 +241,9 @@ def _slope_data():
 def build_fhwa_e1():
     sd = _slope_data()
     os.makedirs(OUT, exist_ok=True)
-    save_slope_data_to_xlsx(sd, DEST)
-    return DEST
+    dest = os.path.join(OUT, NAME)
+    save_slope_data_to_xlsx(sd, dest)
+    return dest
 
 
 if __name__ == '__main__':

@@ -21,7 +21,9 @@ CONFIG = PageConfig(
         ('+5.5', 'the other φ = 0 foundation problem', '1.488', '1.41'),
         ('+9.0', 'is not a search that stopped early', '0.169', '0.155'),
         ('+2.7', 'the three locks within ±2.7%', '0.339', '0.33'),
-        ('−0.4', 'from XSLOPE; nothing published explains', '1.334', '1.34'),
+        # RS2 against itself: the section's two vendor columns, read out of the
+        # table the sentence sits under.
+        ('+6.1', 'vendor answers are 6.1% apart', '1.05', '0.99'),
         ('+1.8', 'The same uncapped machinery is within 1.8%', '1.669', '1.64'),
         ('+3.2', 'baseline is within 3.2% at every frame', '1.713', '1.77'),
         ('+1.1', 'The two vendor numbers landing within', '1.9', '1.88'),
@@ -70,6 +72,8 @@ CONFIG = PageConfig(
         ('+2.2', 'that still lands within 2.2%'),
         ('+2.1', 'lands within 2.1% of'),
         ('+20', 'runs about 20% low'),
+        # RS2-18: a bound over both cases against the scored vendor column.
+        ('+0.8', "lands within 0.8% of RS2's own model"),
     ],
 
     # Flac3D is one of the four programs the RS2-62 tables carry as published

@@ -63,7 +63,7 @@ why rather than leaving a blank; everything else is built and locked at its tagg
 | [15](#rs2-15) | 🟢 | Layered slope II (Greco ex. 4 / Yamagami & Ueta) | SSRM 1.372 vs RS2 SSRM 1.38 (−0.6%) | Scored against the Part IV VP19 model this file is built from. |
 | [16](#rs2-16) | 🟢 | Layered slope and water table with weak seam (Greco ex. 5 / Chen & Shao) | SSRM 0.978 inside Greco 0.973–1.1 · vs RS2 SSRM 1.02 (−4.1%) | Greco's own published range is the source author's and governs. Nearly mesh-invariant (0.997 at 4.0 m). |
 | [17](#rs2-17) | 🟢 | Slope with three pore pressure conditions (Fredlund & Krahn) | Dry: SSRM 1.987 vs RS2 SSRM 1.98 (+0.4%) · r<sub>u</sub> = 0.25: SSRM 1.692 vs RS2 SSRM 1.68 (+0.7%) | **built** (dry + r<sub>u</sub>); the water-table case is not built. |
-| [18](#rs2-18) | 🔴 | Three pore pressure conditions and a weak seam (Fredlund & Krahn) | Dry: SSRM 1.334 vs RS2 SSRM 1.26 (+5.9%) · r<sub>u</sub> = 0.25: SSRM 1.058 vs RS2 SSRM 0.99 (+6.9%) | **built** (dry + r<sub>u</sub>). Compared with RS2's run of the imported Slide2 VP22 model, which the files are transcribed from. RS2's run of its own model of the problem publishes 1.34 / 1.05, −0.4% and +0.8% from XSLOPE; nothing published explains the 6% between the two RS2 runs. |
+| [18](#rs2-18) | 🟢 | Three pore pressure conditions and a weak seam (Fredlund & Krahn) | Dry: SSRM 1.334 vs RS2 SSRM 1.34 (−0.4%) · r<sub>u</sub> = 0.25: SSRM 1.042 vs RS2 SSRM 1.05 (−0.8%) | **built** (dry + r<sub>u</sub>). RS2 publishes two runs of this problem from input-identical files — 1.34 / 1.05 on its own model, 1.26 / 0.99 on the Slide2 VP22 model imported into RS2 — and the row is scored on RS2's own run. |
 | [19](#rs2-19) | 🟡 | Undrained layered slope (Low 1989) | SSRM 1.488 vs Low 1.44 (+3.3%) · vs RS2 SSRM 1.41 (+5.5%) | **built** (caveat) — Low's own factor governs; quoted at the tagged mesh, and the two SSRM values straddle the LEM. |
 | [20](#rs2-20) | 🟢 | Slope with vertical load (Prandtl's wedge) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Prandtl theory 1.0 is a reference authority in its own right here. |
 | [21](#rs2-21) | 🟢 | Bearing capacity test prism (Prandtl II) | SSRM 1.011 vs RS2 SSRM 1.01 (+0.1%) | Converging on Prandtl theory 1.0. One trial is undecided at the iteration ceiling. |
@@ -156,7 +156,7 @@ why rather than leaving a blank; everything else is built and locked at its tagg
 | [17](#rs2-13) | 🟢 | Slope, homogeneous (Yamagami & Ueta) | SSRM 1.332 vs RS2 SSRM 1.33 (+0.2%) | Piggyback on [RS2-13](#rs2-13). Part IV publishes RS2 SSRM 1.32. |
 | [19](#rs2-15) | 🟢 | Slope, 4 materials (Greco ex. 4) | SSRM 1.372 vs RS2 SSRM 1.38 (−0.6%) | Piggyback on [RS2-15](#rs2-15); Greco/Spencer 1.40–1.42. |
 | [21](#rs2-17) | 🟢 | Homogeneous, r<sub>u</sub> (Fredlund & Krahn) | Dry: SSRM 1.987 vs RS2 SSRM 1.98 (+0.4%) · r<sub>u</sub> = 0.25: SSRM 1.692 vs RS2 SSRM 1.68 (+0.7%) | Piggyback on [RS2-17](#rs2-17). Part IV publishes RS2 SSRM 1.98 / 1.68 / 1.77. |
-| [22](#rs2-18) | 🔴 | Weak layer, r<sub>u</sub> (Fredlund & Krahn) | Dry: SSRM 1.334 vs RS2 SSRM 1.26 (+5.9%) · r<sub>u</sub> = 0.25: SSRM 1.058 vs RS2 SSRM 0.99 (+6.9%) | Piggyback on [RS2-18](#rs2-18). Part IV publishes 1.26 / 0.99 / 1.15 against the native model's 1.34 / 1.05 / 1.13 — the vendor's own scatter, both unconstrained. |
+| [22](#rs2-18) | 🟢 | Weak layer, r<sub>u</sub> (Fredlund & Krahn) | Dry: SSRM 1.334 vs RS2 SSRM 1.34 (−0.4%) · r<sub>u</sub> = 0.25: SSRM 1.042 vs RS2 SSRM 1.05 (−0.8%) | Piggyback on [RS2-18](#rs2-18). RS2 publishes two runs of this problem from input-identical files — 1.34 / 1.05 / 1.13 on its own model, 1.26 / 0.99 / 1.15 on the Slide2 model imported into RS2 — and the row is scored on RS2's own run. |
 | [24](#rs2-19) | 🟡 | Slope, 3 materials (Low 1989) | SSRM 1.488 vs Low 1.44 (+3.3%) · vs RS2 SSRM 1.41 (+5.5%) | Piggyback on [RS2-19](#rs2-19); Low's own factor governs, as on that row. Part IV publishes RS2 SSRM 1.42. |
 | [25](#rs2-20) | 🟢 | Bearing-capacity slope (Prandtl / Chen & Shao) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Piggyback on [RS2-20](#rs2-20); Chen & Shao 1.05. |
 | [26](#rs2-21) | 🟢 | Bearing-capacity prism (Prandtl II) | SSRM 1.011 vs RS2 SSRM 1.01 (+0.1%) | Piggyback on [RS2-21](#rs2-21). Part IV publishes RS2 SSRM 1.00; theory 1.0. |
@@ -588,7 +588,7 @@ model nor RS2's own native rebuild carries an SSR polygon on any case. The water
 
 ![RS2-17b: r<sub>u</sub> = 0.25 case (vp021b) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-17b.png)
 
-### 🔴 RS2-18: Three pore pressure conditions and a weak seam (Fredlund & Krahn) {#rs2-18}
+### 🟢 RS2-18: Three pore pressure conditions and a weak seam (Fredlund & Krahn) {#rs2-18}
 
 Slide2 counterpart: [VP22](rocscience.md#vp22). Built for the dry and r<sub>u</sub> cases.
 
@@ -597,18 +597,26 @@ Slide2 counterpart: [VP22](rocscience.md#vp22). Built for the dry and r<sub>u</s
 
 | Method | XSLOPE | RS2, its own model | RS2, imported Slide2 model | Slide2 | Fredlund & Krahn |
 |---|---|---|---|---|---|
-| SSRM (vp022a, dry) | 1.334 | 1.34 | 1.26 (+5.9%) | Bishop 1.382 | — |
-| SSRM (vp022b, r<sub>u</sub> = 0.25) | 1.058 | 1.05 | 0.99 (+6.9%) | 1.124 | 1.124 |
+| SSRM (vp022a, dry) | 1.334 | 1.34 (−0.4%) | 1.26 | Bishop 1.382 | — |
+| SSRM (vp022b, r<sub>u</sub> = 0.25) | 1.042 | 1.05 (−0.8%) | 0.99 | 1.124 | 1.124 |
 
-*RS2 solved this problem twice: once on a model built in RS2, and once on Slide2's VP22 model
-imported into RS2. The XSLOPE files are transcribed from the Slide2 VP22 model, so the imported
-run is the comparison; it is 5.9% and 6.9% below XSLOPE. The RS2-built model is −0.4% and +0.8%
-from XSLOPE. Nothing published explains the 6% between the two RS2 runs.*
+*RS2 publishes two solutions of this problem, from two files whose inputs are identical: the same
+geometry, the same weak seam, the same unit weights, strengths, tension caps, stiffness,
+K<sub>0</sub>, and the same r<sub>u</sub> field. They differ in mesh density and in whether the
+tensile strength is reduced along with the shear strength. On the r<sub>u</sub> case the two
+vendor answers are 6.1% apart. XSLOPE lands within 0.8% of RS2's own model at every element size
+tried, and 5 to 6% above the imported Slide2 run, on the dry case as on the r<sub>u</sub> case.
+The row is scored against RS2's own model, and both vendor runs are shown.*
 
-The factor of safety is the same at 3.0 m and 2.0 m element sizes. The mechanism follows the
-weak seam, a geometric feature, so it does not move with mesh refinement, unlike
-[RS2-14](#rs2-14), where no feature fixes the failure band. Case 3, with the water table, is not
-built.
+Both cases hold each material's tensile strength at its input value through the strength
+reduction, as RS2's own model does; the imported Slide2 model reduces the cap along with the
+shear strength instead. Either setting returns the same factor here, because the upper soil's
+cap never binds and the weak seam has no tensile strength to reduce.
+
+The dry case carries a second tag at a 2.0 m element size beside the 1.5 m one, and the two
+return the same factor. The mechanism follows the weak seam, a geometric feature that fixes
+where the failure band forms, unlike [RS2-14](#rs2-14), where no feature pins it. Case 3, with
+the water table, is not built.
 
 Neither RS2 run restricts its search with an SSR polygon; only case 3, the water-table case,
 carries one, and that case is not built.

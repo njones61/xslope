@@ -51,7 +51,7 @@ MUTATIONS = [
     ("rs2", "deltas", "M2 sign flip, summary row",
      "SSRM 0.986 vs RS2 SSRM 0.99 (−0.4%)", "SSRM 0.986 vs RS2 SSRM 0.99 (+0.4%)"),
     ("rs2", "deltas", "M3 last digit, summary row",
-     "SSRM 1.280 vs RS2 SSRM 1.26 (+1.6%)", "SSRM 1.280 vs RS2 SSRM 1.26 (+1.7%)"),
+     "SSRM 1.286 vs RS2 SSRM 1.26 (+2.1%)", "SSRM 1.286 vs RS2 SSRM 1.26 (+2.2%)"),
     # RS2-31, the Hoek-Brown reading against RS2's own
     ("rs2", "deltas", "M4 prose delta",
      "**1.115** against RS2's 1.11 (+0.5%)",
@@ -65,9 +65,9 @@ MUTATIONS = [
     ("rs2", "deltas", "M5 authority-column table",
      AUTH_HEAD, AUTH_HEAD + AUTH_TABLE.format("−3.9")),
     ("rs2", "deltas", "M6 range bound",
-     "1.24–1.27 (+0.8%)", "1.24–1.27 (+0.9%)"),
+     "1.24–1.27 (+1.3%)", "1.24–1.27 (+1.4%)"),
     ("rs2", "deltas", "M7 whitelisted cross-ref",
-     "cf. [RS2-63](#rs2-63) +2.1%)", "cf. [RS2-63](#rs2-63) +2.4%)"),
+     "cf. [RS2-63](#rs2-63) +0.8%)", "cf. [RS2-63](#rs2-63) +2.4%)"),
     ("rs2", "deltas", "M8 XSLOPE value moved",
      "| SSRM | 1.347 |", "| SSRM | 1.357 |"),
     # The triage of 2026-08-03 removed every absolute-FS-difference claim rs2 had,
@@ -80,10 +80,10 @@ MUTATIONS = [
     ("rs2", "deltas", "M11 hedged unsigned prose %",
      "runs about 20% low", "runs about 60% low"),
     ("rs2", "deltas", "M12 bound claim",
-     "All six stages land within 1.6%", "All six stages land within 0.3%"),
+     "All six stages land within 1% of", "All six stages land within 0.3% of"),
     ("rs2", "deltas", "M13 unsigned integer % in a table cell",
-     "| SSRM | 1.409 | RS2 SSRM 1.38 (+2.1%) |",
-     "| SSRM | 1.409 (44%) | RS2 SSRM 1.38 (+2.1%) |"),
+     "| SSRM | 1.391 | RS2 SSRM 1.38 (+0.8%) |",
+     "| SSRM | 1.391 (44%) | RS2 SSRM 1.38 (+0.8%) |"),
     # The delta is read from the LOWER bound of the printed range (−2.5% against
     # 1.528); the upper bound would read −3.4%.  −3.0% is neither, and no other
     # number in the row produces it.
@@ -95,7 +95,7 @@ MUTATIONS = [
      "### RS2-21: Bearing capacity test prism (Prandtl II) {#rs2-21}\n\n"
      "Under the alternative construction the same prism reads −3.7% on that value.\n"),
     ("rs2", "deltas", "N21a whitelist-operand drift (RS2-22 load direction)",
-     "1.534", "1.499", "all"),
+     "1.523", "1.499", "all"),
     ("rs2", "deltas", "N21d whitelist-operand drift (RS2-29 toe rounding)",
      "+1.9% (0.978 → 0.997)", "+1.9% (0.988 → 0.997)"),
     ("rs2", "figures", "M14 two-panel caption in the 'other' bucket",
@@ -208,9 +208,9 @@ MUTATIONS = [
     # restatement in the same section and requires silence, so this fixture
     # tests the agreement and not the mere presence of a second number.
     ("ssrm", "tags", "G1 rounded tag restatement is a different value",
-     "equilibrium criterion) | 1.34 |", "equilibrium criterion) | 1.44 |"),
+     "equilibrium criterion) | 1.35 |", "equilibrium criterion) | 1.45 |"),
     ("ssrm", "tags", "G1b the same lock drifts in the note instead",
-     "against this model's 1.34", "against this model's 1.44"),
+     "against this model's 1.35", "against this model's 1.45"),
     ("geostudio", "tags", "G2 tagged value dropped from its section",
      "| Janbu | 1.330 | 1.233 |", "| Janbu | — | 1.233 |"),
     ("rocscience_groundwater", "tags", "G3 scientific-notation tag mantissa drifts",

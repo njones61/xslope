@@ -22,7 +22,7 @@ the same line, and the only difference between the runs is which of the two ways
 the weights are declared. Agreement is therefore exact, not approximate, and the
 checks below are written that way.
 
-Four legs:
+Six legs:
 
 1. **The gravity load vector.** The load each formulation builds, node for node.
    This is the split itself, before any solving.
@@ -33,11 +33,16 @@ Four legs:
    stress field and the solved displacements must match.
 4. **The pore-pressure ratio.** u = ru * sigma_v weighs the soil column too, so
    the ru option is checked on the same pair.
-
-A fifth leg proves the comparison is not vacuous: weighing the sidecar model
-moist throughout — gamma_sat dropped, everything else identical — must change the
-answer. Without it, an engine that ignored gamma_sat entirely would pass legs 1-4
-by weighing both models 18 kN/m3 and never be caught.
+5. **A water table that cuts THROUGH elements.** Legs 1-4 put the water table on
+   a zone boundary, where no element straddles it. Leg 5 puts it at an elevation
+   nothing in the geometry marks: the gravity load must reproduce the Gauss-point
+   quadrature written out independently, must NOT reproduce one weight per
+   element, and must carry the weight the body really has to within a fraction
+   of a percent.
+6. **The control.** Weighing the sidecar model moist throughout — gamma_sat
+   dropped, everything else identical — must change the answer. Without it, an
+   engine that ignored gamma_sat entirely would pass legs 1-4 by weighing both
+   models 18 kN/m3 and never be caught.
 
 Run directly:  PYTHONPATH=. python3 test/gamma_sat_fem_check.py
 """
@@ -177,6 +182,133 @@ def _check_solution(sol_s, sol_z, failures, tag):
                         f"counts ({it_s} vs {it_z}) — same problem, same path")
 
 
+def _unsplit_mesh(target, y_w):
+    """One mesh of the WHOLE slope as a single zone, with the water table free to
+    cut through elements — nothing in the geometry marks where it runs."""
+    whole = Polygon(UPPER).union(Polygon(LOWER))
+    polys = [{'coords': list(whole.exterior.coords), 'mat_id': 0}]
+    m = build_mesh_from_polygons(polys, target_size=target, element_type='tri6')
+    d = _slope_data(zoned=False)
+    d['polygons'] = [{'polygon': whole, 'mat_id': 0}]
+    d['piezo_line'] = [(0.0, y_w), (40.0, y_w)]
+    return build_fem_data(d, m), whole
+
+
+def _total_weight(F_gravity, fem_data):
+    """The total downward force the gravity load vector carries."""
+    dof = fem_data.get('dof_offset')
+    n = len(fem_data['nodes'])
+    ydofs = [(dof[i] + 1) if dof is not None else 2 * i + 1 for i in range(n)]
+    return -float(np.sum(np.asarray(F_gravity)[ydofs]))
+
+
+def _element_constant_weight(fem_data, y_w):
+    """What the same model would weigh if the unit weight were one number per
+    element, chosen at the element centroid — the split this implementation
+    deliberately does not take."""
+    nodes, elements = fem_data['nodes'], fem_data['elements']
+    et = fem_data['element_types']
+    total = 0.0
+    for e in range(len(elements)):
+        xy = nodes[elements[e][:3]]
+        area = 0.5 * abs(np.dot(xy[:, 0], np.roll(xy[:, 1], -1))
+                         - np.dot(xy[:, 1], np.roll(xy[:, 0], -1)))
+        total += area * (GAMMA_SAT if xy[:, 1].mean() <= y_w else GAMMA)
+    return total
+
+
+def _gauss_point_reference(fem_data, y_w):
+    """The total weight the Gauss-point rule gives, written from the quadrature
+    and nothing else — an independent reading of what the engine should produce.
+
+    Straight-sided tri6: the 3-point rule, gamma chosen at each Gauss point by
+    its own elevation, integration weight 0.5*|detJ|*w. Sum of the shape functions
+    is 1, so the element weight is the weighted sum of its three point weights.
+    """
+    nodes, elements = fem_data['nodes'], fem_data['elements']
+    total = 0.0
+    for e in range(len(elements)):
+        xy = nodes[elements[e][:6]]
+        x0, y0 = xy[0]; x1, y1 = xy[1]; x2, y2 = xy[2]
+        det_J = (x0 - x2) * (y1 - y2) - (x1 - x2) * (y0 - y2)
+        for L in ((1/6, 1/6, 2/3), (1/6, 2/3, 1/6), (2/3, 1/6, 1/6)):
+            N = np.array([L[0]*(2*L[0]-1), L[1]*(2*L[1]-1), L[2]*(2*L[2]-1),
+                          4*L[0]*L[1], 4*L[1]*L[2], 4*L[2]*L[0]])
+            y_gp = float(N @ xy[:, 1])
+            g = GAMMA_SAT if y_gp <= y_w else GAMMA
+            total += 0.5 * abs(det_J) * (1/3) * g
+    return total
+
+
+def _element_constant_weight(fem_data, y_w):
+    """What the same model would weigh if the unit weight were one number per
+    element, chosen at the element centroid — the split this implementation
+    deliberately does not take."""
+    nodes, elements = fem_data['nodes'], fem_data['elements']
+    total = 0.0
+    for e in range(len(elements)):
+        xy = nodes[elements[e][:3]]
+        area = 0.5 * abs(np.dot(xy[:, 0], np.roll(xy[:, 1], -1))
+                         - np.dot(xy[:, 1], np.roll(xy[:, 0], -1)))
+        total += area * (GAMMA_SAT if xy[:, 1].mean() <= y_w else GAMMA)
+    return total
+
+
+def _check_straddle(failures):
+    """The water table cutting THROUGH elements, not along their edges.
+
+    Legs 1-4 put the water table on a zone boundary, where the split answer is
+    exact and known. This leg puts it at an elevation nothing in the geometry
+    marks, and asks three things of the gravity load vector:
+
+    * it reproduces the Gauss-point quadrature written out independently below,
+      to round-off — this is what says the split is taken point by point;
+    * it does NOT reproduce one weight per element, which would be a different
+      number on this mesh;
+    * it carries the weight the body really has, the two areas the water table
+      cuts the domain into weighed gamma_sat and gamma, to within a fraction of
+      a percent.
+
+    The last bound is loose on purpose. A fixed quadrature of a discontinuous
+    integrand misallocates part of every straddling element, and the residual
+    does not fall monotonically with mesh size because the per-element errors
+    carry both signs and cancel unevenly (measured on this slope: 7.1e-4, 7.2e-4
+    and 1.3e-4 of the total at target 4, 2 and 1). What the bound does catch is
+    a split taken at the wrong elevation or not taken at all — moist throughout
+    is 11.7% light here, saturated throughout 5.5% heavy.
+    """
+    y_w = 4.37                      # deliberately off every zone boundary
+    whole = Polygon(UPPER).union(Polygon(LOWER))
+    box = Polygon([(-1.0, -6.0), (41.0, -6.0), (41.0, y_w), (-1.0, y_w)])
+    a_sat = whole.intersection(box).area
+    exact = GAMMA_SAT * a_sat + GAMMA * (whole.area - a_sat)
+    print(f"  straddle: water table at y = {y_w:g} cuts through elements; "
+          f"the body weighs {exact:.4f} kN/m")
+    for target in (4.0, 2.0):
+        fem_data, _ = _unsplit_mesh(target, y_w)
+        prep = _prepare_fem_model(fem_data)
+        got = _total_weight(prep['F_gravity'], fem_data)
+        ref = _gauss_point_reference(fem_data, y_w)
+        lumped = _element_constant_weight(fem_data, y_w)
+        n_el = len(fem_data['elements'])
+        print(f"    target {target:g} ({n_el} elements): engine {got:.6f}, "
+              f"Gauss-point rule {ref:.6f}, one weight per element {lumped:.6f}, "
+              f"exact {exact:.4f} ({abs(got - exact) / exact:.2e} off)")
+        if abs(got - ref) > 1e-8 * exact:
+            failures.append(f"straddle (target {target:g}): the gravity load "
+                            f"carries {got:.6f} kN/m where the Gauss-point rule "
+                            f"gives {ref:.6f} — the split is not taken point by "
+                            f"point")
+        if abs(ref - lumped) <= 1e-8 * exact:
+            failures.append(f"straddle (target {target:g}): one weight per element "
+                            f"gives the same total as the Gauss-point rule on this "
+                            f"mesh, so the comparison above distinguishes nothing")
+        if abs(got - exact) / exact > 5e-3:
+            failures.append(f"straddle (target {target:g}): the gravity load "
+                            f"carries {got:.4f} kN/m where the body weighs "
+                            f"{exact:.4f} ({abs(got - exact) / exact:.2e} off)")
+
+
 def run():
     """Returns a list of failure strings (empty = pass)."""
     failures = []
@@ -240,7 +372,10 @@ def run():
                     solve_fem(fem_z_ru, F=1.0, fast_kernel=False),
                     failures, f"solve at F = 1, u = ru")
 
-    # --- leg 5: the split is not a no-op --------------------------------------
+    # --- leg 5: a water table that cuts through elements ----------------------
+    _check_straddle(failures)
+
+    # --- leg 6: the split is not a no-op --------------------------------------
     fem_dry = _build(mesh, zoned=False, moist_only=True)
     prep_dry = _prepare_fem_model(fem_dry)
     d, rel = _rel(prep_s['F_gravity'], prep_dry['F_gravity'])

@@ -284,21 +284,23 @@ better either,
 tabulates ranges by soil type in both kPa and psf.
 
 What a nominal stiffness costs, on this model and for the factor of safety, is
-nothing at all. The same mesh and the same bracket are run at a tenth of the
+almost nothing. The same mesh and the same bracket are run at a tenth of the
 file's modulus, at it, and at ten times it, all three at the default iteration
 budget:
 
 | E (psf) | vs. the file | SSRM FS | Largest displacement at *F* = 1 (ft) |
 | :---: | :---: | :---: | :---: |
-| 208,850 | ×0.1 | 1.3633 | 0.5699 |
-| 2,088,500 | ×1 | 1.3633 | 0.05699 |
-| 20,885,000 | ×10 | 1.3633 | 0.005699 |
+| 208,850 | ×0.1 | 1.3633 | 0.5700 |
+| 2,088,500 | ×1 | 1.3711 | 0.05700 |
+| 20,885,000 | ×10 | 1.3711 | 0.005700 |
 
-**The factor of safety is identical to every printed digit across a hundredfold
-sweep**, and so is the bracket it came from — and the first trial took the same
-56 iterations at all three moduli. **The displacements scale exactly as 1/E**:
-ten times the stiffness, a tenth of the movement, to four decimals, in every
-field the run reports.
+**Across a hundredfold sweep the factor of safety moves by one step of the
+bisection**: the two stiffer runs return the same number from the same bracket,
+and the softest returns the neighboring cell, 0.0078 below it, which is the width
+the search was asked to stop at. The first trial took the same 56 iterations at
+all three moduli. **The displacements scale exactly as 1/E**: ten times the
+stiffness, a tenth of the movement, to four significant figures, in every field
+the run reports.
 
 That is the whole of what E does here. It sets the scale of the deformation
 picture and it has no vote in the stability answer, because the answer turns on
@@ -365,33 +367,33 @@ That is what the Log reports, trial by trial:
 | Trial | *F* | Verdict | Iterations | Bracket after it |
 | --- | :---: | --- | :---: | :---: |
 | lower bound | 1.0000 | converged | 56 | — |
-| upper bound | 2.0000 | failed | 12,000 | [1.0000, 2.0000] |
-| 1 | 1.5000 | failed | 12,000 | [1.0000, 1.5000] |
+| upper bound | 2.0000 | failed | 181 | [1.0000, 2.0000] |
+| 1 | 1.5000 | failed | 1,161 | [1.0000, 1.5000] |
 | 2 | 1.2500 | converged | 124 | [1.2500, 1.5000] |
 | 3 | 1.3750 | failed | 12,000 | [1.2500, 1.3750] |
-| 4 | 1.3125 | converged | 490 | [1.3125, 1.3750] |
-| 5 | 1.3438 | converged | 2,790 | [1.3438, 1.3750] |
-| 6 | 1.3594 | converged | 11,904 | [1.3594, 1.3750] |
-| 7 | 1.3672 | failed | 36,000 | [1.3594, 1.3672] |
+| 4 | 1.3125 | converged | 304 | [1.3125, 1.3750] |
+| 5 | 1.3438 | converged | 316 | [1.3438, 1.3750] |
+| 6 | 1.3594 | converged | 328 | [1.3594, 1.3750] |
+| 7 | 1.3672 | converged | 393 | [1.3672, 1.3750] |
 
-**FS = 1.3633**, the midpoint of the final bracket [1.3594, 1.3672], reached in
+**FS = 1.3711**, the midpoint of the final bracket [1.3672, 1.3750], reached in
 nine solves. Seven bisection steps is not luck: each one halves the bracket, so
 from a starting width of 1.0 it takes seven halvings to get under the 0.01
 tolerance, and seven is what it took.
 
-<!-- test: file=files/xslope_ssrm_embankment.xlsx, type=fem_ssrm, expected_fs=1.3633, element_type=tri6, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-1-ssrm -->
+<!-- test: file=files/xslope_ssrm_embankment.xlsx, type=fem_ssrm, expected_fs=1.3711, element_type=tri6, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-1-ssrm -->
 
 **The iteration column is where the physics is.** Trials well below the critical
 factor settle almost immediately — 56 iterations at *F* = 1.00, 124 at 1.25.
 Nearer the transition the slope has to redistribute stress through more and more
-yielded soil before it can balance, and the count climbs steeply: 490 at 1.3125,
-2,790 at 1.3438, and **11,904** at 1.3594, the highest trial that made it. Past
+yielded soil before it can balance, and the count climbs: 304 at 1.3125, 316 at
+1.3438, 328 at 1.3594 and **393** at 1.3672, the highest trial that made it. Past
 the transition the count stops meaning anything, because there is nothing to
-converge to — the last trial, at 1.3672, was still moving after 36,000
-iterations when the search gave up on it. Down that column the method's
-definition of failure stops being an abstraction: the slope does not snap at
-some *F*, it takes longer and longer to find equilibrium until there is no
-equilibrium to find.
+converge to — the trial at 1.3750 was still moving when it had spent its whole
+12,000-iteration budget, and that is the one the search recorded as failed. Down
+that column the method's definition of failure stops being an abstraction: the
+slope does not snap at some *F*, it takes longer to find equilibrium and then
+there is no equilibrium to find.
 
 ---
 
@@ -412,15 +414,16 @@ resolution on the answer and costs one more trial per halving:
 | Tolerance | FS | Final bracket | Trials |
 | :---: | :---: | :---: | :---: |
 | 0.05 | 1.3594 | [1.3438, 1.3750] | 7 |
-| 0.01 (default) | 1.3633 | [1.3594, 1.3672] | 9 |
-| 0.005 | 1.3652 | [1.3633, 1.3672] | 10 |
+| 0.01 (default) | 1.3711 | [1.3672, 1.3750] | 9 |
+| 0.005 | 1.3691 | [1.3672, 1.3711] | 10 |
 
-What moves as the tolerance tightens is the bracket's **lower** edge — the
-highest *F* that actually reached equilibrium. It climbs from 1.3438 to 1.3594
-to 1.3633 as the search is allowed to look between trials it previously skipped
-over, and the reported midpoint follows it up. The upper edge barely moves,
-because the failed trials above the transition fail wherever they are tried. The
-default is a sensible place to leave it: the last halving moves the answer 0.002.
+What moves first as the tolerance tightens is the bracket's **lower** edge — the
+highest *F* that actually reached equilibrium. It climbs from 1.3438 to 1.3672 as
+the search is allowed to look between trials it previously skipped over, and the
+reported midpoint follows it up. The upper edge only comes down at the tightest
+setting, where the search tries 1.3711 for the first time and finds no
+equilibrium there. The default is a sensible place to leave it: the last halving
+moves the answer 0.002.
 
 ### Max iterations per trial decides how long a near-critical trial may work
 
@@ -432,15 +435,15 @@ budget's worth, and another, up to the
 **Iteration ceiling** on the same dialog, which opens at 50,000. Only a trial
 whose displacements are growing stops at its budget and is recorded as failed.
 
-That is what the last two rows of the walk above are showing. The trial at
-*F* = 1.3594 took **11,904** iterations to settle — it was never failing, it was
-still working — and the one at 1.3672 was extended twice, to 36,000, before the
-search accepted that it was running away.
+That is what the third bisection step above is showing. The trial at
+*F* = 1.3750 spent a full **12,000** iterations with its displacements still
+growing, and that is the one the search recorded as failed; every trial that
+settles at all settles inside four hundred.
 
 Because the budget extends itself, it does not decide the answer. Run the same
-model with it set to 3,000 and the search returns **the same 1.3633** from the
-same bracket: the trial at 1.3594 is extended three times instead of running
-inside one budget, and it converges at the same 11,904 iterations either way.
+model with it set to 3,000 and the search returns **the same 1.3711** from the
+same bracket: the trial at 1.3750 is extended three times instead of running
+inside one budget, and it stops at the same 12,000 iterations either way.
 The budget sets how coarsely the work is granted, not whether a slow trial is
 allowed to finish.
 
@@ -458,12 +461,12 @@ trial has to be decided. No trial on this model reaches it.
 | Reading | FS |
 | --- | :---: |
 | Spencer's method, searched on this page | 1.376 |
-| Strength reduction, this page's run | 1.363 |
+| Strength reduction, this page's run | 1.371 |
 | Strength reduction, as [the FEM overview reports it](../fem/overview.md#what-to-expect) for this model | 1.366 |
 | Griffiths & Lane's own finite element result | 1.4 |
 
-The strength reduction answer sits **0.2% below** the documented value for this
-model and **about 1% below** Spencer's — two methods that share almost none of
+The strength reduction answer sits **0.4% above** the documented value for this
+model and **0.4% below** Spencer's — two methods that share almost none of
 their machinery, within a percent of each other.
 
 They agree because they are answering the same question about the same soil.
@@ -501,7 +504,7 @@ are the viscoplastic shear strain — the shearing
 that is left after the elastic response is subtracted — and the band they draw
 is the failure mechanism. It runs from the crest at about x = 50, down through
 the body of the slope, to a hot spot at the toe between x = 120 and x = 150,
-where the strain reaches 0.646.
+where the strain reaches 0.672.
 
 Nothing about that shape was entered. There was no circle and no surface in this
 run; the band is where the soil chose to shear, and it emerges in the same place
@@ -525,15 +528,15 @@ multiplier itself — the number the plot prints in its own title — and its
 default reads **Auto**. On Auto, the multiplier is whatever draws the field's
 largest displacement at the **Auto size** percentage of the mesh height,
 default 15: here 15% of 50 ft is 7.5 ft, the largest viscoplastic displacement
-is 7.64 ft, and Auto lands on **1.0×** — this collapse has developed far enough
-to draw at true scale. Type a number into **Scale ×** to pin the exaggeration
+is 8.09 ft, already past it, and Auto lands on **1.0×** — this collapse has
+developed far enough to draw at true scale. Type a number into **Scale ×** to pin the exaggeration
 instead, which is how two figures are compared at one setting; Auto size dims while an explicit value holds. The box's spin arrows
 redraw the view at every step, and that turns the control into something better
 than a setting: start at Auto and hold the up arrow, and the mesh deforms a
 step at a time — the crest dropping and the toe bulging in what amounts to an
 animation of the slope failing. The reason Auto exists is on display in the
-next section — the same 15% asks for 131× on the converged state, because the
-two states differ by more than a hundredfold in how far the slope moved.
+next section — the same 15% asks for 7.5× on the converged state, because the
+two states differ eightfold in how far the slope moved.
 
 ### Displacement vectors
 
@@ -555,48 +558,48 @@ The run kept two fields, and putting them side by side is where the method's
 definition of failure becomes concrete. We switch **Field state** to **Last
 converged** to see the other one. The panel that comes up is as fully colored as
 the one before it, because Studio scales each field state to its own range. The
-number to read is the color bar beside it: it tops out around **0.008** instead
-of 0.646, about eighty times smaller. That range, not the colors, is what says
-the converged state has barely moved.
+number to read is the color bar beside it: it tops out around **0.32** instead
+of 0.67, about half. That range, not the colors, is what says the converged state
+has strained along the same band without running away on it.
 
 | | Last converged trial | Captured failed state |
 | --- | --- | --- |
-| *F* | 1.3594 | 1.5678 |
+| *F* | 1.3672 | 1.5768 |
 | Equilibrium reached | yes | no |
-| Viscoplastic iterations | 11,904 | 12,000 — the budget |
-| Elements that have yielded, of 1,087 | 210 | 609 |
-| Largest displacement (ft) | 0.106 | 7.646 |
-| Relative to the elastic response | 1.9× | 134.8× |
+| Viscoplastic iterations | 393 | 12,000 — the budget |
+| Elements that have yielded, of 1,087 | 449 | 522 |
+| Largest displacement (ft) | 0.999 | 8.090 |
+| Relative to the elastic response | 17.6× | 142.6× |
 
 An element counts as yielded once it has accumulated permanent strain — shearing
 that stays in the soil rather than springing back when the stress is relieved.
 
-At *F* = 1.3594 the slope is not intact — 210 elements have yielded and the
-crest has moved 0.106 ft, about 1.9 times its own elastic response — but it
+At *F* = 1.3672 the slope is not intact — 449 elements have yielded and the
+crest has moved 0.999 ft, about 18 times its own elastic response — but it
 **stops**. The stresses redistribute onto soil that has strength left, the
-iteration settles, and there is an equilibrium state to report. At *F* = 1.57
-there is none: 609 elements yield, the movement passes a hundred and thirty
+iteration settles, and there is an equilibrium state to report. At *F* = 1.58
+there is none: 522 elements yield, the movement passes a hundred and forty
 times the elastic response, and it is still growing when the iteration budget
 runs out. Nothing broke in the model. It simply never stopped moving, and that
 is the whole of what the method means by failure.
 
 That second field is captured deliberately. Right at the critical factor the
 collapse develops too slowly to draw, so once the bracket resolves the run
-re-solves once at FS × 1.15 — the **Capture margin** on the dialog, 1.3633 ×
-1.15 = 1.57 — with the displacement cap and the early exit off, purely to
+re-solves once at FS × 1.15 — the **Capture margin** on the dialog, 1.3711 ×
+1.15 = 1.58 — with the displacement cap and the early exit off, purely to
 develop the mechanism the figures show. The factor of safety, the bracket and
 the converged field are unaffected either way.
 
-The figure below is the converged state at *F* = 1.3594, drawn the way Studio
+The figure below is the converged state at *F* = 1.3672, drawn the way Studio
 draws it, on its own range:
 
-![The converged state at F = 1.3594, scaled to its own strain range](images/fem01_shear_strain_converged.png){width=1000}
+![The converged state at F = 1.3672, scaled to its own strain range](images/fem01_shear_strain_converged.png){width=1000}
 
 The band is already there. The strain concentrates along the same crest-to-toe
 path the failed state develops, hot spot at the base near the toe and all — but
-the color bar tops out near 0.008 where the failed state's reached 0.646.
+the color bar tops out near 0.32 where the failed state's reached 0.67.
 Below the critical factor the embankment strains along the eventual surface and
-stops; past it, the same band runs away eightyfold. The transition the
+stops; past it, the same band runs away. The transition the
 bisection spent nine solves locating is the transition between these two
 pictures.
 
@@ -616,7 +619,7 @@ This tutorial covered:
   size chosen against what the mechanism needs, and the base and side conditions
   the mesh is held by.
 - The bracket the search validates and bisects, and the iteration count climbing
-  from 56 to 11,904 as the trials approach the critical factor.
+  from 56 to 393 as the trials approach the critical factor.
 - Two controls that look alike and are not: the tolerance that sets the
   bracket's stopping width, and the per-trial iteration budget, which is where
   the automatic extension starts rather than where a slow trial dies.

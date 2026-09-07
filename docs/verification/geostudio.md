@@ -76,7 +76,7 @@ is not fully built and verified one of the [shared status terms](index.md#status
 | [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.03 m of SEEP/W head at t = 46 800 s (0.4% of the 8 m suction step) | **built**; unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.02 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
 | [T03](#seepw-t03) | 🟢 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.09–0.23 m through the 30-day drawdown (1.1–2.9% of the 8 m drawdown); the published factor-of-safety-vs-time curve is reproduced at every saved step of both drawdown rates | **built** (both drawdown rates); the reference columns are the vendor's own solved `node.csv` field, sampled with the same probe used on XSLOPE's, and its solved minimum factor of safety per step |
 | [T04](#seepw-t04) | 🟢 | SEEP/W – Leakage from pond with clay liner | Interior head within ±0.02 m of SEEP/W at the near-steady leaking state (0.3% of the 6.5 m pond head) · 0.08–0.14 m low mid-fill (2.1% at worst) | **built**; the residual is in the filling *rate*, on a problem whose timing the saturated-only storage convention governs outright |
-| [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within ~0.04 m of SEEP/W at the initial and early frames and ~0.12 m at the high-rate near-steady (0.5–1.5% of the 8 m column) | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column |
+| [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within 0.003 m of SEEP/W at the initial frame and 0.07 m at the high-rate near-steady, over the locked stations | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column, the van Genuchten pair fitted to the vendor's conductivity table over the suctions the column reaches |
 | [T06](#seepw-t06) | <span class="nodata">⊘</span> | SEEP/W – Infiltration into multi-layered system | Two gates on the 14-layer infiltration leg: a measured, non-steady per-layer initial condition no steady solve returns, and a unit-gradient (free-drainage) base boundary that is not in the solver's boundary-condition set. The drainage leg is hysteretic, and XSLOPE carries one retention curve per material. | *blocked* |
 | [T07](#seepw-t07) | 🟢 | SEEP/W – GeoStudio-PEST Multistep Outflow | Column total head −0.093 / −0.134 / −0.175 m at the three stages, reproducing SEEP/W's −0.07 … −0.22 m pressure field to the published read-off precision | **built**; stepped base suction through a time-varying head (plain-Dirichlet) series |
 | [SRS](#sigmaw-wall) | 🔴 | SIGMA/W – Slope stabilization with a sheet pile wall | No wall: SSRM 1.048 vs SIGMA/W SRS 1.025 (+2.2%) — with the same project's FE stability 1.035 (+1.3%) and Morgenstern-Price 1.033 (+1.5%) · with the wall: SSRM 1.691 vs SIGMA/W SRS 1.4 (+20.8%) | **built**; the like-for-like case without the wall agrees. Both published factors are interpretations of an SRS sweep rather than solver outputs, and the wall case is read off a still-rising curve that the sweep never brackets from above. The wall's moment and shear reproduce the published shape and turning point at about four-fifths of the published peaks |
@@ -1271,9 +1271,8 @@ at a 0.03 m regression tolerance.
 A one-dimensional column of leach ore under a surface irrigation flux — the test of
 XSLOPE's **specified-flux (Neumann) boundary** path and the van Genuchten
 moisture-capacity storage in a gravity-drained unsaturated column. The uniform silty-sand
-ore column (8 m, Ksat = 5×10⁻⁶ m/s, θ_s = 0.5, θ_r = 0.025; the vendor retention spline
-maps to van Genuchten α = 1.39 /m, n = 1.90) drains freely at its base and takes a
-downward irrigation flux at its top, bound to a `tseep` series. The initial condition is
+ore column (8 m, Ksat = 5×10⁻⁶ m/s, θ_s = 0.5, θ_r = 0.025) drains freely at its base and
+takes a downward irrigation flux at its top, bound to a `tseep` series. The initial condition is
 the low-rate steady state (q = 3×10⁻⁷ m/s); at t = 0 the series steps to the high rate
 (q = 3×10⁻⁶ m/s) and the extra water works its way down. The example's other, non-transient
 analyses layer the coarse and fine ore; the transient rate case runs on the single uniform
@@ -1286,6 +1285,19 @@ upper side is declared a potential seepage-exit face. It never activates, but it
 the t = 0 solve through the unsaturated solver; without it the linear confined initial
 condition would return a dry hydrostatic column and the front would never advance.
 
+The example carries a retention spline and a conductivity spline for this ore as
+independent 20-point curves, and XSLOPE carries one van Genuchten pair per material that
+sets both kr(ψ) and the moisture capacity. Where a vendor ships a conductivity table
+against a two-parameter law, the law is fitted to the **conductivity**, by least squares
+in log₁₀ kr, over the suction range the run reaches — the rule [SEEPW-T04](#seepw-t04) and
+[GW20](rocscience_groundwater.md#gw20) are built on. This column's field lies between ψ = 0
+and the unit-gradient plateau its irrigation rate sets, and the largest suction anywhere in
+the mesh over the whole march is 0.785 m, so the fit is made over ψ ≤ 0.8 m, which holds 14
+of the 20 tabulated conductivity points: **α = 1.3642 /m, n = 1.9888**, holding the table
+to 0.0009 decades rms and 0.0013 at worst over that range. The same pair reproduces the
+vendor's retention table to 0.0033 in water content over the fitted range and 0.0063 over
+the whole of it.
+
 **Input:** [gs2_heap.xlsx](files/geostudio/gs2_heap.xlsx)
 
 ![SEEPW-T05: pressure-head profile vs time, XSLOPE vs SEEP/W](images/gs2_heap.png){width=800px}
@@ -1295,22 +1307,25 @@ closed form), so the seepage comparison is SEEP/W's own solved `node.csv`:
 
 | Frame | XSLOPE total head at y = 2 / 4 / 6 m | Δ vs SEEP/W (bound over the sampled stations) |
 |---|---|---|
-| Initial condition, low rate (t = 0) | 1.2471 / 3.2540 / 5.2570 | within ≈0.04 m of head |
-| High-rate near-steady (t = 96 h) | 1.8479 / 3.8634 / 5.8670 | up to ≈0.12 m at the deep stations |
+| Initial condition, low rate (t = 0) | 1.2197 / 3.2165 / 5.2190 | within 0.003 m of head |
+| High-rate near-steady (t = 96 h) | 1.8055 / 3.8369 / 5.8370 | within 0.07 m, and 0.001 m at y = 6 m |
 
 SEEP/W's own per-station values are not reproduced here — the vendor `.gsz` and its solved
 `node.csv` are Seequent's — so the comparison column carries the bound the frames satisfy
-rather than a per-station source value. At the high-rate near-steady end state XSLOPE
-reaches a flatter, slightly wetter unit-gradient profile than SEEP/W, the van Genuchten
-kr(ψ) wetting the column a little faster than the vendor's tabulated conductivity spline;
-the figure shows the XSLOPE markers on the SEEP/W profile at the initial and early frames
-and standing off it there. The locks are XSLOPE's own solved total heads at interior
-elevations at the two frames, at a 0.03 m regression tolerance.
+rather than a per-station source value. Both unit-gradient plateaus land on SEEP/W's: the
+low-rate initial profile agrees to 0.003 m of head at every station and the high-rate end
+state's deep column to 0.001 m. What stands off is the descending wetting front and the
+boundary layer above the drained base, where the column reads up to 0.12 m drier across the
+front at the middle frame and 0.18 m in the bottom metre at the end frame — the storage
+side of the same (α, n), which the conductivity fit does not reach. The figure shows the
+XSLOPE markers on the SEEP/W profiles away from the front. The locks are XSLOPE's own
+solved total heads at interior elevations at the two frames, at a 0.03 m regression
+tolerance.
 
 **Sources:** GeoStudio SEEP/W example "Mineral Heap Leaching" (Seequent).
 
-<!-- test: file=files/geostudio/gs2_heap.xlsx, type=tseep_head, target_size=0.2, time=0, max_head_change_frac=0.05, points=0.1:2:1.2471;0.1:4:3.2540;0.1:6:5.2570, tolerance=0.03, benchmark=SEEPW-HEAP-ic -->
-<!-- test: file=files/geostudio/gs2_heap.xlsx, type=tseep_head, target_size=0.2, time=345600, max_head_change_frac=0.05, points=0.1:2:1.8479;0.1:4:3.8634;0.1:6:5.8670, tolerance=0.03, benchmark=SEEPW-HEAP-end -->
+<!-- test: file=files/geostudio/gs2_heap.xlsx, type=tseep_head, target_size=0.2, time=0, max_head_change_frac=0.05, points=0.1:2:1.2197;0.1:4:3.2165;0.1:6:5.2190, tolerance=0.03, benchmark=SEEPW-HEAP-ic -->
+<!-- test: file=files/geostudio/gs2_heap.xlsx, type=tseep_head, target_size=0.2, time=345600, max_head_change_frac=0.05, points=0.1:2:1.8055;0.1:4:3.8369;0.1:6:5.8370, tolerance=0.03, benchmark=SEEPW-HEAP-end -->
 
 ### ⊘ SEEPW-T06 — Infiltration into multi-layered system (blocked) {#seepw-t06}
 

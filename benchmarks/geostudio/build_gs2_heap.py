@@ -16,12 +16,39 @@ cases both run on the single uniform "Mineral ore" silty sand, as read from the
 vendor Contexts. So this is a one-material column, not a layered one.)
 
 Model (from the vendor .gsz, read-only oracle -- never committed):
-    1-D column 8 m tall (SatUnsat), Ksat = 5e-6 m/s.  The vendor VWC "Ore W/C -
-    silty sand" (theta_s = 0.5, theta_r = 0.0251 -> Sy = 0.475) is a 20-point
-    spline; a van Genuchten fit (suction kPa -> pressure head m) gives vg_a =
-    1.393 /m, vg_n = 1.897 (RMS 0.005 in effective saturation).  No Beta (mv) is
-    set on the material, so the small saturated storage does not enter (the column
-    never saturates); Ss = 1e-4 /m is used as a nominal floor.
+    1-D column 8 m tall (SatUnsat), Ksat = 5e-6 m/s.  The vendor carries TWO
+    independent 20-point splines for the "Mineral ore" silty sand: a retention
+    curve "Ore W/C - silty sand" (theta_s = 0.5, theta_r = 0.0251 -> Sy = 0.475)
+    and a conductivity curve "Ore conductivity" (5e-6 m/s at psi = 0.001 m down
+    to 2e-12 at psi = 10.2 m).  No Beta (mv) is set on the material, so the small
+    saturated storage does not enter (the column never saturates); Ss = 1e-4 /m
+    is used as a nominal floor.
+
+    THE FIT.  Where a vendor ships a conductivity table and XSLOPE ships a
+    two-parameter law, the law is fitted to the CONDUCTIVITY table, by least
+    squares in log10 kr, over the suction range the shipped run actually visits.
+    (SEEPW-T04 and GW#20 are built on the same rule.)  This column is drained at
+    its base and fed at its top, so its whole field sits between psi = 0 and the
+    unit-gradient plateau the irrigation rate sets: the largest suction anywhere
+    in the mesh, over every accepted step, is 0.785 m.  The fit is therefore made
+    over psi <= 0.8 m, which holds 14 of the 20 tabulated conductivity points,
+    and gives vg_a = 1.3642 /m, vg_n = 1.9888.  It reads 0.0009 decades rms
+    (0.0013 worst) against the table over that range.  Over the whole 20-point
+    table it reads 0.42 decades: the six points beyond psi = 0.9 m carry five of
+    the table's six decades, and no van Genuchten-Mualem pair follows the
+    vendor's spline that far down -- but the column never reaches them.  Over the
+    17 points above kr = 2e-4, the live part of the curve, it reads 0.003.
+
+    That one pair also sets the moisture capacity, so the conductivity fit is
+    paid for in water content: theta rms against the vendor's retention table is
+    0.0033 over psi <= 0.8 m and 0.0063 over the whole table, with the worst
+    single point 0.0145 in water content at psi = 1.47 m -- again a suction the
+    column never reaches.  A pair fitted to the retention table instead
+    (vg_a = 1.3927, vg_n = 1.8965) buys 0.0025 and 0.0026 in theta and costs
+    0.030 decades rms and 0.063 worst in kr across the range the column lives in,
+    which is a one-sided deficit: it sits below the vendor's conductivity
+    everywhere the model reaches, and moves both unit-gradient plateaus about
+    0.04 m of head off SEEP/W's.
 
 Boundary + initial conditions:
     Base (y = 0): specified head = 0 (the free-draining "zero pressure" outlet).
@@ -47,9 +74,13 @@ saved step).  The published external answer is a graphical VWC/flow-rate respons
 (no closed form), so the seepage lock is the PWP/head field, not a headline scalar.
 The locked values are XSLOPE's own solved total heads at interior elevations at
 the IC and the near-steady end state; the docs tabulate the SEEP/W comparison and
-report the achieved deltas honestly (IC and early frames agree within ~0.04 m of
-head; the high-rate near-steady end state within ~0.12 m -- the recurring SWCC-
-mapping timing caveat, the vG fit vs SEEP/W's tabulated retention/kr spline).
+report the achieved deltas honestly.  The conductivity fit above sets the two
+unit-gradient plateaus the column settles at, and they land on the vendor's: the
+low-rate IC profile agrees within 0.003 m of head at every sampled station, and
+the high-rate end state's deep plateau within 0.001 m.  What stands off is the
+descending wetting front and the boundary layer above the drained base -- up to
+0.12 m at the front in the middle frame and 0.18 m in the bottom metre at the
+end frame -- and that is the storage side of the same pair, not its kr side.
 
 Run:  PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_heap.py
       PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_heap.py --locks
@@ -82,8 +113,8 @@ _K = 5e-6                        # saturated conductivity [m/s]
 _THETA_S = 0.5
 _THETA_R = 0.0251
 _SY = _THETA_S - _THETA_R        # 0.475
-_VG_A = 1.3927                   # van Genuchten alpha [1/m]  (fit to Ore silty sand)
-_VG_N = 1.8965                   # van Genuchten n [-]
+_VG_A = 1.3642                   # van Genuchten alpha [1/m]  (fit to the ore k table)
+_VG_N = 1.9888                   # van Genuchten n [-]
 _SS = 1e-4                       # nominal saturated storage [1/m] (column never saturates)
 _HEIGHT = 8.0                    # column height [m]
 _WIDTH = 0.2                     # column width (arbitrary; 1-D) [m]

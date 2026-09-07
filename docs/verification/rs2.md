@@ -613,8 +613,9 @@ model, which is the model these two files are built from; that is the Part IV co
 own rebuild of the same geometry is the native column. Neither run restricts the search with an
 SSR polygon; only case 3, the water-table case, carries one, and that case is not built. The two
 vendor answers differ from each other by about 6%. XSLOPE is −0.4% and +0.8% from the native
-values and +5.9% and +6.9% from the Part IV values. The row is scored against Part IV, because
-that is the solution of the model the files reproduce.
+values and +5.9% and +6.9% from the Part IV values. The row is scored against Part IV because
+both files and the Part IV solution come from the same Slide2 VP22 model file; the native solution
+is RS2's own separately built model of the problem.
 
 <!-- test: file=files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-18-m2.0 -->
 <!-- test: file=files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-18 -->

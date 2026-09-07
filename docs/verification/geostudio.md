@@ -20,6 +20,9 @@ is not fully built and verified one of the [shared status terms](index.md#status
 - Most of these problems are also in the [Slide2 corpus](rocscience.md); where one is built there the row
   reads *covered* and links to it, and one XSLOPE input file serves both pages.
 
+Full bibliographic details for the author-year citations on this page are on the shared
+[References](references.md) page.
+
 
 <div class="corpus-summary match" markdown>
 

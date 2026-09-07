@@ -17,6 +17,9 @@ How the manual's problems reach this corpus:
   `build_vp038.py`, for the steady unsaturated seepage field behind it) and `make_figures.py` the
   figures, model inputs beside a representative solved surface.
 
+Full bibliographic details for the author-year citations on this page are on the shared
+[References](references.md) page.
+
 <!-- test: file=files/rocscience/vp002.xlsx, type=circular_search, num_slices=40, fs_bishop=1.589, fs_spencer=1.585, fs_janbu=1.481, fs_mprice=1.586, benchmark=VP2 -->
 <!-- test: file=files/rocscience/vp003.xlsx, type=circular_search, num_slices=40, fs_bishop=1.403, fs_spencer=1.372, fs_janbu=1.354, fs_mprice=1.371, benchmark=VP3 -->
 <!-- test: file=files/rocscience/vp004.xlsx, type=circular_search, num_slices=40, fs_bishop=1.013, fs_spencer=0.989, fs_janbu=0.963, fs_mprice=0.987, benchmark=VP4 -->

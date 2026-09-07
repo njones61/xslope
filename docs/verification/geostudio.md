@@ -378,7 +378,7 @@ The SLOPE/W model carries the comparison directly: its "Fully Specified" analysi
 |---|---|---|---|---|---|
 | Spencer | 1.043 | 0.960* (+8.6%) | 0.941 (+10.8%) | 1.0 (+4.3%) | the closed form is the governing anchor |
 
-\* SLOPE/W's own Morgenstern-Price solution on its fully-specified surface, not an XSLOPE re-solve — see above.
+\* SLOPE/W's own Morgenstern-Price solution on its fully-specified surface, not an XSLOPE re-solve.
 
 XSLOPE's Spencer and SLOPE/W's own Morgenstern-Price bracket the theoretical 1.0 from
 opposite sides — the same interslice-convention spread that separates XSLOPE's Spencer

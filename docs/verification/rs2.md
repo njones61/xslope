@@ -603,9 +603,10 @@ Slide2 counterpart: [VP22](rocscience.md#vp22). Built for the dry and r<sub>u</s
 *Both files are the Slide2 VP22 model, so the Part IV column is the pairing. The native column is
 the same vendor's second solution of the same problem, −0.4% and +0.8% from XSLOPE.*
 
-This one returns the *same* factor at 3.0 m and 2.0 m — the mechanism is pinned by the weak
-seam, a geometric feature, so it cannot migrate with refinement. The contrast with
-[#14](#rs2-14) is the point: there, nothing pins the band. The water-table case is not built.
+The factor of safety is the same at 3.0 m and 2.0 m element sizes. The mechanism follows the
+weak seam, a geometric feature, so it does not move with mesh refinement, unlike
+[RS2-14](#rs2-14), where no feature fixes the failure band. Case 3, with the water table, is not
+built.
 
 **RS2 solved this problem twice, and both runs are unconstrained.** The Part IV `.fez` files for
 cases 1 and 2 carry no SSR polygon (only the unbuilt case 3, water table, does), and the native

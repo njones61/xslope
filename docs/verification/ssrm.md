@@ -534,8 +534,8 @@ FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rol
 
 ![griffiths4_mesh.png](../fem/images/griffiths4_mesh.png){width=1000}
 
-Results. The two cases straddle a change of failure mechanism, which is the point of the
-example. Griffiths & Lane's own finite-element results for this problem are the curve in
+Results. The two cases straddle a change of failure mechanism, which is what the example
+is built to show. Griffiths & Lane's own finite-element results for this problem are the curve in
 their Fig. 10; XSLOPE lands within 1.4% of it at both bracket cases, and reproduces the
 relative jump between them to the same 1.4%. Also printed on that figure are Taylor's (1937)
 classical stability-number solutions — the deep **base circle** at $c_{u2} = c_{u1}$
@@ -789,8 +789,8 @@ The wet case is a strong test of the pore-pressure treatment. Under the
 effective-stress formulation with consistently integrated boundary loads, the
 submerged soil simply carries its buoyant weight: a solve at F = 1 converges in
 a handful of iterations with an essentially elastic strain field (flooded
-ground at working strength sits quietly — a sanity check worth running on any
-submerged model), and the failure boundary emerges sharply at F = 1.87 under
+ground at working strength sits quietly, which any submerged model should
+reproduce at F = 1), and the failure boundary emerges sharply at F = 1.87 under
 the default failure criterion. The agreement with limit equilibrium is
 striking: XSLOPE's own Spencer analysis of the same section finds the same
 downstream critical surface as the paper's, and the relative reservoir effect

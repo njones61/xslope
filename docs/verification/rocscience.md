@@ -2464,7 +2464,7 @@ K<sub>y</sub>, and it agrees to −0.5%. Displacement is also far more sensitive
 acceleration than the factor of safety is: XSLOPE's K<sub>y</sub> runs +2.9% high because a circular
 search cannot follow Slide2's surface-altering optimization, and carried through the same
 integration that 2.9% removes about 11% of the displacement. That amplification is why the yield
-acceleration, not the displacement, is the quantity worth locking.
+acceleration, not the displacement, is the locked quantity.
 
 **Scope.** XSLOPE's seismic modeling is pseudo-static: a seismic coefficient in the
 limit-equilibrium solve, plus the `critical_kc` search for the k at which the searched minimum

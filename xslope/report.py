@@ -2011,6 +2011,7 @@ def _seep_materials_table(slope_data, counter, unsaturated=True):
              False),
             ("vg_a", "a", lambda m: _fmt(m.get("vg_a"), "{:.4g}"), False),
             ("vg_n", "n", lambda m: _fmt(m.get("vg_n"), "{:.3f}"), False),
+            ("vg_l", "l", lambda m: _fmt(m.get("vg_l"), "{:.4g}"), False),
         ]
     return _property_table(slope_data, fields, "Seepage material properties",
                            counter)

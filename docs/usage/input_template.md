@@ -75,7 +75,7 @@ reinforcement, and boundary conditions to scale.
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks the template format for compatibility. The current version is **25**. xslope refuses a file whose version is newer than it understands, so an older install cannot silently mis-read a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
+- **Template version**: Tracks the template format for compatibility. The current version is **26**. xslope refuses a file whose version is newer than it understands, so an older install cannot silently mis-read a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
 - **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial), so existing files behave exactly as before.
 - **Time** (`sec`, `min`, `hr`, `day`, or `yr`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
 - **Unit weight of water** (γw) — **[F/L³]**: used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type wins (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
@@ -390,6 +390,14 @@ The remaining columns hold the seepage properties, shown in the third view below
       head **[L]**; $a$'s units follow from $n$ so that $a\,\psi^{\,n}$ is dimensionless.
 
   The columns are deliberately law-agnostic — one pair serves both models rather than two near-duplicate pairs.
+
+- **l** **[–]**: the Mualem pore-connectivity exponent of the van Genuchten conductivity curve,
+  $k_r = S_e^{\,l}\left[1 - (1 - S_e^{1/m})^m\right]^2$. Mualem derived $l = 1/2$ from a bundle of
+  capillary tubes, and a blank cell means exactly that. A curve fitted to measured conductivity
+  carries its own exponent instead — published fits run from about $-6$ to $3$, so a negative value
+  is admissible — and entering it lets one $(\alpha, n)$ pair reproduce a measured retention curve
+  and a measured conductivity curve at the same time. The column is read only for `unsat = vg`;
+  the Gardner form has no such term.
 
 **Transient storage (Ss / Sy).** These two columns supply the
 storage properties that a **transient** (time-dependent) seepage analysis needs — the analysis

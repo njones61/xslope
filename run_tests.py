@@ -4911,6 +4911,13 @@ PREFLIGHT_RULE_SPECS = [
          analysis='seep',
          mutation=lambda sd: _pf_mats(sd, unsat='lf', kr0=0.0, h0=0.0),
          expect='needs kr0 > 0'),
+    dict(rule='seep.vg_l_unusual', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_mats(sd, unsat='vg', vg_a=1.0, vg_n=2.0,
+                                      vg_l=9.0),
+         control=lambda sd: _pf_mats(sd, unsat='vg', vg_a=1.0, vg_n=2.0,
+                                     vg_l=0.295138),
+         expect='outside the -2 to 3'),
     dict(rule='seep.confined_unsat_unused', base=PREFLIGHT_BASE_SEEP, mode='dict',
          analysis='seep',
          mutation=lambda sd: _pf_mats(
@@ -12945,23 +12952,27 @@ def run_no_void_test(test):
 def run_vg_kr_test(test):
     """Unit check for the van Genuchten relative-permeability function and the
     kr-model dispatch (xslope.seep). Verifies kr_vg_vec against an independent
-    scalar evaluation of the Mualem-vG formula across pressure heads and (alpha, n),
-    the saturation / floor / monotonicity behavior, and that the dispatcher reduces
-    EXACTLY to the linear-front kr when no vG model is active. Returns (0.0, None)
+    scalar evaluation of the Mualem-vG formula across pressure heads, (alpha, n)
+    and the pore-connectivity exponent l, the saturation / floor / monotonicity
+    behavior, that l = 0.5 (scalar or per element) is BIT-identical to the fixed
+    half-power the function carried before l was an input, and that the dispatcher
+    reduces EXACTLY to the linear-front kr when no vG model is active. Returns (0.0, None)
     on success, else (None, message). No mesh / gmsh needed."""
     import numpy as np
     from xslope.seep import (kr_vg_vec, kr_relative_vec, kr_relative,
                              kr_frontal_vec, KR_LF, KR_VG)
     KR_MIN = 1e-8
 
-    def vg_scalar(p, a, n):
+    def vg_scalar(p, a, n, l=0.5):
         # Independent scalar reference for Mualem-van Genuchten kr.
         n = max(n, 1.0 + 1e-6)
         m = 1.0 - 1.0 / n
         if p >= 0.0:
             return 1.0
         se = (1.0 + (a * abs(p)) ** n) ** (-m)
-        kr = (se ** 0.5) * (1.0 - (1.0 - se ** (1.0 / m)) ** m) ** 2
+        if se <= 0.0:
+            return KR_MIN
+        kr = (se ** l) * (1.0 - (1.0 - se ** (1.0 / m)) ** m) ** 2
         return min(max(kr, KR_MIN), 1.0)
 
     problems = []
@@ -12979,6 +12990,29 @@ def run_vg_kr_test(test):
         if np.any(np.diff(unsat) < -1e-12):     # drier (more negative p) -> lower kr
             problems.append(f"kr not monotonic in p for (a={a}, n={n})")
 
+    # The Mualem pore-connectivity exponent (v26). l=0.5 is the default AND must be
+    # bit-identical to the fixed-exponent function it replaced -- the whole seepage
+    # corpus rests on that -- and a fitted l (SEEP/W's PEST value, a negative one)
+    # must follow the closed form.
+    for a, n in [(0.075, 1.89), (8.893968, 10.190417)]:
+        base = kr_vg_vec(heads, a, n)
+        for l, tag in [(0.5, "scalar 0.5"), (np.full(heads.shape, 0.5), "array 0.5")]:
+            if not np.array_equal(kr_vg_vec(heads, a, n, l), base):
+                problems.append(f"kr_vg_vec at l={tag} is not bit-identical to the "
+                                f"default for (a={a}, n={n})")
+        for l in (0.295138, -0.5, 1.4):
+            got = kr_vg_vec(heads, a, n, l)
+            ref = np.array([vg_scalar(float(p), a, n, l) for p in heads])
+            if not np.allclose(got, ref, atol=1e-12, rtol=1e-9):
+                problems.append(f"kr_vg_vec != Mualem-vG at l={l} for (a={a}, n={n}): "
+                                f"max|d|={np.max(np.abs(got-ref)):.2e}")
+        # A per-element l: the vector path must give each element its own exponent.
+        mix = kr_vg_vec(np.repeat(heads[None, :], 2, axis=0), a, n,
+                        np.array([[0.5], [0.295138]]))
+        if not (np.array_equal(mix[0], base)
+                and np.allclose(mix[1], kr_vg_vec(heads, a, n, 0.295138))):
+            problems.append(f"per-element l not applied row-wise for (a={a}, n={n})")
+
     # Dispatch must reduce EXACTLY to the linear front when no vG model is active.
     P = np.array([[-2.0, -1.0, 0.5], [-5.0, -0.2, 1.0]])
     kr0 = np.array([0.001, 0.01]); h0 = np.array([-1.0, -2.0])
@@ -12992,10 +13026,11 @@ def run_vg_kr_test(test):
         problems.append("kr_relative_vec(all-lf) != kr_frontal_vec")
     mixed = kr_relative_vec(P, kr0[:, None], h0[:, None],
                             vg_a=np.array([[0.075], [0.0]]), vg_n=np.array([[1.89], [0.0]]),
+                            vg_l=np.array([[0.295138], [0.5]]),
                             model=np.array([[KR_VG], [KR_LF]]))
     if not np.array_equal(mixed[1], base[1]):
         problems.append("mixed dispatch perturbed the lf row")
-    if not np.allclose(mixed[0], kr_vg_vec(P[0], 0.075, 1.89)):
+    if not np.allclose(mixed[0], kr_vg_vec(P[0], 0.075, 1.89, 0.295138)):
         problems.append("mixed dispatch wrong on the vG row")
 
     # Scalar kr_relative agrees with the vector path and dispatches on model.
@@ -13003,6 +13038,9 @@ def run_vg_kr_test(test):
         problems.append("scalar kr_relative(lf) != kr_frontal")
     if abs(kr_relative(-1.5, 0.0, 0.0, vg_a=0.075, vg_n=1.89, model=KR_VG) - vg_scalar(-1.5, 0.075, 1.89)) > 1e-12:
         problems.append("scalar kr_relative(vg) != Mualem-vG")
+    if abs(kr_relative(-1.5, 0.0, 0.0, vg_a=0.075, vg_n=1.89, vg_l=0.295138,
+                       model=KR_VG) - vg_scalar(-1.5, 0.075, 1.89, 0.295138)) > 1e-12:
+        problems.append("scalar kr_relative(vg) ignores l")
 
     if problems:
         return None, "; ".join(problems[:5])

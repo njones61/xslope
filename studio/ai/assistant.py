@@ -170,7 +170,9 @@ the canvas re-renders automatically.
   or u in {none,ru}. CAUTION: with u='piezo' the hydrostatic suction above the line is
   unbounded, so s_cap is essential; with u='seep' the FE field self-bounds it), u
   ('none'|'piezo'|'seep'), sigma_gamma/c/phi/cp/d/psi (stddevs, 0 if unused), k1, k2, alpha,
-  kr0, h0 (seepage), E, nu (FEM; also the sole mechanical properties when option='elastic').
+  unsat ('lf'|'vg'|'gard'), kr0, h0 (linear front), vg_a, vg_n (the a/n pair vg and gard
+  share), vg_l (Mualem pore-connectivity exponent, 0.5 unless fitted) (seepage),
+  E, nu (FEM; also the sole mechanical properties when option='elastic').
   Minimal MC example:
   {'name':'Clay','gamma':130.0,'option':'mc','c':400.0,'phi':0.0,'t_cut':None,
    'phi_b':None,'s_cap':None,'u':'none',

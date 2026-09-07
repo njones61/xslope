@@ -3118,6 +3118,7 @@ def _new_material():
             "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
             "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
             "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
+            "vg_l": 0.5,
             "Ss": None, "Sy": None,
             # t_cut starts at 0 (Rankine cutoff ON, no-tension soil) rather than
             # blank: blank leaves the material the tension its own envelope admits
@@ -3189,10 +3190,12 @@ def _mat_dim_keys(row):
     return frozenset()
 
 
-# Unsaturated model -> its curve params. gard reuses vg's a/n columns (fileio.py).
-_MAT_UNSAT_FIELDS = {"lf": ["kr0", "h0"], "vg": ["vg_a", "vg_n"],
+# Unsaturated model -> its curve params. gard reuses vg's a/n columns (fileio.py),
+# but not its Mualem exponent l, which belongs to the van Genuchten conductivity
+# integral alone.
+_MAT_UNSAT_FIELDS = {"lf": ["kr0", "h0"], "vg": ["vg_a", "vg_n", "vg_l"],
                      "gard": ["vg_a", "vg_n"]}
-_MAT_ALL_UNSAT_FIELDS = ["kr0", "h0", "vg_a", "vg_n"]
+_MAT_ALL_UNSAT_FIELDS = ["kr0", "h0", "vg_a", "vg_n", "vg_l"]
 
 
 class _MaterialColorState:
@@ -3931,6 +3934,7 @@ MATERIALS_HELP = {
     "h0": "Suction head at which k = kr0 (linear-front, unsat = lf).",
     "vg_a": "Curve parameter a (vg: α in 1/length; gard: power-form a).",
     "vg_n": "Curve parameter n (van Genuchten / Gardner, unsat = vg or gard).",
+    "vg_l": "Mualem pore-connectivity exponent, 0.5 unless fitted.",
     "Ss": "Specific storage — water released per unit volume of saturated soil per "
           "unit head drop (1/length). Read by a transient seepage run only; "
           "required on every material then, blank otherwise.",
@@ -4218,7 +4222,7 @@ class MaterialsEditor(CategoryEditor):
     # Columns mirror the v17 'mat' worksheet IN FILE ORDER: name, g, gsat, option,
     # c, f, c/p, r-elev, d, psi, t_cut, E, nu, u, ru, phi_b, s_cap, pow_a..pow_d,
     # hb_sci/hb_gsi/hb_mi/hb_d, s(g), s(c), s(f), s(c/p), s(d), s(psi), k1, k2,
-    # alpha, unsat, kr0, h0, a(vg_a), n(vg_n).  v16 inserted t_cut and moved E/nu up
+    # alpha, unsat, kr0, h0, a(vg_a), n(vg_n), l(vg_l).  v16 inserted t_cut and moved E/nu up
     # beside the strength values, with u/ru following; v17's matric-suction pair
     # phi_b/s_cap now sits at cols Q/R, right of ru (relocated there when the feature
     # landed in the FEM too — the red "LEM & FEM" block, same class as c/φ).
@@ -4284,10 +4288,15 @@ class MaterialsEditor(CategoryEditor):
         Field("k2", "k2", usage="seep", unit="k"),
         Field("alpha", "alpha", usage="seep"),
         # Unsaturated model: lf (linear front -> kr0/h0), vg (van Genuchten) or gard
-        # (Gardner); vg/gard share the vg_a/vg_n curve pair.
+        # (Gardner); vg/gard share the vg_a/vg_n curve pair, and vg alone carries
+        # the Mualem exponent l.
         Field("unsat", "unsat", "choice", choices=["lf", "vg", "gard"], usage="seep"),
         Field("kr0", "kr0", usage="seep"), Field("h0", "h0", usage="seep", unit="length"),
         Field("vg_a", "vg_a", usage="seep"), Field("vg_n", "vg_n", usage="seep"),
+        # v26: the Mualem pore-connectivity exponent of the van Genuchten
+        # conductivity curve. optfloat so a blank cell stays None -- which the
+        # loader reads as Mualem's 0.5, the value a 0.0 would NOT mean.
+        Field("vg_l", "l", "optfloat", usage="seep", tooltip=MATERIALS_HELP["vg_l"]),
         # v18: transient storage (mat sheet seepage block, after the unsat curve
         # pair). optfloat so a blank stays None — the loader never defaults these
         # to 0 (a silent zero would drop the storage term), and preflight demands

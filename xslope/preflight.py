@@ -2192,7 +2192,7 @@ MATERIAL_FIELDS = frozenset((
     "psi", "t_cut", "phi_b", "s_cap", "Ss", "Sy", "pow_a", "pow_b", "pow_c",
     "pow_d", "hb_sci", "hb_gsi", "hb_mi", "hb_d", "u", "ru", "sigma_gamma",
     "sigma_c", "sigma_phi", "sigma_cp", "sigma_d", "sigma_psi", "k1", "k2",
-    "alpha", "kr0", "h0", "unsat", "vg_a", "vg_n", "E", "nu",
+    "alpha", "kr0", "h0", "unsat", "vg_a", "vg_n", "vg_l", "E", "nu",
 ))
 
 
@@ -3270,6 +3270,36 @@ def _seep_unsat_params(ctx):
     return out
 
 
+@rule("seep.vg_l_unusual", WARNING, ("seep",),
+      "A van Genuchten material's Mualem exponent is a fitted number near 1/2.")
+def _seep_vg_l(ctx):
+    """The pore-connectivity exponent l of the Mualem conductivity curve.
+
+    Mualem derived 1/2 and that is the blank-cell value. A curve fitted to
+    measured conductivity carries its own, and the published fits run negative as
+    often as not (HYDRUS's soil catalog spans about -6 to 3), so there is no
+    positivity floor to enforce here. Outside -2 to 3 the exponent is far enough
+    from any fitted soil to be worth a second look -- most often a value typed
+    into the wrong column."""
+    out = []
+    for i, m in ctx.seepage_materials():
+        if str(m.get("unsat") or "lf").strip().lower() != "vg":
+            continue
+        l = _num(m.get("vg_l"))
+        if l is None:
+            out.append(
+                f"{ctx.mat_label(i)} uses unsat = vg but its Mualem exponent is "
+                f"not a number: l = {_fmt(m.get('vg_l'))} {_AT_MAT}. Leave the "
+                f"cell blank for Mualem's l = 0.5.")
+        elif not (-2.0 <= l <= 3.0):
+            out.append(
+                f"{ctx.mat_label(i)} uses unsat = vg with a Mualem exponent of "
+                f"l = {l:g} {_AT_MAT}, outside the -2 to 3 that fitted soils "
+                f"span. Mualem's own value is 0.5, which is what a blank cell "
+                f"means.")
+    return out
+
+
 @rule("seep.confined_unsat_unused", INFO, ("seep",),
       "With no exit face the solve is confined and the unsaturated inputs are inert.")
 def _seep_confined_unsat(ctx):
@@ -3282,7 +3312,7 @@ def _seep_confined_unsat(ctx):
     if not named:
         return None
     return (f"No exit face is defined, so this solve is confined and the "
-            f"unsaturated inputs (unsat, kr0, h0, a, n) are not used -- including on "
+            f"unsaturated inputs (unsat, kr0, h0, a, n, l) are not used -- including on "
             f"{named[0]} (Seep BC, seep bc sheet; Materials table, mat sheet).")
 
 

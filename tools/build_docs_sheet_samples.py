@@ -111,10 +111,12 @@ MAT_SHOWCASE = [
      "Ss": 5e-6, "Sy": 0.03,
      "E": 500000, "nu": 0.25},
     # Drainage sand — Mohr-Coulomb with the ru pore-pressure option and a van
-    # Genuchten unsaturated curve.
+    # Genuchten unsaturated curve, carrying a fitted Mualem exponent so the l
+    # column shows a value that is not the 0.5 a blank cell already means.
     {"name": "Drain Sand", "g": 120, "option": "mc",
      "c": 0, "f": 34, "u": "ru", "ru": 0.15,
      "k1": 5e-2, "k2": 5e-2, "alpha": 0, "unsat": "vg", "a": 0.05, "n": 1.8,
+     "l": 0.295,
      "Ss": 5e-6, "Sy": 0.28,
      "E": 40000, "nu": 0.30},
     # Sound bedrock — option='elastic' (cannot fail): only g/gsat, E, nu, and the

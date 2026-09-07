@@ -836,7 +836,7 @@ def ensure_reinforce_pullout(slope_data):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 25
+SUPPORTED_TEMPLATE_VERSION = 26
 
 # The template version that inserted the 1D element size cell at main!D20, pushing
 # every main-sheet run option below it down one row. Files at or above it are read
@@ -1602,6 +1602,12 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
         v = pd.to_numeric(x, errors="coerce")
         return float(v) if pd.notna(v) else 0.0
 
+    def _num_or(x, default):
+        """``_num`` for a column whose unset value is not zero. A blank cell, and
+        a sheet older than the column, both fall back to ``default``."""
+        v = pd.to_numeric(x, errors="coerce")
+        return float(v) if pd.notna(v) else default
+
     def _pick(row, *names):
         """First of ``names`` that is actually a COLUMN on this sheet.
 
@@ -1858,6 +1864,11 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
             # exponent, so preferring 'n' there would silently read nu into vg_n.
             "vg_a": _num(_pick(row, 'vga', 'a')),
             "vg_n": _num(_pick(row, 'vgn', 'n')),
+            # v26: the Mualem pore-connectivity exponent of the van Genuchten
+            # conductivity curve. Blank, and every sheet written before the
+            # column existed, mean Mualem's own 0.5 — the value kr_vg_vec
+            # computed when the exponent was fixed in the code.
+            "vg_l": _num_or(row.get('l'), 0.5),
             "E": _num(row.get('E', 0)),
             # v14 renamed this to 'nu'; pre-v14 sheets call it 'n'
             "nu": _num(_pick(row, 'nu', 'n')),
@@ -2860,6 +2871,9 @@ MAT_NUM_HEADERS = [
     # an archived template.
     ('kr0', 'kr0'), ('h0', 'h0'),
     ('vg_a', ('vga', 'a')), ('vg_n', ('vgn', 'n')),
+    # v26: the Mualem pore-connectivity exponent, alongside the retention pair it
+    # completes. Skipped on any older template, which has no 'l' column.
+    ('vg_l', 'l'),
     ('E', 'E'), ('nu', ('nu', 'n')),
 ]
 # Optional numerics: written only when set (None must stay a blank cell -- e.g.
@@ -2975,7 +2989,8 @@ def _inplace_save_would_drop(filepath, materials):
         return False
     have = set(_read_mat_header_cols(filepath))
     # (header, key, default) for columns that may be absent in older templates.
-    checks = [('unsat', 'unsat', 'lf'), ('vg_a', 'vg_a', 0.0), ('vg_n', 'vg_n', 0.0)]
+    checks = [('unsat', 'unsat', 'lf'), ('vg_a', 'vg_a', 0.0), ('vg_n', 'vg_n', 0.0),
+              ('l', 'vg_l', 0.5)]
     for header, key, default in checks:
         if header in have:
             continue

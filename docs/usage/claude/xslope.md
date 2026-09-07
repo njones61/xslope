@@ -70,7 +70,7 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    **Required for seepage:**
    - Hydraulic conductivity (k1, k2) for every material
    - At least one specified head boundary condition or exit face (a model with only flux boundaries is singular)
-   - For partially saturated problems: the unsaturated model per material — `unsat="lf"` (linear front, default) with kr0/h0, `unsat="vg"` (van Genuchten) with vg_a/vg_n, or `unsat="gard"` (Gardner power form) reusing the same vg_a/vg_n pair
+   - For partially saturated problems: the unsaturated model per material — `unsat="lf"` (linear front, default) with kr0/h0, `unsat="vg"` (van Genuchten) with vg_a/vg_n and the optional Mualem exponent vg_l, or `unsat="gard"` (Gardner power form) reusing the same vg_a/vg_n pair
 
    **Required for reliability:**
    - Standard deviations for at least one material property (sigma_gamma, sigma_c, sigma_phi, or sigma_cp in mat sheet columns AA-AF). If the user requests reliability analysis but provides no standard deviations, stop and ask — do not run the analysis.
@@ -539,6 +539,8 @@ slope_data['materials'] = [
         'vg_a':  0.0,  'vg_n': 0.0,              # curve params for BOTH 'vg' and 'gard'
                                                  #   (vg: alpha & n; gard: a & n in kr=1/(1+a*psi^n))
                                                  #   these are the 'a'/'n' columns on the mat sheet
+        'vg_l':  0.5,                            # Mualem pore-connectivity exponent ('vg' only),
+                                                 #   the 'l' column; 0.5 unless the curve was fitted
         # --- transient-seepage storage (v18): read ONLY for a transient (tseep) run;
         #     leave None for steady-state. Ss = specific storage [1/len], required on
         #     every material; Sy = specific yield [-], required only on UNCONFINED models
@@ -2011,7 +2013,7 @@ results = solve_selected("spencer", slice_df, rapid=True)
 
 10. **Always validate** by plotting inputs before running analysis. If geometry looks wrong, fix the template first.
 
-11. **Seepage material properties**: For fully saturated problems, the unsaturated parameters are ignored but must still have placeholder values. For partially saturated (unconfined) problems, set the `unsat` model per material: `unsat="lf"` (linear front — the default and recommended model) with typical kr0=0.001 to 0.01 and h0=-1; `unsat="vg"` (van Genuchten) with vg_a (α, 1/length) and vg_n; or `unsat="gard"` (Gardner power form, kr = 1/(1 + a·ψⁿ)) reusing the same vg_a/vg_n pair. Use "vg" or "gard" only when those properties are specifically wanted.
+11. **Seepage material properties**: For fully saturated problems, the unsaturated parameters are ignored but must still have placeholder values. For partially saturated (unconfined) problems, set the `unsat` model per material: `unsat="lf"` (linear front — the default and recommended model) with typical kr0=0.001 to 0.01 and h0=-1; `unsat="vg"` (van Genuchten) with vg_a (α, 1/length), vg_n, and vg_l (the Mualem pore-connectivity exponent of kr = Se^l·[1 − (1 − Se^(1/m))^m]², 0.5 unless the conductivity curve was fitted); or `unsat="gard"` (Gardner power form, kr = 1/(1 + a·ψⁿ)) reusing the same vg_a/vg_n pair. Use "vg" or "gard" only when those properties are specifically wanted.
 
 12. **Internal no-flow barriers (sheetpiles, cutoff walls)** have no dedicated input. Model a thin wall as a narrow notch in the profile line (or polygon boundary) that follows the wall: down one face, across the tip, back up the other face, with a small gap (~0.1-0.5 length units) between the two faces so the mesh has a physical crack — both crack faces become natural no-flow boundaries. End any specified-head BC at the wall (never span across it).
 

@@ -178,7 +178,8 @@ _SSRM_TRIAL_COST_KEYS = frozenset((
     # a certified edge should CARRY its evidence into the saved record is a
     # decision about the artifact, not about the solver, and it is the owner's.
     "corrector", "corrector_attempts", "max_yield_violation",
-    "n_yield_above_1pct", "yield_flagged", "gate_failed", "max_yield_at"))
+    "n_yield_above_1pct", "yield_flagged", "gate_failed", "gate_deferrals",
+    "max_yield_at"))
 
 
 def _jsonable(value):
@@ -4241,6 +4242,68 @@ _CORRECTOR_YIELD_TOL = 1e-6
 # is also the threshold `_YIELD_FLAG_FRAC` already counts points against, so the gate
 # and the reading beside it say the same thing about the same state.
 _VP_YIELD_GATE = 1e-2
+
+
+def _vp_gate_armed(iteration, last_progress_iter, disp_hist, u_elastic_scale):
+    """May the yield gate END this trial, or is the state still evolving?
+
+    THE RULE: a gate refusal is a verdict about a FIXED POINT, so the gate may only
+    end a trial from a state the loop has STOPPED CHANGING, in both of the readings
+    the loop already keeps:
+
+      1. the out-of-balance residual has gone flat — `_NO_PROGRESS_WINDOW` iterations
+         with no better than a 1% improvement on the lowest value seen, which is the
+         no-progress watch the plateau observation is taken from; and
+      2. the displacement field is not growing — the hybrid criterion's own growth
+         reading over its own trailing window, `_HYBRID_GROWTH_MIN` elastic
+         displacements gained over the last `_HYBRID_WINDOW_FRAC` of the history.
+
+    Until both hold the gate is disarmed. The corrector is still offered the state the
+    first time it settles, because a certification is a stand and is taken wherever it
+    is found, but a refusal ends nothing: the loop carries on to its own stopping
+    rules, which get their own corrector attempts, and the gate is read again on
+    whatever state it reaches next.
+
+    Why the displacement-and-force CONVERGENCE test is not enough to arm it. Those two
+    conditions decide when a state may be ACCEPTED; they do not say the relaxation has
+    finished, and on a state that fails the yield gate they demonstrably have not.
+    Measured on RS2-66c-deep (rs2_66c.xlsx, tri6, 3 m, K0 = 1, min_slip_depth = 4) at
+    F = 1.05: the displacement test is satisfied from iteration ~30 and the force test
+    crosses its tolerance at iteration 237, where the loop has a 10.7% Mohr-Coulomb
+    violation at one Gauss point and 1 099 Gauss points still yielding and falling.
+    The gate fired there, its single corrector attempt from that 237-pass seed refused,
+    and the trial was FAILED. The residual was still coming down (1.0e-3 at 237, 4.3e-5
+    at 5 500), and the corrector's own 1 000-pass checkpoint — which that exit came 763
+    iterations too early to reach — certifies an admissible field from that same trial
+    in 37 Newton iterations, out-of-balance 7.0e-5 and a worst yield violation of
+    1.5e-15.
+
+    Why the residual going flat is not enough either. On the same model at F = 1.06 and
+    1.07 the residual flattens while the field is still travelling — max|u| climbs from
+    0.088 m to 0.20 m and 0.25 m over the following few thousand iterations. Arming
+    there ended those trials at 5 552 and 6 184 iterations on a state neither settled
+    nor certifiable, and took from them the corrector attempt their own iteration cap
+    would have made, which is the attempt that certifies both. A field in motion is not
+    a fixed point whatever its residual is doing.
+
+    Nothing else moves with this. A state that PASSES the yield reading ends the trial
+    at exactly the iteration it always did, so the converged-trial criteria are
+    untouched; the displacement cap, the runaway rule, the budget and the ceiling are
+    untouched; and a trial whose loop really has stopped — flat residual, still field,
+    inadmissible stress — still reaches the gate, still gets its corrector attempt, and
+    is still FAILED on a refusal.
+    """
+    if (iteration - last_progress_iter) <= _NO_PROGRESS_WINDOW:
+        return False
+    n = len(disp_hist)
+    if n < _HYBRID_MIN_SAMPLES or not u_elastic_scale or u_elastic_scale <= 0.0:
+        # No trend to read: the residual's own verdict stands.
+        return True
+    k = max(2, int(round(n * _HYBRID_WINDOW_FRAC)))
+    growth = (float(disp_hist[-1]) - float(disp_hist[n - k])) / float(u_elastic_scale)
+    return growth <= _HYBRID_GROWTH_MIN
+
+
 # The displacement bound the at-failure capture solve is held inside, as a multiple of
 # the mesh height (see `_finite_guard`). That solve is the one place the displacement
 # cap and the early exit are both off, so its runaway has nothing to stop it before the
@@ -4523,7 +4586,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     Mohr-Coulomb violation at or below `_VP_YIELD_GATE` of the local strength — or
     it does not end the trial; the force test cannot see a yield violation, because
     this scheme is in force balance at every iteration and yield is what it relaxes.
-    And a bounded Newton CORRECTOR is attempted at a checkpoint ladder
+    That gate can only FAIL a trial from a state the loop has stopped changing (see
+    `_vp_gate_armed`): while the out-of-balance residual is still improving, an
+    inadmissible state is not a fixed point, so the iteration carries on instead and
+    the trial is decided by the budget and the failure criterion like any other
+    unsettled trial. And a bounded Newton CORRECTOR is attempted at a checkpoint ladder
     (`_CORRECTOR_CHECKPOINTS`) and at every stopping rule (`_CORRECTOR_RULE_EXITS`)
     on the state the loop has reached: a corrector state that converges AND passes
     force, yield and displacement ends the trial as standing, and a corrector
@@ -5393,6 +5460,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         _sol["nr_iterations"] = int(_sol.get("iterations", 0) or 0)
         _sol["iterations"] = int(vp_iterations) + _sol["nr_iterations"]
         _sol["failure_criterion"] = failure_criterion
+        # How many force-settled but inadmissible states the loop carried past on its
+        # way to this seed (see _vp_gate_armed). It belongs to the trial, not to the
+        # driver that finished it, so a corrector-certified result reports it too.
+        _sol["gate_deferrals"] = int(gate_deferrals)
         _sol["corrector"] = {
             "driver_of_record": "corrector",
             "checkpoint": where,
@@ -5666,6 +5737,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     u_elastic_scale = 0.0
     exit_reason = 'iteration_cap'
     gate_failed = False            # a force-settled state the yield gate refused
+    gate_deferrals = 0             # force-settled but inadmissible states the loop
+                                   # carried past because it was still improving
+                                   # (see _vp_gate_armed)
     plateau_iter = None            # iteration at which the residual plateaued
     plateau_ratio = None           # the out-of-balance ratio it plateaued at
     diverging_iter = None          # iteration at which the early-failure rule fired
@@ -5839,6 +5913,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         loads_hist = [base_loads.copy()]
         ufr_best = float('inf')        # lowest out-of-balance seen this stage
         last_progress_iter = 0         # iteration of last meaningful improvement
+        gate_tried = False             # the yield gate has spent its one corrector
+                                       # attempt on a still-evolving state this stage
         disp_hist = []                 # max|u| samples (hybrid criterion)
         u_elastic_scale = float(np.max(np.abs(u_e_grav))) if u_e_grav.size else 0.0
         exit_reason = 'iteration_cap'
@@ -6679,13 +6755,24 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 # outside its own yield surface (see _VP_YIELD_GATE). A state that
                 # settles in force and fails in yield is handed to the corrector,
                 # exactly as a rule exit is; where the corrector certifies an
-                # admissible field the trial stands on THAT, and where it refuses the
-                # trial is FAILED, because the viscoplastic loop has reached its own
-                # fixed point and this is the state it exits on.
+                # admissible field the trial stands on THAT.
+                #
+                # A REFUSAL, HOWEVER, ONLY ENDS THE TRIAL FROM A STATE THE LOOP HAS
+                # STOPPED CHANGING (see `_vp_gate_armed`). The corrector still gets its
+                # attempt the moment the state first settles in force, so a certifiable
+                # field is certified exactly when it always was; what a refusal there
+                # no longer does is close the trial. While the loop is still making
+                # progress the state is not the fixed point that verdict would be about,
+                # so the iteration carries on — through the early-failure watch, the
+                # checkpoint ladder and the budget, exactly as any other unsettled
+                # trial — and the gate is read again on whatever state it reaches next.
+                _gate_defer = False
                 if _corrector_on:
                     _gv, _gn, _, _gw = _yield_reading(gp_groups, u_new, sq3,
                                                       _yield_floor)
-                    if _gv > _VP_YIELD_GATE:
+                    _armed = _vp_gate_armed(iteration, last_progress_iter,
+                                            disp_hist, u_elastic_scale)
+                    if _gv > _VP_YIELD_GATE and (_armed or not gate_tried):
                         u = u_new
                         if debug_level >= 1:
                             print(f"  Force-settled at iteration {iteration+1} but "
@@ -6693,27 +6780,46 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                   f"{_gv:.3e} of local strength on {_gn} Gauss "
                                   f"point(s) above 1% (worst at element/Gauss point "
                                   f"{_gw}) - handing to the corrector")
+                        gate_tried = True
                         _c = _try_corrector(
                             u, gp_groups, "gate:yield",
                             total_iterations + iteration + 1,
                             softened_1d if has_1d_elements else None)
                         if _c is not None:
                             return _c
-                        converged = False
-                        exit_reason = 'yield_gate'
-                        gate_failed = True
-                        if debug_level >= 1:
-                            print("  The corrector refused; a slope does not stand "
-                                  "on an inadmissible field - FAILED")
-                        break
-                converged = True
-                exit_reason = 'converged'
-                u = u_new
-                if debug_level >= 1:
-                    print(f"  Converged after {iteration+1} iterations "
-                          f"(max|du|/max|u| = {relative_change:.3e}, "
-                          f"max nodal OOB = {unbalanced_force_ratio:.2e} < {force_tol:.1e})")
-                break
+                        if _armed:
+                            converged = False
+                            exit_reason = 'yield_gate'
+                            gate_failed = True
+                            if debug_level >= 1:
+                                print("  The corrector refused; a slope does not "
+                                      "stand on an inadmissible field - FAILED")
+                            break
+                    if _gv > _VP_YIELD_GATE:
+                        # Refused, and the loop is still improving: no verdict. The
+                        # attempt is not repeated on every iterate — the checkpoint
+                        # ladder below is what keeps trying, on states the loop has
+                        # actually moved on to.
+                        gate_deferrals += 1
+                        if debug_level >= 2:
+                            print(f"  Yield gate at iteration {iteration+1} "
+                                  f"(violation {_gv:.3e} on {_gn} Gauss point(s)) "
+                                  f"DISARMED - the out-of-balance last improved at "
+                                  f"iteration {last_progress_iter+1} and max|u| is "
+                                  f"{disp_hist[-1] if disp_hist else float('nan'):.4g}, "
+                                  f"so this state is not a fixed point; the loop "
+                                  f"continues")
+                        _gate_defer = True
+                if not _gate_defer:
+                    converged = True
+                    exit_reason = 'converged'
+                    u = u_new
+                    if debug_level >= 1:
+                        print(f"  Converged after {iteration+1} iterations "
+                              f"(max|du|/max|u| = {relative_change:.3e}, "
+                              f"max nodal OOB = {unbalanced_force_ratio:.2e} "
+                              f"< {force_tol:.1e})")
+                    break
 
             # Early failure. Read on the sampled iterations only, from the two series
             # just appended above, and only AFTER the convergence test, so a solve
@@ -7073,6 +7179,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # it settled on, and the corrector could not reach an admissible one either
         # (see _VP_YIELD_GATE). The trial is FAILED, and this is why.
         "gate_failed": bool(gate_failed),
+        # How many times this trial settled in force with an inadmissible field while
+        # the loop was still improving, and carried on rather than ending on the gate
+        # (see _vp_gate_armed). Zero on a trial the gate never read.
+        "gate_deferrals": int(gate_deferrals),
         # Every corrector attempt this trial made and what it read, including the
         # ones that refused — a refusal decides nothing, but it is the measurement
         # that says whether the corrector is earning its cost. Empty on the plain
@@ -9994,6 +10104,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         # never returns a gate-failed state. The key is here so that every result on
         # every driver answers the question.
         "gate_failed": False,
+        "gate_deferrals": 0,
         "iterations": int(total_iterations),
         "displacements": u_reported,
         "displacements_elastic": u_elastic,
@@ -12171,6 +12282,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "max_yield_at": sol.get("max_yield_at"),
             "yield_flagged": bool(sol.get("yield_flagged", False)),
             "gate_failed": bool(sol.get("gate_failed", False)),
+            "gate_deferrals": int(sol.get("gate_deferrals", 0) or 0),
         })
         if _stable(sol):
             _carried[0] = (float(F) if _carried[0] is None

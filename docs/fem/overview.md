@@ -810,10 +810,21 @@ below any stress a mechanism is carried at, so it leaves a real violation exactl
 
 That reading is also a check. A viscoplastic state that satisfies both convergence conditions but
 sits more than $10^{-2}$ of the local strength outside the yield surface does not end the trial: it
-is handed to the corrector, and where no admissible field is reached at that strength — by the
-corrector or by the loop's own exit — the trial is failed. The force test cannot see this on its
-own, because the viscoplastic scheme is in force balance at every iteration and yield is precisely
-what it relaxes.
+is handed to the corrector, and where the corrector certifies an admissible field the trial stands
+on that. The force test cannot see this on its own, because the viscoplastic scheme is in force
+balance at every iteration and yield is precisely what it relaxes.
+
+**A refusal there ends the trial only from a state the loop has stopped changing.** Settling in
+force and settling in yield are separate questions, and a state outside the surface is one the
+relaxation has not finished with, so the check arms on the loop's own no-progress watch — 1500
+iterations without bettering the lowest out-of-balance value seen by more than 1%, the same reading
+the plateau observation is taken from. Before that the iteration simply carries on, through the
+corrector's checkpoints, the runaway watch and the budget like any other unsettled trial, and the
+reading is taken again on whatever state it reaches next; the trial is then decided by the criteria
+that decide every trial the loop does not settle. Once the residual has gone flat the check is
+armed, the corrector gets the last word on that state, and a refusal fails the trial with
+`exit_reason = 'yield_gate'`. A state that passes the reading ends the trial exactly where it
+always would have.
 
 The threshold is looser than the corrector's $10^{-6}$, and the asymmetry is structural rather than
 a concession. A Newton state solves the equations the reading is taken from and measures $10^{-8}$

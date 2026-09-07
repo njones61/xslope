@@ -2789,7 +2789,6 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         # solve_fem raises there rather than silently initializing to zero stress.
         _overburden_columns = []
 
-
     # Get other parameters
     unit_weight = require_gamma_water(slope_data, "FEM analysis")
     # SIGN CONVENTION (see the FEM overview page): the FEM analyzes both

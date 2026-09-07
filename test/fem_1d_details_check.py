@@ -1921,7 +1921,21 @@ def test_a_healthy_capture_is_untouched():
     with contextlib.redirect_stdout(io.StringIO()):
         mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
                                         target_size=2.0, element_type="quad8")
-        result = solve_ssrm(build_fem_data(slope_data, mesh), F_min=2.0, F_max=2.8)
+        # A last-digit lock is a reference-path quantity: solve_ssrm has no
+        # kernel switch of its own, so its trials are pinned the way the suite
+        # pins them (run_tests._force_fast_kernel).
+        import xslope.fem as _fem
+        _orig_solve_fem = _fem.solve_fem
+
+        def _reference_solve_fem(*a, **k):
+            k["fast_kernel"] = False
+            return _orig_solve_fem(*a, **k)
+
+        _fem.solve_fem = _reference_solve_fem
+        try:
+            result = solve_ssrm(build_fem_data(slope_data, mesh), F_min=2.0, F_max=2.8)
+        finally:
+            _fem.solve_fem = _orig_solve_fem
     capture = result.get("failure_solution")
     if capture is None:
         return ["the healthy model captured no at-failure field at all"]

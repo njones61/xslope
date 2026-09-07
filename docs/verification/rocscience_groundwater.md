@@ -356,7 +356,7 @@ Flowrate 1.692×10⁻⁶ m³/s per m (locked with the total-head field).
 **Case 3 — isotropic dam with a low-permeability core and the horizontal drain.** A
 rectangular central core with saturated k = 10⁻⁹ m/s, 100× lower than the shell, forces
 almost the whole head drop across its 4 m width (Fig 6.13's crowded contours) and throttles
-the flowrate to 4.879×10⁻⁸ m³/s per m. Along line 1-1, now inside the core, XSLOPE reproduces
+the flowrate to 4.880×10⁻⁸ m³/s per m. Along line 1-1, now inside the core, XSLOPE reproduces
 the profile shape and sits at the high end of the published scatter:
 
 | Elevation on line 1-1 | XSLOPE pressure head | Slide2 (Fig 6.14) | Ref[1] |

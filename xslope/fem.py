@@ -49,6 +49,18 @@ from .units import require_gamma_water
 #   vp_const / vp_trisolve / vp_factorize   the same for the viscoplastic driver,
 #                   whose assembly and factorization are once per trial rather than
 #                   once per iteration
+#   vp_assemble     build_global_stiffness, once per prepared model
+#   vp_prep         the whole prepared model (assembly + factorization + the
+#                   geometry, pore-pressure and Gauss-point-group precompute)
+#   vp_1d           the per-iteration 1D bar and pile beam body-load corrections
+#   vp_oob          the per-iteration Dawson out-of-balance reading, history copy
+#                   included
+#   vp_conv         the per-iteration convergence tests: the CHECON norms, the
+#                   plateau and early-failure watches and the displacement limit
+#
+# Subtracting the vp_* phases and the nr_* corrector phases from a solve's wall
+# time leaves the Python loop overhead, which is what makes the remainder a
+# reading rather than a residue.
 _PROF_ON = bool(os.environ.get("XSLOPE_NR_PROFILE", "").strip())
 _PROF = {}
 
@@ -3347,9 +3359,12 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         _resolve_suction_by_elem(fem_data, suction_phi_b, suction_cap, element_materials)
 
     # ---- K_global (elastic, constant) ----
+    _ta = time.perf_counter() if _PROF_ON else None
     K_global = build_global_stiffness(nodes, elements, element_types,
                                       element_materials, E_by_mat, nu_by_mat,
                                       fem_data=fem_data)
+    if _PROF_ON:
+        _prof_add("vp_assemble", _ta)
 
     # ---- Gravity load vector ----
     F_gravity = build_gravity_loads(nodes, elements, element_types,
@@ -4972,6 +4987,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # default) leaves every measurement exactly as it was.
     u_datum = np.zeros(n_dof) if _init_u is None else _init_u
     u_datum_free = u_datum[free_dofs]
+    # A run with no carried-in equilibrated state measures max|u| from zero, which
+    # is the common case and the one the CHECON norm can take without a subtraction.
+    _datum_is_zero = not np.any(u_datum_free)
+    _conv_buf = np.empty(u_datum_free.shape)
     # Per-call (max_disp_factor varies across the SSRM trials vs the capture solve
     # that share a prepared model), so this is recomputed here, never cached.
     if max_disp_factor is not None and mesh_height > 0:
@@ -4986,6 +5005,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     node_has_free = prep["node_has_free"]
     g_node_den = prep["g_node_den"]
     _deep_free_mask = prep["deep_free_mask"]
+    # ---- constants and scratch for the per-iteration out-of-balance reading ----
+    # The reading is elementwise from the body-load increment to the per-node
+    # resultant, and every node the `node_has_free` selection drops is computed and
+    # then discarded. Gathering the free nodes' dof indices, their free-dof mask and
+    # their weight denominator ONCE lets the loop take the same numbers on that
+    # subset alone, into buffers it owns, instead of building full-length
+    # temporaries every iteration and selecting at the end.
+    _oob_ix = node_dof_x[node_has_free]
+    _oob_iy = node_dof_y[node_has_free]
+    _oob_maskf = free_dof_mask.astype(np.float64)
+    _oob_gfree = np.ascontiguousarray(g_node_den[node_has_free], dtype=np.float64)
+    _oob_dload = np.empty(n_dof)
     suction_active = prep["suction_active"]
     suction_tanphib_by_elem = prep["suction_tanphib_by_elem"]
     suction_scap_by_elem = prep["suction_scap_by_elem"]
@@ -5550,11 +5581,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # required divergence fence that keeps 'auto' safe.
     _mc_kernel = None
     _kernel_required = (fast_kernel is True)
-    # The compiled Step-6 kernel computes sigma = D(Bu - evp) + u*m internally and
-    # has no slot for a per-Gauss-point INITIAL stress, so a K0 run stays entirely on
-    # the NumPy reference — which is the oracle anyway. Runs without k0 are untouched.
-    if sv0_gp is not None:
-        fast_kernel = False
+    # The compiled Step-6 kernel takes the per-Gauss-point K0 initial stress as its
+    # own argument (sig0, has_sig0) and adds it in the reference's order, so a K0 run
+    # is no longer held off it. It used to be: the kernel computed
+    # sigma = D(Bu - evp) + u*m with no slot for an initial stress, and 148 of the
+    # corpus's 193 fem_ssrm rows carry k0, so the accelerator was inert on three
+    # quarters of the FEM benchmarks it was built for.
     if fast_kernel:
         try:
             from xslope import _fem_kernel as _mc_kernel
@@ -5576,6 +5608,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             _G = grp['dof'].shape[0]
             grp['_dof_intp'] = np.ascontiguousarray(grp['dof'], dtype=np.intp)
             grp['_zeroG'] = np.zeros(_G, dtype=np.float64)
+            # Stand-in for the K0 initial stress on a run that has none; the stage
+            # loop overwrites _sig0_c with the real field where sv0_gp exists.
+            grp['_zeroG4'] = np.zeros((_G, 4), dtype=np.float64)
+            grp['_sig0_c'] = grp['_zeroG4']
             grp['_B_c'] = np.ascontiguousarray(grp['B'], dtype=np.float64)
             grp['_D4_c'] = np.ascontiguousarray(grp['D4'], dtype=np.float64)
             grp['_w_c'] = np.ascontiguousarray(grp['w'], dtype=np.float64)
@@ -5740,6 +5776,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 z = np.zeros_like(sv_eff)
                 sig0 = np.stack([sh_eff, sv_eff, z, sh_eff], axis=1)
                 grp['sig0'] = sig0
+                if grp.get('_fast'):
+                    grp['_sig0_c'] = np.ascontiguousarray(sig0, dtype=np.float64)
                 contrib = np.einsum('gij,gi->gj', grp['B'], sig0[:, :3]) * grp['w'][:, None]
                 np.add.at(F_sig0, grp['dof'].ravel(), contrib.ravel())
 
@@ -5801,6 +5839,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         disp_hist = []                 # max|u| samples (hybrid criterion)
         u_elastic_scale = float(np.max(np.abs(u_e_grav))) if u_e_grav.size else 0.0
         exit_reason = 'iteration_cap'
+        # The previous iterate on the free dofs, carried forward from the solve that
+        # produced it (see the CHECON test below). None until this stage has solved
+        # once, because the state a stage OPENS on is not a solve's output.
+        _u_free_carry = None
         plateau_iter = None            # no-progress watch, reset per stage
         plateau_ratio = None
         diverging_iter = None          # early-failure watch, reset per stage
@@ -5897,7 +5939,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         grp['snph'], grp['csph'], grp['_tcap_c'],
                         grp['u_gp'], grp['_elastic_u8'], grp['evp'],
                         dt, 1 if grp['has_cap'] else 0,
-                        1 if grp.get('has_elastic') else 0)
+                        1 if grp.get('has_elastic') else 0,
+                        grp['_sig0_c'], 1 if sv0_gp is not None else 0)
                     continue
                 Bg, D4g, wg = grp['B'], grp['D4'], grp['w']
                 dofg, evpg = grp['dof'], grp['evp']
@@ -5910,8 +5953,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 _sig0 = grp.get('sig0')
                 if _sig0 is not None:
                     sig4 = sig4 + _sig0        # K0 initial stress (see the stage loop)
-                sig_eff = sig4.copy()
-                sig_eff[:, [0, 1, 3]] += grp['u_gp'][:, None]
+                # sig4 is this iteration's own temporary and is read nowhere after
+                # this point, so the pore pressure goes into it directly. Three
+                # column adds rather than one fancy-index read-modify-write: the
+                # same three additions, without the (G,3) gather, the (G,1)
+                # broadcast, the scatter back and the (G,4) copy.
+                sig_eff = sig4
+                _ugp = grp['u_gp']
+                sig_eff[:, 0] += _ugp
+                sig_eff[:, 1] += _ugp
+                sig_eff[:, 3] += _ugp
 
                 sx, sy, txy, sz = sig_eff.T
 
@@ -6093,6 +6144,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 _prof_add("vp_const", _tp)
 
             # ---- 1D Truss element body-force corrections ----
+            _tp = time.perf_counter() if _PROF_ON else None
             if has_1d_elements:
                 n_1d_compression = 0
                 n_1d_exceeded = 0
@@ -6239,7 +6291,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     if n_pile_yielded_V > 0 or n_pile_yielded_M > 0:
                         print(f"    Pile elements: {n_pile_yielded_V} V-yielded, {n_pile_yielded_M} M-yielded")
 
+            if _PROF_ON:
+                _prof_add("vp_1d", _tp)
+
             # ---- Out-of-balance force, per node (Dawson, Roth & Drescher 1999) ----
+            _tp = time.perf_counter() if _PROF_ON else None
             #
             # This is an initial-stress viscoplastic scheme, so the solve below
             # enforces
@@ -6275,17 +6331,40 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # iteration — so this rejects a specific numerical mode, it is not a tuning knob.
             # Locality, and hence padding immunity, is unaffected: elastic material contributes
             # exactly zero over any window.
-            loads_hist.append(loads.copy())
+            # `loads` is a fresh array on every iteration (base_loads.copy() at the
+            # top of the group loop) and nothing writes to it after this point, so
+            # the window holds the array itself. The copy this replaces allocated
+            # and filled a second n_dof vector per iteration for a value that could
+            # not change.
+            loads_hist.append(loads)
             if len(loads_hist) > oob_window + 1:
                 loads_hist.pop(0)
-            d_load = ((loads - loads_hist[0])
-                      / min(oob_window, len(loads_hist) - 1)) * free_dof_mask
-            r_node = np.sqrt(d_load[node_dof_x] ** 2 + d_load[node_dof_y] ** 2)
-            oob_node = (r_node / g_node_den)[node_has_free]
+            # Elementwise from the increment to the per-node resultant, so the
+            # per-node half is taken on the FREE NODES ONLY -- the same operations
+            # on the same values in the same order, without computing the entries
+            # the `node_has_free` selection was going to discard. The increment
+            # itself goes into a buffer the solve owns instead of three fresh
+            # n_dof temporaries. The two gathers are plain fancy indexing: a
+            # measured np.take(..., out=) form of the same expression ran 1.41x
+            # SLOWER than the original at every mesh size tried, so this keeps the
+            # allocation and drops the call.
+            np.subtract(loads, loads_hist[0], out=_oob_dload)
+            _oob_dload /= min(oob_window, len(loads_hist) - 1)
+            _oob_dload *= _oob_maskf
+            _oob_bx = _oob_dload[_oob_ix]
+            _oob_by = _oob_dload[_oob_iy]
+            _oob_bx *= _oob_bx
+            _oob_by *= _oob_by
+            _oob_bx += _oob_by
+            np.sqrt(_oob_bx, out=_oob_bx)
+            _oob_bx /= _oob_gfree
+            oob_node = _oob_bx
             # min_slip_depth filter: take the maximum only over nodes deep enough to
             # count. With no filter (_deep_free_mask is None) this is the full set.
             _oob_for_max = oob_node if _deep_free_mask is None else oob_node[_deep_free_mask]
             unbalanced_force_ratio = float(np.max(_oob_for_max)) if _oob_for_max.size else 0.0
+            if _PROF_ON:
+                _prof_add("vp_oob", _tp)
             if debug_level >= 3:
                 n_hot = int(np.count_nonzero(oob_node > force_tol))
                 print(f"    OOB dist: max={unbalanced_force_ratio:.2e} "
@@ -6413,9 +6492,23 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # in the norm would let a large fixed offset dilute both the CHECON ratio
             # and the hybrid criterion's displacement scale. u_datum_free is zero
             # without a carried state, so this is the same norm as before.
-            _u_free_prev = u[free_dofs]
-            norm_diff = np.max(np.abs(u_free_new - _u_free_prev))
-            norm_u_new = np.max(np.abs(u_free_new - u_datum_free))
+            # The previous iterate on the free dofs is the vector the LAST solve
+            # returned: u_new is built as zeros with u_new[free_dofs] = u_free_new,
+            # and u is then u_new, so u[free_dofs] gathers back exactly those
+            # values. Carrying them forward is the same numbers without the gather.
+            _tpc = time.perf_counter() if _PROF_ON else None
+            _u_free_prev = u[free_dofs] if _u_free_carry is None else _u_free_carry
+            np.subtract(u_free_new, _u_free_prev, out=_conv_buf)
+            np.abs(_conv_buf, out=_conv_buf)
+            norm_diff = _conv_buf.max()
+            if _datum_is_zero:
+                # x - 0.0 is exactly x for every finite x, and |-0.0| = |0.0|, so
+                # the datum subtraction is skipped rather than approximated.
+                norm_u_new = np.abs(u_free_new).max()
+            else:
+                np.subtract(u_free_new, u_datum_free, out=_conv_buf)
+                np.abs(_conv_buf, out=_conv_buf)
+                norm_u_new = _conv_buf.max()
 
             if norm_u_new > 1e-30:
                 relative_change = norm_diff / norm_u_new
@@ -6574,6 +6667,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         plateau_iter = None
                         plateau_ratio = None
                         u = u_new
+                        _u_free_carry = u_free_new
                         continue
                 # -------------------------------------------------------------
                 # ---- the yield gate on a CONVERGED viscoplastic state --------
@@ -6655,7 +6749,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                             return _c
                     break
 
+            if _PROF_ON:
+                _prof_add("vp_conv", _tpc)
             u = u_new
+            _u_free_carry = u_free_new
 
             # ---- the checkpoint ladder (see _CORRECTOR_CHECKPOINTS) ----------
             # The plastic history is now developed enough to be worth correcting.
@@ -11583,11 +11680,14 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     # options the trials pass, so it can never serve a stale strength or geometry.
     # (max_disp_factor and tension_srf are per-call scalings applied inside solve_fem,
     # so they are intentionally NOT part of the prepared model.)
+    _tprep = time.perf_counter() if _PROF_ON else None
     prep = _prepare_fem_model(
         fem_data_trials, dt_scale=dt_scale, suction_phi_b=suction_phi_b,
         suction_cap=suction_cap, elastic_mask=elastic_mask,
         tension_cap_by_elem=tension_cap_by_elem, tension_cutoff=tension_cutoff,
         min_slip_depth=min_slip_depth, k0=k0, debug_level=max(0, debug_level - 1))
+    if _PROF_ON:
+        _prof_add("vp_prep", _tprep)
 
     # === K0 in-situ equilibration (once, before the bisection) ===
     # Establishing the in-situ state and reducing the strength are two different

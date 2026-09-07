@@ -72,6 +72,10 @@ _CASES = [
      {"tension_cutoff": True}),
     ("suction tri6", "docs/fem/files/xslope_griffiths5_0p7.xlsx", "tri6", 11.0,
      {"suction_phi_b": {"soil": 15.0}, "suction_cap": 200.0}),
+    # K0 initial stress. The kernel takes sigma_0 as its own argument and adds it
+    # in the reference's order; 148 of the corpus's 193 fem_ssrm rows carry k0, so
+    # this is the case that covers most of the FEM corpus.
+    ("K0 tri6", "docs/fem/files/xslope_griffiths1.xlsx", "tri6", 12.0, {"k0": 1.0}),
 ]
 
 

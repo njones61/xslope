@@ -3354,7 +3354,7 @@ def _resolve_exit_cycle(act, new_act, corner_candidate, mid_cands,
 def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                           dt_max=None, growth=1.3,
                           max_head_change_frac=0.05, h_init=None, verbose=True,
-                          progress_callback=None):
+                          progress_callback=None, max_iter=2000):
     """Transient variably-saturated seepage solver (plan §1/§3/§5).
 
     Solves ``div(kr K grad h) + Q = S dh/dt`` with the theta-method in time
@@ -3382,6 +3382,12 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     lumped : lumped (HRZ) mass by default; ``False`` is not implemented in v1.
     h_init : optional explicit initial head field; default is a steady solve at the
         t=0 BC configuration (plan IC rule).
+    max_iter : sweep budget for that initial-condition solve, the same budget the
+        steady runners carry and the only convergence parameter of it a caller sets.
+        It is spent once, before the march, and has no bearing on the time steps.
+        An initial condition that does not close within it leaves ``converged``
+        False on the returned dict, exactly as a time step that has to be
+        force-accepted does.
     progress_callback : optional ``callback(t, duration) -> bool``. When supplied it
         is called once after each ACCEPTED time step with the new simulated time and
         the run duration (and once at completion with ``(duration, duration)``) so a
@@ -3395,9 +3401,10 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     Returns
     -------
     dict with ``times`` (saved times), ``frames`` (list of {time, head, u}),
-    ``dt_history``, ``mass_balance`` (cumulative + per-frame ledger), ``converged``,
-    ``cancelled`` (True only when a ``progress_callback`` requested an abort), and
-    provenance (theta, lumped, duration).
+    ``dt_history``, ``mass_balance`` (cumulative + per-frame ledger), ``converged``
+    (the initial-condition solve AND every time step; a force-accepted step or an
+    unclosed IC clears it), ``cancelled`` (True only when a ``progress_callback``
+    requested an abort), and provenance (theta, lumped, duration).
     """
     if not lumped:
         raise NotImplementedError(
@@ -3538,10 +3545,19 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     bt0, bv0, flux0 = resolve_bc(0.0)
     if h_init is not None:
         h = np.asarray(h_init, dtype=float).copy()
+        ic_converged = True
     else:
-        h = _transient_steady_ic(nodes, elements, element_types, bt0, bv0,
-                                  k1, k2, angle, kr0, h0, vg_a, vg_n, model,
-                                  flux0, verbose)
+        h, ic_converged = _transient_steady_ic(
+            nodes, elements, element_types, bt0, bv0,
+            k1, k2, angle, kr0, h0, vg_a, vg_n, model, flux0, verbose,
+            max_iter=max_iter)
+        if not ic_converged:
+            # Reported the way the steady path reports the same failure: the march
+            # is starting from a field that is not a steady state, so every frame
+            # downstream of it inherits that, and the flag says so.
+            print("WARNING: the transient initial condition did not converge — the "
+                  "march starts from a field that is not a steady state "
+                  "(solution['converged'] is False).")
 
     # characteristic head scale for the Picard tolerance and the dh limiter
     hmin, hmax = float(np.min(h)), float(np.max(h))
@@ -3593,7 +3609,7 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                   "closure": 0.0}]
     cum_inflow = 0.0            # tangent storage change accumulated (= net boundary inflow)
     active = np.zeros(n_nodes, dtype=bool)   # exit-face active set, warm-started
-    all_converged = True
+    all_converged = ic_converged
     #: [cycles detected, edges resolved]. A cycle DETECTED is a sweep in which the
     #: exit-face active set revisited a state it had left; RESOLVED counts the times
     #: the partly-wet fallback actually had to be applied, which happens only on the
@@ -3976,20 +3992,31 @@ def _nodal_from_elem(masm, elem_vals, n_nodes, mode='mean'):
 
 def _transient_steady_ic(nodes, elements, element_types, bc_type, bc_values,
                          k1, k2, angle, kr0, h0, vg_a, vg_n, model, flux_nodal,
-                         verbose):
+                         verbose, max_iter=2000):
     """Initial condition = a steady solve at the t=0 BC configuration (plan IC rule).
     Confined (no exit face) -> one linear solve; unconfined -> the steady
-    exit-face Picard solver. Reuses the existing steady solvers unchanged."""
+    exit-face Picard solver. Reuses the existing steady solvers unchanged.
+
+    Returns ``(head, converged)``. The flag is the unconfined solver's own, and it
+    belongs to the caller: an initial condition that did not close is a march
+    starting from a field that is not a steady state, which is a fact about the
+    solution and not a line of console output. A confined IC is one direct linear
+    solve and always converged.
+
+    ``max_iter`` is the sweep budget for the unconfined solve. It is the caller's to
+    set because the steady runners already let a model that needs more sweeps ask
+    for them, and the initial condition is the same solve on the same models."""
     if np.any(bc_type == 2):
-        head, _A, _q, _tf, _efa, _conv, _ce = solve_unsaturated(
+        head, _A, _q, _tf, _efa, conv, _ce = solve_unsaturated(
             nodes, elements, bc_type, bc_values, kr0=kr0, h0=h0,
             k1_vals=k1, k2_vals=k2, angles=angle, element_types=element_types,
-            vg_a=vg_a, vg_n=vg_n, model=model, flux_nodal=flux_nodal)
-        return head
+            vg_a=vg_a, vg_n=vg_n, model=model, flux_nodal=flux_nodal,
+            max_iter=max_iter)
+        return head, bool(conv)
     bcs = [(i, bc_values[i]) for i in range(len(bc_type)) if bc_type[i] == 1]
     head, _A, _q, _tf = solve_confined(nodes, elements, bc_type, bcs, k1, k2, angle,
                                        element_types, flux_nodal=flux_nodal)
-    return head
+    return head, True
 
 
 def export_seep_solution(seep_data, solution, filename):

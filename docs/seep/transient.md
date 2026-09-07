@@ -318,6 +318,16 @@ ordinary steady solver is run — one linear solve for a confined problem, the s
 Picard solver for an unconfined one. The transient run therefore begins from a genuine steady state
 rather than a guess. An explicit initial head field may be supplied instead when one is known.
 
+The unconfined branch is an iteration and carries a sweep budget, `max_iter`, which defaults to
+2000 — the one convergence parameter of the initial condition a caller sets, and the same key the
+steady runners take for the same solve. It is spent once, before the march, and has nothing to do
+with the time steps. Raising it is the remedy for a model whose steady state is slow to reach; a
+tall unsaturated column draining at unit gradient is the usual such model, and it converges
+monotonically, just slowly. The outcome of that solve belongs to the run: an initial condition that
+does not close within the budget leaves `converged` False on the returned dictionary, the same flag
+a force-accepted time step clears, so a march begun from a field that is not a steady state says so
+in its result.
+
 Because of that rule, the way to start from a particular steady state — a full reservoir before
 drawdown, say — is simply to give the driving series that value at $t = 0$. To hold it briefly
 and then change it, use a **step** (a repeated time): the series sits at the initial value

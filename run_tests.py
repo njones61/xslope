@@ -542,7 +542,8 @@ def _tag_transient_solution(slope_data, test):
     from the file's own ``tseep`` schedule on the tag's mesh — the same rebuild
     ``run_tseep_head_test`` makes, so the field under a stability lock is the one
     those rows lock. Stepper knobs (``dt_max`` / ``max_head_change_frac`` /
-    ``theta``) ride the tag either way."""
+    ``theta``) and the initial condition's sweep budget (``max_iter``) ride the tag
+    either way."""
     from xslope.seep import (build_seep_data, build_tseep_data,
                              import_transient_solution, run_transient_seepage)
 
@@ -564,6 +565,8 @@ def _tag_transient_solution(slope_data, test):
     for key in ('dt_max', 'max_head_change_frac', 'theta'):
         if key in test and str(test[key]).strip() != '':
             kw[key] = float(test[key])
+    if 'max_iter' in test and str(test['max_iter']).strip() != '':
+        kw['max_iter'] = int(test['max_iter'])
     solution = run_transient_seepage(seep_data, tseep_data, **kw)
     if not solution.get('converged', True):
         return None, None, "transient seepage solution did not converge"
@@ -1532,7 +1535,8 @@ def run_tseep_head_test(test):
     t whose frame is sampled — it must land on the solver's save schedule, which
     the stepper guarantees for every ``save_times`` entry), points="x:y:h;...",
     tolerance (head units, absolute; default 0.01), optional target_size /
-    element_type (mesh) and dt_max / max_head_change_frac / theta (stepper). The
+    element_type (mesh), dt_max / max_head_change_frac / theta (stepper) and
+    max_iter (sweep budget for the initial-condition steady solve). The
     expected heads are LITERALS in the tag (locked-values law) — the runner never
     computes a reference. Pass/fail: returns 0.0 on success.
 
@@ -1559,12 +1563,16 @@ def run_tseep_head_test(test):
                                     **_refine_kwargs(test))
     seep_data = build_seep_data(mesh, slope_data)
 
-    # Optional stepper knobs (analogous to seep_head's max_iter); default = the
-    # solver's own defaults. verbose off so the suite stays quiet.
+    # Optional stepper knobs, plus max_iter — the sweep budget of the steady solve
+    # that builds the initial condition, exactly the key seep_head carries for the
+    # same solve. Default = the solver's own defaults. verbose off so the suite
+    # stays quiet.
     kw = {'verbose': False}
     for key in ('dt_max', 'max_head_change_frac', 'theta'):
         if key in test and str(test[key]).strip() != '':
             kw[key] = float(test[key])
+    if 'max_iter' in test and str(test['max_iter']).strip() != '':
+        kw['max_iter'] = int(test['max_iter'])
     solution = run_transient_seepage(seep_data, tseep_data, **kw)
     if not solution.get('converged', True):
         return None, "transient seepage solution did not converge"

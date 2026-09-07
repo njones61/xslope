@@ -5132,68 +5132,6 @@ def _fem03_solve(model, mesh):
     return fem_data, result, solution, seconds
 
 
-def _fem03_solve_at_F(model, mesh, F=1.0):
-    """One single-trial solve at a stated strength reduction factor — Studio's
-    Run FEM dialog with ``Analysis`` on ``Single (fixed F)`` — at the page's own
-    iteration settings.
-
-    This is where the page reads every displacement MAGNITUDE.  A strength
-    reduction run's own fields are both states of a weakened slope: the shape
-    they draw is the mechanism, but how far a member has moved at the last
-    converged trial follows the iteration path the bisection happened to stop
-    on, not the slope (the page measures that with the bracket below).  At
-    F = 1 the soil is at its own strength, there is one equilibrium state, and
-    the reading is reproducible.
-    """
-    from xslope.fem import build_fem_data, solve_fem
-
-    fem_data = build_fem_data(model, mesh)
-    with contextlib.redirect_stdout(io.StringIO()):
-        solution = solve_fem(fem_data, F=F, debug_level=0,
-                             max_iterations=FEM03_MAX_ITERATIONS)
-    return fem_data, solution
-
-
-def _fem03_f1_heads(model, mesh, label, F=1.0):
-    """The head displacement of every pile line at a stated F, which is the
-    number the page quotes for how far a member moves."""
-    from xslope import fem_details
-
-    fem_data, solution = _fem03_solve_at_F(model, mesh, F=F)
-    for i, row in enumerate(model["pile_lines"]):
-        prof = fem_details.pile_profile(fem_data, solution, i, slope_data=model,
-                                        field_state="converged")
-        print("      F = %-5g %-14s head deflection %.4f · peak moment %.0f per "
-              "unit width at depth %.2f · peak shear %.0f · %s"
-              % (F, label, float(prof["u_lateral"][0]), prof["max_moment"],
-                 prof["max_moment_depth"], prof["max_shear"], prof["status"]))
-
-
-def _fem03_bracket_probe(model, mesh, pile_index, tolerance):
-    """The same run at a different bisection tolerance, which is what the page
-    cites for why a last-converged displacement is not a reading of the slope:
-    the factor of safety barely moves and the head displacement does not follow
-    it."""
-    from xslope import fem_details
-    from xslope.fem import build_fem_data, solve_ssrm
-
-    fem_data = build_fem_data(model, mesh)
-    with contextlib.redirect_stdout(io.StringIO()):
-        result = solve_ssrm(fem_data, F_min=FEM03_F_MIN, F_max=FEM03_F_MAX,
-                            tolerance=tolerance, debug_level=0,
-                            capture_failure_state=True,
-                            failure_criterion=FEM03_CRITERION,
-                            max_iterations=FEM03_MAX_ITERATIONS)
-    prof = fem_details.pile_profile(
-        fem_data, dict(result["last_solution"]), pile_index, slope_data=model,
-        field_state="converged",
-        failure_solution=result.get("failure_solution"))
-    print("      bracket tolerance %-6g FS %.4f from [%.6f, %.6f] · last "
-          "converged head deflection %.4f"
-          % (tolerance, result["FS"], result["final_interval"][0],
-             result["final_interval"][1], float(prof["u_lateral"][0])))
-
-
 def _fem03_mechanism(fem_data, solution):
     """Where the shear strain concentrates at the captured mechanism: the peak,
     how many elements stand above half of it, and where they are."""
@@ -5451,14 +5389,6 @@ def fem03_tip():
             capture(prof_fig, plot_pile_detail, prof)
         _fem03_report(label, sd, mesh, fem_data, result, solution, seconds)
         _fem03_profiles(sd, fem_data, solution)
-        # The magnitudes the page quotes, read where a magnitude is readable —
-        # one solve at F = 1, the soil at its own strength (_fem03_solve_at_F).
-        if prof_fig:
-            _fem03_f1_heads(sd, mesh, "tip %s" % kwargs["tip"])
-        # And the measurement behind the sentence that says why: the same
-        # tip-fixed run with the bisection asked to close half as wide.
-        if kwargs.get("tip") == "fixed":
-            _fem03_bracket_probe(sd, mesh, 1, FEM03_TOLERANCE / 2.0)
 
 
 def fem03_spacing():
@@ -5629,9 +5559,6 @@ def fem03_wall():
                     field_state="failure")
         _fem03_report(label, sd, mesh, fem_data, result, solution, seconds)
         profs = _fem03_profiles(sd, fem_data, solution)
-        if prof_fig == "fem03_wall_profiles_fixed.png":
-            # How far the wall deflects, read at F = 1 (_fem03_solve_at_F).
-            _fem03_f1_heads(sd, mesh, "wall, tip %s" % tip)
         if prof_fig:
             capture(prof_fig, plot_pile_detail, profs[0])
             if prof_fig == "fem03_wall_profiles_fixed.png":

@@ -847,7 +847,9 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     this function RETURNS is |net inflow - net outflow| at the final consistency
     solve, an absolute flow rate in the model's own flow units. Passing the gate says
     the nonlinear iteration has stopped moving, not that the reported flowrate
-    balances to closure_tol.
+    balances to closure_tol. A model with no flow through it has no such ratio to
+    form — both sides of it are round-off — and its closure is 0 (see the no-flow
+    rule at the gate).
 
     Two escapes act on a solve that is caught in a cycle rather than converging; both
     are inert on a solve that is not (see :data:`_CYCLE_PERSIST` and
@@ -1186,8 +1188,24 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         free_mask = ~((bc_type == 1) | ((bc_type == 2) & exit_face_active))
         inflow_pos = (float(np.sum(q_chk[(bc_type == 1) & (q_chk > 0)]))
                       + _flux_inflow(f_ext, free_mask))
+        # NO-FLOW RULE. A model with no flow through it — every specified head at one
+        # elevation and no applied flux — makes both sides of this ratio round-off
+        # rather than flow rates: the conduction operator has zero row sums, so A.h
+        # for a uniform h is identically zero in exact arithmetic, and the ratio is
+        # then 0/0. It takes any value at all and no sweep budget can bring it under
+        # closure_tol, so the threshold that decides "there is flow here" has to be
+        # the model's own flow scale and not an absolute constant. Every term summed
+        # into q_chk is one matrix entry times one nodal head, so
+        # eps x (number of terms) x max|entry| x max|h| bounds the round-off the sum
+        # can carry; an inflow below that is not a flow, and the closure of a model
+        # with no flow is 0. That is the reading run_seepage_analysis's reporting
+        # layer already takes, where a solution with no flow through the section
+        # records closure_fraction = 0.0 rather than a ratio.
+        flow_eps = (np.finfo(float).eps * data_chk.size
+                    * float(np.max(np.abs(data_chk)))
+                    * float(np.max(np.abs(h_solved))))
         rel_closure = (float(np.sum(np.abs(q_chk[free_mask] - f_ext[free_mask]))) / inflow_pos
-                       if inflow_pos > 1e-30 else 0.0)
+                       if inflow_pos > max(flow_eps, 1e-30) else 0.0)
         set_stable = bool(np.array_equal(exit_face_active, _prev_active))
         _flip_sweep[exit_face_active != _prev_active] = iteration
         _prev_active = exit_face_active.copy()

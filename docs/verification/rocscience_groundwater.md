@@ -102,7 +102,7 @@ used across this section (**built**, *covered*, *partial*, *planned*, *blocked*,
 | [17](#gw17) | <span class="nodata">⊘</span> | Transient seepage, earth fill dam with toe drain | At 15 h XSLOPE's *h* = 7 front stands 1.1–1.8 m inside the upstream face against RS2's 1.5–3.3 m · the steady field reproduces RS2's Fig 19-5 total-head contours, and the 16383 h frame is still short of it, settling to within 0.01 m of steady by ≈5×10⁴ h | **built** (both vendor stage times + steady); contour-only target, locked as a regression guard; the retention transcription that closed [GW20](#gw20) is measured here and moves the 15 h front by under 0.1 m |
 | [18](#gw18) | 🟢 | Transient seepage through an earth fill dam | Toe-slope total head within 0.058 m rms of the digitized RS2 Fig 20.5 profile at t = 0.6 h and 0.197 m rms at t = 19656 h, over 11 stations · XSLOPE's steady profile within 0.127 m rms of that chart's 19656 h curve | **built** (both vendor stage times + steady); the elastic *S*<sub>s</sub> acts in the saturated zone only, as Slide2's *m*<sub>v</sub> does — the term that sets the drainage time-scale of every transient row here |
 | [19](#gw19) | 🟢 | Transient seepage below a lagoon | Near-steady (11340 min) pressure head along the top boundary within 0.045 m rms of the digitized RS2 Fig 21.9 markers over 20 stations — under 1% of the driving head · early frames 0.07–0.35 m rms, XSLOPE's mound running slightly *ahead* of RS2's | **built** (all four frames); both vendor curves are reproduced rather than fitted, and the near-steady frame is locked against the vendor profile |
-| [20](#gw20) | 🟢 | Transient seepage in a layered slope | Total head down RS2's own Fig 22.7 query line within 0.021 / 0.012 / 0.001 m rms of RS2's markers at 4.6 / 31 / 208 s over 21 stations · closer to each published series than the two are to each other at every frame | **built** (all three frames); storage is the vendor's straight water-content line, not a curve fitted to its conductivity table |
+| [20](#gw20) | 🟢 | Transient seepage in a layered slope | Total head down RS2's own Fig 22.7 query line within 0.007 / 0.003 / 0.001 m rms of RS2's markers at 4.6 / 31 / 208 s over 21 stations · closer to each published series than the two are to each other at every frame | **built** (all three frames); storage is the vendor's straight water-content line, and the conductivity fit is placed over the suctions the model reaches |
 | [21](#gw21) | 🟢 | Transient seepage through a fully confined aquifer | Within ≈0.02 ft of the Ferris erfc closed form at 600 hr | **built** (both cases) |
 
 </div>
@@ -991,10 +991,20 @@ XSLOPE reproduces that line as the Gardner option's linear drainage band, $S_y=0
 $h_0=-100/\gamma_w=-10.19$ m, which works out to $0.0196\ \text{m}^{-1}$ — equal to the elastic
 $S_s=\gamma_w m_v$ below the phreatic surface, so one constant capacity carries both zones as
 it does in the vendor model. The conductivity table is fitted beside it by the Gardner power
-law ($a=146.9$, $n=4.454$ medium, $a=115.8$, $n=4.189$ fine), which holds the vendor's own
-four-point table to 0.24 decades rms against 0.40 for the Mualem–van Genuchten pair
-[GW7](#gw7) fits to the same curves in the manual's Fig 7.2; both reach the same steady field,
-0.003 and 0.004 m rms against the 208 s profile below.
+law, and where that fit is placed decides which part of the curve is right: the table holds
+$k_r=1$ out to $\psi=0.30581$ m — an air-entry value — then drops three decades over the next
+metre, and a Gardner law has no air-entry parameter, so one pair cannot carry both the plateau
+and the drop. It is fitted over the suctions this model reaches. The initial field puts the
+pressure head at $0.3-y$ everywhere, so the largest suction in the mesh is 0.700 m, at the
+crest, and infiltration only wets it from there; $\psi=1.3252$ and 3.0581 m, two of the
+table's three non-trivial points, are never sampled. Weighting the 0.30581 m point five-fold
+against those two in a least-squares fit in $\log k_r$ gives $a=74.68$, $n=5.306$ for the
+medium sand and $a=57.99$, $n=5.060$ for the fine, which hold the table to 0.07 decades rms
+over $\psi\le0.700$ m, against 0.30 for the Mualem–van Genuchten pair [GW7](#gw7) fits to the
+same curves in the manual's Fig 7.2. Across all three tabulated points the same pairs read
+0.33 and 0.35 decades, the excess sitting at suctions the model never sees. The two
+transcriptions reach the same steady field: GW7's van Genuchten solve matches the 208 s
+markers to 0.005 m rms, and this model's 208 s frame matches them to 0.001 m.
 
 The published target is **total head along a query line**, vertical at $x=1.6$ m and running
 the full 1 m from the base to the crest. The **RS2** manual's Fig 22.7 plots it at the three
@@ -1004,49 +1014,49 @@ times as two series named in the chart's own legend: square markers for RS2's ow
 the base of the line read 0.302–0.305 against the model's initial total head of 0.300, so the
 digitization is good to ≈0.005 m.
 
-**XSLOPE lies between the two published series at every frame.**
+**Every residual against a published series is smaller than the disagreement between the two
+published series at the same frame.**
 
 | frame | XSLOPE vs RS2 | XSLOPE vs Ref [1] | RS2 vs Ref [1] |
 |---|---|---|---|
-| $t$ = 4.6 s | 0.021 m rms, 0.078 m worst | 0.005 m rms, 0.007 m worst | 0.018 m rms, 0.071 m worst |
-| $t$ = 31 s | 0.012 m rms, 0.029 m worst | 0.049 m rms, 0.065 m worst | 0.054 m rms, 0.065 m worst |
+| $t$ = 4.6 s | 0.007 m rms, 0.026 m worst | 0.012 m rms, 0.045 m worst | 0.018 m rms, 0.071 m worst |
+| $t$ = 31 s | 0.003 m rms, 0.007 m worst | 0.052 m rms, 0.064 m worst | 0.054 m rms, 0.065 m worst |
 | $t$ = 208 s | 0.001 m rms, 0.002 m worst | 0.017 m rms, 0.030 m worst | 0.018 m rms, 0.031 m worst |
 
-Every residual against a published series is smaller than the disagreement between the two
-published series at the same frame. What residual there is sits at the top of the line: at
-4.6 s the two crest-most stations account for 0.078 m and 0.042 m of it and the other 19 are
-within 0.017 m; at 31 s 0.029 m and 0.023 m against 0.020 m over the rest; at 208 s the
-largest anywhere is 0.002 m. That is where the rainfall enters and the wetting front is still
-inside the top element, and it is also where RS2 departs furthest from its own reference:
+What residual there is against RS2 sits at the top of the line: at 4.6 s the crest station
+accounts for 0.026 m of it and the next for 0.011 m, with the other 19 within 0.006 m; at
+31 s and 208 s the largest anywhere is 0.007 m and 0.002 m. The crest is where the rainfall
+enters and the wetting front is still inside the top element, and it is also where RS2 departs
+furthest from its own reference:
 
 | total head at the crest, $y=1.0$ | XSLOPE | RS2, Fig 22.7 | Ref [1], Fig 22.7 | Slide2, Fig 20.7 |
 |---|---|---|---|---|
-| $t$ = 4.6 s | 0.469 | 0.392 | 0.462 | ≈0.43 |
-| $t$ = 31 s | 0.634 | 0.605 | 0.652 | ≈0.67 |
+| $t$ = 4.6 s | 0.417 | 0.392 | 0.462 | ≈0.43 |
+| $t$ = 31 s | 0.612 | 0.605 | 0.652 | ≈0.67 |
 | $t$ = 208 s | 0.863 | 0.862 | 0.877 | ≈0.89 |
 
 The fourth column is the same problem in the Slide2 manual, whose Fig 20.7 draws Slide2's own
 markers against the same Ref [1] curves; that chart is unlabeled at this resolution and reads
 to about 0.01 m. The two programs disagree at the crest at every time, and XSLOPE falls
-between them. XSLOPE's crest value is not a discretization artifact — it reads 0.470 at 5375
-nodes, 0.470 at 1429 and 0.467 at 396, and 0.470 again at a fifth of the time step.
+between them. That crest value is converged: it moves under 0.003 m between a 396-node mesh
+and a 5375-node one, and under 0.001 m at a fifth of the time step.
 
 Seven stations of the query line are locked at each of the three report times.
 
 | $y$ on the query line ($x=1.6$) | 1.00 | 0.85 | 0.70 | 0.65 | 0.60 | 0.30 | 0.00 |
 |---|---|---|---|---|---|---|---|
-| XSLOPE, $t$ = 4.6 s | 0.469 | 0.375 | 0.352 | 0.318 | 0.302 | 0.301 | 0.301 |
+| XSLOPE, $t$ = 4.6 s | 0.417 | 0.373 | 0.362 | 0.329 | 0.306 | 0.303 | 0.302 |
 | RS2 Fig 22.7, $t$ = 4.6 s | 0.392 | 0.375 | 0.365 | 0.332 | 0.308 | 0.303 | 0.302 |
-| XSLOPE, $t$ = 31 s | 0.634 | 0.608 | 0.595 | 0.506 | 0.418 | 0.404 | 0.399 |
+| XSLOPE, $t$ = 31 s | 0.612 | 0.593 | 0.582 | 0.498 | 0.418 | 0.405 | 0.400 |
 | RS2 Fig 22.7, $t$ = 31 s | 0.605 | 0.588 | 0.577 | 0.495 | 0.418 | 0.404 | 0.400 |
-| XSLOPE, $t$ = 208 s | 0.863 | 0.846 | 0.833 | 0.730 | 0.629 | 0.611 | 0.605 |
+| XSLOPE, $t$ = 208 s | 0.863 | 0.846 | 0.832 | 0.730 | 0.629 | 0.611 | 0.605 |
 | RS2 Fig 22.7, $t$ = 208 s | 0.862 | 0.845 | 0.832 | 0.730 | 0.628 | 0.610 | 0.605 |
 
 ![gw020: total head down the query line, XSLOPE against both RS2 Fig 22.7 series](images/gw020.png){width=800px}
 
-<!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=4.6, max_head_change_frac=0.25, points=1.6:1:0.469;1.6:0.85:0.375;1.6:0.7:0.352;1.6:0.65:0.318;1.6:0.6:0.302;1.6:0.3:0.301;1.6:0:0.301, tolerance=0.15, benchmark=GW20-t4.6 -->
-<!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=31, max_head_change_frac=0.25, points=1.6:1:0.634;1.6:0.85:0.608;1.6:0.7:0.595;1.6:0.65:0.506;1.6:0.6:0.418;1.6:0.3:0.404;1.6:0:0.399, tolerance=0.15, benchmark=GW20-t31 -->
-<!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=208, max_head_change_frac=0.25, points=1.6:1:0.863;1.6:0.85:0.846;1.6:0.7:0.833;1.6:0.65:0.730;1.6:0.6:0.629;1.6:0.3:0.611;1.6:0:0.605, tolerance=0.15, benchmark=GW20-t208 -->
+<!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=4.6, max_head_change_frac=0.25, points=1.6:1:0.417;1.6:0.85:0.373;1.6:0.7:0.362;1.6:0.65:0.329;1.6:0.6:0.306;1.6:0.3:0.303;1.6:0:0.302, tolerance=0.15, benchmark=GW20-t4.6 -->
+<!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=31, max_head_change_frac=0.25, points=1.6:1:0.612;1.6:0.85:0.593;1.6:0.7:0.582;1.6:0.65:0.498;1.6:0.6:0.418;1.6:0.3:0.405;1.6:0:0.400, tolerance=0.15, benchmark=GW20-t31 -->
+<!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=208, max_head_change_frac=0.25, points=1.6:1:0.863;1.6:0.85:0.846;1.6:0.7:0.832;1.6:0.65:0.730;1.6:0.6:0.629;1.6:0.3:0.611;1.6:0:0.605, tolerance=0.15, benchmark=GW20-t208 -->
 
 ### 🟢 GW21: Transient flow in a fully confined aquifer {#gw21}
 

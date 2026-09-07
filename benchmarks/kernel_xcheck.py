@@ -17,8 +17,9 @@
 The pure-NumPy Step-6 path in ``fem.solve_fem`` is the oracle: every locked
 factor of safety is defined by it. The compiled kernel (``fast_kernel=True``,
 built with ``setup_kernel.py``) must reproduce it bit-for-bit. This module solves
-three small, coarse cases -- one plain Mohr-Coulomb, one with the Rankine tension
-cutoff, one with matric suction -- both ways and fails on:
+four small, coarse cases -- one plain Mohr-Coulomb, one with the Rankine tension
+cutoff, one with matric suction, one with a K0 initial stress -- both ways and
+fails on:
 
   * any factor-of-safety disagreement between the two paths, or
   * any displacement-field max-abs difference above 1e-8 after a fixed number of

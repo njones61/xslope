@@ -4785,9 +4785,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             published factor of safety in XSLOPE is DEFINED by the NumPy reference
             path, permanently; the compiled kernel is an optimization that must
             reproduce it. The suite therefore pins its kernels explicitly rather
-            than inheriting this default — fast-first with a reference fallback on
-            a lock miss, and --reference-only forced to fast_kernel=False — and
-            benchmarks/kernel_xcheck.py remains the required divergence fence.
+            than inheriting this default — fast-first, where the compiled kernel
+            passes a row only by reproducing its lock exactly and anything short
+            of that is re-solved on the reference, and --reference-only forced to
+            fast_kernel=False — and benchmarks/kernel_xcheck.py remains the
+            required divergence fence.
             USAGE DOCTRINE: the compiled kernel is never the definition of a
             result — it is an optimization that must reproduce the reference. Do
             not use it to define or re-record a lock; the NumPy reference alone
@@ -5576,7 +5578,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # the NumPy reference alone DEFINES every locked and published factor of safety;
     # the compiled kernel must reproduce it and is never itself the definition. The
     # verification suite therefore pins its kernel explicitly instead of inheriting
-    # this default (fast-first with reference fallback on a lock miss;
+    # this default (fast-first, where a row passes on the kernel only if the kernel
+    # reproduces its lock exactly and anything else is re-solved on the reference;
     # --reference-only pinned to False), and benchmarks/kernel_xcheck.py is the
     # required divergence fence that keeps 'auto' safe.
     _mc_kernel = None

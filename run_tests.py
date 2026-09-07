@@ -1307,10 +1307,31 @@ def _ssrm_mode_notice(n_ssrm, reference_only):
         return (f"FEM SSRM: {n_ssrm} row(s) verified reference-only "
                 f"(--reference-only; fast-first disabled)")
     if _fast_kernel_available():
-        return (f"FEM SSRM: {n_ssrm} row(s) run fast-first with reference "
-                f"fallback (fast kernel available)")
+        return (f"FEM SSRM: {n_ssrm} row(s) run fast-first — the fast kernel passes "
+                f"a row only by reproducing its lock exactly, and any miss is "
+                f"re-solved on the reference kernel")
     return (f"FEM SSRM: {n_ssrm} row(s) verified reference-only "
             f"(compiled fast kernel not built)")
+
+
+def _lock_exact_window(expected):
+    """Half of the last printed decimal of a locked factor of safety — the window
+    inside which a solve "reproduced the lock to its printed precision".
+
+    Locks are written into the doc tags at the precision they are quoted with,
+    2-4 decimals (``expected_fs=1.418``), and the tag parser floats them, so the
+    printed precision is read back off the shortest round-trip repr: ``1.418`` is
+    three decimals, so the window is 0.0005. A factor of safety inside that window
+    prints as the lock itself at every digit the lock records; one outside it is a
+    different number that merely sits inside the row's pass tolerance. Two decimals
+    is the floor, so a hypothetical lock written ``1.4`` or ``2`` does not buy
+    itself a half-unit window.
+    """
+    txt = repr(float(expected))
+    if 'e' in txt or 'E' in txt:        # 1e-05 and friends: no printed decimals to read
+        return 5e-10
+    frac = txt.split('.')[1] if '.' in txt else ''
+    return 0.5 * 10.0 ** (-max(len(frac), 2))
 
 
 def _run_fem_ssrm(test):
@@ -1328,17 +1349,35 @@ def _run_fem_ssrm(test):
         compiled fast kernel is an optimization that must reproduce the oracle
         bit-for-bit; it is never itself the definition of a lock.
 
-    (2) FAST-FIRST IS SOUND because ~95% of the SSRM pipeline (mesh, assembly, BCs,
-        the bisection driver, the plasticity return-mapping structure) is SHARED by
-        both kernels. A regression in that shared code fails BOTH paths, so the fast
-        solve misses the lock, we fall back to the reference solve, and it *also*
-        misses — a TRUE alarm, correctly raised. Meanwhile the harmless case — a
-        knife-edge fast miss where the fast kernel lands a hair off the lock (e.g.
-        RS2-62c's soft band, fast FS 0.773 vs lock 0.801) — auto-resolves: the
-        reference re-solve lands on the lock and the row passes with a "fell back"
-        annotation, no false alarm and no human in the loop. So fast-first turns the
-        common healthy run cheap without ever weakening a verdict: the reference
-        verdict is always FINAL, whether it passes or fails.
+    (2) TIER 1 PASSES ONLY ON AN EXACT REPRODUCTION OF THE LOCK. The kernel's factor
+        of safety must land within half of the lock's last printed decimal
+        (``_lock_exact_window``: 0.0005 for a lock quoted as 1.418), i.e. it must
+        print as the locked number at every digit the lock records. ANYTHING else —
+        a kernel error, or a factor of safety that is merely inside the row's pass
+        tolerance — falls through to the reference solve, and the reference verdict
+        is FINAL, pass or fail.
+
+        The gate has to be exact because a tag's ``tolerance`` is used twice: it is
+        ``solve_ssrm``'s bisection stopping width AND the lock's comparison
+        tolerance. The closing bracket is therefore never wider than the tolerance,
+        so two paths that bisect to ADJACENT intervals differ by at most the
+        tolerance — and a tolerance-width Tier 1 gate can never see it. Measured, on
+        ``RS2-40-d20`` (``vp077b.xlsx``): the reference returns 1.41796875 and the
+        kernel 1.43515625, one closing-bracket width apart, against a lock of 1.418
+        with a tolerance of 0.02. Under a tolerance-width gate that row passed on
+        the kernel, printed 1.4352, and never ran the oracle. Under the exact gate
+        it falls through, the reference decides it at 1.4180, and the annotation
+        carries the kernel's number and the gap so the divergence is visible.
+
+        FAST-FIRST IS STILL SOUND, and still cheap, because ~95% of the SSRM
+        pipeline (mesh, assembly, BCs, the bisection driver, the plasticity
+        return-mapping structure) is SHARED by both kernels: on a healthy run the
+        kernel reproduces the reference exactly, hits the lock exactly, and the
+        reference solve never runs. A regression in the shared code fails BOTH paths,
+        so the kernel misses the lock, the reference re-solve runs and *also*
+        misses — a TRUE alarm, correctly raised. The cost of the exactness is paid
+        on rows whose lock is stale relative to today's reference answer: they solve
+        twice, every run, and say so on the row.
 
     (3) THE ONE GAP is a change to REFERENCE-ONLY constitutive physics (a kernel the
         fast path does not share) that happens to keep the fast kernel passing the
@@ -1374,23 +1413,36 @@ def _run_fem_ssrm(test):
         why = '--reference-only' if reference_only else 'fast kernel not built'
         return computed, err, ('direct', f'via reference ({why})')
 
-    # Tier 1 — fast kernel. A hit (within the same expected/tolerance the framework
-    # uses) is a PASS by construction, annotated "via fast kernel".
+    # Tier 1 — fast kernel. A pass here requires an EXACT reproduction of the lock:
+    # the kernel's factor of safety inside half of the lock's last printed decimal
+    # (1.418 -> 0.0005), so it prints as the locked number to every digit the lock
+    # records. The row's own pass tolerance is deliberately NOT used here — it is
+    # also the bisection's stopping width, so it is wide enough to hide a full
+    # one-bracket-step divergence between the two kernels (RS2-40-d20). Any miss
+    # falls through to Tier 2.
     fast_fs, fast_err = run_fem_test(test, fast_kernel=True)
-    if fast_err is None and expected is not None and abs(fast_fs - expected) <= tol:
+    if (fast_err is None and expected is not None
+            and abs(fast_fs - expected) < _lock_exact_window(expected)):
         return fast_fs, None, ('fast', 'via fast kernel')
 
     # Tier 2 — reference fallback. The reference verdict is FINAL (PASS or FAIL); the
     # framework re-checks the returned reference FS against the same expected/tol.
     ref_fs, ref_err = run_fem_test(test, fast_kernel=False)
     if ref_err is not None:
-        return None, ref_err, ('fallback', 'via reference (fast missed; reference errored)')
+        if fast_err is not None:
+            return None, ref_err, ('fallback',
+                                   f'kernel errored ({fast_err}), reference errored too')
+        return None, ref_err, ('fallback',
+                               f'kernel read {fast_fs:.6g}, reference errored')
     if fast_err is not None:
-        text = f'via reference (fast errored: {fast_err})'
-    elif expected is not None:
-        text = f'via reference (fast missed by d={abs(fast_fs - expected):.4f})'
+        text = f'kernel errored ({fast_err}), verified via reference'
     else:
-        text = 'via reference (fast miss)'
+        text = f'kernel read {fast_fs:.6g}, verified via reference'
+        # When the reference goes on to PASS, the kernel-vs-reference gap is the
+        # whole story of the row: it is drift between the two paths that the lock's
+        # tolerance absorbed. Print it so it is visible in the tally.
+        if expected is not None and abs(ref_fs - expected) <= tol:
+            text += f' (kernel-vs-reference d={fast_fs - ref_fs:+.6f})'
     return ref_fs, None, ('fallback', text)
 
 
@@ -14509,8 +14561,9 @@ def main():
     # each fem_ssrm row. It must ride ON the test dict (not a module global):
     # parallel workers run under the 'spawn' start method, so only the pickled test
     # dict crosses into the worker. `_default_tol` matches what the summary compares
-    # with, so the fast-hit test uses the identical expected/tolerance the framework
-    # applies to the returned FS.
+    # with, so the router reads a fallback row's reference verdict exactly as the
+    # framework will (the Tier 1 hit test uses the lock's printed precision instead —
+    # see _lock_exact_window).
     _n_ssrm = 0
     for t in tests:
         if t.get('type') == 'fem_ssrm':
@@ -14646,8 +14699,9 @@ def main():
               f"{route_fallback} via reference fallback, {route_direct} reference-only pass, "
               f"{route_fail} failed")
         if route_fallback:
-            print("  (fast-kernel misses fell back to the reference kernel and it "
-                  "decided them — watch this count for kernel drift)")
+            print("  (rows where the fast kernel did not reproduce the lock exactly: "
+                  "the reference kernel re-solved them and decided them, and each row "
+                  "prints what the kernel read)")
     if jobs > 1:
         print(f"Total time: {time.time() - wall_t0:.1f}s wall on {jobs} workers "
               f"({total_time:.1f}s of test time)")

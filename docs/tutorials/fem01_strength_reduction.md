@@ -565,14 +565,15 @@ the converged state has barely moved.
 | Equilibrium reached | yes | no |
 | Viscoplastic iterations | 11,904 | 12,000 — the budget |
 | Elements that have yielded, of 1,087 | 210 | 609 |
-| Largest movement, relative to the elastic response | 1.9× | 134.8× |
+| Largest displacement (ft) | 0.106 | 7.646 |
+| Relative to the elastic response | 1.9× | 134.8× |
 
 An element counts as yielded once it has accumulated permanent strain — shearing
 that stays in the soil rather than springing back when the stress is relieved.
 
-At *F* = 1.3594 the slope is not intact — 210 elements have yielded and the crest
-has moved about 1.9 times its own elastic response — but it **stops**. The
-stresses redistribute onto soil that has strength left, the
+At *F* = 1.3594 the slope is not intact — 210 elements have yielded and the
+crest has moved 0.106 ft, about 1.9 times its own elastic response — but it
+**stops**. The stresses redistribute onto soil that has strength left, the
 iteration settles, and there is an equilibrium state to report. At *F* = 1.57
 there is none: 609 elements yield, the movement passes a hundred and thirty
 times the elastic response, and it is still growing when the iteration budget

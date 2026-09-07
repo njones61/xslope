@@ -72,16 +72,19 @@ carries a relative conductivity $k_r(\psi)$ that depends on the pressure head $\
 
 Three models for $k_r$ are available, selected per material through the `unsat` column
 (`lf`, `vg`, `gard`). The van Genuchten and Gardner models share one pair of law-agnostic
-input columns, `a` and `n`; van Genuchten reads a third, `l`.
+input columns, `a` and `n`; van Genuchten reads a third, `l`. Both of those curves are
+clipped from below at $k_{r,\min} = 10^{-8}$ — a numerical guard rather than a material
+property, keeping the conduction matrix nonsingular where a dry element would otherwise
+carry nothing, set below the conductivity any shipped model reaches and low enough that
+the solved fields do not move when it is lowered further. The linear front carries its
+own floor in $kr_0$ and never reaches it.
 
 ![seep_ov_kr_models.png](images/seep_ov_kr_models.png){width=1000px}
 
 *The three relative-conductivity models, evaluated by the solver's own `kr_relative_vec`
 (log scale, one ordinate per panel). The linear front stops at the $kr_0$ it is given;
-the van Genuchten and Gardner curves run on down to $k_{r,\min} = 10^{-8}$, a numerical
-guard that keeps the conduction matrix nonsingular where a dry element would otherwise
-carry nothing, and low enough that the head field no longer moves when it is lowered
-further. The sand curve is the one that reaches it here.*
+the van Genuchten and Gardner curves run on down to the $k_{r,\min} = 10^{-8}$ floor,
+and the sand curve is the one that reaches it here.*
 
 #### Linear front (`lf`)
 

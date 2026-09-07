@@ -2505,8 +2505,12 @@ resisting moment and divided by the factor of safety — which is how Slide appl
 | D1/D = 4 | 1.341 | 1.33 (+0.8%) | 1.31 (+2.4%) |
 | D1/D = 6 | 1.260 | 1.25 (+0.8%) | 1.25 (+0.8%) |
 
-At the closest spacing (D1/D = 2) all three programs agree exactly: the pile force is
-large enough that the critical surface avoids the pile entirely. At D1/D = 3 the published
+At the closest spacing (D1/D = 2) all three programs report the same factor, but not on
+the same surface. XSLOPE's critical circle passes through the pile head, so it develops no
+pile force at all: the reinforcement is strong enough that the cheapest mechanism is one
+that misses it. Cai & Ugai's own slip-depth table puts their Bishop surface 2.84 m below
+the ground at the pile at that spacing, which does cross the pile and does carry a
+reaction, so the agreement at 1.54 is between two different mechanisms. At D1/D = 3 the published
 values themselves spread — Slide sits 4.4% above the paper, a search-method difference the
 manual acknowledges — and XSLOPE lands 1.5% above Slide but 5.9% above Cai & Ugai's own
 value, the widest gap among this section's references. Every other case agrees with

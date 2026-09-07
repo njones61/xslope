@@ -27,12 +27,6 @@ from .dialogs import SEEP_VARIABLES
 # Size of the gradient preview swatch shown beside each colormap name.
 _CMAP_ICON_SIZE = QSize(72, 14)
 
-# Material-table placements accepted by plot_inputs(tab_loc=…).
-TAB_LOCATIONS = [
-    "top", "upper left", "upper right", "upper center", "lower left",
-    "lower right", "lower center", "center left", "center right", "center",
-]
-
 # FEM Results plot types (one shown at a time). plot_fem_results also supports
 # displace_mag / stress / strain / yield, but those are diagnostic and omitted here.
 # The strain entry is named from SHEAR_STRAIN_LABEL, the one name the colorbar
@@ -242,8 +236,8 @@ class ReliabilityMcDisplayPanel(_CheckboxPanel):
 
 
 class InputsDisplayPanel(QWidget):
-    """Display options for the Inputs view: the material-property table (and its
-    placement) plus legend column layout."""
+    """Display options for the Inputs view: coordinate labels plus legend column
+    layout."""
 
     changed = Signal()
 
@@ -252,27 +246,18 @@ class InputsDisplayPanel(QWidget):
         form = QFormLayout(self)
         _add_title_toggle(self, form)
 
-        self.mat_table = QCheckBox("Material property table")
-        self.tab_loc = QComboBox()
-        self.tab_loc.addItems(TAB_LOCATIONS)
-        form.addRow("", self.mat_table)
-        form.addRow("Table position", self.tab_loc)
         self.label_coords = QCheckBox("Coordinate labels")
         self.coord_size = _ispin(4, 16, 7, suffix=" pt")
         form.addRow("", self.label_coords)
         form.addRow("Coordinate label size", self.coord_size)
         _add_legend_controls(self, form)         # 'Legend' toggle + column layout
 
-        self.mat_table.toggled.connect(self._sync)
-        self.mat_table.toggled.connect(self._emit)
-        self.tab_loc.currentIndexChanged.connect(self._emit)
         self.label_coords.toggled.connect(self._sync)
         self.label_coords.toggled.connect(self._emit)
         self.coord_size.valueChanged.connect(self._emit)
         self._sync()
 
     def _sync(self, *_):
-        self.tab_loc.setEnabled(self.mat_table.isChecked())
         self.coord_size.setEnabled(self.label_coords.isChecked())
 
     def _emit(self, *_):
@@ -280,8 +265,6 @@ class InputsDisplayPanel(QWidget):
 
     def options(self):
         return {
-            "mat_table": self.mat_table.isChecked(),
-            "tab_loc": self.tab_loc.currentText(),
             "label_coordinates": self.label_coords.isChecked(),
             "coord_label_size": self.coord_size.value(),
             "legend_ncol": _legend_option(self),

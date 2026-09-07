@@ -12,7 +12,7 @@ input_path = Path(input_file)
 
 slope_data = load_slope_data(input_file)
 
-plot_inputs(slope_data, figsize=(12, 6), mode='seep', mat_table=False, tab_loc='top', save_png=True)
+plot_inputs(slope_data, figsize=(12, 6), mode='seep', save_png=True)
 
 element_type = 'tri6'
 size_divisions = 80

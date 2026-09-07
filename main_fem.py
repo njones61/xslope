@@ -8,7 +8,7 @@ from xslope.plot_fem import plot_fem_results, plot_fem_data
 input_file = "docs/seep/files/xslope_johnson_res.xlsx"
 slope_data = load_slope_data(input_file)
 
-plot_inputs(slope_data, mode='fem', tab_loc='top', save_png=True)
+plot_inputs(slope_data, mode='fem', save_png=True)
 
 input_path = Path(input_file)
 auto_size = True # @param {"type":"boolean"}

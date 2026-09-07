@@ -1148,9 +1148,6 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     return fig
 
 
-    # plot_seep_material_table has been moved to xslope/plot.py
-
-
 # ---------------------------------------------------------------------------
 # Transient time history
 # ---------------------------------------------------------------------------

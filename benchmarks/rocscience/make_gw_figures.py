@@ -211,7 +211,7 @@ def make_figure(stem, target_size, max_iter, panel_size=(8.0, 5.0), dpi=150):
         fig = plt.figure(figsize=panel_size)
         if which == 'inputs':
             # mode='seep' draws the specified-head and exit-face BC lines
-            plot_inputs(sd, fig=fig, mode='seep', mat_table=False,
+            plot_inputs(sd, fig=fig, mode='seep',
                         show_title=True, title=f'{stem} — inputs',
                         frame='content', pad_frac=CUSHION)
         else:

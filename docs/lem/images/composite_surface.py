@@ -34,7 +34,7 @@ def main():
         raise RuntimeError(fs)
 
     fig = plt.figure(figsize=(9.5, 4.6))
-    plot_inputs(sd, fig=fig, mat_table=False, show_title=False)
+    plot_inputs(sd, fig=fig, show_title=False)
     ax = fig.axes[0]
 
     # Drop plot_inputs' radius arrow and center marker — the center (120, 90) sits

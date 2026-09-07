@@ -211,8 +211,6 @@ class MplCanvas(QWidget):
         opts = opts or {}
         self._draw(lambda fig: plot_inputs(
             slope_data, fig=fig, mode=mode,
-            mat_table=opts.get("mat_table", False),
-            tab_loc=opts.get("tab_loc", "top"),
             label_coordinates=opts.get("label_coordinates", False),
             coord_label_size=opts.get("coord_label_size", 7),
             coord_arrows=opts.get("coord_arrows", False),

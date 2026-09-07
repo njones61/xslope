@@ -473,17 +473,6 @@ def plot_material_kr_set(materials, n=200, fig=None, figsize=(8, 5), style=None,
         plt.show()
     return fig
 
-def _derived_water_blocks(slope_data):
-    """The derived water blocks a model would be drawn with (empty in manual mode).
-
-    Asked by the framing, which must leave room for a load the user never typed;
-    it goes through the same derivation the plot and the solver use.
-    """
-    from .water import with_water_loads, derived_blocks
-    sd = with_water_loads(slope_data)
-    return derived_blocks(sd, 1) + derived_blocks(sd, 2)
-
-
 def plot_profile_lines(ax, profile_lines, materials=None, labels=False, style=None):
     """
     Plots the profile lines for each material in the slope.
@@ -2492,350 +2481,6 @@ def plot_non_circ(ax, non_circ, style=None):
     ax.plot(xs, ys, color=fs.get('color', 'red'), linestyle=fs.get('linestyle', '--'),
             linewidth=fs.get('linewidth', 1.5), label='Non-Circular Surface')
 
-def _table_value(value):
-    """A material property as a number for a comparison, with an unset one as 0.
-
-    A blank mat-sheet cell edited in Studio now reaches the model as ``None``
-    rather than as an invented ``0.0``, so anything that compares a property has to
-    survive one. Absent reads as zero here, which is what the comparisons meant all
-    along -- ``mat.get('d', 0) > 0`` was already asking "is a rapid-drawdown d entered?".
-    """
-    try:
-        f = float(value)
-    except (TypeError, ValueError):
-        return 0.0
-    return 0.0 if f != f else f
-
-
-def _table_cell(value, fmt="{:.1f}"):
-    """A material property formatted for a table cell, or ``-`` when it is unset.
-
-    The counterpart of :func:`_table_value` for display: an absent property prints
-    as a dash rather than as ``0.0``, because a table that shows a unit weight of
-    0.0 for a material the user has not filled in is stating something false.
-    """
-    try:
-        f = float(value)
-    except (TypeError, ValueError):
-        return "-"
-    return "-" if f != f else fmt.format(f)
-
-
-def plot_lem_material_table(ax, materials, xloc=0.6, yloc=0.7):
-    """
-    Adds a limit equilibrium material properties table to the plot.
-
-    Displays soil properties for limit equilibrium analysis including unit weight (γ),
-    cohesion (c), friction angle (φ), and optionally the rapid-drawdown envelope
-    parameters d and ψ (K_f-line intercept and slope angle). Supports both
-    Mohr-Coulomb (mc) and constant-phi (cp) options.
-
-    Parameters:
-        ax: matplotlib Axes object to add the table to
-        materials: List of material property dictionaries with keys:
-            - 'name': Material name (str)
-            - 'gamma': Unit weight (float)
-            - 'option': Material model - 'mc' or 'cp' (str)
-            - 'c': Cohesion for mc option (float)
-            - 'phi': Friction angle for mc option (float)
-            - 'cp': Constant phi for cp option (float)
-            - 'r_elev': Reference elevation for cp option (float)
-            - 'd': Rapid-drawdown K_f-line intercept, optional (float)
-            - 'psi': Rapid-drawdown K_f-line slope angle, optional (float)
-                     NOTE: not a dilation angle. The FE solver's ``psi``
-                     (fem.py) is a dilation angle; these LEM material-sheet
-                     columns are not.
-        xloc: x-location of table bottom-left corner in axes coordinates (0-1, default: 0.6)
-        yloc: y-location of table bottom-left corner in axes coordinates (0-1, default: 0.7)
-
-    Returns:
-        None
-    """
-    if not materials:
-        return
-
-    # Check if any materials have non-zero d and psi values
-    has_d_psi = any(_table_value(mat.get('d')) > 0 or _table_value(mat.get('psi')) > 0
-                    for mat in materials)
-
-    # Check material options
-    options = set(mat['option'] for mat in materials)
-
-    # Decide column headers
-    if options == {'mc'}:
-        if has_d_psi:
-            col_labels = ["Mat", "Name", "γ", "c", "φ", "d", "ψ"]
-        else:
-            col_labels = ["Mat", "Name", "γ", "c", "φ"]
-    elif options == {'cp'}:
-        if has_d_psi:
-            col_labels = ["Mat", "Name", "γ", "cp", "rₑ", "d", "ψ"]
-        else:
-            col_labels = ["Mat", "Name", "γ", "cp", "rₑ"]
-    else:
-        if has_d_psi:
-            col_labels = ["Mat", "Name", "γ", "c / cp", "φ / rₑ", "d", "ψ"]
-        else:
-            col_labels = ["Mat", "Name", "γ", "c / cp", "φ / rₑ"]
-
-    # Build table rows
-    table_data = []
-    for idx, mat in enumerate(materials):
-        name = mat['name']
-        gamma_str = _table_cell(mat.get('gamma'))
-        option = mat['option']
-        d = _table_value(mat.get('d'))
-        psi = _table_value(mat.get('psi'))
-        d_str = f"{d:.1f}" if d > 0 or psi > 0 else "-"
-        psi_str = f"{psi:.1f}" if d > 0 or psi > 0 else "-"
-        tail = [d_str, psi_str] if has_d_psi else []
-
-        if option == 'mc':
-            cells = [_table_cell(mat.get('c')), _table_cell(mat.get('phi'))]
-        elif option == 'cp':
-            cells = [_table_cell(mat.get('cp'), "{:.2f}"),
-                     _table_cell(mat.get('r_elev'))]
-        else:
-            cells = ["-", "-"]
-        table_data.append([idx + 1, name, gamma_str] + cells + tail)
-
-    # Adjust table width based on number of columns
-    table_width = 0.25 if has_d_psi else 0.2
-
-    # Choose table height based on number of materials (uniform across table types)
-    num_rows = max(1, len(materials))
-    table_height = 0.06 + 0.035 * num_rows  # header + per-row estimate
-    table_height = min(0.35, table_height)  # cap to avoid overflows for many rows
-
-    # Add the table
-    table = ax.table(cellText=table_data,
-                     colLabels=col_labels,
-                     loc='upper right',
-                     colLoc='center',
-                     cellLoc='center',
-                     bbox=[xloc, yloc, table_width, table_height])
-    table.auto_set_font_size(False)
-    table.set_fontsize(8)
-    # Auto layout based on content (shared method for all table types)
-    auto_size_table_to_content(ax, table, col_labels, table_data, table_width, table_height)
-
-def plot_seep_material_table(ax, seep_data, xloc=0.6, yloc=0.7):
-    """
-    Adds a seep material properties table to the plot.
-
-    Displays hydraulic properties for seep analysis including hydraulic conductivities
-    (k₁, k₂), anisotropy angle, and unsaturated flow parameters (kr₀, h₀).
-
-    Parameters:
-        ax: matplotlib Axes object to add the table to
-        seep_data: Dictionary containing seep material properties with keys:
-            - 'k1_by_mat': List of primary hydraulic conductivity values (float)
-            - 'k2_by_mat': List of secondary hydraulic conductivity values (float)
-            - 'angle_by_mat': List of anisotropy angles in degrees (float)
-            - 'kr0_by_mat': List of relative permeability at residual saturation (float)
-            - 'h0_by_mat': List of pressure head parameters (float)
-            - 'material_names': List of material names (str), optional
-        xloc: x-location of table bottom-left corner in axes coordinates (0-1, default: 0.6)
-        yloc: y-location of table bottom-left corner in axes coordinates (0-1, default: 0.7)
-
-    Returns:
-        None
-    """
-    k1_by_mat = seep_data.get("k1_by_mat")
-    k2_by_mat = seep_data.get("k2_by_mat")
-    angle_by_mat = seep_data.get("angle_by_mat")
-    kr0_by_mat = seep_data.get("kr0_by_mat")
-    h0_by_mat = seep_data.get("h0_by_mat")
-    material_names = seep_data.get("material_names", [])
-    if k1_by_mat is None or len(k1_by_mat) == 0:
-        return
-    col_labels = ["Mat", "Name", "k₁", "k₂", "Angle", "kr₀", "h₀"]
-    table_data = []
-    for idx in range(len(k1_by_mat)):
-        k1 = k1_by_mat[idx]
-        k2 = k2_by_mat[idx] if k2_by_mat is not None else 0.0
-        angle = angle_by_mat[idx] if angle_by_mat is not None else 0.0
-        kr0 = kr0_by_mat[idx] if kr0_by_mat is not None else 0.0
-        h0 = h0_by_mat[idx] if h0_by_mat is not None else 0.0
-        material_name = material_names[idx] if idx < len(material_names) else f"Material {idx+1}"
-        row = [idx + 1, material_name, f"{k1:.3f}", f"{k2:.3f}", f"{angle:.1f}", f"{kr0:.4f}", f"{h0:.2f}"]
-        table_data.append(row)
-    # Dimensions
-    num_rows = max(1, len(k1_by_mat))
-    table_width = 0.45
-    table_height = 0.10 + 0.06 * num_rows
-    table_height = min(0.50, table_height)
-    table = ax.table(cellText=table_data,
-                     colLabels=col_labels,
-                     loc='upper right',
-                     colLoc='center',
-                     cellLoc='center',
-                     bbox=[xloc, yloc, table_width, table_height])
-    table.auto_set_font_size(False)
-    table.set_fontsize(8)
-    auto_size_table_to_content(ax, table, col_labels, table_data, table_width, table_height)
-
-def plot_fem_material_table(ax, fem_data, xloc=0.6, yloc=0.7, width=0.6, height=None):
-    """
-    Adds a finite element material properties table to the plot.
-
-    Displays material properties for FEM analysis including unit weight (γ), cohesion (c),
-    friction angle (φ), Young's modulus (E), and Poisson's ratio (ν).
-
-    Parameters:
-        ax: matplotlib Axes object to add the table to
-        fem_data: Dictionary containing FEM material properties with keys:
-            - 'c_by_mat': List of cohesion values (float)
-            - 'phi_by_mat': List of friction angle values in degrees (float)
-            - 'E_by_mat': List of Young's modulus values (float)
-            - 'nu_by_mat': List of Poisson's ratio values (float)
-            - 'gamma_by_mat': List of unit weight values (float)
-            - 'material_names': List of material names (str), optional
-        xloc: x-location of table bottom-left corner in axes coordinates (0-1, default: 0.6)
-        yloc: y-location of table bottom-left corner in axes coordinates (0-1, default: 0.7)
-        width: Table width in axes coordinates (0-1, default: 0.6)
-        height: Table height in axes coordinates (0-1, default: auto-calculated)
-
-    Returns:
-        None
-    """
-    c_by_mat = fem_data.get("c_by_mat")
-    phi_by_mat = fem_data.get("phi_by_mat")
-    E_by_mat = fem_data.get("E_by_mat")
-    nu_by_mat = fem_data.get("nu_by_mat")
-    gamma_by_mat = fem_data.get("gamma_by_mat")
-    material_names = fem_data.get("material_names", [])
-    if c_by_mat is None or len(c_by_mat) == 0:
-        return
-    col_labels = ["Mat", "Name", "γ", "c", "φ", "E", "ν"]
-    table_data = []
-    for idx in range(len(c_by_mat)):
-        c = c_by_mat[idx]
-        phi = phi_by_mat[idx] if phi_by_mat is not None else 0.0
-        E = E_by_mat[idx] if E_by_mat is not None else 0.0
-        nu = nu_by_mat[idx] if nu_by_mat is not None else 0.0
-        gamma = gamma_by_mat[idx] if gamma_by_mat is not None else 0.0
-        material_name = material_names[idx] if idx < len(material_names) else f"Material {idx+1}"
-        row = [idx + 1, material_name, f"{gamma:.1f}", f"{c:.1f}", f"{phi:.1f}", f"{E:.0f}", f"{nu:.2f}"]
-        table_data.append(row)
-    if height is None:
-        num_rows = max(1, len(c_by_mat))
-        height = 0.06 + 0.035 * num_rows
-        height = min(0.32, height)
-    table = ax.table(cellText=table_data,
-                     colLabels=col_labels,
-                     loc='upper right',
-                     colLoc='center',
-                     cellLoc='center',
-                     bbox=[xloc, yloc, width, height])
-    table.auto_set_font_size(False)
-    table.set_fontsize(8)
-    auto_size_table_to_content(ax, table, col_labels, table_data, width, height)
-def auto_size_table_to_content(ax, table, col_labels, table_data, table_width, table_height, min_row_frac=0.02, row_pad=1.35, col_min_frac=0.08, col_max_frac=0.15):
-    """
-    Automatically adjusts table column widths and row heights based on content.
-
-    Measures text extents using the matplotlib renderer and sets column widths proportional
-    to content while enforcing minimum and maximum constraints. The "Name" column gets
-    more space (18-30%) while numeric columns are constrained to prevent excessive whitespace.
-    Row heights are uniform and based on the tallest content in each row.
-
-    Parameters:
-        ax: matplotlib Axes object containing the table
-        table: matplotlib Table object to be resized
-        col_labels: List of column header labels (str)
-        table_data: List of lists containing table cell data
-        table_width: Total table width in axes coordinates (0-1)
-        table_height: Total table height in axes coordinates (0-1)
-        min_row_frac: Minimum row height as fraction of axes height (default: 0.02)
-        row_pad: Padding factor applied to measured row heights (default: 1.35)
-        col_min_frac: Minimum column width as fraction of table width for numeric columns (default: 0.08)
-        col_max_frac: Maximum column width as fraction of table width for numeric columns (default: 0.15)
-
-    Returns:
-        None
-
-    Notes:
-        - The "Name" column is automatically left-aligned and gets 18-30% of table width
-        - Numeric columns are center-aligned and constrained to 8-15% of table width
-        - All three material table types (LEM, SEEP, FEM) use the same sizing parameters
-    """
-    # Force draw to get a valid renderer
-    try:
-        ax.figure.canvas.draw()
-        renderer = ax.figure.canvas.get_renderer()
-    except Exception:
-        renderer = None
-
-    ncols = len(col_labels)
-    nrows = len(table_data) + 1  # include header
-    # Measure text widths per column in pixels
-    widths_px = [1.0] * ncols
-    if renderer is not None:
-        for c in range(ncols):
-            max_w = 1.0
-            for r in range(nrows):
-                cell = table[(r, c)]
-                text = cell.get_text()
-                try:
-                    bbox = text.get_window_extent(renderer=renderer)
-                    max_w = max(max_w, bbox.width)
-                except Exception:
-                    pass
-            widths_px[c] = max_w
-    total_w = sum(widths_px) if sum(widths_px) > 0 else float(ncols)
-    col_fracs = [w / total_w for w in widths_px]
-    # Clamp extreme column widths to keep numeric columns from becoming too wide
-    clamped = []
-    for i, frac in enumerate(col_fracs):
-        label = str(col_labels[i]).lower()
-        min_frac = col_min_frac
-        max_frac = col_max_frac
-        if label == "name":
-            min_frac = 0.18
-            max_frac = 0.30
-        clamped.append(min(max(frac, min_frac), max_frac))
-    # Re-normalize to sum to 1.0
-    s = sum(clamped)
-    if s > 0:
-        col_fracs = [c / s for c in clamped]
-    # Compute per-row pixel heights based on text extents, convert to axes fraction
-    axes_h_px = None
-    if renderer is not None:
-        try:
-            axes_h_px = ax.get_window_extent(renderer=renderer).height
-        except Exception:
-            axes_h_px = None
-    # Fallback axes height if needed (avoid division by zero)
-    if not axes_h_px or axes_h_px <= 0:
-        axes_h_px = 800.0  # arbitrary but reasonable default
-    row_heights_frac = []
-    for r in range(nrows):
-        max_h_px = 1.0
-        if renderer is not None:
-            for c in range(ncols):
-                try:
-                    bbox = table[(r, c)].get_text().get_window_extent(renderer=renderer)
-                    max_h_px = max(max_h_px, bbox.height)
-                except Exception:
-                    pass
-        # padding factor to provide breathing room around text
-        padded_px = max_h_px * row_pad
-        # Convert to axes fraction with minimum clamp
-        rh = max(padded_px / axes_h_px, min_row_frac)
-        row_heights_frac.append(rh)
-
-    # Apply column widths and per-row heights
-    for r in range(nrows):
-        for c in range(ncols):
-            cell = table[(r, c)]
-            cell.set_width(table_width * col_fracs[c])
-            cell.set_height(row_heights_frac[r])
-            # Left-align the "Name" column if present
-            label = str(col_labels[c]).lower()
-            if label == "name":
-                cell.get_text().set_ha('left')
-
 def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
     """
     Plots base normal stresses for each slice as bars.
@@ -3538,12 +3183,10 @@ def plot_inputs(
     slope_data,
     title="Slope Geometry and Inputs",
     figsize=(12, 7),
-    mat_table=False,
     save_png=False,
     save_dxf=False,
     dpi=300,
     mode="lem",
-    tab_loc="top",
     legend_ncol="auto",
     legend_frame=False,
     show_title=True,
@@ -3564,18 +3207,18 @@ def plot_inputs(
         slope_data: Dictionary containing plot data
         title: Title for the plot
         figsize: Tuple of (width, height) in inches for the plot
-        mat_table: Controls material table display. Can be:
-            - True: Use tab_loc for positioning (default)
-            - False: Don't show material table
-            - 'auto': Use tab_loc for positioning
-            - String: Specific location from valid placements (see tab_loc)
         save_png: If True, save plot as PNG file (default: False)
         dpi: Resolution for saved PNG file (default: 300)
-        mode: Which engine's view of the model to draw, and which material
-            properties table to display with it:
-            - "lem": Limit equilibrium materials (γ, c, φ, optional d/ψ)
-            - "seep": Seepage properties (k₁, k₂, Angle, kr₀, h₀)
-            - "fem": FEM properties (γ, c, φ, E, ν)
+        mode: Which engine's view of the model to draw — each engine's view
+            carries the inputs that engine reads, and leaves out the ones it
+            does not:
+            - "lem": the limit equilibrium model — piezometric line and derived
+              water surface, tension crack, loads, members, and the trial
+              circles or non-circular surface.
+            - "seep": the seepage model — the head and flux boundaries, and no
+              loads or members.
+            - "fem": the finite element model — the SSR zones, the water lines,
+              the loads and the members.
             - "shared": the SECTION every engine shares — its geometry and its
               material zones, and nothing else. Everything an analysis applies
               to the section or reads off it is suppressed: no trial circles or
@@ -3590,19 +3233,7 @@ def plot_inputs(
               engine's own model figure draws the ones it reads; drawn here too
               they were the same lines twice, one page apart, on a model whose
               only feature is its water or its members. This is the plot the
-              Analysis Report's Project Definition uses. Its material table, if
-              asked for, is the LEM one.
-        tab_loc: Table placement when mat_table is True or 'auto'. Valid options:
-            - "upper left": Top-left corner of plot area
-            - "upper right": Top-right corner of plot area
-            - "upper center": Top-center of plot area
-            - "lower left": Bottom-left corner of plot area
-            - "lower right": Bottom-right corner of plot area
-            - "lower center": Bottom-center of plot area
-            - "center left": Middle-left of plot area
-            - "center right": Middle-right of plot area
-            - "center": Center of plot area
-            - "top": Above plot area, horizontally centered
+              Analysis Report's Project Definition uses.
         legend_ncol: Legend column count. Use "auto" (default) to lay it out
             automatically — as wide as fits the axes, with the fewest, neatly
             balanced rows — or pass an int to force a specific column count.
@@ -3763,114 +3394,6 @@ def plot_inputs(
                 fontsize=10, fontweight='bold', ha='right', va='top',
                 bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow',
                           edgecolor='orange', linewidth=1.0, alpha=0.9))
-
-    # Handle material table display
-    if mat_table:
-        # Helpers to adapt slope_data materials into formats expected by table functions
-        def _build_seep_data():
-            materials = slope_data.get('materials', [])
-            return {
-                "k1_by_mat": [m.get('k1', 0.0) for m in materials],
-                "k2_by_mat": [m.get('k2', 0.0) for m in materials],
-                "angle_by_mat": [m.get('alpha', 0.0) for m in materials],
-                "kr0_by_mat": [m.get('kr0', 0.0) for m in materials],
-                "h0_by_mat": [m.get('h0', 0.0) for m in materials],
-                "material_names": [m.get('name', f"Material {i+1}") for i, m in enumerate(materials)],
-            }
-
-        def _build_fem_data():
-            materials = slope_data.get('materials', [])
-            return {
-                "c_by_mat": [m.get('c', 0.0) for m in materials],
-                "phi_by_mat": [m.get('phi', 0.0) for m in materials],
-                "E_by_mat": [m.get('E', 0.0) for m in materials],
-                "nu_by_mat": [m.get('nu', 0.0) for m in materials],
-                "gamma_by_mat": [m.get('gamma', 0.0) for m in materials],
-                "material_names": [m.get('name', f"Material {i+1}") for i, m in enumerate(materials)],
-            }
-
-        def _estimate_table_dims():
-            """Estimate table dimensions based on mode and materials."""
-            materials = slope_data.get('materials', [])
-            num_rows = max(1, len(materials))
-
-            if mode in ("lem", "shared"):
-                has_d_psi = any(_table_value(mat.get('d')) > 0
-                                or _table_value(mat.get('psi')) > 0
-                                for mat in materials)
-                width = 0.25 if has_d_psi else 0.2
-                height = min(0.35, 0.06 + 0.035 * num_rows)
-            elif mode == "fem":
-                width = 0.60
-                height = min(0.32, 0.06 + 0.035 * num_rows)
-            elif mode == "seep":
-                width = 0.45
-                height = min(0.50, 0.10 + 0.06 * num_rows)
-            else:
-                raise ValueError(f"Unknown mode '{mode}'. Expected one of: "
-                                 f"'lem', 'seep', 'fem', 'shared'.")
-
-            return width, height
-
-        def _plot_table(ax, xloc, yloc):
-            """Plot the appropriate material table based on mode."""
-            if mode in ("lem", "shared"):
-                plot_lem_material_table(ax, slope_data['materials'], xloc=xloc, yloc=yloc)
-            elif mode == "seep":
-                plot_seep_material_table(ax, _build_seep_data(), xloc=xloc, yloc=yloc)
-            elif mode == "fem":
-                width, height = _estimate_table_dims()
-                plot_fem_material_table(ax, _build_fem_data(), xloc=xloc, yloc=yloc, width=width, height=height)
-
-        def _calculate_position(location, margin=0.03):
-            """Calculate xloc, yloc for a given location string."""
-            width, height = _estimate_table_dims()
-
-            # Location map with default coordinates
-            position_map = {
-                'upper left': (margin, max(0.0, 1.0 - margin - height)),
-                'upper right': (max(0.0, 1.0 - width - margin), max(0.0, 1.0 - margin - height)),
-                'upper center': (0.35, 0.70),
-                'lower left': (0.05, 0.05),
-                'lower right': (0.70, 0.05),
-                'lower center': (0.35, 0.05),
-                'center left': (0.05, 0.35),
-                'center right': (0.70, 0.35),
-                'center': (0.35, 0.35),
-                'top': ((1.0 - width) / 2.0, 1.16)
-            }
-
-            return position_map.get(location, position_map['upper right'])
-
-        # Determine which location to use
-        placement = mat_table if isinstance(mat_table, str) and mat_table != 'auto' else tab_loc
-
-        # Validate placement
-        valid_placements = ['upper left', 'upper right', 'upper center', 'lower left',
-                          'lower right', 'lower center', 'center left', 'center right', 'center', 'top']
-        if placement not in valid_placements:
-            raise ValueError(f"Unknown placement '{placement}'. Expected one of: {', '.join(valid_placements)}.")
-
-        # Calculate position and plot table
-        xloc, yloc = _calculate_position(placement)
-        _plot_table(ax, xloc, yloc)
-
-        # Adjust y-limits to prevent table overlap with plot data
-        if placement in ("upper left", "upper right", "upper center"):
-            _, height = _estimate_table_dims()
-            margin = 0.03
-            bottom_fraction = max(0.0, 1.0 - margin - height)
-
-            y_min_curr, y_max_curr = ax.get_ylim()
-            y_range = y_max_curr - y_min_curr
-            if y_range > 0:
-                elem_bounds = get_plot_elements_bounds(ax, slope_data)
-                if elem_bounds:
-                    y_top = max(b[3] for b in elem_bounds)
-                    y_norm = (y_top - y_min_curr) / y_range
-                    if y_norm >= bottom_fraction and bottom_fraction > 0:
-                        y_max_new = y_min_curr + (y_top - y_min_curr) / bottom_fraction
-                        ax.set_ylim(y_min_curr, y_max_new)
 
     if frame == "content":
         # Frame the panel to its CONTENT: the model's extent, box-adjusted equal
@@ -4043,7 +3566,6 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     plot_line_loads(ax, slope_data, style=style)
     # Slice numbers go on last of all, once the frame and the layout are final —
     # they are sized against the slice widths as they will actually print.
-    # plot_material_table(ax, data['materials'], xloc=0.75) # Adjust this so that it fits with the legend
 
     alpha = 0.3
     if results['method'] in ('spencer', 'mprice'):
@@ -4987,55 +4509,6 @@ def plot_polygons_separately(polygons, materials=None, save_png=False, dpi=300):
 
 
 
-
-def get_plot_elements_bounds(ax, slope_data):
-    """
-    Get bounding boxes of existing plot elements to avoid overlaps.
-    
-    Parameters:
-        ax: matplotlib Axes object
-        slope_data: Dictionary containing slope data
-        
-    Returns:
-        List of (x_min, x_max, y_min, y_max) tuples for plot elements
-    """
-    bounds = []
-    
-    # Get axis limits
-    x_min, x_max = ax.get_xlim()
-    y_min, y_max = ax.get_ylim()
-    
-    # Profile lines bounds
-    if slope_data.get('profile_lines'):
-        for line in slope_data['profile_lines']:
-            if line:
-                coords = line['coords']
-                xs = [p[0] for p in coords]
-                ys = [p[1] for p in coords]
-                bounds.append((min(xs), max(xs), min(ys), max(ys)))
-    elif slope_data.get('domain_polygon') is not None:
-        # Polygon input: use the domain polygon's bounding box.
-        dx0, dy0, dx1, dy1 = slope_data['domain_polygon'].bounds
-        bounds.append((dx0, dx1, dy0, dy1))
-
-    # Distributed loads bounds — the derived water loads included, so the material
-    # table is not placed on top of a reservoir the user did not type.
-    for dload_set in (list(slope_data.get('dloads') or [])
-                      + _derived_water_blocks(slope_data)):
-        if dload_set:
-            xs = [p['X'] for p in dload_set]
-            ys = [p['Y'] for p in dload_set]
-            bounds.append((min(xs), max(xs), min(ys), max(ys)))
-    
-    # Reinforcement lines bounds
-    if 'reinforce_lines' in slope_data and slope_data['reinforce_lines']:
-        for line in slope_data['reinforce_lines']:
-            if line:
-                xs = [p['X'] for p in line]
-                ys = [p['Y'] for p in line]
-                bounds.append((min(xs), max(xs), min(ys), max(ys)))
-    
-    return bounds
 
 def plot_sensitivity(df, target_fs=None, figsize=(8, 5), save_png=False,
                      dpi=300, fig=None, style=None):

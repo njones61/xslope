@@ -100,7 +100,7 @@ def run_all():
 
     # A — the problem definition, over the mesh built from the same geometry
     panel_a = _panel(lambda fig: plot_inputs(
-        slope_data, fig=fig, mode="lem", mat_table=False,
+        slope_data, fig=fig, mode="lem",
         show_title=False, show_legend=True, legend_ncol=6))
 
     # B — finite element seepage

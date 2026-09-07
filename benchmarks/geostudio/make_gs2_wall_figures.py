@@ -103,7 +103,7 @@ def composite(stem):
 
     paths = []
     fig = plt.figure(figsize=PANEL)
-    _quiet(plot_inputs, sd, fig=fig, mat_table=False, show_title=True,
+    _quiet(plot_inputs, sd, fig=fig, show_title=True,
            title=f'{stem} — inputs')
     p = os.path.join(OUT, f'_{stem}_inputs.png')
     fig.savefig(p, dpi=DPI, bbox_inches='tight')

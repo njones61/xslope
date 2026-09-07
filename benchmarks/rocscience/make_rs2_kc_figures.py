@@ -78,7 +78,7 @@ def make_figure(stem, tag, panel_size=(8.0, 5.0), dpi=150):
     for which in ('inputs', 'solution'):
         fig = plt.figure(figsize=panel_size)
         if which == 'inputs':
-            plot_inputs(sd, fig=fig, mat_table=False, show_title=True,
+            plot_inputs(sd, fig=fig, show_title=True,
                         title=f'{stem} — inputs', label_coordinates=False)
         else:
             plot_solution(sd, df, surface, results, fig=fig, show_title=True)

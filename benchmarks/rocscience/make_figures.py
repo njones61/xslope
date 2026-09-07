@@ -256,7 +256,7 @@ def make_figure(stem, kind, method, src=None, panel_size=(8.0, 5.0), dpi=150):
     for which in ('inputs', 'solution'):
         fig = plt.figure(figsize=panel_size)
         if which == 'inputs':
-            plot_inputs(sd, fig=fig, mat_table=False, show_title=True,
+            plot_inputs(sd, fig=fig, show_title=True,
                         title=f'{stem} — inputs',
                         label_coordinates=stem not in NO_COORD_LABELS,
                         coord_arrows=stem in COORD_ARROWS,

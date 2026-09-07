@@ -7221,7 +7221,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": false,
-        "k0": null,
+        "k0": 1.0,
         "line_loads": 0,
         "material_options": [
           "mc"
@@ -7257,7 +7257,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 24,
+        "template_version": 25,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7285,6 +7285,368 @@
       ],
       "topics": [
         "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 12,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": true,
+          "end_anchorage": true,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "generic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 25,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/published/fhwa_e3.xlsx",
+      "references": [
+        {
+          "anchor": "fhwa-e3",
+          "checks": [
+            "FHWA-E3",
+            "FHWA-E3-global"
+          ],
+          "level": 2,
+          "page": "verification/published/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/published.md",
+          "title": "FHWA Example E3 — precast panel wall with a sloping backfill",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/published/#fhwa-e3"
+        }
+      ],
+      "topics": []
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 1,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 10,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": true,
+          "end_anchorage": true,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "generic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 25,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/published/fhwa_e4.xlsx",
+      "references": [
+        {
+          "anchor": "fhwa-e4",
+          "checks": [
+            "FHWA-E4",
+            "FHWA-E4-global"
+          ],
+          "level": 2,
+          "page": "verification/published/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/published.md",
+          "title": "FHWA Example E4 — precast panel wall with a level backfill",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/published/#fhwa-e4"
+        }
+      ],
+      "topics": []
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 2,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 4,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 11,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": true,
+          "end_anchorage": true,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "generic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 25,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/published/fhwa_e5.xlsx",
+      "references": [
+        {
+          "anchor": "fhwa-e5",
+          "checks": [
+            "FHWA-E5",
+            "FHWA-E5-global"
+          ],
+          "level": 2,
+          "page": "verification/published/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/published.md",
+          "title": "FHWA Example E5 — bridge abutment on a spread footing",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/published/#fhwa-e5"
+        }
+      ],
+      "topics": []
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 10,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": true,
+          "end_anchorage": true,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "generic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 25,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/published/fhwa_e6.xlsx",
+      "references": [
+        {
+          "anchor": "fhwa-e6",
+          "checks": [
+            "FHWA-E6",
+            "FHWA-E6-global"
+          ],
+          "level": 2,
+          "page": "verification/published/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/published.md",
+          "title": "FHWA Example E6 — traffic barrier impact on the E4 wall",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/published/#fhwa-e6"
+        }
+      ],
+      "topics": []
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 1,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 10,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": true,
+          "end_anchorage": true,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "generic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.211,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 25,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/published/fhwa_e7.xlsx",
+      "references": [
+        {
+          "anchor": "fhwa-e7",
+          "checks": [
+            "FHWA-E7",
+            "FHWA-E7-global"
+          ],
+          "level": 2,
+          "page": "verification/published/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/published.md",
+          "title": "FHWA Example E7 — seismic loading on the E4 wall",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/published/#fhwa-e7"
+        }
+      ],
+      "topics": [
+        "seismic"
       ]
     },
     {
@@ -23834,7 +24196,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 336,
+    "models": 341,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -23860,7 +24222,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 576,
+    "tags": 586,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
@@ -23871,7 +24233,7 @@
       "rapid-drawdown": 8,
       "reinforcement": 23,
       "seepage-coupled": 73,
-      "seismic": 10,
+      "seismic": 11,
       "soil-nails": 5,
       "tension-cracks": 19,
       "transient-seepage": 24,
@@ -24246,6 +24608,7 @@
       "docs/verification/files/rocscience_gw/gw021b.xlsx"
     ],
     "seismic": [
+      "docs/verification/files/published/fhwa_e7.xlsx",
       "docs/verification/files/rocscience/rs2_51.xlsx",
       "docs/verification/files/rocscience/rs2_64g.xlsx",
       "docs/verification/files/rocscience/rs2_64k.xlsx",

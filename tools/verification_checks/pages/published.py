@@ -24,6 +24,21 @@ CONFIG = PageConfig(
         # the summary row states a bound over the whole eleven-layer table; the
         # per-layer pairs it summarises are re-derived row by row in the entry
         ('+0.1', 'reproduced within 0.1% of the manual'),
+        # the same shape on each steel-reinforcement row: a bound over the whole
+        # published table, whose per-level pairs the entry's own table carries
+        ('+0.1', 'twelve levels of Table E3-7.3'),
+        ('+0.1', 'ten levels of Table E4-7.4'),
+        ('+0.1', 'eleven levels of Table E5-8.3'),
+        ('+0.3', 'layers the impact check covers'),
+        ('+0.1', 'ten levels of Table E7-7'),
+    ],
+
+    worded_ok=[
+        # Example E6's two levels differ from the manual by the same amount, so
+        # the entry states it once in words rather than restating either row's
+        # own percentage; both pairs are re-derived in the table above it.
+        "The quarter of a percent is the wall face itself",
+        "short by the same quarter of a percent",
     ],
 
     untagged_allow=[
@@ -37,6 +52,9 @@ CONFIG = PageConfig(
         ('2.82', 'ratios run 11.4 to 31.1'),
         ('1.00', 'Step 7.9 checks the connection'),
         ('1.03', 'on five of the lower layers'),
+        # the top of FHWA's pullout resistance factor ladder for steel strips,
+        # 1.2 + log10(Cu), quoted in prose as the input it is
+        ('2.000', 'at 20 ft depth, which for this backfill is'),
     ],
 
     tag_value_keys=['expected_fs*', 'fs_*', 'expected_pullout',

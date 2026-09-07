@@ -340,8 +340,8 @@ Open **Results → 1D Details** on the upper row again and set **Field state** t
 
 ![The upper row's 1D Details with the tip fixed, at the last converged state: bending against the restraint, the moment at capacity from 16 ft down to the toe](images/fem03_piles_profile_fixed.png){width=1000}
 
-The head moves 0.19 ft and the displacement profile is curved: the shaft is
-bending, not rotating about a pin. The moment is zero at the free head, reaches
+The displacement profile is curved rather than straight: the shaft is bending,
+not rotating about a pin. The moment is zero at the free head, reaches
 the 10,000 lb·ft per foot that is M<sub>cap</sub> ÷ S about 16 ft below the
 head, and holds it to the toe: those sections have hinged and carry no more
 moment however far the shaft bends. The largest shear is 1,062 lb/ft at 9 ft
@@ -350,6 +350,26 @@ now bent against its toe rather than swung about it.
 
 Held at its toe, the shaft develops the full moment capacity the limit
 equilibrium method assumed all along.
+
+That panel is read for the shape of the deflection and for what the shaft
+carries, and not for how far it has moved. A strength reduction run weakens the
+soil until the slope will not stand, so both of the fields it reports are the
+slope at or past the edge of failure. There the shape is the mechanism, which is
+what the run is for, but the size of the movement is set by how far the iteration
+had walked when the trial stopped rather than by the slope. **Tolerance (SSRM)**
+on the Run FEM dialog is how narrow the bisection closes its bracket before
+stopping, `0.01` on every run on this page. Setting it to `0.005` instead — the
+same model, the same mesh, the same soil — moves the factor of safety by 0.002
+and this shaft's head from 0.19 ft to 1.39 ft.
+
+A displacement is read at **F = 1** instead — the soil at its own strength, which
+is the condition the slope is in. **Run → Run FEM…**, set **Analysis**
+to **Single (fixed F)**, leave **F (single)** at `1.00`, and **Run**. That solve
+reports no factor of safety and captures no at-failure state, so **1D Details**
+opens on the single field it has, with **Field state** fixed on **Converged**.
+The upper row's head moves **0.0135 ft** there with its tip fixed, against
+**0.0155 ft** with it pinned: holding the toe against rotation takes about an
+eighth off the movement at the head.
 
 Set `Tip` back to `pinned` on both rows before going on.
 
@@ -590,7 +610,7 @@ times the peak. The **shear** holds one sign the whole length, peaking at
 5,969 lb/ft at 13 ft. The **soil reaction** changes sign near 12 ft — the clay
 drives the wall downslope over its upper length and the soil below pushes back —
 and swings positive again over the last 2 ft, where the fixed toe is held. The
-**lateral displacement** is 0.255 ft at the head and decays smoothly to zero at
+**lateral displacement** is largest at the head and decays smoothly to zero at
 the toe.
 
 Switch **Field state** to **At failure**, which is the state the panel opens on:
@@ -603,6 +623,13 @@ the title now reads *at capacity*. The shear grows with it, from 5,969 to
 7,124 lb/ft, and its peak moves from 13 ft down to the toe. A wall that carries
 91% of its section at the answer and the whole of it at the collapse the run
 captured is one to check the section of.
+
+How far the wall deflects is read at **F = 1**, for the reason the pile rows
+were: both of the fields above are a slope at or past the edge of failure, where
+the size of a movement follows the iteration rather than the slope. **Run → Run
+FEM…**, set **Analysis** to **Single (fixed F)**, leave **F (single)** at `1.00`,
+and **Run**; then open **1D Details** on the wall. With the clay at its own
+strength the head moves **0.0140 ft**.
 
 ### A finer beam
 
@@ -682,6 +709,9 @@ This tutorial covered:
 - How a continuous wall is entered and what the finite element engine reports
   for it that no limit equilibrium analysis can: moment, shear, deflection and
   soil reaction down the member.
+- Which field each of those is read from: the strength reduction run for the
+  mechanism and for what a member carries as the slope gives way, and a single
+  solve at F = 1 for how far the member actually moves.
 
 **Where to go next:** [Piles and concrete piers in FEM](../fem/piles.md) carries
 the beam formulation, the assembly and the applicability rule in full, and

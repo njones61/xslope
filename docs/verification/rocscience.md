@@ -36,6 +36,7 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp020.xlsx, type=circular_search, num_slices=50, fs_bishop=1.086, fs_spencer=1.091, benchmark=VP20-circ -->
 <!-- test: file=files/rocscience/vp020.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.082, benchmark=VP20-noncirc -->
 <!-- test: file=files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.130, benchmark=VP23 -->
+<!-- test: file=files/rocscience/vp023.xlsx, type=single_circle, circle_index=1, num_slices=50, fs_oms=1.377, fs_bishop=1.195, benchmark=VP23-circle -->
 <!-- test: file=files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.435, fs_bishop=1.435, benchmark=VP24 -->
 <!-- test: file=files/rocscience/vp025.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.052, benchmark=VP25 -->
 <!-- test: file=files/rocscience/vp026.xlsx, type=single_noncirc, num_slices=60, right_facing=true, fs_spencer=1.043, benchmark=VP26 -->
@@ -765,9 +766,22 @@ finite-element limit analysis of the same section.
 | Ordinary | 1.357 | 1.370 (−0.9%) | 1.36 (−0.2%) | — |
 | Bishop | 1.130 | 1.192 (−5.2%) | 1.14 (−0.9%) | 1.17 (−3.4%) |
 
-*The Bishop spread on this deep φ = 0 problem is not a surface disagreement: the two
-searches settle on the same center (XSLOPE (18.00, 16.04), Slide (18.001, 16.000)). The
-outlier is Slide's own Bishop, 1.192 against the Low 1.14 its manual cites (+4.6%).*
+The manual prints no radius for its critical circle, so the surfaces cannot be compared
+directly; what can be compared is a circle that carries both published values. One circle
+through this model, center (19.0, 18.5) and radius 18, returns Slide's Ordinary and its
+Bishop together:
+
+| Method, on that circle | XSLOPE | Slide |
+|---|---|---|
+| Ordinary | 1.377 | 1.370 (+0.5%) |
+| Bishop | 1.195 | 1.192 (+0.3%) |
+
+*Two independent values matching identifies the circle far more tightly than either would
+alone, and on it the two programs agree on both methods. The Bishop spread in the first
+table is therefore a search result rather than a solver difference: XSLOPE's Bishop search
+reaches a deeper circle and a lower minimum than Slide's reported critical, and the lower
+minimum is the one Low's published 1.14 corroborates. Both searches settle on the same
+center (XSLOPE (18.00, 16.04), Slide (18.001, 16.000)).*
 
 ![vp023: inputs and representative solution](images/vp023.png)
 

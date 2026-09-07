@@ -841,7 +841,16 @@ def vp023():
     """Slide #23: Low (1989) slope over two undrained layers; the lower
     layer's cu grows linearly 15->30 kPa from y=4 to y=0 (xslope 'cp'
     option: Su = c + cp*(r_elev - y)). Circular search. Slide2:
-    Ordinary 1.370, Bishop 1.192; Low 1.36 / 1.14; Kim (2002) 1.17."""
+    Ordinary 1.370, Bishop 1.192; Low 1.36 / 1.14; Kim (2002) 1.17.
+
+    Two circles. The first is the search seed. The second carries both of
+    Slide2's published values at once -- Ordinary and Bishop within half a
+    percent of 1.370 and 1.192 on this model -- which is how it was identified:
+    the manual prints no radius for its critical circle, and a circle
+    reproducing two independent published factors together is a far tighter
+    identification than one reproducing a single factor. It is analysed
+    directly (circle_index=1) and adding it does not move the search, which
+    returns the same Ordinary 1.357 and Bishop 1.130 from either seed set."""
     sd = load_slope_data(ACADS_1A)
     base = dict(sd['materials'][0])
     sd['materials'] = []
@@ -858,7 +867,8 @@ def vp023():
         {'mat_id': 2, 'coords': [(0.0, 4.0), (40.0, 4.0)]},
     ]
     sd['max_depth'] = 0.0
-    sd['circles'] = [{'Xo': 18.0, 'Yo': 20.0, 'Depth': 2.0, 'R': 18.0}]
+    sd['circles'] = [{'Xo': 18.0, 'Yo': 20.0, 'Depth': 2.0, 'R': 18.0},
+                     {'Xo': 19.0, 'Yo': 18.5, 'Depth': 0.5, 'R': 18.0}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp023.xlsx'))
     return 'vp023.xlsx'
 

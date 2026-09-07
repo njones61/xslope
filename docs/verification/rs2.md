@@ -1346,8 +1346,9 @@ runs the route the case names: mesh the dam at the tagged 12.4 ft in tri6, solve
 boundary set on that mesh — specified head 315 on the submerged upstream face, the downstream face
 an exit face, the foundation impervious — and reduce the strengths on that same mesh and that same
 field. It brackets **1.590**, +4.6% on RS2's 1.52 for its Case 1. Unlike the piezometric case there
-is no shallow skin to exclude: excluding everything shallower than 30 ft returns the same 1.590,
-so the mechanism the filter leaves is the mechanism the unconstrained run already finds. With the phreatic surface solved on the mesh rather
+is no shallow skin to exclude: excluding everything shallower than 30 ft returns **1.607**, one
+cell of the row's own bracket above the unconstrained minimum, so the mechanism the filter leaves
+is the mechanism the unconstrained run already finds. With the phreatic surface solved on the mesh rather
 than drawn across it, the downstream face does not carry the saturated skin the piezometric case
 localizes on.
 
@@ -1361,7 +1362,7 @@ localizes on.
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.583, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=80, k0=1, benchmark=RS2-40-d80 -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.521, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep -->
 <!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, seep=steady, benchmark=RS2-40-seep -->
-<!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, seep=steady, benchmark=RS2-40-seep-d30 -->
+<!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.607, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, seep=steady, benchmark=RS2-40-seep-d30 -->
 
 **Filter off — the saturated downstream face skin (vp077b)**
 

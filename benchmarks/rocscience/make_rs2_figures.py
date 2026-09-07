@@ -147,9 +147,9 @@ EXTRA_CASES = [
 # both ways: an entry naming a row that is not registered, or a row that HAS a PNG,
 # is reported as a DEAD exemption and fails the audit exactly like a missing figure.
 EXPECTED_NO_FIGURE = {
-    # RS2-40's FE-seepage case under the depth filter: the filtered run reads the same
-    # factor as the unconstrained one and selects the same mechanism, which
-    # RS2-40-seep.png already draws (values per the page tags).
+    # RS2-40's FE-seepage case under the depth filter: the filtered run reads one cell
+    # of its own bracket above the unconstrained one and selects the same mechanism,
+    # which RS2-40-seep.png already draws (values per the page tags).
     'RS2-40-seep-d30': 'same mechanism as the unconstrained run in RS2-40-seep.png; the depth filter has no skin to remove',
 
     # RS2-64 — C3 and C5 are the second and third short-term Original slopes. All

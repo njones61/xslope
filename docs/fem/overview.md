@@ -697,7 +697,7 @@ out-of-balance still **trending down** — the mean over the last 500 iterations
 mean over the 500 before it — is given another `max_iterations` worth, and again, for as long as the
 trend holds, up to `max_iterations_ceiling` (default 50000). So the budget sets where the extension
 starts, not where the trial dies, and the answer stops depending on it: the FEM-1 embankment returns
-FS = 1.3633 from a 3000-iteration budget and from a 12000-iteration one. A trial whose residual is
+FS = 1.3711 from a 3000-iteration budget and from a 12000-iteration one. A trial whose residual is
 **not** falling at the budget stops there and is failed exactly as before.
 
 **Inconclusive trials.** A trial that reaches `max_iterations_ceiling` while still improving is
@@ -1323,7 +1323,7 @@ band — is the benchmark where this decides the answer. Its vendor model caps t
 $T$ = 20 / 0 / 10 kPa and reduces them with the SRF. Run uncapped, the cap soil's implicit
 $c/\tan\phi \approx 28$ kPa holds the crest entry cut shut and the model equilibrates to
 $F \ge 1.3$; run with the vendor caps and the tension SRF, the band mechanism mobilizes as limit
-equilibrium predicts and the factor of safety is 0.781, against RS2's 0.81 and Plaxis' 0.82.
+equilibrium predicts and the factor of safety is 0.769, against RS2's 0.81 and Plaxis' 0.82.
 
 ### Fast kernel
 

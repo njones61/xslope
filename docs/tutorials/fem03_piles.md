@@ -453,7 +453,7 @@ pile's surface. XSLOPE runs the same slope through both of its engines in
 | --- | :---: | :---: |
 | No pile | 1.136 | 1.14 (−0.4%) |
 | Pile at D<sub>1</sub>/D = 3, free head | 1.497 | 1.36 (+10.1%) |
-| Pile, head rotation restrained | 1.587 | 1.45 (+9.4%) |
+| Pile, head rotation restrained | 1.594 | 1.45 (+9.9%) |
 
 The unpiled row agrees to 0.4%, which is what makes the other two readable. With
 the row in place the plane-strain model credits it ×1.318, where the

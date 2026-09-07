@@ -346,7 +346,7 @@ Neither of those is a three-dimensional answer, and the direction of the error i
 |---|---|---|
 | No pile | 1.136 | 1.14 (−0.4%) |
 | Pile at $D_1/D$ = 3, free head | 1.472 | 1.36 (+8.2%) |
-| Pile, head rotation restrained | 1.587 | 1.45 (+9.4%) |
+| Pile, head rotation restrained | 1.594 | 1.45 (+9.9%) |
 
 The unpiled case agrees to 0.4%, which is what makes the other two readable. With the row in place the plane-strain model reads high: it credits the row with multiplying the unreinforced factor of safety by 1.296 where the three-dimensional model credits 1.193. On the same slope a Bishop search with the Ito & Matsui force reads 1.451 against the paper's own limit-equilibrium value of 1.37 and Slide2's 1.43, a credit of 1.269. Both two-dimensional credits stand well above the three-dimensional one — the beam by 0.103 and the limit-equilibrium search by 0.076 — and the 0.027 between them is small beside either gap. Neither two-dimensional credit recovers the three-dimensional one. What the one benchmark with a published three-dimensional answer settles is the direction of the plane-strain error, not a ranking of the two routes. Both comparisons are quantified in [VP106](../verification/rocscience.md#vp106) and [the VP106 finite-element diagnostic](../verification/rocscience.md#vp106-fem).
 

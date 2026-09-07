@@ -477,8 +477,8 @@ Two details follow from the definition:
 - The overburden is **soil only**. Surface tractions — a reservoir load, a distributed load, a
   footing — are not in-situ stress and are applied as boundary forces during the equilibrium
   iteration, where a load applied after the in-situ state belongs.
-- The compiled [fast kernel](#fast-kernel) has no slot for an initial stress, so a $K_0$ run always
-  takes the NumPy reference path — the oracle, but slower.
+- The compiled [fast kernel](#fast-kernel) takes the in-situ stress as an input, so a $K_0$ run
+  accelerates like any other Mohr-Coulomb run.
 
 On **level ground** the $K_0$ field is an exact equilibrium for any $K_0$ whatsoever: vertical
 equilibrium contains only $\sigma_v(z)$, which the overburden integral satisfies by construction,
@@ -1345,10 +1345,10 @@ reproduce it bit-for-bit. Do not use the compiled kernel to define or re-record 
 safety; pin `fast_kernel=False` for that work. `fast_kernel=True` *requires* the kernel but warns
 and falls back to NumPy if it has not been built, so the flag is always safe to set.
 
-The kernel handles the standard Mohr-Coulomb path, including the Rankine tension cutoff and the
-matric-suction term. Curved-envelope materials (power-curve and Hoek-Brown), $K_0$ runs, and all 1D
-reinforcement and pile work stay on the NumPy path automatically — a model that mixes them
-accelerates its Mohr-Coulomb groups and leaves the rest unchanged.
+The kernel handles the standard Mohr-Coulomb path, including the Rankine tension cutoff, the
+matric-suction term and the $K_0$ in-situ stress. Curved-envelope materials (power-curve and
+Hoek-Brown) and all 1D reinforcement and pile work stay on the NumPy path automatically — a model
+that mixes them accelerates its Mohr-Coulomb groups and leaves the rest unchanged.
 
 To build it locally, with Cython installed:
 

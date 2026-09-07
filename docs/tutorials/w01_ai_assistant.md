@@ -114,20 +114,17 @@ The eight conversations below cost this much between them, measured as they ran:
 | Modifying the model | 3 | 12 | 230,865 (190,212) | 6,198 | 122 s |
 | A sweep with the helper | 1 | 3 | 58,106 (31,702) | 1,699 | 73 s |
 | A sweep written ad hoc | 1 | 5 | 87,126 (79,255) | 2,759 | 54 s |
-| Stiffnesses and a strength reduction run | 2 | 5 | 87,553 (63,404) | 1,613 | 571 s |
+| Stiffnesses and a strength reduction run | 2 | 6 | 105,471 (83,949) | 1,761 | 550 s |
 | Two documentation questions | 2 | 5 | 92,550 (79,255) | 5,250 | 88 s |
 | A broken file | 1 | 9 | 176,923 (142,659) | 8,544 | 173 s |
 | Generating a report | 2 | 4 | 67,664 (63,404) | 839 | 30 s |
-| **Total** | **13** | **46** | **852,959 (697,444)** | **29,113** | **1,154 s** |
+| **Total** | **13** | **47** | **870,877 (717,989)** | **29,261** | **1,132 s** |
 
 That comes to **\$1.85** at Anthropic's list prices on 2026-08-29 (\$5.00 per
 million input tokens, a cache read at a tenth of that, \$25.00 per million output
 tokens). Price and wall time do not track each other: the strength reduction run
-takes half the total time for under a tenth of the cost, because 521 of its 556
-seconds are spent inside the solver. These sessions were measured with the
-assistant's reference brief cached but the conversation history sent at full
-price on every call; the assistant now caches the history as well, so the same
-sessions cost less today than the table shows.
+takes half the total time for about a tenth of the cost, because 491 of its 550
+seconds are spent inside the solver.
 
 The same eight sessions were then played, unchanged, on four other models.
 **Everything in this table is a snapshot: the models as they behaved and the list
@@ -143,7 +140,7 @@ about the mechanism or the finding is right.
 
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Model and numbers | Explanation |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Claude Opus 5 | 46 | 852,959 (697,444) | 29,113 | \$1.85 | 8 of 8 | 7 of 8 |
+| Claude Opus 5 | 47 | 870,877 (717,989) | 29,261 | \$1.85 | 8 of 8 | 7 of 8 |
 | Claude Sonnet 5 | 45 | 935,563 (684,517) | 28,060 | \$0.92 | 7 of 8 | 7 of 8 |
 | OpenAI gpt-5.5 | 29 | 364,339 (325,120) | 17,437 | \$0.88 | 7 of 8 | 6 of 8 |
 | Kimi K3 (Moonshot AI) | 37 | 449,769 (343,143) | 44,953 | \$1.10 | 7 of 8 | 4 of 8 |
@@ -440,18 +437,26 @@ Run a strength reduction analysis and compare it with the limit equilibrium resu
 ```
 </div>
 
-![Both turns in the dock: the classifier's two suggestions written onto the materials, then the Spencer search, the mesh, the seven bisection steps with their two inconclusive trials, and the comparison table](images/w1_elastic_fem_2.png){width=560}
+![Both turns in the dock: the classifier's two suggestions written onto the materials, then the searched Spencer run with its critical circle, the mesh, the nine strength reduction trials with the at-failure plots, and the comparison table](images/w1_elastic_fem_2.png){width=560}
 
 A built-in estimator classifies each soil from its strength and suggests
 values — the embankment as **Soft Clay** at E = 167,100 psf with ν = 0.45, the
 foundation as **Medium Clay** at E = 668,300 psf with ν = 0.40 — and the
 assistant entered both, calling them last-resort suggestions since the model
-states no stiffnesses. The second turn ran the Spencer's-method search at
-**FS = 1.244**, built the mesh, and ran the strength reduction to **1.254**,
-about 0.8% higher — on a φ = 0 section the two mechanisms develop in
-essentially the same place. The two trials just past failure stopped at the
-solver's iteration limit, so 1.254 sits in a narrow interval rather than on a
-single converged value.
+states no stiffnesses.
+
+The second turn ran the limit equilibrium search at **FS = 1.244** — Spencer,
+the method a run takes when the model names none, as the reply points out — then
+built the mesh and ran the strength reduction to **1.270**, 2.1% higher. That
+number comes out of a bisection on the factor the strengths are divided by: nine
+trials, each of them either converging or failing to converge, closing on the
+bracket [1.2656, 1.2734], and 1.270 is its midpoint. It puts the gap between the
+two answers down to the two analyses looking for different surfaces — the search
+is confined to circles and to Spencer's assumed interslice inclination, while
+the finite element run develops whatever shear band the stress field produces.
+Both runs drew themselves into the dock along the way: the critical circle, then
+the deformed mesh, the shear strain band and the displacement vectors at
+failure.
 
 The session saved
 [w1_elastic_fem_after.xlsx](files/w1_elastic_fem_after.xlsx); the exchange is in
@@ -461,11 +466,12 @@ The session saved
 
 - **Materials editor.** The classifier's two values, entered unedited, with the
   strengths untouched.
-- **Read 1.254 as a narrow interval.** The two trials just past failure stopped
-  at the iteration limit; the interval is 0.008 wide, so the answer is pinned
-  to about ±0.3%.
-- **The mesh came from defaults.** The summary calls it "built from the model's
-  declared settings", but this model declares neither an element type nor a mesh
+- **Read 1.270 as a bracket.** The bisection stops once the bracket is narrower
+  than the tolerance it was given, 0.01. [1.2656, 1.2734] is 0.008 wide, so the
+  answer is pinned to about ±0.3%; a tighter tolerance buys a narrower one at
+  the price of another trial or two.
+- **The mesh came from defaults.** The run reports a tri6 mesh at target size
+  1.2 — 8,849 nodes — and this model declares neither an element type nor a mesh
   size. Rebuilding at another size is how to find out what the answer owes to
   it.
 

@@ -28,13 +28,38 @@ Model (from the vendor .gsz, read-only oracle -- never committed):
     1-D column, base at y = 0.  Porous plate  y = 0..0.007 m (7 mm); sample
     y = 0.007..0.1234 m.
     Sample = coarse sand: Ksat = 9.009e-4 m/s, theta_s = 0.348, theta_r = 0.029
-    -> Sy = 0.319.  The vendor VWC is an 80-point spline; a van Genuchten fit
-    (suction kPa -> pressure head m) gives vg_a = 8.913 /m, vg_n = 10.19
-    (RMS 1e-4 in effective saturation -- a near-exact fit).  The sample
-    desaturates sharply across the operating band (suction 0.9->1.7 kPa gives
-    Se 0.89->0.02), so the moisture-capacity storage term drives the outflow.
-    Porous plate: Ksat = 5.833e-6 m/s, high air-entry -> stays saturated (kr = 1)
-    over the whole suction range; it is the rate-limiting element.
+    -> Sy = 0.319.  The vendor carries an 80-point retention spline and an
+    80-point conductivity spline for the sample, PEST-calibrated together.  The
+    sample desaturates sharply across the operating band (suction 0.9->1.7 kPa
+    gives Se 0.89->0.02), so the moisture-capacity storage term drives the
+    outflow.  Porous plate: Ksat = 5.833e-6 m/s, high air-entry -> stays
+    saturated (kr = 1) over the whole suction range; it is the rate-limiting
+    element.
+
+    THE FIT.  Where a vendor ships a conductivity table and XSLOPE ships a
+    two-parameter law, the law is fitted to the CONDUCTIVITY table, by least
+    squares in log10 kr, over the suction range the shipped run actually visits
+    (SEEPW-T04, SEEPW-T05 and GW#20 are built on the same rule).  The column is
+    hydrostatic above a base held at the stage suction, so the largest suction
+    it reaches is the deepest stage plus the sample height, 0.1749 + 0.1234 =
+    0.298 m.  The vendor's own kr falls below XSLOPE's 1e-4 conductivity floor
+    at psi = 0.165 m and its table is set to 1e-28 beyond psi = 0.4 m, so the
+    live part of the curve -- the 54 tabulated points above kr = 1e-4 -- lies
+    entirely inside the visited range, and fitting over the visited range and
+    over the live curve give the same pair: vg_a = 8.8157 /m, vg_n = 9.7144.
+    It reads 0.0033 decades rms and 0.011 worst against the table there, where
+    the retention fit it replaces reads 0.055 rms and 0.291 worst.  There is no
+    meaningful whole-table figure: past psi = 0.4 m the vendor writes a hard
+    zero that no continuous law reaches.
+
+    The same pair sets the moisture capacity, so the conductivity fit is paid
+    for in water content: theta rms against the vendor's retention table is
+    0.0023 over the visited range and 0.0020 over the whole table, with the
+    worst single point 0.0104 in water content at psi = 0.12 m, inside the
+    drainage band.  A pair fitted to the retention table instead (vg_a = 8.9125,
+    vg_n = 10.1875) reproduces it to 0.00005 and costs the conductivity error
+    above.  The locked heads are hydrostatic profiles set by the base Dirichlet
+    and do not move between the two (see the docs section).
 
 Boundary + initial conditions:
     Base (y = 0): specified PRESSURE head stepped in five stages --
@@ -51,8 +76,22 @@ saved step).  The published external answer is the lab outflow curve (a SLOPE/W-
 free scalar the PEST loop fits) -- not a seepage headline number -- so the lock
 is the PWP field.  The locked heads are XSLOPE's own solved values at three
 elevations at representative save times; the docs tabulate the SEEP/W comparison
-and report the achieved deltas honestly (the vG fit reproduces the retention
-curve to RMS 1e-4, so the residual is storage-discretization, not SWCC mapping).
+and report the achieved deltas honestly.
+
+    XSLOPE's sample reaches the stage suction uniformly at each reporting time,
+    where SEEP/W's still carries a gradient at the two later stages, and that is
+    where the departure sits: 0.001 m of head at the first reported stage, up to
+    0.046 m at the last.  The mechanism is the CONDUCTIVITY FLOOR, not the fit.
+    XSLOPE clamps kr at 1e-4 (``kr_min`` in xslope/seep.py, a solver-wide
+    numerical guard), and the vendor's own conductivity curve passes 1e-4 at
+    psi = 0.165 m, well inside the 0.298 m this column reaches, so above that
+    suction the sample conducts at the floor instead of at the vendor's value and
+    drains to equilibrium within the stage.  Re-solved with the floor lowered to
+    1e-8, the same three stations read -0.1341 / -0.1325 / -0.1134 at t = 132000
+    and -0.1732 / -0.1505 / -0.1222 at t = 219600, and the largest departure from
+    SEEP/W falls from 0.046 to 0.007 m.  That is a MEASUREMENT, not a shipped
+    configuration: no default is changed here, and the locked values above are
+    the shipped floor's.
 
 Run:  PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_mso.py
       PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_mso.py --locks
@@ -88,8 +127,8 @@ _K_PLATE = 5.8333e-6            # porous-plate conductivity [m/s]
 _THETA_S = 0.348
 _THETA_R = 0.029
 _SY = _THETA_S - _THETA_R        # 0.319
-_VG_A = 8.9125                   # van Genuchten alpha [1/m]  (fit to sample VWC)
-_VG_N = 10.1875                  # van Genuchten n [-]
+_VG_A = 8.8157                   # van Genuchten alpha [1/m]  (fit to the sample k table)
+_VG_N = 9.7144                   # van Genuchten n [-]
 _SS = 1e-5                       # small saturated storage [1/m]
 _H_IC = -0.072801                # uniform initial total head [m]
 _DURATION = 219600.0            # total time [s]

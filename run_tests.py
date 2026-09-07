@@ -5062,6 +5062,17 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel', analysis='tseep',
          mutation=lambda sd: _pf_mats(sd, unsat='lf', h0=0.0),
          expect='invented rather than'),
+    # A Gardner material, because its h0 is asked for by NOTHING else: the
+    # exit-face parameter check wants a and n from it, and the steady rule that
+    # requires h0 < 0 speaks only to a linear front. The control is the same
+    # material with the sign the band needs.
+    dict(rule='tseep.retention_band_sign', base=PREFLIGHT_BASE_TSEEP,
+         mode='excel', analysis='tseep',
+         mutation=lambda sd: _pf_mats(sd, unsat='gard', vg_a=1.0, vg_n=2.0,
+                                      h0=0.3),
+         control=lambda sd: _pf_mats(sd, unsat='gard', vg_a=1.0, vg_n=2.0,
+                                     h0=-0.3),
+         expect='leaves it empty'),
     dict(rule='tseep.duration_invalid', base=PREFLIGHT_BASE_TSEEP, mode='dict',
          analysis='tseep',
          mutation=lambda sd: _pf_tseep(sd, duration=0.0),

@@ -3956,6 +3956,42 @@ def _tseep_retention_band(ctx):
                f"reaches its residual conductivity {_AT_MAT}.")
 
 
+@rule("tseep.retention_band_sign", WARNING, ("tseep",),
+      "h0 entered positive on a linear-front or Gardner material leaves no "
+      "drainage band at all.",
+      fields=("h0",))
+def _tseep_retention_band_sign(ctx):
+    """h0 is a suction head, so it is negative; a positive one is a typed sign.
+
+    The band the soil drains over is ``h0 < psi < 0``. Entered positive it is
+    empty at every pressure, so the moisture capacity collapses to the residual
+    floor everywhere above the phreatic surface and the material gives up its
+    water as if it held almost none. Nothing else reports it: the exit-face
+    parameter check asks a Gardner material for a and n only, and the steady rule
+    that does ask a linear-front material for h0 < 0 runs only where an exit face
+    is drawn, so a confined march reaches the stepper with the sign as typed.
+    """
+    if ctx.tseep is None:
+        return None
+    for i, m in ctx.seepage_materials():
+        model = str(m.get("unsat") or "lf").strip().lower()
+        if model not in ("lf", "gard"):
+            continue
+        h0 = _num(m.get("h0"))
+        if h0 is None or h0 <= 0.0:
+            continue
+        extra = ("" if model == "gard" else
+                 " The same sign carries into the conductivity curve, which drops "
+                 "to kr0 at the phreatic surface and stays there.")
+        yield (f"{ctx.mat_label(i)} has h0 = {h0:g} with unsat = {model}. h0 is a "
+               f"suction head and belongs below zero: the band the soil drains "
+               f"over is h0 < psi < 0, so a positive h0 leaves it empty and the "
+               f"moisture capacity above the phreatic surface is the residual "
+               f"floor alone -- a ten-thousandth of Sy/|h0| -- rather than "
+               f"Sy/|h0| itself.{extra} Enter h0 as the negative pressure head at "
+               f"which the material reaches its residual conductivity {_AT_MAT}.")
+
+
 @rule("tseep.duration_invalid", ERROR, ("tseep",),
       "Duration must be present and greater than zero.")
 def _tseep_duration(ctx):

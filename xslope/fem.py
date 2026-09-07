@@ -4873,6 +4873,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # default) leaves every measurement exactly as it was.
     u_datum = np.zeros(n_dof) if _init_u is None else _init_u
     u_datum_free = u_datum[free_dofs]
+    # A run with no carried-in equilibrated state measures max|u| from zero, which
+    # is the common case and the one the CHECON norm can take without a subtraction.
+    _datum_is_zero = not np.any(u_datum_free)
+    _conv_buf = np.empty(u_datum_free.shape)
     # Per-call (max_disp_factor varies across the SSRM trials vs the capture solve
     # that share a prepared model), so this is recomputed here, never cached.
     if max_disp_factor is not None and mesh_height > 0:
@@ -5717,6 +5721,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         disp_hist = []                 # max|u| samples (hybrid criterion)
         u_elastic_scale = float(np.max(np.abs(u_e_grav))) if u_e_grav.size else 0.0
         exit_reason = 'iteration_cap'
+        # The previous iterate on the free dofs, carried forward from the solve that
+        # produced it (see the CHECON test below). None until this stage has solved
+        # once, because the state a stage OPENS on is not a solve's output.
+        _u_free_carry = None
         plateau_iter = None            # no-progress watch, reset per stage
         plateau_ratio = None
         diverging_iter = None          # early-failure watch, reset per stage
@@ -6352,10 +6360,23 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # in the norm would let a large fixed offset dilute both the CHECON ratio
             # and the hybrid criterion's displacement scale. u_datum_free is zero
             # without a carried state, so this is the same norm as before.
+            # The previous iterate on the free dofs is the vector the LAST solve
+            # returned: u_new is built as zeros with u_new[free_dofs] = u_free_new,
+            # and u is then u_new, so u[free_dofs] gathers back exactly those
+            # values. Carrying them forward is the same numbers without the gather.
             _tpc = time.perf_counter() if _PROF_ON else None
-            _u_free_prev = u[free_dofs]
-            norm_diff = np.max(np.abs(u_free_new - _u_free_prev))
-            norm_u_new = np.max(np.abs(u_free_new - u_datum_free))
+            _u_free_prev = u[free_dofs] if _u_free_carry is None else _u_free_carry
+            np.subtract(u_free_new, _u_free_prev, out=_conv_buf)
+            np.abs(_conv_buf, out=_conv_buf)
+            norm_diff = _conv_buf.max()
+            if _datum_is_zero:
+                # x - 0.0 is exactly x for every finite x, and |-0.0| = |0.0|, so
+                # the datum subtraction is skipped rather than approximated.
+                norm_u_new = np.abs(u_free_new).max()
+            else:
+                np.subtract(u_free_new, u_datum_free, out=_conv_buf)
+                np.abs(_conv_buf, out=_conv_buf)
+                norm_u_new = _conv_buf.max()
 
             if norm_u_new > 1e-30:
                 relative_change = norm_diff / norm_u_new
@@ -6514,6 +6535,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         plateau_iter = None
                         plateau_ratio = None
                         u = u_new
+                        _u_free_carry = u_free_new
                         continue
                 # -------------------------------------------------------------
                 # ---- the yield gate on a CONVERGED viscoplastic state --------
@@ -6598,6 +6620,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             if _PROF_ON:
                 _prof_add("vp_conv", _tpc)
             u = u_new
+            _u_free_carry = u_free_new
 
             # ---- the checkpoint ladder (see _CORRECTOR_CHECKPOINTS) ----------
             # The plastic history is now developed enough to be worth correcting.

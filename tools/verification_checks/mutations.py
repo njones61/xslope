@@ -250,6 +250,8 @@ MUTATIONS = [
      "expected_depth=3.142", "expected_depth=3.242"),
     ("rocscience", "tags", "G12 a printed slip-surface depth drifts from its tag",
      "| D1/D = 4 | 3.261 |", "| D1/D = 4 | 3.361 |"),
+    ("rocscience", "tags", "G13 a back-analyzed support force drifts in the tag",
+     "expected_force=351.4", "expected_force=352.4"),
 
     # ----------------------------------------------------------- figures ---
     ("rocscience_groundwater", "figures", "F1 two-panel caption on a one-panel figure",

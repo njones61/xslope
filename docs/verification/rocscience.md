@@ -45,6 +45,7 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp035.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=3.353, tolerance=0.03, benchmark=VP35-beta -->
 <!-- test: file=files/rocscience/vp036.xlsx, type=circular_search, num_slices=50, fs_bishop=1.333, benchmark=VP36-fs -->
 <!-- test: file=files/rocscience/vp037.xlsx, type=single_circle, num_slices=60, fs_bishop=0.764, fs_spencer=0.764, benchmark=VP37 -->
+<!-- test: file=files/rocscience/vp037.xlsx, type=support_force, method=bishop, target_fs=1.5, force_elev=9.0, toe=5;5, center_box=-20;15;12;45, grid=0.5, refine_grid=0.1, min_depth=2.0, num_slices=50, refine_slices=80, expected_force=351.4, tolerance=0.01, benchmark=VP37-force -->
 <!-- test: file=files/rocscience/vp038a.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.612, benchmark=VP38-h61 -->
 <!-- test: file=files/rocscience/vp038b.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.533, benchmark=VP38-h62 -->
 <!-- test: file=files/rocscience/vp038c.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.413, benchmark=VP38-h63 -->
@@ -233,7 +234,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [34](#vp34) | 🟢 | Dam, (3) materials, probabilistic analysis, water table | M-P 2.384 vs Wolff & Harr 2.36 (+1.0%) | deterministic lock; the Phase I COV of 124% is outside the Taylor series' domain |
 | [35](#vp35) | 🟢 | Dam, (5) materials, probabilistic analysis, reliability index | Bishop critical FS at mean strengths 2.529 vs Slide 2.551 (−0.9%) | reproduced by procedure; β spreads with the estimator at these COVs · the paper's nine fixed surfaces are reproduced at [§2.22](geostudio.md#gs-2-22) |
 | [36](#vp36) | 🟢 | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | Bishop 1.333 vs H&W 1.334 (−0.1%) · Bishop 1.333 vs Slide 1.340 (−0.5%) |  |
-| [37](#vp37) | 🟢 | Slope, homogenous, distributed load, back analysis of required support force and length | Bishop 0.764 vs Slide 0.764 (0.0%) · Bishop 0.764 vs XSTABL 0.734 (+4.1%) | **built** (base slope); the support-force back-analysis and reinforced-zone length are documented, not locked |
+| [37](#vp37) | 🟢 | Slope, homogenous, distributed load, back analysis of required support force and length | Bishop 0.764 vs Slide 0.764 (0.0%) · Bishop 0.764 vs XSTABL 0.734 (+4.1%) · support force 351.4 vs Slide 351 kN/m (+0.1%) | **built** (base slope and the required support force); the reinforced-zone length needs a variable-length material zone |
 | [38](#vp38) | 🟢 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | H = 61: Bishop 1.612 vs Slide 1.621 (−0.6%) · H = 62: Bishop 1.533 vs Slide 1.538 (−0.3%) · H = 63: Bishop 1.413 vs Slide 1.407 (+0.4%) |  |
 | [39](#vp39) | 🟢 | Reinforced embankment, (2) materials, tension crack, geosynthetic | clay fill: Spencer 0.968 vs Slide 0.975 (−0.7%) · sand fill: Spencer 1.200 vs Slide 1.209 (−0.7%) | **built** (circular cases); noncircular cases not locked |
 | [40](#vp40) | 🟢 | Slope, homogenous, sensitivity analysis | Janbu(corr) 1.003 vs Perry 0.98 (+2.3%) | the A and b sensitivity sweeps track Slide's published curves within about a percent |
@@ -1169,14 +1170,15 @@ Slide #37 reproduces the "Reinforcement Example" of the XSTABL v5 reference manu
 | Bishop | 0.764 | 0.764 (0.0%) | 0.734 (+4.1%) |
 | Spencer | 0.764 | — | — |
 
-**Required support force (part a).** XSTABL and Slide back-analyse the horizontal support that raises the slope to FS = 1.5, reported as the maximum over all toe surfaces. Sweeping that force in XSLOPE — a reinforcement line at el 9, re-searching the critical surface at each step — gives the required design force below.
+**Required support force (part a).** XSTABL and Slide back-analyze the horizontal support that raises the slope to FS = 1.5, reported as the maximum over all toe surfaces. XSLOPE back-analyzes the same slope two ways: by the support-force procedure the two programs use, and by sweeping a limit-equilibrium reinforcement line.
 
 | Back-analyzed quantity for FS = 1.5 | XSLOPE | Slide | XSTABL |
 |---|---|---|---|
-| Required support force (part a) | ≈205 kN/m (active) / ≈305 kN/m (passive) | 351 kN/m (support-force procedure — cross-basis) | 345 kN/m (support-force procedure — cross-basis) |
+| Required support force, support-force procedure (part a) | 351.4 kN/m | 351 kN/m (+0.1%) | 345 kN/m (+1.9%) |
+| Required support force, reinforcement line (part a) | ≈205 kN/m (active) / ≈305 kN/m (passive) | — | — |
 | Reinforced-zone length (part b) | — *not built* | 7.6 m | 7.5 m |
 
-The published forces come from XSTABL's support-force procedure, which sizes the force from the effective normal forces at the target factor of safety — a more conservative crediting than a limit-equilibrium reinforcement line. The regression therefore locks the base-slope factor of safety and documents the back-analysis rather than locking a force the two methods compute differently. Part b, the minimum length of an elevated-friction zone that holds FS = 1.5, needs a variable-length material zone XSLOPE does not have.
+The two procedures credit the force differently, which is why they need separate rows. XSTABL's support-force procedure, stated in its reference manual and reproduced by Slide, takes the effective base normal forces at the target factor of safety, computes the factor of safety those normals give, and sizes a horizontal resultant at el 9 to make up the moment deficit; the resultant is credited as an external moment and earns no friction back. XSLOPE runs that procedure over the same family the two programs search — circles through the toe, at a minimum depth of 2 m — and reports the maximum over it, which is the quantity the published numbers are. A limit-equilibrium reinforcement line at the same elevation reaches FS = 1.5 on a smaller force, because the line raises the base normal and the friction that buys pays for part of the deficit. Part b, the minimum length of an elevated-friction zone that holds FS = 1.5, needs a variable-length material zone XSLOPE does not have.
 
 ![vp037: inputs and representative solution](images/vp037.png)
 

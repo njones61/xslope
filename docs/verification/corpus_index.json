@@ -13635,7 +13635,8 @@
         {
           "anchor": "vp37",
           "checks": [
-            "VP37"
+            "VP37",
+            "VP37-force"
           ],
           "level": 2,
           "page": "verification/rocscience/",
@@ -24227,7 +24228,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 591,
+    "tags": 592,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

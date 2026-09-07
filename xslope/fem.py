@@ -49,6 +49,18 @@ from .units import require_gamma_water
 #   vp_const / vp_trisolve / vp_factorize   the same for the viscoplastic driver,
 #                   whose assembly and factorization are once per trial rather than
 #                   once per iteration
+#   vp_assemble     build_global_stiffness, once per prepared model
+#   vp_prep         the whole prepared model (assembly + factorization + the
+#                   geometry, pore-pressure and Gauss-point-group precompute)
+#   vp_1d           the per-iteration 1D bar and pile beam body-load corrections
+#   vp_oob          the per-iteration Dawson out-of-balance reading, history copy
+#                   included
+#   vp_conv         the per-iteration convergence tests: the CHECON norms, the
+#                   plateau and early-failure watches and the displacement limit
+#
+# Subtracting the vp_* phases and the nr_* corrector phases from a solve's wall
+# time leaves the Python loop overhead, which is what makes the remainder a
+# reading rather than a residue.
 _PROF_ON = bool(os.environ.get("XSLOPE_NR_PROFILE", "").strip())
 _PROF = {}
 
@@ -3246,9 +3258,12 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         _resolve_suction_by_elem(fem_data, suction_phi_b, suction_cap, element_materials)
 
     # ---- K_global (elastic, constant) ----
+    _ta = time.perf_counter() if _PROF_ON else None
     K_global = build_global_stiffness(nodes, elements, element_types,
                                       element_materials, E_by_mat, nu_by_mat,
                                       fem_data=fem_data)
+    if _PROF_ON:
+        _prof_add("vp_assemble", _ta)
 
     # ---- Gravity load vector ----
     F_gravity = build_gravity_loads(nodes, elements, element_types,
@@ -5979,6 +5994,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 _prof_add("vp_const", _tp)
 
             # ---- 1D Truss element body-force corrections ----
+            _tp = time.perf_counter() if _PROF_ON else None
             if has_1d_elements:
                 n_1d_compression = 0
                 n_1d_exceeded = 0
@@ -6125,7 +6141,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     if n_pile_yielded_V > 0 or n_pile_yielded_M > 0:
                         print(f"    Pile elements: {n_pile_yielded_V} V-yielded, {n_pile_yielded_M} M-yielded")
 
+            if _PROF_ON:
+                _prof_add("vp_1d", _tp)
+
             # ---- Out-of-balance force, per node (Dawson, Roth & Drescher 1999) ----
+            _tp = time.perf_counter() if _PROF_ON else None
             #
             # This is an initial-stress viscoplastic scheme, so the solve below
             # enforces
@@ -6172,6 +6192,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # count. With no filter (_deep_free_mask is None) this is the full set.
             _oob_for_max = oob_node if _deep_free_mask is None else oob_node[_deep_free_mask]
             unbalanced_force_ratio = float(np.max(_oob_for_max)) if _oob_for_max.size else 0.0
+            if _PROF_ON:
+                _prof_add("vp_oob", _tp)
             if debug_level >= 3:
                 n_hot = int(np.count_nonzero(oob_node > force_tol))
                 print(f"    OOB dist: max={unbalanced_force_ratio:.2e} "
@@ -6299,6 +6321,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # in the norm would let a large fixed offset dilute both the CHECON ratio
             # and the hybrid criterion's displacement scale. u_datum_free is zero
             # without a carried state, so this is the same norm as before.
+            _tpc = time.perf_counter() if _PROF_ON else None
             _u_free_prev = u[free_dofs]
             norm_diff = np.max(np.abs(u_free_new - _u_free_prev))
             norm_u_new = np.max(np.abs(u_free_new - u_datum_free))
@@ -6541,6 +6564,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                             return _c
                     break
 
+            if _PROF_ON:
+                _prof_add("vp_conv", _tpc)
             u = u_new
 
             # ---- the checkpoint ladder (see _CORRECTOR_CHECKPOINTS) ----------
@@ -11469,11 +11494,14 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     # options the trials pass, so it can never serve a stale strength or geometry.
     # (max_disp_factor and tension_srf are per-call scalings applied inside solve_fem,
     # so they are intentionally NOT part of the prepared model.)
+    _tprep = time.perf_counter() if _PROF_ON else None
     prep = _prepare_fem_model(
         fem_data_trials, dt_scale=dt_scale, suction_phi_b=suction_phi_b,
         suction_cap=suction_cap, elastic_mask=elastic_mask,
         tension_cap_by_elem=tension_cap_by_elem, tension_cutoff=tension_cutoff,
         min_slip_depth=min_slip_depth, k0=k0, debug_level=max(0, debug_level - 1))
+    if _PROF_ON:
+        _prof_add("vp_prep", _tprep)
 
     # === K0 in-situ equilibration (once, before the bisection) ===
     # Establishing the in-situ state and reducing the strength are two different

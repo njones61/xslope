@@ -1160,6 +1160,21 @@ the per-trial records (`trials`), and — with the capture on — `failure_solut
 `last_solution` to `plot_fem_results()` shows the near-critical converged state; passing
 `failure_solution` shows the developed collapse mechanism.
 
+Both fields are states of a weakened slope, and that governs what may be read from them. The
+**shape** of a displacement field — where it concentrates, which way it moves, the mechanism it
+draws — is what a strength reduction run is for, and it is what the panels and the
+[1D detail profiles](#structural-elements) show. The **size** of a displacement is not. At the last
+converged trial the soil is at the brink of failing, where plastic movement keeps accumulating along
+the iteration path while force balance is already satisfied, so the magnitude reported there follows
+how far that path had walked rather than the slope: on the [FEM-3](../tutorials/fem03_piles.md)
+socketed pile rows, closing the bisection bracket to 0.005 instead of 0.01 moves the factor of
+safety by 0.002 and the pile head displacement from 0.19 ft to 1.39 ft. A displacement magnitude is
+therefore read from a single solve at a stated factor — `solve_fem(fem_data, F=1.0)` for the working
+condition, the soil at its own strength — and text that quotes one names the factor it was read at.
+That solve is reproducible: the same reading holds to every printed digit under a $10^{-13}$
+perturbation of the loading or the stiffness, and moves under 2% when the target element size is cut
+by a quarter.
+
 ### SSR search areas and exclusion zones {#ssr-exclusion-zones}
 
 A strength reduction run finds the weakest mechanism the model admits, which is not always the

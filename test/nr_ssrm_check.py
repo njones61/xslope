@@ -2819,7 +2819,10 @@ def check_corrector(fem_data):
         in force and fails the yield reading is handed to the corrector; where the
         corrector certifies an admissible field the trial stands on that, and where
         it refuses too the trial is FAILED — `converged` False, `stable` False under
-        every criterion, `exit_reason` 'yield_gate'.
+        every criterion, `exit_reason` 'yield_gate' — but only once the loop has
+        stopped changing. While the out-of-balance is still improving the gate is
+        disarmed: the same trial with the same two gates shut carries on, records
+        the reading as a deferral, and is decided by the budget instead.
 
     The refusal property is the safety property the corrector rests on: it can only
     ever convert a rule-decided refusal into a certified stand, so the corrector
@@ -3017,21 +3020,30 @@ def check_corrector(fem_data):
     # the loop settles fastest on — the one that needs no corrector at all — so the
     # only thing that can change the answer is the gate itself.
     _saved_vp_gate = _fem._VP_YIELD_GATE
+    _saved_armed = _fem._vp_gate_armed
     try:
         _fem._VP_YIELD_GATE = -1.0
         gated = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET)
         # ... and with the corrector's own gate shut as well, nothing can be
-        # certified, so there is no admissible field anywhere and the trial FAILS.
+        # certified, so there is no admissible field anywhere. What happens then
+        # depends on whether the gate is ARMED (_vp_gate_armed): a state the loop
+        # has stopped changing is FAILED on the spot, and a state it is still
+        # working on is carried past. Both are exercised — the arming rule forced
+        # on for the first, and the shipped rule for the second, on the same trial.
         _saved_c_gate = _fem._CORRECTOR_YIELD_TOL
         try:
             _fem._CORRECTOR_YIELD_TOL = -1.0
+            deferred = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET)
+            _fem._vp_gate_armed = lambda *a, **k: True
             failed = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET)
             hybrid = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET,
                             failure_criterion='hybrid')
         finally:
             _fem._CORRECTOR_YIELD_TOL = _saved_c_gate
+            _fem._vp_gate_armed = _saved_armed
     finally:
         _fem._VP_YIELD_GATE = _saved_vp_gate
+        _fem._vp_gate_armed = _saved_armed
     if not (gated.get('corrector_attempts') or ()):
         fails.append(
             f"with the yield gate unreachable the force-settled state at "
@@ -3061,6 +3073,30 @@ def check_corrector(fem_data):
                 f"exit {sol['exit_reason']!r} / verdict {sol.get('verdict')!r} "
                 f"instead of 'yield_gate' / 'FAILED', so nothing downstream can say "
                 f"WHY it failed")
+    # ... and under the SHIPPED arming rule the same trial, with the same two gates
+    # shut, may not end at the state it first settles on: the loop is still working
+    # there, so that state is not the fixed point a refusal would be a verdict about.
+    # It carries on — recording the reading as a deferral — and can only end on the
+    # gate once the loop has stopped changing, which is at least a no-progress
+    # window later.
+    if not int(deferred.get('gate_deferrals', 0) or 0):
+        fails.append(
+            f"the trial at F = {CORR_SETTLES_F} with both gates unreachable reports "
+            f"no gate deferrals: nothing records that the gate read an inadmissible "
+            f"state while the loop was still improving and the loop carried on")
+    if int(deferred.get('iterations', 0)) <= CORR_SETTLES_ITERS + _fem._NO_PROGRESS_WINDOW:
+        fails.append(
+            f"the trial at F = {CORR_SETTLES_F} with both gates unreachable ended "
+            f"after {deferred.get('iterations')} iterations, no more than the "
+            f"{CORR_SETTLES_ITERS} it settles in plus the "
+            f"{_fem._NO_PROGRESS_WINDOW}-iteration no-progress window: a gate "
+            f"refusal ended a trial on a state the loop had not finished with")
+    if not (deferred.get('corrector_attempts') or ()):
+        fails.append(
+            f"the trial at F = {CORR_SETTLES_F} with both gates unreachable made no "
+            f"corrector attempt: a disarmed gate still offers the state the first "
+            f"time it settles, because a certification is a stand wherever it is "
+            f"found")
 
     # --- the admissibility reading is on every result, on both drivers ---------
     for sol, name in ((vp_full, 'the viscoplastic loop'), (auto_full, 'the default path')):

@@ -113,7 +113,12 @@ complete for it.
 
 Click **Run → Run LEM…**, choose **Method** = `Spencer` and **Analysis** =
 `Auto search`, and leave the slice count at 40. **Model checks** reads
-*No problems found for this run*.
+*No problems found for this run*, with one note under it: the six reinforcement
+lines carry a tensile capacity and no axial stiffness. That is complete for a
+limit equilibrium run, which reads the capacity envelope directly, and
+incomplete for a finite element run of the same file, which models each line as
+a bar and needs a stiffness for it. We enter one
+[further down](#the-stiffnesses-the-run-needs).
 We compare against Spencer because it satisfies both force and moment
 equilibrium, which makes it the closest limit equilibrium statement of what a
 finite element run solves. Click **Run**.
@@ -328,10 +333,11 @@ element engine reads.
 
 ![The reinforcement table on the starter: Tres, E and Area empty](images/fem02_studio_reinforce_blank.png)
 
-The six lines are complete on everything both engines share: 800 lb/ft of
-capacity, a 4 ft pullout length at each end, no end anchorage, and a `Spacing` of
-1 because geogrid properties are already per unit width. The three blue
-columns are empty.
+The toggle has taken the capacity columns out of view — `Tmax`, the two pullout
+lengths and the two end anchorages — and the six lines are complete on every one
+of them: 800 lb/ft of capacity, a 4 ft pullout length at each end and no end
+anchorage. `Spacing` is still on screen and reads 1, because geogrid properties
+are already per unit width. The three blue columns are empty.
 
 Fill `E (psf)` and `Area` on all six rows, and leave `Tres` empty:
 

@@ -136,10 +136,11 @@ the file downloaded above arrives past all three.
 
 ### Entering the soil properties
 
-In the starter file the unit weight γ, the saturated unit weight γsat, the
-cohesion c′, the friction angle φ′ and the pore-pressure option u are blank for
-both zones — the seepage analysis never needed them. We will enter the five
-missing values for each zone now.
+In the starter file the strength band carries nothing to analyze with: the
+saturated unit weight γsat is blank on both zones, and the unit weight γ, the
+cohesion c′ and the friction angle φ′ sit at 0 with the pore-pressure option u
+on `none`. The seepage analysis never needed any of them. We enter the five
+values for each zone now.
 
 Switch back to **LEM** (`Ctrl+1`) and click **Materials** in the Inputs tree. Set
 the **Show parameters for:** toggles to **LEM** alone, which hides the
@@ -349,15 +350,19 @@ analysis reads; Part 2 runs it on a dam that does. Leave **Grid search (auto-see
 the circular search)** off, and leave **Re-search the critical surface at each
 step** ticked, because the mechanism moves.
 
-Click **Run**. Nineteen searches report their factors of safety to the Log:
+Click **Run**. Nineteen searches report to the Log as one table, a row per
+instant carrying the factor of safety and the circle it was found on:
 
 ```text
 Factor of safety vs time (lem): 19 instant(s) of the transient solution, spencer, re-searching at each…
-  t = 0 day      spencer   FS = 1.5311
-  t = 2 day      spencer   FS = 1.5311
-  t = 5 day      spencer   FS = 1.5134
-  t = 10 day     spencer   FS = 1.4572
-  ...
+Factor of safety versus time
+t (day)      FS      Xo     Yo      R
+      0  1.5311  103.00  56.79  56.79
+      2  1.5311  103.00  56.79  56.79
+      5  1.5134    5.20  65.90  65.88
+     10  1.4572    5.20  65.90  65.88
+     ...
+    300  1.5572  103.00  56.79  56.79
 Lowest factor of safety 1.3312 at t = 35 day (19 instant(s), 0 without a result).
 ```
 
@@ -393,12 +398,12 @@ and the face it sits on, read from the tab's **Table** sub-tab:
 | 5 | 16.93 | 1.5134 | (5.20, 65.90) | 65.88 | upstream |
 | 10 | 15.16 | 1.4572 | (5.20, 65.90) | 65.88 | upstream |
 | 15 | 13.38 | 1.4132 | (5.20, 65.90) | 65.88 | upstream |
-| 20 | 11.60 | 1.3779 | (6.40, 60.06) | 60.04 | upstream |
+| 20 | 11.60 | 1.3774 | (6.25, 60.58) | 60.58 | upstream |
 | 25 | 9.82 | 1.3510 | (7.00, 57.81) | 57.75 | upstream |
-| 30 | 8.04 | 1.3343 | (7.00, 56.91) | 56.91 | upstream |
+| 30 | 8.04 | 1.3344 | (7.00, 56.91) | 56.91 | upstream |
 | 35 | 6.27 | **1.3312** | (7.00, 56.91) | 56.91 | upstream |
 | 40 | 4.49 | 1.3436 | (7.00, 56.91) | 56.91 | upstream |
-| 47 | 2.00 | 1.3812 | (7.00, 57.16) | 57.16 | upstream |
+| 47 | 2.00 | 1.3813 | (7.00, 57.16) | 57.16 | upstream |
 | 55 | 2.00 | 1.4385 | (7.00, 57.16) | 57.16 | upstream |
 | 65 | 2.00 | 1.4827 | (7.00, 57.16) | 57.16 | upstream |
 | 80 | 2.00 | 1.5187 | (7.00, 57.16) | 57.16 | upstream |
@@ -415,11 +420,11 @@ the pool has not moved and neither has the field.
 1.5311, and **12 days before the drawdown ends**, with the pool at elevation 6.27
 and 4.3 m of the 16 m drawdown still to come.
 
-**Day 47, the end of the drawdown, reads 1.3812** — 0.05 *above* the minimum and
+**Day 47, the end of the drawdown, reads 1.3813** — 0.05 *above* the minimum and
 still upstream. The instant the pool stops falling is not the instant the dam is
 weakest.
 
-**After the fall the curve climbs, then flattens.** From 1.3812 it rises to
+**After the fall the curve climbs, then flattens.** From 1.3813 it rises to
 1.4385 by day 55, 1.4827 by day 65 and 1.5187 by day 80, all upstream; the answer
 passes to the downstream mechanism at day 100 and levels out at 1.5482, 1.5516,
 1.5550, 1.5566 and 1.5572 through day 300.
@@ -448,7 +453,7 @@ starting circle on one face would draw a smooth curve through one mechanism and
 miss the other.
 
 **The mechanism also grows.** At full pool the critical circle carries 5,580.9
-kN/m over 57.93 m of surface; the day-35 circle carries 5,722.8 kN/m over
+kN/m over 57.93 m of surface; the day-35 circle carries 5,722.9 kN/m over
 58.01 m of the other slope. Neither is the surface the other run would have
 reported, which is why **Re-search the critical surface at each step** matters.
 
@@ -482,7 +487,7 @@ The factor of safety falls while the load is ahead of the drainage and rises onc
 the drainage catches up, so day 35 marks that crossover rather than the end of
 the drawdown. Over the next 12 days the pool gives up its last 4.3 m while the
 shell keeps draining, and the strength recovers faster than the load falls —
-1.3436 by day 40, 1.3812 by day 47, 1.5187 by day 80.
+1.3436 by day 40, 1.3813 by day 47, 1.5187 by day 80.
 
 ---
 
@@ -629,17 +634,17 @@ t (day)  stage 1  stage 2       stage 3      FS  governs      Xo      Yo       R
      20   1.5352   1.2036  not required  1.2036        2  249.59  244.90  159.60
      25   1.5414   1.1489  not required  1.1489        2  249.59  243.48  159.38
      30   1.5440   1.1051  not required  1.1051        2  249.59  243.48  159.76
-     35   1.5453   1.0711  not required  1.0711        2  248.17  244.19  161.02
-     40   1.5465   1.0457  not required  1.0457        2  247.47  244.90  162.02
+     35   1.5453   1.0712  not required  1.0712        2  248.17  244.19  161.02
+     40   1.5465   1.0458  not required  1.0458        2  247.47  244.90  162.02
      45   1.5525   1.0279        1.0278  1.0278        3  244.64  244.19  162.68
      50   1.5545   1.0163        1.0157  1.0157        3  243.93  244.90  163.64
-     60   1.5518   1.0523        1.0522  1.0522        3  245.35  242.07  160.48
+     60   1.5518   1.0524        1.0522  1.0522        3  245.35  242.07  160.48
      70   1.5506   1.0743  not required  1.0743        2  245.31  246.38  164.30
-     80   1.5512   1.0902  not required  1.0902        2  245.31  244.96  163.08
+     80   1.5512   1.0903  not required  1.0903        2  245.31  244.96  163.08
     100   1.5514   1.1159  not required  1.1159        2  245.31  243.53  161.82
     130   1.5514   1.1414  not required  1.1414        2  245.31  243.53  161.82
     170   1.5514   1.1612  not required  1.1612        2  245.31  243.53  161.82
-    220   1.5514   1.1744  not required  1.1744        2  245.31  243.53  161.82
+    220   1.5514   1.1743  not required  1.1743        2  245.31  243.53  161.82
     300   1.5514   1.1848  not required  1.1848        2  245.31  243.53  161.82
     400   1.5514   1.1893  not required  1.1893        2  245.31  243.53  161.82
     500   1.5514   1.1912  not required  1.1912        2  245.31  243.53  161.82
@@ -674,17 +679,17 @@ stage factors of safety, the one that governs, and the critical circle at each:
 | 20 | 1.5352 | 1.2036 | — | 1.2036 | 2 | (249.59, 244.90) | 159.60 |
 | 25 | 1.5414 | 1.1489 | — | 1.1489 | 2 | (249.59, 243.48) | 159.38 |
 | 30 | 1.5440 | 1.1051 | — | 1.1051 | 2 | (249.59, 243.48) | 159.76 |
-| 35 | 1.5453 | 1.0711 | — | 1.0711 | 2 | (248.17, 244.19) | 161.02 |
-| 40 | 1.5465 | 1.0457 | — | 1.0457 | 2 | (247.47, 244.90) | 162.02 |
+| 35 | 1.5453 | 1.0712 | — | 1.0712 | 2 | (248.17, 244.19) | 161.02 |
+| 40 | 1.5465 | 1.0458 | — | 1.0458 | 2 | (247.47, 244.90) | 162.02 |
 | 45 | 1.5525 | 1.0279 | 1.0278 | 1.0278 | 3 | (244.64, 244.19) | 162.68 |
 | 50 | 1.5545 | 1.0163 | 1.0157 | **1.0157** | 3 | (243.93, 244.90) | 163.64 |
-| 60 | 1.5518 | 1.0523 | 1.0522 | 1.0522 | 3 | (245.35, 242.07) | 160.48 |
+| 60 | 1.5518 | 1.0524 | 1.0522 | 1.0522 | 3 | (245.35, 242.07) | 160.48 |
 | 70 | 1.5506 | 1.0743 | — | 1.0743 | 2 | (245.31, 246.38) | 164.30 |
-| 80 | 1.5512 | 1.0902 | — | 1.0902 | 2 | (245.31, 244.96) | 163.08 |
+| 80 | 1.5512 | 1.0903 | — | 1.0903 | 2 | (245.31, 244.96) | 163.08 |
 | 100 | 1.5514 | 1.1159 | — | 1.1159 | 2 | (245.31, 243.53) | 161.82 |
 | 130 | 1.5514 | 1.1414 | — | 1.1414 | 2 | (245.31, 243.53) | 161.82 |
 | 170 | 1.5514 | 1.1612 | — | 1.1612 | 2 | (245.31, 243.53) | 161.82 |
-| 220 | 1.5514 | 1.1744 | — | 1.1744 | 2 | (245.31, 243.53) | 161.82 |
+| 220 | 1.5514 | 1.1743 | — | 1.1743 | 2 | (245.31, 243.53) | 161.82 |
 | 300 | 1.5514 | 1.1848 | — | 1.1848 | 2 | (245.31, 243.53) | 161.82 |
 | 400 | 1.5514 | 1.1893 | — | 1.1893 | 2 | (245.31, 243.53) | 161.82 |
 | 500 | 1.5514 | 1.1912 | — | 1.1912 | 2 | (245.31, 243.53) | 161.82 |
@@ -698,8 +703,8 @@ the same starting circle — so the curve passes through that answer.
 <!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, num_slices=40, expected_first=1.4563, critical_time=50, min_fs=1.0157, tolerance=0.005, benchmark=COMBO-3-rapid -->
 
 **Stage 3 runs on three rows, all of them at the bottom of the dip.** Days 45, 50
-and 60 read 3 in the **governs** column, by a single ten-thousandth on days 45
-and 60 and six on day 50 — 1.0279 / 1.0278, 1.0163 / 1.0157, 1.0523 / 1.0522.
+and 60 read 3 in the **governs** column, by a single ten-thousandth on day 45, two
+on day 60 and six on day 50 — 1.0279 / 1.0278, 1.0163 / 1.0157, 1.0524 / 1.0522.
 Every other row reads `not required`, meaning no core slice came out weaker
 drained than undrained. The margins are thin because the handover falls at
 $d = 223$ psf, 27 psf under the 250 psf this core carries.
@@ -722,7 +727,7 @@ Day 45 reads 1.0278 and day 60 reads 1.0522, so the saved times bracket that
 minimum and the curve turns at a frame rather than between two.
 
 **The recovery climbs toward COMBO-2's two-steady answer.** From 1.0157 the curve
-rises to 1.0902 by day 80 and 1.1414 by day 130, then slows to 1.1612, 1.1744,
+rises to 1.0903 by day 80 and 1.1414 by day 130, then slows to 1.1612, 1.1743,
 1.1848, 1.1893 and 1.1912 through day 500, the last two frames together moving it
 by 0.0019. COMBO-2's **two-steady-solution**
 answer is **1.195**, and the curve is still 0.004 under it at day 500, because by
@@ -741,8 +746,9 @@ We can run the same twenty-one frames at drained strengths. Open
 other field, and click **Run**; **Re-search the critical surface at each step**
 comes back live and stays ticked.
 
-Each point now runs about three times faster, solving the section once rather
-than three times:
+Each point now solves the section once rather than three times, and takes about
+half as long for it — 8 seconds an instant against 17 on the machine these runs
+were timed on:
 
 ```text
 Factor of safety vs time (lem): 21 instant(s) of the transient solution, spencer, re-searching at each…
@@ -754,20 +760,20 @@ t (day)      FS      Xo      Yo       R
      15  1.3093  244.00  250.40  162.76
      20  1.2374  248.18  242.77  157.49
      25  1.1779  249.59  242.07  157.77
-     30  1.1301  249.59  239.24  155.60
-     35  1.0930  248.88  239.24  156.31
+     30  1.1302  249.59  239.24  155.60
+     35  1.0931  248.88  239.24  156.31
      40  1.0656  246.76  241.36  159.20
      45  1.0469  246.76  241.01  158.89
      50  1.0350  243.89  244.96  163.73
-     60  1.0765  245.31  242.11  160.55
+     60  1.0766  245.31  242.11  160.55
      70  1.1037  245.31  244.96  163.08
-     80  1.1244  245.31  243.53  161.82
+     80  1.1245  245.31  243.53  161.82
     100  1.1587  245.31  243.53  161.82
     130  1.1949  245.31  243.53  161.82
     170  1.2252  245.31  243.53  161.82
     220  1.2475  244.60  244.60  163.07
-    300  1.2684  245.67  243.18  161.32
-    400  1.2802  244.60  242.82  161.51
+    300  1.2683  245.67  243.18  161.32
+    400  1.2801  244.60  242.82  161.51
     500  1.2870  244.60  244.25  162.76
 ```
 
@@ -793,25 +799,25 @@ and the distance between them is not constant:
 
 | t (day) | drawdown | single-stage | difference |
 | :---: | :---: | :---: | :---: |
-| 5 | 1.4563 | 1.5097 | 0.0534 |
+| 5 | 1.4563 | 1.5097 | 0.0535 |
 | 10 | 1.3496 | 1.3944 | 0.0448 |
 | 15 | 1.2704 | 1.3093 | 0.0389 |
 | 20 | 1.2036 | 1.2374 | 0.0338 |
 | 25 | 1.1489 | 1.1779 | 0.0290 |
-| 30 | 1.1051 | 1.1301 | 0.0250 |
-| 35 | 1.0711 | 1.0930 | 0.0219 |
-| 40 | 1.0457 | 1.0656 | 0.0199 |
+| 30 | 1.1051 | 1.1302 | 0.0250 |
+| 35 | 1.0712 | 1.0931 | 0.0219 |
+| 40 | 1.0458 | 1.0656 | 0.0199 |
 | 45 | 1.0278 | 1.0469 | 0.0191 |
 | 50 | **1.0157** | **1.0350** | **0.0193** |
-| 60 | 1.0522 | 1.0765 | 0.0243 |
+| 60 | 1.0522 | 1.0766 | 0.0244 |
 | 70 | 1.0743 | 1.1037 | 0.0294 |
-| 80 | 1.0902 | 1.1244 | 0.0342 |
-| 100 | 1.1159 | 1.1587 | 0.0428 |
-| 130 | 1.1414 | 1.1949 | 0.0535 |
-| 170 | 1.1612 | 1.2252 | 0.0640 |
-| 220 | 1.1744 | 1.2475 | 0.0731 |
-| 300 | 1.1848 | 1.2684 | 0.0836 |
-| 400 | 1.1893 | 1.2802 | 0.0909 |
+| 80 | 1.0903 | 1.1245 | 0.0342 |
+| 100 | 1.1159 | 1.1587 | 0.0429 |
+| 130 | 1.1414 | 1.1949 | 0.0536 |
+| 170 | 1.1612 | 1.2252 | 0.0641 |
+| 220 | 1.1743 | 1.2475 | 0.0731 |
+| 300 | 1.1848 | 1.2683 | 0.0835 |
+| 400 | 1.1893 | 1.2801 | 0.0909 |
 | 500 | 1.1912 | 1.2870 | 0.0958 |
 
 **The gap is narrowest where the slope is weakest.** Across the bottom of the dip

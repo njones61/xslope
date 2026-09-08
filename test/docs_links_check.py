@@ -2361,7 +2361,19 @@ def _lem08_editor_labels(mw):
         fails.append(f"LEM-8's model carries {len(lines)} reinforcement lines, not "
                      f"the six the page enters and reads its crossings against")
 
-    dlg = ReinforcementEditor().build(data, None)
+    # The reinforcement editor opens on the view the session last used
+    # (editors._LAST_LINE_VIEW); an earlier check in the same process can leave
+    # it on Table view, so LEM-8's first open is pinned to the page's List view.
+    import studio.editors as editors_mod
+    remembered_line_view = editors_mod._LAST_LINE_VIEW.get("reinforce")
+    editors_mod._LAST_LINE_VIEW["reinforce"] = "list"
+    try:
+        dlg = ReinforcementEditor().build(data, None)
+    finally:
+        if remembered_line_view is None:
+            editors_mod._LAST_LINE_VIEW.pop("reinforce", None)
+        else:
+            editors_mod._LAST_LINE_VIEW["reinforce"] = remembered_line_view
     if dlg.windowTitle() != "Reinforcement":
         fails.append(f"the reinforcement editor is titled {dlg.windowTitle()!r}, "
                      f"not 'Reinforcement'")

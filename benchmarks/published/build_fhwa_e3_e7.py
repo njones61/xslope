@@ -167,6 +167,7 @@ def _base(x_left, x_right, y_base, materials):
     sd['tcrack_depth'] = 0.0
     sd['tcrack_water'] = 0.0
     sd['k_seismic'] = 0.0
+    sd['k0'] = None          # limit equilibrium only: no in-situ stress state
     sd['materials'] = materials
     sd['profile_lines'] = []
     sd['max_depth'] = y_base

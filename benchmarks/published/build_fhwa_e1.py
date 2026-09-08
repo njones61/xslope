@@ -187,6 +187,7 @@ def _slope_data():
     sd['tcrack_depth'] = 0.0
     sd['tcrack_water'] = 0.0
     sd['k_seismic'] = 0.0
+    sd['k0'] = None          # limit equilibrium only: no in-situ stress state
     sd['materials'] = [_material('Reinforced fill', PHI_R),
                        _material('Retained backfill', PHI_B),
                        _material('Foundation', PHI_F)]

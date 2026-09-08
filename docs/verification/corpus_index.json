@@ -7221,7 +7221,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": false,
-        "k0": 1.0,
+        "k0": null,
         "line_loads": 0,
         "material_options": [
           "mc"
@@ -7257,7 +7257,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 26,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7295,7 +7295,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": false,
-        "k0": 1.0,
+        "k0": null,
         "line_loads": 0,
         "material_options": [
           "mc"
@@ -7331,7 +7331,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 26,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7367,7 +7367,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": false,
-        "k0": 1.0,
+        "k0": null,
         "line_loads": 0,
         "material_options": [
           "mc"
@@ -7403,7 +7403,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 26,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7439,7 +7439,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": false,
-        "k0": 1.0,
+        "k0": null,
         "line_loads": 0,
         "material_options": [
           "mc"
@@ -7475,7 +7475,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 26,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7511,7 +7511,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": false,
-        "k0": 1.0,
+        "k0": null,
         "line_loads": 0,
         "material_options": [
           "mc"
@@ -7547,7 +7547,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 26,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7583,7 +7583,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": false,
-        "k0": 1.0,
+        "k0": null,
         "line_loads": 0,
         "material_options": [
           "mc"
@@ -7619,7 +7619,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 26,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,

@@ -426,18 +426,17 @@ pile adds its 5,900 lb/ft of shear where the surface passes it at the toe.
 
 Each method runs its own search and finds its own critical surface:
 
-| Janbu | Corps | Lowe | Spencer |
-| :---: | :---: | :---: | :---: |
-| 1.431 | 1.415 | 1.412 | 1.414 |
+| Janbu | Corps | Lowe | Spencer | M-P |
+| :---: | :---: | :---: | :---: | :---: |
+| 1.431 | 1.415 | 1.412 | 1.414 | 1.416 |
 
-<!-- test: file=../verification/files/rocscience/vp049.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.431, fs_corps=1.415, fs_lowe=1.412, fs_spencer=1.414, tolerance=0.005 -->
+<!-- test: file=../verification/files/rocscience/vp049.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.431, fs_corps=1.415, fs_lowe=1.412, fs_spencer=1.414, fs_mprice=1.416, tolerance=0.005 -->
 
-All four land between 1.412 and 1.431. The Ordinary Method of Slices and Bishop's
+All five land between 1.412 and 1.431. The Ordinary Method of Slices and Bishop's
 simplified method are not on the list: both take moments about a circle center,
 which a polyline does not have, so they refuse the run rather than approximate it.
-Morgenstern–Price is absent for a different reason — its solver fails on the
-starting wedge itself, so the search never starts and the run reports that the
-starting surface is not viable.
+Spencer and Morgenstern-Price, the two that satisfy force and moment equilibrium
+together, agree to 0.1% at 1.414 and 1.416.
 
 ### Why not a circle?
 

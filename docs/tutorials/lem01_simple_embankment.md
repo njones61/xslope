@@ -160,7 +160,7 @@ Most of this sheet is already right:
    you type already mean, and drives the unit labels on the plots.
 2. Leave **Tension crack depth**, **Depth of water in crack** and **Seismic
    coefficient** at `0`.
-3. Leave `main!D23` **Water loads** at `auto`, which derives the weight of standing
+3. Leave `main!D24` **Water loads** at `auto`, which derives the weight of standing
    water from the water table rather than from a load you type. There is no water
    here, so it changes nothing — but it is the setting to leave alone.
 4. Leave **LEM method** and **Number of slices** blank. A blank run option means
@@ -182,7 +182,9 @@ The ID is what the geometry will reference and the name is what the legends
 show. **option** = `mc` is the traditional Mohr-Coulomb envelope, and c = 500
 with φ = 0 is the undrained strength: the envelope is flat, so the strength is
 500 psf at every depth. **u** = `none` means there is no pore pressure to
-compute. Every other column in the row stays blank.
+compute. The remaining columns belong to the other strength models and to the
+finite element analysis, and none of them applies here: a blank cell and the `0`
+the figure shows both reach the solver as zero.
 
 ### 3. The `profile` worksheet
 
@@ -376,11 +378,12 @@ they can only disagree about which circles they managed to solve.
 
 ![Bishop's critical surface](images/lem01_solution_bishop.png){width=1000}
 
-Bishop finds **FS = 1.215** on a circle deeper into the crest — a *lower* answer
-than Spencer's on the same model. Look at the crest end of the surface: the last few
-slices' base-stress bars are drawn in red, meaning the computed normal stress on the
-base is negative. The model is asking the top of the slope to hold itself together
-in tension.
+Bishop finds **FS = 1.215** on a smaller, shallower circle — radius 33.5 against
+Spencer's 40.4, breaking out of the crest at x = 36 rather than x = 44 — and that
+is a *lower* answer than Spencer's on the same model. Look at the crest end of
+the surface: the last few slices' base-stress bars are drawn in red, meaning the
+computed normal stress on the base is negative. The model is asking the top of the
+slope to hold itself together in tension.
 
 That tension is why the two searches disagree. On the circles nearest the true
 minimum, Spencer's stricter equilibrium — force *and* moment, with one interslice
@@ -411,7 +414,7 @@ $$ z_c = \frac{2c}{\gamma} = \frac{2 \times 500}{125} = 8 \text{ ft} $$
 We add the crack to the model:
 
 - **Studio** — open **Global parameters** and set **Tension crack depth** = `8`
-  (leave **Depth of water in crack** at `0`; the crack is dry).
+  (leave **Water in crack** at `0`; the crack is dry).
 - **Excel** — `main!D11` **Tension crack depth** = `8`, `main!D12` = `0`.
 - **Assistant** — say: *"Add a dry tension crack 8 ft deep."*
 
@@ -426,8 +429,8 @@ We run the Spencer search again:
 **FS = 1.084**, and this time the solution is clean: no amber strip, no red bars,
 and the line of thrust (the dashed red curve) stays inside the sliding mass. Run
 Bishop or Morgenstern-Price on the cracked model and they land on the *same* circle
-and the *same* 1.084 — once the model stops asking the soil to carry tension, the
-methods stop disagreeing.
+and the *same* factor of safety — once the model stops asking the soil to carry
+tension, the methods stop disagreeing.
 
 Two things to carry out of this:
 
@@ -447,15 +450,16 @@ to eliminate the tension is the smallest change that fixes the model — anythin
 deeper removes strength the soil actually has.
 
 We can find that depth with the search itself: re-run it at a few trial depths and
-watch for the shallowest clean solution. On this slope the
-warnings persist at 4 ft, and clear at about **4¾ ft** — well short of the
-theoretical 8. Spencer there gives **FS = 1.107**, about 2% above the 8-ft
-answer, with no tension anywhere.
+watch for the shallowest clean solution. The tension does not switch off — it
+thins. On this slope 15% of the interior boundaries are in tension at a 4 ft
+crack, 8% at 6 ft and 3% at 7 ft, and the last of it goes at about **7¼ ft**, a
+little short of the theoretical 8. The factor of safety there is **1.084**, which
+is the 8-ft answer to three decimals.
 
-Which to use is an engineering call, and a mild one — the two depths differ by 2%
-in factor of safety. The verge depth is the most defensible model of the soil; the
-theoretical depth is the conservative habit. What is not defensible is the
-uncracked model: both cracked answers sit far below its 1.276.
+Which to use is an engineering call, and on this slope a mild one — the two depths
+are 0.06% apart in factor of safety. The verge depth is the most defensible model
+of the soil; the theoretical depth is the conservative habit. What is not
+defensible is the uncracked model: both cracked answers sit far below its 1.276.
 
 The [sample page](../lem/samples.md#1-simple-embankment) catalogs the uncracked
 variant of this model; the cracked model is yours — keep it with **Save As**.

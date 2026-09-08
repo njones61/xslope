@@ -158,12 +158,16 @@ n = 0.60, T = 0.0015) and a fitted Mohr-Coulomb envelope c′ = 6.0 kPa,
 φ′ = 32°. This data set includes measurements at very low normal stress, so
 neither fit has to be extended past what was measured.
 
-Running Spencer's search on the power curve:
+Each fit is its own model, and both ship with the verification corpus:
+[vp061a.xlsx](../verification/files/rocscience/vp061a.xlsx) carries the power
+curve and [vp061b.xlsx](../verification/files/rocscience/vp061b.xlsx) the
+straight line, with the same geometry under both. Open the first and run
+Spencer's search on the power curve:
 
 ![Spencer on the London clay power curve](images/lem07_london_pow.png){width=1000}
 
-**FS = 1.466**, against Slide's 1.468 and Baker's 1.48. And on the fitted
-Mohr-Coulomb envelope:
+**FS = 1.466**, against Slide's 1.468 and Baker's 1.48. And on the second
+model, the fitted Mohr-Coulomb envelope:
 
 ![Spencer on the London clay Mohr-Coulomb fit](images/lem07_london_mc.png){width=1000}
 

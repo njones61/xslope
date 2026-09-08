@@ -39,6 +39,8 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from tools import studio_settings                      # noqa: E402
+
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -548,6 +550,7 @@ def check_the_tornado_table_is_its_bars(failures):
                                 f"{want:.4f}")
 
 
+@studio_settings.isolated
 def run():
     failures = []
     if not COMBO03.exists():

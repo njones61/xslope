@@ -68,6 +68,8 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from tools import studio_settings                      # noqa: E402
+
 import xslope
 from xslope.fileio import load_slope_data
 from xslope.package import (PACKAGE_EXT, SIDECAR_SUFFIXES, package_contents,
@@ -836,6 +838,7 @@ CHECKS = [
 ]
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:

@@ -46,6 +46,8 @@ from PySide6.QtCore import QEventLoop, QSettings, Qt, QTimer
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+from tools import studio_settings
+
 IMAGES_DIR = os.path.join(REPO_ROOT, "docs", "tutorials", "images")
 FILES_DIR = os.path.join(REPO_ROOT, "docs", "tutorials", "files")
 
@@ -186,9 +188,11 @@ def _usage_probe():
 #: The organization / application pair Studio's own store is opened under —
 #: ``QSettings("XSlope", "XSlope Studio")``, constructed in a dozen places across
 #: the GUI. A call carrying this pair is the machine-wide store, and is what the
-#: redirector below sends to the session's own ini instead.
-ORG_NAME = "XSlope"
-SETTINGS_APP = "XSlope Studio"
+#: redirector sends to the session's own ini instead. Both names, the redirector
+#: and the class-replacement mechanism live in ``tools/studio_settings.py``, which
+#: every Studio-opening check in the suite uses for the same purpose.
+ORG_NAME = studio_settings.ORG_NAME
+SETTINGS_APP = studio_settings.SETTINGS_APP
 
 #: Environment override for the session store's path. The suite sets it so every
 #: session of one run shares a store; unset, each PROCESS gets its own file.
@@ -214,71 +218,8 @@ def _session_settings_path():
     (or restored) the first one's values — and a run whose ``ai/confirm`` had been
     put back to True stopped dead on the "Run code?" modal with nobody to click it.
     """
-    override = os.environ.get(SETTINGS_ENV)
-    if override:
-        os.makedirs(os.path.dirname(os.path.abspath(override)) or ".",
-                    exist_ok=True)
-        return os.path.abspath(override)
-    import tempfile
-    root = os.path.join(tempfile.gettempdir(), "xslope_assistant_sessions")
-    os.makedirs(root, exist_ok=True)
-    return os.path.join(root, "settings_%d.ini" % os.getpid())
-
-
-class _StoreRedirector:
-    """Stands in for ``QSettings`` and hands out the session's store instead.
-
-    Studio opens its store as ``QSettings("XSlope", "XSlope Studio")`` from a
-    dozen call sites, none of which take a path, and on macOS that store CANNOT be
-    redirected by ``setDefaultFormat``/``setPath`` (measured — see
-    ``test/welcome_window_check.py``): the two-argument form comes back
-    NativeFormat at the real plist whatever those say. A store that cannot be
-    redirected has to be REPLACED, so the *class* is what this replaces, for the
-    length of the session and inside this process only.
-
-    Every other construction — a scratch ini, a path with an explicit format —
-    is passed through untouched, and so is every attribute (``IniFormat``,
-    ``UserScope``, …), so the name behaves as the class everywhere else.
-    """
-
-    def __init__(self, real, path):
-        self._real = real
-        self._path = path
-
-    def __call__(self, *args, **kwargs):
-        if self._is_machine_store(args):
-            return self._real(self._path, self._real.IniFormat)
-        return self._real(*args, **kwargs)
-
-    @staticmethod
-    def _is_machine_store(args):
-        """Whether this construction asks for Studio's own machine-wide store."""
-        if not args:
-            return True          # QSettings() — the application-wide default store
-        return any(a == ORG_NAME for a in args if isinstance(a, str))
-
-    def __getattr__(self, name):
-        return getattr(self._real, name)
-
-
-def _patch_targets():
-    """Every already-imported module holding its own reference to ``QSettings``.
-
-    Studio's modules bind the class at import time (``from PySide6.QtCore import
-    QSettings``), so patching ``PySide6.QtCore`` alone reaches only the modules
-    imported afterwards. Both are done: this sweep catches the ones already in,
-    and the QtCore patch catches every later import (``studio.editors`` and
-    ``studio.welcome`` are loaded lazily, mid-session).
-    """
-    import PySide6.QtCore
-    real = PySide6.QtCore.QSettings
-    targets = [(PySide6.QtCore, real)]
-    for name, mod in list(sys.modules.items()):
-        if mod is None or not (name == "studio" or name.startswith("studio.")):
-            continue
-        if getattr(mod, "QSettings", None) is real:
-            targets.append((mod, real))
-    return targets
+    return studio_settings.scratch_settings_path(prefix="assistant_session",
+                                                 env=SETTINGS_ENV)
 
 
 @contextlib.contextmanager
@@ -312,25 +253,11 @@ def _pinned_settings(values):
         store.setValue(key, value)
     store.sync()
 
-    targets = _patch_targets()
-    real_class = targets[0][1]
-    for module, real in targets:
-        setattr(module, "QSettings", _StoreRedirector(real, path))
-    try:
-        yield store
-    finally:
-        for module, real in targets:
-            setattr(module, "QSettings", real)
-        # A module imported DURING the session bound the redirector as its own
-        # ``QSettings`` and is not in the list above; left alone it would keep
-        # sending the machine store to this session's ini for the rest of the
-        # process. The sweep is repeated on the way out for exactly that set.
-        for name, mod in list(sys.modules.items()):
-            if mod is None or not (name == "studio" or name.startswith("studio.")):
-                continue
-            if isinstance(getattr(mod, "QSettings", None), _StoreRedirector):
-                setattr(mod, "QSettings", real_class)
-        store.sync()
+    with studio_settings.redirected(path):
+        try:
+            yield store
+        finally:
+            store.sync()
 
 
 # --------------------------------------------------------------------------- #

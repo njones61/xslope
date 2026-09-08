@@ -43,6 +43,8 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from tools import studio_settings                      # noqa: E402
+
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -526,6 +528,7 @@ def test_water_levels():
     return fails
 
 
+@studio_settings.isolated
 def main():
     print("transient seepage studio smoke:")
     checks = [("run dialog (simplified, no stage widgets)", test_dialog),

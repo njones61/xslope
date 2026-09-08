@@ -61,6 +61,8 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from tools import studio_settings                      # noqa: E402
+
 MAIN = threading.main_thread().name
 
 #: A small model with a circular surface — solved once, single surface, for the
@@ -319,6 +321,7 @@ CHECKS = [("nothing Qt reaches a runner", test_no_qt_in_runners),
           ("quitting stops every thread", test_quit_stops_threads)]
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:

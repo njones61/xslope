@@ -62,6 +62,8 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from tools import studio_settings                      # noqa: E402
+
 import numpy as np
 
 from xslope.fileio import (_round_cell_float, default_template_path,
@@ -689,6 +691,7 @@ CHECKS = [("the run gate, both directions", test_gate),
           ("Studio: solve then run, offscreen", test_studio)]
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:

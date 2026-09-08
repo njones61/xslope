@@ -58,6 +58,8 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from tools import studio_settings                      # noqa: E402
+
 import numpy as np
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
@@ -804,6 +806,7 @@ CHECKS = [("time resolution + entry surface", test_resolution),
           ("Run LEM end to end on a staged frame", test_run_with_march)]
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:

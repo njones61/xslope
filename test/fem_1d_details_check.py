@@ -67,6 +67,8 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from tools import studio_settings                      # noqa: E402
+
 import numpy as np                                              # noqa: E402
 
 REINF_XLSX = os.path.join(_REPO, "docs", "fem", "files", "xslope_reinforce_fem.xlsx")
@@ -2008,6 +2010,7 @@ _STUDIO_ONLY = {test_gate, test_gate_mutation, test_list,
                 test_field_state_export, test_the_inset_follows_the_selection}
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     checks = CHECKS

@@ -46,6 +46,8 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from tools import studio_settings                      # noqa: E402
+
 #: A plain limit-equilibrium model — opens in LEM mode.
 DAM_LEM = os.path.join(_REPO, "docs/inputs/slope/xslope_dam.xlsx")
 #: Materials with hydraulic properties and no strength — opens in Seepage mode.
@@ -342,6 +344,7 @@ CHECKS = [("the segments + the fresh-window mode", test_strip),
           ("the mode a reopened file selects", test_reload)]
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:

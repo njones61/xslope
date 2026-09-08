@@ -41,6 +41,8 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from tools import studio_settings                      # noqa: E402
+
 #: The LEM-1 tutorial's model: one material, one profile line, a rigid base at the
 #: toe. Its geometry is what the tutorial's Studio path generates a circle from.
 LEM01 = os.path.join(_REPO, "docs/lem/files/xslope_simple_embankment.xlsx")
@@ -747,6 +749,7 @@ CHECKS = [
 ]
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:

@@ -49,6 +49,8 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from tools import studio_settings                      # noqa: E402
+
 #: A polygon-based section (no profile sheet) for the Studio legs.
 POLY_FILE = os.path.join(_REPO, "docs/seep/files/xslope_levee_poly.xlsx")
 
@@ -315,6 +317,7 @@ def test_row_lands():
     return fails
 
 
+@studio_settings.isolated
 def run():
     legs = [("interior click -> polygons editor", test_interior),
             ("features win over the interior", test_precedence),

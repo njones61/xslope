@@ -86,6 +86,27 @@ def _grab(dlg, name, settle=True):
     return out
 
 
+def _build_mesh_dialog(defaults):
+    """Open Build mesh the way ``MainWindow._build_mesh`` opens it.
+
+    ``MainWindow._file_defaults("mesh")`` seeds ``target_size`` only from a size
+    the FILE declares, and a declared size is what turns auto-sizing off. So an
+    auto-sized run reaches the dialog with no target size at all and its grayed
+    box shows the dialog's own 1.000 — the auto size is computed by the build,
+    after the dialog closes, and never appears in the box. Passing a computed
+    size in here photographed a state the model cannot produce, which is why the
+    key is dropped whenever auto-sizing is on.
+    """
+    from studio.dialogs import BuildMeshDialog
+
+    d = dict(defaults)
+    if d.get("auto_size", True):
+        d.pop("target_size", None)
+    dlg = BuildMeshDialog(defaults=d)
+    dlg.resize(dlg.sizeHint())
+    return dlg
+
+
 def _list_view(dlg, width):
     """Put a two-view line editor in its LIST view and size it to the whole form.
 
@@ -1583,11 +1604,11 @@ def _seep_only(dlg):
 
 def seep01_global():
     """Global parameters as the seepage build leaves them: SI, and a declared
-    Time of days.
+    Time of years.
 
     The time unit is why this shot exists on a page whose LEM siblings skip it —
     conductivity, flux and discharge all carry a time dimension, and the declared
-    unit is what puts `m/day` on the input forms and `m³/day per m` on the flow
+    unit is what puts `m/yr` on the input forms and `m³/yr per m` on the flow
     net's title.
     """
     from studio.editors import GlobalEditor
@@ -1641,17 +1662,15 @@ def seep01_seep_bc():
 
 
 def _seep01_build_mesh(name, **over):
-    from studio.dialogs import BuildMeshDialog
-
-    dlg = BuildMeshDialog(defaults=dict(SEEP01_MESH, **over))
-    dlg.resize(dlg.sizeHint())
-    return _grab(dlg, name)
+    return _grab(_build_mesh_dialog(dict(SEEP01_MESH, **over)), name)
 
 
 def seep01_build_mesh():
     """Build Mesh as the page's first run leaves it: tri3, auto-sized at 100
     divisions, no refinement. The quadrilateral style is dimmed, because a
-    triangular element type has none."""
+    triangular element type has none, and the target-size box is dimmed at the
+    dialog's own 1.000 because auto-sizing computes the size after the dialog
+    closes (see ``_build_mesh_dialog``)."""
     return _seep01_build_mesh("seep01_studio_build_mesh.png")
 
 
@@ -1784,11 +1803,7 @@ def seep02_build_mesh():
     """Build Mesh as this page sets it: tri3 again, and 120 divisions rather than
     the dialog's own 100, which is what puts the target size at the 6.25 ft the
     sample page's discharge was computed on."""
-    from studio.dialogs import BuildMeshDialog
-
-    dlg = BuildMeshDialog(defaults=dict(SEEP02_MESH))
-    dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "seep02_studio_build_mesh.png")
+    return _grab(_build_mesh_dialog(SEEP02_MESH), "seep02_studio_build_mesh.png")
 
 
 def seep02_run_seep():
@@ -2731,11 +2746,7 @@ def combo01_build_mesh():
     goes on to carry the strength reduction, which linear elements cannot run
     honestly.
     """
-    from studio.dialogs import BuildMeshDialog
-
-    dlg = BuildMeshDialog(defaults=dict(COMBO01_MESH))
-    dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "combo01_studio_build_mesh.png")
+    return _grab(_build_mesh_dialog(COMBO01_MESH), "combo01_studio_build_mesh.png")
 
 
 def combo01_run_seep():

@@ -310,5 +310,5 @@ The tutorial block (`T1`–`T4`) moves one number the sweep reads as guarded and
 names the bucket it must fall into — `disagreeing` where the page ties it to a
 method, `unguarded` where nothing does — and requires it to leave the guarded
 bucket either way. Its two controls run the other way: `N-T1` restates a lock
-one place coarser and must add no finding, and `N-T2` repairs a restatement the
-sweep already flags and must remove exactly one.
+one place coarser and must add no finding, and `N-T2` moves a flagged number onto
+a lock in scope and must remove exactly one.

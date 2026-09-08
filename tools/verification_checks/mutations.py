@@ -356,8 +356,8 @@ TUTORIAL_MUTATIONS = [
     # The method table with the methods in the HEADER and one row of answers
     # under it, which is how every LEM tutorial publishes its method spread.
     ("lem03_layered_slope", "disagreeing", "T1 method-table cell moved",
-     "| 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |",
-     "| 1.244 | 1.244 | 1.313 | 1.336 | 1.285 | 1.244 | 1.244 |"),
+     "| 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |",
+     "| 1.244 | 1.244 | 1.314 | 1.336 | 1.285 | 1.244 | 1.244 |"),
     # Prose that names the method it reports.
     ("fem01_strength_reduction", "disagreeing", "T2 prose restatement moved",
      "**Spencer's method gives FS = 1.376**",
@@ -381,11 +381,15 @@ TUTORIAL_MUTATIONS = [
 #: (page stem, name, old, new, delta)
 TUTORIAL_NEGATIVE = [
     ("lem03_layered_slope", "N-T1 lock restated one place coarser",
-     "| 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |",
-     "| 1.244 | 1.244 | 1.313 | 1.33 | 1.285 | 1.244 | 1.244 |", 0),
-    ("lem03_layered_slope", "N-T2 a flagged restatement repaired",
-     "| 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |",
-     "| 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |", -1),
+     "| 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |",
+     "| 1.244 | 1.244 | 1.314 | 1.33 | 1.285 | 1.244 | 1.244 |", 0),
+    # A number nothing in scope locks, moved onto a lock in scope: it leaves the
+    # flagged buckets, and exactly one number does.  Agreement is by printed
+    # form, so this is the same rule that lets a correct restatement pass, read
+    # from the other side.
+    ("lem03_layered_slope", "N-T2 a flagged number restated onto a lock",
+     "a clean solution at\n**FS = 1.175**, on a circle",
+     "a clean solution at\n**FS = 1.247**, on a circle", -1),
 ]
 
 DOCS = os.path.join(certify.REPO, "docs")

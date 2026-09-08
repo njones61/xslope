@@ -300,6 +300,9 @@ plot, and the weight is ΣW summed over the run's slices:
 | Through the toe | −4.72 | 1.646 | 100,872 |
 | Base of the foundation | −10 | 1.656 | 157,486 |
 
+<!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=single_circle, method=spencer, num_slices=40, circle_index=0, expected_fs=1.247, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=single_circle, method=spencer, num_slices=40, circle_index=1, expected_fs=1.656, tolerance=0.005 -->
+
 The deep circles carry up to 2.57 times the weight of the shallow one and are
 still a third safer, because everything they add is in the foundation:
 twice the cohesion of the fill along every extra foot of base. On this section
@@ -368,10 +371,11 @@ c = 300 psf — below the fill's 400 — with everything else unchanged:
 
 **FS = 0.792**, and it is a different mechanism entirely. The critical circle is
 now tangent to the rock at elevation −10; it exits 9 ft beyond the toe, on the
-flat ground the section provides for it, and reaches back to x = 64 in the crest.
-It weighs 152,758 lb/ft against the 61,393 of the answer above, and its base runs
-through both soils. Deeper is now lower: a circle held at the contact gives
-1.250 against the 0.792 at the rock.
+flat ground the section provides for it, and reaches back to x = 63 in the crest.
+It weighs 149,933 lb/ft against the 61,393 of the answer above, and its base runs
+through both soils. Deeper is now lower: a circle tangent to the contact lies
+wholly in the fill, where nothing has changed, so held still it returns the same
+1.247 it did before — against the 0.792 at the rock.
 
 Two things follow. **A layered model has one candidate mechanism per layer**, and
 a set of starting circles that names them all is how the model states that — the
@@ -387,7 +391,7 @@ The search finds each method its own critical circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |
+| 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |
 
 The four methods that satisfy moment equilibrium — the Ordinary Method of
 Slices (OMS), Bishop, Spencer and

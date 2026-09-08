@@ -143,7 +143,7 @@ about the mechanism or the finding is right.
 | Claude Opus 5 | 47 | 870,877 (717,989) | 29,261 | \$1.85 | 8 of 8 | 7 of 8 |
 | Claude Sonnet 5 | 45 | 935,563 (684,517) | 28,060 | \$0.92 | 7 of 8 | 7 of 8 |
 | OpenAI gpt-5.5 | 29 | 364,339 (325,120) | 17,437 | \$0.88 | 7 of 8 | 6 of 8 |
-| Kimi K3 (Moonshot AI) | 37 | 449,769 (343,143) | 44,953 | \$1.10 | 7 of 8 | 4 of 8 |
+| Kimi K3 (Moonshot AI) | 37 | 449,769 (343,143) | 44,953 | \$1.10 | 7 of 8 | 6 of 8 |
 | GLM-5V-Turbo (Z.ai) | 40 | 563,429 (459,660) | 13,480 | ~\$0.29 | 6 of 8 | 4 of 8 |
 
 All five build the model correctly and get the 1.244 that LEM-3 publishes for
@@ -231,7 +231,7 @@ The session saved
 exchange is in
 [w1_build_from_image_transcript.md](files/w1_build_from_image_transcript.md).
 
-<!-- test: file=files/w1_build_from_image_after.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.244, tolerance=0.005 -->
+<!-- test: file=files/w1_build_from_image_after.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.2441, tolerance=0.005 -->
 
 ### Check its work
 
@@ -303,9 +303,9 @@ One workbook was saved per turn —
 [w1_modify_after_3.xlsx](files/w1_modify_after_3.xlsx) — and the conversation is
 in [w1_modify_transcript.md](files/w1_modify_transcript.md).
 
-<!-- test: file=files/w1_modify_after_1.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.546, tolerance=0.005 -->
-<!-- test: file=files/w1_modify_after_2.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=2.767, tolerance=0.005 -->
-<!-- test: file=files/w1_modify_after_3.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.418, tolerance=0.005 -->
+<!-- test: file=files/w1_modify_after_1.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.5460, tolerance=0.005 -->
+<!-- test: file=files/w1_modify_after_2.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=2.7673, tolerance=0.005 -->
+<!-- test: file=files/w1_modify_after_3.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.4184, tolerance=0.005 -->
 
 ### Check its work
 
@@ -342,7 +342,7 @@ back — `foundation c now = 800.0`.
 
 | Foundation c (psf) | FS (Spencer, searched) |
 | :---: | :---: |
-| 200 | 0.640 |
+| 200 | 0.627 |
 | 300 | 0.792 |
 | 400 | 0.964 |
 | 500 | 1.135 |
@@ -357,9 +357,21 @@ surface moves to the contact and the embankment governs, capping the factor of
 safety at 1.244. The transcript is
 [w1_sweep_builtin_transcript.md](files/w1_sweep_builtin_transcript.md).
 
+The 200-psf step is the one to treat with care, and the assistant said so in its
+own summary. On the weakest foundation the search raises an **unsolved trials**
+warning: Spencer finds no admissible solution on a share of the circles it tries,
+and some of those rank below the minimum it does report. The assistant called its
+own answer for that step possibly optimistic on the strength of it, and a rerun
+bears that out: the table above carries the 0.627 a fresh search settles on, on a
+different circle, rather than the 0.640 the transcript prints. The warning fades
+up the column — the 500-psf step and everything above it is clean — which is why
+the plateau at 1.244 is the part of this table to trust and the bottom row is the
+part to re-run.
+
 ### Check its work
 
-- **Re-run any step.** The seven values reproduce.
+- **Re-run any step.** The six clean values reproduce; the 200-psf step is the
+  one the warning is about, and it can land a little below what the table shows.
 - **Read two rows against LEM-3.** 0.792 at 300 psf is its weak-foundation
   answer; 1.244 at 800 psf is its published one.
 - **Read the Depth column.** The switch from −10 to 0 at 600 psf is the
@@ -462,6 +474,8 @@ The session saved
 [w1_elastic_fem_after.xlsx](files/w1_elastic_fem_after.xlsx); the exchange is in
 [w1_elastic_fem_transcript.md](files/w1_elastic_fem_transcript.md).
 
+<!-- test: file=files/w1_elastic_fem_after.xlsx, type=fem_ssrm, expected_fs=1.270, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=W-1-ssrm -->
+
 ### Check its work
 
 - **Materials editor.** The classifier's two values, entered unedited, with the
@@ -512,6 +526,8 @@ same".
 | Lowe & Karafiath | force only | 1.2988 |
 | Janbu (corrected, f₀ = 1.09) | force only | 1.3215 |
 | Corps of Engineers | force only | 1.3631 |
+
+<!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=single_circle, circle_index=0, num_slices=40, fs_oms=1.2471, fs_bishop=1.2471, fs_janbu=1.3215, fs_corps=1.3631, fs_lowe=1.2988, fs_spencer=1.2471, fs_mprice=1.2471, tolerance=0.005 -->
 
 The reason it gives is the right one: at φ = 0 the base resistance is c·ΔL, which
 carries no normal force, so moment equilibrium about the center is the same
@@ -592,8 +608,8 @@ the shape most wrong explanations here take — and this one sentence is the
 single miss behind Opus 5's 7 of 8 in the comparison table's Explanation
 column.
 
-<!-- test: file=files/w1_diagnose_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=0.998, tolerance=0.005 -->
-<!-- test: file=files/w1_diagnose_after.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.244, tolerance=0.005 -->
+<!-- test: file=files/w1_diagnose_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=0.9984, tolerance=0.005 -->
+<!-- test: file=files/w1_diagnose_after.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.2441, tolerance=0.005 -->
 
 ### Check its work
 

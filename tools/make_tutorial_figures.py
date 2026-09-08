@@ -781,7 +781,7 @@ LEM06 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_sloping_bottom.xlsx")
 LEM06_SLICES = 40
 
 #: A circle 1.2 ft deeper than the deepest one that fits inside the domain — the
-#: file's second starting circle is tangent to the dipping base at Depth
+#: file's first starting circle is tangent to the dipping base at Depth
 #: −10.7887, so this one crosses it. It is the page's demonstration of both
 #: halves of the composite option: refused without it, truncated with it.
 LEM06_DEEP = dict(Xo=20.0, Yo=40.0, Depth=-12.0, R=52.0)

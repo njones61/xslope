@@ -106,15 +106,15 @@ twice the slope height:
 
 | Xo | Yo | Option | Depth |
 | :---: | :---: | --- | :---: |
-| 20 | 40 | Depth | 0 |
 | 20 | 40 | Depth | -10.7887 |
+| 20 | 40 | Depth | 0 |
 
-The first is tangent to the contact between the two soils. The second is as deep
-as a circle from that center can be and still fit inside the domain: its lowest
-point sits at elevation −10.7887, and the bedrock beneath the center is at
-−10.88. **Depth is an elevation**, and on a dipping base a circle tangent to that
-base touches it at a single point rather than running along it — which is what
-the [last section](#circles-that-will-not-fit) of this page is about.
+The first is as deep as a circle from that center can be and still fit inside the
+domain: its lowest point sits at elevation −10.7887, and the bedrock beneath the
+center is at −10.88. The second is tangent to the contact between the two soils.
+**Depth is an elevation**, and on a dipping base a circle tangent to that base
+touches it at a single point rather than running along it — which is what the
+[last section](#circles-that-will-not-fit) of this page is about.
 
 Every number the model needs is in the tables above, and each is laid out exactly
 as its destination — the template's worksheets and Studio's editors, same
@@ -325,7 +325,7 @@ own, the deeper of the two starting circles — the deepest that fits — comes 
 third safer, because everything it adds is foundation at twice the fill's
 cohesion.
 
-<!-- test: file=../lem/files/xslope_sloping_bottom.xlsx, type=single_circle, circle_index=1, method=spencer, num_slices=40, expected_fs=1.655, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_sloping_bottom.xlsx, type=single_circle, circle_index=0, method=spencer, num_slices=40, expected_fs=1.655, tolerance=0.005 -->
 
 The solution carries the interslice-tension and line-of-thrust warnings a φ = 0
 crest produces, which [LEM-1](lem01_simple_embankment.md) diagnoses and fixes
@@ -347,9 +347,10 @@ satisfies both force and moment equilibrium and is the one to report.
 
 ### Circles that will not fit {#circles-that-will-not-fit}
 
-We take the second starting circle, whose lowest point grazes the bedrock, and
+We take the first starting circle, whose lowest point grazes the bedrock, and
 push it 1.2 ft deeper — **Depth** `-12` in place of `-10.7887` — then run it as a
-**Single surface**. There is no answer:
+**Single surface**, which solves the first circle on the sheet. There is no
+answer:
 
 > **LEM run failed** — Failure surface extends outside the domain polygon
 

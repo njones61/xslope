@@ -346,9 +346,9 @@ agree.** That is what the per-layer set is for. We run the search from the shall
 circle, the deep circle and the generator's toe circle: every one returns the same
 surface here — tangent to the contact, FS = 1.244.
 
-Here it passes even from starts that have no business working. Seed the search
-with an arc wildly out of scale with the section — a center 220 ft above the
-slope, R = 269 ft — and it walks back down to the same contact-tangent circle
+The check passes here even from starts that have no business working. Seed the
+search with an arc wildly out of scale with the section — a center 220 ft above
+the slope, R = 269 ft — and it walks back down to the same contact-tangent circle
 and reports the same **1.244**. The soils are why: in a uniform φ = 0 fill the
 deepest surface available is the critical one, so the search drives down through
 the embankment, and everything below the contact is twice as strong, so a trial

@@ -20,7 +20,7 @@ reproduces that row's locked values.
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
 <div class="tgt-tile"><span class="tg-label">Assistant</span><p>~5 min</p></div>
-<div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
+<div class="tgt-tile"><span class="tg-label">By hand</span><p>20–25 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to model a tieback wall: how to enter grouted anchors
@@ -428,7 +428,9 @@ Each method runs its own search and finds its own critical surface:
 
 | Janbu | Corps | Lowe | Spencer |
 | :---: | :---: | :---: | :---: |
-| 1.431 | 1.415 | 1.412 | 1.412 |
+| 1.431 | 1.415 | 1.412 | 1.414 |
+
+<!-- test: file=../verification/files/rocscience/vp049.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.431, fs_corps=1.415, fs_lowe=1.412, fs_spencer=1.414, tolerance=0.005 -->
 
 All four land between 1.412 and 1.431. The Ordinary Method of Slices and Bishop's
 simplified method are not on the list: both take moments about a circle center,
@@ -448,7 +450,7 @@ becomes a choice — and run the same Janbu auto search on `Circular`:
 
 The best circle bottoms out deep and climbs back to the crest break, because a
 circle cannot run flat along a plane. It reads **FS = 1.473, 3% above the
-wedge's 1.431**, and the other methods agree: Spencer 1.473 against 1.412, and
+wedge's 1.431**, and the other methods agree: Spencer 1.473 against 1.414, and
 Bishop — which joins the list because a circle restores its moment arm — 1.487.
 Searched only in circles, this wall would look 3 to 4% safer than it is, and the
 non-circular family is what carries its real mechanism.

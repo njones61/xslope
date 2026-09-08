@@ -111,6 +111,12 @@ minimum of this model and not a mechanism anything is designed against. Two
 searches on one model, 6% apart, on mechanisms that share almost nothing: the
 sliver rides the sand face; the deep circle cuts the full depth of the clay.
 
+That is the answer moving with the seed, and it is what the check in
+[LEM-3](lem03_layered_slope.md#guarding-against-local-minima) is for. On the
+layered section there the check passes: every start walks to the same
+contact-tangent surface, even one wildly out of scale with the model. Here it
+does not, and the seed is an input to the answer rather than a convenience.
+
 ### The surficial filter
 
 **Ignore surficial (skin) failures**, with a **Min slip depth** beside it, is

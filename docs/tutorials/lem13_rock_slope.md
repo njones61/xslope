@@ -20,7 +20,7 @@ observations, not laboratory constants.**
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium, finite element</p></div>
-<div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~25 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~60 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to analyze a rock slope with the generalized
@@ -296,7 +296,7 @@ ticked:
 ![The Parametric dialog set up for the GSI sweep](images/lem13_studio_parametric.png)
 
 GSI runs to 100, but we stop the sweep at 20 on purpose. The factor of safety is
-1.152 at GSI 5 and already 2.698 at GSI 20, and above that the rock cannot fail
+1.152 at GSI 5 and already 2.806 at GSI 20, and above that the rock cannot fail
 at all — a search over a slope with no critical surface to find wanders the whole
 domain before it settles, and each step takes many times longer than the ones
 below it.
@@ -308,7 +308,7 @@ than the single search in Part A:
 
 Six searches, and the factor of safety more than doubles across them: 1.152 at
 the file's own GSI = 5, then 1.439, 1.740, 2.069 and 2.419 at each further step of
-three, and 2.698 at GSI = 20. The green marker reads the target off the solved
+three, and 2.806 at GSI = 20. The green marker reads the target off the solved
 points — **GSI = 8.611 for FS = 1.5** — so three and a half points of a chart-read
 index separate this cut from the factor of safety a permanent rock slope is asked
 for. Each step solved with its own rock-mass constants:
@@ -320,7 +320,7 @@ for. Each step solved with its own rock-mass constants:
 | 11 | 0.0833 | 5.07 × 10<sup>−5</sup> | 0.580 | 97.0 | 1.740 |
 | 14 | 0.0927 | 7.08 × 10<sup>−5</sup> | 0.565 | 135 | 2.069 |
 | 17 | 0.1032 | 9.88 × 10<sup>−5</sup> | 0.553 | 182 | 2.419 |
-| 20 | 0.1149 | 1.38 × 10<sup>−4</sup> | 0.544 | 239 | 2.698 |
+| 20 | 0.1149 | 1.38 × 10<sup>−4</sup> | 0.544 | 239 | 2.806 |
 
 ### Why the index carries it
 
@@ -433,8 +433,8 @@ This tutorial covered:
   slice's own normal stress, as an output of the analysis rather than an input to
   it.
 - One rock slope solved by Spencer's method and by finite element strength
-  reduction from the same file, the two engines agreeing to 1.2% and both landing
-  within 1.4% of the published values.
+  reduction from the same file, the two engines agreeing to 0.1% and both landing
+  within 0.3% of the published values.
 - A Design sweep in the Parametric study: which of the four field inputs the
   factor of safety turns on, and why the Geological Strength Index has the leverage
   it does — *s* collapses about three times as fast as m<sub>b</sub>, and a slope

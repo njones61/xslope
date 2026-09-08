@@ -7312,6 +7312,42 @@ def run_verification_pages_test(test):
     return None, msg or ' | '.join(lines[-4:])
 
 
+def run_tutorial_restatements_test(test):
+    """Restated factors of safety on the tutorial pages (reporting).
+
+    A tutorial walks the reader through runs it prints the answers to, and
+    those answers go stale the moment a solver round moves them: the sample
+    table and the verification section are re-measured because a tag guards
+    them, and the tutorial keeps printing what it printed the day it was
+    written. tools/verification_checks/tutorials.py reads every factor of
+    safety a tutorial attributes to a run of its own and scores it against the
+    tags in scope — the page's own, and the tags anywhere under docs/ on a
+    model file the page links, which is how LEM-3 inherits the seven method
+    locks its workbook carries on docs/lem/samples.md.
+
+    Each number is guarded (it restates a lock, verbatim or correctly rounded),
+    disagreeing (its own column header, row label or sentence names a method
+    whose lock says something else), or unguarded (nothing in the docs locks
+    it). The row REPORTS the tally and passes: a tutorial legitimately re-runs
+    a sample under settings its tag does not use, so a finding is a sentence
+    someone reads before it is a defect. It fails only if the checker itself
+    raises.
+    """
+    import io
+    from contextlib import redirect_stdout
+    sys.path.insert(0, str(Path(__file__).parent))
+    from tools.verification_checks import tutorials
+    buf = io.StringIO()
+    try:
+        with redirect_stdout(buf):
+            tutorials.run(verbose=False)
+    except Exception as exc:                       # the checker itself broke
+        return None, f"tutorial restatement sweep raised {type(exc).__name__}: {exc}"
+    head = next((l for l in buf.getvalue().splitlines() if l.strip()), '')
+    print(f"    {head}")
+    return 0.0, None
+
+
 def run_corpus_index_test(test):
     """Guard: the generated corpus example index is current.
 
@@ -13731,6 +13767,8 @@ def _dispatch_test(test):
         return run_docs_heading_trap_test(test)
     if test_type == 'verification_pages':
         return run_verification_pages_test(test)
+    if test_type == 'tutorial_restatements':
+        return run_tutorial_restatements_test(test)
     if test_type == 'corpus_index':
         return run_corpus_index_test(test)
     if test_type == 'tag_k0':
@@ -13820,7 +13858,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'tag_k0', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -13912,6 +13950,8 @@ def main():
                         help='Run only the Slide2 (.slim/.slmd) import test')
     parser.add_argument('--rs2', action='store_true',
                         help='Run only the RS2 (.fez) import test')
+    parser.add_argument('--tutorials', action='store_true',
+                        help='Run only the tutorial-page restatement sweep')
     parser.add_argument('--preflight', action='store_true',
                         help='Run only the preflight (input dependency check) tests')
     parser.add_argument('--tolerance', type=float, default=0.01,
@@ -13959,7 +13999,7 @@ def main():
     # If no specific flags, run all
     run_all = not (args.lem or args.fem or args.seep or args.tseep or args.roundtrip
                    or args.dxf or args.gsz or args.slide2 or args.rs2
-                   or args.preflight or args.mesh)
+                   or args.preflight or args.mesh or args.tutorials)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
@@ -13971,6 +14011,7 @@ def main():
     run_rs2 = args.rs2 or run_all
     run_preflight = args.preflight or run_all
     run_mesh = args.mesh or run_all
+    run_tutorials = args.tutorials or run_all
 
     # Discover tests from markdown files
     tests = []
@@ -14808,6 +14849,16 @@ def main():
                 print(f"Including {n_rt} Excel round-trip tests")
         else:
             print(f"Skipping round-trip tests (template not found: {ROUNDTRIP_TEMPLATE})")
+
+    # Standing sweep of the tutorial pages: every factor of safety a tutorial
+    # attributes to a run of its own, read against the tags that guard the
+    # model it walks — the page's own, and the sample or benchmark tags on the
+    # same workbook elsewhere in the docs. Reports a per-page tally and never
+    # fails on a finding; see tools/verification_checks/tutorials.py.
+    if run_tutorials:
+        tests.append({'type': 'tutorial_restatements',
+                      'file': 'docs/tutorials (restated factors of safety)',
+                      'method': '-', 'source': 'tutorials'})
 
     # Structured DXF export/import round-trip tests. These touch the studio layer
     # (build_from_dxf_mapping) and ezdxf, so they're skipped cleanly when either

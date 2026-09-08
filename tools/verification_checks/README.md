@@ -164,6 +164,45 @@ manual, a catalog row piggybacking on the section another row built.  Where they
 agree the heading takes their dot; where they disagree `heading_dot_multi` names
 which of those rows speaks for the section.
 
+## Tutorial restatements
+
+`tutorials.py` sweeps the 28 tutorial pages under `docs/tutorials`, which carry
+no configs and no certification manifest. A tutorial walks the reader through
+runs it prints the answers to, and those answers drift the moment a solver round
+moves them: the sample table and the verification section are re-measured
+because a tag guards them, and the tutorial keeps printing what it printed the
+day it was written.
+
+The locks in scope for a page are its own tags plus every tag anywhere under
+`docs/` on a model file the page links, so LEM-3 inherits the seven method locks
+its workbook carries on `docs/lem/samples.md` and LEM-9 inherits the Rocscience
+lock on the vendor model it borrows. Every factor-of-safety-shaped number the
+page attributes to a run of its own then lands in one of three buckets:
+
+- **guarded** — it restates a lock in scope, verbatim or correctly rounded to
+  fewer places. Agreement is by printed form, not by the tag's tolerance: a page
+  printing 1.313 where the lock reads 1.314 is restating it wrongly however
+  small the gap, and that digit is the failure the sweep exists for.
+- **disagreeing** — the number's own column header, row label or sentence names
+  a method (or the strength-reduction run), and none of the locks it names is
+  what it prints.
+- **unguarded** — nothing in the docs locks the number. A sweep row, a variant
+  run, a reading off a solved field: reproducible only by hand.
+
+Two rules keep the identity honest where a tutorial's tables are read. A column
+header binds its cells only where the table has ONE body row, because several
+rows are variants of each other and a lock belongs to one of them; and a table
+whose columns after the first are headed by numbers is a sweep, whose row label
+names the method for the whole curve rather than for any column. Inside a code
+fence — a verbatim console transcript — only the numbers the log itself labels
+`FS`, `FOS` or `SRF` are read, and lines reporting an intermediate search
+iteration are skipped.
+
+The sweep REPORTS. `run_tests.py --tutorials` prints the per-page tally and
+passes; it fails only if the checker raises. A tutorial legitimately re-runs a
+sample under settings the sample's own tag does not use, so every finding is a
+sentence someone reads before it is a defect.
+
 ## Running them
 
 ```bash
@@ -171,6 +210,8 @@ python -m tools.verification_checks.certify                  # all six pages
 python -m tools.verification_checks.certify rs2 seep         # named pages
 python -m tools.verification_checks.certify --force          # ignore the manifest
 python -m tools.verification_checks.mutations                # the mutation suite
+python -m tools.verification_checks.tutorials                # the 28 tutorials
+python -m tools.verification_checks.tutorials docs/tutorials/lem03_layered_slope.md
 ```
 
 Each check can also be run on its own page for a detailed report:
@@ -257,9 +298,17 @@ longer matches its figure, a section heading whose dot disagrees with its summar
 row, a tagged value dropped from its section, one element
 of an eleven-value row corrupted on the page or in the tag, a slip-surface
 depth or a support force moved on the page or in the tag, a planted dead
-exemption — and requires the checks to catch every one. It also plants edits
+exemption, a tutorial number moved off the lock it restates — and requires the
+checks to catch every one. It also plants edits
 that must **not** be flagged (a value reprinted at a different, correct
 precision), because a check that fails on those would push the pages toward
 printing tag values verbatim instead of at the precision each comparison is read
 at. Run it after any change to the check logic; a gate that certifies a wrong
 number is worse than no gate.
+
+The tutorial block (`T1`–`T4`) moves one number the sweep reads as guarded and
+names the bucket it must fall into — `disagreeing` where the page ties it to a
+method, `unguarded` where nothing does — and requires it to leave the guarded
+bucket either way. Its two controls run the other way: `N-T1` restates a lock
+one place coarser and must add no finding, and `N-T2` repairs a restatement the
+sweep already flags and must remove exactly one.

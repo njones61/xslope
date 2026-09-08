@@ -24,6 +24,11 @@ delta the page's own numbers imply, and N5 plants a correct third statement of
 the lock G1 and G1b corrupt, so that each pair tests the rule it names rather
 than the absence of any pairing or of any second statement at all.
 
+A closing block covers the tutorial restatement sweep: a number moved off the
+lock a tutorial restates must leave the guarded bucket, and its two controls
+prove the sweep reads agreement rather than flagging every number beside a
+method name.
+
 Every fixture is a temporary copy — the pages themselves are never written.
 
 Usage: python -m tools.verification_checks.mutations
@@ -33,7 +38,7 @@ import shutil
 import sys
 import tempfile
 
-from . import certify, deltas, dots, figures, tags, voice
+from . import certify, deltas, dots, figures, tags, tutorials, voice
 from .pages import PAGES
 
 #: A table with no XSLOPE column whose header names an authority: the delta in
@@ -339,7 +344,53 @@ DEAD_EXEMPTIONS = [
     ("rs2", "heading_dot_multi", ("an-anchor-that-occurs-nowhere", "\U0001F7E2")),
 ]
 
+#: Tutorial-page mutations, for the restatement sweep in ``tutorials.py``.
+#: Each moves ONE number the sweep currently reads as guarded and names the
+#: bucket it must land in: ``disagreeing`` where the number's own column header,
+#: row label or sentence names the method whose lock it now contradicts,
+#: ``unguarded`` where nothing on the page ties it to a method at all.  Either
+#: way it must leave the guarded bucket — a moved tutorial number that stayed
+#: guarded is the failure this guard exists to prevent.
+#: (page stem, bucket, name, old, new)
+TUTORIAL_MUTATIONS = [
+    # The method table with the methods in the HEADER and one row of answers
+    # under it, which is how every LEM tutorial publishes its method spread.
+    ("lem03_layered_slope", "disagreeing", "T1 method-table cell moved",
+     "| 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |",
+     "| 1.244 | 1.244 | 1.313 | 1.336 | 1.285 | 1.244 | 1.244 |"),
+    # Prose that names the method it reports.
+    ("fem01_strength_reduction", "disagreeing", "T2 prose restatement moved",
+     "**Spencer's method gives FS = 1.376**",
+     "**Spencer's method gives FS = 1.386**"),
+    # The other table orientation: the method in the row label, the answer in
+    # the cell beside it.
+    ("fem01_strength_reduction", "disagreeing", "T3 method-row cell moved",
+     "| Spencer's method, searched on this page | 1.376 |",
+     "| Spencer's method, searched on this page | 1.396 |"),
+    # A page's own lock, restated in a sentence that names no method: moving it
+    # takes it out of every lock's reach rather than into conflict with one.
+    ("fem01_strength_reduction", "unguarded", "T4 page's own lock moved",
+     "**FS = 1.3711**, the midpoint", "**FS = 1.3811**, the midpoint"),
+]
+
+#: Tutorial edits that must NOT add a finding, so the sweep is tested for
+#: reading agreement rather than for flagging every number beside a method
+#: name.  ``delta`` is the change each must make to the page's non-guarded
+#: count: 0 where the edit restates the lock correctly, −1 where it repairs a
+#: restatement the sweep already flags.
+#: (page stem, name, old, new, delta)
+TUTORIAL_NEGATIVE = [
+    ("lem03_layered_slope", "N-T1 lock restated one place coarser",
+     "| 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |",
+     "| 1.244 | 1.244 | 1.313 | 1.33 | 1.285 | 1.244 | 1.244 |", 0),
+    ("lem03_layered_slope", "N-T2 a flagged restatement repaired",
+     "| 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |",
+     "| 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |", -1),
+]
+
 DOCS = os.path.join(certify.REPO, "docs")
+
+TUTORIALS = os.path.join(DOCS, "tutorials")
 
 
 def _stage(tmp, page, text):
@@ -377,6 +428,74 @@ def _run(check, path, cfg):
     if check == "dots":
         return dots.run(path, cfg, report=_quiet)
     return figures.run(path, cfg, report=_quiet)
+
+
+def _tutorial_counts(text, by_file):
+    """Verdict tally for a tutorial page held as text.
+
+    The sweep takes its locks from the real ``docs/`` tree, so a mutated page
+    needs no staging: the file it is written to is read for its own numbers and
+    the model files it links, and both travel with the text.
+    """
+    tmp = tempfile.mkdtemp()
+    try:
+        path = os.path.join(tmp, "page.md")
+        with open(path, "w") as fh:
+            fh.write(text)
+        findings, _files = tutorials.scan(path, by_file)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    tally = {"guarded": 0, "disagreeing": 0, "unguarded": 0}
+    for f in findings:
+        tally[f.verdict] += 1
+    return tally
+
+
+def _tutorial_fixtures(fails):
+    """Run the tutorial restatement fixtures; returns how many were run."""
+    by_file = tutorials.doc_locks()
+    base_counts, total = {}, 0
+
+    def counts(page, text=None):
+        path = os.path.join(TUTORIALS, page + ".md")
+        if text is None:
+            if page not in base_counts:
+                base_counts[page] = _tutorial_counts(open(path).read(), by_file)
+            return base_counts[page]
+        return _tutorial_counts(text, by_file)
+
+    for page, bucket, name, old, new in TUTORIAL_MUTATIONS:
+        total += 1
+        base = open(os.path.join(TUTORIALS, page + ".md")).read()
+        if base.count(old) != 1:
+            print(f"  ANCHOR  {name} ({page}) — mutation anchor not unique")
+            fails.append(name)
+            continue
+        was, now = counts(page), counts(page, base.replace(old, new, 1))
+        caught = (now[bucket] > was[bucket]
+                  and now["guarded"] < was["guarded"])
+        print(f"  {'CAUGHT ' if caught else 'MISSED '} {name} "
+              f"({page}/tutorials, {bucket})")
+        if not caught:
+            fails.append(name)
+
+    for page, name, old, new, delta in TUTORIAL_NEGATIVE:
+        total += 1
+        base = open(os.path.join(TUTORIALS, page + ".md")).read()
+        if base.count(old) != 1:
+            print(f"  ANCHOR  {name} ({page}) — anchor not unique")
+            fails.append(name)
+            continue
+        was, now = counts(page), counts(page, base.replace(old, new, 1))
+        flagged = ((now["disagreeing"] + now["unguarded"])
+                   - (was["disagreeing"] + was["unguarded"]))
+        ok = flagged == delta
+        print(f"  {'PASSED ' if ok else 'FLAGGED'} {name} (tutorials, "
+              f"expected {delta:+d}, read {flagged:+d})")
+        if not ok:
+            fails.append(name + f" (non-guarded moved {flagged:+d}, "
+                                f"expected {delta:+d})")
+    return total
 
 
 def main():
@@ -433,6 +552,8 @@ def main():
         print(f"  {'CAUGHT ' if n else 'MISSED '} {name}")
         if not n:
             fails.append(name)
+
+    total += _tutorial_fixtures(fails)
 
     print(f"mutations: {total}  missed: {len(fails)}")
     for f in fails:

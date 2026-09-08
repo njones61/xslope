@@ -18,7 +18,7 @@ answer.**
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
-<div class="tgt-tile"><span class="tg-label">Open & run</span><p>~10 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Open & run</span><p>20–25 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to find the global minimum rather than a local one:
@@ -73,9 +73,11 @@ seeds finds the deep mechanism:
 
 **FS = 1.376**, on a circle centered at (16.90, 26.22) with a radius of 46.22 —
 tangent to the limiting depth at elevation −20, entering at the crest and exiting
-21 ft beyond the toe, 82.9 ft of failure surface carrying 204,041 lb/ft of soil.
+21 ft beyond the toe, 105.7 ft of failure surface carrying 204,041 lb/ft of soil.
 The starting circle is a seed and not an answer — solved as entered it gives
 1.426, and the search deepens and lengthens it to 1.376.
+
+<!-- test: file=../lem/files/xslope_mult_min_KEY.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.376, tolerance=0.005 -->
 
 ### Move the seed and the answer moves
 
@@ -98,8 +100,8 @@ Click **OK** and run the same Spencer auto search again:
 
 **FS = 1.299.** The gray arcs are the trial circles, fanning across the fill and
 shrinking toward the face as the search walks its center up and left; the red
-critical circle is the short mark high on the slope — 1.2 ft long, never more
-than 0.01 ft below the ground surface, moving 1 lb/ft of sand.
+critical circle is the short mark high on the slope — 0.9 ft long, never more
+than 0.01 ft below the ground surface, moving 0.3 lb/ft of sand.
 
 That number is not an artifact of the search. On a cohesionless face the factor
 of safety against an infinitely shallow slide is tan φ′ / tan β, which is
@@ -134,10 +136,15 @@ reporting the answer.
 
 ### Which answer the model reports
 
-If we run every circle in one search, it reports the lowest surface any seed
-reached — here, the 1.299 sliver. **Several starting circles, and agreement
-between them, is the check**; where they disagree, the surfaces decide, and the
-design number is the deep one.
+One search over both circles does not report both mechanisms. A seeded search
+scores each starting circle's own neighborhood first and then refines only the
+best-scoring one, so with the deep circle and the embankment circle together on
+the sheet it follows the deep one and returns **1.376**, in either row order. The
+1.299 sliver is the lower of the two answers and a single seeded run does not
+reach it. **What exposes a competing mechanism is a search per seed — the two
+runs above — or the grid seeding of [Part B](#grid-search)**; where two searches
+disagree, the surfaces decide which answer is the design case, and here it is the
+deep one.
 
 ---
 
@@ -180,6 +187,8 @@ base of the model, cuts all three clays, and converged cleanly. It exits
 through the berm — and that is exactly what is wrong with it, because the berm
 is there to hold that mechanism.
 
+<!-- test: file=../lem/files/xslope_james_bay.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.744, tolerance=0.005 -->
+
 ### Grid search
 
 Now we bring in the seeding-independent tool. **Grid search (auto-seed the
@@ -196,7 +205,7 @@ Run again:
 ![Spencer with grid seeding](images/lem10_vp75_grid.png){width=1000}
 
 **FS = 1.420**, on a wider circle that runs under the berm and daylights beyond
-it — 23% below the single seed's answer, against Slide's 1.464 and Duncan &
+it — 19% below the single seed's answer, against Slide's 1.464 and Duncan &
 Wright's published 1.45. The wrongly seeded search missed by far more than the
 programs and the textbook differ among themselves, and it reported nothing
 unusual. The full **Generate starting circles…** set also finds 1.420 with the
@@ -204,6 +213,8 @@ unusual. The full **Generate starting circles…** set also finds 1.420 with the
 [LEM-3](lem03_layered_slope.md#guarding-against-local-minima) rule doing its
 job. Grid search is the version of that rule that does not depend on any
 circle having been placed at all.
+
+<!-- test: file=../lem/files/xslope_james_bay.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.420, tolerance=0.005 -->
 
 ---
 

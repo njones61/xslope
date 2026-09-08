@@ -79,9 +79,9 @@ Click **File → Generate Report…**.
 
 ![The Generate Report dialog on the solved model, with Bishop and Spencer ticked and the title page filled in](images/w03_report_dialog.png){width=1000}
 
-Three groups sit on the left — Output, Analysis and Title page — and a contents
-tree on the right. Every field opens on a default that works; this report changes
-the methods and the title page, and nothing else.
+Three groups sit on the left — Output, Limit equilibrium analysis, and Title
+page — and a contents tree on the right. Every field opens on a default that
+works; this report changes the methods and the title page, and nothing else.
 
 **Output.** **Format** stays on Word (`.docx`), the one format reports come in
 today. **Save
@@ -110,10 +110,11 @@ document every analysis this model carries.
 
 The dialog is composed. Click **Generate**.
 
-Generating takes a minute or two. The progress bar names each figure as it is
-drawn, and **Cancel** stops the build. When the figures are done, Studio fills
-in the contents page's page numbers — through Word where the machine has it,
-LibreOffice otherwise. With neither installed, the report is still complete;
+Generating this report takes about twenty seconds. The progress bar names each
+figure as it is drawn, and **Cancel** stops the build. When the figures are done,
+Studio fills in the contents page's page numbers — through Word where the machine
+has it, LibreOffice otherwise — which adds fifteen seconds or so. With neither
+installed, the report is still complete;
 its contents page just lists the headings without numbers.
 
 ---
@@ -138,7 +139,7 @@ records that each searched for a surface of its own.
 | Spencer's method | the search we ran | 1.257 |
 | Strength reduction | attached to the file | 1.246 |
 
-<!-- test: file=files/xslope_johnson_res_solved.xlsx, type=circular_search, method=bishop, num_slices=40, expected_fs=1.231, tolerance=0.005 -->
+<!-- test: file=files/xslope_johnson_res_solved.xlsx, type=circular_search, num_slices=40, fs_bishop=1.231, fs_spencer=1.257, tolerance=0.005 -->
 
 The seepage section states the conductivities and the mesh it was solved on, then
 the four fields the solution carries: the flow net, pore pressure, velocity
@@ -185,13 +186,13 @@ A report goes out on the firm's letterhead by being built on the firm's own Word
 template. Start from the one XSLOPE ships —
 [report_template.docx](../studio/files/report_template.docx) — and edit it in
 Word, where its page size and margins, its header and footer and the fonts and
-colors of its styles are all yours. Three edits make a letterhead:
+colors of its styles are all yours. Two edits make a letterhead:
 
 - **The firm's name in the header** (a logo can sit beside it, sized to the
   header frame).
 - **A footer line** naming the firm and the document type.
 
-Where those three go decides whether they survive. The report writes its running
+Where those two go decides whether they survive. The report writes its running
 head into the first paragraph of the header and *page N of M* into the first
 paragraph of the footer, and deletes every other paragraph in both — so a logo
 dropped into a header paragraph, or a firm name typed on a second line under it,

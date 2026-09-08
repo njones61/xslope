@@ -19,7 +19,7 @@ firmly as the geometry does.**
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
-<div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~15 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>30–40 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to use strength options beyond Mohr-Coulomb: how to
@@ -102,6 +102,8 @@ reports 0.960 on this case and Baker's own solution is 0.97. The surface is
 shallow, and the effective normal stress along its slice bases averages
 8.3 kPa: the low-stress end of the envelope, where a curve running into the
 origin has almost nothing left to give.
+
+<!-- test: file=../lem/files/xslope_baker_clay.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=0.958, tolerance=0.005 -->
 
 ### Enter the linear fit
 
@@ -241,6 +243,8 @@ elevation 0.82**, four fifths of a meter above the rigid base it could have
 reached. Of the 38.09 m of surface, 20.05 m lies in the lowest clay, and the
 strength mobilized along that stretch averages 22.91 kPa.
 
+<!-- test: file=../lem/files/xslope_low_clay.xlsx, type=circular_search, method=bishop, num_slices=50, expected_fs=1.130, tolerance=0.005 -->
+
 ### Flatten the profile
 
 The search stopped short of the base because going deeper costs more than it
@@ -316,4 +320,3 @@ effective — and the [Limit Equilibrium Method overview](../lem/overview.md)
 gives each strength option's equation.
 In [LEM-13](lem13_rock_slope.md) we take the third nonlinear option, the `hb`
 Hoek-Brown envelope for rock, through both engines.
-</content>

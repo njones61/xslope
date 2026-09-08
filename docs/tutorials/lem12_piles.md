@@ -22,7 +22,7 @@ with the force stated directly, and here we compare the two routes.
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
-<div class="tgt-tile"><span class="tg-label">Open &amp; explore</span><p>~15 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Open &amp; explore</span><p>~25 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to model stabilizing piles: how XSLOPE computes the
@@ -71,9 +71,10 @@ it beside the bar.
 Everything XSLOPE needs to know about the two pile rows sits in two rows of
 the piles sheet, and we read them closely before running anything. Open
 **Piles** in the **Inputs** tree and press **Table view**. Its columns match
-the piles worksheet; with **Show parameters for:** set to **LEM**, the
-columns only the finite element engine reads (`E`, `I`, `Area`, `Head`, `Tip`)
-are hidden:
+the piles worksheet, all sixteen of them. **Show parameters for:** opens with
+both **LEM** and **FEM** ticked; untick **FEM** and the five columns only the
+finite element engine reads (`E`, `I`, `Area`, `Head`, `Tip`) go away, leaving
+the eleven a limit equilibrium run uses:
 
 ![The two pile rows as the file carries them](images/lem12_studio_piles_table.png)
 
@@ -470,7 +471,9 @@ pile row contributes **0.04 lb/ft** to a surface that slides over the top of it.
 This is an important check for any pile design. The piles hold the deep mechanism, and
 holding it promotes whatever the next mechanism is; here the next one runs above
 the pile heads and takes nothing from them. It is not a numerical artifact —
-**Min slip depth** at 5 ft leaves it untouched, because 6.5 ft of clay is moving —
+tick **Ignore surficial (skin) failures** in **Run LEM…**, which brings the
+**Min slip depth** box beside it live, and 5 ft there leaves the answer
+untouched, because 6.5 ft of clay is moving —
 and the same slope searched without piles at all returns 1.149 from either
 seeding, so it is adding the piles that makes the shallow surface critical.
 The same behavior is

@@ -616,13 +616,13 @@ not, so the choice is about cost and about what is being asked.
 - **The response surface** is for probabilities too small to count: it
   reaches resolution no affordable number of real solves could, for a few
   hundred of them — *when its self-checks pass*. It refuses the models it
-  cannot fit honestly — on VP34 the checks find that a third of the formula's
+  cannot fit honestly: on VP34 the checks find that a third of the formula's
   predicted failures have no analyzable solution, so the engine declines to
   answer, a refusal the
   [response-surface section](../reliability/monte_carlo.md#sampling-a-fitted-response-surface)
-  works through — and its β differs from Monte
-  Carlo's only in the third decimal. Quote its P<sub>f</sub> together with
-  the fit-quality numbers it prints beside it.
+  works through. Where the checks do pass, its β differs from Monte Carlo's only
+  in the third decimal. Quote its P<sub>f</sub> together with the fit-quality
+  numbers it prints beside it.
 
 A working habit: start with the Taylor series, decide with Monte Carlo at
 the default convergence stop, and bring in the response surface when the

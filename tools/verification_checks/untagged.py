@@ -77,7 +77,8 @@ LABEL_BEFORE = re.compile(
     r"/\s*$|"
     r"\b(?:coefficient of|equal to|exactly)\s*$|"
     r"\b(?:r_?u|r<sub>u</sub>|k_?c|k_?h|K0|A|n|ν|nu|ψ|psi|β|beta|σ_?F|"
-    r"Poisson[’']?s ratio|coefficient|exponent)\s*[=≈]\s*$", re.I)
+    r"Poisson[’']?s ratio|coefficient|exponent|"
+    r"(?:entry|exit|center|centre|toe|crest)?\s*[xyR]|Xo|Yo|radius|R)\s*[=≈]\s*$", re.I)
 
 #: A coordinate pair reads as two factor-of-safety-shaped numbers and is
 #: neither.  Both halves of ``(16.453, 5.178)`` are recognised by what sits

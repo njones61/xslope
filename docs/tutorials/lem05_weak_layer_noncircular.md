@@ -38,8 +38,9 @@ seam.
 ## The problem
 
 **Materials** — four Mohr-Coulomb (`mc`) soils, listed top down. Unit weights are
-pcf and cohesions psf; the row order is the Mat ID, and the columns none of the
-four use stay blank:
+pcf and cohesions psf, and the row order is the Mat ID. The columns none of the
+four use are left empty below; a blank cell and the `0` the worksheet figure
+further down shows both reach the solver as zero:
 
 | name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | nu | u |
 | --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |
@@ -483,18 +484,17 @@ a number. The five that remain, each one run as its own search:
 
 | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: |
-| 1.575 | 1.523 | 1.315 | **1.656** | 1.634 |
+| 1.575 | 1.523 | 1.357 | **1.656** | 1.634 |
 
 Every entry is a separate search that found its own critical surface, which is the
 only sound way to compare methods: a method's factor of safety on another method's
 surface is not that method's answer. **Spencer satisfies both force and moment
 equilibrium and is the one to report.**
 
-They spread 26% low to high — much wider than five methods differing on one shared
-surface, because here the surfaces differ too. Lowe & Karafiath's 1.315 is the
-outlier, and its surface says why: its search drove the entry ramp to 65.0°, hard
-against the limit below, where the other four enter the seam between 26.4° and
-36.1°.
+They spread 22% low to high — much wider than five methods differing on one shared
+surface, because here the surfaces differ too. Lowe & Karafiath's 1.357 is the
+outlier, and its surface says why: its search drove the entry ramp to 62.2°, close
+to the limit below, where the other four enter the seam between 26.4° and 36.1°.
 
 ### The end ramps a search will start from {#the-end-ramps-a-search-will-start-from}
 
@@ -519,12 +519,26 @@ The line is sharp: an exit ramp of 64.9° searches normally and reaches the same
 all five methods refuse the 72.4° seed.
 
 What is Spencer's, and every other method's, is what happens if that shape is
-solved anyway. We hold the 72.4° surface still — **Analysis** = `Single surface`
-— and the five read 2.014 (Janbu), 2.356 (M-P), 2.597 (Spencer), 3.713 (Corps) and
-13.223 (Lowe & Karafiath): a factor of six and a half across one geometry. At an
-82.4° exit Janbu and Lowe return no solution at all while the Corps method
-reports 10.710. Those are the answers the 65° cap exists to keep a search from
-reporting as critical surfaces.
+solved anyway. **Analysis** = `Single surface` solves the points as entered
+whatever their ramps, so we hold three shapes still — the surface as delivered,
+the 72.4° one, and one pulled in further to x = 32.11, an 82.4° exit:
+
+| Exit ramp | 60.0° | 72.4° | 82.4° |
+| --- | :---: | :---: | :---: |
+| Janbu | 1.789 | 2.014 | no solution |
+| Corps of Engineers | 2.650 | 3.713 | no solution |
+| Lowe & Karafiath | 2.442 | no solution | no solution |
+| Spencer | 2.022 | 2.597 | 5.431 |
+| Morgenstern-Price | 1.977 | 2.356 | 3.487 |
+
+Standing the ramp up raises every answer that still has one — Spencer's nearly
+triples across the row — and takes the three force-equilibrium procedures out one
+at a time. Lowe & Karafiath and the Corps method are refused for want of an
+admissible force-closure root, the only root available falling an order of
+magnitude below the moment answer on the same slices; Janbu, at the steepest
+shape, is left with no net horizontal driving force to divide at all. Those are
+the answers the 65° cap exists to keep a search from reporting as critical
+surfaces.
 
 Sixty-five degrees is the active-wedge inclination 45° + φ/2 for a φ of about 40°,
 the steep end of real soils. **The generator's ramps sit under it deliberately** —
@@ -585,6 +599,8 @@ output. We solve them as they come — `Single surface`, said out loud because a
 held number and a searched one answer different questions:
 
 ![Spencer on the generated surface](images/lem05_solution_generated.png){width=1000}
+
+<!-- test: file=../lem/files/xslope_noncircular.xlsx, type=single_noncirc, num_slices=40, fs_janbu=1.789, fs_corps=2.650, fs_lowe=2.442, fs_spencer=2.022, fs_mprice=1.977, tolerance=0.005 -->
 
 **FS = 2.022** standing still, against the **1.656** the search reached from it —
 18% lower, on a surface whose track never left −5.8 and whose entry point walked

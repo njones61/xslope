@@ -1068,15 +1068,19 @@ against rounding noise. The one verdict that survives a missing yardstick is a t
 displacement limit, which is an absolute fraction of mesh height and is evidence in its own right.
 
 **Why it is the default.** All 103 FEM benchmarks were solved under both criteria on the same mesh
-with the same options. It moved **four** rows, **none of them downward**; ninety-nine are identical
-to the last digit, because on a healthy model every non-converged trial carries real displacement
-evidence and the extra test simply agrees with non-convergence.
+with the same options. No row comes back **lower** under the hybrid, and all but a few come back
+identical to the last digit, because on a healthy model every non-converged trial carries real
+displacement evidence and the extra test simply agrees with non-convergence.
 
-| Case | Non-convergence | Hybrid | What moved |
+| Case | Non-convergence | Hybrid | What the hybrid changes |
 |---|---|---|---|
-| [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) | 1.366 | 1.366 | Nothing — the 99-row majority case |
-| [RS2-62c](../verification/rs2.md#rs2-62) as locked | 0.769 | 0.781 | Exit suppression only: with its full budget the $F = 0.775$ trial *converges* at 29,786 iterations, where the no-progress exit had stopped it at 11,834 and called it failed |
+| [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) | 1.372 | 1.372 | Nothing — the majority case. Every non-converged trial is beyond elastic scale and still growing, so the displacement test agrees with non-convergence trial for trial |
+| [RS2-62c](../verification/rs2.md#rs2-62) as locked | 0.769 | 0.769 | Nothing, by the other route: the $F = 0.775$ trial that sets the bracket spends its whole budget still at elastic scale ($u_{ratio} = 1.23$) but still moving (growth 0.22), one signal without the other, so its verdict is `AMBIGUOUS` and non-convergence's failed verdict stands |
 | [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | An outright rescue. Under the vendor's $T = 0$ cap the trials are stationary rather than collapsing, so non-convergence has no failure side to bisect: it drives the auto-bracket to its floor and returns no factor of safety, while the hybrid brackets the same model |
+
+Agreement is therefore the usual outcome, and it is reached two ways: on a healthy model the
+displacement evidence confirms the non-converged trial has failed, and where the evidence is
+inconclusive the hybrid defers rather than overriding.
 
 Pass `failure_criterion="non_convergence"` for the classical Griffiths & Lane verdict; it remains
 fully supported, and every criterion returns the same per-trial records.
@@ -1102,7 +1106,7 @@ the measurement on the mechanism rather than on any localized background deforma
 
 | Problem class | Criterion | Why |
 |---|---|---|
-| All slope problems, including submerged boundaries and reservoir loading | `hybrid` (default) | Bisection on true equilibrium, with a non-converged trial required to show displacement evidence before it counts as failed. Certified over the whole FEM benchmark corpus: it matches `non_convergence` on 99 of 103 rows and never returns a lower factor of safety |
+| All slope problems, including submerged boundaries and reservoir loading | `hybrid` (default) | Bisection on true equilibrium, with a non-converged trial required to show displacement evidence before it counts as failed. Certified over the whole FEM benchmark corpus: it matches `non_convergence` on all but a few rows and never returns a lower factor of safety |
 | Reproducing the classical Griffiths & Lane (1999) verdict, or a published result obtained that way | `non_convergence` | The same bisection without the displacement-evidence test. Expect agreement with the default except where a slow-but-converging trial is truncated at the no-progress exit |
 | Evidence and reporting | `displacement_increase` | Produces the displacement-vs-$F$ curve; read the upturn at the automatically selected characteristic point |
 

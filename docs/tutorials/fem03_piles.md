@@ -257,9 +257,9 @@ engine is deriving the solid circular section — the derivation described above
 reported rather than assumed.
 
 Set **F min (SSRM)** to `1.00` and **F max (SSRM)** to `2.00`. A bracket has to
-contain the answer, and the runs on this page range from 1.17 on the bare slope
-to 1.79 on the wall of the second half, so every one of them uses the same 1.0 to
-2.0 and the answers stay comparable.
+contain the answer, and the runs on this page range from 1.137 on the bare slope
+to 1.723 on the wall of the second half, so every one of them uses the same 1.0
+to 2.0 and the answers stay comparable.
 Leave everything else as it is and click **Run**.
 
 **FS = 1.363**. Spencer's method gave 1.842 on the same file.
@@ -328,6 +328,11 @@ worth more is the shafts' own capacity: six of the 18 beam elements now stand at
 their moment capacity, none at their shear capacity.
 
 ![The pile rows with both tips fixed, at the captured mechanism: a compact band of shear strain around and below the two socketed toes](images/fem03_fem_shear_piles_fixed.png){width=1000}
+
+The title records that this capture stopped at iteration 38: the displacements
+ran away past the bound the capture allows, so the run kept the last finite
+state rather than the one that overflowed. It is early in the collapse — far
+enough to place the shearing, not to develop it.
 
 The failure has moved. The shipped file's mechanism peaked near the upper row's
 head, at (10.5, 9.0). Here the shearing is a compact band between the two rows
@@ -452,16 +457,24 @@ pile's surface. XSLOPE runs the same slope through both of its engines in
 | Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
 | --- | :---: | :---: |
 | No pile | 1.136 | 1.14 (−0.4%) |
-| Pile at D<sub>1</sub>/D = 3, free head | 1.497 | 1.36 (+10.1%) |
+| Pile at D<sub>1</sub>/D = 3, free head | 1.578 | 1.36 (+16.0%) |
 | Pile, head rotation restrained | 1.594 | 1.45 (+9.9%) |
 
+The three strength reduction rows are XSLOPE's runs of
+[vp106a_fem.xlsx](../verification/files/rocscience/vp106a_fem.xlsx),
+[vp106c_fem.xlsx](../verification/files/rocscience/vp106c_fem.xlsx) and
+[vp106c_fem_fix.xlsx](../verification/files/rocscience/vp106c_fem_fix.xlsx); the
+two Bishop searches that follow are of
+[vp106a.xlsx](../verification/files/rocscience/vp106a.xlsx) and
+[vp106c.xlsx](../verification/files/rocscience/vp106c.xlsx).
+
 The unpiled row agrees to 0.4%, which is what makes the other two readable. With
-the row in place the plane-strain model credits it ×1.318, where the
+the row in place the plane-strain model credits it ×1.389, where the
 three-dimensional model credits ×1.193. On the same slope a Bishop search reads
 1.143 with no pile and 1.451 with it, a credit of ×1.269. Both two-dimensional
-routes sit above the three-dimensional answer by a comparable amount, and
-neither recovers it. What this benchmark settles is the direction of the
-plane-strain error, not a ranking of the two routes against each other.
+routes sit above the three-dimensional answer — the limit equilibrium one by
+less — and neither recovers it. What this benchmark settles is the direction of
+the plane-strain error, not which of the two routes to trust.
 
 So the reason to take a discrete row's factor of safety from the limit
 equilibrium engine is not that its number is larger or smaller. It is that Ito &
@@ -600,9 +613,9 @@ Switch **Field state** to **At failure**, which is the state the panel opens on:
 The extra movement takes the toe the last 9% to its capacity: the moment there
 reaches the whole 90,600 lb·ft/ft, one beam element has yielded in bending, and
 the title now reads *at capacity*. The shear grows with it, from 5,969 to
-7,124 lb/ft, and its peak moves from 13 ft down to the toe. A wall that carries
-91% of its section at the answer and the whole of it at the collapse the run
-captured is one to check the section of.
+7,124 lb/ft, and its peak moves from 13 ft down to 19 ft, the last of the ten
+elements. A wall that carries 91% of its section at the answer and the whole of
+it at the collapse the run captured is one to check the section of.
 
 ### A finer beam
 

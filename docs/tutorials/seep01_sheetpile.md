@@ -134,19 +134,23 @@ ground level.
 permeability and the permeability at right angles to it — and `alpha` is the
 angle of the `k1` direction above horizontal, in degrees. An isotropic soil
 has `k1` = `k2`, which makes `alpha` irrelevant; it is entered here as 0.
-The columns shown are the first six of the `mat` worksheet's seepage band,
-in its order; the four after them belong to the unsaturated and transient
-models this problem does not use. The row carries no strength properties:
-this model is analyzed for flow only.
+`mat` and `name` are the worksheet's first two columns, and the four after
+them are the first four of its seepage band, in the band's order; the seven
+band columns beyond `unsat` belong to the unsaturated and transient models
+this problem does not use. The row carries no strength properties: this
+model is analyzed for flow only.
 
 | mat | name | k1 | k2 | alpha | unsat |
 | :---: | --- | :---: | :---: | :---: | --- |
 | 1 | `soil` | 30 | 30 | 0 | `lf` |
 
 **Geometry** — Profile Line 1, on material 1 (`soil`), one vertex per row, with
-Maximum depth = `0`. The drawing shows every vertex the line needs, including
-the three that cut the sheetpile slot, and the two base corners the maximum
-depth supplies:
+Maximum depth = `0`. The drawing carries the dimensions the line follows — the
+ground surface at elevation 10, the wall reaching down to elevation 7, and the
+two base corners the maximum depth supplies. It draws the wall as a single
+vertical line; the table gives that line a width, three vertices at 29.9, 30 and
+30.1, which is what makes the wall's two faces separate boundaries of the flow
+region:
 
 ![The profile line's vertices](../seep/images/clay_blanket_geometry.png){width=650}
 
@@ -288,17 +292,20 @@ then the material; then the geometry; then the boundary conditions.
 
 ### 1. The `main` worksheet
 
-This sheet needs exactly two edits:
+This sheet needs exactly three edits:
 
-1. Set `main!D8` **Units** to `SI`. Choosing a unit system fills
-   **Unit weight of water** with that system's value, `9.81` kN/m³ here.
-   XSLOPE never converts between systems — the declaration states what the
-   numbers you type already mean, and drives the unit labels on the plots.
+1. Set `main!D8` **Units** to `SI`. XSLOPE never converts between systems — the
+   declaration states what the numbers you type already mean, and drives the
+   unit labels on the plots.
 2. Set `main!D9` **Time** to `yr`, the base this model's conductivity is
    stated in. On a seepage model this field is load-bearing: it is what puts
    `m/yr` on the material form and `m³/yr per m` on the flow net's title.
    Left blank, the arithmetic is unchanged but the results carry no unit
    labels.
+3. Set `main!D10` **Unit weight of water** to `9.81` kN/m³, the SI value. That
+   cell holds a plain number — the template ships with the Imperial `62.4`
+   lb/ft³ in it — so declaring `SI` above does not change it. Studio's Global
+   parameters form fills it when you pick a unit system; the worksheet does not.
 
 Nothing else on the sheet applies to this model — the crack and seismic
 entries, the mesh presets, **Tension SRF (FEM)**, **Side BC** and
@@ -310,7 +317,7 @@ mesh time. Leave them however they stand.
 ### 2. The `mat` worksheet
 
 The `mat` sheet is wide, and a seepage-only material fills one band of it: the
-**Seepage** band at columns AG–AP. Enter (or copy-paste) the material properties
+**Seepage** band at columns AG–AQ. Enter (or copy-paste) the material properties
 from the table above into the first row of the table, row 11:
 
 ![The seepage band of the finished mat worksheet](images/seep01_sheet_mat.png)
@@ -511,8 +518,11 @@ its default, so the dialog now stands as your settings leave it:
 
 **Auto-size from geometry** is ticked, and **Size divisions** below it sets the
 element size to the width of the section divided by that number. Leave it at
-`100`: the section is 50 m wide, so the target element size is 0.5 m and the
-grayed **Target element size** box shows it. Untick **Auto-size from geometry** to
+`100`: the section is 50 m wide, so the element size is 0.5 m. The grayed
+**Target element size** box does not follow the divisions — it holds whatever
+size the model itself declares, and this model declares none, so it sits at the
+dialog's own `1.000`. The size the build actually uses is the one the Log states
+when the mesh is built. Untick **Auto-size from geometry** to
 type a size directly instead — useful when you are comparing meshes, which is what
 we do in the [mesh study](#how-fine-the-mesh-has-to-be) below.
 
@@ -610,6 +620,8 @@ under a 60 m stretch of this wall is 60 × 40.111 = 2,406.7 m³/yr. Everything e
 a two-dimensional analysis produces carries the same convention — a slice weight, a
 reinforcement force, a pile row's share of the soil — and it is the easiest place
 to be out by a factor of the wall length.
+
+<!-- test: file=../seep/files/xslope_clay_blanket.xlsx, type=seep, element_type=tri3, size_divisions=100, expected_flowrate=40.111, tolerance=0.005 -->
 
 The head ranges from **10.000 m to 13.000 m**, which is the two boundary values and
 nothing outside them. That is a property of the governing equation rather than a
@@ -747,7 +759,7 @@ geometry** and type each size into **Target element size** — and run each one:
 | Target size (m) | Nodes | Triangles | q (m³/yr per m) |
 | :---: | :---: | :---: | :---: |
 | 2.0 | 191 | 316 | 41.978 |
-| 1.0 | 670 | 1,212 | 40.797 |
+| 1.0 | 670 | 1,212 | 40.796 |
 | 0.5 | 2,490 | 4,726 | 40.111 |
 | 0.25 | 9,607 | 18,708 | 39.786 |
 | 0.125 | 37,656 | 74,300 | 39.618 |
@@ -783,9 +795,9 @@ a 1 m target size with each of the five element types gives:
 
 | Element type | Nodes | Elements | q (m³/yr per m) |
 | --- | :---: | :---: | :---: |
-| `tri3` | 670 | 1,212 | 40.797 |
+| `tri3` | 670 | 1,212 | 40.796 |
 | `tri6` | 2,551 | 1,212 | 39.866 |
-| `quad4` | 568 | 503 | 40.288 |
+| `quad4` | 568 | 503 | 40.289 |
 | `quad8` | 1,638 | 503 | 39.838 |
 | `quad9` | 2,141 | 503 | 39.714 |
 
@@ -887,11 +899,14 @@ discharge as its output quantity instead of a factor of safety. We fill the
 dialog in one control at a time:
 
 - **Mode** = `Design (q target)`, which sweeps one parameter between stated bounds
-  and reports where the discharge reaches a target you name. The other two are
-  `Sensitivity (tornado + plots)`, which moves several parameters a percentage
-  either side of their current values and ranks them, and
+  and reports where the discharge reaches a target you name. Two more are open
+  here: `Sensitivity (tornado + plots)`, which moves several parameters a
+  percentage either side of their current values and ranks them, and
   `Back-Analysis (target q)`, the same single-parameter sweep run backwards from a
-  discharge you have measured.
+  discharge you have measured. A fourth, `Factor of safety vs time`, is listed but
+  grayed out, since a factor-of-safety curve needs a stability engine and the
+  seepage solution is this run's input rather than its output;
+  [COMBO-3](combo03_fs_vs_time.md) is the tutorial that runs it.
 - **Convergence tol** = `0.0001`, the same solver control the Run Seepage dialog
   carries and with the same meaning: every step of the sweep is one of those
   runs.
@@ -908,8 +923,9 @@ dialog in one control at a time:
 
 ![The Parametric dialog set up as a conductivity sweep](images/seep01_studio_parametric.png)
 
-Each step is one seepage solve on the mesh already built, so the whole sweep costs
-about what a single run does. It reports:
+Each step is one seepage solve on the mesh already built, and there are eleven of
+them — the model as it stands, plus the ten swept values — so the sweep costs
+about eleven runs. On this mesh that is under a second. It reports:
 
 ```text
 q = 100 at seep:soil:k1 = 126.1 (interpolated between solves).

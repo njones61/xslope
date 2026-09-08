@@ -38,8 +38,10 @@ effective-stress strength reading the piezometric line. Each states **two** unit
 weights: γ, what the soil weighs above the water table, and γ_sat, what it
 weighs below it.
 
-Unit weights are pcf, cohesions psf and φ′ degrees; the row order is the Mat ID,
-and the columns none of the three soils use stay blank:
+Unit weights are pcf, cohesions psf and φ′ degrees, and the row order is the Mat
+ID. The columns none of the three soils use are left empty below; a blank cell
+and the `0` the worksheet figure further down shows both reach the solver as
+zero:
 
 | name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | nu | u |
 | --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |
@@ -165,7 +167,7 @@ Build a model with three horizontal soil layers over a rigid base at elevation 0
 - **The line never rises above the ground.** Here it touches the ground at the
   toe and runs along it. A piezometric line *above* the ground surface means
   standing water, and the weight of standing water is a distributed load —
-  XSLOPE derives it automatically when `main!D23` **Water loads** is `auto` —
+  XSLOPE derives it automatically when `main!D24` **Water loads** is `auto` —
   not something to skip.
 - **Both unit-weight columns are filled**, and γ_sat is the larger of the pair
   in every row. A saturated soil weighs more than the same soil moist, never
@@ -187,7 +189,7 @@ Continue at [Running the analysis](#running-the-analysis).
 
 Start from [input_template.xlsx](../inputs/input_template.xlsx) and save a copy
 under a name of your own. Confirm `main!D8` **Units** is `Imperial`, confirm
-`main!D23` **Water loads** is `auto`, and leave the rest of that sheet alone.
+`main!D24` **Water loads** is `auto`, and leave the rest of that sheet alone.
 
 ### 1. The `mat` worksheet
 
@@ -329,6 +331,8 @@ Yo = 88.32, Depth = 26.90** — entering the crest well behind the shoulder and
 exiting past the toe, with most of its base in soil 3. That is where the answer
 should live: soil 3 is the weakest soil in the section, and circles that stay
 above it come back around 1.37 or higher.
+
+<!-- test: file=../lem/files/xslope_method_slices_problem.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.301, tolerance=0.005 -->
 
 ### Holding the circle still {#holding-the-circle-still}
 

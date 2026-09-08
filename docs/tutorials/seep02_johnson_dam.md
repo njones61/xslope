@@ -195,7 +195,7 @@ worksheets just as well. And to skip the construction entirely, download
 
 ### 1. Global parameters
 
-Click **Global parameters** and set **Units** to `imperial`; the unit weight of
+Click **Global parameters** and set **Units** to `Imperial`; the unit weight of
 water fills itself with `62.4`. Set **Time** to `day`. Together the two make
 heads and pore pressures read `ft` and `psf`, put `k1 (ft/day)` on the material
 form, and make every discharge on this page cubic feet per day per foot of dam;
@@ -398,9 +398,11 @@ Leave **Auto-size from geometry** ticked. It takes the element size from the wid
 of the section rather than from a number typed in feet, which is what makes the
 next field the one to set.
 
-Set **Size divisions** to `120`. The section is 750 ft wide, so the target element
-size becomes 750/120 = 6.25 ft, and the grayed **Target element size** box shows
-it.
+Set **Size divisions** to `120`. The section is 750 ft wide, so the element size
+becomes 750/120 = 6.25 ft. The grayed **Target element size** box does not follow
+the divisions — it holds whatever size the model itself declares, and this model
+declares none, so it sits at the dialog's own `1.000`. The size the build uses is
+the one the Log states.
 
 Leave every other control at its default — each one is explained in
 [Building the mesh](seep01_sheetpile.md#building-the-mesh) in SEEP-1, and none of
@@ -471,6 +473,8 @@ its axis, the convention every quantity a two-dimensional analysis reports carri
 The [sample page](../seep/samples.md#johnson-reservoir) cross-checks this same
 mesh against the USACE SEEP2D program, which solves the identical topology and
 returns 1.9544.
+
+<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, element_type=tri3, size_divisions=120, expected_flowrate=1.9546, tolerance=0.005 -->
 
 The head ranges from **100.000 ft to 160.000 ft**, which is the two boundary values
 and nothing outside them, because a region with no sources or sinks inside it can
@@ -634,7 +638,8 @@ of 6.19 channels down to the 6 that can actually be drawn.
 Above the phreatic surface the governing equation carries *k<sub>r</sub>*(ψ), and
 XSLOPE offers three functions for it, chosen per material through the `unsat`
 column. Open **Materials** and press **List view** — with **Seepage** alone
-ticked, the form shows the **Conductivity** group and nothing else:
+ticked, the form shows an **Identity** group — the material's name and display
+color — and a **Conductivity** group under it, and nothing else:
 
 ![The conductivity group and the curve it draws](images/seep02_studio_materials_unsat.png)
 
@@ -730,10 +735,12 @@ solver sees:
 ![The three relative-conductivity curves per material](images/seep02_kr_models.png){width=1000}
 
 The van Genuchten and Gardner curves lie close together on the shell and the
-foundation, which is what the fit was for. On the core they part by about a
-quarter of a log cycle over the wet end — 0.18 against 0.45 at a hundredth of a
-foot of suction — and cross near one foot; that gap is the 0.252 in the table
-above, the worst of the three fits. The linear front lies with none of them.
+foundation, which is what the fit was for. On the core they part most: 0.47 for
+Gardner against 0.17 for van Genuchten at a hundredth of a foot of suction, four
+tenths of a log cycle. They cross near a tenth of a foot, and Gardner runs the
+lower of the two from there out to about ten feet. Averaged over the whole
+suction range that parting is the 0.252 in the table above, the worst of the
+three fits. The linear front lies with none of them.
 Between zero and one foot of suction it stays much wetter: at half a
 foot it is halfway down its straight line, at
 *k<sub>r</sub>* = 0.01 + 0.99 × 0.5 = 0.505, an order of magnitude above the other
@@ -755,11 +762,11 @@ surface changes.
 
 | Model | q (ft³/day per ft) | Iterations | Flow above the phreatic surface at x = 500 |
 | --- | :---: | :---: | :---: |
-| `lf` | 1.9546 | 23 | 10.3% |
-| `vg` | 1.8641 | 36 | 8.2% |
-| `gard` | 1.8655 | 28 | 8.6% |
+| `lf` | 1.9546 | 47 | 10.3% |
+| `vg` | 1.8641 | 40 | 8.2% |
+| `gard` | 1.8654 | 29 | 8.6% |
 
-The two calibrated models agree with each other to **0.08%** in discharge, and
+The two calibrated models agree with each other to **0.07%** in discharge, and
 both sit **4.6% below** the linear front. That gap is the whole of what the
 choice of model changes in this dam's total discharge.
 
@@ -768,9 +775,9 @@ On the phreatic surface it changes less still:
 ![The phreatic surface under each model](images/seep02_phreatic_models.png){width=1000}
 
 At section scale the three surfaces are one line. Read station by station, the
-linear front and van Genuchten differ by at most **0.46 ft** anywhere, the linear
-front and Gardner by at most **0.36 ft**, and van Genuchten and Gardner by at most
-**0.15 ft** — on a dam 80 ft tall, under a 60 ft head, on a mesh whose elements are
+linear front and van Genuchten differ by at most **0.44 ft**, the linear front and
+Gardner by at most **0.41 ft**, and van Genuchten and Gardner by at most
+**0.04 ft** — on a dam 80 ft tall, under a 60 ft head, on a mesh whose elements are
 6.25 ft.
 
 These are differences between three runs on one mesh, so the discretization error
@@ -793,7 +800,7 @@ floor of 0.01 through the deep unsaturated zone, far above the conductivity the
 other two models leave there — and rerunning it with *kr<sub>0</sub>* lowered to
 10<sup>−4</sup>, which the other two are already below by five feet of suction,
 brings its discharge to 1.8707, against van Genuchten's 1.8641 and Gardner's
-1.8655: 93% of the gap closes on that one parameter. The curve's shape barely matters by
+1.8654: 93% of the gap closes on that one parameter. The curve's shape barely matters by
 comparison — sweeping *h<sub>0</sub>* twentyfold moves the discharge by the same
 4.6% — because on a dam whose unsaturated zone stands tens of feet above the
 water inside it, what the curve does in its first foot of suction is beside the
@@ -893,8 +900,8 @@ polyline itself, stays exactly as it was:
 
 | Core k (ft/day) | q (ft³/day per ft) | Exit-face nodes wet | Highest wet node | Iterations |
 | :---: | :---: | :---: | :---: | :---: |
-| 0.001 | 1.9546 | 1 of 31 | (544.5, 102.6) | 23 |
-| 0.01 | 2.2258 | 1 of 31 | (544.5, 102.6) | 17 |
+| 0.001 | 1.9546 | 1 of 31 | (544.5, 102.6) | 47 |
+| 0.01 | 2.2257 | 1 of 31 | (544.5, 102.6) | 18 |
 | 0.1 | 4.3501 | 2 of 31 | (539.0, 105.2) | 20 |
 | 1 | 10.2959 | 8 of 31 | (506.1, 120.6) | 8 |
 
@@ -937,7 +944,7 @@ The one thing that has to be decided before the seepage run, rather than after, 
 the element type. A finite element stability analysis requires quadratic elements,
 so a mesh built at `tri3` for a fast seepage solve has to be rebuilt at `tri6`
 before it can carry one. That is why the sample page's shipped mesh is quadratic —
-3,362 nodes and 1,605 `tri6` elements — and it returns 1.9555 ft³/day per ft
+3,362 nodes and 1,605 `tri6` elements — and it returns 1.9554 ft³/day per ft
 against the 1.9546 of the linear tri3 mesh built above.
 
 [Seepage and Slope Stability](../seep/seep_slope.md#worked-example) carries this

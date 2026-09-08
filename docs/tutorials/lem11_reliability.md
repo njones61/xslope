@@ -39,7 +39,7 @@ it.**
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
-<div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~15 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~30 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to run a reliability analysis: what the
@@ -131,6 +131,8 @@ at elevation −20, 141.27 ft of failure surface carrying 370,624 lb/ft of clay.
 This is where every deterministic analysis in the previous ten tutorials would
 stop, and it is the number the rest of this page is about: not whether
 1.354 is right, but how much of it is real.
+
+<!-- test: file=../lem/files/xslope_reliability.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.354, tolerance=0.005 -->
 
 ---
 
@@ -267,7 +269,7 @@ percentage point. A rarer failure needs more: at a P<sub>f</sub> of a couple
 percent, only a couple hundred realizations fail, and reaching the same
 precision takes several times more. Raising the count costs only time, and
 not much of it: the solves are heavily optimized, and this model's full
-ten-thousand-realization campaign finishes in about twenty seconds. Ticking the
+ten-thousand-realization campaign finishes in about 25 seconds. Ticking the
 convergence stop described below lets the campaign decide when to stop, and this
 field then becomes the upper limit.
 
@@ -313,8 +315,8 @@ tolerance, raise the samples cap to match. The
 convergence plot. Leave it unticked here, and **Run**.
 
 The cost is closer to the Taylor series than the counts suggest: its five
-solves are five full searches (about 13 seconds here), while Monte Carlo
-searches once and then solves a held surface ten thousand times (about 22
+solves are five full searches (about 15 seconds here), while Monte Carlo
+searches once and then solves a held surface ten thousand times (about 25
 seconds). The result is the histogram of all ten thousand factors of
 safety — the actual distribution of FS, not an assumed shape:
 
@@ -461,13 +463,11 @@ thousand. This model's 16.42% is a count of 1,642 failed realizations, which
 is plenty to trust. Now picture a much safer slope with a P<sub>f</sub> near
 0.05%: the same campaign would catch only about five failures, and if a
 single realization had landed on the other side of FS = 1, the reported
-probability would change by a fifth of its own value.
-[VP28](../verification/rocscience.md#vp28) shows the same limit in a
-commercial code: SLOPE/W's own 10,000-sample campaign reports a probability
-of failure of 0.04% — a count of four. Getting a small P<sub>f</sub> right
-by counting means running many more realizations. The Taylor series sidesteps
-the cost by computing β and converting it to a probability through an
-assumed distribution shape — free, but only as good as the assumption.
+probability would change by a fifth of its own value. Getting a small
+P<sub>f</sub> right by counting means running many more realizations, which is
+the case the response surface above was built for. The Taylor series sidesteps
+the cost differently, by computing β and converting it to a probability through
+an assumed distribution shape — free, but only as good as the assumption.
 
 ---
 
@@ -506,7 +506,8 @@ variance squared, the wider interval wins.
 
 The Pareto is Taylor-series arithmetic, and it runs its own five solves no
 matter which reliability engine was used last. It is not the only way to ask
-the question: the same **Plot type** list offers `MC rank correlation`,
+the question: the same **Plot type** list offers
+`Monte Carlo rank correlation (σ)`,
 which runs a Monte Carlo campaign and ranks the parameters by how strongly
 each sampled input tracks the factor of safety across all the realizations.
 Run it and the same verdict comes back:
@@ -615,9 +616,11 @@ not, so the choice is about cost and about what is being asked.
 - **The response surface** is for probabilities too small to count: it
   reaches resolution no affordable number of real solves could, for a few
   hundred of them — *when its self-checks pass*. It refuses the models it
-  cannot fit honestly (on [VP34](../verification/rocscience.md#vp34) the
-  checks find that a third of the formula's predicted failures have no real
-  solution, so the engine declines to answer), and its β differs from Monte
+  cannot fit honestly — on VP34 the checks find that a third of the formula's
+  predicted failures have no analyzable solution, so the engine declines to
+  answer, a refusal the
+  [response-surface section](../reliability/monte_carlo.md#sampling-a-fitted-response-surface)
+  works through — and its β differs from Monte
   Carlo's only in the third decimal. Quote its P<sub>f</sub> together with
   the fit-quality numbers it prints beside it.
 

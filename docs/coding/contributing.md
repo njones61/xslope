@@ -61,6 +61,26 @@ The exact gate is what makes the fallback able to catch anything. A tag's `toler
 
 The run summary reports how many rows the fast kernel decided, how many the reference re-solved, and how many failed. A row whose locked value sits farther from today's reference answer than its own printed precision falls through every run and pays both solves. Those rows are recognizable by a printed kernel-versus-reference gap of zero: the two kernels agree and it is the lock that is behind, which is a lock to re-record rather than a kernel to fix. The corpus carries none — every `fem_ssrm` lock reproduces today's reference answer at the precision it is quoted with. A *rise* in the fallback count, or a fallback row whose printed gap is not zero, is the drift signal. When the compiled kernel is absent the rows are verified on the reference kernel only. Pass `--reference-only` to force the pure reference verdict for every row regardless of the fast kernel; use it for strict runs such as a pre-release check or immediately after a change to the constitutive physics. The `kernel_xcheck` gate, which compares the two kernels directly on small cases, is the companion guard that keeps this scheme sound and should not be removed while fast-first is the default.
 
+### Documentation checks
+
+The numbers the docs print are checked by the same suite that checks the solver. `tools/verification_checks/` holds the checkers; its README describes each in full.
+
+**Verification pages.** The six pages under `docs/verification` run as one suite row. Every printed percentage and absolute difference is re-derived from two numbers the page prints in the same sentence or row; every value a `<!-- test: -->` tag locks must be printed in the section carrying it, every number the section attributes to XSLOPE must agree with the lock it restates, and every value presented as locked must have a tag behind it; captions are checked against their figures. The row is change-gated on a committed content hash, so an unchanged page costs one file read. A page you edit stays a failure until you run `python -m tools.verification_checks.certify --recertify <page>` and commit `certified.json` with the edit.
+
+**Tutorials.** `python run_tests.py --tutorials` sweeps the tutorial pages for factors of safety they attribute to a run of their own, and scores each against the locks in scope — the page's own tags, plus every tag anywhere under `docs/` on a model file the page links, which is how LEM-3 inherits the seven method locks its workbook carries on `docs/lem/samples.md`. A number is *guarded* when it restates a lock verbatim or correctly rounded, *disagreeing* when its column header, row label or sentence names a method whose lock says otherwise, and *unguarded* when nothing in the docs locks it. The row reports the per-page tally and passes; it fails only if the checker raises. A tutorial legitimately re-runs a sample under settings the sample's tag does not use, so read a finding before treating it as a defect.
+
+**Before a lock moves.** A re-lock round changes a tag and re-measures the verification section that carries it; the tutorials print the same answer in prose, in a results table and in a console transcript, and go stale silently. Run `tools/tutorial_quotes.py` first and fix them in the same round:
+
+```bash
+python tools/tutorial_quotes.py --benchmark FEM-1-ssrm   # that benchmark's locks
+python tools/tutorial_quotes.py --value 1.3633           # a value on its way out
+python tools/tutorial_quotes.py --since <ref>            # every lock a diff moved
+```
+
+It matches a value at the precision the tutorials write it — the lock's digits and the lock rounded down to `--dp` places, three by default — and marks a hit on a page that links the workbook the lock is recorded on.
+
+Mutation fixtures for all of this live in `tools/verification_checks/mutations.py`: each plants one defect and requires the checks to catch it. Run `python -m tools.verification_checks.mutations` after any change to the check logic.
+
 ## Documentation
 
 If your change affects user-facing behavior, update the matching file under `docs/` and preview locally with `mkdocs serve`.

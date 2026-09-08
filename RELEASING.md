@@ -25,6 +25,17 @@ but decide by *what changed*, not the version number. The concept DOI in
 to "cite xslope" has a working link even for versions where no per-version DOI
 was minted.
 
+## Before a minor or major release
+
+- [ ] Run the tutorial execution pass: every tutorial page executed as written,
+      each printed number compared to what the run produces, each linked file
+      and image checked. The brief that scopes it is `BRIEF.md` under
+      `reports/campaign_1_0_0_readiness/tutorial_pass/` in the private repo.
+      `python run_tests.py --tutorials` is the cheap standing layer under it and
+      is not a substitute: it reads the numbers a tag can reach, not the steps.
+
+Patch releases skip this.
+
 ## Steps
 
 1. **Bump the version.** Edit `xslope/_version.py` (`__version__`), e.g.

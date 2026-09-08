@@ -346,18 +346,25 @@ agree.** That is what the per-layer set is for. We run the search from the shall
 circle, the deep circle and the generator's toe circle: every one returns the same
 surface here — tangent to the contact, FS = 1.244.
 
-The failure this guards against looks like success. Seed the search with an arc
-wildly out of scale with the section — a center 220 ft above the slope, R = 269
-ft — and it converges without complaint, reporting **1.784**, 43% high, on a
-long flat surface that is only a local minimum. Nothing in the output says so.
-Circles built from the section, like the generated per-layer set, keep the
-start in scale; agreement across several starts is the check.
+Here it passes even from starts that have no business working. Seed the search
+with an arc wildly out of scale with the section — a center 220 ft above the
+slope, R = 269 ft — and it walks back down to the same contact-tangent circle
+and reports the same **1.244**. The soils are why: in a uniform φ = 0 fill the
+deepest surface available is the critical one, so the search drives down through
+the embankment, and everything below the contact is twice as strong, so a trial
+surface that dips into the foundation gains more strength than the weight it
+adds and is pushed back up. The minimum sits on the contact and is reached
+downhill from either side. That every start agrees is what makes 1.244 the
+model's minimum rather than one neighborhood's.
 
-Some sections genuinely hold two competing mechanisms, and layering is the
-usual way to get one — [Sample Problem 13](../lem/samples.md#13-multiple-local-minima)
-is a cohesionless embankment on soft clay where a free search collapses onto a
-shallow sliver on the face and the deep foundation mechanism has to be seeded to
-be found at all. Which is why the rule is per layer rather than per model: the
+Other sections genuinely hold two competing mechanisms, and layering is the
+usual way to get one: [Tutorial LEM-10](lem10_global_minimum.md) works a
+cohesionless embankment on soft clay —
+[Sample Problem 13](../lem/samples.md#13-multiple-local-minima) — where the two
+mechanisms answer differently and the search returns whichever one its starting
+circle sits nearest, so a circle placed in the fill finds a shallow sliver on
+the face and the deep foundation surface is found only when a circle is placed
+for it. Which is why the rule is per layer rather than per model: the
 circle you can argue was unnecessary costs one row on a worksheet, and the one
 you left out costs the answer.
 

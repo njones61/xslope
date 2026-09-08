@@ -109,9 +109,11 @@ elastic-plastic solution and report a factor of safety that is too high — in
 chosen for the stricter of the two, which is why quadratic is both the default
 and the requirement here.
 
-**Auto-size from geometry** is ticked at **100** size divisions, so the target
-element size is the width of the section divided by that: 750/100 = 7.5 ft, which
-the grayed **Target element size** box shows.
+**Auto-size from geometry** is ticked at **100** size divisions, so the element
+size is the width of the section divided by that: 750/100 = 7.5 ft. The grayed
+**Target element size** box does not follow the divisions — it holds whatever
+size the model itself declares, and this model declares none, so it sits at the
+dialog's own `1.000`. The Log states the size the build uses.
 
 The mesh comes out at **8,082 nodes and 3,923 triangles**, with the seepage
 boundary conditions marked on it:
@@ -233,9 +235,9 @@ The Log pane follows the search. Its last two refinement steps and its closing
 lines read:
 
 ```text
-[🔁 iteration 11] center=(508.96, 262.80), FS=1.2571, grid=1.4927
-[🔁 iteration 12] center=(508.96, 262.80), FS=1.2571, grid=0.7463
-[✅ converged] Iter=12, FS=1.2571 (ΔFS<0.0005) at (x=508.96, y=262.80, depth=77.28)
+[🔁 iteration 11] center=(508.96, 262.80), FS=1.2572, grid=1.4927
+[🔁 iteration 12] center=(508.96, 262.80), FS=1.2572, grid=0.7463
+[✅ converged] Iter=12, FS=1.2572 (ΔFS<0.0005) at (x=508.96, y=262.80, depth=77.28)
 Critical FS = 1.257
 Sliding mass = 1,284,328.7 lb/ft over 290.62 ft of failure surface
 ```
@@ -287,7 +289,7 @@ solve and the search before it.
 
 ![Shear strain at failure](images/combo01_fem_shear.png){width=1000}
 
-**Strength reduction gives FS = 1.2461**. The shear strain field above is the
+**Strength reduction gives FS = 1.246**. The shear strain field above is the
 mechanism the run found, and nothing about a surface was assumed to find it: the
 band of straining soil is wherever the model put it.
 
@@ -324,7 +326,7 @@ will read it again. [Stale results and the mesh](../studio/editing.md#stale-resu
 states the rule in full. The practical effect is that the three answers on this
 page cannot silently belong to three different models.
 
-The two factors of safety are 1.257 and 1.2461, 0.9% apart, on the same
+The two factors of safety are 1.257 and 1.246, 0.9% apart, on the same
 mechanism: a deep surface from the upstream face just below the crest, down
 through the core and the downstream shell, into the foundation and out beyond the
 toe. They are independent routes to it — the search prescribes a circular surface
@@ -343,7 +345,7 @@ This tutorial covered:
 - A seepage run that leaves a pore pressure at every mesh node.
 - The materials table's `u` column: `seep` reads that field, `none` ignores it
   (Spencer 1.618 instead of 1.257).
-- Spencer 1.257 and strength reduction 1.2461 from the same model and field,
+- Spencer 1.257 and strength reduction 1.246 from the same model and field,
   with nothing exported or retyped.
 - Results go stale when the inputs they depend on change.
 

@@ -340,8 +340,10 @@ started, with its tangent 7 ft higher, at elevation 82.3 rather than 75. It
 daylights just past the crest at x = 392 and toes on the upstream foreshore at
 x = 174.
 
-**Stage 3 was not required.** Twelve of the 40 slices cut the core, a count the
-analysis report's slice table gives, and on all 12 the drained strength at the
+**Stage 3 was not required.** The slicer adds a slice wherever the surface
+crosses a material boundary, so the 40 slices asked for come back as 42, and
+**twelve of them cut the core** — a count the
+analysis report's slice table gives. On all 12 the drained strength at the
 stage-2 stresses came out higher than the undrained strength stage 2 used, so
 there was nothing lower to substitute. Stage 2 governs, and the drawdown costs
 this slope 0.30 against its own full-pool stage-1 figure of 1.484.
@@ -489,7 +491,7 @@ The **Seep · Solution** tab:
 
 ![Set 1's steady solution, full pool](images/combo02_seep_set1.png){width=1000}
 
-**Set 1** settles in **22 unconfined sweeps** to a total discharge of
+**Set 1** settles in **20 unconfined sweeps** to a total discharge of
 **1.9566 ft³/day per ft** of dam, printed on the figure as 1.957. The head runs
 from 100.000 to 160.000 ft, the two boundary values and nothing outside them.
 The heavy black line traces the phreatic surface: nearly
@@ -501,8 +503,8 @@ face. The contours crowd where head falls fastest, and each channel between two
 flow lines carries an equal share of the discharge. Three-quarters of the head loss
 is in the core, which is what a cutoff key is for.
 (In [COMBO-1](combo01_seepage_stability.md#solving-it) the same boundary set
-reads 1.925 on a quadratic mesh at the same 7.5 ft target — 8,082 nodes rather
-than 2,080, because quadratic elements add a node on every edge. The 1.6%
+reads 1.948 on a quadratic mesh at the same 7.5 ft target — 8,082 nodes rather
+than 2,080, because quadratic elements add a node on every edge. The 0.45%
 between the two answers is that discretization, not the physics.)
 
 The **Seep · Solution 2** tab:
@@ -563,10 +565,10 @@ x = 392 and toe on the upstream foreshore within 4 ft of each other, at x = 171 
 x = 174 for the pair, so only the water separates the two answers. Dropping the
 undrained envelope shows that most clearly. Run as ordinary drained problems —
 **Rapid drawdown** unticked, each searching for itself — the drawn-down state
-gives 1.3125 from Line 2 and 1.3105 from Set 2, the same model to within two
+gives 1.3125 from Line 2 and 1.3107 from Set 2, the same model to within two
 thousandths, because Line 2 was traced off Set 2's own phreatic surface. At full
 pool — the same two drained searches, run from Line 1 and from Set 1 — the pair
-gives 1.4670 and 1.5098, and the sketch comes out 2.8% lower: a static column
+gives 1.4670 and 1.5097, and the sketch comes out 2.8% lower: a static column
 measured down from Line 1 puts more pore pressure deep in the section than the
 solved field does. That full-pool difference reaches the
 drawdown answer, because stage 2 computes its undrained strengths from the
@@ -672,33 +674,35 @@ returns the same 1.9566 ft³/day per ft as before, and says so in its log —
 With the schedule and the stage times on the file, we run the transient seepage
 analysis from the same seepage dialog. Click **Run → Run Seep…**. The dialog has grown
 a **Run type** selector, which appears only on a file carrying a schedule; set it
-to **Transient (time-dependent)**. **Convergence tol** and **Max iterations** gray
-out — they belong to the steady solve, and the transient run sets its own step size from
-how fast the field is moving. Click **Run**.
+to **Transient (time-dependent)**. **Convergence tol** grays out — it belongs to
+the steady solve, and the march sets its own step size from how fast the field is
+moving. **Max iterations** stays live and moves from `400` to `2000`, the budget
+for the one steady solve the march still makes: its initial condition. Leave it
+there and click **Run**.
 
 The run solves its initial condition first — the same unconfined iteration as
 the steady run — and then prints a line per saved frame:
 
 ```text
-  t=5: frame saved (steps so far=6, mass-balance closure=1.39e-05)
+  t=5: frame saved (steps so far=6, mass-balance closure=1.06e-05)
   t=35: frame saved (steps so far=272, mass-balance closure=7.28e-02)
-  t=50: frame saved (steps so far=440, mass-balance closure=6.79e-02)
-  t=80: frame saved (steps so far=846, mass-balance closure=6.87e-02)
-  t=150: frame saved (steps so far=1320, mass-balance closure=2.04e-02)
-  t=200: frame saved (steps so far=1394, mass-balance closure=2.02e-02)
-  t=300: frame saved (steps so far=1466, mass-balance closure=5.67e-02)
-  t=400: frame saved (steps so far=1507, mass-balance closure=5.43e-02)
-  t=600: frame saved (steps so far=1569, mass-balance closure=3.43e-02)
-  t=800: frame saved (steps so far=1617, mass-balance closure=2.82e-02)
-  t=1000: frame saved (steps so far=1671, mass-balance closure=2.41e-02)
+  t=50: frame saved (steps so far=440, mass-balance closure=6.80e-02)
+  t=80: frame saved (steps so far=792, mass-balance closure=6.83e-02)
+  t=150: frame saved (steps so far=1288, mass-balance closure=2.02e-02)
+  t=200: frame saved (steps so far=1359, mass-balance closure=1.99e-02)
+  t=300: frame saved (steps so far=1480, mass-balance closure=5.69e-02)
+  t=400: frame saved (steps so far=1550, mass-balance closure=5.41e-02)
+  t=600: frame saved (steps so far=1624, mass-balance closure=3.42e-02)
+  t=800: frame saved (steps so far=1681, mass-balance closure=2.82e-02)
+  t=1000: frame saved (steps so far=1727, mass-balance closure=2.40e-02)
 ```
 
 This is the long run of the page, taking far longer than any other on it.
 **Twelve frames** come out of it, at t = 0, 5, 35, 50, 80, 150, 200, 300, 400,
 600, 800 and 1000: the union of the save-interval grid, the extra
-save times, the schedule's own breakpoints, and the two stage times. **1,671
+save times, the schedule's own breakpoints, and the two stage times. **1,727
 steps** sit behind them, and where the solver spent them is itself a reading:
-**440 of them, 26%, are inside the first 50 days**, which are 5% of the run's
+**440 of them, 25%, are inside the first 50 days**, which are 5% of the run's
 duration. The field moves while the pool is falling and barely at all afterward.
 
 The two frames the drawdown will read are the first and the fourth. The

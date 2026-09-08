@@ -186,7 +186,9 @@ rather than guessing:
 **Open Existing** leaves that folder untouched and opens the project already in it;
 **Extract Fresh** unpacks into a numbered folder beside it.
 
-The next tutorial's completed model is published as a package:
+The next tutorial's completed model has no sidecars — no mesh, no seepage
+solution — so there is nothing for a package to hold that the workbook does not,
+and it is published as the workbook alone:
 
 [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx)
 

@@ -18,7 +18,7 @@ UTEXASED user manual, S. G. Wright's educational version of UTEXAS.
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
 <div class="tgt-tile"><span class="tg-label">Assistant</span><p>~5 min</p></div>
-<div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
+<div class="tgt-tile"><span class="tg-label">By hand</span><p>20–25 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to model soil reinforcement: how to enter geogrid
@@ -449,13 +449,15 @@ Each method gets its own search and its own critical circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.480 | 1.594 | 1.524 | 1.381 | 1.598 | 1.587 | 1.587 |
+| 1.480 | 1.594 | 1.524 | 1.608 | 1.598 | 1.587 | 1.587 |
 
 Spencer and Morgenstern-Price agree to four figures on the same circle and are
-the ones to report. The spread below them is the usual one for a frictional
-slope: OMS neglects the interslice forces and comes out 7% low, and the Corps of
-Engineers procedure settles on a far deeper circle of its own, bottoming out at
-elevation −9.7, just above the base of the model.
+the ones to report. Below them sit the two procedures that leave an equilibrium
+condition out: OMS neglects the interslice forces altogether and comes out 7%
+low, and Janbu's corrected method, which satisfies force equilibrium but not
+moment equilibrium, 4%. Bishop, Lowe & Karafiath and the Corps of Engineers land
+0.4 to 1.3% above Spencer, each on a shallow circle of its own that daylights at
+the toe and cuts the same reinforced block.
 
 ### What the reinforcement is worth
 

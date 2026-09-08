@@ -325,6 +325,8 @@ own, the deeper of the two starting circles — the deepest that fits — comes 
 third safer, because everything it adds is foundation at twice the fill's
 cohesion.
 
+<!-- test: file=../lem/files/xslope_sloping_bottom.xlsx, type=single_circle, circle_index=1, method=spencer, num_slices=40, expected_fs=1.655, tolerance=0.005 -->
+
 The solution carries the interslice-tension and line-of-thrust warnings a φ = 0
 crest produces, which [LEM-1](lem01_simple_embankment.md) diagnoses and fixes
 with a tension crack.
@@ -335,7 +337,7 @@ Each method gets its own search and its own critical circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |
+| 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |
 
 The four that satisfy moment equilibrium — OMS, Bishop, Spencer and
 Morgenstern-Price — land on the same circle and the same 1.244; with φ = 0 they
@@ -386,8 +388,8 @@ unchanged, and search again:
 
 ![Spencer on the same section with a weak foundation](images/lem06_solution_weak.png){width=1000}
 
-**FS = 0.784**, and the mechanism is a different one: the critical circle now
-bottoms out at elevation −10.85, grazing the bedrock, with 162,210 lb/ft of soil
+**FS = 0.783**, and the mechanism is a different one: the critical circle now
+bottoms out at elevation −10.85, grazing the bedrock, with 153,546 lb/ft of soil
 above it and most of its base in the foundation. This is the surface the second
 starting circle was there to describe, and the search reached it from that seed.
 

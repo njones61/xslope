@@ -205,7 +205,7 @@ box below it, and set that box to `3.5` — the size the verification page's own
 element-type comparison meshes this model at. Auto-sizing instead divides the
 section width by the size divisions, 160 ft over 100, for a 1.6 ft element, and
 the mesh that follows carries 10,313 nodes against 2,286 at 3.5 ft. The *F* = 1
-trial on it takes **7.0 s against 0.7 s**, and every trial in the run pays that
+trial on it takes **1.7 s against 0.3 s**, and every trial in the run pays that
 multiple, for detail this mechanism does not need. Leave the rest of the dialog
 alone and click **Build**.
 
@@ -335,10 +335,10 @@ start at 0.
 works through the cap and its effects.
 
 The rest of the dialog opens on the defaults this run wants. **Analysis** is
-**SSRM (find FS)**. **F min** and **F max** are 1.00 and 2.00, the ends of the
-bracket to search. **Tolerance** is 0.0100, **Max iterations per trial** is
-12000 and **Iteration ceiling** is 50000, all three of which the next section is
-about. **Failure criterion** is
+**SSRM (find FS)**. **F min (SSRM)** and **F max (SSRM)** are 1.00 and 2.00, the
+ends of the bracket to search. **Tolerance (SSRM)** is 0.0100, **Max iterations
+per trial** is 12000 and **Iteration ceiling** is 50000, all three of which the
+next section is about. **Failure criterion** is
 **Non-convergence** — the plain reading, that a trial which cannot reach
 equilibrium has failed. The list offers three others, among them **Hybrid**,
 which weighs displacement evidence alongside the convergence verdict; on this
@@ -462,10 +462,14 @@ trial has to be decided. No trial on this model reaches it.
 | --- | :---: |
 | Spencer's method, searched on this page | 1.376 |
 | Strength reduction, this page's run | 1.371 |
-| Strength reduction, as [the FEM overview reports it](../fem/overview.md#what-to-expect) for this model | 1.366 |
+| Strength reduction, as [the FEM overview reports it](../fem/overview.md#what-to-expect) for this model | 1.372 |
 | Griffiths & Lane's own finite element result | 1.4 |
 
-The strength reduction answer sits **0.4% above** the documented value for this
+The third row is XSLOPE's own verification run of the same problem,
+[xslope_griffiths1.xlsx](../fem/files/xslope_griffiths1.xlsx), meshed in
+quadratic quadrilaterals at the same 3.5 ft element size.
+
+The strength reduction answer sits **0.1% below** the documented value for this
 model and **0.4% below** Spencer's — two methods that share almost none of
 their machinery, within a percent of each other.
 

@@ -3821,11 +3821,25 @@ def is_point_on_line_segment(point, seg_start, seg_end, tolerance=1e-6):
             min(y1, y2) - tolerance <= py <= max(y1, y2) + tolerance):
         return False
     
-    # Check collinearity using cross product
+    # Check collinearity by the point's PERPENDICULAR DISTANCE to the segment.
+    #
+    # The cross product below is twice the triangle's area — a distance times a
+    # length — so comparing it against a tolerance measured in length units made
+    # the test scale with the segment: the same point passed on a short segment
+    # and failed on a long one. On the soil-nailed wall (RS2-P4-VP60) the point
+    # where a nail crosses the foundation boundary sits 1.2e-7 from the nail,
+    # comfortably inside the tolerance as a distance, but 3.9e-6 as an area on
+    # the 33 m nail. The crossing was therefore never inserted as a line vertex,
+    # the nail stayed one curve spanning two material zones, and it was embedded
+    # in BOTH surfaces — the coincident-geometry case that sends the 2D mesher
+    # into the unbounded split-and-retry loop (see build_mesh_from_polygons).
+    # Dividing by the length makes the tolerance mean what its name says.
     cross_product = abs((py - y1) * (x2 - x1) - (px - x1) * (y2 - y1))
-    
-    # Check if cross product is close to zero (collinear)
-    if cross_product < tolerance:
+    seg_length = math.hypot(x2 - x1, y2 - y1)
+    perp_distance = cross_product / seg_length if seg_length > 0 else cross_product
+
+    # Check if the point is on the segment's line (within tolerance)
+    if perp_distance < tolerance:
         # Verify point is between segment endpoints using dot product
         dot_product = (px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)
         segment_length_sq = (x2 - x1) ** 2 + (y2 - y1) ** 2
@@ -4908,9 +4922,17 @@ def extract_reinforcement_line_geometry(slope_data):
     lines = []
     if 'reinforce_lines' in slope_data and slope_data['reinforce_lines']:
         for line in slope_data['reinforce_lines']:
-            # Convert from dict format to tuple format
-            line_coords = [(point['X'], point['Y']) for point in line]
-            lines.append(line_coords)
+            # A reinforcement line's point list is the LEM tension distribution:
+            # the envelope's breakpoints under the constant-rate law, a dense
+            # sampling of the curve under the overburden law. Neither is mesh
+            # geometry. The mesher takes the line's two endpoints, as it does for
+            # a pile, and the 1D element size governs the subdivision; the FEM
+            # engine reads each bar's capacity from the envelope on its own.
+            if len(line) < 2:
+                continue
+            (x1, y1) = (line[0]['X'], line[0]['Y'])
+            (x2, y2) = (line[-1]['X'], line[-1]['Y'])
+            lines.append([(x1, y1), (x2, y2)])
     return lines
 
 

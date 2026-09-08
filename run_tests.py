@@ -7996,6 +7996,12 @@ MODULE_CHECKS = {
         "weigh them identically: same gravity load, same overburden, same factor of "
         "safety, same displaced mesh. Only a split taken Gauss point by Gauss point "
         "at the water table makes the two agree."),
+    'reinforce_mesh_geometry': (
+        'reinforce_mesh_geometry_check.py',
+        "A reinforcement line reaches the mesher as its two endpoints, whatever "
+        "the pullout law. It used to reach it as the LEM tension-distribution "
+        "point list, so filling in Adhesion and Delta — a statement about bond "
+        "strength — re-meshed the model and moved the factor of safety."),
     'spencer_root': (
         'spencer_root_check.py',
         "Spencer's equations have a root outside the pole-free band on many "
@@ -13908,6 +13914,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'indep_bishop': 3, 'tension_crack_symmetry': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
+              'reinforce_mesh_geometry': 2,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'circle_vertex': 2,
@@ -14474,6 +14481,14 @@ def main():
         tests.append({'type': 'dload_pass2b',
                       'file': 'surface load direction (FEM lumped fallback)',
                       'method': '-', 'source': 'dload_pass2b'})
+        # A reinforcement line's discretization is a mesh question, not a
+        # property of its capacity law. The mesher used to take the LEM
+        # tension-distribution point list, so entering the overburden law put a
+        # node at each of its 41 stored points: on the FEM-2 slope 2,101
+        # triangles and 60 bars became 6,569 and 240, and the factor fell 8%.
+        tests.append({'type': 'reinforce_mesh_geometry',
+                      'file': 'reinforcement line mesh geometry (both laws)',
+                      'method': '-', 'source': 'reinforce_mesh_geometry'})
         # The opt-in strength-reduction criterion that wants displacement
         # evidence before calling a non-converged trial a failed slope.
         tests.append({'type': 'hybrid_criterion',

@@ -199,6 +199,190 @@ def test_preview_is_below_the_table():
 
 
 # ---------------------------------------------------------------------------
+# A2. The dialog fits the screen it opens on
+# ---------------------------------------------------------------------------
+
+def _screen_failures():
+    """The fit assertions, made against whatever screen this process is running on.
+
+    Reported from Windows at 1920x1080 with the display at 125%, which is a 1536x864
+    desktop in the pixels a layout counts in (issue #3): the dialog's own MINIMUM
+    height came out taller than that, so the window could not be made to fit and
+    opened hanging off the top edge. What the user met was the preview's Fit / + / −
+    row, with the table and the Add row / Remove selected buttons above the screen,
+    no way to drag the window shorter and no scroll bar to reach them.
+
+    Asserted as a property of the layout, not of one screen: whatever screen this
+    runs on, the dialog opens inside it, can be shrunk to it, and keeps every row of
+    itself inside its own visible rect. The parent process re-runs this on a 1536x864
+    screen, the reported one (:func:`test_fits_the_reported_screen`)."""
+    from PySide6.QtWidgets import QApplication, QPushButton
+    from studio.editors import CATEGORY_EDITORS
+
+    avail = QApplication.primaryScreen().availableGeometry()
+    editor = CATEGORY_EDITORS["circles"]
+    out = []
+    for label, model in (("with a circle", _load(LEM01)),
+                         ("empty", _bare_model()),
+                         ("forty circles", _many_circles(40))):
+        where = f"{label} on a {avail.width()}x{avail.height()} screen"
+        dlg = _shown(editor.build(model, None))
+        out += _fail(dlg.height() <= avail.height(),
+                     f"{where}: the dialog opened {dlg.height()} px tall, past the "
+                     f"{avail.height()} px the screen has — its top edge is off the "
+                     f"desktop and the table with it")
+        out += _fail(dlg.width() <= avail.width(),
+                     f"{where}: the dialog opened {dlg.width()} px wide against "
+                     f"{avail.width()} px of screen")
+        floor = dlg.minimumSizeHint().height()
+        out += _fail(floor <= avail.height(),
+                     f"{where}: the dialog cannot be resized below {floor} px on a "
+                     f"{avail.height()} px screen, so the user cannot drag it into "
+                     f"view")
+        # Every row of the dialog inside the dialog: the table pane and the two
+        # buttons under it are the ones the report says went missing.
+        for widget, name in ((dlg._editable, "the table pane"),
+                             (dlg._preview, "the preview")):
+            top = widget.mapTo(dlg, widget.rect().topLeft())
+            bottom = widget.mapTo(dlg, widget.rect().bottomRight())
+            out += _fail(top.y() >= 0 and bottom.y() <= dlg.height(),
+                         f"{where}: {name} runs {top.y()}..{bottom.y()} px in a "
+                         f"{dlg.height()} px dialog")
+        for button in dlg.findChildren(QPushButton):
+            if button.text() not in ("Add row", "Remove selected"):
+                continue
+            top = button.mapTo(dlg, button.rect().topLeft())
+            bottom = button.mapTo(dlg, button.rect().bottomRight())
+            out += _fail(top.y() >= 0 and bottom.y() <= dlg.height()
+                         and button.isVisible(),
+                         f"{where}: the {button.text()!r} button sits at "
+                         f"{top.y()}..{bottom.y()} px in a {dlg.height()} px dialog")
+        # Draggable shorter, and it really goes: a dialog pinned at one height is the
+        # dialog in the report.
+        dlg.resize(dlg.width(), max(floor, avail.height() - 120))
+        _settle()
+        out += _fail(dlg.height() <= max(floor, avail.height() - 120),
+                     f"{where}: dragging the dialog shorter left it {dlg.height()} px")
+        dlg.deleteLater()
+
+    # And after Generate, which adds a summary strip to a dialog already as tall as
+    # the screen lets it be. The room for it comes out of the panes; if it comes out
+    # of nothing, the splitter keeps a minimum the dialog cannot pay for and its
+    # preview spills over the strip below -- the caption reading through the Generate
+    # button, present and unreadable.
+    where = f"after Generate on a {avail.width()}x{avail.height()} screen"
+    dlg = _shown(editor.build(_bare_model(), None))
+    _generate(dlg)
+    _settle()
+    out += _fail(dlg.height() <= avail.height(),
+                 f"{where}: the dialog grew to {dlg.height()} px on a "
+                 f"{avail.height()} px screen")
+    caption = dlg._preview._caption
+    out += _fail(caption is not None
+                 and caption.geometry().bottom() <= dlg._preview.rect().bottom(),
+                 f"{where}: the preview caption is clipped by the bottom of its pane")
+    pane_bottom = dlg._preview.mapTo(dlg, dlg._preview.rect().bottomLeft()).y()
+    for button in dlg.findChildren(QPushButton):
+        if not button.text().startswith("Generate"):
+            continue
+        top = button.mapTo(dlg, button.rect().topLeft()).y()
+        out += _fail(top >= pane_bottom,
+                     f"{where}: the preview pane ends at {pane_bottom} px and the "
+                     f"{button.text()!r} button starts at {top} px — they overlap, "
+                     f"and what is underneath is the caption")
+    out += _fail(dlg.generate_summary.isVisible(),
+                 f"{where}: the generator's summary line is not visible")
+    dlg.deleteLater()
+    return out
+
+
+def test_fits_the_screen():
+    """The dialog fits the screen the checks are running on, frame included."""
+    from PySide6.QtCore import QRect
+    from PySide6.QtWidgets import QApplication
+    from studio.editors import CATEGORY_EDITORS
+
+    out = _screen_failures()
+
+    # The title bar and borders are part of what has to fit, and the offscreen
+    # platform draws none — so a Windows-sized frame is put on one dialog and the fit
+    # made again. Without it the dialog is sized to the whole desktop and the frame
+    # pushes it off the bottom.
+    avail = QApplication.primaryScreen().availableGeometry()
+    frame_h, frame_w = 31, 16
+    dlg = _shown(CATEGORY_EDITORS["circles"].build(_load(LEM01), None))
+    dlg.frameGeometry = lambda: QRect(0, 0, dlg.width() + frame_w,
+                                      dlg.height() + frame_h)
+    dlg.showEvent(_show_event())
+    _settle()
+    out += _fail(dlg.height() + frame_h <= avail.height(),
+                 f"with a {frame_h} px title bar the window is "
+                 f"{dlg.height() + frame_h} px tall on a {avail.height()} px screen")
+    out += _fail(dlg.minimumSizeHint().height() + frame_h <= avail.height(),
+                 f"with a {frame_h} px title bar the window cannot be dragged below "
+                 f"{dlg.minimumSizeHint().height() + frame_h} px on a "
+                 f"{avail.height()} px screen")
+    dlg.deleteLater()
+    return out
+
+
+def test_fits_the_reported_screen():
+    """The same fit on the reported desktop: 1920x1080 at 125%, a 1536x864 layout.
+
+    A screen size cannot be changed inside a running Qt application, so this leg runs
+    in a child process with the offscreen platform configured to that screen. If the
+    platform will not take the screen size, the leg reports that rather than passing
+    on a screen nobody asked for."""
+    import json
+    import subprocess
+    import tempfile
+
+    out = []
+    for width, height in ((1536, 864), (1536, 824)):     # with and without a taskbar
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = os.path.join(tmp, "screen.json")
+            with open(cfg, "w") as fh:
+                json.dump({"screens": [{"name": "reported", "x": 0, "y": 0,
+                                        "width": width, "height": height,
+                                        "logicalDpi": 96, "logicalBaseDpi": 96,
+                                        "dpr": 1}]}, fh)
+            env = dict(os.environ,
+                       QT_QPA_PLATFORM=f"offscreen:configfile={cfg}",
+                       MPLBACKEND="Agg")
+            proc = subprocess.run([sys.executable, os.path.abspath(__file__),
+                                   "--screen-leg", f"{width}x{height}"],
+                                  env=env, capture_output=True, text=True)
+        tag = f"{width}x{height}"
+        marker = "SCREEN-LEG "
+        line = next((l for l in proc.stdout.splitlines() if l.startswith(marker)), None)
+        if line is None:
+            out.append(f"the {tag} leg produced no result: "
+                       f"{proc.stdout[-400:]}{proc.stderr[-400:]}")
+            continue
+        payload = json.loads(line[len(marker):])
+        if payload.get("skipped"):
+            out.append(f"the {tag} leg ran on a "
+                       f"{payload['screen']} screen instead — the offscreen platform "
+                       f"would not take the configured size, so the reported desktop "
+                       f"went unchecked")
+            continue
+        out += payload["failures"]
+    return out
+
+
+def _show_event():
+    from PySide6.QtGui import QShowEvent
+    return QShowEvent()
+
+
+def _settle():
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    for _ in range(4):
+        app.processEvents()
+
+
+# ---------------------------------------------------------------------------
 # B. Display rounding never reaches the stored value
 # ---------------------------------------------------------------------------
 
@@ -733,6 +917,8 @@ def test_window_edit_keeps_the_mesh():
 CHECKS = [
     ("every column is visible at the opening size", test_all_columns_visible),
     ("the preview sits below the table", test_preview_is_below_the_table),
+    ("the dialog fits the screen it opens on", test_fits_the_screen),
+    ("it fits the reported 1536x864 desktop", test_fits_the_reported_screen),
     ("generate leaves other editors' layout alone",
      test_generate_leaves_the_other_editors_alone),
     ("display rounds, storage does not", test_display_rounds_but_stores_the_truth),
@@ -781,6 +967,22 @@ def main():
     print("\nAll circles editor checks passed.")
 
 
+def _screen_leg(requested):
+    """Child-process entry point for :func:`test_fits_the_reported_screen`: run the
+    fit assertions here and print them on one line the parent can read back."""
+    import json
+
+    from PySide6.QtWidgets import QApplication
+    geom = QApplication.primaryScreen().availableGeometry()
+    got = f"{geom.width()}x{geom.height()}"
+    if got != requested:
+        payload = {"skipped": True, "screen": got}
+    else:
+        payload = {"skipped": False, "screen": got,
+                   "failures": studio_settings.isolated(_screen_failures)()}
+    print("SCREEN-LEG " + json.dumps(payload))
+
+
 if __name__ == "__main__":
     import matplotlib
     matplotlib.use("Agg")
@@ -789,4 +991,7 @@ if __name__ == "__main__":
         _app = QApplication.instance() or QApplication([])
     except Exception:
         pass
-    main()
+    if "--screen-leg" in sys.argv:
+        _screen_leg(sys.argv[sys.argv.index("--screen-leg") + 1])
+    else:
+        main()

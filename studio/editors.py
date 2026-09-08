@@ -2015,6 +2015,16 @@ _TABLE_SPARE_ROWS = 3
 #: Preview-pane depth, in lines of the dialog's own text. Deep enough to read a
 #: cross-section in; it scales with the font rather than fixing a pixel height.
 _PREVIEW_MIN_LINES = 16
+#: The depth the preview will not go below even on a screen too short for the rest:
+#: a picture this deep plus its caption is still a picture. Below this the pane would
+#: be a strip, and a dialog that will not fit on the screen at all is worse than a
+#: shallow one -- it opens with its top edge above the desktop, where the table and
+#: the Add row / Remove selected buttons cannot be reached (issue #3).
+_PREVIEW_FLOOR_LINES = 6
+#: Empty rows the table pane keeps below its last one when the screen is too short
+#: for the full :data:`_TABLE_SPARE_ROWS` -- still a table you can see yourself
+#: adding to, and the pane has a scroll bar for the rows past it.
+_TABLE_FLOOR_SPARE_ROWS = 1
 #: A negative number written to the display precision — the widest ordinary thing a
 #: numeric cell holds. It floors a NUMERIC column's width, so a table opened EMPTY is
 #: as wide as the same table opened full, and typing the first row does not need a
@@ -2266,16 +2276,17 @@ class TableEditorDialog(QDialog):
             return
         super().accept()
 
-    def _table_pane_height(self, rows_shown=None):
+    def _table_pane_height(self, rows_shown=None, spare_rows=_TABLE_SPARE_ROWS):
         """The height the table half needs for ``rows_shown`` rows (its own row count
-        by default), plus a few spare rows, its header and the Add/Remove bar."""
+        by default), plus ``spare_rows`` empty ones, its header and the Add/Remove
+        bar."""
         table = self._editable.table
         vh = table.verticalHeader()
         if rows_shown is None:
             rows = sum(table.rowHeight(r) for r in range(table.rowCount()))
         else:
             rows = rows_shown * vh.defaultSectionSize()
-        spare = _TABLE_SPARE_ROWS * vh.defaultSectionSize()
+        spare = spare_rows * vh.defaultSectionSize()
         chrome = 2 * table.frameWidth()
         # The Add/Remove bar is whatever the pane's own hint holds beyond the table's.
         bar = max(0, self._editable.sizeHint().height() - table.sizeHint().height())
@@ -2303,40 +2314,145 @@ class TableEditorDialog(QDialog):
         own minimum, so the dialog grows with it rather than taking the room out of
         the picture. Where the two cannot both be satisfied -- a table of forty
         circles is taller than any screen -- the preview keeps its minimum and the
-        table scrolls, which is the pane that has a scroll bar for the purpose."""
+        table scrolls, which is the pane that has a scroll bar for the purpose.
+
+        Those minimums are themselves trimmed to the SCREEN
+        (:meth:`_fit_minimums_to_screen`): a minimum taller than the desktop is a
+        window the user cannot shrink, so it opens with its top edge off the screen
+        and the table above the fold, out of reach."""
         width = self._content_width()
+        avail_w, avail_h = self._available_size()
+        if avail_w is not None:
+            width = min(width, avail_w)
         pane = self._table_pane_height()
         # The caption wraps at the width it is GIVEN, which is the dialog's width less
         # the layout margins -- reserving at the full width buys one line too few and
         # cuts the last line off along the bottom edge.
         margins = self.layout().contentsMargins()
         caption_width = width - margins.left() - margins.right()
-        preview = (_PREVIEW_MIN_LINES * self.fontMetrics().height()
-                   + self._preview.reserve_caption(caption_width))
-        self._preview.setMinimumHeight(preview)
-        self._editable.setMinimumHeight(self._table_pane_height(rows_shown=0))
-        # A QSplitter does not carry its children's minimums into its own, so a strip
-        # that appears later (the generator's summary) is free to squeeze the split
-        # rather than grow the dialog -- and what gets cut is the bottom of the
-        # preview's caption. Stating the minimum here puts the panes into the layout's
-        # own minimum, so the dialog grows for the new strip instead.
-        self._split.setMinimumHeight(self._editable.minimumHeight() + preview
-                                     + self._split.handleWidth())
+        self._caption_reserve = self._preview.reserve_caption(caption_width)
+        preview = self._fit_minimums_to_screen(width)
         # Everything that is not the splitter: help text, legend, generate bar,
         # buttons, help strip. sizeHint() knows them all; the splitter's own hint is
         # replaced by the two pane heights measured above.
         chrome = self.sizeHint().height() - self._split.sizeHint().height()
         height = chrome + pane + preview
-
-        screen = self.screen() or QApplication.primaryScreen()
-        if screen is not None:
-            avail = screen.availableGeometry()
-            width = min(width, avail.width())
-            height = min(height, avail.height())
+        if avail_h is not None:
+            height = min(height, avail_h)
         self.resize(width, height)
+        # A resize to the size the dialog already has is a no-op, and a no-op leaves
+        # the rows where the PREVIOUS minimums put them -- with a splitter that has
+        # since grown to a new minimum sitting on top of the strip below it. Laying
+        # the dialog out again is what puts every row back in its own space.
+        self.layout().activate()
         split_height = max(0, height - chrome)
         pane = max(0, min(pane, split_height - preview))
         self._split.setSizes([pane, split_height - pane])
+
+    def _available_size(self):
+        """The size a window can have and still sit wholly on the screen: the usable
+        desktop less this window's own title bar and borders.
+
+        The frame is only real once the window manager has drawn it, so before the
+        first show this is the usable desktop itself -- which is why the fit is made
+        again from :meth:`showEvent`, when the title bar has a height."""
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None:
+            return None, None
+        avail = screen.availableGeometry()
+        frame, geom = self.frameGeometry(), self.geometry()
+        return (avail.width() - max(0, frame.width() - geom.width()),
+                avail.height() - max(0, frame.height() - geom.height()))
+
+    def _chrome_minimum(self, width=None):
+        """The height every row of the dialog OTHER than the splitter insists on at
+        ``width`` -- margins, spacing, the help text, the generate bar, the search
+        window, the help strip and the buttons.
+
+        Measured at a width, because the rows that dominate it are wrapped paragraphs
+        whose height is a function of one. ``layout.minimumSize()`` is no substitute:
+        it leaves the wrapping out, and budgeting the panes against a chrome that
+        reads fifteen pixels short is a splitter handed less than the minimum it was
+        promised -- it keeps that minimum anyway and its panes spill over the strip
+        below, which is the caption disappearing under the Generate button.
+
+        The nested bars are invalidated first: each caches its own minimum, and the
+        strip that just appeared inside one (the generator's summary) is not in that
+        cache yet."""
+        layout = self.layout()
+        margins = layout.contentsMargins()
+        if width is None:
+            width = self.width()
+        inner = width - margins.left() - margins.right()
+        want = (margins.top() + margins.bottom()
+                + layout.spacing() * max(0, layout.count() - 1))
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            widget = item.widget()
+            if widget is self._split:
+                continue
+            if widget is None:
+                item.invalidate()
+            if item.hasHeightForWidth():
+                want += item.heightForWidth(inner)
+            elif widget is None:
+                want += item.minimumSize().height()
+            else:
+                # What the LAYOUT will honour: a widget given an explicit minimum (the
+                # help strip reserves its wrapped height) holds the larger of the two.
+                want += max(widget.minimumSizeHint().height(), widget.minimumHeight())
+        return want
+
+    def _fit_minimums_to_screen(self, width=None):
+        """Give the two panes minimum heights that leave the dialog shrinkable to the
+        screen, and return the preview's.
+
+        A minimum is a promise the layout keeps at the user's expense: a dialog whose
+        minimum is taller than the desktop cannot be resized to fit it, so the window
+        manager opens it hanging off the top and the rows above the fold -- the table,
+        Add row, Remove selected -- are unreachable, with no scroll bar anywhere to
+        bring them back (issue #3: the circles editor at 1920x1080 with Windows at
+        125%, where a wrapped help paragraph, a ten-field search window and a
+        16-line preview together asked for more height than the screen had).
+
+        So the panes are budgeted against what is left of the screen once the strips
+        outside the splitter have taken their own minimums. The preview gives way
+        first, down to a floor that is still a readable picture plus its caption; the
+        table gives way after it, down to its header and a spare row, because the
+        table is the pane with a scroll bar. On a screen too short even for those --
+        1080p at 200%, an old netbook -- the preview goes below its floor and, in the
+        limit, to a strip the splitter handle can drag back open: a squeezed picture
+        the user can trade for is worth more than a table they cannot reach."""
+        preview = (_PREVIEW_MIN_LINES * self.fontMetrics().height()
+                   + self._caption_reserve)
+        table = self._table_pane_height(rows_shown=0)
+        avail = self._available_size()[1]
+        if avail is not None:
+            budget = (avail - self._chrome_minimum(width)
+                      - self._split.handleWidth())
+            if table + preview > budget:
+                floor = (_PREVIEW_FLOOR_LINES * self.fontMetrics().height()
+                         + self._caption_reserve)
+                preview = max(floor, min(preview, budget - table))
+            if table + preview > budget:
+                floor = self._table_pane_height(
+                    rows_shown=0, spare_rows=_TABLE_FLOOR_SPARE_ROWS)
+                table = max(floor, min(table, budget - preview))
+            if table + preview > budget:
+                preview = max(0, budget - table)
+        self._preview.setMinimumHeight(preview)
+        self._editable.setMinimumHeight(table)
+        # A QSplitter does not carry its children's minimums into its own, so a strip
+        # that appears later (the generator's summary) is free to squeeze the split
+        # rather than grow the dialog -- and what gets cut is the bottom of the
+        # preview's caption. Stating the minimum here puts the panes into the layout's
+        # own minimum, so the dialog grows for the new strip instead.
+        self._split.setMinimumHeight(table + preview + self._split.handleWidth())
+        # A resize is clamped by the layout's minimum as the layout last computed it,
+        # so the relaxed minimums have to reach it before anyone resizes to them --
+        # otherwise the dialog is held at a height the screen does not have.
+        self.layout().activate()
+        return preview
 
     def _refit_columns(self):
         """Re-fit the columns to content that arrived after the dialog opened (a
@@ -2368,7 +2484,11 @@ class TableEditorDialog(QDialog):
         wrapped label at the dialog's own MINIMUM width, where the same text takes
         more lines than it does at the width on screen, so it answers a question
         nobody asked. Summing the rows at the real width is the measurement that
-        matches what is drawn."""
+        matches what is drawn.
+
+        Never past the screen, though: the room a late strip needs comes out of the
+        panes, which have minimums trimmed to fit (:meth:`_fit_minimums_to_screen`),
+        rather than out of the desktop."""
         layout = self.layout()
         margins = layout.contentsMargins()
         width = self.width() - margins.left() - margins.right()
@@ -2382,20 +2502,37 @@ class TableEditorDialog(QDialog):
             widget = item.widget()
             want += (max(widget.sizeHint().height(), widget.minimumHeight())
                      if widget is not None else item.sizeHint().height())
+        avail = self._available_size()[1]
+        if avail is not None:
+            want = min(want, avail)
         if want > self.height():
             self.resize(self.width(), want)
 
     def _grow(self, width):
         """Widen to ``width``, never past the screen."""
-        screen = self.screen() or QApplication.primaryScreen()
-        avail = screen.availableGeometry().width() if screen is not None else width
-        self.resize(min(width, avail), self.height())
+        avail = self._available_size()[0]
+        self.resize(min(width, avail) if avail is not None else width, self.height())
 
     def showEvent(self, event):
         super().showEvent(event)
         if getattr(self, "_content_sized", False):
+            # The title bar and borders only have a height once the window is up, and
+            # they are part of what has to fit on the screen -- so the pane minimums
+            # are budgeted again here, against the frame the user will actually drag.
+            self._fit_minimums_to_screen()
+            self._shrink_to_screen()
             self._grow_to_layout_minimum()
             self._grow_to_fit_columns()
+
+    def _shrink_to_screen(self):
+        """Pull the window back inside the desktop it opened on, in case the screen
+        it landed on is smaller than the one it was sized against (a laptop docked to
+        a second display, a dialog opened on the short screen of the pair)."""
+        avail_w, avail_h = self._available_size()
+        if avail_w is None:
+            return
+        if self.width() > avail_w or self.height() > avail_h:
+            self.resize(min(self.width(), avail_w), min(self.height(), avail_h))
 
     def _grow_to_fit_columns(self):
         """Close any gap between what the columns need and what the viewport gives

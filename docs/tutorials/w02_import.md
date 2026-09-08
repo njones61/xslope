@@ -18,7 +18,7 @@ new unsaved project on the canvas and a list of what did not come across.
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
-<div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~25 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~40 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Map a CAD drawing's layers to input features, import a
@@ -122,7 +122,7 @@ of its points. That model ships as
 
 With the properties in, the model is complete. Click **Run LEM**, choose
 **Spencer** and **Auto search**, leave **Number of slices** at 40, and click
-**OK**. The search returns **FS = 1.185** on a circle tangent to the top of the
+**Run**. The search returns **FS = 1.185** on a circle tangent to the top of the
 dense sand — through the foundation clay rather than the fill.
 
 <!-- test: file=files/w02_section_imported.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.185, tolerance=0.005, benchmark=W-2-dxf -->
@@ -179,10 +179,12 @@ kPa.
 
 We want the two programs on the same surface, so this run goes on the imported
 circle. Click **Run LEM**, choose **Spencer**, set **Analysis** to **Single
-surface**, and click **OK**. XSLOPE returns **FS = 1.939** against SLOPE/W's 1.934
-— a difference of 0.3% on identical geometry, materials and water, and the value
-[§2.25 of the GeoStudio verification page](../verification/geostudio.md#gs-2-25)
-already publishes from a hand-built input file.
+surface**, and click **Run**. XSLOPE returns **FS = 1.939** against SLOPE/W's 1.934
+— a difference of 0.3% on identical geometry, materials and water. The same dam is
+worked from a hand-built input file at
+[§2.25 of the GeoStudio verification page](../verification/geostudio.md#gs-2-25),
+which solves Slide's critical circle and Baker & Leshchinsky's own surface rather
+than this one.
 
 ### Check its work
 
@@ -247,7 +249,7 @@ toe, on a circle through it, the placement
 
 The model now has everything a search needs. Click **Run LEM**, choose
 **Spencer** and **Auto search**, leave **Number of slices** at 40, and click
-**OK**.
+**Run**.
 The search returns **FS = 1.372** against Slide2's published 1.360, a difference
 of 0.9% that
 [problem 104 of the Slide2 verification page](../verification/rocscience.md#vp104)
@@ -262,6 +264,8 @@ circle and reaches lower than a circular search can.
   what the source defines.
 - **The starting circle is yours, not Slide2's.** A run without one has no surface
   to solve.
+- **There is no Max Depth line.** The flat bottom of the section is the lower edge
+  of the three zones, not a rigid base the import carried across.
 
 ---
 

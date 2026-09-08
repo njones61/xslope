@@ -201,9 +201,9 @@ def placeholder(name, title, lines, width=1200):
 def lem01_sheets():
     """The four worksheets the tutorial's Excel path fills, as the reader leaves them.
 
-    Column windows, where given, are the real table edge: ``mat`` is 42 columns
+    Column windows, where given, are the real table edge: ``mat`` is 43 columns
     wide and only its strength band is filled here, and ``main``'s content stops at
-    the Water-loads row — everything below it on that sheet is the hidden source
+    the Surface-family row — everything below it on that sheet is the hidden source
     data behind the dropdowns, which is not part of what a reader fills in.
 
     The ``mat`` window ends at Z because that is where the sheet's own row-9 band
@@ -212,7 +212,7 @@ def lem01_sheets():
     rather than a quiet crop — the same constraint the input-template manifest
     documents for its three ``mat`` views.
     """
-    render("lem01_sheet_main.png", LEM01, "main", rows=(1, 24), cols="A:D")
+    render("lem01_sheet_main.png", LEM01, "main", rows=(1, 25), cols="A:D")
     render("lem01_sheet_mat.png", LEM01, "mat", rows=(9, 13), cols="A:Z")
     # profile spans two neighbouring tables so the capture reads like the real
     # sheet — Profile Line #2 sits empty beside the filled #1, as the reader
@@ -304,11 +304,11 @@ def t0_template():
     to its own fixed width with empty grid columns, which the owner's review of the
     LEM-1 captures rejected.
 
-    Rows stop at 24 (the Surface-family row) for the same reason LEM-1's do —
+    Rows stop at 25 (the Surface-family row) for the same reason LEM-1's do —
     below it the sheet holds the hidden source data behind the dropdowns, which is
     not part of what a reader fills in.
     """
-    render("t0_template_main.png", TEMPLATE, "main", rows=(1, 24), cols="A:G")
+    render("t0_template_main.png", TEMPLATE, "main", rows=(1, 25), cols="A:G")
 
 
 # --------------------------------------------------------------------------- #
@@ -2137,10 +2137,10 @@ def seep01_sheets():
     """The four worksheets SEEP-1's Excel path fills.
 
     ``main`` and ``profile`` take LEM-1's own windows on those sheets, so a reader
-    coming from that page sees the same frame twice — through the Water-loads row on
-    one, and through the empty Profile Line #2 beside the filled #1 on the other.
+    coming from that page sees the same frame twice — through the Surface-family row
+    on one, and through the empty Profile Line #2 beside the filled #1 on the other.
 
-    ``mat`` cannot: this problem fills the seepage band at columns AG–AP and nothing
+    ``mat`` cannot: this problem fills the seepage band at columns AG–AQ and nothing
     in the strength band at all, and a window wide enough to hold both would be forty
     columns across. It is rendered as the split view the input-template manifest uses
     for the same band — the seepage columns, with the mat ID and name re-shown at the
@@ -2151,8 +2151,8 @@ def seep01_sheets():
     reason LEM-1's profile window does: the empty neighbor is what the sheet looks
     like, and cropping it makes the capture read as a table rather than a worksheet.
     """
-    render("seep01_sheet_main.png", SEEP01, "main", rows=(1, 24), cols="A:D")
-    render("seep01_sheet_mat.png", SEEP01, "mat", rows=(10, 12), cols="AG:AP",
+    render("seep01_sheet_main.png", SEEP01, "main", rows=(1, 25), cols="A:D")
+    render("seep01_sheet_mat.png", SEEP01, "mat", rows=(10, 12), cols="AG:AQ",
            identity_cols="A:B")
     render("seep01_sheet_profile.png", SEEP01, "profile", rows=(1, 15), cols="A:H")
     render("seep01_sheet_seep_bc.png", SEEP01, "seep bc", rows=(1, 8), cols="A:L")
@@ -2242,10 +2242,15 @@ def _seep01_tip_zoom(panels, half=1.6):
     fig.tight_layout()
 
 
-def _seep01_q_vs_k(both, k1_only, target=None, crossing=None):
+def _seep01_q_vs_k(both, k1_only, target=None, crossing=None,
+                   length="m", time="yr"):
     """The discharge against conductivity, two sweeps on one pair of axes.
 
-    Both series start at the model's own 30 m/day, so the figure's whole content is
+    The axis and legend units are the model's own — this file declares metres and
+    a year time base, and a conductivity axis labelled per day would be a picture
+    of a problem three hundred and sixty-five times faster than the one solved.
+
+    Both series start at the model's own 30 length/time, so the figure's whole content is
     how they diverge above it. Scaling both principal conductivities together leaves
     the head field untouched and makes the discharge exactly proportional to k;
     sweeping k1 alone changes the anisotropy ratio, and with it the head field, so
@@ -2267,7 +2272,8 @@ def _seep01_q_vs_k(both, k1_only, target=None, crossing=None):
     ax.plot(ks, [q for _, q in both], "o-", color="#1f6fb4", lw=1.2, ms=6,
             label="k₁ and k₂ scaled together")
     ax.plot([k for k, _ in k1_only], [q for _, q in k1_only], "s-", color="#c1663a",
-            lw=1.4, ms=5, label="k₁ swept, k₂ held at 30 m/day")
+            lw=1.4, ms=5,
+            label="k₁ swept, k₂ held at 30 %s/%s" % (length, time))
     if target is not None:
         ax.axhline(target, color="#7a8592", lw=0.9, ls="--")
         ax.annotate("target q = %g" % target, (0.0, target), xytext=(4, 4),
@@ -2278,8 +2284,8 @@ def _seep01_q_vs_k(both, k1_only, target=None, crossing=None):
                         textcoords="offset points", color="#c1663a", fontsize=9)
     ax.set_xlim(0, max(ks) * 1.02)
     ax.set_ylim(0, None)
-    ax.set_xlabel("hydraulic conductivity (m/day)")
-    ax.set_ylabel("total discharge q (m³/day per m)")
+    ax.set_xlabel("hydraulic conductivity (%s/%s)" % (length, time))
+    ax.set_ylabel("total discharge q (%s³/%s per %s)" % (length, time, length))
     ax.set_title("Discharge against hydraulic conductivity")
     ax.grid(True, color="#e3e7eb", lw=0.6)
     ax.legend(loc="upper left", frameon=False)
@@ -2433,7 +2439,8 @@ def seep01_plots():
     print("   design      %s · bracketed %s · %s"
           % (res["message"], res["bracketed"], res["direction"]))
     capture("seep01_q_vs_k.png", _seep01_q_vs_k, both, k1_only,
-            target=SEEP01_TARGET_Q, crossing=res["crossing"])
+            target=SEEP01_TARGET_Q, crossing=res["crossing"],
+            length=declared_unit_labels(sd)["length"], time=sd["time_unit"])
 
     # The other half of q = k·Δh·Nf/Nd, measured the same way: the head drop, with
     # the conductivity left alone. The page states this one rather than drawing it,

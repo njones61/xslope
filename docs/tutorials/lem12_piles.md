@@ -126,11 +126,16 @@ and **Analysis** = `Auto search`, with the slice count left at 40:
 
 ![The Run LEM dialog on the loaded model](images/lem12_studio_run_lem.png)
 
-Click **Run**. The search walks the circle the file carries down onto the rigid
-base, and the plot draws every circle it tried in gray with the one it kept in
-red:
+Click **Run**. The circle the file carries runs along the rigid base and reads
+2.643; the search does not stay down there, settling instead on a smaller circle
+whose lowest point is 4.90 ft above the base, at 1.842. Where the surface sits
+decides where it crosses each pile row, and that crossing is what sets the
+Ito & Matsui force the row delivers. The plot draws every circle it tried in
+gray with the one it kept in red:
 
 ![The Spencer search with the pile rows in place](images/lem12_search.png){width=1000}
+
+<!-- test: file=../lem/files/xslope_piles.xlsx, type=single_circle, circle_index=0, method=spencer, num_slices=40, expected_fs=2.643, tolerance=0.005 -->
 
 **FS = 1.842**, on a circle centered at (3.79, 26.69) with a radius of 31.79,
 tangent at elevation −5.10. The solution plot draws that surface with its base

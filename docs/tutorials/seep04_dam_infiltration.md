@@ -263,7 +263,8 @@ doing its job. From there the zero-pressure line is the drain itself: an active
 exit-face node is held at atmospheric pressure, ψ = 0, and all thirteen stay
 active, so the drain runs at zero pressure head end to end. Water arrives all
 along it, but not evenly — the first meter passes over half the discharge, the
-shares fall away tenfold by mid-drain, and what little lands farther along has
+shares fall away tenfold four meters in and thirty-fold by mid-drain, and what
+little lands farther along has
 percolated down through the unsaturated soil that sits above the drain
 downstream of x = 40. Below and left of that line the soil is saturated and the pressure
 head is positive; above it the soil is unsaturated and the pressure head is
@@ -445,6 +446,8 @@ the same 13 of 13 exit-face nodes draining at the end.
 The head still ranges from **0 to 10 m**: the rain lifts heads inside the dam but
 does not push any of them above the reservoir that is the model's high point.
 
+<!-- test: file=files/xslope_dam_infiltration.xlsx, type=seep, element_type=tri3, target_size=1.0, expected_flowrate=4.916e-07, tolerance=0.005 -->
+
 The two solution figures are drawn on the **same color scale**, 0 to 10 m of total
 head, so we can read them against each other directly. Everything downstream of the
 crest is warmer under rain — heads there are higher — and the phreatic surface is
@@ -533,9 +536,10 @@ whole family on one section:
 | 0.2 | 2 × 10<sup>−8</sup> | 6.949 × 10<sup>−7</sup> | 9.55 |
 | 0.4 | 4 × 10<sup>−8</sup> | 1.246 × 10<sup>−6</sup> | none — saturated to the surface |
 
-All six runs are on the mesh we have been using, all six converge in the
-same eight sweeps, and all thirteen drain nodes drain in every one of them, so
-nothing below is the drain switching on or off.
+All six runs are on the mesh we have been using, none of them takes more than
+the eight sweeps the dry run took — the two wettest close in six and five — and
+all thirteen drain nodes drain in every one of them, so nothing below is the
+drain switching on or off.
 
 **The water table rises faster than the rain does.** Each step of the sweep
 lifts the centerline surface more than the step before — the table above shows

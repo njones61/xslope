@@ -122,17 +122,20 @@ left at 40:
 
 ![The Run LEM dialog on the loaded model](images/lem11_studio_run_lem.png)
 
-Click **Run**. The search deepens the file's circle onto the base of the model:
+Click **Run**. The circle the file carries already reaches the rigid base at
+elevation −20, and solved on its own it reads 1.366, so the search has nowhere
+deeper to take it. It pulls the circle in instead — radius 80 ft to 67.36,
+failure surface 152.62 ft to 141.27, factor of safety 1.366 to 1.354:
 
 ![Spencer on the most-likely values](images/lem11_solution.png){width=1000}
 
-**FS = 1.354**, on a circle centered at (23.14, 47.36), tangent to the rigid base
-at elevation −20, 141.27 ft of failure surface carrying 370,624 lb/ft of clay.
-This is where every deterministic analysis in the previous ten tutorials would
-stop, and it is the number the rest of this page is about: not whether
-1.354 is right, but how much of it is real.
+**FS = 1.354**, on a circle centered at (23.14, 47.36), still tangent to the
+rigid base, carrying 370,624 lb/ft of clay. This is where every deterministic
+analysis in the previous ten tutorials would stop, and it is the number the rest
+of this page is about: not whether 1.354 is right, but how much of it is real.
 
 <!-- test: file=../lem/files/xslope_reliability.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.354, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_reliability.xlsx, type=single_circle, circle_index=0, method=spencer, num_slices=40, expected_fs=1.366, tolerance=0.005 -->
 
 ---
 

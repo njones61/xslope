@@ -161,13 +161,13 @@ unit does one more thing: it is the unit of every time on the schedule, so
 
 Click **Materials**. On **Table view** — the view the editor opens on — set the
 **Show parameters for:** toggles to **Seepage**
-alone, and the table shows the seepage band of the `mat` worksheet — ten columns,
-the last two of which need a scroll to the right to reach:
+alone, and the table shows the seepage band of the `mat` worksheet — eleven
+columns, the rightmost of which need a scroll to the right to reach:
 
-| mat | name | k1 (m/day) | k2 (m/day) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n | Ss (1/m) | Sy |
-| :---: | --- | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1 | `shell` | 1.5 | 0.5 | 0 | `lf` | 0.01 | −0.3 | 0 | 0 | 3 × 10<sup>−4</sup> | 0.22 |
-| 2 | `core` | 0.012 | 0.005 | 0 | `lf` | 0.01 | −0.3 | 0 | 0 | 3 × 10<sup>−3</sup> | 0.03 |
+| mat | name | k1 (m/day) | k2 (m/day) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n | l | Ss (1/m) | Sy |
+| :---: | --- | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1 | `shell` | 1.5 | 0.5 | 0 | `lf` | 0.01 | −0.3 | 0 | 0 | 0.5 | 3 × 10<sup>−4</sup> | 0.22 |
+| 2 | `core` | 0.012 | 0.005 | 0 | `lf` | 0.01 | −0.3 | 0 | 0 | 0.5 | 3 × 10<sup>−3</sup> | 0.03 |
 
 Both zones are **anisotropic** — `k1` is three times `k2` on the shell and about
 2.4 times on the core, which is what compacted horizontal lifts produce. `alpha`
@@ -180,7 +180,9 @@ The `unsat` selector and the two parameters after it are the linear-front
 relative-conductivity model, covered in full in
 [SEEP-2](seep02_johnson_dam.md#the-three-unsaturated-models).
 `vg_a` and `vg_n` carry the curve the van Genuchten and Gardner models use, and
-sit at zero here because this model uses neither.
+sit at zero here because this model uses neither; `l` is the pore-connectivity
+exponent of the van Genuchten conductivity function, which stays at its
+conventional 0.5 for the same reason.
 
 The last two columns — the ones the scroll was for — are what this page is about.
 The shell's *S<sub>s</sub>* = 3 × 10<sup>−4</sup> /m and *S<sub>y</sub>* = 0.22 are
@@ -385,6 +387,8 @@ and nothing outside them. The pore pressure runs from **−78.6 kPa to 176.6 kPa
 the negative end is the unsaturated soil above the phreatic surface, where
 the pressure head ψ = *h* − *z* (*z* the elevation) is negative.
 
+<!-- test: file=files/xslope_earth_dam_drawdown.xlsx, type=seep, element_type=tri3, size_divisions=64, expected_flowrate=0.16488, tolerance=0.005 -->
+
 The heavy black line is the phreatic surface, and the flow lines crowding into the
 core say the same thing it does. Read across the section, the surface stands at
 **17.90 m at x = 50**, inside the core's upstream half, and at **3.52 m at
@@ -519,11 +523,13 @@ run:
 choice between solving the model as it stands and stepping it through the
 schedule. Set it to **Transient (time-dependent)**.
 
-**Convergence tol** and **Max iterations** gray out the moment **Transient** is
-chosen, and there is nothing to do to them. They belong to the steady solve — the
-nonlinear iteration we measured on the unconfined problem in SEEP-2 — while the
-transient run carries its own step-size and iteration controls and sets them from how
-fast the field is moving.
+**Convergence tol** grays out the moment **Transient** is chosen. It belongs to
+the steady solve — the nonlinear iteration we measured on the unconfined problem
+in SEEP-2 — while the transient march carries its own step-size controls and sets
+them from how fast the field is moving. **Max iterations** stays live and jumps
+from `400` to `2000`, because the march still has one steady solve to make: the
+initial condition, which is that same nonlinear iteration at full pool. Leave it
+at 2000.
 
 The **Model checks** panel reports **No problems found for this run.** with
 **2 notes** collapsed beneath it. Opening them shows the anisotropy reading from
@@ -537,18 +543,18 @@ and then prints a line per saved frame:
 
 ```text
 Building seepage data (transient, BC set 1)…
-Running transient seepage analysis…
-  t=2: frame saved (steps so far=6, mass-balance closure=7.60e-04)
-  t=15: frame saved (steps so far=283, mass-balance closure=4.66e-03)
-  t=30: frame saved (steps so far=716, mass-balance closure=1.82e-02)
-  t=47: frame saved (steps so far=1207, mass-balance closure=2.89e-02)
-  t=60: frame saved (steps so far=1579, mass-balance closure=2.67e-02)
-  t=80: frame saved (steps so far=1802, mass-balance closure=3.99e-02)
-  t=120: frame saved (steps so far=1940, mass-balance closure=4.92e-02)
-  t=180: frame saved (steps so far=2050, mass-balance closure=3.25e-02)
-  t=240: frame saved (steps so far=2076, mass-balance closure=1.59e-02)
-  t=300: frame saved (steps so far=2084, mass-balance closure=9.54e-03)
-  t=360: frame saved (steps so far=2098, mass-balance closure=6.84e-03)
+Running transient seepage analysis… (initial condition: up to 2000 sweeps)
+  t=2: frame saved (steps so far=6, mass-balance closure=3.59e-04)
+  t=15: frame saved (steps so far=292, mass-balance closure=7.82e-03)
+  t=30: frame saved (steps so far=698, mass-balance closure=1.73e-02)
+  t=47: frame saved (steps so far=1132, mass-balance closure=2.85e-02)
+  t=60: frame saved (steps so far=1537, mass-balance closure=2.64e-02)
+  t=80: frame saved (steps so far=1729, mass-balance closure=3.96e-02)
+  t=120: frame saved (steps so far=1870, mass-balance closure=4.89e-02)
+  t=180: frame saved (steps so far=1959, mass-balance closure=3.25e-02)
+  t=240: frame saved (steps so far=1984, mass-balance closure=1.59e-02)
+  t=300: frame saved (steps so far=1993, mass-balance closure=9.36e-03)
+  t=360: frame saved (steps so far=1997, mass-balance closure=6.80e-03)
 Transient seepage complete — 12 saved frame(s).
 ```
 
@@ -560,10 +566,10 @@ dropped, so 0, 2, 15, 30, 47, 60, 80, 120, 180, 240, 300 and 360 is what survive
 in full. Nothing on this file contributes stage times, since those fields were
 left blank.
 
-**2,098 steps behind those 12 frames**, and the running count in the log says where
-the solver spent them. It reaches day 47 on step 1,207 — **the first 47 days are
-13% of the run's duration but take 58% of its steps** — and it covers the last 180 days in
-**48 steps**. The step size is chosen from how fast the field is moving, so the step
+**1,997 steps behind those 12 frames**, and the running count in the log says where
+the solver spent them. It reaches day 47 on step 1,132 — **the first 47 days are
+13% of the run's duration but take 57% of its steps** — and it covers the last 180 days in
+**38 steps**. The step size is chosen from how fast the field is moving, so the step
 count is itself a reading: the dam is changing quickly while the pool is falling
 and barely at all by the end.
 
@@ -664,7 +670,9 @@ three solid traces are the nodes. Four instants tell the story:
 | 0 | 18.00 | 13.56 | 17.98 | +4.65 | +9.06 |
 | 30 | 8.04 | 10.50 | 9.84 | +1.59 | +0.92 |
 | 47 | 2.00 | 9.35 | 6.54 | +0.44 | −2.37 |
-| 120 | 2.00 | 2.92 | 2.71 | −5.99 | −6.21 |
+| 120 | 2.00 | 2.92 | 2.71 | −5.98 | −6.21 |
+
+<!-- test: file=files/xslope_earth_dam_drawdown.xlsx, type=tseep_head, element_type=tri3, size_divisions=64, time=47, points=54.5:8.9:9.347;30.7:8.9:6.543;75.3:6.8:3.176, tolerance=0.05 -->
 
 At full pool the shell node stands at **17.98 m** and the core node at
 **13.56 m** — the shell is **4.42 m higher**, which is just the steady picture
@@ -700,16 +708,16 @@ from. Each saved frame reports the flow across the boundary in each direction:
 | :---: | :---: | :---: | :---: |
 | 0 | 18.00 | 0.16488 | 0.16488 |
 | 2 | 18.00 | 0.16488 | 0.16488 |
-| 15 | 13.38 | 0.00000 | 1.25079 |
-| 30 | 8.04 | 0.00000 | 1.65767 |
-| 47 | 2.00 | 0.00000 | 1.43680 |
-| 60 | 2.00 | 0.00000 | 0.81468 |
-| 80 | 2.00 | 0.00000 | 0.42130 |
-| 120 | 2.00 | 0.00000 | 0.15870 |
-| 180 | 2.00 | 0.00000 | 0.04799 |
-| 240 | 2.00 | 0.00000 | 0.01830 |
-| 300 | 2.00 | 0.00000 | 0.00769 |
-| 360 | 2.00 | 0.00000 | 0.00326 |
+| 15 | 13.38 | 0.00000 | 1.24935 |
+| 30 | 8.04 | 0.00000 | 1.65905 |
+| 47 | 2.00 | 0.00000 | 1.43737 |
+| 60 | 2.00 | 0.00000 | 0.81497 |
+| 80 | 2.00 | 0.00000 | 0.42133 |
+| 120 | 2.00 | 0.00000 | 0.15883 |
+| 180 | 2.00 | 0.00000 | 0.04821 |
+| 240 | 2.00 | 0.00000 | 0.01850 |
+| 300 | 2.00 | 0.00000 | 0.00770 |
+| 360 | 2.00 | 0.00000 | 0.00350 |
 
 The first two rows are the check the two-day hold was entered for: inflow equals
 outflow at **0.16488**, which is the steady discharge computed at full pool, and it
@@ -720,7 +728,7 @@ until the pool is asked to move.
 the upstream face stops being a source. The first frame to record that is t = 15,
 and from there to the end of the run — 345 days — nothing enters the dam at all.
 
-**The outflow peaks at 1.6577 on day 30**, which is **ten times** the steady
+**The outflow peaks at 1.6591 on day 30**, which is **ten times** the steady
 discharge the same dam passed under a full reservoir. Every bit of that is water
 the soil is giving up: it cannot be water arriving from the reservoir, because
 there is none. This is what the storage properties bought, and it is why a
@@ -729,16 +737,16 @@ steady solve at elevation 2 would report a small discharge and no lag at all.
 
 **Late in the run the outflow decays toward the new steady state.** It drops by
 roughly a factor of two and a half between successive frames at the end of the
-run — 0.04799, 0.01830, 0.00769, 0.00326 — which is what a diffusive relaxation
+run — 0.04821, 0.01850, 0.00770, 0.00350 — which is what a diffusive relaxation
 looks like, and
-finishes at **0.20% of the peak**. That decay and the 0.05 m of remaining lag from
+finishes at **0.21% of the peak**. That decay and the 0.05 m of remaining lag from
 the frames are the same statement made two ways: by day 360 there is almost
 nothing left to drain.
 
 The solver also keeps a running ledger of the whole run, which is the transient
 counterpart of the steady solver's flow-closure check. Over the 360 days,
-**105.109 m³ per m of dam crossed the boundary outward**, and the soil released
-**105.828 m³ per m** from storage. Those two are the same volume counted two
+**105.113 m³ per m of dam crossed the boundary outward**, and the soil released
+**105.827 m³ per m** from storage. Those two are the same volume counted two
 ways, so their difference is a measure of how well the run conserved water: over
 the whole run it comes to **0.7% of the volume transferred**. That difference is
 the `mass-balance closure` printed on each frame line of the log — a running

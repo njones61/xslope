@@ -104,10 +104,10 @@ TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 #
 # The multi-tiered geotextile wall family (RS2-48–55, Leshchinsky & Han 2004) is the
 # case in point. The baseline's SSR row is not attempted (RS2 splits that mesh at the
-# sheets and joins it with slip interfaces, so the page carries no figure for it); of
-# the seven parametric variants, the two that hold their factor across a refinement
-# step are locked and reach this script through their tags, and the five that follow
-# the mesh are reported and registered below. All eight share what was the baseline's
+# sheets and joins it with slip interfaces, so the page carries no figure for it); all
+# seven parametric variants follow the mesh — each moves past its own tolerance under a
+# refinement step, in the 2D size and in the 1D size alike — so all seven are reported
+# rather than locked, and all seven are registered below. All eight share what was the baseline's
 # model settings — 1.0 m tri6 mesh, the vendor's isotropic at-rest field stress
 # (k0 = 1) and static tensile caps (tension_srf off) — but the variants run the auto
 # bracket rather than the baseline's narrow one, because the family spans 0.74–1.16.
@@ -124,7 +124,9 @@ EXTRA_CASES = [
      'element_type': 'tri6', 'target_size': '6.0', 'tolerance': '0.02',
      'f_min': '1.4', 'f_max': '2.8', 'max_iter': '16000',
      'tension_srf': 'true', 'k0': '1'},
+    {**_WALL, 'file': 'files/rocscience/vp088.xlsx', 'benchmark': 'RS2-49'},
     {**_WALL, 'file': 'files/rocscience/vp089.xlsx', 'benchmark': 'RS2-50'},
+    {**_WALL, 'file': 'files/rocscience/vp090.xlsx', 'benchmark': 'RS2-51-wall'},
     {**_WALL, 'file': 'files/rocscience/vp091.xlsx', 'benchmark': 'RS2-52'},
     {**_WALL, 'file': 'files/rocscience/vp092.xlsx', 'benchmark': 'RS2-53'},
     {**_WALL, 'file': 'files/rocscience/vp093.xlsx', 'benchmark': 'RS2-54'},

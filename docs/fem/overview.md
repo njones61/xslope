@@ -222,7 +222,9 @@ construction is covered in [Mesh Generation](mesh.md).
 Reinforcement and pile lines are embedded in the same mesh, so their 1D elements are edges of the
 soil elements around them and every 1D node is a soil node. That coupling makes their discretization
 a mesh question rather than a per-member one: refining a member means refining the soil it hands its
-load to. The **1D element size** on the main sheet is where a model states it — the element size
+load to. A line enters the mesh as its two endpoints, subdivided at the 1D element size — its
+capacity, and the law behind it, are read by the solver and never decide the discretization. The
+**1D element size** on the main sheet is where a model states it — the element size
 along those lines, blank to mesh them at the global target size like everything else. A stated size
 is applied as a graded band around the lines, so the structural elements and the soil sharing their
 nodes both come back at that size and grow back to the target away from them, and a member can be

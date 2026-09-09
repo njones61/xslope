@@ -15,7 +15,14 @@ date-released: '2026-09-08'
 license: Apache-2.0
 repository-code: "https://github.com/njones61/xslope"
 url: "https://xslope.org"
-doi: 10.5281/zenodo.21830232
+doi: 10.5281/zenodo.22669320
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.20709269
+    description: The concept DOI, resolving to the latest released version.
+  - type: doi
+    value: 10.5281/zenodo.22669320
+    description: The version DOI for 0.5.2.
 keywords:
   - slope stability
   - seepage

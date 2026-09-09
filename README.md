@@ -113,7 +113,7 @@ which covers the development install, coding conventions, and the test suite.
 If you use xslope in published work, please cite the archived release:
 
 > Jones, N. L. (2026). *xslope* (Version 0.2.1) [Computer software].
-> https://doi.org/10.5281/zenodo.21830232
+> https://doi.org/10.5281/zenodo.20709269
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff).
 

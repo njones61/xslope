@@ -528,6 +528,29 @@ def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area,
         step = max(1, (len(pullout.s) - 1) // 40)
         cands = set(float(v) for v in pullout.s[::step])
         cands.update((0.0, line_length))
+        # The envelope's corners are stored exactly, as they are under the
+        # constant-rate law: the station where each end's pullout capacity
+        # reaches Tmax, and the crossing of the two capacities where that lies
+        # below the plateau. The integrated resistance is monotone in the
+        # embedment, so each station is one inversion of the stored integral.
+        s_grid, cum = pullout.s, pullout.cum
+        if len(s_grid) > 1:
+            need1 = Tmax - Tend1
+            if 0.0 < need1 <= pullout.total:
+                cands.add(float(np.interp(need1, cum, s_grid)))
+            need2 = Tmax - Tend2
+            if 0.0 < need2 <= pullout.total:
+                d2 = float(np.interp(need2, cum[::-1] * -1.0 + pullout.total, s_grid[::-1] * -1.0 + line_length))
+                cands.add(max(0.0, min(line_length, line_length - d2)))
+            cap1 = Tend1 + cum
+            cap2 = Tend2 + (pullout.total - cum)
+            diff = cap1 - cap2
+            sign = np.sign(diff)
+            cross = np.nonzero(sign[:-1] * sign[1:] < 0)[0]
+            for k in cross:
+                s_x = float(s_grid[k] - diff[k] * (s_grid[k + 1] - s_grid[k]) / (diff[k + 1] - diff[k]))
+                if 0.0 < s_x < line_length and (Tend1 + pullout.from_end1(s_x)) < Tmax:
+                    cands.add(s_x)
     else:
         # Candidate breakpoints: the endpoints plus every kink of the envelope —
         # where each end's ramp reaches Tmax, and where the two ramps cross.

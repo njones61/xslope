@@ -8364,7 +8364,7 @@ def _joint_profiles(slope_data, bundle, field_state):
     fem_data = bundle.get("fem_data") or {}
     solution = bundle.get("solution") or {}
     out = []
-    for line_id in joint_line_ids(fem_data):
+    for line_id in joint_line_ids(fem_data, solution):
         out.append(joint_profile(fem_data, solution, line_id, slope_data,
                                  field_state=field_state,
                                  failure_solution=bundle.get("failure_solution")))

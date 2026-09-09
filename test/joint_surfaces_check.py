@@ -414,6 +414,25 @@ def _leg_report(failures, cache):
     if _joint_profiles(plain, {"fem_data": fd0, "solution": sol0}, "converged"):
         failures.append("an unjointed run is offered a joints table")
 
+    # A field read back from a saved sidecar carries no interface state, and
+    # reading its absent arrays as zeros would report every interface intact —
+    # a state nothing measured.
+    stale = {k: v for k, v in sol.items() if not k.startswith("joint_")}
+    if _joint_profiles(sd, {"fem_data": fem_data, "solution": stale}, "converged"):
+        failures.append("a solution carrying no interface state was tabulated "
+                        "as though every joint were intact")
+    from xslope.fem_details import list_lines
+    if [r for r in list_lines(fem_data, stale, sd) if r["kind"] == "joint"]:
+        failures.append("a solution carrying no interface state still lists "
+                        "its joints")
+    import matplotlib.pyplot as plt
+    from xslope.plot_fem import plot_joint_states
+    fig, ax = plt.subplots()
+    if plot_joint_states(ax, fem_data, stale):
+        failures.append("a solution carrying no interface state was offered a "
+                        "slip colorbar")
+    plt.close(fig)
+
 
 # --------------------------------------------------------------------------
 

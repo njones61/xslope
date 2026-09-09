@@ -2765,6 +2765,12 @@ def draw_joint_ticks(ax, xs, ys, span, color, alpha=0.8, zorder=None,
                            np.asarray(ys, dtype=float)])
     if len(pts) < 2:
         return
+    # A repeated point would divide by a zero step below, and a tension point
+    # list can carry one where two breakpoints land together.
+    keep = np.concatenate([[True], np.any(np.diff(pts, axis=0) != 0.0, axis=1)])
+    pts = pts[keep]
+    if len(pts) < 2:
+        return
     seg = np.diff(pts, axis=0)
     step = np.hypot(seg[:, 0], seg[:, 1])
     s = np.concatenate([[0.0], np.cumsum(step)])

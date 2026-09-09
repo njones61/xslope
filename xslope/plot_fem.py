@@ -2247,9 +2247,12 @@ def _joint_spans(fem_data, solution):
     larger. Drawing them separately would put one line exactly on top of the
     other and report whichever happened to be drawn last.
     """
+    from .joint import solution_has_joint_state
     jd = fem_data.get("joint_data")
     if jd is None or not jd.get("n"):
         return []
+    if not solution_has_joint_state(solution, jd["n"]):
+        return []                # nothing measured: a saved field carries none
     conn = np.asarray(jd["conn"], dtype=int)
     side = np.asarray(jd["side"], dtype=int)
     nodes = np.asarray(fem_data["nodes"], dtype=float)

@@ -89,6 +89,22 @@ def mesh_has_joints(mesh):
     return conn is not None and len(conn) > 0
 
 
+def solution_has_joint_state(solution, n):
+    """True when a solution carries the interface state of ``n`` joint elements.
+
+    A field read back from a saved sidecar carries the soil, the bars and the
+    piles and nothing about the joints, so its joint arrays are absent. Reading
+    an absent array as zeros would report every interface intact — a state
+    nothing measured — so every consumer asks this first and draws, tabulates
+    and lists nothing where it is false.
+    """
+    ts = (solution or {}).get("joint_ts")
+    if ts is None:
+        return False
+    ts = np.asarray(ts)
+    return ts.ndim == 2 and ts.shape[0] == int(n) and ts.shape[1] == 3
+
+
 def _node_element_map(elements, element_types, n_nodes):
     """node id -> list of 2D element indices standing on it."""
     out = [[] for _ in range(n_nodes)]

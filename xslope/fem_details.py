@@ -410,7 +410,7 @@ def list_lines(fem_data, solution, slope_data=None, field_state="converged",
             "status": prof["status"],
             "status_key": prof["status_key"],
         })
-    for line_id in joint_line_ids(fem_data):
+    for line_id in joint_line_ids(fem_data, solution):
         prof = joint_profile(fem_data, solution, line_id, slope_data,
                              field_state=field_state,
                              failure_solution=failure_solution)
@@ -923,11 +923,20 @@ JOINT_STATES = (
 )
 
 
-def joint_line_ids(fem_data):
-    """1-based constraint-line ids the mesh was split along, in order."""
+def joint_line_ids(fem_data, solution=None):
+    """1-based constraint-line ids the mesh was split along, in order.
+
+    With a ``solution``, only the lines that solution actually measured: a field
+    read back from a saved sidecar carries no interface state, and listing its
+    joints would offer a reading nothing produced.
+    """
     jd = (fem_data or {}).get("joint_data")
     if jd is None or not jd.get("n"):
         return []
+    if solution is not None:
+        from .joint import solution_has_joint_state
+        if not solution_has_joint_state(solution, jd["n"]):
+            return []
     return sorted(int(v) for v in np.unique(np.asarray(jd["line_id"], dtype=int)))
 
 

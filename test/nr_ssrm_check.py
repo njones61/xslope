@@ -92,6 +92,23 @@ since no admissible state can reach that apex; the cap being reduced by the tria
 strength when ``tension_srf`` says so; and the factor of safety on a capped model,
 from both drivers.
 
+Two of the legs above are written on the reinforced sample, and a re-mesh moves what
+they measure. The rule they follow, so the next one is handled the same way:
+
+  * a constructed SPECIMEN is re-measured. Where a leg builds its own model by
+    drawing capacities down or dropping layers, the draw-down is a property of the
+    mesh as much as of the soil, and a mesh that moves the demand gets a new
+    measurement written out with the numbers behind it (see SOFT_SCALE). What the leg
+    asserts does not change.
+  * a spike BUDGET is named, never waived. The Newton driver is an experimental spike
+    and its predictor is budgeted by the caller; where a mesh lengthens the plastic
+    walk past the default chunk, the leg says which budget its seed needs and goes on
+    asserting the answer (see THREE_LAYER_MAX_ITER). A leg that turned into a warning
+    would stop catching the thing it was written for.
+  * and the SHIPPING path is asserted separately wherever a spike leg rests on a
+    claim about the slope, so a regression in the driver every locked factor of
+    safety is defined on cannot hide behind a spike measurement.
+
 Run directly:  PYTHONPATH=. python3 test/nr_ssrm_check.py
 """
 
@@ -1258,6 +1275,29 @@ THREE_LAYER_KEEP = (0, 2, 4)
 THREE_LAYER_STANDS = 1.20625
 THREE_LAYER_FAILS = 1.215625
 
+# The predictor budget the seed needs on this mesh, and why it is written here
+# rather than left at the default.
+#
+# The adaptive rung takes the caller's own ``max_iterations`` as its chunk and asks
+# ``_still_progressing`` at the end of each chunk whether to run another. Under the
+# subdivision this model meshed at before a reinforcement line meshed by its two
+# endpoints (563 elements, 1210 nodes) that rule extended the walk and it converged
+# at iteration 22,964. Under the endpoints mesh (571 elements, 1226 nodes) the rule
+# declines to extend past the first chunk, and the capped walk does not converge
+# until iteration 18,452 — so a 12,000-iteration chunk hands the corrector a seed
+# 6,000 iterations short of the one it needs, and the trial comes back FAILED at the
+# load-step floor having carried none of the gravity load. Given a chunk that reaches
+# the walk's own convergence the same trial corrects in 474 Newton iterations to an
+# out-of-balance of 5.1e-8 and a yield violation of 8.7e-16.
+#
+# That is a statement about the predictor's budget on this mesh and not about the
+# slope, which is why the leg names the budget and asserts the answer rather than
+# waiving it. The claim the budget is spent to reach — that an admissible field in
+# equilibrium with full gravity exists at THREE_LAYER_STANDS — is proved
+# independently below by the DEFAULT driver, which stands there on the same mesh at
+# an out-of-balance of 2.2e-5.
+THREE_LAYER_MAX_ITER = 25000
+
 
 def check_cohesionless_seed_depth():
     """A seed has to be deep enough, and the model that proves it.
@@ -1268,17 +1308,32 @@ def check_cohesionless_seed_depth():
     and each corrected to a different non-equilibrium state. What closes it is a rung
     that runs while the walk is still progressing and stops when it is not.
 
-    Two assertions, and neither refers to the other driver:
+    Three assertions. The first is on the SHIPPING driver and the other two on the
+    spike:
 
-      * F = 1.20625 converges to an ADMISSIBLE field — force equilibrium inside the
-        trial tolerance AND a stress field on the yield surface. That is a statically
-        admissible field in equilibrium with full gravity, so by the lower-bound
-        theorem the slope stands there, and the bisection that refuses it is 0.045
-        low. On the driver before the adaptive rung this comes back FAILED, which is
-        the point of the check.
-      * F = 1.215625, one bisection cell above it, still FAILS. The predictor is a
-        seed generator and never a verdict: if a longer walk could talk the corrector
-        into standing anywhere, this is where it would show.
+      * the DEFAULT driver — the viscoplastic loop with the Newton corrector, which
+        every locked and published factor of safety here is defined on — stands at
+        F = 1.20625 with an admissible field. That is the independent evidence for
+        the lower-bound claim the two Newton legs rest on, and it is the leg that
+        catches a regression on the path that ships.
+      * F = 1.20625 converges to an ADMISSIBLE field on the pure Newton driver too —
+        force equilibrium inside the trial tolerance AND a stress field on the yield
+        surface. That is a statically admissible field in equilibrium with full
+        gravity, so by the lower-bound theorem the slope stands there, and the
+        bisection that refuses it is 0.045 low. On the driver before the adaptive
+        rung this comes back FAILED at any budget, which is the point of the check:
+        with ``_NR_VP_PREDICTOR_ADAPTIVE`` off it fails at THREE_LAYER_MAX_ITER after
+        1,250 predictor iterations, so the assertion is on the rung and not on the
+        budget.
+      * F = 1.215625, one bisection cell above it, still FAILS — at the same enlarged
+        budget, which is the stronger form of the test. The predictor is a seed
+        generator and never a verdict: if a longer walk could talk the corrector into
+        standing anywhere, this is where it would show.
+
+    The budget the Newton legs run at is THREE_LAYER_MAX_ITER, written out above with
+    the measurement behind it. The rung is budgeted by the caller's ``max_iterations``
+    as its chunk, so a mesh whose plastic walk is longer than one chunk needs a chunk
+    that reaches it; the default 12,000 stops this one 6,000 iterations short.
 
     The mesh is the coarse tri6/4.0 one on purpose. Unlike the locked-mesh check
     above, the defect here is not a mesh-refinement effect — it is the length of the
@@ -1292,7 +1347,33 @@ def check_cohesionless_seed_depth():
         return ["the three-layer specimen carries no bar with capacity, so nothing "
                 "here is a reinforced measurement"]
 
-    stands = _newton(fd, THREE_LAYER_STANDS)
+    ship = solve_fem(fd, F=THREE_LAYER_STANDS, max_disp_factor=None, force_tol=1e-3)
+    if not ship['converged']:
+        fails.append(
+            f"the DEFAULT driver came back {ship['verdict']} at F = "
+            f"{THREE_LAYER_STANDS} ({ship.get('exit_reason')}, "
+            f"{ship['iterations']} iterations, out-of-balance "
+            f"{ship['unbalanced_force_ratio']:.3e}). An admissible stress field in "
+            f"equilibrium with full gravity exists at this strength — an independent "
+            f"referee sharing no code with either driver certified it — so this is a "
+            f"regression on the path every locked factor of safety is defined on, "
+            f"not a spike measurement.")
+    else:
+        if ship['unbalanced_force_ratio'] >= 1e-3:
+            fails.append(
+                f"the DEFAULT driver reports F = {THREE_LAYER_STANDS} CONVERGED at "
+                f"an out-of-balance of {ship['unbalanced_force_ratio']:.3e}, at or "
+                f"above the 1e-3 force tolerance")
+        _viol = ship.get('nr_max_yield_violation')
+        if _viol is not None and _viol > 1e-6:
+            fails.append(
+                f"the DEFAULT driver reports F = {THREE_LAYER_STANDS} CONVERGED with "
+                f"a worst yield violation of {_viol:.3e} of the local strength: the "
+                f"field is outside the surface it is meant to lie on")
+
+    stands = solve_fem(fd, F=THREE_LAYER_STANDS, fem_solver='newton',
+                       max_disp_factor=None, force_tol=1e-3,
+                       max_iterations=THREE_LAYER_MAX_ITER)
     if not stands['converged']:
         fails.append(
             f"F = {THREE_LAYER_STANDS} came back {stands['verdict']} "
@@ -1300,10 +1381,13 @@ def check_cohesionless_seed_depth():
             f"{stands.get('diverging_signal')!r}) after {stands['iterations']} "
             f"iterations at a load factor of "
             f"{stands.get('nr_load_factor', 0.0):.2f}, on {stands.get('nr_predictor_iterations', 0)} "
-            f"predictor iterations. An admissible stress field in equilibrium with "
-            f"full gravity exists at this strength, so the slope stands here and the "
-            f"bisection that refuses it reads about 0.045 low: the seed the corrector "
-            f"was handed is not deep enough.")
+            f"predictor iterations against a chunk of {THREE_LAYER_MAX_ITER}. An "
+            f"admissible stress field in equilibrium with full gravity exists at "
+            f"this strength, so the slope stands here and the bisection that refuses "
+            f"it reads about 0.045 low: the seed the corrector was handed is not "
+            f"deep enough. A seed that stops short of the walk's own convergence is "
+            f"the adaptive rung's chunk, so read the predictor count against "
+            f"THREE_LAYER_MAX_ITER before reading it as a defect in the corrector.")
     else:
         if stands['unbalanced_force_ratio'] >= 1e-3:
             fails.append(
@@ -1317,7 +1401,9 @@ def check_cohesionless_seed_depth():
                 f"strength: the field is outside the surface it is meant to lie on, "
                 f"so it proves nothing about whether the slope stands")
 
-    above = _newton(fd, THREE_LAYER_FAILS)
+    above = solve_fem(fd, F=THREE_LAYER_FAILS, fem_solver='newton',
+                      max_disp_factor=None, force_tol=1e-3,
+                      max_iterations=THREE_LAYER_MAX_ITER)
     if above['converged']:
         fails.append(
             f"F = {THREE_LAYER_FAILS} came back CONVERGED. The predictor supplies a "
@@ -2473,10 +2559,28 @@ def check_piles():
 # at about 0.97 of its peak, so nothing drops. The specimen is therefore constructed
 # out of the same model, the same soil and the same six lines, with the capacities
 # drawn down until the demand has to cross them — the same construction the
-# reinforcement round used for its half-capacity row. Measured on this checkout:
-# nothing softens at F = 1.1 on either driver, and at F = 1.2 the Newton latch drops
-# seven bar elements where the viscoplastic one drops four.
-SOFT_SCALE, SOFT_RES = 0.35, 0.5
+# reinforcement round used for its half-capacity row.
+#
+# SOFT_SCALE is the draw-down, and it is a property of the MESH as well as of the
+# soil: it has to leave the demand below the capacity at SOFT_F_QUIET and above it at
+# SOFT_F_DROPS, and the demand is what the mesh produces. At the 0.35 it was set to
+# for the subdivision this model meshed at before a reinforcement line meshed by its
+# two endpoints, the endpoints mesh leaves the worst bar at 0.937 of its peak on the
+# Newton path and 0.989 on the default one — under the crossing on both, so nothing
+# latched and the leg below had nothing to measure. Re-measured on the endpoints mesh
+# (571 elements, 1226 nodes): at 0.30 the worst bar sits at 0.44 of its peak on the
+# Newton path at F = 1.1 and 0.84 on the viscoplastic one, and at F = 1.2 BOTH
+# drivers latch eight bar elements with none of them left above its residual. The
+# window is real but not wide — at 0.33 nothing crosses at F = 1.2 and at 0.25 the
+# trial dies before it reaches full gravity, so the latch never reads — which is why
+# the value is measured here rather than chosen.
+#
+# The trial that fires is a FAILED one, on this mesh and on the one before it: the
+# strength at which a bar's demand crosses its peak is the strength at which the
+# structure cannot shed the drop, so the walk down to the residual reaches its limit
+# point. The latch still fires, because it reads a state that has already carried
+# full gravity, which is exactly what this leg asserts.
+SOFT_SCALE, SOFT_RES = 0.30, 0.5
 SOFT_F_QUIET, SOFT_F_DROPS = 1.1, 1.2
 
 

@@ -26,6 +26,10 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 from .hoekbrown import hb_constants, hb_tangent_const
+from .joint import (mesh_has_joints as _joint_mesh_has_joints,
+                    joint_reduced_strength, joint_vp_sweep, tie_vp_sweep,
+                    joint_internal_force, tie_internal_force,
+                    joint_state, joint_yield_violation)
 from .units import require_gamma_water
 
 
@@ -1905,6 +1909,15 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     dist_end1_1d = np.zeros(n_1d_elements)   # centroid -> line end 1
     dist_end2_1d = np.zeros(n_1d_elements)   # centroid -> line end 2
 
+    # Which constraint lines are JOINTS. The mesh is split along those, so the
+    # bar on one carries no bond-slip cap: pullout is the interface elements'
+    # job and a cap read from the pullout envelope would count it twice. Empty
+    # on every model with no jointed line, and the taper below is then exactly
+    # what it has always been.
+    _jointed_lines = set(int(v) for v in
+                         np.asarray(mesh.get("element_materials_joint", ()),
+                                    dtype=int).ravel())
+
     if n_1d_elements > 0 and "reinforcement_lines" in slope_data:
         from .fileio import ensure_reinforce_pullout
         ensure_reinforce_pullout(slope_data)
@@ -1985,10 +1998,19 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     # pullout profile instead of a development length, and the
                     # same call reads that: both engines take their capacity
                     # from one function under either law.
-                    from .fileio import reinforce_available_tension
-                    t_allow = reinforce_available_tension(
-                        dist_to_left, dist_to_right, t_max, lp1, lp2, tend1, tend2,
-                        pullout=line_data.get("_pullout_profile"))
+                    #
+                    # On a JOINTED line the taper is not applied at all. The mesh
+                    # is split along the line and the sheet's grip on the soil is
+                    # the interface traction the joint elements integrate, so the
+                    # bar's only limit is its own rupture strength Tmax; Lp1 and
+                    # Lp2 are not read there.
+                    if (line_id + 1) in _jointed_lines:
+                        t_allow = t_max
+                    else:
+                        from .fileio import reinforce_available_tension
+                        t_allow = reinforce_available_tension(
+                            dist_to_left, dist_to_right, t_max, lp1, lp2, tend1, tend2,
+                            pullout=line_data.get("_pullout_profile"))
                     t_allow_by_1d_elem[elem_idx] = t_allow
 
                     if t_res != t_res:
@@ -2275,6 +2297,17 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         if node_m is not None and n_dof_by_1d_elem[elem_idx] == 6:
             row += [dof_offset[node_m], dof_offset[node_m] + 1]
         dof_indices_1d[elem_idx, :len(row)] = row
+
+    # === INTERFACE (JOINT) ELEMENTS ===
+    # Built only where the mesh was split along a jointed line. A model with no
+    # joint carries no joint_data key at all, so its fem_data is exactly what it
+    # has always been.
+    joint_data = None
+    if _joint_mesh_has_joints(mesh):
+        from .joint import build_joint_data
+        joint_data = build_joint_data(
+            slope_data, mesh, nodes, E_by_mat, nu_by_mat,
+            elements, element_types, element_materials, dof_offset=dof_offset)
 
     # Identify the pile end nodes and their rotation restraints for boundary
     # conditions. The head is the top node (highest y) of each pile line and the
@@ -2964,6 +2997,11 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         fem_data["unit_system"] = slope_data["unit_system"]
     if slope_data.get("time_unit"):
         fem_data["time_unit"] = slope_data["time_unit"]
+    # The interface elements, on a model that has any. The key is absent
+    # otherwise, so an unjointed model's fem_data carries exactly the keys it
+    # always has.
+    if joint_data is not None:
+        fem_data["joint_data"] = joint_data
 
     return fem_data
 
@@ -5174,7 +5212,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # strength steps, so it needs the working state this call is about to
             # build and a way to re-reduce the strengths in place. Only the ramp
             # passes this; every other caller leaves it None and nothing here runs.
-            def _restrength(groups, F_new):
+            def _restrength(groups, F_new, joints=None):
                 Fb = np.full(n_elements, float(F_new))
                 if ssr_exclude_mask is not None:
                     Fb[np.asarray(ssr_exclude_mask, dtype=bool)] = 1.0
@@ -5220,6 +5258,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     # the strength its foot was solved at.
                     _nr_group_restrength_envelope(grp, Fb)
                     grp.pop('_env_seed', None)
+                # The interface strengths follow the soil's: c_j and tan phi_j
+                # divided by the step's factor on every joint that opts in.
+                for _jg in (joints or ()):
+                    if _jg.get('kind') != 'joint':
+                        continue
+                    _jg['cj_r'], _jg['tanphi_r'] = joint_reduced_strength(
+                        _jg['jd'], F_new)
             _nr_export['restrength'] = _restrength
         _nr_kw = dict(
             c_reduced=c_reduced, phi_reduced=phi_reduced,
@@ -5577,6 +5622,26 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             _pile_kind = "/".join(f"{n}-node" for n in _n_node_pile)
             print(f"  Pile beam elements: {n_pile_elements} "
                   f"({_pile_kind} Euler-Bernoulli)")
+
+    # ---- Interface (joint) elements ----
+    # The interface strengths are reduced by the trial factor on every joint whose
+    # line does not opt out; k_n, k_s and the ties are structural and are not.
+    # Everything below is skipped entirely on a model with no jointed line.
+    joint_data = fem_data.get("joint_data")
+    has_joints = joint_data is not None and joint_data["n"] > 0
+    if has_joints:
+        joint_cj_r, joint_tanphi_r = joint_reduced_strength(joint_data, F)
+        joint_slip = np.zeros((joint_data["n"], 3))
+        joint_open = np.zeros((joint_data["n"], 3), dtype=bool)
+        joint_state_last = None
+        tie_data = joint_data.get("ties")
+        tie_forces = (np.zeros((tie_data["n"], 2)) if tie_data is not None
+                      else np.zeros((0, 2)))
+        if debug_level >= 1:
+            print(f"  Joint elements: {joint_data['n']} on "
+                  f"{len(joint_data['jointed_lines'])} line(s)"
+                  + (f", {tie_data['n']} tied end(s)" if tie_data is not None
+                     else ""))
 
     # ---- Working Gauss-point groups: the F-DEPENDENT half, rebuilt each solve ----
     # The prepared model carries the F-INDEPENDENT halves of each group (geometry
@@ -6315,6 +6380,24 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     print(f"    1D elements: {n_1d_compression} in compression, "
                           f"{n_1d_exceeded} exceeded capacity, "
                           f"{np.sum(failed_1d)} total failed")
+
+            # ---- Interface (joint) element body-force corrections ----
+            # Joint slip is a plastic increment like a soil Gauss point's: the
+            # tangential offset the interface cannot hold grows by
+            # dt (|t_s| - t_lim) sign / k_s and its share of the elastic traction
+            # is subtracted from the internal force, so the loop's convergence
+            # test, its yield gate and its growth reading all see joint slip as
+            # plastic activity without a switch of their own. An open joint sheds
+            # its whole traction vector, which is the initial-strain form of
+            # taking both its stiffnesses to zero.
+            if has_joints:
+                n_joint_active, joint_state_last = joint_vp_sweep(
+                    joint_data, u, loads, joint_cj_r, joint_tanphi_r,
+                    joint_slip, joint_open)
+                if tie_data is not None:
+                    tie_forces, n_tie_cap = tie_vp_sweep(tie_data, u, loads)
+                if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
+                    print(f"    Joint pairs slipping or open: {n_joint_active}")
 
             # ---- Pile beam element force computation and capacity checks ----
             if has_pile_elements:
@@ -7117,6 +7200,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # this solve rather than the fictitious travel of setting up the in-situ state.
     u_reported = u if _init_u is None else u - u_datum
 
+    # The interface state on the field being reported: the tractions, the
+    # accumulated slip, and which pairs are slipping or open.
+    if has_joints:
+        joint_state_last = joint_state(joint_data, u, joint_cj_r, joint_tanphi_r,
+                                       slip_p=joint_slip, open_prev=joint_open)
+
     n_plastic = np.sum(plastic_elements)
     if debug_level >= 1:
         print(f"  Plastic elements: {n_plastic}/{n_elements}")
@@ -7263,6 +7352,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         "yielded_pile_V": yielded_pile_V if has_pile_elements else np.array([], dtype=bool),
         "yielded_pile_M": yielded_pile_M if has_pile_elements else np.array([], dtype=bool),
         "yielded_pile": (yielded_pile_V | yielded_pile_M) if has_pile_elements else np.array([], dtype=bool),
+        # Interface (joint) elements, per element and per node pair: normal and
+        # shear traction (compression positive on the normal), the Mohr-Coulomb
+        # limit the shear is read against, the accumulated plastic slip, and
+        # which pairs are slipping or open. Empty on a model with no joint.
+        "joint_tn": joint_state_last["tn"] if has_joints else np.zeros((0, 3)),
+        "joint_ts": joint_state_last["ts"] if has_joints else np.zeros((0, 3)),
+        "joint_tlim": joint_state_last["tlim"] if has_joints else np.zeros((0, 3)),
+        "joint_slip": joint_slip if has_joints else np.zeros((0, 3)),
+        "joint_open": (joint_state_last["open"] if has_joints
+                       else np.zeros((0, 3), dtype=bool)),
+        "joint_slipping": (joint_state_last["slipping"] if has_joints
+                           else np.zeros((0, 3), dtype=bool)),
+        "tie_forces": tie_forces if has_joints else np.zeros((0, 2)),
     }
 
 
@@ -8132,6 +8234,41 @@ def _nr_build_bars(fem_data):
     return bars or None
 
 
+def _nr_build_joints(fem_data, F):
+    """The model's interface (joint) element and tie groups, or ``None``.
+
+    One group per kind, shaped like the bar groups the same assembly pattern
+    walks: a dense ``dof`` map, an element matrix stashed on ``_Ke`` at every
+    tangent re-form, and a force law evaluated from the current displacement
+    alone. The joint's interface strengths carry the trial's reduction; its
+    stiffnesses, and the ties, do not.
+    """
+    jd = fem_data.get("joint_data")
+    if jd is None or jd["n"] == 0:
+        return None
+    cj_r, tanphi_r = joint_reduced_strength(jd, F)
+    groups = [{'kind': 'joint', 'jd': jd, 'dof': jd['dof'],
+               'cj_r': cj_r, 'tanphi_r': tanphi_r}]
+    td = jd.get("ties")
+    if td is not None:
+        groups.append({'kind': 'tie', 'td': td, 'dof': td['dof']})
+    return groups
+
+
+def _nr_joint_force(jg, u, want_tangent):
+    """One joint or tie group's internal force (and tangent) at displacement ``u``."""
+    if jg['kind'] == 'joint':
+        f, Ke, st = joint_internal_force(jg['jd'], u, jg['cj_r'], jg['tanphi_r'],
+                                         want_tangent=want_tangent)
+        jg['_state'] = st
+    else:
+        f, Ke, at_cap = tie_internal_force(jg['td'], u, want_tangent=want_tangent)
+        jg['_at_cap'] = at_cap
+    if want_tangent:
+        jg['_Ke'] = Ke
+    return f
+
+
 def _nr_translational_dofs(fem_data, n_dof):
     """Indices of the degrees of freedom that are LENGTHS, or None when all are.
 
@@ -8443,16 +8580,17 @@ def _nr_bar_force(bg, u, want_tangent):
 
 
 def _nr_internal_force(gp_groups, u, n_dof, h_eps=None, want_tangent=False,
-                       bars=None, piles=None):
+                       bars=None, piles=None, joints=None):
     """Assemble the internal force vector (and optionally the per-group tangents).
 
     ``h_eps=None`` with ``want_tangent=False`` is the cheap residual-only pass the
     line search uses: one return map per group and no differentiation.
 
-    ``bars`` adds the reinforcement bar elements' contribution and ``piles`` the
-    pile beam elements'. Their tangents are stashed on their own groups (``_Ke``)
-    rather than returned, because they need no differencing and the caller consumes
-    them through the same assembly pattern.
+    ``bars`` adds the reinforcement bar elements' contribution, ``piles`` the
+    pile beam elements' and ``joints`` the interface elements' and tied ends'.
+    Their tangents are stashed on their own groups (``_Ke``) rather than returned,
+    because they need no differencing and the caller consumes them through the
+    same assembly pattern.
     """
     fint = np.zeros(n_dof)
     tangents = [] if want_tangent else None
@@ -8500,6 +8638,10 @@ def _nr_internal_force(gp_groups, u, n_dof, h_eps=None, want_tangent=False,
         for pg in piles:
             fp = _nr_pile_force(pg, u, want_tangent)
             np.add.at(fint, pg['dof'].ravel(), fp.ravel())
+    if joints is not None:
+        for jg in joints:
+            fj = _nr_joint_force(jg, u, want_tangent)
+            np.add.at(fint, jg['dof'].ravel(), fj.ravel())
     return fint, tangents, n_plastic_gp
 
 
@@ -8717,7 +8859,8 @@ def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
     return groups
 
 
-def _nr_prepare_assembly(groups, free_dofs, n_dof, bars=None, piles=None):
+def _nr_prepare_assembly(groups, free_dofs, n_dof, bars=None, piles=None,
+                         joints=None):
     """Cache the assembly pattern every tangent re-form reuses.
 
     The sparsity pattern is fixed for the whole solve — only the VALUES change
@@ -8743,7 +8886,8 @@ def _nr_prepare_assembly(groups, free_dofs, n_dof, bars=None, piles=None):
     fidx[free_dofs] = np.arange(n_free)
     lin_parts = []
     for grp in (list(groups) + (list(bars) if bars else [])
-                + (list(piles) if piles else [])):
+                + (list(piles) if piles else [])
+                + (list(joints) if joints else [])):
         fd = fidx[grp['dof']]
         G, nd = fd.shape
         rows = np.broadcast_to(fd[:, :, None], (G, nd, nd))
@@ -8762,11 +8906,13 @@ def _nr_prepare_assembly(groups, free_dofs, n_dof, bars=None, piles=None):
             "indptr": indptr, "n_free": n_free}
 
 
-def _nr_assemble_tangent(groups, tangents, pattern, bars=None, piles=None):
+def _nr_assemble_tangent(groups, tangents, pattern, bars=None, piles=None,
+                         joints=None):
     """Global non-symmetric tangent stiffness on the free degrees of freedom.
 
-    Soil groups first, then the reinforcement bar groups, then the pile beam groups
-    — the same order :func:`_nr_prepare_assembly` built the pattern in.
+    Soil groups first, then the reinforcement bar groups, then the pile beam
+    groups, then the interface (joint) and tie groups — the same order
+    :func:`_nr_prepare_assembly` built the pattern in.
     """
     vals = []
     for grp, Dep in zip(groups, tangents):
@@ -8780,6 +8926,9 @@ def _nr_assemble_tangent(groups, tangents, pattern, bars=None, piles=None):
     if piles is not None:
         for pg in piles:
             vals.append(pg['_Ke'][pg['_keep']])
+    if joints is not None:
+        for jg in joints:
+            vals.append(jg['_Ke'][jg['_keep']])
     data = np.bincount(pattern["inv"], weights=np.concatenate(vals),
                        minlength=pattern["nnz"])
     n_free = pattern["n_free"]
@@ -9152,7 +9301,8 @@ def _nr_soften_set_eta(bars, newly, eta):
 
 def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
                      force_tol, oob_fn, nr_max_iter, u_el, piles=None,
-                     trans_dofs=None, debug_level=0, deep_free=None):
+                     joints=None, trans_dofs=None, debug_level=0,
+                     deep_free=None):
     """Run the post-peak latch to its fixed point on a converged full-load state.
 
     Returns ``(ok, u, iterations, force_evaluations, out_of_balance, rounds, cuts)``.
@@ -9183,7 +9333,7 @@ def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
                 groups, pattern, u, f_ext, free_dofs, n_dof, h_eps, force_tol,
                 oob_fn, nr_max_iter, u_el, debug_level=debug_level,
                 label=f"soften eta={eta_try:.4f}", bars=bars, piles=piles,
-                trans_dofs=trans_dofs, deep_free=deep_free)
+                joints=joints, trans_dofs=trans_dofs, deep_free=deep_free)
             it_total += it
             fe_total += fe
             if ok:
@@ -9217,7 +9367,7 @@ def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
 
 def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
                     force_tol, oob_fn, nr_max_iter, u_elastic_scale,
-                    debug_level=0, label="", bars=None, piles=None,
+                    debug_level=0, label="", bars=None, piles=None, joints=None,
                     trans_dofs=None, deep_free=None):
     """Drive the equilibrium residual to zero at a FIXED external load.
 
@@ -9296,7 +9446,8 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         _tp = time.perf_counter() if _PROF_ON else None
         fint, tangents, _ = _nr_internal_force(groups, u_try, n_dof,
                                                h_eps=h_eps, want_tangent=reform,
-                                               bars=bars, piles=piles)
+                                               bars=bars, piles=piles,
+                                               joints=joints)
         if _PROF_ON:
             _prof_add("nr_const_tan" if reform else "nr_const_res", _tp)
         n_fe += 1
@@ -9327,7 +9478,8 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
 
         if reform:
             _tp = time.perf_counter() if _PROF_ON else None
-            K = _nr_assemble_tangent(groups, tangents, pattern, bars=bars,
+            K = _nr_assemble_tangent(groups, tangents, pattern, joints=joints,
+                                     bars=bars,
                                      piles=piles)
             if _PROF_ON:
                 _prof_add("nr_assemble", _tp)
@@ -9370,7 +9522,8 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         for _ls in range(_NR_LS_MAX):
             cand = u_try + alpha * du
             _tp = time.perf_counter() if _PROF_ON else None
-            f_c, _, _ = _nr_internal_force(groups, cand, n_dof, bars=bars,
+            f_c, _, _ = _nr_internal_force(groups, cand, n_dof, joints=joints,
+                                           bars=bars,
                                            piles=piles)
             if _PROF_ON:
                 _prof_add("nr_linesearch", _tp)
@@ -9556,7 +9709,13 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                     bg['softened'] |= take
                     bg['t_cap'] = np.where(take, bg['t_res'], bg['t_cap'])
     piles = _nr_build_piles(fem_data)
-    pattern = _nr_prepare_assembly(groups, free_dofs, n_dof, bars=bars, piles=piles)
+    # Interface (joint) elements and tied ends. Their law is a function of the
+    # current displacement alone -- the shear traction returned onto the
+    # Mohr-Coulomb limit, the normal onto the tension cutoff -- so, like the bar,
+    # they carry no state across a step.
+    joints = _nr_build_joints(fem_data, F)
+    pattern = _nr_prepare_assembly(groups, free_dofs, n_dof, bars=bars,
+                                   piles=piles, joints=joints)
 
     # ---- external load -------------------------------------------------------
     # Effective-stress formulation, exactly as the viscoplastic path builds it:
@@ -9707,7 +9866,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         ok, u_try, it, _fe, oob_here, rel_du = _nr_equilibrate(
             groups, pattern, u, f_ext, free_dofs, n_dof, h_eps, force_tol,
             _oob, nr_max_iter, u_elastic_scale, debug_level=debug_level,
-            label=f"lam={lam_try:.4f}", bars=bars, piles=piles,
+            label=f"lam={lam_try:.4f}", bars=bars, piles=piles, joints=joints,
             trans_dofs=trans_dofs, deep_free=deep_free)
         n_force_evals += _fe
         total_iterations += it
@@ -9753,7 +9912,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # A trial that reached full load must still pass the SAME force-equilibrium
     # gate the viscoplastic verdict is read on, or it is not converged.
     if converged:
-        fint, _, _ = _nr_internal_force(groups, u, n_dof, bars=bars, piles=piles)
+        fint, _, _ = _nr_internal_force(groups, u, n_dof, bars=bars, piles=piles,
+                                        joints=joints)
         n_force_evals += 1
         r_full = np.zeros(n_dof)
         r_full[free_dofs] = (base_loads - fint)[free_dofs]
@@ -9784,7 +9944,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         _ok, u, _it, _fe, _oobs, n_soften_rounds, _cuts = _nr_soften_latch(
             bars, groups, pattern, u, base_loads, free_dofs, n_dof, h_eps,
             force_tol, _oob, nr_max_iter, u_elastic_scale, piles=piles,
-            trans_dofs=trans_dofs, debug_level=debug_level,
+            joints=joints, trans_dofs=trans_dofs, debug_level=debug_level,
             deep_free=deep_free)
         total_iterations += _it
         n_force_evals += _fe
@@ -9794,7 +9954,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             exit_reason = 'diverging'
         # The state that came out of the last drop must pass the SAME force gate.
         if converged:
-            fint, _, _ = _nr_internal_force(groups, u, n_dof, bars=bars, piles=piles)
+            fint, _, _ = _nr_internal_force(groups, u, n_dof, bars=bars,
+                                            piles=piles, joints=joints)
             n_force_evals += 1
             r_full = np.zeros(n_dof)
             r_full[free_dofs] = (base_loads - fint)[free_dofs]
@@ -9827,7 +9988,13 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     for grp in groups:
         grp['_u'] = u
     # refresh _sig / _branch (and the bar and pile forces) at the reported state
-    _fint_rep, _, _ = _nr_internal_force(groups, u, n_dof, bars=bars, piles=piles)
+    _fint_rep, _, _ = _nr_internal_force(groups, u, n_dof, bars=bars, piles=piles,
+                                         joints=joints)
+    # The interface state on the state being reported (the call above evaluated it).
+    _j_state = None
+    for _jg in (joints or ()):
+        if _jg.get('kind') == 'joint':
+            _j_state = _jg.get('_state')
     n_force_evals += 1
     # The out-of-balance at the reported state, over the WHOLE model and over the
     # skin the min_slip_depth filter excludes. Reported, never read for a verdict:
@@ -9967,6 +10134,17 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                     else max(max_tension_violation, _tv))
     if max_tension_violation is not None:
         max_yield_violation = max(max_yield_violation, max_tension_violation)
+    # The interface's own admissibility, on the same scale: a joint AT its
+    # Mohr-Coulomb limit is admissible and reads zero; one above it reads the
+    # fraction of its own strength it exceeds by. The return map lands every pair
+    # on or inside the surface, so a nonzero reading here is a defect, not a state.
+    _j_viol = 0.0
+    for _jg in (joints or ()):
+        if _jg.get('kind') == 'joint' and _jg.get('_state') is not None:
+            _j_viol = max(_j_viol, joint_yield_violation(
+                _jg['_state'], _jg['cj_r'], _jg['tanphi_r'],
+                floor=_yield_floor_abs))
+    max_yield_violation = max(max_yield_violation, _j_viol)
 
     sig_by_gp = [[None] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
     branch_by_gp = [[0] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
@@ -10013,7 +10191,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     if _nr_export is not None:
         # Hand the live solve state to the ramp driver, which continues it.
         _nr_export.update({
-            'groups': groups, 'bars': bars, 'piles': piles,
+            'groups': groups, 'bars': bars, 'piles': piles, 'joints': joints,
             'trans_dofs': trans_dofs,
             'pattern': pattern, 'base_loads': base_loads,
             'oob_fn': _oob, 'h_eps': h_eps, 'u_elastic_scale': u_elastic_scale,
@@ -10163,6 +10341,19 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         # returns them there (`forces_1d if has_1d_elements else np.array([])`).
         "forces_1d": forces_1d_out,
         "failed_1d_elements": failed_1d_out,
+        # The interface state on the reported field, in the same shape the
+        # viscoplastic driver publishes it.
+        "joint_tn": _j_state["tn"] if _j_state is not None else np.zeros((0, 3)),
+        "joint_ts": _j_state["ts"] if _j_state is not None else np.zeros((0, 3)),
+        "joint_tlim": (_j_state["tlim"] if _j_state is not None
+                       else np.zeros((0, 3))),
+        "joint_slip": np.zeros((0, 3)) if _j_state is None else np.zeros(
+            _j_state["tn"].shape),
+        "joint_open": (_j_state["open"] if _j_state is not None
+                       else np.zeros((0, 3), dtype=bool)),
+        "joint_slipping": (_j_state["slipping"] if _j_state is not None
+                           else np.zeros((0, 3), dtype=bool)),
+        "tie_forces": np.zeros((0, 2)),
         "softened_1d_elements": softened_1d_out,
         # Empty arrays on a model with no pile, exactly as the viscoplastic path
         # returns them there.
@@ -10282,6 +10473,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                 sol0['max_displacement'], 'cold', sol0.get('exit_reason'))
 
     groups, pattern, bars = ctx['groups'], ctx['pattern'], ctx.get('bars')
+    joints = ctx.get('joints')
     piles, trans_dofs = ctx.get('piles'), ctx.get('trans_dofs')
     base_loads, oob_fn = ctx['base_loads'], ctx['oob_fn']
     free_dofs, n_dof = ctx['free_dofs'], ctx['n_dof']
@@ -10329,7 +10521,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
             return {"converged": False, "error": msg, "FS": None, "trials": trials,
                     "last_solution": last_solution}
 
-        restrength(groups, F_try)
+        restrength(groups, F_try, joints=joints)
         seeded = False
         # The step's own history, kept so a REJECTED step leaves nothing behind —
         # the plastic strains a predictor seed or a softening sub-step committed,
@@ -10342,7 +10534,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
         ok, u_try, it, fe, oob, _rel = _nr_equilibrate(
             groups, pattern, u, base_loads, free_dofs, n_dof, h_eps, force_tol,
             oob_fn, _NR_MAX_ITER, u_el, debug_level=debug_level,
-            label=f"ramp F={F_try:.4f}", bars=bars, piles=piles,
+            label=f"ramp F={F_try:.4f}", bars=bars, piles=piles, joints=joints,
             trans_dofs=trans_dofs, deep_free=deep_free)
         total_iters += it
         total_fevals += fe
@@ -10397,7 +10589,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                     groups, pattern, _u_seed, base_loads, free_dofs, n_dof, h_eps,
                     force_tol, oob_fn, _NR_MAX_ITER, u_el, debug_level=debug_level,
                     label=f"ramp F={F_try:.4f} (seeded)", bars=bars, piles=piles,
-                    trans_dofs=trans_dofs, deep_free=deep_free)
+                    joints=joints, trans_dofs=trans_dofs, deep_free=deep_free)
                 # Work is cumulative: the refused cold step, every predictor run and
                 # every corrector are all charged to this step.
                 it += it2
@@ -10421,7 +10613,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
             ok, u_try, it_s, fe_s, oob_s, _r, _c = _nr_soften_latch(
                 bars, groups, pattern, u_try, base_loads, free_dofs, n_dof, h_eps,
                 force_tol, oob_fn, _NR_MAX_ITER, u_el, piles=piles,
-                trans_dofs=trans_dofs, debug_level=debug_level,
+                joints=joints, trans_dofs=trans_dofs, debug_level=debug_level,
                 deep_free=deep_free)
             it += it_s
             fe += fe_s
@@ -10511,7 +10703,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
     # therefore the convention of every locked and published factor of safety here.
     # See the note at _RAMP_DF_GROW.
     FS = 0.5 * (F_stands + F_refused)
-    restrength(groups, F_stands)
+    restrength(groups, F_stands, joints=joints)
     if debug_level >= 1:
         print(f"  Ramp limit: {F_stands:.4f} carried, {F_refused:.4f} refused "
               f"-> FS = {FS:.4f} ({n_steps} steps, {n_retries} retries, "
@@ -12982,6 +13174,19 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
             n_use = np.asarray(K_global_pile_elems[p_idx]).shape[0]
             _stage(K_global_pile_elems[p_idx],
                    np.asarray(dof_indices_pile[p_idx])[:n_use])
+
+        # Interface (joint) elements and the tied ends, on a model that has them.
+        # The joint's FULL elastic block is assembled here, exactly as the bar's
+        # is, so that K u carries the unrestrained interface tractions and the
+        # part it cannot deliver is subtracted as a body load in the solve.
+        _jd = fem_data.get("joint_data")
+        if _jd is not None:
+            for j in range(_jd["n"]):
+                _stage(_jd["K"][j], _jd["dof"][j])
+            _td = _jd.get("ties")
+            if _td is not None:
+                for m in range(_td["n"]):
+                    _stage(_td["K"][m], _td["dof"][m])
 
     return _coo_to_csr_ordered(coo_rows, coo_cols, coo_vals, (n_dof, n_dof))
 

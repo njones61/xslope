@@ -19,11 +19,12 @@ have to move together:
   method, a fix that changes factors of safety, a meaningful feature). Skip the
   GitHub Release (step 3) for packaging, docs, typos, and metadata-only fixes.
 
-Rule of thumb: minor/major bumps usually get a DOI; patch bumps usually do not —
-but decide by *what changed*, not the version number. The concept DOI in
-`CITATION.cff` always resolves to the newest release, so anyone who just wants
-to "cite xslope" has a working link even for versions where no per-version DOI
-was minted.
+Every tag `vX.Y.Z` pushed to GitHub runs the installer workflow, which publishes
+the installers as a GitHub Release; Zenodo archives every GitHub Release and
+mints a version DOI for it. So every released version, patch or not, carries its
+own DOI (accepted 2026-09-09). The concept DOI in `CITATION.cff` always resolves
+to the newest release; update the `version`, `date-released` and `doi` fields
+after each release once Zenodo shows the new record.
 
 ## Before a minor or major release
 
@@ -49,12 +50,14 @@ Patch releases skip this.
    twine upload dist/*
    ```
 
-3. **Create a GitHub Release** (THIS is what mints the Zenodo DOI):
-   - GitHub -> Releases -> Draft a new release.
-   - New tag `vX.Y.Z` on `main` (match `_version.py`).
-   - Title `xslope X.Y.Z`, add notes, Publish.
-   - Zenodo (integration already enabled for `njones61/xslope`) archives the
-     release zip and mints a **new version DOI** automatically within a minute.
+3. **Tag the release** — `git tag -a vX.Y.Z -m "xslope X.Y.Z"` and push the tag.
+   The push runs `.github/workflows/release-installers.yml`, which builds and signs
+   the macOS and Windows installers and publishes them as the GitHub Release
+   `XSLOPE vX.Y.Z` (with `latest.json` for Studio's update check). Zenodo
+   (integration enabled for `njones61/xslope`) archives that release and mints
+   the version DOI within a minute. Add release notes on the GitHub Release
+   afterwards if wanted. If the macOS leg fails on Apple's timestamp service the
+   step retries on its own; re-run the workflow from the Actions tab otherwise.
 
 ## DOIs
 

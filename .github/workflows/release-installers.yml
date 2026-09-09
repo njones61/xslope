@@ -142,7 +142,18 @@ jobs:
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
           rm -f "$RUNNER_TEMP/cert.p12"
-          codesign --force --deep --timestamp --options runtime \
+          # A timestamped signature needs Apple's timestamp service, which
+          # sometimes does not answer ("The timestamp service is not available",
+          # v0.5.1's run). Retry the signing call a few times before failing.
+          sign_with_retry() {
+            for attempt in 1 2 3 4 5; do
+              if codesign "$@"; then return 0; fi
+              echo "codesign attempt $attempt failed; retrying in $((attempt * 20)) s"
+              sleep $((attempt * 20))
+            done
+            return 1
+          }
+          sign_with_retry --force --deep --timestamp --options runtime \
             --entitlements packaging/macos/entitlements.plist \
             --sign "$IDENTITY" "packaging/dist/XSLOPE Studio.app"
           codesign --verify --deep --strict --verbose=2 "packaging/dist/XSLOPE Studio.app"
@@ -160,7 +171,13 @@ jobs:
         run: |
           set -euo pipefail
           DMG=$(ls packaging/dist/*.dmg)
-          codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+          # Same retry as the app signature: the timestamp service can be away.
+          for attempt in 1 2 3 4 5; do
+            if codesign --force --timestamp --sign "$IDENTITY" "$DMG"; then break; fi
+            if [ "$attempt" = 5 ]; then echo "codesign failed after 5 attempts"; exit 1; fi
+            echo "codesign attempt $attempt failed; retrying in $((attempt * 20)) s"
+            sleep $((attempt * 20))
+          done
           codesign --verify --strict --verbose=2 "$DMG"
 
       - name: Notarize and staple the .dmg

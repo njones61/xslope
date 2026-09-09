@@ -5422,7 +5422,27 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # at each attempt. `_corrector_on` is the whole switch: with it False this
     # function is the loop exactly as it was before this round, which is what
     # fem_solver='viscoplastic' selects.
-    _corrector_on = (_solver == 'auto') and bool(_corrector)
+    #
+    # A JOINTED model is not offered to the corrector. On a slipping interface
+    # pair the shear traction is held at c_j + t_n tan phi_j and is therefore
+    # independent of the tangential displacement, so a state the viscoplastic
+    # loop reached by growing the slip has no variable left for a Newton step
+    # that may only move displacements. Measured on the block-on-a-plane row at
+    # F = 1.3: the residual the corrector reads at the viscoplastic state lives
+    # ENTIRELY on the joint degrees of freedom (the soil residual is exactly
+    # zero) and is the last sweep's un-returned excess -- 0.15% of the mean
+    # interface strength, invisible to the yield gate, and 2.3e-2 in the Dawson
+    # measure against a tolerance of 1e-3. No step along the Newton direction
+    # reduces it: the line search exhausts its backtracks at alpha = 1/256 and
+    # the attempt is refused after two or three iterations. Supplying the
+    # friction cross term the slipping tangent omits (d t_s / d delta_n =
+    # +/- k_n tan phi_j, which takes the tangent's departure from a finite
+    # difference of the element force from 53% to 16%) leaves the trace
+    # identical, step for step, so the tangent is not what refuses it. The
+    # viscoplastic verdict stands in every case, which is what it did before,
+    # so nothing is lost by not spending the attempts.
+    _corrector_on = ((_solver == 'auto') and bool(_corrector)
+                     and fem_data.get("joint_data") is None)
     _corr_attempts = []
     _corr_nr_kw = None
     if _corrector_on:
@@ -9673,6 +9693,12 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # sigma_h = K0 sigma'_v, and the same in-situ pre-equilibration sequencing
     # through `_nr_init_state`. It arrives here as prep['sv0_gp'] plus the k0
     # argument, so nothing about the field's semantics is decided on this path.
+    # Interface (joint) elements and tied ends ARE assembled here (see
+    # _nr_build_joints), but this driver cannot CERTIFY a jointed state: a
+    # slipping pair's shear traction does not depend on displacement, so a
+    # residual carried by the joints has nothing left to move. That is why the
+    # default driver does not offer a jointed model to the corrector (see
+    # `_corrector_on` in solve_fem), and it applies here as well.
     if unsupported:
         raise NotImplementedError(
             "fem_solver='newton' is a plain Mohr-Coulomb spike and does not "

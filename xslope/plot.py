@@ -2821,7 +2821,7 @@ def plot_reinforcement_lines(ax, slope_data, style=None, solution=False):
     tension_points_plotted = False  # Track if tension points have been added to legend
     raw = slope_data.get('reinforcement_lines') or []
     span = _model_span(slope_data)
-    bonded_labelled = jointed_labelled = False
+    bonded_labeled = jointed_labeled = False
 
     for i, line in enumerate(slope_data['reinforce_lines']):
         # Extract x and y coordinates from the line points
@@ -2829,9 +2829,9 @@ def plot_reinforcement_lines(ax, slope_data, style=None, solution=False):
         ys = [point['Y'] for point in line]
         jointed = line_is_jointed(raw[i] if i < len(raw) else None)
         label = None
-        if not jointed and not bonded_labelled:
+        if not jointed and not bonded_labeled:
             label = 'Reinforcement Line'
-            bonded_labelled = True
+            bonded_labeled = True
 
         # Plot the reinforcement line with a distinctive style
         ax.plot(xs, ys, color=rfs.get('color', 'darkgray'),
@@ -2840,14 +2840,14 @@ def plot_reinforcement_lines(ax, slope_data, style=None, solution=False):
         if jointed:
             draw_joint_ticks(ax, xs, ys, span, rfs.get('color', 'darkgray'),
                              alpha=rfs.get('alpha', 0.8))
-            if not jointed_labelled:
+            if not jointed_labeled:
                 # The legend swatch carries the tick too: without it a jointed
                 # line and a bonded one are the same gray bar in the legend.
                 ax.plot([], [], color=rfs.get('color', 'darkgray'),
                         linewidth=rfs.get('linewidth', 3),
                         alpha=rfs.get('alpha', 0.8), marker='|', markersize=11,
                         markeredgewidth=1.5, label='Reinforcement (joint)')
-                jointed_labelled = True
+                jointed_labeled = True
         
         # On a SOLUTION plot, two dots per line mark where the available
         # tension first reaches its full value from each end -- the ends of the

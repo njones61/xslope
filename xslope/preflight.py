@@ -5148,7 +5148,7 @@ _JOINT_SPAN_FRAC = 0.75
 _JOINT_SMOOTH_FRAC = 0.6
 
 #: The wall pattern: at least this many near-horizontal sheets, at a median
-#: vertical spacing at or under _JOINT_WALL_SPACING (metres; scaled by
+#: vertical spacing at or under _JOINT_WALL_SPACING (meters; scaled by
 #: units.LENGTH_PER_METRE for an imperial file), behind a face at least this
 #: steep, with their front ends inside a facing column no wider than
 #: _JOINT_WALL_FACING_FRAC of the sheet length.
@@ -5159,8 +5159,8 @@ _JOINT_WALL_FACING_FRAC = 0.2
 _JOINT_NEAR_HORIZONTAL_DEG = 10.0
 
 
-def _joint_metre(ctx):
-    """One metre in the file's own length unit."""
+def _joint_meter(ctx):
+    """One meter in the file's own length unit."""
     from .units import normalize_unit_system
     return 3.28084 if normalize_unit_system(
         ctx.sd.get("unit_system")) == "imperial" else 1.0
@@ -5401,7 +5401,7 @@ def _joint_signal_boundary(ctx):
         if frac < _JOINT_BOUNDARY_FRAC:
             continue
         yield (f"{ctx.reinf_label(i)} lies on a material boundary over "
-               f"{frac * 100:.0f}% of its length and is modelled as a bonded "
+               f"{frac * 100:.0f}% of its length and is modeled as a bonded "
                f"bar, so the soil above it and the soil below it move together "
                f"and the only way the sheet can be passed is for the bar to "
                f"reach its capacity. A sheet on a contact is where the surface "
@@ -5431,7 +5431,7 @@ def _joint_signal_flat(ctx):
             continue
         yield (f"{ctx.reinf_label(i)} is within {_JOINT_FLAT_DEG:g} degrees of "
                f"horizontal and spans {span * 100:.0f}% of the width of the "
-               f"zone above it, and is modelled as a bonded bar. A sheet that "
+               f"zone above it, and is modeled as a bonded bar. A sheet that "
                f"long and that flat under a mass is a plane the mass can slide "
                f"ON, and a bonded bar cannot represent that: it reports the "
                f"bars at their capacity while the mesh decides the answer. "
@@ -5479,7 +5479,7 @@ def _joint_signal_wall(ctx):
         return None
     gaps.sort()
     median = gaps[len(gaps) // 2]
-    if median > _JOINT_WALL_SPACING * _joint_metre(ctx):
+    if median > _JOINT_WALL_SPACING * _joint_meter(ctx):
         return None
     # A face at least _JOINT_WALL_FACE_DEG steep, somewhere over the elevations
     # the sheets occupy.
@@ -5515,7 +5515,7 @@ def _joint_signal_wall(ctx):
             f"vertical spacing of {median:g}, behind a face at least "
             f"{_JOINT_WALL_FACE_DEG:g} degrees steep, with their front ends "
             f"inside a facing column — a reinforced wall, and every one of them "
-            f"is modelled as a bonded bar. The fill between the sheets then "
+            f"is modeled as a bonded bar. The fill between the sheets then "
             f"cannot move relative to them and the facing is held up by the "
             f"bars' grip on the block, which refines as the bar elements refine "
             f"instead of converging. Joint = Yes on each sheet splits the mesh "
@@ -5550,7 +5550,8 @@ def _joint_bond_inputs(ctx):
                f"bond-slip cap the development lengths build is not applied — "
                f"it would count the same grip twice — and the bar's only limit "
                f"is its own rupture strength Tmax. The limit-equilibrium engine "
-               f"ignores Joint entirely and still reads all three {_AT_REINF}.")
+               f"ignores Joint entirely and reads them as it always did "
+               f"{_AT_REINF}.")
 
 
 # ---------------------------------------------------------------------------

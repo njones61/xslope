@@ -580,7 +580,7 @@ warning naming the line:
 - a **long, flat sheet** within a few degrees of horizontal spanning most of the width of the zone above it;
 - a **smooth interface**, `Delta` below about 0.6 of the surrounding soil's $\phi$ — a geomembrane or liner rather
   than an ordinary soil-geosynthetic contact;
-- the **wall pattern**: four or more near-horizontal sheets at a vertical spacing under a metre, behind a face at
+- the **wall pattern**: four or more near-horizontal sheets at a vertical spacing under a meter, behind a face at
   least 70° steep, with their front ends inside a thin facing column.
 
 Two stronger signals come out of a bonded run itself, and a strength reduction reports them when it finds them: the

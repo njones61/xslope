@@ -204,8 +204,15 @@ the canvas re-renders automatically.
 - piezo_line / piezo_line2: list of (x, y) tuples.
 - dloads / dloads2: list of blocks; each block is a list of {'X','Y','Normal'} pts.
 - reinforcement_lines[i]: {'x1','y1','x2','y2','t_max','t_res','lp1','lp2','area','E',
-  'tend1','tend2','spacing','type','dir','appl','adhesion','delta'}
+  'tend1','tend2','spacing','type','dir','appl','adhesion','delta',
+  'joint','kn','ks','jred'}
   ('adhesion'+'delta' both set = overburden pullout law; 'lp1'/'lp2' then unused)
+  ('joint'='Yes' makes the line a slip surface in the FEM: the mesh splits along
+   it and interface elements carry 'adhesion'/'delta', which are then required;
+   'kn'/'ks' blank = derived from the adjacent soil; 'jred'='No' holds the
+   interface at full strength in the SSR. Right where the surface runs ALONG the
+   sheet — a base geotextile, a wall whose fill slides on its sheets — and wrong
+   where it cuts across. 'lp1'/'lp2'/'t_res' are not read there. LEM ignores it.)
   # EDIT THIS one; reinforce_lines (capitalized X/Y/T/Tres) is derived from it.
 - pile_lines[i]: {'x1','y1','x2','y2','D_pile','S','E','I','area','M_cap','V_cap',
   'theta_p','head_fixity','tip_fixity','label','H'}

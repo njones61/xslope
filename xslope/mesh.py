@@ -5519,6 +5519,41 @@ def extract_point_constraints(slope_data):
     return [(ll['x'], ll['y']) for ll in (slope_data.get('line_loads') or [])]
 
 
+def line_is_jointed(line):
+    """True when a reinforcement line's ``Joint`` column says yes.
+
+    One reading of the column, shared by the mesher, the finite element engine,
+    preflight, the plotters and the report, so a line is a joint in all of them
+    or in none. The loader stores the cell as entered — ``'Yes'``, ``'No'`` or
+    blank — and blank is no.
+    """
+    return str((line or {}).get("joint", "") or "").strip().lower() == "yes"
+
+
+def extract_joint_lines(slope_data):
+    """The ``joint_lines`` mapping for ``build_mesh_from_polygons``, or ``None``.
+
+    Every reinforcement line whose ``Joint`` column reads yes, keyed by its index
+    in the constraint-line list ``extract_constraint_line_geometry`` returns —
+    reinforcement lines come first there, so the key is the reinforcement line's
+    own index — and carrying that line's end anchorages as the mesher's
+    ``tend1`` / ``tend2`` options, which decide whether each end of the bar is
+    tied to the soil.
+
+    ``None`` when no line is jointed, which is the value that leaves the mesh
+    exactly what it always was.
+    """
+    lines = slope_data.get("reinforcement_lines") or []
+    opts = {}
+    for i in range(len(extract_reinforcement_line_geometry(slope_data))):
+        line = lines[i] if i < len(lines) else None
+        if not line_is_jointed(line):
+            continue
+        opts[i] = {"tend1": line.get("tend1") or 0.0,
+                   "tend2": line.get("tend2") or 0.0}
+    return opts or None
+
+
 def extract_constraint_line_geometry(slope_data):
     """
     Extract all constraint line geometry (reinforcement + piles) for mesh generation.

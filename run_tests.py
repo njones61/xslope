@@ -537,7 +537,8 @@ def _tag_mesh(slope_data, test, default_element_type='tri3', default_divisions=1
     there, and because a seepage-coupled FEM row must solve on the very mesh the
     field was computed on."""
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_constraint_line_geometry, extract_size_regions)
+                             extract_constraint_line_geometry, extract_joint_lines,
+                             extract_size_regions)
     constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
     polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
     mesh = build_mesh_from_polygons(
@@ -547,6 +548,7 @@ def _tag_mesh(slope_data, test, default_element_type='tri3', default_divisions=1
         lines=constraint_lines or None,
         element_size_1d=slope_data.get('element_size_1d'),
         size_regions=extract_size_regions(slope_data),
+        joint_lines=extract_joint_lines(slope_data),
         **_refine_kwargs(test))
     slope_data['mesh'] = mesh
     return mesh
@@ -1373,8 +1375,8 @@ def build_fem_ssrm_case(test):
     from xslope.fileio import load_slope_data
     from xslope.fem import build_fem_data
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_constraint_line_geometry, extract_point_constraints,
-                             extract_size_regions)
+                             extract_constraint_line_geometry, extract_joint_lines,
+                             extract_point_constraints, extract_size_regions)
 
     file_path = test['file']
     element_type = test.get('element_type', 'tri6')
@@ -1416,6 +1418,7 @@ def build_fem_ssrm_case(test):
             element_size_1d=slope_data.get('element_size_1d'),
             point_constraints=extract_point_constraints(slope_data),
             size_regions=extract_size_regions(slope_data),
+            joint_lines=extract_joint_lines(slope_data),
             **_refine_kwargs(test)
         )
 
@@ -4562,6 +4565,54 @@ def _pf_move(sd, key, dx=0.0, dy=0.0):
     return sd
 
 
+def _pf_joint(sd, **kw):
+    """Flag every reinforcement line as a joint, with an interface strength.
+
+    ``Adhesion`` and ``Delta`` come along because the interface law is those two
+    columns: a spec that flags a line and leaves them blank is testing
+    ``joint.no_interface_strength`` rather than whatever it meant to test.
+    """
+    kw.setdefault('adhesion', 5.0)
+    kw.setdefault('delta', 25.0)
+    return _pf_rows(sd, 'reinforcement_lines', joint='Yes', **kw)
+
+
+def _pf_joint_pair(sd, both=True):
+    """Two crossing reinforcement lines, the first jointed and the second either.
+
+    ``both=True`` is two jointed lines meeting; ``both=False`` is a jointed line
+    crossing a bonded one. Every other line is put out of the way so the pair is
+    the only crossing in the model.
+    """
+    rows = sd.get('reinforcement_lines') or []
+    _pf_rows(sd, 'reinforcement_lines', joint='No')
+    for k, r in enumerate(rows):
+        r.update(x1=60.0 + 3.0 * k, y1=-8.0, x2=70.0 + 3.0 * k, y2=-8.0)
+    if len(rows) >= 2:
+        rows[0].update(joint='Yes', adhesion=5.0, delta=25.0,
+                       x1=5.0, y1=2.0, x2=25.0, y2=2.0)
+        rows[1].update(joint='Yes' if both else 'No', adhesion=5.0, delta=25.0,
+                       x1=15.0, y1=-2.0, x2=15.0, y2=6.0)
+    return sd
+
+
+def _pf_joint_line_load(sd, on=True):
+    """A line load standing on a jointed line, or clear of it."""
+    rows = sd.get('reinforcement_lines') or []
+    _pf_rows(sd, 'reinforcement_lines', joint='No')
+    if rows:
+        rows[0].update(joint='Yes', adhesion=5.0, delta=25.0,
+                       x1=5.0, y1=2.0, x2=25.0, y2=2.0)
+    sd['line_loads'] = [{'x': 15.0, 'y': 2.0 if on else 10.0, 'P': 10.0,
+                         'angle': -90.0, 'label': 'probe'}]
+    return sd
+
+
+def _pf_joint_stretch(sd, x1=-25.0, x2=40.0):
+    """Stretch every sheet across the zone it lies under."""
+    return _pf_rows(sd, 'reinforcement_lines', x1=x1, x2=x2)
+
+
 #: One entry per rule. Fields:
 #:   rule      the rule id under test
 #:   base      the sample file to break a copy of
@@ -5351,6 +5402,68 @@ PREFLIGHT_RULE_SPECS = [
                                      adhesion=5.0, delta=30.0,
                                      lp1=0.0, lp2=0.0),
          expect='Lp1/Lp2 are not read'),
+
+    # --- interface (joint) elements ---------------------------------------
+    # The refusals first: what phase 1 cannot mesh, named before the mesher
+    # raises, plus the one input the interface law cannot do without.
+    dict(rule='joint.no_interface_strength', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='Yes'),
+         control=lambda sd: _pf_joint(sd),
+         expect='Mohr-Coulomb strength from those two columns'),
+    dict(rule='joint.lines_meet', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_pair(sd, both=True),
+         control=lambda sd: _pf_joint_pair(sd, both=False),
+         expect='both set Joint = Yes and meet'),
+    dict(rule='joint.crosses_constraint_line', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_pair(sd, both=False),
+         control=lambda sd: _pf_joint_pair(sd, both=True),
+         expect='sets Joint = Yes and crosses'),
+    dict(rule='joint.line_load_on_line', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_line_load(sd, on=True),
+         control=lambda sd: _pf_joint_line_load(sd, on=False),
+         expect='there is no single node for the load'),
+    # The four §4c signals, on a BONDED line. Two of them are read off files the
+    # corpus already ships in exactly the geometry the signal is about, so the
+    # mutation is the file itself and the control is the repair: a base
+    # geotextile lying on the fill/foundation contact (VP30), and the fifteen
+    # sheets of the geotextile wall (VP88). The other two are built on the
+    # reinforced-slope sample, whose sheets fire nothing as they stand.
+    dict(rule='joint.likely_on_material_boundary',
+         base=_repo('docs/verification/files/rocscience/vp030a.xlsx'),
+         mode='dict', analysis='fem',
+         mutation=lambda sd: sd,
+         control=lambda sd: _pf_move(sd, 'reinforcement_lines', dy=1.0),
+         expect='lies on a material boundary'),
+    dict(rule='joint.likely_flat_sheet',
+         base=_repo('docs/verification/files/geostudio/gs2_18.xlsx'),
+         mode='excel', analysis='fem',
+         mutation=lambda sd: _pf_joint_stretch(sd),
+         control=lambda sd: sd,
+         expect='degrees of horizontal and spans'),
+    dict(rule='joint.likely_smooth_interface', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='No',
+                                      adhesion=1.0, delta=5.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='No',
+                                     adhesion=1.0, delta=30.0),
+         expect='of the soil\'s own friction angle'),
+    dict(rule='joint.likely_wall',
+         base=_repo('docs/verification/files/rocscience/vp088.xlsx'),
+         mode='dict', analysis='fem',
+         mutation=lambda sd: sd,
+         control=lambda sd: _pf_joint(sd),
+         expect='a reinforced wall'),
+    # The INFO: which bonded-bar inputs a jointed line stops reading.
+    dict(rule='joint.bond_inputs_ignored', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint(sd),
+         control=lambda sd: _pf_joint(sd, lp1=0.0, lp2=0.0,
+                                      t_res=float('nan')),
+         expect='does not read on a jointed line'),
 
     # --- magnitude plausibility (the sniff tests) --------------------------
     dict(rule='mat.E_off_soil_type_band', base=PREFLIGHT_BASE_FEM, mode='excel',
@@ -7531,8 +7644,8 @@ def run_mesh_elements_test(test):
     """
     from xslope.fileio import load_slope_data
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_constraint_line_geometry, extract_point_constraints,
-                             extract_size_regions)
+                             extract_constraint_line_geometry, extract_joint_lines,
+                             extract_point_constraints, extract_size_regions)
 
     want_el = test.get('expected_elements')
     want_nd = test.get('expected_nodes')
@@ -7553,6 +7666,7 @@ def run_mesh_elements_test(test):
         element_size_1d=slope_data.get('element_size_1d'),
         point_constraints=extract_point_constraints(slope_data),
         size_regions=extract_size_regions(slope_data),
+        joint_lines=extract_joint_lines(slope_data),
         **_refine_kwargs(test)
     )
 

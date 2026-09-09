@@ -694,7 +694,7 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
     """
     from .fem import build_fem_data, solve_ssrm
     from .mesh import (get_material_polygons, build_mesh_from_polygons, extract_point_constraints,
-                       extract_constraint_line_geometry)
+                       extract_constraint_line_geometry, extract_joint_lines)
     from .search import _check_cancel
 
     def _progress(done, total, label):
@@ -731,7 +731,8 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
         mesh = build_mesh_from_polygons(polygons, target_size=target_size,
                                         element_type=element_type, lines=constraint_lines,
                                         element_size_1d=slope_data.get('element_size_1d'),
-                                        point_constraints=extract_point_constraints(slope_data))
+                                        point_constraints=extract_point_constraints(slope_data),
+                                        joint_lines=extract_joint_lines(slope_data))
 
     # grid=tolerance: bisect each SSRM on a fixed global grid so every factor of
     # safety (F_MLV and all perturbations) is independent of the F_min/F_max bracket

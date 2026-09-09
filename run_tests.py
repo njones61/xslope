@@ -8018,6 +8018,19 @@ MODULE_CHECKS = {
         "classification, the boundary conditions the copies inherit, the three "
         "refused geometries, and that a model with no jointed line meshes "
         "exactly as it always did."),
+    'joint_element': (
+        'joint_element_check.py',
+        "The interface (joint) element against four closed forms: Goodman "
+        "direct shear (the elastic slope, the Mohr-Coulomb surface pointwise, "
+        "the slip load, and no traction oscillation at a hundred times the "
+        "normal stiffness), a block on an inclined plane and its strength "
+        "reduction, the pullout envelope the joints must reproduce where the "
+        "bar's bond cap used to state it, and the infinite-slope form on a "
+        "slab riding a cohesive interface. Also the tension cutoff, the tied "
+        "end, the stiffness the softer adjacent soil sets on each side of a "
+        "material crossing, the stiffness default (which must carry no result "
+        "over two orders of magnitude), and that a model with no jointed line "
+        "builds exactly the fem_data it always did."),
     'spencer_root': (
         'spencer_root_check.py',
         "Spencer's equations have a root outside the pole-free band on many "
@@ -13931,6 +13944,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'indep_bishop': 3, 'tension_crack_symmetry': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'reinforce_mesh_geometry': 2, 'joint_mesh': 3,
+              'joint_element': 5,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'circle_vertex': 2,
@@ -14007,6 +14021,12 @@ def main():
                              'path. Use for strict runs: pre-release, or right '
                              'after a constitutive-physics change, when the oracle '
                              'should speak directly (see run_tests._run_fem_ssrm).')
+    parser.add_argument('--joints', action='store_true',
+                        help='Run only the interface (joint) element checks: '
+                             'the mesh split and the four closed-form rows. '
+                             'The element rows solve and strength-reduce '
+                             'several small models, so this scope runs in '
+                             'minutes rather than seconds.')
     parser.add_argument('--mesh', action='store_true',
                         help='Run only the mesh-size locks (type=mesh_elements): '
                              'the element and node counts the verification pages '
@@ -14022,7 +14042,8 @@ def main():
     # If no specific flags, run all
     run_all = not (args.lem or args.fem or args.seep or args.tseep or args.roundtrip
                    or args.dxf or args.gsz or args.slide2 or args.rs2
-                   or args.preflight or args.mesh or args.tutorials)
+                   or args.preflight or args.mesh or args.tutorials
+                   or args.joints)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
@@ -14034,6 +14055,7 @@ def main():
     run_rs2 = args.rs2 or run_all
     run_preflight = args.preflight or run_all
     run_mesh = args.mesh or run_all
+    run_joints = args.joints or run_all
     run_tutorials = args.tutorials or run_all
 
     # Discover tests from markdown files
@@ -14968,6 +14990,19 @@ def main():
                       'method': 'load deck', 'source': 'rs2'})
         if not run_all:
             print("Including 3 RS2 import tests")
+
+    # Interface (joint) elements. The mesh split's fixture rides the round trip;
+    # --joints wants it too, and adds it only when that scope is not already
+    # running. The element's own closed-form rows are their own scope: they
+    # solve and strength-reduce several models, so they cost minutes.
+    if args.joints and not run_roundtrip:
+        tests.append({'type': 'joint_mesh',
+                      'file': 'the mesh split along a jointed line',
+                      'method': '-', 'source': 'joint_mesh'})
+    if run_joints:
+        tests.append({'type': 'joint_element',
+                      'file': 'the interface (joint) element (closed forms)',
+                      'method': '-', 'source': 'joint_element'})
 
     if args.skip_benchmarks:
         n_before = len(tests)

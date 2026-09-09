@@ -63,6 +63,8 @@ A tip pair therefore never opens, and the normal traction its yield limit is
 taken at is read from the rest of its own element.
 """
 
+import warnings
+
 import numpy as np
 
 #: Virtual thickness for the derived joint stiffnesses, as a fraction of the 1D
@@ -237,20 +239,28 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
         sel = line_id == li
         line = lines[li - 1] if 0 < li <= len(lines) else {}
         label = line.get("label") or f"line {li}"
+        # Adhesion and Delta ARE the interface strength. A line that states
+        # neither describes a frictionless, cohesionless interface, which is a
+        # model the element can carry and preflight is the place that refuses;
+        # the warning is here because a silent zero is the reading that would
+        # otherwise go unnoticed.
         adhesion = line.get("adhesion")
         delta = line.get("delta")
-        if (adhesion is None or delta is None
-                or not np.isfinite(float(adhesion)) or not np.isfinite(float(delta))):
-            raise ValueError(
-                f"Reinforcement '{label}' is flagged as a joint, so the mesh is "
-                "split along it and the two faces slide on the interface strength "
-                "stated in the Adhesion and Delta columns. Both are blank, which "
-                "would leave the interface with no strength at all.")
+        adhesion = 0.0 if adhesion is None or not np.isfinite(float(adhesion)) \
+            else float(adhesion)
+        delta = 0.0 if delta is None or not np.isfinite(float(delta)) \
+            else float(delta)
+        if adhesion == 0.0 and delta == 0.0:
+            warnings.warn(
+                f"Reinforcement {label!r} is flagged as a joint, so the mesh is "
+                f"split along it and the two faces slide on the interface "
+                f"strength stated in the Adhesion and Delta columns. Both are "
+                f"blank, so this interface has no strength at all.")
         spacing = float(line.get("spacing") or 1.0)
         if not np.isfinite(spacing) or spacing <= 0.0:
             spacing = 1.0
-        cj[sel] = float(adhesion) / spacing
-        tanphi[sel] = np.tan(np.radians(float(delta))) / spacing
+        cj[sel] = adhesion / spacing
+        tanphi[sel] = np.tan(np.radians(delta)) / spacing
         _kn = line.get("kn")
         _ks = line.get("ks")
         if _kn is not None and np.isfinite(float(_kn)) and float(_kn) > 0.0:

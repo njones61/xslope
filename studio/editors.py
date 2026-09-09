@@ -7026,7 +7026,8 @@ def _new_reinf():
             # Blank, not zero: a new line uses the development-length law, and a
             # zero Adhesion with a zero Delta would be a real (and useless)
             # overburden law rather than the absence of one.
-            "adhesion": float("nan"), "delta": float("nan")}
+            "adhesion": float("nan"), "delta": float("nan"),
+            "joint": "", "kn": float("nan"), "ks": float("nan"), "jred": ""}
 
 
 # List-view form layout for a reinforcement line: every ReinforcementEditor.FIELDS
@@ -7040,6 +7041,7 @@ _REINF_FORM_GROUPS = [
     ("Anchorage", [["lp1", "lp2"], ["adhesion", "delta"],
                    ["tend1", "tend2"], ["spacing"]]),
     ("Type", [["type"], ["dir", "appl"]]),
+    ("Joint", [["joint", "jred"], ["kn", "ks"]]),
 ]
 
 
@@ -7077,6 +7079,15 @@ REINFORCE_HELP = {
     "t_max": "Maximum tensile force the line can mobilize, per unit width (discrete "
             "supports: enter the per-element capacity with Spacing). Caps both the "
             "LEM force and the FEM yield force.",
+    "joint": "Model the line as a joint (slip) element: the finite element mesh splits along it "
+             "and the soil can slide on it, with the interface strength from Adhesion and Delta. "
+             "FEM only; LEM is unchanged.",
+    "kn": "Joint normal stiffness. Blank derives it from the adjacent soil's E and the 1D "
+          "element size.",
+    "ks": "Joint shear stiffness. Blank derives it from the adjacent soil's G and the 1D "
+          "element size.",
+    "jred": "Reduce the joint's strength with the soil during strength reduction (blank = Yes). "
+            "No keeps a construction-detail joint at full strength.",
     "t_res": "Residual tensile force the line retains after it ruptures (post-peak), "
             "per unit width (÷ Spacing for discrete supports). Capped by the pullout "
             "envelope: bond slip is perfectly plastic, so an element keeps carrying "
@@ -7153,6 +7164,13 @@ class ReinforcementEditor(CategoryEditor):
         # per-element (L²) / per-unit-width (L²/L) instead.
         Field("E", "E", usage="fem", unit="stress", tooltip=REINFORCE_HELP["E"]),
         Field("area", "Area", usage="fem", tooltip=REINFORCE_HELP["area"]),
+        # v27 joint (slip) option: the mesh splits along the line (FEM only).
+        Field("joint", "Joint", "choice", choices=["", "Yes", "No"], usage="fem",
+              tooltip=REINFORCE_HELP["joint"]),
+        Field("kn", "kn", "optfloat", usage="fem", tooltip=REINFORCE_HELP["kn"]),
+        Field("ks", "ks", "optfloat", usage="fem", tooltip=REINFORCE_HELP["ks"]),
+        Field("jred", "Jred", "choice", choices=["", "Yes", "No"], usage="fem",
+              tooltip=REINFORCE_HELP["jred"]),
     ]
     # Which pullout law a line uses is not a stored field — the row says it. A
     # filled Adhesion/Delta pair IS the overburden law, and the development lengths

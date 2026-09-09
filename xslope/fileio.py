@@ -859,7 +859,7 @@ def ensure_reinforce_pullout(slope_data):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 26
+SUPPORTED_TEMPLATE_VERSION = 27
 
 # The template version that inserted the 1D element size cell at main!D20, pushing
 # every main-sheet run option below it down one row. Files at or above it are read
@@ -2420,6 +2420,15 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                 "tend1": tend1 / spacing,
                 "tend2": tend2 / spacing,
                 "spacing": spacing,
+                # v27 joint (slip) option, stored as entered ('Yes' / 'No' / '')
+                # so a file round-trips blank as blank. Readers: the line is a
+                # joint iff joint.lower() == 'yes'; its strength is reduced in the
+                # SSR unless jred.lower() == 'no'. kn / ks blank = NaN = derived
+                # from the adjacent soil.
+                "joint": _choice(row.get('joint'), ''),
+                "kn": float(row['kn']) if pd.notna(row.get('kn')) else float('nan'),
+                "ks": float(row['ks']) if pd.notna(row.get('ks')) else float('nan'),
+                "jred": _choice(row.get('jred'), ''),
                 # v24 overburden-dependent pullout. NaN = blank = the constant-
                 # rate law from Lp1/Lp2, so a file written before the columns
                 # existed reads exactly as it always did. These two are entered
@@ -3579,6 +3588,15 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
             if col is not None:
                 reinf[cell_ref(row, col)] = (None if _isnan(r.get(key))
                                              else _f(r.get(key)))
+        # v27 joint columns; a template without them (older master) has no
+        # column to write, and the loader defaults read back the same line.
+        for hdr, val in (('joint', (str(r.get('joint') or '').strip() or None)),
+                         ('kn', None if _isnan(r.get('kn')) else _f(r.get('kn'))),
+                         ('ks', None if _isnan(r.get('ks')) else _f(r.get('ks'))),
+                         ('jred', (str(r.get('jred') or '').strip() or None))):
+            col = _rcol.get(hdr)
+            if col is not None:
+                reinf[cell_ref(row, col)] = val
         # Type is the INPUT; Dir and Appl are derived from it in the sheet by a
         # VLOOKUP against the type table. A row whose direction and application
         # are exactly what its Type derives is written as the Type alone, so the

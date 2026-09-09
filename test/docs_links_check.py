@@ -2414,9 +2414,18 @@ def _lem08_editor_labels(mw):
 
     # The Type preset table, read from the template's own lookup block.
     sheet = openpyxl.load_workbook(TEMPLATE_FILE)["reinforce"]
-    presets = tuple(tuple(str(sheet.cell(row=r, column=c).value)
-                          for c in (28, 29, 30))          # AB, AC, AD
-                    for r in range(8, 12))
+    # The presets table sits to the right of the data columns and moves when a
+    # column is inserted (v27 moved it from AB to AF); find it by its header.
+    first = next((c for c in range(1, sheet.max_column + 1)
+                  if sheet.cell(row=8, column=c).value == "Geosynthetic"), None)
+    if first is None:
+        fails.append("the template's support-type presets table (header 'Geosynthetic' "
+                     "in row 8) was not found on the reinforce sheet")
+        presets = ()
+    else:
+        presets = tuple(tuple(str(sheet.cell(row=r, column=c).value)
+                              for c in (first, first + 1, first + 2))
+                        for r in range(8, 12))
     if presets != LEM08_TYPE_PRESETS:
         fails.append(f"the template's support-type presets read {presets}, not "
                      f"{LEM08_TYPE_PRESETS} — the table Tutorial LEM-8 reproduces")

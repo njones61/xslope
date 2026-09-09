@@ -1796,6 +1796,9 @@ def vp032a_fem():
     it. RS2 SSR 1.15; Borges & Cardoso 1.25 / 1.19 on the two circles the
     limit-equilibrium files vp032a / vp032b carry."""
     sd = _rs2_24_slope_data(1)
+    # Inert for a strength-reduction run; vp032a's own published circle is kept so
+    # the file still opens as a complete model.
+    sd['circles'] = [{'Xo': -4.8, 'Yo': 8.0, 'Depth': 8.0 - 21.83, 'R': 21.83}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032a_fem.xlsx'))
     return 'vp032a_fem.xlsx'
 
@@ -1804,6 +1807,7 @@ def vp032c_fem():
     """RS2-24, Part I case 2 — the 8.75 m embankment as vendor `#024_02.fez`
     builds it. RS2 SSR 0.95; Borges & Cardoso 0.99."""
     sd = _rs2_24_slope_data(2)
+    sd['circles'] = [{'Xo': -4.8, 'Yo': 14.0, 'Depth': 14.0 - 28.8, 'R': 28.8}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032c_fem.xlsx'))
     return 'vp032c_fem.xlsx'
 
@@ -2911,104 +2915,38 @@ def vp091():
 
 
 # ---------------------------------------------------------------------------
-# The wall family's strength-reduction siblings (RS2-48 to RS2-55).
+# The wall family's strength-reduction sibling (RS2-52).
 #
-# Each vpNNN.xlsx above is the Slide2 limit-equilibrium model, locked against a
-# printed circle. Each vpNNN_fem.xlsx below is the same wall as the RS2 vendor
-# model builds it for its strength reduction: the sheets moved out of the block
-# columns to the columns' back faces, and each sheet flagged Joint with the
-# vendor's interface (see _lh_wall_slope_data). The two cannot be one file. The
-# sheet move alone drops seven of the eight locked Slide2 factors by 2-4%
-# (vp088 1.0574 -> 1.0348, vp089 1.0105 -> 0.9777, vp090 1.0116 -> 0.9708,
-# vp092 1.0100 -> 0.9756, vp093 0.9611 -> 0.9291, vp094 1.0204 -> 0.9874,
-# vp087 1.0313 -> 0.9971; vp091's circle does not reach the face and is
-# unmoved), and those circles are Slide2's own printed criticals, which is what
-# the limit-equilibrium rows are for.
-#
-# vp091_fem predates the joints and already stood apart for its own reason: its
-# limit-equilibrium twin extends the foundation to x = -6 to seat a circle that
-# daylights there, and 36 m2 of extra cohesionless foundation in front of the
-# toe is the last thing to carry into a bearing mechanism. It now carries the
-# joints as well, on the same 24 m section the vendor uses.
+# `_lh_wall_slope_data(joint=True)` builds the whole family the way the RS2
+# vendor models build it -- sheets at the block columns' back faces, each on a
+# slip joint, front end tied -- and the family is NOT shipped on it. At that
+# construction the strength reduction returns about a third of RS2's factor,
+# because the 0.3 m block columns fail: their free-standing critical height is
+# 1.05 m against a 3 m tier, and at the vendor's sheet position nothing holds
+# them. The joints are not what fails. Giving every interface a cohesion of 500
+# stops all 210 joint elements slipping and moves the displacement field by
+# 0.0003%; switching the joints off entirely leaves the same mechanism in the
+# same block column; and holding the blocks at full strength lifts the factor
+# from 0.298 to 0.959. What the bonded corpus files have and the vendor build
+# does not is 0.25 m of bar embedded in each block column, which is what carries
+# the facing. See xslope_private/reports/campaign_joints_2026-09/r4_corpus.md.
 # ---------------------------------------------------------------------------
-
-def _wall_fem(stem, **kw):
-    """Write one jointed strength-reduction sibling and return its file name."""
-    sd = _lh_wall_slope_data(joint=True, **kw)
-    save_slope_data_to_xlsx(sd, os.path.join(OUT, stem + '.xlsx'))
-    return stem + '.xlsx'
-
-
-def vp087_fem():
-    """RS2-48 — the baseline three-tier wall, joint-built. Vendor
-    `slope stability #048.fez`: Ta = 10 kN/m, sheets 6.3 -> 12.6 / 7.5 -> 13.8 /
-    8.7 -> 15.0, Kn = Ks = 100000, Cjo = 0, Ajo = 28.35. RS2 SSR 1.05,
-    Leshchinsky & Han FLAC 0.99."""
-    return _wall_fem('vp087_fem')
-
-
-def vp088_fem():
-    """RS2-49 — the fill-quality variant, joint-built. Vendor `#049.fez`:
-    fill phi = 25, Ft = 22 kN/m. RS2 SSR 1.08, L&H FLAC 0.99."""
-    return _wall_fem('vp088_fem', fill=(0.0, 25.0), ta_of=lambda i, n: 22.0)
-
-
-def vp089_fem():
-    """RS2-50 — the reinforcement-length variant, joint-built. Vendor
-    `#050.fez`: five beam elements per layer over 4.2 m, Ft = 11.4 kN/m.
-    RS2 SSR 0.93, L&H FLAC 0.98."""
-    return _wall_fem('vp089_fem', L=4.2, ta_of=lambda i, n: 11.4)
-
-
-def vp090_fem():
-    """RS2-51 — the two-grade variant, joint-built. Vendor `#051.fez` is the one
-    file in the family with two reinforcement sets: cbeam2/joint2 on the lower
-    seven sheets (Ft = 11, Ks = 10000) and cbeam1/joint1 on the upper eight
-    (Ft = 7.5, Ks = 100000), Kn = 100000 on both. RS2 SSR 1.00, L&H FLAC
-    1.01."""
-    return _wall_fem('vp090_fem',
-                     ta_of=lambda i, n: 11.0 if i < 7 else 7.5,
-                     ks_of=lambda i, n: 1.0e4 if i < 7 else 1.0e5)
-
 
 def vp091_fem():
     """RS2-52 — the weak-foundation wall as RS2 models it, for the SSRM row.
 
-    Two things separate this file from its limit-equilibrium twin vp091. The
-    foundation runs x = 0 -> 24 (section 295.20 m2), which is the extent of
-    vendor `slope stability #052.fez` and of all seven sibling corpus files;
-    vp091's x = -6 extension exists only to seat Slide's printed LEM circle, and
-    on a bearing mechanism the run of foundation in front of the toe is the
-    dimension the answer is most sensitive to. And the sheets are joint-built
-    at the block columns' back faces, as in every _fem sibling.
-
-    Vendor `#052.fez`: foundation c = 0, phi = 18, Ft = 10 kN/m. RS2 SSR 0.84,
-    L&H FLAC 0.86 (bearing failure).
+    Identical to vp091 except that the foundation runs x = 0 -> 24 (section 295.20 m2),
+    which is the extent of vendor `slope stability #052.fez` and of all seven sibling
+    corpus files; vp091's x = -6 extension exists only to seat Slide's printed LEM
+    circle. On a bearing mechanism the run of foundation in front of the toe is the
+    dimension the answer is most sensitive to, so the two models are kept apart rather
+    than sharing one file.
     """
-    return _wall_fem('vp091_fem', fnd=(0.0, 18.0))
-
-
-def vp092_fem():
-    """RS2-53 — the water variant, joint-built. Vendor `#053.fez`: Ft = 9.25
-    kN/m. The reinforced fill stays free-draining, pore pressure on the
-    foundation only, as on the limit-equilibrium file. RS2 SSR 1.03, L&H FLAC
-    1.01."""
-    return _wall_fem('vp092_fem', ta_of=lambda i, n: 9.25, water=True)
-
-
-def vp093_fem():
-    """RS2-54 — the crest-surcharge variant, joint-built. Vendor `#054.fez`:
-    q = 20 kPa on the uppermost tier, Ft = 10 kN/m. RS2 SSR 0.92, L&H FLAC
-    1.02."""
-    return _wall_fem('vp093_fem', ta_of=lambda i, n: 10.0, surcharge=20.0)
-
-
-def vp094_fem():
-    """RS2-55 — the tier-count variant, joint-built. Vendor `#055.fez`: five
-    1.8 m tiers offset 0.6 m, fifteen sheets at 6.3 -> 12.6 through
-    8.7 -> 15.0, Ft = 10.1 kN/m. RS2 SSR 1.04, L&H FLAC 1.00."""
-    return _wall_fem('vp094_fem', n_tiers=5, tier_h=1.8, offset=0.6,
-                     ta_of=lambda i, n: 10.1)
+    sd = _lh_wall_slope_data(fnd=(0.0, 18.0))
+    # Inert for a strength-reduction run; the family's default seed is kept so the file
+    # still opens as a complete model.
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp091_fem.xlsx'))
+    return 'vp091_fem.xlsx'
 
 
 def vp092():
@@ -5327,9 +5265,8 @@ BUILDERS = [
     vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a,
     vp072b, vp073, vp074, vp075, vp076a, vp076b, vp077a, vp077b, vp078, vp078b, vp078c,
     vp079, vp080a, vp080b, vp081, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d,
-    vp085a, vp085b, vp086, vp087, vp087_fem, vp088, vp088_fem, vp089, vp089_fem,
-    vp090, vp090_fem, vp091, vp091_fem, vp092, vp092_fem, vp093, vp093_fem,
-    vp094, vp094_fem, vp096, vp097, vp098, vp099, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c,
+    vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp091_fem, vp092, vp093,
+    vp094, vp096, vp097, vp098, vp099, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c,
     vp103d, vp104a, vp104b, vp106a, vp106b, vp106c, vp106d, vp106e, vp107a, vp107b, vp108a,
     vp108b, vp109,
 ]

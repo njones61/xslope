@@ -73,7 +73,8 @@ import matplotlib.pyplot as plt
 from xslope.fileio import load_slope_data
 from xslope.fem import build_fem_data, solve_ssrm, export_fem_solution
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                         extract_constraint_line_geometry, extract_point_constraints,
+                         extract_constraint_line_geometry, extract_joint_lines,
+                         extract_point_constraints,
                          extract_size_regions, export_mesh_to_json)
 from xslope.style import resolve_style, material_style
 # The composite is ONE figure whose four panels are drawn into axes the composite
@@ -103,14 +104,15 @@ TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 # reported-not-locked row still gets a figure instead of silently having none.
 #
 # The multi-tiered geotextile wall family (RS2-48–55, Leshchinsky & Han 2004) is the
-# case in point. The baseline's SSR row is not attempted (RS2 splits that mesh at the
-# sheets and joins it with slip interfaces, so the page carries no figure for it); all
-# seven parametric variants follow the mesh — each moves past its own tolerance under a
-# refinement step, in the 2D size and in the 1D size alike — so all seven are reported
-# rather than locked, and all seven are registered below. All eight share what was the baseline's
-# model settings — 1.0 m tri6 mesh, the vendor's isotropic at-rest field stress
-# (k0 = 1) and static tensile caps (tension_srf off) — but the variants run the auto
-# bracket rather than the baseline's narrow one, because the family spans 0.74–1.16.
+# case in point. The baseline's SSR row is not attempted (the vendor mesh is split at
+# the sheets and the block facing is what fails when that split is reproduced, so the
+# page carries no figure for it); all seven parametric variants follow the mesh — each
+# moves past its own tolerance under a refinement step, in the 2D size and in the 1D
+# size alike — so all seven are reported rather than locked, and all seven are
+# registered below. All eight share what was the baseline's model settings — 1.0 m
+# tri6 mesh, the vendor's isotropic at-rest field stress (k0 = 1) and static tensile
+# caps (tension_srf off) — but the variants run the auto bracket rather than the
+# baseline's narrow one, because the family spans 0.74–1.16.
 #
 _WALL = dict(element_type='tri6', target_size='1.0', tolerance='0.02',
              f_min='0.5', f_max='3.0', max_iter='16000',
@@ -182,6 +184,12 @@ EXPECTED_NO_FIGURE = {
     'RS2-67e': 'same unconstrained downstream-face mechanism as RS2-67b.png, at the drained limit',
     'RS2-67f': 'same Search-Area-confined upstream mechanism as RS2-67d.png, at the drained limit',
 
+    # RS2-24 — each case is locked at two meshes. The coarser one selects the same
+    # deep-seated mechanism through the soft clay (values per the page tags); the
+    # finer mesh is what the figure draws.
+    'RS2-24a-m2.0': 'same mechanism as RS2-24a.png, one mesh step coarser',
+    'RS2-24b-m2.0': 'same mechanism as RS2-24b.png, one mesh step coarser',
+
     # RS2 Part IV VP102 — the drawdown mechanism is one downstream-face wedge at every
     # frame of a monotone sequence. One frame of each case is figured: the mid-sequence
     # phi_b = 0 baseline frame, and the phi_b = 37 frame that sets the dot.
@@ -200,6 +208,9 @@ EXPECTED_NO_FIGURE = {
 # per benchmark keeps each run's field beside its own figure.
 SIDECAR_STEM = {
     'RS2-4-zone': 'vp005_zone',
+    # vp032a_fem carries two runs: the vendor's elastic face strip, and the
+    # control that lets it yield. Each keeps its own field beside its own figure.
+    'RS2-24a-noskin': 'vp032a_fem_noskin',
     'RS2-40-deep': 'vp077b_deep',
     # vp077a ships the tri3 seepage mesh and field its LEM locks read; the SSRM row
     # solves the seepage again on its own tri6 mesh, so its sidecars — the mesh json
@@ -345,12 +356,17 @@ def _build(tag):
         # here for the same reason refine_factor does: a file that refines a band
         # is solved on the refined mesh by the suite, and a figure built without
         # the overlay would draw a coarser mesh and report a different FS.
+        # A model whose reinforcement states Joint is meshed SPLIT along that line,
+        # with the two faces sliding on an interface. Left out, the figure would
+        # mesh and solve a bonded continuum -- a different model from the one the
+        # lock was measured on, drawn under the lock's caption.
         mesh = build_mesh_from_polygons(
             polys, target_size=target,
             element_type=tag.get('element_type', 'tri6'), lines=lines,
             element_size_1d=sd.get('element_size_1d'),
             point_constraints=extract_point_constraints(sd),
-            size_regions=extract_size_regions(sd), **refine_kw)
+            size_regions=extract_size_regions(sd),
+            joint_lines=extract_joint_lines(sd), **refine_kw)
     # `sd` (unmodified) is what the inputs panel draws; the FEM build gets the
     # dry-beyond-the-line spelling where a piezo line stops short of the mesh.
     return sd, build_fem_data(_declare_dry_beyond_piezo(sd, mesh), mesh), path, mesh

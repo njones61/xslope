@@ -444,45 +444,6 @@ VENDOR_T_CUT = {
         'Foundation soil': 10.0,
         'Blocks': 2.5,
     },
-    # The wall family's SSRM siblings carry their twins' caps: '#048' through
-    #   '#055' state T = c on every material, so T = 0 on the c = 0 reinforced
-    #   and retained fill, 10 on the c = 10 foundation and 2.5 on the blocks.
-    #   vp091_fem's foundation is itself c = 0, so its T = 0, above.
-    'vp087_fem.xlsx': {
-        'Reinforced and retained fill': 0.0,
-        'Foundation soil': 10.0,
-        'Blocks': 2.5,
-    },
-    'vp088_fem.xlsx': {
-        'Reinforced and retained fill': 0.0,
-        'Foundation soil': 10.0,
-        'Blocks': 2.5,
-    },
-    'vp089_fem.xlsx': {
-        'Reinforced and retained fill': 0.0,
-        'Foundation soil': 10.0,
-        'Blocks': 2.5,
-    },
-    'vp090_fem.xlsx': {
-        'Reinforced and retained fill': 0.0,
-        'Foundation soil': 10.0,
-        'Blocks': 2.5,
-    },
-    'vp092_fem.xlsx': {
-        'Reinforced and retained fill': 0.0,
-        'Foundation soil': 10.0,
-        'Blocks': 2.5,
-    },
-    'vp093_fem.xlsx': {
-        'Reinforced and retained fill': 0.0,
-        'Foundation soil': 10.0,
-        'Blocks': 2.5,
-    },
-    'vp094_fem.xlsx': {
-        'Reinforced and retained fill': 0.0,
-        'Foundation soil': 10.0,
-        'Blocks': 2.5,
-    },
     # RS2-56a
     'rs2_56a.xlsx': {
         'soil': 5.0,
@@ -1240,43 +1201,6 @@ VENDOR_E_NU = {
         'Blocks': (0.4, 50000.0),
     },
     'vp094.xlsx': {
-        'Reinforced and retained fill': (0.4, 50000.0),
-        'Foundation soil': (0.4, 50000.0),
-        'Blocks': (0.4, 50000.0),
-    },
-    # The wall family's SSRM siblings: '#048' through '#055' give all three
-    #   materials nu = 0.4 / E = 50000 kPa, as their twins carry.
-    'vp087_fem.xlsx': {
-        'Reinforced and retained fill': (0.4, 50000.0),
-        'Foundation soil': (0.4, 50000.0),
-        'Blocks': (0.4, 50000.0),
-    },
-    'vp088_fem.xlsx': {
-        'Reinforced and retained fill': (0.4, 50000.0),
-        'Foundation soil': (0.4, 50000.0),
-        'Blocks': (0.4, 50000.0),
-    },
-    'vp089_fem.xlsx': {
-        'Reinforced and retained fill': (0.4, 50000.0),
-        'Foundation soil': (0.4, 50000.0),
-        'Blocks': (0.4, 50000.0),
-    },
-    'vp090_fem.xlsx': {
-        'Reinforced and retained fill': (0.4, 50000.0),
-        'Foundation soil': (0.4, 50000.0),
-        'Blocks': (0.4, 50000.0),
-    },
-    'vp092_fem.xlsx': {
-        'Reinforced and retained fill': (0.4, 50000.0),
-        'Foundation soil': (0.4, 50000.0),
-        'Blocks': (0.4, 50000.0),
-    },
-    'vp093_fem.xlsx': {
-        'Reinforced and retained fill': (0.4, 50000.0),
-        'Foundation soil': (0.4, 50000.0),
-        'Blocks': (0.4, 50000.0),
-    },
-    'vp094_fem.xlsx': {
         'Reinforced and retained fill': (0.4, 50000.0),
         'Foundation soil': (0.4, 50000.0),
         'Blocks': (0.4, 50000.0),

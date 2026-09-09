@@ -69,7 +69,7 @@ why rather than leaving a blank; everything else is built and locked at its tagg
 | [21](#rs2-21) | 🟢 | Bearing capacity test prism (Prandtl II) | SSRM 1.011 vs RS2 SSRM 1.01 (+0.1%) | Converging on Prandtl theory 1.0. One trial is undecided at the iteration ceiling. |
 | [22](#rs2-22) | 🟢 | Layered slope with undulating bedrock | SSRM 1.523 vs RS2 SSRM 1.52 (+0.2%) | **built** (SSRM variant), on the vendor's boundary-load cap, carried at the vendor's own vertical load direction. |
 | [23](#rs2-23) | 🟢 | Underwater slope with linearly varying cohesion | Under RS2's own elastic partition: SSRM 1.112 vs RS2 SSRM 1.12 (−0.7%) | **built** — the vendor model states the "can't fail" region element by element (a full-depth vertical band, not the text's "above el. −20 and right of the bench"), and the corpus carries it. Partition removed, the same model reads 0.215. |
-| [24](#rs2-24) | <span class="nodata">⊘</span> | Layered slope with geosynthetic reinforcement | | *blocked* — the vendor models join embankment to foundation across a frictional slip interface along the geotextile, an element type XSLOPE does not have, so these rows are not attempted. The construction is read from the vendor models. RS2 SSRM 1.15 / 0.95 published. |
+| [24](#rs2-24) | 🟡 | Layered slope with geosynthetic reinforcement | 1.104 / 0.939 | RS2 SSR 1.15 (−4.0%) and 0.95 (−1.2%). Built as the vendor models build it: the mesh split along the geotextile, the two faces on a frictional slip interface, and the ~1 m elastic strip up the embankment face. |
 | [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs RS2 SSRM 1.29 (−6.8%) | **built** (caveat) — refinement widens the gap rather than closing it: 1.188 at a 2.5 m mesh against the 1.202 locked at 5 m. |
 | [26](#rs2-26) | 🟢 | Clarence Cannon dam (Wolff & Harr 1987) | SSRM 2.294 vs RS2 SSRM 2.29 (+0.2%) | |
 | [27](#rs2-27) | 🟢 | Homogeneous slope, pore pressure by r<sub>u</sub> | SSRM 1.342 vs RS2 SSRM 1.31 (+2.4%) | **built** — regression lock at the 1.0 m mesh, flat from there down. |
@@ -160,7 +160,7 @@ why rather than leaving a blank; everything else is built and locked at its tagg
 | [24](#rs2-19) | 🟡 | Slope, 3 materials (Low 1989) | SSRM 1.488 vs Low 1.44 (+3.3%) · vs RS2 SSRM 1.41 (+5.5%) | Piggyback on [RS2-19](#rs2-19); Low's own factor governs, as on that row. Part IV publishes RS2 SSRM 1.42. |
 | [25](#rs2-20) | 🟢 | Bearing-capacity slope (Prandtl / Chen & Shao) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Piggyback on [RS2-20](#rs2-20); Chen & Shao 1.05. |
 | [26](#rs2-21) | 🟢 | Bearing-capacity prism (Prandtl II) | SSRM 1.011 vs RS2 SSRM 1.01 (+0.1%) | Piggyback on [RS2-21](#rs2-21). Part IV publishes RS2 SSRM 1.00; theory 1.0. |
-| [32](#rs2-24) | <span class="nodata">⊘</span> | Reinforced embankment, 7 materials (Borges 2002) | | *blocked* with [RS2-24](#rs2-24), whose models these are: the slip interface along the geotextile has no XSLOPE counterpart, so the SSR rows are not attempted. Part IV publishes RS2 SSRM 1.24 / 1.21 / 0.98; Borges 1.25 / 1.19 / 0.99. The limit-equilibrium build of the same problem is Slide2 [VP32](rocscience.md#vp32). |
+| [32](#rs2-24) | 🟡 | Reinforced embankment, 7 materials (Borges 2002) | 1.104 / 0.939 | The same two sections [RS2-24](#rs2-24) builds, scored there against Part I. Part IV publishes RS2 SSRM 1.24 / 1.21 / 0.98 under an SSR search polygon and a wider elastic region; Borges 1.25 / 1.19 / 0.99. The limit-equilibrium build of the same problem is Slide2 [VP32](rocscience.md#vp32). |
 | [38](#rs2-28) | 🟢 | Excavated slope, FE seepage, suction (Ng & Shi 1998) | H = 61: SSRM 1.669 vs RS2 SSR 1.64 (+1.8%) · H = 62: SSRM 1.544 vs RS2 SSR 1.55 (−0.4%) · H = 63: SSRM 1.406 vs RS2 SSR 1.41 (−0.3%) | Piggyback on [RS2-28](#rs2-28), which is built from the native `#028` models; the Part I §28 values govern. |
 | [39](#rs2-29) | 🟢 | Reinforced embankment, geosynthetic (Tandjiria 2002) | Sand: SSRM 1.219 vs RS2 SSRM 1.22 (−0.1%) · Clay: SSRM 0.997 vs RS2 SSR 0.99 (+0.7%) | Piggyback on [RS2-29](#rs2-29), both cases; the clay lock pairs with RS2's own Part I model. Part IV publishes RS2 SSRM 0.97 / 1.42 / 1.22 / 1.39. |
 | [40](#rs2-30) | 🟡 | Homogeneous, power curve, sensitivity (Perry 1993) | SSRM 1.023 vs RS2 SSR 0.97 (+5.5%) | Piggyback on [RS2-30](#rs2-30); run under the vendor's own three exclusion areas, carried in the file. Perry 0.98. |
@@ -767,29 +767,73 @@ vendor's constraint acting on this slope's mechanics.
 
 ![RS2-23: LASH terminal underwater slope (Duncan 2000) under RS2's own elastic partition, SSRM 1.112 vs RS2 SSRM 1.12 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-23.png)
 
-### ⊘ RS2-24: Layered slope with geosynthetic reinforcement {#rs2-24}
+### 🟡 RS2-24: Layered slope with geosynthetic reinforcement {#rs2-24}
 
 Slide2 counterpart: [VP32](rocscience.md#vp32).
 
 The problem is a 7 m and an 8.75 m embankment of two cohesionless fills on five soft clay layers,
 with a single geosynthetic sheet at the fill base (Borges & Cardoso 2002).
 
-| Published | RS2 SSR (Part I, 7 m / 8.75 m) | RS2 SSR (Part IV, three cases) |
-|---|---|---|
-| Borges & Cardoso 2002 | 1.15 / 0.95 | 1.24 / 1.21 / 0.98 |
+**Input files:** [vp032a_fem.xlsx](files/rocscience/vp032a_fem.xlsx) (7 m),
+[vp032c_fem.xlsx](files/rocscience/vp032c_fem.xlsx) (8.75 m).
 
-**The SSR rows are not attempted.** RS2 does not mesh the section as one body. Its `#024` models
-split the solid mesh along the geotextile into two, 39 coincident node pairs joined by frictional slip
-joints (c = 0, φ = 30.96°), with the geotextile itself as tension-only beam elements
-(EA = 200 000 kN/m, Ft = 200 kN/m) running along the split — so the load path between embankment
-and foundation passes through a sliding interface. XSLOPE meshes a bonded continuum and has no
-interface element, so that sliding joint has no XSLOPE counterpart, and no XSLOPE run stands
-opposite the published factors. All five vendor models are built this way — the two native `#024`
-models and the three `#032` Slide2 imports.
+| Case | XSLOPE SSRM | RS2 SSR (Part I) | Borges & Cardoso |
+|---|---|---|---|
+| 7 m embankment | 1.104 | 1.15 (−4.0%) | 1.25 |
+| 8.75 m embankment | 0.939 | 0.95 (−1.2%) | 0.99 |
+
+**The sheet is an interface, not a bonded bar.** RS2 does not mesh the section as one body: its
+`#024` models split the solid mesh along the geotextile and join the two faces with frictional slip
+joints (c = 0, φ = 30.96°, k<sub>n</sub> = 100 000 kPa/m, k<sub>s</sub> = 10 000 kPa/m, no tensile
+capacity), with the sheet itself a tension-only member between them (EA = 200 000 kN/m,
+T = 200 kN/m). Its end nodes belong to no solid element, so both ends are free to slide and the
+sheet's whole grip on the ground is the interface. These files carry that construction: the
+reinforcement line is flagged `Joint` and states those four properties, the mesher splits the mesh
+along it, and the strength reduction reduces the interface with the soil, which is the vendor's
+coupled setting.
+
+**A band of the face cannot yield.** Vendor materials `rock8` and `rock9` carry the lower and upper
+fill's density and elastic constants with no plasticity at all, in a strip about 1 m wide running
+from the toe up the face to the crest — 6.6 m² of the 7 m section, 8.5 m² of the 8.75 m one. The
+files carry that strip as two zones of its own so the run can hold it elastic, the way
+[RS2-23](#rs2-23) carries RS2's elastic partition. The second row below is what makes the first a
+comparison rather than a coincidence: take the strip away and the same model reduces into a
+shallow slip on the face instead of the deep-seated mechanism.
+
+| 7 m embankment | XSLOPE SSRM |
+|---|---|
+| face strip held elastic, as the vendor models build it | 1.104 |
+| face strip yielding with the rest of the fill | 0.811 |
+
+Both cases are locked at a 1.5 m mesh and again at 2.0 m, which brackets the vendor's own 2 442
+and 2 462 quadratic triangles. The two readings differ by less than the deficit against RS2, and
+they move in opposite directions, so neither case is riding a trend:
+
+| Case | 2.0 m mesh | 1.5 m mesh |
+|---|---|---|
+| 7 m embankment | 1.080 | 1.104 |
+| 8.75 m embankment | 0.951 | 0.939 |
+
+Part IV publishes three further factors for this problem, 1.24 / 1.21 / 0.98, from Slide2 imports
+`#032-1` through `#032-3`. Those carry the same two sections and the same jointed sheet with an SSR
+search polygon and a much larger elastic region — six of their seven soils have a non-yielding
+twin — so they are a different constraint on the same problem and the rows here are scored against
+Part I.
 
 The limit-equilibrium side of this problem is built and locked as Slide2
 [VP32](rocscience.md#vp32) — Bishop and Spencer on the three published circles, where the
-geosynthetic enters as a force rather than through an interface.
+geosynthetic enters as a force rather than through an interface. Those files keep the bonded sheet
+and the profile-line section they are locked against.
+
+<!-- test: file=files/rocscience/vp032a_fem.xlsx, type=fem_ssrm, expected_fs=1.104, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Upper embankment (elastic face);Lower embankment (elastic face), benchmark=RS2-24a -->
+<!-- test: file=files/rocscience/vp032a_fem.xlsx, type=fem_ssrm, expected_fs=1.080, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Upper embankment (elastic face);Lower embankment (elastic face), benchmark=RS2-24a-m2.0 -->
+<!-- test: file=files/rocscience/vp032a_fem.xlsx, type=fem_ssrm, expected_fs=0.811, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-24a-noskin -->
+<!-- test: file=files/rocscience/vp032c_fem.xlsx, type=fem_ssrm, expected_fs=0.939, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Upper embankment (elastic face);Lower embankment (elastic face), benchmark=RS2-24b -->
+<!-- test: file=files/rocscience/vp032c_fem.xlsx, type=fem_ssrm, expected_fs=0.951, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Upper embankment (elastic face);Lower embankment (elastic face), benchmark=RS2-24b-m2.0 -->
+
+![RS2-24a: the 7 m Borges & Cardoso embankment on its basal geotextile, the sheet built as RS2 builds it — the mesh split along it and the two faces sliding on a frictional interface — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-24a.png)
+
+![RS2-24b: the 8.75 m case, same construction — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-24b.png)
 
 ### 🔴 RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003) {#rs2-25}
 
@@ -1543,10 +1587,15 @@ model.
 **The SSR row is not attempted.** RS2 does not mesh the wall as one body: its `#048` model splits
 the solid mesh along the geotextile layers, 195 coincident node pairs joined by frictional slip
 joints with tension-only beam elements running along the split, so the load path between the
-reinforced fill and its sheets passes through sliding interfaces. XSLOPE meshes a bonded continuum
-and has no interface element, so those joints have no counterpart and no XSLOPE run stands opposite
-RS2's factor. The limit-equilibrium side of the same wall is built and locked
-([VP87](rocscience.md#vp87): Bishop 1.031 vs Slide2 1.040), where the sheets enter as forces.
+reinforced fill and its sheets passes through sliding interfaces. Splitting the mesh that way is
+something XSLOPE does — a reinforcement line can be declared a joint, as
+[RS2-24](#rs2-24)'s models are — but on this wall it also moves each sheet out of its facing
+column to the column's back face, where the vendor puts it, and the 0.3 m facing columns then have
+nothing holding them: their free-standing critical height is 1.05 m against a 3 m tier. That is
+what the corpus files' 0.25 m of bar embedded in each column carries, so the wall is built bonded
+here and no XSLOPE run stands opposite RS2's factor. The limit-equilibrium side of the same wall is
+built and locked ([VP87](rocscience.md#vp87): Bishop 1.031 vs Slide2 1.040), where the sheets enter
+as forces.
 
 `#049` through `#055` carry the same split mesh and the same joints as `#048`; what changes case
 by case is the sheet. So every RS2 SSR value in the variant sections below comes from the

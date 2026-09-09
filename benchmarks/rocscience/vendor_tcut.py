@@ -181,6 +181,31 @@ VENDOR_T_CUT = {
         'Clay 4': 32.0,
         'Clay 5': 32.0,
     },
+    # RS2-24's SSRM files. Same caps as their limit-equilibrium twins; the two
+    #   elastic face zones mirror vendor rock8 / rock9, Plasticity: Non, which
+    #   carries no tensile field.
+    'vp032a_fem.xlsx': {
+        'Upper embankment': 0.0,
+        'Lower embankment': 0.0,
+        'Clay 1': 43.0,
+        'Clay 2': 31.0,
+        'Clay 3': 30.0,
+        'Clay 4': 32.0,
+        'Clay 5': 32.0,
+        'Upper embankment (elastic face)': None,
+        'Lower embankment (elastic face)': None,
+    },
+    'vp032c_fem.xlsx': {
+        'Upper embankment': 0.0,
+        'Lower embankment': 0.0,
+        'Clay 1': 43.0,
+        'Clay 2': 31.0,
+        'Clay 3': 30.0,
+        'Clay 4': 32.0,
+        'Clay 5': 32.0,
+        'Upper embankment (elastic face)': None,
+        'Lower embankment (elastic face)': None,
+    },
     # RS2-25 — the Syncrude tailings dyke, vendor model 'slope stability #025.fez',
     #   which states T: 0 on all five materials.
     #   The file-number join missed this one for the same reason VENDOR_E_NU records
@@ -415,6 +440,45 @@ VENDOR_T_CUT = {
         'Blocks': 2.5,
     },
     'vp094.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+        'Blocks': 2.5,
+    },
+    # The wall family's SSRM siblings carry their twins' caps: '#048' through
+    #   '#055' state T = c on every material, so T = 0 on the c = 0 reinforced
+    #   and retained fill, 10 on the c = 10 foundation and 2.5 on the blocks.
+    #   vp091_fem's foundation is itself c = 0, so its T = 0, above.
+    'vp087_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+        'Blocks': 2.5,
+    },
+    'vp088_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+        'Blocks': 2.5,
+    },
+    'vp089_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+        'Blocks': 2.5,
+    },
+    'vp090_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+        'Blocks': 2.5,
+    },
+    'vp092_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+        'Blocks': 2.5,
+    },
+    'vp093_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+        'Blocks': 2.5,
+    },
+    'vp094_fem.xlsx': {
         'Reinforced and retained fill': 0.0,
         'Foundation soil': 10.0,
         'Blocks': 2.5,
@@ -921,6 +985,30 @@ VENDOR_E_NU = {
         'Clay 4': (0.4, 50000.0),
         'Clay 5': (0.4, 50000.0),
     },
+    # RS2-24's SSRM files, including the two elastic face zones, which vendor
+    #   rock8 / rock9 give the same pair as the fill they copy.
+    'vp032a_fem.xlsx': {
+        'Upper embankment': (0.4, 50000.0),
+        'Lower embankment': (0.4, 50000.0),
+        'Clay 1': (0.4, 50000.0),
+        'Clay 2': (0.4, 50000.0),
+        'Clay 3': (0.4, 50000.0),
+        'Clay 4': (0.4, 50000.0),
+        'Clay 5': (0.4, 50000.0),
+        'Upper embankment (elastic face)': (0.4, 50000.0),
+        'Lower embankment (elastic face)': (0.4, 50000.0),
+    },
+    'vp032c_fem.xlsx': {
+        'Upper embankment': (0.4, 50000.0),
+        'Lower embankment': (0.4, 50000.0),
+        'Clay 1': (0.4, 50000.0),
+        'Clay 2': (0.4, 50000.0),
+        'Clay 3': (0.4, 50000.0),
+        'Clay 4': (0.4, 50000.0),
+        'Clay 5': (0.4, 50000.0),
+        'Upper embankment (elastic face)': (0.4, 50000.0),
+        'Lower embankment (elastic face)': (0.4, 50000.0),
+    },
     # RS2-25 — the Syncrude tailings dyke. Its vendor model is the RS2-NATIVE
     # 'slope stability #025.fez' (five zones, gamma 20/17/17/17/17, phi
     # 34/34/34/7.5/7.5 — the dyke, matching this file zone for zone), NOT
@@ -1152,6 +1240,43 @@ VENDOR_E_NU = {
         'Blocks': (0.4, 50000.0),
     },
     'vp094.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    # The wall family's SSRM siblings: '#048' through '#055' give all three
+    #   materials nu = 0.4 / E = 50000 kPa, as their twins carry.
+    'vp087_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp088_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp089_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp090_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp092_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp093_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp094_fem.xlsx': {
         'Reinforced and retained fill': (0.4, 50000.0),
         'Foundation soil': (0.4, 50000.0),
         'Blocks': (0.4, 50000.0),

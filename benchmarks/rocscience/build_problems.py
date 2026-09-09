@@ -1717,6 +1717,97 @@ def vp032c():
     return 'vp032c.xlsx'
 
 
+# The Borges & Cardoso embankment as RS2 models it (RS2-24), for the SSRM rows.
+#
+# Vendor `slope stability #024_01.fez` (crest el 7.0) and `#024_02.fez` (crest el
+# 8.75) are the two Part I models. They carry the same seven strengths the vp032
+# corpus files carry, and two things the profile-line files do not:
+#
+#   * The geotextile is not embedded in the solid mesh. Its nodes are a separate
+#     set, tied to the ground only through zero-thickness joint elements above and
+#     below it (Ks 10 000, Kn 100 000, Cjo 0, Ajo 30.96 deg, Tjo 0); its two end
+#     nodes appear in no 2-D element, so both ends are free to slide. That is
+#     `Joint = Yes` with those four columns and both end anchorages left blank.
+#   * A band of the embankment face cannot yield. Vendor materials `rock8` and
+#     `rock9` carry the same density and elastic constants as the lower and upper
+#     fill but no plasticity at all, and they occupy a ~1 m (horizontal) skin
+#     running from the toe up the face to the crest: 0.99 m2 below el 1 and
+#     5.62 m2 above it in `#024_01`, 1.00 and 7.48 m2 in `#024_02`. The file
+#     carries them as their own zones so a tag can name them, exactly as
+#     vp029_split carries RS2-23's elastic partition.
+#
+# The limit-equilibrium build of the same problem is vp032a / vp032b / vp032c,
+# whose locks are untouched: those files keep their profile lines, their bonded
+# sheet and their published circles.
+_RS2_24_SKIN = {
+    # case: (toe, face-at-el-1, skin-at-el-1, skin-at-toe-el, crest, skin-at-crest)
+    1: ((0.0, 0.0), (-1.23, 1.0), (-2.2143, 1.0), (-1.0, 0.0),
+        (-8.61, 7.0), (-9.5, 7.0)),
+    2: ((0.0, 0.0), (-1.23, 1.0), (-2.2229, 1.0), (-1.0, 0.0),
+        (-10.7625, 8.75), (-11.7, 8.75)),
+}
+
+
+def _rs2_24_slope_data(case):
+    """The vp032 section rebuilt as zones, with the elastic face skin and the
+    jointed geotextile the vendor `#024` models carry."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    from xslope.mesh import get_material_polygons
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = _vp032_slope_data(case)
+    toe, face1, skin1, skin0, crest, skinc = _RS2_24_SKIN[case]
+    # The skin: the strip between the face and a line about 1 m inside it, from
+    # the toe to the crest. Split at el 1, where the fill's own two materials meet.
+    upper_skin = Polygon([face1, crest, skinc, skin1])
+    lower_skin = Polygon([toe, face1, skin1, skin0])
+
+    zones = get_material_polygons(sd)
+    mats = [dict(m) for m in sd['materials']]
+    polys, names = [], [m['name'] for m in mats]
+    for z in zones:
+        poly = Polygon(z['coords'])
+        keep = poly.difference(unary_union([upper_skin, lower_skin]))
+        for part in (keep.geoms if keep.geom_type == 'MultiPolygon' else [keep]):
+            if part.area > 1e-9:
+                polys.append({'mat_id': z['mat_id'], 'polygon': part})
+    for skin, src, label in ((upper_skin, 0, 'Upper embankment (elastic face)'),
+                             (lower_skin, 1, 'Lower embankment (elastic face)')):
+        mats.append(dict(mats[src], name=label))
+        polys.append({'mat_id': len(mats) - 1, 'polygon': skin})
+    sd['materials'] = mats
+    sd['polygons'] = polys
+    sd['profile_lines'] = []
+    sd['max_depth'] = None
+    gs, dom = build_ground_surface_from_polygons(polys)
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    for r in sd['reinforcement_lines']:
+        # Vendor joint1 / cjoint1: Ks 10000, Kn 100000, Cjo 0, Ajo 30.96, Tjo 0,
+        # reduced with the soil (CoupledSSR). Both ends free: the vendor's beam
+        # end nodes belong to no 2-D element.
+        r.update(joint='Yes', kn=1.0e5, ks=1.0e4, adhesion=0.0, delta=30.96,
+                 jred='', tend1=0.0, tend2=0.0)
+    sd['reinforce_lines'] = sd['reinforcement_lines']
+    return sd
+
+
+def vp032a_fem():
+    """RS2-24, Part I case 1 — the 7 m embankment as vendor `#024_01.fez` builds
+    it. RS2 SSR 1.15; Borges & Cardoso 1.25 / 1.19 on the two circles the
+    limit-equilibrium files vp032a / vp032b carry."""
+    sd = _rs2_24_slope_data(1)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032a_fem.xlsx'))
+    return 'vp032a_fem.xlsx'
+
+
+def vp032c_fem():
+    """RS2-24, Part I case 2 — the 8.75 m embankment as vendor `#024_02.fez`
+    builds it. RS2 SSR 0.95; Borges & Cardoso 0.99."""
+    sd = _rs2_24_slope_data(2)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032c_fem.xlsx'))
+    return 'vp032c_fem.xlsx'
+
+
 def vp033():
     """Slide #33 / El-Ramly, Morgenstern & Cruden (2003): the Syncrude
     tailings dyke (simplified probabilistic case). Cohesionless section over a
@@ -2610,7 +2701,7 @@ def vp044c():
 
 def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
                         fnd=(10.0, 34.0), L=6.3, ta_of=None, water=False,
-                        surcharge=None, left_x=0.0):
+                        surcharge=None, left_x=0.0, joint=False, ks_of=None):
     """Leshchinsky & Han (2004) multitiered MSE wall (Slide #87-#94 family).
 
     Baseline (Fig. 1 of the paper): three 3-m tiers offset 1.2 m, 0.3-m block
@@ -2624,6 +2715,30 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
     each end. Slide applies the geotextile force horizontally: dir='axial',
     appl='passive' reproduces Slide's printed VP87 circle within 1%
     (axial/active gives +1%; tangent orientation is 5-7% low).
+
+    joint=True builds the wall the way the RS2 vendor models build it, for the
+    strength-reduction files (the *_fem siblings). Two things change together,
+    and they cannot be carried by the limit-equilibrium files:
+
+      * The sheets run from the BACK face of the block column outward, x =
+        face + 0.3 to face + 0.3 + L, which is where vendor `slope stability
+        #048.fez` through `#055.fez` put them (bottom tier 6.3 -> 12.6, middle
+        7.5 -> 13.8, top 8.7 -> 15.0). The limit-equilibrium files start each
+        sheet at face + 0.05, 0.25 m inside the block, and moving them is what
+        the eight locked Slide2 circles are locked against: the same move on
+        vp087-vp094 drops seven of the eight by 2-4%.
+      * Each sheet carries Joint = Yes with the vendor's interface: kn = ks =
+        100 000 kPa/m (Kn, Ks), Adhesion 0 (Cjo) and Delta 28.35 deg (Ajo),
+        reduced with the soil in the strength reduction (RS2 Apply_SSR /
+        CoupledSSR). RS2 gives the sheet's front node to the block column, an
+        unbreakable connection; here the front end is TIED at the sheet's own
+        tensile capacity, so the sheet ruptures before the connection does.
+        The back end is free, which is what lets it pull out through the
+        interfaces.
+
+    ks_of(layer_index_from_bottom, total) overrides the shear stiffness per
+    layer; #051 gives its lower seven sheets Ks = 10 000 against the upper
+    eight's 100 000.
     """
     import math as _math
     from shapely.geometry import Polygon
@@ -2688,10 +2803,12 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
         for k in range(K):
             y = ys[t] + 0.3 + 0.6 * k
             ta = ta_of(idx, total)
+            x1 = faces[t] + (0.30 if joint else 0.05)
+            x2 = (x1 + L) if joint else (faces[t] + L)
             d1 = max(ys[t] + tier_h - y, 0.3)
-            d2 = max(gelev(faces[t] + L) - y, 0.3)
+            d2 = max(gelev(x2) - y, 0.3)
             po = 2 * 0.8 * _math.tan(phi_f) * 18.0
-            rows.append({'x1': faces[t] + 0.05, 'y1': y, 'x2': faces[t] + L, 'y2': y,
+            rows.append({'x1': x1, 'y1': y, 'x2': x2, 'y2': y,
                          't_max': ta, 't_res': float('nan'),
                          'lp1': ta / (po * d1), 'lp2': ta / (po * d2),
                          # EA = 6300 kN/m: the geotextile stiffness in the RS2
@@ -2702,6 +2819,14 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
                          'label': f'T{t + 1}L{k + 1}', 'type': 'geosynthetic',
                          'dir': 'axial', 'appl': 'passive',
                          'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0})
+            if joint:
+                rows[-1].update(
+                    joint='Yes', kn=1.0e5,
+                    ks=(ks_of(idx, total) if ks_of else 1.0e5),
+                    adhesion=0.0, delta=28.35, jred='',
+                    # The front end is tied to the block column at the sheet's
+                    # own capacity; the back end pulls out through the joints.
+                    tend1=ta, tend2=0.0)
             idx += 1
     sd['reinforcement_lines'] = rows
     sd['reinforce_lines'] = rows
@@ -2785,21 +2910,105 @@ def vp091():
     return 'vp091.xlsx'
 
 
+# ---------------------------------------------------------------------------
+# The wall family's strength-reduction siblings (RS2-48 to RS2-55).
+#
+# Each vpNNN.xlsx above is the Slide2 limit-equilibrium model, locked against a
+# printed circle. Each vpNNN_fem.xlsx below is the same wall as the RS2 vendor
+# model builds it for its strength reduction: the sheets moved out of the block
+# columns to the columns' back faces, and each sheet flagged Joint with the
+# vendor's interface (see _lh_wall_slope_data). The two cannot be one file. The
+# sheet move alone drops seven of the eight locked Slide2 factors by 2-4%
+# (vp088 1.0574 -> 1.0348, vp089 1.0105 -> 0.9777, vp090 1.0116 -> 0.9708,
+# vp092 1.0100 -> 0.9756, vp093 0.9611 -> 0.9291, vp094 1.0204 -> 0.9874,
+# vp087 1.0313 -> 0.9971; vp091's circle does not reach the face and is
+# unmoved), and those circles are Slide2's own printed criticals, which is what
+# the limit-equilibrium rows are for.
+#
+# vp091_fem predates the joints and already stood apart for its own reason: its
+# limit-equilibrium twin extends the foundation to x = -6 to seat a circle that
+# daylights there, and 36 m2 of extra cohesionless foundation in front of the
+# toe is the last thing to carry into a bearing mechanism. It now carries the
+# joints as well, on the same 24 m section the vendor uses.
+# ---------------------------------------------------------------------------
+
+def _wall_fem(stem, **kw):
+    """Write one jointed strength-reduction sibling and return its file name."""
+    sd = _lh_wall_slope_data(joint=True, **kw)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, stem + '.xlsx'))
+    return stem + '.xlsx'
+
+
+def vp087_fem():
+    """RS2-48 — the baseline three-tier wall, joint-built. Vendor
+    `slope stability #048.fez`: Ta = 10 kN/m, sheets 6.3 -> 12.6 / 7.5 -> 13.8 /
+    8.7 -> 15.0, Kn = Ks = 100000, Cjo = 0, Ajo = 28.35. RS2 SSR 1.05,
+    Leshchinsky & Han FLAC 0.99."""
+    return _wall_fem('vp087_fem')
+
+
+def vp088_fem():
+    """RS2-49 — the fill-quality variant, joint-built. Vendor `#049.fez`:
+    fill phi = 25, Ft = 22 kN/m. RS2 SSR 1.08, L&H FLAC 0.99."""
+    return _wall_fem('vp088_fem', fill=(0.0, 25.0), ta_of=lambda i, n: 22.0)
+
+
+def vp089_fem():
+    """RS2-50 — the reinforcement-length variant, joint-built. Vendor
+    `#050.fez`: five beam elements per layer over 4.2 m, Ft = 11.4 kN/m.
+    RS2 SSR 0.93, L&H FLAC 0.98."""
+    return _wall_fem('vp089_fem', L=4.2, ta_of=lambda i, n: 11.4)
+
+
+def vp090_fem():
+    """RS2-51 — the two-grade variant, joint-built. Vendor `#051.fez` is the one
+    file in the family with two reinforcement sets: cbeam2/joint2 on the lower
+    seven sheets (Ft = 11, Ks = 10000) and cbeam1/joint1 on the upper eight
+    (Ft = 7.5, Ks = 100000), Kn = 100000 on both. RS2 SSR 1.00, L&H FLAC
+    1.01."""
+    return _wall_fem('vp090_fem',
+                     ta_of=lambda i, n: 11.0 if i < 7 else 7.5,
+                     ks_of=lambda i, n: 1.0e4 if i < 7 else 1.0e5)
+
+
 def vp091_fem():
     """RS2-52 — the weak-foundation wall as RS2 models it, for the SSRM row.
 
-    Identical to vp091 except that the foundation runs x = 0 -> 24 (section 295.20 m2),
-    which is the extent of vendor `slope stability #052.fez` and of all seven sibling
-    corpus files; vp091's x = -6 extension exists only to seat Slide's printed LEM
-    circle. On a bearing mechanism the run of foundation in front of the toe is the
-    dimension the answer is most sensitive to, so the two models are kept apart rather
-    than sharing one file.
+    Two things separate this file from its limit-equilibrium twin vp091. The
+    foundation runs x = 0 -> 24 (section 295.20 m2), which is the extent of
+    vendor `slope stability #052.fez` and of all seven sibling corpus files;
+    vp091's x = -6 extension exists only to seat Slide's printed LEM circle, and
+    on a bearing mechanism the run of foundation in front of the toe is the
+    dimension the answer is most sensitive to. And the sheets are joint-built
+    at the block columns' back faces, as in every _fem sibling.
+
+    Vendor `#052.fez`: foundation c = 0, phi = 18, Ft = 10 kN/m. RS2 SSR 0.84,
+    L&H FLAC 0.86 (bearing failure).
     """
-    sd = _lh_wall_slope_data(fnd=(0.0, 18.0))
-    # Inert for a strength-reduction run; the family's default seed is kept so the file
-    # still opens as a complete model.
-    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp091_fem.xlsx'))
-    return 'vp091_fem.xlsx'
+    return _wall_fem('vp091_fem', fnd=(0.0, 18.0))
+
+
+def vp092_fem():
+    """RS2-53 — the water variant, joint-built. Vendor `#053.fez`: Ft = 9.25
+    kN/m. The reinforced fill stays free-draining, pore pressure on the
+    foundation only, as on the limit-equilibrium file. RS2 SSR 1.03, L&H FLAC
+    1.01."""
+    return _wall_fem('vp092_fem', ta_of=lambda i, n: 9.25, water=True)
+
+
+def vp093_fem():
+    """RS2-54 — the crest-surcharge variant, joint-built. Vendor `#054.fez`:
+    q = 20 kPa on the uppermost tier, Ft = 10 kN/m. RS2 SSR 0.92, L&H FLAC
+    1.02."""
+    return _wall_fem('vp093_fem', ta_of=lambda i, n: 10.0, surcharge=20.0)
+
+
+def vp094_fem():
+    """RS2-55 — the tier-count variant, joint-built. Vendor `#055.fez`: five
+    1.8 m tiers offset 0.6 m, fifteen sheets at 6.3 -> 12.6 through
+    8.7 -> 15.0, Ft = 10.1 kN/m. RS2 SSR 1.04, L&H FLAC 1.00."""
+    return _wall_fem('vp094_fem', n_tiers=5, tier_h=1.8, offset=0.6,
+                     ta_of=lambda i, n: 10.1)
 
 
 def vp092():
@@ -5111,15 +5320,16 @@ BUILDERS = [
     vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp010, vp015, vp016, vp017, vp018,
     vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp026, vp027,
     vp027_fem, vp028a, vp028b, vp028c, vp029, vp029_split, vp030a, vp030b, vp032a,
-    vp032b, vp032c, vp033, vp034, vp035, vp036, vp037, vp039a,
+    vp032a_fem, vp032b, vp032c, vp032c_fem, vp033, vp034, vp035, vp036, vp037, vp039a,
     vp039b, vp039c, vp039d, vp040, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp045a,
     vp045b, vp046, vp047, vp048, vp049, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b,
     vp055, vp056, vp057, vp058, vp059, vp060, vp061a, vp061b, vp062a, vp062b, vp063, vp064,
     vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a,
     vp072b, vp073, vp074, vp075, vp076a, vp076b, vp077a, vp077b, vp078, vp078b, vp078c,
     vp079, vp080a, vp080b, vp081, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d,
-    vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp091_fem, vp092, vp093,
-    vp094, vp096, vp097, vp098, vp099, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c,
+    vp085a, vp085b, vp086, vp087, vp087_fem, vp088, vp088_fem, vp089, vp089_fem,
+    vp090, vp090_fem, vp091, vp091_fem, vp092, vp092_fem, vp093, vp093_fem,
+    vp094, vp094_fem, vp096, vp097, vp098, vp099, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c,
     vp103d, vp104a, vp104b, vp106a, vp106b, vp106c, vp106d, vp106e, vp107a, vp107b, vp108a,
     vp108b, vp109,
 ]

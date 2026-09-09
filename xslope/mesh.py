@@ -1647,6 +1647,16 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
         _insert_point_constraints(polygon_coords, point_constraints,
                                   tol=1e-6 * max(1.0, target_size), debug=debug)
 
+    # A constraint line's own ends are inserted the same way, so a line that runs
+    # ALONG a zone edge — or ends on one — meets a polygon that carries a vertex
+    # there and the mesher reuses that edge instead of laying a second curve on
+    # top of it. See _insert_constraint_line_points. Also before the conforming
+    # pass, so the neighbour zone gets the same vertex.
+    if lines:
+        _insert_constraint_line_points(polygon_coords, lines,
+                                       tol=1e-6 * max(1.0, target_size),
+                                       debug=debug)
+
     # Make adjacent zones conforming: split any edge at a neighbour's vertex that
     # lies in its interior (a T-junction), so shared interfaces mesh without slits.
     make_polygons_conforming(polygon_coords, debug=debug)
@@ -3018,6 +3028,18 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
     A joint element holds the same nodes as the 2D edge it lies on — three node
     pairs on a quadratic mesh, two on a linear one — so its shape functions match
     the adjacent triangles' edges.
+
+    **A line on a zone edge.** A jointed line that runs ALONG a material boundary
+    — the base geotextile at a fill/foundation contact, the wall sheet on a
+    fill/facing contact — is not embedded as a curve of its own: the mesher
+    carries the line's ends as polygon vertices and reuses the boundary curve
+    (see _insert_constraint_line_points), so the stations are the nodes the two
+    zones already share. The split then runs unchanged, and because the elements
+    above the line are the upper zone's and those below are the lower zone's, the
+    centroid classification is a classification by material side. A line that lies
+    on an edge over part of its length and inside a zone over the rest is one line
+    with both kinds of station; the bar and both joints run its whole length
+    either way.
 
     **Ends.** The two soil faces REJOIN at the line's ends: a tip is a crack tip,
     one shared soil node, not duplicated. The bar still gets its own end node
@@ -5422,6 +5444,67 @@ def _insert_point_constraints(polygon_coords, points, tol=1e-6, debug=False):
                     if debug:
                         print(f"Inserted point constraint ({px}, {py}) into polygon edge {j}")
                     break
+
+
+def _insert_constraint_line_points(polygon_coords, lines, tol=1e-6, debug=False):
+    """Insert every constraint-line vertex that falls inside a polygon edge as a
+    vertex of that edge, in place.
+
+    A constraint line that CROSSES a zone edge already gets a polygon vertex at the
+    crossing, from ``add_intersection_points_to_polygons``. A line that runs ALONG
+    one does not: two collinear segments have no point intersection, so that routine
+    finds nothing and the polygon keeps its long, unbroken edge. The mesher then
+    finds no zone edge joining the line's two ends, builds a SECOND gmsh curve on the
+    same locus and embeds it in both neighbouring surfaces — geometry gmsh cannot
+    triangulate, because each surface's own boundary already runs there. Its 2D
+    mesher reports ``Impossible to recover edge`` and returns either no elements at
+    all or a mesh whose 1D nodes float free of the triangles; the OCC-fragment
+    fallback then rebuilds the whole section at the global target size, which drops
+    ``element_size_1d``, the size regions and the refinement bands. A quadrilateral
+    mesh has no fallback and keeps the broken mesh.
+
+    With the line's ends carried as polygon vertices the coincident stretch IS a zone
+    edge, and the mesher reuses that curve rather than doubling it (the ``edge_map``
+    lookup in ``build_mesh_from_polygons``). Its nodes are the ones the two zones
+    already share, so a jointed line splits along them like any other and the two
+    faces are classified by which zone's elements hold them.
+
+    The same insertion covers a line that ENDS on a zone edge without crossing it.
+    That end has to be recovered as a point of the boundary curve, and without a
+    vertex there gmsh's recovery does not terminate.
+
+    A vertex the polygon already carries, and a point on no edge at all, are left
+    alone — so a model whose lines all lie clear of the zone edges is untouched.
+    """
+    n_inserted = 0
+    for line in (lines or []):
+        for pt in (line or []):
+            px, py = float(pt[0]), float(pt[1])
+            for coords in polygon_coords:
+                n = len(coords)
+                if n < 2:
+                    continue
+                if any(abs(px - x) <= tol and abs(py - y) <= tol for (x, y) in coords):
+                    continue
+                for j in range(n):
+                    x1, y1 = coords[j]
+                    x2, y2 = coords[(j + 1) % n]
+                    dx, dy = x2 - x1, y2 - y1
+                    L2 = dx * dx + dy * dy
+                    if L2 <= tol * tol:
+                        continue
+                    t = ((px - x1) * dx + (py - y1) * dy) / L2
+                    if t <= 0.0 or t >= 1.0:
+                        continue
+                    qx, qy = x1 + t * dx, y1 + t * dy
+                    if abs(px - qx) <= tol and abs(py - qy) <= tol:
+                        coords.insert(j + 1, (px, py))
+                        n_inserted += 1
+                        if debug:
+                            print(f"Inserted constraint-line end ({px}, {py}) into "
+                                  f"polygon edge {j}")
+                        break
+    return n_inserted
 
 
 def extract_point_constraints(slope_data):

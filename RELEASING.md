@@ -66,8 +66,9 @@ Patch releases skip this.
 - The **concept DOI** ("Cite all versions" on the Zenodo record) always resolves
   to the newest version. Put the concept DOI in `CITATION.cff` once a second
   version exists, so the citation metadata tracks the latest release.
-- Update the `version`, `date-released`, and `doi` fields in `CITATION.cff` after
-  each release.
+- Update the `version`, `date-released`, and `doi` fields in `CITATION.cff` and the
+  citation block in `README.md` after each release, once Zenodo shows the new record
+  (query `https://zenodo.org/api/records?q=%22xslope%22&all_versions=true`).
 
 ## Notes
 

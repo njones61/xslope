@@ -7472,10 +7472,17 @@ def run_tag_k0_test(test):
     # The reverse sweep. main!D16 only means K0 from template v19 on, so the
     # version in D5 gates the read exactly the way fileio.load_slope_data gates it.
     declared_by_tag = {os.path.basename(p) for p in wanted}
+    # Models that carry the vendor's K0 but are REPORTED rather than locked: their
+    # FEM rows print a number with no tag behind it, by decision on the page
+    # (docs/verification/rs2.md, RS2-49 and RS2-51: the geotextile wall family
+    # follows the mesh and has no vendor factor to score against). The file still
+    # transcribes the vendor's K0 = 1, and nothing asks the suite to check it.
+    reported_not_locked = {'vp088.xlsx', 'vp090.xlsx'}
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
         for book in sorted(docs.rglob('*.xlsx')):
-            if book.name.startswith('~$') or book.name in declared_by_tag:
+            if (book.name.startswith('~$') or book.name in declared_by_tag
+                    or book.name in reported_not_locked):
                 continue
             try:
                 wb = openpyxl.load_workbook(book, read_only=True, data_only=True)

@@ -1656,7 +1656,11 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     if lines:
         _validate_constraint_lines(lines, polygon_coords)
 
+    # Joint geometries phase 1 cannot represent are refused here, before gmsh
+    # runs, so the message names the lines rather than a mesh entity.
     _joint_opts = _normalize_joint_lines(joint_lines, len(lines) if lines else 0)
+    if _joint_opts:
+        _validate_joint_lines(lines, _joint_opts, point_constraints, polygon_coords)
 
     # Build a list of region ids (list of material IDs - one per polygon)
     if any(mat_id is not None for mat_id in polygon_mat_ids):
@@ -2918,6 +2922,85 @@ def _normalize_joint_lines(joint_lines, n_lines):
     return opts
 
 
+def _joint_line_tol(lines, polygon_coords=None):
+    """Geometric tolerance for the joint checks: a fixed fraction of the span of
+    the model, so it means the same thing in feet, meters and millimeters."""
+    xs, ys = [], []
+    for line in (lines or []):
+        for (x, y) in line:
+            xs.append(x)
+            ys.append(y)
+    for coords in (polygon_coords or []):
+        for (x, y) in coords:
+            xs.append(x)
+            ys.append(y)
+    if not xs:
+        return 1e-9
+    span = max(max(xs) - min(xs), max(ys) - min(ys), 1.0)
+    return 1e-6 * span
+
+
+def _validate_joint_lines(lines, opts, point_constraints=None, polygon_coords=None):
+    """Refuse the joint geometries the phase-1 split cannot represent.
+
+    Three cases, each raising a ValueError that names the lines involved:
+
+    * a jointed line that meets ANY other constraint line — another jointed line,
+      a plain reinforcement line, or a pile. Meeting means sharing a point or
+      crossing. The split triples every node along the jointed line, and a member
+      standing on one of those nodes would silently keep the lower face's copy:
+      the crossing member's connection to the soil above the sheet would be
+      dropped without a word;
+    * a jointed line carrying a point constraint (a line load's application
+      point). The load is applied to one node, and after the split there are
+      three at that place;
+    * two jointed lines sharing an endpoint, which the first case covers.
+
+    Phase 2 lifts whichever of these a problem needs; until then they are errors
+    rather than silently wrong meshes.
+    """
+    if not opts:
+        return
+    from shapely.geometry import LineString as _LS, Point as _Pt
+    tol = _joint_line_tol(lines, polygon_coords)
+
+    segs = [_LS([tuple(line[0]), tuple(line[-1])]) if line and len(line) >= 2
+            else None for line in lines]
+
+    for li in sorted(opts):
+        seg_i = segs[li]
+        if seg_i is None:
+            raise ValueError(
+                f"Constraint line {li + 1} is flagged as a joint but has fewer "
+                "than two points.")
+        for lj in range(len(lines)):
+            if lj == li or segs[lj] is None:
+                continue
+            if seg_i.distance(segs[lj]) > tol:
+                continue
+            if lj in opts:
+                if lj < li:
+                    continue        # already reported from the other side
+                what = "another jointed line"
+            else:
+                what = "another constraint line (a reinforcement line or a pile)"
+            raise ValueError(
+                f"Jointed constraint line {li + 1} touches {what}, line {lj + 1}. "
+                "The mesh splits along a jointed line and every node on it is "
+                "tripled, so a second member standing on one of those nodes has "
+                "no defined side to attach to. Move the lines apart, or clear the "
+                "Joint flag on line "
+                f"{li + 1}.")
+        for (px, py) in (point_constraints or []):
+            if seg_i.distance(_Pt(px, py)) <= tol:
+                raise ValueError(
+                    f"Jointed constraint line {li + 1} carries a point constraint "
+                    f"at ({px}, {py}) — a line load's application point. After the "
+                    "split there are three nodes at that place and no rule says "
+                    "which one the load acts on. Move the load off the line, or "
+                    f"clear the Joint flag on line {li + 1}.")
+
+
 def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
     """Split the mesh along every jointed constraint line, in place.
 
@@ -3052,6 +3135,18 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
                 f"length {length:.3g}; it must reach both stated endpoints.")
         station_set = set(ordered)
         interior = set(ordered[1:-1])
+
+        # No other member may stand on a node this line is about to triple.
+        for i in range(len(e1d)):
+            if mats_1d[i] == li + 1:
+                continue
+            for k in range(int(types_1d[i])):
+                if int(e1d[i, k]) in station_set:
+                    raise ValueError(
+                        f"Constraint line {int(mats_1d[i])} shares mesh node "
+                        f"{int(e1d[i, k])} with jointed line {li + 1}. A member "
+                        "standing on a node the split triples has no defined side "
+                        "to attach to.")
 
         # Which side of the line each 2D element touching it is on, from its
         # centroid. An element with nodes on both sides would be cut by the split

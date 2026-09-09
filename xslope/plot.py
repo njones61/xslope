@@ -2730,14 +2730,79 @@ def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
 
 # ========== FOR PLOTTING INPUT DATA  =========
 
+def _model_span(slope_data):
+    """The width of the section, for glyphs whose size is a fraction of it."""
+    gs = slope_data.get('ground_surface')
+    if gs is not None and not gs.is_empty:
+        xs = [p[0] for p in gs.coords]
+        if max(xs) > min(xs):
+            return max(xs) - min(xs)
+    dom = slope_data.get('domain_polygon')
+    try:
+        xmin, _ymin, xmax, _ymax = dom.bounds
+        if xmax > xmin:
+            return xmax - xmin
+    except (AttributeError, TypeError, ValueError):
+        pass
+    return 100.0
+
+
+#: A joint tick's half-length, as a fraction of the width of the section. Short
+#: enough to read as a hatch on the line rather than as geometry of its own.
+JOINT_TICK_FRACTION = 0.009
+
+
+def draw_joint_ticks(ax, xs, ys, span, color, alpha=0.8, zorder=None,
+                     label=None):
+    """Short ticks on BOTH sides of a line: the mark for a slip surface.
+
+    The convention a section drawing uses for a fault or a bedding plane, and
+    what tells a jointed reinforcement line apart from a bonded one at a glance:
+    the mesh splits along this line and the two sides can move on it.
+    """
+    import numpy as np
+    pts = np.column_stack([np.asarray(xs, dtype=float),
+                           np.asarray(ys, dtype=float)])
+    if len(pts) < 2:
+        return
+    seg = np.diff(pts, axis=0)
+    step = np.hypot(seg[:, 0], seg[:, 1])
+    s = np.concatenate([[0.0], np.cumsum(step)])
+    total = float(s[-1])
+    if total <= 0:
+        return
+    half = JOINT_TICK_FRACTION * span
+    # One tick every four half-lengths, between four and sixteen of them, so a
+    # short sheet and a long one both read as hatched rather than as a comb or
+    # as two lonely marks.
+    n = int(min(16, max(4, round(total / (4.0 * half)))))
+    at = np.linspace(0.0, total, n + 2)[1:-1]
+    xi = np.interp(at, s, pts[:, 0])
+    yi = np.interp(at, s, pts[:, 1])
+    tx = np.interp(at, s, np.concatenate([seg[:, 0] / step, [seg[-1, 0] / step[-1]]]))
+    ty = np.interp(at, s, np.concatenate([seg[:, 1] / step, [seg[-1, 1] / step[-1]]]))
+    norm = np.hypot(tx, ty)
+    norm[norm == 0] = 1.0
+    nx, ny = -ty / norm, tx / norm
+    for k in range(n):
+        ax.plot([xi[k] - half * nx[k], xi[k] + half * nx[k]],
+                [yi[k] - half * ny[k], yi[k] + half * ny[k]],
+                color=color, linewidth=1.5, alpha=alpha, solid_capstyle='butt',
+                zorder=zorder, label=(label if k == 0 else None))
+
+
 def plot_reinforcement_lines(ax, slope_data, style=None, solution=False):
     """
     Plots the reinforcement lines from slope_data.
-    
+
+    A line whose ``Joint`` column reads yes carries short ticks on both sides —
+    the mesh splits along it, so it is a slip surface rather than a bar sharing
+    the soil's nodes — and its own legend entry.
+
     Parameters:
         ax: matplotlib Axes object
         slope_data: Dictionary containing slope data with 'reinforce_lines' key
-        
+
     Returns:
         None
     """
@@ -2745,18 +2810,38 @@ def plot_reinforcement_lines(ax, slope_data, style=None, solution=False):
         return
 
     from .style import resolve_style, feature_style
+    from .mesh import line_is_jointed
     rfs = feature_style(resolve_style(style), "reinforcement")
     tension_points_plotted = False  # Track if tension points have been added to legend
+    raw = slope_data.get('reinforcement_lines') or []
+    span = _model_span(slope_data)
+    bonded_labelled = jointed_labelled = False
 
     for i, line in enumerate(slope_data['reinforce_lines']):
         # Extract x and y coordinates from the line points
         xs = [point['X'] for point in line]
         ys = [point['Y'] for point in line]
+        jointed = line_is_jointed(raw[i] if i < len(raw) else None)
+        label = None
+        if not jointed and not bonded_labelled:
+            label = 'Reinforcement Line'
+            bonded_labelled = True
 
         # Plot the reinforcement line with a distinctive style
         ax.plot(xs, ys, color=rfs.get('color', 'darkgray'),
                 linewidth=rfs.get('linewidth', 3), linestyle=rfs.get('linestyle', '-'),
-                alpha=rfs.get('alpha', 0.8), label='Reinforcement Line' if i == 0 else "")
+                alpha=rfs.get('alpha', 0.8), label=label)
+        if jointed:
+            draw_joint_ticks(ax, xs, ys, span, rfs.get('color', 'darkgray'),
+                             alpha=rfs.get('alpha', 0.8))
+            if not jointed_labelled:
+                # The legend swatch carries the tick too: without it a jointed
+                # line and a bonded one are the same gray bar in the legend.
+                ax.plot([], [], color=rfs.get('color', 'darkgray'),
+                        linewidth=rfs.get('linewidth', 3),
+                        alpha=rfs.get('alpha', 0.8), marker='|', markersize=11,
+                        markeredgewidth=1.5, label='Reinforcement (joint)')
+                jointed_labelled = True
         
         # On a SOLUTION plot, two dots per line mark where the available
         # tension first reaches its full value from each end -- the ends of the
@@ -4260,6 +4345,34 @@ def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=T
         if material_lines:
             legend_elements.append(plt.Line2D([0], [0], color='red', linewidth=3, 
                                             alpha=0.8, label='1D Elements'))
+
+    # A jointed line, over the mesh, in the style the inputs plot gives it. The
+    # split itself is invisible — the three copies of every station stand at one
+    # point — so the ticks are the only thing that says the mesh is torn there.
+    joint_records = mesh.get("joints") or []
+    if joint_records:
+        node_xy = np.asarray(nodes, dtype=float)
+        xmin_j, xmax_j = float(node_xy[:, 0].min()), float(node_xy[:, 0].max())
+        span_j = (xmax_j - xmin_j) or 1.0
+        drawn = False
+        for rec in joint_records:
+            stations = rec.get("stations") or []
+            pts = [node_xy[int(st[1])] for st in stations]
+            if len(pts) < 2:
+                continue
+            xs_j = [float(q[0]) for q in pts]
+            ys_j = [float(q[1]) for q in pts]
+            ax.plot(xs_j, ys_j, color='darkgray', linewidth=3, alpha=0.95,
+                    zorder=6)
+            draw_joint_ticks(ax, xs_j, ys_j, span_j, 'darkgray', alpha=0.95,
+                             zorder=6)
+            drawn = True
+        if drawn:
+            legend_elements.append(plt.Line2D([0], [0], color='darkgray',
+                                              linewidth=3, alpha=0.95,
+                                              marker='|', markersize=11,
+                                              markeredgewidth=1.5,
+                                              label='Reinforcement (joint)'))
     
     # Material colors (style overrides → palette default). Mesh material IDs are
     # 1-based (gmsh); the style sheet keys by 0-based mat_id, so map mid-1 — this

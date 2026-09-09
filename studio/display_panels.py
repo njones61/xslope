@@ -610,6 +610,16 @@ class FemResultsDisplayPanel(QWidget):
             "this is the original, undeformed mesh.")
         self.show_reinforcement = QCheckBox("Reinforcement")
         self.show_reinforcement.setChecked(True)
+        # The interface (joint) elements' own reading, on a model whose mesh was
+        # split along a line. A joint carries no strain, so it does not appear in
+        # the strain field at all; this draws its state on the line itself.
+        self.show_joints = QCheckBox("Joint state")
+        self.show_joints.setChecked(True)
+        self.show_joints.setToolTip(
+            "Draw each jointed line's interface state — intact, slipping or "
+            "open — on the line, with a colorbar for how far the two faces have "
+            "slid. Nothing to show on a model with no jointed reinforcement "
+            "line.")
         self.label_elements = QCheckBox("Element numbers")
 
         # Displacement-vector-only controls.
@@ -639,6 +649,7 @@ class FemResultsDisplayPanel(QWidget):
         form.addRow("Deformed color", self.deformed_color)
         form.addRow("", self.element_edges)
         form.addRow("", self.show_reinforcement)
+        form.addRow("", self.show_joints)
         form.addRow("", self.label_elements)
         form.addRow("", self.plot_boundary)
         form.addRow("", self.plot_nodes)
@@ -660,7 +671,8 @@ class FemResultsDisplayPanel(QWidget):
         self.show_original.currentIndexChanged.connect(self._emit)
         self.deformed_color.currentIndexChanged.connect(self._emit)
         self.displacement_tolerance.valueChanged.connect(self._emit)
-        for c in (self.element_edges, self.show_reinforcement, self.label_elements,
+        for c in (self.element_edges, self.show_reinforcement, self.show_joints,
+                  self.label_elements,
                   self.plot_boundary, self.plot_nodes, self.scale_vectors,
                   self.color_by_magnitude):
             c.toggled.connect(self._emit)
@@ -737,6 +749,7 @@ class FemResultsDisplayPanel(QWidget):
             "mesh_on_fields": edges,
             "plot_elements": edges,
             "show_reinforcement": self.show_reinforcement.isChecked(),
+            "show_joints": self.show_joints.isChecked(),
             "label_elements": self.label_elements.isChecked(),
             "plot_boundary": self.plot_boundary.isChecked(),
             "plot_nodes": self.plot_nodes.isChecked(),

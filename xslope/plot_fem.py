@@ -720,7 +720,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                     mesh_on_fields=False, fs=None, failure_solution=None,
                     show_original='outline', deformed_color='k', deform_scale=None,
                     field_state=None, strain_state=None, color_by_magnitude=False, vector_cmap='viridis',
-                    vmin=None, vmax=None, vector_max=None):
+                    vmin=None, vmax=None, vector_max=None, show_joints=True):
     """
     Plot FEM results with various visualization options.
 
@@ -749,6 +749,9 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             default (the fill is the content); turn on to inspect element boundaries
             against the field.
         show_reinforcement: Show reinforcement elements
+        show_joints: Draw each interface (joint) element's state on the line it
+            runs along — intact, slipping or open — with a colorbar for the
+            relative displacement. Inert on a model with no jointed line.
         figsize: Figure size (width, height)
         label_elements: Show element ID labels at centroids
         plot_nodes: For displace_vector, show dots at node locations
@@ -1050,7 +1053,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             single_mappable, reinf_cbar_specs = plot_shear_strain_contours(
                 ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                 cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
-                cmap=cmap, single_panel=defer_panel_cbar, vmin=vmin, vmax=vmax)
+                cmap=cmap, single_panel=defer_panel_cbar, vmin=vmin, vmax=vmax,
+                show_joints=show_joints)
             single_cbar_label = SHEAR_STRAIN_LABEL
         elif pt == 'yield':
             plot_yield_function_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
@@ -1609,7 +1613,9 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
     if show_mesh:
         plot_mesh_lines(ax, fem_data, color='gray', alpha=0.3, linewidth=0.3)
     
-    # Plot reinforcement with force visualization
+    # Plot reinforcement with force visualization, with the joint states drawn
+    # first so they reach the legend plot_reinforcement_forces assembles.
+    plot_joint_states(ax, fem_data, solution)
     if show_reinforcement and 'elements_1d' in fem_data:
         plot_reinforcement_forces(ax, fem_data, solution)
     
@@ -2223,6 +2229,117 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
     return cbar_specs
 
 
+#: Colors for the three states an interface (joint) element can be in. The
+#: slipping ramp carries the magnitude; the other two are single colors, because
+#: "intact" and "open" are conditions rather than quantities.
+_JOINT_INTACT_COLOR = '#999999'
+_JOINT_OPEN_COLOR = '#ff7f0e'
+_JOINT_SLIP_CMAP = 'Purples'
+
+
+def _joint_spans(fem_data, solution):
+    """One record per station span of every jointed line: where it is, what state
+    it is in, and how far the two faces have slid.
+
+    A span carries TWO joint elements — the soil above against the bar, and the
+    bar against the soil below — and they stand on the same chord, so they are
+    read together: the span's state is the worse of the two and its slip is the
+    larger. Drawing them separately would put one line exactly on top of the
+    other and report whichever happened to be drawn last.
+    """
+    jd = fem_data.get("joint_data")
+    if jd is None or not jd.get("n"):
+        return []
+    conn = np.asarray(jd["conn"], dtype=int)
+    side = np.asarray(jd["side"], dtype=int)
+    nodes = np.asarray(fem_data["nodes"], dtype=float)
+    n = int(jd["n"])
+    slip = np.asarray(solution.get("joint_slip", np.zeros((n, 3))), dtype=float)
+    opened = np.asarray(solution.get("joint_open", np.zeros((n, 3), dtype=bool)))
+    slipping = np.asarray(solution.get("joint_slipping",
+                                       np.zeros((n, 3), dtype=bool)))
+    if len(slip) != n or len(opened) != n or len(slipping) != n:
+        return []
+    w = np.asarray(jd["w"], dtype=float) > 0.0
+    spans = {}
+    for i in range(n):
+        bar = conn[i, 3:6] if side[i] == 1 else conn[i, 0:3]
+        key = tuple(sorted(int(v) for v in bar))
+        rec = spans.get(key)
+        if rec is None:
+            rec = spans[key] = {
+                "line": int(jd["line_id"][i]),
+                "coords": nodes[conn[i, 0:2], :2],
+                "open": False, "slipping": False, "slip": 0.0}
+        active = w[i]
+        rec["open"] = rec["open"] or bool(np.any(opened[i] & active))
+        rec["slipping"] = rec["slipping"] or bool(np.any(slipping[i] & active))
+        if np.any(active):
+            rec["slip"] = max(rec["slip"],
+                              float(np.max(np.abs(slip[i][active]))))
+    return list(spans.values())
+
+
+def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
+    """Draw the interface (joint) elements on the line, colored by their state.
+
+    A joint has no strain, so it appears in a shear-strain field only through
+    what it does to the soil beside it. This is the joint's own reading: intact
+    where the two faces are still stuck together, slipping where the shear
+    traction sits on the Mohr-Coulomb limit and the faces are sliding, open where
+    the normal traction passed the tension cutoff and the faces have parted. The
+    slipping stretches are colored by how far they have slid, on a colorbar laid
+    out the way the pile-shear and reinforcement-force bars are.
+
+    Returns the ``(mappable, label)`` specs, empty on a model with no joint, so a
+    caller that stacks colorbars can place this one beside the field bar.
+    """
+    import matplotlib.cm as cm
+    from matplotlib.colors import Normalize
+
+    spans = _joint_spans(fem_data, solution)
+    if not spans:
+        return []
+
+    intact = [r["coords"] for r in spans
+              if not r["open"] and not r["slipping"]]
+    opened = [r["coords"] for r in spans if r["open"]]
+    sliding = [r for r in spans if r["slipping"] and not r["open"]]
+
+    for lines, color, label in ((intact, _JOINT_INTACT_COLOR, 'Joint (intact)'),
+                                (opened, _JOINT_OPEN_COLOR, 'Joint (open)')):
+        if not lines:
+            continue
+        ax.add_collection(LineCollection(lines, colors='black', linewidths=4.5,
+                                         alpha=0.9, zorder=6.4))
+        ax.add_collection(LineCollection(lines, colors=color, linewidths=3,
+                                         alpha=0.95, zorder=6.5))
+        ax.plot([], [], '-', color=color, linewidth=3, alpha=0.95, label=label)
+
+    cbar_specs = []
+    if sliding:
+        cmap = plt.get_cmap(_JOINT_SLIP_CMAP)
+        smax = max(r["slip"] for r in sliding)
+        norm = Normalize(vmin=0.0, vmax=smax if smax > 0 else 1.0)
+        ax.add_collection(LineCollection([r["coords"] for r in sliding],
+                                         colors='black', linewidths=4.5,
+                                         alpha=0.9, zorder=6.4))
+        ax.add_collection(LineCollection(
+            [r["coords"] for r in sliding],
+            colors=[cmap(norm(r["slip"])) for r in sliding],
+            linewidths=3, alpha=0.95, zorder=6.5))
+        ax.plot([], [], '-', color=cmap(0.75), linewidth=3, alpha=0.95,
+                label='Joint (slipping)')
+        sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        label = _fem_cbar_label(fem_data, 'Joint Slip', 'length')
+        cbar_specs.append((sm, label))
+        if draw_cbar:
+            cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
+            cbar.set_label(label, rotation=270, labelpad=15, fontsize=10)
+    return cbar_specs
+
+
 def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8), save_png=False, dpi=300):
     """
     Plot axial force profiles along each reinforcement line as subplots.
@@ -2519,7 +2636,7 @@ def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
 
 def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                               cbar_shrink=0.8, cbar_labelpad=20, label_elements=False, cmap=None,
-                              single_panel=False, vmin=None, vmax=None):
+                              single_panel=False, vmin=None, vmax=None, show_joints=True):
     """
     Plot viscoplastic max shear strain contours.
 
@@ -2558,10 +2675,18 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     # deferred (single_panel — placed by plot_fem_results via make_axes_locatable),
     # defer the force colorbar the same way and hand its spec back, so the two bars
     # get separate full-height slots instead of colliding in one.
+    # A joint carries no strain of its own, so the contour field says nothing
+    # about it. Its state goes on the line, over the bar it stands beside —
+    # drawn FIRST because plot_reinforcement_forces builds the panel's legend
+    # from what is already on the axes when it finishes.
+    joint_cbar_specs = (plot_joint_states(ax, fem_data, solution,
+                                          draw_cbar=not single_panel)
+                        if show_joints else [])
     reinf_cbar_specs = []
     if show_reinforcement and 'elements_1d' in fem_data:
         reinf_cbar_specs = plot_reinforcement_forces(
             ax, fem_data, solution, draw_cbar=not single_panel)
+    reinf_cbar_specs = joint_cbar_specs + reinf_cbar_specs
 
     F = solution.get("F", None)
     at_failure = solution.get("_at_failure", False)

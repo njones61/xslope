@@ -581,3 +581,165 @@ def joint_yield_violation(st, cj_r, tanphi_r, floor=0.0):
         return 0.0
     viol = (np.abs(st["ts"]) - st["tlim"])[ok] / den[ok]
     return float(max(0.0, np.max(viol)))
+
+
+# ---------------------------------------------------------------------------
+# What a BONDED run says about the joint it did not have
+#
+# The selection rule (docs/fem/reinforcement.md, "Bonded bar or joint?") is
+# about the mechanism, and a bonded run has already found the mechanism. Two of
+# its readings say the surface wanted to run ALONG a sheet rather than across
+# it, and both are one pass over a solution the engine already holds.
+# ---------------------------------------------------------------------------
+
+#: How much of a sheet's length has to lie in the strain band before the band is
+#: read as running ALONG the sheet. A surface that merely CUTS a sheet touches a
+#: short stretch of it; one that follows it covers most of it.
+JOINT_BAND_COVERAGE = 0.6
+
+#: An element is IN the band when its shear strain is at least this fraction of
+#: the largest in the model.
+JOINT_BAND_STRAIN_FRAC = 0.5
+
+#: A bar is at its cap within this fraction of it.
+JOINT_CAP_TOL = 0.99
+
+
+def _element_centroids(nodes, elements, element_types):
+    """The centroid of every 2D element, from its corner nodes."""
+    nodes = np.asarray(nodes, dtype=float)
+    elements = np.asarray(elements, dtype=int)
+    types = np.asarray(element_types, dtype=int)
+    corners = np.where(types >= 6, types // 2, types)
+    out = np.zeros((len(elements), 2))
+    for k in np.unique(corners):
+        rows = corners == k
+        out[rows] = nodes[elements[rows][:, :int(k)], :2].mean(axis=1)
+    return out
+
+
+def _line_band_coverage(p1, p2, points, half_width):
+    """How much of the segment p1-p2 has one of ``points`` within ``half_width``.
+
+    Measured as the fraction of the segment's length covered by the union of the
+    intervals each near point projects onto, so a cluster at one end reads as the
+    short stretch it is.
+    """
+    p1 = np.asarray(p1, dtype=float)
+    p2 = np.asarray(p2, dtype=float)
+    d = p2 - p1
+    L = float(np.hypot(*d))
+    if L <= 0 or len(points) == 0:
+        return 0.0
+    t = d / L
+    rel = np.asarray(points, dtype=float)[:, :2] - p1
+    s = rel @ t
+    off = np.abs(rel[:, 0] * (-t[1]) + rel[:, 1] * t[0])
+    near = (off <= half_width) & (s >= -half_width) & (s <= L + half_width)
+    if not np.any(near):
+        return 0.0
+    lo = np.clip(s[near] - half_width, 0.0, L)
+    hi = np.clip(s[near] + half_width, 0.0, L)
+    order = np.argsort(lo)
+    lo, hi = lo[order], hi[order]
+    covered, end = 0.0, -np.inf
+    for a, b in zip(lo, hi):
+        if a > end:
+            covered += b - a
+            end = b
+        elif b > end:
+            covered += b - end
+            end = b
+    return float(covered / L)
+
+
+def joint_advisories(fem_data, solution):
+    """What a BONDED solution says about a sheet that wanted to be a joint.
+
+    Two readings, each naming the line and suggesting ``Joint``:
+
+    * the shear-strain band at the critical factor lies ALONG a sheet rather
+      than across it, and
+    * every bar element on one sheet sits at its capacity, so the sheet is
+      holding the mass up through a grip the bond cap set rather than through
+      an interface the mesh resolved.
+
+    Reads ``fem_data['reinforcement_lines']`` — the per-line label, endpoints
+    and ``Joint`` flag ``build_fem_data`` carries for exactly this — so a caller
+    that has the solve has everything the reading needs.
+
+    Returns a list of message strings, empty on a model with no reinforcement,
+    on a line already flagged ``Joint``, and where neither reading fires.
+    """
+    from .mesh import line_is_jointed
+    lines = (fem_data or {}).get("reinforcement_lines") or []
+    if not lines or fem_data is None or not solution:
+        return []
+    elements_1d = fem_data.get("elements_1d")
+    if elements_1d is None or len(elements_1d) == 0:
+        return []
+    mat_1d = np.asarray(fem_data.get("element_materials_1d", ()), dtype=int)
+    pile_mask = np.asarray(fem_data.get("pile_elem_mask",
+                                        np.zeros(len(elements_1d), dtype=bool)),
+                           dtype=bool)
+    forces = np.asarray(solution.get("forces_1d", ()), dtype=float)
+    t_allow = np.asarray(fem_data.get("t_allow_by_1d_elem", ()), dtype=float)
+
+    # The strain band, where the solution carries one.
+    hot = np.zeros((0, 2))
+    strains = solution.get("strains")
+    half_width = 0.0
+    if strains is not None:
+        strains = np.asarray(strains, dtype=float)
+        if strains.ndim == 2 and strains.shape[1] >= 4:
+            shear = np.abs(strains[:, 3])
+            peak = float(np.max(shear)) if len(shear) else 0.0
+            if peak > 0:
+                cen = _element_centroids(fem_data["nodes"], fem_data["elements"],
+                                         fem_data["element_types"])
+                hot = cen[shear >= JOINT_BAND_STRAIN_FRAC * peak]
+                # The band's own width: one element. Read from the mesh rather
+                # than chosen, so a fine mesh judges on a narrow band and a
+                # coarse one on a wide one, which is what each can resolve.
+                areas = float(np.ptp(cen[:, 0]) * np.ptp(cen[:, 1]))
+                half_width = 1.5 * np.sqrt(max(areas, 0.0)
+                                           / max(len(cen), 1)) if len(cen) else 0.0
+
+    out = []
+    for i, line in enumerate(lines):
+        if line_is_jointed(line):
+            continue
+        label = line.get("label") or f"Reinforcement line {i + 1}"
+        try:
+            p1 = (float(line["x1"]), float(line["y1"]))
+            p2 = (float(line["x2"]), float(line["y2"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        if len(hot) and half_width > 0:
+            cover = _line_band_coverage(p1, p2, hot, half_width)
+            if cover >= JOINT_BAND_COVERAGE:
+                out.append(
+                    f"The shear strain band at the critical factor runs along "
+                    f"{cover * 100:.0f}% of '{label}' rather than across it. A "
+                    f"surface that follows a sheet is a surface ON the sheet, "
+                    f"and a bonded bar cannot carry one: the soil above and "
+                    f"below the line share its nodes. Set Joint = Yes on that "
+                    f"line to split the mesh along it and give the interface "
+                    f"its own strength (reinforce sheet, Adhesion/Delta).")
+
+        rows = np.flatnonzero((mat_1d == i + 1) & ~pile_mask) if len(mat_1d) else []
+        if (len(rows) >= 3 and len(forces) == len(elements_1d)
+                and len(t_allow) == len(elements_1d)
+                and np.all(t_allow[rows] > 0)
+                and np.all(forces[rows] >= JOINT_CAP_TOL * t_allow[rows])):
+            out.append(
+                f"Every one of the {len(rows)} bar elements on '{label}' sits "
+                f"at its capacity at the critical factor. A sheet whose whole "
+                f"length is at its cap is not carrying a computed grip on the "
+                f"soil: the bond cap is what is holding the mass, and refining "
+                f"the bar elements refines it instead of converging. Set "
+                f"Joint = Yes on that line to make the grip the traction the "
+                f"interface elements integrate (reinforce sheet, "
+                f"Adhesion/Delta).")
+    return out

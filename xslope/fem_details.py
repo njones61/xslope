@@ -384,8 +384,14 @@ def list_lines(fem_data, solution, slope_data=None, field_state="converged",
     as it does for the profiles themselves, so the badges and the plotted
     profile always report the same state.
 
-    Grouped output is the caller's job; the two kinds are returned in order,
-    reinforcement first, matching the order the solver assigns line ids.
+    A jointed line appears TWICE: once as the reinforcement line it is, and
+    once as the interface the mesh was split along (``kind == "joint"``), which
+    is a different member with a different reading — the bar's tension against
+    its capacity, and the interface's traction against its Mohr-Coulomb limit.
+
+    Grouped output is the caller's job; the kinds are returned in order,
+    reinforcement first, then joints, then piles, matching the order the solver
+    assigns line ids.
     """
     out = []
     if not has_1d_details(fem_data):
@@ -396,6 +402,20 @@ def list_lines(fem_data, solution, slope_data=None, field_state="converged",
                                      failure_solution=failure_solution)
         out.append({
             "kind": "reinforcement",
+            "index": line_id,
+            "label": prof["label"],
+            "n_elements": len(prof["s"]),
+            "utilization": prof["peak_utilization"],
+            "badge": prof["badge"],
+            "status": prof["status"],
+            "status_key": prof["status_key"],
+        })
+    for line_id in joint_line_ids(fem_data):
+        prof = joint_profile(fem_data, solution, line_id, slope_data,
+                             field_state=field_state,
+                             failure_solution=failure_solution)
+        out.append({
+            "kind": "joint",
             "index": line_id,
             "label": prof["label"],
             "n_elements": len(prof["s"]),
@@ -888,6 +908,197 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "status_key": status_key,
         "units": unit_labels(fem_data),
     }
+
+
+#: The states an interface reports, most serious first, each with the phrase it
+#: is displayed as and the sentence that says what it means.
+JOINT_STATES = (
+    ("open", "open", "The normal traction passed the tension cutoff somewhere "
+                     "along the line and the two faces have parted there."),
+    ("slipping", "slipping", "The shear traction stands on the Mohr-Coulomb "
+                             "limit somewhere along the line and the faces are "
+                             "sliding on each other."),
+    ("intact", "intact", "The interface is everywhere below its limit: the two "
+                         "faces are still stuck together."),
+)
+
+
+def joint_line_ids(fem_data):
+    """1-based constraint-line ids the mesh was split along, in order."""
+    jd = (fem_data or {}).get("joint_data")
+    if jd is None or not jd.get("n"):
+        return []
+    return sorted(int(v) for v in np.unique(np.asarray(jd["line_id"], dtype=int)))
+
+
+def joint_profile(fem_data, solution, line_id, slope_data=None,
+                  field_state="converged", failure_solution=None):
+    """Everything the detail view draws for one jointed line's interface.
+
+    A jointed line carries two interfaces — the soil above against the sheet and
+    the sheet against the soil below — standing on the same chord. They are read
+    TOGETHER, station by station: the normal and shear tractions reported are the
+    larger in magnitude of the two, the limit is the one that traction is judged
+    against, and the slip is the larger. The alternative, two series per line
+    lying on top of each other, says which face is which and nothing else, and
+    the reading a user needs from an interface is what its worst point is doing.
+
+    Keys
+    ----
+    ``kind`` (``"joint"``), ``index``, ``label``, ``length``
+    ``s`` : distance from end 1 to each station, ascending
+    ``x``, ``y`` : station coordinates
+    ``tn``, ``ts`` : normal (compression positive) and shear traction
+    ``tlim`` : the Mohr-Coulomb limit the shear is held to
+    ``slip`` : accumulated tangential offset of the two faces
+    ``open``, ``slipping`` : per-station state flags
+    ``bar_s``, ``bar_T``, ``bar_cap`` : the bar's tension profile on the same
+        line, so the sheet's force and the interface that develops it are read
+        on one panel
+    ``field_state``, ``units``
+    ``peak_utilization`` : the greatest ``|ts| / tlim`` along the line
+    ``badge``, ``status``, ``status_key`` : the line's verdict
+    """
+    state = effective_field_state(solution, field_state, failure_solution)
+    field = field_solution(solution, field_state, failure_solution)
+    jd = (fem_data or {}).get("joint_data")
+    label = _line_label(fem_data, slope_data, "reinforcement", line_id)
+    units = unit_labels(fem_data)
+    empty = np.zeros(0)
+    blank = {"kind": "joint", "index": int(line_id), "label": label,
+             "length": 0.0, "s": empty, "x": empty, "y": empty,
+             "tn": empty, "ts": empty, "tlim": empty, "slip": empty,
+             "open": np.zeros(0, bool), "slipping": np.zeros(0, bool),
+             "bar_s": empty, "bar_T": empty, "bar_cap": empty,
+             "field_state": state, "units": units, "peak_utilization": None,
+             "badge": "none", "status": "not measured", "status_key": "none"}
+    if jd is None or not jd.get("n"):
+        return blank
+
+    n = int(jd["n"])
+    conn = np.asarray(jd["conn"], dtype=int)
+    side = np.asarray(jd["side"], dtype=int)
+    line_of = np.asarray(jd["line_id"], dtype=int)
+    w = np.asarray(jd["w"], dtype=float) > 0.0
+    nodes = np.asarray(fem_data["nodes"], dtype=float)
+    tn = _sol_grid(field, "tn", n)
+    ts = _sol_grid(field, "ts", n)
+    tlim = _sol_grid(field, "tlim", n)
+    slip = _sol_grid(field, "slip", n)
+    opened = _sol_grid(field, "open", n, dtype=bool)
+    slipping = _sol_grid(field, "slipping", n, dtype=bool)
+
+    # One record per NODE of the split, keyed by the node itself, so the upper
+    # and the lower interface at a station meet in the same record.
+    rows = {}
+    for i in np.flatnonzero(line_of == line_id):
+        for p in range(3):
+            if not w[i, p]:
+                continue
+            node = int(conn[i, 3 + p] if side[i] == 1 else conn[i, p])
+            r = rows.setdefault(node, {"tn": 0.0, "ts": 0.0, "tlim": np.inf,
+                                       "slip": 0.0, "open": False,
+                                       "slipping": False})
+            if abs(ts[i, p]) >= abs(r["ts"]):
+                r["ts"] = float(ts[i, p])
+                r["tlim"] = float(tlim[i, p])
+            if abs(tn[i, p]) >= abs(r["tn"]):
+                r["tn"] = float(tn[i, p])
+            r["slip"] = max(r["slip"], abs(float(slip[i, p])))
+            r["open"] = r["open"] or bool(opened[i, p])
+            r["slipping"] = r["slipping"] or bool(slipping[i, p])
+    if not rows:
+        return blank
+
+    ids = np.array(sorted(rows), dtype=int)
+    pts = nodes[ids, :2]
+    # Distance from end 1: the stations run along a straight line, so the
+    # projection on its chord orders them and measures them at once.
+    far = pts[int(np.argmax(((pts - pts.mean(axis=0)) ** 2).sum(axis=1)))]
+    other = pts[int(np.argmax(((pts - far) ** 2).sum(axis=1)))]
+    axis = other - far
+    length = float(np.hypot(*axis))
+    if length <= 0:
+        return blank
+    # End 1 is the line's own first endpoint, so the profile runs the way the
+    # sheet is entered rather than the way the node ids happen to fall.
+    ends = _joint_end1(fem_data, line_id, far, other)
+    axis = (other - far) if ends else (far - other)
+    origin = far if ends else other
+    t = axis / length
+    sdist = (pts - origin) @ t
+    order = np.argsort(sdist, kind="stable")
+    ids, pts, sdist = ids[order], pts[order], sdist[order]
+    rec = [rows[int(k)] for k in ids]
+
+    ts_a = np.array([r["ts"] for r in rec])
+    tlim_a = np.array([r["tlim"] for r in rec])
+    with np.errstate(divide="ignore", invalid="ignore"):
+        util = np.where(tlim_a > 1e-12, np.abs(ts_a) / tlim_a, np.nan)
+    peak_util = (float(np.nanmax(util)) if np.any(np.isfinite(util)) else None)
+    opened_a = np.array([r["open"] for r in rec], dtype=bool)
+    slipping_a = np.array([r["slipping"] for r in rec], dtype=bool)
+    if opened_a.any():
+        key = "open"
+    elif slipping_a.any():
+        key = "slipping"
+    else:
+        key = "intact"
+    status = dict((k, phrase) for k, phrase, _ in JOINT_STATES)[key]
+
+    prof = reinforcement_profile(fem_data, solution, line_id, slope_data,
+                                 field_state=field_state,
+                                 failure_solution=failure_solution)
+    return {
+        "kind": "joint", "index": int(line_id), "label": label,
+        "length": length,
+        "s": sdist, "x": pts[:, 0], "y": pts[:, 1],
+        "tn": np.array([r["tn"] for r in rec]),
+        "ts": ts_a, "tlim": tlim_a,
+        "slip": np.array([r["slip"] for r in rec]),
+        "open": opened_a, "slipping": slipping_a,
+        "utilization": util,
+        "bar_s": prof["s"], "bar_T": prof["T"], "bar_cap": prof["t_allow"],
+        "field_state": state,
+        "capture_stop": (capture_stop(solution, failure_solution)
+                         if state == "failure" else None),
+        "capture_failed": (capture_failed(solution, failure_solution)
+                           if field_state == "failure" else None),
+        "peak_utilization": peak_util,
+        "badge": _badge(peak_util),
+        "status": status, "status_key": key,
+        "units": units,
+    }
+
+
+def _joint_end1(fem_data, line_id, far, other):
+    """True when ``far`` is the end of the line the model calls end 1.
+
+    The stations are read off the mesh, which knows nothing about which end the
+    sheet was entered from; the reinforcement line does, and the bar's own
+    ``dist_end1_1d`` is measured from it, so the two profiles on one panel run
+    the same way.
+    """
+    lines = (fem_data or {}).get("reinforcement_lines") or []
+    i = int(line_id) - 1
+    if not (0 <= i < len(lines)):
+        return True
+    try:
+        p1 = np.array([float(lines[i]["x1"]), float(lines[i]["y1"])])
+    except (KeyError, TypeError, ValueError):
+        return True
+    return bool(np.sum((far - p1) ** 2) <= np.sum((other - p1) ** 2))
+
+
+def _sol_grid(solution, name, n, dtype=float):
+    """One of the solution's per-joint-element (n, 3) arrays, or zeros."""
+    v = (solution or {}).get(f"joint_{name}")
+    if v is None:
+        return np.zeros((n, 3), dtype=dtype)
+    v = np.asarray(v, dtype=dtype)
+    if v.shape != (n, 3):
+        return np.zeros((n, 3), dtype=dtype)
+    return v
 
 
 def _peak_utilization(util):
@@ -1615,7 +1826,22 @@ def profile_table(profile):
     mo = f" ({u['moment']})" if u.get("moment") else ""
     ll = f" ({u['line_load']})" if u.get("line_load") else ""
 
-    if profile["kind"] == "reinforcement":
+    if profile["kind"] == "joint":
+        st = f" ({u['stress']})" if u.get("stress") else ""
+        series = [
+            (f"position{ln}", profile["s"]),
+            (f"normal_traction{st}", profile["tn"]),
+            (f"shear_traction{st}", profile["ts"]),
+            (f"shear_limit{st}", profile["tlim"]),
+            (f"slip{ln}", profile["slip"]),
+            ("utilization", profile["utilization"]),
+            ("open", np.asarray(profile["open"]).astype(int)),
+            ("slipping", np.asarray(profile["slipping"]).astype(int)),
+        ]
+        extra = [(f"bar_position{ln}", profile["bar_s"]),
+                 (f"bar_axial_force{fo}", profile["bar_T"]),
+                 (f"bar_capacity{fo}", profile["bar_cap"])]
+    elif profile["kind"] == "reinforcement":
         series = [
             (f"position{ln}", profile["s"]),
             (f"axial_force{fo}", profile["T"]),

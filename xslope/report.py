@@ -8358,6 +8358,51 @@ def _pile_forces_table(profiles, counter):
     return Table(headers, rows, "Pile forces", counter.next_table())
 
 
+def _joint_profiles(slope_data, bundle, field_state):
+    """The interface profile of every jointed line in one run, in line order."""
+    from .fem_details import joint_line_ids, joint_profile
+    fem_data = bundle.get("fem_data") or {}
+    solution = bundle.get("solution") or {}
+    out = []
+    for line_id in joint_line_ids(fem_data):
+        out.append(joint_profile(fem_data, solution, line_id, slope_data,
+                                 field_state=field_state,
+                                 failure_solution=bundle.get("failure_solution")))
+    return [p for p in out if len(p.get("s", []))]
+
+
+def _joint_table(profiles, counter):
+    """What the interfaces did: how much of each line slid, and how far.
+
+    The share is measured on the stations, which is where the state is decided:
+    a line whose whole length is at its Mohr-Coulomb limit reads 100%, and one
+    the surface merely touches reads the fraction it touched.
+    """
+    import numpy as _np
+    lu = ""
+    for profile in profiles:
+        u = profile.get("units", {}) or {}
+        if u.get("length"):
+            lu = f" ({u['length']})"
+            break
+    headers = ["Line", f"Length{lu}", "Slipping", f"Peak slip{lu}", "State"]
+    rows = []
+    for profile in profiles:
+        slipping = _np.asarray(profile.get("slipping", []), dtype=bool)
+        opened = _np.asarray(profile.get("open", []), dtype=bool)
+        moving = slipping | opened
+        share = (float(moving.sum()) / len(moving)) if len(moving) else None
+        slip = _np.abs(_np.asarray(profile.get("slip", []), dtype=float))
+        rows.append([
+            profile["label"],
+            _fmt(profile.get("length"), "{:.2f}"),
+            _percent(share),
+            _fmt(float(slip.max()) if len(slip) else None, "{:.4g}"),
+            str(profile.get("status") or ""),
+        ])
+    return Table(headers, rows, "Interface (joint) response", counter.next_table())
+
+
 def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                     progress=None, field_state=DETAIL_FIELD_STATE, defined=None):
     """One kind of one-dimensional member in one finite element run.
@@ -8592,6 +8637,26 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                             if part.strip())
         if trailing:
             sec.blocks.append(Prose(trailing))
+
+    # The interfaces, where the mesh was split along a line. They belong under
+    # the reinforcement heading because a phase 1 joint IS a reinforcement line:
+    # the sheet is the bar the table above reports, and this is what the soil on
+    # either side of it did.
+    if kind == "reinforcement":
+        joints = _joint_profiles(slope_data, bundle, field_state)
+        if joints:
+            jt = _joint_table(joints, counter)
+            at, at_links = cite("Table", jt.number)
+            sec.blocks.append(Prose(
+                f"{len(joints)} of the lines are modeled as joints: the mesh is "
+                f"split along each of them, so the soil above the sheet and the "
+                f"soil below it are separate bodies joined by interface elements "
+                f"that carry the Adhesion and Delta of that line. What those "
+                f"interfaces did is listed in {at} — the share of each line's "
+                f"length standing at its Mohr-Coulomb limit, and the largest "
+                f"tangential offset the two faces reached.",
+                links=at_links))
+            sec.blocks.append(jt)
     return sec
 
 

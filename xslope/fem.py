@@ -29,7 +29,7 @@ from .hoekbrown import hb_constants, hb_tangent_const
 from .joint import (mesh_has_joints as _joint_mesh_has_joints,
                     joint_reduced_strength, joint_vp_sweep, tie_vp_sweep,
                     joint_internal_force, tie_internal_force,
-                    joint_state, joint_yield_violation)
+                    joint_state, joint_yield_violation, joint_advisories)
 from .units import require_gamma_water
 
 
@@ -3002,6 +3002,16 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     # always has.
     if joint_data is not None:
         fem_data["joint_data"] = joint_data
+    # What the post-run joint advisories read: each reinforcement line's name,
+    # its endpoints and whether it is already a joint. Carried here because
+    # solve_ssrm is handed fem_data and never the model, and written only where
+    # there is a reinforcement line to describe.
+    if slope_data.get("reinforcement_lines"):
+        fem_data["reinforcement_lines"] = [
+            {"label": r.get("label"), "joint": r.get("joint", ""),
+             "x1": r.get("x1"), "y1": r.get("y1"),
+             "x2": r.get("x2"), "y2": r.get("y2")}
+            for r in slope_data["reinforcement_lines"]]
 
     return fem_data
 
@@ -12363,6 +12373,16 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             fallback = _capture_fallback(result.get("last_solution"), capture_reason)
             if fallback is not None:
                 result["failure_solution"] = fallback
+
+    # What a BONDED run says about a sheet that wanted to be a joint: the strain
+    # band lying along one, and a sheet every bar of which is at its cap. One
+    # pass over the critical solution, reported where the run is read, because a
+    # joint option nobody knows to set is not much use.
+    _advisories = joint_advisories(fem_data, result.get("last_solution"))
+    if _advisories:
+        result["joint_advisories"] = _advisories
+        for _msg in _advisories:
+            print(f"\n*** {_msg}")
 
     elapsed = time.perf_counter() - t_start
     result["elapsed_time"] = elapsed

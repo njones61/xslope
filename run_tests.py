@@ -8145,6 +8145,14 @@ MODULE_CHECKS = {
         "material crossing, the stiffness default (which must carry no result "
         "over two orders of magnitude), and that a model with no jointed line "
         "builds exactly the fem_data it always did."),
+    'joint_surfaces': (
+        'joint_surfaces_check.py',
+        "What a jointed line reaches once the reinforce sheet says so: the "
+        "mesher through extract_joint_lines, preflight's four refusals and four "
+        "signals, the inputs / mesh / results plots, the two soil faces of the "
+        "split moving apart in the solved field, the 1D detail profile and its "
+        "figure, and the report's joints table — with the same model unflagged "
+        "carrying none of it."),
     'spencer_root': (
         'spencer_root_check.py',
         "Spencer's equations have a root outside the pole-free band on many "
@@ -14058,7 +14066,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'indep_bishop': 3, 'tension_crack_symmetry': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'reinforce_mesh_geometry': 2, 'joint_mesh': 3,
-              'joint_element': 5,
+              'joint_element': 5, 'joint_surfaces': 4,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'circle_vertex': 2,
@@ -15117,6 +15125,12 @@ def main():
         tests.append({'type': 'joint_element',
                       'file': 'the interface (joint) element (closed forms)',
                       'method': '-', 'source': 'joint_element'})
+        # The path a MODEL takes to the element: the column, the mesher, the
+        # plots, the detail panel and the report, on one solve of the shipped
+        # reinforcement sample with two of its lines made joints in memory.
+        tests.append({'type': 'joint_surfaces',
+                      'file': 'a jointed line from the column to the report',
+                      'method': '-', 'source': 'joint_surfaces'})
 
     if args.skip_benchmarks:
         n_before = len(tests)

@@ -283,6 +283,44 @@ def _place_stacked_cbars(fig, ax, specs):
     return cbars
 
 
+def _refit_panel_heights(fig, axes, tol=0.02, passes=4):
+    """Shrink the figure by the height its equal-aspect panels leave unused.
+
+    The stacked-panel height is first computed from an ESTIMATE of the axes width
+    — the figure width less a structural allowance for margins and one colorbar
+    slot. The number of slots is not fixed: a shear-strain panel carries the field
+    bar alone, or the field bar plus a joint-slip bar plus a reinforcement-force
+    bar, and every sibling panel reserves the same width so the stack stays
+    x-aligned. Three slots leave the panels narrower than the estimate, so each
+    equal-aspect panel shrinks inside its grid row and the row's spare height
+    opens as a gap between panels. ``tight_layout`` cannot see that shrink: it
+    lays out the nominal boxes, and the aspect is applied afterwards, at draw
+    time.
+
+    So measure it. Draw, compare each panel's nominal row box against the box it
+    was actually drawn in, and take the difference off the figure height. Nothing
+    here is assumed about how many colorbars there are or how wide they turn out
+    to be; the loop settles as soon as every row is the height its own panel
+    needs.
+    """
+    for _ in range(passes):
+        fig.tight_layout()
+        fig.canvas.draw()
+        dpi = fig.get_dpi()
+        slack = 0.0
+        for ax in axes:
+            spec = ax.get_subplotspec()
+            if spec is None:
+                continue
+            cell_h = spec.get_position(fig).height * fig.get_figheight()
+            drawn_h = ax.get_window_extent().height / dpi
+            slack += max(0.0, cell_h - drawn_h)
+        if slack <= tol:
+            break
+        fig.set_figheight(float(np.clip(fig.get_figheight() - slack, 3.0, 60.0)))
+    fig.tight_layout()
+
+
 def _extract_uv(disp, fem_data):
     """Extract per-node u,v displacements from a mixed-DOF displacement vector."""
     dof_offset = fem_data.get("dof_offset", None)
@@ -1131,7 +1169,14 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         if plot_types[0] == 'deformation':
             _place_deform_legend(axes[0], show_legend)
         try:
-            fig.tight_layout()
+            # The figure this stack was opened at was sized from an estimated
+            # axes width; the colorbar slots just placed are what that estimate
+            # stands for, so refit the height to the width they left. An
+            # embedded figure belongs to the caller's canvas and is not resized.
+            if own_fig:
+                _refit_panel_heights(fig, axes)
+            else:
+                fig.tight_layout()
         except Exception:
             pass
         for cb in field_cbars + vector_cbars:

@@ -206,6 +206,7 @@ severity and one-line summary.
 | **Rapid drawdown** | The stage-2 water source each pore-pressure option needs; the `d`/`psi` pair; a post-drawdown pool standing higher than the full pool, or above the ground with no stage-2 load; a stage-2 load that repeats stage 1; a boundary set 2 left on a file whose drawdown takes both stages from a transient seepage analysis, where it supplies nothing and editing it changes nothing; and, on that same route, a pool that stands at the same level at both stage times — a reservoir head typed as a fixed number, or bound to a series that does not fall between them — so the run never lowers the water and the drawdown answer is the full-pool state read twice |
 | **Tension cracks** | A crack at or below the base of the slope; a crack that intersects no failure surface while its water thrust still applies; a depth far past the theoretical `2c/γ` |
 | **Reinforcement and piles** | Pile spacing that is blank, zero or negative wherever the run divides by it; a pile or reinforcement line the finite element engine cannot build; a pullout length longer than its own line, or negative; an element that crosses no failure surface; and a **Type**, **Dir** or **Appl** that is not one of the words that column speaks — including a number typed into it, which reaches the engine as neither a direction nor an application |
+| **Interface (joint) elements** | A line set `Joint = Yes` that leaves `Adhesion` or `Delta` blank, which is an interface with no strength at all; and the three geometries the mesh split cannot represent, named before the build raises — two jointed lines that meet, a jointed line crossing another reinforcement or pile line, and a line load standing on one. Beside those, four readings of a line left BONDED that says the surface will run along it rather than across it: a sheet lying on a material boundary over most of its length, a long flat sheet spanning most of the zone above it, a `Delta` under 0.6 of the surrounding soil's friction angle, and the wall pattern — closely spaced near-horizontal sheets behind a steep face with their front ends in a facing column. Those four are warnings, not refusals: a bonded bar is the right model wherever the surface crosses the layer, and the reading is about the mechanism, which preflight cannot see. They are asked only of a line the finite element engine could model at all. One more says which bonded-bar inputs a jointed line stops reading |
 | **Plausibility** | A modulus far outside the band for its own soil type; a Poisson's ratio below any real soil; a structural modulus outside the range from geosynthetic to steel; a Hoek-Brown $\sigma_{ci}$ too small, in the declared unit system, to be intact rock — the magnitude a strength quoted in MPa lands at when it is entered into a model whose stress unit is the kPa |
 
 ### The cross-analysis findings
@@ -239,6 +240,16 @@ input, and they are the ones easiest to miss by reading a single result:
   node is not reported. The finding is about the seepage run rather than the stability model:
   check the [exit face](../seep/overview.md#exit-face-seepage-face) over that reach, since a
   face that stops short of the discharge point leaves the head standing above the ground there.
+- A **jointed reinforcement line** is a different model from a bonded one, and the difference is
+  invisible in the inputs. A bonded bar shares the soil's nodes, so the soil above the sheet and
+  the soil below it move together and the sheet can only be passed by the bar reaching its
+  capacity; `Joint = Yes` splits the mesh along the line and lets the two sides slide on the
+  sheet at the `Adhesion` / `Delta` interface. The right choice is about the mechanism — whether
+  the slip surface cuts the layer or runs along it — and preflight can only read the geometry, so
+  the `joint.likely_*` rules are **WARNING**s that name the line and say a joint is the likelier
+  model. The limit equilibrium engine ignores `Joint` altogether: a reinforcement line enters it
+  as a force across the slip surface either way, so the same file poses one problem there and two
+  different ones in the finite element engine.
 - **Reinforcement** complete for one engine can be incomplete for the other. The
   limit-equilibrium engine applies the `Tmax`/`Lp` capacity envelope directly; the
   finite element engine models each line as a bar element and needs `E` and `Area`.

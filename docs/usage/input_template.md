@@ -872,6 +872,15 @@ a bar that sheds part of its load and retains the rest. Near the ends the capaci
 take a bar below the force its embedment can hold.<br>
 >>E **[F/L²]**: Elastic modulus of reinforcement<br>
 >>Area — **[L²] per element (÷ Spacing)** (or [L²/L] per unit width when Spacing is blank): Cross-sectional area<br>
+- **Interface (joint)** (FEM only):<br>
+>>Joint: **Yes** makes the line a slip surface — the mesh splits along it and a pair of interface elements
+carries the sheet's grip on the soil, in place of the bond cap `Lp1`/`Lp2` set. Blank or **No** is the ordinary
+bonded bar. The interface's strength is that line's own `Adhesion` and `Delta`, which must both be filled.<br>
+>>kn **[F/L³]**: Normal stiffness of the interface. Leave blank to derive it from the softer adjacent soil,
+$E_{adj}$ over a virtual thickness of 0.1 × the 1D element size.<br>
+>>ks **[F/L³]**: Shear stiffness of the interface. Leave blank to derive it the same way, from $G_{adj}$.<br>
+>>Jred: **No** holds the interface at full strength through a strength reduction. Blank or **Yes** reduces the
+interface's `Adhesion` and $\tan$`Delta` by the trial factor along with the soil's, which is the usual choice.<br>
 
 The available tensile force varies *along* the line: it is limited by the tendon's own capacity in the middle, and
 tapers off toward each end as there is progressively less bond length available to develop it. That capacity
@@ -898,6 +907,16 @@ How the force is then *used* differs by analysis:
   envelope, and dropping to `Tres` once it yields, or to the envelope value where that is the lower of the two.
   **Dir** and **Appl** have no effect. See
   [Soil Reinforcement in FEM](../fem/reinforcement.md#force-behavior-and-failure-modes).
+
+`Joint` changes what the FEM builds. A bonded line shares the soil's nodes, so the soil above it and the soil below
+it are one body; a jointed line is a slip surface, and the mesh is split along it into an upper face, the bar, and a
+lower face, with an interface element between each pair carrying the `Adhesion` and `Delta` as a Mohr-Coulomb
+strength. Use it where the failure surface can run **along** a sheet rather than across it — a base geotextile under
+an embankment, a wall whose fill slides on its sheets, a smooth liner. `Lp1`, `Lp2` and `Tres` are not read on a
+jointed line: the grip is what the interface elements integrate, and the bar's only limit is `Tmax`. A non-blank
+`Tend1` / `Tend2` ties that end of the sheet to the soil or facing at the stated capacity; a blank end is free and
+can pull out. LEM ignores `Joint` entirely and reads the line as it always did. See
+[Bonded bar or joint?](../fem/reinforcement.md#bonded-bar-or-joint).
 
 ---
 

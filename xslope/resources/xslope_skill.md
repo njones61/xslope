@@ -973,7 +973,16 @@ slope_data['reinforcement_lines'] = [
      # v24 overburden-dependent pullout, the alternative to lp1/lp2. NaN = blank =
      # use the pullout lengths. Fill BOTH or neither (preflight refuses one of two).
      'adhesion': float('nan'),   # interface adhesion, stress units
-     'delta': float('nan')},     # interface friction angle, degrees, in (0, 90)
+     'delta': float('nan'),      # interface friction angle, degrees, in (0, 90)
+     # v27 interface (joint) option, FEM only. 'Yes' makes the line a slip
+     # surface: the mesh splits along it and a pair of interface elements
+     # carries the sheet's grip, with 'adhesion'/'delta' as their Mohr-Coulomb
+     # strength (both required). '' / 'No' is the ordinary bonded bar.
+     'joint': '',           # '', 'No' (bonded, the default) | 'Yes' (slip surface)
+     'kn': float('nan'),    # interface normal stiffness; NaN = derive from the
+     'ks': float('nan'),    # softer adjacent soil over 0.1 x the 1D element size
+     'jred': ''},           # '' / 'Yes' = reduce the interface with the soil in
+                            # the SSR (the default); 'No' holds it at full strength
 ]
 ```
 
@@ -991,6 +1000,17 @@ Support-type recipes: geosynthetics -> `type='geosynthetic'` (tangent, active); 
 `type='tieback'` (axial, active, `tend1` = connection capacity). Enter per-element capacities
 plus `Spacing` in the template and the loader divides; in-memory dicts like the above are
 already per unit width.
+
+`joint` decides how the FEM represents the sheet, and the choice is about the mechanism, not
+the material: does the slip surface CUT the reinforcement or run ALONG it? A bonded bar is right
+where the surface crosses the layers (a circle through a geogrid slope, a nail wall, a pile
+row) — it is the FE twin of the LEM treatment. A joint is right where the surface can run along
+the layer: a base geotextile under an embankment on soft clay, a wrapped-face or block-faced
+wall whose fill slides on its sheets, a smooth liner. On a jointed line `lp1`/`lp2` and `t_res`
+are not read (the grip is the interface traction), a blank `tend1`/`tend2` leaves that end free
+to pull out, and a filled one ties it at that capacity. LEM ignores `joint` entirely. Preflight
+reports the geometry that says a bonded line should have been a joint. See
+`docs/fem/reinforcement.md`, "Bonded bar or joint?".
 
 **Layout convention** (when the sketch gives spacing but not explicit elevations): the bottom
 line sits **AT the toe/base elevation** (e.g. y=0), then y = s, 2s, … upward; each line starts

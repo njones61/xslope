@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+from collections import defaultdict
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -1489,7 +1490,7 @@ def detect_sweepable_regions(polygon_coords, target_size, polygon_sizes=None,
     return accepted, edge_divisions
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=None, debug=False, mesh_params=None, element_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None, size_regions=None, quad_style='free'):
+def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=None, debug=False, mesh_params=None, element_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None, size_regions=None, quad_style='free', joint_lines=None):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -1561,6 +1562,17 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                       one), so swept and free zones meet at the same node spacing. A zone
                       the classifier declines is simply free-meshed, so 'structured' can
                       never produce a worse mesh than 'free'.
+        joint_lines  : Optional selection of the lines that are JOINTS — slip surfaces
+                      the mesh splits along, rather than bars sharing the soil's nodes.
+                      None (the default) is no joints and the mesh is what it always
+                      was. Otherwise a sequence of indices into `lines`, or a mapping
+                      from such an index to that line's options ('tend1' / 'tend2',
+                      the end anchorage capacities: an end above zero is tied). Each
+                      named line is meshed as an ordinary embedded curve and then
+                      split by split_mesh_along_joints, which see: every node on it
+                      becomes three (soil above, bar, soil below), a pair of joint
+                      elements spans each bar element, and the two soil faces rejoin
+                      at the line's ends.
 
     Returns:
         mesh dict containing:
@@ -1573,9 +1585,13 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
         elements_1d  : np.ndarray of 1D element vertex indices (n_elements_1d, 3) - unused nodes set to 0
         element_types_1d: np.ndarray indicating element type (2 for linear, 3 for quadratic)
         element_materials_1d: np.ndarray of material ID for each 1D element (line index)
+
+        If joint_lines names any line, also includes the keys
+        split_mesh_along_joints writes: joints, elements_joint,
+        element_types_joint, element_materials_joint, element_side_joint, ties.
+        A mesh with no jointed line carries none of them.
     """
     gmsh = _get_gmsh()
-    from collections import defaultdict
 
     # A stated 1D size REFINES along the constraint lines; None (the default) leaves
     # them at whatever the size field asks for there, which is the global target away
@@ -1639,6 +1655,8 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     # outside the domain) up front, with a clear message instead of a gmsh crash.
     if lines:
         _validate_constraint_lines(lines, polygon_coords)
+
+    _joint_opts = _normalize_joint_lines(joint_lines, len(lines) if lines else 0)
 
     # Build a list of region ids (list of material IDs - one per polygon)
     if any(mat_id is not None for mat_id in polygon_mat_ids):
@@ -2576,6 +2594,12 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     # conversion above, or the OCC-fragment fallback.
     attach_1d_midside_nodes(mesh, debug=debug)
 
+    # Jointed lines are split last, on the finished mesh: the bar elements must
+    # already carry the midside node of their 2D edge before that edge is torn
+    # into three.
+    if _joint_opts:
+        split_mesh_along_joints(mesh, lines, _joint_opts, debug=debug)
+
     return mesh
 
 
@@ -2782,6 +2806,9 @@ def attach_1d_midside_nodes(mesh, debug=False):
     generator's output, on a mesh read back from JSON, and on both in turn.
     Elements on an edge no quadratic 2D element carries -- a linear mesh, or a
     constraint line the mesher could not make conform -- keep their two nodes.
+    A jointed line's bar is in that position after the split: it stands on its
+    own node set, which no 2D element shares. It is left alone, because it was
+    given its midside node here before the split tore the edge into three.
     """
     e1d = mesh.get("elements_1d")
     if e1d is None or len(e1d) == 0:
@@ -2840,6 +2867,319 @@ def attach_1d_midside_nodes(mesh, debug=False):
     if debug and (n_attached or n_missed):
         print(f"  1D elements: {n_attached} given the midside node of their 2D "
               f"edge, {n_missed} left two-node (no quadratic edge)")
+    return mesh
+
+
+
+#: Mesh keys the joint (interface) construction adds. They are written only when
+#: at least one constraint line is jointed, so an ordinary mesh — and the JSON it
+#: exports — is exactly what it was before joints existed.
+JOINT_MESH_KEYS = ('joints', 'elements_joint', 'element_types_joint',
+                   'element_materials_joint', 'element_side_joint', 'ties')
+
+#: Joint keys whose value is a list of dicts rather than a numeric array, so the
+#: JSON reader must leave them as Python objects instead of calling np.array.
+_MESH_JSON_OBJECT_KEYS = frozenset(('joints', 'ties'))
+
+
+def _normalize_joint_lines(joint_lines, n_lines):
+    """Normalize the ``joint_lines`` argument to ``{line index: options dict}``.
+
+    Accepts None (no joints), a sequence of indices into ``lines``, or a mapping
+    from such an index to a dict of per-line options. The only options read here
+    are ``tend1`` and ``tend2``, the end anchorage capacities: an end whose value
+    is present and greater than zero is TIED and gets a ``ties`` entry, and every
+    other end is free.
+    """
+    if not joint_lines:
+        return {}
+    if isinstance(joint_lines, dict):
+        items = [(int(k), dict(v or {})) for k, v in joint_lines.items()]
+    else:
+        items = []
+        for entry in joint_lines:
+            if isinstance(entry, dict):
+                idx = entry.get('index')
+                if idx is None:
+                    raise ValueError(
+                        "joint_lines entries given as dicts must carry an 'index' "
+                        f"key naming the line; got {entry!r}")
+                items.append((int(idx), {k: v for k, v in entry.items()
+                                         if k != 'index'}))
+            else:
+                items.append((int(entry), {}))
+    opts = {}
+    for idx, o in items:
+        if idx < 0 or idx >= n_lines:
+            raise ValueError(
+                f"joint_lines names constraint line {idx}, which is outside the "
+                f"{n_lines} lines passed to the mesher.")
+        opts[idx] = o
+    return opts
+
+
+def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
+    """Split the mesh along every jointed constraint line, in place.
+
+    **The construction.** A jointed line reaches gmsh as an ordinary embedded
+    curve, so the mesh comes back with one node set on it and the soil on the two
+    sides sharing those nodes. This routine takes that bonded mesh apart. Every
+    node on the curve — corner nodes and, on a quadratic mesh, the midside nodes
+    between them — becomes THREE nodes at the same point: a copy carried by the
+    2D elements above the line, a copy carried by the bar, and the original,
+    which the 2D elements below keep. Which side a 2D element is on is decided by
+    its centroid against the line's normal.
+
+    Two joint elements then span each bar element: an upper one connecting the
+    soil above to the bar, and a lower one connecting the bar to the soil below.
+    A joint element holds the same nodes as the 2D edge it lies on — three node
+    pairs on a quadratic mesh, two on a linear one — so its shape functions match
+    the adjacent triangles' edges.
+
+    **Ends.** The two soil faces REJOIN at the line's ends: a tip is a crack tip,
+    one shared soil node, not duplicated. The bar still gets its own end node
+    there, connected to the soil only through the joints along its length, so a
+    sheet end is free by default and can pull out. An end whose ``tend1`` /
+    ``tend2`` is present and greater than zero is TIED instead, and gets a
+    ``ties`` entry: the bar's end node, the soil node at the same point, and the
+    capacity. The tie's spring is R2's; the mesh only records the pair.
+
+    **What it writes.** ``joints`` — per jointed line, the stations along the
+    split in order from end 1, each the three node ids ``[upper, bar, lower]`` at
+    that point (at a tip ``upper`` and ``lower`` are the one shared node).
+    ``elements_joint`` — the joint elements, six columns
+    ``[a0, a1, a2, b0, b1, b2]``: side ``a`` is always the upper side of the pair
+    (the soil above for an upper joint, the bar for a lower one) and side ``b``
+    the lower, so the normal runs the same way on every joint. The third column
+    of each triple is a padding zero on a linear mesh, as ``elements_1d`` does it,
+    and ``element_types_joint`` records 2 or 3 node pairs.
+    ``element_materials_joint`` is the 1-based constraint-line index, matching
+    ``element_materials_1d``; ``element_side_joint`` is 1 on the upper joint of a
+    pair and 0 on the lower. ``ties`` holds the tied ends.
+
+    The bar's own elements stay in ``elements_1d`` with their node ids rewritten
+    to the bar's node set.
+
+    Nothing is written when no line is jointed: an ordinary mesh carries none of
+    these keys and is what it always was.
+
+    Parameters:
+        mesh        : the mesh dict from build_mesh_from_polygons, modified in place
+        lines       : the constraint lines the mesh was built from
+        joint_lines : which of them are jointed — see _normalize_joint_lines
+        debug       : print the counts per line
+
+    Returns:
+        the same mesh dict.
+    """
+    opts = _normalize_joint_lines(joint_lines, len(lines) if lines else 0)
+    if not opts:
+        return mesh
+
+    e1d = mesh.get("elements_1d")
+    if e1d is None or len(e1d) == 0:
+        raise ValueError(
+            "A constraint line is flagged as a joint, but the mesh carries no 1D "
+            "elements: gmsh did not recover the line. Check that the line lies "
+            "inside the section and that its endpoints are polygon vertices.")
+
+    nodes_in = np.asarray(mesh["nodes"], dtype=float)
+    nodes = [list(row) for row in nodes_in]
+    elements = np.asarray(mesh["elements"], dtype=int).copy()
+    element_types = np.asarray(mesh["element_types"], dtype=int)
+    e1d = np.asarray(e1d, dtype=int).copy()
+    types_1d = np.asarray(mesh["element_types_1d"], dtype=int)
+    mats_1d = np.asarray(mesh["element_materials_1d"], dtype=int)
+
+    xy = nodes_in[:, :2]
+    span = max(float(xy[:, 0].max() - xy[:, 0].min()),
+               float(xy[:, 1].max() - xy[:, 1].min()), 1.0)
+    tol = 1e-6 * span
+
+    # Node -> the 2D elements standing on it, from the connectivity as it came
+    # from the mesher. Duplicated nodes are appended at the end and are never in
+    # a pre-existing element, so this map stays correct line after line.
+    node_elems = defaultdict(list)
+    for ei in range(len(elements)):
+        for k in range(int(element_types[ei])):
+            node_elems[int(elements[ei, k])].append(ei)
+
+    joints_out = []
+    ties_out = []
+    joint_conn = []
+    joint_types = []
+    joint_mats = []
+    joint_sides = []
+
+    for li in sorted(opts):
+        line = lines[li]
+        p1 = np.array(line[0][:2], dtype=float)
+        p2 = np.array(line[-1][:2], dtype=float)
+        d = p2 - p1
+        length = float(np.hypot(d[0], d[1]))
+        if length <= tol:
+            raise ValueError(f"Jointed constraint line {li + 1} has zero length.")
+        d = d / length
+        normal = np.array([-d[1], d[0]])
+
+        bar_idx = [int(i) for i in np.where(mats_1d == li + 1)[0]]
+        if not bar_idx:
+            raise ValueError(
+                f"Constraint line {li + 1} is flagged as a joint but has no 1D "
+                "elements in the mesh — gmsh did not recover it, so there is "
+                "nothing to split along.")
+
+        # The curve's nodes, ordered from end 1. A constraint line is straight
+        # (two endpoints), so the order is the projection onto its direction.
+        station_ids = set()
+        for i in bar_idx:
+            for k in range(int(types_1d[i])):
+                station_ids.add(int(e1d[i, k]))
+        t_of = {}
+        for nid in sorted(station_ids):
+            v = np.array(nodes[nid][:2], dtype=float) - p1
+            off = float(v @ normal)
+            if abs(off) > tol:
+                raise ValueError(
+                    f"Node {nid} of jointed line {li + 1} lies {off:.3g} off the "
+                    "line; the split needs every node of the curve on it.")
+            t_of[nid] = float(v @ d)
+        ordered = sorted(station_ids, key=lambda n: t_of[n])
+        if abs(t_of[ordered[0]]) > tol or abs(t_of[ordered[-1]] - length) > tol:
+            raise ValueError(
+                f"The meshed curve of jointed line {li + 1} runs from "
+                f"{t_of[ordered[0]]:.3g} to {t_of[ordered[-1]]:.3g} along a line of "
+                f"length {length:.3g}; it must reach both stated endpoints.")
+        station_set = set(ordered)
+        interior = set(ordered[1:-1])
+
+        # Which side of the line each 2D element touching it is on, from its
+        # centroid. An element with nodes on both sides would be cut by the split
+        # and is a mesh the construction cannot represent.
+        upper_elems = []
+        seen = set()
+        for nid in interior:
+            for ei in node_elems.get(nid, ()):
+                if ei in seen:
+                    continue
+                seen.add(ei)
+                et = int(element_types[ei])
+                enodes = [int(elements[ei, k]) for k in range(et)]
+                n_corner = 3 if et in (3, 6) else 4
+                cen = np.mean([nodes[n][:2] for n in enodes[:n_corner]], axis=0)
+                s_c = float((cen - p1) @ normal)
+                if abs(s_c) <= tol:
+                    raise ValueError(
+                        f"2D element {ei} on jointed line {li + 1} has its centroid "
+                        "on the line, so which side it is on is undecidable.")
+                signs = set()
+                for n in enodes:
+                    if n in station_set:
+                        continue
+                    s_n = float((np.array(nodes[n][:2], dtype=float) - p1) @ normal)
+                    if abs(s_n) > tol:
+                        signs.add(1 if s_n > 0 else -1)
+                if len(signs) > 1:
+                    raise ValueError(
+                        f"2D element {ei} straddles jointed line {li + 1} — it has "
+                        "nodes on both sides. The line must be a conforming edge of "
+                        "the mesh before it can be split.")
+                if s_c > 0:
+                    upper_elems.append(ei)
+
+        # The bar elements, each read from end 1 (start, end, midside) and the
+        # elements themselves in order along the line.
+        bar_ordered = []
+        for i in bar_idx:
+            et = int(types_1d[i])
+            a, b = int(e1d[i, 0]), int(e1d[i, 1])
+            if t_of[a] > t_of[b]:
+                a, b = b, a
+            mid = int(e1d[i, 2]) if et >= 3 else 0
+            bar_ordered.append((t_of[a], i, a, b, mid, et))
+        bar_ordered.sort(key=lambda r: r[0])
+
+        # Triple every station: an upper copy and a bar copy, with the original
+        # left to the elements below. A tip is not duplicated on the soil side —
+        # the two faces rejoin there — but the bar still gets its own node.
+        upper_of = {}
+        bar_of = {}
+        for k, nid in enumerate(ordered):
+            if k == 0 or k == len(ordered) - 1:
+                upper_of[nid] = nid
+            else:
+                nodes.append(list(nodes[nid]))
+                upper_of[nid] = len(nodes) - 1
+            nodes.append(list(nodes[nid]))
+            bar_of[nid] = len(nodes) - 1
+
+        for ei in upper_elems:
+            et = int(element_types[ei])
+            for k in range(et):
+                nid = int(elements[ei, k])
+                new = upper_of.get(nid)
+                if new is not None and new != nid:
+                    elements[ei, k] = new
+
+        for i in bar_idx:
+            for k in range(int(types_1d[i])):
+                e1d[i, k] = bar_of[int(e1d[i, k])]
+
+        for _t, _i, a, b, mid, et in bar_ordered:
+            n_pairs = 3 if et >= 3 else 2
+            up = [upper_of[a], upper_of[b], upper_of[mid] if n_pairs == 3 else 0]
+            bar = [bar_of[a], bar_of[b], bar_of[mid] if n_pairs == 3 else 0]
+            low = [a, b, mid if n_pairs == 3 else 0]
+            # side a of the pair is always the upper one, so the joint normal
+            # runs from b to a on every joint element.
+            joint_conn.append([up[0], up[1], up[2], bar[0], bar[1], bar[2]])
+            joint_types.append(n_pairs)
+            joint_mats.append(li + 1)
+            joint_sides.append(1)
+            joint_conn.append([bar[0], bar[1], bar[2], low[0], low[1], low[2]])
+            joint_types.append(n_pairs)
+            joint_mats.append(li + 1)
+            joint_sides.append(0)
+
+        joints_out.append({
+            "line": li + 1,
+            "stations": [[int(upper_of[n]), int(bar_of[n]), int(n)]
+                         for n in ordered],
+        })
+
+        for end, nid, key in ((1, ordered[0], 'tend1'), (2, ordered[-1], 'tend2')):
+            cap = opts[li].get(key)
+            if cap is None:
+                continue
+            try:
+                cap = float(cap)
+            except (TypeError, ValueError):
+                continue
+            if not np.isfinite(cap) or cap <= 0.0:
+                continue
+            ties_out.append({
+                "line": li + 1,
+                "end": end,
+                "bar_node": int(bar_of[nid]),
+                "soil_node": int(nid),
+                "capacity": cap,
+            })
+
+        if debug:
+            print(f"  Joint line {li + 1}: {len(ordered)} stations, "
+                  f"{len(upper_elems)} elements above, "
+                  f"{2 * len(bar_ordered)} joint elements, "
+                  f"{len(nodes) - len(nodes_in)} nodes added so far")
+
+    mesh["nodes"] = np.array(nodes, dtype=float)
+    mesh["elements"] = elements
+    mesh["elements_1d"] = e1d
+    mesh["joints"] = joints_out
+    mesh["elements_joint"] = np.array(joint_conn, dtype=int).reshape(-1, 6)
+    mesh["element_types_joint"] = np.array(joint_types, dtype=int)
+    mesh["element_materials_joint"] = np.array(joint_mats, dtype=int)
+    mesh["element_side_joint"] = np.array(joint_sides, dtype=int)
+    mesh["ties"] = ties_out
     return mesh
 
 
@@ -3698,10 +4038,11 @@ def import_mesh_from_json(filename):
     with open(filename, 'r') as f:
         mesh_json = json.load(f)
     
-    # Convert lists back to numpy arrays
+    # Convert lists back to numpy arrays. The joint keys 'joints' and 'ties' are
+    # lists of records, not numeric arrays, and stay Python objects.
     mesh = {}
     for key, value in mesh_json.items():
-        if isinstance(value, list):
+        if isinstance(value, list) and key not in _MESH_JSON_OBJECT_KEYS:
             mesh[key] = np.array(value)
         else:
             mesh[key] = value

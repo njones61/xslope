@@ -207,14 +207,19 @@ def _solve(fem_data, F=1.0, max_iterations=8000):
                          fast_kernel=False)
 
 
-def _ssrm(fem_data, F_min=1.0, F_max=2.5, tolerance=0.005, **kw):
+def _ssrm(fem_data, F_min=1.0, F_max=2.5, tolerance=0.005, budget=1.0, **kw):
     # The iteration budget is capped well below the shipped ceiling. A penalty
     # interface makes the viscoplastic iteration crawl at a factor just under
     # the critical one -- the correction is a fixed force against a stiffness
     # the joint dominates -- and an uncapped trial there spends tens of
     # thousands of sweeps to decide what the next bisection step decides for it.
-    kw.setdefault('max_iterations', 3000)
-    kw.setdefault('max_iterations_ceiling', 6000)
+    #
+    # ``budget`` scales it with the joint stiffness: the slip a sweep puts into
+    # a joint is the excess traction divided by k_s, so a ten-times stiffer
+    # interface needs ten times the sweeps to travel the same distance, and a
+    # fixed budget would read that cost as an answer.
+    kw.setdefault('max_iterations', int(3000 * budget))
+    kw.setdefault('max_iterations_ceiling', int(6000 * budget))
     with contextlib.redirect_stdout(io.StringIO()):
         return solve_ssrm(fem_data, F_min=F_min, F_max=F_max,
                           tolerance=tolerance, **kw)
@@ -375,7 +380,8 @@ ROW2 = dict(beta=20.0, HV=3.0, X1=36.0, XA=6.0, XB=30.0, YB=-6.0, VD=1.0,
             ts=1.5, s1d=1.0, phi_j=30.0, cj=0.0, E_void=1.0)
 
 
-def _leg_incline(failures, results, k_scale=1.0, quiet=False, criterion=None):
+def _leg_incline(failures, results, k_scale=1.0, quiet=False, criterion=None,
+                 budget=1.0):
     """Block on an inclined plane: it stands iff tan phi_j > tan beta, and the
     strength reduction returns tan phi_j / tan beta."""
     T = math.tan(math.radians(ROW2['beta']))
@@ -399,7 +405,8 @@ def _leg_incline(failures, results, k_scale=1.0, quiet=False, criterion=None):
 
     _d, fd, g = slab_model(**dict(ROW2, k_scale=k_scale))
     _kw = {} if criterion is None else {'failure_criterion': criterion}
-    res = _ssrm(fd, F_min=1.0, F_max=2.5, tolerance=0.005, **_kw)
+    res = _ssrm(fd, F_min=1.0, F_max=2.5, tolerance=0.005,
+                budget=budget, **_kw)
     FS = res.get('FS')
     if FS is None:
         failures.append("row 2: the strength reduction returned no factor of "
@@ -513,11 +520,13 @@ def _row4_expected():
             / (GAMMA * H * math.sin(b) * math.cos(b)))
 
 
-def _leg_infinite(failures, results, k_scale=1.0, quiet=False, criterion=None):
+def _leg_infinite(failures, results, k_scale=1.0, quiet=False, criterion=None,
+                  budget=1.0):
     expected = _row4_expected()
     _d, fd, g = slab_model(**dict(ROW4, k_scale=k_scale))
     _kw = {} if criterion is None else {'failure_criterion': criterion}
-    res = _ssrm(fd, F_min=1.0, F_max=2.5, tolerance=0.005, **_kw)
+    res = _ssrm(fd, F_min=1.0, F_max=2.5, tolerance=0.005,
+                budget=budget, **_kw)
     FS = res.get('FS')
     if FS is None:
         failures.append("row 4: the strength reduction returned no factor of "
@@ -556,7 +565,8 @@ def _leg_stiffness(failures, results):
         row = {}
         for scale in (0.1, 1.0, 10.0):
             row[scale] = leg(failures, results, k_scale=scale, quiet=True,
-                             criterion='non_convergence')
+                             criterion='non_convergence',
+                             budget=max(1.0, scale))
         table.append((name, row))
         vals = [v for v in row.values() if v is not None]
         if len(vals) == 3:

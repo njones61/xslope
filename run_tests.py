@@ -8009,6 +8009,15 @@ MODULE_CHECKS = {
         "the pullout law. It used to reach it as the LEM tension-distribution "
         "point list, so filling in Adhesion and Delta — a statement about bond "
         "strength — re-meshed the model and moved the factor of safety."),
+    'joint_mesh': (
+        'joint_mesh_check.py',
+        "A reinforcement line flagged as a joint is a slip surface, so the mesh "
+        "is split along it: every node on the line becomes three — soil above, "
+        "bar, soil below — with a pair of joint elements at each station and the "
+        "two soil faces rejoining at the ends. The counts, the side "
+        "classification, the boundary conditions the copies inherit, the three "
+        "refused geometries, and that a model with no jointed line meshes "
+        "exactly as it always did."),
     'spencer_root': (
         'spencer_root_check.py',
         "Spencer's equations have a root outside the pole-free band on many "
@@ -13921,7 +13930,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'indep_bishop': 3, 'tension_crack_symmetry': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
-              'reinforce_mesh_geometry': 2,
+              'reinforce_mesh_geometry': 2, 'joint_mesh': 3,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'circle_vertex': 2,
@@ -14496,6 +14505,12 @@ def main():
         tests.append({'type': 'reinforce_mesh_geometry',
                       'file': 'reinforcement line mesh geometry (both laws)',
                       'method': '-', 'source': 'reinforce_mesh_geometry'})
+        # A jointed reinforcement line is a slip surface: the mesh splits along
+        # it into soil-above, bar and soil-below node sets, with joint elements
+        # between them and the soil faces rejoining at the ends.
+        tests.append({'type': 'joint_mesh',
+                      'file': 'the mesh split along a jointed line',
+                      'method': '-', 'source': 'joint_mesh'})
         # The opt-in strength-reduction criterion that wants displacement
         # evidence before calling a non-converged trial a failed slope.
         tests.append({'type': 'hybrid_criterion',

@@ -1570,9 +1570,12 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                       the end anchorage capacities: an end above zero is tied). Each
                       named line is meshed as an ordinary embedded curve and then
                       split by split_mesh_along_joints, which see: every node on it
-                      becomes three (soil above, bar, soil below), a pair of joint
-                      elements spans each bar element, and the two soil faces rejoin
-                      at the line's ends.
+                      is copied once per WEDGE of material around it, the bar takes
+                      a copy of its own, and a pair of joint elements spans each bar
+                      element. Two wedges at an ordinary station (soil above, soil
+                      below), one at a crack tip buried in material, where the two
+                      faces rejoin, and more where jointed lines meet — three at a
+                      T, four at a crossing.
 
     Returns:
         mesh dict containing:

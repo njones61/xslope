@@ -548,6 +548,62 @@ slipping interface the shear traction is held at $c_j + t_n \tan\phi_j$ and does
 displacement, so a state the viscoplastic loop reached by growing the slip leaves a corrector — which may only move
 displacements — with nothing to move.
 
+## Joints Without Reinforcement
+
+Not every slip surface has a sheet in it. A rock joint, a bedding plane, the contact between a concrete facing block
+and the one beneath it, the back of a retaining wall against the soil it holds: each is a surface two bodies meet on
+and can slide along, with no member between them. Those go on the **joints** worksheet, one row per line:
+
+| column | what it is |
+|---|---|
+| `Label` | the name the plots, the details view and the report use |
+| `x1`, `y1`, `x2`, `y2` | the line's endpoints |
+| `c` | the interface's cohesion (blank = 0) |
+| `phi` | its friction angle, in degrees — required |
+| `t_cut` | the tension cutoff at which the two faces part (blank = 0) |
+| `kn`, `ks` | the penalty stiffnesses (blank = derived, as above) |
+| `Jred` | blank or **Yes** reduces the joint with the soil in a strength reduction; **No** holds it |
+
+The mesh split, the interface element, its constitutive law, the derived stiffnesses and the strength reduction are
+all exactly what a jointed reinforcement line gets, described above. The one difference is that there is no bar
+between the two faces, so a station carries two coincident nodes instead of three and **one** interface element
+spans them instead of two:
+
+```
+  Joint = Yes on a sheet             a joints-sheet line
+
+   ----o----o----o----  upper        ----o----o----o----  upper face nodes
+   ~~~~~~~~~~~~~~~~~~~  interface    ~~~~~~~~~~~~~~~~~~~  the interface
+   ====b====b====b====  the bar      ----o'---o'---o'---  lower face nodes
+   ~~~~~~~~~~~~~~~~~~~  interface
+   ----o'---o'---o'---  lower
+```
+
+A sheet's two interfaces act in series, so the pair carries the stated stiffness twice over; a joints-sheet line
+carries it once, which is what a single contact is. Neither difference reaches the strength: `c` and `phi` are the
+Mohr-Coulomb limit the faces slide at either way. The tension cutoff is a column of its own here, where a
+reinforcement line's is fixed at zero, because a rock joint may hold a little tension across it and a
+soil-geosynthetic contact does not.
+
+Joint lines may **meet** — at a T, at a crossing, at a corner, end to end. Where they do, the mesh split counts the
+wedges of material around the shared node and gives the node one copy per wedge, so each element keeps the material
+on its own side of every line through the point. That is what makes a block column with a joint on its back face, a
+joint under its base and a course joint at every mortar line into a stack that can slide, part and rock, rather than
+a notched solid. What they may not do is lie **on** one another over a stretch, or run along the outside of the
+section, where there is material on one side only and nothing for the other face to be; preflight refuses both by
+name.
+
+A joint line is finite element geometry: the limit equilibrium engines do not read the joints worksheet at all.
+
+### Both kinds in one model
+
+A model may carry both, and the multi-tiered geotextile wall is the case that needs both at once: each sheet is a
+reinforcement line with `Joint = Yes`, so the fill can slide on it while the sheet still carries tension, and each
+facing column stands on joints-sheet lines that let the blocks slide on each other, on the fill behind them and on
+the foundation beneath. A sheet whose front end stops on the back face of a column is **tied** there, and the tie
+takes the material the line runs into past its end — the column — so the wrap's connection to the facing is what the
+tie represents.
+
 ## Bonded Bar or Joint?
 
 The choice is about the mechanism, not about the material: does the slip surface **cut** the reinforcement, or run

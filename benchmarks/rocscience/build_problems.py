@@ -2582,6 +2582,7 @@ def vp048():
                                   f'Nail row {i+1}', constant=True))
     sd['reinforcement_lines'] = rows
     sd['reinforce_lines'] = rows
+
     # 55-degree plane stored (the angle at which Slide and Sheahan agree)
     import math
     run = 7.0 / math.tan(math.radians(55.0))
@@ -2740,6 +2741,18 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
         The back end is free, which is what lets it pull out through the
         interfaces.
 
+    joint=True also builds the facing as a DRY STACK, which is what the paper
+    describes: the blocks are `elastic` (the tag holds them out of the strength
+    reduction with ssr_exclude=Blocks) and every contact around and inside each
+    column is a joint line on the joints sheet — the column's back face, its
+    base, and a course joint across the 0.3 m column at each sheet elevation, so
+    the courses run face to face and end on the back-face joint. Those contacts
+    carry Adhesion 0 and the block's own friction, delta = 34 deg; neither the
+    paper nor the vendor file states a block-on-block strength. kn = ks = 100 000
+    as on the sheets, and Jred blank, so the strength reduction reduces them with
+    the soil. The 0.3 m columns take a per-polygon mesh Size of 0.15 m: at the
+    model's own target size the stack does not mesh at all.
+
     ks_of(layer_index_from_bottom, total) overrides the shear stiffness per
     layer; #051 gives its lower seven sheets Ks = 10 000 against the upper
     eight's 100 000.
@@ -2764,6 +2777,14 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
         m = dict(base)
         uopt = 'piezo' if (water and name == 'Foundation soil') else 'none'
         m.update(name=name, c=c, phi=phi, gamma=18.0, option='mc', u=uopt)
+        # The dry-stack facing is concrete: it does not yield, and the strength
+        # reduction leaves it alone (ssr_exclude on the tag). The paper's 2.5 kPa
+        # was a numerical crutch for a column meshed as one body -- 'was used for
+        # blocks to prevent possible local failure of the block facing' (p. 4) --
+        # and a 0.3 x 3 m column at that cohesion cannot carry its own weight, so
+        # the crutch is replaced by the physical statement it stood in for.
+        if joint and name == 'Blocks':
+            m.update(option='elastic')
         mats.append(m)
     sd['materials'] = mats
     toe, ftop = 6.0, 6.0
@@ -2780,7 +2801,14 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
     for t in range(n_tiers):
         zones.append((2, [(faces[t], ys[t]), (faces[t] + 0.3, ys[t]),
                           (faces[t] + 0.3, ys[t] + tier_h), (faces[t], ys[t] + tier_h)]))
-    sd['polygons'] = [{'polygon': Polygon(p), 'mat_id': mid} for mid, p in zones]
+    # A local mesh size on the block columns, and only on the jointed build. The
+    # dry stack crosses each 0.3 m column with a joint line every 0.6 m; at the
+    # model's own target size gmsh does not return from edge recovery. 0.15 m
+    # meshes it in seconds, and 0.10 m returns the same mesh, so the value is not
+    # a knife edge.
+    sd['polygons'] = [{'polygon': Polygon(p), 'mat_id': mid,
+                       'size': (0.15 if (joint and mid == 2) else None)}
+                      for mid, p in zones]
     gs, dom = build_ground_surface_from_polygons(sd['polygons'])
     sd['ground_surface'], sd['domain_polygon'] = gs, dom
     sd['profile_lines'] = []
@@ -2834,6 +2862,30 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
             idx += 1
     sd['reinforcement_lines'] = rows
     sd['reinforce_lines'] = rows
+
+    # The facing's own contacts, on the joints sheet: a joint line with no
+    # reinforcement in it. Around each column, its back face and its base; across
+    # each column, one course joint at every sheet elevation, so the 0.6 m courses
+    # run face to face and end on the back-face joint. Empty on the bonded
+    # limit-equilibrium build, which meshes the facing as one body.
+    jrows = []
+    if joint:
+        for t in range(n_tiers):
+            xf, xb = faces[t], faces[t] + 0.3
+            jrows.append({'label': f'T{t + 1} back face',
+                          'x1': xb, 'y1': ys[t], 'x2': xb, 'y2': ys[t] + tier_h})
+            jrows.append({'label': f'T{t + 1} base',
+                          'x1': xf, 'y1': ys[t], 'x2': xb, 'y2': ys[t]})
+            for k in range(K):
+                y = ys[t] + 0.3 + 0.6 * k
+                jrows.append({'label': f'T{t + 1}C{k + 1}',
+                              'x1': xf, 'y1': y, 'x2': xb, 'y2': y})
+        for j in jrows:
+            # Adhesion 0 and the block's own friction. Neither Leshchinsky & Han
+            # nor the vendor .fez states a block-on-block interface strength, so
+            # the blocks' own phi is used and the page says so.
+            j.update(c=0.0, phi=34.0, t_cut=0.0, kn=1.0e5, ks=1.0e5, jred='')
+    sd['joint_lines'] = jrows
     if water:
         # water table 3 m above the foundation soil (hw = 3): flat piezometric
         # line at y = 9 plus the 3-m pond standing against the lower tier
@@ -2932,6 +2984,45 @@ def vp091():
 # the facing. See xslope_private/reports/campaign_joints_2026-09/r4_corpus.md.
 # ---------------------------------------------------------------------------
 
+def vp087_fem():
+    """RS2-48 — the baseline wall as a jointed dry stack, for the SSRM row.
+
+    The sheets run from the block columns' back faces on their vendor interfaces,
+    the facing is a stack of elastic blocks on frictional joints, and the mesh is
+    split along every one of them. See :func:`_lh_wall_slope_data`.
+    """
+    sd = _lh_wall_slope_data(joint=True)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp087_fem.xlsx'))
+    return 'vp087_fem.xlsx'
+
+
+def vp088_fem():
+    """RS2-49 — fill quality (phi = 25, Ta = 22), jointed dry stack."""
+    sd = _lh_wall_slope_data(fill=(0.0, 25.0), ta_of=lambda i, n: 22.0, joint=True)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp088_fem.xlsx'))
+    return 'vp088_fem.xlsx'
+
+
+def vp089_fem():
+    """RS2-50 — reinforcement length (L = 4.2, Ta = 11.4), jointed dry stack."""
+    sd = _lh_wall_slope_data(L=4.2, ta_of=lambda i, n: 11.4, joint=True)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp089_fem.xlsx'))
+    return 'vp089_fem.xlsx'
+
+
+def vp090_fem():
+    """RS2-51 — two geotextile grades, jointed dry stack.
+
+    Vendor `#051` gives the lower seven sheets Ks = 10 000 against the upper
+    eight's 100 000, which is the one thing that distinguishes this variant's
+    interfaces from the family's.
+    """
+    sd = _lh_wall_slope_data(ta_of=lambda i, n: 11.0 if i < 7 else 7.5, joint=True,
+                             ks_of=lambda i, n: 1.0e4 if i < 7 else 1.0e5)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp090_fem.xlsx'))
+    return 'vp090_fem.xlsx'
+
+
 def vp091_fem():
     """RS2-52 — the weak-foundation wall as RS2 models it, for the SSRM row.
 
@@ -2942,11 +3033,33 @@ def vp091_fem():
     dimension the answer is most sensitive to, so the two models are kept apart rather
     than sharing one file.
     """
-    sd = _lh_wall_slope_data(fnd=(0.0, 18.0))
+    sd = _lh_wall_slope_data(fnd=(0.0, 18.0), joint=True)
     # Inert for a strength-reduction run; the family's default seed is kept so the file
     # still opens as a complete model.
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp091_fem.xlsx'))
     return 'vp091_fem.xlsx'
+
+
+def vp092_fem():
+    """RS2-53 — water (piezo at y = 9 with a 3 m pond, Ta = 9.25), jointed dry stack."""
+    sd = _lh_wall_slope_data(ta_of=lambda i, n: 9.25, water=True, joint=True)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp092_fem.xlsx'))
+    return 'vp092_fem.xlsx'
+
+
+def vp093_fem():
+    """RS2-54 — 20 kPa crest surcharge (Ta = 10.0), jointed dry stack."""
+    sd = _lh_wall_slope_data(ta_of=lambda i, n: 10.0, surcharge=20.0, joint=True)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp093_fem.xlsx'))
+    return 'vp093_fem.xlsx'
+
+
+def vp094_fem():
+    """RS2-55 — five 1.8 m tiers offset 0.6 m (Ta = 10.1), jointed dry stack."""
+    sd = _lh_wall_slope_data(n_tiers=5, tier_h=1.8, offset=0.6,
+                             ta_of=lambda i, n: 10.1, joint=True)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp094_fem.xlsx'))
+    return 'vp094_fem.xlsx'
 
 
 def vp092():
@@ -5265,8 +5378,9 @@ BUILDERS = [
     vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a,
     vp072b, vp073, vp074, vp075, vp076a, vp076b, vp077a, vp077b, vp078, vp078b, vp078c,
     vp079, vp080a, vp080b, vp081, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d,
-    vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp091_fem, vp092, vp093,
-    vp094, vp096, vp097, vp098, vp099, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c,
+    vp085a, vp085b, vp086, vp087, vp087_fem, vp088, vp088_fem, vp089, vp089_fem,
+    vp090, vp090_fem, vp091, vp091_fem, vp092, vp092_fem, vp093, vp093_fem,
+    vp094, vp094_fem, vp096, vp097, vp098, vp099, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c,
     vp103d, vp104a, vp104b, vp106a, vp106b, vp106c, vp106d, vp106e, vp107a, vp107b, vp108a,
     vp108b, vp109,
 ]

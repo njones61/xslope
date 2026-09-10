@@ -393,7 +393,6 @@ VENDOR_T_CUT = {
     'vp091_fem.xlsx': {
         'Reinforced and retained fill': 0.0,
         'Foundation soil': 0.0,
-        'Blocks': 2.5,
     },
     # RS2-49 through RS2-55 — the seven parametric variants of the Leshchinsky & Han
     #   multi-tiered wall, vendor models 'slope stability #049.fez' through '#055.fez'
@@ -421,6 +420,37 @@ VENDOR_T_CUT = {
         'Reinforced and retained fill': 0.0,
         'Foundation soil': 10.0,
         'Blocks': 2.5,
+    },
+    # The strength-reduction siblings, built as the paper's dry stack. The soils'
+    # caps are the vendor's, transcribed unchanged; the facing carries none,
+    # because on those files it is elastic and cannot yield in any mode.
+    'vp087_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+    },
+    'vp088_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+    },
+    'vp089_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+    },
+    'vp090_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+    },
+    'vp092_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+    },
+    'vp093_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+    },
+    'vp094_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
     },
     # RS2-52's LEM/figure file. #052 gives the weak foundation c = 0, so its T = 0 too
     # — the same row vp091_fem carries above, on the 30 m section.
@@ -1181,6 +1211,43 @@ VENDOR_E_NU = {
         'Blocks': (0.4, 50000.0),
     },
     'vp090.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    # The strength-reduction siblings carry the same pair on all three materials;
+    # the facing is elastic there, and this is the modulus it is elastic at.
+    'vp087_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp088_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp089_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp090_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp092_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp093_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp094_fem.xlsx': {
         'Reinforced and retained fill': (0.4, 50000.0),
         'Foundation soil': (0.4, 50000.0),
         'Blocks': (0.4, 50000.0),

@@ -24,6 +24,7 @@ open its editor:
 | **Failure surfaces** | Circles (center, radius/depth/intercept) or the non-circular surface (vertex table). |
 | **Distributed loads** | The two distributed-load sets, each load with its direction. |
 | **Reinforcement** | Reinforcement lines (rebuilt into the engine's display format). |
+| **Joints** | Joint lines — slip surfaces with no reinforcement in them (FEM only). |
 | **Line loads** | Concentrated line loads (force per unit width) on the ground surface. |
 | **Piles** | Pile lines. |
 | **Seepage BC** | Specified-head lines, specified-flux lines, and exit faces (two BC sets). |
@@ -258,6 +259,23 @@ Table view lays every column out at once — the bulk-entry path for the fifteen
 lines of a tiered wall:
 
 ![Reinforcement editor (table view)](images/editing_reinforcement_table.png)
+
+**Joints** are the lines the finite element mesh splits along that carry no
+reinforcement — a rock joint, a bedding plane, a block-on-block contact, the back
+of a wall against the soil. Their fields group as **Identity**, **Geometry**,
+**Strength** (c, phi and the tension cutoff the joint parts at) and **Stiffness**
+(kn, ks and the Jred switch that decides whether a strength reduction reduces the
+joint with the soil). The preview draws each line the way the section does, dark
+and dashed with short ticks on both sides, with the selected one emphasized:
+
+![Joints editor (list view)](images/editing_joints_editor.png)
+
+A reinforcement line that is *also* a slip surface stays in the reinforcement
+editor with its **Joint** column set, so that the sheet between the two faces is
+still there; this editor is for the lines that have nothing between them. Blank kn
+and ks are derived from the adjacent soil. Every column is FEM only — the limit
+equilibrium engines do not read the sheet — so the LEM toggle leaves the table
+empty.
 
 **Piles** group their fields as **Identity**, **Geometry**, **Capacity / design**
 (H, D, S, Vcap, Mcap, and the FEM E/I/Area), and **Behavior** — the **Appl** dropdown chooses how

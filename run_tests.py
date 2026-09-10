@@ -8009,6 +8009,13 @@ MODULE_CHECKS = {
         "the pullout law. It used to reach it as the LEM tension-distribution "
         "point list, so filling in Adhesion and Delta — a statement about bond "
         "strength — re-meshed the model and moved the factor of safety."),
+    'assistant_docs_answers': (
+        'assistant_docs_questions_check.py',
+        "Six capability questions asked of the live assistant and recorded: "
+        "every answer must have searched the documentation and must cite a page "
+        "that documents the feature. What it holds is the measured behavior — "
+        "the assistant denied line loads, and prose in a prompt is not proof "
+        "that it stopped."),
     'docs_index_sync': (
         'docs_index_sync_check.py',
         "The documentation the Studio assistant searches ships as a generated "
@@ -13931,7 +13938,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'reinforce_mesh_geometry': 2,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
-              'docs_index_sync': 3,
+              'docs_index_sync': 3, 'assistant_docs_answers': 2,
               'circle_vertex': 2,
               'circle_above_center': 2}
 
@@ -14819,6 +14826,12 @@ def main():
         tests.append({'type': 'docs_index_sync',
                       'file': 'xslope/resources/docs_index.json',
                       'method': '-', 'source': 'docs_index_sync'})
+        # What the live assistant actually answered to six capability questions,
+        # read back from the recorded transcripts. Offline and free; re-record
+        # with tools/assistant_docs_questions.py (that part is billed).
+        tests.append({'type': 'assistant_docs_answers',
+                      'file': 'recorded capability answers (docs search)',
+                      'method': '-', 'source': 'assistant_docs_answers'})
         # Guard that a K0 initial stress named on a test tag is also DECLARED by
         # the model file (main!D16). The tag passes K0 as a solver keyword; the
         # file's cell reaches the same solver parameter. If only the tag carries

@@ -1,0 +1,3 @@
+# Dock grabs the capture harness always writes. Nothing reads them — the
+# transcripts beside this file are the evidence — so they stay out of the repo.
+_grabs/

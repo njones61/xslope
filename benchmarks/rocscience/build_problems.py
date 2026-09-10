@@ -2900,7 +2900,17 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
         sd['dloads'] = [[{'X': faces[-1] + 0.3, 'Y': ftop + H, 'Normal': surcharge},
                          {'X': 24.0, 'Y': ftop + H, 'Normal': surcharge}]]
     sd['circular'] = True
-    sd['circles'] = [{'Xo': -5.713, 'Yo': 20.432, 'Depth': 20.432 - 18.547, 'R': 18.547}]
+    if joint:
+        # The dry-stack facing is elastic and cannot fail, so no surface may pass
+        # through it — which is what the family's printed Slide2 circle does. The
+        # seed here is a deep circle beneath the wall, through the foundation: the
+        # bearing surface, the one mechanism a limit-equilibrium run of THIS model
+        # can describe. It is inert for the strength reduction the file exists for,
+        # and it lets the file open as a complete model.
+        sd['circles'] = [{'Xo': 7.0, 'Yo': 24.0, 'Depth': 5.0, 'R': 19.0}]
+    else:
+        sd['circles'] = [{'Xo': -5.713, 'Yo': 20.432, 'Depth': 20.432 - 18.547,
+                          'R': 18.547}]
     sd['non_circ'] = []
     return sd
 
@@ -3034,8 +3044,6 @@ def vp091_fem():
     than sharing one file.
     """
     sd = _lh_wall_slope_data(fnd=(0.0, 18.0), joint=True)
-    # Inert for a strength-reduction run; the family's default seed is kept so the file
-    # still opens as a complete model.
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp091_fem.xlsx'))
     return 'vp091_fem.xlsx'
 

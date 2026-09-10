@@ -217,19 +217,19 @@ SIDECAR_STEM = {
     'RS2-40-seep': 'vp077a_ssrm',
     'RS2-66a-deep': 'rs2_66a_deep',
     # The geotextile wall family. The strength reduction runs on the `_fem`
-    # siblings (vp087_fem…vp094_fem, the jointed dry stack) while the LEM circles
-    # stay on vp087…vp094, and each benchmark's field keeps the stem the corpus
-    # already ships it under — vp088_fem_nodes.csv is RS2-49's field either way.
-    # Without the override the stem would double the suffix (vp088_fem_fem_…) and
-    # orphan the committed pair.
-    'RS2-48': 'vp087',
-    'RS2-49': 'vp088',
-    'RS2-50': 'vp089',
-    'RS2-51-wall': 'vp090',
-    'RS2-52': 'vp091',
-    'RS2-53': 'vp092',
-    'RS2-54': 'vp093',
-    'RS2-55': 'vp094',
+    # siblings (vp087_fem…vp094_fem, the jointed dry stack) and the limit
+    # equilibrium circles stay on vp087…vp094, so the two need separate stems:
+    # the plain one would put the jointed mesh into vp088_mesh.json, which is the
+    # LEM file's own mesh companion, and the file's own stem would double the
+    # suffix (vp088_fem_fem_…).
+    'RS2-48': 'vp087_ssrm',
+    'RS2-49': 'vp088_ssrm',
+    'RS2-50': 'vp089_ssrm',
+    'RS2-51-wall': 'vp090_ssrm',
+    'RS2-52': 'vp091_ssrm',
+    'RS2-53': 'vp092_ssrm',
+    'RS2-54': 'vp093_ssrm',
+    'RS2-55': 'vp094_ssrm',
     'RS2-P4-VP68-zone': 'vp068_zone',
     'RS2-P4-VP102-t-300-c2': 'vp102t_300_c2',
     'RS2-P4-VP102-t-1500-c3': 'vp102t_1500_c3',

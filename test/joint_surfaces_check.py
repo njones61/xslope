@@ -121,9 +121,16 @@ def _leg_wiring(failures, cache):
                         f"flagged lines {JOINTED}")
     else:
         for k in JOINTED:
-            if set(got[k]) != {"tend1", "tend2"}:
+            # A reinforcement line flagged Joint carries its end anchorages and
+            # says it HAS a bar; the joints sheet's own lines say the opposite.
+            if set(got[k]) != {"tend1", "tend2", "bar"}:
                 failures.append(f"line {k}'s options are {sorted(got[k])}, not "
-                                f"the end anchorages the mesher reads")
+                                f"the end anchorages and the bar flag the mesher "
+                                f"reads")
+            elif got[k].get("bar") is not True:
+                failures.append(f"line {k} is a reinforcement line flagged Joint "
+                                f"and must carry a bar; its option says "
+                                f"{got[k].get('bar')!r}")
 
     plain = _model(jointed=())
     if extract_joint_options(plain) is not None:

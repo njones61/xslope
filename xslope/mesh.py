@@ -3294,6 +3294,34 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
                         bar_idx=bar_idx, bars=bars, stations=set(ordered),
                         first_edge=first_edge)
 
+    # Two jointed lines that meet must SHARE a node there. The mesher splits both
+    # curves at the meeting point so gmsh has to place one, but a mesh that came
+    # from somewhere else — or a recovery that failed quietly — would leave two
+    # curves passing through each other, and the split would then tear each line
+    # along a mesh that is not conforming at the crossing. Checked, not assumed.
+    if len(opts) > 1:
+        idx = sorted(opts)
+        for _a in range(len(idx)):
+            for _b in range(_a + 1, len(idx)):
+                li, lj = idx[_a], idx[_b]
+                cross = line_segment_intersection(
+                    tuple(lines[li][0][:2]), tuple(lines[li][-1][:2]),
+                    tuple(lines[lj][0][:2]), tuple(lines[lj][-1][:2]))
+                if cross is None:
+                    continue
+                cx, cy = float(cross[0]), float(cross[1])
+                for lk in (li, lj):
+                    hit = any(abs(nodes[n][0] - cx) <= tol
+                              and abs(nodes[n][1] - cy) <= tol
+                              for n in info[lk]['ordered'])
+                    if not hit:
+                        raise ValueError(
+                            f"Jointed constraint lines {li + 1} and {lj + 1} meet "
+                            f"at ({cx:g}, {cy:g}), but line {lk + 1} has no mesh "
+                            "node there: the two curves cross without sharing a "
+                            "node, and a split along either of them would tear a "
+                            "mesh that is not conforming at the crossing.")
+
     # ---- 2. the joint edges: the mesh edges a jointed line runs along ----------
     joint_edge = {}
     for li in sorted(opts):

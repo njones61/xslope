@@ -78,7 +78,9 @@ if _ROOT not in sys.path:
 
 import numpy as np
 
-from xslope.mesh import (JOINT_MESH_KEYS, add_intersection_points_to_polygons,
+from xslope.mesh import (JOINT_MESH_KEYS, JOINT_SIDE_WHOLE,
+                         add_intersection_points_to_polygons,
+                         barless_joint_line_ids,
                          build_mesh_from_polygons, export_mesh_to_json,
                          extract_constraint_line_geometry,
                          extract_point_constraints, extract_size_regions,
@@ -286,6 +288,80 @@ def _leg_a(failures):
         base = _build([{'coords': list(ring), 'mat_id': 0}], [line], et)
         mesh = _build([dict(p) for p in polys], [line], et, joint_lines=[0])
         counts[et] = _check_split(base, mesh, line, f"a/{et}", failures)
+    return counts
+
+
+def _leg_j(failures):
+    """The same horizontal sheet, BAR-LESS: one interface element, not two.
+
+    A line off the ``joints`` sheet has nothing between its faces, so a station
+    carries two coincident nodes rather than three, its ``joints`` record says
+    ``bar: False``, its station triple's middle slot is -1, and one joint element
+    spans each mesh edge instead of a pair. The counts are checked against leg
+    a's, which is the same geometry with a bar.
+    """
+    ring = [(0, 0), (20, 0), (20, 10), (0, 10)]
+    line = [(5.0, 5.0), (15.0, 5.0)]
+    counts = {}
+    for et in ('tri3', 'tri6'):
+        base = _build([{'coords': list(ring), 'mat_id': 0}], [line], et)
+        barred = _build([{'coords': list(ring), 'mat_id': 0}], [line], et,
+                        joint_lines=[0])
+        mesh = _build([{'coords': list(ring), 'mat_id': 0}], [line], et,
+                      joint_lines={0: {'bar': False}})
+        tag = f"j/{et}"
+        rec = (mesh.get('joints') or [None])[0]
+        if rec is None:
+            failures.append(f"{tag}: the mesh carries no 'joints' record")
+            continue
+        if rec.get('bar', True) is not False:
+            failures.append(f"{tag}: the line's record does not say bar: False")
+        stations = rec['stations']
+        n = len(stations)
+        counts[et] = n
+        if any(int(st[1]) != -1 for st in stations):
+            failures.append(f"{tag}: a station's middle slot is not -1 on a "
+                            f"line with no bar")
+        # One copy per station instead of two: the bar's own node is not made,
+        # and the two soil faces are still separate everywhere but at the tips.
+        added = len(mesh['nodes']) - len(base['nodes'])
+        if added != n - 2:
+            failures.append(f"{tag}: {n} stations added {added} nodes, not "
+                            f"{n - 2} (one copy per interior station; the two "
+                            f"faces rejoin at a buried tip)")
+        if len(mesh['elements_joint']) != len(barred['elements_joint']) // 2:
+            failures.append(
+                f"{tag}: {len(mesh['elements_joint'])} joint elements against "
+                f"{len(barred['elements_joint'])} on the same line with a bar; "
+                f"one element per span, not a pair")
+        sides = np.asarray(mesh['element_side_joint'])
+        if set(sides.tolist()) != {JOINT_SIDE_WHOLE}:
+            failures.append(f"{tag}: the side markers are {sorted(set(sides.tolist()))}, "
+                            f"not all {JOINT_SIDE_WHOLE}")
+        if mesh.get('ties'):
+            failures.append(f"{tag}: a line with no bar reported {len(mesh['ties'])} "
+                            f"tie(s); there is nothing to tie")
+        nodes = np.asarray(mesh['nodes'], dtype=float)
+        for k, (up, bar, low) in enumerate(stations):
+            if not np.allclose(nodes[up][:2], nodes[low][:2]):
+                failures.append(f"{tag}: station {k}'s two copies are not at "
+                                f"one point")
+            tip = k in (0, n - 1)
+            if tip and up != low:
+                failures.append(f"{tag}: station {k} is a buried tip but its "
+                                f"two faces are separate nodes")
+            if not tip and up == low:
+                failures.append(f"{tag}: station {k} is interior but its two "
+                                f"faces share a node")
+        # The bar-less line's 1D elements are still there — the curve the split
+        # ran along — and the mesher's own reading of which lines have no bar
+        # comes off the record, not off a key of its own.
+        if barless_joint_line_ids(mesh) != {1}:
+            failures.append(f"{tag}: barless_joint_line_ids read "
+                            f"{barless_joint_line_ids(mesh)}, not {{1}}")
+        if barless_joint_line_ids(barred):
+            failures.append(f"{tag}: the barred mesh reported a bar-less line")
+        _roundtrip(mesh, tag, failures)
     return counts
 
 
@@ -696,6 +772,7 @@ def main():
     g = _leg_g(failures)
     h = _leg_h(failures)
     i_ends, i_wall = _leg_i(failures)
+    j = _leg_j(failures)
 
     if not failures:
         print(f"a: horizontal sheet, {a['tri3']} stations on tri3 / "
@@ -716,6 +793,8 @@ def main():
               f"{h['tri3']} / {h['tri6']} stations")
         print(f"i: sheet ending on a material boundary, {i_ends['tri3']} / "
               f"{i_ends['tri6']} stations")
+        print(f"j: the same sheet with no bar, {j.get('tri3')} / {j.get('tri6')} "
+              f"stations, one interface element per span")
         if i_wall:
             print(f"i: {os.path.basename(WALL_MODEL)} with all fifteen sheets "
                   f"flagged, {i_wall[2]} stations, {i_wall[0]} -> {i_wall[1]} "

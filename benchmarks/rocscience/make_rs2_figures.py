@@ -115,8 +115,8 @@ TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 # baseline's narrow one, because the family spans 0.74–1.16.
 #
 _WALL = dict(element_type='tri6', target_size='1.0', tolerance='0.02',
-             f_min='0.5', f_max='3.0', max_iter='16000',
-             tension_srf='false', k0='1')
+             f_min='0.5', f_max='3.0', max_iter='30000',
+             tension_srf='false', k0='1', ssr_exclude='Blocks')
 
 EXTRA_CASES = [
     # RS2 Part IV VP65: solves and brackets, reported rather than locked (its factor
@@ -126,13 +126,14 @@ EXTRA_CASES = [
      'element_type': 'tri6', 'target_size': '6.0', 'tolerance': '0.02',
      'f_min': '1.4', 'f_max': '2.8', 'max_iter': '16000',
      'tension_srf': 'true', 'k0': '1'},
-    {**_WALL, 'file': 'files/rocscience/vp088.xlsx', 'benchmark': 'RS2-49'},
-    {**_WALL, 'file': 'files/rocscience/vp089.xlsx', 'benchmark': 'RS2-50'},
-    {**_WALL, 'file': 'files/rocscience/vp090.xlsx', 'benchmark': 'RS2-51-wall'},
-    {**_WALL, 'file': 'files/rocscience/vp091.xlsx', 'benchmark': 'RS2-52'},
-    {**_WALL, 'file': 'files/rocscience/vp092.xlsx', 'benchmark': 'RS2-53'},
-    {**_WALL, 'file': 'files/rocscience/vp093.xlsx', 'benchmark': 'RS2-54'},
-    {**_WALL, 'file': 'files/rocscience/vp094.xlsx', 'benchmark': 'RS2-55'},
+    {**_WALL, 'file': 'files/rocscience/vp087_fem.xlsx', 'benchmark': 'RS2-48'},
+    {**_WALL, 'file': 'files/rocscience/vp088_fem.xlsx', 'benchmark': 'RS2-49'},
+    {**_WALL, 'file': 'files/rocscience/vp089_fem.xlsx', 'benchmark': 'RS2-50'},
+    {**_WALL, 'file': 'files/rocscience/vp090_fem.xlsx', 'benchmark': 'RS2-51-wall'},
+    {**_WALL, 'file': 'files/rocscience/vp091_fem.xlsx', 'benchmark': 'RS2-52'},
+    {**_WALL, 'file': 'files/rocscience/vp092_fem.xlsx', 'benchmark': 'RS2-53'},
+    {**_WALL, 'file': 'files/rocscience/vp093_fem.xlsx', 'benchmark': 'RS2-54'},
+    {**_WALL, 'file': 'files/rocscience/vp094_fem.xlsx', 'benchmark': 'RS2-55'},
 ]
 
 

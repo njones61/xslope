@@ -114,8 +114,13 @@ def _material(name, **kw):
 
 
 def _finish(d, polys_and_ids, domain, ground, y_bottom, materials, line,
-            cj, phi_j, ts, s1d, kn=None, ks=None, jred='yes', tend1=0.0):
-    """Common tail: install the geometry and the jointed line, mesh, build."""
+            cj, phi_j, ts, s1d, kn=None, ks=None, jred='yes', tend1=0.0,
+            barless=False):
+    """Common tail: install the geometry and the jointed line, mesh, build.
+
+    ``barless=True`` puts the line on the ``joints`` sheet instead of the
+    reinforce sheet: the same interface strength with no bar between the two
+    faces, which is one element per span rather than a pair in series."""
     d['unit_system'] = 'metric'
     d['gamma_water'] = 9.81
     d['profile_lines'] = []
@@ -128,18 +133,32 @@ def _finish(d, polys_and_ids, domain, ground, y_bottom, materials, line,
     d['piezo_line'] = []
     d['piezo_phreatic'] = False
     d['materials'] = materials
-    d['reinforcement_lines'] = [dict(
-        label='joint', x1=line[0][0], y1=line[0][1], x2=line[1][0], y2=line[1][1],
-        t_max=1.0e6, t_res=float('nan'), lp1=0.0, lp2=0.0, tend1=0.0, tend2=0.0,
-        E=2.0e5, area=1.0e-5, spacing=None, adhesion=cj, delta=phi_j,
-        kn=kn, ks=ks, jred=jred)]
-    d['reinforcement_lines'][0]['tend1'] = tend1
-    d['reinforce_lines'] = build_reinforce_lines(d['reinforcement_lines'])
     d['pile_lines'] = []
+    d['joint_lines'] = []
+    if barless:
+        d['reinforcement_lines'] = []
+        d['reinforce_lines'] = []
+        d['joint_lines'] = [dict(
+            label='joint', x1=line[0][0], y1=line[0][1],
+            x2=line[1][0], y2=line[1][1],
+            c=cj, phi=phi_j, t_cut=0.0,
+            kn=float('nan') if kn is None else kn,
+            ks=float('nan') if ks is None else ks, jred=jred)]
+    else:
+        d['reinforcement_lines'] = [dict(
+            label='joint', x1=line[0][0], y1=line[0][1], x2=line[1][0], y2=line[1][1],
+            t_max=1.0e6, t_res=float('nan'), lp1=0.0, lp2=0.0, tend1=0.0, tend2=0.0,
+            E=2.0e5, area=1.0e-5, spacing=None, adhesion=cj, delta=phi_j,
+            kn=kn, ks=ks, jred=jred)]
+        d['reinforcement_lines'][0]['tend1'] = tend1
+        d['reinforce_lines'] = build_reinforce_lines(d['reinforcement_lines'])
     lines, _n_r, _n_p = extract_constraint_line_geometry(d)
     polys = get_material_polygons(d, reinf_lines=lines)
     with contextlib.redirect_stdout(io.StringIO()):
-        joint_lines = {0: {'tend1': tend1}} if tend1 else [0]
+        if barless:
+            joint_lines = {0: {'bar': False}}
+        else:
+            joint_lines = {0: {'tend1': tend1}} if tend1 else [0]
         mesh = build_mesh_from_polygons(polys, target_size=ts, element_type='tri6',
                                         lines=lines, element_size_1d=s1d,
                                         joint_lines=joint_lines)
@@ -155,7 +174,8 @@ def _finish(d, polys_and_ids, domain, ground, y_bottom, materials, line,
 
 def slab_model(beta=20.0, HV=3.0, X1=36.0, XA=6.0, XB=30.0, YB=-6.0, VD=1.0,
                ts=1.5, s1d=1.0, phi_j=30.0, cj=0.0, E_void=0.1,
-               k_seismic=0.0, kn=None, ks=None, jred='yes', k_scale=1.0):
+               k_seismic=0.0, kn=None, ks=None, jred='yes', k_scale=1.0,
+               barless=False):
     """A slab of vertical thickness ``HV`` on a jointed plane at ``beta``.
 
     The plane runs the full width; the slab is the soil between ``XA`` and
@@ -178,7 +198,8 @@ def slab_model(beta=20.0, HV=3.0, X1=36.0, XA=6.0, XB=30.0, YB=-6.0, VD=1.0,
     domain = Polygon([(0.0, HV), (X1, y(X1) + HV), (X1, YB), (0.0, YB)])
     ground = LineString([(0.0, HV), (X1, y(X1) + HV)])
     d, mesh, fem_data = _finish(d, ids, domain, ground, YB, mats, line,
-                                cj, phi_j, ts, s1d, kn=kn, ks=ks, jred=jred)
+                                cj, phi_j, ts, s1d, kn=kn, ks=ks, jred=jred,
+                                barless=barless)
     fem_data['k_seismic'] = k_seismic
     if k_scale != 1.0:
         jd = fem_data['joint_data']
@@ -425,6 +446,60 @@ def _leg_incline(failures, results, k_scale=1.0, quiet=False, criterion=None,
         results.append(f"row 2  SSRM FS = {FS:.4f} vs tan phi_j / tan beta = "
                        f"{expected:.4f}  ({100*err:+.2f}%)")
     return FS
+
+
+def _leg_incline_barless(failures, results, barred_fs=None):
+    """The same block on the same plane, with the joint taken off the joints
+    sheet: one interface element between the two faces instead of a pair.
+
+    Two readings. Against the closed form the bar-less build sits a little higher
+    than the barred one, and the reason is stated rather than absorbed: a pair of
+    interfaces acts in SERIES, so a sheet's two joints carry half the stated
+    stiffness between the soil above and the soil below, where a single contact
+    carries it once. Halving the bar-less line's stiffness therefore has to
+    reproduce the barred build's factor exactly — which is the check that says
+    the element is the same element, and that the only difference between the two
+    constructions is the one the mesh makes.
+    """
+    T = math.tan(math.radians(ROW2['beta']))
+    expected = math.tan(math.radians(ROW2['phi_j'])) / T
+
+    _d, fd, _g = slab_model(**dict(ROW2, barless=True))
+    jd = fd['joint_data']
+    sides = sorted(set(int(v) for v in jd['side']))
+    if sides != [2]:
+        failures.append(f"row 2 (no bar): the joint elements carry side markers "
+                        f"{sides}, not [2] — the whole interface")
+    _db, fdb, _gb = slab_model(**dict(ROW2))
+    if jd['n'] * 2 != fdb['joint_data']['n']:
+        failures.append(f"row 2 (no bar): {jd['n']} joint elements against "
+                        f"{fdb['joint_data']['n']} on the same line with a bar; "
+                        f"one element per span, not a pair")
+    FS = _ssrm(fd, F_min=1.0, F_max=2.5, tolerance=0.005).get('FS')
+    if FS is None:
+        failures.append("row 2 (no bar): the strength reduction returned no "
+                        "factor of safety")
+        return
+    err = (FS - expected) / expected
+    if abs(err) > 0.05:
+        failures.append(f"row 2 (no bar): the strength reduction returns "
+                        f"FS = {FS:.4f} against tan phi_j / tan beta = "
+                        f"{expected:.4f} ({100*err:+.2f}%)")
+    results.append(f"row 2  no bar: SSRM FS = {FS:.4f} vs tan phi_j / tan beta "
+                   f"= {expected:.4f}  ({100*err:+.2f}%)")
+
+    if barred_fs is None:
+        return
+    _d2, fd2, _g2 = slab_model(**dict(ROW2, barless=True, k_scale=0.5))
+    FS_half = _ssrm(fd2, F_min=1.0, F_max=2.5, tolerance=0.005).get('FS')
+    if FS_half is None or abs(FS_half - barred_fs) > 0.01:
+        failures.append(
+            f"row 2 (no bar): at half the stiffness the single interface reads "
+            f"{FS_half} where the bar's pair in series reads {barred_fs:.4f}; "
+            f"the two constructions must differ only in that series")
+    else:
+        results.append(f"row 2  no bar at half stiffness: FS = {FS_half:.4f}, "
+                       f"the bar's pair in series to the digit")
 
 
 # --------------------------------------------------------------------------
@@ -790,7 +865,8 @@ def run():
     failures, results = [], []
     t0 = time.time()
     _leg_goodman(failures, results)
-    _leg_incline(failures, results)
+    _barred_fs = _leg_incline(failures, results)
+    _leg_incline_barless(failures, results, barred_fs=_barred_fs)
     _leg_pullout(failures, results)
     _leg_infinite(failures, results)
     _leg_opening_and_ties(failures, results)

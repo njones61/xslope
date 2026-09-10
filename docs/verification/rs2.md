@@ -1723,10 +1723,20 @@ without a lock.
 
 #### 🔴 RS2-52: Geotextile wall, weak foundation (vp091_fem) {#rs2-52}
 
-The foundation is c = 0, φ = 18°, and the wall fails in bearing rather than through the reinforced
-mass — the lowest factor in the family for all three codes. XSLOPE brackets a factor and holds it
-under a refinement step, well below both published ones. What the three agree on is the mechanism;
-the size of the gap is what the row records.
+The foundation is c = 0, φ = 18°, and this is the lowest factor in the family for all three codes.
+XSLOPE brackets a factor and holds it under a refinement step, well below both published ones —
+and the two are not measuring the same mechanism. Leshchinsky & Han's referee fails on a
+deep-seated bearing wedge that runs from the crest down through the reinforced mass, turns under
+the toe and daylights several meters out in the foundation (their Fig. 6, reproduced as Figure 2
+of the RS2 manual's problem 52). XSLOPE's refusal is local to the toe of the lowest facing column:
+the strain concentrates in a patch under that corner, the foundation beyond it stays elastic, and
+what gives way is the interfaces rather than the soil.
+
+The paper says of this variant that a circle is a poor description of its shear zone, that a
+three-part wedge through the foundation drops Spencer's factor further, that many deeper
+mechanisms exist which would drop it further still, and that FLAC's own critical surface "seems
+somewhat unrealistic as it emerges very steeply" — so the published factor for this case is the
+least settled in the family on its own authors' account.
 
 | XSLOPE SSRM | RS2 SSR | L&H FDM referee |
 |---|---|---|

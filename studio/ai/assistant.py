@@ -214,6 +214,14 @@ the canvas re-renders automatically.
    sheet — a base geotextile, a wall whose fill slides on its sheets — and wrong
    where it cuts across. 'lp1'/'lp2'/'t_res' are not read there. LEM ignores it.)
   # EDIT THIS one; reinforce_lines (capitalized X/Y/T/Tres) is derived from it.
+- joint_lines[i]: {'label','x1','y1','x2','y2','c','phi','t_cut','kn','ks','jred'}
+  (the v27 'joints' sheet: a slip surface with NO reinforcement in it — a rock
+   joint, a bedding plane, a block-on-block contact, a wall-soil interface. Same
+   mesh split and same interface element as a jointed reinforcement line, without
+   a bar between the two faces. 'phi' is required; blank 'c'/'t_cut' are zero;
+   blank 'kn'/'ks' are derived from the adjacent soil; 'jred'='No' holds the joint
+   at full strength in the SSR. Joint lines may MEET at a point but may not lie on
+   one another, or run along the outside of the section. FEM only.)
 - pile_lines[i]: {'x1','y1','x2','y2','D_pile','S','E','I','area','M_cap','V_cap',
   'theta_p','head_fixity','tip_fixity','label','H'}
 - scalars: gamma_water, max_depth (elevation of the hard base — the lowest
@@ -484,7 +492,8 @@ _SOURCE_KEYS = (
     "gamma_water", "tcrack_depth", "tcrack_water", "k_seismic", "max_depth",
     "circular",
     "materials", "profile_lines", "polygons", "circles", "non_circ", "piezo_line",
-    "piezo_line2", "dloads", "dloads2", "reinforcement_lines", "pile_lines",
+    "piezo_line2", "dloads", "dloads2", "reinforcement_lines", "joint_lines",
+    "pile_lines",
     "seepage_bc", "seepage_bc2",
 )
 
@@ -496,7 +505,8 @@ _KEY_LABELS = {
     "materials": "materials", "profile_lines": "profile", "polygons": "polygons",
     "circles": "circles", "non_circ": "non-circular", "piezo_line": "piezo",
     "piezo_line2": "piezo", "dloads": "dloads", "dloads2": "dloads",
-    "reinforcement_lines": "reinforcement", "pile_lines": "piles",
+    "reinforcement_lines": "reinforcement", "joint_lines": "joints",
+    "pile_lines": "piles",
     "seepage_bc": "seep BC", "seepage_bc2": "seep BC",
 }
 
@@ -1089,6 +1099,7 @@ def model_summary_text(slope_data, results=None, name=None):
         lines.append(_water_line(sd))
         lines.append(_surface_line(sd))
         counts = [f"{len(sd.get('reinforcement_lines') or [])} reinforcement line(s)",
+                  f"{len(sd.get('joint_lines') or [])} joint line(s)",
                   f"{len(sd.get('pile_lines') or [])} pile(s)",
                   f"{len(sd.get('line_loads') or [])} line load(s)"]
         lines.append("Loads & structures: " + ", ".join(counts))

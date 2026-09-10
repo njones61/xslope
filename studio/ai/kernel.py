@@ -83,6 +83,9 @@ _FIG_EXTS = (".png", ".pdf", ".svg", ".jpg", ".jpeg")
 #: Parsed corpus index, built once per process (the JSON is ~650 KB).
 _CORPUS_CACHE = None
 
+#: The searchable documentation, built once per process from the shipped index.
+_DOCS_CACHE = None
+
 #: The inputs a geometry resync reads. Compared before and after a snippet to
 #: tell an edit made on the model's OWN geometry source from one made on the
 #: derived copy, which the resync silently overwrites.
@@ -292,6 +295,260 @@ def _corpus_from_skill():
     return (topics, rows) if rows else None
 
 
+# --------------------------------------------------------------------------- #
+# The documentation search
+#
+# A pip install ships no docs/ tree, so the assistant used to answer capability
+# questions ("does xslope support line loads?") out of the model's memory. It
+# answered NO on a capability the template, the loader and six pages carry. The
+# documentation is therefore shipped as an index inside the wheel
+# (xslope/resources/docs_index.json, built by tools/build_docs_index.py) and
+# searched: the answer comes from the installed version's own pages, with the
+# page and anchor to cite.
+# --------------------------------------------------------------------------- #
+
+#: Site the index's relative page paths hang off. The index carries its own copy
+#: (a future docs move changes it there); this is only the fallback.
+_DOCS_BASE_URL = "https://xslope.readthedocs.io/en/latest/"
+
+#: Field weights, as token repetitions. A heading is a title for the section and
+#: says what it is about in five words, so a hit there is worth several in a
+#: thousand-word body; the page title is the next-strongest signal.
+_DOCS_HEADING_WEIGHT = 4
+_DOCS_TITLE_WEIGHT = 2
+
+
+#: Words a question is FRAMED with rather than about. Questions reach this search
+#: as they were asked ("does xslope support line loads?"), and the frame is not
+#: only noise: "does" and "support" carry real weight in a corpus where every page
+#: says "xslope" and a whole section set is about structural SUPPORT. Dropped from
+#: the QUERY only — the documents keep every word, so a query that is nothing but
+#: frame words still matches on whatever is left.
+_DOCS_STOPWORDS = frozenset("""
+a an and any are as at be by can could do does doing done for from has have
+how i in into is it its me my of on or should support supports the there this
+those to use used using was what when where which will with would you your
+xslope""".split())
+
+
+def _docs_tokens(text):
+    import re
+    return re.findall(r"[a-z0-9]+", str(text).lower())
+
+
+def _docs_query_terms(query):
+    """The words of ``query`` that say what it is ABOUT.
+
+    The question frame is dropped, unless dropping it would leave nothing — a
+    query of "support" alone is still a query about support.
+    """
+    toks = [t for t in _docs_tokens(query) if len(t) > 1]
+    kept = [t for t in toks if t not in _DOCS_STOPWORDS]
+    return kept or toks
+
+
+class _DocsSearch:
+    """BM25 over the shipped documentation index.
+
+    One document per documentation SECTION (the unit a reader is sent to: a
+    heading, its anchor, and the prose under it) plus one per input-template
+    sheet (its header row and every label and help-box string on it), so a query
+    naming a column — "Tmax", "Angle", "Depth" — reaches the sheet that has it
+    even where no page spells the word.
+
+    BM25 rather than plain TF-IDF because section lengths span three orders of
+    magnitude here: the verification corpus pages are tables thousands of words
+    long and would otherwise swamp a four-line section that answers the question
+    exactly. k1 = 1.2, b = 0.75 (the standard pair). A phrase match — the query
+    as typed, appearing in the heading or the body — is scored on top, since
+    "line loads" as two independent tokens matches half the load documentation
+    and as a phrase matches the sections that are about them.
+    """
+
+    K1 = 1.2
+    B = 0.75
+    HEADING_PHRASE_BONUS = 6.0
+    BODY_PHRASE_BONUS = 2.5
+
+    def __init__(self, index, bodies):
+        import math
+
+        self.base_url = index.get("base_url") or _DOCS_BASE_URL
+        self.docs = []
+        for page in index.get("pages") or []:
+            for sec in page.get("sections") or []:
+                start = int(sec.get("offset") or 0)
+                text = bodies[start:start + int(sec.get("length") or 0)]
+                self.docs.append({
+                    "page": page.get("title") or page.get("url", ""),
+                    "url": page.get("url", ""),
+                    "anchor": sec.get("anchor", ""),
+                    "heading": sec.get("heading") or page.get("title") or "",
+                    "text": text,
+                })
+        # The template sheets, each as a document of its own.
+        sheet_sections = {c["sheet"]: c.get("sections") or []
+                          for c in index.get("capabilities") or []}
+        for sheet in (index.get("template") or {}).get("sheets") or []:
+            name = sheet.get("name", "")
+            # The sheet's OWN section on the template page ("Worksheet: lloads"),
+            # not merely the first section there that names it — the structure
+            # table at the top of that page names every sheet.
+            on_page = [s for s in sheet_sections.get(name, [])
+                       if s.get("url", "").startswith("usage/input_template/")]
+            home = next((s for s in on_page
+                         if s.get("heading", "").lower().startswith("worksheet")),
+                        None)
+            if home is None:
+                home = on_page[0] if on_page else {"url": "usage/input_template/",
+                                                   "anchor": ""}
+            body = "\n".join([
+                "Input template worksheet '%s'." % name,
+                "Columns: " + ", ".join(sheet.get("headers") or []),
+                "\n".join(sheet.get("strings") or []),
+            ])
+            self.docs.append({
+                "page": "Input Template",
+                "url": home.get("url", "usage/input_template/"),
+                "anchor": home.get("anchor", ""),
+                "heading": "Worksheet: %s" % name,
+                "text": body,
+            })
+
+        # Term frequencies. The heading and the page title are folded in as
+        # repeated tokens rather than as separate scored fields — same effect,
+        # one pass, and the document length BM25 normalizes by then honestly
+        # includes the weight they were given.
+        self._tf = []
+        self._len = []
+        df = {}
+        for doc in self.docs:
+            toks = (_docs_tokens(doc["heading"]) * _DOCS_HEADING_WEIGHT
+                    + _docs_tokens(doc["page"]) * _DOCS_TITLE_WEIGHT
+                    + _docs_tokens(doc["text"]))
+            counts = {}
+            for tok in toks:
+                counts[tok] = counts.get(tok, 0) + 1
+            self._tf.append(counts)
+            self._len.append(len(toks) or 1)
+            for tok in counts:
+                df[tok] = df.get(tok, 0) + 1
+        n = len(self.docs) or 1
+        self._avglen = sum(self._len) / n
+        self._idf = {t: math.log(1.0 + (n - c + 0.5) / (c + 0.5))
+                     for t, c in df.items()}
+
+    def search(self, query, limit=8):
+        """The best-scoring sections for ``query``, highest first."""
+        import re
+
+        terms = _docs_query_terms(query)
+        if not terms:
+            return []
+        # The phrase is the query with its question frame off, so "does xslope
+        # support line loads?" phrase-matches the sections about line loads.
+        phrase = re.sub(r"\s+", " ", str(query).strip().lower()).strip("?.! ")
+        if len(terms) < len(_docs_tokens(query)):
+            phrase = " ".join(terms)
+        scored = []
+        for i, doc in enumerate(self.docs):
+            tf, length = self._tf[i], self._len[i]
+            score = 0.0
+            for term in terms:
+                f = tf.get(term)
+                if not f:
+                    continue
+                idf = self._idf.get(term, 0.0)
+                score += idf * (f * (self.K1 + 1.0)) / (
+                    f + self.K1 * (1.0 - self.B + self.B * length / self._avglen))
+            if score <= 0.0:
+                continue
+            if len(phrase) > 3:
+                if phrase in doc["heading"].lower():
+                    score += self.HEADING_PHRASE_BONUS
+                elif phrase in doc["text"].lower():
+                    score += self.BODY_PHRASE_BONUS
+            scored.append((score, i))
+        scored.sort(key=lambda pair: (-pair[0], self.docs[pair[1]]["url"],
+                                      self.docs[pair[1]]["anchor"]))
+        return [(s, self.docs[i]) for s, i in scored[:max(1, int(limit))]]
+
+    def section(self, url, anchor=""):
+        """One section by page URL and anchor, or None.
+
+        ``url`` is taken either as the index writes it (``lem/overview/``) or as
+        the site serves it (the full https address), with or without the anchor
+        already on the end.
+        """
+        url = str(url or "").strip()
+        if "#" in url:
+            url, _, tail = url.partition("#")
+            anchor = anchor or tail
+        for prefix in (self.base_url, _DOCS_BASE_URL):
+            if url.startswith(prefix):
+                url = url[len(prefix):]
+        url = url.strip("/")
+        anchor = str(anchor or "").strip().lstrip("#")
+        for doc in self.docs:
+            if doc["url"].strip("/") != url:
+                continue
+            if doc["anchor"] == anchor:
+                return doc
+        return None
+
+    def full_url(self, doc):
+        return self.base_url + doc["url"]
+
+
+def _docs_search():
+    """The documentation search, built once per process (``None`` if unshipped)."""
+    global _DOCS_CACHE
+    if _DOCS_CACHE is None:
+        _DOCS_CACHE = _load_docs_search() or False
+    return _DOCS_CACHE or None
+
+
+def _load_docs_search():
+    import base64
+    import json
+    import lzma
+
+    try:
+        from importlib import resources
+        raw = (resources.files("xslope") / "resources" / "docs_index.json").read_text(
+            encoding="utf-8")
+    except Exception:
+        return None
+    try:
+        index = json.loads(raw)
+        packed = index.get("bodies") or ""
+        if index.get("encoding") == "lzma+base64":
+            bodies = lzma.decompress(base64.b64decode(packed)).decode("utf-8")
+        else:
+            bodies = packed
+        return _DocsSearch(index, bodies)
+    except Exception:
+        return None
+
+
+def _docs_snippet(text, terms, width=320):
+    """A window of ``text`` around the first query term, whitespace collapsed."""
+    import re
+
+    flat = re.sub(r"\s+", " ", text).strip()
+    if len(flat) <= width:
+        return flat
+    low = flat.lower()
+    at = -1
+    for term in terms:
+        at = low.find(term)
+        if at >= 0:
+            break
+    start = 0 if at < 0 else max(0, at - width // 3)
+    end = min(len(flat), start + width)
+    return ("…" if start else "") + flat[start:end].strip() + ("…" if end < len(flat) else "")
+
+
 class PythonKernel:
     def __init__(self, doc, window=None):
         self._doc = doc
@@ -472,6 +729,11 @@ class PythonKernel:
           ``search=False`` solves the surface the model already defines. The
           bundle is attached to the session as ``doc.results['lem_solution']``,
           which is what the report and the result tabs read.
+        - ``docs(query, full=False, limit=8)`` — search THIS install's own
+          documentation (the whole page set ships in the package) and get back
+          the matching sections with the page URL and anchor to cite. The FIRST
+          call for any "does xslope support / can xslope / how do I / where is"
+          question. ``docs_section(url, anchor)`` reads one section in full.
         - ``corpus_index(query=None)`` — verification-corpus rows matching a topic
           or phrase, so a citation is looked up rather than remembered.
         - ``run_seep(bc=1, ...)`` — one steady seepage solve; builds the mesh from
@@ -1731,10 +1993,84 @@ class PythonKernel:
                 print(f"- {r['title']}  [{r['topic']}]\n  {r['url']}")
             return rows
 
+        def docs(query, full=False, limit=8):
+            """Search THIS install's documentation and return the sections found.
+
+            The whole XSLOPE documentation ships inside the package, so a
+            capability question is answered from the pages rather than from
+            memory. Call this FIRST for anything of the form "does xslope
+            support…", "can xslope…", "how do I…", "where is…" — including the
+            ones you are sure of, because being sure is exactly how a supported
+            feature gets denied.
+
+            Returns `[{'page', 'url', 'heading', 'anchor', 'snippet', 'score'}]`,
+            best first, and prints the same. `url` is the page's real address and
+            `anchor` the fragment on it: cite them. `full=True` adds the matched
+            section's whole text under `'text'` — use it when the snippet answers
+            the question only partly. `docs_section(url, anchor)` reads one
+            section directly.
+
+            An empty result is itself an answer, but only a narrow one: it means
+            these words are not in the documentation, not that xslope lacks the
+            feature. Try the plain engineering term before concluding anything.
+            """
+            search = _docs_search()
+            if search is None:
+                print("The documentation index is not available in this install; "
+                      "the pages are at https://xslope.readthedocs.io/en/latest/")
+                return []
+            hits = search.search(query, limit=limit)
+            if not hits:
+                print(f"No documentation section matches {query!r}. Try the plain "
+                      "engineering term (or a template column name) before "
+                      "concluding the feature is missing.")
+                return []
+            terms = _docs_query_terms(query)
+            rows = []
+            for score, doc in hits:
+                row = {"page": doc["page"], "url": search.full_url(doc),
+                       "heading": doc["heading"], "anchor": doc["anchor"],
+                       "snippet": _docs_snippet(doc["text"], terms),
+                       "score": round(float(score), 2)}
+                if full:
+                    row["text"] = doc["text"]
+                rows.append(row)
+            for row in rows:
+                link = row["url"] + ("#" + row["anchor"] if row["anchor"] else "")
+                print(f"- {row['page']} — {row['heading']}  [{row['score']}]\n"
+                      f"  {link}\n  {row['text'] if full else row['snippet']}")
+            return rows
+
+        def docs_section(url, anchor=""):
+            """One documentation section in full, by page URL and anchor.
+
+            Takes the address as `docs()` returned it (either half, or the two
+            joined by `#`). Returns
+            `{'page', 'url', 'heading', 'anchor', 'text'}`, or None when the page
+            or the anchor is not one the shipped documentation has — which is the
+            answer to "is this URL real", so never cite a page this cannot read.
+            """
+            search = _docs_search()
+            if search is None:
+                print("The documentation index is not available in this install.")
+                return None
+            doc = search.section(url, anchor)
+            if doc is None:
+                print(f"No documentation section at {url!r}"
+                      + (f" #{anchor}" if anchor else "")
+                      + " — find it with docs('<topic>').")
+                return None
+            link = search.full_url(doc) + ("#" + doc["anchor"] if doc["anchor"] else "")
+            print(f"{doc['page']} — {doc['heading']}\n{link}\n\n{doc['text']}")
+            return {"page": doc["page"], "url": search.full_url(doc),
+                    "heading": doc["heading"], "anchor": doc["anchor"],
+                    "text": doc["text"]}
+
         return {"run_lem": run_lem, "run_seep": run_seep, "run_fem": run_fem,
                 "run_tseep": run_tseep, "fs_vs_time": fs_vs_time,
                 "transient_solution": transient_solution,
                 "corpus_index": corpus_index,
+                "docs": docs, "docs_section": docs_section,
                 "suggest_elastic": suggest_elastic,
                 "generate_report": generate_report,
                 "resync_geometry": resync_geometry,

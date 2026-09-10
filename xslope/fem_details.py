@@ -241,7 +241,13 @@ def _reinforcement_line_ids(fem_data):
         return []
     if len(mask) != n_1d:
         mask = np.zeros(n_1d, dtype=bool)
-    return sorted(int(v) for v in np.unique(mats[~mask]) if v > 0)
+    # A bar-less joint line's 1D elements are the curve the split ran along, not
+    # a member: the line is listed as an interface and nowhere else.
+    barless = np.asarray(fem_data.get("barless_1d_mask", np.zeros(n_1d, dtype=bool)),
+                         dtype=bool)
+    if len(barless) != n_1d:
+        barless = np.zeros(n_1d, dtype=bool)
+    return sorted(int(v) for v in np.unique(mats[~mask & ~barless]) if v > 0)
 
 
 def _pile_line_indices(fem_data):
@@ -277,9 +283,30 @@ def display_labels(labels, fallback):
             for i, name in enumerate(own)]
 
 
+def _joint_sheet_index(fem_data, line_id):
+    """The ``joints`` sheet row a constraint-line id names, or ``None``.
+
+    The constraint lines run reinforcement, then piles, then the joints sheet, so
+    a line id past the first two blocks is a row of the sheet. ``None`` on a
+    model with no joints sheet, and on any id inside the first two blocks.
+    """
+    lines = (fem_data or {}).get("joint_lines") or []
+    if not lines:
+        return None
+    base = (int(fem_data.get("n_reinforcement_lines", 0) or 0)
+            + int(fem_data.get("n_pile_lines", 0) or 0))
+    i = int(line_id) - base - 1
+    return i if 0 <= i < len(lines) else None
+
+
 def _line_label(fem_data, slope_data, kind, index):
     """The display name of one member, by its own index."""
     if kind == "reinforcement":
+        j = _joint_sheet_index(fem_data, index)
+        if j is not None:
+            names = display_labels(
+                [ln.get("label") for ln in fem_data["joint_lines"]], "Joint")
+            return names[j]
         labels = list(fem_data.get("reinforce_line_labels", None) or [])
         i, fallback = index - 1, "Line"
     else:
@@ -1055,9 +1082,16 @@ def joint_profile(fem_data, solution, line_id, slope_data=None,
         key = "intact"
     status = dict((k, phrase) for k, phrase, _ in JOINT_STATES)[key]
 
-    prof = reinforcement_profile(fem_data, solution, line_id, slope_data,
-                                 field_state=field_state,
-                                 failure_solution=failure_solution)
+    # A bar-less joint has no member between its faces, so there is no tension
+    # profile to draw beside the interface's: the panel carries the interface
+    # alone.
+    if _joint_sheet_index(fem_data, line_id) is None:
+        prof = reinforcement_profile(fem_data, solution, line_id, slope_data,
+                                     field_state=field_state,
+                                     failure_solution=failure_solution)
+        bar_s, bar_T, bar_cap = prof["s"], prof["T"], prof["t_allow"]
+    else:
+        bar_s = bar_T = bar_cap = empty
     return {
         "kind": "joint", "index": int(line_id), "label": label,
         "length": length,
@@ -1067,7 +1101,7 @@ def joint_profile(fem_data, solution, line_id, slope_data=None,
         "slip": np.array([r["slip"] for r in rec]),
         "open": opened_a, "slipping": slipping_a,
         "utilization": util,
-        "bar_s": prof["s"], "bar_T": prof["T"], "bar_cap": prof["t_allow"],
+        "bar_s": bar_s, "bar_T": bar_T, "bar_cap": bar_cap,
         "field_state": state,
         "capture_stop": (capture_stop(solution, failure_solution)
                          if state == "failure" else None),
@@ -1088,8 +1122,12 @@ def _joint_end1(fem_data, line_id, far, other):
     ``dist_end1_1d`` is measured from it, so the two profiles on one panel run
     the same way.
     """
-    lines = (fem_data or {}).get("reinforcement_lines") or []
-    i = int(line_id) - 1
+    j = _joint_sheet_index(fem_data, line_id)
+    if j is not None:
+        lines, i = fem_data["joint_lines"], j
+    else:
+        lines = (fem_data or {}).get("reinforcement_lines") or []
+        i = int(line_id) - 1
     if not (0 <= i < len(lines)):
         return True
     try:

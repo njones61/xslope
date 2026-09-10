@@ -2905,6 +2905,7 @@ _EDITOR_MANAGED_KEYS = {
     "seep_bc": ["seepage_bc", "seepage_bc2"],
     "piles": ["pile_lines"],
     "reinforce": ["reinforcement_lines"],
+    "joints": ["joint_lines"],
     "line_loads": ["line_loads"],
     "profile": ["profile_lines"],
     # The polygon editor also owns the polygon sheet's overlay rows — SSR zones and
@@ -3060,6 +3061,17 @@ def _editor_fixture():
              "t_res": 400.0, "lp1": 0.5, "lp2": 1.0, "E": 1200.0, "area": 0.8,
              "type": "anchor", "dir": "axial", "appl": "passive",
              "tend1": 20.0, "tend2": 22.0, "spacing": 2.5},
+        ],
+        # v27 joints sheet. Two rows, every field set to a distinct non-default
+        # value, and one carrying blank kn/ks so the "derived" reading (NaN, not
+        # zero) has to survive the editor.
+        "joint_lines": [
+            {"label": "bedding plane", "x1": 2.0, "y1": 4.0, "x2": 42.0, "y2": 4.5,
+             "c": 3.5, "phi": 27.5, "t_cut": 1.25,
+             "kn": 120000.0, "ks": 90000.0, "jred": "No"},
+            {"label": "block base", "x1": 5.0, "y1": 11.0, "x2": 9.0, "y2": 11.0,
+             "c": 0.0, "phi": 34.0, "t_cut": 0.0,
+             "kn": float("nan"), "ks": float("nan"), "jred": ""},
         ],
         "pile_lines": [pile(20.0, 20.0, 20.0, 0.0, "passive"),
                        pile(35.0, 20.0, 35.0, 2.0, "active")],
@@ -3369,6 +3381,33 @@ def run_editor_roundtrip_test(test):
     #       list-view label AND edit, and the context-sensitive help strip;
     #   (b) the dynamic label re-words set -> "per element" / blank -> "per unit width",
     #       joining the declared unit string, and flips live as Spacing/S changes.
+    # The joints editor carries per-field help too, but no spacing-scaled field
+    # and so no dynamic label; only the help half applies to it.
+    for cat in ("joints",):
+        editor = CATEGORY_EDITORS[cat]
+        for f in editor.FIELDS:
+            if not (getattr(f, "tooltip", "") or "").strip():
+                problems.append(f"{cat}:tooltip:{f.key} is empty")
+        sd = _editor_fixture()
+        dlg = editor.build(sd, None)
+        dlg.set_view_mode("table")
+        app.processEvents()
+        tbl = dlg._table.table
+        for j, f in enumerate(editor.FIELDS):
+            it = tbl.horizontalHeaderItem(j)
+            if it is None or not it.toolTip():
+                problems.append(f"{cat}:header-tooltip:{f.key} missing")
+        dlg.set_view_mode("list")
+        lv = dlg._list_view
+        lv.list.setCurrentRow(0)
+        app.processEvents()
+        for f in editor.FIELDS:
+            w = lv._edits.get(f.key)
+            if w is None or not w.toolTip():
+                problems.append(f"{cat}:list-tooltip:{f.key} missing")
+        dlg.deleteLater()
+        app.processEvents()
+
     for cat, driver, dyn_key, per_elem_unit, per_width_unit in (
             ("reinforce", "spacing", "t_max", "lb", "lb/ft"),
             ("piles",     "S",       "V_cap", "lb", "lb/ft")):

@@ -8643,21 +8643,32 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
     # the sheet is the bar the table above reports, and this is what the soil on
     # either side of it did.
     if kind == "reinforcement":
-        joints = _joint_profiles(slope_data, bundle, field_state)
-        if joints:
-            jt = _joint_table(joints, counter)
-            at, at_links = cite("Table", jt.number)
-            sec.blocks.append(Prose(
-                f"{len(joints)} of the lines are modeled as joints: the mesh is "
-                f"split along each of them, so the soil above the sheet and the "
-                f"soil below it are separate bodies joined by interface elements "
-                f"that carry the Adhesion and Delta of that line. What those "
-                f"interfaces did is listed in {at} — the share of each line's "
-                f"length standing at its Mohr-Coulomb limit, and the largest "
-                f"tangential offset the two faces reached.",
-                links=at_links))
-            sec.blocks.append(jt)
+        for block in _joint_blocks(slope_data, bundle, counter, field_state):
+            sec.blocks.append(block)
     return sec
+
+
+def _joint_blocks(slope_data, bundle, counter, field_state):
+    """The interface paragraph and table for one run, or an empty list.
+
+    The lines the mesh was split along, whichever sheet they came from: a
+    reinforcement line whose Joint column is set, which keeps its sheet between
+    the two faces, and a line off the joints sheet, which has nothing between
+    them. Both are interfaces and both are read the same way.
+    """
+    joints = _joint_profiles(slope_data, bundle, field_state)
+    if not joints:
+        return []
+    jt = _joint_table(joints, counter)
+    at, at_links = cite("Table", jt.number)
+    return [Prose(
+        f"The mesh is split along {len(joints)} of the model's lines, so the "
+        f"material on one side of each is a separate body from the material on "
+        f"the other, joined by interface elements carrying that line's own "
+        f"Mohr-Coulomb strength. What those interfaces did is listed in {at} — "
+        f"the share of each line's length standing at its limit, and the "
+        f"largest tangential offset the two faces reached.",
+        links=at_links), jt]
 
 
 def _deformation_exaggeration(scale, stated=None):
@@ -8965,12 +8976,25 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
 
     # The members the run carries, after the fields it solved: what a bar or a
     # pile ended up holding is read off the same solution the fields are.
+    _saw_reinforcement = False
     for kind in DETAIL_KINDS:
         child = _detail_section(slope_data, bundle, kind, tag, opts, counter,
                                 figure_dir, progress, _fem_primary_state(bundle, opts),
                                 defined)
         if child is not None:
             sub.children.append(child)
+            _saw_reinforcement = _saw_reinforcement or kind == "reinforcement"
+    # A model whose only lines are joints has no reinforcement subsection to put
+    # the interface table in, and the interfaces are still what its mesh was
+    # split along, so the table gets a heading of its own.
+    if not _saw_reinforcement:
+        blocks = _joint_blocks(slope_data, bundle, counter,
+                               _fem_primary_state(bundle, opts))
+        if blocks:
+            joint_sec = Section("Interfaces")
+            for block in blocks:
+                joint_sec.blocks.append(block)
+            sub.children.append(joint_sec)
     return sub
 
 

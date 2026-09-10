@@ -2908,6 +2908,21 @@ JOINT_SIDE_WHOLE = 2
 _MESH_JSON_OBJECT_KEYS = frozenset(('joints', 'ties'))
 
 
+def barless_joint_line_ids(mesh):
+    """The 1-based constraint-line ids the split gave no bar, as a set.
+
+    A line off the ``joints`` sheet has no reinforcement between its faces, so
+    its 1D elements carry the curve and nothing structural: no bar is assembled
+    from them, they are not drawn as members, and the details view lists the line
+    as an interface rather than as a reinforcement line. Derived from the
+    ``joints`` records rather than from a key of its own, so a mesh written
+    before the sheet existed — every record without a ``bar`` key — reads back
+    as it always did.
+    """
+    return set(int(rec["line"]) for rec in ((mesh or {}).get("joints") or [])
+               if rec.get("bar", True) is False)
+
+
 def _normalize_joint_lines(joint_lines, n_lines):
     """Normalize the ``joint_lines`` argument to ``{line index: options dict}``.
 

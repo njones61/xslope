@@ -508,10 +508,11 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True, fit_height=True
     return fig
 
 
-#: The bands a joint detail figure's four panels get, as fractions of the
+#: The bands a joint detail figure's panels get, as fractions of the
 #: figure's width — the same shallow-and-wide rule the reinforcement panels
 #: follow. The bar's tension leads, because it is what the sheet is FOR; the
-#: three interface panels beneath it are what develops that tension.
+#: three interface panels beneath it are what develops that tension. A line with
+#: no bar drops the first band and keeps the other three.
 JOINT_BANDS = (0.13, 0.11, 0.13, 0.11)
 
 C_JOINT_OPEN = "#e08214"   # a parted interface
@@ -523,9 +524,11 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
 
     Four panels sharing one position axis, measured from end 1 of the line:
 
-    * the BAR's mobilized tension over its capacity — a phase 1 joint is a sheet,
-      and the tension it carries is what the interface beneath it developed, so
-      the two are read on one figure;
+    * the BAR's mobilized tension over its capacity — a reinforcement line that is
+      also a joint is a sheet, and the tension it carries is what the interface
+      beneath it developed, so the two are read on one figure. A line off the
+      joints sheet has no bar between its faces, and the figure is the three
+      interface panels alone;
     * the NORMAL traction the interface carries, compression positive, with zero
       marked: a station at zero has opened;
     * the SHEAR traction with the Mohr-Coulomb limit ``c_j + t_n tan phi_j``
@@ -542,17 +545,25 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
         fig = plt.figure(figsize=(9.5, 7.5))
     fig.clear()
     u = profile.get("units", {}) or {}
-    axes = fig.subplots(4, 1, sharex=True,
-                        gridspec_kw={"height_ratios": list(JOINT_BANDS)})
-    ax_T, ax_n, ax_s, ax_d = axes
-    s = np.asarray(profile["s"], dtype=float)
-
-    # --- the bar the interface carries -----------------------------------
     bar_s = np.asarray(profile.get("bar_s", []), dtype=float)
     bar_T = np.asarray(profile.get("bar_T", []), dtype=float)
     bar_cap = np.asarray(profile.get("bar_cap", []), dtype=float)
-    handles, labels = [], []
-    if len(bar_s):
+    # A line off the joints sheet has nothing between its faces, so there is no
+    # tension panel: three panels, not four.
+    has_bar = len(bar_s) > 0
+    bands = JOINT_BANDS if has_bar else JOINT_BANDS[1:]
+    axes = fig.subplots(len(bands), 1, sharex=True,
+                        gridspec_kw={"height_ratios": list(bands)})
+    if has_bar:
+        ax_T, ax_n, ax_s, ax_d = axes
+    else:
+        ax_T = None
+        ax_n, ax_s, ax_d = axes
+    s = np.asarray(profile["s"], dtype=float)
+
+    # --- the bar the interface carries -----------------------------------
+    if has_bar:
+        handles, labels = [], []
         if len(bar_cap) == len(bar_s):
             cap, = ax_T.step(bar_s, bar_cap, where="mid", linestyle="--",
                              linewidth=1.3, color=C_ENVELOPE)
@@ -563,11 +574,8 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
         handles.append(mob)
         labels.append("Bar tension")
         ax_T.legend(handles, labels, loc="best", fontsize=8, frameon=False)
-    else:
-        ax_T.text(0.5, 0.5, "no bar on this line", transform=ax_T.transAxes,
-                  ha="center", va="center", fontsize=9, color="0.4")
-    ax_T.set_ylabel(_axis_label("Bar tension", u.get("force")), fontsize=9)
-    ax_T.grid(True, **GRID)
+        ax_T.set_ylabel(_axis_label("Bar tension", u.get("force")), fontsize=9)
+        ax_T.grid(True, **GRID)
 
     # --- normal traction ---------------------------------------------------
     ax_n.axhline(0.0, color="0.6", linewidth=0.8)
@@ -608,9 +616,9 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
 
     for ax in axes:
         _thin_ticks(ax, axis="y", nbins=4)
-    ax_T.set_title(_title(profile), fontsize=10.5)
+    axes[0].set_title(_title(profile), fontsize=10.5)
     if fit_height:
-        _fit_stacked_panels(fig, JOINT_BANDS)
+        _fit_stacked_panels(fig, bands)
     return fig
 
 

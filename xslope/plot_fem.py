@@ -1983,6 +1983,17 @@ PILE_COLOR = 'green'
 PILE_DEFORMED_COLOR = 'red'
 
 
+def _barless_mask(fem_data, n):
+    """Per-1D-element: True where the element belongs to a joint line with no bar.
+
+    All False on a model with no joints sheet, and on a solution read back from a
+    sidecar whose fem_data predates the key.
+    """
+    m = np.asarray((fem_data or {}).get("barless_1d_mask",
+                                        np.zeros(n, dtype=bool)), dtype=bool)
+    return m if len(m) == n else np.zeros(n, dtype=bool)
+
+
 def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0,
                              linewidth=2, label=None, pile_color=PILE_COLOR):
     """
@@ -2000,12 +2011,17 @@ def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0,
     elements_1d = fem_data["elements_1d"]
     element_types_1d = fem_data["element_types_1d"]
     pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(len(elements_1d), dtype=bool))
+    # A bar-less joint line's 1D elements are not a member and are not drawn as
+    # one: the line's own state is drawn on it by plot_joint_states.
+    barless = _barless_mask(fem_data, len(elements_1d))
 
     reinf_lines = []
     pile_lines = []
     for i, elem in enumerate(elements_1d):
         elem_type = element_types_1d[i]
         if elem_type >= 2:
+            if barless[i]:
+                continue
             line_coords = nodes[elem[:2]]
             if pile_elem_mask[i]:
                 pile_lines.append(line_coords)
@@ -2405,7 +2421,10 @@ def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8), save_
     failed_1d = solution.get("failed_1d_elements", np.zeros(len(elements_1d), dtype=bool))
     
     # Group elements by reinforcement line (material ID)
-    unique_lines = np.unique(element_materials_1d)
+    # A bar-less joint line owns 1D elements but no bar, so it has no force
+    # profile to draw: its reading is the interface's, in the joint detail.
+    _bl = _barless_mask(fem_data, len(elements_1d))
+    unique_lines = np.unique(np.asarray(element_materials_1d)[~_bl])
     n_lines = len(unique_lines)
     
     if n_lines == 0:

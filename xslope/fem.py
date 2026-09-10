@@ -1917,6 +1917,16 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     _jointed_lines = set(int(v) for v in
                          np.asarray(mesh.get("element_materials_joint", ()),
                                     dtype=int).ravel())
+    # Which of them carry NO bar. Their 1D elements hold the curve the split ran
+    # along and nothing else: no truss stiffness is assembled from them, no
+    # member is drawn on them, and the details view lists the line as an
+    # interface. Empty on every model with no joints sheet.
+    from .mesh import barless_joint_line_ids as _barless_ids
+    _barless_lines = _barless_ids(mesh)
+    barless_1d_mask = np.zeros(n_1d_elements, dtype=bool)
+    if _barless_lines and n_1d_elements:
+        barless_1d_mask = np.isin(np.asarray(element_materials_1d, dtype=int),
+                                  sorted(_barless_lines))
 
     if n_1d_elements > 0 and "reinforcement_lines" in slope_data:
         from .fileio import ensure_reinforce_pullout
@@ -2941,6 +2951,11 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "t_allow_by_1d_elem": t_allow_by_1d_elem,
         "t_res_by_1d_elem": t_res_by_1d_elem,
         "k_by_1d_elem": k_by_1d_elem,
+        # Which 1D elements belong to a joint line that carries no bar. They hold
+        # the curve the split ran along; nothing structural is built from them,
+        # so every reader of the 1D elements as MEMBERS skips them. All False on
+        # a model with no joints sheet.
+        "barless_1d_mask": barless_1d_mask,
         # Per-element geometry along each reinforcement line, and the line labels:
         # what the 1D details panel needs to place and name a line's elements.
         "elem_length_1d": elem_length_1d,

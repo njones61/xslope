@@ -2897,6 +2897,12 @@ def attach_1d_midside_nodes(mesh, debug=False):
 JOINT_MESH_KEYS = ('joints', 'elements_joint', 'element_types_joint',
                    'element_materials_joint', 'element_side_joint', 'ties')
 
+#: ``element_side_joint`` on a joint element that is the WHOLE interface: one
+#: element joining the two faces, on a line with no bar between them. The two
+#: values a bar's pair carries — 1 for the upper joint, 0 for the lower — keep
+#: their meaning, so a mesh written before the joints sheet existed is unchanged.
+JOINT_SIDE_WHOLE = 2
+
 #: Joint keys whose value is a list of dicts rather than a numeric array, so the
 #: JSON reader must leave them as Python objects instead of calling np.array.
 _MESH_JSON_OBJECT_KEYS = frozenset(('joints', 'ties'))
@@ -2906,10 +2912,17 @@ def _normalize_joint_lines(joint_lines, n_lines):
     """Normalize the ``joint_lines`` argument to ``{line index: options dict}``.
 
     Accepts None (no joints), a sequence of indices into ``lines``, or a mapping
-    from such an index to a dict of per-line options. The only options read here
-    are ``tend1`` and ``tend2``, the end anchorage capacities: an end whose value
-    is present and greater than zero is TIED and gets a ``ties`` entry, and every
-    other end is free.
+    from such an index to a dict of per-line options.
+
+    Three options are read. ``tend1`` and ``tend2`` are the end anchorage
+    capacities: an end whose value is present and greater than zero is TIED and
+    gets a ``ties`` entry, and every other end is free. ``bar`` says whether the
+    line carries a reinforcement bar between its two faces: True (the default,
+    and what a reinforcement line whose ``Joint`` column reads yes always is)
+    puts the sheet's own nodes between an upper and a lower interface, and False
+    — a line off the ``joints`` sheet, a rock joint or a block contact with no
+    reinforcement in it — makes ONE interface element per span, joining the two
+    faces directly.
     """
     if not joint_lines:
         return {}
@@ -3183,6 +3196,18 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
     ``element_materials_1d``; ``element_side_joint`` is 1 on the upper joint of a
     pair and 0 on the lower. ``ties`` holds the tied ends.
 
+    **A line with no bar.** A joint line off the ``joints`` sheet — a rock joint,
+    a bedding plane, a block-on-block contact — has no reinforcement between its
+    faces, and its ``bar`` option is False. The split is the same up to the node
+    copies: it writes ONE joint element per span instead of two, joining the
+    upper face to the lower one directly, with ``element_side_joint`` reading
+    :data:`JOINT_SIDE_WHOLE`; the station triple's middle slot is ``-1`` and the
+    line's ``joints`` record carries ``"bar": False``; no node is added for a bar
+    and no end can be tied. So a bar-less joint carries the interface stiffness
+    once rather than as two springs in series, which is what a single contact is.
+    Both keys are additions: a record with no ``bar`` key is a line that has one,
+    which is every mesh written before the ``joints`` sheet existed.
+
     The bar's own elements stay in ``elements_1d`` with their node ids rewritten
     to the bar's node set. A bar on a jointed line is unaffected by a junction:
     it has its own node there like every other station, and two bars that meet on
@@ -3295,7 +3320,8 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
 
         info[li] = dict(p1=p1, d=d, normal=normal, ordered=ordered, t_of=t_of,
                         bar_idx=bar_idx, bars=bars, stations=set(ordered),
-                        first_edge=first_edge)
+                        first_edge=first_edge,
+                        has_bar=bool(opts[li].get('bar', True)))
 
     # Two jointed lines that meet must SHARE a node there. The mesher splits both
     # curves at the meeting point so gmsh has to place one, but a mesh that came
@@ -3470,8 +3496,9 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
                     nodes.append(list(nodes[nid]))
                     ids[gi] = len(nodes) - 1
                 wedge_ids[nid] = ids
-            nodes.append(list(nodes[nid]))
-            bar_of[(li, nid)] = len(nodes) - 1
+            if inf['has_bar']:
+                nodes.append(list(nodes[nid]))
+                bar_of[(li, nid)] = len(nodes) - 1
 
     # ---- 6. every element takes the copy of its own wedge ----------------------
     copy_of = {}                             # (node, element) -> the id it uses
@@ -3487,6 +3514,12 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
                         elements[ei, k] = new
 
     for li in sorted(opts):
+        if not info[li]['has_bar']:
+            # A bar-less joint line has no member of its own to rewire. Its 1D
+            # elements stay on the ids gmsh gave them — the copies stand at one
+            # point, so the curve is still drawn where the line is — and the
+            # finite element engine builds no bar from them.
+            continue
         for i in info[li]['bar_idx']:
             for k in range(int(types_1d[i])):
                 e1d[i, k] = bar_of[(li, int(e1d[i, k]))]
@@ -3501,6 +3534,7 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
 
     for li in sorted(opts):
         inf = info[li]
+        has_bar = inf['has_bar']
         faces = {}                           # station -> (upper elem, lower elem)
         for (_t, _i, a, b, mid, et) in inf['bars']:
             n_pairs = 3 if et >= 3 else 2
@@ -3512,6 +3546,16 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
                   copy_of[(mid, e_up)] if n_pairs == 3 else 0]
             low = [copy_of[(a, e_low)], copy_of[(b, e_low)],
                    copy_of[(mid, e_low)] if n_pairs == 3 else 0]
+            if not has_bar:
+                # No member between the faces: ONE interface element joins the
+                # upper face to the lower one, and its side marker says so. The
+                # two sides of the pair keep their meaning — a is the upper — so
+                # the normal runs the same way as on every other joint element.
+                joint_conn.append([up[0], up[1], up[2], low[0], low[1], low[2]])
+                joint_types.append(n_pairs)
+                joint_mats.append(li + 1)
+                joint_sides.append(JOINT_SIDE_WHOLE)
+                continue
             bar = [bar_of[(li, a)], bar_of[(li, b)],
                    bar_of[(li, mid)] if n_pairs == 3 else 0]
             # side a of the pair is always the upper one, so the joint normal
@@ -3528,9 +3572,25 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
         stations = []
         for nid in inf['ordered']:
             e_up, e_low = faces[nid]
-            stations.append([int(copy_of[(nid, e_up)]), int(bar_of[(li, nid)]),
+            stations.append([int(copy_of[(nid, e_up)]),
+                             int(bar_of[(li, nid)]) if has_bar else -1,
                              int(copy_of[(nid, e_low)])])
-        joints_out.append({"line": li + 1, "stations": stations})
+        rec = {"line": li + 1, "stations": stations}
+        if not has_bar:
+            # Only a bar-LESS line carries the key, so every mesh written before
+            # the joints sheet existed reads back exactly as it did.
+            rec["bar"] = False
+        joints_out.append(rec)
+
+        if debug:
+            n_wedges = sum(len(wedges[n]) for n in inf['ordered'])
+            print(f"  Joint line {li + 1}: {len(inf['ordered'])} stations, "
+                  f"{n_wedges} material wedges, "
+                  f"{(2 if has_bar else 1) * len(inf['bars'])} joint elements, "
+                  f"{len(nodes) - len(nodes_in)} nodes added so far")
+
+        if not has_bar:
+            continue                         # nothing to tie: there is no bar
 
         for end, nid, key in ((1, inf['ordered'][0], 'tend1'),
                               (2, inf['ordered'][-1], 'tend2')):
@@ -3552,13 +3612,6 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
                     -inf['d'] if end == 1 else inf['d'])),
                 "capacity": cap,
             })
-
-        if debug:
-            n_wedges = sum(len(wedges[n]) for n in inf['ordered'])
-            print(f"  Joint line {li + 1}: {len(inf['ordered'])} stations, "
-                  f"{n_wedges} material wedges, "
-                  f"{2 * len(inf['bars'])} joint elements, "
-                  f"{len(nodes) - len(nodes_in)} nodes added so far")
 
     mesh["nodes"] = np.array(nodes, dtype=float)
     mesh["elements"] = elements
@@ -5823,6 +5876,17 @@ def extract_point_constraints(slope_data):
     return [(ll['x'], ll['y']) for ll in (slope_data.get('line_loads') or [])]
 
 
+def extract_joint_line_geometry(slope_data):
+    """The ``joints`` sheet's lines, as constraint-line geometry.
+
+    Each is ``[(x1, y1), (x2, y2)]``, in sheet order. Empty on a model with no
+    joints sheet, which is what leaves the constraint-line list exactly what it
+    was before the sheet existed.
+    """
+    return [[(j['x1'], j['y1']), (j['x2'], j['y2'])]
+            for j in (slope_data.get('joint_lines') or [])]
+
+
 def line_is_jointed(line):
     """True when a reinforcement line's ``Joint`` column says yes.
 
@@ -5834,42 +5898,65 @@ def line_is_jointed(line):
     return str((line or {}).get("joint", "") or "").strip().lower() == "yes"
 
 
-def extract_joint_lines(slope_data):
-    """The ``joint_lines`` mapping for ``build_mesh_from_polygons``, or ``None``.
+def extract_joint_options(slope_data):
+    """Which CONSTRAINT lines are joints, as ``build_mesh_from_polygons`` wants
+    them in its ``joint_lines=`` argument — or ``None`` when none is.
 
-    Every reinforcement line whose ``Joint`` column reads yes, keyed by its index
-    in the constraint-line list ``extract_constraint_line_geometry`` returns —
-    reinforcement lines come first there, so the key is the reinforcement line's
-    own index — and carrying that line's end anchorages as the mesher's
-    ``tend1`` / ``tend2`` options, which decide whether each end of the bar is
-    tied to the soil.
+    Two sources, and the key is the line's index in the constraint-line list
+    :func:`extract_constraint_line_geometry` returns:
+
+    * every reinforcement line whose ``Joint`` column reads yes. Reinforcement
+      lines come first in that list, so the key is the reinforcement line's own
+      index. The line's end anchorages ride along as ``tend1`` / ``tend2``, which
+      decide whether each end of the bar is tied to the soil, and ``bar`` is True:
+      the sheet is a member between two interfaces.
+    * every row of the ``joints`` sheet. Those lines come last in the constraint
+      list, after the piles, so the key is ``n_reinf + n_pile + j``, and ``bar``
+      is False: there is no reinforcement between the faces and the split writes
+      one interface element per span.
 
     ``None`` when no line is jointed, which is the value that leaves the mesh
-    exactly what it always was.
+    exactly what it always was. Not to be confused with ``slope_data['joint_lines']``,
+    which is the ``joints`` sheet's own rows.
     """
     lines = slope_data.get("reinforcement_lines") or []
+    n_reinf = len(extract_reinforcement_line_geometry(slope_data))
+    n_pile = len(extract_pile_line_geometry(slope_data))
     opts = {}
-    for i in range(len(extract_reinforcement_line_geometry(slope_data))):
+    for i in range(n_reinf):
         line = lines[i] if i < len(lines) else None
         if not line_is_jointed(line):
             continue
         opts[i] = {"tend1": line.get("tend1") or 0.0,
-                   "tend2": line.get("tend2") or 0.0}
+                   "tend2": line.get("tend2") or 0.0,
+                   "bar": True}
+    for j in range(len(extract_joint_line_geometry(slope_data))):
+        opts[n_reinf + n_pile + j] = {"bar": False}
     return opts or None
 
 
 def extract_constraint_line_geometry(slope_data):
     """
-    Extract all constraint line geometry (reinforcement + piles) for mesh generation.
+    Extract all constraint line geometry (reinforcement + piles + joints) for
+    mesh generation.
+
+    The order is what every reader of ``element_materials_1d`` and
+    ``element_materials_joint`` keys off: reinforcement lines, then piles, then
+    the ``joints`` sheet's lines. A joint line is a constraint line like any
+    other — gmsh recovers it as an embedded curve, and the split runs along it —
+    but it carries no bar, so nothing structural is built from its 1D elements.
 
     Parameters:
         slope_data: Dictionary containing slope data
 
     Returns:
-        lines: Combined list of constraint lines (reinforcement first, then piles)
+        lines: Combined list of constraint lines (reinforcement, then piles, then
+               joint lines — the joints are ``lines[n_reinf + n_pile:]``)
         n_reinf: Number of reinforcement lines
         n_pile: Number of pile lines
     """
     reinf_lines = extract_reinforcement_line_geometry(slope_data)
     pile_lines = extract_pile_line_geometry(slope_data)
-    return reinf_lines + pile_lines, len(reinf_lines), len(pile_lines)
+    joint_lines = extract_joint_line_geometry(slope_data)
+    return (reinf_lines + pile_lines + joint_lines,
+            len(reinf_lines), len(pile_lines))

@@ -287,7 +287,7 @@ class MeshWorker(QObject):
     def build(self, slope_data, options):
         from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                                  extract_constraint_line_geometry, extract_size_regions,
-                                 extract_joint_lines, MeshInputError, _REFINE_FEATURES)
+                                 extract_joint_options, MeshInputError, _REFINE_FEATURES)
         try:
             sd = slope_data
             element_type = options["element_type"]
@@ -356,7 +356,7 @@ class MeshWorker(QObject):
                       f"{_z['width']:.3g}{_len_unit(sd)})")
             if thin_plan:
                 print("  ('Refine thin zones' in the Build mesh dialog disables this)")
-            joint_lines = extract_joint_lines(sd)
+            joint_lines = extract_joint_options(sd)
             mesh = build_mesh_from_polygons(polygons, target_size=target,
                                             element_type=element_type,
                                             lines=constraint_lines or None,

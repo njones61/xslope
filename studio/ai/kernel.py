@@ -681,7 +681,7 @@ class PythonKernel:
                 return sd["mesh"]
             from xslope.mesh import (build_mesh_from_polygons,
                                      extract_constraint_line_geometry,
-                                     extract_joint_lines,
+                                     extract_joint_options,
                                      extract_size_regions, get_material_polygons)
             resync_geometry(sd)
             lines, _n_reinf, _n_pile = extract_constraint_line_geometry(sd)
@@ -696,7 +696,7 @@ class PythonKernel:
                 lines=lines or None,
                 element_size_1d=sd.get("element_size_1d"),
                 size_regions=extract_size_regions(sd),
-                joint_lines=extract_joint_lines(sd))
+                joint_lines=extract_joint_options(sd))
             sd["mesh"] = mesh
             if not quiet:
                 print(f"Built a {element_type} mesh (target size {float(target):.4g}): "

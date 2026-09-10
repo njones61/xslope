@@ -73,7 +73,7 @@ import matplotlib.pyplot as plt
 from xslope.fileio import load_slope_data
 from xslope.fem import build_fem_data, solve_ssrm, export_fem_solution
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                         extract_constraint_line_geometry, extract_joint_lines,
+                         extract_constraint_line_geometry, extract_joint_options,
                          extract_point_constraints,
                          extract_size_regions, export_mesh_to_json)
 from xslope.style import resolve_style, material_style
@@ -366,7 +366,7 @@ def _build(tag):
             element_size_1d=sd.get('element_size_1d'),
             point_constraints=extract_point_constraints(sd),
             size_regions=extract_size_regions(sd),
-            joint_lines=extract_joint_lines(sd), **refine_kw)
+            joint_lines=extract_joint_options(sd), **refine_kw)
     # `sd` (unmodified) is what the inputs panel draws; the FEM build gets the
     # dry-beyond-the-line spelling where a piezo line stops short of the mesh.
     return sd, build_fem_data(_declare_dry_beyond_piezo(sd, mesh), mesh), path, mesh

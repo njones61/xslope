@@ -1,12 +1,20 @@
 """Zero-thickness interface (joint) elements and the end ties that anchor a bar.
 
 A jointed constraint line is a slip surface: the mesher splits the mesh along it
-(``mesh.split_mesh_along_joints``) so every station on the line carries three
-coincident nodes — the soil above, the bar, the soil below — and a pair of joint
-elements spans them, an upper one between the soil above and the bar and a lower
-one between the bar and the soil below. This module turns that mesh into the
-arrays the finite element solve reads, and holds the interface's kinematics,
-constitutive law and element stiffness.
+(``mesh.split_mesh_along_joints``) so the two faces can move relative to one
+another, and joint elements carry the traction between them. This module turns
+that mesh into the arrays the finite element solve reads, and holds the
+interface's kinematics, constitutive law and element stiffness.
+
+A line comes in two kinds. A REINFORCEMENT line whose ``Joint`` column reads yes
+has a sheet between its faces, so every station carries three coincident nodes —
+the soil above, the bar, the soil below — and a pair of joint elements spans
+them, an upper one between the soil above and the bar and a lower one between the
+bar and the soil below. A line off the ``joints`` sheet — a rock joint, a bedding
+plane, a block-on-block contact — has nothing between its faces, so a station
+carries two nodes and ONE joint element spans them. The two kinds share
+everything below; the pair carries its stiffness as two springs in series, the
+single element carries it once.
 
 **Kinematics.** A joint element has no thickness and no area: its state is the
 RELATIVE displacement of the two faces it connects. Side ``a`` of
@@ -50,8 +58,10 @@ the same two numbers the overburden-dependent pullout law reads
 that law divides its rate by the line's ``Spacing``, and so do these, so a
 discrete support's interface strength and its pullout envelope stay in one
 convention. A continuous sheet — the only thing a mesh split represents — has a
-blank Spacing and the division is inert. The tension cutoff is zero: a
-soil-geotextile interface carries no tension.
+blank Spacing and the division is inert. Its tension cutoff is zero: a
+soil-geotextile interface carries no tension. A ``joints`` sheet line states
+``c``, ``phi`` and ``t_cut`` in columns of its own, per unit width, with no
+spacing to divide by.
 
 **Tips.** The two soil faces rejoin at each end of the line, so the end station
 carries one soil node, not two, and the two joint elements there stand between
@@ -105,6 +115,13 @@ def solution_has_joint_state(solution, n):
     return ts.ndim == 2 and ts.shape[0] == int(n) and ts.shape[1] == 3
 
 
+#: ``element_side_joint`` on a joint element that is the whole interface — one
+#: element between the two faces, on a line with no bar. The mesher's own name
+#: for it is :data:`xslope.mesh.JOINT_SIDE_WHOLE`; kept here as a plain number so
+#: the element module does not import the mesher to read a mesh key.
+_SIDE_WHOLE = 2
+
+
 def _node_element_map(elements, element_types, n_nodes):
     """node id -> list of 2D element indices standing on it."""
     out = [[] for _ in range(n_nodes)]
@@ -126,14 +143,18 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
 
     Reads the split the mesher wrote (``elements_joint``, ``element_types_joint``,
     ``element_materials_joint``, ``element_side_joint``, ``joints``, ``ties``) and
-    the jointed lines' own properties from ``slope_data['reinforcement_lines']``,
-    and returns the dictionary ``fem_data['joint_data']`` carries:
+    the jointed lines' own properties — from ``slope_data['reinforcement_lines']``
+    for a line whose ``Joint`` column reads yes, whose interface strength is its
+    Adhesion and Delta, and from ``slope_data['joint_lines']`` for a line off the
+    ``joints`` sheet, which states c, phi and a tension cutoff of its own — and
+    returns the dictionary ``fem_data['joint_data']`` carries:
 
     ``n``            number of joint elements
     ``conn``         (n, 6) node ids, [a0, a1, a2, b0, b1, b2]; side a is the upper
     ``n_pairs``      (n,) 3 on a quadratic mesh, 2 on a linear one
     ``line_id``      (n,) 1-based constraint-line index
-    ``side``         (n,) 1 on the upper joint of a pair, 0 on the lower
+    ``side``         (n,) 1 on the upper joint of a bar's pair, 0 on the lower,
+                     2 on a bar-less line's single element, which IS the interface
     ``dof``          (n, 12) global degrees of freedom in the ``conn`` order
     ``w``            (n, 3) Lobatto weights, LENGTHS (zero on a padded pair)
     ``tx, ty``       (n,) the unit chord
@@ -141,7 +162,8 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
     ``L``            (n,) element length
     ``kn, ks``       (n,) normal and shear stiffness
     ``cj, tanphi``   (n,) interface cohesion and friction coefficient
-    ``tcut``         (n,) tension cutoff (zero in phase 1)
+    ``tcut``         (n,) tension cutoff — the joints sheet's own column; zero on
+                     a reinforcement line, whose interface carries no tension
     ``jred``         (n,) reduce this joint's strength in the SSR
     ``tip``          (n, 3) pairs standing at an end station, where the two soil
                      faces are one node
@@ -164,6 +186,13 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
     nodes = np.asarray(nodes, dtype=float)
 
     lines = slope_data.get("reinforcement_lines") or []
+    # The constraint-line numbering the mesh keys off: reinforcement lines, then
+    # piles, then the joints sheet's own lines. A joint element's line id lands in
+    # the first block or the third; the middle one is the piles, which are never
+    # jointed.
+    n_reinf = len(lines)
+    n_pile = len(slope_data.get("pile_lines") or [])
+    sheet_joints = slope_data.get("joint_lines") or []
 
     # ---- geometry: the chord, its normal, and the nodal integration weights ----
     p0 = nodes[conn[:, 0], :2]
@@ -211,9 +240,13 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
     G_by_mat = E_by_mat / (2.0 * (1.0 + nu_by_mat))
 
     # The upper and lower joint of a station span share the bar's nodes, so the
-    # two are paired on that node set and each reads BOTH soils.
+    # two are paired on that node set and each reads BOTH soils. A bar-less joint
+    # element (side WHOLE) is the whole interface on its own and has no partner:
+    # both of its sides are soil, and it reads them directly.
     bar_key = {}
     for i in range(n):
+        if side[i] == _SIDE_WHOLE:
+            continue
         cols = (3, 4, 5) if side[i] == 1 else (0, 1, 2)
         bar_key.setdefault(tuple(int(conn[i, c]) for c in cols), []).append(i)
     partner = np.full(n, -1, dtype=int)
@@ -224,9 +257,14 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
     E_adj = np.zeros(n)
     G_adj = np.zeros(n)
     for i in range(n):
-        soil_cols = (0, 1, 2) if side[i] == 1 else (3, 4, 5)
-        soil_nodes = [int(conn[i, c]) for c in soil_cols[:int(n_pairs[i])]]
-        j = partner[i]
+        if side[i] == _SIDE_WHOLE:
+            soil_nodes = ([int(conn[i, c]) for c in range(int(n_pairs[i]))]
+                          + [int(conn[i, 3 + c]) for c in range(int(n_pairs[i]))])
+            j = -1
+        else:
+            soil_cols = (0, 1, 2) if side[i] == 1 else (3, 4, 5)
+            soil_nodes = [int(conn[i, c]) for c in soil_cols[:int(n_pairs[i])]]
+            j = partner[i]
         if j >= 0:
             cols_j = (0, 1, 2) if side[j] == 1 else (3, 4, 5)
             soil_nodes += [int(conn[j, c]) for c in cols_j[:int(n_pairs[j])]]
@@ -253,6 +291,26 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
     jred = np.ones(n, dtype=bool)
     for li in sorted(set(int(v) for v in line_id)):
         sel = line_id == li
+        jsheet = li - n_reinf - n_pile - 1     # index into the joints sheet
+        if 0 <= jsheet < len(sheet_joints):
+            # A line off the joints sheet states its own strength: c, phi and the
+            # tension cutoff are columns of its own, and there is no out-of-plane
+            # spacing to divide by — a joint is a surface, not a discrete member.
+            jl = sheet_joints[jsheet]
+            _c = jl.get("c")
+            _phi = jl.get("phi")
+            _tc = jl.get("t_cut")
+            cj[sel] = 0.0 if _c is None or not np.isfinite(float(_c)) else float(_c)
+            tanphi[sel] = (0.0 if _phi is None or not np.isfinite(float(_phi))
+                           else np.tan(np.radians(float(_phi))))
+            tcut[sel] = (0.0 if _tc is None or not np.isfinite(float(_tc))
+                         else float(_tc))
+            for key, arr in (("kn", kn), ("ks", ks)):
+                v = jl.get(key)
+                if v is not None and np.isfinite(float(v)) and float(v) > 0.0:
+                    arr[sel] = float(v)
+            jred[sel] = str(jl.get("jred", "yes") or "yes").strip().lower() != "no"
+            continue
         line = lines[li - 1] if 0 < li <= len(lines) else {}
         label = line.get("label") or f"line {li}"
         # Adhesion and Delta ARE the interface strength. A line that states

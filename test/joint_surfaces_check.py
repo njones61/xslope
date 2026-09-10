@@ -8,7 +8,7 @@ model then shows.
 Six legs, all on one solve of the shipped reinforcement sample with two of its
 six lines made joints in memory:
 
-  a. the wiring. ``mesh.extract_joint_lines`` reads the column off a loaded
+  a. the wiring. ``mesh.extract_joint_options`` reads the column off a loaded
      model and returns the mapping the mesher takes, keyed by the line's index
      in the constraint-line list and carrying its end anchorages; a model with
      no jointed line returns None, which is the value that leaves the mesh what
@@ -80,14 +80,14 @@ def _model(jointed=JOINTED):
 
 def _mesh_for(sd):
     from xslope.mesh import (build_mesh_from_polygons, extract_constraint_line_geometry,
-                             extract_joint_lines, extract_size_regions,
+                             extract_joint_options, extract_size_regions,
                              get_material_polygons)
     lines, _nr, _np = extract_constraint_line_geometry(sd)
     polys = get_material_polygons(sd, reinf_lines=lines)
     return _quiet(build_mesh_from_polygons, polys, target_size=TARGET_SIZE,
                   element_type="tri6", lines=lines, element_size_1d=SIZE_1D,
                   size_regions=extract_size_regions(sd),
-                  joint_lines=extract_joint_lines(sd))
+                  joint_lines=extract_joint_options(sd))
 
 
 def _solved():
@@ -112,12 +112,12 @@ def _solved():
 # --------------------------------------------------------------------------
 
 def _leg_wiring(failures, cache):
-    from xslope.mesh import extract_joint_lines, line_is_jointed
+    from xslope.mesh import extract_joint_options, line_is_jointed
     sd, mesh, fem_data, _sol = cache["solved"]
 
-    got = extract_joint_lines(sd)
+    got = extract_joint_options(sd)
     if got is None or sorted(got) != sorted(JOINTED):
-        failures.append(f"extract_joint_lines returned {got}, not the two "
+        failures.append(f"extract_joint_options returned {got}, not the two "
                         f"flagged lines {JOINTED}")
     else:
         for k in JOINTED:
@@ -126,7 +126,7 @@ def _leg_wiring(failures, cache):
                                 f"the end anchorages the mesher reads")
 
     plain = _model(jointed=())
-    if extract_joint_lines(plain) is not None:
+    if extract_joint_options(plain) is not None:
         failures.append("a model with no jointed line does not read as None, "
                         "so the mesher would take the joint path on it")
     for i, r in enumerate(sd["reinforcement_lines"]):

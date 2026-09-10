@@ -3012,6 +3012,18 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
              "x1": r.get("x1"), "y1": r.get("y1"),
              "x2": r.get("x2"), "y2": r.get("y2")}
             for r in slope_data["reinforcement_lines"]]
+    # The joints sheet's lines, for the same reason: the details view and the
+    # report name a bar-less joint and measure its profile from end 1, and
+    # neither is handed the model.
+    if slope_data.get("joint_lines"):
+        fem_data["joint_lines"] = [
+            {"label": j.get("label"),
+             "x1": j.get("x1"), "y1": j.get("y1"),
+             "x2": j.get("x2"), "y2": j.get("y2")}
+            for j in slope_data["joint_lines"]]
+        fem_data["n_reinforcement_lines"] = len(
+            slope_data.get("reinforcement_lines") or [])
+        fem_data["n_pile_lines"] = len(slope_data.get("pile_lines") or [])
 
     return fem_data
 

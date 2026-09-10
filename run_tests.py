@@ -537,7 +537,7 @@ def _tag_mesh(slope_data, test, default_element_type='tri3', default_divisions=1
     there, and because a seepage-coupled FEM row must solve on the very mesh the
     field was computed on."""
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_constraint_line_geometry, extract_joint_lines,
+                             extract_constraint_line_geometry, extract_joint_options,
                              extract_size_regions)
     constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
     polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
@@ -548,7 +548,7 @@ def _tag_mesh(slope_data, test, default_element_type='tri3', default_divisions=1
         lines=constraint_lines or None,
         element_size_1d=slope_data.get('element_size_1d'),
         size_regions=extract_size_regions(slope_data),
-        joint_lines=extract_joint_lines(slope_data),
+        joint_lines=extract_joint_options(slope_data),
         **_refine_kwargs(test))
     slope_data['mesh'] = mesh
     return mesh
@@ -1375,7 +1375,7 @@ def build_fem_ssrm_case(test):
     from xslope.fileio import load_slope_data
     from xslope.fem import build_fem_data
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_constraint_line_geometry, extract_joint_lines,
+                             extract_constraint_line_geometry, extract_joint_options,
                              extract_point_constraints, extract_size_regions)
 
     file_path = test['file']
@@ -1418,7 +1418,7 @@ def build_fem_ssrm_case(test):
             element_size_1d=slope_data.get('element_size_1d'),
             point_constraints=extract_point_constraints(slope_data),
             size_regions=extract_size_regions(slope_data),
-            joint_lines=extract_joint_lines(slope_data),
+            joint_lines=extract_joint_options(slope_data),
             **_refine_kwargs(test)
         )
 
@@ -4636,6 +4636,36 @@ def _pf_joint_stretch(sd, x1=-25.0, x2=40.0):
     return _pf_rows(sd, 'reinforcement_lines', x1=x1, x2=x2)
 
 
+def _pf_joint_sheet(sd, x1=5.0, y1=2.0, x2=25.0, y2=2.0, **kw):
+    """One row on the v27 joints sheet: a joint with no reinforcement in it.
+
+    The default row is a sound one — inside the section, with a friction angle —
+    so a spec that changes one field is testing that field.
+    """
+    row = dict(label='seam', x1=x1, y1=y1, x2=x2, y2=y2,
+               c=0.0, phi=25.0, t_cut=0.0,
+               kn=float('nan'), ks=float('nan'), jred='')
+    row.update(kw)
+    sd['joint_lines'] = [row]
+    return sd
+
+
+def _pf_joint_on_boundary(sd, on=True):
+    """A joint line running ALONG the bottom of the section, or across it.
+
+    The outside of the section has material on one side only, so there is
+    nothing for the joint's other face to be.
+    """
+    from shapely.ops import unary_union
+    body = unary_union([p['polygon'] for p in (sd.get('polygons') or [])])
+    x0, y0, x1, y1 = body.bounds
+    xa, xb = x0 + 0.25 * (x1 - x0), x0 + 0.75 * (x1 - x0)
+    if on:
+        return _pf_joint_sheet(sd, x1=xa, y1=y0, x2=xb, y2=y0)
+    return _pf_joint_sheet(sd, x1=xa, y1=0.5 * (y0 + y1),
+                           x2=xb, y2=0.5 * (y0 + y1))
+
+
 #: One entry per rule. Fields:
 #:   rule      the rule id under test
 #:   base      the sample file to break a copy of
@@ -5443,7 +5473,31 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_joint_pair(sd, both=False),
          control=lambda sd: _pf_joint_pair(sd, both=True),
-         expect='sets Joint = Yes and crosses'),
+         expect='is a joint and touches'),
+    # The joints sheet's own rows: a line with no reinforcement in it. What the
+    # interface law cannot do without, and the two geometries the split cannot
+    # represent.
+    dict(rule='joint.phi_missing', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, phi=float('nan')),
+         control=lambda sd: _pf_joint_sheet(sd),
+         expect='leaves phi blank'),
+    dict(rule='joint.no_strength', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, c=0.0, phi=0.0),
+         control=lambda sd: _pf_joint_sheet(sd),
+         expect='states c = 0 and phi = 0'),
+    dict(rule='joint.outside_domain', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, x1=200.0, y1=200.0,
+                                             x2=260.0, y2=200.0),
+         control=lambda sd: _pf_joint_sheet(sd),
+         expect='lies outside the material zones'),
+    dict(rule='joint.on_domain_boundary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_on_boundary(sd, on=True),
+         control=lambda sd: _pf_joint_on_boundary(sd, on=False),
+         expect='lies on the outside of the section'),
     dict(rule='joint.line_load_on_line', base=PREFLIGHT_BASE_REINF_FEM,
          mode='dict', analysis='ssrm',
          mutation=lambda sd: _pf_joint_line_load(sd, on=True),
@@ -7668,7 +7722,7 @@ def run_mesh_elements_test(test):
     """
     from xslope.fileio import load_slope_data
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_constraint_line_geometry, extract_joint_lines,
+                             extract_constraint_line_geometry, extract_joint_options,
                              extract_point_constraints, extract_size_regions)
 
     want_el = test.get('expected_elements')
@@ -7690,7 +7744,7 @@ def run_mesh_elements_test(test):
         element_size_1d=slope_data.get('element_size_1d'),
         point_constraints=extract_point_constraints(slope_data),
         size_regions=extract_size_regions(slope_data),
-        joint_lines=extract_joint_lines(slope_data),
+        joint_lines=extract_joint_options(slope_data),
         **_refine_kwargs(test)
     )
 
@@ -8188,7 +8242,7 @@ MODULE_CHECKS = {
     'joint_surfaces': (
         'joint_surfaces_check.py',
         "What a jointed line reaches once the reinforce sheet says so: the "
-        "mesher through extract_joint_lines, preflight's four refusals and four "
+        "mesher through extract_joint_options, preflight's four refusals and four "
         "signals, the inputs / mesh / results plots, the two soil faces of the "
         "split moving apart in the solved field, the 1D detail profile and its "
         "figure, and the report's joints table — with the same model unflagged "

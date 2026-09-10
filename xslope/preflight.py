@@ -1292,6 +1292,19 @@ class _Ctx:
         return f"{base} ('{name}')" if name else base
 
     @property
+    def joints(self):
+        """The ``joints`` sheet's lines -- endpoints plus interface properties."""
+        return list(self.sd.get("joint_lines") or [])
+
+    def joint_label(self, i):
+        try:
+            name = self.joints[i].get("label")
+        except (IndexError, AttributeError):
+            name = None
+        base = f"Joint line {i + 1}"
+        return f"{base} ('{name}')" if name else base
+
+    @property
     def surfaces(self):
         """The failure-surface geometries this deck DEFINES, for engagement tests.
 
@@ -5279,7 +5292,8 @@ def _joint_candidate_lines(ctx):
 
 
 def _joint_lines(ctx):
-    """``(index, line, segment)`` for every line flagged ``Joint = Yes``."""
+    """``(index, line, segment)`` for every reinforcement line flagged
+    ``Joint = Yes`` — the lines that carry a bar between their two faces."""
     from .mesh import line_is_jointed
     out = []
     for i, r in enumerate(ctx.reinforcement):
@@ -5289,6 +5303,25 @@ def _joint_lines(ctx):
         if seg is not None:
             out.append((i, r, seg))
     return out
+
+
+def _all_joint_lines(ctx):
+    """``(label, line, segment)`` for every line the mesh will split along.
+
+    Both sources in one list, in the order the mesher numbers them: the
+    reinforcement lines whose ``Joint`` column reads yes, then the ``joints``
+    sheet's own lines. Every rule about what a split can represent asks this,
+    because the split does not care which sheet the line came from.
+    """
+    out = [(ctx.reinf_label(i), r, seg) for i, r, seg in _joint_lines(ctx)]
+    for i, j in enumerate(ctx.joints):
+        seg = _joint_seg(j)
+        if seg is not None:
+            out.append((ctx.joint_label(i), j, seg))
+    return out
+
+
+_AT_JOINTS = "(joints sheet)"
 
 
 # ---- the errors: what phase 1 cannot mesh, and what it cannot solve ---------
@@ -5312,16 +5345,128 @@ def _joint_no_strength(ctx):
                f"Joint to model the line as a bonded bar {_AT_REINF}.")
 
 
+@rule("joint.phi_missing", ERROR, ("fem",),
+      "A joint line's friction angle has no default.",
+      fields=("phi",))
+def _joint_phi_missing(ctx):
+    for i, j in enumerate(ctx.joints):
+        phi = _num(j.get("phi"))
+        if phi is not None:
+            continue
+        yield (f"{ctx.joint_label(i)} leaves phi blank. The interface elements "
+               f"the mesh split puts between the two faces take their "
+               f"Mohr-Coulomb strength from c and phi, and c alone defaults to "
+               f"zero, so a blank phi is a frictionless interface the two sides "
+               f"slide along under any load at all. Enter the joint's friction "
+               f"angle in degrees {_AT_JOINTS}.")
+
+
+@rule("joint.no_strength", ERROR, ("fem",),
+      "A joint with neither cohesion nor friction has no strength at all.",
+      fields=("c", "phi"))
+def _joint_no_strength_sheet(ctx):
+    for i, j in enumerate(ctx.joints):
+        c = _num(j.get("c")) or 0.0
+        phi = _num(j.get("phi"))
+        if phi is None:
+            continue                     # the phi rule names it
+        if c > 0.0 or phi > 0.0:
+            continue
+        yield (f"{ctx.joint_label(i)} states c = 0 and phi = 0. The mesh splits "
+               f"along the line and the two faces meet on that strength and on "
+               f"nothing else, so this interface carries no shear at all and the "
+               f"material on either side of it is free to slide. Enter the "
+               f"joint's cohesion, its friction angle, or both {_AT_JOINTS}.")
+
+
+@rule("joint.outside_domain", ERROR, ("fem",),
+      "A joint line has to lie in the section it splits.")
+def _joint_outside_domain(ctx):
+    from shapely.geometry import LineString
+    from shapely.ops import unary_union
+    rings = [poly for poly, _ in _joint_zone_rings(ctx)]
+    if not rings:
+        return
+    try:
+        body = unary_union(rings)
+    except Exception:
+        return
+    for i, j in enumerate(ctx.joints):
+        seg = _joint_seg(j)
+        if seg is None:
+            continue
+        g = LineString(list(seg))
+        if g.length <= 0:
+            yield (f"{ctx.joint_label(i)} has the same point at both ends. A "
+                   f"joint is a surface between two bodies and needs two "
+                   f"distinct endpoints {_AT_JOINTS}.")
+            continue
+        tol = max(1e-9, 1e-6 * g.length)
+        inside = g.intersection(body.buffer(tol)).length
+        if inside >= (1.0 - 1e-6) * g.length:
+            continue
+        outside = g.length - inside
+        yield (f"{ctx.joint_label(i)} runs from ({seg[0][0]:g}, {seg[0][1]:g}) "
+               f"to ({seg[1][0]:g}, {seg[1][1]:g}), and {outside:.4g} of its "
+               f"{g.length:.4g} length lies outside the material zones. The mesh "
+               f"can only split where there is material to split, so the part "
+               f"outside is a line the mesher has nothing to recover. Move the "
+               f"endpoints onto the section {_AT_JOINTS}.")
+
+
+@rule("joint.on_domain_boundary", ERROR, ("fem",),
+      "A joint needs material on both sides; the outside of the section has one.")
+def _joint_on_domain_boundary(ctx):
+    from shapely.geometry import LineString
+    from shapely.ops import unary_union
+    rings = [poly for poly, _ in _joint_zone_rings(ctx)]
+    if not rings:
+        return
+    try:
+        edge = unary_union(rings).boundary
+    except Exception:
+        return
+    span = 1.0
+    try:
+        xs = unary_union(rings).bounds
+        span = max(xs[2] - xs[0], xs[3] - xs[1], 1.0)
+    except Exception:
+        pass
+    tol = 1e-6 * span
+    for label, _row, seg in _all_joint_lines(ctx):
+        g = LineString(list(seg))
+        if g.length <= 0:
+            continue
+        try:
+            shared = g.intersection(edge.buffer(tol)).length
+        except Exception:
+            continue
+        # An END on the outside is normal — a sheet reaching the face, a course
+        # joint stopping on it — and each such touch picks up about one buffer
+        # width. What is refused is a STRETCH of the line running along the
+        # outside, which is a line with material on one side only.
+        if shared <= max(0.02 * g.length, 4.0 * tol):
+            continue
+        yield (f"{label} lies on the outside of the section over "
+               f"{shared:.4g} of its {g.length:.4g} length. A joint is an "
+               f"interface between two bodies and the split needs a mesh edge "
+               f"with an element on each side of it; on the outer boundary "
+               f"there is material on one side only, and nothing for the other "
+               f"face of the joint to be. Move the line inside the section, or "
+               f"— if what is wanted is a free face — model it as a boundary "
+               f"rather than as a joint.")
+
+
 @rule("joint.lines_meet", ERROR, ("fem",),
       "Two jointed lines cannot lie on one another: one edge, one interface law.")
 def _joint_lines_meet(ctx):
     from shapely.geometry import LineString
-    lines = _joint_lines(ctx)
+    lines = _all_joint_lines(ctx)
     for a in range(len(lines)):
-        ia, _ra, sa = lines[a]
+        la, _ra, sa = lines[a]
         ga = LineString(list(sa))
         for b in range(a + 1, len(lines)):
-            ib, _rb, sb = lines[b]
+            lb, _rb, sb = lines[b]
             gb = LineString(list(sb))
             if not ga.intersects(gb):
                 continue
@@ -5329,58 +5474,55 @@ def _joint_lines_meet(ctx):
             tol = max(1e-9, 1e-6 * max(ga.length, gb.length))
             if shared.geom_type == 'Point' or shared.length <= tol:
                 continue          # a junction: the mesh split builds it
-            yield (f"{ctx.reinf_label(ia)} and {ctx.reinf_label(ib)} both set "
-                   f"Joint = Yes and lie on one another over "
+            yield (f"{la} and {lb} are both joints and lie on one another over "
                    f"{shared.length:.4g} of their length. Two jointed lines may "
                    f"MEET — where they do, the mesh split copies the shared node "
                    f"once per wedge of material around it — but they cannot "
                    f"share a stretch: the mesh has one edge chain there and it "
                    f"carries one interface law. Make the overlapping stretch one "
-                   f"line {_AT_REINF}.")
+                   f"line.")
 
 
 @rule("joint.crosses_constraint_line", ERROR, ("fem",),
       "A jointed line cannot cross another reinforcement or pile line.")
 def _joint_crosses(ctx):
     from shapely.geometry import LineString
-    jointed = _joint_lines(ctx)
+    jointed = _all_joint_lines(ctx)
     if not jointed:
         return
+    jointed_labels = set(label for label, _r, _s in jointed)
     others = []
     for i, r in enumerate(ctx.reinforcement):
         seg = _joint_seg(r)
         if seg is not None:
-            others.append((ctx.reinf_label(i), i, seg, "reinforcement"))
+            others.append((ctx.reinf_label(i), seg, "reinforcement"))
     for i, p in enumerate(ctx.piles):
         seg = _joint_seg(p)
         if seg is not None:
-            others.append((ctx.pile_label(i), None, seg, "pile"))
-    for ij, _rj, sj in jointed:
+            others.append((ctx.pile_label(i), seg, "pile"))
+    for lj, _rj, sj in jointed:
         gj = LineString(list(sj))
-        for label, idx, so, kind in others:
-            if idx == ij:
-                continue
-            if kind == "reinforcement" and idx is not None and any(
-                    idx == k for k, _r, _s in jointed):
-                continue                     # the jointed pair has its own rule
+        for label, so, kind in others:
+            if label in jointed_labels:
+                continue          # two joints meeting is allowed; overlap has its own rule
             if not gj.intersects(LineString(list(so))):
                 continue
-            yield (f"{ctx.reinf_label(ij)} sets Joint = Yes and crosses "
-                   f"{label}. The crossing node belongs to both lines, and the "
-                   f"split gives it three copies for the jointed one: the "
-                   f"{kind} line's own element would keep the lower face's copy "
-                   f"and lose the soil above the sheet. Move the lines apart, "
-                   f"or leave this one bonded {_AT_REINF}.")
+            yield (f"{lj} is a joint and touches {label}. The mesh splits along "
+                   f"a jointed line and every node on it is copied once per "
+                   f"wedge of material around it, so the {kind} line's own "
+                   f"element would keep one wedge's copy and lose the material "
+                   f"on the other side of the joint. Move the lines apart, or "
+                   f"make the {kind} line a joint too.")
 
 
 @rule("joint.line_load_on_line", ERROR, ("fem",),
-      "A line load cannot be applied on a jointed line: the node is tripled.")
+      "A line load cannot be applied on a jointed line: the node is copied.")
 def _joint_line_load(ctx):
     from shapely.geometry import LineString, Point
-    jointed = _joint_lines(ctx)
+    jointed = _all_joint_lines(ctx)
     if not jointed:
         return
-    for ij, _rj, sj in jointed:
+    for lj, _rj, sj in jointed:
         g = LineString(list(sj))
         tol = max(1e-9, 1e-6 * g.length)
         for k, ll in enumerate(ctx.sd.get("line_loads") or []):
@@ -5391,11 +5533,10 @@ def _joint_line_load(ctx):
             if g.distance(pt) > tol:
                 continue
             yield (f"Line load {k + 1} is applied at "
-                   f"({pt.x:g}, {pt.y:g}), which lies on {ctx.reinf_label(ij)} "
-                   f"— a line that sets Joint = Yes. The mesh splits there, so "
-                   f"that point becomes three nodes and there is no single node "
-                   f"for the load to act on. Move the load clear of the sheet, "
-                   f"or leave the line bonded (dloads sheet, line loads).")
+                   f"({pt.x:g}, {pt.y:g}), which lies on {lj} — a joint. The "
+                   f"mesh splits there, so that point becomes several nodes and "
+                   f"there is no single node for the load to act on. Move the "
+                   f"load clear of the line (dloads sheet, line loads).")
 
 
 # ---- the warnings: a bonded line the mechanism may run along ----------------

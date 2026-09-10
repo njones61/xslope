@@ -1,0 +1,12 @@
+{
+  "benchmark": "RS2-24a-noskin",
+  "analysis": "ssrm",
+  "FS": 0.810546875,
+  "expected_fs": "0.811",
+  "file": "files/rocscience/vp032a_fem.xlsx",
+  "unit_system": "si",
+  "converged": true,
+  "iterations": 16153,
+  "residual": 1.07587991519251e-06,
+  "max_displacement": 0.03995207147692963
+}

@@ -12,91 +12,65 @@ Captured by `tools/assistant_sessions.py` against the live Studio assistant, off
 You: How do I add a piezometric line?
 
 Ran code:
-    r = docs("piezometric line pore pressure piezo", limit=8)
-    for x in r:
-        print(x['score'], x['page'], '|', x['heading'], '|', x['url'], x['anchor'])
-        print('   ', x['snippet'][:300].replace('\n',' '))
+    r = docs('piezometric line')
 
 Output:
-    - Input Template — Worksheet: piezo  [18.3]
-      https://xslope.readthedocs.io/en/latest/usage/input_template/#worksheet-piezo
-      …e pressure head is computed: - **piezo** (the default — a blank cell means the same): the line is a true *piezometric line*, i.e., the locus of pressure heads measured by piezometers at the slip surface. The pore pressure at a slice base is the full static head, u = γw · Δz, where Δz is the vertical distance from the s…
-    - Seep-Slope Integration — Pore-pressure options  [17.8]
-      https://xslope.readthedocs.io/en/latest/seep/seep_slope/#pore-pressure-options
-      …----------| | none | No pore pressures — dry soils, or a total stress analysis | | piezo | Derived from a piezometric line defined on the `piezo` sheet | | seep | Interpolated from the finite-element seepage solution | | ru | A pore-pressure ratio applied to the vertical total stress | Materials that are not set to `se…
-    - Overview — Pore pressures  [17.6]
-      https://xslope.readthedocs.io/en/latest/lem/overview/#pore-pressures
-      …to supply the pore pressure $u$, selected per material through the **u** column of the input template. **Piezometric line** (`u = piezo`, the piezo sheet's `Type` = *piezo* or blank). The line is a true piezometric line — the locus of pressure heads a set of piezometers would read at the slip surface. The pore pressur…
-    - 4. Water in the Slope — 3. The piezo worksheet  [17.01]
-      https://xslope.readthedocs.io/en/latest/tutorials/lem04_water_in_the_slope/#3-the-piezo-worksheet
-      …for the **Type**, and enter (or copy-paste) the eight coordinates from the table above, as shown below: A piezometric line is the model's water table, given as its own polyline: the pore pressure at a point on the failure surface is γ<sub>w</sub> times the vertical distance below the line, and zero above it. The sheet'…
-    - Overview — Pore pressures  [16.72]
-      https://xslope.readthedocs.io/en/latest/fem/overview/#pore-pressure-options
-      …-----------------------| | `none` | none | $u = 0$; the yield check is a total-stress check | | `piezo` | piezometric line | $u = \gamma_w (z_{piezo} - y_{gp})$ from the line elevation above the point | | `ru` | pore-pressure ratio | $u = r_u\,\sigma_v$, with $\sigma_v$ the weight of the soil column above the point | |…
-    - 5. A Weak Layer, Non-Circular — 3. The piezo worksheet  [16.53]
-      https://xslope.readthedocs.io/en/latest/tutorials/lem05_weak_layer_noncircular/#3-the-piezo-worksheet
-      …` for the **Type**, and enter (or copy-paste) the two coordinates from the table above, as shown below: A piezometric line is a water table given as its own polyline: pore pressure at a point on the failure surface is γ<sub>w</sub> times the vertical distance below it. It spans the full section because the water table…
-    - 4. Water in the Slope — Check its work  [15.66]
-      https://xslope.readthedocs.io/en/latest/tutorials/lem04_water_in_the_slope/#check-its-work
-      …ure source reads u = 0 everywhere. If any material came back with `none`, say: *"All three soils read the piezometric line — set every pore pressure option to piezo."* - **One piezometric line, eight points, spanning x = 0 to 320.** A line that stops short of the surface's reach is an error at run time, not a warning.…
-    - Sample Problems — 16. Saturated vs. Moist Unit Weight (γ_sat)  [15.3]
-      https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat
-      …ight — γ_sat below the water table, γ above it. The water table comes from whichever the model defines: a piezometric line on the **piezo** sheet, or the phreatic surface of a finite-element seepage solution. It belongs to the problem rather than to any one material, so it splits the weight whether or not the material'…
-    18.3 Input Template | Worksheet: piezo | https://xslope.readthedocs.io/en/latest/usage/input_template/ worksheet-piezo
-        …e pressure head is computed: - **piezo** (the default — a blank cell means the same): the line is a true *piezometric line*, i.e., the locus of pressure heads measured by piezometers at the slip surface. The pore pressure at a slice base is the full static head, u = γw · Δz, where Δz is the vertica
-    17.8 Seep-Slope Integration | Pore-pressure options | https://xslope.readthedocs.io/en/latest/seep/seep_slope/ pore-pressure-options
-        …----------| | none | No pore pressures — dry soils, or a total stress analysis | | piezo | Derived from a piezometric line defined on the `piezo` sheet | | seep | Interpolated from the finite-element seepage solution | | ru | A pore-pressure ratio applied to the vertical total stress | Materials th
-    17.6 Overview | Pore pressures | https://xslope.readthedocs.io/en/latest/lem/overview/ pore-pressures
-        …to supply the pore pressure $u$, selected per material through the **u** column of the input template. **Piezometric line** (`u = piezo`, the piezo sheet's `Type` = *piezo* or blank). The line is a true piezometric line — the locus of pressure heads a set of piezometers would read at the slip surfa
-    17.01 4. Water in the Slope | 3. The piezo worksheet | https://xslope.readthedocs.io/en/latest/tutorials/lem04_water_in_the_slope/ 3-the-piezo-worksheet
-        …for the **Type**, and enter (or copy-paste) the eight coordinates from the table above, as shown below: A piezometric line is the model's water table, given as its own polyline: the pore pressure at a point on the failure surface is γ<sub>w</sub> times the vertical distance below the line, and zero
-    16.72 Overview | Pore pressures | https://xslope.readthedocs.io/en/latest/fem/overview/ pore-pressure-options
-        …-----------------------| | `none` | none | $u = 0$; the yield check is a total-stress check | | `piezo` | piezometric line | $u = \gamma_w (z_{piezo} - y_{gp})$ from the line elevation above the point | | `ru` | pore-pressure ratio | $u = r_u\,\sigma_v$, with $\sigma_v$ the weight of the soil colum
-    16.53 5. A Weak Layer, Non-Circular | 3. The piezo worksheet | https://xslope.readthedocs.io/en/latest/tutorials/lem05_weak_layer_noncircular/ 3-the-piezo-worksheet
-        …` for the **Type**, and enter (or copy-paste) the two coordinates from the table above, as shown below: A piezometric line is a water table given as its own polyline: pore pressure at a point on the failure surface is γ<sub>w</sub> times the vertical distance below it. It spans the full section bec
-    15.66 4. Water in the Slope | Check its work | https://xslope.readthedocs.io/en/latest/tutorials/lem04_water_in_the_slope/ check-its-work
-        …ure source reads u = 0 everywhere. If any material came back with `none`, say: *"All three soils read the piezometric line — set every pore pressure option to piezo."* - **One piezometric line, eight points, spanning x = 0 to 320.** A line that stops short of the surface's reach is an error at run 
-    15.3 Sample Problems | 16. Saturated vs. Moist Unit Weight (γ_sat) | https://xslope.readthedocs.io/en/latest/lem/samples/ 16-saturated-vs-moist-unit-weight-_sat
-        …ight — γ_sat below the water table, γ above it. The water table comes from whichever the model defines: a piezometric line on the **piezo** sheet, or the phreatic surface of a finite-element seepage solution. It belongs to the problem rather than to any one material, so it splits the weight whether
+    - 2. Rapid Drawdown — Clearing the piezometric lines  [13.24]
+      https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#clearing-the-piezometric-lines
+      …s replace both of the jobs they did. Where a seepage analysis is defined, its head boundaries outrank the piezometric line for the water loads, and the `u` column set to `seep` outranks it for pore pressure — a line answers only for a model that has neither. Left on the file, the pair would be read by nothing, so delet…
+    - 4. Water in the Slope — 2. The piezometric line  [13.23]
+      https://xslope.readthedocs.io/en/latest/tutorials/lem04_water_in_the_slope/#2-the-piezometric-line
+      Click **Piezometric lines**. The editor holds the two lines on tabs — the water table on **Line 1**, and **Line 2 (rapid drawdown)**, which stays empty here. Press **Add row** eight times and enter the points from the table above, left to right. The preview draws the line on the section as you type, which is where a mi…
+    - Seep-Slope Integration — Piezometric line vs. seepage-derived pore pressures  [13.23]
+      https://xslope.readthedocs.io/en/latest/seep/seep_slope/#piezometric-line-vs-seepage-derived-pore-pressures
+      A piezometric line is a drawn estimate of the phreatic surface; a seepage solution honours the flow field and the conductivities. The right-facing slope below (a three-layer silt / sand / clay profile) is solved both ways on the **same single circle** ($X_0 = 175$, $Y_0 = 100$), so the pore-pressure model is the only d…
+    - Seep-Slope Integration — Part a — piezometric line  [13.2]
+      https://xslope.readthedocs.io/en/latest/seep/seep_slope/#part-a-piezometric-line
+      All three materials use the `piezo` option, with the surface entered on the **piezo** sheet. Input file: [xslope_rface_PIEZO_KEY.xlsx](files/xslope_rface_PIEZO_KEY.xlsx) {width=900} {width=900} Spencer's method gives **FS = 1.94**.
+    - Rocscience Slide2 Corpus — 🟢 VP76: Homogeneous dam, FE seepage vs. piezometric line (D&W Fig. 7.19)  [13.04]
+      https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp76
+      …the entire upstream face. As in VP71, pore pressures are modeled two ways — an FE seepage analysis and a piezometric line — and the critical circle is found by free search. **Input files:** [vp076a.xlsx](files/rocscience/vp076a.xlsx) (FE seepage), [vp076b.xlsx](files/rocscience/vp076b.xlsx) (piezometric line) | Case |…
+    - Rocscience Slide2 Corpus — 🟢 VP71: FE seepage vs. piezometric line, same slope (D&W Figs. 6.37–6.38)  [12.99]
+      https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp71
+      …ope is solved two ways — pore pressures from a finite-element seepage analysis, and pore pressures from a piezometric line — and the two must agree. Case 1 runs XSLOPE's own FE seepage solver (specified heads of 40 and 75 on the two vertical boundaries, the ground surface an exit face) and feeds the nodal pore pressure…
+    - Rocscience Slide2 Corpus — 🟢 VP69: Steady-seepage dam with a piezometric line (USACE example F-6)  [12.89]
+      https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp69
+      …a granular foundation (c' = 0, φ' = 35°, γ = 125 pcf) under steady seepage. Pore pressures come from the piezometric line, which leaves the pool surface at el. 100, drops to the chimney drain, follows it to the tailwater at el. 22.5 and runs out flat to the downstream face; USACE takes u as the vertical distance to th…
+    - 2. Rapid Drawdown — Part 1 — Two piezometric lines  [12.55]
+      https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#part-1-two-piezometric-lines
+      The first way to describe the two water states is also the simplest: a piezometric line for each, one at full pool and one drawn down, sketched from the piezometers or from judgment, with no seepage run behind either. The file already carries both lines, so we look at them first and then run the procedure on the pair.
 
-Assistant: Two things have to be set — the line, and the materials that read it. Setting only one is the usual mistake.
+Assistant: Two pieces are needed: the **line** itself, and the materials that **read** it.
 
-## 1. The line
+## In Studio (GUI)
 
-In Studio it's the **piezo** worksheet/tab: a polyline of (x, y) points, left to right, spanning the **full width** of the section (yours is x = -30 to 90 — a line that stops short of the failure surface's reach is a run-time error, not a warning). The sheet's **Type** column picks how head is computed:
+Click **Piezometric lines** in the inputs dock. The editor has two tabs — **Line 1** (the water table) and **Line 2 (rapid drawdown)**, which stays empty unless you're staging a drawdown. Add rows and type the points left to right; the preview draws them on the section as you go. Then, in the **Materials** table, set the `u` column to `piezo` for every material whose pore pressure should come from that line. (Tutorial: [Water in the Slope §2](https://xslope.readthedocs.io/en/latest/tutorials/lem04_water_in_the_slope/#2-the-piezometric-line))
 
-| Type | Meaning |
-|:--|:--|
-| `piezo` (or blank, the default) | true piezometric line — u = γw · Δz, the full vertical distance from the line down to the slice base |
-| `phreatic` | that head reduced by cos²(local inclination of the line) — the sloping-water-table correction |
-
-## 2. Each material's pore-pressure option
-
-On the materials sheet set the **u** column to `piezo` for every material that should feel it. Materials left at `none` read u = 0 no matter what line exists. (Other options: `seep` = FE seepage field, `ru` = pore-pressure ratio.)
-
-Your two soils are both φ = 0 at `u = none`, i.e. a total-stress analysis — adding a piezo line changes nothing until you switch them to `piezo`, and in a φ = 0 undrained run you normally *shouldn't*.
-
-## Doing it from here
-
-If you'd rather I set it, it's a small edit to `slope_data`:
+## Or have me do it
 
 ```python
-slope_data['piezo_line'] = [(-30, 12), (10, 12), (40, 4), (90, 4)]
-slope_data['piezo_phreatic'] = False        # True = phreatic correction
+slope_data['piezo_line'] = [(-30, 12), (10, 12), (30, 6), (90, 6)]
+slope_data['piezo_phreatic'] = False
 for m in slope_data['materials']:
     m['u'] = 'piezo'
 ```
 
-Two related rules worth knowing: use **total** unit weights, never buoyant ones (set `gamma_sat` and the weight is split at the line automatically); and if the water stands *above* the ground surface anywhere, `water_loads = 'auto'` derives the hydrostatic surface load itself — don't add a `dload` for the pool.
+Three things worth knowing:
 
-Docs: [Input Template — piezo worksheet](https://xslope.readthedocs.io/en/latest/usage/input_template/#worksheet-piezo) and [LEM Overview — Pore pressures](https://xslope.readthedocs.io/en/latest/lem/overview/#pore-pressures); worked walkthrough in [Tutorial 4 — Water in the Slope](https://xslope.readthedocs.io/en/latest/tutorials/lem04_water_in_the_slope/#3-the-piezo-worksheet).
+| Item | Behavior |
+|:--|:--|
+| `piezo_phreatic` | `False` (default) = true piezometric line, u = γ_w × vertical distance below it. `True` = phreatic surface, that head reduced by cos²(local line inclination). |
+| Ponded water | Where the line rises above the ground, the pool load is added automatically as long as `water_loads = 'auto'` (it is, in your model). Do **not** also enter a `dloads` block — that counts the pool twice. |
+| Precedence | A material with `u = 'seep'`, or a defined seepage BC, outranks the line. A line answers only for a model with neither. |
 
-Tell me the water elevations you want and I'll add the line to this model.
+Your model currently has `u = 'none'` on both materials and no line, so it's running fully dry.
+
+If you tell me the water level(s) — where the line starts on the left, where it exits the face, and its tailwater elevation — I'll enter it and set the materials to `piezo`. I won't run anything unless you ask.
 ````
 
-Tokens: input 40,471 · cached_input 37,016 · output 1,229 · calls 2 · 17.5s
+Tokens: input 39,262 · cached_input 37,116 · output 837 · calls 2 · 12.5s
 
 ## Session total
 
-- Tokens: input 40,471 · cached_input 37,016 · output 1,229 · calls 2
-- Wall time: 19.5s
+- Tokens: input 39,262 · cached_input 37,116 · output 837 · calls 2
+- Wall time: 14.7s

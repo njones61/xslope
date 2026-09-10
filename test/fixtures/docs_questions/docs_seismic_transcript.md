@@ -12,73 +12,54 @@ Captured by `tools/assistant_sessions.py` against the live Studio assistant, off
 You: Can it do seismic loading?
 
 Ran code:
-    r = docs("seismic coefficient pseudo-static")
-    for x in r[:8]:
-        print(x['page'], '|', x['heading'], '|', x['url'], x['anchor'])
-        print('   ', x['snippet'][:220].replace('\n',' '))
+    docs('seismic loading k_seismic pseudo-static')
 
 Output:
-    - GeoStudio (SLOPE/W) Corpus — 🟢 2.4 — ACADS Non-Homogeneous + Seismic  [21.12]
+    - GeoStudio (SLOPE/W) Corpus — 🟢 2.4 — ACADS Non-Homogeneous + Seismic  [27.92]
       https://xslope.readthedocs.io/en/latest/verification/geostudio/#gs-2-4
       ACADS 1(d): the three-material non-homogeneous slope of §2.3 with a horizontal pseudo-static seismic coefficient of 0.15 added, verifying seismic loading over layered strengths. **Input:** [vp004.xlsx](files/rocscience/vp004.xlsx) · **Rocscience detail:** [VP4](rocscience.md#vp4) | Method | XSLOPE | SLOPE/W | ACADS | |…
-    - 2. Loads on the Crest — A second kind of demand  [20.08]
-      https://xslope.readthedocs.io/en/latest/tutorials/lem02_loads_on_the_crest/#a-second-kind-of-demand
-      A **seismic coefficient** applies a horizontal force of k × W to every slice, at the slice's center of gravity — the pseudo-static way of asking what an earthquake would do. It is a single global number: - **Studio** — open **Global parameters** and set **Seismic coefficient k**. - **Excel** — `main!D13`. - **Assistant…
-    - GeoStudio (SLOPE/W) Corpus — 🟢 2.39 — Loukidis – Seismic Coefficient #2  [19.04]
-      https://xslope.readthedocs.io/en/latest/verification/geostudio/#gs-2-39
-      …ides, and a strong φ = 45° base (c = 15, γ = 19). The target is not a factor of safety but the **critical seismic coefficient** k꜀, the horizontal pseudo-static coefficient at which the searched minimum FS = 1. **Input:** [vp063.xlsx](files/rocscience/vp063.xlsx) · **Rocscience detail:** [VP63](rocscience.md#vp63) · **…
-    - GeoStudio (SLOPE/W) Corpus — 🟢 2.38 — Loukidis – Seismic Coefficient  [18.09]
-      https://xslope.readthedocs.io/en/latest/verification/geostudio/#gs-2-38
-      A homogeneous slope loaded pseudo-statically at its critical seismic coefficient (dry and ru = 0.5 cases), where the factor of safety is driven to ≈ 1. **Input:** [vp062a.xlsx](files/rocscience/vp062a.xlsx) · **Rocscience detail:** [VP62](rocscience.md#vp62) | Method | XSLOPE | SLOPE/W | Reference | |---|---|---|---| |…
-    - Overview — Equilibrium  [17.85]
+    - Overview — Seismic forces  [25.83]
+      https://xslope.readthedocs.io/en/latest/fem/overview/#seismic-forces
+      Seismic loading uses the pseudo-static method in both the limit-equilibrium and finite element solvers: a constant horizontal acceleration, expressed as a fraction $k$ of gravity, applied to the whole soil mass as an additional body force, >>$b_{x,seismic} = k \gamma, \qquad b_{y,seismic} = 0$ integrated to nodal force…
+    - Overview — Equilibrium  [23.23]
       https://xslope.readthedocs.io/en/latest/fem/overview/#equilibrium
       …onents and $b_x$, $b_y$ are body forces — gravity, $b_x = 0$ and $b_y = -\gamma$, plus the pseudo-static [seismic](#seismic-forces) term when one is applied.
-    - Rocscience Slide2 Corpus — 🟢 VP63: Slope, (3) materials, seismic — critical seismic coefficient  [16.82]
-      https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp63
-      …between a light c = 4 kPa cap and a strong φ = 45° base) loaded pseudo-statically at the paper's critical seismic coefficient kc = 0.155, at which the factor of safety is exactly 1. Loukidis analyzed a log-spiral mechanism and Slide a path search with Monte-Carlo optimization; XSLOPE runs its noncircular search from a…
-    - Rocscience RS2 (SSRM) Corpus — 🟢 RS2-3: Non-homogeneous slope with seismic load (0.15g)  [16.53]
+    - Rocscience RS2 (SSRM) Corpus — 🟢 RS2-3: Non-homogeneous slope with seismic load (0.15g)  [22.43]
       https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-3
       …| 1.00 (−5.2%) | k is entered negative per the FEM sign convention — this is a left-facing slope, so the pseudo-static force acts in −x, while the LEM takes the magnitude and directs it from the failure surface.
-    - Input Template — Worksheet: main  [16.49]
-      https://xslope.readthedocs.io/en/latest/usage/input_template/#worksheet-main
-      …h **[L]** and water-surface elevation **[L]** within tension cracks at the top of the failure surface - **Seismic coefficient** (kh) — **[–]**: Horizontal seismic acceleration coefficient (dimensionless) for pseudo-static earthquake analysis
-    GeoStudio (SLOPE/W) Corpus | 🟢 2.4 — ACADS Non-Homogeneous + Seismic | https://xslope.readthedocs.io/en/latest/verification/geostudio/ gs-2-4
-        ACADS 1(d): the three-material non-homogeneous slope of §2.3 with a horizontal pseudo-static seismic coefficient of 0.15 added, verifying seismic loading over layered strengths. **Input:** [vp004.xlsx](files/rocscience/v
-    2. Loads on the Crest | A second kind of demand | https://xslope.readthedocs.io/en/latest/tutorials/lem02_loads_on_the_crest/ a-second-kind-of-demand
-        A **seismic coefficient** applies a horizontal force of k × W to every slice, at the slice's center of gravity — the pseudo-static way of asking what an earthquake would do. It is a single global number: - **Studio** — o
-    GeoStudio (SLOPE/W) Corpus | 🟢 2.39 — Loukidis – Seismic Coefficient #2 | https://xslope.readthedocs.io/en/latest/verification/geostudio/ gs-2-39
-        …ides, and a strong φ = 45° base (c = 15, γ = 19). The target is not a factor of safety but the **critical seismic coefficient** k꜀, the horizontal pseudo-static coefficient at which the searched minimum FS = 1. **Input:
-    GeoStudio (SLOPE/W) Corpus | 🟢 2.38 — Loukidis – Seismic Coefficient | https://xslope.readthedocs.io/en/latest/verification/geostudio/ gs-2-38
-        A homogeneous slope loaded pseudo-statically at its critical seismic coefficient (dry and ru = 0.5 cases), where the factor of safety is driven to ≈ 1. **Input:** [vp062a.xlsx](files/rocscience/vp062a.xlsx) · **Rocscienc
-    Overview | Equilibrium | https://xslope.readthedocs.io/en/latest/fem/overview/ equilibrium
-        …onents and $b_x$, $b_y$ are body forces — gravity, $b_x = 0$ and $b_y = -\gamma$, plus the pseudo-static [seismic](#seismic-forces) term when one is applied.
-    Rocscience Slide2 Corpus | 🟢 VP63: Slope, (3) materials, seismic — critical seismic coefficient | https://xslope.readthedocs.io/en/latest/verification/rocscience/ vp63
-        …between a light c = 4 kPa cap and a strong φ = 45° base) loaded pseudo-statically at the paper's critical seismic coefficient kc = 0.155, at which the factor of safety is exactly 1. Loukidis analyzed a log-spiral mechan
-    Rocscience RS2 (SSRM) Corpus | 🟢 RS2-3: Non-homogeneous slope with seismic load (0.15g) | https://xslope.readthedocs.io/en/latest/verification/rs2/ rs2-3
-        …| 1.00 (−5.2%) | k is entered negative per the FEM sign convention — this is a left-facing slope, so the pseudo-static force acts in −x, while the LEM takes the magnitude and directs it from the failure surface.
-    Input Template | Worksheet: main | https://xslope.readthedocs.io/en/latest/usage/input_template/ worksheet-main
-        …h **[L]** and water-surface elevation **[L]** within tension cracks at the top of the failure surface - **Seismic coefficient** (kh) — **[–]**: Horizontal seismic acceleration coefficient (dimensionless) for pseudo-stat
+    - Published Problems — 🟢 FHWA Example E7 — seismic loading on the E4 wall  [21.82]
+      https://xslope.readthedocs.io/en/latest/verification/published/#fhwa-e7
+      …cceleration within the reinforced zone out to k<sub>av</sub> = 0.211 g, and the model carries that as its seismic coefficient. Internal Step 4 reduces $F^{*}$ to 80 percent of its static value for seismic loading, so every level's Delta is taken on 0.8F\*. The static resistances the reduction applies to are E4's own, c…
+    - 2. Loads on the Crest — A second kind of demand  [19.97]
+      https://xslope.readthedocs.io/en/latest/tutorials/lem02_loads_on_the_crest/#a-second-kind-of-demand
+      A **seismic coefficient** applies a horizontal force of k × W to every slice, at the slice's center of gravity — the pseudo-static way of asking what an earthquake would do. It is a single global number: - **Studio** — open **Global parameters** and set **Seismic coefficient k**. - **Excel** — `main!D13`. - **Assistant…
+    - Overview — Advanced Loading Conditions  [18.93]
+      https://xslope.readthedocs.io/en/latest/lem/overview/#advanced-loading-conditions
+      …ificantly affect the stability calculations. These advanced loading conditions include distributed loads, seismic loads, reinforcement forces, and tension cracks. **Distributed Loads**: Surface loads such as traffic, construction equipment, or other surcharges can be represented as distributed forces acting on the top…
+    - GeoStudio (SLOPE/W) Corpus — 🟢 2.39 — Loukidis – Seismic Coefficient #2  [18.74]
+      https://xslope.readthedocs.io/en/latest/verification/geostudio/#gs-2-39
+      …ides, and a strong φ = 45° base (c = 15, γ = 19). The target is not a factor of safety but the **critical seismic coefficient** k꜀, the horizontal pseudo-static coefficient at which the searched minimum FS = 1. **Input:** [vp063.xlsx](files/rocscience/vp063.xlsx) · **Rocscience detail:** [VP63](rocscience.md#vp63) · **…
 
 Assistant: Yes — pseudo-static seismic loading, in both the LEM and the FEM.
 
-**How it works.** A single global horizontal coefficient `k_seismic` (kh, dimensionless fraction of g) applies a horizontal force of k × W to every slice at its center of gravity, directed out of the slope in the driving direction. There is no vertical coefficient. In the FEM it enters as a body force term alongside gravity (`fem/overview/#equilibrium`), where the sign convention matters: k is entered **negative** for a left-facing slope, whereas the LEM takes the magnitude and directs it from the failure surface.
+**How it works.** A single global horizontal coefficient `k` (a fraction of g) applies a force `k·W` to every slice at its center of gravity in the LEM; in the FEM it enters as an extra body force `bx = k·γ`, `by = 0` (`fem/overview/#seismic-forces`). There is no vertical component and no time-history option — it is the classic pseudo-static method, described for the LEM at `lem/overview/#advanced-loading-conditions`.
 
-**Where to set it.**
-- Studio → Global parameters → *Seismic coefficient k*
-- Excel → `main!D13` (Input Template, `usage/input_template/#worksheet-main`)
+**Where you set it.** One number, not a per-material or per-slice input:
+
+- Studio → **Global parameters** → *Seismic coefficient k*
+- Excel → `main!D13`
 - Here → `slope_data['k_seismic'] = 0.15`
 
-**Worked/verified examples** — the corpus has several:
-- ACADS 1(d), non-homogeneous slope at k = 0.15 — `verification/geostudio/#gs-2-4`
-- Loukidis critical seismic coefficient (dry and ru = 0.5), where k is raised until FS = 1 — `verification/geostudio/#gs-2-38` and `#gs-2-39`, Slide2 counterpart at `verification/rocscience/#vp63`
-- SSRM version with 0.15g — `verification/rs2/#rs2-3`
+Sign convention: the LEM takes the magnitude and directs the force away from the failure surface (driving), so a positive `k` is what you normally want. The FEM is direction-sensitive — for a left-facing slope `k` is entered negative, since the pseudo-static force must act in −x (`verification/rs2/#rs2-3`).
 
-Your model currently has no seismic coefficient set. If you want the classic "what k drives this slope to FS = 1" study, `design_sweep({'global': 'k_seismic'}, 0.0, 0.3, target_fs=1.0)` does it directly — say the word and I'll run it.
+**Verified against.** ACADS problem 1(d) — a three-layer non-homogeneous slope with k = 0.15 — is in the corpus at `verification/geostudio/#gs-2-4`, compared to SLOPE/W and the ACADS reference; the same problem run by SSRM is `verification/rs2/#rs2-3`. There is also a critical-seismic-coefficient study (find the k that drives FS to 1.0) at `verification/geostudio/#gs-2-39` — that one is a `design_sweep({'global': 'k_seismic'}, ..., target_fs=1.0)` job.
+
+Your model currently has no seismic coefficient set. Want me to add one and run it?
 ```
 
-Tokens: input 40,496 · cached_input 37,015 · output 738 · calls 2 · 10.6s
+Tokens: input 39,173 · cached_input 37,115 · output 694 · calls 2 · 10.8s
 
 ## Session total
 
-- Tokens: input 40,496 · cached_input 37,015 · output 738 · calls 2
-- Wall time: 12.9s
+- Tokens: input 39,173 · cached_input 37,115 · output 694 · calls 2
+- Wall time: 13.2s

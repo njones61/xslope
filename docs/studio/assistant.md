@@ -34,6 +34,14 @@ browser**, so a chat reply is a starting point rather than the last word. When a
 question matches a topic the [verification corpus](../verification/index.md) covers,
 it points at the worked problems too.
 
+A question about what XSLOPE can do is answered out of **this documentation, as
+your installed version ships it**. The whole page set travels inside the package,
+and the assistant searches it before answering rather than recalling what the
+program supports, so the reply describes the version you are running and names the
+page and section it came from — follow the link and you are reading the source of
+the answer. Where the search turns up nothing it says that it searched, instead of
+reporting a capability missing.
+
 *The exchanges below are representative, not screenshots. Wording varies with the
 model you select; answers are grounded in this documentation and in the model's own
 knowledge, and are shortened here to show the pattern rather than to stand in for

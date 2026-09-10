@@ -2004,7 +2004,9 @@ class PythonKernel:
             feature gets denied.
 
             Returns `[{'page', 'url', 'heading', 'anchor', 'snippet', 'score'}]`,
-            best first, and prints the same. `url` is the page's real address and
+            best first, and PRINTS every row as it goes — so `docs(...)` on its own
+            line is the whole snippet, and a loop that prints the rows back only
+            doubles what you have already been shown. `url` is the page's real address and
             `anchor` the fragment on it: cite them. `full=True` adds the matched
             section's whole text under `'text'` — use it when the snippet answers
             the question only partly. `docs_section(url, anchor)` reads one

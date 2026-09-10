@@ -996,6 +996,28 @@ def w1_conceptual(dry_run=False):
         timeout_s=600, max_height=20000, save_after=False, dry_run=dry_run)
 
 
+def w1_capability(dry_run=False):
+    """A question about XSLOPE rather than about the model.
+
+    "Does it do X" is the question a reader asks before they build anything, and
+    the one the documentation search answers: the pages ship inside the package,
+    so the reply is read out of the installed version rather than recalled. Line
+    loads because the answer is layered — a worksheet, a slice-equation term, and
+    a tutorial that applies the same resultant both ways — so the citation is
+    doing real work.
+
+    Not yet on the page. W-1 publishes a measured cost table over exactly eight
+    sessions, and the same eight replayed on four other models; a ninth would
+    misdescribe both until they are re-measured. This session is the producer
+    ready for that pass — it records as w1_capability_1.png and
+    w1_capability_transcript.md, the same shapes every other W-1 session writes.
+    """
+    return run_assistant_session(
+        "capability", W1_MODEL,
+        ["Does XSLOPE support line loads?"],
+        timeout_s=600, max_height=20000, save_after=False, dry_run=dry_run)
+
+
 def w1_diagnose(dry_run=False):
     """A broken model, and no hint about where the breakage is.
 
@@ -1030,8 +1052,8 @@ def w1_report(dry_run=False):
 
 
 for _fn in (w1_smoke, w1_build_from_image, w1_modify, w1_sweep_builtin,
-            w1_sweep_adhoc, w1_elastic_fem, w1_conceptual, w1_diagnose,
-            w1_report):
+            w1_sweep_adhoc, w1_elastic_fem, w1_capability, w1_conceptual,
+            w1_diagnose, w1_report):
     SESSIONS[_fn.__name__] = _fn
 del _fn
 

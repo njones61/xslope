@@ -12,12 +12,8 @@ Captured by `tools/assistant_sessions.py` against the live Studio assistant, off
 You: Can xslope do rapid drawdown?
 
 Ran code:
-    r = docs('rapid drawdown', limit=8)
-    for row in r:
-        print(row['page'], '|', row['heading'], '|', row['url'], row['anchor'])
-    print('---CORPUS---')
-    for row in corpus_index('rapid drawdown'):
-        print(row)
+    docs('rapid drawdown')
+    corpus_index('rapid drawdown')
 
 Output:
     - 2. Rapid Drawdown — 2. Rapid Drawdown  [15.24]
@@ -44,15 +40,6 @@ Output:
     - GeoStudio (SLOPE/W) Corpus — 🟢 2.40 — Rapid Drawdown – Walter Bouldin Dam  [15.02]
       https://xslope.readthedocs.io/en/latest/verification/geostudio/#gs-2-40
       The Walter Bouldin Dam is a rolled earthfill dam that failed during a rapid drawdown in 1975; this case verifies XSLOPE's Duncan-Wright-Wong three-stage rapid drawdown procedure. **Input:** [vp098.xlsx](files/rocscience/vp098.xlsx) · **Rocscience detail:** [VP98](rocscience.md#vp98) | Method | XSLOPE | SLOPE/W | DWW |…
-    2. Rapid Drawdown | 2. Rapid Drawdown | https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/ 
-    Overview | Rapid Drawdown Analysis | https://xslope.readthedocs.io/en/latest/lem/overview/ rapid-drawdown-analysis
-    Rapid Drawdown Analysis | Rapid Drawdown Analysis | https://xslope.readthedocs.io/en/latest/lem/rapid/ rapid-drawdown-analysis
-    2. Rapid Drawdown | What rapid drawdown is | https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/ what-rapid-drawdown-is
-    Rapid Drawdown Analysis | When Does Rapid Drawdown Apply? | https://xslope.readthedocs.io/en/latest/lem/rapid/ when-does-rapid-drawdown-apply
-    GeoStudio (SLOPE/W) Corpus | 🟢 2.43 — Rapid Drawdown – Pilarcitos Dam | https://xslope.readthedocs.io/en/latest/verification/geostudio/ gs-2-43
-    Sample Problems | 12. Rapid Drawdown (Johnson Reservoir Dam) | https://xslope.readthedocs.io/en/latest/lem/samples/ 12-rapid-drawdown-johnson-reservoir-dam
-    GeoStudio (SLOPE/W) Corpus | 🟢 2.40 — Rapid Drawdown – Walter Bouldin Dam | https://xslope.readthedocs.io/en/latest/verification/geostudio/ gs-2-40
-    ---CORPUS---
     - 16. Saturated vs. Moist Unit Weight (γ_sat)  [rapid-drawdown]
       https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat
     - 12. Rapid Drawdown (Johnson Reservoir Dam)  [rapid-drawdown]
@@ -73,51 +60,49 @@ Output:
       https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp99
     - VP100: Embankment dam, homogenous, rapid drawdown, water table  [homogeneous]
       https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp100
-    {'topic': 'rapid-drawdown', 'title': '16. Saturated vs. Moist Unit Weight (γ_sat)', 'url': 'https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat'}
-    {'topic': 'rapid-drawdown', 'title': '12. Rapid Drawdown (Johnson Reservoir Dam)', 'url': 'https://xslope.readthedocs.io/en/latest/lem/samples/#12-rapid-drawdown-johnson-reservoir-dam'}
-    {'topic': 'rapid-drawdown', 'title': 'Tutorial COMBO-2 — Rapid Drawdown', 'url': 'https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#tutorial-combo-2-rapid-drawdown'}
-    {'topic': 'rapid-drawdown', 'title': 'The dam', 'url': 'https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#the-dam'}
-    {'topic': 'transient-seepage', 'title': 'SEEPW-T03 — Rapid drawdown', 'url': 'https://xslope.readthedocs.io/en/latest/verification/geostudio/#seepw-t03'}
-    {'topic': 'rapid-drawdown', 'title': 'VP96: Embankment dam, homogenous, rapid drawdown, water table', 'url': 'https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp96'}
-    {'topic': 'rapid-drawdown', 'title': 'VP97: Embankment dam, homogenous, rapid drawdown, water table', 'url': 'https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp97'}
-    {'topic': 'rapid-drawdown', 'title': 'VP98: Walter Bouldin Dam rapid drawdown (Duncan, Wright & Wong 1990)', 'url': 'https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp98'}
-    {'topic': 'rapid-drawdown', 'title': 'VP99: Pumped-storage project dam rapid drawdown (DWW 1990)', 'url': 'https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp99'}
-    {'topic': 'homogeneous', 'title': 'VP100: Embankment dam, homogenous, rapid drawdown, water table', 'url': 'https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp100'}
 
-Assistant: Yes — it's a first-class feature, not a workaround.
+Assistant: Yes — it's a first-class capability, using the **Duncan, Wright & Wong (1990) three-stage procedure** (as documented in Duncan & Wright's text).
 
-## What it implements
+## How it works
 
-The **Duncan, Wright & Wong (1990) three-stage procedure**, run on top of any of the standard methods (OMS, Bishop, Janbu, Corps, Lowe, Spencer, M-P). Stage 1 solves the pre-drawdown (full pool) condition to get consolidation stresses on the failure surface; stage 2 re-solves with the pool lowered using undrained strengths derived from those stresses; stage 3 takes the lower of drained/undrained strength slice by slice. Full write-up: [`lem/rapid/`](https://xslope.readthedocs.io/en/latest/lem/rapid/#rapid-drawdown-analysis), including the *T = c_v·t / D²* screening rubric for **when** drawdown is actually "rapid" ([when-does-rapid-drawdown-apply](https://xslope.readthedocs.io/en/latest/lem/rapid/#when-does-rapid-drawdown-apply)).
+Three stages on the same trial surface:
+
+1. **Stage 1 — before drawdown.** Drained (effective-stress) analysis with the full pool. This gives the consolidation stresses on the base of each slice.
+2. **Stage 2 — immediately after drawdown.** Undrained strengths derived from those stage-1 consolidation stresses, with the pool now at the drawn-down level (the low pool still counts as a surface load and as pore pressure below it).
+3. **Stage 3 — check.** Where the drained strength at stage-2 stresses is *lower* than the undrained strength, the drained value governs and is substituted. The reported FS is stage 2/3.
+
+Page: `lem/rapid/#rapid-drawdown-analysis`, plus the applicability rubric (the consolidation time factor T = c_v·t/D², with T > 3 meaning the soil drains as fast as the pool falls, so drawdown is *not* rapid for it) at `lem/rapid/#when-does-rapid-drawdown-apply`.
 
 ## What you supply
 
 | Input | Meaning |
 |:--|:--|
-| `piezo_line` / `piezo_line2` | pool before / after drawdown |
-| `dloads` / `dloads2` | stage-1 / stage-2 surface loads (skip on `water_loads='auto'`) |
+| `piezo_line` | stage 1 — the full pool |
+| `piezo_line2` | stage 2 — the drawn-down pool |
+| `dloads` / `dloads2` | stage-specific surface loads (leave to `water_loads='auto'` for the pool itself) |
 | `seepage_bc` / `seepage_bc2` | the seepage alternative — two steady solves instead of sketched lines |
-| material `c`, `phi`, `cp`, `r_elev`, `d`, `psi` | drained envelope plus the R-envelope for the undrained stage |
+| materials | `c`, `phi` **and** `cp`, `r_elev`, `d`, `psi` (the R-envelope parameters for the undrained stage) |
 
-Three ways to state where the water is — a sketched piezometric pair, two steady seepage solutions, or a transient march — all shown in [Tutorial COMBO-2, Johnson Reservoir Dam](https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/) (pool dropped 160 → 110 ft; Spencer FS = 1.498, [sample 12](https://xslope.readthedocs.io/en/latest/lem/samples/#12-rapid-drawdown-johnson-reservoir-dam)).
-
-## How you run it
+Run it with:
 
 ```python
-res = run_lem(rapid=True, search=True)          # sketched piezo pair
-res = run_lem(rapid=True, seep_time='model')    # transient: uses tseep stage_1/stage_2
+res = run_lem(rapid=True, search=True)
 ```
 
-## Verification
+A transient version exists too: with a `tseep` sheet, `run_lem(rapid=True, seep_time='model')` stages the two drawdown instants the sheet names.
 
-Two documented drawdown failures are in the corpus with published comparisons: [Walter Bouldin Dam](https://xslope.readthedocs.io/en/latest/verification/geostudio/#gs-2-40) (1975 failure) and [Pilarcitos Dam](https://xslope.readthedocs.io/en/latest/verification/geostudio/#gs-2-43), both against SLOPE/W and the original DWW numbers, plus Rocscience cases [VP96–VP100](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp98).
+## Worked examples and verification
 
-Your current model (`xslope_simple_mult_layers`) has no piezometric lines at all, so it isn't set up for drawdown — say the word if you'd like me to add the two pool levels.
+- **Tutorial COMBO-2 — Johnson Reservoir Dam**, pool lowered 50 ft from el. 160 to 110, built three ways (sketched piezometric pair, two steady seepage solves, transient): `tutorials/combo02_rapid_drawdown/`. Its results table (`lem/samples/#12-rapid-drawdown-johnson-reservoir-dam`) gives Spencer 1.498, Bishop 1.439, OMS 1.247.
+- **Pilarcitos Dam** (drawn down 72 → 37 ft, a documented drawdown failure): `verification/geostudio/#gs-2-43`.
+- **Walter Bouldin Dam**, which actually failed in a 1975 drawdown, compared against SLOPE/W and the original DWW numbers: `verification/geostudio/#gs-2-40`.
+
+Your current model has no piezometric lines at all, so it isn't set up for a drawdown run — want me to check whether that's something you'd like to add?
 ````
 
-Tokens: input 41,626 · cached_input 37,019 · output 1,647 · calls 2 · 23.7s
+Tokens: input 40,123 · cached_input 37,119 · output 1,130 · calls 2 · 17.2s
 
 ## Session total
 
-- Tokens: input 41,626 · cached_input 37,019 · output 1,647 · calls 2
-- Wall time: 26.0s
+- Tokens: input 40,123 · cached_input 37,119 · output 1,130 · calls 2
+- Wall time: 19.5s

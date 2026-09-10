@@ -1,12 +1,12 @@
 {
   "benchmark": "RS2-50",
   "analysis": "ssrm",
-  "FS": 0.919921875,
+  "FS": 0.998046875,
   "expected_fs": null,
-  "file": "files/rocscience/vp089.xlsx",
+  "file": "files/rocscience/vp089_fem.xlsx",
   "unit_system": "si",
   "converged": true,
-  "iterations": 315,
-  "residual": 2.8290825939791604e-06,
-  "max_displacement": 0.023248089717830496
+  "iterations": 31850,
+  "residual": 7.11234382568045e-09,
+  "max_displacement": 0.12236233508591653
 }

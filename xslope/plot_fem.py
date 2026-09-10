@@ -2165,7 +2165,15 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
     # Build pile element index mapping: global 1d index -> pile force index
     pile_force_idx = 0
 
+    # A bar-less joint line's 1D elements are the curve the split ran along and
+    # not a member: they carry no force, and drawn here they would be classified
+    # as members carrying none. The line's own state is drawn by
+    # plot_joint_states.
+    barless = _barless_mask(fem_data, len(elements_1d))
+
     for i in range(len(elements_1d)):
+        if barless[i]:
+            continue
         elem = elements_1d[i]
         coords = nodes[elem[:2]]
 

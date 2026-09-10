@@ -1687,7 +1687,7 @@ scored against.
 
 <!-- test: file=files/rocscience/vp087_fem.xlsx, type=fem_ssrm, expected_fs=0.979, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=30000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-48 -->
 
-![RS2-48: the baseline three-tier geotextile wall (vp087_fem, φ = 34°, Ta = 10 kN/m) built as a dry stack — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The facing columns slide on their courses and the reinforced mass shears behind them](images/RS2-48.png)
+![RS2-48: the baseline three-tier geotextile wall (vp087_fem, φ = 34°, Ta = 10 kN/m) built as a dry stack — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The back-face joint of every column has opened, and the band runs from the toe of the lowest column up through the reinforced fill behind them](images/RS2-48.png)
 
 #### 🟡 RS2-49: Geotextile wall, fill quality (vp088_fem) {#rs2-49}
 
@@ -1741,7 +1741,7 @@ rather than sharing one.
 
 <!-- test: file=files/rocscience/vp091_fem.xlsx, type=fem_ssrm, expected_fs=0.705, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=30000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-52 -->
 
-![RS2-52: cohesionless foundation (vp091_fem, c = 0, φ = 18°) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The strain band leaves the reinforced mass and runs down through the foundation to daylight beyond the toe: the bearing mechanism all three codes find on this variant](images/RS2-52.png)
+![RS2-52: cohesionless foundation (vp091_fem, c = 0, φ = 18°) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The strain leaves the reinforced fill almost entirely and concentrates in the weak foundation directly under the toe of the lowest facing column, where the wall bears on it](images/RS2-52.png)
 
 #### ⊘ RS2-53: Geotextile wall, water (vp092_fem) {#rs2-53}
 
@@ -1757,7 +1757,7 @@ under refinement, so it is reported without a lock.
 A 20 kPa surcharge on the uppermost tier. It brackets on the family's mesh and is the most
 refinement-sensitive member of the family, so it is reported without a lock.
 
-![RS2-54: 20 kPa surcharge on the uppermost tier (vp093_fem, Ta = 10.0 kN/m) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The surcharge drives the band through the upper tiers of the reinforced mass](images/RS2-54.png)
+![RS2-54: 20 kPa surcharge on the uppermost tier (vp093_fem, Ta = 10.0 kN/m) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The surcharge drives the band from the toe up through all three tiers of the reinforced mass, behind the facing](images/RS2-54.png)
 
 #### 🟡 RS2-55: Geotextile wall, tier count (vp094_fem) {#rs2-55}
 

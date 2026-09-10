@@ -84,8 +84,9 @@ from xslope.style import resolve_style, material_style
 # and run their own tight_layout / legend / colorbar and so can't share one figure.
 from xslope.plot import (
     plot_base_geometry, plot_piezo_line, plot_dloads, plot_tcrack_surface, plot_ssr_zones,
-    plot_reinforcement_lines as _plot_input_reinf_lines, plot_piles, plot_line_loads,
-    adaptive_colorbar_ticks, adaptive_edge_linewidth,
+    plot_reinforcement_lines as _plot_input_reinf_lines, plot_joint_lines,
+    plot_piles, plot_line_loads,
+    adaptive_colorbar_ticks, adaptive_edge_linewidth, JOINT_COLOR, draw_joint_ticks,
 )
 from xslope.plot_fem import (
     plot_shear_strain_contours, plot_displacement_vectors,
@@ -650,6 +651,7 @@ def _draw_inputs_panel(ax, sd, style):
     plot_dloads(ax, sd, style=style)
     plot_tcrack_surface(ax, sd, style=style)
     _plot_input_reinf_lines(ax, sd, style=style)
+    plot_joint_lines(ax, sd, style=style)
     plot_piles(ax, sd, style=style)
     plot_line_loads(ax, sd, style=style)
 
@@ -749,10 +751,19 @@ def _draw_mesh_panel(ax, fem_data, style, alpha=0.6):
     # 1D elements (reinforcement truss / pile beam)
     elements_1d = fem_data.get('elements_1d', np.array([]).reshape(0, 3))
     pile_mask = fem_data.get('pile_elem_mask', np.zeros(len(elements_1d), dtype=bool))
+    # A bar-less joint line owns 1D elements and no member. They are not counted
+    # as reinforcement and not drawn as it; the line goes on in the joint style
+    # below, over the mesh, the way the inputs panel draws it.
+    barless = np.asarray(fem_data.get('barless_1d_mask',
+                                      np.zeros(len(elements_1d), dtype=bool)), dtype=bool)
+    if len(barless) != len(elements_1d):
+        barless = np.zeros(len(elements_1d), dtype=bool)
     n_reinf = n_pile = 0
     if len(elements_1d) > 0:
         reinf_segs, pile_segs = [], []
         for i in range(len(elements_1d)):
+            if barless[i]:
+                continue
             seg = [nodes[elements_1d[i][0]], nodes[elements_1d[i][1]]]
             (pile_segs if pile_mask[i] else reinf_segs).append(seg)
             n_pile += int(pile_mask[i]); n_reinf += int(not pile_mask[i])
@@ -766,6 +777,35 @@ def _draw_mesh_panel(ax, fem_data, style, alpha=0.6):
                                              zorder=5, gid='PILES'))
             legend_handles.append(plt.Line2D([0], [0], color='green', lw=3.5,
                                             label=f'Pile ({n_pile} elements)'))
+
+    # The joint lines with no member in them, over the mesh, in the style the
+    # inputs panel gives them. The split itself is invisible — the copies of each
+    # station stand at one point — so the ticks are the only thing that says the
+    # mesh is torn there.
+    _jd = fem_data.get('joint_data')
+    if _jd is not None and int(_jd.get('n', 0)):
+        _whole = np.asarray(_jd['side'], dtype=int) == 2
+        _lines = sorted(set(int(v) for v in np.asarray(_jd['line_id'])[_whole]))
+        if _lines:
+            _span = float(np.max(nodes[:, 0]) - np.min(nodes[:, 0])) or 1.0
+            _conn = np.asarray(_jd['conn'], dtype=int)
+            _lid = np.asarray(_jd['line_id'], dtype=int)
+            for li in _lines:
+                sel = np.flatnonzero(_whole & (_lid == li))
+                ends = np.vstack([nodes[_conn[sel, 0], :2], nodes[_conn[sel, 1], :2]])
+                # The line is straight, so its own direction orders its stations.
+                d = ends[-1] - ends[0]
+                d = d / (np.hypot(d[0], d[1]) or 1.0)
+                order = np.argsort(ends @ d)
+                pts = ends[order]
+                ax.plot(pts[:, 0], pts[:, 1], color=JOINT_COLOR, linewidth=1.6,
+                        linestyle=(0, (6, 3)), alpha=0.95, zorder=6)
+                draw_joint_ticks(ax, pts[:, 0], pts[:, 1], _span, JOINT_COLOR,
+                                 alpha=0.95, zorder=6)
+            legend_handles.append(plt.Line2D([0], [0], color=JOINT_COLOR, lw=1.6,
+                                             linestyle=(0, (6, 3)), marker='|',
+                                             markersize=9, markeredgewidth=1.4,
+                                             label=f'Joint ({len(_lines)} lines)'))
 
     _plot_boundary_conditions(ax, nodes, fem_data['bc_type'], fem_data['bc_values'],
                               legend_handles, 0.03, fem_data.get('roller_x_nodes', set()))

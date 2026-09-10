@@ -1,12 +1,12 @@
 {
   "benchmark": "RS2-51-wall",
   "analysis": "ssrm",
-  "FS": 0.998046875,
+  "FS": 0.978515625,
   "expected_fs": null,
-  "file": "files/rocscience/vp090.xlsx",
+  "file": "files/rocscience/vp090_fem.xlsx",
   "unit_system": "si",
   "converged": true,
-  "iterations": 1009,
-  "residual": 4.504746459091484e-06,
-  "max_displacement": 0.022826157170357277
+  "iterations": 40035,
+  "residual": 1.1601943050726836e-08,
+  "max_displacement": 0.048027088355620196
 }

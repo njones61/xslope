@@ -8009,6 +8009,13 @@ MODULE_CHECKS = {
         "the pullout law. It used to reach it as the LEM tension-distribution "
         "point list, so filling in Adhesion and Delta — a statement about bond "
         "strength — re-meshed the model and moved the factor of safety."),
+    'docs_index_sync': (
+        'docs_index_sync_check.py',
+        "The documentation the Studio assistant searches ships as a generated "
+        "resource, so a page added, retitled or moved since the last build is a "
+        "capability the assistant can no longer read about — and an assistant "
+        "that cannot read the page answers from memory, which is how it came to "
+        "deny line loads."),
     'spencer_root': (
         'spencer_root_check.py',
         "Spencer's equations have a root outside the pole-free band on many "
@@ -13924,6 +13931,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'reinforce_mesh_geometry': 2,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
+              'docs_index_sync': 3,
               'circle_vertex': 2,
               'circle_above_center': 2}
 
@@ -14803,6 +14811,14 @@ def main():
         # the fix is always `python tools/make_corpus_index.py`.
         tests.append({'type': 'corpus_index', 'file': 'docs/verification/corpus_index.json',
                       'method': '-', 'source': 'corpus_index'})
+        # Same guard for the OTHER generated index the assistant reads: the whole
+        # documentation, folded into the wheel so a pip install can search the
+        # pages it was built from. Regenerates in memory and names the pages and
+        # sections that moved; the fix is always
+        # `python tools/build_docs_index.py`.
+        tests.append({'type': 'docs_index_sync',
+                      'file': 'xslope/resources/docs_index.json',
+                      'method': '-', 'source': 'docs_index_sync'})
         # Guard that a K0 initial stress named on a test tag is also DECLARED by
         # the model file (main!D16). The tag passes K0 as a solver keyword; the
         # file's cell reaches the same solver parameter. If only the tag carries

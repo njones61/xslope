@@ -37,6 +37,19 @@ after each release once Zenodo shows the new record.
 
 Patch releases skip this.
 
+## Before every release
+
+- [ ] Rebuild the generated indexes the wheel carries, so the assistant ships the
+      documentation of the version being released rather than of the last build:
+      ```
+      python tools/build_docs_index.py
+      python tools/make_corpus_index.py
+      ```
+      Commit whatever they change. `python run_tests.py --roundtrip` proves it —
+      the `docs_index_sync` and `corpus_index` rows regenerate both in memory and
+      fail on a stale copy, beside `template_sync` on the packaged template and
+      skill.
+
 ## Steps
 
 1. **Bump the version.** Edit `xslope/_version.py` (`__version__`), e.g.

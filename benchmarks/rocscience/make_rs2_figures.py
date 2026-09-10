@@ -104,15 +104,13 @@ TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 # reported-not-locked row still gets a figure instead of silently having none.
 #
 # The multi-tiered geotextile wall family (RS2-48–55, Leshchinsky & Han 2004) is the
-# case in point. The baseline's SSR row is not attempted (the vendor mesh is split at
-# the sheets and the block facing is what fails when that split is reproduced, so the
-# page carries no figure for it); all seven parametric variants follow the mesh — each
-# moves past its own tolerance under a refinement step, in the 2D size and in the 1D
-# size alike — so all seven are reported rather than locked, and all seven are
-# registered below. All eight share what was the baseline's model settings — 1.0 m
-# tri6 mesh, the vendor's isotropic at-rest field stress (k0 = 1) and static tensile
-# caps (tension_srf off) — but the variants run the auto bracket rather than the
-# baseline's narrow one, because the family spans 0.74–1.16.
+# case in point. All eight rows run the jointed dry stack on the `_fem` siblings, at
+# the family's settings — 1.0 m tri6 mesh, the vendor's isotropic at-rest field stress
+# (k0 = 1), static tensile caps (tension_srf off), the elastic facing held out of the
+# reduction (ssr_exclude=Blocks) — and the auto bracket, because the family spans
+# 0.70–1.00. Four of them hold their factor across a refinement step and are locked by
+# a tag on the page; the four registered below move past the bracket tolerance and are
+# reported without one, so they would otherwise have no figure.
 #
 _WALL = dict(element_type='tri6', target_size='1.0', tolerance='0.02',
              f_min='0.5', f_max='3.0', max_iter='30000',
@@ -126,14 +124,13 @@ EXTRA_CASES = [
      'element_type': 'tri6', 'target_size': '6.0', 'tolerance': '0.02',
      'f_min': '1.4', 'f_max': '2.8', 'max_iter': '16000',
      'tension_srf': 'true', 'k0': '1'},
-    {**_WALL, 'file': 'files/rocscience/vp087_fem.xlsx', 'benchmark': 'RS2-48'},
-    {**_WALL, 'file': 'files/rocscience/vp088_fem.xlsx', 'benchmark': 'RS2-49'},
+    # The four wall variants a refinement step moves. RS2-48, 49, 52 and 55 hold
+    # under it and carry fem_ssrm tags of their own on the page, so they are not
+    # here.
     {**_WALL, 'file': 'files/rocscience/vp089_fem.xlsx', 'benchmark': 'RS2-50'},
     {**_WALL, 'file': 'files/rocscience/vp090_fem.xlsx', 'benchmark': 'RS2-51-wall'},
-    {**_WALL, 'file': 'files/rocscience/vp091_fem.xlsx', 'benchmark': 'RS2-52'},
     {**_WALL, 'file': 'files/rocscience/vp092_fem.xlsx', 'benchmark': 'RS2-53'},
     {**_WALL, 'file': 'files/rocscience/vp093_fem.xlsx', 'benchmark': 'RS2-54'},
-    {**_WALL, 'file': 'files/rocscience/vp094_fem.xlsx', 'benchmark': 'RS2-55'},
 ]
 
 
@@ -218,6 +215,20 @@ SIDECAR_STEM = {
     # included — go under a stem of their own rather than over the committed ones.
     'RS2-40-seep': 'vp077a_ssrm',
     'RS2-66a-deep': 'rs2_66a_deep',
+    # The geotextile wall family. The strength reduction runs on the `_fem`
+    # siblings (vp087_fem…vp094_fem, the jointed dry stack) while the LEM circles
+    # stay on vp087…vp094, and each benchmark's field keeps the stem the corpus
+    # already ships it under — vp088_fem_nodes.csv is RS2-49's field either way.
+    # Without the override the stem would double the suffix (vp088_fem_fem_…) and
+    # orphan the committed pair.
+    'RS2-48': 'vp087',
+    'RS2-49': 'vp088',
+    'RS2-50': 'vp089',
+    'RS2-51-wall': 'vp090',
+    'RS2-52': 'vp091',
+    'RS2-53': 'vp092',
+    'RS2-54': 'vp093',
+    'RS2-55': 'vp094',
     'RS2-P4-VP68-zone': 'vp068_zone',
     'RS2-P4-VP102-t-300-c2': 'vp102t_300_c2',
     'RS2-P4-VP102-t-1500-c3': 'vp102t_1500_c3',

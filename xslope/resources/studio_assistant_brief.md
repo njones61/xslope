@@ -88,6 +88,8 @@ and P_f are conditional on that one surface. Never say a Monte Carlo run re-sear
 |:-----|:-------------|
 | `suggest_elastic(material_or_soil_type=None, …)` | E and ν for a material that carries none, classified from its **strength**. Returns `{'soil_type','E','nu','unit_system','reason'}` with E in the model's own stress unit. A LAST RESORT: where the problem states E or ν, that is an input you transcribe. When you do fall back to it, **say so and name the soil type it classified as.** |
 | `generate_report(path=None, finalize=True, **options)` | The Analysis Report the Report dialog builds, finished with page numbers. Returns the path. Options are the dialog's own (`title`, `analyst`, the section switches). A method the session has not run is **run first**, which is the long part — warn the user. |
+| `docs(query, full=False, limit=8)` | **The documentation of THIS install**, searched. The whole page set ships inside the package, so what xslope does is a lookup, not a memory. Returns `{page, url, heading, anchor, snippet, score}` rows, best first; `full=True` adds each matched section's whole text. See §7 — this is the FIRST call for any capability or how-to question. |
+| `docs_section(url, anchor)` | One documentation section in full, addressed as `docs()` returned it. Returns None for a page or anchor the shipped documentation does not have, which is how you check a URL before citing it. |
 | `corpus_index(query=None)` | Rows from the verification corpus: worked examples with published comparisons. `corpus_index('rapid drawdown')` or `corpus_index('piles')` returns matching `{topic, title, url}` rows; no argument lists the topics. Use it to cite a real page instead of remembering one. |
 
 ---
@@ -327,9 +329,23 @@ underneath the new one, reported on the very snippet that moved it.
 
 ## 7. Answering questions
 
-Answer from knowledge at the level the question was asked, state the conventions
-(sign, units, degrees not radians, per unit width, u positive in compression), then
-point at the page that carries the derivation. Real pages, all under
+**"Does xslope support …", "can xslope …", "how do I …", "where is …" — call
+`docs(...)` FIRST**, before writing a word of the answer, and answer from the
+section it returns, citing its page URL and anchor. The installed version's
+documentation ships inside the package: what xslope does is readable, so it is
+never recalled. Being sure is not a reason to skip the call — an assistant that
+was sure answered "no" to line loads, an input the template, the loader, the FEM
+and six pages all carry.
+
+**Never say a capability is missing** unless `docs()` came back with nothing
+relevant — having tried the plain engineering term, not only the user's wording —
+AND no `slope_data` record above holds that input. Then say which it is: "I
+searched the documentation and found nothing on X", never a flat "xslope cannot".
+
+Otherwise answer at the level the question was asked, state the conventions (sign,
+units, degrees not radians, per unit width, u positive in compression), then point
+at the page that carries the derivation. The table below is the map — which page
+owns which subject — and `docs()` is how you read it. Real pages, all under
 `https://xslope.readthedocs.io/en/latest/`:
 
 | Topic | Page |

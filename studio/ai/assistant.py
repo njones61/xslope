@@ -201,17 +201,74 @@ the canvas re-renders automatically.
   bites: if the resulting Depth falls below max_depth, the circle is not usable —
   move the center (or drop the candidate), never lower max_depth to admit it.
 - non_circ[i]: {'X':-10.0,'Y':0.0,'Movement':'Free'}
-- piezo_line / piezo_line2: list of (x, y) tuples.
-- dloads / dloads2: list of blocks; each block is a list of {'X','Y','Normal'} pts.
+- piezo_line / piezo_line2: list of (x, y) tuples, left to right — the water surface a
+  material with u='piezo' reads. piezo_line2 is the SECOND stage's line, read only by a
+  rapid drawdown run (the drawn-down level; stage 1 uses piezo_line). Each line carries a
+  flag beside it, piezo_phreatic / piezo_phreatic2 (bool): False (the default) = a true
+  piezometric line, u = gamma_water x vertical distance below it; True = a phreatic
+  surface, that head reduced by cos^2 of the line's own local inclination.
+- dloads / dloads2: distributed loads on the ground surface. Each is a LIST OF BLOCKS and
+  each block a list of {'X','Y','Normal'} points along the loaded surface, 'Normal' the
+  pressure at that point (per unit width; taper it to zero where the load ends).
+  dloads2 is the second (drawn-down) stage's loads for a rapid drawdown run.
+  dload_dirs / dload2_dirs: one word per block, PARALLEL to the list above and always the
+  same length — 'normal' (perpendicular to the loaded surface, the default) or 'vertical'
+  (a dead-weight surcharge). Ponded water is a dload, but only under
+  water_loads = 'manual'; on 'auto' the engine measures the pool from the model's own
+  water surface at solve time and a hand-entered pool is counted twice.
+- line_loads[i]: {'x','y','P','angle','label'} — a concentrated force per unit width
+  applied AT A POINT on the ground surface (the classic case is the self-weight of a
+  facing element, e.g. a soil nail wall's shotcrete plate). 'P' is the magnitude and must
+  be positive — direction is 'angle', degrees from horizontal, default -90 (straight
+  down). The point must lie ON the ground surface (the loader snaps a small mismatch and
+  refuses a larger one), so take (x, y) from the profile, not from a sketch dimension.
+  Every LEM method carries it; the FEM applies it as a concentrated force on the
+  nearest mesh node.
 - reinforcement_lines[i]: {'x1','y1','x2','y2','t_max','t_res','lp1','lp2','area','E',
   'tend1','tend2','spacing','type','dir','appl','adhesion','delta'}
   ('adhesion'+'delta' both set = overburden pullout law; 'lp1'/'lp2' then unused)
   # EDIT THIS one; reinforce_lines (capitalized X/Y/T/Tres) is derived from it.
 - pile_lines[i]: {'x1','y1','x2','y2','D_pile','S','E','I','area','M_cap','V_cap',
   'theta_p','head_fixity','tip_fixity','label','H'}
+- seepage_bc / seepage_bc2: the boundary conditions for a seepage run, one dict each:
+  {'specified_heads': [{'head': <value>, 'coords': [(x,y),...], 'kind': 'head'|'reservoir'}],
+   'specified_fluxes': [{'flux': <value>, 'coords': [(x,y),...]}],
+   'exit_face': [(x,y),...]}.
+  kind 'head' holds every node of the polyline at that head at all times; 'reservoir' is
+  the submerged-only face — a node is held only while it is under the level, and nodes
+  above it become seepage-exit faces. 'exit_face' is the polyline where water may leave
+  at atmospheric pressure. seepage_bc is set 1 (`run_seep(bc=1)`, the field lands on
+  slope_data['seep_u']); seepage_bc2 is set 2 (`run_seep(bc=2)` -> ['seep_u2']), the
+  CONSTANT-STEADY second solve of a rapid drawdown — has_seepage_bc2 (bool) says whether
+  it carries anything. A 'head'/'flux' value may also be a STRING naming a tseep series,
+  which makes that boundary time-varying; set 2 may never carry one (nor a reservoir).
+- tseep: the transient timeline, or absent/None on a steady model.
+  {'times': [t, ...], 'series': {name: [value per time, ...]}, 'duration': float|None,
+   'save_interval': float|None, 'save_times': [t, ...], 'stage_1': float|None,
+   'stage_2': float|None, 'stability_time': float|None}. 'series' are the time-varying
+  values a seep bc block names by string; 'stage_1'/'stage_2' are the two instants a
+  transient rapid drawdown is staged at, and 'stability_time' the instant a stability
+  run reads by default. Drive it with `run_tseep()` / `fs_vs_time()`, not by hand.
+- ssr_zones[i] / refine_zones[i]: polygon-sheet overlays that are NOT geometry — they
+  carry no material and never generate slices. ssr_zones = {'kind': 'reduce'|'hold'|
+  'elastic', 'polygon': [(x,y),...], 'label', 'size'}, read only by the SSRM (where
+  strength reduction applies). refine_zones = {'polygon': [(x,y),...], 'size'}, a local
+  target element size inside the ring — the way to resolve a thin band, never a smaller
+  global size.
 - scalars: gamma_water, max_depth (elevation of the hard base — the lowest
   elevation the PROBLEM describes, never one you chose; see iron rule 1),
-  k_seismic, tcrack_depth, tcrack_water, circular (bool).
+  k_seismic (pseudo-static horizontal seismic coefficient, a fraction of g, applied to
+  each slice's weight in the driving direction), tcrack_depth, tcrack_water,
+  circular (bool), surface_family ('circular'|'noncircular'|None — which surface the
+  model declares), water_loads ('auto'|'manual', see §5), unit_system, time_unit,
+  template_version (the file's, not editable).
+- run options, all from the main sheet and all None where the file leaves them blank
+  (each consumer then applies its own default): lem_method, num_slices,
+  element_type ('tri3'|'tri6'|'quad4'|'quad8'|'quad9'), target_size and
+  element_size_1d (mesh sizes), k0, tension_srf, side_bc ('rollers'|'fixed'),
+  ssrm_f_min, ssrm_f_max.
+  search_window (a dict of entry/exit and center-box limits) is present only when the
+  circles sheet sets at least one limit.
 
 Editing the source lists re-renders the canvas — derived geometry (ground_surface,
 polygons, domain_polygon) is rebuilt automatically AFTER the snippet returns, so a

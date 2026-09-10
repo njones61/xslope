@@ -22,7 +22,13 @@ does regardless of the model, and that is what this file covers:
   B. THE MODELING BRIEF AGREES WITH THEM — the non-skill providers' rulebook
      carries the circle floor rule and the rigid-base corollary, since its extents
      paragraph used to say the opposite of the corollary and that contradiction is
-     the (a) in the evidence chain.
+     the (a) in the evidence chain. Beside it, the record schemas cover every
+     input the loader reads: the prompt calls them the ground truth and forbids
+     opening a workbook to check, so an input missing from them reads to the model
+     as an input xslope does not have — which is how line loads came to be denied.
+     And the documentation search reaches the pages that document each capability,
+     with every address it returns readable back, since a citation that does not
+     resolve is a fabricated one.
   C. THE CHECKS ARE INJECTED — every snippet that CHANGES the model comes back
      with a MODEL CHECKS block appended to its own output, carrying the preflight
      findings (errors AND warnings) or the explicit clean line. This is the
@@ -103,6 +109,7 @@ import os
 import sys
 import tempfile
 import threading
+from pathlib import Path
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
@@ -448,6 +455,66 @@ def check_modeling_brief_agrees():
     for anchor in IRON_ANCHORS:
         if anchor in MODELING_BRIEF:
             out.append(f"MODELING_BRIEF duplicates the iron rule {anchor!r}")
+    return out
+
+
+#: Keys ``load_slope_data`` returns that SCHEMA_BRIEF is NOT required to name,
+#: each because the assistant must not write it. The derived geometry is rebuilt
+#: from the source lists after every snippet (the brief says so where it says how
+#: to edit geometry), and the two derived lists are copies of records the brief
+#: already carries under their editable names.
+_SCHEMA_DERIVED_KEYS = {
+    "ground_surface", "domain_polygon", "tcrack_surface",
+    "reinforce_lines",          # derived from reinforcement_lines; brief says so
+    "has_seepage_bc2",          # a flag over seepage_bc2, named in its entry
+}
+
+
+def check_schema_brief_covers_every_loaded_key():
+    """Every input the loader reads off a sheet has a record in SCHEMA_BRIEF.
+
+    The line-loads defect had two halves. One was that the assistant could not
+    read the documentation; the other was that SCHEMA_BRIEF — which the prompt
+    calls the ground truth for field names, and tells the model not to open a
+    workbook to check — did not mention line loads at all, nor the distributed
+    load sets, the piezometric flags, the seepage boundary conditions or the
+    transient timeline. A schema that is authoritative and incomplete is worse
+    than one that is neither: the model reads "these records ARE the schema" and
+    concludes that an input not listed does not exist.
+
+    So the ground truth is checked against the loader. Every key
+    ``load_slope_data`` writes must be named in SCHEMA_BRIEF, except the derived
+    ones listed above — which makes a NEW template sheet impossible to forget,
+    since the key it fills fails this until it is written down.
+
+    The key list is read out of ``fileio.py``'s own assignments rather than by
+    loading a workbook: it then covers the keys set only under a condition (a
+    seepage field, a transient sheet, a search window), which a blank template
+    would never produce.
+    """
+    import re
+
+    from studio.ai.assistant import SCHEMA_BRIEF
+    import xslope.fileio as fileio
+
+    src = Path(fileio.__file__).read_text(encoding="utf-8")
+    keys = set(re.findall(r'globals_data\[[\'"]([A-Za-z_][A-Za-z0-9_]*)[\'"]\]\s*=',
+                          src))
+    out = []
+    if len(keys) < 40:
+        out.append(f"only {len(keys)} slope_data keys found in fileio.py — the "
+                   "assignment pattern this check reads must have changed")
+    for key in sorted(keys - _SCHEMA_DERIVED_KEYS):
+        if not re.search(r'\b%s\b' % re.escape(key), SCHEMA_BRIEF):
+            out.append(f"SCHEMA_BRIEF does not name slope_data['{key}'], which "
+                       "load_slope_data fills — the model is told the records it "
+                       "lists ARE the schema, so an input missing from it reads "
+                       "as an input xslope does not have")
+    for key in sorted(_SCHEMA_DERIVED_KEYS):
+        if key not in keys:
+            out.append(f"'{key}' is excused from SCHEMA_BRIEF as a derived key, "
+                       "but load_slope_data no longer writes it — drop it from "
+                       "_SCHEMA_DERIVED_KEYS")
     return out
 
 
@@ -1339,6 +1406,8 @@ HELPERS = {
     "run_lem": ("method", "num_slices", "plot", "slope_data", "search",
                 "seep_time"),
     "corpus_index": ("query",),
+    "docs": ("query", "full", "limit"),
+    "docs_section": ("url", "anchor"),
     "run_seep": ("bc", "tol", "max_iter", "plot", "slope_data", "transient"),
     "run_tseep": ("times", "plot", "slope_data", "rerun", "save"),
     "fs_vs_time": ("times", "method", "mode", "search", "rapid", "plot"),
@@ -1545,7 +1614,13 @@ def check_usage_accumulates():
 #: about 1.48x low against Anthropic's own count_tokens endpoint — the brief
 #: measures 4,347 here and 6,432 there — so this bound is the ~9k of billed tokens
 #: the brief is allowed, expressed in the units the check can measure.
-BRIEF_TOKEN_BOUND = 6500  # offline counter; ~1.48x low against the billed count, so ~9.6k billed
+#: Raised from 6,500 to 7,000 when §7 gained the documentation-search rule and §2
+#: the two helper rows for it (+364 offline tokens, leaving the brief at 6,850).
+#: The old bound stood 14 tokens above the brief, so it admitted no rule at all,
+#: and the rule is what stops the assistant answering a capability question out of
+#: memory. The brief is prompt-cached and read once per completion, so the cost of
+#: the raise is small beside a wrong "no" on a shipped feature.
+BRIEF_TOKEN_BOUND = 7000  # offline counter; ~1.48x low against the billed count, so ~10.1k billed
 
 
 def check_the_brief_ships():
@@ -1753,6 +1828,83 @@ def check_corpus_index_returns_rows():
                 break
     if _quiet(corpus_index, "zzzz no such topic zzzz"):
         out.append("corpus_index() invents rows for a query that matches nothing")
+    mw.deleteLater()
+    return out
+
+
+#: Capability questions and the page each must be able to reach. These are the
+#: shape the defect took — a yes/no about a feature — and the pages are the ones
+#: that document the feature, so a search that cannot reach them cannot answer.
+DOC_QUESTIONS = [
+    ("Does xslope support line loads?",
+     ("lem/overview/", "usage/input_template/", "fem/overview/",
+      "tutorials/lem02_loads_on_the_crest/")),
+    ("Can xslope do rapid drawdown?", ("lem/rapid/", "lem/overview/",
+                                       "tutorials/combo02_rapid_drawdown/")),
+    ("Does xslope have a tension crack?", ("lem/overview/", "lem/samples/",
+                                           "usage/input_template/")),
+    ("Can it do seismic loading?", ("lem/overview/", "fem/overview/",
+                                    "usage/input_template/")),
+    ("How do I add a piezometric line?", ("usage/input_template/",
+                                          "seep/seep_slope/", "studio/editing/",
+                                          "tutorials/lem04_water_in_the_slope/")),
+    ("Does xslope support anchors or tiebacks?",
+     ("lem/reinforcement/", "usage/input_template/",
+      "tutorials/lem09_tieback_wall/")),
+]
+
+
+def check_docs_search_answers_capability_questions():
+    """The documentation pointer resolves: the pages exist, and they are found.
+
+    The assistant denied line loads because it had no way to read the
+    documentation of the version it was running — a pip install ships no docs
+    tree. The pages now ship as an index inside the package and `docs()` searches
+    it, so what has to hold is: a plain capability question returns rows, at
+    least one row is on a page that really documents the feature, every address
+    returned reads back through `docs_section` (a citation that does not resolve
+    is a fabricated citation), and a query about nothing returns nothing.
+    """
+    out = []
+    mw, asst = _session()
+    kernel = asst._kernel
+    _quiet(kernel.run, "pass")
+    docs = kernel._ns.get("docs")
+    docs_section = kernel._ns.get("docs_section")
+    if not callable(docs) or not callable(docs_section):
+        mw.deleteLater()
+        return ["docs() / docs_section() are not in the kernel namespace"]
+
+    for question, expected in DOC_QUESTIONS:
+        rows = _quiet(docs, question)
+        if not rows:
+            out.append(f"docs({question!r}) returned nothing")
+            continue
+        urls = [r.get("url", "") for r in rows]
+        if not any(any(e in u for e in expected) for u in urls):
+            out.append(f"docs({question!r}) reached none of {expected}; "
+                       f"it returned {urls[:3]}")
+        for row in rows:
+            if not str(row.get("url", "")).startswith("https://"):
+                out.append(f"docs({question!r}) returned a row with no URL")
+                break
+            if not row.get("snippet"):
+                out.append(f"docs({question!r}) returned a row with no snippet")
+                break
+            if _quiet(docs_section, row["url"], row.get("anchor", "")) is None:
+                out.append(f"docs({question!r}) cites {row['url']}"
+                           f"#{row.get('anchor')}, which docs_section cannot read")
+                break
+
+    full = _quiet(docs, "line loads", True, 1)
+    if not full or not full[0].get("text"):
+        out.append("docs(..., full=True) returns no section text")
+    # Gibberish, not "no such topic here" — the search scores partial matches
+    # (a question rarely uses the documentation's own words for every term), so a
+    # query of real English words SHOULD come back with whatever they matched.
+    # What must come back empty is a query with no word the documentation has.
+    if _quiet(docs, "qqzxwv wubbleflorp zzyxth"):
+        out.append("docs() invents rows for a query that matches nothing")
     mw.deleteLater()
     return out
 
@@ -2495,6 +2647,8 @@ CHECKS = [
     ("A. iron rules, once per prompt tier", check_iron_rules_once),
     ("A. the live prompts carry them", check_assembled_prompt_is_the_real_one),
     ("B. modeling brief agrees", check_modeling_brief_agrees),
+    ("B. the schema covers every loaded key",
+     check_schema_brief_covers_every_loaded_key),
     ("C/D. sound build comes back clean", check_clean_build),
     ("D. the edit cascade surfaces", check_edit_cascade),
     ("D. ground past the toe surfaces", check_ground_past_the_toe),
@@ -2534,6 +2688,8 @@ CHECKS = [
     ("K. the model summary says what the model is",
      check_model_summary_says_what_the_model_is),
     ("K. the corpus pointer resolves", check_corpus_index_returns_rows),
+    ("K. the documentation search answers capability questions",
+     check_docs_search_answers_capability_questions),
     ("L. the LEM run is the session's run", check_run_lem_is_the_sessions_run),
     ("L. an unqualified run runs the model's method",
      check_run_lem_runs_the_models_method),

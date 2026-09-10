@@ -349,8 +349,23 @@ def _leg_details(failures, cache):
     if not prof["slipping"].any():
         failures.append("no station reads as slipping, so the panel would show "
                         "an interface doing nothing")
-    if prof["status"] != "slipping":
+    if prof["status"] not in ("slipping", "open"):
         failures.append(f"the line's verdict is {prof['status']!r}")
+    # A station may only be OPEN where the line reaches a free face. The sample's
+    # sheets start ON the slope face, so the split gives that end two soil faces
+    # and the crack can open there; the other end is buried, its two faces are
+    # one node, and a tip pair never opens (see xslope/joint.py, "Tips").
+    from shapely.geometry import Point as _Pt
+    ring = sd["domain_polygon"].exterior
+    for k in np.flatnonzero(prof["open"]):
+        at_end = k in (0, n - 1)
+        on_face = ring.distance(_Pt(float(prof["x"][k]),
+                                    float(prof["y"][k]))) <= 1e-6
+        if not (at_end and on_face):
+            failures.append(
+                f"station {k} at ({prof['x'][k]:.3g}, {prof['y'][k]:.3g}) reads "
+                f"as open and is not an end of the line standing on the model's "
+                f"external boundary")
     if not len(prof["bar_s"]):
         failures.append("the bar's own profile is missing from the panel")
 

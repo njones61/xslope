@@ -4580,9 +4580,10 @@ def _pf_joint(sd, **kw):
 def _pf_joint_pair(sd, both=True):
     """Two crossing reinforcement lines, the first jointed and the second either.
 
-    ``both=True`` is two jointed lines meeting; ``both=False`` is a jointed line
-    crossing a bonded one. Every other line is put out of the way so the pair is
-    the only crossing in the model.
+    ``both=True`` is two jointed lines meeting — which the mesh split BUILDS, as
+    a junction — and ``both=False`` is a jointed line crossed by a bonded one,
+    which it refuses. Every other line is put out of the way so the pair is the
+    only crossing in the model.
     """
     rows = sd.get('reinforcement_lines') or []
     _pf_rows(sd, 'reinforcement_lines', joint='No')
@@ -4593,6 +4594,28 @@ def _pf_joint_pair(sd, both=True):
                        x1=5.0, y1=2.0, x2=25.0, y2=2.0)
         rows[1].update(joint='Yes' if both else 'No', adhesion=5.0, delta=25.0,
                        x1=15.0, y1=-2.0, x2=15.0, y2=6.0)
+    return sd
+
+
+def _pf_joint_overlap(sd, overlap=True):
+    """Two jointed lines lying on one another, or merely crossing.
+
+    One locus carries one interface law, so a shared STRETCH is refused; a
+    crossing is a junction the split builds.
+    """
+    rows = sd.get('reinforcement_lines') or []
+    _pf_rows(sd, 'reinforcement_lines', joint='No')
+    for k, r in enumerate(rows):
+        r.update(x1=60.0 + 3.0 * k, y1=-8.0, x2=70.0 + 3.0 * k, y2=-8.0)
+    if len(rows) >= 2:
+        rows[0].update(joint='Yes', adhesion=5.0, delta=25.0,
+                       x1=5.0, y1=2.0, x2=25.0, y2=2.0)
+        if overlap:
+            rows[1].update(joint='Yes', adhesion=5.0, delta=25.0,
+                           x1=15.0, y1=2.0, x2=35.0, y2=2.0)
+        else:
+            rows[1].update(joint='Yes', adhesion=5.0, delta=25.0,
+                           x1=15.0, y1=-2.0, x2=15.0, y2=6.0)
     return sd
 
 
@@ -5413,9 +5436,9 @@ PREFLIGHT_RULE_SPECS = [
          expect='Mohr-Coulomb strength from those two columns'),
     dict(rule='joint.lines_meet', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
-         mutation=lambda sd: _pf_joint_pair(sd, both=True),
-         control=lambda sd: _pf_joint_pair(sd, both=False),
-         expect='both set Joint = Yes and meet'),
+         mutation=lambda sd: _pf_joint_overlap(sd, overlap=True),
+         control=lambda sd: _pf_joint_overlap(sd, overlap=False),
+         expect='lie on one another over'),
     dict(rule='joint.crosses_constraint_line', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_joint_pair(sd, both=False),
@@ -8133,6 +8156,22 @@ MODULE_CHECKS = {
         "classification, the boundary conditions the copies inherit, the three "
         "refused geometries, and that a model with no jointed line meshes "
         "exactly as it always did."),
+    'joint_junction': (
+        'joint_junction_check.py',
+        "Jointed lines that meet. The split copies a junction node once per "
+        "wedge of material around it — three at a T, four at a crossing, two at "
+        "a corner, a chain, or an end on the external boundary, and one at a "
+        "buried crack tip, where the two faces rejoin. Six mesh fixtures on tri3 "
+        "and tri6 with the wedge counts read off the drawing, the refusals that "
+        "survive, and three closed forms through the finite element engine: the "
+        "block on a plane cut in two, the same slab as a two-course stack, and "
+        "an elastic block sliding out of an L-shaped joint at the friction the "
+        "joint states."),
+    'joint_junction_mesh': (
+        'joint_junction_check.py',
+        "The junction fixtures alone — the wedge counts at a T, an X, an L, a "
+        "chain, a crack to the boundary and a joint on a material boundary, and "
+        "the refusals that survive — without the closed-form rows, which solve."),
     'joint_element': (
         'joint_element_check.py',
         "The interface (joint) element against four closed forms: Goodman "
@@ -8184,7 +8223,7 @@ def run_module_check(test):
     spec = importlib.util.spec_from_file_location(path.stem, path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    failures = mod.run()
+    failures = getattr(mod, test.get('entry', 'run'))()
     if failures:
         return None, "; ".join(str(f) for f in failures)
     return 0.0, None
@@ -14067,6 +14106,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'indep_bishop': 3, 'tension_crack_symmetry': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'reinforce_mesh_geometry': 2, 'joint_mesh': 3,
+              'joint_junction': 5, 'joint_junction_mesh': 3,
               'joint_element': 5, 'joint_surfaces': 4,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
@@ -15122,7 +15162,17 @@ def main():
         tests.append({'type': 'joint_mesh',
                       'file': 'the mesh split along a jointed line',
                       'method': '-', 'source': 'joint_mesh'})
+    # The junction fixtures are a mesh build each, so they ride --mesh as well;
+    # the closed-form rows solve, so the full module runs in --joints only.
+    if args.mesh and not run_joints:
+        tests.append({'type': 'joint_junction_mesh',
+                      'file': 'joints that meet (the mesh split)',
+                      'method': '-', 'source': 'joint_junction',
+                      'entry': 'run_mesh_legs'})
     if run_joints:
+        tests.append({'type': 'joint_junction',
+                      'file': 'joints that meet (junctions and closed forms)',
+                      'method': '-', 'source': 'joint_junction'})
         tests.append({'type': 'joint_element',
                       'file': 'the interface (joint) element (closed forms)',
                       'method': '-', 'source': 'joint_element'})

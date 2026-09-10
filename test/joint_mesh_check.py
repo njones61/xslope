@@ -13,7 +13,7 @@ Nine legs, each on a mesh built for it:
 
   a. a horizontal sheet inside one material polygon, on tri3 and on tri6. The
      counts: n stations along the curve, 2n - 2 nodes added (every station
-     triples except the two tips, which only double), and two joint elements per
+     triples except the two buried tips, which only double), and two joint elements per
      bar element — 2(n-1) on tri3, where a station pair is a bar element, and
      n-1 on tri6, where a bar element spans two stations and its joints carry
      three node pairs. The classification: every 2D element above the line holds
@@ -22,9 +22,11 @@ Nine legs, each on a mesh built for it:
   b. the same sheet crossing a material boundary. The crossing node is a station
      like any other and is tripled like any other, and both sides of it read the
      same line — one interface law per line in phase 1.
-  c. a sheet ending on the domain boundary, on a real model. The boundary
-     condition is built from node coordinates, so the copies at the tip, which
-     sit at the same point as the original, must come back with the same
+  c. a sheet ending on the domain boundary, on a real model. That end is a
+     crack reaching the surface: the fan of elements around it is cut in two, so
+     it carries two soil faces rather than the one a buried tip carries. The
+     boundary condition is built from node coordinates, so every copy at the tip,
+     which sits at the same point as the original, must come back with the same
      restraint. This leg measures that through build_fem_data rather than
      assuming it.
   d. an inclined sheet, so nothing in the split depends on the line being
@@ -34,9 +36,10 @@ Nine legs, each on a mesh built for it:
      node, element and 1D arrays are the ones the mesher always produced. The
      jointed mesh's first N nodes are the unflagged mesh's nodes unchanged, so
      the split is purely additive.
-  f. the three geometries phase 1 refuses, each raising: two jointed lines that
-     meet, a jointed line meeting another constraint line (the pile case), and a
-     line load's application point sitting on a jointed line.
+  f. what the split refuses and what it does not: a jointed line met by a BONDED
+     constraint line (the pile case) and a line load's application point sitting
+     on a jointed line both raise; two jointed lines that MEET are built, and
+     what the junction becomes is test/joint_junction_check.py's subject.
   g. a sheet lying ALONG a material boundary, on tri3 and tri6 — the base
      geotextile at a fill/foundation contact, and the wall sheet on a
      fill/facing-block contact. The line coincides with a zone edge, so the
@@ -138,8 +141,16 @@ def _line_frame(line):
     return p1, np.array([-d[1], d[0]])
 
 
-def _check_split(base, mesh, line, tag, failures, expect_line=1):
-    """The counts and the classification, on one jointed mesh."""
+def _check_split(base, mesh, line, tag, failures, expect_line=1, open_ends=0):
+    """The counts and the classification, on one jointed mesh.
+
+    ``open_ends`` is how many of the line's two ends stand on the model's
+    external boundary. A buried end is a crack tip: the two soil faces rejoin
+    there and the station carries one soil node. An end on the boundary is a
+    crack that reaches the surface, and the fan of elements around it is cut in
+    two, so it carries two — one node more than a buried end, and the leg states
+    which of its ends are which rather than reading it off the split.
+    """
     joints = mesh.get('joints')
     if not joints:
         failures.append(f"{tag}: the mesh carries no 'joints' record")
@@ -153,10 +164,12 @@ def _check_split(base, mesh, line, tag, failures, expect_line=1):
 
     # --- counts -----------------------------------------------------------
     added = len(mesh['nodes']) - len(base['nodes'])
-    if added != 2 * n - 2:
-        failures.append(f"{tag}: {n} stations added {added} nodes, not "
-                        f"{2 * n - 2} (three copies per station, the two tips "
-                        f"shared by the soil faces)")
+    expect_added = 2 * n - 2 + open_ends
+    if added != expect_added:
+        failures.append(f"{tag}: {n} stations with {open_ends} end(s) on the "
+                        f"boundary added {added} nodes, not {expect_added} "
+                        f"(three copies per station; a buried tip's soil faces "
+                        f"rejoin, an end on the boundary opens)")
     mats_1d = np.asarray(mesh['element_materials_1d'], dtype=int)
     own_bars = np.where(mats_1d == expect_line)[0]
     n_bar = len(own_bars)
@@ -190,14 +203,18 @@ def _check_split(base, mesh, line, tag, failures, expect_line=1):
                 failures.append(f"{tag}: station {k}'s {name} copy is not at "
                                 f"the same point as the original")
     tips = (0, len(stations) - 1)
+    n_open = 0
     for k in tips:
         up, bar, low = stations[k]
         if up != low:
-            failures.append(f"{tag}: the soil faces are duplicated at tip "
-                            f"station {k}; they must rejoin there")
+            n_open += 1
         if bar == low:
             failures.append(f"{tag}: the bar shares the soil's node at tip "
                             f"station {k}; the bar keeps its own end node")
+    if n_open != open_ends:
+        failures.append(f"{tag}: {n_open} of the line's ends carry two soil "
+                        f"faces, not {open_ends}; a buried tip must rejoin and "
+                        f"an end on the external boundary must not")
     for k in range(1, len(stations) - 1):
         up, bar, low = stations[k]
         if len({up, bar, low}) != 3:
@@ -327,7 +344,7 @@ def _leg_c(failures):
         base = build_mesh_from_polygons(polys, **kw)
         mesh = build_mesh_from_polygons(polys, joint_lines=[len(lines) - 1], **kw)
     n = _check_split(base, mesh, lines[-1], 'c', failures,
-                     expect_line=len(lines))
+                     expect_line=len(lines), open_ends=1)
     stations = mesh['joints'][0]['stations']
     nodes = np.asarray(mesh['nodes'], dtype=float)
     if abs(nodes[stations[0][2], 0] - x_left) > 1e-9:
@@ -388,8 +405,10 @@ def _leg_e(failures):
             failures.append(f"e: an unflagged model wrote the joint key "
                             f"'{key}'")
 
+    # the tutorial's geotextiles start ON the slope face, so end 1 is a crack
+    # that reaches the surface and end 2 is buried in the fill.
     n = _check_split(base, mesh, lines[flagged], 'e', failures,
-                     expect_line=flagged + 1)
+                     expect_line=flagged + 1, open_ends=1)
 
     # The split only appends: the unflagged mesh's nodes come back unchanged.
     n_base = len(base['nodes'])
@@ -417,15 +436,21 @@ def _leg_e(failures):
 
 
 def _leg_f(failures):
-    """The three geometries phase 1 refuses."""
+    """The geometries the split still refuses — and the one it no longer does.
+
+    Two jointed lines that MEET are built, not refused: the split gives the
+    shared node one copy per wedge of material around it (test/joint_junction_
+    check.py). What stays refused is a jointed line met by a BONDED member, whose
+    element would keep one wedge's copy and lose the material on the other side,
+    and a line load standing on a jointed line, which has no single node to act
+    on.
+    """
     ring = [(0, 0), (20, 0), (20, 10), (0, 10)]
     sheet = [(5.0, 5.0), (15.0, 5.0)]
     crossing = [(10.0, 2.0), (10.0, 8.0)]
     refusals = [
-        ("two jointed lines that meet", 'another jointed line',
-         dict(lines=[sheet, crossing], joint_lines=[0, 1])),
         ("a jointed line meeting another constraint line (a pile)",
-         'another constraint line',
+         'touches another constraint line',
          dict(lines=[sheet, crossing], joint_lines=[0])),
         ("a line load's application point on a jointed line",
          'carries a point constraint',
@@ -445,8 +470,14 @@ def _leg_f(failures):
             else:
                 raised += 1
         else:
-            failures.append(f"f: the mesher accepted {what}; phase 1 must "
-                            f"refuse it")
+            failures.append(f"f: the mesher accepted {what}; it must refuse it")
+    try:
+        _build([{'coords': list(ring), 'mat_id': 0}], [sheet, crossing], 'tri6',
+               joint_lines=[0, 1])
+    except ValueError as exc:
+        failures.append(f"f: two jointed lines that meet were refused: {exc}")
+    else:
+        raised += 1
     return raised
 
 
@@ -671,13 +702,14 @@ def main():
               f"{a['tri6']} on tri6")
         print(f"b: crossing a material boundary, {b['tri3']} / {b['tri6']} "
               f"stations")
-        print(f"c: sheet on the domain boundary, {c_n} stations; the tip's "
-              f"three copies all carry boundary condition {c_bc}")
+        print(f"c: sheet on the domain boundary, {c_n} stations; the copies at "
+              f"the open end all carry boundary condition {c_bc}")
         print(f"d: inclined sheet, {d['tri3']} / {d['tri6']} stations")
         print(f"e: {os.path.basename(MODEL)} with one line flagged, {e_n} "
               f"stations, {e_base} -> {e_split} nodes; unflagged it writes no "
               f"joint key")
-        print(f"f: {n_refused} of 3 refused geometries raised")
+        print(f"f: {n_refused - 1} of 2 refused geometries raised; two jointed "
+              f"lines that meet were built")
         print(f"g: sheet along a material boundary, {g['tri3']} / {g['tri6']} "
               f"stations")
         print(f"h: sheet part on the boundary, part inside the zone above, "

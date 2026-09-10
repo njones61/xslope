@@ -5313,23 +5313,30 @@ def _joint_no_strength(ctx):
 
 
 @rule("joint.lines_meet", ERROR, ("fem",),
-      "Two jointed lines cannot meet: phase 1 splits one mesh edge at a time.")
+      "Two jointed lines cannot lie on one another: one edge, one interface law.")
 def _joint_lines_meet(ctx):
     from shapely.geometry import LineString
     lines = _joint_lines(ctx)
     for a in range(len(lines)):
         ia, _ra, sa = lines[a]
+        ga = LineString(list(sa))
         for b in range(a + 1, len(lines)):
             ib, _rb, sb = lines[b]
-            if not LineString(list(sa)).intersects(LineString(list(sb))):
+            gb = LineString(list(sb))
+            if not ga.intersects(gb):
                 continue
+            shared = ga.intersection(gb)
+            tol = max(1e-9, 1e-6 * max(ga.length, gb.length))
+            if shared.geom_type == 'Point' or shared.length <= tol:
+                continue          # a junction: the mesh split builds it
             yield (f"{ctx.reinf_label(ia)} and {ctx.reinf_label(ib)} both set "
-                   f"Joint = Yes and meet. The mesh splits along a jointed line "
-                   f"by giving every node on it three copies, and a node shared "
-                   f"by two such lines has no single upper side and no single "
-                   f"lower one, so the split cannot be built. Move one line "
-                   f"clear of the other, or leave one of them bonded "
-                   f"{_AT_REINF}.")
+                   f"Joint = Yes and lie on one another over "
+                   f"{shared.length:.4g} of their length. Two jointed lines may "
+                   f"MEET — where they do, the mesh split copies the shared node "
+                   f"once per wedge of material around it — but they cannot "
+                   f"share a stretch: the mesh has one edge chain there and it "
+                   f"carries one interface law. Make the overlapping stretch one "
+                   f"line {_AT_REINF}.")
 
 
 @rule("joint.crosses_constraint_line", ERROR, ("fem",),

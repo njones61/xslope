@@ -56,13 +56,15 @@ python run_tests.py --gate           # the release gate: every row, every lock r
 
 If your change adds a new sample, add a `<!-- test: ... -->` tag to the sample so it becomes part of the suite automatically.
 
-### Two tiers, and what each is for
+### How much of the suite to run
 
 A strength-reduction lock is **proved** once, when it is cut: a bisection on two meshes at a budget that decided every trial, run by the corpus builder or the round that published it. What the suite owes it afterwards is a **check** that it is still reproducible. Separating the two is what keeps a suite that carries two hundred strength-reduction rows runnable, because the most expensive of them are hours apiece.
 
 **`--standard` is the default**, and it is what a change is checked against. It runs every row except the ones the gate tier holds: a row whose tag says `tier=gate`, and a strength-reduction row this machine has already timed over ten minutes in the mode a standard run would use it. A row nothing has timed runs — unmeasured is unknown, not known-heavy — so a fresh clone checks everything and learns what things cost by running them. What it measured is written to `test/row_timings.json`, which is local and never committed; the run prints its slowest rows and names every row it held back, so nothing disappears silently.
 
 **`--gate` is the release gate**, on the owner's word. It runs every row including the held-back ones, and forces the full bisection on every strength-reduction lock, so each one is re-proved rather than checked. Naming rows with `--benchmark` also overrides the hold — asking for a row by name is asking for it.
+
+**`--quick` is the cheapest run.** It collapses each LEM problem's method list to one check, and it rides the standard tier, so it holds back the same rows.
 
 ### Checking a lock on its bracket edges
 

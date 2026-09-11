@@ -1952,8 +1952,10 @@ def _run_fem_ssrm_edges(test, pair):
     fs, bracket_err, _annotation = _run_fem_ssrm_bracket(test)
     why = '; '.join(notes)
     if bracket_err is not None:
-        return None, bracket_err, ('edges_bracket', f'edge flipped ({why}), bracket errored')
-    return fs, None, ('edges_bracket', f'edge flipped ({why}), bracket re-solved it')
+        return None, bracket_err, ('edges_bracket',
+                                   f'edges did not hold ({why}), bracket errored')
+    return fs, None, ('edges_bracket',
+                      f'edges did not hold ({why}), bracket re-solved it')
 
 
 def _run_fem_ssrm(test):
@@ -14735,9 +14737,10 @@ def main():
                              "sequential runs (in-order rows, full solver "
                              "output — the debugging mode).")
     parser.add_argument('--quick', action='store_true',
-                        help='For LEM problems that list several methods, check '
-                             'only one method per problem (prefers Spencer) so '
-                             'routine runs stay fast')
+                        help='The cheapest run: for LEM problems that list '
+                             'several methods, check only one method per problem '
+                             '(prefers Spencer). It rides the standard tier, so '
+                             'the rows the gate holds back are held here too.')
     parser.add_argument('--reference-only', action='store_true',
                         help='Verify every FEM SSRM row on the pure reference '
                              'kernel only, disabling the fast-first-with-fallback '
@@ -16067,7 +16070,12 @@ def main():
     if row_times:
         _save_row_timings(row_times)
         slowest = sorted(row_times.items(), key=lambda kv: -kv[1][1])[:5]
-        print("Slowest rows: " + ", ".join(f"{k.split('|')[1]} {s:.0f}s ({m})"
+
+        def _label(key):
+            parts = key.split('|')
+            return parts[1] if parts[1] != '-' else Path(parts[2]).name
+
+        print("Slowest rows: " + ", ".join(f"{_label(k)} {s:.0f}s ({m})"
                                            for k, (m, s) in slowest))
     if jobs > 1:
         print(f"Total time: {time.time() - wall_t0:.1f}s wall on {jobs} workers "

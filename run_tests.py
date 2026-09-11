@@ -8331,6 +8331,19 @@ MODULE_CHECKS = {
         "material crossing, the stiffness default (which must carry no result "
         "over two orders of magnitude), and that a model with no jointed line "
         "builds exactly the fem_data it always did."),
+    'joint_network': (
+        'joint_network_check.py',
+        "The joint NETWORK generators: a parallel set's trace count, its exact "
+        "spacing along its own normal and its dip; clipping to a named material, "
+        "to a polygon and to the whole section, with a trace that would lie "
+        "ALONG the region's boundary dropped rather than handed to the mesher; "
+        "persistence cutting each trace into pieces of the stated length with "
+        "the stated rock bridge between them; a Voronoi network reproduced by "
+        "its seed and sized by its block size; the refusals (two sets at one "
+        "dip, two sets sharing a label, an unknown material, a misspelt "
+        "property); the mesh of a generated cross-jointed block; and a "
+        "generated network written to the joints sheet and read back "
+        "unchanged."),
     'joint_surfaces': (
         'joint_surfaces_check.py',
         "What a jointed line reaches once the reinforce sheet says so: the "
@@ -14253,7 +14266,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'reinforce_mesh_geometry': 2, 'joint_mesh': 3,
               'joint_junction': 5, 'joint_junction_mesh': 3,
-              'joint_element': 5, 'joint_surfaces': 4,
+              'joint_element': 5, 'joint_surfaces': 4, 'joint_network': 3,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'docs_index_sync': 3, 'assistant_docs_answers': 2,
@@ -15343,6 +15356,12 @@ def main():
         tests.append({'type': 'joint_surfaces',
                       'file': 'a jointed line from the column to the report',
                       'method': '-', 'source': 'joint_surfaces'})
+        # The generators that write the joints sheet's rows for a whole set at
+        # once. Geometry and one mesh build, so it is cheap next to the rows
+        # above, and it rides this scope because what it produces is their input.
+        tests.append({'type': 'joint_network',
+                      'file': 'the joint network generators',
+                      'method': '-', 'source': 'joint_network'})
 
     if args.skip_benchmarks:
         n_before = len(tests)

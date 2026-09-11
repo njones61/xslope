@@ -1050,6 +1050,40 @@ material on one side only. A thin zone crossed by many joint lines needs a per-p
 1 m target size. LEM ignores the sheet entirely. See `docs/fem/reinforcement.md`, "Joints without
 reinforcement".
 
+#### Joint networks (`xslope.joints`)
+
+A jointed rock mass is described as SETS, not as individual lines. Three generators turn a set
+description into the rows above, clipped to where the set exists; each returns a list ready for
+`slope_data['joint_lines']`, so a generated network is inspected, edited, saved and reloaded
+like a typed one.
+
+```python
+from xslope.joints import parallel_set, cross_jointed, voronoi
+
+# dip_deg is the trace's inclination CCW from +x: 0 horizontal, 90 vertical,
+# NEGATIVE for a set descending to the right. region= None is the whole section,
+# a material name (or several) is that material's polygons, or pass a polygon.
+bedding = parallel_set(slope_data, dip_deg=30, spacing=2.0, offset=0.0,
+                       persistence=None,          # or (trace_len, gap): a rock bridge
+                       region='Sandstone', label='bed',
+                       props={'phi': 32.0, 'c': 0.0, 'dil': 5.0})
+joints  = parallel_set(slope_data, dip_deg=-60, spacing=2.5, label='j2',
+                       props={'phi': 35.0})
+slope_data['joint_lines'] = cross_jointed(bedding, joints)   # refuses two sets at one dip
+
+# A blocky mass with no preferred orientation. seed is REQUIRED: the same block
+# size and seed reproduce the same network exactly.
+slope_data['joint_lines'] = voronoi(slope_data, block_size=1.5, seed=7,
+                                    region='Rock', label='vor',
+                                    props={'phi': 20.0, 'c': 500.0})
+```
+
+Rows come out labelled `bed-01`, `bed-02`, … so a network keeps one name per set. A trace that
+would lie ALONG the region's boundary is DROPPED rather than emitted — the mesh split needs
+material on both sides of a joint and there is none outside the section — while a trace ENDING
+on the boundary is ordinary and is kept. Generated networks mesh exactly as typed ones do: their
+traces meet, and the split copies each shared node once per wedge of material around it.
+
 **Layout convention** (when the sketch gives spacing but not explicit elevations): the bottom
 line sits **AT the toe/base elevation** (e.g. y=0), then y = s, 2s, … upward; each line starts
 **on the slope face** at its elevation; **length = the labeled dimension measured from the

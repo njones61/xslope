@@ -1534,6 +1534,50 @@ def _draw_reinforcement_preview(ax, rows, selected, slope_data, style):
     _finish_preview_axes(ax)
 
 
+def _draw_joints_preview(ax, rows, selected, slope_data, style):
+    """Preview for the joints editor: the base geometry with each pending joint
+    line from (x1,y1)→(x2,y2), drawn the way the inputs plot draws one — a dark
+    dashed line with short ticks on both sides, the section-drawing mark for a
+    surface the two sides can slide on. The selected line is bold with endpoint
+    markers; the others are dimmed."""
+    from xslope.plot import plot_base_geometry, draw_joint_ticks, JOINT_COLOR
+    from xslope.style import resolve_style
+    rstyle = resolve_style(style)
+    try:
+        plot_base_geometry(ax, slope_data, labels=False, style=rstyle)
+    except Exception:
+        pass
+    span = _preview_span(ax, slope_data)
+    for i, r in enumerate(rows):
+        p1, p2 = _xy(r, "x1", "y1"), _xy(r, "x2", "y2")
+        if p1 is None or p2 is None:
+            continue
+        xs, ys = [p1[0], p2[0]], [p1[1], p2[1]]
+        emph = i == selected
+        color = _PREVIEW_EMPH if emph else JOINT_COLOR
+        if emph:
+            ax.plot(xs, ys, color=color, linewidth=_PREVIEW_EMPH_LW,
+                    linestyle="--", marker="o", markersize=6,
+                    markerfacecolor=color, markeredgecolor="white", zorder=20)
+            draw_joint_ticks(ax, xs, ys, span, color, alpha=0.95, zorder=20)
+        else:
+            ax.plot(xs, ys, color=color, linewidth=2.0, linestyle="--",
+                    alpha=_PREVIEW_DIM_ALPHA, zorder=6)
+            draw_joint_ticks(ax, xs, ys, span, color,
+                             alpha=_PREVIEW_DIM_ALPHA, zorder=6)
+    _finish_preview_axes(ax)
+
+
+def _preview_span(ax, slope_data):
+    """The width of the section a preview is drawn on, for the tick length."""
+    dom = slope_data.get("domain_polygon")
+    try:
+        x0, y0, x1, y1 = dom.bounds
+        return max(x1 - x0, y1 - y0, 1.0)
+    except Exception:
+        return 1.0
+
+
 def _draw_piles_preview(ax, rows, selected, slope_data, style):
     """Preview for the piles editor: each pending pile from (x1,y1)→(x2,y2) over the
     full section. The selected pile is bold (emphasis color) with a square cap marker
@@ -4486,7 +4530,7 @@ class MaterialsEditor(CategoryEditor):
 # LIST view: piles are almost always 1-3 rows, and a tiered wall's reinforcement is
 # edited one line at a time — the table stays the bulk-entry path for the 15-20
 # lines of a big wall, but the list is the primary editing surface.
-_LAST_LINE_VIEW = {"reinforce": "list", "piles": "list"}
+_LAST_LINE_VIEW = {"reinforce": "list", "piles": "list", "joints": "list"}
 
 
 def _last_line_view(key):
@@ -6360,6 +6404,112 @@ class PilesEditor(CategoryEditor):
         slope_data["pile_lines"] = rows
 
 
+# --- joints ----------------------------------------------------------------- #
+def _new_joint():
+    # A frictional contact with no cohesion and no tension — what a dry joint IS.
+    # phi has no default in the sheet either, so a new row starts at zero and the
+    # preflight rule that refuses a strengthless joint is what asks for a value.
+    return {"label": "", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0,
+            "c": 0.0, "phi": 0.0, "t_cut": 0.0,
+            # Blank, not zero: a blank stiffness is derived from the adjacent
+            # soil, and a zero one would be a joint with no stiffness at all.
+            "kn": float("nan"), "ks": float("nan"), "jred": ""}
+
+
+# List-view form layout for a joint line: every JointsEditor.FIELDS key grouped
+# (Identity / Geometry / Strength / Stiffness).
+_JOINT_FORM_GROUPS = [
+    ("Identity", [["label"]]),
+    ("Geometry", [["x1", "y1"], ["x2", "y2"]]),
+    ("Strength", [["c", "phi"], ["t_cut"]]),
+    ("Stiffness", [["kn", "ks"], ["jred"]]),
+]
+
+
+def _joint_item_label(i, row):
+    name = str(row.get("label") or "joint")
+    try:
+        return (f"{i + 1}. {name} (x={float(row.get('x1', 0) or 0):g}"
+                f"→{float(row.get('x2', 0) or 0):g})")
+    except (TypeError, ValueError):
+        return f"{i + 1}. {name}"
+
+
+# Wording is the 'joints' worksheet's own legend, one entry per column.
+JOINTS_HELP = {
+    "label": "Name used in error messages, summaries, and plots (optional).",
+    "x1": "Start point X-coordinate of the joint line.",
+    "y1": "Start point Y-coordinate of the joint line.",
+    "x2": "End point X-coordinate of the joint line.",
+    "y2": "End point Y-coordinate of the joint line.",
+    "c": "Joint cohesion (blank = 0). With phi it is the interface's "
+         "Mohr-Coulomb strength, which is what the two faces slide on.",
+    "phi": "Joint friction angle, degrees. Required: c alone defaults to zero, so "
+           "a blank phi would be a frictionless interface.",
+    "t_cut": "Tension cutoff (blank = 0). The joint opens when the normal "
+             "traction passes it, and closes again when the faces meet.",
+    "kn": "Joint normal stiffness (blank = from soil E and size).",
+    "ks": "Joint shear stiffness (blank = from soil G and size).",
+    "jred": "Reduce joint strength in SSRM (blank = Yes). No keeps a "
+            "construction-detail joint at full strength while the soil is reduced.",
+}
+
+
+class JointsEditor(CategoryEditor):
+    label = "Joints"
+    # A joint line is FEM only: the mesh splits along it and interface elements
+    # carry the two faces. The limit-equilibrium engines never see one, so every
+    # field is tagged fem and the LEM toggle hides the lot.
+    FIELDS = [
+        Field("label", "Label", "str", tooltip=JOINTS_HELP["label"]),
+        Field("x1", "x1", usage="fem", tooltip=JOINTS_HELP["x1"]),
+        Field("y1", "y1", usage="fem", tooltip=JOINTS_HELP["y1"]),
+        Field("x2", "x2", usage="fem", tooltip=JOINTS_HELP["x2"]),
+        Field("y2", "y2", usage="fem", tooltip=JOINTS_HELP["y2"]),
+        Field("c", "c", "optfloat", usage="fem", unit="stress",
+              tooltip=JOINTS_HELP["c"]),
+        Field("phi", "phi", "optfloat", usage="fem", tooltip=JOINTS_HELP["phi"]),
+        Field("t_cut", "t_cut", "optfloat", usage="fem", unit="stress",
+              tooltip=JOINTS_HELP["t_cut"]),
+        Field("kn", "kn", "optfloat", usage="fem", tooltip=JOINTS_HELP["kn"]),
+        Field("ks", "ks", "optfloat", usage="fem", tooltip=JOINTS_HELP["ks"]),
+        Field("jred", "Jred", "choice", choices=["", "Yes", "No"], usage="fem",
+              tooltip=JOINTS_HELP["jred"]),
+    ]
+
+    def build(self, slope_data, parent):
+        style = _doc_style(parent)
+
+        def preview(ax, rows, selected):
+            _draw_joints_preview(ax, rows, selected, slope_data, style)
+
+        return _LineEditorDialog(
+            "Joints", self.FIELDS, slope_data.get("joint_lines", []),
+            _new_joint, _JOINT_FORM_GROUPS, _joint_item_label, preview,
+            lambda x, y, tol, rows: _pick_line_rows(rows, x, y, tol),
+            view_state="joints", parent=parent,
+            unit_labels=_unit_labels_for(slope_data),
+            help_text="A joint line is a slip surface with no reinforcement in "
+                      "it — a rock joint, a bedding plane, a block-on-block "
+                      "contact, a wall-soil interface. The finite element mesh "
+                      "splits along it and the two faces slide on the "
+                      "Mohr-Coulomb strength c and phi, parting where the normal "
+                      "traction passes t_cut. A reinforcement line that is also a "
+                      "slip surface belongs on the reinforce sheet with its Joint "
+                      "column set instead, so that the sheet between the two "
+                      "faces is still there. Blank kn and ks are derived from the "
+                      "adjacent soil; the strength reduction reduces the joint "
+                      "with the soil unless Jred says No. FEM only.",
+            usage_toggles=["lem", "fem"],
+            preview_caption="Preview shows the joint lines on the section "
+                            "(selected line bold with its endpoints; others "
+                            "dimmed). Click a line to select it.",
+            field_help=JOINTS_HELP)
+
+    def apply(self, slope_data, dlg):
+        slope_data["joint_lines"] = dlg.result_rows()
+
+
 # --- geometry: profile lines & polygons (master/detail) --------------------- #
 def _set_derived_geometry(slope_data, polys):
     """Store material-zone polygons and rebuild the geometry derived from them
@@ -7026,7 +7176,8 @@ def _new_reinf():
             # Blank, not zero: a new line uses the development-length law, and a
             # zero Adhesion with a zero Delta would be a real (and useless)
             # overburden law rather than the absence of one.
-            "adhesion": float("nan"), "delta": float("nan")}
+            "adhesion": float("nan"), "delta": float("nan"),
+            "joint": "", "kn": float("nan"), "ks": float("nan"), "jred": ""}
 
 
 # List-view form layout for a reinforcement line: every ReinforcementEditor.FIELDS
@@ -7040,6 +7191,7 @@ _REINF_FORM_GROUPS = [
     ("Anchorage", [["lp1", "lp2"], ["adhesion", "delta"],
                    ["tend1", "tend2"], ["spacing"]]),
     ("Type", [["type"], ["dir", "appl"]]),
+    ("Joint", [["joint", "jred"], ["kn", "ks"]]),
 ]
 
 
@@ -7077,6 +7229,15 @@ REINFORCE_HELP = {
     "t_max": "Maximum tensile force the line can mobilize, per unit width (discrete "
             "supports: enter the per-element capacity with Spacing). Caps both the "
             "LEM force and the FEM yield force.",
+    "joint": "Model the line as a joint (slip) element: the finite element mesh splits along it "
+             "and the soil can slide on it, with the interface strength from Adhesion and Delta. "
+             "FEM only; LEM is unchanged.",
+    "kn": "Joint normal stiffness. Blank derives it from the adjacent soil's E and the 1D "
+          "element size.",
+    "ks": "Joint shear stiffness. Blank derives it from the adjacent soil's G and the 1D "
+          "element size.",
+    "jred": "Reduce the joint's strength with the soil during strength reduction (blank = Yes). "
+            "No keeps a construction-detail joint at full strength.",
     "t_res": "Residual tensile force the line retains after it ruptures (post-peak), "
             "per unit width (÷ Spacing for discrete supports). Capped by the pullout "
             "envelope: bond slip is perfectly plastic, so an element keeps carrying "
@@ -7153,6 +7314,13 @@ class ReinforcementEditor(CategoryEditor):
         # per-element (L²) / per-unit-width (L²/L) instead.
         Field("E", "E", usage="fem", unit="stress", tooltip=REINFORCE_HELP["E"]),
         Field("area", "Area", usage="fem", tooltip=REINFORCE_HELP["area"]),
+        # v27 joint (slip) option: the mesh splits along the line (FEM only).
+        Field("joint", "Joint", "choice", choices=["", "Yes", "No"], usage="fem",
+              tooltip=REINFORCE_HELP["joint"]),
+        Field("kn", "kn", "optfloat", usage="fem", tooltip=REINFORCE_HELP["kn"]),
+        Field("ks", "ks", "optfloat", usage="fem", tooltip=REINFORCE_HELP["ks"]),
+        Field("jred", "Jred", "choice", choices=["", "Yes", "No"], usage="fem",
+              tooltip=REINFORCE_HELP["jred"]),
     ]
     # Which pullout law a line uses is not a stored field — the row says it. A
     # filled Adhesion/Delta pair IS the overburden law, and the development lengths
@@ -7798,6 +7966,7 @@ CATEGORY_EDITORS = {
     "seep_bc": SeepBcEditor(),
     "piles": PilesEditor(),
     "reinforce": ReinforcementEditor(),
+    "joints": JointsEditor(),
     "line_loads": LineLoadsEditor(),
     "profile": ProfileEditor(),
     "polygons": PolygonEditor(),

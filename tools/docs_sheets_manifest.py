@@ -38,6 +38,7 @@ RAPID = "docs/usage/sample_sheets/sheets_rapid.xlsx"
 SEEPBC = "docs/usage/sample_sheets/sheets_seepbc.xlsx"
 TSEEP = "docs/usage/sample_sheets/sheets_tseep.xlsx"
 POLY = "docs/usage/sample_sheets/sheets_polygon.xlsx"
+JOINTS = "docs/usage/sample_sheets/sheets_joints.xlsx"
 
 SHEETS = [
     # main comes from the blank template (what that section describes); auto-framed.
@@ -95,6 +96,9 @@ SHEETS = [
     # ends at Area in column T.
     {"out": "sheet_reinforce.png", "src": "docs/lem/files/xslope_reinforce.xlsx",
      "sheet": "reinforce", "cols": "A:T"},
+    # joints (v27): the whole table, A:L. There is no hidden lookup block behind
+    # it, and the Yes/No list on Jred is a validation list rather than in-sheet data.
+    {"out": "sheet_joints.png", "src": JOINTS, "sheet": "joints", "cols": "A:L"},
     {"out": "sheet_piles.png", "src": "docs/lem/files/xslope_piles.xlsx",
      "sheet": "piles", "cols": "A:T"},
     {"out": "sheet_lloads.png", "src": "docs/inputs/slope/xslope_nail_axial.xlsx",

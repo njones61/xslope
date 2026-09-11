@@ -859,7 +859,7 @@ def ensure_reinforce_pullout(slope_data):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 26
+SUPPORTED_TEMPLATE_VERSION = 27
 
 # The template version that inserted the 1D element size cell at main!D20, pushing
 # every main-sheet run option below it down one row. Files at or above it are read
@@ -2420,6 +2420,15 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                 "tend1": tend1 / spacing,
                 "tend2": tend2 / spacing,
                 "spacing": spacing,
+                # v27 joint (slip) option, stored as entered ('Yes' / 'No' / '')
+                # so a file round-trips blank as blank. Readers: the line is a
+                # joint iff joint.lower() == 'yes'; its strength is reduced in the
+                # SSR unless jred.lower() == 'no'. kn / ks blank = NaN = derived
+                # from the adjacent soil.
+                "joint": _choice(row.get('joint'), ''),
+                "kn": float(row['kn']) if pd.notna(row.get('kn')) else float('nan'),
+                "ks": float(row['ks']) if pd.notna(row.get('ks')) else float('nan'),
+                "jred": _choice(row.get('jred'), ''),
                 # v24 overburden-dependent pullout. NaN = blank = the constant-
                 # rate law from Lp1/Lp2, so a file written before the columns
                 # existed reads exactly as it always did. These two are entered
@@ -2437,6 +2446,61 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     # LEM tension-distribution format, derived from the raw endpoints/pullout data.
     reinforce_lines = build_reinforce_lines(reinforcement_lines)
 
+    # === JOINT LINES ===
+    # The v27 'joints' sheet: a slip surface with no reinforcement in it — a rock
+    # joint, a bedding plane, a block-to-block contact, a wall-soil interface. The
+    # mesh splits along it and interface elements carry the two faces, exactly as
+    # they do on a reinforcement line whose Joint column reads yes; the difference
+    # is that there is no bar between the faces.
+    #
+    # A v27 file written before the sheet existed carries no 'joints' sheet, and
+    # that file simply has no joint lines. The reader is structural only: a blank
+    # phi is stored as NaN and refused by preflight, which is where value rules
+    # live.
+    joint_lines = []
+    if 'joints' in xls.sheet_names:
+        joints_df = xls.parse('joints', header=1)   # header in row 2
+        joints_df.columns = [str(c).strip().lower() for c in joints_df.columns]
+        for i, row in joints_df.iterrows():
+            excel_row = i + 3
+            if 'x1' not in joints_df.columns or pd.isna(row.get('x1')):
+                break
+            label = (str(row['label']).strip()
+                     if 'label' in joints_df.columns and pd.notna(row.get('label'))
+                     else f"Joint {i + 1}")
+            if (pd.isna(row.get('y1')) or pd.isna(row.get('x2'))
+                    or pd.isna(row.get('y2'))):
+                raise ValueError(
+                    f"Joint line '{label}' (joints sheet, Excel row {excel_row}) has "
+                    "an x1 but not a complete pair of endpoints. All four of x1, "
+                    "y1, x2 and y2 are required.")
+            try:
+                joint_lines.append({
+                    "label": label,
+                    "x1": float(row['x1']), "y1": float(row['y1']),
+                    "x2": float(row['x2']), "y2": float(row['y2']),
+                    # Blank cohesion and blank tension cutoff are zero: a joint
+                    # with neither stated is a purely frictional contact that
+                    # cannot carry tension, which is what a dry contact IS.
+                    "c": float(row['c']) if pd.notna(row.get('c')) else 0.0,
+                    # phi has no default. NaN carries "not stated" to preflight,
+                    # which refuses it by name rather than solving a frictionless
+                    # interface nobody asked for.
+                    "phi": float(row['phi']) if pd.notna(row.get('phi')) else float('nan'),
+                    "t_cut": (float(row['t_cut'])
+                              if pd.notna(row.get('t_cut')) else 0.0),
+                    # Blank stiffness is derived from the adjacent soil, the same
+                    # rule the reinforce sheet's kn/ks columns carry.
+                    "kn": float(row['kn']) if pd.notna(row.get('kn')) else float('nan'),
+                    "ks": float(row['ks']) if pd.notna(row.get('ks')) else float('nan'),
+                    # Stored as entered so a blank round-trips blank; blank = yes.
+                    "jred": _choice(row.get('jred'), ''),
+                })
+            except ValueError:
+                raise
+            except Exception as e:
+                raise ValueError(
+                    f"Error processing joint line '{label}' in row {excel_row}: {e}")
 
     # === PILE LINES ===
     pile_lines = []
@@ -2806,6 +2870,10 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     globals_data["dload2_dirs"] = dload2_dirs
     globals_data["reinforce_lines"] = reinforce_lines
     globals_data["reinforcement_lines"] = reinforcement_lines
+    # The v27 'joints' sheet's rows. Named for the sheet; the mesher's own
+    # ``joint_lines=`` argument is a different thing — which CONSTRAINT lines are
+    # jointed — and is built by mesh.extract_joint_options.
+    globals_data["joint_lines"] = joint_lines
     globals_data["pile_lines"] = pile_lines
     globals_data["line_loads"] = line_loads
     globals_data["seepage_bc"] = seepage_bc
@@ -3579,6 +3647,15 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
             if col is not None:
                 reinf[cell_ref(row, col)] = (None if _isnan(r.get(key))
                                              else _f(r.get(key)))
+        # v27 joint columns; a template without them (older master) has no
+        # column to write, and the loader defaults read back the same line.
+        for hdr, val in (('joint', (str(r.get('joint') or '').strip() or None)),
+                         ('kn', None if _isnan(r.get('kn')) else _f(r.get('kn'))),
+                         ('ks', None if _isnan(r.get('ks')) else _f(r.get('ks'))),
+                         ('jred', (str(r.get('jred') or '').strip() or None))):
+            col = _rcol.get(hdr)
+            if col is not None:
+                reinf[cell_ref(row, col)] = val
         # Type is the INPUT; Dir and Appl are derived from it in the sheet by a
         # VLOOKUP against the type table. A row whose direction and application
         # are exactly what its Type derives is written as the Type alone, so the
@@ -3604,6 +3681,58 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
                 reinf[cell_ref(row, col)] = value.capitalize()
     if reinf:
         updates['reinforce'] = reinf
+
+    # === joints ===  (v27; header row 2, data rows 3+)
+    # # | Label | x1 y1 x2 y2 | c phi t_cut | kn ks | Jred. Each field's column is
+    # read from the target template's own header row, so filling an ARCHIVED
+    # pre-v27 template — which has no joints sheet at all — writes nothing rather
+    # than putting the rows somewhere they do not belong. Blank cells round-trip
+    # blank: a derived stiffness, a blank Jred and a zero-by-default c or t_cut
+    # are what the empty cell MEANS, and a literal 0 or NaN in the sheet would
+    # read back as a stated value.
+    def _jt_zero_blank(v):
+        """A joint's c or t_cut for the sheet: zero and unset both write blank,
+        because blank is what the loader reads as zero."""
+        if v is None or _isnan(v):
+            return None
+        v = _f(v)
+        return None if v == 0.0 else v
+
+    joints_u = {}
+    if slope_data.get('joint_lines'):
+        try:
+            _jt_hdr = pd.read_excel(template, sheet_name='joints', header=1,
+                                    nrows=0)
+        except (ValueError, KeyError):
+            _jt_hdr = None
+        if _jt_hdr is not None:
+            _jcol = {}
+            for i, c in enumerate(_jt_hdr.columns):
+                name = str(c).strip().lower()
+                if name and not name.startswith('unnamed'):
+                    _jcol.setdefault(name, i + 1)
+            for n, j in enumerate(slope_data['joint_lines']):
+                row = 3 + n
+                joints_u[cell_ref(row, _jcol.get('#', 1))] = n + 1
+                joints_u[cell_ref(row, _jcol.get('label', 2))] = str(
+                    j.get('label', f"Joint {n + 1}"))
+                for hdr, val in (('x1', _f(j['x1'])), ('y1', _f(j['y1'])),
+                                 ('x2', _f(j['x2'])), ('y2', _f(j['y2'])),
+                                 ('c', _jt_zero_blank(j.get('c'))),
+                                 ('phi', None if _isnan(j.get('phi'))
+                                  else _f(j.get('phi'))),
+                                 ('t_cut', _jt_zero_blank(j.get('t_cut'))),
+                                 ('kn', None if _isnan(j.get('kn'))
+                                  else _f(j.get('kn'))),
+                                 ('ks', None if _isnan(j.get('ks'))
+                                  else _f(j.get('ks'))),
+                                 ('jred', (str(j.get('jred') or '').strip()
+                                           or None))):
+                    col = _jcol.get(hdr)
+                    if col is not None:
+                        joints_u[cell_ref(row, col)] = val
+    if joints_u:
+        updates['joints'] = joints_u
 
     # === piles ===  (header row 2, data rows 3+. The piles layout changed at
     # v23 — the qp force-angle column was dropped, shifting everything after H

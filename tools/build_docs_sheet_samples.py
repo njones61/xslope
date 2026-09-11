@@ -309,8 +309,40 @@ def build_tseep(out_path):
     return out_path
 
 
+def build_joints(out_path):
+    """A joints sheet with one row of each reading the columns carry.
+
+    A rock joint that holds a little tension and states its own stiffnesses; a
+    bedding plane on the derived default with a stated cohesion; a block-on-block
+    contact with friction alone; and one held at full strength through a strength
+    reduction. No committed model carries a joints sheet with that spread, and the
+    image documents the columns rather than any particular slope, so it is built
+    here the way the mat showcase is.
+    """
+    sd = load_slope_data(os.path.join(REPO_ROOT,
+                                      "docs/lem/files/xslope_reinforce.xlsx"))
+    sd["joint_lines"] = [
+        {"label": "Bedding plane", "x1": -20.0, "y1": -4.0, "x2": 90.0, "y2": -1.0,
+         "c": 100.0, "phi": 24.0, "t_cut": 0.0,
+         "kn": float("nan"), "ks": float("nan"), "jred": ""},
+        {"label": "Rock joint", "x1": 20.0, "y1": 16.0, "x2": 44.0, "y2": -8.0,
+         "c": 0.0, "phi": 32.0, "t_cut": 300.0,
+         "kn": 200000.0, "ks": 80000.0, "jred": ""},
+        {"label": "Wall back face", "x1": 60.0, "y1": 24.0, "x2": 60.0, "y2": 6.0,
+         "c": 0.0, "phi": 20.0, "t_cut": 0.0,
+         "kn": 100000.0, "ks": 100000.0, "jred": ""},
+        {"label": "Wall base", "x1": 56.0, "y1": 6.0, "x2": 60.0, "y2": 6.0,
+         "c": 0.0, "phi": 34.0, "t_cut": 0.0,
+         "kn": 100000.0, "ks": 100000.0, "jred": "No"},
+    ]
+    template = os.path.join(REPO_ROOT, "docs", "inputs", "input_template.xlsx")
+    save_slope_data_to_xlsx(sd, out_path, template=template)
+    return out_path
+
+
 BUILDERS = {
     "sheets_mat.xlsx": build_mat,
+    "sheets_joints.xlsx": build_joints,
     "sheets_rapid.xlsx": build_rapid,
     "sheets_polygon.xlsx": build_polygon,
     "sheets_seepbc.xlsx": build_seepbc,

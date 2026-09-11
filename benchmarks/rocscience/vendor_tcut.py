@@ -181,6 +181,31 @@ VENDOR_T_CUT = {
         'Clay 4': 32.0,
         'Clay 5': 32.0,
     },
+    # RS2-24's SSRM files. Same caps as their limit-equilibrium twins; the two
+    #   elastic face zones mirror vendor rock8 / rock9, Plasticity: Non, which
+    #   carries no tensile field.
+    'vp032a_fem.xlsx': {
+        'Upper embankment': 0.0,
+        'Lower embankment': 0.0,
+        'Clay 1': 43.0,
+        'Clay 2': 31.0,
+        'Clay 3': 30.0,
+        'Clay 4': 32.0,
+        'Clay 5': 32.0,
+        'Upper embankment (elastic face)': None,
+        'Lower embankment (elastic face)': None,
+    },
+    'vp032c_fem.xlsx': {
+        'Upper embankment': 0.0,
+        'Lower embankment': 0.0,
+        'Clay 1': 43.0,
+        'Clay 2': 31.0,
+        'Clay 3': 30.0,
+        'Clay 4': 32.0,
+        'Clay 5': 32.0,
+        'Upper embankment (elastic face)': None,
+        'Lower embankment (elastic face)': None,
+    },
     # RS2-25 — the Syncrude tailings dyke, vendor model 'slope stability #025.fez',
     #   which states T: 0 on all five materials.
     #   The file-number join missed this one for the same reason VENDOR_E_NU records
@@ -368,7 +393,6 @@ VENDOR_T_CUT = {
     'vp091_fem.xlsx': {
         'Reinforced and retained fill': 0.0,
         'Foundation soil': 0.0,
-        'Blocks': 2.5,
     },
     # RS2-49 through RS2-55 — the seven parametric variants of the Leshchinsky & Han
     #   multi-tiered wall, vendor models 'slope stability #049.fez' through '#055.fez'
@@ -396,6 +420,37 @@ VENDOR_T_CUT = {
         'Reinforced and retained fill': 0.0,
         'Foundation soil': 10.0,
         'Blocks': 2.5,
+    },
+    # The strength-reduction siblings, built as the paper's dry stack. The soils'
+    # caps are the vendor's, transcribed unchanged; the facing carries none,
+    # because on those files it is elastic and cannot yield in any mode.
+    'vp087_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+    },
+    'vp088_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+    },
+    'vp089_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+    },
+    'vp090_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+    },
+    'vp092_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+    },
+    'vp093_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
+    },
+    'vp094_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 10.0,
     },
     # RS2-52's LEM/figure file. #052 gives the weak foundation c = 0, so its T = 0 too
     # — the same row vp091_fem carries above, on the 30 m section.
@@ -921,6 +976,30 @@ VENDOR_E_NU = {
         'Clay 4': (0.4, 50000.0),
         'Clay 5': (0.4, 50000.0),
     },
+    # RS2-24's SSRM files, including the two elastic face zones, which vendor
+    #   rock8 / rock9 give the same pair as the fill they copy.
+    'vp032a_fem.xlsx': {
+        'Upper embankment': (0.4, 50000.0),
+        'Lower embankment': (0.4, 50000.0),
+        'Clay 1': (0.4, 50000.0),
+        'Clay 2': (0.4, 50000.0),
+        'Clay 3': (0.4, 50000.0),
+        'Clay 4': (0.4, 50000.0),
+        'Clay 5': (0.4, 50000.0),
+        'Upper embankment (elastic face)': (0.4, 50000.0),
+        'Lower embankment (elastic face)': (0.4, 50000.0),
+    },
+    'vp032c_fem.xlsx': {
+        'Upper embankment': (0.4, 50000.0),
+        'Lower embankment': (0.4, 50000.0),
+        'Clay 1': (0.4, 50000.0),
+        'Clay 2': (0.4, 50000.0),
+        'Clay 3': (0.4, 50000.0),
+        'Clay 4': (0.4, 50000.0),
+        'Clay 5': (0.4, 50000.0),
+        'Upper embankment (elastic face)': (0.4, 50000.0),
+        'Lower embankment (elastic face)': (0.4, 50000.0),
+    },
     # RS2-25 — the Syncrude tailings dyke. Its vendor model is the RS2-NATIVE
     # 'slope stability #025.fez' (five zones, gamma 20/17/17/17/17, phi
     # 34/34/34/7.5/7.5 — the dyke, matching this file zone for zone), NOT
@@ -1132,6 +1211,43 @@ VENDOR_E_NU = {
         'Blocks': (0.4, 50000.0),
     },
     'vp090.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    # The strength-reduction siblings carry the same pair on all three materials;
+    # the facing is elastic there, and this is the modulus it is elastic at.
+    'vp087_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp088_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp089_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp090_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp092_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp093_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    'vp094_fem.xlsx': {
         'Reinforced and retained fill': (0.4, 50000.0),
         'Foundation soil': (0.4, 50000.0),
         'Blocks': (0.4, 50000.0),

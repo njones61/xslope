@@ -58,7 +58,7 @@ from xslope.fem import (build_fem_data, export_fem_solution,            # noqa: 
                         solve_ssrm, ssrm_run_record)
 import xslope.fem as _fem                                               # noqa: E402
 from xslope.mesh import (build_mesh_from_polygons, export_mesh_to_json,  # noqa: E402
-                         extract_constraint_line_geometry,
+                         extract_constraint_line_geometry, extract_joint_options,
                          extract_point_constraints, extract_size_regions,
                          get_material_polygons)
 
@@ -182,6 +182,7 @@ def _mesh_for(tag, path):
                   element_size_1d=slope_data.get("element_size_1d"),
                   point_constraints=extract_point_constraints(slope_data),
                   size_regions=extract_size_regions(slope_data),
+                  joint_lines=extract_joint_options(slope_data),
                   **RT._refine_kwargs(tag))
     return slope_data, mesh
 

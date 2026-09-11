@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+from collections import defaultdict
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -1489,7 +1490,7 @@ def detect_sweepable_regions(polygon_coords, target_size, polygon_sizes=None,
     return accepted, edge_divisions
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=None, debug=False, mesh_params=None, element_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None, size_regions=None, quad_style='free'):
+def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=None, debug=False, mesh_params=None, element_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None, size_regions=None, quad_style='free', joint_lines=None):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -1561,6 +1562,20 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                       one), so swept and free zones meet at the same node spacing. A zone
                       the classifier declines is simply free-meshed, so 'structured' can
                       never produce a worse mesh than 'free'.
+        joint_lines  : Optional selection of the lines that are JOINTS — slip surfaces
+                      the mesh splits along, rather than bars sharing the soil's nodes.
+                      None (the default) is no joints and the mesh is what it always
+                      was. Otherwise a sequence of indices into `lines`, or a mapping
+                      from such an index to that line's options ('tend1' / 'tend2',
+                      the end anchorage capacities: an end above zero is tied). Each
+                      named line is meshed as an ordinary embedded curve and then
+                      split by split_mesh_along_joints, which see: every node on it
+                      is copied once per WEDGE of material around it, the bar takes
+                      a copy of its own, and a pair of joint elements spans each bar
+                      element. Two wedges at an ordinary station (soil above, soil
+                      below), one at a crack tip buried in material, where the two
+                      faces rejoin, and more where jointed lines meet — three at a
+                      T, four at a crossing.
 
     Returns:
         mesh dict containing:
@@ -1573,9 +1588,13 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
         elements_1d  : np.ndarray of 1D element vertex indices (n_elements_1d, 3) - unused nodes set to 0
         element_types_1d: np.ndarray indicating element type (2 for linear, 3 for quadratic)
         element_materials_1d: np.ndarray of material ID for each 1D element (line index)
+
+        If joint_lines names any line, also includes the keys
+        split_mesh_along_joints writes: joints, elements_joint,
+        element_types_joint, element_materials_joint, element_side_joint, ties.
+        A mesh with no jointed line carries none of them.
     """
     gmsh = _get_gmsh()
-    from collections import defaultdict
 
     # A stated 1D size REFINES along the constraint lines; None (the default) leaves
     # them at whatever the size field asks for there, which is the global target away
@@ -1624,12 +1643,31 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             polygon_mat_ids.append(None)
             polygon_sizes.append(None)
 
+    # Joint geometries the split cannot represent are refused here, before gmsh
+    # runs, so the message names the lines rather than a mesh entity. Where two
+    # jointed lines MEET, the meeting point is made a vertex of both lines first,
+    # so both curves are split there and gmsh gives the junction one node.
+    _joint_opts = _normalize_joint_lines(joint_lines, len(lines) if lines else 0)
+    if _joint_opts:
+        _validate_joint_lines(lines, _joint_opts, point_constraints, polygon_coords)
+        _insert_joint_junction_points(lines, _joint_opts, debug=debug)
+
     # Point constraints (e.g. line-load application points): insert each point as
     # a vertex into every polygon edge that contains it, so gmsh places a node
     # exactly there. Done BEFORE the conforming pass so shared edges stay welded.
     if point_constraints:
         _insert_point_constraints(polygon_coords, point_constraints,
                                   tol=1e-6 * max(1.0, target_size), debug=debug)
+
+    # A constraint line's own ends are inserted the same way, so a line that runs
+    # ALONG a zone edge — or ends on one — meets a polygon that carries a vertex
+    # there and the mesher reuses that edge instead of laying a second curve on
+    # top of it. See _insert_constraint_line_points. Also before the conforming
+    # pass, so the neighbour zone gets the same vertex.
+    if lines:
+        _insert_constraint_line_points(polygon_coords, lines,
+                                       tol=1e-6 * max(1.0, target_size),
+                                       debug=debug)
 
     # Make adjacent zones conforming: split any edge at a neighbour's vertex that
     # lies in its interior (a T-junction), so shared interfaces mesh without slits.
@@ -2576,6 +2614,12 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     # conversion above, or the OCC-fragment fallback.
     attach_1d_midside_nodes(mesh, debug=debug)
 
+    # Jointed lines are split last, on the finished mesh: the bar elements must
+    # already carry the midside node of their 2D edge before that edge is torn
+    # into three.
+    if _joint_opts:
+        split_mesh_along_joints(mesh, lines, _joint_opts, debug=debug)
+
     return mesh
 
 
@@ -2782,6 +2826,9 @@ def attach_1d_midside_nodes(mesh, debug=False):
     generator's output, on a mesh read back from JSON, and on both in turn.
     Elements on an edge no quadratic 2D element carries -- a linear mesh, or a
     constraint line the mesher could not make conform -- keep their two nodes.
+    A jointed line's bar is in that position after the split: it stands on its
+    own node set, which no 2D element shares. It is left alone, because it was
+    given its midside node here before the split tore the edge into three.
     """
     e1d = mesh.get("elements_1d")
     if e1d is None or len(e1d) == 0:
@@ -2841,6 +2888,788 @@ def attach_1d_midside_nodes(mesh, debug=False):
         print(f"  1D elements: {n_attached} given the midside node of their 2D "
               f"edge, {n_missed} left two-node (no quadratic edge)")
     return mesh
+
+
+
+#: Mesh keys the joint (interface) construction adds. They are written only when
+#: at least one constraint line is jointed, so an ordinary mesh — and the JSON it
+#: exports — is exactly what it was before joints existed.
+JOINT_MESH_KEYS = ('joints', 'elements_joint', 'element_types_joint',
+                   'element_materials_joint', 'element_side_joint', 'ties')
+
+#: ``element_side_joint`` on a joint element that is the WHOLE interface: one
+#: element joining the two faces, on a line with no bar between them. The two
+#: values a bar's pair carries — 1 for the upper joint, 0 for the lower — keep
+#: their meaning, so a mesh written before the joints sheet existed is unchanged.
+JOINT_SIDE_WHOLE = 2
+
+#: Joint keys whose value is a list of dicts rather than a numeric array, so the
+#: JSON reader must leave them as Python objects instead of calling np.array.
+_MESH_JSON_OBJECT_KEYS = frozenset(('joints', 'ties'))
+
+
+def barless_joint_line_ids(mesh):
+    """The 1-based constraint-line ids the split gave no bar, as a set.
+
+    A line off the ``joints`` sheet has no reinforcement between its faces, so
+    its 1D elements carry the curve and nothing structural: no bar is assembled
+    from them, they are not drawn as members, and the details view lists the line
+    as an interface rather than as a reinforcement line. Derived from the
+    ``joints`` records rather than from a key of its own, so a mesh written
+    before the sheet existed — every record without a ``bar`` key — reads back
+    as it always did.
+    """
+    return set(int(rec["line"]) for rec in ((mesh or {}).get("joints") or [])
+               if rec.get("bar", True) is False)
+
+
+def _normalize_joint_lines(joint_lines, n_lines):
+    """Normalize the ``joint_lines`` argument to ``{line index: options dict}``.
+
+    Accepts None (no joints), a sequence of indices into ``lines``, or a mapping
+    from such an index to a dict of per-line options.
+
+    Three options are read. ``tend1`` and ``tend2`` are the end anchorage
+    capacities: an end whose value is present and greater than zero is TIED and
+    gets a ``ties`` entry, and every other end is free. ``bar`` says whether the
+    line carries a reinforcement bar between its two faces: True (the default,
+    and what a reinforcement line whose ``Joint`` column reads yes always is)
+    puts the sheet's own nodes between an upper and a lower interface, and False
+    — a line off the ``joints`` sheet, a rock joint or a block contact with no
+    reinforcement in it — makes ONE interface element per span, joining the two
+    faces directly.
+    """
+    if not joint_lines:
+        return {}
+    if isinstance(joint_lines, dict):
+        items = [(int(k), dict(v or {})) for k, v in joint_lines.items()]
+    else:
+        items = []
+        for entry in joint_lines:
+            if isinstance(entry, dict):
+                idx = entry.get('index')
+                if idx is None:
+                    raise ValueError(
+                        "joint_lines entries given as dicts must carry an 'index' "
+                        f"key naming the line; got {entry!r}")
+                items.append((int(idx), {k: v for k, v in entry.items()
+                                         if k != 'index'}))
+            else:
+                items.append((int(entry), {}))
+    opts = {}
+    for idx, o in items:
+        if idx < 0 or idx >= n_lines:
+            raise ValueError(
+                f"joint_lines names constraint line {idx}, which is outside the "
+                f"{n_lines} lines passed to the mesher.")
+        opts[idx] = o
+    return opts
+
+
+def _joint_line_tol(lines, polygon_coords=None):
+    """Geometric tolerance for the joint checks: a fixed fraction of the span of
+    the model, so it means the same thing in feet, meters and millimeters."""
+    xs, ys = [], []
+    for line in (lines or []):
+        for (x, y) in line:
+            xs.append(x)
+            ys.append(y)
+    for coords in (polygon_coords or []):
+        for (x, y) in coords:
+            xs.append(x)
+            ys.append(y)
+    if not xs:
+        return 1e-9
+    span = max(max(xs) - min(xs), max(ys) - min(ys), 1.0)
+    return 1e-6 * span
+
+
+def _validate_joint_lines(lines, opts, point_constraints=None, polygon_coords=None):
+    """Refuse the joint geometries the split cannot represent.
+
+    Three cases, each raising a ValueError that names the lines involved:
+
+    * a jointed line that meets a line which is NOT a joint — a plain
+      reinforcement line or a pile. The split gives every node on the jointed
+      line one copy per wedge of material around it, and a bonded member standing
+      on such a node would silently keep one wedge's copy: its connection to the
+      material on the other side of the sheet would be dropped without a word;
+    * a jointed line carrying a point constraint (a line load's application
+      point). The load is applied to one node, and after the split there are
+      several at that place;
+    * two jointed lines lying ON one another over a stretch. One locus cannot
+      carry two interface laws, and the mesher has one curve there to give.
+
+    Two jointed lines that MEET at a point — a T, a crossing, a corner, a chain —
+    are not refused: :func:`split_mesh_along_joints` gives the shared node one
+    copy per wedge of material between the lines and each element takes its own
+    wedge's copy.
+    """
+    if not opts:
+        return
+    from shapely.geometry import LineString as _LS, Point as _Pt
+    tol = _joint_line_tol(lines, polygon_coords)
+
+    segs = [_LS([tuple(line[0]), tuple(line[-1])]) if line and len(line) >= 2
+            else None for line in lines]
+
+    for li in sorted(opts):
+        seg_i = segs[li]
+        if seg_i is None:
+            raise ValueError(
+                f"Constraint line {li + 1} is flagged as a joint but has fewer "
+                "than two points.")
+        for lj in range(len(lines)):
+            if lj == li or segs[lj] is None:
+                continue
+            if seg_i.distance(segs[lj]) > tol:
+                continue
+            if lj in opts:
+                if lj < li:
+                    continue        # already reported from the other side
+                shared = seg_i.intersection(segs[lj])
+                if shared.geom_type == 'Point' or shared.length <= tol:
+                    continue        # a junction: the split makes it
+                raise ValueError(
+                    f"Jointed constraint lines {li + 1} and {lj + 1} lie on one "
+                    f"another over {shared.length:.4g} of their length. Two "
+                    "jointed lines may MEET — at a T, a crossing or a corner, "
+                    "where the split gives the shared node one copy per wedge of "
+                    "material around it — but they cannot share a stretch: the "
+                    "mesh has one edge chain there and it can carry one interface "
+                    "law. Make the overlapping stretch one line.")
+            raise ValueError(
+                f"Jointed constraint line {li + 1} touches another constraint "
+                f"line (a reinforcement line or a pile), line {lj + 1}. "
+                "The mesh splits along a jointed line and every node on it is "
+                "copied once per wedge of material around it, so a bonded member "
+                "standing on one of those nodes has no defined side to attach to. "
+                "Move the lines apart, flag the other line as a joint too, or "
+                f"clear the Joint flag on line {li + 1}.")
+        for (px, py) in (point_constraints or []):
+            if seg_i.distance(_Pt(px, py)) <= tol:
+                raise ValueError(
+                    f"Jointed constraint line {li + 1} carries a point constraint "
+                    f"at ({px}, {py}) — a line load's application point. After the "
+                    "split there are several nodes at that place and no rule says "
+                    "which one the load acts on. Move the load off the line, or "
+                    f"clear the Joint flag on line {li + 1}.")
+
+
+def _insert_joint_junction_points(lines, opts, tol=1e-9, debug=False):
+    """Give every meeting point of two jointed lines a vertex on BOTH lines.
+
+    Two jointed lines that meet — a T, a crossing, a corner, a chain — must share
+    a mesh node at the meeting point, and gmsh only guarantees one where the
+    geometry carries a point. The mesher builds its points from the lines'
+    vertices and keys them by coordinate, so inserting the same point in both
+    lines splits both curves there and hands them one point tag. Without it a
+    crossing is two curves passing through each other with no shared vertex,
+    which is the geometry gmsh reports as ``intersections in the 1D mesh`` and
+    then fails to recover.
+
+    In place, on ``lines``; the endpoints are left first and last, so the line's
+    own ends are still ``line[0]`` and ``line[-1]``.
+    """
+    if not opts or len(opts) < 2:
+        return 0
+    from shapely.geometry import LineString as _LS
+    idx = sorted(opts)
+    pts_to_add = defaultdict(list)
+    for a in range(len(idx)):
+        for b in range(a + 1, len(idx)):
+            li, lj = idx[a], idx[b]
+            if not lines[li] or not lines[lj]:
+                continue
+            si = _LS([tuple(lines[li][0]), tuple(lines[li][-1])])
+            sj = _LS([tuple(lines[lj][0]), tuple(lines[lj][-1])])
+            if not si.intersects(sj):
+                continue
+            shared = si.intersection(sj)
+            if shared.geom_type != 'Point':
+                continue                       # the overlap case, refused elsewhere
+            p = (float(shared.x), float(shared.y))
+            pts_to_add[li].append(p)
+            pts_to_add[lj].append(p)
+    n_inserted = 0
+    for li, pts in pts_to_add.items():
+        line = [tuple(map(float, q[:2])) for q in lines[li]]
+        p1, p2 = line[0], line[-1]
+        span = math.hypot(p2[0] - p1[0], p2[1] - p1[1]) or 1.0
+        near = max(tol, 1e-9 * span)
+        for p in pts:
+            if any(math.hypot(p[0] - q[0], p[1] - q[1]) <= near for q in line):
+                continue                       # already a vertex of this line
+            t = line_segment_parameter(p, p1, p2)
+            pos = len(line) - 1
+            for k in range(1, len(line)):
+                if line_segment_parameter(line[k], p1, p2) > t:
+                    pos = k
+                    break
+            line.insert(pos, p)
+            n_inserted += 1
+            if debug:
+                print(f"  Joint junction ({p[0]:g}, {p[1]:g}) inserted into "
+                      f"constraint line {li + 1}")
+        lines[li] = line
+    return n_inserted
+
+
+def _element_corner_edges(elements, element_types, ei):
+    """The edges of one 2D element as ``((corner_a, corner_b), midside or None)``.
+
+    Corner order is gmsh's — the corners first, then the midside of each corner
+    pair in the same order (``convert_linear_to_quadratic_mesh``) — so edge ``k``
+    of a triangle runs corner ``k`` to corner ``k + 1`` and carries midside
+    ``3 + k``. A quad9's center node is on no edge and is never on a joint.
+    """
+    et = int(element_types[ei])
+    n_corner = 3 if et in (3, 6) else 4
+    has_mid = et in (6, 8, 9)
+    out = []
+    for k in range(n_corner):
+        a = int(elements[ei, k])
+        b = int(elements[ei, (k + 1) % n_corner])
+        mid = int(elements[ei, n_corner + k]) if has_mid else None
+        out.append(((a, b), mid))
+    return out
+
+
+def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
+    """Split the mesh along every jointed constraint line, in place.
+
+    **The construction.** A jointed line reaches gmsh as an ordinary embedded
+    curve, so the mesh comes back with one node set on it and the soil on the two
+    sides sharing those nodes. This routine takes that bonded mesh apart.
+
+    **The wedge rule.** Every node on a jointed curve — corner nodes and, on a
+    quadratic mesh, the midside nodes between them — is copied ONCE PER WEDGE of
+    material around it. A wedge is a connected group of the 2D elements standing
+    on that node: two elements belong to the same wedge when they share an edge
+    at the node and that edge is not part of a jointed line. Every element takes
+    the copy of its own wedge, and the bar of each jointed line through the node
+    takes a copy of its own. Counting the wedges is the whole rule, and it gives
+    every case at once:
+
+    * an ordinary station of one line: two wedges, the material above and the
+      material below — the split the line is for;
+    * a crack tip buried in material: ONE wedge (the ring of elements around the
+      node is cut in one place and stays connected), so the two soil faces rejoin
+      there and the tip is one shared node, as it always was;
+    * a jointed line reaching the model's external boundary: two wedges, because
+      the fan of elements around a boundary node is cut in two — a crack that
+      reaches the surface can open there;
+    * a chain, where two jointed lines meet end to end, and an L corner, where
+      they share an endpoint: two wedges;
+    * a T, where one line ends on another: three wedges;
+    * a crossing: four.
+
+    **The joint elements.** Two span each bar element: an upper one connecting
+    the material above the edge to the bar, and a lower one connecting the bar to
+    the material below. Above and below are read from the two 2D elements that
+    stand on that edge, so at a junction each joint element joins the two copies
+    on either side of its OWN line at that station. A joint element holds the same
+    nodes as the 2D edge it lies on — three node pairs on a quadratic mesh, two on
+    a linear one — so its shape functions match the adjacent triangles' edges.
+
+    **A line on a zone edge.** A jointed line that runs ALONG a material boundary
+    — the base geotextile at a fill/foundation contact, the wall sheet on a
+    fill/facing contact — is not embedded as a curve of its own: the mesher
+    carries the line's ends as polygon vertices and reuses the boundary curve
+    (see _insert_constraint_line_points), so the stations are the nodes the two
+    zones already share. The wedges are then the two zones' elements, so the split
+    is a split by material side. A line that lies on an edge over part of its
+    length and inside a zone over the rest is one line with both kinds of station;
+    the bar and both joints run its whole length either way.
+
+    **Ends.** A tip buried in material is one shared soil node, as above. The bar
+    gets its own end node wherever the line ends, connected to the soil only
+    through the joints along its length, so a sheet end is free by default and can
+    pull out. An end whose ``tend1`` / ``tend2`` is present and greater than zero
+    is TIED instead, and gets a ``ties`` entry: the bar's end node, the soil node
+    at the same point, and the capacity. Where the end has more than one soil copy
+    — a junction, or the external boundary — the tie takes the copy of the wedge
+    the line runs INTO past its end, which is the material an anchorage there is
+    anchored in. The tie's spring is the element module's; the mesh records the
+    pair.
+
+    **What it writes.** ``joints`` — per jointed line, the stations along the
+    split in order from end 1, each ``[upper, bar, lower]`` at that point: the
+    copy the material above this line holds, the bar's own, and the copy the
+    material below holds. Where the line has more than one wedge on a side at a
+    junction, the copy recorded is the one adjacent to the line's own first
+    segment at that station; every copy at the station is still in ``nodes`` and
+    in the elements that carry it. At a buried tip ``upper`` and ``lower`` are the
+    one shared node, which is what marks a tip for the element module.
+    ``elements_joint`` — the joint elements, six columns
+    ``[a0, a1, a2, b0, b1, b2]``: side ``a`` is always the upper side of the pair
+    (the material above for an upper joint, the bar for a lower one) and side
+    ``b`` the lower, so the normal runs the same way on every joint. The third
+    column of each triple is a padding zero on a linear mesh, as ``elements_1d``
+    does it, and ``element_types_joint`` records 2 or 3 node pairs.
+    ``element_materials_joint`` is the 1-based constraint-line index, matching
+    ``element_materials_1d``; ``element_side_joint`` is 1 on the upper joint of a
+    pair and 0 on the lower. ``ties`` holds the tied ends.
+
+    **A line with no bar.** A joint line off the ``joints`` sheet — a rock joint,
+    a bedding plane, a block-on-block contact — has no reinforcement between its
+    faces, and its ``bar`` option is False. The split is the same up to the node
+    copies: it writes ONE joint element per span instead of two, joining the
+    upper face to the lower one directly, with ``element_side_joint`` reading
+    :data:`JOINT_SIDE_WHOLE`; the station triple's middle slot is ``-1`` and the
+    line's ``joints`` record carries ``"bar": False``; no node is added for a bar
+    and no end can be tied. So a bar-less joint carries the interface stiffness
+    once rather than as two springs in series, which is what a single contact is.
+    Both keys are additions: a record with no ``bar`` key is a line that has one,
+    which is every mesh written before the ``joints`` sheet existed.
+
+    The bar's own elements stay in ``elements_1d`` with their node ids rewritten
+    to the bar's node set. A bar on a jointed line is unaffected by a junction:
+    it has its own node there like every other station, and two bars that meet on
+    a junction node each keep their own, so two sheets that cross are not welded
+    to each other by the crossing.
+
+    Nothing is written when no line is jointed: an ordinary mesh carries none of
+    these keys and is what it always was.
+
+    Parameters:
+        mesh        : the mesh dict from build_mesh_from_polygons, modified in place
+        lines       : the constraint lines the mesh was built from
+        joint_lines : which of them are jointed — see _normalize_joint_lines
+        debug       : print the counts per line
+
+    Returns:
+        the same mesh dict.
+    """
+    opts = _normalize_joint_lines(joint_lines, len(lines) if lines else 0)
+    if not opts:
+        return mesh
+
+    e1d = mesh.get("elements_1d")
+    if e1d is None or len(e1d) == 0:
+        raise ValueError(
+            "A constraint line is flagged as a joint, but the mesh carries no 1D "
+            "elements: gmsh did not recover the line. Check that the line lies "
+            "inside the section and that its endpoints are polygon vertices.")
+
+    nodes_in = np.asarray(mesh["nodes"], dtype=float)
+    nodes = [list(row) for row in nodes_in]
+    elements = np.asarray(mesh["elements"], dtype=int).copy()
+    element_types = np.asarray(mesh["element_types"], dtype=int)
+    e1d = np.asarray(e1d, dtype=int).copy()
+    types_1d = np.asarray(mesh["element_types_1d"], dtype=int)
+    mats_1d = np.asarray(mesh["element_materials_1d"], dtype=int)
+
+    xy = nodes_in[:, :2]
+    span = max(float(xy[:, 0].max() - xy[:, 0].min()),
+               float(xy[:, 1].max() - xy[:, 1].min()), 1.0)
+    tol = 1e-6 * span
+
+    # Node -> the 2D elements standing on it, from the connectivity as it came
+    # from the mesher. Duplicated nodes are appended at the end and are never in
+    # a pre-existing element, so this map stays correct line after line.
+    node_elems = defaultdict(list)
+    for ei in range(len(elements)):
+        for k in range(int(element_types[ei])):
+            node_elems[int(elements[ei, k])].append(ei)
+
+    # ---- 1. every jointed line's curve: its nodes in order, and its bar --------
+    info = {}
+    for li in sorted(opts):
+        line = lines[li]
+        p1 = np.array(line[0][:2], dtype=float)
+        p2 = np.array(line[-1][:2], dtype=float)
+        d = p2 - p1
+        length = float(np.hypot(d[0], d[1]))
+        if length <= tol:
+            raise ValueError(f"Jointed constraint line {li + 1} has zero length.")
+        d = d / length
+        normal = np.array([-d[1], d[0]])
+
+        bar_idx = [int(i) for i in np.where(mats_1d == li + 1)[0]]
+        if not bar_idx:
+            raise ValueError(
+                f"Constraint line {li + 1} is flagged as a joint but has no 1D "
+                "elements in the mesh — gmsh did not recover it, so there is "
+                "nothing to split along.")
+
+        # The curve's nodes, ordered from end 1. A constraint line is straight
+        # (two endpoints), so the order is the projection onto its direction.
+        station_ids = set()
+        for i in bar_idx:
+            for k in range(int(types_1d[i])):
+                station_ids.add(int(e1d[i, k]))
+        t_of = {}
+        for nid in sorted(station_ids):
+            v = np.array(nodes[nid][:2], dtype=float) - p1
+            off = float(v @ normal)
+            if abs(off) > tol:
+                raise ValueError(
+                    f"Node {nid} of jointed line {li + 1} lies {off:.3g} off the "
+                    "line; the split needs every node of the curve on it.")
+            t_of[nid] = float(v @ d)
+        ordered = sorted(station_ids, key=lambda n: t_of[n])
+        if abs(t_of[ordered[0]]) > tol or abs(t_of[ordered[-1]] - length) > tol:
+            raise ValueError(
+                f"The meshed curve of jointed line {li + 1} runs from "
+                f"{t_of[ordered[0]]:.3g} to {t_of[ordered[-1]]:.3g} along a line of "
+                f"length {length:.3g}; it must reach both stated endpoints.")
+
+        # The bar elements, each read from end 1 (start, end, midside) and the
+        # elements themselves in order along the line.
+        bars = []
+        for i in bar_idx:
+            et = int(types_1d[i])
+            a, b = int(e1d[i, 0]), int(e1d[i, 1])
+            if t_of[a] > t_of[b]:
+                a, b = b, a
+            mid = int(e1d[i, 2]) if et >= 3 else 0
+            bars.append((t_of[a], i, a, b, mid, et))
+        bars.sort(key=lambda r: r[0])
+
+        first_edge = {}
+        for (_t, _i, a, b, mid, et) in bars:
+            key = (min(a, b), max(a, b))
+            for nid in ((a, b, mid) if et >= 3 else (a, b)):
+                first_edge.setdefault(nid, key)
+
+        info[li] = dict(p1=p1, d=d, normal=normal, ordered=ordered, t_of=t_of,
+                        bar_idx=bar_idx, bars=bars, stations=set(ordered),
+                        first_edge=first_edge,
+                        has_bar=bool(opts[li].get('bar', True)))
+
+    # Two jointed lines that meet must SHARE a node there. The mesher splits both
+    # curves at the meeting point so gmsh has to place one, but a mesh that came
+    # from somewhere else — or a recovery that failed quietly — would leave two
+    # curves passing through each other, and the split would then tear each line
+    # along a mesh that is not conforming at the crossing. Checked, not assumed.
+    if len(opts) > 1:
+        idx = sorted(opts)
+        for _a in range(len(idx)):
+            for _b in range(_a + 1, len(idx)):
+                li, lj = idx[_a], idx[_b]
+                cross = line_segment_intersection(
+                    tuple(lines[li][0][:2]), tuple(lines[li][-1][:2]),
+                    tuple(lines[lj][0][:2]), tuple(lines[lj][-1][:2]))
+                if cross is None:
+                    continue
+                cx, cy = float(cross[0]), float(cross[1])
+                for lk in (li, lj):
+                    hit = any(abs(nodes[n][0] - cx) <= tol
+                              and abs(nodes[n][1] - cy) <= tol
+                              for n in info[lk]['ordered'])
+                    if not hit:
+                        raise ValueError(
+                            f"Jointed constraint lines {li + 1} and {lj + 1} meet "
+                            f"at ({cx:g}, {cy:g}), but line {lk + 1} has no mesh "
+                            "node there: the two curves cross without sharing a "
+                            "node, and a split along either of them would tear a "
+                            "mesh that is not conforming at the crossing.")
+
+    # ---- 2. the joint edges: the mesh edges a jointed line runs along ----------
+    joint_edge = {}
+    for li in sorted(opts):
+        for (_t, _i, a, b, _mid, _et) in info[li]['bars']:
+            key = (min(a, b), max(a, b))
+            prev = joint_edge.get(key)
+            if prev is not None and prev != li:
+                raise ValueError(
+                    f"Jointed constraint lines {prev + 1} and {li + 1} share the "
+                    f"mesh edge {key}: they lie on one another there. One edge "
+                    "carries one interface law.")
+            joint_edge[key] = li
+
+    all_stations = set()
+    for li in sorted(opts):
+        all_stations |= info[li]['stations']
+
+    # A member that is NOT a joint may not stand on a node the split copies: its
+    # element would silently keep one wedge's copy and lose the material on the
+    # other side of the sheet.
+    jointed_mats = set(li + 1 for li in opts)
+    for i in range(len(e1d)):
+        if int(mats_1d[i]) in jointed_mats:
+            continue
+        for k in range(int(types_1d[i])):
+            if int(e1d[i, k]) in all_stations:
+                raise ValueError(
+                    f"Constraint line {int(mats_1d[i])} shares mesh node "
+                    f"{int(e1d[i, k])} with a jointed line. A bonded member "
+                    "standing on a node the split copies has no defined side to "
+                    "attach to; flag it as a joint too, or move it clear.")
+
+    # ---- 3. the edges of every element standing on a station ------------------
+    elem_edges = {}
+    for nid in all_stations:
+        for ei in node_elems.get(nid, ()):
+            if ei not in elem_edges:
+                elem_edges[ei] = _element_corner_edges(elements, element_types, ei)
+
+    edge_elems = defaultdict(list)          # joint edge -> the 2D elements on it
+    for ei, edges in elem_edges.items():
+        for (a, b), _mid in edges:
+            key = (min(a, b), max(a, b))
+            if key in joint_edge:
+                edge_elems[key].append(ei)
+
+    def _centroid_side(ei, li):
+        """Which side of line ``li`` element ``ei`` stands on, by its centroid."""
+        et = int(element_types[ei])
+        n_corner = 3 if et in (3, 6) else 4
+        cen = np.mean([nodes[int(elements[ei, k])][:2] for k in range(n_corner)],
+                      axis=0)
+        return float((cen - info[li]['p1']) @ info[li]['normal'])
+
+    _sides_cache = {}
+
+    def _sides_of_edge(key, li):
+        """The elements above and below joint edge ``key`` on line ``li``."""
+        hit = _sides_cache.get(key)
+        if hit is not None:
+            return hit
+        members = edge_elems.get(key, ())
+        if len(members) != 2:
+            raise ValueError(
+                f"The mesh edge {key} on jointed line {li + 1} is carried by "
+                f"{len(members)} two-dimensional element(s), not two. A joint is "
+                "an interface between two bodies, so the line must run through "
+                "the section with material on both sides of it — a line on the "
+                "domain boundary has material on one side only.")
+        s0 = _centroid_side(members[0], li)
+        s1 = _centroid_side(members[1], li)
+        if abs(s0) <= tol or abs(s1) <= tol or (s0 > 0) == (s1 > 0):
+            raise ValueError(
+                f"The two elements on mesh edge {key} of jointed line {li + 1} "
+                f"stand on the same side of it ({s0:.3g}, {s1:.3g}); the line is "
+                "not a conforming edge of the mesh there.")
+        out = (members[0], members[1]) if s0 > 0 else (members[1], members[0])
+        _sides_cache[key] = out
+        return out
+
+    # ---- 4. the wedges of material around every station -----------------------
+    wedges = {}                              # node -> [ [element ids], ... ]
+    wedge_at = {}                            # (node, element) -> wedge index
+    for nid in sorted(all_stations):
+        star = node_elems.get(nid, ())
+        if not star:
+            raise ValueError(
+                f"Node {nid} of a jointed line stands on no 2D element, so there "
+                "is no material to split there.")
+        incident = defaultdict(list)
+        for ei in star:
+            for (a, b), mid in elem_edges[ei]:
+                if nid == a or nid == b or (mid is not None and nid == mid):
+                    incident[(min(a, b), max(a, b))].append(ei)
+        parent = {ei: ei for ei in star}
+
+        def _find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        for key, members in incident.items():
+            if key in joint_edge:
+                continue                     # a joint edge does not join wedges
+            root = _find(members[0])
+            for other in members[1:]:
+                parent[_find(other)] = root
+        groups = defaultdict(list)
+        for ei in star:
+            groups[_find(ei)].append(ei)
+        gl = sorted((sorted(g) for g in groups.values()), key=lambda g: g[0])
+        wedges[nid] = gl
+        for gi, g in enumerate(gl):
+            for ei in g:
+                wedge_at[(nid, ei)] = gi
+
+    # ---- 5. a node copy per wedge, and the bar's own node per line -------------
+    # The wedge that keeps the ORIGINAL id is the one below the first jointed line
+    # that reaches the node, so a station with the two wedges of an ordinary split
+    # keeps the original below and appends the copy above — the numbering the
+    # split has always produced.
+    wedge_ids = {}                           # node -> {wedge index: node id}
+    bar_of = {}                              # (line, node) -> the bar's node
+    for li in sorted(opts):
+        inf = info[li]
+        for nid in inf['ordered']:
+            if nid not in wedge_ids:
+                gl = wedges[nid]
+                base = 0
+                if len(gl) > 1:
+                    key = inf['first_edge'].get(nid)
+                    if key is None:
+                        raise ValueError(
+                            f"Node {nid} is a station of jointed line {li + 1} but "
+                            "stands on none of its bar elements.")
+                    _e_up, e_low = _sides_of_edge(key, li)
+                    base = wedge_at[(nid, e_low)]
+                ids = {base: nid}
+                for gi in range(len(gl)):
+                    if gi == base:
+                        continue
+                    nodes.append(list(nodes[nid]))
+                    ids[gi] = len(nodes) - 1
+                wedge_ids[nid] = ids
+            if inf['has_bar']:
+                nodes.append(list(nodes[nid]))
+                bar_of[(li, nid)] = len(nodes) - 1
+
+    # ---- 6. every element takes the copy of its own wedge ----------------------
+    copy_of = {}                             # (node, element) -> the id it uses
+    for nid, ids in wedge_ids.items():
+        for gi, g in enumerate(wedges[nid]):
+            new = ids[gi]
+            for ei in g:
+                copy_of[(nid, ei)] = new
+                if new == nid:
+                    continue
+                for k in range(int(element_types[ei])):
+                    if int(elements[ei, k]) == nid:
+                        elements[ei, k] = new
+
+    for li in sorted(opts):
+        if not info[li]['has_bar']:
+            # A bar-less joint line has no member of its own to rewire. Its 1D
+            # elements stay on the ids gmsh gave them — the copies stand at one
+            # point, so the curve is still drawn where the line is — and the
+            # finite element engine builds no bar from them.
+            continue
+        for i in info[li]['bar_idx']:
+            for k in range(int(types_1d[i])):
+                e1d[i, k] = bar_of[(li, int(e1d[i, k]))]
+
+    # ---- 7. the joint elements, the station records and the ties ---------------
+    joints_out = []
+    ties_out = []
+    joint_conn = []
+    joint_types = []
+    joint_mats = []
+    joint_sides = []
+
+    for li in sorted(opts):
+        inf = info[li]
+        has_bar = inf['has_bar']
+        faces = {}                           # station -> (upper elem, lower elem)
+        for (_t, _i, a, b, mid, et) in inf['bars']:
+            n_pairs = 3 if et >= 3 else 2
+            key = (min(a, b), max(a, b))
+            e_up, e_low = _sides_of_edge(key, li)
+            for nid in ((a, b, mid) if n_pairs == 3 else (a, b)):
+                faces.setdefault(nid, (e_up, e_low))
+            up = [copy_of[(a, e_up)], copy_of[(b, e_up)],
+                  copy_of[(mid, e_up)] if n_pairs == 3 else 0]
+            low = [copy_of[(a, e_low)], copy_of[(b, e_low)],
+                   copy_of[(mid, e_low)] if n_pairs == 3 else 0]
+            if not has_bar:
+                # No member between the faces: ONE interface element joins the
+                # upper face to the lower one, and its side marker says so. The
+                # two sides of the pair keep their meaning — a is the upper — so
+                # the normal runs the same way as on every other joint element.
+                joint_conn.append([up[0], up[1], up[2], low[0], low[1], low[2]])
+                joint_types.append(n_pairs)
+                joint_mats.append(li + 1)
+                joint_sides.append(JOINT_SIDE_WHOLE)
+                continue
+            bar = [bar_of[(li, a)], bar_of[(li, b)],
+                   bar_of[(li, mid)] if n_pairs == 3 else 0]
+            # side a of the pair is always the upper one, so the joint normal
+            # runs from b to a on every joint element.
+            joint_conn.append([up[0], up[1], up[2], bar[0], bar[1], bar[2]])
+            joint_types.append(n_pairs)
+            joint_mats.append(li + 1)
+            joint_sides.append(1)
+            joint_conn.append([bar[0], bar[1], bar[2], low[0], low[1], low[2]])
+            joint_types.append(n_pairs)
+            joint_mats.append(li + 1)
+            joint_sides.append(0)
+
+        stations = []
+        for nid in inf['ordered']:
+            e_up, e_low = faces[nid]
+            stations.append([int(copy_of[(nid, e_up)]),
+                             int(bar_of[(li, nid)]) if has_bar else -1,
+                             int(copy_of[(nid, e_low)])])
+        rec = {"line": li + 1, "stations": stations}
+        if not has_bar:
+            # Only a bar-LESS line carries the key, so every mesh written before
+            # the joints sheet existed reads back exactly as it did.
+            rec["bar"] = False
+        joints_out.append(rec)
+
+        if debug:
+            n_wedges = sum(len(wedges[n]) for n in inf['ordered'])
+            print(f"  Joint line {li + 1}: {len(inf['ordered'])} stations, "
+                  f"{n_wedges} material wedges, "
+                  f"{(2 if has_bar else 1) * len(inf['bars'])} joint elements, "
+                  f"{len(nodes) - len(nodes_in)} nodes added so far")
+
+        if not has_bar:
+            continue                         # nothing to tie: there is no bar
+
+        for end, nid, key in ((1, inf['ordered'][0], 'tend1'),
+                              (2, inf['ordered'][-1], 'tend2')):
+            cap = opts[li].get(key)
+            if cap is None:
+                continue
+            try:
+                cap = float(cap)
+            except (TypeError, ValueError):
+                continue
+            if not np.isfinite(cap) or cap <= 0.0:
+                continue
+            ties_out.append({
+                "line": li + 1,
+                "end": end,
+                "bar_node": int(bar_of[(li, nid)]),
+                "soil_node": int(_tie_soil_node(
+                    nodes, elements, element_types, wedges, wedge_ids, nid,
+                    -inf['d'] if end == 1 else inf['d'])),
+                "capacity": cap,
+            })
+
+    mesh["nodes"] = np.array(nodes, dtype=float)
+    mesh["elements"] = elements
+    mesh["elements_1d"] = e1d
+    mesh["joints"] = joints_out
+    mesh["elements_joint"] = np.array(joint_conn, dtype=int).reshape(-1, 6)
+    mesh["element_types_joint"] = np.array(joint_types, dtype=int)
+    mesh["element_materials_joint"] = np.array(joint_mats, dtype=int)
+    mesh["element_side_joint"] = np.array(joint_sides, dtype=int)
+    mesh["ties"] = ties_out
+    return mesh
+
+
+def _tie_soil_node(nodes, elements, element_types, wedges, wedge_ids,
+                   nid, outward):
+    """The soil node a tied end is anchored to, where the end has several.
+
+    A buried crack tip has ONE wedge and one soil node, and that is the node —
+    the case every phase 1 model is. Where the line ends at a junction or on the
+    external boundary the station carries a copy per wedge, and the tie takes the
+    wedge the line runs INTO past its end (``outward`` is that direction): a sheet
+    whose front end stops on the back face of a facing column is anchored to the
+    column, which is the material on the far side of that joint.
+    """
+    gl = wedges[nid]
+    if len(gl) == 1:
+        return nid
+    p = np.asarray(nodes[nid][:2], dtype=float)
+    best, best_cos = None, -2.0
+    for gi, g in enumerate(gl):
+        for ei in g:
+            et = int(element_types[ei])
+            n_corner = 3 if et in (3, 6) else 4
+            cen = np.mean([nodes[int(elements[ei, k])][:2]
+                           for k in range(n_corner)], axis=0)
+            v = cen - p
+            n = float(np.hypot(v[0], v[1]))
+            if n <= 0.0:
+                continue
+            c = float((v / n) @ outward)
+            if c > best_cos:
+                best_cos, best = c, gi
+    return wedge_ids[nid][best if best is not None else 0]
 
 
 def line_segment_parameter(point, line_start, line_end):
@@ -3698,10 +4527,11 @@ def import_mesh_from_json(filename):
     with open(filename, 'r') as f:
         mesh_json = json.load(f)
     
-    # Convert lists back to numpy arrays
+    # Convert lists back to numpy arrays. The joint keys 'joints' and 'ties' are
+    # lists of records, not numeric arrays, and stay Python objects.
     mesh = {}
     for key, value in mesh_json.items():
-        if isinstance(value, list):
+        if isinstance(value, list) and key not in _MESH_JSON_OBJECT_KEYS:
             mesh[key] = np.array(value)
         else:
             mesh[key] = value
@@ -4988,6 +5818,67 @@ def _insert_point_constraints(polygon_coords, points, tol=1e-6, debug=False):
                     break
 
 
+def _insert_constraint_line_points(polygon_coords, lines, tol=1e-6, debug=False):
+    """Insert every constraint-line vertex that falls inside a polygon edge as a
+    vertex of that edge, in place.
+
+    A constraint line that CROSSES a zone edge already gets a polygon vertex at the
+    crossing, from ``add_intersection_points_to_polygons``. A line that runs ALONG
+    one does not: two collinear segments have no point intersection, so that routine
+    finds nothing and the polygon keeps its long, unbroken edge. The mesher then
+    finds no zone edge joining the line's two ends, builds a SECOND gmsh curve on the
+    same locus and embeds it in both neighbouring surfaces — geometry gmsh cannot
+    triangulate, because each surface's own boundary already runs there. Its 2D
+    mesher reports ``Impossible to recover edge`` and returns either no elements at
+    all or a mesh whose 1D nodes float free of the triangles; the OCC-fragment
+    fallback then rebuilds the whole section at the global target size, which drops
+    ``element_size_1d``, the size regions and the refinement bands. A quadrilateral
+    mesh has no fallback and keeps the broken mesh.
+
+    With the line's ends carried as polygon vertices the coincident stretch IS a zone
+    edge, and the mesher reuses that curve rather than doubling it (the ``edge_map``
+    lookup in ``build_mesh_from_polygons``). Its nodes are the ones the two zones
+    already share, so a jointed line splits along them like any other and the two
+    faces are classified by which zone's elements hold them.
+
+    The same insertion covers a line that ENDS on a zone edge without crossing it.
+    That end has to be recovered as a point of the boundary curve, and without a
+    vertex there gmsh's recovery does not terminate.
+
+    A vertex the polygon already carries, and a point on no edge at all, are left
+    alone — so a model whose lines all lie clear of the zone edges is untouched.
+    """
+    n_inserted = 0
+    for line in (lines or []):
+        for pt in (line or []):
+            px, py = float(pt[0]), float(pt[1])
+            for coords in polygon_coords:
+                n = len(coords)
+                if n < 2:
+                    continue
+                if any(abs(px - x) <= tol and abs(py - y) <= tol for (x, y) in coords):
+                    continue
+                for j in range(n):
+                    x1, y1 = coords[j]
+                    x2, y2 = coords[(j + 1) % n]
+                    dx, dy = x2 - x1, y2 - y1
+                    L2 = dx * dx + dy * dy
+                    if L2 <= tol * tol:
+                        continue
+                    t = ((px - x1) * dx + (py - y1) * dy) / L2
+                    if t <= 0.0 or t >= 1.0:
+                        continue
+                    qx, qy = x1 + t * dx, y1 + t * dy
+                    if abs(px - qx) <= tol and abs(py - qy) <= tol:
+                        coords.insert(j + 1, (px, py))
+                        n_inserted += 1
+                        if debug:
+                            print(f"Inserted constraint-line end ({px}, {py}) into "
+                                  f"polygon edge {j}")
+                        break
+    return n_inserted
+
+
 def extract_point_constraints(slope_data):
     """Mesh point constraints from slope_data: currently the line-load
     application points (a node must land exactly at each so the load can be
@@ -5000,18 +5891,87 @@ def extract_point_constraints(slope_data):
     return [(ll['x'], ll['y']) for ll in (slope_data.get('line_loads') or [])]
 
 
+def extract_joint_line_geometry(slope_data):
+    """The ``joints`` sheet's lines, as constraint-line geometry.
+
+    Each is ``[(x1, y1), (x2, y2)]``, in sheet order. Empty on a model with no
+    joints sheet, which is what leaves the constraint-line list exactly what it
+    was before the sheet existed.
+    """
+    return [[(j['x1'], j['y1']), (j['x2'], j['y2'])]
+            for j in (slope_data.get('joint_lines') or [])]
+
+
+def line_is_jointed(line):
+    """True when a reinforcement line's ``Joint`` column says yes.
+
+    One reading of the column, shared by the mesher, the finite element engine,
+    preflight, the plotters and the report, so a line is a joint in all of them
+    or in none. The loader stores the cell as entered — ``'Yes'``, ``'No'`` or
+    blank — and blank is no.
+    """
+    return str((line or {}).get("joint", "") or "").strip().lower() == "yes"
+
+
+def extract_joint_options(slope_data):
+    """Which CONSTRAINT lines are joints, as ``build_mesh_from_polygons`` wants
+    them in its ``joint_lines=`` argument — or ``None`` when none is.
+
+    Two sources, and the key is the line's index in the constraint-line list
+    :func:`extract_constraint_line_geometry` returns:
+
+    * every reinforcement line whose ``Joint`` column reads yes. Reinforcement
+      lines come first in that list, so the key is the reinforcement line's own
+      index. The line's end anchorages ride along as ``tend1`` / ``tend2``, which
+      decide whether each end of the bar is tied to the soil, and ``bar`` is True:
+      the sheet is a member between two interfaces.
+    * every row of the ``joints`` sheet. Those lines come last in the constraint
+      list, after the piles, so the key is ``n_reinf + n_pile + j``, and ``bar``
+      is False: there is no reinforcement between the faces and the split writes
+      one interface element per span.
+
+    ``None`` when no line is jointed, which is the value that leaves the mesh
+    exactly what it always was. Not to be confused with ``slope_data['joint_lines']``,
+    which is the ``joints`` sheet's own rows.
+    """
+    lines = slope_data.get("reinforcement_lines") or []
+    n_reinf = len(extract_reinforcement_line_geometry(slope_data))
+    n_pile = len(extract_pile_line_geometry(slope_data))
+    opts = {}
+    for i in range(n_reinf):
+        line = lines[i] if i < len(lines) else None
+        if not line_is_jointed(line):
+            continue
+        opts[i] = {"tend1": line.get("tend1") or 0.0,
+                   "tend2": line.get("tend2") or 0.0,
+                   "bar": True}
+    for j in range(len(extract_joint_line_geometry(slope_data))):
+        opts[n_reinf + n_pile + j] = {"bar": False}
+    return opts or None
+
+
 def extract_constraint_line_geometry(slope_data):
     """
-    Extract all constraint line geometry (reinforcement + piles) for mesh generation.
+    Extract all constraint line geometry (reinforcement + piles + joints) for
+    mesh generation.
+
+    The order is what every reader of ``element_materials_1d`` and
+    ``element_materials_joint`` keys off: reinforcement lines, then piles, then
+    the ``joints`` sheet's lines. A joint line is a constraint line like any
+    other — gmsh recovers it as an embedded curve, and the split runs along it —
+    but it carries no bar, so nothing structural is built from its 1D elements.
 
     Parameters:
         slope_data: Dictionary containing slope data
 
     Returns:
-        lines: Combined list of constraint lines (reinforcement first, then piles)
+        lines: Combined list of constraint lines (reinforcement, then piles, then
+               joint lines — the joints are ``lines[n_reinf + n_pile:]``)
         n_reinf: Number of reinforcement lines
         n_pile: Number of pile lines
     """
     reinf_lines = extract_reinforcement_line_geometry(slope_data)
     pile_lines = extract_pile_line_geometry(slope_data)
-    return reinf_lines + pile_lines, len(reinf_lines), len(pile_lines)
+    joint_lines = extract_joint_line_geometry(slope_data)
+    return (reinf_lines + pile_lines + joint_lines,
+            len(reinf_lines), len(pile_lines))

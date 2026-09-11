@@ -1,0 +1,771 @@
+"""Joints that meet: the mesh split at a junction, and three closed forms.
+
+A jointed line no longer has to stand alone. Where jointed lines meet — one
+ending on another (a T), two crossing (an X), two sharing an endpoint (an L),
+two running end to end (a chain) — and where a jointed line reaches the model's
+external boundary (a crack to the surface), the split copies the shared node
+ONCE PER WEDGE of material around it. A wedge is a connected group of the 2D
+elements standing on that node, two of them belonging to the same wedge when
+they share an edge at the node and that edge is not part of a jointed line. Away
+from junctions nothing changes, so every mesh that carried no junction is the
+mesh it was.
+
+The wedge counts this check pins, each one countable by hand from the drawing:
+
+  ordinary station     2   the material above the line and the material below
+  buried crack tip     1   the ring of elements is cut in one place and holds
+  end on the boundary  2   the fan of elements is cut in two
+  chain / L corner     2   two rays leave the node
+  T                    3
+  X                    4
+
+Six mesh fixtures (a-f), each on tri3 and tri6, assert for every junction that
+the number of soil copies at the point equals the wedge count; that the elements
+in one angular sector all hold the same copy and no two sectors share one; that
+each bar keeps its own node there; that every joint element's two sides stand at
+one point and are held by the elements on opposite sides of its own line; and
+that the mesh JSON round trip reproduces every array and record. Leg g is the
+refusals that survive.
+
+Three closed-form rows then run the split through the finite element engine:
+
+  i.   R2's block on a plane, CUT by a vertical joint into two blocks — a T on
+       the base joint and a crack to the ground surface. Each block rides its
+       own stretch of the same plane, so the strength reduction must still
+       return tan phi_j / tan beta.
+  ii.  the same slab as a two-course STACK: a joint parallel to the plane at
+       mid-thickness, crossed by the vertical cut (an X), so four blocks ride
+       three interfaces of the same friction. Same closed form.
+  iii. an L-shaped joint around a rectangular ELASTIC block: a horizontal joint
+       under it and a vertical joint up its back face, meeting at the corner.
+       The block is driven by a horizontal seismic coefficient k -- a known
+       lateral load -- with weightless space behind the back face and in front,
+       so the sliding-block calculation is
+
+           driving  k W        resisting  (W) tan phi_base
+
+       and the block stands while k < tan phi_base. Reducing the interface
+       strength by F, the block stands while tan phi_base / F > k, so
+
+           FS = tan phi_base / k.
+
+       The back-face joint carries the corner: down-slope of it the block leaves
+       the corner, which it cannot do while the corner node is one node. Its own
+       normal traction goes to zero — the face opens — and that is measured, not
+       assumed.
+
+Run directly:  PYTHONPATH=. python3 test/joint_junction_check.py
+"""
+
+import contextlib
+import copy
+import io
+import math
+import os
+import sys
+import time
+import warnings
+
+warnings.filterwarnings('ignore')
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(_HERE)
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
+import numpy as np
+from shapely.geometry import LineString, Polygon
+
+from xslope.fem import build_fem_data, solve_fem, solve_ssrm
+from xslope.fileio import build_reinforce_lines, load_slope_data
+from xslope.mesh import (add_intersection_points_to_polygons,
+                         build_mesh_from_polygons, export_mesh_to_json,
+                         import_mesh_from_json)
+
+#: A shipped FEM model, for the boilerplate every slope_data carries (units,
+#: gamma_water, solver options). Every row replaces geometry and materials.
+BASE_FILE = os.path.join(_ROOT, 'docs', 'fem', 'files', 'xslope_griffiths1.xlsx')
+
+GAMMA = 20.0
+E_SOIL = 30000.0
+NU_SOIL = 0.3
+TOL = 1e-9
+
+_base_sd = None
+
+
+# ---------------------------------------------------------------------------
+# mesh fixtures
+# ---------------------------------------------------------------------------
+
+def _build(lines, joint_lines, element_type, ring=None, mats=None,
+           target_size=2.0, s1d=1.0):
+    """A mesh on a rectangular block, with the mesher's chatter swallowed."""
+    if mats is None:
+        ring = ring or [(0.0, 0.0), (20.0, 0.0), (20.0, 10.0), (0.0, 10.0)]
+        polys = [{'coords': list(ring), 'mat_id': 0}]
+    else:
+        polys = [{'coords': list(r), 'mat_id': i} for r, i in mats]
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            polys, target_size, element_type,
+            lines=[[tuple(p) for p in ln] for ln in lines],
+            element_size_1d=s1d, joint_lines=joint_lines)
+
+
+def _roundtrip(mesh, tag, failures):
+    """Export the mesh to JSON, read it back, and compare every entry."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, 'mesh.json')
+        with contextlib.redirect_stdout(io.StringIO()):
+            export_mesh_to_json(mesh, path)
+            back = import_mesh_from_json(path)
+    if set(back) != set(mesh):
+        failures.append(f"{tag}: JSON round trip changed the key set, "
+                        f"{sorted(set(mesh) ^ set(back))} differ")
+        return
+    for key, value in mesh.items():
+        if isinstance(value, np.ndarray):
+            got = np.asarray(back[key])
+            if got.shape != value.shape or not np.array_equal(got, value):
+                failures.append(f"{tag}: JSON round trip did not reproduce "
+                                f"'{key}'")
+        elif back[key] != value:
+            failures.append(f"{tag}: JSON round trip did not reproduce '{key}'")
+
+
+def _at(nodes, p):
+    """Every node id standing at point ``p``."""
+    q = np.asarray(nodes, dtype=float)[:, :2]
+    return [int(i) for i in np.flatnonzero(
+        (np.abs(q[:, 0] - p[0]) < 1e-8) & (np.abs(q[:, 1] - p[1]) < 1e-8))]
+
+
+def _bar_nodes(mesh):
+    e1d = np.asarray(mesh['elements_1d'], dtype=int)
+    t1d = np.asarray(mesh['element_types_1d'], dtype=int)
+    out = set()
+    for i in range(len(e1d)):
+        for k in range(int(t1d[i])):
+            out.add(int(e1d[i, k]))
+    return out
+
+
+def _sector_of(nodes, elements, element_types, ei, p, rays):
+    """Which angular sector between the joint rays at ``p`` element ``ei`` is in.
+
+    The sectors are read from the LINE DIRECTIONS at the junction, not from the
+    mesh's own connectivity, so this is an independent statement about the split:
+    the elements the drawing puts in one wedge must hold one copy of the node.
+    """
+    et = int(element_types[ei])
+    n_corner = 3 if et in (3, 6) else 4
+    cen = np.mean([np.asarray(nodes[int(elements[ei, k])][:2], dtype=float)
+                   for k in range(n_corner)], axis=0)
+    a = math.atan2(cen[1] - p[1], cen[0] - p[0]) % (2 * math.pi)
+    ordered = sorted(r % (2 * math.pi) for r in rays)
+    for k in range(len(ordered)):
+        lo = ordered[k]
+        hi = ordered[(k + 1) % len(ordered)]
+        span = (hi - lo) % (2 * math.pi) or 2 * math.pi
+        if ((a - lo) % (2 * math.pi)) < span - 1e-12:
+            return k
+    return len(ordered) - 1
+
+
+def _check_junction(mesh, p, rays, n_wedges, n_bars, tag, failures):
+    """One junction: the copies, the wedges the elements land in, the bars."""
+    nodes = np.asarray(mesh['nodes'], dtype=float)
+    elements = np.asarray(mesh['elements'], dtype=int)
+    types = np.asarray(mesh['element_types'], dtype=int)
+    here = _at(nodes, p)
+    bars = _bar_nodes(mesh)
+    soil_copies = [n for n in here if n not in bars]
+    bar_copies = [n for n in here if n in bars]
+    if len(soil_copies) != n_wedges:
+        failures.append(f"{tag}: {len(soil_copies)} soil copies at {p}, not "
+                        f"{n_wedges} — one per wedge of material there")
+    if len(bar_copies) != n_bars:
+        failures.append(f"{tag}: {len(bar_copies)} bar nodes at {p}, not "
+                        f"{n_bars} — each jointed line keeps its own")
+
+    # every element standing at the point, by the sector the drawing puts it in
+    by_sector = {}
+    for ei in range(len(elements)):
+        et = int(types[ei])
+        hit = [int(elements[ei, k]) for k in range(et)
+               if int(elements[ei, k]) in here]
+        if not hit:
+            continue
+        if len(set(hit)) != 1:
+            failures.append(f"{tag}: 2D element {ei} holds {len(set(hit))} "
+                            f"different copies of the node at {p}")
+            continue
+        s = _sector_of(nodes, elements, types, ei, p, rays)
+        by_sector.setdefault(s, set()).add(hit[0])
+    if len(by_sector) != n_wedges:
+        failures.append(f"{tag}: the elements at {p} fall in {len(by_sector)} "
+                        f"angular sectors, not the {n_wedges} the joint lines "
+                        f"cut there")
+    used = []
+    for s, ids in sorted(by_sector.items()):
+        if len(ids) != 1:
+            failures.append(f"{tag}: the elements in sector {s} at {p} hold "
+                            f"{len(ids)} different copies; a wedge holds one")
+        used.extend(ids)
+    if len(set(used)) != len(by_sector):
+        failures.append(f"{tag}: two wedges at {p} share a copy "
+                        f"({sorted(used)}) — the split did not separate them")
+
+
+def _check_pairs(mesh, tag, failures, lines):
+    """Every joint element: its node pairs stand at one point, its soil edge is
+    held by the 2D element on its own side of its own line, and the other side
+    of every pair is the bar's node.
+
+    The soil edge of a joint element is the pair of soil nodes its first two
+    columns name (the upper joint) or its last two (the lower one). Exactly one
+    2D element stands on that edge, and it must be on that side of the line — the
+    one exception is a buried crack tip, where the two soil faces are one node
+    and the edge is shared by the elements on both sides.
+    """
+    nodes = np.asarray(mesh['nodes'], dtype=float)
+    elements = np.asarray(mesh['elements'], dtype=int)
+    types = np.asarray(mesh['element_types'], dtype=int)
+    conn = np.asarray(mesh['elements_joint'], dtype=int)
+    pairs = np.asarray(mesh['element_types_joint'], dtype=int)
+    mats = np.asarray(mesh['element_materials_joint'], dtype=int)
+    side = np.asarray(mesh['element_side_joint'], dtype=int)
+    bars = _bar_nodes(mesh)
+
+    tips = set()
+    for rec in mesh.get('joints') or []:
+        for st in rec['stations']:
+            if int(st[0]) == int(st[2]):
+                tips.add(int(st[0]))
+
+    on_edge = {}
+    for ei in range(len(elements)):
+        et = int(types[ei])
+        n_corner = 3 if et in (3, 6) else 4
+        for k in range(n_corner):
+            a = int(elements[ei, k])
+            b = int(elements[ei, (k + 1) % n_corner])
+            on_edge.setdefault((min(a, b), max(a, b)), []).append(ei)
+
+    n_off = n_side = n_bar = n_edge = 0
+    for i in range(len(conn)):
+        li = int(mats[i]) - 1
+        p1 = np.asarray(lines[li][0], dtype=float)
+        p2 = np.asarray(lines[li][-1], dtype=float)
+        d = (p2 - p1) / np.hypot(*(p2 - p1))
+        normal = np.array([-d[1], d[0]])
+        for k in range(int(pairs[i])):
+            a, b = int(conn[i, k]), int(conn[i, 3 + k])
+            if np.max(np.abs(nodes[a][:2] - nodes[b][:2])) > TOL:
+                n_off += 1
+            bar_node = b if int(side[i]) == 1 else a
+            if bar_node not in bars:
+                n_bar += 1
+        cols = (0, 1) if int(side[i]) == 1 else (3, 4)
+        want = 1.0 if int(side[i]) == 1 else -1.0
+        s0, s1 = int(conn[i, cols[0]]), int(conn[i, cols[1]])
+        members = on_edge.get((min(s0, s1), max(s0, s1)), [])
+        if not members:
+            n_edge += 1
+            continue
+        if len(members) > 1 and not (tips & {s0, s1}):
+            n_edge += 1
+        ok = False
+        for ei in members:
+            et = int(types[ei])
+            n_corner = 3 if et in (3, 6) else 4
+            cen = np.mean([nodes[int(elements[ei, q])][:2]
+                           for q in range(n_corner)], axis=0)
+            if float((cen - p1) @ normal) * want > 0.0:
+                ok = True
+        if not ok:
+            n_side += 1
+    if n_off:
+        failures.append(f"{tag}: {n_off} joint node pairs do not stand at one "
+                        f"point")
+    if n_side:
+        failures.append(f"{tag}: {n_side} joint elements take their soil edge "
+                        f"from the wrong side of their own line")
+    if n_edge:
+        failures.append(f"{tag}: {n_edge} joint elements do not stand on one 2D "
+                        f"element's edge")
+    if n_bar:
+        failures.append(f"{tag}: {n_bar} joint node pairs do not stand on the "
+                        f"bar of their line")
+
+
+def _counts(mesh, tag, failures, lines, joint_idx):
+    """The joint element count, two per bar element on every jointed line."""
+    mats_1d = np.asarray(mesh['element_materials_1d'], dtype=int)
+    mats_j = np.asarray(mesh['element_materials_joint'], dtype=int)
+    side = np.asarray(mesh['element_side_joint'], dtype=int)
+    for li in joint_idx:
+        n_bar = int((mats_1d == li + 1).sum())
+        n_j = int((mats_j == li + 1).sum())
+        if n_j != 2 * n_bar:
+            failures.append(f"{tag}: line {li + 1} has {n_j} joint elements for "
+                            f"{n_bar} bar elements, not {2 * n_bar}")
+        n_up = int(((mats_j == li + 1) & (side == 1)).sum())
+        if n_up != n_bar:
+            failures.append(f"{tag}: line {li + 1} has {n_up} upper joints for "
+                            f"{n_bar} bar elements")
+
+
+#: The five junction fixtures: the lines, the junction points with the ray
+#: directions the joint lines leave them by, the wedge count and how many bars
+#: meet there. Every wedge count is countable from the drawing.
+FIXTURES = {
+    'a. T': dict(
+        lines=[[(2.0, 5.0), (18.0, 5.0)], [(10.0, 5.0), (10.0, 9.0)]],
+        joints=[0, 1],
+        junctions=[((10.0, 5.0), [0.0, math.pi, math.pi / 2], 3, 2)]),
+    'b. X': dict(
+        lines=[[(2.0, 5.0), (18.0, 5.0)], [(10.0, 1.0), (10.0, 9.0)]],
+        joints=[0, 1],
+        junctions=[((10.0, 5.0),
+                    [0.0, math.pi, math.pi / 2, 3 * math.pi / 2], 4, 2)]),
+    'c. L': dict(
+        lines=[[(6.0, 5.0), (14.0, 5.0)], [(6.0, 5.0), (6.0, 9.0)]],
+        joints=[0, 1],
+        junctions=[((6.0, 5.0), [0.0, math.pi / 2], 2, 2)]),
+    'd. chain': dict(
+        lines=[[(4.0, 5.0), (10.0, 5.0)], [(10.0, 5.0), (16.0, 5.0)]],
+        joints=[0, 1],
+        junctions=[((10.0, 5.0), [0.0, math.pi], 2, 2)]),
+    'e. crack to the boundary': dict(
+        lines=[[(4.0, 5.0), (20.0, 5.0)]],
+        joints=[0],
+        junctions=[((20.0, 5.0), [math.pi, math.pi / 2, 3 * math.pi / 2], 2, 1)]),
+}
+
+
+def _leg_fixtures(failures, results):
+    for tag, spec in FIXTURES.items():
+        for et in ('tri3', 'tri6'):
+            mesh = _build(spec['lines'], spec['joints'], et)
+            name = f"{tag} / {et}"
+            for (p, rays, n_wedges, n_bars) in spec['junctions']:
+                _check_junction(mesh, p, rays, n_wedges, n_bars, name, failures)
+            _counts(mesh, name, failures, spec['lines'], spec['joints'])
+            _check_pairs(mesh, name, failures, spec['lines'])
+            _roundtrip(mesh, name, failures)
+            nodes = np.asarray(mesh['nodes'])
+            here = _at(nodes, spec['junctions'][0][0])
+            results.append(
+                f"{tag:26s} {et}: {len(mesh['nodes']):5d} nodes, "
+                f"{len(mesh['elements_joint']):3d} joint elements, "
+                f"{len(here)} nodes at the junction")
+
+
+def _leg_material_boundary(failures, results):
+    """f. A joint ON a material boundary, met by a second joint at a T.
+
+    The vertical line is the zone edge between two materials — the mesher reuses
+    that edge rather than laying a curve on it (R2b) — and the horizontal joint
+    ends on it. The junction is therefore a T whose three wedges are two zones on
+    one side and one on the other, which is the wall's block column met by a
+    course joint.
+    """
+    left = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
+    right = [(10.0, 0.0), (20.0, 0.0), (20.0, 10.0), (10.0, 10.0)]
+    lines = [[(10.0, 1.0), (10.0, 9.0)], [(10.0, 5.0), (18.0, 5.0)]]
+    rings = add_intersection_points_to_polygons([left, right], lines)
+    for et in ('tri3', 'tri6'):
+        mesh = _build(lines, [0, 1], et,
+                      mats=[(rings[0], 0), (rings[1], 1)])
+        tag = f"f. joint on a material boundary / {et}"
+        _check_junction(mesh, (10.0, 5.0),
+                        [math.pi / 2, 3 * math.pi / 2, 0.0], 3, 2, tag, failures)
+        _counts(mesh, tag, failures, lines, [0, 1])
+        _check_pairs(mesh, tag, failures, lines)
+        _roundtrip(mesh, tag, failures)
+        # the two zones survive, and the wedge on the left of the vertical joint
+        # is the left zone's alone
+        mats = np.asarray(mesh['element_materials'], dtype=int)
+        if len(set(mats.tolist())) != 2:
+            failures.append(f"{tag}: the split lost a material zone")
+        nodes = np.asarray(mesh['nodes'])
+        elements = np.asarray(mesh['elements'], dtype=int)
+        types = np.asarray(mesh['element_types'], dtype=int)
+        here = set(_at(nodes, (10.0, 5.0)))
+        for ei in range(len(elements)):
+            et_ = int(types[ei])
+            hit = [int(elements[ei, k]) for k in range(et_)
+                   if int(elements[ei, k]) in here]
+            if not hit:
+                continue
+            cen = np.mean([nodes[int(elements[ei, k])][:2]
+                           for k in range(3 if et_ in (3, 6) else 4)], axis=0)
+            want = 1 if cen[0] < 10.0 else 2
+            if int(mats[ei]) != want:
+                failures.append(f"{tag}: element {ei} at x = {cen[0]:.2f} reads "
+                                f"material {int(mats[ei])}, not {want}")
+                break
+        results.append(f"f. joint on a zone edge   {et}: "
+                       f"{len(mesh['nodes']):5d} nodes, "
+                       f"{len(mesh['elements_joint']):3d} joint elements, "
+                       f"{len(here)} nodes at the T")
+
+
+def _leg_refusals(failures, results):
+    """g. What is still refused, and what is not."""
+    ring = [(0.0, 0.0), (20.0, 0.0), (20.0, 10.0), (0.0, 10.0)]
+    cases = [
+        ("a jointed line meeting a bonded reinforcement line",
+         [[(2.0, 5.0), (18.0, 5.0)], [(10.0, 1.0), (10.0, 9.0)]], [0],
+         "touches another constraint line"),
+        ("a line load on a jointed line",
+         [[(2.0, 5.0), (18.0, 5.0)]], [0], "carries a point constraint"),
+        ("two jointed lines lying on one another",
+         [[(2.0, 5.0), (14.0, 5.0)], [(8.0, 5.0), (18.0, 5.0)]], [0, 1],
+         "lie on one another"),
+    ]
+    for name, lines, joints, want in cases:
+        kw = {}
+        if 'line load' in name:
+            kw['point_constraints'] = [(10.0, 5.0)]
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                build_mesh_from_polygons(
+                    [{'coords': list(ring), 'mat_id': 0}], 2.0, 'tri3',
+                    lines=[[tuple(p) for p in ln] for ln in lines],
+                    element_size_1d=1.0, joint_lines=joints, **kw)
+        except ValueError as e:
+            if want not in str(e):
+                failures.append(f"g: {name} raised the wrong message: {e}")
+            else:
+                results.append(f"g. refused: {name}")
+            continue
+        failures.append(f"g: the mesher accepted {name}; it must refuse it")
+
+    # a jointed line ON the domain boundary has material on one side only
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            build_mesh_from_polygons(
+                [{'coords': list(ring), 'mat_id': 0}], 2.0, 'tri3',
+                lines=[[(2.0, 0.0), (18.0, 0.0)]], element_size_1d=1.0,
+                joint_lines=[0])
+    except (ValueError, Exception) as e:          # noqa: BLE001
+        results.append("g. refused: a jointed line on the domain boundary")
+        if 'element' not in str(e) and 'boundary' not in str(e):
+            results[-1] += f" ({type(e).__name__})"
+    else:
+        failures.append("g: a jointed line lying on the domain boundary was "
+                        "accepted; it has material on one side only")
+
+
+# ---------------------------------------------------------------------------
+# the closed-form rows
+# ---------------------------------------------------------------------------
+
+def _base():
+    global _base_sd
+    if _base_sd is None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            _base_sd = load_slope_data(BASE_FILE)
+    return copy.deepcopy(_base_sd)
+
+
+def _material(name, **kw):
+    m = dict(name=name, gamma=GAMMA, gamma_sat=None, option='mc', c=100.0,
+             phi=45.0, E=E_SOIL, nu=NU_SOIL, t_cut=None, u='none', ru=0.0)
+    m.update(kw)
+    return m
+
+
+def _reinf_row(line, cj, phi_j, label):
+    return dict(label=label, x1=line[0][0], y1=line[0][1],
+                x2=line[-1][0], y2=line[-1][1],
+                t_max=1.0e6, t_res=float('nan'), lp1=0.0, lp2=0.0,
+                tend1=0.0, tend2=0.0, E=2.0e5, area=1.0e-5, spacing=None,
+                adhesion=cj, delta=phi_j, kn=None, ks=None, jred='yes')
+
+
+def _model(polys_and_ids, domain, ground, y_bottom, materials, joint_lines,
+           cj, phi_j, ts, s1d, k_seismic=0.0, element_type='tri6'):
+    """Install the geometry and every jointed line, mesh, build fem_data."""
+    d = _base()
+    d['unit_system'] = 'metric'
+    d['gamma_water'] = 9.81
+    d['profile_lines'] = []
+    d['polygons'] = [{'polygon': Polygon(r), 'mat_id': i}
+                     for r, i in polys_and_ids]
+    d['domain_polygon'] = domain
+    d['ground_surface'] = ground
+    d['max_depth'] = y_bottom
+    d['circles'] = []
+    d['non_circ'] = []
+    d['piezo_line'] = []
+    d['piezo_phreatic'] = False
+    d['materials'] = materials
+    d['reinforcement_lines'] = [
+        _reinf_row(ln, cj, phi_j, f'joint {i + 1}')
+        for i, ln in enumerate(joint_lines)]
+    d['reinforce_lines'] = build_reinforce_lines(d['reinforcement_lines'])
+    d['pile_lines'] = []
+    lines = [[(float(ln[0][0]), float(ln[0][1])),
+              (float(ln[-1][0]), float(ln[-1][1]))] for ln in joint_lines]
+    polys = [{'coords': list(r), 'mat_id': i} for r, i in polys_and_ids]
+    with contextlib.redirect_stdout(io.StringIO()):
+        mesh = build_mesh_from_polygons(polys, target_size=ts,
+                                        element_type=element_type, lines=lines,
+                                        element_size_1d=s1d,
+                                        joint_lines=list(range(len(lines))))
+        fem_data = build_fem_data(d, mesh)
+    fem_data['k_seismic'] = k_seismic
+    return d, mesh, fem_data
+
+
+def _solve(fem_data, F=1.0, max_iterations=8000):
+    with contextlib.redirect_stdout(io.StringIO()):
+        return solve_fem(fem_data, F=F, max_iterations=max_iterations,
+                         fast_kernel=False)
+
+
+def _ssrm(fem_data, F_min=1.0, F_max=2.5, tolerance=0.005, **kw):
+    kw.setdefault('max_iterations', 3000)
+    kw.setdefault('max_iterations_ceiling', 6000)
+    with contextlib.redirect_stdout(io.StringIO()):
+        return solve_ssrm(fem_data, F_min=F_min, F_max=F_max,
+                          tolerance=tolerance, **kw)
+
+
+#: Rows i and ii: R2's slab on a plane at beta, with the cuts phase 2 adds.
+SLAB = dict(beta=20.0, HV=3.0, X1=36.0, XA=6.0, XB=30.0, YB=-6.0, VD=1.0,
+            ts=1.5, s1d=1.0, phi_j=30.0, E_void=1.0)
+
+
+def _slab(cut=False, course=False):
+    """The slab on its plane, optionally cut by a vertical joint and stacked.
+
+    ``cut`` adds a vertical joint at mid-length from the base joint to the ground
+    surface: a T where it meets the plane and a crack to the surface at the top.
+    ``course`` adds a joint parallel to the plane at mid-thickness, which the cut
+    crosses at an X.
+    """
+    p = SLAB
+    T = math.tan(math.radians(p['beta']))
+    y = lambda x: x * T
+    HV, X1, XA, XB, YB, VD = (p['HV'], p['X1'], p['XA'], p['XB'], p['YB'],
+                              p['VD'])
+    soil = [(0.0, YB), (X1, YB), (X1, y(X1) - VD), (XB, y(XB) - VD),
+            (XB, y(XB) + HV), (XA, y(XA) + HV), (XA, y(XA) - VD), (0.0, -VD)]
+    vl = [(0.0, -VD), (XA, y(XA) - VD), (XA, y(XA) + HV), (0.0, HV)]
+    vr = [(XB, y(XB) - VD), (X1, y(X1) - VD), (X1, y(X1) + HV), (XB, y(XB) + HV)]
+    lines = [[(0.0, 0.0), (X1, y(X1))]]
+    if course:
+        lines.append([(0.0, 0.5 * HV), (X1, y(X1) + 0.5 * HV)])
+    if cut:
+        xc = 0.5 * (XA + XB)
+        lines.append([(xc, y(xc)), (xc, y(xc) + HV)])
+    rings = add_intersection_points_to_polygons([soil, vl, vr], lines)
+    mats = [_material('soil'),
+            _material('void', option='elastic', c=0.0, phi=0.0,
+                      E=p['E_void'], gamma=0.001, nu=0.2)]
+    ids = [(rings[0], 0), (rings[1], 1), (rings[2], 1)]
+    domain = Polygon([(0.0, HV), (X1, y(X1) + HV), (X1, YB), (0.0, YB)])
+    ground = LineString([(0.0, HV), (X1, y(X1) + HV)])
+    d, mesh, fem_data = _model(ids, domain, ground, YB, mats, lines,
+                               0.0, p['phi_j'], p['ts'], p['s1d'])
+    return d, mesh, fem_data, lines
+
+
+def _leg_row_i(failures, results):
+    """i. The block on a plane, cut in two by a vertical joint."""
+    p = SLAB
+    expected = math.tan(math.radians(p['phi_j'])) / math.tan(
+        math.radians(p['beta']))
+    _d, mesh, fem_data, lines = _slab(cut=True)
+    xc = 0.5 * (p['XA'] + p['XB'])
+    yc = xc * math.tan(math.radians(p['beta']))
+    _check_junction(mesh, (xc, yc),
+                    [math.radians(p['beta']), math.radians(p['beta']) + math.pi,
+                     math.pi / 2], 3, 2, 'row i (T on the plane)', failures)
+    _check_junction(mesh, (xc, yc + p['HV']),
+                    [3 * math.pi / 2, math.radians(p['beta']),
+                     math.radians(p['beta']) + math.pi], 2, 1,
+                    'row i (crack to the surface)', failures)
+    _check_pairs(mesh, 'row i', failures, lines)
+    res = _ssrm(fem_data, F_min=1.0, F_max=2.5, tolerance=0.005)
+    FS = res.get('FS')
+    if FS is None:
+        failures.append("row i: the strength reduction returned no factor")
+        return
+    err = (FS - expected) / expected
+    if abs(err) > 0.03:
+        failures.append(f"row i: the cut slab returns FS = {FS:.4f} against "
+                        f"tan phi_j / tan beta = {expected:.4f} "
+                        f"({100 * err:+.2f}%)")
+    results.append(f"row i   cut into two blocks: SSRM FS = {FS:.4f} vs "
+                   f"{expected:.4f}  ({100 * err:+.2f}%), "
+                   f"{len(mesh['elements_joint'])} joint elements")
+
+
+def _leg_row_ii(failures, results):
+    """ii. The same slab as a two-course stack, the cut crossing the course."""
+    p = SLAB
+    expected = math.tan(math.radians(p['phi_j'])) / math.tan(
+        math.radians(p['beta']))
+    _d, mesh, fem_data, lines = _slab(cut=True, course=True)
+    xc = 0.5 * (p['XA'] + p['XB'])
+    yc = xc * math.tan(math.radians(p['beta']))
+    _check_junction(mesh, (xc, yc + 0.5 * p['HV']),
+                    [math.radians(p['beta']), math.radians(p['beta']) + math.pi,
+                     math.pi / 2, 3 * math.pi / 2], 4, 2,
+                    'row ii (X on the course joint)', failures)
+    _check_pairs(mesh, 'row ii', failures, lines)
+    res = _ssrm(fem_data, F_min=1.0, F_max=2.5, tolerance=0.005)
+    FS = res.get('FS')
+    if FS is None:
+        failures.append("row ii: the strength reduction returned no factor")
+        return
+    err = (FS - expected) / expected
+    if abs(err) > 0.03:
+        failures.append(f"row ii: the stacked slab returns FS = {FS:.4f} "
+                        f"against tan phi_j / tan beta = {expected:.4f} "
+                        f"({100 * err:+.2f}%)")
+    results.append(f"row ii  two courses, four blocks: SSRM FS = {FS:.4f} vs "
+                   f"{expected:.4f}  ({100 * err:+.2f}%), "
+                   f"{len(mesh['elements_joint'])} joint elements")
+
+
+#: Row iii: the L-shaped joint around an elastic block.
+BLOCK = dict(W=30.0, H=12.0, XA=12.0, XB=18.0, YB=6.0, phi_base=30.0,
+             k=0.30, ts=1.0, s1d=0.75, E_void=1.0)
+
+
+def _block_model(phi_base=None, k=None):
+    """An elastic block in a notch: base joint under it, back joint up its back.
+
+    The block occupies XA..XB, YB..H. The soil fills 0..H below YB; the space
+    behind the block (XA..0 above YB) and in front of it (XB..W above YB) is the
+    near-weightless elastic 'void' the R2 rows use for a free face, so the only
+    horizontal load on the block is the seismic one, k W.
+
+    The base joint runs from the corner to the model's right-hand boundary rather
+    than stopping under the block's front face. A joint that stops there leaves a
+    buried crack tip at the block's own bottom corner — one shared node, which is
+    a rigid link between the block and the foundation — and the block cannot
+    slide out past it: at that geometry the reduction returns 6.57 rather than
+    1.92, which is not the interface's answer but the pin's.
+    """
+    p = dict(BLOCK)
+    if phi_base is not None:
+        p['phi_base'] = phi_base
+    if k is not None:
+        p['k'] = k
+    W, H, XA, XB, YB = p['W'], p['H'], p['XA'], p['XB'], p['YB']
+    soil = [(0.0, 0.0), (W, 0.0), (W, YB), (0.0, YB)]
+    block = [(XA, YB), (XB, YB), (XB, H), (XA, H)]
+    behind = [(0.0, YB), (XA, YB), (XA, H), (0.0, H)]
+    front = [(XB, YB), (W, YB), (W, H), (XB, H)]
+    base = [(XA, YB), (W, YB)]
+    back = [(XA, YB), (XA, H)]
+    rings = add_intersection_points_to_polygons([soil, block, behind, front],
+                                                [base, back])
+    mats = [_material('soil', c=1000.0, phi=45.0),
+            _material('block', option='elastic', c=0.0, phi=0.0, E=E_SOIL,
+                      gamma=GAMMA, nu=0.2),
+            _material('void', option='elastic', c=0.0, phi=0.0, E=p['E_void'],
+                      gamma=0.001, nu=0.2)]
+    ids = [(rings[0], 0), (rings[1], 1), (rings[2], 2), (rings[3], 2)]
+    domain = Polygon([(0.0, 0.0), (W, 0.0), (W, H), (0.0, H)])
+    ground = LineString([(0.0, H), (W, H)])
+    d, mesh, fem_data = _model(ids, domain, ground, 0.0, mats, [base, back],
+                               0.0, p['phi_base'], p['ts'], p['s1d'],
+                               k_seismic=p['k'])
+    return d, mesh, fem_data, [base, back], p
+
+
+def _leg_row_iii(failures, results):
+    """iii. The block slides out of its corner at the base joint's friction."""
+    _d, mesh, fem_data, lines, p = _block_model()
+    expected = math.tan(math.radians(p['phi_base'])) / p['k']
+    _check_junction(mesh, (p['XA'], p['YB']),
+                    [0.0, math.pi / 2], 2, 2, 'row iii (the L corner)',
+                    failures)
+    _check_pairs(mesh, 'row iii', failures, lines)
+
+    # the corner is what lets the block leave: with the two lines a single
+    # bonded pair of nodes there would be no mechanism at all.
+    res = _ssrm(fem_data, F_min=0.5, F_max=3.0, tolerance=0.005)
+    FS = res.get('FS')
+    if FS is None:
+        failures.append("row iii: the strength reduction returned no factor")
+        return
+    err = (FS - expected) / expected
+    if abs(err) > 0.05:
+        failures.append(f"row iii: the block returns FS = {FS:.4f} against "
+                        f"tan phi_base / k = {expected:.4f} "
+                        f"({100 * err:+.2f}%)")
+
+    # the back face opens: its normal traction is zero where the block has left
+    sol = _solve(fem_data, F=max(1.0, expected * 0.9))
+    jd = fem_data['joint_data']
+    back = np.asarray(jd['line_id']) == 2
+    tn = np.asarray(sol['joint_tn'])
+    w = np.asarray(jd['w'])
+    thrust = float(np.sum(np.maximum(tn[back], 0.0) * w[back]))
+    weight = GAMMA * (p['XB'] - p['XA']) * (p['H'] - p['YB'])
+    if thrust > 0.02 * weight:
+        failures.append(f"row iii: the back face carries {thrust:.2f} kN/m of "
+                        f"thrust against a block weight of {weight:.1f}; it "
+                        f"must open as the block slides out")
+    results.append(f"row iii the block in an L: SSRM FS = {FS:.4f} vs "
+                   f"tan phi_base / k = {expected:.4f}  ({100 * err:+.2f}%), "
+                   f"back-face thrust {thrust:.3f} kN/m on a "
+                   f"{weight:.0f} kN/m block")
+
+
+def run_mesh_legs():
+    """The mesh fixtures and the refusals, without the rows that solve.
+
+    What the --mesh scope runs: every leg here is a mesh build and a count.
+    """
+    failures, results = [], []
+    t0 = time.time()
+    _leg_fixtures(failures, results)
+    _leg_material_boundary(failures, results)
+    _leg_refusals(failures, results)
+    print(f"Joint junction check, mesh legs ({time.time() - t0:.0f} s):")
+    for line in results:
+        print("  " + line)
+    return failures
+
+
+def run():
+    """Returns a list of failure strings (empty = pass)."""
+    failures, results = [], []
+    t0 = time.time()
+    _leg_fixtures(failures, results)
+    _leg_material_boundary(failures, results)
+    _leg_refusals(failures, results)
+    _leg_row_i(failures, results)
+    _leg_row_ii(failures, results)
+    _leg_row_iii(failures, results)
+    print(f"Joint junction check ({time.time() - t0:.0f} s):")
+    for line in results:
+        print("  " + line)
+    return failures
+
+
+def main():
+    failures = run()
+    if failures:
+        print("\nFAILURES:")
+        for f in failures:
+            print(f"  - {f}")
+        raise SystemExit(1)
+    print("\nJointed lines meet: the split copies a junction node once per wedge "
+          "of material, and the closed forms hold through the junctions.")
+
+
+if __name__ == '__main__':
+    main()

@@ -43,7 +43,7 @@ you are about to run actually needs is checked separately, when the run starts; 
 
 ## Template Structure
 
-The template consists of 13 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).
+The template consists of 14 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).
 
 | Sheet Name | Description | LEM | SEEP | FEM |
 |------------|-------------|:---:|:----:|:---:|
@@ -56,6 +56,7 @@ The template consists of 13 worksheets, each serving a specific purpose. Differe
 | **non-circ** | Non-circular failure surface coordinates | X   |      |     |
 | **dloads** | Distributed surface loads | X   |      | X   |
 | **reinforce** | Soil reinforcement elements (anchors, nails, geosynthetics) | X   |      | X   |
+| **joints** | Slip surfaces with no reinforcement in them (rock joints, block contacts) |     |      | X   |
 | **piles** | Pile and concrete pier support elements | X   |      | X   |
 | **lloads** | Line loads (concentrated forces on the ground surface) | X   |      |     |
 | **seep bc** | Seepage analysis boundary conditions |     | X    |     |
@@ -872,6 +873,15 @@ a bar that sheds part of its load and retains the rest. Near the ends the capaci
 take a bar below the force its embedment can hold.<br>
 >>E **[F/L²]**: Elastic modulus of reinforcement<br>
 >>Area — **[L²] per element (÷ Spacing)** (or [L²/L] per unit width when Spacing is blank): Cross-sectional area<br>
+- **Interface (joint)** (FEM only):<br>
+>>Joint: **Yes** makes the line a slip surface — the mesh splits along it and a pair of interface elements
+carries the sheet's grip on the soil, in place of the bond cap `Lp1`/`Lp2` set. Blank or **No** is the ordinary
+bonded bar. The interface's strength is that line's own `Adhesion` and `Delta`, which must both be filled.<br>
+>>kn **[F/L³]**: Normal stiffness of the interface. Leave blank to derive it from the softer adjacent soil,
+$E_{adj}$ over a virtual thickness of 0.1 × the 1D element size.<br>
+>>ks **[F/L³]**: Shear stiffness of the interface. Leave blank to derive it the same way, from $G_{adj}$.<br>
+>>Jred: **No** holds the interface at full strength through a strength reduction. Blank or **Yes** reduces the
+interface's `Adhesion` and $\tan$`Delta` by the trial factor along with the soil's, which is the usual choice.<br>
 
 The available tensile force varies *along* the line: it is limited by the tendon's own capacity in the middle, and
 tapers off toward each end as there is progressively less bond length available to develop it. That capacity
@@ -898,6 +908,65 @@ How the force is then *used* differs by analysis:
   envelope, and dropping to `Tres` once it yields, or to the envelope value where that is the lower of the two.
   **Dir** and **Appl** have no effect. See
   [Soil Reinforcement in FEM](../fem/reinforcement.md#force-behavior-and-failure-modes).
+
+`Joint` changes what the FEM builds. A bonded line shares the soil's nodes, so the soil above it and the soil below
+it are one body; a jointed line is a slip surface, and the mesh is split along it into an upper face, the bar, and a
+lower face, with an interface element between each pair carrying the `Adhesion` and `Delta` as a Mohr-Coulomb
+strength. Use it where the failure surface can run **along** a sheet rather than across it — a base geotextile under
+an embankment, a wall whose fill slides on its sheets, a smooth liner. `Lp1`, `Lp2` and `Tres` are not read on a
+jointed line: the grip is what the interface elements integrate, and the bar's only limit is `Tmax`. A non-blank
+`Tend1` / `Tend2` ties that end of the sheet to the soil or facing at the stated capacity; a blank end is free and
+can pull out. LEM ignores `Joint` entirely and reads the line as it always did. See
+[Bonded bar or joint?](../fem/reinforcement.md#bonded-bar-or-joint).
+
+---
+
+## Worksheet: joints
+
+![sheet_joints.png](images/sheet_joints.png)
+
+The **joints** worksheet defines slip surfaces that carry no reinforcement: a rock joint, a bedding plane, the
+contact between a facing block and the one beneath it, the back of a retaining wall against the soil behind it.
+Each is a straight line between two points, and the finite element mesh is **split** along it, so the material on
+one side is a separate body from the material on the other and the two can slide along it and part across it. The
+reinforce sheet's `Joint` column does the same thing to a line that *does* carry a sheet; this worksheet is for the
+lines that do not.
+
+The template is formatted for up to 30 joint lines (rows 3-32), but additional rows can be added as needed. Every
+column on this sheet is **FEM only** — the limit equilibrium engines do not read it.
+
+Each joint line is defined by:
+
+- **Geometry**:<br>
+>>Label: Name used in error messages, summaries, and plots (optional)<br>
+>>x1, y1 **[L]**: Start point coordinates<br>
+>>x2, y2 **[L]**: End point coordinates<br>
+- **Strength**:<br>
+>>c **[F/L²]**: Joint cohesion. Blank is 0, which with a stated `phi` is the purely frictional contact a dry joint
+usually is.<br>
+>>phi **[degrees]**: Joint friction angle. **Required** — `c` alone defaults to zero, so a blank `phi` would be a
+frictionless surface the two sides slide along under any load at all.<br>
+>>t_cut **[F/L²]**: Tension cutoff. The joint **opens** when the normal traction passes it — carrying neither shear
+nor normal traction — and closes again when the two faces come back into contact. Blank is 0, which is a contact
+that holds no tension at all.<br>
+- **Stiffness**:<br>
+>>kn **[F/L³]**: Normal stiffness of the interface. Leave blank to derive it from the softer adjacent soil,
+$E_{adj}$ over a virtual thickness of 0.1 × the 1D element size.<br>
+>>ks **[F/L³]**: Shear stiffness of the interface. Leave blank to derive it the same way, from $G_{adj}$.<br>
+>>Jred: **No** holds the joint at full strength through a strength reduction — for a construction detail rather
+than the design question. Blank or **Yes** reduces `c` and $\tan$`phi` by the trial factor along with the soil's,
+which is the usual choice.<br>
+
+Joint lines may **meet** — at a T, at a crossing, at a corner, end to end — and where they do the split copies the
+shared node once per wedge of material around it, so each element keeps the material on its own side of every line
+through the point. That is what turns a facing column with a joint on its back face, a joint under its base and a
+course joint at every mortar line into a stack that can slide and rock rather than a notched solid. What two joint
+lines may not do is lie **on** one another over a stretch, or run along the outside of the section, where there is
+material on one side only and nothing for the other face of the joint to be; preflight refuses both by name.
+
+The interface element, its constitutive law, the derived stiffnesses and what the results show are the same as for a
+jointed reinforcement line: see
+[Joints without reinforcement](../fem/reinforcement.md#joints-without-reinforcement).
 
 ---
 

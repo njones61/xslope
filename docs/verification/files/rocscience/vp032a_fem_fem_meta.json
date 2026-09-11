@@ -1,0 +1,12 @@
+{
+  "benchmark": "RS2-24a",
+  "analysis": "ssrm",
+  "FS": 1.103515625,
+  "expected_fs": "1.104",
+  "file": "files/rocscience/vp032a_fem.xlsx",
+  "unit_system": "si",
+  "converged": true,
+  "iterations": 46516,
+  "residual": 2.2590884790880973e-06,
+  "max_displacement": 0.04834029827518983
+}

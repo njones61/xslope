@@ -537,7 +537,8 @@ def _tag_mesh(slope_data, test, default_element_type='tri3', default_divisions=1
     there, and because a seepage-coupled FEM row must solve on the very mesh the
     field was computed on."""
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_constraint_line_geometry, extract_size_regions)
+                             extract_constraint_line_geometry, extract_joint_options,
+                             extract_size_regions)
     constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
     polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
     mesh = build_mesh_from_polygons(
@@ -547,6 +548,7 @@ def _tag_mesh(slope_data, test, default_element_type='tri3', default_divisions=1
         lines=constraint_lines or None,
         element_size_1d=slope_data.get('element_size_1d'),
         size_regions=extract_size_regions(slope_data),
+        joint_lines=extract_joint_options(slope_data),
         **_refine_kwargs(test))
     slope_data['mesh'] = mesh
     return mesh
@@ -1373,8 +1375,8 @@ def build_fem_ssrm_case(test):
     from xslope.fileio import load_slope_data
     from xslope.fem import build_fem_data
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_constraint_line_geometry, extract_point_constraints,
-                             extract_size_regions)
+                             extract_constraint_line_geometry, extract_joint_options,
+                             extract_point_constraints, extract_size_regions)
 
     file_path = test['file']
     element_type = test.get('element_type', 'tri6')
@@ -1416,6 +1418,7 @@ def build_fem_ssrm_case(test):
             element_size_1d=slope_data.get('element_size_1d'),
             point_constraints=extract_point_constraints(slope_data),
             size_regions=extract_size_regions(slope_data),
+            joint_lines=extract_joint_options(slope_data),
             **_refine_kwargs(test)
         )
 
@@ -2902,6 +2905,7 @@ _EDITOR_MANAGED_KEYS = {
     "seep_bc": ["seepage_bc", "seepage_bc2"],
     "piles": ["pile_lines"],
     "reinforce": ["reinforcement_lines"],
+    "joints": ["joint_lines"],
     "line_loads": ["line_loads"],
     "profile": ["profile_lines"],
     # The polygon editor also owns the polygon sheet's overlay rows — SSR zones and
@@ -3057,6 +3061,17 @@ def _editor_fixture():
              "t_res": 400.0, "lp1": 0.5, "lp2": 1.0, "E": 1200.0, "area": 0.8,
              "type": "anchor", "dir": "axial", "appl": "passive",
              "tend1": 20.0, "tend2": 22.0, "spacing": 2.5},
+        ],
+        # v27 joints sheet. Two rows, every field set to a distinct non-default
+        # value, and one carrying blank kn/ks so the "derived" reading (NaN, not
+        # zero) has to survive the editor.
+        "joint_lines": [
+            {"label": "bedding plane", "x1": 2.0, "y1": 4.0, "x2": 42.0, "y2": 4.5,
+             "c": 3.5, "phi": 27.5, "t_cut": 1.25,
+             "kn": 120000.0, "ks": 90000.0, "jred": "No"},
+            {"label": "block base", "x1": 5.0, "y1": 11.0, "x2": 9.0, "y2": 11.0,
+             "c": 0.0, "phi": 34.0, "t_cut": 0.0,
+             "kn": float("nan"), "ks": float("nan"), "jred": ""},
         ],
         "pile_lines": [pile(20.0, 20.0, 20.0, 0.0, "passive"),
                        pile(35.0, 20.0, 35.0, 2.0, "active")],
@@ -3366,6 +3381,33 @@ def run_editor_roundtrip_test(test):
     #       list-view label AND edit, and the context-sensitive help strip;
     #   (b) the dynamic label re-words set -> "per element" / blank -> "per unit width",
     #       joining the declared unit string, and flips live as Spacing/S changes.
+    # The joints editor carries per-field help too, but no spacing-scaled field
+    # and so no dynamic label; only the help half applies to it.
+    for cat in ("joints",):
+        editor = CATEGORY_EDITORS[cat]
+        for f in editor.FIELDS:
+            if not (getattr(f, "tooltip", "") or "").strip():
+                problems.append(f"{cat}:tooltip:{f.key} is empty")
+        sd = _editor_fixture()
+        dlg = editor.build(sd, None)
+        dlg.set_view_mode("table")
+        app.processEvents()
+        tbl = dlg._table.table
+        for j, f in enumerate(editor.FIELDS):
+            it = tbl.horizontalHeaderItem(j)
+            if it is None or not it.toolTip():
+                problems.append(f"{cat}:header-tooltip:{f.key} missing")
+        dlg.set_view_mode("list")
+        lv = dlg._list_view
+        lv.list.setCurrentRow(0)
+        app.processEvents()
+        for f in editor.FIELDS:
+            w = lv._edits.get(f.key)
+            if w is None or not w.toolTip():
+                problems.append(f"{cat}:list-tooltip:{f.key} missing")
+        dlg.deleteLater()
+        app.processEvents()
+
     for cat, driver, dyn_key, per_elem_unit, per_width_unit in (
             ("reinforce", "spacing", "t_max", "lb", "lb/ft"),
             ("piles",     "S",       "V_cap", "lb", "lb/ft")):
@@ -4562,6 +4604,107 @@ def _pf_move(sd, key, dx=0.0, dy=0.0):
     return sd
 
 
+def _pf_joint(sd, **kw):
+    """Flag every reinforcement line as a joint, with an interface strength.
+
+    ``Adhesion`` and ``Delta`` come along because the interface law is those two
+    columns: a spec that flags a line and leaves them blank is testing
+    ``joint.no_interface_strength`` rather than whatever it meant to test.
+    """
+    kw.setdefault('adhesion', 5.0)
+    kw.setdefault('delta', 25.0)
+    return _pf_rows(sd, 'reinforcement_lines', joint='Yes', **kw)
+
+
+def _pf_joint_pair(sd, both=True):
+    """Two crossing reinforcement lines, the first jointed and the second either.
+
+    ``both=True`` is two jointed lines meeting — which the mesh split BUILDS, as
+    a junction — and ``both=False`` is a jointed line crossed by a bonded one,
+    which it refuses. Every other line is put out of the way so the pair is the
+    only crossing in the model.
+    """
+    rows = sd.get('reinforcement_lines') or []
+    _pf_rows(sd, 'reinforcement_lines', joint='No')
+    for k, r in enumerate(rows):
+        r.update(x1=60.0 + 3.0 * k, y1=-8.0, x2=70.0 + 3.0 * k, y2=-8.0)
+    if len(rows) >= 2:
+        rows[0].update(joint='Yes', adhesion=5.0, delta=25.0,
+                       x1=5.0, y1=2.0, x2=25.0, y2=2.0)
+        rows[1].update(joint='Yes' if both else 'No', adhesion=5.0, delta=25.0,
+                       x1=15.0, y1=-2.0, x2=15.0, y2=6.0)
+    return sd
+
+
+def _pf_joint_overlap(sd, overlap=True):
+    """Two jointed lines lying on one another, or merely crossing.
+
+    One locus carries one interface law, so a shared STRETCH is refused; a
+    crossing is a junction the split builds.
+    """
+    rows = sd.get('reinforcement_lines') or []
+    _pf_rows(sd, 'reinforcement_lines', joint='No')
+    for k, r in enumerate(rows):
+        r.update(x1=60.0 + 3.0 * k, y1=-8.0, x2=70.0 + 3.0 * k, y2=-8.0)
+    if len(rows) >= 2:
+        rows[0].update(joint='Yes', adhesion=5.0, delta=25.0,
+                       x1=5.0, y1=2.0, x2=25.0, y2=2.0)
+        if overlap:
+            rows[1].update(joint='Yes', adhesion=5.0, delta=25.0,
+                           x1=15.0, y1=2.0, x2=35.0, y2=2.0)
+        else:
+            rows[1].update(joint='Yes', adhesion=5.0, delta=25.0,
+                           x1=15.0, y1=-2.0, x2=15.0, y2=6.0)
+    return sd
+
+
+def _pf_joint_line_load(sd, on=True):
+    """A line load standing on a jointed line, or clear of it."""
+    rows = sd.get('reinforcement_lines') or []
+    _pf_rows(sd, 'reinforcement_lines', joint='No')
+    if rows:
+        rows[0].update(joint='Yes', adhesion=5.0, delta=25.0,
+                       x1=5.0, y1=2.0, x2=25.0, y2=2.0)
+    sd['line_loads'] = [{'x': 15.0, 'y': 2.0 if on else 10.0, 'P': 10.0,
+                         'angle': -90.0, 'label': 'probe'}]
+    return sd
+
+
+def _pf_joint_stretch(sd, x1=-25.0, x2=40.0):
+    """Stretch every sheet across the zone it lies under."""
+    return _pf_rows(sd, 'reinforcement_lines', x1=x1, x2=x2)
+
+
+def _pf_joint_sheet(sd, x1=5.0, y1=2.0, x2=25.0, y2=2.0, **kw):
+    """One row on the v27 joints sheet: a joint with no reinforcement in it.
+
+    The default row is a sound one — inside the section, with a friction angle —
+    so a spec that changes one field is testing that field.
+    """
+    row = dict(label='seam', x1=x1, y1=y1, x2=x2, y2=y2,
+               c=0.0, phi=25.0, t_cut=0.0,
+               kn=float('nan'), ks=float('nan'), jred='')
+    row.update(kw)
+    sd['joint_lines'] = [row]
+    return sd
+
+
+def _pf_joint_on_boundary(sd, on=True):
+    """A joint line running ALONG the bottom of the section, or across it.
+
+    The outside of the section has material on one side only, so there is
+    nothing for the joint's other face to be.
+    """
+    from shapely.ops import unary_union
+    body = unary_union([p['polygon'] for p in (sd.get('polygons') or [])])
+    x0, y0, x1, y1 = body.bounds
+    xa, xb = x0 + 0.25 * (x1 - x0), x0 + 0.75 * (x1 - x0)
+    if on:
+        return _pf_joint_sheet(sd, x1=xa, y1=y0, x2=xb, y2=y0)
+    return _pf_joint_sheet(sd, x1=xa, y1=0.5 * (y0 + y1),
+                           x2=xb, y2=0.5 * (y0 + y1))
+
+
 #: One entry per rule. Fields:
 #:   rule      the rule id under test
 #:   base      the sample file to break a copy of
@@ -5352,6 +5495,102 @@ PREFLIGHT_RULE_SPECS = [
                                      lp1=0.0, lp2=0.0),
          expect='Lp1/Lp2 are not read'),
 
+    # --- interface (joint) elements ---------------------------------------
+    # The refusals first: what phase 1 cannot mesh, named before the mesher
+    # raises, plus the one input the interface law cannot do without.
+    dict(rule='joint.no_interface_strength', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='Yes'),
+         control=lambda sd: _pf_joint(sd),
+         expect='Mohr-Coulomb strength from those two columns'),
+    dict(rule='joint.lines_meet', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_overlap(sd, overlap=True),
+         control=lambda sd: _pf_joint_overlap(sd, overlap=False),
+         expect='lie on one another over'),
+    dict(rule='joint.crosses_constraint_line', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_pair(sd, both=False),
+         control=lambda sd: _pf_joint_pair(sd, both=True),
+         expect='is a joint and touches'),
+    # The joints sheet's own rows: a line with no reinforcement in it. What the
+    # interface law cannot do without, and the two geometries the split cannot
+    # represent.
+    # The sweep budget a jointed model needs. The mutation is the DEFAULT budget a
+    # run arrives with; the control is one that allows what a joint takes. Both
+    # carry the same jointed model, so what is under test is the budget alone.
+    dict(rule='joint.iteration_budget_low', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         selection={'max_iterations': 12000},
+         mutation=lambda sd: _pf_joint(sd),
+         control_selection={'max_iterations': 100000},
+         control=lambda sd: _pf_joint(sd),
+         expect='viscoplastic sweeps'),
+    dict(rule='joint.phi_missing', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, phi=float('nan')),
+         control=lambda sd: _pf_joint_sheet(sd),
+         expect='leaves phi blank'),
+    dict(rule='joint.no_strength', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, c=0.0, phi=0.0),
+         control=lambda sd: _pf_joint_sheet(sd),
+         expect='states c = 0 and phi = 0'),
+    dict(rule='joint.outside_domain', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, x1=200.0, y1=200.0,
+                                             x2=260.0, y2=200.0),
+         control=lambda sd: _pf_joint_sheet(sd),
+         expect='lies outside the material zones'),
+    dict(rule='joint.on_domain_boundary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_on_boundary(sd, on=True),
+         control=lambda sd: _pf_joint_on_boundary(sd, on=False),
+         expect='lies on the outside of the section'),
+    dict(rule='joint.line_load_on_line', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_line_load(sd, on=True),
+         control=lambda sd: _pf_joint_line_load(sd, on=False),
+         expect='there is no single node for the load'),
+    # The four §4c signals, on a BONDED line. Two of them are read off files the
+    # corpus already ships in exactly the geometry the signal is about, so the
+    # mutation is the file itself and the control is the repair: a base
+    # geotextile lying on the fill/foundation contact (VP30), and the fifteen
+    # sheets of the geotextile wall (VP88). The other two are built on the
+    # reinforced-slope sample, whose sheets fire nothing as they stand.
+    dict(rule='joint.likely_on_material_boundary',
+         base=_repo('docs/verification/files/rocscience/vp030a.xlsx'),
+         mode='dict', analysis='fem',
+         mutation=lambda sd: sd,
+         control=lambda sd: _pf_move(sd, 'reinforcement_lines', dy=1.0),
+         expect='lies on a material boundary'),
+    dict(rule='joint.likely_flat_sheet',
+         base=_repo('docs/verification/files/geostudio/gs2_18.xlsx'),
+         mode='excel', analysis='fem',
+         mutation=lambda sd: _pf_joint_stretch(sd),
+         control=lambda sd: sd,
+         expect='degrees of horizontal and spans'),
+    dict(rule='joint.likely_smooth_interface', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='No',
+                                      adhesion=1.0, delta=5.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='No',
+                                     adhesion=1.0, delta=30.0),
+         expect='of the soil\'s own friction angle'),
+    dict(rule='joint.likely_wall',
+         base=_repo('docs/verification/files/rocscience/vp088.xlsx'),
+         mode='dict', analysis='fem',
+         mutation=lambda sd: sd,
+         control=lambda sd: _pf_joint(sd),
+         expect='a reinforced wall'),
+    # The INFO: which bonded-bar inputs a jointed line stops reading.
+    dict(rule='joint.bond_inputs_ignored', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint(sd),
+         control=lambda sd: _pf_joint(sd, lp1=0.0, lp2=0.0,
+                                      t_res=float('nan')),
+         expect='does not read on a jointed line'),
+
     # --- magnitude plausibility (the sniff tests) --------------------------
     dict(rule='mat.E_off_soil_type_band', base=PREFLIGHT_BASE_FEM, mode='excel',
          analysis='ssrm',
@@ -5660,6 +5899,14 @@ def run_preflight_corpus_test(test):
         # `seep=transient`, `march=file`) is checked as the run that follows it:
         # the field the shipped file lacks is exactly what the route produces.
         field_at_run = bool(t.get('seep') or t.get('march'))
+        # A strength-reduction tag states the sweep budget its lock was cut at, and
+        # joint.iteration_budget_low is a question about exactly that: a jointed row
+        # whose tag allows the budget must not be reported as if it did not. Carried
+        # into the selection so the corpus is checked as it is actually run.
+        if t.get('type') == 'fem_ssrm':
+            sel = dict(sel)
+            if t.get('max_iter'):
+                sel['max_iterations'] = int(float(t['max_iter']))
         key = (f, analysis, tuple(sorted(sel.items())))
         if key in cases:
             cases[key] = (analysis, sel, cases[key][2] or field_at_run)
@@ -7472,12 +7719,13 @@ def run_tag_k0_test(test):
     # The reverse sweep. main!D16 only means K0 from template v19 on, so the
     # version in D5 gates the read exactly the way fileio.load_slope_data gates it.
     declared_by_tag = {os.path.basename(p) for p in wanted}
-    # Models that carry the vendor's K0 but are REPORTED rather than locked: their
-    # FEM rows print a number with no tag behind it, by decision on the page
-    # (docs/verification/rs2.md, RS2-49 and RS2-51: the geotextile wall family
-    # follows the mesh and has no vendor factor to score against). The file still
-    # transcribes the vendor's K0 = 1, and nothing asks the suite to check it.
-    reported_not_locked = {'vp088.xlsx', 'vp090.xlsx'}
+    # Models that carry a K0 no test tag asks for. The geotextile wall family used to
+    # be here: vp088 and vp090 declared the vendor's K0 = 1 for a strength-reduction
+    # row that printed a number with no tag behind it. That row now runs on the
+    # jointed siblings vp088_fem / vp090_fem, so the two limit-equilibrium files no
+    # longer carry a K0 at all and the set is empty. An entry here is an exception
+    # that needs a reason; the reverse sweep below is what enforces the rule.
+    reported_not_locked = set()
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
         for book in sorted(docs.rglob('*.xlsx')):
@@ -7531,8 +7779,8 @@ def run_mesh_elements_test(test):
     """
     from xslope.fileio import load_slope_data
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_constraint_line_geometry, extract_point_constraints,
-                             extract_size_regions)
+                             extract_constraint_line_geometry, extract_joint_options,
+                             extract_point_constraints, extract_size_regions)
 
     want_el = test.get('expected_elements')
     want_nd = test.get('expected_nodes')
@@ -7553,6 +7801,7 @@ def run_mesh_elements_test(test):
         element_size_1d=slope_data.get('element_size_1d'),
         point_constraints=extract_point_constraints(slope_data),
         size_regions=extract_size_regions(slope_data),
+        joint_lines=extract_joint_options(slope_data),
         **_refine_kwargs(test)
     )
 
@@ -8023,6 +8272,52 @@ MODULE_CHECKS = {
         "capability the assistant can no longer read about — and an assistant "
         "that cannot read the page answers from memory, which is how it came to "
         "deny line loads."),
+    'joint_mesh': (
+        'joint_mesh_check.py',
+        "A reinforcement line flagged as a joint is a slip surface, so the mesh "
+        "is split along it: every node on the line becomes three — soil above, "
+        "bar, soil below — with a pair of joint elements at each station and the "
+        "two soil faces rejoining at the ends. The counts, the side "
+        "classification, the boundary conditions the copies inherit, the three "
+        "refused geometries, and that a model with no jointed line meshes "
+        "exactly as it always did."),
+    'joint_junction': (
+        'joint_junction_check.py',
+        "Jointed lines that meet. The split copies a junction node once per "
+        "wedge of material around it — three at a T, four at a crossing, two at "
+        "a corner, a chain, or an end on the external boundary, and one at a "
+        "buried crack tip, where the two faces rejoin. Six mesh fixtures on tri3 "
+        "and tri6 with the wedge counts read off the drawing, the refusals that "
+        "survive, and three closed forms through the finite element engine: the "
+        "block on a plane cut in two, the same slab as a two-course stack, and "
+        "an elastic block sliding out of an L-shaped joint at the friction the "
+        "joint states."),
+    'joint_junction_mesh': (
+        'joint_junction_check.py',
+        "The junction fixtures alone — the wedge counts at a T, an X, an L, a "
+        "chain, a crack to the boundary and a joint on a material boundary, and "
+        "the refusals that survive — without the closed-form rows, which solve."),
+    'joint_element': (
+        'joint_element_check.py',
+        "The interface (joint) element against four closed forms: Goodman "
+        "direct shear (the elastic slope, the Mohr-Coulomb surface pointwise, "
+        "the slip load, and no traction oscillation at a hundred times the "
+        "normal stiffness), a block on an inclined plane and its strength "
+        "reduction, the pullout envelope the joints must reproduce where the "
+        "bar's bond cap used to state it, and the infinite-slope form on a "
+        "slab riding a cohesive interface. Also the tension cutoff, the tied "
+        "end, the stiffness the softer adjacent soil sets on each side of a "
+        "material crossing, the stiffness default (which must carry no result "
+        "over two orders of magnitude), and that a model with no jointed line "
+        "builds exactly the fem_data it always did."),
+    'joint_surfaces': (
+        'joint_surfaces_check.py',
+        "What a jointed line reaches once the reinforce sheet says so: the "
+        "mesher through extract_joint_options, preflight's four refusals and four "
+        "signals, the inputs / mesh / results plots, the two soil faces of the "
+        "split moving apart in the solved field, the 1D detail profile and its "
+        "figure, and the report's joints table — with the same model unflagged "
+        "carrying none of it."),
     'spencer_root': (
         'spencer_root_check.py',
         "Spencer's equations have a root outside the pole-free band on many "
@@ -8053,7 +8348,7 @@ def run_module_check(test):
     spec = importlib.util.spec_from_file_location(path.stem, path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    failures = mod.run()
+    failures = getattr(mod, test.get('entry', 'run'))()
     if failures:
         return None, "; ".join(str(f) for f in failures)
     return 0.0, None
@@ -13935,7 +14230,9 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'indep_bishop': 3, 'tension_crack_symmetry': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
-              'reinforce_mesh_geometry': 2,
+              'reinforce_mesh_geometry': 2, 'joint_mesh': 3,
+              'joint_junction': 5, 'joint_junction_mesh': 3,
+              'joint_element': 5, 'joint_surfaces': 4,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'docs_index_sync': 3, 'assistant_docs_answers': 2,
@@ -14013,6 +14310,12 @@ def main():
                              'path. Use for strict runs: pre-release, or right '
                              'after a constitutive-physics change, when the oracle '
                              'should speak directly (see run_tests._run_fem_ssrm).')
+    parser.add_argument('--joints', action='store_true',
+                        help='Run only the interface (joint) element checks: '
+                             'the mesh split and the four closed-form rows. '
+                             'The element rows solve and strength-reduce '
+                             'several small models, so this scope runs in '
+                             'minutes rather than seconds.')
     parser.add_argument('--mesh', action='store_true',
                         help='Run only the mesh-size locks (type=mesh_elements): '
                              'the element and node counts the verification pages '
@@ -14028,7 +14331,8 @@ def main():
     # If no specific flags, run all
     run_all = not (args.lem or args.fem or args.seep or args.tseep or args.roundtrip
                    or args.dxf or args.gsz or args.slide2 or args.rs2
-                   or args.preflight or args.mesh or args.tutorials)
+                   or args.preflight or args.mesh or args.tutorials
+                   or args.joints)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
@@ -14040,6 +14344,7 @@ def main():
     run_rs2 = args.rs2 or run_all
     run_preflight = args.preflight or run_all
     run_mesh = args.mesh or run_all
+    run_joints = args.joints or run_all
     run_tutorials = args.tutorials or run_all
 
     # Discover tests from markdown files
@@ -14511,6 +14816,12 @@ def main():
         tests.append({'type': 'reinforce_mesh_geometry',
                       'file': 'reinforcement line mesh geometry (both laws)',
                       'method': '-', 'source': 'reinforce_mesh_geometry'})
+        # A jointed reinforcement line is a slip surface: the mesh splits along
+        # it into soil-above, bar and soil-below node sets, with joint elements
+        # between them and the soil faces rejoining at the ends.
+        tests.append({'type': 'joint_mesh',
+                      'file': 'the mesh split along a jointed line',
+                      'method': '-', 'source': 'joint_mesh'})
         # The opt-in strength-reduction criterion that wants displacement
         # evidence before calling a non-converged trial a failed slope.
         tests.append({'type': 'hybrid_criterion',
@@ -14982,6 +15293,35 @@ def main():
                       'method': 'load deck', 'source': 'rs2'})
         if not run_all:
             print("Including 3 RS2 import tests")
+
+    # Interface (joint) elements. The mesh split's fixture rides the round trip;
+    # --joints wants it too, and adds it only when that scope is not already
+    # running. The element's own closed-form rows are their own scope: they
+    # solve and strength-reduce several models, so they cost minutes.
+    if args.joints and not run_roundtrip:
+        tests.append({'type': 'joint_mesh',
+                      'file': 'the mesh split along a jointed line',
+                      'method': '-', 'source': 'joint_mesh'})
+    # The junction fixtures are a mesh build each, so they ride --mesh as well;
+    # the closed-form rows solve, so the full module runs in --joints only.
+    if args.mesh and not run_joints:
+        tests.append({'type': 'joint_junction_mesh',
+                      'file': 'joints that meet (the mesh split)',
+                      'method': '-', 'source': 'joint_junction',
+                      'entry': 'run_mesh_legs'})
+    if run_joints:
+        tests.append({'type': 'joint_junction',
+                      'file': 'joints that meet (junctions and closed forms)',
+                      'method': '-', 'source': 'joint_junction'})
+        tests.append({'type': 'joint_element',
+                      'file': 'the interface (joint) element (closed forms)',
+                      'method': '-', 'source': 'joint_element'})
+        # The path a MODEL takes to the element: the column, the mesher, the
+        # plots, the detail panel and the report, on one solve of the shipped
+        # reinforcement sample with two of its lines made joints in memory.
+        tests.append({'type': 'joint_surfaces',
+                      'file': 'a jointed line from the column to the report',
+                      'method': '-', 'source': 'joint_surfaces'})
 
     if args.skip_benchmarks:
         n_before = len(tests)

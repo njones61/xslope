@@ -275,31 +275,43 @@ def test_attribution():
     finally:
         P.companion_of = original
 
-    # And the real corpus pair the defect was found on, if it is in this checkout.
-    vp091 = os.path.join(_REPO, "docs/verification/files/rocscience/vp091.xlsx")
-    if os.path.exists(vp091):
-        real = [os.path.basename(p) for p in project_files(vp091)]
-        fem_results = [n for n in real if n.startswith("vp091_fem")]
+    # And a real corpus pair, if it is in this checkout. vp091/vp091_fem was the
+    # pair the defect was found on: vp091 carried the solved set and the naive
+    # longest-prefix rule handed it to the neighbouring workbook. The corpus no
+    # longer ships that shape — RS2-52's strength reduction moved onto vp091_fem,
+    # so the solved set moved with it — and vp032c/vp032c_fem is the pair that
+    # still has a real instance of the rule, in the other direction: the sibling's
+    # companions are the sibling's, and the plain workbook packs alone.
+    vp032c = os.path.join(_REPO, "docs/verification/files/rocscience/vp032c.xlsx")
+    vp032c_fem = os.path.join(_REPO,
+                              "docs/verification/files/rocscience/vp032c_fem.xlsx")
+    if os.path.exists(vp032c) and os.path.exists(vp032c_fem):
+        plain = [os.path.basename(p) for p in project_files(vp032c)]
+        if sorted(plain) != ["vp032c.xlsx"]:
+            fails.append(f"vp032c.xlsx collected {sorted(plain)}, and it has no "
+                         f"companions of its own: the sibling's set leaked into it")
+        sib = [os.path.basename(p) for p in project_files(vp032c_fem)]
+        fem_results = [n for n in sib if n.startswith("vp032c_fem_fem")]
         if len(fem_results) != 8:
-            fails.append(f"vp091.xlsx collected {len(fem_results)} of its 8 FEM "
-                         f"result files: {real}")
-        if "vp091_fem.xlsx" in real:
-            fails.append("vp091's package carries the neighbouring workbook")
+            fails.append(f"vp032c_fem.xlsx collected {len(fem_results)} of its 8 FEM "
+                         f"result files: {sib}")
+        if "vp032c.xlsx" in sib:
+            fails.append("vp032c_fem's package carries the neighbouring workbook")
         # And it survives the round trip as something the FEM loader can still read.
         # dest= throughout: the corpus is read here, never written to.
         from xslope.fem import import_fem_meta
 
-        before = import_fem_meta(os.path.splitext(vp091)[0])
-        pkg = xslope.pack(vp091, dest=_tmp())
-        book = xslope.unpack(pkg, dest=os.path.join(_tmp(), "vp091"))
+        before = import_fem_meta(os.path.splitext(vp032c_fem)[0])
+        pkg = xslope.pack(vp032c_fem, dest=_tmp())
+        book = xslope.unpack(pkg, dest=os.path.join(_tmp(), "vp032c_fem"))
         after = import_fem_meta(os.path.splitext(book)[0])
         if before is None:
-            fails.append("the vp091 fixture no longer carries an FEM solution")
+            fails.append("the vp032c_fem fixture no longer carries an FEM solution")
         elif after is None:
-            fails.append("vp091's FEM solution did not survive the round trip — the "
-                         "package arrived without the results")
+            fails.append("vp032c_fem's FEM solution did not survive the round trip — "
+                         "the package arrived without the results")
         elif _diff(before, after, "fem_meta"):
-            fails.append("vp091's FEM metadata came back changed: "
+            fails.append("vp032c_fem's FEM metadata came back changed: "
                          + "; ".join(_diff(before, after, "fem_meta")[:3]))
     return fails
 

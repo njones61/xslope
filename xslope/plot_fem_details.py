@@ -508,6 +508,120 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True, fit_height=True
     return fig
 
 
+#: The bands a joint detail figure's panels get, as fractions of the
+#: figure's width — the same shallow-and-wide rule the reinforcement panels
+#: follow. The bar's tension leads, because it is what the sheet is FOR; the
+#: three interface panels beneath it are what develops that tension. A line with
+#: no bar drops the first band and keeps the other three.
+JOINT_BANDS = (0.13, 0.11, 0.13, 0.11)
+
+C_JOINT_OPEN = "#e08214"   # a parted interface
+C_JOINT_SLIP = "#6a51a3"   # a sliding one
+
+
+def plot_joint_detail(profile, fig=None, fit_height=True):
+    """Draw the detail figure for one jointed line's interface onto ``fig``.
+
+    Four panels sharing one position axis, measured from end 1 of the line:
+
+    * the BAR's mobilized tension over its capacity — a reinforcement line that is
+      also a joint is a sheet, and the tension it carries is what the interface
+      beneath it developed, so the two are read on one figure. A line off the
+      joints sheet has no bar between its faces, and the figure is the three
+      interface panels alone;
+    * the NORMAL traction the interface carries, compression positive, with zero
+      marked: a station at zero has opened;
+    * the SHEAR traction with the Mohr-Coulomb limit ``c_j + t_n tan phi_j``
+      drawn beside it, so where the interface is AT its limit is where the two
+      curves meet rather than something a reader has to infer from a color;
+    * the SLIP, the accumulated tangential offset of the two faces.
+
+    Stations that are open or slipping are marked on the shear panel, which is
+    where the state is decided.
+    """
+    import matplotlib.pyplot as plt
+
+    if fig is None:
+        fig = plt.figure(figsize=(9.5, 7.5))
+    fig.clear()
+    u = profile.get("units", {}) or {}
+    bar_s = np.asarray(profile.get("bar_s", []), dtype=float)
+    bar_T = np.asarray(profile.get("bar_T", []), dtype=float)
+    bar_cap = np.asarray(profile.get("bar_cap", []), dtype=float)
+    # A line off the joints sheet has nothing between its faces, so there is no
+    # tension panel: three panels, not four.
+    has_bar = len(bar_s) > 0
+    bands = JOINT_BANDS if has_bar else JOINT_BANDS[1:]
+    axes = fig.subplots(len(bands), 1, sharex=True,
+                        gridspec_kw={"height_ratios": list(bands)})
+    if has_bar:
+        ax_T, ax_n, ax_s, ax_d = axes
+    else:
+        ax_T = None
+        ax_n, ax_s, ax_d = axes
+    s = np.asarray(profile["s"], dtype=float)
+
+    # --- the bar the interface carries -----------------------------------
+    if has_bar:
+        handles, labels = [], []
+        if len(bar_cap) == len(bar_s):
+            cap, = ax_T.step(bar_s, bar_cap, where="mid", linestyle="--",
+                             linewidth=1.3, color=C_ENVELOPE)
+            handles.append(cap)
+            labels.append("Bar capacity")
+        mob, = ax_T.plot(bar_s, bar_T, "-o", color=C_FORCE, linewidth=1.7,
+                         markersize=3.2)
+        handles.append(mob)
+        labels.append("Bar tension")
+        ax_T.legend(handles, labels, loc="best", fontsize=8, frameon=False)
+        ax_T.set_ylabel(_axis_label("Bar tension", u.get("force")), fontsize=9)
+        ax_T.grid(True, **GRID)
+
+    # --- normal traction ---------------------------------------------------
+    ax_n.axhline(0.0, color="0.6", linewidth=0.8)
+    ax_n.plot(s, profile["tn"], "-", color=C_FORCE, linewidth=1.5)
+    ax_n.set_ylabel(_axis_label("Normal traction\n(compression +)",
+                                u.get("stress")), fontsize=9)
+    ax_n.grid(True, **GRID)
+
+    # --- shear traction against its limit ----------------------------------
+    ts = np.abs(np.asarray(profile["ts"], dtype=float))
+    tlim = np.asarray(profile["tlim"], dtype=float)
+    lim, = ax_s.plot(s, tlim, "--", color=C_ENVELOPE, linewidth=1.3)
+    mob, = ax_s.plot(s, ts, "-", color=C_FORCE, linewidth=1.6)
+    h, l = [lim, mob], ["Mohr-Coulomb limit", "Shear traction"]
+    slipping = np.asarray(profile["slipping"], dtype=bool)
+    opened = np.asarray(profile["open"], dtype=bool)
+    if slipping.any():
+        m = ax_s.plot(s[slipping], ts[slipping], "o", color=C_JOINT_SLIP,
+                      markersize=4.5, linestyle="none")[0]
+        h.append(m)
+        l.append("Slipping")
+    if opened.any():
+        m = ax_s.plot(s[opened], ts[opened], "s", color=C_JOINT_OPEN,
+                      markersize=4.5, linestyle="none")[0]
+        h.append(m)
+        l.append("Open")
+    ax_s.legend(h, l, loc="best", fontsize=8, frameon=False)
+    ax_s.set_ylabel(_axis_label("Shear traction", u.get("stress")), fontsize=9)
+    ax_s.grid(True, **GRID)
+
+    # --- slip --------------------------------------------------------------
+    ax_d.axhline(0.0, color="0.6", linewidth=0.8)
+    ax_d.plot(s, profile["slip"], "-", color=C_JOINT_SLIP, linewidth=1.5)
+    ax_d.set_ylabel(_axis_label("Slip", u.get("length")), fontsize=9)
+    ax_d.grid(True, **GRID)
+    ax_d.set_xlabel(_axis_label("Position along line from end 1",
+                                u.get("length")))
+
+    for ax in axes:
+        _thin_ticks(ax, axis="y", nbins=4)
+    axes[0].set_title(_title(profile), fontsize=10.5)
+    if fit_height:
+        _fit_stacked_panels(fig, bands)
+    return fig
+
+
 # --------------------------------------------------------------------------
 # piles
 # --------------------------------------------------------------------------
@@ -828,4 +942,6 @@ def plot_detail(profile, fig=None, fit_height=True, **kwargs):
     """
     if profile.get("kind") == "pile":
         return plot_pile_detail(profile, fig=fig, fit_height=fit_height)
+    if profile.get("kind") == "joint":
+        return plot_joint_detail(profile, fig=fig, fit_height=fit_height)
     return plot_reinforcement_detail(profile, fig=fig, fit_height=fit_height, **kwargs)

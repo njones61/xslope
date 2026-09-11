@@ -86,7 +86,7 @@ def _row_text(entry):
     # against ("at capacity (moment vs Mcap)"), which is longer than the list is
     # wide and would be read truncated; it stays on the row's tooltip, where the
     # reinforcement meanings are too.
-    if entry.get("kind") == "reinforcement" and entry.get("status"):
+    if entry.get("kind") in ("reinforcement", "joint") and entry.get("status"):
         bits.append(entry["status"])
     return "   ".join(bits)
 
@@ -248,7 +248,8 @@ class FemDetailsDialog(QDialog):
             if entry["kind"] not in seen:
                 seen.add(entry["kind"])
                 head = QListWidgetItem(
-                    "Reinforcement" if entry["kind"] == "reinforcement" else "Piles")
+                    {"reinforcement": "Reinforcement", "joint": "Joints"}
+                    .get(entry["kind"], "Piles"))
                 head.setFlags(Qt.NoItemFlags)
                 f = head.font()
                 f.setBold(True)
@@ -282,6 +283,10 @@ class FemDetailsDialog(QDialog):
             self._profile = self._details.reinforcement_profile(
                 self._fem_data, self._solution, entry["index"], self._slope_data,
                 field_state=state, failure_solution=self._failure_solution)
+        elif entry["kind"] == "joint":
+            self._profile = self._details.joint_profile(
+                self._fem_data, self._solution, entry["index"], self._slope_data,
+                field_state=state, failure_solution=self._failure_solution)
         else:
             self._profile = self._details.pile_profile(
                 self._fem_data, self._solution, entry["index"], self._slope_data,
@@ -295,17 +300,20 @@ class FemDetailsDialog(QDialog):
 
         The map is of the member's OWN kind — a reinforcement line is placed
         among the reinforcement lines and a pile among the piles — and the
-        selected one is the one picked out.
+        selected one is the one picked out. A joint is placed among the
+        reinforcement lines: the interface runs along one of them, and its
+        index is that line's.
         """
         from xslope.plot_fem_details import plot_member_map
         fem_data, slope_data = self._fem_data, self._slope_data
         kind, index = entry["kind"], entry["index"]
+        map_kind = "reinforcement" if kind == "joint" else kind
 
         def _draw(fig):
             # Only the selected member is named. The panel is a column beside a
             # list, and six names in it land on each other's members; the list
             # is where the others are read.
-            plot_member_map(fem_data, slope_data, kind, highlight=index,
+            plot_member_map(fem_data, slope_data, map_kind, highlight=index,
                             fig=fig, labels=False)
 
         self._mapped = (kind, index)

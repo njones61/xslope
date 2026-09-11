@@ -461,10 +461,211 @@ line in both states at once is reported yielded, the more serious of the two. **
 $T_{res}$: a line that declares none cannot reach them.
 
 
+## Two Ways to Represent a Sheet
+
+Everything above is the **bonded bar**: the truss element shares the soil's own nodes, so the soil above the line
+and the soil below it are one body and the sheet cannot slide in the soil except by the bar reaching the capacity
+its embedment develops. "Bond" there is a cap on the tension, read from the pullout envelope at each element's
+position, and not a sliding surface.
+
+The alternative is the **joint**. Setting `Joint = Yes` on a reinforcement line makes that line a slip surface: the
+mesh is split along it, the sheet becomes a bar with its own nodes between an upper and a lower interface, and each
+interface carries the line's own `Adhesion` and `Delta` as a Mohr-Coulomb strength. The soil on the two sides can
+then slide on the sheet, and on each other, at that interface strength.
+
+```
+  bonded (the default)                joint (Joint = Yes)
+
+   soil above                         soil above
+   ----o----o----o----   the bar      ----o----o----o----  upper face nodes
+       |    |    |       shares       ~~~~~~~~~~~~~~~~~~~  upper interface
+   ----o----o----o----   these        ====b====b====b====  bar nodes (their own)
+   soil below            nodes        ~~~~~~~~~~~~~~~~~~~  lower interface
+                                      ----o'---o'---o'---  lower face nodes
+                                      soil below           (all three at one point)
+```
+
+Every node on a jointed line exists three times at the same point — a copy for the soil above, a copy for the bar,
+a copy for the soil below — and two interface elements connect them at each station: the soil above against the
+bar, and the bar against the soil below. On a quadratic mesh the midside nodes are tripled too, so an interface
+element has three node pairs and matches the adjacent triangles' edges. The split is invisible on a mesh plot,
+because the three copies stand at one point; the jointed line is drawn in its input style with short ticks on both
+sides so it can be told from a bonded one.
+
+### The interface element
+
+Each interface element is a zero-thickness joint (Goodman, Taylor & Brekke, 1968). Its state is the relative
+displacement of the two faces, resolved into a normal component $\Delta_n$ (closing, compression positive) and a
+tangential component $\Delta_t$ (sliding), and its constitutive law is a traction-displacement relation:
+
+$$
+t_n = k_n \Delta_n, \qquad t_s = k_s \Delta_t, \qquad |t_s| \le c_j + t_n \tan\phi_j
+$$
+
+with $c_j$ and $\phi_j$ the line's `Adhesion` and `Delta`. Slip past the limit is perfectly plastic: the shear
+traction stays at the limit while the tangential offset grows. A normal traction below the tension cutoff — zero on
+a reinforcement line, because a soil-geosynthetic contact carries no tension — **opens** the joint, which then
+carries neither traction until the faces come back into contact.
+
+The tractions are integrated at the element's own nodes rather than at Gauss points. Gauss quadrature on a
+zero-thickness interface produces traction oscillations that grow with the penalty stiffness; nodal integration
+does not, and the traction spread along an element measured on the direct-shear case *falls* from 15% to 1.8% when
+$k_n$ is multiplied by a hundred.
+
+$k_n$ and $k_s$ are penalty stiffnesses: large enough that an intact joint does not visibly deform, small enough
+not to ill-condition the system. Left blank they are derived as $E_{adj}/d_v$ and $G_{adj}/d_v$ over a virtual
+thickness $d_v = 0.1\,L_{1D}$, with $E_{adj}$ and $G_{adj}$ those of the softer of the two soils the element stands
+between. The factor of safety is insensitive to them — it moves by about 1.5% over two orders of magnitude — but
+the **cost** is not: the slip a viscoplastic sweep puts into a joint is the excess traction divided by $k_s$, so a
+model that states a $k_n$ / $k_s$ an order of magnitude above the derived default needs its iteration limit raised
+by the same factor, or the strength reduction reports the iteration budget instead of the slope.
+
+### Ends, ties and the bar
+
+The two soil faces rejoin at each end of the line: one shared soil node, a crack tip. The bar's end node is not
+that node — it is the bar's own, connected to the soil only through the interfaces along it — so **a sheet end is
+free by default**. It carries no load, it can pull out, and the tension the bar develops at any station is the
+interface shear integrated from the free end, which is the pullout envelope produced by the elements instead of by
+hand.
+
+An end is **tied** when that end's `Tend1` / `Tend2` is filled in: a spring from the bar's end node to the soil (or
+facing) node at the same point, perfectly plastic at the stated capacity, restraining both components with the
+capacity read on the resultant. That is what those columns have always meant, and it is how a wall sheet is
+connected to its facing.
+
+On a jointed line the bar keeps its own law — tension only, rupture at $T_{max}$, softening to $T_{res}$ where
+stated — **minus the bond-slip cap**. The grip on the soil is now the interface traction the joints integrate, so
+applying the pullout envelope as well would count it twice; `Lp1` and `Lp2` are not read there. Preflight says so.
+
+### Strength reduction
+
+A strength reduction divides $c_j$ and $\tan\phi_j$ by the trial factor along with the soil's, on every jointed
+line unless that line sets `Jred = No`. The stiffnesses $k_n$ and $k_s$, the ties and $T_{max}$ are structural and
+are not reduced, exactly as the bar's properties are not.
+
+A jointed model takes the viscoplastic solver's verdict directly: the Newton corrector is not offered one. On a
+slipping interface the shear traction is held at $c_j + t_n \tan\phi_j$ and does not depend on the tangential
+displacement, so a state the viscoplastic loop reached by growing the slip leaves a corrector — which may only move
+displacements — with nothing to move.
+
+## Joints Without Reinforcement
+
+Not every slip surface has a sheet in it. A rock joint, a bedding plane, the contact between a concrete facing block
+and the one beneath it, the back of a retaining wall against the soil it holds: each is a surface two bodies meet on
+and can slide along, with no member between them. Those go on the **joints** worksheet, one row per line:
+
+| column | what it is |
+|---|---|
+| `Label` | the name the plots, the details view and the report use |
+| `x1`, `y1`, `x2`, `y2` | the line's endpoints |
+| `c` | the interface's cohesion (blank = 0) |
+| `phi` | its friction angle, in degrees — required |
+| `t_cut` | the tension cutoff at which the two faces part (blank = 0) |
+| `kn`, `ks` | the penalty stiffnesses (blank = derived, as above) |
+| `Jred` | blank or **Yes** reduces the joint with the soil in a strength reduction; **No** holds it |
+
+The mesh split, the interface element, its constitutive law, the derived stiffnesses and the strength reduction are
+all exactly what a jointed reinforcement line gets, described above. The one difference is that there is no bar
+between the two faces, so a station carries two coincident nodes instead of three and **one** interface element
+spans them instead of two:
+
+```
+  Joint = Yes on a sheet             a joints-sheet line
+
+   ----o----o----o----  upper        ----o----o----o----  upper face nodes
+   ~~~~~~~~~~~~~~~~~~~  interface    ~~~~~~~~~~~~~~~~~~~  the interface
+   ====b====b====b====  the bar      ----o'---o'---o'---  lower face nodes
+   ~~~~~~~~~~~~~~~~~~~  interface
+   ----o'---o'---o'---  lower
+```
+
+A sheet's two interfaces act in series, so the pair carries the stated stiffness twice over; a joints-sheet line
+carries it once, which is what a single contact is. Neither difference reaches the strength: `c` and `phi` are the
+Mohr-Coulomb limit the faces slide at either way. The tension cutoff is a column of its own here, where a
+reinforcement line's is fixed at zero, because a rock joint may hold a little tension across it and a
+soil-geosynthetic contact does not.
+
+Joint lines may **meet** — at a T, at a crossing, at a corner, end to end. Where they do, the mesh split counts the
+wedges of material around the shared node and gives the node one copy per wedge, so each element keeps the material
+on its own side of every line through the point. That is what makes a block column with a joint on its back face, a
+joint under its base and a course joint at every mortar line into a stack that can slide, part and rock, rather than
+a notched solid. What they may not do is lie **on** one another over a stretch, or run along the outside of the
+section, where there is material on one side only and nothing for the other face to be; preflight refuses both by
+name.
+
+A joint line is finite element geometry: the limit equilibrium engines do not read the joints worksheet at all.
+
+### Both kinds in one model
+
+A model may carry both, and the multi-tiered geotextile wall is the case that needs both at once: each sheet is a
+reinforcement line with `Joint = Yes`, so the fill can slide on it while the sheet still carries tension, and each
+facing column stands on joints-sheet lines that let the blocks slide on each other, on the fill behind them and on
+the foundation beneath. A sheet whose front end stops on the back face of a column is **tied** there, and the tie
+takes the material the line runs into past its end — the column — so the wrap's connection to the facing is what the
+tie represents.
+
+## Bonded Bar or Joint?
+
+The choice is about the mechanism, not about the material: does the slip surface **cut** the reinforcement, or run
+**along** it?
+
+**A bonded bar is right where the surface crosses the layers.** A circle through a geogrid slope, a nail wall, a
+pile row: the soil on both sides of each layer moves together, the layer carries tension across the surface, and
+the only interface question is pullout, which is a capacity the bar's cap answers. It is the finite element twin of
+the limit equilibrium treatment — a force where the surface crosses the line — so the two engines compare like for
+like.
+
+**A joint is right where the surface can run along the layer.** A reinforced embankment on soft clay sliding on
+its base geotextile, a wrapped-face or block-faced wall where the fill between the sheets moves relative to them
+and each sheet anchors to a facing, a smooth geomembrane or liner whose interface friction is well below the soil's,
+any long flat sheet under a sliding mass. The interface shear strength along the sheet governs, the two sides move
+differently, and a bonded bar cannot represent it: it reports the bars at their cap while the mesh decides the
+answer.
+
+Joints are off by default, because tripled nodes and a penalty stiffness cost something. On a wall or a base sheet,
+running both ways settles it: a bonded answer that matches the jointed one says the mechanism is crossing, and one
+that sits above it says the mechanism was sliding and the bond was holding it up.
+
+### What says a joint was needed
+
+Preflight cannot know the mechanism, but four of these cases show in the inputs, and it reports each of them as a
+warning naming the line:
+
+- a sheet **lying on a material boundary** over most of its length — the base geotextile of a reinforced
+  embankment, which slides on its own interface;
+- a **long, flat sheet** within a few degrees of horizontal spanning most of the width of the zone above it;
+- a **smooth interface**, `Delta` below about 0.6 of the surrounding soil's $\phi$ — a geomembrane or liner rather
+  than an ordinary soil-geosynthetic contact;
+- the **wall pattern**: four or more near-horizontal sheets at a vertical spacing under a meter, behind a face at
+  least 70° steep, with their front ends inside a thin facing column.
+
+Two stronger signals come out of a bonded run itself, and a strength reduction reports them when it finds them: the
+shear strain band at the critical factor running **along** a sheet rather than across it, and **every bar element
+on one sheet at its capacity** — a sheet held up by a cap the bond set rather than by a grip the mesh resolved,
+which refines as the bar elements refine instead of converging.
+
+### What the results show
+
+The results view draws each interface on the line it runs along, colored by its state — intact, slipping or open —
+with a colorbar for how far the two faces have slid. A joint carries no strain of its own, so it appears in the
+shear-strain field only through what it does to the soil beside it; this is its own reading. The deformed mesh and
+the at-failure capture show the two faces at their own displaced positions, which is what a slipped joint looks
+like: the mass sliding on the sheet.
+
+**1D Details…** lists every jointed line under a *Joints* heading beside the reinforcement lines, and draws four
+panels along the line: the bar's tension over its capacity, the normal traction the interface carries, the shear
+traction with the Mohr-Coulomb limit $c_j + t_n \tan\phi_j$ drawn beside it, and the slip. Where the two shear
+curves meet is where the interface is at its limit. A generated report carries the same reading as a table: the
+share of each line's length standing at its limit, and the largest offset the two faces reached.
+
 ## References
 
 Duncan, J.M., & Wright, S.G. (2005). *Soil Strength and Slope Stability*. John Wiley & Sons.
 
 Griffiths, D.V., & Lane, P.A. (1999). Slope stability analysis by finite elements. *Geotechnique*, 49(3), 387-403.
+
+Goodman, R.E., Taylor, R.L., & Brekke, T.L. (1968). A model for the mechanics of jointed rock. *Journal of the Soil Mechanics and Foundations Division*, 94(SM3), 637-659.
+
+Schellekens, J.C.J., & de Borst, R. (1993). On the numerical integration of interface elements. *International Journal for Numerical Methods in Engineering*, 36(1), 43-66.
 
 Smith, I.M., & Griffiths, D.V. (2004). *Programming the Finite Element Method* (4th ed.). John Wiley & Sons.

@@ -1,7 +1,8 @@
 from pathlib import Path
 from xslope.fem import build_fem_data, solve_fem, solve_ssrm, print_reinforcement_summary, print_pile_summary, print_detailed_element_summary, export_fem_solution
 from xslope.fileio import load_slope_data
-from xslope.mesh import get_material_polygons, build_mesh_from_polygons, export_mesh_to_json, extract_constraint_line_geometry, extract_size_regions
+from xslope.mesh import (get_material_polygons, build_mesh_from_polygons, export_mesh_to_json,
+                         extract_constraint_line_geometry, extract_size_regions, extract_joint_options)
 from xslope.plot import plot_inputs
 from xslope.plot_fem import plot_fem_results, plot_fem_data
 
@@ -35,7 +36,8 @@ else:
 
     mesh = build_mesh_from_polygons(polygons, target_size=target_size, element_type=element_type, lines=constraint_lines,
                                     element_size_1d=slope_data.get('element_size_1d'),
-                                    size_regions=extract_size_regions(slope_data))
+                                    size_regions=extract_size_regions(slope_data),
+                                    joint_lines=extract_joint_options(slope_data))
     mesh_file = input_path.parent / f"{input_path.stem}_mesh.json"
     export_mesh_to_json(mesh, mesh_file)
 

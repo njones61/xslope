@@ -1292,6 +1292,36 @@ class _Ctx:
         return f"{base} ('{name}')" if name else base
 
     @property
+    def joints(self):
+        """The ``joints`` sheet's lines -- endpoints plus interface properties."""
+        return list(self.sd.get("joint_lines") or [])
+
+    @property
+    def fem_iteration_budget(self):
+        """The most viscoplastic sweeps one finite element trial of this run may
+        take, or ``None`` where the run does not say.
+
+        Not the stated number on its own: ``solve_fem`` extends a budget that is
+        still making progress and takes ``max(max_iterations_ceiling,
+        max_iterations)``, so a run asking for 12 000 actually reaches 50 000, and
+        only a request above the ceiling raises it. What a rule about the budget
+        has to compare against is that effective figure.
+        """
+        want = _num(self.selection.get("max_iterations"))
+        ceiling = _num(self.selection.get("max_iterations_ceiling"))
+        if want is None and ceiling is None:
+            return None
+        return int(max(want or 0, ceiling or 50000))
+
+    def joint_label(self, i):
+        try:
+            name = self.joints[i].get("label")
+        except (IndexError, AttributeError):
+            name = None
+        base = f"Joint line {i + 1}"
+        return f"{base} ('{name}')" if name else base
+
+    @property
     def surfaces(self):
         """The failure-surface geometries this deck DEFINES, for engagement tests.
 
@@ -5103,6 +5133,617 @@ def _pile_no_engagement(ctx):
             f"this file defines, so no pile force enters this run. A pile that stops "
             f"above the surface, or sits outside its x-range, is silently inert "
             f"{_AT_PILES}.")
+
+
+
+
+# ---------------------------------------------------------------------------
+# Family: interface (joint) elements
+#
+# `Joint = Yes` on a reinforcement line makes that line a SLIP SURFACE: the
+# finite element mesh splits along it and a pair of interface elements carries
+# the sheet's grip on the soil, in place of the bond cap a bonded bar carries.
+# Three groups of rules live here.
+#
+# The ERRORS are the phase-1 geometry the mesher refuses, brought forward so the
+# line is named before the mesh build raises, plus the one input the interface
+# law cannot do without.
+#
+# The WARNINGS are the other half: a line left BONDED whose geometry or strength
+# says the slip surface is likely to run ALONG it rather than across it. None of
+# them is a defect -- a bonded bar is the right model wherever the surface cuts
+# the layer -- so each names the line and says a joint is the likelier model.
+# They are asked only of a line the finite element engine can model at all: a
+# line with no E and no Area is refused outright by reinforce.fem_incomplete,
+# and a second opinion about how to represent it would be noise.
+#
+# The INFO says which bonded-bar inputs a jointed line stops reading.
+# ---------------------------------------------------------------------------
+
+#: How much of a sheet has to lie on a material boundary before the boundary is
+#: read as the thing it is lying on. The base-geotextile case puts the whole
+#: sheet on the contact; a sheet that merely CROSSES one touches a few percent.
+_JOINT_BOUNDARY_FRAC = 0.5
+
+#: How flat a sheet has to be, and how much of its host zone it has to span,
+#: for the "long flat sheet under the mass" reading. The corpus's widest bonded
+#: sheet spans 0.60 of its zone, so the span threshold is above every bonded
+#: model in it and below a base sheet that runs the width of the fill.
+_JOINT_FLAT_DEG = 5.0
+_JOINT_SPAN_FRAC = 0.75
+
+#: Delta below this fraction of the surrounding soil's phi is a smooth
+#: interface -- a geomembrane or a liner -- rather than an ordinary
+#: soil-geosynthetic contact.
+_JOINT_SMOOTH_FRAC = 0.6
+
+#: The wall pattern: at least this many near-horizontal sheets, at a median
+#: vertical spacing at or under _JOINT_WALL_SPACING (meters; scaled by
+#: units.LENGTH_PER_METRE for an imperial file), behind a face at least this
+#: steep, with their front ends inside a facing column no wider than
+#: _JOINT_WALL_FACING_FRAC of the sheet length.
+_JOINT_WALL_MIN_SHEETS = 4
+_JOINT_WALL_SPACING = 1.0
+_JOINT_WALL_FACE_DEG = 70.0
+_JOINT_WALL_FACING_FRAC = 0.2
+_JOINT_NEAR_HORIZONTAL_DEG = 10.0
+
+
+def _joint_meter(ctx):
+    """One meter in the file's own length unit."""
+    from .units import normalize_unit_system
+    return 3.28084 if normalize_unit_system(
+        ctx.sd.get("unit_system")) == "imperial" else 1.0
+
+
+def _joint_seg(r):
+    """A reinforcement line's two endpoints, or ``None`` when they are unusable."""
+    try:
+        p1 = (float(r["x1"]), float(r["y1"]))
+        p2 = (float(r["x2"]), float(r["y2"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+    if p1 == p2:
+        return None
+    return p1, p2
+
+
+def _joint_inclination(seg):
+    """A segment's inclination from horizontal, in degrees, 0 to 90."""
+    (x1, y1), (x2, y2) = seg
+    a = abs(math.degrees(math.atan2(y2 - y1, x2 - x1)))
+    return min(a, 180.0 - a)
+
+
+def _joint_zone_rings(ctx):
+    """The model's material zones as shapely polygons, with their material ids."""
+    def _build():
+        out = []
+        for p in (ctx.sd.get("polygons") or []):
+            poly = p.get("polygon") if isinstance(p, dict) else None
+            if poly is None or poly.is_empty:
+                continue
+            out.append((poly, p.get("mat_id")))
+        return out
+    return ctx._c("joint_zone_rings", _build)
+
+
+def _joint_shared_boundaries(ctx):
+    """The union of the model's MATERIAL boundaries, or ``None``.
+
+    A contact between two zones, not the outside of the domain: it is built from
+    the pairwise intersections of the zone boundaries, so a sheet lying on the
+    ground surface or on the domain floor does not read as lying on one.
+    """
+    def _build():
+        from shapely.ops import unary_union
+        rings = [poly for poly, _ in _joint_zone_rings(ctx)]
+        parts = []
+        for i in range(len(rings)):
+            for j in range(i + 1, len(rings)):
+                try:
+                    inter = rings[i].boundary.intersection(rings[j].boundary)
+                except Exception:
+                    continue
+                if not inter.is_empty:
+                    parts.append(inter)
+        if not parts:
+            return None
+        try:
+            return unary_union(parts)
+        except Exception:
+            return None
+    return ctx._c("joint_shared_bnd", _build)
+
+
+def _joint_zone_at(ctx, x, y):
+    """``(polygon, mat_id)`` of the zone holding a point, or ``(None, None)``."""
+    from shapely.geometry import Point
+    pt = Point(x, y)
+    for poly, mid in _joint_zone_rings(ctx):
+        try:
+            if poly.buffer(1e-9).contains(pt):
+                return poly, mid
+        except Exception:
+            continue
+    return None, None
+
+
+def _joint_boundary_fraction(ctx, seg):
+    """How much of a sheet's length lies on a material boundary, 0 to 1."""
+    from shapely.geometry import LineString
+    shared = _joint_shared_boundaries(ctx)
+    if shared is None:
+        return 0.0
+    line = LineString(list(seg))
+    L = line.length
+    if L <= 0:
+        return 0.0
+    try:
+        return float(line.intersection(shared.buffer(max(1e-9, 1e-3 * L))).length) / L
+    except Exception:
+        return 0.0
+
+
+def _joint_candidate_lines(ctx):
+    """``(index, line, segment)`` for every BONDED reinforcement line the finite
+    element engine can model.
+
+    A line already flagged ``Joint`` is not a candidate -- the reading has been
+    made -- and neither is one with no axial stiffness, which no finite element
+    run reaches.
+    """
+    from .mesh import line_is_jointed
+    out = []
+    for i, r in enumerate(ctx.reinforcement):
+        if line_is_jointed(r):
+            continue
+        E, area = _num(r.get("E")), _num(r.get("area"))
+        if E is None or E <= 0 or area is None or area <= 0:
+            continue
+        seg = _joint_seg(r)
+        if seg is None:
+            continue
+        out.append((i, r, seg))
+    return out
+
+
+def _joint_lines(ctx):
+    """``(index, line, segment)`` for every reinforcement line flagged
+    ``Joint = Yes`` — the lines that carry a bar between their two faces."""
+    from .mesh import line_is_jointed
+    out = []
+    for i, r in enumerate(ctx.reinforcement):
+        if not line_is_jointed(r):
+            continue
+        seg = _joint_seg(r)
+        if seg is not None:
+            out.append((i, r, seg))
+    return out
+
+
+def _all_joint_lines(ctx):
+    """``(label, line, segment)`` for every line the mesh will split along.
+
+    Both sources in one list, in the order the mesher numbers them: the
+    reinforcement lines whose ``Joint`` column reads yes, then the ``joints``
+    sheet's own lines. Every rule about what a split can represent asks this,
+    because the split does not care which sheet the line came from.
+    """
+    out = [(ctx.reinf_label(i), r, seg) for i, r, seg in _joint_lines(ctx)]
+    for i, j in enumerate(ctx.joints):
+        seg = _joint_seg(j)
+        if seg is not None:
+            out.append((ctx.joint_label(i), j, seg))
+    return out
+
+
+_AT_JOINTS = "(joints sheet)"
+
+
+# ---- the errors: what phase 1 cannot mesh, and what it cannot solve ---------
+
+@rule("joint.no_interface_strength", ERROR, ("fem",),
+      "A jointed line's interface strength is its Adhesion and Delta.",
+      fields=("adhesion", "delta"))
+def _joint_no_strength(ctx):
+    for i, r, _seg in _joint_lines(ctx):
+        a, d = _num(r.get("adhesion")), _num(r.get("delta"))
+        if a is not None and d is not None:
+            continue
+        missing = " and ".join(
+            [n for n, v in (("Adhesion", a), ("Delta", d)) if v is None])
+        yield (f"{ctx.reinf_label(i)} sets Joint = Yes and leaves {missing} "
+               f"blank. The interface elements the mesh split puts on either "
+               f"side of the sheet take their Mohr-Coulomb strength from those "
+               f"two columns and from nowhere else, so a blank one is a "
+               f"frictionless, cohesionless interface: the sheet would slide "
+               f"free of the soil under any load at all. Fill both, or clear "
+               f"Joint to model the line as a bonded bar {_AT_REINF}.")
+
+
+@rule("joint.phi_missing", ERROR, ("fem",),
+      "A joint line's friction angle has no default.",
+      fields=("phi",))
+def _joint_phi_missing(ctx):
+    for i, j in enumerate(ctx.joints):
+        phi = _num(j.get("phi"))
+        if phi is not None:
+            continue
+        yield (f"{ctx.joint_label(i)} leaves phi blank. The interface elements "
+               f"the mesh split puts between the two faces take their "
+               f"Mohr-Coulomb strength from c and phi, and c alone defaults to "
+               f"zero, so a blank phi is a frictionless interface the two sides "
+               f"slide along under any load at all. Enter the joint's friction "
+               f"angle in degrees {_AT_JOINTS}.")
+
+
+@rule("joint.no_strength", ERROR, ("fem",),
+      "A joint with neither cohesion nor friction has no strength at all.",
+      fields=("c", "phi"))
+def _joint_no_strength_sheet(ctx):
+    for i, j in enumerate(ctx.joints):
+        c = _num(j.get("c")) or 0.0
+        phi = _num(j.get("phi"))
+        if phi is None:
+            continue                     # the phi rule names it
+        if c > 0.0 or phi > 0.0:
+            continue
+        yield (f"{ctx.joint_label(i)} states c = 0 and phi = 0. The mesh splits "
+               f"along the line and the two faces meet on that strength and on "
+               f"nothing else, so this interface carries no shear at all and the "
+               f"material on either side of it is free to slide. Enter the "
+               f"joint's cohesion, its friction angle, or both {_AT_JOINTS}.")
+
+
+@rule("joint.outside_domain", ERROR, ("fem",),
+      "A joint line has to lie in the section it splits.")
+def _joint_outside_domain(ctx):
+    from shapely.geometry import LineString
+    from shapely.ops import unary_union
+    rings = [poly for poly, _ in _joint_zone_rings(ctx)]
+    if not rings:
+        return
+    try:
+        body = unary_union(rings)
+    except Exception:
+        return
+    for i, j in enumerate(ctx.joints):
+        seg = _joint_seg(j)
+        if seg is None:
+            continue
+        g = LineString(list(seg))
+        if g.length <= 0:
+            yield (f"{ctx.joint_label(i)} has the same point at both ends. A "
+                   f"joint is a surface between two bodies and needs two "
+                   f"distinct endpoints {_AT_JOINTS}.")
+            continue
+        tol = max(1e-9, 1e-6 * g.length)
+        inside = g.intersection(body.buffer(tol)).length
+        if inside >= (1.0 - 1e-6) * g.length:
+            continue
+        outside = g.length - inside
+        yield (f"{ctx.joint_label(i)} runs from ({seg[0][0]:g}, {seg[0][1]:g}) "
+               f"to ({seg[1][0]:g}, {seg[1][1]:g}), and {outside:.4g} of its "
+               f"{g.length:.4g} length lies outside the material zones. The mesh "
+               f"can only split where there is material to split, so the part "
+               f"outside is a line the mesher has nothing to recover. Move the "
+               f"endpoints onto the section {_AT_JOINTS}.")
+
+
+@rule("joint.on_domain_boundary", ERROR, ("fem",),
+      "A joint needs material on both sides; the outside of the section has one.")
+def _joint_on_domain_boundary(ctx):
+    from shapely.geometry import LineString
+    from shapely.ops import unary_union
+    rings = [poly for poly, _ in _joint_zone_rings(ctx)]
+    if not rings:
+        return
+    try:
+        edge = unary_union(rings).boundary
+    except Exception:
+        return
+    span = 1.0
+    try:
+        xs = unary_union(rings).bounds
+        span = max(xs[2] - xs[0], xs[3] - xs[1], 1.0)
+    except Exception:
+        pass
+    tol = 1e-6 * span
+    for label, _row, seg in _all_joint_lines(ctx):
+        g = LineString(list(seg))
+        if g.length <= 0:
+            continue
+        try:
+            shared = g.intersection(edge.buffer(tol)).length
+        except Exception:
+            continue
+        # An END on the outside is normal — a sheet reaching the face, a course
+        # joint stopping on it — and each such touch picks up about one buffer
+        # width. What is refused is a STRETCH of the line running along the
+        # outside, which is a line with material on one side only.
+        if shared <= max(0.02 * g.length, 4.0 * tol):
+            continue
+        yield (f"{label} lies on the outside of the section over "
+               f"{shared:.4g} of its {g.length:.4g} length. A joint is an "
+               f"interface between two bodies and the split needs a mesh edge "
+               f"with an element on each side of it; on the outer boundary "
+               f"there is material on one side only, and nothing for the other "
+               f"face of the joint to be. Move the line inside the section, or "
+               f"— if what is wanted is a free face — model it as a boundary "
+               f"rather than as a joint.")
+
+
+@rule("joint.iteration_budget_low", WARNING, ("fem",),
+      "A jointed model needs tens of thousands of sweeps to reach equilibrium.")
+def _joint_budget_low(ctx):
+    from .joint import JOINT_DECIDED_BUDGET
+    lines = _all_joint_lines(ctx)
+    if not lines:
+        return
+    budget = ctx.fem_iteration_budget
+    if budget is None or budget >= JOINT_DECIDED_BUDGET:
+        return
+    n_reinf = sum(1 for _l, _r, _s in _joint_lines(ctx))
+    what = (f"{len(lines)} lines are modeled as joints"
+            if len(lines) > 1 else "one line is modeled as a joint")
+    if n_reinf and n_reinf < len(lines):
+        what += (f" ({n_reinf} on the reinforce sheet, "
+                 f"{len(lines) - n_reinf} on the joints sheet)")
+    yield (f"{what[0].upper()}{what[1:]}, and this run allows {budget:,} "
+           f"viscoplastic sweeps. A joint reaches equilibrium by growing slip, a "
+           f"little per sweep, so a jointed model settles over tens of thousands "
+           f"of sweeps where a bonded one settles over hundreds. A strength "
+           f"reduction trial that runs out of sweeps is recorded as undecided, "
+           f"the bracket reads that as not standing, and the factor of safety "
+           f"comes out low — a reading of the budget rather than of the slope. "
+           f"Allow at least {JOINT_DECIDED_BUDGET:,}: it costs almost nothing, "
+           f"because a trial that decides stops.")
+
+
+@rule("joint.lines_meet", ERROR, ("fem",),
+      "Two jointed lines cannot lie on one another: one edge, one interface law.")
+def _joint_lines_meet(ctx):
+    from shapely.geometry import LineString
+    lines = _all_joint_lines(ctx)
+    for a in range(len(lines)):
+        la, _ra, sa = lines[a]
+        ga = LineString(list(sa))
+        for b in range(a + 1, len(lines)):
+            lb, _rb, sb = lines[b]
+            gb = LineString(list(sb))
+            if not ga.intersects(gb):
+                continue
+            shared = ga.intersection(gb)
+            tol = max(1e-9, 1e-6 * max(ga.length, gb.length))
+            if shared.geom_type == 'Point' or shared.length <= tol:
+                continue          # a junction: the mesh split builds it
+            yield (f"{la} and {lb} are both joints and lie on one another over "
+                   f"{shared.length:.4g} of their length. Two jointed lines may "
+                   f"MEET — where they do, the mesh split copies the shared node "
+                   f"once per wedge of material around it — but they cannot "
+                   f"share a stretch: the mesh has one edge chain there and it "
+                   f"carries one interface law. Make the overlapping stretch one "
+                   f"line.")
+
+
+@rule("joint.crosses_constraint_line", ERROR, ("fem",),
+      "A jointed line cannot cross another reinforcement or pile line.")
+def _joint_crosses(ctx):
+    from shapely.geometry import LineString
+    jointed = _all_joint_lines(ctx)
+    if not jointed:
+        return
+    jointed_labels = set(label for label, _r, _s in jointed)
+    others = []
+    for i, r in enumerate(ctx.reinforcement):
+        seg = _joint_seg(r)
+        if seg is not None:
+            others.append((ctx.reinf_label(i), seg, "reinforcement"))
+    for i, p in enumerate(ctx.piles):
+        seg = _joint_seg(p)
+        if seg is not None:
+            others.append((ctx.pile_label(i), seg, "pile"))
+    for lj, _rj, sj in jointed:
+        gj = LineString(list(sj))
+        for label, so, kind in others:
+            if label in jointed_labels:
+                continue          # two joints meeting is allowed; overlap has its own rule
+            if not gj.intersects(LineString(list(so))):
+                continue
+            yield (f"{lj} is a joint and touches {label}. The mesh splits along "
+                   f"a jointed line and every node on it is copied once per "
+                   f"wedge of material around it, so the {kind} line's own "
+                   f"element would keep one wedge's copy and lose the material "
+                   f"on the other side of the joint. Move the lines apart, or "
+                   f"make the {kind} line a joint too.")
+
+
+@rule("joint.line_load_on_line", ERROR, ("fem",),
+      "A line load cannot be applied on a jointed line: the node is copied.")
+def _joint_line_load(ctx):
+    from shapely.geometry import LineString, Point
+    jointed = _all_joint_lines(ctx)
+    if not jointed:
+        return
+    for lj, _rj, sj in jointed:
+        g = LineString(list(sj))
+        tol = max(1e-9, 1e-6 * g.length)
+        for k, ll in enumerate(ctx.sd.get("line_loads") or []):
+            try:
+                pt = Point(float(ll["x"]), float(ll["y"]))
+            except (KeyError, TypeError, ValueError):
+                continue
+            if g.distance(pt) > tol:
+                continue
+            yield (f"Line load {k + 1} is applied at "
+                   f"({pt.x:g}, {pt.y:g}), which lies on {lj} — a joint. The "
+                   f"mesh splits there, so that point becomes several nodes and "
+                   f"there is no single node for the load to act on. Move the "
+                   f"load clear of the line (dloads sheet, line loads).")
+
+
+# ---- the warnings: a bonded line the mechanism may run along ----------------
+
+@rule("joint.likely_on_material_boundary", WARNING, ("fem",),
+      "A sheet lying on a material boundary is where a slip surface goes.")
+def _joint_signal_boundary(ctx):
+    for i, _r, seg in _joint_candidate_lines(ctx):
+        frac = _joint_boundary_fraction(ctx, seg)
+        if frac < _JOINT_BOUNDARY_FRAC:
+            continue
+        yield (f"{ctx.reinf_label(i)} lies on a material boundary over "
+               f"{frac * 100:.0f}% of its length and is modeled as a bonded "
+               f"bar, so the soil above it and the soil below it move together "
+               f"and the only way the sheet can be passed is for the bar to "
+               f"reach its capacity. A sheet on a contact is where the surface "
+               f"goes: the base geotextile of a reinforced embankment slides on "
+               f"its own interface. Joint = Yes splits the mesh along the line "
+               f"and lets the two sides move on the Adhesion/Delta interface "
+               f"instead {_AT_REINF}.")
+
+
+@rule("joint.likely_flat_sheet", WARNING, ("fem",),
+      "A long, flat sheet under the mass is a sliding plane, not a tie.")
+def _joint_signal_flat(ctx):
+    for i, _r, seg in _joint_candidate_lines(ctx):
+        if _joint_inclination(seg) > _JOINT_FLAT_DEG:
+            continue
+        (x1, y1), (x2, y2) = seg
+        poly, _mid = _joint_zone_at(ctx, (x1 + x2) / 2.0,
+                                    (y1 + y2) / 2.0 + 1e-6)
+        if poly is None:
+            continue
+        xmin, _ymin, xmax, _ymax = poly.bounds
+        width = xmax - xmin
+        if width <= 0:
+            continue
+        span = abs(x2 - x1) / width
+        if span < _JOINT_SPAN_FRAC:
+            continue
+        yield (f"{ctx.reinf_label(i)} is within {_JOINT_FLAT_DEG:g} degrees of "
+               f"horizontal and spans {span * 100:.0f}% of the width of the "
+               f"zone above it, and is modeled as a bonded bar. A sheet that "
+               f"long and that flat under a mass is a plane the mass can slide "
+               f"ON, and a bonded bar cannot represent that: it reports the "
+               f"bars at their capacity while the mesh decides the answer. "
+               f"Joint = Yes makes the sheet a slip surface with the "
+               f"Adhesion/Delta interface strength {_AT_REINF}.")
+
+
+@rule("joint.likely_smooth_interface", WARNING, ("fem",),
+      "Delta well below the soil's phi is a liner, not a soil contact.",
+      fields=("delta",))
+def _joint_signal_smooth(ctx):
+    for i, r, seg in _joint_candidate_lines(ctx):
+        d = _num(r.get("delta"))
+        if d is None or d <= 0:
+            continue
+        (x1, y1), (x2, y2) = seg
+        _poly, mid = _joint_zone_at(ctx, (x1 + x2) / 2.0, (y1 + y2) / 2.0)
+        if mid is None or not (0 <= mid < len(ctx.materials)):
+            continue
+        phi = _num(ctx.materials[mid].get("phi"))
+        if phi is None or phi <= 0:
+            continue
+        if d >= _JOINT_SMOOTH_FRAC * phi:
+            continue
+        yield (f"{ctx.reinf_label(i)} has Delta = {d:g} degrees against the "
+               f"{phi:g} degrees of {ctx.mat_label(mid)} around it — under "
+               f"{_JOINT_SMOOTH_FRAC:g} of the soil's own friction angle, which "
+               f"is a smooth interface: a geomembrane or a liner rather than a "
+               f"soil-geosynthetic contact. The interface is then weaker than "
+               f"the soil, so the surface prefers to run along the sheet, and a "
+               f"bonded bar cannot let it. Joint = Yes puts that interface "
+               f"strength on a slip surface {_AT_REINF}.")
+
+
+@rule("joint.likely_wall", WARNING, ("fem",),
+      "Closely spaced sheets behind a steep face are a wall, not a slope.")
+def _joint_signal_wall(ctx):
+    cands = [(i, r, seg) for i, r, seg in _joint_candidate_lines(ctx)
+             if _joint_inclination(seg) <= _JOINT_NEAR_HORIZONTAL_DEG]
+    if len(cands) < _JOINT_WALL_MIN_SHEETS:
+        return None
+    ys = sorted((seg[0][1] + seg[1][1]) / 2.0 for _i, _r, seg in cands)
+    gaps = [b - a for a, b in zip(ys, ys[1:]) if b - a > 1e-9]
+    if not gaps:
+        return None
+    gaps.sort()
+    median = gaps[len(gaps) // 2]
+    if median > _JOINT_WALL_SPACING * _joint_meter(ctx):
+        return None
+    # A face at least _JOINT_WALL_FACE_DEG steep, somewhere over the elevations
+    # the sheets occupy.
+    steep = False
+    coords = ctx.ground
+    for (ax, ay), (bx, by) in zip(coords, coords[1:]):
+        if max(ay, by) < ys[0] or min(ay, by) > ys[-1]:
+            continue
+        if abs(bx - ax) < 1e-12:
+            steep = True
+            break
+        if abs(math.degrees(math.atan2(by - ay, bx - ax))) >= _JOINT_WALL_FACE_DEG:
+            steep = True
+            break
+    if not steep:
+        return None
+    # ... and the sheets' front ends buried in a thin facing column.
+    faced = 0
+    for _i, _r, seg in cands:
+        L = math.hypot(seg[1][0] - seg[0][0], seg[1][1] - seg[0][1])
+        for (px, py) in seg:
+            poly, _mid = _joint_zone_at(ctx, px, py)
+            if poly is None:
+                continue
+            xmin, _ymin, xmax, _ymax = poly.bounds
+            if (xmax - xmin) <= _JOINT_WALL_FACING_FRAC * L:
+                faced += 1
+                break
+    if faced * 2 < len(cands):
+        return None
+    return (f"{len(cands)} reinforcement lines run within "
+            f"{_JOINT_NEAR_HORIZONTAL_DEG:g} degrees of horizontal at a median "
+            f"vertical spacing of {median:g}, behind a face at least "
+            f"{_JOINT_WALL_FACE_DEG:g} degrees steep, with their front ends "
+            f"inside a facing column — a reinforced wall, and every one of them "
+            f"is modeled as a bonded bar. The fill between the sheets then "
+            f"cannot move relative to them and the facing is held up by the "
+            f"bars' grip on the block, which refines as the bar elements refine "
+            f"instead of converging. Joint = Yes on each sheet splits the mesh "
+            f"along it, so the fill slides on the sheet at its Adhesion/Delta "
+            f"interface and the facing is loaded through the anchored sheet "
+            f"{_AT_REINF}.")
+
+
+# ---- the info: what a jointed line stops reading ---------------------------
+
+@rule("joint.bond_inputs_ignored", INFO, ("fem",),
+      "A jointed line's pullout comes from the interface, not from Lp or Tres.",
+      fields=("lp1", "lp2", "t_res"))
+def _joint_bond_inputs(ctx):
+    rows = []
+    for i, r, _seg in _joint_lines(ctx):
+        cols = []
+        if _num(r.get("lp1")):
+            cols.append("Lp1")
+        if _num(r.get("lp2")):
+            cols.append("Lp2")
+        tres = _num(r.get("t_res"))
+        if tres is not None:
+            cols.append("Tres")
+        if cols:
+            rows.append((i, cols))
+    for i, cols in rows:
+        yield (f"{ctx.reinf_label(i)} sets Joint = Yes and fills "
+               f"{', '.join(cols)}, which the finite element engine does not "
+               f"read on a jointed line. The sheet's grip on the soil is the "
+               f"traction the interface elements integrate along it, so the "
+               f"bond-slip cap the development lengths build is not applied — "
+               f"it would count the same grip twice — and the bar's only limit "
+               f"is its own rupture strength Tmax. The limit-equilibrium engine "
+               f"ignores Joint entirely and reads them as it always did "
+               f"{_AT_REINF}.")
 
 
 # ---------------------------------------------------------------------------

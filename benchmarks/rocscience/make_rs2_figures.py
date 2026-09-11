@@ -71,9 +71,11 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 from xslope.fileio import load_slope_data
-from xslope.fem import build_fem_data, solve_ssrm, export_fem_solution
+from xslope.fem import (build_fem_data, solve_ssrm, export_fem_solution,
+                       ssrm_run_record)
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                         extract_constraint_line_geometry, extract_point_constraints,
+                         extract_constraint_line_geometry, extract_joint_options,
+                         extract_point_constraints,
                          extract_size_regions, export_mesh_to_json)
 from xslope.style import resolve_style, material_style
 # The composite is ONE figure whose four panels are drawn into axes the composite
@@ -83,8 +85,9 @@ from xslope.style import resolve_style, material_style
 # and run their own tight_layout / legend / colorbar and so can't share one figure.
 from xslope.plot import (
     plot_base_geometry, plot_piezo_line, plot_dloads, plot_tcrack_surface, plot_ssr_zones,
-    plot_reinforcement_lines as _plot_input_reinf_lines, plot_piles, plot_line_loads,
-    adaptive_colorbar_ticks, adaptive_edge_linewidth,
+    plot_reinforcement_lines as _plot_input_reinf_lines, plot_joint_lines,
+    plot_piles, plot_line_loads,
+    adaptive_colorbar_ticks, adaptive_edge_linewidth, JOINT_COLOR, draw_joint_ticks,
 )
 from xslope.plot_fem import (
     plot_shear_strain_contours, plot_displacement_vectors,
@@ -103,18 +106,25 @@ TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 # reported-not-locked row still gets a figure instead of silently having none.
 #
 # The multi-tiered geotextile wall family (RS2-48–55, Leshchinsky & Han 2004) is the
-# case in point. The baseline's SSR row is not attempted (RS2 splits that mesh at the
-# sheets and joins it with slip interfaces, so the page carries no figure for it); all
-# seven parametric variants follow the mesh — each moves past its own tolerance under a
-# refinement step, in the 2D size and in the 1D size alike — so all seven are reported
-# rather than locked, and all seven are registered below. All eight share what was the baseline's
-# model settings — 1.0 m tri6 mesh, the vendor's isotropic at-rest field stress
-# (k0 = 1) and static tensile caps (tension_srf off) — but the variants run the auto
-# bracket rather than the baseline's narrow one, because the family spans 0.74–1.16.
+# case in point. All eight rows run the jointed dry stack on the `_fem` siblings, at
+# the family's settings — 1.0 m tri6 mesh, the vendor's isotropic at-rest field stress
+# (k0 = 1), static tensile caps (tension_srf off), the elastic facing held out of the
+# reduction (ssr_exclude=Blocks) — and the auto bracket, because the family spans
+# 0.70–1.00. Four of them hold their factor across a refinement step and are locked by
+# a tag on the page; the four registered below move past the bracket tolerance and are
+# reported without one, so they would otherwise have no figure.
+#
+# The budget is stated, not inherited. solve_fem extends a budget that is still
+# making progress up to max_iterations_ceiling and takes the LARGER of the two, so
+# a tag below 50 000 silently runs to 50 000 — which is where this family's slow
+# equilibria were being cut off, and what was costing RS2-52 ten percent. The
+# family runs at 250 000, at which every trial of every variant reaches a verdict —
+# the longest to do so takes about 153 000 sweeps. 100 000 was tried first, on a
+# two-row measurement, and left an undecided trial on the edge of three brackets.
 #
 _WALL = dict(element_type='tri6', target_size='1.0', tolerance='0.02',
-             f_min='0.5', f_max='3.0', max_iter='16000',
-             tension_srf='false', k0='1')
+             f_min='0.5', f_max='3.0', max_iter='250000',
+             tension_srf='false', k0='1', ssr_exclude='Blocks')
 
 EXTRA_CASES = [
     # RS2 Part IV VP65: solves and brackets, reported rather than locked (its factor
@@ -124,13 +134,14 @@ EXTRA_CASES = [
      'element_type': 'tri6', 'target_size': '6.0', 'tolerance': '0.02',
      'f_min': '1.4', 'f_max': '2.8', 'max_iter': '16000',
      'tension_srf': 'true', 'k0': '1'},
-    {**_WALL, 'file': 'files/rocscience/vp088.xlsx', 'benchmark': 'RS2-49'},
-    {**_WALL, 'file': 'files/rocscience/vp089.xlsx', 'benchmark': 'RS2-50'},
-    {**_WALL, 'file': 'files/rocscience/vp090.xlsx', 'benchmark': 'RS2-51-wall'},
-    {**_WALL, 'file': 'files/rocscience/vp091.xlsx', 'benchmark': 'RS2-52'},
-    {**_WALL, 'file': 'files/rocscience/vp092.xlsx', 'benchmark': 'RS2-53'},
-    {**_WALL, 'file': 'files/rocscience/vp093.xlsx', 'benchmark': 'RS2-54'},
-    {**_WALL, 'file': 'files/rocscience/vp094.xlsx', 'benchmark': 'RS2-55'},
+    # The four wall variants that are not locked: RS2-50 and RS2-52 because a
+    # refinement step moves them, RS2-51 and RS2-53 because one trial of the
+    # bracket reaches the sweep budget without a verdict at an edge. RS2-48, 49,
+    # 54 and 55 carry fem_ssrm tags of their own on the page, so they are not here.
+    {**_WALL, 'file': 'files/rocscience/vp089_fem.xlsx', 'benchmark': 'RS2-50'},
+    {**_WALL, 'file': 'files/rocscience/vp090_fem.xlsx', 'benchmark': 'RS2-51-wall'},
+    {**_WALL, 'file': 'files/rocscience/vp091_fem.xlsx', 'benchmark': 'RS2-52'},
+    {**_WALL, 'file': 'files/rocscience/vp092_fem.xlsx', 'benchmark': 'RS2-53'},
 ]
 
 
@@ -182,6 +193,12 @@ EXPECTED_NO_FIGURE = {
     'RS2-67e': 'same unconstrained downstream-face mechanism as RS2-67b.png, at the drained limit',
     'RS2-67f': 'same Search-Area-confined upstream mechanism as RS2-67d.png, at the drained limit',
 
+    # RS2-24 — each case is locked at two meshes. The coarser one selects the same
+    # deep-seated mechanism through the soft clay (values per the page tags); the
+    # finer mesh is what the figure draws.
+    'RS2-24a-m2.0': 'same mechanism as RS2-24a.png, one mesh step coarser',
+    'RS2-24b-m2.0': 'same mechanism as RS2-24b.png, one mesh step coarser',
+
     # RS2 Part IV VP102 — the drawdown mechanism is one downstream-face wedge at every
     # frame of a monotone sequence. One frame of each case is figured: the mid-sequence
     # phi_b = 0 baseline frame, and the phi_b = 37 frame that sets the dot.
@@ -200,6 +217,9 @@ EXPECTED_NO_FIGURE = {
 # per benchmark keeps each run's field beside its own figure.
 SIDECAR_STEM = {
     'RS2-4-zone': 'vp005_zone',
+    # vp032a_fem carries two runs: the vendor's elastic face strip, and the
+    # control that lets it yield. Each keeps its own field beside its own figure.
+    'RS2-24a-noskin': 'vp032a_fem_noskin',
     'RS2-40-deep': 'vp077b_deep',
     # vp077a ships the tri3 seepage mesh and field its LEM locks read; the SSRM row
     # solves the seepage again on its own tri6 mesh, so its sidecars — the mesh json
@@ -345,12 +365,17 @@ def _build(tag):
         # here for the same reason refine_factor does: a file that refines a band
         # is solved on the refined mesh by the suite, and a figure built without
         # the overlay would draw a coarser mesh and report a different FS.
+        # A model whose reinforcement states Joint is meshed SPLIT along that line,
+        # with the two faces sliding on an interface. Left out, the figure would
+        # mesh and solve a bonded continuum -- a different model from the one the
+        # lock was measured on, drawn under the lock's caption.
         mesh = build_mesh_from_polygons(
             polys, target_size=target,
             element_type=tag.get('element_type', 'tri6'), lines=lines,
             element_size_1d=sd.get('element_size_1d'),
             point_constraints=extract_point_constraints(sd),
-            size_regions=extract_size_regions(sd), **refine_kw)
+            size_regions=extract_size_regions(sd),
+            joint_lines=extract_joint_options(sd), **refine_kw)
     # `sd` (unmodified) is what the inputs panel draws; the FEM build gets the
     # dry-beyond-the-line spelling where a piezo line stops short of the mesh.
     return sd, build_fem_data(_declare_dry_beyond_piezo(sd, mesh), mesh), path, mesh
@@ -425,7 +450,7 @@ def _record_ssr_zone(sd, ssr_zone, fem_data=None):
 
 def build_and_solve(tag):
     """Build the mesh, run the SSRM bracket, and return the pieces the figure and
-    the sidecars need: (sd, fem_data, field, failure, FS, path, mesh).
+    the sidecars need: (sd, fem_data, field, failure, FS, path, mesh, run).
 
     ``field`` is the last-CONVERGED field (the F just below critical); it is what
     the export writes as the converged sidecar. ``failure`` is the AT-FAILURE
@@ -436,6 +461,9 @@ def build_and_solve(tag):
     to the converged field. ``path`` is the case xlsx (for the sidecar stem), and
     ``mesh`` is the discretization the fields were solved on — exported beside them,
     since a reload that has to guess at the mesh reads a section that was never solved.
+    ``run`` is the bracket's own record — criterion, final interval, per-trial
+    verdicts — which the meta sidecar carries so a lock can be audited for whether
+    its trials decided or ran out of budget.
     """
     sd, fem_data, path, mesh = _build(tag)
 
@@ -523,7 +551,18 @@ def build_and_solve(tag):
     # The at-failure (unconverged) mechanism for the strain/vector panels; None if
     # the capture was skipped/failed (the panels then fall back to ``field``).
     failure = sol.get('failure_solution')
-    return sd, fem_data, field, failure, sol['FS'], path, mesh
+    # What the bracket CHOSE and what its trials found. A row locked at a value no
+    # trial decided — every trial at its iteration ceiling, the final bracket's
+    # edges among them — is a statement about the budget rather than about the
+    # slope, and without the per-trial record in the sidecar nothing downstream can
+    # tell the two apart (tools/ssrm_trial_audit.py is what reads it).
+    run = ssrm_run_record(sol, fem_data=fem_data, options={
+        'tolerance': float(tag.get('tolerance', 0.02)),
+        'F_min': float(tag.get('f_min', 0.5)),
+        'F_max': float(tag.get('f_max', 3.0)),
+        'ssr_exclude': ssr_exclude,
+    })
+    return sd, fem_data, field, failure, sol['FS'], path, mesh, run
 
 
 # ── Composite geometry (inches). These are the figure's structural chrome —
@@ -622,6 +661,7 @@ def _draw_inputs_panel(ax, sd, style):
     plot_dloads(ax, sd, style=style)
     plot_tcrack_surface(ax, sd, style=style)
     _plot_input_reinf_lines(ax, sd, style=style)
+    plot_joint_lines(ax, sd, style=style)
     plot_piles(ax, sd, style=style)
     plot_line_loads(ax, sd, style=style)
 
@@ -721,10 +761,19 @@ def _draw_mesh_panel(ax, fem_data, style, alpha=0.6):
     # 1D elements (reinforcement truss / pile beam)
     elements_1d = fem_data.get('elements_1d', np.array([]).reshape(0, 3))
     pile_mask = fem_data.get('pile_elem_mask', np.zeros(len(elements_1d), dtype=bool))
+    # A bar-less joint line owns 1D elements and no member. They are not counted
+    # as reinforcement and not drawn as it; the line goes on in the joint style
+    # below, over the mesh, the way the inputs panel draws it.
+    barless = np.asarray(fem_data.get('barless_1d_mask',
+                                      np.zeros(len(elements_1d), dtype=bool)), dtype=bool)
+    if len(barless) != len(elements_1d):
+        barless = np.zeros(len(elements_1d), dtype=bool)
     n_reinf = n_pile = 0
     if len(elements_1d) > 0:
         reinf_segs, pile_segs = [], []
         for i in range(len(elements_1d)):
+            if barless[i]:
+                continue
             seg = [nodes[elements_1d[i][0]], nodes[elements_1d[i][1]]]
             (pile_segs if pile_mask[i] else reinf_segs).append(seg)
             n_pile += int(pile_mask[i]); n_reinf += int(not pile_mask[i])
@@ -738,6 +787,35 @@ def _draw_mesh_panel(ax, fem_data, style, alpha=0.6):
                                              zorder=5, gid='PILES'))
             legend_handles.append(plt.Line2D([0], [0], color='green', lw=3.5,
                                             label=f'Pile ({n_pile} elements)'))
+
+    # The joint lines with no member in them, over the mesh, in the style the
+    # inputs panel gives them. The split itself is invisible — the copies of each
+    # station stand at one point — so the ticks are the only thing that says the
+    # mesh is torn there.
+    _jd = fem_data.get('joint_data')
+    if _jd is not None and int(_jd.get('n', 0)):
+        _whole = np.asarray(_jd['side'], dtype=int) == 2
+        _lines = sorted(set(int(v) for v in np.asarray(_jd['line_id'])[_whole]))
+        if _lines:
+            _span = float(np.max(nodes[:, 0]) - np.min(nodes[:, 0])) or 1.0
+            _conn = np.asarray(_jd['conn'], dtype=int)
+            _lid = np.asarray(_jd['line_id'], dtype=int)
+            for li in _lines:
+                sel = np.flatnonzero(_whole & (_lid == li))
+                ends = np.vstack([nodes[_conn[sel, 0], :2], nodes[_conn[sel, 1], :2]])
+                # The line is straight, so its own direction orders its stations.
+                d = ends[-1] - ends[0]
+                d = d / (np.hypot(d[0], d[1]) or 1.0)
+                order = np.argsort(ends @ d)
+                pts = ends[order]
+                ax.plot(pts[:, 0], pts[:, 1], color=JOINT_COLOR, linewidth=1.6,
+                        linestyle=(0, (6, 3)), alpha=0.95, zorder=6)
+                draw_joint_ticks(ax, pts[:, 0], pts[:, 1], _span, JOINT_COLOR,
+                                 alpha=0.95, zorder=6)
+            legend_handles.append(plt.Line2D([0], [0], color=JOINT_COLOR, lw=1.6,
+                                             linestyle=(0, (6, 3)), marker='|',
+                                             markersize=9, markeredgewidth=1.4,
+                                             label=f'Joint ({len(_lines)} lines)'))
 
     _plot_boundary_conditions(ax, nodes, fem_data['bc_type'], fem_data['bc_values'],
                               legend_handles, 0.03, fem_data.get('roller_x_nodes', set()))
@@ -1123,7 +1201,7 @@ def make_figure(tag, dpi=150):
     if tag.get('figure') == 'inputs':
         sd, fem_data, _path, _mesh = _build(tag)
         return render_inputs_figure(bench, sd, fem_data, dpi=dpi), None
-    sd, fem_data, field, failure, fs, path, mesh = build_and_solve(tag)
+    sd, fem_data, field, failure, fs, path, mesh, run = build_and_solve(tag)
 
     # Sidecars next to the case xlsx (Norm directive): the converged field plus,
     # when captured, the at-failure mechanism, so every future re-render is
@@ -1131,7 +1209,9 @@ def make_figure(tag, dpi=150):
     # except on a second run of a shared file (see SIDECAR_STEM).
     stem = _sidecar_stem(tag, path)
     meta = {'benchmark': bench, 'analysis': 'ssrm', 'FS': float(fs),
-            'expected_fs': tag.get('expected_fs'), 'file': tag.get('file')}
+            'expected_fs': tag.get('expected_fs'), 'file': tag.get('file'),
+            'max_iter': int(tag.get('max_iter', 4000))}
+    meta.update(run)
     with contextlib.redirect_stdout(io.StringIO()):
         export_fem_solution(fem_data, field, stem, meta=meta,
                             failure_solution=failure)

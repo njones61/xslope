@@ -973,7 +973,16 @@ slope_data['reinforcement_lines'] = [
      # v24 overburden-dependent pullout, the alternative to lp1/lp2. NaN = blank =
      # use the pullout lengths. Fill BOTH or neither (preflight refuses one of two).
      'adhesion': float('nan'),   # interface adhesion, stress units
-     'delta': float('nan')},     # interface friction angle, degrees, in (0, 90)
+     'delta': float('nan'),      # interface friction angle, degrees, in (0, 90)
+     # v27 interface (joint) option, FEM only. 'Yes' makes the line a slip
+     # surface: the mesh splits along it and a pair of interface elements
+     # carries the sheet's grip, with 'adhesion'/'delta' as their Mohr-Coulomb
+     # strength (both required). '' / 'No' is the ordinary bonded bar.
+     'joint': '',           # '', 'No' (bonded, the default) | 'Yes' (slip surface)
+     'kn': float('nan'),    # interface normal stiffness; NaN = derive from the
+     'ks': float('nan'),    # softer adjacent soil over 0.1 x the 1D element size
+     'jred': ''},           # '' / 'Yes' = reduce the interface with the soil in
+                            # the SSR (the default); 'No' holds it at full strength
 ]
 ```
 
@@ -991,6 +1000,50 @@ Support-type recipes: geosynthetics -> `type='geosynthetic'` (tangent, active); 
 `type='tieback'` (axial, active, `tend1` = connection capacity). Enter per-element capacities
 plus `Spacing` in the template and the loader divides; in-memory dicts like the above are
 already per unit width.
+
+`joint` decides how the FEM represents the sheet, and the choice is about the mechanism, not
+the material: does the slip surface CUT the reinforcement or run ALONG it? A bonded bar is right
+where the surface crosses the layers (a circle through a geogrid slope, a nail wall, a pile
+row) — it is the FE twin of the LEM treatment. A joint is right where the surface can run along
+the layer: a base geotextile under an embankment on soft clay, a wrapped-face or block-faced
+wall whose fill slides on its sheets, a smooth liner. On a jointed line `lp1`/`lp2` and `t_res`
+are not read (the grip is the interface traction), a blank `tend1`/`tend2` leaves that end free
+to pull out, and a filled one ties it at that capacity. LEM ignores `joint` entirely. Preflight
+reports the geometry that says a bonded line should have been a joint. See
+`docs/fem/reinforcement.md`, "Bonded bar or joint?".
+
+### Joint lines (v27 `joints` sheet, FEM only)
+
+`slope_data['joint_lines']` is a slip surface with NO reinforcement in it — a rock joint, a
+bedding plane, the contact between one facing block and the next, the back of a wall against
+the soil. Same mesh split, same interface element and same strength reduction as a jointed
+reinforcement line; what is missing is the bar between the two faces, so a station carries two
+coincident nodes and one interface element instead of three and two.
+
+```python
+slope_data['joint_lines'] = [
+    {'label': 'Block base',
+     'x1': 6.0, 'y1': 6.0, 'x2': 6.3, 'y2': 6.0,
+     'c': 0.0,              # joint cohesion; blank/0 is a purely frictional contact
+     'phi': 34.0,           # friction angle, degrees. REQUIRED — preflight refuses a blank
+     't_cut': 0.0,          # tension cutoff: the joint opens past it and closes on contact
+     'kn': float('nan'),    # NaN = derive from the softer adjacent soil over
+     'ks': float('nan'),    # 0.1 x the 1D element size, as the reinforce sheet's pair does
+     'jred': ''},           # '' / 'Yes' = reduce with the soil in the SSR; 'No' holds it
+]
+```
+
+Use a joints-sheet line when the sliding surface has no member on it, and the reinforce sheet's
+`joint` column when it does: a wall's sheet is a reinforcement line with `joint='Yes'` (it still
+carries tension), while the joints between its facing blocks are joint lines. Joint lines may
+MEET — at a T, a crossing, a corner, end to end — and the split copies the shared node once per
+wedge of material around it, which is what makes a facing column with a back-face joint, a base
+joint and a course joint at each mortar line into a stack rather than a notched solid. They may
+NOT lie on one another over a stretch, or run along the outside of the section, where there is
+material on one side only. A thin zone crossed by many joint lines needs a per-polygon `size`
+(the polygon sheet's Size column) — a 0.3 m facing column crossed every 0.6 m does not mesh at a
+1 m target size. LEM ignores the sheet entirely. See `docs/fem/reinforcement.md`, "Joints without
+reinforcement".
 
 **Layout convention** (when the sketch gives spacing but not explicit elevations): the bottom
 line sits **AT the toe/base elevation** (e.g. y=0), then y = s, 2s, … upward; each line starts

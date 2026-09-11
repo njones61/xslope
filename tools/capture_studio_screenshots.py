@@ -582,6 +582,9 @@ def capture_dxf_wizard():
 # --------------------------------------------------------------------------- #
 REINFORCE = os.path.join(REPO_ROOT, "docs/lem/files/xslope_reinforce.xlsx")
 PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
+# The joints sheet showcase built for the input-template page: the same slope as
+# REINFORCE with four joint lines, one of each reading the columns carry.
+JOINTS = os.path.join(REPO_ROOT, "docs/usage/sample_sheets/sheets_joints.xlsx")
 
 
 def _line_editor(editor_cls, path, mode, size):
@@ -644,6 +647,15 @@ def capture_reinforcement_table():
 
     return _grab(_line_editor(ReinforcementEditor, REINFORCE, "table", (930, 460)),
                  "editing_reinforcement_table.png")
+
+
+def capture_joints_editor():
+    """Joints editor, list view: the four form groups on the first joint line, with
+    the section preview drawing every line in the joint style."""
+    from studio.editors import JointsEditor
+
+    return _grab(_line_editor(JointsEditor, JOINTS, "list", (1240, 700)),
+                 "editing_joints_editor.png")
 
 
 def capture_piles_editor():
@@ -1076,6 +1088,7 @@ def main():
                capture_welcome_dialog,
                capture_report_dialog,
                capture_reinforcement_editor, capture_reinforcement_table,
+               capture_joints_editor,
                capture_piles_editor, capture_piles_table,
                capture_seep_bc_editor,
                capture_materials_table, capture_materials_list,

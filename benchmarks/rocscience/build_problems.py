@@ -3056,8 +3056,23 @@ def vp092_fem():
 
 
 def vp093_fem():
-    """RS2-54 — 20 kPa crest surcharge (Ta = 10.0), jointed dry stack."""
-    sd = _lh_wall_slope_data(ta_of=lambda i, n: 10.0, surcharge=20.0, joint=True)
+    """RS2-54 — 20 kPa crest surcharge (Ta = 11.6), jointed dry stack.
+
+    The tensile strength is the paper's, not the vendor .fez's. Leshchinsky &
+    Han state it in words -- "the addition of surcharge on the top of the wall
+    increased the required strength of reinforcement from 10 kN/m to 11.6 kN/m"
+    -- their Table 2 lists the surcharge case as Ta = 11.6 with a continuum
+    factor of 1.02, and the RS2 manual's own Table 2 for problem 54 reprints
+    11.6. The shipped `slope stability #054.fez` carries the baseline's Ft = 10,
+    the one place any of the eight wall .fez files departs from the value its own
+    manual page states: #048 through #055 otherwise carry 10, 22, 11.4, 11/7.5,
+    10, 9.25 and 10.1, each the paper's own number. This file is scored against
+    the FLAC referee, so it is built at the strength the referee ran.
+
+    The limit-equilibrium sibling vp093 stays at Ta = 10, which is what Slide2's
+    VP93 model carries and what its printed Bishop 0.958 is measured on.
+    """
+    sd = _lh_wall_slope_data(ta_of=lambda i, n: 11.6, surcharge=20.0, joint=True)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp093_fem.xlsx'))
     return 'vp093_fem.xlsx'
 
@@ -3082,9 +3097,14 @@ def vp092():
 
 
 def vp093():
-    """Slide #93, surcharge case: q=20 kPa on the uppermost tier, Ta=10.0
-    (the RS2 vendor .fez #054 value; earlier carried at the Slide2 11.6).
-    Slide circular Bishop 0.958; L&H 1.02/1.00."""
+    """Slide #93, surcharge case: q=20 kPa on the uppermost tier, Ta=10.0.
+
+    Slide2's own VP93 model carries the baseline Ta=10, and so does the RS2
+    vendor .fez #054, although both manuals' support tables print the paper's
+    11.6 for this case; this file is locked against Slide's printed Bishop 0.958
+    and so carries 10. The strength-reduction sibling vp093_fem is scored against
+    Leshchinsky & Han's FLAC referee and carries the paper's 11.6 -- see
+    :func:`vp093_fem`. Slide circular Bishop 0.958; L&H 1.02/1.00."""
     sd = _lh_wall_slope_data(ta_of=lambda i, n: 10.0, surcharge=20.0)
     # Slide's printed critical circle: (-8.825, 23.102) R=22.603, spencer 0.957
     sd['circles'] = [{'Xo': -8.825, 'Yo': 23.102, 'Depth': 23.102 - 22.603, 'R': 22.603}]

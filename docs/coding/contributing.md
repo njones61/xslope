@@ -51,9 +51,28 @@ python run_tests.py --fem            # only FEM tests
 python run_tests.py --seep           # only seepage tests
 python run_tests.py --skip-benchmarks  # skip slow verification benchmarks
 python run_tests.py --reference-only    # strict: reference kernel only for FEM SSRM rows
+python run_tests.py --gate           # the release gate: every row, every lock re-proved
 ```
 
 If your change adds a new sample, add a `<!-- test: ... -->` tag to the sample so it becomes part of the suite automatically.
+
+### Two tiers, and what each is for
+
+A strength-reduction lock is **proved** once, when it is cut: a bisection on two meshes at a budget that decided every trial, run by the corpus builder or the round that published it. What the suite owes it afterwards is a **check** that it is still reproducible. Separating the two is what keeps a suite that carries two hundred strength-reduction rows runnable, because the most expensive of them are hours apiece.
+
+**`--standard` is the default**, and it is what a change is checked against. It runs every row except the ones the gate tier holds: a row whose tag says `tier=gate`, and a strength-reduction row this machine has already timed over ten minutes in the mode a standard run would use it. A row nothing has timed runs — unmeasured is unknown, not known-heavy — so a fresh clone checks everything and learns what things cost by running them. What it measured is written to `test/row_timings.json`, which is local and never committed; the run prints its slowest rows and names every row it held back, so nothing disappears silently.
+
+**`--gate` is the release gate**, on the owner's word. It runs every row including the held-back ones, and forces the full bisection on every strength-reduction lock, so each one is re-proved rather than checked. Naming rows with `--benchmark` also overrides the hold — asking for a row by name is asking for it.
+
+### Checking a lock on its bracket edges
+
+A bisection ends on a bracket: the highest trial factor at which the model stood, and the lowest at which it failed. The locked factor of safety is that bracket's midpoint, so the pair **is** the lock, and a lock that is still reproducible is one whose model still stands at the first factor and still fails at the second. A tag that carries both — `f_stand`, `f_fail`, `check=edges` — is checked that way: two solves instead of nine.
+
+Both trials must be **decided**. A trial that ran out of iteration budget — `STABLE_STUCK`, `AMBIGUOUS`, `INCONCLUSIVE`, or simply at the ceiling — has not shown the model standing or failing anywhere, and it fails the check rather than passing it: a bracket edge nothing ruled on is exactly how a factor of safety ends up being a statement about the budget. The row reports the midpoint of its two re-solved edges as its computed value, which is the factor of safety those two trials bound.
+
+The kernel scheme above still applies: the two trials run on the fast kernel first and on the reference kernel after, and only then, if an edge has genuinely flipped on the oracle, does the full bisection run — once, deciding the row against `expected_fs` exactly as a bracket-mode row is decided. The row then prints which edge moved and in which direction. The `--fem` summary counts all three: how many locks were checked on their edges, how many fell back to the bisection, and how many were held for the gate.
+
+The two factors are never written by hand. `tools/lock_edges.py` reads the trial record the figure producers persist beside each model (`ssrm_run_record` → `*_fem_meta.json`) and appends the pair to the tag, refusing any record whose bracket was not decided at both edges, does not straddle the lock, or is wider than twice the tag's tolerance. A lock with no such record stays in bracket mode until the next run that cuts it writes one; `python tools/lock_edges.py --missing` lists those. The suite's `lock_edges` row re-checks the last three properties on every `check=edges` tag, so a pair that stops matching its lock fails the suite instead of quietly checking the wrong thing.
 
 **FEM SSRM rows use a two-tier kernel scheme.** When the optional compiled Mohr-Coulomb kernel is built (`setup_kernel.py`), each `type=fem_ssrm` row is first solved with the fast kernel. It passes the row there only by reproducing the lock **exactly** — its factor of safety within half of the lock's last printed decimal, so that it prints as the locked number at every digit the lock records (0.0005 for a lock of 1.418) — annotated *via fast kernel*. Anything else, including a factor of safety that sits comfortably inside the row's pass tolerance, falls through: the suite re-solves the same row on the pure reference kernel — the oracle that defines every locked value — and that reference verdict is final, pass or fail. Such a row is annotated *kernel read X, verified via reference*, and when the reference goes on to pass, the annotation also carries the kernel-versus-reference gap, which is the drift the lock's tolerance absorbed.
 

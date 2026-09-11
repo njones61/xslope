@@ -25,6 +25,16 @@ publishes it, so the corpus counts itself: `python3 tools/count_verification_cas
 prints how many tags, locked comparisons, locked values and distinct models
 these pages currently hold, broken down by source.
 
+A locked factor of safety is **proved** once, by the strength-reduction
+bisection that cut it, and **checked** afterwards. The two are not the same
+work: a bisection is nine solves rediscovering a number nobody has moved, while
+the pair of trials it closed on — the highest strength the slope stood at and
+the lowest it failed at — is what the lock is, and re-solving those two says
+whether it still reproduces. Rows whose tag carries that pair are checked in two
+solves; the rest are re-bisected. The heaviest rows of all, where one model is
+hours of iterations, are marked for the release gate and run there.
+`python run_tests.py --gate` is that gate: every row, every lock re-proved.
+
 ---
 
 ## Benchmark classes

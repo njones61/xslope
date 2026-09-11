@@ -164,6 +164,44 @@ manual, a catalog row piggybacking on the section another row built.  Where they
 agree the heading takes their dot; where they disagree `heading_dot_multi` names
 which of those rows speaks for the section.
 
+## What a strength-reduction tag says
+
+A `type=fem_ssrm` tag is a locked factor of safety plus everything needed to
+reproduce it: the model (`file`), the mesh (`element_type`, `target_size`, and
+the `refine_*` keys), the search (`f_min`, `f_max`, `tolerance`, `max_iter`),
+and the solver options the vendor model implies (`k0`, `tension_srf`,
+`ssr_exclude`, `ssr_zone`, `elastic_materials`, `min_slip_depth`,
+`suction_phi_b`, `suction_cap`). `benchmark` names the row. Everything in the
+list reaches `solve_ssrm` through one function — `run_tests.build_fem_ssrm_case`
+— which is also what the figure producers call, so a figure and its lock cannot
+solve different problems.
+
+Four keys say how the row is RUN rather than what it solves:
+
+* **`check=edges`** checks the lock with the two trials its bisection closed on
+  instead of re-running the bisection. It requires both of the next two.
+* **`f_stand`** is the highest trial factor at which the model stood when the
+  lock was cut, **`f_fail`** the lowest at which it failed. The locked value is
+  that bracket's midpoint, so the pair is the lock; a run in which the model
+  still stands at the one and still fails at the other has reproduced it.
+  Written by `tools/lock_edges.py` from the trial record the figure producers
+  persist (`*_fem_meta.json`), never by hand — a pair invented from the lock and
+  the tolerance is a guess at where the bisection closed, and a guess one bracket
+  step out passes while the lock moves underneath it.
+* **`tier=gate`** holds the row out of the standard run: it is checked at the
+  release gate (`run_tests.py --gate`) or when it is named with `--benchmark`.
+  It is for rows that cost hours — the RS2 joint corpus — and it does not hold
+  back a row that also carries an edge pair, since two trials is cheap enough to
+  run routinely and holding it back would leave the lock unchecked between
+  releases.
+
+The `lock_edges` suite row re-checks every `check=edges` tag: both factors
+present, `f_stand < expected_fs <= f_fail`, and the pair no wider than twice the
+tag's `tolerance` — the bisection stops inside the tolerance, so a wider pair is
+not a final bracket at all. `tools/ssrm_trial_audit.py` reads the same records
+for the other question they answer: which locks were cut at the iteration
+ceiling rather than at a mechanism.
+
 ## Tutorial restatements
 
 `tutorials.py` sweeps the 28 tutorial pages under `docs/tutorials`, which carry
@@ -206,6 +244,10 @@ sentence someone reads before it is a defect.
 ## Running them
 
 ```bash
+python tools/lock_edges.py                                   # what can be checked on its edges
+python tools/lock_edges.py --missing                         # and what cannot, with reasons
+python tools/lock_edges.py --write                           # write the pairs into the tags
+python tools/ssrm_trial_audit.py --all                       # which locks were cut at the ceiling
 python -m tools.verification_checks.certify                  # all six pages
 python -m tools.verification_checks.certify rs2 seep         # named pages
 python -m tools.verification_checks.certify --force          # ignore the manifest

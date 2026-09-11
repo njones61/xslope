@@ -39,6 +39,15 @@ Patch releases skip this.
 
 ## Before every release
 
+- [ ] Run the gate: `python run_tests.py --gate`. It runs every row, including
+      the ones the standard tier holds back, and re-proves every strength-
+      reduction lock with its full bisection instead of checking it on the two
+      bracket edges. It is hours, and it is the only run that covers the rows a
+      `tier=gate` tag holds — the RS2 joint corpus and anything this machine has
+      timed over the threshold. The standard run (`python run_tests.py`, or one
+      of `--lem` / `--fem` / `--seep`) is what a change is checked against
+      between releases; it is not a substitute for this one.
+
 - [ ] Rebuild the generated indexes the wheel carries, so the assistant ships the
       documentation of the version being released rather than of the last build:
       ```

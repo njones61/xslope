@@ -6,10 +6,11 @@ its config; ``config_for`` accepts either a stem or a path.
 import os
 
 from . import (geostudio, published, rocscience,  # noqa: F401
-               rocscience_groundwater, rs2, seep, ssrm)
+               rocscience_groundwater, rs2, rs2_joints, seep, ssrm)
 
 PAGES = {
     "rs2": rs2.CONFIG,
+    "rs2_joints": rs2_joints.CONFIG,
     "rocscience": rocscience.CONFIG,
     "geostudio": geostudio.CONFIG,
     "rocscience_groundwater": rocscience_groundwater.CONFIG,
@@ -19,8 +20,8 @@ PAGES = {
 }
 
 #: Page order used by the runner and the manifest.
-ORDER = ["rs2", "rocscience", "geostudio", "rocscience_groundwater",
-         "ssrm", "seep", "published"]
+ORDER = ["rs2", "rs2_joints", "rocscience", "geostudio",
+         "rocscience_groundwater", "ssrm", "seep", "published"]
 
 
 def config_for(page):

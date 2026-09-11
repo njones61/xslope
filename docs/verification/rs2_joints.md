@@ -1,0 +1,178 @@
+# Rocscience RS2 Joint Corpus
+
+The [RS2 Joint Verification Manual](https://www.rocscience.com/help/rs2/verification-theory/verification-manuals)
+(Rocscience) publishes 23 problems on jointed rock: block and flexural toppling, plane failure,
+Alejano's sliding and ploughing slabs, step-path failure, a Voronoi-tessellated mass, a jointed
+tunnel, and two shear-box problems that exercise the joint's own constitutive law rather than a
+slope. Every one of them is a mesh split along discontinuities with interface elements carrying
+the traction between the faces, which is what XSLOPE's [joint lines](../fem/reinforcement.md#joints-without-reinforcement)
+are. The rows below verify XSLOPE's FEM/**SSRM** solver on that corpus.
+
+The wall and embankment rows that use the same element but reach it through the reinforce
+sheet's `Joint` column are on the [RS2 corpus page](rs2.md) — [RS2-24](rs2.md#rs2-24) and
+[RS2-48–55](rs2.md#rs2-48). Full bibliographic details for the author-year citations here are on
+the shared [References](references.md) page.
+
+## Methodology
+
+**Where the inputs come from.** Geometry, materials, joint properties, restraints and loads are
+read from the vendor's own `.fez` model rather than from the manual's tables. The manual's tables
+carry errata the models do not — problem 7's slope angle is printed as 5° where its figure and its
+model are 55°, and problem 19's joint inclination is printed as 59° where both give 56° — and the
+model is what RS2 solved. The manual supplies what the tables are for: the referee each problem is
+scored against, and RS2's own two reported factors.
+
+**Units.** The vendor models are stated in MPa with unit weight in MN/m³. These files carry the
+metric kPa / kN/m³ the rest of the corpus uses, so every stress is multiplied by a thousand.
+
+**The referee.** Each problem is scored against its own reference solution — a closed form
+(Goodman & Bray, Alejano et al., Lorig & Varona) where the problem has one, and UDEC where that is
+all the manual publishes. Both are strength-reduction or limit-equilibrium answers on the same
+mechanism, so the pairing is like for like. RS2's factors are recorded beside every row and score
+none of them, for the reason the next paragraph gives.
+
+**RS2's two factors.** The manual reports each problem twice, *without* and *with* the "joint
+improvement" option. The vendor's rerun models show what that option is: `improve_joint_convergence`
+turns on, the convergence criterion and the SRF convergence type change, `CoupledSSR` turns **off**
+— so the joints are no longer reduced with the rock — and the iteration limit and tolerance go back
+to their defaults. It is a different analysis, not a better-converged one, and on problem 4 it
+raises the factor while on problems 17, 18 and 19 it lowers it. XSLOPE reduces the joint with the
+rock, which is the *without* setting, and both of RS2's numbers are recorded so a reader can see
+the spread.
+
+**The budget.** A joint reaches equilibrium by growing slip, so a jointed model settles over tens
+of thousands of viscoplastic sweeps where a bonded one settles over hundreds; a strength-reduction
+trial that runs out of sweeps is recorded undecided, the bracket reads that as not standing, and
+the factor comes out low. Every row here states its own sweep budget and its trial record is
+checked (`tools/ssrm_trial_audit.py`), the same rule the [geotextile wall family](rs2.md#rs2-48)
+runs under.
+
+`benchmarks/rocscience/build_joint_problems.py` writes the input files, which are named `rjNNN`
+by the manual's own problem number — `rj018.xlsx` is problem 18 — with a letter suffix where the
+manual letters its cases. `make_rs2_joint_figures.py` writes the figures.
+
+## Status
+
+Status terms follow the [shared definitions](index.md#status-terms) and match dots the
+[shared scoring](index.md#how-the-match-dots-are-scored). Of the manual's 23 problems, 21 report a
+factor of safety or a tilt angle; problems 22 and 23 report neither, being shear-box tests of the
+joint model whose output is a stress-displacement curve.
+
+<div class="corpus-summary match" markdown>
+
+| # | Match | Problem | Referee | RS2 without / with improvement | Notes |
+|---:|:-:|---|---|---|---|
+| 1a | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1a | Goodman & Bray 1.0 · UDEC 0.99 | 0.99 / 0.97 | *planned* — sixteen explicit block outlines and a deleted region above the face. |
+| 1b | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1b | Goodman & Bray 1.0 · UDEC 0.99 | 0.97 / 0.94 | *planned* — as 1a, with the 2013 kN toe force. |
+| 1c | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1c | Goodman & Bray 1.02 · UDEC 1.01 | 1.01 / 0.99 | *planned* — as 1a. |
+| 1d | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 · UDEC 1.22 | 1.19 / 1.16 | *planned* — as 1b. |
+| 2 | <span class="nodata">⊘</span> | Alejano & Alonso block toppling | UDEC 0.87 · Goodman 0.76 | 0.86 / 0.82 | *planned* — a 64° parallel set at 1.6 m over a 30° stepped basal surface, 517 joint elements. |
+| 3 | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | 1.12 / 1.09 | *planned* — two parallel sets, 789 joint elements. |
+| 4 | <span class="nodata">⊘</span> | Lorig & Varona flexural toppling | UDEC 1.3 | 1.19 / 1.27 | *planned* — one 70° set, 489 joint elements. |
+| 5 | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | 1.65 / 1.86 | *planned* — two crossing sets, 1748 joint elements. |
+| 6 | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | 1.25 / 1.31 | *planned* — one −35° set, 1690 joint elements. |
+| 7 | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | 1.57 / 1.59 | *planned* — one −70° set, 594 joint elements. |
+| 8 | <span class="nodata">⊘</span> | Flexural toppling, base friction model | UDEC 0.76 | 0.75 / 0.75 | *planned* — a −60° set at 5.08 m with a horizontal basal joint. |
+| 9 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1a | UDEC 1.03 | 1.01 / 1.09 | *planned* — bedding at 3 m plus a toe release joint, 1957 joint elements. |
+| 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | 0.92 / 1.08 | *planned* — as 9 with the release joint moved upslope. |
+| 11 | <span class="nodata">⊘</span> | Ploughing sliding slab failure | UDEC 1.21 | 1.22 / 1.3 | *planned* — bedding at 1.5 m plus a release joint. |
+| 12 | <span class="nodata">⊘</span> | Ploughing toppling slab failure | UDEC 1.78 | 1.39 / 1.75 | *planned* — bedding at 1.5 m plus a release joint. |
+| 13 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 4 | UDEC 1.0 | 1.0 / 1.05 | *planned* — bedding at 1.5 m plus a 95° release joint. |
+| 14 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | UDEC 0.9 | 0.89 / 1.09 | *planned* — as 13, release joint moved. |
+| 15 | <span class="nodata">⊘</span> | Partially joint-controlled footwall | Slide 1.25 · UDEC 1.6 | 1.28 / 1.42 | *planned* — bedding parallel to the face at 2 m, 2143 joint elements. |
+| 16 | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | experiment 9° · UDEC 11° | 9° / 7° | *blocked* — the problem scores the TILT ANGLE at which a block grid topples, found by rotating gravity through a staged sweep; XSLOPE's seismic coefficient tilts the load but the row needs the sweep and a toppling criterion, neither of which is a strength reduction. |
+| 17 | <span class="nodata">⊘</span> | Step-path, en-echelon joints | UDEC 1.29 | 1.24 / 1.2 | *planned* — the vendor model's second, elastic material has no boundary of its own in the file, so the two zones are recoverable only from its element-material map. |
+| [18](#rj-18) | 🟣 | Step-path, continuous joints | UDEC 1.01 | 1.01 / 1.0 | |
+| [19](#rj-19) | 🟣 | Bi-planar step-path failure | UDEC 1.46 | 1.5 / 1.41 | |
+| 20 | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | 2.21 / 2.37 | *blocked* — the manual states no block size and no seed, and the vendor model carries the tessellation as 523 digitized traces rather than as a generated network, so the input is not reproducible from anything published. |
+| 21 | <span class="nodata">⊘</span> | Shallow excavation, jointed tunnel | UDEC 8.16 | 8.27 / 8.5 | *planned* — a two-stage model whose second stage excavates a 2 m opening. |
+| 22 | <span class="nodata">⊘</span> | Joint model: hyperbolic softening | — | — | *not supported* — the problem exercises RS2's hyperbolic displacement- and work-softening joint law, which XSLOPE's interface element does not have; it reports no factor of safety. |
+| 23 | <span class="nodata">⊘</span> | Joint model: residual strength and dilation | — | — | *no lock possible* — the problem reports no factor of safety, and its six vendor models all carry `include_dilation: no`. See [The dilation problem](#the-dilation-problem). |
+
+</div>
+
+---
+
+## The Dilation Problem {#the-dilation-problem}
+
+Problem 23 is the manual's statement of the joint constitutive law XSLOPE implements: a
+Mohr-Coulomb interface whose limit falls from $S_{max} = c - \sigma_n \tan\phi$ to
+$S_{res} = c_{res} - \sigma_n \tan\phi_{res}$ once it has slipped, with a dilation angle that opens
+the joint as it slides. It is a two-block shear box — a single horizontal joint, a normal load
+raised from 3 to 9 MPa part way through, and a prescribed shear displacement — and it reports a
+stress-displacement curve rather than a factor of safety, so there is nothing here to lock.
+
+The six vendor models are named for dilation angles of 0, 10, 20, 20 directional, 20
+non-directional and 30 degrees. All six carry `include_dilation: no`, so the angle their names
+state never reaches the solver and every one of them runs at zero dilation; the only compute-level
+difference among them is the `directional` flag on one. Two of the three "20 degree" cases also
+differ in when the normal load steps from 3 to 9 MPa — stage 22 against stage 15 — so they are not
+a constant-history comparison either. The problem therefore verifies nothing about dilation that
+could be scored, and XSLOPE's dilation is verified instead against the kinematic identity it
+states: on a sliding interface the normal opening per unit slip is $\tan(\text{dil})$
+(`test/joint_element_check.py`, row 6).
+
+---
+
+## The Rows
+
+### 🟣 RJ-18: Step-path failure, continuous joints (rj018) {#rj-18}
+
+A 45 × 20 m section of one Mohr-Coulomb rock (γ = 19.62 kN/m³, E = 20 GPa, ν = 0.3, c = 25 kPa,
+φ = 25°, no tensile capacity) with a slope face rising from (17, 8.2) to (26.9, 20), cut by three
+parallel joints at 36.1° that run from the face to the crest at a perpendicular spacing of
+0.883 m. The joints carry c = 1 kPa, φ = 35°, k<sub>n</sub> = 10<sup>8</sup> kPa/m,
+k<sub>s</sub> = 10<sup>7</sup> kPa/m and are reduced with the rock in the strength reduction.
+Referee: UDEC 1.01.
+
+**Input file:** [rj018.xlsx](files/rocscience/joints/rj018.xlsx).
+
+### 🟣 RJ-19: Bi-planar step-path failure (rj019) {#rj-19}
+
+A 120 × 70 m section of one Mohr-Coulomb rock (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 10 500 kPa,
+φ = 35°, tensile capacity 200 kPa) with a slope face from (30, 20) to (60, 70), cut by two
+discontinuous joints with a rock bridge between them: a basal joint at 28.4° from (39.0149,
+35.0248) to (63, 48), and an upper joint at 56.3° from (62, 49) to (76, 70). Both carry c = 0,
+φ = 40° and the same stiffness pair as RJ-18. Referee: UDEC 1.46.
+
+The manual's table for this problem states one joint inclination as 59°. Its figure dimensions 56°
+and 28°, and the vendor model's own endpoints give 56.3° and 28.4°, so the table is the outlier and
+the model is what is built.
+
+**Input file:** [rj019.xlsx](files/rocscience/joints/rj019.xlsx).
+
+---
+
+## Where the Vendor Models Depart from the Manual
+
+Each of these was found by reading the `.fez` against the manual page it belongs to, and each
+changes what a faithful transcription is.
+
+- **Problem 7's slope angle.** The table prints 5°; the figure and the model are the same 55°
+  slope its siblings use.
+- **Problem 19's joint inclination.** The table prints 59°; the figure and the model give 56°.
+- **Problem 23's dilation.** All six "dilation" models run at zero dilation — see
+  [The dilation problem](#the-dilation-problem).
+- **Problem 1's toe force.** The manual describes a stabilizing force at the toe of the lowest
+  block. It is 2013 kN in cases b and d — about twice that block's own weight — and 0.5 kN in cases
+  a and c, which is 0.05% of it and does nothing. The vendor's own rerun models move the force from
+  the toe at (−0.5, 0.866) to the upper-left block corner at (−2.5, 4.330) in all four cases, so
+  the "with joint improvement" factors are not the same load case as the "without" ones.
+- **Problem 20's network.** The manual calls it a Voronoi tessellation generated in UDEC and
+  imported. The vendor model carries it as 523 digitized traces with no block size, density or seed
+  recorded, so nothing published reproduces it.
+- **Problem 16's boundary conditions.** The 0° case runs on rollers; the nine tilted cases pin
+  every exterior node in both directions, and use a convergence tolerance two orders tighter.
+- **Problems 3 and 5 are elastic.** Their manual pages describe Mohr-Coulomb rock and their
+  material rows carry c = 0.675 MPa and φ = 43°, but both files set the plasticity specification to
+  none, so the rock cannot yield and only the joints can.
+- **Problems 9 to 14 use two joint strengths, not one.** The network's 1928–1962 elements carry one
+  friction angle and the one or two short explicit crest traces carry another — 40°, 20° or 30°
+  against the network's 30°, 25° or 20° — so a single quoted joint friction angle for these
+  problems is incomplete.
+- **Problem 22's units.** The joint numbers (c = 143, residual c = 76, load 345) read as kPa in a
+  file declared in MPa: at MPa a 143 MPa joint under 345 MPa never slips at the prescribed 0.3 m of
+  shear, and at kPa it is an ordinary rock-joint shear test.
+- **No problem from 1 to 21 states a joint residual strength or a dilation angle.** Those appear
+  only in problems 22 and 23, and material residual values, where they appear, always equal the
+  peak.

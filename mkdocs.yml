@@ -132,6 +132,7 @@ nav:
     - Rocscience Slide2 Corpus: verification/rocscience.md
     - Rocscience Groundwater Corpus: verification/rocscience_groundwater.md
     - Rocscience RS2 (SSRM) Corpus: verification/rs2.md
+    - Rocscience RS2 Joint Corpus: verification/rs2_joints.md
     - GeoStudio (SLOPE/W) Corpus: verification/geostudio.md
     - Published Problems: verification/published.md
     - References: verification/references.md

@@ -137,6 +137,13 @@ GROUPS = {
                      corpus='docs/verification/files/rocscience',
                      builders=lambda m: list(m.BUILDERS),
                      slow=False),
+    # The RS2 JOINT-analysis manual's problems (docs/verification/rs2_joints.md).
+    # Their own directory under the rocscience corpus, so the rj files and the
+    # vp/rs2 ones cannot collide on a name.
+    'joints': dict(module='build_joint_problems', outattr='OUT',
+                   corpus='docs/verification/files/rocscience/joints',
+                   builders=lambda m: list(m.BUILDERS),
+                   slow=False),
     'gw': dict(module='build_groundwater', outattr='OUT',
                corpus='docs/verification/files/rocscience_gw',
                builders=lambda m: [getattr(m, n) for n in

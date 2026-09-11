@@ -118,11 +118,12 @@ TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 # making progress up to max_iterations_ceiling and takes the LARGER of the two, so
 # a tag below 50 000 silently runs to 50 000 — which is where this family's slow
 # equilibria were being cut off, and what was costing RS2-52 ten percent. The
-# longest trial that reached a verdict on these walls is about 97 000 sweeps, so
-# 100 000 is the smallest round budget at which every trial decides.
+# family runs at 250 000, at which every trial of every variant reaches a verdict —
+# the longest to do so takes about 153 000 sweeps. 100 000 was tried first, on a
+# two-row measurement, and left an undecided trial on the edge of three brackets.
 #
 _WALL = dict(element_type='tri6', target_size='1.0', tolerance='0.02',
-             f_min='0.5', f_max='3.0', max_iter='100000',
+             f_min='0.5', f_max='3.0', max_iter='250000',
              tension_srf='false', k0='1', ssr_exclude='Blocks')
 
 EXTRA_CASES = [
@@ -133,13 +134,14 @@ EXTRA_CASES = [
      'element_type': 'tri6', 'target_size': '6.0', 'tolerance': '0.02',
      'f_min': '1.4', 'f_max': '2.8', 'max_iter': '16000',
      'tension_srf': 'true', 'k0': '1'},
-    # The four wall variants a refinement step moves. RS2-48, 49, 52 and 55 hold
-    # under it and carry fem_ssrm tags of their own on the page, so they are not
-    # here.
+    # The four wall variants that are not locked: RS2-50 and RS2-52 because a
+    # refinement step moves them, RS2-51 and RS2-53 because one trial of the
+    # bracket reaches the sweep budget without a verdict at an edge. RS2-48, 49,
+    # 54 and 55 carry fem_ssrm tags of their own on the page, so they are not here.
     {**_WALL, 'file': 'files/rocscience/vp089_fem.xlsx', 'benchmark': 'RS2-50'},
     {**_WALL, 'file': 'files/rocscience/vp090_fem.xlsx', 'benchmark': 'RS2-51-wall'},
+    {**_WALL, 'file': 'files/rocscience/vp091_fem.xlsx', 'benchmark': 'RS2-52'},
     {**_WALL, 'file': 'files/rocscience/vp092_fem.xlsx', 'benchmark': 'RS2-53'},
-    {**_WALL, 'file': 'files/rocscience/vp093_fem.xlsx', 'benchmark': 'RS2-54'},
 ]
 
 

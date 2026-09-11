@@ -91,12 +91,15 @@ JOINT_VIRTUAL_THICKNESS_FRAC = 0.1
 #: reads it as not standing, and the factor of safety comes out LOW: it is then a
 #: statement about the budget rather than about the slope.
 #:
-#: 100 000 is measured, not assumed. On the geotextile wall family the longest
-#: trial that reached a verdict was 96 738 sweeps (the weak-foundation variant's
-#: equilibrium just below its critical factor), and at the 50 000 the solver
-#: reaches by default four of that row's nine trials never decided and the factor
-#: came out ten percent low. It costs almost nothing to allow, because a trial
-#: that decides stops.
+#: 100 000 is measured, not assumed, and is a FLOOR rather than a sufficiency. At
+#: the 50 000 the solver reaches by default, four of the weak-foundation wall's
+#: nine trials never decided and its factor came out ten percent low; at 100 000
+#: three rows of that family still had an undecided trial on an edge of their
+#: bracket, and the family is cut at 250 000, where the longest trial to reach a
+#: verdict takes about 153 000 sweeps. So this is the level below which a jointed
+#: model is worth warning about, not the level at which any particular model is
+#: settled — what says that is the trial record (tools/ssrm_trial_audit.py).
+#: Allowing more costs almost nothing, because a trial that decides stops.
 JOINT_DECIDED_BUDGET = 100000
 
 #: The viscoplastic pseudo-time step of the joint's slip increment. At 1.0 one

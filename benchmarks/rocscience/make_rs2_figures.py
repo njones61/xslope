@@ -135,11 +135,12 @@ EXTRA_CASES = [
      'element_type': 'tri6', 'target_size': '6.0', 'tolerance': '0.02',
      'f_min': '1.4', 'f_max': '2.8', 'max_iter': '16000',
      'tension_srf': 'true', 'k0': '1'},
-    # The five wall variants that are not locked: RS2-50, RS2-52 and RS2-54 because
-    # a refinement step moves them, RS2-51 and RS2-53 because one trial of the
-    # bracket reaches the sweep budget without a verdict at an edge. RS2-48, 49 and
-    # 55 carry fem_ssrm tags of their own on the page, so they are not here.
-    {**_WALL, 'file': 'files/rocscience/vp089_fem.xlsx', 'benchmark': 'RS2-50'},
+    # The five wall variants that are not locked: RS2-51 and RS2-54 because a
+    # refinement step moves them by twice the bracket tolerance, RS2-49, RS2-52 and
+    # RS2-53 because trials of the bracket reach the sweep budget without a
+    # verdict. RS2-48, 50 and 55 carry fem_ssrm tags of their own on the page, so
+    # they are not here.
+    {**_WALL, 'file': 'files/rocscience/vp088_fem.xlsx', 'benchmark': 'RS2-49'},
     {**_WALL, 'file': 'files/rocscience/vp090_fem.xlsx', 'benchmark': 'RS2-51-wall'},
     {**_WALL, 'file': 'files/rocscience/vp091_fem.xlsx', 'benchmark': 'RS2-52'},
     {**_WALL, 'file': 'files/rocscience/vp092_fem.xlsx', 'benchmark': 'RS2-53'},

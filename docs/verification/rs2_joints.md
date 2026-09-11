@@ -82,8 +82,8 @@ joint model whose output is a stress-displacement curve.
 | 15 | <span class="nodata">⊘</span> | Partially joint-controlled footwall | Slide 1.25 · UDEC 1.6 | 1.28 / 1.42 | *planned* — bedding parallel to the face at 2 m, 2143 joint elements. |
 | 16 | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | experiment 9° · UDEC 11° | 9° / 7° | *blocked* — the problem scores the TILT ANGLE at which a block grid topples, found by rotating gravity through a staged sweep; XSLOPE's seismic coefficient tilts the load but the row needs the sweep and a toppling criterion, neither of which is a strength reduction. |
 | 17 | <span class="nodata">⊘</span> | Step-path, en-echelon joints | UDEC 1.29 | 1.24 / 1.2 | *planned* — the vendor model's second, elastic material has no boundary of its own in the file, so the two zones are recoverable only from its element-material map. |
-| [18](#rj-18) | 🟣 | Step-path, continuous joints | UDEC 1.01 | 1.01 / 1.0 | |
-| [19](#rj-19) | 🟣 | Bi-planar step-path failure | UDEC 1.46 | 1.5 / 1.41 | |
+| [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | 1.01 / 1.0 | |
+| [19](#rj-19) | <span class="nodata">⊘</span> | Bi-planar step-path failure | UDEC 1.46 | 1.5 / 1.41 | *reported, no lock* — two trials of the bracket reach the sweep budget without a verdict. |
 | 20 | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | 2.21 / 2.37 | *blocked* — the manual states no block size and no seed, and the vendor model carries the tessellation as 523 digitized traces rather than as a generated network, so the input is not reproducible from anything published. |
 | 21 | <span class="nodata">⊘</span> | Shallow excavation, jointed tunnel | UDEC 8.16 | 8.27 / 8.5 | *planned* — a two-stage model whose second stage excavates a 2 m opening. |
 | 22 | <span class="nodata">⊘</span> | Joint model: hyperbolic softening | — | — | *not supported* — the problem exercises RS2's hyperbolic displacement- and work-softening joint law, which XSLOPE's interface element does not have; it reports no factor of safety. |
@@ -116,18 +116,30 @@ states: on a sliding interface the normal opening per unit slip is $\tan(\text{d
 
 ## The Rows
 
-### 🟣 RJ-18: Step-path failure, continuous joints (rj018) {#rj-18}
+### 🟢 RJ-18: Step-path failure, continuous joints (rj018) {#rj-18}
 
 A 45 × 20 m section of one Mohr-Coulomb rock (γ = 19.62 kN/m³, E = 20 GPa, ν = 0.3, c = 25 kPa,
 φ = 25°, no tensile capacity) with a slope face rising from (17, 8.2) to (26.9, 20), cut by three
 parallel joints at 36.1° that run from the face to the crest at a perpendicular spacing of
 0.883 m. The joints carry c = 1 kPa, φ = 35°, k<sub>n</sub> = 10<sup>8</sup> kPa/m,
 k<sub>s</sub> = 10<sup>7</sup> kPa/m and are reduced with the rock in the strength reduction.
-Referee: UDEC 1.01.
+
+| XSLOPE SSRM | UDEC referee | RS2 without / with improvement |
+|---|---|---|
+| **0.998** | 1.01 (−1.2%) | 1.01 / 1.00 |
+
+<!-- test: file=files/rocscience/joints/rj018.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-18 -->
+
+A step of refinement — a 2D size of 0.7 m, which takes the mesh from 3 486 nodes and 48 interface
+elements to 6 707 and 66 — does not move the factor at all, and every trial of both brackets
+reaches a verdict. The budget is what the row needs rather than what it has to spare: the longest
+trial to decide takes about 226 000 sweeps of the 250 000 allowed.
 
 **Input file:** [rj018.xlsx](files/rocscience/joints/rj018.xlsx).
 
-### 🟣 RJ-19: Bi-planar step-path failure (rj019) {#rj-19}
+![RJ-18: step-path failure through three continuous joints (rj018) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. Every joint is slipping along its lower half and open along its upper, and the three slabs between them slide out together down the 36.1° path; the rock itself carries almost no plastic strain](images/RJ-18.png)
+
+### ⊘ RJ-19: Bi-planar step-path failure (rj019) {#rj-19}
 
 A 120 × 70 m section of one Mohr-Coulomb rock (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 10 500 kPa,
 φ = 35°, tensile capacity 200 kPa) with a slope face from (30, 20) to (60, 70), cut by two
@@ -135,11 +147,17 @@ discontinuous joints with a rock bridge between them: a basal joint at 28.4° fr
 35.0248) to (63, 48), and an upper joint at 56.3° from (62, 49) to (76, 70). Both carry c = 0,
 φ = 40° and the same stiffness pair as RJ-18. Referee: UDEC 1.46.
 
+Two trials of the bracket reach 250 000 sweeps without a verdict, so the factor this variant
+brackets is a statement about the budget as much as about the slope, and the row is reported
+without a lock.
+
 The manual's table for this problem states one joint inclination as 59°. Its figure dimensions 56°
 and 28°, and the vendor model's own endpoints give 56.3° and 28.4°, so the table is the outlier and
 the model is what is built.
 
 **Input file:** [rj019.xlsx](files/rocscience/joints/rj019.xlsx).
+
+![RJ-19: bi-planar step-path failure with a rock bridge (rj019) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. Both joints have opened, the basal one is slipping at its lower end, and the only plastic strain in the rock is the patch at the bridge between the two joint tips, where the block above has to break through to move](images/RJ-19.png)
 
 ---
 

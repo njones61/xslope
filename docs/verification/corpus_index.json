@@ -8296,6 +8296,74 @@
     },
     {
       "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj018.xlsx",
+      "references": [
+        {
+          "anchor": "rj-18",
+          "checks": [
+            "RJ-18"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-18: Step-path failure, continuous joints (rj018)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-18"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
         "circular": true,
         "cutoff_walls": 0,
         "dloads": 0,
@@ -20301,80 +20369,6 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": false,
-        "k0": 1.0,
-        "line_loads": 0,
-        "material_options": [
-          "elastic",
-          "mc"
-        ],
-        "n_materials": 3,
-        "non_circular": false,
-        "piezo_line": false,
-        "pile_fixities": [],
-        "piles": 0,
-        "polygon_geometry": true,
-        "probabilistic": false,
-        "rapid_drawdown": false,
-        "reinforcement": {
-          "appls": [
-            "passive"
-          ],
-          "count": 15,
-          "dirs": [
-            "axial"
-          ],
-          "discrete_spacing": false,
-          "end_anchorage": true,
-          "pullout": true,
-          "residual_drop": false,
-          "types": [
-            "geosynthetic"
-          ]
-        },
-        "ru": false,
-        "seepage_coupled": false,
-        "seepage_problem": false,
-        "seismic_k": 0.0,
-        "sigmas": [],
-        "ssr_zones": 0,
-        "suction_strength": false,
-        "template_version": 27,
-        "tensile_cutoff": true,
-        "tension_crack": false,
-        "tension_crack_water": false,
-        "transient_seepage": false,
-        "unit_system": "si",
-        "unsaturated_models": [
-          "lf"
-        ]
-      },
-      "model": "docs/verification/files/rocscience/vp088_fem.xlsx",
-      "references": [
-        {
-          "anchor": "rs2-49",
-          "checks": [
-            "RS2-49"
-          ],
-          "level": 4,
-          "page": "verification/rs2/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/verification/rs2.md",
-          "title": "RS2-49: Geotextile wall, fill quality (vp088_fem)",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-49"
-        }
-      ],
-      "topics": [
-        "reinforcement"
-      ]
-    },
-    {
-      "features": {
-        "circular": true,
-        "cutoff_walls": 0,
-        "dloads": 0,
-        "element_type": null,
-        "hoek_brown": false,
-        "homogeneous": false,
         "k0": null,
         "line_loads": 0,
         "material_options": [
@@ -20434,6 +20428,80 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp089_fem.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-50",
+          "checks": [
+            "RS2-50"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "nearest-heading",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-50: Geotextile wall, 4.2 m reinforcement (vp089_fem)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-50"
         }
       ],
       "topics": [
@@ -25138,7 +25206,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 353,
+    "models": 354,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -25173,15 +25241,16 @@
       "verification/rocscience/",
       "verification/rocscience_groundwater/",
       "verification/rs2/",
+      "verification/rs2_joints/",
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 619,
+    "tags": 620,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 160,
-      "non-circular": 32,
+      "homogeneous": 161,
+      "non-circular": 33,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
@@ -25271,6 +25340,7 @@
       "docs/verification/files/geostudio/gs2_heap.xlsx",
       "docs/verification/files/geostudio/gs2_infil.xlsx",
       "docs/verification/files/rocscience/hammah_hb1.xlsx",
+      "docs/verification/files/rocscience/joints/rj018.xlsx",
       "docs/verification/files/rocscience/rs2_56a.xlsx",
       "docs/verification/files/rocscience/rs2_56b.xlsx",
       "docs/verification/files/rocscience/rs2_57a.xlsx",
@@ -25395,6 +25465,7 @@
       "docs/lem/files/xslope_noncircular.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
       "docs/verification/files/geostudio/gs2_33.xlsx",
+      "docs/verification/files/rocscience/joints/rj018.xlsx",
       "docs/verification/files/rocscience/vp008.xlsx",
       "docs/verification/files/rocscience/vp009.xlsx",
       "docs/verification/files/rocscience/vp017.xlsx",
@@ -25484,8 +25555,8 @@
       "docs/verification/files/rocscience/vp087.xlsx",
       "docs/verification/files/rocscience/vp087_fem.xlsx",
       "docs/verification/files/rocscience/vp088.xlsx",
-      "docs/verification/files/rocscience/vp088_fem.xlsx",
       "docs/verification/files/rocscience/vp089.xlsx",
+      "docs/verification/files/rocscience/vp089_fem.xlsx",
       "docs/verification/files/rocscience/vp090.xlsx",
       "docs/verification/files/rocscience/vp091.xlsx",
       "docs/verification/files/rocscience/vp092.xlsx",

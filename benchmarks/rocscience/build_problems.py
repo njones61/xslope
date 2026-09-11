@@ -2843,11 +2843,16 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
             rows.append({'x1': x1, 'y1': y, 'x2': x2, 'y2': y,
                          't_max': ta, 't_res': float('nan'),
                          'lp1': ta / (po * d1), 'lp2': ta / (po * d2),
-                         # EA = 6300 kN/m: the geotextile stiffness in the RS2
-                         # vendor .fez (cbeam1) for this wall family, so the file
-                         # runs the FEM SSRM faithfully as well as the LEM; the
-                         # LEM ignores E/area.
-                         'E': 6.3e4, 'area': 0.1,
+                         # EA = 1000 kN/m (E 1.0e4 x area 0.1): Leshchinsky &
+                         # Han's reinforcement stiffness J = 1000 kN/m, which is
+                         # what their FLAC referee ran and what scores these
+                         # rows. The vendor .fez states EA = 1000 x the sheet
+                         # LENGTH per sheet (6300 on the 6.3 m sheets, 4200 on
+                         # #050's 4.2 m sheets), a length-dependent axial
+                         # stiffness with no physical reading; it is recorded on
+                         # the page as a departure and not carried. The LEM
+                         # files share this recipe and ignore E/area.
+                         'E': 1.0e4, 'area': 0.1,
                          'label': f'T{t + 1}L{k + 1}', 'type': 'geosynthetic',
                          'dir': 'axial', 'appl': 'passive',
                          'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0})

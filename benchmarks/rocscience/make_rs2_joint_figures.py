@@ -29,7 +29,15 @@ PAGE = os.path.join(ROOT, 'docs', 'verification', 'rs2_joints.md')
 
 #: Rows the page reports without locking, so they carry no fem_ssrm tag and are
 #: registered here instead. Settings are the ones the page states for the row.
-EXTRA_CASES = []
+_JOINT = dict(element_type='tri6', tolerance='0.02', f_min='0.5', f_max='3.0',
+              max_iter='250000', tension_srf='false', k0='1')
+
+EXTRA_CASES = [
+    # RJ-19 brackets a factor but two trials of that bracket reach the sweep
+    # budget without a verdict, so the row is reported and carries no tag.
+    {**_JOINT, 'file': 'files/rocscience/joints/rj019.xlsx',
+     'target_size': '3.0', 'benchmark': 'RJ-19'},
+]
 
 #: Rows the page documents as not yet built or blocked, each with the reason. A
 #: row here gets no figure and the audit does not count it as missing.

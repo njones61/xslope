@@ -23,6 +23,20 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.22669320
     description: The version DOI for 0.5.2.
+preferred-citation:
+  type: article
+  title: "xslope: An open, validated Python package and desktop application for integrated seepage and slope stability analysis"
+  authors:
+    - family-names: Jones
+      given-names: Norman L.
+      affiliation: Brigham Young University
+    - family-names: Williams
+      given-names: Gustavious P.
+  journal: SoftwareX
+  volume: 36
+  start: 103018
+  year: 2026
+  doi: 10.1016/j.softx.2026.103018
 keywords:
   - slope stability
   - seepage

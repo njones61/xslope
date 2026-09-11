@@ -110,7 +110,14 @@ which covers the development install, coding conventions, and the test suite.
 
 ## Citation
 
-If you use xslope in published work, please cite the archived release:
+If you use xslope in published work, please cite the paper:
+
+> Jones, N. L., & Williams, G. P. (2026). xslope: An open, validated Python
+> package and desktop application for integrated seepage and slope stability
+> analysis. *SoftwareX*, 36, 103018.
+> https://doi.org/10.1016/j.softx.2026.103018
+
+To cite the exact version you ran, add the archived release:
 
 > Jones, N. L. (2026). *xslope* (Version 0.5.2) [Computer software].
 > https://doi.org/10.5281/zenodo.22669320

@@ -81,6 +81,8 @@ Patch releases skip this.
   version exists, so the citation metadata tracks the latest release.
 - Update the `version`, `date-released`, and `doi` fields in `CITATION.cff` and the
   citation block in `README.md` after each release, once Zenodo shows the new record
+  (the SoftwareX paper reference in both stays as it is; only the version line and
+  its DOI change)
   (query `https://zenodo.org/api/records?q=%22xslope%22&all_versions=true`).
 
 ## Notes

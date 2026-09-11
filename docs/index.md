@@ -232,6 +232,20 @@ ordinary here and awkward in a closed graphical program. The
 [Colab Notebooks](usage/notebooks.md) runs XSLOPE in a browser with nothing
 installed, and the [API](api/solve.md) section documents every function.
 
+## Citing XSLOPE
+
+If you use XSLOPE in published work, cite the paper:
+
+> Jones, N. L., & Williams, G. P. (2026). xslope: An open, validated Python
+> package and desktop application for integrated seepage and slope stability
+> analysis. *SoftwareX*, 36, 103018.
+> [https://doi.org/10.1016/j.softx.2026.103018](https://doi.org/10.1016/j.softx.2026.103018){target="blank"}
+
+To cite the exact version you ran, add its archived release; every release has
+its own DOI, and the concept DOI
+[10.5281/zenodo.20709269](https://doi.org/10.5281/zenodo.20709269){target="blank"}
+always resolves to the newest one.
+
 ## Who makes it
 
 XSLOPE is developed by Norman L. Jones, PhD, a professor in the Civil and

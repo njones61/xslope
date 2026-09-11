@@ -71,7 +71,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 from xslope.fileio import load_slope_data
-from xslope.fem import build_fem_data, solve_ssrm, export_fem_solution
+from xslope.fem import (build_fem_data, solve_ssrm, export_fem_solution,
+                       ssrm_run_record)
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                          extract_constraint_line_geometry, extract_joint_options,
                          extract_point_constraints,
@@ -113,8 +114,15 @@ TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 # a tag on the page; the four registered below move past the bracket tolerance and are
 # reported without one, so they would otherwise have no figure.
 #
+# The budget is stated, not inherited. solve_fem extends a budget that is still
+# making progress up to max_iterations_ceiling and takes the LARGER of the two, so
+# a tag below 50 000 silently runs to 50 000 — which is where this family's slow
+# equilibria were being cut off, and what was costing RS2-52 ten percent. The
+# longest trial that reached a verdict on these walls is about 97 000 sweeps, so
+# 100 000 is the smallest round budget at which every trial decides.
+#
 _WALL = dict(element_type='tri6', target_size='1.0', tolerance='0.02',
-             f_min='0.5', f_max='3.0', max_iter='30000',
+             f_min='0.5', f_max='3.0', max_iter='100000',
              tension_srf='false', k0='1', ssr_exclude='Blocks')
 
 EXTRA_CASES = [
@@ -440,7 +448,7 @@ def _record_ssr_zone(sd, ssr_zone, fem_data=None):
 
 def build_and_solve(tag):
     """Build the mesh, run the SSRM bracket, and return the pieces the figure and
-    the sidecars need: (sd, fem_data, field, failure, FS, path, mesh).
+    the sidecars need: (sd, fem_data, field, failure, FS, path, mesh, run).
 
     ``field`` is the last-CONVERGED field (the F just below critical); it is what
     the export writes as the converged sidecar. ``failure`` is the AT-FAILURE
@@ -451,6 +459,9 @@ def build_and_solve(tag):
     to the converged field. ``path`` is the case xlsx (for the sidecar stem), and
     ``mesh`` is the discretization the fields were solved on — exported beside them,
     since a reload that has to guess at the mesh reads a section that was never solved.
+    ``run`` is the bracket's own record — criterion, final interval, per-trial
+    verdicts — which the meta sidecar carries so a lock can be audited for whether
+    its trials decided or ran out of budget.
     """
     sd, fem_data, path, mesh = _build(tag)
 
@@ -538,7 +549,18 @@ def build_and_solve(tag):
     # The at-failure (unconverged) mechanism for the strain/vector panels; None if
     # the capture was skipped/failed (the panels then fall back to ``field``).
     failure = sol.get('failure_solution')
-    return sd, fem_data, field, failure, sol['FS'], path, mesh
+    # What the bracket CHOSE and what its trials found. A row locked at a value no
+    # trial decided — every trial at its iteration ceiling, the final bracket's
+    # edges among them — is a statement about the budget rather than about the
+    # slope, and without the per-trial record in the sidecar nothing downstream can
+    # tell the two apart (tools/ssrm_trial_audit.py is what reads it).
+    run = ssrm_run_record(sol, fem_data=fem_data, options={
+        'tolerance': float(tag.get('tolerance', 0.02)),
+        'F_min': float(tag.get('f_min', 0.5)),
+        'F_max': float(tag.get('f_max', 3.0)),
+        'ssr_exclude': ssr_exclude,
+    })
+    return sd, fem_data, field, failure, sol['FS'], path, mesh, run
 
 
 # ── Composite geometry (inches). These are the figure's structural chrome —
@@ -1177,7 +1199,7 @@ def make_figure(tag, dpi=150):
     if tag.get('figure') == 'inputs':
         sd, fem_data, _path, _mesh = _build(tag)
         return render_inputs_figure(bench, sd, fem_data, dpi=dpi), None
-    sd, fem_data, field, failure, fs, path, mesh = build_and_solve(tag)
+    sd, fem_data, field, failure, fs, path, mesh, run = build_and_solve(tag)
 
     # Sidecars next to the case xlsx (Norm directive): the converged field plus,
     # when captured, the at-failure mechanism, so every future re-render is
@@ -1185,7 +1207,9 @@ def make_figure(tag, dpi=150):
     # except on a second run of a shared file (see SIDECAR_STEM).
     stem = _sidecar_stem(tag, path)
     meta = {'benchmark': bench, 'analysis': 'ssrm', 'FS': float(fs),
-            'expected_fs': tag.get('expected_fs'), 'file': tag.get('file')}
+            'expected_fs': tag.get('expected_fs'), 'file': tag.get('file'),
+            'max_iter': int(tag.get('max_iter', 4000))}
+    meta.update(run)
     with contextlib.redirect_stdout(io.StringIO()):
         export_fem_solution(fem_data, field, stem, meta=meta,
                             failure_solution=failure)

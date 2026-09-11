@@ -60,10 +60,13 @@ normal OPENING increment ``|d(delta_t)| tan(dil)``, accumulated as a plastic
 normal offset, so the elastic part of the normal closing — and with it the
 normal traction ``t_n = k_n (delta_n + opening)`` — grows while the joint slides
 under confinement. That is dilatant hardening: held apart by the material around
-it, a dilating joint builds normal stress and so builds shear strength. The
-dilation here is NON-DIRECTIONAL — the joint opens whichever way it slides,
-which is RS2's default. Blank means zero and the normal traction is
-``k_n delta_n`` exactly.
+it, a dilating joint builds normal stress and so builds shear strength. Where the
+sliding block is free to lift, it lifts instead and the normal traction stays at
+whatever equilibrium with its weight requires. The dilation here is
+NON-DIRECTIONAL — the joint opens whichever way it slides — and it does not decay
+with accumulated slip: a joint that slides a long way keeps riding up at the
+stated angle. Blank means zero and the normal traction is ``k_n delta_n``
+exactly.
 
 **Integration.** The tractions are integrated at the element's own NODES
 (Newton-Cotes / Lobatto), not at Gauss points: L/6, L/6, 2L/3 on the three-pair

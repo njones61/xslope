@@ -63,6 +63,9 @@ def _base():
     """A loaded model stripped to its boilerplate."""
     sd = load_slope_data(DONOR)
     sd['unit_system'] = 'metric'
+    # The donor carries the imperial unit weight of water; these files are metric
+    # and none of them has water, so the value is inert but it must not be wrong.
+    sd['gamma_water'] = 9.81
     sd['profile_lines'] = []
     sd['circles'] = []
     sd['non_circ'] = []
@@ -81,7 +84,9 @@ def _base():
 
 def _rock(name, gamma, E, nu, c, phi, t_cut=0.0):
     """One Mohr-Coulomb rock, in kPa and kN/m^3."""
-    return {'name': name, 'gamma': gamma, 'gamma_sat': gamma,
+    # gamma_sat is left unset: none of these models has water, and a saturated
+    # unit weight on a dry model is a value nothing reads.
+    return {'name': name, 'gamma': gamma, 'gamma_sat': float('nan'),
             'option': 'mc', 'c': c, 'phi': phi, 'psi': 0.0, 'r_elev': 0.0,
             'u': 'none', 'ru': 0.0, 'E': E, 'nu': nu, 't_cut': t_cut,
             'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0,
@@ -100,6 +105,19 @@ def _joint(label, p1, p2, c, phi, kn=KN_STD, ks=KS_STD, t_cut=0.0,
             'phi_res': nan if phi_res is None else phi_res,
             'dil': nan if dil is None else dil,
             't_cut': t_cut, 'kn': kn, 'ks': ks, 'jred': jred}
+
+
+def _surface(points):
+    """A non-circular failure surface through the stated points.
+
+    The two ends are Free — they are on the ground surface and the slicer finds
+    where — and every point between them is Fixed. Each carries an explicit Y,
+    which is what a Free end needs.
+    """
+    n = len(points)
+    return [{'X': float(x), 'Y': float(y),
+             'Movement': 'Free' if i in (0, n - 1) else 'Fixed'}
+            for i, (x, y) in enumerate(points)]
 
 
 def _finish(sd, rings_and_ids, materials):
@@ -151,9 +169,11 @@ def rj018():
         _joint('joint-2', (19.3571, 11.0095), (31.7, 20.0), 1.0, 35.0),
         _joint('joint-3', (21.7143, 13.819), (30.2, 20.0), 1.0, 35.0),
     ]
-    # Inert for a strength reduction, and there so the file opens as a complete
-    # model: the toe circle the starting-circle rule gives on this face.
-    sd['circles'] = [{'Xo': 21.95, 'Yo': 31.8, 'R': 24.11, 'Depth': 31.8 - 24.11}]
+    # The seed failure surface. A rock slope cut by through-going joints does not
+    # fail on a circle, and the surface worth shipping with the file is the one
+    # the joints draw: the lowest joint, from the toe of the face to the crest.
+    # Inert for a strength reduction, and it makes the file a complete model.
+    sd['non_circ'] = _surface([(17.0, 8.2), (33.2, 20.0)])
     return _write(sd, 'rj018.xlsx')
 
 
@@ -186,8 +206,10 @@ def rj019():
         _joint('basal', (39.0149, 35.0248), (63.0, 48.0), 0.0, 40.0),
         _joint('upper', (62.0, 49.0), (76.0, 70.0), 0.0, 40.0),
     ]
-    sd['circles'] = [{'Xo': 45.0, 'Yo': 120.0, 'R': 101.12,
-                      'Depth': 120.0 - 101.12}]
+    # The seed surface is the bi-planar path itself: up the basal joint, across
+    # the rock bridge, and out along the upper one.
+    sd['non_circ'] = _surface([(39.0149, 35.0248), (63.0, 48.0),
+                               (76.0, 70.0)])
     return _write(sd, 'rj019.xlsx')
 
 

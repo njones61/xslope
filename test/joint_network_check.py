@@ -130,7 +130,7 @@ def _leg_counts(failures, results):
 
     labels = [r['label'] for r in base]
     if labels != [f"s-{i + 1:02d}" for i in range(len(base))]:
-        failures.append(f"counts: the rows are labelled {labels[:3]}…, not "
+        failures.append(f"counts: the rows are labeled {labels[:3]}…, not "
                         f"s-01, s-02, …")
     if any(r.get('phi') != 30.0 for r in base):
         failures.append("counts: the stated phi did not reach every row")

@@ -623,8 +623,9 @@ $$t_n = k_n (\Delta_n + u_{open})$$
 grows while the joint slides. Where the material around the joint holds it closed, that is dilatant hardening —
 sliding builds normal stress and with it shear strength. Where the sliding block is free to lift, it lifts instead,
 and the normal traction stays at whatever equilibrium with the block's weight requires. The dilation is
-**non-directional**: the joint opens whichever way it slides. A blank is zero and the normal traction is
-$k_n \Delta_n$ exactly.
+**non-directional**: the joint opens whichever way it slides, and it does not die out with accumulated
+slip — a joint that slides a long way keeps riding up at the stated angle. A blank is zero and the normal
+traction is $k_n \Delta_n$ exactly.
 
 Neither column exists on the reinforce sheet. A soil-geosynthetic contact is a frictional interface with one
 strength, and the sheet between its two faces is what carries the mechanism.

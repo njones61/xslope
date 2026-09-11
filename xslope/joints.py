@@ -29,7 +29,7 @@ the right — dipping right, in the field sense — is a NEGATIVE angle. A set a
 its negative are mirror images about the vertical, which is what makes a
 conjugate pair ``cross_jointed(parallel_set(..., 60), parallel_set(..., -60))``.
 
-**Labels.** Rows are labelled ``<label>-01``, ``<label>-02``, … in the order the
+**Labels.** Rows are labeled ``<label>-01``, ``<label>-02``, … in the order the
 traces come out, which is along the set's own normal from the low side. The
 label reaches the plots, the 1D details view and the report, so a network keeps
 one name per set rather than a hundred anonymous lines.

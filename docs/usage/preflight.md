@@ -250,6 +250,13 @@ input, and they are the ones easiest to miss by reading a single result:
   model. The limit equilibrium engine ignores `Joint` altogether: a reinforcement line enters it
   as a force across the slip surface either way, so the same file poses one problem there and two
   different ones in the finite element engine.
+- A **joint takes sweeps**. A joint reaches equilibrium by growing slip, a little per sweep, so a
+  jointed model settles over tens of thousands of viscoplastic sweeps where a bonded one settles
+  over hundreds. A strength-reduction trial that runs out of sweeps is recorded as undecided, the
+  bracket reads that as not standing, and the factor of safety comes out low — a reading of the
+  budget rather than of the slope. `joint.iteration_budget_low` is a **WARNING** on any model
+  carrying a joint whose run allows fewer than 100,000 sweeps, and it costs almost nothing to
+  allow them, because a trial that decides stops.
 - **Reinforcement** complete for one engine can be incomplete for the other. The
   limit-equilibrium engine applies the `Tmax`/`Lp` capacity envelope directly; the
   finite element engine models each line as a bar element and needs `E` and `Area`.

@@ -1296,6 +1296,23 @@ class _Ctx:
         """The ``joints`` sheet's lines -- endpoints plus interface properties."""
         return list(self.sd.get("joint_lines") or [])
 
+    @property
+    def fem_iteration_budget(self):
+        """The most viscoplastic sweeps one finite element trial of this run may
+        take, or ``None`` where the run does not say.
+
+        Not the stated number on its own: ``solve_fem`` extends a budget that is
+        still making progress and takes ``max(max_iterations_ceiling,
+        max_iterations)``, so a run asking for 12 000 actually reaches 50 000, and
+        only a request above the ceiling raises it. What a rule about the budget
+        has to compare against is that effective figure.
+        """
+        want = _num(self.selection.get("max_iterations"))
+        ceiling = _num(self.selection.get("max_iterations_ceiling"))
+        if want is None and ceiling is None:
+            return None
+        return int(max(want or 0, ceiling or 50000))
+
     def joint_label(self, i):
         try:
             name = self.joints[i].get("label")
@@ -5455,6 +5472,33 @@ def _joint_on_domain_boundary(ctx):
                f"face of the joint to be. Move the line inside the section, or "
                f"— if what is wanted is a free face — model it as a boundary "
                f"rather than as a joint.")
+
+
+@rule("joint.iteration_budget_low", WARNING, ("fem",),
+      "A jointed model needs tens of thousands of sweeps to reach equilibrium.")
+def _joint_budget_low(ctx):
+    from .joint import JOINT_DECIDED_BUDGET
+    lines = _all_joint_lines(ctx)
+    if not lines:
+        return
+    budget = ctx.fem_iteration_budget
+    if budget is None or budget >= JOINT_DECIDED_BUDGET:
+        return
+    n_reinf = sum(1 for _l, _r, _s in _joint_lines(ctx))
+    what = (f"{len(lines)} lines are modeled as joints"
+            if len(lines) > 1 else "one line is modeled as a joint")
+    if n_reinf and n_reinf < len(lines):
+        what += (f" ({n_reinf} on the reinforce sheet, "
+                 f"{len(lines) - n_reinf} on the joints sheet)")
+    yield (f"{what[0].upper()}{what[1:]}, and this run allows {budget:,} "
+           f"viscoplastic sweeps. A joint reaches equilibrium by growing slip, a "
+           f"little per sweep, so a jointed model settles over tens of thousands "
+           f"of sweeps where a bonded one settles over hundreds. A strength "
+           f"reduction trial that runs out of sweeps is recorded as undecided, "
+           f"the bracket reads that as not standing, and the factor of safety "
+           f"comes out low — a reading of the budget rather than of the slope. "
+           f"Allow at least {JOINT_DECIDED_BUDGET:,}: it costs almost nothing, "
+           f"because a trial that decides stops.")
 
 
 @rule("joint.lines_meet", ERROR, ("fem",),

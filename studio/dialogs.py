@@ -794,6 +794,10 @@ class RunFemDialog(QDialog):
         self.min_slip_on.toggled.connect(self._sync_enabled)
         self.capture_failure_state.toggled.connect(self._sync_enabled)
         self.capture_iter_on.toggled.connect(self._sync_enabled)
+        # The budget is one of the things the checks are told, so changing it
+        # re-evaluates them (joint.iteration_budget_low) rather than only the button.
+        self.max_iterations.valueChanged.connect(self._recheck)
+        self.max_iterations_ceiling.valueChanged.connect(self._recheck)
         self.preflight.changed.connect(self._sync_run)
         # The chosen instant is part of what the checks are told, so it re-evaluates
         # them rather than only the button.
@@ -806,10 +810,14 @@ class RunFemDialog(QDialog):
 
     def _selection(self):
         """What the model checks are asked about — the transient frame this run will
-        stage, which is what makes ``u = seep`` satisfiable before it is staged. See
-        :meth:`RunLemDialog._seep_frame`."""
+        stage, which is what makes ``u = seep`` satisfiable before it is staged (see
+        :meth:`RunLemDialog._seep_frame`), and the sweep budget, which is what makes
+        ``joint.iteration_budget_low`` answerable: a jointed model settles over tens
+        of thousands of sweeps, and a trial that runs out is read as not standing."""
         return {"seep_frame": (self.seep_time.frame_selection()
-                               if self.seep_time is not None else None)}
+                               if self.seep_time is not None else None),
+                "max_iterations": self.max_iterations.value(),
+                "max_iterations_ceiling": self.max_iterations_ceiling.value()}
 
     def _recheck(self):
         self.preflight.refresh()

@@ -5516,6 +5516,16 @@ PREFLIGHT_RULE_SPECS = [
     # The joints sheet's own rows: a line with no reinforcement in it. What the
     # interface law cannot do without, and the two geometries the split cannot
     # represent.
+    # The sweep budget a jointed model needs. The mutation is the DEFAULT budget a
+    # run arrives with; the control is one that allows what a joint takes. Both
+    # carry the same jointed model, so what is under test is the budget alone.
+    dict(rule='joint.iteration_budget_low', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         selection={'max_iterations': 12000},
+         mutation=lambda sd: _pf_joint(sd),
+         control_selection={'max_iterations': 100000},
+         control=lambda sd: _pf_joint(sd),
+         expect='viscoplastic sweeps'),
     dict(rule='joint.phi_missing', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_joint_sheet(sd, phi=float('nan')),
@@ -5889,6 +5899,14 @@ def run_preflight_corpus_test(test):
         # `seep=transient`, `march=file`) is checked as the run that follows it:
         # the field the shipped file lacks is exactly what the route produces.
         field_at_run = bool(t.get('seep') or t.get('march'))
+        # A strength-reduction tag states the sweep budget its lock was cut at, and
+        # joint.iteration_budget_low is a question about exactly that: a jointed row
+        # whose tag allows the budget must not be reported as if it did not. Carried
+        # into the selection so the corpus is checked as it is actually run.
+        if t.get('type') == 'fem_ssrm':
+            sel = dict(sel)
+            if t.get('max_iter'):
+                sel['max_iterations'] = int(float(t['max_iter']))
         key = (f, analysis, tuple(sorted(sel.items())))
         if key in cases:
             cases[key] = (analysis, sel, cases[key][2] or field_at_run)

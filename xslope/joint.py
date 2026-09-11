@@ -81,6 +81,24 @@ import numpy as np
 #: element length (PLAXIS's idiom): k_n = E_adj / d_v, k_s = G_adj / d_v.
 JOINT_VIRTUAL_THICKNESS_FRAC = 0.1
 
+#: The iteration budget a jointed model needs before a strength-reduction trial
+#: can be trusted to have decided.
+#:
+#: A joint reaches equilibrium by growing slip, and the slip a viscoplastic sweep
+#: puts into an interface is the excess traction divided by k_s — so a jointed
+#: model converges by tens of thousands of sweeps where a bonded one converges by
+#: hundreds. A trial that runs out of budget is recorded undecided, the bracket
+#: reads it as not standing, and the factor of safety comes out LOW: it is then a
+#: statement about the budget rather than about the slope.
+#:
+#: 100 000 is measured, not assumed. On the geotextile wall family the longest
+#: trial that reached a verdict was 96 738 sweeps (the weak-foundation variant's
+#: equilibrium just below its critical factor), and at the 50 000 the solver
+#: reaches by default four of that row's nine trials never decided and the factor
+#: came out ten percent low. It costs almost nothing to allow, because a trial
+#: that decides stops.
+JOINT_DECIDED_BUDGET = 100000
+
 #: The viscoplastic pseudo-time step of the joint's slip increment. At 1.0 one
 #: sweep returns the shear traction exactly to its limit at the current
 #: displacement field, which is the interface twin of the bar's tension cap.

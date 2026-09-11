@@ -11568,7 +11568,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                suction_phi_b=None, suction_cap=None,
                capture_failure_state=True, capture_max_iterations=None,
                capture_margin=0.15, early_failure=True, fem_solver=None,
-               ssrm_driver='bisection'):
+               ssrm_driver='bisection', trial_factors=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -11620,6 +11620,17 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             slope failing) — no element is masked and no strength is held back — so a
             shallow zone still yields, it just cannot decide the bisection alone. Set the
             same value on the LEM search (search.py) to compare like-for-like surfaces.
+        trial_factors (list of float or None): Solve at these strength reduction
+            factors and bisect nothing. Each is a trial exactly as the bisection
+            makes one — same model preparation, same in-situ equilibration, same
+            solve_fem call, same verdict — and the result carries them in
+            'trials' with FS, final_interval and 'converged' all absent, because
+            a set of trials bounds a factor of safety without measuring one.
+            It answers "does this model still stand here and still fail there"
+            for the cost of the named trials, which is how a lock already cut is
+            re-checked against the two factors its bracket closed on (see
+            run_tests.py's edges mode). Default None = bisect, the only mode that
+            produces a factor of safety.
         fem_solver (str or None): Which per-trial driver runs, passed to every
             solve_fem trial — 'auto' (the default: the viscoplastic loop with the
             Newton corrector and the yield gate), 'viscoplastic' (that loop alone,
@@ -12160,6 +12171,22 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         raise ValueError(
             f"Unknown ssrm_driver {ssrm_driver!r}. Supported: 'bisection' "
             "(default) and 'ramp'.")
+    if trial_factors:
+        # The probe is a set of trials read for their verdicts, so it lives only
+        # where a trial's verdict is the standing/failing question the bisection
+        # asks. The displacement measures answer a different question (how far the
+        # section moved), and the ramp is a continuation rather than a set of
+        # independent trials; neither can be handed a factor list to rule on.
+        if _driver != 'bisection':
+            raise ValueError(
+                f"trial_factors runs on ssrm_driver='bisection' only, not "
+                f"{ssrm_driver!r}.")
+        if failure_criterion not in ("non_convergence", "hybrid"):
+            raise ValueError(
+                f"trial_factors does not run failure_criterion="
+                f"'{failure_criterion}'. A probe trial is read for the "
+                "standing/failing verdict the non-convergence and hybrid "
+                "criteria produce.")
     if _driver == 'ramp':
         if resolve_fem_solver(fem_solver) != 'newton':
             raise ValueError(
@@ -12204,7 +12231,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             elastic_mask=elastic_mask,
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
             early_failure=early_failure, fem_solver=fem_solver,
-            _prepared=prep, _init_state=init_state)
+            _prepared=prep, _init_state=init_state,
+            trial_factors=trial_factors)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -12442,7 +12470,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  grid=None, min_slip_depth=None, ssr_exclude_mask=None,
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
                  suction_phi_b=None, suction_cap=None, early_failure=True,
-                 fem_solver=None, _prepared=None, _init_state=None, hybrid=False):
+                 fem_solver=None, _prepared=None, _init_state=None, hybrid=False,
+                 trial_factors=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -12636,6 +12665,56 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         nonlocal bracket_step
         bracket_step += 1
         prog["n_bracket"] = max(prog["n_bracket"], bracket_step + 1)
+
+    # === Fixed-trial probe: solve at named factors, bisect nothing ===========
+    # ``trial_factors`` asks a question a bisection cannot be asked cheaply: does
+    # the model still stand at THIS strength, and still fail at THAT one. Each
+    # factor is solved through the same _solve_at the bisection uses and recorded
+    # through the same _record, so a probe trial and a bracket trial at the same F
+    # are the same solve with the same verdict — which is what makes a probe able
+    # to check an edge a bracket cut.
+    #
+    # It returns NO factor of safety. A pair of trials bounds one; it does not
+    # measure one, and a caller that wants the number runs the bracket. Reporting
+    # `converged` False with `FS`/`final_interval` None is what says so, and it is
+    # also what keeps solve_ssrm's at-failure capture (guarded on all three) from
+    # running on a probe.
+    if trial_factors:
+        factors = [float(f) for f in trial_factors]
+        prog["n_bracket"], prog["n_steps"] = len(factors), 0
+        for k, F_probe in enumerate(factors):
+            from .search import _check_cancel
+            _check_cancel(cancel_check)
+            _ssrm_progress(progress_callback, k * SUBDIV, len(factors) * SUBDIV,
+                           f"Trial F={F_probe:.4f}")
+            if debug_level >= 1:
+                print(f"\n  SSRM probe trial: F = {F_probe:.4f}")
+            sol_probe = _record(F_probe,
+                                _solve_at(F_probe, k, f"Trial F={F_probe:.4f}"),
+                                "probe")
+            if _inconclusive(sol_probe):
+                _note_inconclusive(F_probe, sol_probe)
+            if debug_level >= 1:
+                print(f"    -> {_verdict_note(sol_probe)} "
+                      f"({sol_probe['iterations']} iters)")
+        _ssrm_progress(progress_callback, len(factors) * SUBDIV,
+                       len(factors) * SUBDIV, "probe complete")
+        return {
+            "converged": False,
+            "FS": None,
+            "last_solution": None,
+            "iterations_ssrm": 0,
+            "final_interval": None,
+            "interval_width": None,
+            "trials": trials,
+            "inconclusive": inconclusive,
+            "note": (inconclusive[-1]["message"] if inconclusive else None),
+            "probe": True,
+            "failure_criterion": ("hybrid" if hybrid else
+                                  "non_convergence" if max_disp_factor is None
+                                  else "displacement_limit"),
+            "method": "SSRM — fixed-trial probe (no bisection, no factor of safety)",
+        }
 
     # === Establish a valid bracket, auto-expanding a wrong guess ===
     # The lower bound must converge and the upper must not. If the guess is off,

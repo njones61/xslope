@@ -27,6 +27,13 @@ own ceiling. That is what this reports as the effective ceiling.
 Most committed sidecars predate the trial record and carry none; those rows are
 listed as NOT CAPTURED, which is a thing to fix by re-running them, not a pass.
 
+It also reads the other thing a tag can say about the same bracket. A row tagged
+``check=edges`` is verified by re-solving at ``f_stand`` and ``f_fail`` rather
+than by bisecting, so those two factors have to BE the bracket its record ended
+on; a pair that has drifted from the record is reported here, because such a row
+passes while checking two factors that belong to a different run.
+``tools/lock_edges.py`` is what writes them.
+
 Usage:
     python tools/ssrm_trial_audit.py [--page docs/verification/rs2.md] [--all]
 
@@ -135,6 +142,7 @@ def audit_one(kv, meta):
                          if edge_lo is not None and abs(r[0] - edge_lo) < 1e-12
                          or edge_hi is not None and abs(r[0] - edge_hi) < 1e-12)
     return {
+        "edges": (edge_lo, edge_hi),
         "trials": len(rows),
         "decided": len(decided),
         "at_ceiling": len(undecided),
@@ -163,10 +171,22 @@ def main(argv=None):
     rows = tags(pages)
     print(f"{len(rows)} fem_ssrm locks on {len(set(p for p, _ in rows))} page(s)")
     flagged, captured, missing = [], 0, []
+    checked_on_edges, stale_edges = 0, []
     for page, kv in rows:
         meta = meta_path(page, kv, overrides)
         a = audit_one(kv, meta) if meta else None
         name = kv.get("benchmark") or os.path.basename(kv["file"])
+        # What the TAG says about the same bracket. A row checked on its edges is
+        # re-solved at exactly these two factors instead of bisected, so a pair
+        # that has drifted from the record it was written off is a row checking
+        # something other than its own lock.
+        tag_edges = None
+        if str(kv.get("check", "")).strip().lower() == "edges":
+            checked_on_edges += 1
+            try:
+                tag_edges = (float(kv["f_stand"]), float(kv["f_fail"]))
+            except (KeyError, TypeError, ValueError):
+                tag_edges = None
         if a is None:
             missing.append((name, os.path.relpath(page, _ROOT)))
             continue
@@ -174,17 +194,33 @@ def main(argv=None):
         finding = a["at_ceiling"] > 0
         if finding:
             flagged.append((name, a))
+        rec_lo, rec_hi = a["edges"]
+        if (tag_edges and rec_lo is not None and rec_hi is not None
+                and (abs(tag_edges[0] - rec_lo) > 1e-9
+                     or abs(tag_edges[1] - rec_hi) > 1e-9)):
+            stale_edges.append((name, tag_edges, (rec_lo, rec_hi)))
         if args.all or finding:
             head = "BUDGET-BOUND" if a["edge_undecided"] else \
                    ("at-ceiling trials" if finding else "decided")
+            edges = (f", checked on edges [{tag_edges[0]:g}, {tag_edges[1]:g}]"
+                     if tag_edges else "")
             print(f"  {name:22s} {head:18s} "
                   f"{a['decided']}/{a['trials']} decided, "
                   f"{a['at_ceiling']} at the {a['ceiling']} ceiling "
                   f"(tag max_iter={a['stated']}), "
-                  f"longest decided {a['max_decided']}")
+                  f"longest decided {a['max_decided']}{edges}")
 
     print(f"\n{captured} lock(s) carry a trial record; {len(flagged)} have a trial "
           f"that ended at the ceiling")
+    print(f"{checked_on_edges} lock(s) are checked on their bracket edges rather "
+          f"than re-bisected (tools/lock_edges.py writes the pair)")
+    if stale_edges:
+        print(f"{len(stale_edges)} of them carry a pair that is NOT the bracket "
+              f"their own record ended on — the row is checking two factors that "
+              f"belong to some other run, and the pair has to be rewritten:")
+        for name, tag_pair, rec_pair in stale_edges:
+            print(f"  {name:22s} tag [{tag_pair[0]:g}, {tag_pair[1]:g}] vs "
+                  f"record [{rec_pair[0]:g}, {rec_pair[1]:g}]")
     if missing:
         print(f"{len(missing)} lock(s) carry NO trial record — the sidecar predates "
               f"it, so the budget question cannot be answered from the corpus and "

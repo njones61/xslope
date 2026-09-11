@@ -58,3 +58,9 @@ ref_docs/
 # Design and planning notes live in the private sibling repo, ../xslope_private/plans/.
 plans/
 .figure_cache/
+
+# What each suite row cost on THIS machine, written by run_tests.py after every
+# run. It is a local measurement — the tier rule reads it to hold a row that has
+# been timed over the threshold — and a machine that has measured nothing runs
+# everything, so it is never committed. The durable decision is the tag: tier=gate.
+test/row_timings.json

@@ -88,6 +88,7 @@ the ``cwd_invariant`` row checks that discovery is the same either way.
 
 import argparse
 import glob
+import json
 import os
 import re
 import sys
@@ -461,7 +462,7 @@ def parse_test_tags(md_path):
             params['file2'] = str(md_dir / params['file2'])
 
         # Convert numeric fields
-        for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'beta', 'k0',
+        for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'f_stand', 'f_fail', 'beta', 'k0',
                     'expected_kc', 'k_min', 'k_max', 'fs_tol', 'kc_tol', 'refine_factor',
                     'expected_pf', 'pf_tol',
                     'expected_depth', 'depth_x', 'depth_datum',
@@ -1637,7 +1638,342 @@ def _lock_exact_window(expected):
     return 0.5 * 10.0 ** (-max(len(frac), 2))
 
 
+# ============================== TIERS AND EDGES ==============================
+# A lock is PROVED once, when it is cut: a bracket on two meshes at a decided
+# budget, by a corpus builder or a campaign round. What this suite owes it after
+# that is a CHECK that it is still reproducible. The bracket re-proves it from
+# scratch every run — nine trials to rediscover a number nobody has moved — and
+# on the geotextile walls and the RS2 joint corpus one row of that costs an hour
+# or more. Two things follow from separating the two jobs.
+#
+# EDGES MODE (``check=edges``) checks the lock with the two trials that DEFINE
+# it: the highest factor that stood when the lock was cut (``f_stand``) and the
+# lowest that failed (``f_fail``). Both are re-solved at the row's own settings,
+# and the check passes only if the model still stands at the one and still fails
+# at the other. Nothing else can be true of a reproducible lock, and nothing less
+# than a flip at one of those two factors can move it: the bisection that cut it
+# closed on exactly that pair. Two solves instead of nine.
+#
+# TIERS say which rows a change is checked against. ``--standard`` (the default)
+# runs every row a change could plausibly move for a cost a change can be checked
+# at; ``--gate`` runs everything, bracket mode forced on every row, and is the
+# release gate. A row goes to the gate tier either because its tag pins it there
+# (``tier=gate``) or because the last wall-clock this suite recorded for it is
+# over GATE_SECONDS.
+
+#: Verdicts that mean a trial ran out of iteration budget rather than deciding.
+#: Read exactly as tools/ssrm_trial_audit.py reads them, because the tool is what
+#: cut the edges a tag carries and the runner is what re-checks them: the two must
+#: not disagree about what "decided" means.
+UNDECIDED_VERDICTS = ('STABLE_STUCK', 'AMBIGUOUS', 'INCONCLUSIVE')
+
+#: fem.solve_fem's own hard stop on budget extension (max_iterations_ceiling).
+#: A trial's effective ceiling is the larger of this and its tag's max_iter.
+DEFAULT_TRIAL_CEILING = 50000
+
+#: A BRACKET-mode row whose last recorded wall-clock exceeds this is gate-only.
+#: Chosen off the recorded distribution (test/row_timings.json): the corpus's
+#: bracket rows cluster well under it, and what sits above are the geotextile
+#: walls and the jointed corpus rows, which are the rows the tiering exists for.
+#: Raising it does not make a run safer — it makes the standard run longer.
+GATE_SECONDS = 600.0
+
+#: Where the suite records what each row cost, so the threshold above can be
+#: revisited against measurements instead of guessed again. It is written after
+#: every run and is NOT committed: it is what this machine measured, and a clone
+#: that has measured nothing runs everything. The durable, reviewable half of the
+#: rule is the tag — ``tier=gate``.
+ROW_TIMINGS_PATH = _repo('test/row_timings.json')
+
+
+def _row_key(test):
+    """A stable identity for one row, for the timing record.
+
+    Type, benchmark id, model file, method, mesh size, locked value and the page
+    the tag is on. Every part is load-bearing, because a row that shared a key
+    with another would inherit its timing and be held back for it: a benchmark id
+    names three models on one figure (SSRM-G5), a file is commonly locked at two
+    mesh sizes that cost different amounts, one page locks a model twice at one
+    size, and two pages lock the same model. Paths are relative to the repo, so
+    the key is the same from any working directory."""
+    def _rel(p):
+        # Only an ABSOLUTE path is treated as one. Discovery makes every real
+        # file path absolute, so anything relative here is a label a file-less
+        # row carries in its `file` slot ("the sign of the base normal") — and
+        # resolving one against the process working directory is what made this
+        # key, and the --list enumeration built from it, depend on where the
+        # suite was invoked from.
+        s = str(p)
+        if not os.path.isabs(s):
+            return s
+        try:
+            return Path(s).resolve().relative_to(REPO_ROOT).as_posix()
+        except (ValueError, OSError):
+            return Path(s).name
+    size = test.get('target_size')
+    size = '-' if size in (None, '') else f"{float(size):g}"
+    lock = test.get('expected_fs')
+    lock = '-' if lock in (None, '') else f"{float(lock):g}"
+    return (f"{test.get('type', '?')}|{test.get('benchmark', '-')}"
+            f"|{_rel(test.get('file', '-'))}|{test.get('method', '-')}|{size}"
+            f"|{lock}|{_rel(test.get('source', '-'))}")
+
+
+def _load_row_timings(path=None):
+    """The recorded per-row wall-clock, ``{key: {mode: seconds}}``. Empty when the
+    file is absent, which is not an error: a clone that has never run the suite
+    has measured nothing, and a row nothing has measured runs in the standard
+    tier rather than being dropped from it on a guess."""
+    try:
+        with open(path or ROW_TIMINGS_PATH) as fh:
+            data = json.load(fh)
+        return data.get('rows', {}) if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_row_timings(updates, path=None):
+    """Merge this run's per-row wall-clock into the record, newest wins.
+
+    Timings are stored per MODE — a row's edges check and its bracket run are
+    different measurements of different work, and the tier rule reads the bracket
+    one. Written sorted so a commit of the file is a readable diff."""
+    path = path or ROW_TIMINGS_PATH
+    rows = _load_row_timings(path)
+    for key, (mode, seconds) in updates.items():
+        rows.setdefault(key, {})[mode] = round(float(seconds), 1)
+    payload = {
+        '_readme': ("Wall-clock seconds per suite row, per run mode, from the "
+                    "last run that exercised it on this machine. run_tests.py "
+                    "reads the entry for the mode a standard run would use to "
+                    "decide which fem_ssrm rows are gate-only (GATE_SECONDS). "
+                    "Everything here is a measurement, never a lock, and the "
+                    "file is not committed."),
+        'rows': {k: dict(sorted(rows[k].items())) for k in sorted(rows)},
+    }
+    try:
+        with open(path, 'w') as fh:
+            json.dump(payload, fh, indent=1, sort_keys=False)
+            fh.write('\n')
+    except OSError:
+        pass          # a read-only checkout still runs; it just records nothing
+
+
+def _row_mode(test):
+    """How a standard-tier run would exercise this row: ``'edges'`` for a lock
+    checked on its two bracket edges, ``'bracket'`` for one re-proved by the
+    bisection, ``'run'`` for everything that is not a strength-reduction lock."""
+    if test.get('type') != 'fem_ssrm':
+        return 'run'
+    return 'edges' if _edges_pair(test) is not None else 'bracket'
+
+
+def _row_tier(test, timings, threshold=GATE_SECONDS):
+    """``'standard'`` or ``'gate'`` for one row.
+
+    A row is held for the gate when it is measured to be too expensive for a
+    routine run, or when its tag says it is:
+
+    * MEASURED. The last wall-clock recorded for the row IN THE MODE THE
+      STANDARD TIER WOULD RUN IT — a lock's edges check and its bisection are
+      different work and are timed separately — decides it. Only strength
+      reduction rows are subject to this: they are the rows whose cost the tier
+      exists for, and a rule that could silently drop any row that once ran long
+      is a rule that quietly stops checking things.
+    * A row nothing has measured is STANDARD. Unmeasured is unknown, not
+      known-heavy, so a fresh clone checks everything and learns what things cost
+      by running them.
+    * PINNED. ``tier=gate`` on the tag holds the row whatever it costs — the RS2
+      joint corpus, where a single row is hours of interface iterations. The one
+      exception is a row in edges mode, which the standard tier checks anyway:
+      two trials is what edges mode is for, holding back a check that cheap would
+      leave the lock unchecked between releases, and if those two trials turn out
+      to be expensive the measured rule above holds the row on its own.
+    """
+    mode = _row_mode(test)
+    if test.get('type') == 'fem_ssrm':
+        recorded = (timings or {}).get(_row_key(test), {}).get(mode)
+        if recorded is not None and float(recorded) > threshold:
+            return 'gate'
+    if str(test.get('tier', '')).strip().lower() == 'gate' and mode != 'edges':
+        return 'gate'
+    return 'standard'
+
+
+def _edges_pair(test):
+    """``(f_stand, f_fail)`` for a row that asks for the two-trial check, else None.
+
+    ``check=edges`` selects the mode and both factors are required with it: a tag
+    that asks for the check without saying which two trials to make is a broken
+    tag, and is reported as one rather than quietly bisecting."""
+    if str(test.get('check', 'bracket')).strip().lower() != 'edges':
+        return None
+    try:
+        return float(test['f_stand']), float(test['f_fail'])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _trial_ceiling(test):
+    """The iteration ceiling a trial on this row actually runs to. ``solve_fem``
+    extends a budget that is still improving up to ``max_iterations_ceiling``
+    (50 000) and takes ``max(ceiling, max_iterations)``, so a tag below 50 000
+    does not state its own ceiling and one above it does."""
+    try:
+        stated = int(float(test.get('max_iter', 12000)))
+    except (TypeError, ValueError):
+        stated = 12000
+    return max(DEFAULT_TRIAL_CEILING, stated)
+
+
+def _trial_at(trials, factor):
+    """The probe trial solved at ``factor``, or None."""
+    for trial in trials or ():
+        try:
+            if abs(float(trial.get('F')) - float(factor)) < 1e-9:
+                return trial
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _edge_reading(trials, factor, ceiling):
+    """``(verdict, decided)`` for the probe trial at ``factor``.
+
+    A trial is DECIDED when its verdict is CONVERGED or FAILED and it reached
+    that verdict inside its budget. One that ran out of budget — STABLE_STUCK,
+    AMBIGUOUS, INCONCLUSIVE, or simply at the ceiling — has not answered the
+    question, and an unanswered question is never a pass: it is the exact state
+    in which a bracket edge biases the lock it closed on."""
+    trial = _trial_at(trials, factor)
+    if trial is None:
+        return None, False
+    verdict = str(trial.get('verdict'))
+    iterations = int(trial.get('iterations') or 0)
+    decided = (verdict in ('CONVERGED', 'FAILED')
+               and verdict not in UNDECIDED_VERDICTS
+               and iterations < ceiling
+               and trial.get('exit_reason') != 'inconclusive')
+    return verdict, decided
+
+
+def _edges_check(trials, f_stand, f_fail, ceiling):
+    """Does the lock's bracket still close where it closed? ``(ok, note)``.
+
+    ``ok`` requires both trials to be decided AND to fall the way the lock says:
+    standing at ``f_stand``, failing at ``f_fail``. ``note`` names what happened
+    at each factor, so a flip says which edge moved and in which direction."""
+    v_lo, lo_ok = _edge_reading(trials, f_stand, ceiling)
+    v_hi, hi_ok = _edge_reading(trials, f_fail, ceiling)
+    stands = lo_ok and v_lo == 'CONVERGED'
+    fails = hi_ok and v_hi == 'FAILED'
+    note = (f"F={f_stand:g} {v_lo or 'not solved'}, "
+            f"F={f_fail:g} {v_hi or 'not solved'}")
+    if stands and fails:
+        return True, note
+    flipped = []
+    if not stands:
+        flipped.append(f"the standing edge F={f_stand:g} no longer stands ({v_lo})")
+    if not fails:
+        flipped.append(f"the failing edge F={f_fail:g} no longer fails ({v_hi})")
+    return False, "; ".join(flipped)
+
+
+def run_fem_ssrm_probe(test, factors, fast_kernel):
+    """Solve one ``fem_ssrm`` row at named strength reduction factors, bisecting
+    nothing. Returns ``(trials, error)``.
+
+    Everything but the driver is the bracket runner's: the same
+    ``build_fem_ssrm_case`` mesh and options, the same kernel pinning, the same
+    ``solve_ssrm`` call — which is what makes a probe trial and a bracket trial at
+    one factor the same solve with the same verdict."""
+    from xslope.fem import solve_ssrm
+
+    try:
+        fem_data, kwargs, f_min, f_max, ssrm_tolerance = build_fem_ssrm_case(test)
+    except ValueError as exc:
+        return None, str(exc)
+
+    def _solve():
+        return solve_ssrm(fem_data, F_min=f_min, F_max=f_max,
+                          tolerance=ssrm_tolerance, debug_level=0,
+                          trial_factors=[float(f) for f in factors], **kwargs)
+
+    if fast_kernel is None:
+        result = _solve()
+    else:
+        import xslope.fem as _fem
+        with _force_fast_kernel(_fem, fast_kernel):
+            result = _solve()
+    return result.get('trials') or [], None
+
+
+def _run_fem_ssrm_edges(test, pair):
+    """The two-trial lock check for one ``fem_ssrm`` row, with the bracket behind
+    it. Returns ``(computed_FS, error_msg, annotation)``.
+
+    Three tiers, each entered only when the one before it did not settle the row:
+
+      1. the two edge trials on the FAST kernel (skipped under --reference-only
+         and where the compiled kernel is not built);
+      2. the same two trials on the REFERENCE kernel, which is the path every
+         lock is defined by;
+      3. the full bracket on the reference kernel, exactly as a bracket-mode row
+         runs, compared to ``expected_fs`` inside the row's tolerance. Its verdict
+         is FINAL.
+
+    A row that passes at (1) or (2) reports the midpoint of its two edges as the
+    computed value. That is not the bisection's answer re-derived — it is the
+    factor of safety the two re-solved trials BOUND, and the guard on the tag
+    (``lock_edges``) is what keeps that bound inside the lock's own tolerance. A
+    row that reaches (3) reports what the bracket measured, and nothing about
+    the edges is read for its verdict."""
+    f_stand, f_fail = pair
+    reference_only = bool(test.get('_reference_only', False))
+    ceiling = _trial_ceiling(test)
+    mid = 0.5 * (f_stand + f_fail)
+
+    kernels = [] if (reference_only or not _fast_kernel_available()) else [True]
+    kernels.append(False)
+    notes = []
+    for fast in kernels:
+        trials, err = run_fem_ssrm_probe(test, (f_stand, f_fail), fast_kernel=fast)
+        which = 'fast kernel' if fast else 'reference'
+        if err is not None:
+            notes.append(f"{which}: {err}")
+            continue
+        ok, note = _edges_check(trials, f_stand, f_fail, ceiling)
+        if ok:
+            return mid, None, ('edges', f'edges hold on the {which} ({note})')
+        notes.append(f"{which}: {note}")
+
+    # An edge flipped on the oracle. The bracket is what can say where the lock
+    # sits now, so it runs — once — and it decides the row.
+    fs, bracket_err, _annotation = _run_fem_ssrm_bracket(test)
+    why = '; '.join(notes)
+    if bracket_err is not None:
+        return None, bracket_err, ('edges_bracket', f'edge flipped ({why}), bracket errored')
+    return fs, None, ('edges_bracket', f'edge flipped ({why}), bracket re-solved it')
+
+
 def _run_fem_ssrm(test):
+    """One ``fem_ssrm`` row, in the mode its tag asks for.
+
+    ``check=edges`` runs the two-trial lock check (``_run_fem_ssrm_edges``);
+    anything else runs the bracket (``_run_fem_ssrm_bracket``). ``--gate`` forces
+    the bracket on every row by setting ``_force_bracket``, which is what makes
+    the release gate re-prove every lock rather than check it."""
+    pair = _edges_pair(test)
+    if pair is not None and not test.get('_force_bracket'):
+        return _run_fem_ssrm_edges(test, pair)
+    if (pair is None and not test.get('_force_bracket')
+            and str(test.get('check', 'bracket')).strip().lower() == 'edges'):
+        return None, ("check=edges needs both f_stand and f_fail on the tag "
+                      "(tools/lock_edges.py writes them)"), None
+    return _run_fem_ssrm_bracket(test)
+
+
+def _run_fem_ssrm_bracket(test):
     """Two-tier *fast-first-with-fallback* runner for a single ``fem_ssrm`` row.
     Returns ``(computed_FS, error_msg, annotation)`` where ``annotation`` is a
     ``(bucket, text)`` routing note the summary tallies (``bucket`` in
@@ -7778,6 +8114,68 @@ def run_tag_k0_test(test):
                       f"(rebuild the file, do not edit it): " + "; ".join(problems[:5]))
     if not wanted:
         return None, "no k0 test tags found — the guard is not looking at anything"
+    return 0.0, None
+
+
+def run_lock_edges_test(test):
+    """Guard: every ``check=edges`` tag states a pair of trials that can only be
+    true of the lock it carries.
+
+    Edges mode checks a lock with two solves instead of nine, and what makes that
+    a check of the lock rather than of two arbitrary factors is that the pair is
+    the bracket the bisection closed on. Three properties say it is:
+
+    * both factors are present. ``check=edges`` without them is a tag that asks
+      for a check it does not describe;
+    * ``f_stand < expected_fs <= f_fail``. The lock is the midpoint of its final
+      bracket, so it lies between the edges — a pair that does not straddle it
+      belongs to some other run of some other model, which is exactly what a
+      sidecar written before a re-lock is;
+    * ``f_fail - f_stand <= 2 x tolerance``. The bisection stops when the bracket
+      is narrower than the tolerance, so a wider pair is not a final bracket: it
+      is two trials from somewhere in the middle of the search, and they would
+      pass while the lock moved between them.
+
+    ``tools/lock_edges.py`` writes the fields, from the trial record the figure
+    producers persist beside each model; this is what stops a hand-edited or
+    stale pair from standing in for a bracket.
+    """
+    problems = []
+    n_edges = 0
+    for md in sorted(Path(_repo('docs')).rglob('*.md')):
+        for t in parse_test_tags(md):
+            if t.get('type') != 'fem_ssrm':
+                continue
+            name = t.get('benchmark') or Path(str(t.get('file', '?'))).name
+            asks = str(t.get('check', 'bracket')).strip().lower() == 'edges'
+            has = ('f_stand' in t) or ('f_fail' in t)
+            if not asks:
+                if has:
+                    problems.append(f"{name}: carries f_stand/f_fail but no "
+                                    f"check=edges, so neither is read")
+                continue
+            n_edges += 1
+            pair = _edges_pair(t)
+            if pair is None:
+                problems.append(f"{name}: check=edges needs both f_stand and f_fail")
+                continue
+            f_stand, f_fail = pair
+            expected = t.get('expected_fs')
+            tol = float(t.get('tolerance', 0.05))
+            if expected is None:
+                problems.append(f"{name}: check=edges on a tag with no expected_fs")
+                continue
+            expected = float(expected)
+            if not (f_stand < expected <= f_fail):
+                problems.append(f"{name}: edges [{f_stand:g}, {f_fail:g}] do not "
+                                f"straddle the lock {expected:g}")
+            if (f_fail - f_stand) > 2.0 * tol + 1e-12:
+                problems.append(f"{name}: edge pair is {f_fail - f_stand:.4g} wide, "
+                                f"more than twice the tolerance {tol:g} — not a "
+                                f"final bracket")
+    if problems:
+        return None, (f"{len(problems)} edge-pair problem(s): "
+                      + "; ".join(problems[:5]))
     return 0.0, None
 
 
@@ -14129,6 +14527,8 @@ def _dispatch_test(test):
         return run_corpus_index_test(test)
     if test_type == 'tag_k0':
         return run_tag_k0_test(test)
+    if test_type == 'lock_edges':
+        return run_lock_edges_test(test)
     if test_type == 'gsat_pair':
         return run_gsat_pair_test(test)
     if test_type == 'axial_mirror':
@@ -14214,7 +14614,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -14354,6 +14754,20 @@ def main():
                         help='Run only the mesh-size locks (type=mesh_elements): '
                              'the element and node counts the verification pages '
                              'print. A mesh build each, no solve — seconds.')
+    parser.add_argument('--standard', action='store_true',
+                        help='The default tier: every row except the ones the '
+                             'gate tier holds — a tag pinned tier=gate, or a '
+                             'bracket-mode SSRM row whose last recorded '
+                             'wall-clock is over the threshold. Strength-'
+                             'reduction locks whose tag carries check=edges are '
+                             'CHECKED with their two bracket-edge trials instead '
+                             'of re-proved with a full bisection.')
+    parser.add_argument('--gate', action='store_true',
+                        help='The release gate: every row, including the ones '
+                             'the standard tier holds back, with the full '
+                             'bisection forced on every strength-reduction row '
+                             '(check=edges is ignored). Hours, not minutes — run '
+                             'it before a release, not to check a change.')
     parser.add_argument('--list', action='store_true',
                         help='Print the discovered test count and a per-source '
                              'breakdown, then exit without running anything. '
@@ -14410,6 +14824,13 @@ def main():
         # Side-roller assignment on an off-vertical truncation face.
         tests.append({'type': 'side_roller', 'file': 'off-vertical side face (fem)',
                       'method': '-', 'source': 'side_roller'})
+        # The two-trial lock check's tag guard. It belongs to the SSRM locks, so
+        # --fem wants it; it is registered with the other tag guards under
+        # --roundtrip, and added here only when that scope is not already running.
+        if not run_roundtrip:
+            tests.append({'type': 'lock_edges',
+                          'file': 'check=edges tags vs their locks',
+                          'method': '-', 'source': 'lock_edges'})
         # The 1D details dialog: gating, envelope sharing, reload, export.
         tests.append({'type': 'fem_1d_details',
                       'file': 'FEM 1D solution details (Studio dialog)',
@@ -15184,6 +15605,12 @@ def main():
         # else — the same file opened in Studio initializes by gravity turn-on.
         tests.append({'type': 'tag_k0', 'file': 'K0 tags vs main!D16',
                       'method': '-', 'source': 'tag_k0'})
+        # Guard the two-trial lock check's inputs: a check=edges tag must carry a
+        # pair of trials that could only have come from the bracket its own lock
+        # was cut by. It parses tags and solves nothing, so it rides with the
+        # other tag guards; --fem picks it up too when that scope runs alone.
+        tests.append({'type': 'lock_edges', 'file': 'check=edges tags vs their locks',
+                      'method': '-', 'source': 'lock_edges'})
         # Editor no-drop guard (studio.editors). Touches the studio/Qt layer, so
         # it's skipped cleanly when PySide6 is absent (engine-only installs), like
         # the DXF round-trip tests.
@@ -15400,6 +15827,25 @@ def main():
                  for grp in groups.values()]
         print(f"--quick: checking one method per problem ({len(tests)} tests)")
 
+    # === Tier ================================================================
+    # --gate runs everything and re-proves every strength-reduction lock with its
+    # full bisection; --standard (the default) holds back the rows the gate tier
+    # owns. Naming rows with --benchmark is itself a request for them, so it
+    # overrides the hold — the tier decides what a blanket run covers, not what a
+    # deliberate one may ask for.
+    row_timings = _load_row_timings()
+    gate_run = bool(args.gate)
+    gate_held = []
+    if not gate_run and not args.benchmark:
+        kept = []
+        for t in tests:
+            (kept if _row_tier(t, row_timings) == 'standard' else gate_held).append(t)
+        tests = kept
+    if gate_run:
+        for t in tests:
+            if t.get('type') == 'fem_ssrm':
+                t['_force_bracket'] = True
+
     if not tests:
         print("No test tags found in documentation files.")
         sys.exit(1)
@@ -15414,6 +15860,16 @@ def main():
         print(f"TOTAL {len(tests)}")
         for name in sorted(by_source):
             print(f"{by_source[name]:5d}  {Path(name).name if os.sep in name else name}")
+        # Per-row tier and mode, so a row held back by the gate tier is visible
+        # here rather than only in its absence from a run. Sorted by the row key,
+        # which is repo-relative, so this stays byte-identical from any directory.
+        listed = sorted((_row_key(t), _row_tier(t, row_timings), _row_mode(t))
+                        for t in tests + gate_held)
+        print(f"TIERS {sum(1 for _, tier, _ in listed if tier == 'standard')} standard, "
+              f"{sum(1 for _, tier, _ in listed if tier == 'gate')} gate "
+              f"(bracket rows over {GATE_SECONDS:g}s recorded, and tier=gate tags)")
+        for key, tier, mode in listed:
+            print(f"{tier:9s} {mode:8s} {key}")
         return
 
     # Thread the run-level context the two-tier fem_ssrm kernel router needs onto
@@ -15424,13 +15880,33 @@ def main():
     # framework will (the Tier 1 hit test uses the lock's printed precision instead —
     # see _lock_exact_window).
     _n_ssrm = 0
+    _n_edges = 0
     for t in tests:
         if t.get('type') == 'fem_ssrm':
             t['_default_tol'] = args.tolerance
             t['_reference_only'] = args.reference_only
             _n_ssrm += 1
+            if _edges_pair(t) is not None and not t.get('_force_bracket'):
+                _n_edges += 1
     if _n_ssrm:
         print(_ssrm_mode_notice(_n_ssrm, args.reference_only))
+    if gate_run:
+        print("Tier: gate — every row, full bisection forced on every SSRM lock "
+              "(check=edges ignored)")
+    else:
+        print(f"Tier: standard — {_n_edges} SSRM lock(s) checked on their two "
+              f"bracket edges, {_n_ssrm - _n_edges} re-proved by bisection, "
+              f"{len(gate_held)} row(s) held for --gate (tier=gate, or a bracket "
+              f"row over {GATE_SECONDS:g}s recorded in "
+              f"{Path(ROW_TIMINGS_PATH).name})")
+        if gate_held:
+            for t in sorted(gate_held, key=_row_key)[:12]:
+                recorded = row_timings.get(_row_key(t), {}).get(_row_mode(t))
+                held_for = (f"{recorded:g}s recorded" if recorded is not None
+                            else 'tier=gate')
+                print(f"  held: {_row_key(t)} ({held_for})")
+            if len(gate_held) > 12:
+                print(f"  ... and {len(gate_held) - 12} more")
 
     print(f"Found {len(tests)} tests\n")
     print(f"{'#':<4} {'File':<45} {'Type':<20} {'Method':<10} {'Expected':>10}  {'Computed':>10}  {'Status'}")
@@ -15447,6 +15923,12 @@ def main():
     route_fallback = 0        # PASS via the reference kernel after a fast miss (Tier 2)
     route_direct = 0          # PASS via reference with no fast attempt (--reference-only / no kernel)
     route_fail = 0            # fem_ssrm row that did not pass (reference verdict FINAL)
+    # Edges-mode tallies (see _run_fem_ssrm_edges): a rise in the second is the
+    # signal that a lock's bracket no longer closes where it was cut.
+    route_edges = 0           # row settled by its two bracket-edge trials
+    route_edges_bracket = 0   # edges row whose edge flipped, re-solved by the bracket
+    # What each row cost, keyed for the timing record the tier rule reads.
+    row_times = {}
 
     def _fmt(v):
         """Expected/computed in a 10-wide column, readable at ANY magnitude.
@@ -15465,6 +15947,13 @@ def main():
     def report(i, test, computed, error_msg, annotation, elapsed):
         nonlocal passed, failed, errors
         nonlocal route_fast, route_fallback, route_direct, route_fail
+        nonlocal route_edges, route_edges_bracket
+        # Every row's wall-clock, under the mode it ran in. This is the record the
+        # tier rule reads next run, so it is written for every row, not only the
+        # slow ones — a threshold can only be revisited against the whole
+        # distribution.
+        row_times[_row_key(test)] = (
+            'bracket' if test.get('_force_bracket') else _row_mode(test), elapsed)
         file_name = Path(test['file']).name
         test_type = test.get('type', '?')
         method = test.get('method', '-')
@@ -15500,14 +15989,18 @@ def main():
         if annotation is not None:
             bucket, ann_text = annotation
             status = f"{status} [{ann_text}]"
-            if status.startswith('PASS'):
+            if bucket == 'edges':
+                route_edges += 1
+            elif bucket == 'edges_bracket':
+                route_edges_bracket += 1
+            elif status.startswith('PASS'):
                 if bucket == 'fast':
                     route_fast += 1
                 elif bucket == 'fallback':
                     route_fallback += 1
                 else:
                     route_direct += 1
-            elif status.startswith('FAIL'):
+            if status.startswith('FAIL'):
                 route_fail += 1
         exp_str = _fmt(expected)
         print(f"{i:<4} {file_name:<45} {test_type:<20} {method:<10} {exp_str}  {comp_str}  {status}",
@@ -15561,6 +16054,21 @@ def main():
             print("  (rows where the fast kernel did not reproduce the lock exactly: "
                   "the reference kernel re-solved them and decided them, and each row "
                   "prints what the kernel read)")
+    # Edges mode: what the standard tier checked with two trials, what it had to
+    # re-prove with the bisection anyway, and what it did not run at all.
+    if route_edges or route_edges_bracket or gate_held:
+        print(f"FEM SSRM lock checks: {route_edges} checked on their two bracket "
+              f"edges, {route_edges_bracket} fell back to the bisection, "
+              f"{len(gate_held)} held for --gate")
+        if route_edges_bracket:
+            print("  (an edge that flipped is a lock whose bracket no longer closes "
+                  "where it was cut: the bisection decided the row, and the row "
+                  "prints which edge moved)")
+    if row_times:
+        _save_row_timings(row_times)
+        slowest = sorted(row_times.items(), key=lambda kv: -kv[1][1])[:5]
+        print("Slowest rows: " + ", ".join(f"{k.split('|')[1]} {s:.0f}s ({m})"
+                                           for k, (m, s) in slowest))
     if jobs > 1:
         print(f"Total time: {time.time() - wall_t0:.1f}s wall on {jobs} workers "
               f"({total_time:.1f}s of test time)")

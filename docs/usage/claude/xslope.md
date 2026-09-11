@@ -1026,6 +1026,11 @@ slope_data['joint_lines'] = [
      'x1': 6.0, 'y1': 6.0, 'x2': 6.3, 'y2': 6.0,
      'c': 0.0,              # joint cohesion; blank/0 is a purely frictional contact
      'phi': 34.0,           # friction angle, degrees. REQUIRED — preflight refuses a blank
+     'c_res': float('nan'),  # NaN = no residual branch: the joint keeps its peak strength.
+     'phi_res': float('nan'),#   A stated pair is what it drops to the first time it slips,
+                             #   permanently; neither may exceed the peak.
+     'dil': float('nan'),   # NaN/0 = no dilation. An angle makes a unit of slip open the
+                            #   joint by tan(dil), which builds normal stress under confinement
      't_cut': 0.0,          # tension cutoff: the joint opens past it and closes on contact
      'kn': float('nan'),    # NaN = derive from the softer adjacent soil over
      'ks': float('nan'),    # 0.1 x the 1D element size, as the reinforce sheet's pair does

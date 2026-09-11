@@ -235,11 +235,16 @@ the canvas re-renders automatically.
    sheet — a base geotextile, a wall whose fill slides on its sheets — and wrong
    where it cuts across. 'lp1'/'lp2'/'t_res' are not read there. LEM ignores it.)
   # EDIT THIS one; reinforce_lines (capitalized X/Y/T/Tres) is derived from it.
-- joint_lines[i]: {'label','x1','y1','x2','y2','c','phi','t_cut','kn','ks','jred'}
+- joint_lines[i]: {'label','x1','y1','x2','y2','c','phi','c_res','phi_res','dil',
+  't_cut','kn','ks','jred'}
   (the v27 'joints' sheet: a slip surface with NO reinforcement in it — a rock
    joint, a bedding plane, a block-on-block contact, a wall-soil interface. Same
    mesh split and same interface element as a jointed reinforcement line, without
    a bar between the two faces. 'phi' is required; blank 'c'/'t_cut' are zero;
+   blank 'c_res'/'phi_res' mean no residual branch — the joint keeps its peak
+   strength after slipping, and a stated pair is what it drops to the first time
+   it slips, permanently; blank 'dil' is no dilation, and an angle makes a unit of
+   slip open the joint by tan(dil);
    blank 'kn'/'ks' are derived from the adjacent soil; 'jred'='No' holds the joint
    at full strength in the SSR. Joint lines may MEET at a point but may not lie on
    one another, or run along the outside of the section. FEM only.)

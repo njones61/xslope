@@ -322,17 +322,26 @@ def build_joints(out_path):
     sd = load_slope_data(os.path.join(REPO_ROOT,
                                       "docs/lem/files/xslope_reinforce.xlsx"))
     sd["joint_lines"] = [
+        # A bedding plane that loses most of its cohesion once it has sheared,
+        # and a rock joint rough enough to ride up as it slides: the two columns
+        # the sheet added at v27, shown on the rows they belong to. The wall's
+        # own contacts state neither -- a block sliding on a block has one
+        # strength and does not dilate.
         {"label": "Bedding plane", "x1": -20.0, "y1": -4.0, "x2": 90.0, "y2": -1.0,
-         "c": 100.0, "phi": 24.0, "t_cut": 0.0,
+         "c": 100.0, "phi": 24.0, "c_res": 20.0, "phi_res": 20.0,
+         "dil": float("nan"), "t_cut": 0.0,
          "kn": float("nan"), "ks": float("nan"), "jred": ""},
         {"label": "Rock joint", "x1": 20.0, "y1": 16.0, "x2": 44.0, "y2": -8.0,
-         "c": 0.0, "phi": 32.0, "t_cut": 300.0,
+         "c": 0.0, "phi": 32.0, "c_res": float("nan"), "phi_res": float("nan"),
+         "dil": 8.0, "t_cut": 300.0,
          "kn": 200000.0, "ks": 80000.0, "jred": ""},
         {"label": "Wall back face", "x1": 60.0, "y1": 24.0, "x2": 60.0, "y2": 6.0,
-         "c": 0.0, "phi": 20.0, "t_cut": 0.0,
+         "c": 0.0, "phi": 20.0, "c_res": float("nan"), "phi_res": float("nan"),
+         "dil": float("nan"), "t_cut": 0.0,
          "kn": 100000.0, "ks": 100000.0, "jred": ""},
         {"label": "Wall base", "x1": 56.0, "y1": 6.0, "x2": 60.0, "y2": 6.0,
-         "c": 0.0, "phi": 34.0, "t_cut": 0.0,
+         "c": 0.0, "phi": 34.0, "c_res": float("nan"), "phi_res": float("nan"),
+         "dil": float("nan"), "t_cut": 0.0,
          "kn": 100000.0, "ks": 100000.0, "jred": "No"},
     ]
     template = os.path.join(REPO_ROOT, "docs", "inputs", "input_template.xlsx")

@@ -4682,7 +4682,8 @@ def _pf_joint_sheet(sd, x1=5.0, y1=2.0, x2=25.0, y2=2.0, **kw):
     so a spec that changes one field is testing that field.
     """
     row = dict(label='seam', x1=x1, y1=y1, x2=x2, y2=y2,
-               c=0.0, phi=25.0, t_cut=0.0,
+               c=0.0, phi=25.0, c_res=float('nan'), phi_res=float('nan'),
+               dil=float('nan'), t_cut=0.0,
                kn=float('nan'), ks=float('nan'), jred='')
     row.update(kw)
     sd['joint_lines'] = [row]
@@ -5536,6 +5537,26 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_joint_sheet(sd, c=0.0, phi=0.0),
          control=lambda sd: _pf_joint_sheet(sd),
          expect='states c = 0 and phi = 0'),
+    # The residual branch and the dilation angle. The control on each is a
+    # residual BELOW the peak and a dilation angle inside its range -- a sound
+    # joint stating both -- so what the mutation moves is the one value.
+    dict(rule='joint.residual_above_peak', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, c=10.0, phi=25.0, c_res=20.0,
+                                             phi_res=30.0),
+         control=lambda sd: _pf_joint_sheet(sd, c=10.0, phi=25.0, c_res=4.0,
+                                            phi_res=18.0),
+         expect='does not come back stronger'),
+    dict(rule='joint.residual_negative', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, c=10.0, phi=25.0, c_res=-1.0),
+         control=lambda sd: _pf_joint_sheet(sd, c=10.0, phi=25.0, c_res=0.0),
+         expect='is a strength, so it is zero or more'),
+    dict(rule='joint.dilation_out_of_range', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, dil=95.0),
+         control=lambda sd: _pf_joint_sheet(sd, dil=10.0),
+         expect='tan(dil)'),
     dict(rule='joint.outside_domain', base=PREFLIGHT_BASE_REINF_FEM,
          mode='dict', analysis='ssrm',
          mutation=lambda sd: _pf_joint_sheet(sd, x1=200.0, y1=200.0,

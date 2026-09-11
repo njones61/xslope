@@ -96,9 +96,11 @@ SHEETS = [
     # ends at Area in column T.
     {"out": "sheet_reinforce.png", "src": "docs/lem/files/xslope_reinforce.xlsx",
      "sheet": "reinforce", "cols": "A:T"},
-    # joints (v27): the whole table, A:L. There is no hidden lookup block behind
-    # it, and the Yes/No list on Jred is a validation list rather than in-sheet data.
-    {"out": "sheet_joints.png", "src": JOINTS, "sheet": "joints", "cols": "A:L"},
+    # joints (v27): the whole table, A:O -- the residual pair and the dilation
+    # angle sit between phi and t_cut, so the table that ended at Jred in column L
+    # ends at Jred in column O. There is no hidden lookup block behind it, and the
+    # Yes/No list on Jred is a validation list rather than in-sheet data.
+    {"out": "sheet_joints.png", "src": JOINTS, "sheet": "joints", "cols": "A:O"},
     {"out": "sheet_piles.png", "src": "docs/lem/files/xslope_piles.xlsx",
      "sheet": "piles", "cols": "A:T"},
     {"out": "sheet_lloads.png", "src": "docs/inputs/slope/xslope_nail_axial.xlsx",

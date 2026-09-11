@@ -1,4 +1,4 @@
-"""The interface (joint) element, against four closed forms.
+"""The interface (joint) element, against six closed forms.
 
 A jointed constraint line is a slip surface: the mesh is split along it and a
 pair of zero-thickness interface elements spans each station, upper soil to bar
@@ -33,6 +33,17 @@ Four rows, each building its model in memory and solving it on the reference
      interface, so the cohesion term the third row reads as an adhesion is read
      again as a strength: ``FS = (c_j + gamma H cos^2 beta tan phi_j) /
      (gamma H sin beta cos beta)``.
+  5. **Residual strength.** Row 1's direct shear again, with a residual branch
+     on the joint. The plateau the sliding interface settles at is the joint's
+     strength at that normal stress, so it moves from ``c + sigma_n tan phi`` to
+     ``c_res + sigma_n tan phi_res``; and a block on a plane whose joint drops
+     from phi to phi_res returns ``FS = tan phi_res / tan beta``, the residual
+     branch being what carries the mechanism by the time a trial is decided.
+  6. **Dilation.** A slipping joint with a dilation angle rides up on its
+     asperities: between two states of the same sliding interface the normal
+     OPENING per unit SLIP is ``tan(dil)``. Riding up against ``k_n`` also
+     builds normal traction, which the same model with ``dil`` blank does not,
+     and ``dil = 0`` reproduces that blank model to the bit.
 
 Three more legs read what the rows do not reach: the tension cutoff and the
 tied end, on an imposed displacement field; the stiffness the SOFTER adjacent
@@ -115,7 +126,7 @@ def _material(name, **kw):
 
 def _finish(d, polys_and_ids, domain, ground, y_bottom, materials, line,
             cj, phi_j, ts, s1d, kn=None, ks=None, jred='yes', tend1=0.0,
-            barless=False):
+            barless=False, c_res=None, phi_res=None, dil=None):
     """Common tail: install the geometry and the jointed line, mesh, build.
 
     ``barless=True`` puts the line on the ``joints`` sheet instead of the
@@ -142,6 +153,11 @@ def _finish(d, polys_and_ids, domain, ground, y_bottom, materials, line,
             label='joint', x1=line[0][0], y1=line[0][1],
             x2=line[1][0], y2=line[1][1],
             c=cj, phi=phi_j, t_cut=0.0,
+            # Blank (NaN) is what the loader puts there for an unstated residual
+            # or dilation, so these rows drive the same values the sheet does.
+            c_res=float('nan') if c_res is None else c_res,
+            phi_res=float('nan') if phi_res is None else phi_res,
+            dil=float('nan') if dil is None else dil,
             kn=float('nan') if kn is None else kn,
             ks=float('nan') if ks is None else ks, jred=jred)]
     else:
@@ -175,7 +191,7 @@ def _finish(d, polys_and_ids, domain, ground, y_bottom, materials, line,
 def slab_model(beta=20.0, HV=3.0, X1=36.0, XA=6.0, XB=30.0, YB=-6.0, VD=1.0,
                ts=1.5, s1d=1.0, phi_j=30.0, cj=0.0, E_void=0.1,
                k_seismic=0.0, kn=None, ks=None, jred='yes', k_scale=1.0,
-               barless=False):
+               barless=False, c_res=None, phi_res=None, dil=None):
     """A slab of vertical thickness ``HV`` on a jointed plane at ``beta``.
 
     The plane runs the full width; the slab is the soil between ``XA`` and
@@ -199,7 +215,8 @@ def slab_model(beta=20.0, HV=3.0, X1=36.0, XA=6.0, XB=30.0, YB=-6.0, VD=1.0,
     ground = LineString([(0.0, HV), (X1, y(X1) + HV)])
     d, mesh, fem_data = _finish(d, ids, domain, ground, YB, mats, line,
                                 cj, phi_j, ts, s1d, kn=kn, ks=ks, jred=jred,
-                                barless=barless)
+                                barless=barless, c_res=c_res, phi_res=phi_res,
+                                dil=dil)
     fem_data['k_seismic'] = k_seismic
     if k_scale != 1.0:
         jd = fem_data['joint_data']
@@ -500,6 +517,196 @@ def _leg_incline_barless(failures, results, barred_fs=None):
     else:
         results.append(f"row 2  no bar at half stiffness: FS = {FS_half:.4f}, "
                        f"the bar's pair in series to the digit")
+
+
+# --------------------------------------------------------------------------
+# Row 5 — residual strength, on the direct-shear model
+#
+# A joint that has sheared through its asperities is weaker than one that has
+# not. Row 1's direct-shear plateau IS the joint's strength at the stated normal
+# stress, so running it again with a residual branch reads the residual strength
+# the same way it read the peak: the plateau moves from c + sigma_n tan phi to
+# c_res + sigma_n tan phi_res, and nothing else about the row changes.
+# --------------------------------------------------------------------------
+
+#: The residual branch put on row 1's joint: half the cohesion and a friction
+#: angle eight degrees down, both well clear of the peak so the two plateaus are
+#: far apart in the reading.
+ROW5 = dict(ROW1, barless=True, c_res=4.0, phi_res=12.0)
+
+
+def _leg_residual(failures, results):
+    """The plateau after slip reads the residual strength, not the peak."""
+    sigma = GAMMA * ROW1['HV']
+    peak = ROW1['cj'] + sigma * math.tan(math.radians(ROW1['phi_j']))
+    resid = ROW5['c_res'] + sigma * math.tan(math.radians(ROW5['phi_res']))
+
+    # The same model with no residual stated, as the control: its plateau is the
+    # peak, and the two runs differ in nothing else.
+    _dc, fd_peak, geom = slab_model(**dict(ROW1, barless=True, k_seismic=0.90))
+    _dr, fd_res, _g = slab_model(**dict(ROW5, k_seismic=0.90))
+    jd = fd_res['joint_data']
+    if not jd.get('has_residual'):
+        failures.append("row 5: the model states c_res and phi_res but the "
+                        "joint data does not carry a residual branch")
+        return
+    if fd_peak['joint_data'].get('has_residual'):
+        failures.append("row 5: the control states no residual, yet its joint "
+                        "data carries a residual branch")
+
+    inside, _u = _slab_masks(fd_res, geom)
+    live = inside[:, None] & (jd['w'] > 0.0)
+    sol_p = _solve(fd_peak, max_iterations=20000)
+    sol_r = _solve(fd_res, max_iterations=20000)
+    plateau_p = float(np.mean(np.abs(sol_p['joint_ts'][live])))
+    plateau_r = float(np.mean(np.abs(sol_r['joint_ts'][live])))
+
+    for what, got, want in (('peak', plateau_p, peak), ('residual', plateau_r, resid)):
+        err = (got - want) / want
+        if abs(err) > 0.03:
+            failures.append(f"row 5: the {what} plateau reads {got:.4f} kPa "
+                            f"against the closed form {want:.4f} "
+                            f"({100*err:+.2f}%)")
+        results.append(f"row 5  {what} plateau {got:.4f} kPa vs "
+                       f"{'c' if what == 'peak' else 'c_res'} + sigma_n tan "
+                       f"phi{'' if what == 'peak' else '_res'} = {want:.4f} "
+                       f"({100*err:+.2f}%)")
+
+    # The drop is permanent: a pair that has slipped stays on the residual
+    # branch, so unloading the slab back below the PEAK limit leaves every pair
+    # that slipped still at its residual limit rather than back at the peak.
+    if plateau_r >= plateau_p:
+        failures.append(f"row 5: the residual plateau {plateau_r:.4f} is not "
+                        f"below the peak plateau {plateau_p:.4f}; the strength "
+                        f"did not drop")
+
+    # The strength reduction divides both branches. On a residual joint the
+    # factor is set by the residual strength, because every pair that carries
+    # the mechanism has slipped by the time the trial is decided.
+    _d2, fd2, _g2 = slab_model(**dict(ROW5, beta=20.0, phi_j=40.0, cj=0.0,
+                                      c_res=0.0, phi_res=30.0, E_void=1.0,
+                                      s1d=1.0, k_seismic=0.0))
+    expected = (math.tan(math.radians(30.0))
+                / math.tan(math.radians(20.0)))
+    FS = _ssrm(fd2, F_min=1.0, F_max=2.5, tolerance=0.005).get('FS')
+    if FS is None:
+        failures.append("row 5: the strength reduction returned no factor")
+    else:
+        err = (FS - expected) / expected
+        if abs(err) > 0.05:
+            failures.append(f"row 5: on a block whose joint drops from phi = 40 "
+                            f"to phi_res = 30 the strength reduction returns "
+                            f"FS = {FS:.4f} against tan phi_res / tan beta = "
+                            f"{expected:.4f} ({100*err:+.2f}%)")
+        results.append(f"row 5  SSRM on the residual branch FS = {FS:.4f} vs "
+                       f"tan phi_res / tan beta = {expected:.4f} "
+                       f"({100*err:+.2f}%)")
+
+
+# --------------------------------------------------------------------------
+# Row 6 — dilation
+#
+# A rough joint rides up on its asperities as it slides. The dilation angle IS
+# that ratio, so the reading is kinematic and needs no strength at all: between
+# two states of the same slipping joint, the normal OPENING the interface takes
+# divided by the SLIP it takes is tan(dil).
+# --------------------------------------------------------------------------
+
+ROW6 = dict(ROW1, barless=True, dil=20.0)
+
+
+def _leg_dilation(failures, results):
+    """The normal opening per unit slip is tan(dil), and dil = 0 changes nothing."""
+    tandil = math.tan(math.radians(ROW6['dil']))
+
+    _d, fd, geom = slab_model(**dict(ROW6, k_seismic=0.0))
+    jd = fd['joint_data']
+    if not jd.get('has_dilation'):
+        failures.append("row 6: the model states dil = 20 but the joint data "
+                        "does not carry a dilation angle")
+        return
+    inside, _u = _slab_masks(fd, geom)
+    live = inside[:, None] & (jd['w'] > 0.0)
+
+    # Two states past the limit, so both are sliding and the increment between
+    # them is pure slip. The elastic part of the normal closing is pinned by the
+    # slab's own weight, which does not change between the two, so the whole
+    # change in relative normal displacement is the dilational opening.
+    states = []
+    for k in (0.60, 0.90):
+        fd['k_seismic'] = k
+        sol = _solve(fd, max_iterations=20000)
+        dt, dn = joint_kinematics(jd, sol['displacements'])
+        n_slip = int(np.count_nonzero(sol['joint_slipping'] & (jd['w'] > 0.0)))
+        if n_slip == 0:
+            failures.append(f"row 6: no joint pair slips at k = {k:g}, so there "
+                            f"is no slip for the dilation to ride on")
+            return
+        states.append((float(np.mean(dt[live])), float(np.mean(dn[live]))))
+
+    (dt1, dn1), (dt2, dn2) = states
+    d_slip = abs(dt2 - dt1)
+    d_open = -(dn2 - dn1)               # dn is closing-positive
+    ratio = d_open / d_slip
+    err = (ratio - tandil) / tandil
+    if abs(err) > 0.05:
+        failures.append(f"row 6: the joint opens {d_open:.6g} m over "
+                        f"{d_slip:.6g} m of slip, a ratio of {ratio:.4f} "
+                        f"against tan(dil) = {tandil:.4f} ({100*err:+.2f}%)")
+    results.append(f"row 6  opening per unit slip {ratio:.4f} vs tan(dil) = "
+                   f"{tandil:.4f}  ({100*err:+.2f}%)")
+
+    # The normal traction the dilation itself carries. Part of the relative
+    # normal displacement is now plastic opening, so the elastic part — the part
+    # that carries traction — is LARGER than the measured closing, and
+    # ``t_n - k_n delta_n`` is exactly ``k_n`` times the opening the joint has
+    # ridden up by. On a slipping pair that difference is positive; on a pair
+    # that has not slipped it is zero.
+    fd['k_seismic'] = 0.90
+    sol1 = _solve(fd, max_iterations=20000)
+    dt1s, dn1s = joint_kinematics(jd, sol1['displacements'])
+    kn = jd['kn'][:, None]
+    gap = sol1['joint_tn'] - kn * dn1s
+    slipped = sol1['joint_slipping'] & (jd['w'] > 0.0)
+    if not np.any(slipped & inside[:, None]):
+        failures.append("row 6: no pair inside the slab is slipping at k = 0.90")
+    else:
+        sel = slipped & inside[:, None]
+        worst = float(np.min(gap[sel]))
+        if worst <= 0.0:
+            failures.append(f"row 6: a slipping pair carries t_n no larger than "
+                            f"k_n delta_n (worst {worst:.4g} kPa); the dilation "
+                            f"is putting no normal traction into the joint")
+        results.append(f"row 6  dilational normal traction on slipping pairs: "
+                       f"mean {float(np.mean(gap[sel])):.3f} kPa, least "
+                       f"{worst:.3f} kPa")
+
+    # What the slab ITSELF does with that is a question about confinement, not
+    # about the element: this slab has a free upper surface, so it lifts instead
+    # of building stress, and its mean normal traction is set by its own weight
+    # whether the joint dilates or not. Recorded as a reading rather than
+    # asserted, so the row says where dilatant hardening does and does not show.
+    _d0, fd0, _g0 = slab_model(**dict(ROW1, barless=True, k_seismic=0.90))
+    sol0 = _solve(fd0, max_iterations=20000)
+    tn0 = float(np.mean(sol0['joint_tn'][live]))
+    tn1 = float(np.mean(sol1['joint_tn'][live]))
+    results.append(f"row 6  mean normal traction on the free-topped slab "
+                   f"{tn1:.3f} kPa dilating vs {tn0:.3f} kPa not: the slab "
+                   f"lifts rather than builds stress")
+
+    # dil = 0 stated and dil blank are the same joint, to the bit.
+    _dz, fdz, _gz = slab_model(**dict(ROW6, dil=0.0, k_seismic=0.90))
+    if fdz['joint_data'].get('has_dilation'):
+        failures.append("row 6: dil = 0 is carried as a dilating joint; a zero "
+                        "angle is no dilation and must take the same path as a "
+                        "blank cell")
+    solz = _solve(fdz, max_iterations=20000)
+    same = np.array_equal(solz['displacements'], sol0['displacements'])
+    if not same:
+        failures.append("row 6: dil = 0 does not reproduce the blank-dil "
+                        "displacement field to the bit")
+    results.append("row 6  dil = 0 reproduces dil blank to the bit: "
+                   + ("yes" if same else "NO"))
 
 
 # --------------------------------------------------------------------------
@@ -867,6 +1074,8 @@ def run():
     _leg_goodman(failures, results)
     _barred_fs = _leg_incline(failures, results)
     _leg_incline_barless(failures, results, barred_fs=_barred_fs)
+    _leg_residual(failures, results)
+    _leg_dilation(failures, results)
     _leg_pullout(failures, results)
     _leg_infinite(failures, results)
     _leg_opening_and_ties(failures, results)
@@ -888,8 +1097,9 @@ def main():
             print(f"  - {f}")
         raise SystemExit(1)
     print("\nThe interface element reproduces Goodman direct shear, the block "
-          "on a plane, the pullout envelope and the infinite-slope form, and "
-          "the joint stiffness default carries no result.")
+          "on a plane, the pullout envelope, the infinite-slope form, the "
+          "residual-strength plateau and the dilation ratio, and the joint "
+          "stiffness default carries no result.")
 
 
 if __name__ == '__main__':

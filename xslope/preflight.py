@@ -5396,6 +5396,60 @@ def _joint_no_strength_sheet(ctx):
                f"joint's cohesion, its friction angle, or both {_AT_JOINTS}.")
 
 
+@rule("joint.residual_above_peak", ERROR, ("fem",),
+      "A joint's residual strength cannot exceed its peak strength.")
+def _joint_residual_above_peak(ctx):
+    for i, j in enumerate(ctx.joints):
+        c = _num(j.get("c")) or 0.0
+        phi = _num(j.get("phi"))
+        c_res = _num(j.get("c_res"))
+        phi_res = _num(j.get("phi_res"))
+        bad = []
+        if c_res is not None and c_res > c:
+            bad.append(f"c_res = {c_res:g} against c = {c:g}")
+        if phi_res is not None and phi is not None and phi_res > phi:
+            bad.append(f"phi_res = {phi_res:g} against phi = {phi:g}")
+        if not bad:
+            continue
+        yield (f"{ctx.joint_label(i)} states {' and '.join(bad)}. The residual "
+               f"branch is what the joint keeps AFTER it has slipped, and a "
+               f"surface that has sheared through its asperities does not come "
+               f"back stronger: the strength drops to the residual the first "
+               f"time the pair reaches its limit, so a residual above the peak "
+               f"would make the joint stronger for having failed. Lower the "
+               f"residual, or leave it blank to keep the peak {_AT_JOINTS}.")
+
+
+@rule("joint.residual_negative", ERROR, ("fem",),
+      "A joint's residual strength cannot be negative.")
+def _joint_residual_negative(ctx):
+    for i, j in enumerate(ctx.joints):
+        for key, what in (("c_res", "cohesion"), ("phi_res", "friction angle")):
+            v = _num(j.get(key))
+            if v is None or v >= 0.0:
+                continue
+            yield (f"{ctx.joint_label(i)} states {key} = {v:g}. A residual "
+                   f"{what} is a strength, so it is zero or more; a negative one "
+                   f"would have the interface pull its two faces along rather "
+                   f"than resist them. Enter zero for a joint that keeps no "
+                   f"{what} once it has slipped {_AT_JOINTS}.")
+
+
+@rule("joint.dilation_out_of_range", ERROR, ("fem",),
+      "A joint's dilation angle is an angle between 0 and 90 degrees.")
+def _joint_dilation_out_of_range(ctx):
+    for i, j in enumerate(ctx.joints):
+        dil = _num(j.get("dil"))
+        if dil is None or 0.0 <= dil < 90.0:
+            continue
+        yield (f"{ctx.joint_label(i)} states dil = {dil:g} degrees. Dilation is "
+               f"the angle the two faces ride apart at as they slide, so a slip "
+               f"of one unit opens the joint by tan(dil): it is zero on a smooth "
+               f"interface and below 90 degrees on any real one, where tan(dil) "
+               f"is unbounded. Enter an angle in [0, 90), or leave it blank for "
+               f"a joint that does not dilate {_AT_JOINTS}.")
+
+
 @rule("joint.outside_domain", ERROR, ("fem",),
       "A joint line has to lie in the section it splits.")
 def _joint_outside_domain(ctx):

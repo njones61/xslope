@@ -38,6 +38,33 @@ tractions and both stiffnesses go to zero — and it closes again when the faces
 return to contact. Slip past the limit is perfectly plastic: the shear traction
 stays at the limit while the tangential offset grows.
 
+**Residual strength.** A joint that has slipped may be weaker than one that has
+not: a rough surface shears through its asperities once and does not rebuild
+them. The ``joints`` sheet states that with ``c_res`` and ``phi_res``, and the
+drop is instantaneous — the pair's limit falls from
+
+    S_peak     = c     + t_n tan phi
+to
+    S_residual = c_res + t_n tan phi_res
+
+on the sweep after the one that first found it at its limit — and permanent: a
+pair that has slipped keeps the residual branch for the rest of the solve, even
+where it later re-closes or unloads. Blank residuals mean no residual branch and
+the peak carries throughout. In a strength reduction the residual strength is
+divided by the trial factor alongside the peak, so a joint that opts out of the
+reduction opts both branches out.
+
+**Dilation.** A rough joint riding over its asperities opens as it slides. The
+``dil`` column is that angle: a slip increment ``|d(delta_t)|`` produces a
+normal OPENING increment ``|d(delta_t)| tan(dil)``, accumulated as a plastic
+normal offset, so the elastic part of the normal closing — and with it the
+normal traction ``t_n = k_n (delta_n + opening)`` — grows while the joint slides
+under confinement. That is dilatant hardening: held apart by the material around
+it, a dilating joint builds normal stress and so builds shear strength. The
+dilation here is NON-DIRECTIONAL — the joint opens whichever way it slides,
+which is RS2's default. Blank means zero and the normal traction is
+``k_n delta_n`` exactly.
+
 **Integration.** The tractions are integrated at the element's own NODES
 (Newton-Cotes / Lobatto), not at Gauss points: L/6, L/6, 2L/3 on the three-pair
 element that matches a tri6 edge and L/2, L/2 on the two-pair element that
@@ -183,6 +210,11 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
     ``L``            (n,) element length
     ``kn, ks``       (n,) normal and shear stiffness
     ``cj, tanphi``   (n,) interface cohesion and friction coefficient
+    ``cj_res``       (n,) residual cohesion — equal to ``cj`` where none is stated
+    ``tanphi_res``   (n,) residual friction coefficient — likewise
+    ``tandil``       (n,) tangent of the dilation angle; zero where none is stated
+    ``has_residual`` True when any line states a residual below its peak
+    ``has_dilation`` True when any line states a dilation angle
     ``tcut``         (n,) tension cutoff — the joints sheet's own column; zero on
                      a reinforcement line, whose interface carries no tension
     ``jred``         (n,) reduce this joint's strength in the SSR
@@ -308,6 +340,12 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
     # ---- the line's own properties ----
     cj = np.zeros(n)
     tanphi = np.zeros(n)
+    # The residual branch defaults to the peak, which is the no-residual case
+    # written out; a reinforcement line has no columns for it and always reads
+    # this way. `tandil` is zero unless a joints-sheet line states an angle.
+    cj_res = np.zeros(n)
+    tanphi_res = np.zeros(n)
+    tandil = np.zeros(n)
     tcut = np.zeros(n)
     jred = np.ones(n, dtype=bool)
     for li in sorted(set(int(v) for v in line_id)):
@@ -321,9 +359,23 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
             _c = jl.get("c")
             _phi = jl.get("phi")
             _tc = jl.get("t_cut")
-            cj[sel] = 0.0 if _c is None or not np.isfinite(float(_c)) else float(_c)
-            tanphi[sel] = (0.0 if _phi is None or not np.isfinite(float(_phi))
-                           else np.tan(np.radians(float(_phi))))
+            _c = 0.0 if _c is None or not np.isfinite(float(_c)) else float(_c)
+            _tanphi = (0.0 if _phi is None or not np.isfinite(float(_phi))
+                       else np.tan(np.radians(float(_phi))))
+            cj[sel] = _c
+            tanphi[sel] = _tanphi
+            # A blank residual is not a residual of zero: it means the joint has
+            # no residual branch and keeps its peak strength after slipping.
+            _cr = jl.get("c_res")
+            _pr = jl.get("phi_res")
+            _dl = jl.get("dil")
+            cj_res[sel] = (_c if _cr is None or not np.isfinite(float(_cr))
+                           else float(_cr))
+            tanphi_res[sel] = (_tanphi if _pr is None
+                               or not np.isfinite(float(_pr))
+                               else np.tan(np.radians(float(_pr))))
+            tandil[sel] = (0.0 if _dl is None or not np.isfinite(float(_dl))
+                           else np.tan(np.radians(float(_dl))))
             tcut[sel] = (0.0 if _tc is None or not np.isfinite(float(_tc))
                          else float(_tc))
             for key, arr in (("kn", kn), ("ks", ks)):
@@ -354,8 +406,10 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
         spacing = float(line.get("spacing") or 1.0)
         if not np.isfinite(spacing) or spacing <= 0.0:
             spacing = 1.0
-        cj[sel] = adhesion / spacing
-        tanphi[sel] = np.tan(np.radians(delta)) / spacing
+        # A reinforcement line has no residual or dilation columns: the sheet-soil
+        # interface it describes is a frictional contact with one strength.
+        cj[sel] = cj_res[sel] = adhesion / spacing
+        tanphi[sel] = tanphi_res[sel] = np.tan(np.radians(delta)) / spacing
         _kn = line.get("kn")
         _ks = line.get("ks")
         if _kn is not None and np.isfinite(float(_kn)) and float(_kn) > 0.0:
@@ -371,6 +425,13 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
         "side": side, "dof": dof, "w": w,
         "tx": tx, "ty": ty, "nx": nx, "ny": ny, "L": L,
         "kn": kn, "ks": ks, "cj": cj, "tanphi": tanphi, "tcut": tcut,
+        "cj_res": cj_res, "tanphi_res": tanphi_res, "tandil": tandil,
+        # Whether the solve has to carry the history these two need at all. A
+        # model that states neither takes the path it always did, arrays and
+        # arithmetic included, so every answer produced before they existed is
+        # reproduced to the bit.
+        "has_residual": bool(np.any(cj_res != cj) or np.any(tanphi_res != tanphi)),
+        "has_dilation": bool(np.any(tandil != 0.0)),
         "jred": jred, "tip": tip, "K": K,
         "jointed_lines": sorted(set(int(v) for v in line_id)),
     }
@@ -464,6 +525,24 @@ def joint_reduced_strength(jd, F):
     return jd["cj"] / div, jd["tanphi"] / div
 
 
+def joint_reduced_residual_strength(jd, F):
+    """``(c_res, tan phi_res)`` after the strength reduction, per joint element.
+
+    The residual branch is reduced by the same factor and on the same per-line
+    switch as the peak: a joint whose line opts out of the reduction keeps both
+    branches at full strength, and one that does not has both divided. Returns
+    ``None`` on a model where no line states a residual, which is the signal to
+    the solve that it has no residual history to carry.
+    """
+    if not jd.get("has_residual"):
+        return None
+    F = float(F)
+    if F == 1.0:
+        return jd["cj_res"].copy(), jd["tanphi_res"].copy()
+    div = np.where(jd["jred"], F, 1.0)
+    return jd["cj_res"] / div, jd["tanphi_res"] / div
+
+
 def joint_kinematics(jd, u):
     """The relative displacement of the two faces at every node pair.
 
@@ -498,19 +577,32 @@ def _limit_normal(jd, tn):
     return out
 
 
-def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None):
+def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
+                slipped=None, res_r=None, dil_p=None):
     """The joint tractions at displacement ``u``.
 
     ``slip_p`` is the accumulated plastic tangential offset (the viscoplastic
     driver's state); ``None`` means the stateless form the Newton path uses, in
     which the shear traction is returned straight onto the limit surface.
 
+    ``slipped`` is the (n, 3) record of which pairs have already reached their
+    limit and ``res_r`` the reduced residual strengths ``(c_res, tan phi_res)``;
+    passed together they put those pairs on the residual branch. ``dil_p`` is the
+    accumulated plastic normal OPENING from dilation, which the elastic normal
+    closing is measured against. All three are ``None`` on a model that states
+    neither residual strength nor dilation, and the arithmetic below is then
+    exactly what it was before either existed.
+
     Returns a dict with ``dt``, ``dn``, ``tn``, ``ts``, ``tlim``, ``open`` and
     ``slipping``, each (n, 3).
     """
     dt, dn = joint_kinematics(jd, u)
     kn, ks = jd["kn"][:, None], jd["ks"][:, None]
-    tn = kn * dn
+    # Dilation: the joint rides up on its asperities as it slides, so part of the
+    # normal closing is plastic opening and the elastic part — the part that
+    # carries traction — is larger by it. Under confinement that IS the normal
+    # stress the dilation builds.
+    tn = kn * dn if dil_p is None else kn * (dn + dil_p)
     ts_el = ks * (dt if slip_p is None else dt - slip_p)
 
     # Opening: a joint carrying tension past its cutoff parts, and stays parted
@@ -523,7 +615,13 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None):
     opened &= jd["w"] > 0.0
 
     tn_lim = _limit_normal(jd, tn)
-    tlim = cj_r[:, None] + np.maximum(tn_lim, 0.0) * tanphi_r[:, None]
+    if slipped is None or res_r is None:
+        cj_eff, tanphi_eff = cj_r[:, None], tanphi_r[:, None]
+    else:
+        # A pair that has slipped is on the residual branch and stays there.
+        cj_eff = np.where(slipped, res_r[0][:, None], cj_r[:, None])
+        tanphi_eff = np.where(slipped, res_r[1][:, None], tanphi_r[:, None])
+    tlim = cj_eff + np.maximum(tn_lim, 0.0) * tanphi_eff
     slipping = (~opened) & (np.abs(ts_el) > tlim)
 
     tn_true = np.where(opened, 0.0, tn)
@@ -534,7 +632,7 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None):
 
 
 def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
-                   dt_vp=JOINT_VP_DT):
+                   dt_vp=JOINT_VP_DT, slipped=None, res_r=None, dil_p=None):
     """One viscoplastic sweep over the joints: update the slip, load the residual.
 
     The global stiffness carries every joint's FULL elastic block, so ``K u``
@@ -546,25 +644,42 @@ def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
     the current displacement field — and an open pair sheds the whole traction
     vector.
 
+    ``slipped``, ``res_r`` and ``dil_p`` carry the residual and dilation history
+    (see :func:`joint_state`); ``slipped`` and ``dil_p`` are mutated in place too.
+    A pair that reaches its limit here is marked slipped, so its strength is the
+    residual one from the next sweep onward, and the slip it takes opens the
+    joint by ``|d slip| tan(dil)``.
+
     Mutates ``slip_p`` and ``open_state`` in place, adds into ``loads``, and
     returns the number of pairs that are slipping or open.
     """
-    st = joint_state(jd, u, cj_r, tanphi_r, slip_p=slip_p, open_prev=open_state)
+    st = joint_state(jd, u, cj_r, tanphi_r, slip_p=slip_p, open_prev=open_state,
+                     slipped=slipped, res_r=res_r, dil_p=dil_p)
     np.copyto(open_state, st["open"])
 
     ks = jd["ks"][:, None]
     excess = np.abs(st["ts_trial"]) - st["tlim"]
     grow = st["slipping"] & (excess > 0.0)
     if np.any(grow):
-        slip_p += np.where(grow,
-                           dt_vp * excess * np.sign(st["ts_trial"]) / ks, 0.0)
+        d_slip = np.where(grow, dt_vp * excess * np.sign(st["ts_trial"]) / ks, 0.0)
+        slip_p += d_slip
+        if dil_p is not None:
+            # Non-directional: the joint rides up whichever way it slides.
+            dil_p += np.abs(d_slip) * jd["tandil"][:, None]
+    if slipped is not None:
+        # Permanent: once a pair has been at its limit it keeps the residual
+        # branch, whether or not it is still slipping.
+        slipped |= st["slipping"]
 
     # The correction, in the same sense as K u's own contribution: the elastic
     # traction minus the one the interface can carry. Open pairs shed both
-    # components; closed ones shed only the plastic tangential offset.
+    # components; closed ones shed the plastic tangential offset, and the plastic
+    # normal opening in the other direction — a dilating joint delivers MORE
+    # normal traction than K u holds, so its correction is negative.
     kn = jd["kn"][:, None]
     corr_t = np.where(st["open"], ks * st["dt"], ks * slip_p)
-    corr_n = np.where(st["open"], kn * st["dn"], 0.0)
+    corr_n = np.where(st["open"], kn * st["dn"],
+                      0.0 if dil_p is None else -kn * dil_p)
     # Back to global components. The internal force on side a of pair p is
     # w (t_s t - t_n n); the correction carries the same pattern.
     fx = jd["w"] * (corr_t * jd["tx"][:, None] - corr_n * jd["nx"][:, None])
@@ -610,6 +725,13 @@ def joint_internal_force(jd, u, cj_r, tanphi_r, want_tangent=False):
     both as functions of the current displacement alone, so nothing is committed
     at the end of a step. The tangent drops ``k_s`` on a slipping pair and both
     stiffnesses on an open one.
+
+    Residual strength and dilation are histories, and a stateless law cannot
+    carry one: this reads every pair on its PEAK branch with no dilational
+    opening. That is not a limitation of any answer the solver produces, because
+    the Newton corrector is skipped on every jointed model (``_corrector_on``
+    reads ``joint_data is None``) — a slipping pair's shear traction does not
+    depend on displacement, so a displacement-only corrector has nothing to move.
 
     Returns ``(f, Ke, state)`` with ``f`` of shape (n, 12).
     """

@@ -2487,6 +2487,21 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                     # which refuses it by name rather than solving a frictionless
                     # interface nobody asked for.
                     "phi": float(row['phi']) if pd.notna(row.get('phi')) else float('nan'),
+                    # Residual strength and dilation (v27). A blank c_res or
+                    # phi_res means the joint has no residual branch — it keeps
+                    # its peak strength after slipping — and a blank dil means
+                    # no dilation, which is what the sheet's help box states.
+                    # NaN carries "not stated" through to the solver, which
+                    # resolves it to the peak value there rather than writing a
+                    # copy of the peak into the model: a stated residual EQUAL to
+                    # the peak and an unstated one then read back the way they
+                    # were entered.
+                    "c_res": (float(row['c_res'])
+                              if pd.notna(row.get('c_res')) else float('nan')),
+                    "phi_res": (float(row['phi_res'])
+                                if pd.notna(row.get('phi_res')) else float('nan')),
+                    "dil": (float(row['dil'])
+                            if pd.notna(row.get('dil')) else float('nan')),
                     "t_cut": (float(row['t_cut'])
                               if pd.notna(row.get('t_cut')) else 0.0),
                     # Blank stiffness is derived from the adjacent soil, the same
@@ -3683,7 +3698,8 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
         updates['reinforce'] = reinf
 
     # === joints ===  (v27; header row 2, data rows 3+)
-    # # | Label | x1 y1 x2 y2 | c phi t_cut | kn ks | Jred. Each field's column is
+    # # | Label | x1 y1 x2 y2 | c phi c_res phi_res dil t_cut | kn ks | Jred.
+    # Each field's column is
     # read from the target template's own header row, so filling an ARCHIVED
     # pre-v27 template — which has no joints sheet at all — writes nothing rather
     # than putting the rows somewhere they do not belong. Blank cells round-trip
@@ -3721,6 +3737,12 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
                                  ('c', _jt_zero_blank(j.get('c'))),
                                  ('phi', None if _isnan(j.get('phi'))
                                   else _f(j.get('phi'))),
+                                 ('c_res', None if _isnan(j.get('c_res'))
+                                  else _f(j.get('c_res'))),
+                                 ('phi_res', None if _isnan(j.get('phi_res'))
+                                  else _f(j.get('phi_res'))),
+                                 ('dil', None if _isnan(j.get('dil'))
+                                  else _f(j.get('dil'))),
                                  ('t_cut', _jt_zero_blank(j.get('t_cut'))),
                                  ('kn', None if _isnan(j.get('kn'))
                                   else _f(j.get('kn'))),

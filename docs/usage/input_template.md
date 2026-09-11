@@ -946,6 +946,15 @@ Each joint line is defined by:
 usually is.<br>
 >>phi **[degrees]**: Joint friction angle. **Required** — `c` alone defaults to zero, so a blank `phi` would be a
 frictionless surface the two sides slide along under any load at all.<br>
+>>c_res **[F/L²]**, phi_res **[degrees]**: Residual cohesion and friction angle — what the joint keeps once it has
+slipped. A rough surface shears through its asperities the first time it reaches its limit and does not rebuild
+them, so the drop is instantaneous and permanent: the pair stays on the residual branch for the rest of the run
+even where it later closes or unloads. Blank is the peak value, which is a joint with no residual branch at all.
+Neither may exceed its peak.<br>
+>>dil **[degrees]**: Dilation angle. A rough joint rides up on its asperities as it slides, so a unit of slip opens
+it by $\tan$`dil`. Where the material around it holds it closed that opening builds normal traction against `kn`,
+and with it shear strength; where the sliding block is free to lift, it lifts. Blank is 0, a joint that slides
+without opening.<br>
 >>t_cut **[F/L²]**: Tension cutoff. The joint **opens** when the normal traction passes it — carrying neither shear
 nor normal traction — and closes again when the two faces come back into contact. Blank is 0, which is a contact
 that holds no tension at all.<br>

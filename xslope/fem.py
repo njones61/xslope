@@ -27,7 +27,8 @@ from shapely.ops import unary_union
 
 from .hoekbrown import hb_constants, hb_tangent_const
 from .joint import (mesh_has_joints as _joint_mesh_has_joints,
-                    joint_reduced_strength, joint_vp_sweep, tie_vp_sweep,
+                    joint_reduced_strength, joint_reduced_residual_strength,
+                    joint_vp_sweep, tie_vp_sweep,
                     joint_internal_force, tie_internal_force,
                     joint_state, joint_yield_violation, joint_advisories)
 from .units import require_gamma_water
@@ -5690,6 +5691,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         joint_cj_r, joint_tanphi_r = joint_reduced_strength(joint_data, F)
         joint_slip = np.zeros((joint_data["n"], 3))
         joint_open = np.zeros((joint_data["n"], 3), dtype=bool)
+        # The residual and dilation histories, allocated only where a line states
+        # one. On a model that states neither all three stay None and every call
+        # below takes the path it took before those columns existed.
+        joint_res_r = joint_reduced_residual_strength(joint_data, F)
+        joint_slipped = (np.zeros((joint_data["n"], 3), dtype=bool)
+                         if joint_res_r is not None else None)
+        joint_dil = (np.zeros((joint_data["n"], 3))
+                     if joint_data.get("has_dilation") else None)
         joint_state_last = None
         tie_data = joint_data.get("ties")
         tie_forces = (np.zeros((tie_data["n"], 2)) if tie_data is not None
@@ -6450,7 +6459,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             if has_joints:
                 n_joint_active, joint_state_last = joint_vp_sweep(
                     joint_data, u, loads, joint_cj_r, joint_tanphi_r,
-                    joint_slip, joint_open)
+                    joint_slip, joint_open, slipped=joint_slipped,
+                    res_r=joint_res_r, dil_p=joint_dil)
                 if tie_data is not None:
                     tie_forces, n_tie_cap = tie_vp_sweep(tie_data, u, loads)
                 if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
@@ -7261,7 +7271,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # accumulated slip, and which pairs are slipping or open.
     if has_joints:
         joint_state_last = joint_state(joint_data, u, joint_cj_r, joint_tanphi_r,
-                                       slip_p=joint_slip, open_prev=joint_open)
+                                       slip_p=joint_slip, open_prev=joint_open,
+                                       slipped=joint_slipped, res_r=joint_res_r,
+                                       dil_p=joint_dil)
 
     n_plastic = np.sum(plastic_elements)
     if debug_level >= 1:

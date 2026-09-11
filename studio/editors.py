@@ -6410,7 +6410,12 @@ def _new_joint():
     # phi has no default in the sheet either, so a new row starts at zero and the
     # preflight rule that refuses a strengthless joint is what asks for a value.
     return {"label": "", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0,
-            "c": 0.0, "phi": 0.0, "t_cut": 0.0,
+            "c": 0.0, "phi": 0.0,
+            # Blank, not zero: a blank residual means the joint keeps its peak
+            # strength after slipping, where a residual of zero would mean it
+            # keeps none, and a blank dilation means it does not ride up.
+            "c_res": float("nan"), "phi_res": float("nan"),
+            "dil": float("nan"), "t_cut": 0.0,
             # Blank, not zero: a blank stiffness is derived from the adjacent
             # soil, and a zero one would be a joint with no stiffness at all.
             "kn": float("nan"), "ks": float("nan"), "jred": ""}
@@ -6421,7 +6426,7 @@ def _new_joint():
 _JOINT_FORM_GROUPS = [
     ("Identity", [["label"]]),
     ("Geometry", [["x1", "y1"], ["x2", "y2"]]),
-    ("Strength", [["c", "phi"], ["t_cut"]]),
+    ("Strength", [["c", "phi"], ["c_res", "phi_res"], ["dil", "t_cut"]]),
     ("Stiffness", [["kn", "ks"], ["jred"]]),
 ]
 
@@ -6446,6 +6451,13 @@ JOINTS_HELP = {
          "Mohr-Coulomb strength, which is what the two faces slide on.",
     "phi": "Joint friction angle, degrees. Required: c alone defaults to zero, so "
            "a blank phi would be a frictionless interface.",
+    "c_res": "Residual joint cohesion (blank = same as c). The strength the "
+             "joint keeps once it has slipped; the drop is permanent.",
+    "phi_res": "Residual joint friction angle, degrees (blank = same as phi). "
+               "The strength the joint keeps once it has slipped.",
+    "dil": "Joint dilation angle, degrees (blank = 0). A rough joint rides up "
+           "on its asperities as it slides: a unit of slip opens it by "
+           "tan(dil).",
     "t_cut": "Tension cutoff (blank = 0). The joint opens when the normal "
              "traction passes it, and closes again when the faces meet.",
     "kn": "Joint normal stiffness (blank = from soil E and size).",
@@ -6469,6 +6481,11 @@ class JointsEditor(CategoryEditor):
         Field("c", "c", "optfloat", usage="fem", unit="stress",
               tooltip=JOINTS_HELP["c"]),
         Field("phi", "phi", "optfloat", usage="fem", tooltip=JOINTS_HELP["phi"]),
+        Field("c_res", "c_res", "optfloat", usage="fem", unit="stress",
+              tooltip=JOINTS_HELP["c_res"]),
+        Field("phi_res", "phi_res", "optfloat", usage="fem",
+              tooltip=JOINTS_HELP["phi_res"]),
+        Field("dil", "dil", "optfloat", usage="fem", tooltip=JOINTS_HELP["dil"]),
         Field("t_cut", "t_cut", "optfloat", usage="fem", unit="stress",
               tooltip=JOINTS_HELP["t_cut"]),
         Field("kn", "kn", "optfloat", usage="fem", tooltip=JOINTS_HELP["kn"]),
@@ -6497,9 +6514,12 @@ class JointsEditor(CategoryEditor):
                       "traction passes t_cut. A reinforcement line that is also a "
                       "slip surface belongs on the reinforce sheet with its Joint "
                       "column set instead, so that the sheet between the two "
-                      "faces is still there. Blank kn and ks are derived from the "
-                      "adjacent soil; the strength reduction reduces the joint "
-                      "with the soil unless Jred says No. FEM only.",
+                      "faces is still there. A joint that is weaker once it has "
+                      "slipped states c_res and phi_res, and a rough one that "
+                      "rides up as it slides states dil. Blank kn and ks are "
+                      "derived from the adjacent soil; the strength reduction "
+                      "reduces the joint with the soil unless Jred says No. "
+                      "FEM only.",
             usage_toggles=["lem", "fem"],
             preview_caption="Preview shows the joint lines on the section "
                             "(selected line bold with its endpoints; others "

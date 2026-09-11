@@ -560,14 +560,17 @@ and can slide along, with no member between them. Those go on the **joints** wor
 | `x1`, `y1`, `x2`, `y2` | the line's endpoints |
 | `c` | the interface's cohesion (blank = 0) |
 | `phi` | its friction angle, in degrees — required |
+| `c_res`, `phi_res` | what it drops to once it has slipped (blank = the peak, i.e. no residual branch) |
+| `dil` | its dilation angle, in degrees: a unit of slip opens it by $\tan$`dil` (blank = 0) |
 | `t_cut` | the tension cutoff at which the two faces part (blank = 0) |
 | `kn`, `ks` | the penalty stiffnesses (blank = derived, as above) |
 | `Jred` | blank or **Yes** reduces the joint with the soil in a strength reduction; **No** holds it |
 
-The mesh split, the interface element, its constitutive law, the derived stiffnesses and the strength reduction are
-all exactly what a jointed reinforcement line gets, described above. The one difference is that there is no bar
-between the two faces, so a station carries two coincident nodes instead of three and **one** interface element
-spans them instead of two:
+The mesh split, the interface element, the derived stiffnesses and the strength reduction are all exactly what a
+jointed reinforcement line gets, described above. Two things this sheet states that the reinforce sheet does not
+are described under [Residual strength and dilation](#residual-strength-and-dilation) below. The other difference
+is that there is no bar between the two faces, so a station carries two coincident nodes instead of three and
+**one** interface element spans them instead of two:
 
 ```
   Joint = Yes on a sheet             a joints-sheet line
@@ -594,6 +597,37 @@ section, where there is material on one side only and nothing for the other face
 name.
 
 A joint line is finite element geometry: the limit equilibrium engines do not read the joints worksheet at all.
+
+### Residual Strength and Dilation
+
+A rock joint is not a smooth plane, and two of its columns say so.
+
+**`c_res` and `phi_res`** are the strength the joint keeps once it has slipped. A rough surface shears through its
+asperities the first time it reaches its limit and does not rebuild them, so the drop is instantaneous and
+permanent: the pair's limit falls from
+
+$$S_{peak} = c + t_n \tan\phi \qquad\text{to}\qquad S_{res} = c_{res} + t_n \tan\phi_{res}$$
+
+on the sweep after the one that first found it at its limit, and it stays on the residual branch for the rest of the
+run even where it later closes or unloads. A blank leaves the joint on its peak strength throughout, which is what a
+joint with no residual branch is. Neither residual may exceed its peak; preflight refuses one that does. A strength
+reduction divides both branches by the trial factor, on the same `Jred` switch, so a joint that opts out of the
+reduction opts both branches out.
+
+**`dil`** is the dilation angle. A rough joint rides up on its asperities as it slides, so a slip increment
+$|\Delta u_s|$ opens it by $|\Delta u_s| \tan(\text{dil})$. That opening is a plastic normal offset: the elastic
+part of the normal displacement, and with it the normal traction
+
+$$t_n = k_n (\Delta_n + u_{open})$$
+
+grows while the joint slides. Where the material around the joint holds it closed, that is dilatant hardening —
+sliding builds normal stress and with it shear strength. Where the sliding block is free to lift, it lifts instead,
+and the normal traction stays at whatever equilibrium with the block's weight requires. The dilation is
+**non-directional**: the joint opens whichever way it slides. A blank is zero and the normal traction is
+$k_n \Delta_n$ exactly.
+
+Neither column exists on the reinforce sheet. A soil-geosynthetic contact is a frictional interface with one
+strength, and the sheet between its two faces is what carries the mechanism.
 
 ### Both kinds in one model
 

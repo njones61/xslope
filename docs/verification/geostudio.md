@@ -1515,4 +1515,4 @@ result with and without the wall, a stress-based FE stability corroboration, a M
 limit-equilibrium comparison, and the wall's moment and shear distributions.
 
 <!-- test: file=files/geostudio/gs2_wall_none.xlsx, type=fem_ssrm, expected_fs=1.0484, element_type=tri6, tolerance=0.01, f_min=0.95, f_max=1.25, max_iter=16000, benchmark=SIGMAW-SRS-nowall -->
-<!-- test: file=files/geostudio/gs2_wall.xlsx, type=fem_ssrm, expected_fs=1.691, element_type=tri6, tolerance=0.01, f_min=1.15, f_max=1.95, max_iter=16000, benchmark=SIGMAW-SRS-wall -->
+<!-- test: file=files/geostudio/gs2_wall.xlsx, type=fem_ssrm, expected_fs=1.691, element_type=tri6, tolerance=0.01, f_min=1.15, f_max=1.95, max_iter=16000, benchmark=SIGMAW-SRS-wall, f_stand=1.6875, f_fail=1.69375, check=edges -->

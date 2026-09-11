@@ -128,7 +128,7 @@ k<sub>s</sub> = 10<sup>7</sup> kPa/m and are reduced with the rock in the streng
 |---|---|---|
 | **0.998** | 1.01 (−1.2%) | 1.01 / 1.00 |
 
-<!-- test: file=files/rocscience/joints/rj018.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-18 -->
+<!-- test: file=files/rocscience/joints/rj018.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-18, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 0.7 m, which takes the mesh from 3 486 nodes and 48 interface
 elements to 6 707 and 66 — does not move the factor at all, and every trial of both brackets

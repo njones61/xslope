@@ -199,7 +199,7 @@ non-convergence criterion, at **FS = 1.258**:
 
 ![seep_slope_fem_results.png](images/seep_slope_fem_results.png){width=1200px}
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, expected_fs=1.258, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, expected_fs=1.258, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000, f_stand=1.253125, f_fail=1.2625, check=edges -->
 
 The critical circle the LEM search found passes deeper, into the foundation, than
 the mechanism the FEM develops through the downstream shell, yet the two factors

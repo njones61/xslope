@@ -20741,7 +20741,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": false,
-        "k0": null,
+        "k0": 1.0,
         "line_loads": 0,
         "material_options": [
           "elastic",

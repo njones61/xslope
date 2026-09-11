@@ -39,8 +39,8 @@ hooks:
   - hooks/docs_packages.py
 nav:
   - Home: index.md
-  - Installation: getting_started/install.md
   - Usage Guide:
+    - Installation: getting_started/install.md
     - Ways to Use XSLOPE: usage/index.md
     - Input Template: usage/input_template.md
     - Project Packaging: usage/packaging.md

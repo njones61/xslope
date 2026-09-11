@@ -1871,11 +1871,24 @@ def _edges_check(trials, f_stand, f_fail, ceiling):
             f"F={f_fail:g} {v_hi or 'not solved'}")
     if stands and fails:
         return True, note
+
+    def _why(factor, verdict, decided, expected, verb):
+        # Three different things, and a run is read wrong if they are printed the
+        # same way: the trial is missing, it ran out of budget without ruling, or
+        # it ruled the other way — only the last is the lock moving.
+        iterations = int((_trial_at(trials, factor) or {}).get('iterations') or 0)
+        if verdict is None:
+            return f"the {verb} edge F={factor:g} was not solved"
+        if not decided:
+            return (f"the {verb} edge F={factor:g} is undecided at the iteration "
+                    f"budget ({verdict}, {iterations} iterations)")
+        return f"the {verb} edge F={factor:g} now reads {verdict}, not {expected}"
+
     flipped = []
     if not stands:
-        flipped.append(f"the standing edge F={f_stand:g} no longer stands ({v_lo})")
+        flipped.append(_why(f_stand, v_lo, lo_ok, 'CONVERGED', 'standing'))
     if not fails:
-        flipped.append(f"the failing edge F={f_fail:g} no longer fails ({v_hi})")
+        flipped.append(_why(f_fail, v_hi, hi_ok, 'FAILED', 'failing'))
     return False, "; ".join(flipped)
 
 

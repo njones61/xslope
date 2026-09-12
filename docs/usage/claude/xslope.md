@@ -740,6 +740,23 @@ slope_data['refine_zones'] = [
 ]
 ```
 
+#### Joint regions (`joint_zones`) — authoring only
+
+A polygon of Type `joints`: a region a generated joint set is clipped to, for ground no material
+boundary draws. No material, no mesh region, no slices, no effect on the mesh — only
+`xslope.joints` reads it, and only when a set names it.
+
+```python
+slope_data['joint_zones'] = [
+    {'polygon': [(10, 0), (30, 0), (30, 12), (10, 12)], 'label': 'North block',
+     'size': None, 'mat_id': None},
+]
+```
+
+`label` is the polygon sheet's block header, and it is how a set names the region
+(`region='poly:North block'`, or `'poly:1'` by position). `size` and `mat_id` do nothing on such
+a polygon and preflight warns about either. A region no set names is fine.
+
 A `size` key on a **material** polygon (`slope_data['polygons'][i]['size']`) or on a **profile
 line** (`slope_data['profile_lines'][i]['size']`) does the same thing for that zone. Use those
 when the region to resolve *is* a layer, and a refine zone when it is not. All of them are
@@ -1062,10 +1079,12 @@ from xslope.joints import parallel_set, cross_jointed, voronoi
 
 # dip_deg is the trace's inclination CCW from +x: 0 horizontal, 90 vertical,
 # NEGATIVE for a set descending to the right. region= None is the whole section,
-# a material name (or several) is that material's polygons, or pass a polygon.
+# a material name (or several) is that material's polygons, 'poly:<name or number>'
+# is a polygon of Type 'joints' on the polygon sheet, or pass a polygon outright.
+# band=(y_min, y_max) cuts any of those to an elevation band, either end None.
 bedding = parallel_set(slope_data, dip_deg=30, spacing=2.0, offset=0.0,
                        persistence=None,          # or (trace_len, gap): a rock bridge
-                       region='Sandstone', label='bed',
+                       region='Sandstone', band=(40.0, None), label='bed',
                        props={'phi': 32.0, 'c': 0.0, 'dil': 5.0})
 joints  = parallel_set(slope_data, dip_deg=-60, spacing=2.5, label='j2',
                        props={'phi': 35.0})
@@ -1081,8 +1100,44 @@ slope_data['joint_lines'] = voronoi(slope_data, block_size=1.5, seed=7,
 Rows come out labelled `bed-01`, `bed-02`, … so a network keeps one name per set. A trace that
 would lie ALONG the region's boundary is DROPPED rather than emitted — the mesh split needs
 material on both sides of a joint and there is none outside the section — while a trace ENDING
-on the boundary is ordinary and is kept. Generated networks mesh exactly as typed ones do: their
-traces meet, and the split copies each shared node once per wedge of material around it.
+on the boundary is ordinary and is kept. An elevation BAND is the exception: its edges are lines
+drawn through material, so a trace along one of them is kept. Generated networks mesh exactly as
+typed ones do: their traces meet, and the split copies each shared node once per wedge of
+material around it.
+
+**A set that can be edited (`JointSet`).** Build the set as a RECORD and the parameters ride in
+the rows' own labels, so the set can be regenerated later instead of deleted row by row. Use this
+whenever you generate a network from a description — it is what Studio's Build network dialog
+writes, and what reopens it.
+
+```python
+from xslope.joints import JointSet, regenerate, sets_in, set_name
+
+bed = JointSet('bed', 'parallel',                 # 'parallel' | 'cross' | 'voronoi'
+               {'dip': 25.0, 'spacing': 2.5, 'offset': 0.0},
+               region='poly:North block',         # or 'mat:Sandstone', or None
+               band=(40.0, None),                 # optional elevation band
+               props={'phi': 34.0, 'c': 0.0, 'dil': 5.0})
+slope_data['joint_lines'] += bed.generate(slope_data)
+# label -> 'bed-01|par|dip=25|s=2.5|reg=poly:North block|band=40:'
+
+sets_in(slope_data)          # [(name, JointSet, [row indices]), ...]
+regenerate(slope_data, 'bed', JointSet('bed', 'parallel',
+                                       {'dip': 25.0, 'spacing': 1.5},
+                                       region='poly:North block'))
+```
+
+`regenerate` replaces exactly that set's rows, where they were: another set, a hand-entered joint
+line and the properties the rows carry are untouched. With no record it re-runs the set as its
+labels state it. Parameter keys per kind: parallel `dip`, `spacing`, `offset`, `trace_len`,
+`gap`; cross adds `dip2`, `spacing2`, `offset2`; voronoi takes `block_size` and `seed`.
+
+**The label grammar** (`<name>-<nn>|<kind>|key=value|…`, each field omitted at its default):
+`par` / `crs` / `vor` for the kind, then `dip=` (a cross set writes `dip=60,-60`), `s=`, `off=`,
+`len=`, `gap=`, `blk=`, `seed=`, `reg=` (`mat:<name>[+<name>]` or `poly:<name or number>`) and
+`band=<lo>:<hi>` with either end empty for open. Properties are NOT in the label — they are the
+row's own columns — so `joint_lines` rows gain no new key from any of this. A label that is not
+of this form is a hand-typed name and is never regenerated.
 
 **Layout convention** (when the sketch gives spacing but not explicit elevations): the bottom
 line sits **AT the toe/base elevation** (e.g. y=0), then y = s, 2s, … upward; each line starts

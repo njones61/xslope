@@ -488,8 +488,9 @@ each polygon you provide:
 
 - A **Type**, which says what kind of region the polygon is. `material` (the default, and what a
   blank cell means) is a soil zone; the three `ssr` values are [SSR zone](#ssr-zones) analysis
-  overlays; `refine` is a [mesh refinement region](#refine-regions). An unrecognized word is
-  rejected at load time, never read as a material zone.
+  overlays; `refine` is a [mesh refinement region](#refine-regions); `joints` is a
+  [joint region](#joint-regions). An unrecognized word is rejected at load time, never read as a
+  material zone.
 - A **Material ID**, which references one of the materials in the **mat** worksheet. As with the
   profile sheet, the name below it is filled in automatically. Both cells gray out for any Type
   other than `material`, because an overlay has no material.
@@ -599,6 +600,26 @@ there; xslope warns at mesh time rather than leaving a setting with no effect to
 
 Refine regions may overlap anything, including each other and material boundaries; where several apply,
 the smallest size wins.
+
+### Joint regions {#joint-regions}
+
+A polygon whose **Type** is `joints` is an **authoring region**: it says where a generated joint network exists.
+Like a refine region it carries no material, is never meshed as a region, never generates slices and is invisible
+to every solver — and unlike one it does not change the mesh either. The only thing that reads it is a
+[generated joint set](#joint-sets) that names it as its region, and a region no set names costs nothing.
+
+Draw one when the ground a set exists in is not a material zone: one block of an outcrop, the rock behind a wall,
+the part of a unit above a bench. A set that *is* confined to a material needs no polygon at all — it can name the
+material directly.
+
+The region's **name** is the block header over its column — the `Polygon #3` cell, which you can type over. A set
+refers to it by that name (`poly:North block`) or by its number among the joint regions (`poly:1`). A header left
+as the template wrote it is the block's number rather than a name, so such a region is referred to by number.
+
+Two cells on a joint region do nothing, and the [model checks](preflight.md) say so rather than letting either pass
+unnoticed: a **Material ID**, because the region is not a soil zone (if the polygon was meant to *be* that zone, its
+Type is the cell to change), and a **Size**, because nothing about the region is meshed — draw a `refine` polygon
+over the same ground to refine the mesh there.
 
 ---
 
@@ -976,6 +997,32 @@ material on one side only and nothing for the other face of the joint to be; pre
 The interface element, its constitutive law, the derived stiffnesses and what the results show are the same as for a
 jointed reinforcement line: see
 [Joints without reinforcement](../fem/reinforcement.md#joints-without-reinforcement).
+
+### Generated sets, and what a Label holds {#joint-sets}
+
+A jointed rock mass is rarely described one line at a time, so a whole **set** of them can be generated at once —
+from Studio's [Build network](../studio/editing.md#build-network) dialog, or from `xslope.joints` in a script. A
+generated line is an ordinary row on this sheet: it can be read, edited by hand, saved and reloaded like a typed
+one, and nothing downstream can tell the two apart.
+
+What marks it is its **Label**, which carries the description the set was generated from:
+
+```
+bed-03|par|dip=25|s=2.5|off=0.5|reg=poly:North block|band=40:
+```
+
+Reading left to right: the set is named `bed` and this is its third row; `par` says it is a parallel set (`crs` is
+cross-jointed, `vor` is Voronoi); then one `key=value` per parameter, each left out when it is at its default. The
+keys are `dip` (degrees counter-clockwise from horizontal), `s` (spacing), `off` (offset across the set's normal),
+`len` and `gap` (a discontinuous set's trace length and the rock bridge between pieces), `blk` and `seed` (a
+Voronoi set's block size and random seed), `reg` (the region: `mat:<name>`, several joined by `+`, or
+`poly:<name or number>` for a [joint region](#joint-regions)), and `band` (an elevation band, `40:60`, with either
+end left empty for open). A cross-jointed set writes both of its sets into one field: `dip=60,-60|s=2,3`.
+
+The record is what lets a set be **edited**: reopening it regenerates its rows in place instead of asking you to
+delete a hundred of them and start again. The joint properties are not in it — they are in the row's own columns,
+where they can be edited one line at a time — so it is the geometry the Label carries and nothing else. A label
+that is not of this form is a name you chose, and it is never touched by a regeneration.
 
 ---
 

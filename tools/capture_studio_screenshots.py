@@ -658,6 +658,98 @@ def capture_joints_editor():
                  "editing_joints_editor.png")
 
 
+def _joints_network_model():
+    """The joints showcase with a joint REGION drawn on it.
+
+    The region is a polygon of Type 'joints' — an authoring region the network
+    generators clip a set to, which is how a set is confined to ground no
+    material boundary draws. Set on the loaded dict, never written back to the
+    sample file, exactly as the refine region on the polygon shot is.
+    """
+    from xslope.fileio import load_slope_data
+
+    d = _quiet(load_slope_data, JOINTS)
+    x0, y0, x1, y1 = d["domain_polygon"].bounds
+    d["joint_zones"] = [{
+        "polygon": [(x0 + 0.35 * (x1 - x0), y0 + 0.30 * (y1 - y0)),
+                    (x0 + 0.75 * (x1 - x0), y0 + 0.30 * (y1 - y0)),
+                    (x0 + 0.75 * (x1 - x0), y0 + 0.72 * (y1 - y0)),
+                    (x0 + 0.35 * (x1 - x0), y0 + 0.72 * (y1 - y0))],
+        "label": "North block", "size": None, "mat_id": None}]
+    return d
+
+
+def capture_joint_network_dialog():
+    """The Build network dialog: a cross-jointed set in a named joint region,
+    with the traces it resolves to previewed beside the parameters."""
+    from studio.network_dialog import BuildNetworkDialog
+
+    d = _joints_network_model()
+    dlg = BuildNetworkDialog(d, d.get("joint_lines") or [], None)
+    dlg._name.setText("bed")
+    dlg._kind.setCurrentIndex(1)                       # cross-jointed
+    for key, value in (("dip", "25"), ("spacing", "2.5"), ("offset", "0"),
+                       ("dip2", "-65"), ("spacing2", "3"), ("offset2", "0")):
+        dlg._param_edits["cross"][key].setText(value)
+    dlg._region.setCurrentIndex(dlg._region.count() - 1)   # the joint region
+    for key, value in (("c", "0"), ("phi", "34"), ("dil", "5"),
+                       ("t_cut", "0")):
+        dlg._prop_edits[key].setText(value)
+    dlg.show()
+    _settle()
+    # The dialog sizes its preview against the screen it is on, and the offscreen
+    # platform reports a small one — so the WIDTH is set here for the shot, as
+    # the two-view editors' shots set theirs.
+    dlg.resize(1180, dlg.height())
+    _settle()
+    # The height is measured, not chosen: the parameters, the region and the
+    # property set are the shot's subject and none of them may be below the
+    # scroll. Measured twice, the way the two-view line editors are — the first
+    # pass reports the chrome of an unshown layout,
+    # which is a band of nothing along the bottom of the shot; the second
+    # measures the dialog the first one produced.
+    scroll = dlg._form_scroll
+    for _ in range(2):
+        chrome = dlg.height() - scroll.viewport().height()
+        dlg.resize(dlg.width(), scroll.widget().sizeHint().height() + chrome)
+        _settle()
+    dlg._preview.refresh_now()
+    _settle()
+    return _grab(dlg, "editing_joint_network_dialog.png", settle=False)
+
+
+def capture_joints_editor_network():
+    """The joints editor after a network was built: the generated rows labeled
+    with the set record, and the Build network button that made them."""
+    from studio.editors import JointsEditor
+    from xslope.joints import JointSet
+
+    d = _joints_network_model()
+    jset = JointSet("bed", "parallel", {"dip": 25.0, "spacing": 2.5},
+                    region="poly:North block",
+                    props={"c": 0.0, "phi": 34.0, "dil": 5.0})
+    d["joint_lines"] = (d.get("joint_lines") or []) + jset.generate(d)
+    dlg = JointsEditor().build(d, None)
+    dlg.set_view_mode("table")
+    for cb in dlg._toggles.values():                   # every column, LEM and FEM
+        cb.setChecked(True)
+    dlg.resize(1000, 520)
+    dlg.show()
+    # The preview is collapsed and the dialog widened to whatever the columns
+    # need, measured: the Label column carrying the set record is the subject,
+    # and a column cut off at the right edge is the one thing the shot must not
+    # do. Two passes, as the two-view editor shots take.
+    table = dlg._table.table
+    for _ in range(2):
+        dlg._table_split.setSizes([dlg.height(), 0])
+        _settle()
+        chrome = dlg.width() - table.viewport().width()
+        dlg.resize(table.horizontalHeader().length() + chrome, dlg.height())
+    dlg._table_split.setSizes([dlg.height(), 0])
+    _settle()
+    return _grab(dlg, "editing_joints_network_rows.png", settle=False)
+
+
 def capture_piles_editor():
     """Piles editor, list view: the four form groups on the first pile."""
     from studio.editors import PilesEditor
@@ -1088,7 +1180,8 @@ def main():
                capture_welcome_dialog,
                capture_report_dialog,
                capture_reinforcement_editor, capture_reinforcement_table,
-               capture_joints_editor,
+               capture_joints_editor, capture_joint_network_dialog,
+               capture_joints_editor_network,
                capture_piles_editor, capture_piles_table,
                capture_seep_bc_editor,
                capture_materials_table, capture_materials_list,

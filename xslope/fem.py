@@ -4189,6 +4189,12 @@ _JOINT_MOVING_GROWTH = 0.05       # elastic displacements gained over the window
 # 16 000, 41 000, 185 000 and 207 000 sweeps, so a rule that ruled on the first few
 # thousand would be ruling on a transient.
 _JOINT_MOVING_MIN_SWEEPS = 25000
+# How often the two readings are taken. The windows they read are thousands of
+# sweeps wide, so asking every sweep the trace is sampled on would buy no
+# resolution and would pay for it: each reading fits two least-squares lines and
+# takes a maximum over half the history, which at a 250 000-sweep budget is a
+# 6 000-sample fit repeated 25 000 times.
+_JOINT_VERDICT_EVERY = 100
 
 
 def _window_rate(series, lo, hi):
@@ -7379,7 +7385,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # otherwise spend its whole budget and end undecided. Jointed models
             # only — `jslip_hist` is empty without a joint and the call is skipped.
             if (has_joints and JOINT_VERDICT_ON
-                    and iteration % _HYBRID_SAMPLE_EVERY == 0
+                    and iteration % _JOINT_VERDICT_EVERY == 0
                     and iteration >= _JOINT_VERDICT_WARMUP):
                 _jv = joint_verdict(jslip_hist, soob_hist, disp_hist,
                                     u_elastic_scale, force_tol,

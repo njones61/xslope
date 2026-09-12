@@ -91,7 +91,8 @@ from xslope.plot import (
     draw_joint_ticks, joint_legend_label, joint_linestyle, joint_ticks_wanted,
 )
 from xslope.plot_fem import (
-    plot_shear_strain_contours, plot_displacement_vectors,
+    plot_shear_strain_contours, plot_displacement_vectors, plot_deformed_mesh,
+    deformation_scale, solution_has_joint_state,
     plot_reinforcement_lines as _plot_mesh_reinf_lines, _plot_boundary_conditions,
 )
 
@@ -973,9 +974,20 @@ def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi, 
     strain_mappable, reinf_specs = plot_shear_strain_contours(
         ax_ur, fem_data, afield, show_mesh=False, show_reinforcement=True,
         single_panel=True)
-    plot_displacement_vectors(
-        ax_lr, fem_data, afield, show_mesh=False, show_reinforcement=True,
-        plot_boundary=True, displacement_tolerance=0.5, single_panel=True)
+    # The lower-right panel is the displacement field, and on a JOINTED row that
+    # is the scaled deformed mesh rather than an arrow field — the row fails by
+    # blocks moving as bodies on their joints, and arrows sampled at nodes miss
+    # the parting and sliding that is the mechanism. Same rule plot_fem_results
+    # applies to the standard figure; a row with no joint is unchanged.
+    if solution_has_joint_state(fem_data, afield):
+        plot_deformed_mesh(
+            ax_lr, fem_data, afield, deformation_scale(fem_data, afield),
+            show_reinforcement=True, single_panel=True, joint_faces=True,
+            at_failure=afield.get('_at_failure', False))
+    else:
+        plot_displacement_vectors(
+            ax_lr, fem_data, afield, show_mesh=False, show_reinforcement=True,
+            plot_boundary=True, displacement_tolerance=0.5, single_panel=True)
 
     # Impose the SAME padded limits + equal aspect on every panel. The fixed rect
     # already carries the padded-domain aspect, so 'box' is a no-op here (no shrink,

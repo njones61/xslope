@@ -43,7 +43,7 @@ def _fem_cbar_label(fem_data, base, unit_key):
 #: The deformed grid's color on a JOINTED deformation panel. The joint faces are
 #: drawn in the panel's own deformed color over it, so the elements have to give
 #: way — light enough to read as context, dark enough to still carry the shape.
-_DEFORMED_GRID_UNDER_JOINTS = '0.72'
+_DEFORMED_GRID_UNDER_JOINTS = '0.62'
 
 # Median rendered element edge (device px) below which two full interleaved grids
 # (original + deformed) tangle; below it the original mesh collapses to its domain

@@ -22,8 +22,11 @@ six lines made joints in memory:
      the jointed lines over the mesh; the results panel draws every joint as a
      hairline colored by slip, with the slip colorbar as its only legend and no
      colorbar where nothing slipped, and draws nothing at all on a model with
-     no joint. The standard figure's displacement panel is the scaled deformed
-     mesh on a jointed model and the arrow field on every other one.
+     no joint. The displacement panel is the scaled deformed mesh, with the
+     joint faces over its grid, on a jointed model and the arrow field on every
+     other one — asserted in both layouts a results figure is drawn in, the
+     stacked multi-panel one and the single panel Studio and the report render,
+     which take different paths through plot_fem_results.
   d. the faces are offset. The split gives the two soil faces their own nodes,
      so a slipped joint moves them apart in the solved field — which is what
      the deformed mesh and the at-failure capture draw. Measured on the
@@ -336,34 +339,53 @@ def _leg_plots(failures, cache):
     plt.close(fig)
     cache["plain"] = (plain, mesh0, fd0, sol0)
 
-    # The standard figure's displacement panel. A jointed model's mechanism is
-    # blocks moving as bodies on their joints, which an arrow field sampled at
-    # nodes does not show, so that panel becomes the scaled deformed mesh with
-    # the joint faces drawn. An unjointed model keeps the arrows.
+    # The displacement panel. A jointed model's mechanism is blocks moving as
+    # bodies on their joints, which an arrow field sampled at nodes does not
+    # show, so that panel becomes the scaled deformed mesh with the joint faces
+    # drawn. An unjointed model keeps the arrows.
+    #
+    # The rule belongs to the PANEL, not to a figure, so it is asserted on every
+    # layout a results figure is drawn in: the stacked multi-panel figure the
+    # driver scripts and the docs render, AND the one-panel-at-a-time figure
+    # Studio's results view and the report render. Those take different layout
+    # branches through plot_fem_results (deferred stacked colorbars vs. the
+    # single-panel make_axes_locatable path), so one passing does not prove the
+    # other.
     from matplotlib.quiver import Quiver
     from xslope.plot_fem import plot_fem_results
+    layouts = (["shear_strain", "displace_vector"],   # stacked figure
+               ["displace_vector"])                   # Studio / report: one panel
     for fd, sol, jointed in ((fem_data, sol, True), (fd0, sol0, False)):
-        fig, axes = _quiet(plot_fem_results, fd, sol,
-                           plot_type=["shear_strain", "displace_vector"],
-                           figsize=(9, 7))
-        ax_d = axes[1]
-        title = ax_d.get_title()
-        arrows = [a for a in ax_d.collections if isinstance(a, Quiver)]
-        if jointed and arrows:
-            failures.append("a jointed model's displacement panel still draws "
-                            "an arrow field")
-        if jointed and "Deformation" not in title:
-            failures.append(f"a jointed model's displacement panel is not the "
-                            f"deformed mesh: {title!r}")
-        if jointed and "Scale" not in title:
-            failures.append(f"the deformed-mesh panel does not print its "
-                            f"exaggeration: {title!r}")
-        if not jointed and not arrows:
-            failures.append("an unjointed model lost its displacement vectors")
-        if not jointed and "Displacement Vectors" not in title:
-            failures.append(f"an unjointed model's displacement panel changed: "
-                            f"{title!r}")
-        plt.close(fig)
+        for panels in layouts:
+            where = f"{len(panels)}-panel"
+            fig, axes = _quiet(plot_fem_results, fd, sol, plot_type=list(panels),
+                               figsize=(9, 7))
+            # One panel returns the Axes itself, not a list of them.
+            ax_d = axes if len(panels) == 1 else axes[-1]
+            title = ax_d.get_title()
+            arrows = [a for a in ax_d.collections if isinstance(a, Quiver)]
+            faces = [c for c in ax_d.collections if isinstance(c, LineCollection)]
+            if jointed and arrows:
+                failures.append(f"a jointed model's {where} displacement panel "
+                                f"still draws an arrow field")
+            if jointed and "Deformation" not in title:
+                failures.append(f"a jointed model's {where} displacement panel "
+                                f"is not the deformed mesh: {title!r}")
+            if jointed and "Scale" not in title:
+                failures.append(f"the {where} deformed-mesh panel does not print "
+                                f"its exaggeration: {title!r}")
+            # The joint faces are the point of the substitution: a deformed grid
+            # with no faces on it says nothing the arrows didn't.
+            if jointed and len(faces) < 2:
+                failures.append(f"the {where} deformed-mesh panel drew no joint "
+                                f"faces over its grid: {len(faces)} collections")
+            if not jointed and not arrows:
+                failures.append(f"an unjointed model lost its {where} "
+                                f"displacement vectors")
+            if not jointed and "Displacement Vectors" not in title:
+                failures.append(f"an unjointed model's {where} displacement "
+                                f"panel changed: {title!r}")
+            plt.close(fig)
 
 
 # --------------------------------------------------------------------------

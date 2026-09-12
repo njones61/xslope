@@ -924,6 +924,51 @@ viscoplastic loop with the corrector off. That solve exists to let the failure m
 the deformation figure, and a certified equilibrium there would replace the field the figure is
 drawn to show.
 
+### A jointed model, and the two interface switches {#jointed-model-solver-policy}
+
+A trial on a model with [interface (joint) elements](reinforcement.md#joints-without-reinforcement)
+costs tens or hundreds of thousands of sweeps where an unjointed one costs hundreds. The cause is
+the iteration, not the joint law. The loop factorizes the elastic stiffness once and gives back
+everything the material cannot carry as a body load, so its error contracts by the ratio of the
+stiffness the assembly holds to the stiffness the material has — and a pair at its Mohr-Coulomb
+limit carries a traction pinned at that limit, so its tangential stiffness is zero while the matrix
+still holds the full $k_s$. Where slipping and open pairs are the whole of what holds a block up,
+the contraction factor is within a ten-thousandth of one: measured at 0.99947 on one rock-toppling
+bracket edge, which is 13,000 sweeps to take the error down by a factor of a thousand. A trial that
+is *failing* is slow for the mirror-image reason — both residuals go flat within a few hundred
+sweeps and the block then slides at a few billionths of an elastic displacement per sweep until it
+has moved the eight that the runaway rule reads.
+
+On a jointed model `'auto'` runs the viscoplastic loop alone: the Newton corrector is not offered a
+jointed state, and the trial is decided by the stopping rules and by
+[the joint verdict](#the-joint-verdict). Two switches change that, and **both are off by default**,
+because each of them decides two of the shipped jointed benchmark brackets at a higher factor of
+safety than the plain loop does.
+
+>- **`joint_tangent='slip'`** on `solve_fem()` and `solve_ssrm()` — the interface relief. The shear
+>  stiffness of every slipping pair, and both stiffnesses of every open one, are taken out of the
+>  assembled free matrix down to `joint_tangent_factor` (default 0.01) of their elastic value, and
+>  the matrix is refactorized whenever the slipping and open set moves. It is the interface's
+>  consistent tangent, so the loop becomes a modified Newton on the active set; the traction limit,
+>  the slip return and the state a trial converges to are untouched. The relief runs as a
+>  **predictor** — until its state settles or its own sweep budget runs out — and then puts itself
+>  away and hands the trial to the plain loop, which decides it on its own trace, because every
+>  level and rate in the stopping rules is calibrated on that trace. Off by default and inert on a
+>  model with no joint.<br>
+>- **`fem.JOINT_NEWTON_ON`** — the corrector on a jointed model. The interface's consistent tangent
+>  carries the friction cross term $\partial t_s/\partial\Delta_n = \pm k_n\tan\phi_j$, which is
+>  non-symmetric and which only the Newton path's general factorization sees, and the corrector's
+>  interface law carries the sweep's own accumulated slip, dilational opening, residual branch and
+>  opening history, held fixed across the step and linearized about. With both, the corrector
+>  certifies a jointed state on the same three checks it applies to any other: one rock-toppling
+>  bracket edge that the plain loop takes 185,381 sweeps to converge is certified at 300 sweeps, at
+>  a force residual of $3\times10^{-11}$ with no Gauss point outside its surface.
+
+`fem_solver='newton'` on a jointed model runs from a cold start with no accumulated slip behind it,
+and on the rock-joint benchmarks it diverges on trials the viscoplastic loop converges. A divergence
+there is reported as a failed trial, not as an error, but it is not a driver those models can be
+bracketed on.
+
 ### Surficial (skin) failures and the minimum-slip-depth filter
 
 On a purely frictional face ($c = 0$) the critical mechanism is a shallow slide running parallel to

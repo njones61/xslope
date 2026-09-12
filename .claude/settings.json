@@ -3,8 +3,7 @@
     "allow": [
       "Bash(python3:*)",
       "Bash(mkdir:*)",
-      "Edit(//Users/njones/python_projects/xslope/**)",
-      "Write(//Users/njones/python_projects/xslope/**)"
+      "Edit(//Users/njones/python_projects/xslope/**)"
     ]
   }
 }

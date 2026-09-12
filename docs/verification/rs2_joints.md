@@ -84,7 +84,7 @@ joint model whose output is a stress-displacement curve.
 |---:|:-:|---|---|---|---|---|
 | [1a](#rj-1a) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1a | Goodman & Bray 1.0 | UDEC 0.99 | 0.99 / 0.97 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
 | [1b](#rj-1b) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1b | Goodman & Bray 1.0 | UDEC 0.99 | 0.97 / 0.94 | *reported, no lock* — the lower edge of the bracket reaches the sweep budget without a verdict. |
-| [1c](#rj-1c) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1c | Goodman & Bray 1.02 | UDEC 1.01 | 1.01 / 0.99 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
+| [1c](#rj-1c) | 🟡 | Goodman & Bray block toppling, case 1c | SSRM 1.057 vs Goodman & Bray 1.02 (+3.6%) | UDEC 1.01 | 1.01 / 0.99 | |
 | [1d](#rj-1d) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 | UDEC 1.22 | 1.19 / 1.16 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
 | [2](#rj-2) | 🔴 | Alejano & Alonso block toppling | SSRM 0.764 vs UDEC 0.87 (−12.2%) | LE (Goodman & Bray) 0.76 | 0.86 / 0.82 | |
 | [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | — | 1.12 / 1.09 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
@@ -224,16 +224,28 @@ magnitude and direction.
 
 ![RJ-1b: Goodman & Bray block toppling, case b (rj001b) — FEM inputs with the 2013 kN toe force drawn at the block corner it acts on, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The mechanism is case a's — slip up every column contact and along the stepped base, the stack rotating forward over the face — reached on joints four degrees weaker, which is what the force at the toe buys](images/RJ-1b.png)
 
-### ⊘ RJ-1c: Goodman & Bray block toppling, case c (rj001c) {#rj-1c}
+### 🟡 RJ-1c: Goodman & Bray block toppling, case c (rj001c) {#rj-1c}
 
 Case a's section and rock with the joints half a degree steeper, φ = 38.6598°, and the same 0.5 kN
 toe force that does nothing. Half a degree is worth about two points of factor of safety here, which
 is what the closed form's own pair of answers for cases a and c says as well — 1.0 against 1.02.
 
-The row reads case a's: the corpus bracket is decided on all nine trials, its longest taking
-95 070 sweeps of the 250 000 allowed, and the refinement step to a 2D size of 7.0 m brackets a
-factor one step away with its upper edge at the budget and no verdict. So this row prints no factor
-either, for the same reason.
+| XSLOPE SSRM | Goodman & Bray referee | UDEC | RS2 without / with improvement |
+|---|---|---|---|
+| **1.057** | 1.02 (+3.6%) | 1.01 | 1.01 / 0.99 |
+
+<!-- test: file=files/rocscience/joints/rj001c.xlsx, type=fem_ssrm, expected_fs=1.057, element_type=tri6, target_size=10.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1c, f_stand=1.046875, f_fail=1.06640625, check=edges, tier=gate -->
+
+A step of refinement — a 2D size of 7.0 m, which takes the mesh from 2 072 nodes and 67
+interface elements to 3 573 and 94 — moves the factor by one bracket step, inside the row's own
+tolerance, and every trial of both brackets reaches a verdict. The corpus bracket's longest takes
+82 261 sweeps of the 250 000 allowed, and the refinement's upper edge — the trial that held this
+row back, which used to reach the budget with nothing to say — comes back FAILED at 225 001
+sweeps on a steady slip.
+
+The four standing trials of that refinement cost 302 to 311 sweeps each, where on the same mesh
+and the same bracket they cost 11 196 to 131 095 before. Shortening a standing trial is what the
+interface Newton corrector does, and it is why this row can be cut at all.
 
 **Input file:** [rj001c.xlsx](files/rocscience/joints/rj001c.xlsx).
 

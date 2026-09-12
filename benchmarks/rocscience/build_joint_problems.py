@@ -82,6 +82,13 @@ def _base():
     sd['joint_lines'] = []
     sd['max_depth'] = None
     sd['k_seismic'] = 0.0
+    # RS2 restrains the SIDES of every model in this manual in both directions,
+    # not just in x: the restraint list of each .fez names every node on the base
+    # and on both sides with tx = ty = 0, and mapping those node numbers back to
+    # coordinates puts all of them on those three faces and nowhere else. XSLOPE's
+    # default side restraint is a roller, so the files declare the vendor's.
+    # (Problem 21, the tunnel, is the one model in the set that uses rollers.)
+    sd['side_bc'] = 'fixed'
     return sd
 
 

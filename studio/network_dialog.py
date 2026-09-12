@@ -88,11 +88,9 @@ KIND_FIELDS = {
 #: Which parameters a kind may leave blank, and what blank means.
 _OPTIONAL = {"offset", "offset2", "trace_len", "gap"}
 
-#: The joint properties every trace of the set gets, in the joints sheet's own
-#: order. The help text is the editor's, imported rather than restated.
-PROP_KEYS = ["c", "phi", "c_res", "phi_res", "dil", "t_cut", "kn", "ks", "jred"]
-
-#: How the property fields are laid out: two per row, the sheet's pairings.
+#: The joint properties every trace of the set gets, laid out two per row in the
+#: joints sheet's own pairings. The help text is the joints editor's, imported
+#: rather than restated.
 _PROP_ROWS = [("c", "phi"), ("c_res", "phi_res"), ("dil", "t_cut"),
               ("kn", "ks"), ("jred", None)]
 
@@ -207,7 +205,7 @@ class BuildNetworkDialog(QDialog):
         self.resize(max(want, self.width()), self.height())
 
     # -- construction ------------------------------------------------------
-    def _edit(self, key, tooltip, width=None):
+    def _edit(self, key, tooltip):
         w = QLineEdit()
         w.setToolTip(tooltip)
         w.setAlignment(Qt.AlignRight | Qt.AlignVCenter)

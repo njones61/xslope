@@ -642,6 +642,122 @@ def _1d_sidecar_mismatch(name, df, id_column, n_rows, n_slots, kind,
     return None
 
 
+#: The joint-state arrays a solved field carries, each (n_joint_elements, 3) —
+#: one column per node pair of the element. They are what every joint drawing
+#: and table reads, and none of them can be derived from the displacements
+#: alone: slip and the opened/slipped record are the solve's own history.
+_JOINT_STATE_COLUMNS = (("tn", "joint_tn"), ("ts", "joint_ts"),
+                        ("tlim", "joint_tlim"), ("slip", "joint_slip"),
+                        ("open", "joint_open"), ("slipping", "joint_slipping"))
+
+
+def _fem_joint_dataframe(fem_data, solution):
+    """The per-node-pair interface results for one solve_fem field, or ``None``
+    where the model has no joint or the field measured none.
+
+    One row per node pair of every joint element — the pair is where the state
+    is decided, so it is the row — carrying the element and 1-based line id, the
+    pair index, the two node ids and the point they stand at, the integration
+    weight (zero on a padded pair of a two-pair element), the normal and shear
+    tractions, the Mohr-Coulomb limit the shear is judged against, the slip, and
+    the open / slipping flags. It reads as a results file AND carries everything
+    the state arrays hold, so a reloaded solution draws its joints.
+    """
+    import pandas as pd
+
+    jd = fem_data.get("joint_data")
+    if jd is None or not jd.get("n"):
+        return None
+    n = int(jd["n"])
+    if not _joint_solution_has_state(solution, n):
+        return None
+    conn = np.asarray(jd["conn"], dtype=int)
+    w = np.asarray(jd["w"], dtype=float)
+    line_id = np.asarray(jd["line_id"], dtype=int)
+    side = np.asarray(jd["side"], dtype=int)
+    nodes = np.asarray(fem_data["nodes"], dtype=float)
+    state = {name: np.asarray(solution[key]) for name, key in _JOINT_STATE_COLUMNS}
+
+    rows = []
+    for i in range(n):
+        for p in range(3):
+            a, b = int(conn[i, p]), int(conn[i, p + 3])
+            row = {"joint_id": i, "line_id": int(line_id[i]),
+                   "side": int(side[i]), "pair": p,
+                   "node_a": a, "node_b": b,
+                   "x": float(nodes[a, 0]), "y": float(nodes[a, 1]),
+                   "weight": float(w[i, p])}
+            for name, _key in _JOINT_STATE_COLUMNS:
+                v = state[name][i, p]
+                row[name] = bool(v) if name in ("open", "slipping") else float(v)
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def _joint_solution_has_state(solution, n):
+    """Whether ``solution`` carries measured joint arrays for ``n`` elements."""
+    from .joint import solution_has_joint_state
+    return bool(solution_has_joint_state(solution, n))
+
+
+def _write_joint_result_sidecar(fem_data, solution, output_stem, tag):
+    """Write ``{stem}_{tag}_joints.csv`` for one field; returns ``[(kind, path)]``
+    or ``[]`` where there is nothing to write."""
+    df = _fem_joint_dataframe(fem_data, solution)
+    if df is None:
+        return []
+    path = output_stem.parent / f"{output_stem.name}_{tag}_joints.csv"
+    with open(path, "w") as f:
+        _write_units_header(f, fem_data)
+        df.to_csv(f, index=False)
+    return [("joint", path)]
+
+
+def _import_joint_result_sidecar(fem_data, solution, output_stem, tag):
+    """Restore the joint state onto ``solution`` from ``{stem}_{tag}_joints.csv``.
+
+    A no-op where the file is absent, so a field saved before this sidecar
+    existed imports exactly as it did — and goes on drawing no joints, which is
+    the honest reading of a field that measured none.
+
+    A file that is not this model's is refused whole and noted under
+    ``sidecar_notes``, for the reason the member sidecars are: the name carries
+    no model identity, and half a set of restored pairs would read as a solved
+    interface. The check is the row count against three per joint element plus
+    the pairs' own node ids, which are exactly what this model's export writes.
+    """
+    import pandas as pd
+
+    jd = fem_data.get("joint_data")
+    if jd is None or not jd.get("n"):
+        return
+    path = output_stem.parent / f"{output_stem.name}_{tag}_joints.csv"
+    if not path.exists():
+        return
+    n = int(jd["n"])
+    df = pd.read_csv(path, comment="#")
+    conn = np.asarray(jd["conn"], dtype=int)
+    want = 3 * n
+    bad = None
+    if len(df) != want:
+        bad = (f"{path.name} holds {len(df)} interface rows where this model "
+               f"has {want} ({n} joint elements x 3 node pairs); the joint "
+               f"state was not restored.")
+    else:
+        got = df[["node_a", "node_b"]].to_numpy(dtype=int)
+        expect = np.column_stack([conn[:, 0:3].ravel(), conn[:, 3:6].ravel()])
+        if not np.array_equal(got, expect):
+            bad = (f"{path.name} addresses node pairs this model's joints do "
+                   f"not stand on; the joint state was not restored.")
+    if bad:
+        solution.setdefault("sidecar_notes", []).append(bad)
+        return
+    for name, key in _JOINT_STATE_COLUMNS:
+        col = df[name].to_numpy()
+        solution[key] = col.astype(bool if name in ("open", "slipping")
+                                   else float).reshape(n, 3)
+
+
 def _import_1d_result_sidecars(fem_data, solution, output_stem, tag):
     """Restore reinforcement / pile results onto ``solution`` from the ``tag``
     sidecars (``"fem"`` converged / ``"fem_failure"`` twin) when they are present.
@@ -738,6 +854,12 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None,
     snapshot is given. These double as results files for reading AND let a reloaded
     solution re-render the reinforcement-force / pile-shear colorbars solve-free.
     They are written only when the corresponding element type is present.
+
+    A jointed model writes ``{stem}_fem_joints.csv`` (and its ``_fem_failure_``
+    twin) the same way: one row per node pair with its tractions, the limit, the
+    slip and the open / slipping flags. None of that can be recovered from the
+    displacements — slip and the opened record are the solve's own history — so
+    without this file a reloaded jointed field draws no joints at all.
     """
     from pathlib import Path
 
@@ -757,7 +879,8 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None,
     print(f"Exported FEM nodal results to {nodes_file}")
     print(f"Exported FEM element results to {elements_file}")
 
-    for kind, path in _write_1d_result_sidecars(fem_data, solution, output_stem, "fem"):
+    for kind, path in (_write_1d_result_sidecars(fem_data, solution, output_stem, "fem")
+                       + _write_joint_result_sidecar(fem_data, solution, output_stem, "fem")):
         print(f"Exported FEM {kind} results to {path}")
 
     if failure_solution is not None:
@@ -789,8 +912,10 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None,
         print(f"Exported FEM at-failure nodal results to {f_nodes_file}")
         print(f"Exported FEM at-failure element results to {f_elements_file}")
 
-        for kind, path in _write_1d_result_sidecars(
-                fem_data, failure_solution, output_stem, "fem_failure"):
+        for kind, path in (_write_1d_result_sidecars(
+                fem_data, failure_solution, output_stem, "fem_failure")
+                + _write_joint_result_sidecar(
+                    fem_data, failure_solution, output_stem, "fem_failure")):
             print(f"Exported FEM at-failure {kind} results to {path}")
 
     if meta is not None:
@@ -920,6 +1045,12 @@ def import_fem_solution(fem_data, output_stem):
     ``"sidecar_notes"`` rather than grafted (see
     :func:`_import_1d_result_sidecars`).
 
+    A jointed model's ``{stem}_fem_joints.csv`` (and twin) is restored the same
+    way, putting the joint state back on the solution so the reloaded field
+    draws its joints and tabulates them. A field saved before that sidecar
+    existed carries none, and goes on drawing none — the honest reading of a
+    field that measured no interface.
+
     The solve facts the meta sidecar records — ``converged``, ``iterations``,
     ``residual``, ``max_displacement`` — are restored onto the returned dict.
     Keys the file does not record are left ABSENT rather than guessed, so a
@@ -948,6 +1079,7 @@ def import_fem_solution(fem_data, output_stem):
         if meta.get(key) is not None:
             solution[key] = meta[key]
     _import_1d_result_sidecars(fem_data, solution, output_stem, "fem")
+    _import_joint_result_sidecar(fem_data, solution, output_stem, "fem")
 
     f_nodes_file = output_stem.parent / f"{output_stem.name}_fem_failure_nodes.csv"
     f_elements_file = output_stem.parent / f"{output_stem.name}_fem_failure_elements.csv"
@@ -966,6 +1098,8 @@ def import_fem_solution(fem_data, output_stem):
         # honest even if a stale/absent meta sidecar leaves it unset.
         failure_solution.setdefault("converged", False)
         _import_1d_result_sidecars(fem_data, failure_solution, output_stem, "fem_failure")
+        _import_joint_result_sidecar(fem_data, failure_solution, output_stem,
+                                     "fem_failure")
         solution["failure_solution"] = failure_solution
 
     return solution

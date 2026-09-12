@@ -35,6 +35,11 @@ six lines made joints in memory:
   f. the report table. A jointed run's reinforcement section carries the joints
      table — line, the share of its length at its limit, the peak slip — and an
      unjointed run carries none.
+  g. the saved field keeps its joints. Slip and the opened record are the
+     solve's own history and cannot be recovered from the displacements, so a
+     field exported without them reloads as a model whose interfaces went
+     quiet. The round trip is exact, and a file that is not this model's is
+     refused whole.
 
 Run directly:  PYTHONPATH=. python3 test/joint_surfaces_check.py
 """
@@ -542,12 +547,61 @@ def _leg_report(failures, cache):
 
 
 # --------------------------------------------------------------------------
+# g. the saved field keeps its joints
+# --------------------------------------------------------------------------
+
+def _leg_sidecar(failures, cache):
+    """A solved jointed field, exported and read back, still knows what its
+    joints did — otherwise every figure of a reloaded run is drawn on a model
+    whose interfaces have silently gone quiet, and a corpus figure can only be
+    re-rendered by solving again.
+    """
+    import tempfile
+    from xslope.fem import export_fem_solution, import_fem_solution
+    from xslope.plot_fem import solution_has_joint_state
+    _sd, _mesh, fem_data, sol = cache["solved"]
+
+    with tempfile.TemporaryDirectory() as d:
+        stem = os.path.join(d, "rt")
+        _quiet(export_fem_solution, fem_data, sol, stem, meta={"FS": 1.0})
+        joints_csv = os.path.join(d, "rt_fem_joints.csv")
+        if not os.path.exists(joints_csv):
+            failures.append("a solved jointed field writes no joint sidecar, "
+                            "so its state cannot be read back")
+            return
+        back = _quiet(import_fem_solution, fem_data, stem)
+        if not solution_has_joint_state(fem_data, back):
+            failures.append("a reloaded jointed field carries no joint state")
+        for key in ("joint_slip", "joint_open", "joint_slipping",
+                    "joint_tn", "joint_ts", "joint_tlim"):
+            a = np.asarray(sol[key]).astype(float)
+            b = np.asarray(back.get(key, [])).astype(float)
+            if a.shape != b.shape or not np.allclose(a, b):
+                failures.append(f"{key} does not survive the round trip")
+
+        # And a file that is not this model's is refused whole rather than
+        # grafted: half a set of restored pairs reads as a solved interface.
+        with open(joints_csv) as f:
+            lines = f.readlines()
+        with open(joints_csv, "w") as f:
+            f.writelines(lines[:-1])
+        hurt = _quiet(import_fem_solution, fem_data, stem)
+        if not hurt.get("sidecar_notes"):
+            failures.append("a joint sidecar that is not this model's is "
+                            "grafted on without a word")
+        if solution_has_joint_state(fem_data, hurt):
+            failures.append("a refused joint sidecar still left joint state "
+                            "on the solution")
+
+
+# --------------------------------------------------------------------------
 
 LEGS = (
     ("the loader's column reaches the mesher", _leg_wiring),
     ("preflight names the line", _leg_preflight),
     ("the plots draw the joint", _leg_plots),
     ("the two faces move apart", _leg_faces),
+    ("the saved field keeps its joints", _leg_sidecar),
     ("the detail profile and its figure", _leg_details),
     ("the report's joints table", _leg_report),
 )

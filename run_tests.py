@@ -8762,9 +8762,10 @@ MODULE_CHECKS = {
         "What a jointed line reaches once the reinforce sheet says so: the "
         "mesher through extract_joint_options, preflight's four refusals and four "
         "signals, the inputs / mesh / results plots, the two soil faces of the "
-        "split moving apart in the solved field, the 1D detail profile and its "
-        "figure, and the report's joints table — with the same model unflagged "
-        "carrying none of it."),
+        "split moving apart in the solved field, the joint state surviving an "
+        "export and reload, the 1D detail profile and its figure, and the "
+        "report's joints table — with the same model unflagged carrying none "
+        "of it."),
     'spencer_root': (
         'spencer_root_check.py',
         "Spencer's equations have a root outside the pole-free band on many "

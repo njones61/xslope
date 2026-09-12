@@ -209,9 +209,8 @@ changes what a faithful transcription is.
   recorded, so nothing published reproduces it.
 - **Problem 16's boundary conditions.** The 0° case runs on rollers; the nine tilted cases pin
   every exterior node in both directions, and use a convergence tolerance two orders tighter.
-- **Problems 3 and 5 are elastic.** Their manual pages describe Mohr-Coulomb rock and their
-  material rows carry c = 0.675 MPa and φ = 43°, but both files set the plasticity specification to
-  none, so the rock cannot yield and only the joints can.
+- **Problems 3 and 5 are elastic.** Both files set the plasticity specification to none and carry
+  no strength values under it, so the rock cannot yield and only the joints can.
 - **Problems 9 to 14 use two joint strengths, not one.** The network's 1928–1962 elements carry one
   friction angle and the one or two short explicit crest traces carry another — 40°, 20° or 30°
   against the network's 30°, 25° or 20° — so a single quoted joint friction angle for these
@@ -220,19 +219,18 @@ changes what a faithful transcription is.
   file declared in MPa: at MPa a 143 MPa joint under 345 MPa never slips at the prescribed 0.3 m of
   shear, and at kPa it is an ordinary rock-joint shear test.
 - **The manual states no rock strength for problems 3 to 7.** Their tables carry the slope
-  geometry, the joint friction angle and the rock's tensile strength, and nothing else. The models
-  carry c = 0.675 MPa and φ = 43° on problems 4, 6 and 7, and on problems 3 and 5 no plasticity
-  specification at all — an elastic rock, which only the joints can fail. The same tables state no
-  joint cohesion either, where all five models carry 0.1 MPa.
+  geometry, the joint friction angle and the rock's tensile strength, and nothing else, where the
+  models of problems 4, 6 and 7 carry c = 0.675 MPa and φ = 43°. The same tables state no joint
+  cohesion either, where all five models carry 0.1 MPa — on a 260 m slope, not a rounding.
 - **Problem 8's tensile strength never binds.** The model caps the rock at 75 kPa, and the
   Mohr-Coulomb apex its own c and φ imply is c/tan φ = 74.1 kPa, so the cap sits above the strength
   the envelope already has. Problem 15 is the same: a 1000 kPa cap over a 285.6 kPa apex.
 - **Problem 8's joint network is not the whole section.** Its thirteen columns are clipped to the
   block above the basal joint; generated over the section they would be sixteen, three of them
   under a plane the model has no columns below.
-- **Problems 9 to 15 run on a rock a thousand times stiffer than steel.** E = 2 × 10⁸ MPa is the
+- **Problems 9 to 14 run on a rock a thousand times stiffer than steel.** E = 2 × 10⁸ MPa is the
   manual's own device, and it says so: the UDEC models these are scored against use rigid blocks,
-  and the modulus is how RS2 reproduces one.
+  and the modulus is how RS2 reproduces one. Problem 15, whose rock can yield, runs at 1 GPa.
 - **No problem from 1 to 21 states a joint residual strength or a dilation angle.** Those appear
   only in problems 22 and 23, and material residual values, where they appear, always equal the
   peak.

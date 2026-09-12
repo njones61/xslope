@@ -87,7 +87,7 @@ joint model whose output is a stress-displacement curve.
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.744 vs UDEC 0.76 (−2.1%) | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.018 vs UDEC 1.03 (−1.2%) · LE 0.40–1.45 | 1.01 / 1.09 | |
 | 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 (LE 0.43–1.45) | 0.92 / 1.08 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is not yet measured. |
-| 11 | <span class="nodata">⊘</span> | Ploughing sliding slab failure | LE (Alejano) 1.75 · UDEC 1.21 | 1.22 / 1.3 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is running. |
+| [11](#rj-11) | 🔴 | Ploughing sliding slab failure | SSRM 1.213 vs LE (Alejano) 1.75 (−30.7%) · UDEC 1.21 | 1.22 / 1.3 | |
 | [12](#rj-12) | <span class="nodata">⊘</span> | Ploughing toppling slab failure | LE (Alejano) 2.0 · UDEC 1.78 | 1.39 / 1.75 | *reported, no lock* — a step of refinement moves the factor, so it is not the section's answer but its mesh's. |
 | 13 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 4 | LE (Alejano) 1.0 · UDEC 1.0 | 1.0 / 1.05 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is running. |
 | [14](#rj-14) | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | LE (Alejano) 1.0 · UDEC 0.9 | 0.89 / 1.09 | *reported, no lock* — a step of refinement moves the factor, as it does on problem 12. |
@@ -438,6 +438,45 @@ this corpus follows wherever a problem publishes no single closed-form value.
 **Input file:** [rj009.xlsx](files/rocscience/joints/rj009.xlsx).
 
 ![RJ-9: Alejano et al. bilinear slab failure, example 1a (rj009) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it moves: the release trace under the crest carries the brightest slip, a bedding plane below the toe carries the rest, and the deformed section shows the slab between them sliding out over the bench](images/RJ-9.png)
+
+### 🔴 RJ-11: Alejano et al. ploughing sliding slab failure (rj011) {#rj-11}
+
+A 25 m slope at 50° with bedding dipping out of the face at −50° at 1.5 m spacing, φ = 30°, and two
+release traces at φ = 20°: one at the toe running below the bench and one from the face down onto
+the bedding plane that releases the toe block. Ploughing failure is the paper's name for sliding on
+a primary discontinuity combining with sliding on a joint sub-parallel to the face, which lifts the
+toe block and eventually rotates it out of the slope. The rock is the family's elastic rigid-block
+stand-in at E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3. The lower tip of a release trace is stated to six
+decimals, so it lands a part in 10⁷ from the bedding plane it belongs on; see
+[where a joint ends on another](#joint-terminations).
+
+| XSLOPE SSRM | LE (Alejano) referee | UDEC | RS2 without / with improvement |
+|---|---|---|---|
+| **1.213** | 1.75 (−30.7%) | 1.21 | 1.22 / 1.3 |
+
+<!-- test: file=files/rocscience/joints/rj011.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-11, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
+
+A step of refinement — a 2D size of 1.05 m, which takes the mesh from 12 326 nodes and 1 768
+interface elements to 26 052 and 2 524 — does not move the factor at all: the finer mesh returns
+the same bracket, edge for edge. Every trial of both brackets reaches a verdict, the longest taking
+61 171 sweeps of the 250 000 allowed.
+
+**The two published referees are half a factor apart, and this row lands on one of them.** Alejano
+et al. publish a limit-equilibrium 1.75 and a UDEC run at 1.21 for the same problem, and RS2's own
+two factors sit beside the UDEC one rather than beside the limit-equilibrium one. The corpus scores
+against the closed form wherever a problem has one, which is what the dot reads; against the
+distinct-element run the same factor reads +0.2%. [Problem 15](#rj-15) has the same shape, with
+three referees on one problem.
+
+Every input class the corpus transcribes was diffed against the vendor model and matches: the rock's
+E, ν and γ, both joint friction angles, the joints' stiffness pair, cohesion and tensile cap, the
+bedding dip and spacing, the release traces' endpoints, and the side restraint the vendor clamps in
+both directions. Nothing here explains the gap to the limit-equilibrium value; it is recorded as
+measured.
+
+**Input file:** [rj011.xlsx](files/rocscience/joints/rj011.xlsx).
+
+![RJ-11: Alejano et al. ploughing sliding slab failure (rj011) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. One bedding plane from the crest to the toe carries almost all of the slip, and at its foot the two release traces cut out a small wedge: the deformed section shows that wedge lifted and rotated out over the bench while the slab above it slides down the plane, which is the ploughing mechanism the paper names](images/RJ-11.png)
 
 ### ⊘ RJ-12: Alejano et al. ploughing toppling slab failure (rj012) {#rj-12}
 

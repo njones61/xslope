@@ -74,10 +74,10 @@ joint model whose output is a stress-displacement curve.
 
 | # | Match | Problem | Referee | RS2 without / with improvement | Notes |
 |---:|:-:|---|---|---|---|
-| 1a | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1a | Goodman & Bray 1.0 · UDEC 0.99 | 0.99 / 0.97 | *blocked* — the stepped base puts each column's basal contact partway along its neighbour's side joint; see [where a joint ends on another](#joint-terminations). |
-| 1b | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1b | Goodman & Bray 1.0 · UDEC 0.99 | 0.97 / 0.94 | *blocked* — as 1a; its 2013 kN stabilizing toe force enters as a line load on the `lloads` sheet. |
-| 1c | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1c | Goodman & Bray 1.02 · UDEC 1.01 | 1.01 / 0.99 | *blocked* — as 1a. |
-| 1d | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 · UDEC 1.22 | 1.19 / 1.16 | *blocked* — as 1b, with the same 2013 kN toe force. |
+| [1a](#rj-1a) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1a | Goodman & Bray 1.0 · UDEC 0.99 | 0.99 / 0.97 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
+| [1b](#rj-1b) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1b | Goodman & Bray 1.0 · UDEC 0.99 | 0.97 / 0.94 | *reported, no lock* — the lower edge of the bracket reaches the sweep budget without a verdict. |
+| [1c](#rj-1c) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1c | Goodman & Bray 1.02 · UDEC 1.01 | 1.01 / 0.99 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
+| [1d](#rj-1d) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 · UDEC 1.22 | 1.19 / 1.16 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
 | [2](#rj-2) | 🟢 | Alejano & Alonso block toppling | SSRM 0.764 vs Goodman 0.76 (+0.5%) | 0.86 / 0.82 | |
 | [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | 1.12 / 1.09 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
 | [4](#rj-4) | <span class="nodata">⊘</span> | Lorig & Varona flexural toppling | UDEC 1.3 | 1.19 / 1.27 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
@@ -85,12 +85,12 @@ joint model whose output is a stress-displacement curve.
 | [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | 1.25 / 1.31 | *reported, no lock* — both edges of the bracket reach the sweep budget without a verdict. |
 | [7](#rj-7) | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | 1.57 / 1.59 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.744 vs UDEC 0.76 (−2.1%) | 0.75 / 0.75 | |
-| 9 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1a | UDEC 1.03 | 1.01 / 1.09 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
-| 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | 0.92 / 1.08 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
-| 11 | <span class="nodata">⊘</span> | Ploughing sliding slab failure | UDEC 1.21 | 1.22 / 1.3 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
-| 12 | <span class="nodata">⊘</span> | Ploughing toppling slab failure | UDEC 1.78 | 1.39 / 1.75 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
-| 13 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 4 | UDEC 1.0 | 1.0 / 1.05 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
-| 14 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | UDEC 0.9 | 0.89 / 1.09 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
+| 9 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1a | UDEC 1.03 | 1.01 / 1.09 | *planned* — the file is built and meshes; its corpus bracket has not been run. |
+| 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | 0.92 / 1.08 | *planned* — the file is built and meshes; its corpus bracket has not been run. |
+| 11 | <span class="nodata">⊘</span> | Ploughing sliding slab failure | LE (Alejano) 1.75 · UDEC 1.21 | 1.22 / 1.3 | *planned* — the file is built and meshes; its corpus bracket has not been run. |
+| [12](#rj-12) | <span class="nodata">⊘</span> | Ploughing toppling slab failure | LE (Alejano) 2.0 · UDEC 1.78 | 1.39 / 1.75 | *reported, no lock* — a step of refinement moves the factor, so it is not the section's answer but its mesh's. |
+| 13 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 4 | LE (Alejano) 1.0 · UDEC 1.0 | 1.0 / 1.05 | *planned* — the file is built and meshes; its corpus bracket has not been run. |
+| 14 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | LE (Alejano) 1.0 · UDEC 0.9 | 0.89 / 1.09 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is not yet measured. |
 | [15](#rj-15) | <span class="nodata">⊘</span> | Partially joint-controlled footwall | LE (Alejano) 1.72 · UDEC 1.6 · Slide2 1.25 | 1.28 / 1.42 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
 | 16 | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | experiment 9° · UDEC 11° | 9° / 7° | *blocked* — the problem scores the TILT ANGLE at which a block grid topples, found by rotating gravity through a staged sweep; XSLOPE's seismic coefficient tilts the load but the row needs the sweep and a toppling criterion, neither of which is a strength reduction. |
 | 17 | <span class="nodata">⊘</span> | Step-path, en-echelon joints | UDEC 1.29 | 1.24 / 1.2 | *blocked* — the vendor model's second, elastic material has no boundary of its own. Recovered from the element-material map it is an 83-vertex staircase of element edges, trending vertical near x = 12 and horizontal near y = 3 with excursions of about one element either side, so the boundary is a property of the vendor's mesh rather than of its model. |
@@ -107,31 +107,33 @@ joint model whose output is a stress-displacement curve.
 
 ## Where a Joint Ends on Another Joint {#joint-terminations}
 
-Ten of the manual's twenty-one scorable problems are held out of the corpus by one property of
-their geometry: a joint that stops **on** another joint rather than crossing it.
+Ten of the manual's twenty-one scorable problems turn on one property of their geometry: a joint
+that stops **on** another joint rather than crossing it.
 
-A joint is an interface, so the mesh has to carry two elements on every edge of it — one on each
-face. Where two joints cross, the shared node sits at the middle of four wedges of rock and the
-split copies it once per wedge, which leaves two elements on each of the four edges leaving it.
-Where one joint *terminates* on another there are three wedges, not four, and the edge at the
-junction comes out carrying four elements. XSLOPE refuses that mesh by name rather than solving
-a section it has meshed wrongly.
+A joint is an interface, so the mesh carries two elements on every edge of it, one on each face,
+and the split gives every node on a jointed curve one copy per wedge of material around it — four
+at a crossing, where the shared node sits at the middle of four wedges of rock, and three at a
+termination. The wedge count is read from the mesh's own topology, so a termination needs nothing
+of its own there. What it needs is for the two lines to meet at **one point**: the meeting point
+is a vertex of the ending line and of nothing else, and the mesher only places a node where the
+geometry carries one.
 
-Problem 1's four cases meet it exactly. Goodman & Bray's sixteen columns stand on a **stepped**
-base, so each column's basal contact begins partway along its downslope neighbour's side joint:
-fifteen terminations in one section, at every mesh size from 1.0 m to 4.0 m.
+Whether they meet at one point is a question about arithmetic rather than about the drawing. Two
+tips that are meant to lie on a line land beside it instead — Goodman & Bray's fifteen column
+contacts by between 7 × 10⁻¹⁶ and 3 × 10⁻¹⁴, because they are computed from the same base angle
+the line is, and Alejano's release traces by between 2 × 10⁻⁷ and 2 × 10⁻⁶, because the vendor
+states their lower tip to six decimals — and the sliver between the two lines is thinner than any
+mesh resolves. So **every jointed line's end within a millionth of the section of another jointed
+line is moved onto it**, and the line it stops on is given a vertex at that same point, before the
+mesher runs. The through line is not moved: it is the plane the ending line belongs to and it keeps
+the geometry it was stated with. An end already on another line is left exactly where it is.
 
-Problems 9 to 14 meet it by a rounding. Each of those models runs a short release trace from the
-crest down to a bedding plane, and the vendor states the trace's lower tip to six decimal places,
-so it lands between 2 × 10⁻⁷ and 2 × 10⁻⁶ from the bedding trace it belongs on — a part in 10⁷ of
-the section. What is left between the two lines is a sliver no mesh can resolve: on problems 9 and
-10 both elements on an edge come out on the same side of the joint, one of them with its centroid
-3 × 10⁻⁸ from the line; on problem 11 the edge again carries four elements; on problem 12 gmsh
-does not finish at all, reporting `Impossible to recover edge 113 113` and splitting the offending
-curves level after level. Snapping the tip onto the bedding plane would make the near termination
-an exact one, which is problem 1's case, so both families are waiting on the same thing.
+Problem 1's stepped base is fifteen such terminations in one section — each column's basal contact
+begins partway along its downslope neighbour's side joint — and problems 9 to 14 are one or two
+each, where a release trace runs from the crest down onto the bedding plane that releases it.
 
-Every junction in the rows that **are** built is a crossing.
+Problem 8's thirteen columns stand on their basal joint the same way, and there the tips land on
+it exactly; every other junction in the corpus is a crossing.
 
 ## The Dilation Problem {#the-dilation-problem}
 
@@ -155,6 +157,132 @@ row 6. The peak and residual strengths are checked there as well, each against i
 ---
 
 ## The Rows
+
+### ⊘ RJ-1a: Goodman & Bray block toppling, case a (rj001a) {#rj-1a}
+
+Goodman & Bray's own toppling example, and the section all four of problem 1's cases share: sixteen
+rock columns 10 m wide and 4 to 40 m tall standing on a base that steps up one metre per column at
+30°, their sides at 120° — normal to that base — and their tops cut off by a 56.6° face above column
+ten. The toe is at (−0.5, 0.866) and the crest at (130.564, 93.856), inside the 261 × 140 m
+rectangle the vendor cuts, with everything above the columns deleted. The rock is elastic
+(γ = 25 kN/m³, E = 20 GPa, ν = 0.3), the vendor's own material type, so the columns cannot break and
+every mechanism the model has is a joint one — which is the idealization the closed form makes.
+
+The joints are not a list. They are the **shared edges** of the seventeen polygons the vendor's
+sixteen column outlines and the rock beneath them make: 31 contacts over 460.0 m, merged into 31
+straight lines, so a pair of columns that touches over three metres gets a three-metre joint rather
+than a full-height one. Fifteen of those contacts **end on** another, because a stepped base begins
+each column's basal contact partway along its downslope neighbour's side joint; see
+[where a joint ends on another](#joint-terminations). They carry no cohesion, φ = 38.15° — the angle
+this case is posed at — and the corpus's standard stiffness pair.
+
+The corpus bracket is decided on all nine trials, and its longest takes 84 401 sweeps of the
+250 000 allowed. What keeps the row reported is the refinement step: a 2D size of 7.0 m takes the
+mesh from 2 072 nodes and 67 interface elements to 3 573 and 94, the two meshes bracket factors one
+step apart, and the upper edge of the finer bracket reaches 250 000 sweeps without a verdict. So
+the claim that refinement does not move the factor rests on an edge nothing ruled on, and the row
+prints no factor.
+
+The manual's figure for this case labels the side boundaries as rollers. The model's restraint list
+does not: all 191 of its restrained nodes carry both components fixed, 111 of them on the base and
+80 on the two sides. The model is what is transcribed. Its stabilizing toe force is 0.5 kN against a
+toe column weighing about a thousand times that, and the file carries no load at all; see the
+departures table.
+
+**Input file:** [rj001a.xlsx](files/rocscience/joints/rj001a.xlsx).
+
+![RJ-1a: Goodman & Bray block toppling, case a (rj001a) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own, so the whole figure is the joints: slip runs up every column contact and along the stepped base, brightest on the columns at mid-slope, and the deformed section shows the stack rotating forward over the face column by column while the toe column slides out along its own stretch of base](images/RJ-1a.png)
+
+### ⊘ RJ-1b: Goodman & Bray block toppling, case b (rj001b) {#rj-1b}
+
+Case a's section and rock with the joints at φ = 33.0239°, the lowest of the four, held up by the
+2013 kN horizontal force the case is posed with — about twice the lowest column's own weight, and
+what lets a stack on 33° joints stand where case a's needs 38°. It enters as a line load on the
+`lloads` sheet, at the point the departures table names.
+
+Nothing else about the mechanism changes: the stack still rotates forward over the face on slip up
+every column contact and along the stepped base.
+
+The row carries no lock, so it prints no factor of its own. The lower edge of its final bracket
+reaches 250 000 sweeps without a verdict, and a bracket edge nothing ruled on cannot define a factor
+of safety.
+
+Every input class the corpus transcribes was diffed against the vendor model and matches: the rock's
+E, ν and γ, the joints' stiffness pair, cohesion, friction angle and tensile cap, the 31 contacts the
+column outlines make, the side restraint the vendor clamps in both directions, and the force's
+magnitude and direction.
+
+**Input file:** [rj001b.xlsx](files/rocscience/joints/rj001b.xlsx).
+
+![RJ-1b: Goodman & Bray block toppling, case b (rj001b) — FEM inputs with the 2013 kN toe force drawn at the block corner it acts on, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The mechanism is case a's — slip up every column contact and along the stepped base, the stack rotating forward over the face — reached on joints four degrees weaker, which is what the force at the toe buys](images/RJ-1b.png)
+
+### ⊘ RJ-1c: Goodman & Bray block toppling, case c (rj001c) {#rj-1c}
+
+Case a's section and rock with the joints half a degree steeper, φ = 38.6598°, and the same 0.5 kN
+toe force that does nothing. Half a degree is worth about two points of factor of safety here, which
+is what the closed form's own pair of answers for cases a and c says as well — 1.0 against 1.02.
+
+The row reads case a's: the corpus bracket is decided on all nine trials, its longest taking
+95 070 sweeps of the 250 000 allowed, and the refinement step to a 2D size of 7.0 m brackets a
+factor one step away with its upper edge at the budget and no verdict. So this row prints no factor
+either, for the same reason.
+
+**Input file:** [rj001c.xlsx](files/rocscience/joints/rj001c.xlsx).
+
+![RJ-1c: Goodman & Bray block toppling, case c (rj001c) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The mechanism is case a's at half a degree more friction: the same forward rotation of the column stack over the face, and the same slip on every column contact and along the stepped base](images/RJ-1c.png)
+
+### ⊘ RJ-1d: Goodman & Bray block toppling, case d (rj001d) {#rj-1d}
+
+Case c's joint friction angle with case b's 2013 kN force: the same stack, stabilized. It is the
+strongest of the four, and the closed form and UDEC agree that it is.
+
+The row carries no lock and prints no factor. The upper edge of its final bracket reaches 250 000
+sweeps without a verdict.
+
+Every transcribed input class matches the vendor model, the force reaching the same point case b's
+does.
+
+**Input file:** [rj001d.xlsx](files/rocscience/joints/rj001d.xlsx).
+
+![RJ-1d: Goodman & Bray block toppling, case d (rj001d) — FEM inputs with the 2013 kN toe force, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. As on case b the right-hand panels are one sweep past the critical factor rather than a developed mechanism, so they show where the stack starts to move rather than where it ends up](images/RJ-1d.png)
+
+### 🟢 RJ-2: Alejano & Alonso block toppling (rj002) {#rj-2}
+
+A 30 × 19.85 m section whose 9.85 m face rises at 58.65° from (20, 10) to (14, 19.85). A basal
+joint runs from the toe of that face up to the crest at (2.9393, 19.85) at 30° — the stepped
+surface the columns stand on — and twenty-two columns at 64°, 1.6 m apart, pass through the same
+toe. Both carry φ = 31° and no cohesion. The rock is elastic (γ = 25 kN/m³, E = 20 GPa, ν = 0.3),
+the vendor's own `Plasticity Specifications: Non`, so the columns cannot yield and every mechanism
+the model has is a joint one.
+
+| XSLOPE SSRM | Goodman & Bray referee | UDEC | RS2 without / with improvement |
+|---|---|---|---|
+| **0.764** | 0.76 (+0.5%) | 0.87 | 0.86 / 0.82 |
+
+<!-- test: file=files/rocscience/joints/rj002.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-2, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
+
+A step of refinement — a 2D size of 0.35 m, which takes the mesh from 11 537 nodes to 21 110 —
+moves the factor by one bracket step, inside the row's own tolerance, and all nine trials of both
+brackets reach a verdict. The longest takes 185 381 sweeps of the 250 000 allowed.
+
+**The two other codes agree with each other, and not with this row.** Alejano & Alonso publish
+Goodman & Bray's limit equilibrium at 0.76 and their own UDEC run at 0.87; RS2 reports 0.86 and
+0.82. XSLOPE lands on the limit equilibrium, and RS2 and UDEC land together above it. That is a
+difference between codes on one problem, stated here because it is measured, and it is not
+explained: every input class the corpus transcribes was diffed against the vendor model and
+matches. The joints reconstruct from the vendor's own 517 joint elements to 311.4 m of trace,
+291.7 m at 64° and 19.7 m at 30°, against this file's 311.4 m at the same angles over the same
+extent; the rock's E, ν and γ, the joints' k<sub>n</sub>, k<sub>s</sub>, c, φ and tensile cap, and
+the clamped side restraint all match.
+
+What is not transcribed is a class of RS2 solver switch that every model in this manual carries and
+the corpus has never read: a joint stiffness recalculated when a joint violates its strength
+criterion, which the manual's own release notes describe as the "joint improvement" option's
+mechanism. Whether it bears on this gap is untested.
+
+**Input file:** [rj002.xlsx](files/rocscience/joints/rj002.xlsx).
+
+![RJ-2: Alejano & Alonso block toppling (rj002) — FEM inputs, mesh, joint slip at the critical SRF and the section deformed 17×. The rock carries no strain of its own because it cannot yield, so every movement in the section is on a joint: slip gathers where the basal joint reaches the toe of the face, the columns standing on it open along their upper halves, and the deformed section shows them rotating out over the face while the rock below the basal joint stays put](images/RJ-2.png)
 
 ### ⊘ RJ-3: Lorig & Varona forward block toppling (rj003) {#rj-3}
 
@@ -277,43 +405,36 @@ The model's stated tensile strength of 75 kPa is above the Mohr-Coulomb apex its
 
 ![RJ-8: flexural toppling in a base friction model (rj008) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. The strain gathers into one lobe per column along a band that climbs from the toe across the stack; above that band the columns are visibly bent rather than merely tilted, and the rock below it is unstrained. That is the break surface of flexural toppling rather than sliding along any one joint](images/RJ-8.png)
 
-### 🟢 RJ-2: Alejano & Alonso block toppling (rj002) {#rj-2}
+### ⊘ RJ-12: Alejano et al. ploughing toppling slab failure (rj012) {#rj-12}
 
-A 30 × 19.85 m section whose 9.85 m face rises at 58.65° from (20, 10) to (14, 19.85). A basal
-joint runs from the toe of that face up to the crest at (2.9393, 19.85) at 30° — the stepped
-surface the columns stand on — and twenty-two columns at 64°, 1.6 m apart, pass through the same
-toe. Both carry φ = 31° and no cohesion. The rock is elastic (γ = 25 kN/m³, E = 20 GPa, ν = 0.3),
-the vendor's own `Plasticity Specifications: Non`, so the columns cannot yield and every mechanism
-the model has is a joint one.
+A 25 m slope at 60° cut by bedding dipping out of the face at −60° at 1.5 m spacing, φ = 30°, with
+two short release traces at φ = 40°: one at the toe running below the bench, and one from the face
+down onto the bedding plane that releases the toe block. Ploughing failure is the paper's name for
+sliding on a primary discontinuity combining with sliding on a joint sub-parallel to the face, which
+lifts the toe block and rotates it out; at 60° the rotation rather than the sliding governs, which
+is what separates this row from problem 11. The rock is elastic at E = 2 × 10⁸ MPa, γ = 25 kN/m³,
+ν = 0.3 — not a rock modulus but the manual's own device for reproducing UDEC's rigid blocks.
 
-| XSLOPE SSRM | Goodman & Bray referee | UDEC | RS2 without / with improvement |
-|---|---|---|---|
-| **0.764** | 0.76 (+0.5%) | 0.87 | 0.86 / 0.82 |
+The lower tip of each release trace is stated to six decimals, so it lands a part in 10⁷ from the
+bedding plane it belongs on; see [where a joint ends on another](#joint-terminations). This row and
+problem 14 state their generated bedding network to six decimals as well, which is the precision
+the mesher's own crossing arithmetic carries — see the departures table.
 
-<!-- test: file=files/rocscience/joints/rj002.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-2, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
+The row carries no lock and prints no factor, and what holds it back is the mesh rather than the
+sweep budget. Every trial of both brackets reaches a verdict — the longest takes 16 061 sweeps of
+the 250 000 allowed, which is the least budget-limited row in this corpus — but a step of
+refinement to a 2D size of 1.05 m, which takes the mesh from 12 294 nodes and 1 818 interface
+elements to 26 407 and 2 572, moves the factor by 0.27. That is fourteen bracket steps, where the
+row's own tolerance is one. The corpus mesh size for this family is the bedding spacing, which puts
+about one element between one bedding plane and the next, and this row says that is not enough to
+settle the factor.
 
-A step of refinement — a 2D size of 0.35 m, which takes the mesh from 11 537 nodes to 21 110 —
-moves the factor by one bracket step, inside the row's own tolerance, and all nine trials of both
-brackets reach a verdict. The longest takes 185 381 sweeps of the 250 000 allowed.
+The manual publishes two referees for this problem and they do not agree with each other, with
+RS2's own two factors falling between them.
 
-**The two other codes agree with each other, and not with this row.** Alejano & Alonso publish
-Goodman & Bray's limit equilibrium at 0.76 and their own UDEC run at 0.87; RS2 reports 0.86 and
-0.82. XSLOPE lands on the limit equilibrium, and RS2 and UDEC land together above it. That is a
-difference between codes on one problem, stated here because it is measured, and it is not
-explained: every input class the corpus transcribes was diffed against the vendor model and
-matches. The joints reconstruct from the vendor's own 517 joint elements to 311.4 m of trace,
-291.7 m at 64° and 19.7 m at 30°, against this file's 311.4 m at the same angles over the same
-extent; the rock's E, ν and γ, the joints' k<sub>n</sub>, k<sub>s</sub>, c, φ and tensile cap, and
-the clamped side restraint all match.
+**Input file:** [rj012.xlsx](files/rocscience/joints/rj012.xlsx).
 
-What is not transcribed is a class of RS2 solver switch that every model in this manual carries and
-the corpus has never read: a joint stiffness recalculated when a joint violates its strength
-criterion, which the manual's own release notes describe as the "joint improvement" option's
-mechanism. Whether it bears on this gap is untested.
-
-**Input file:** [rj002.xlsx](files/rocscience/joints/rj002.xlsx).
-
-![RJ-2: Alejano & Alonso block toppling (rj002) — FEM inputs, mesh, joint slip at the critical SRF and the section deformed 17×. The rock carries no strain of its own because it cannot yield, so every movement in the section is on a joint: slip gathers where the basal joint reaches the toe of the face, the columns standing on it open along their upper halves, and the deformed section shows them rotating out over the face while the rock below the basal joint stays put](images/RJ-2.png)
+![RJ-12: Alejano et al. ploughing toppling slab failure (rj012) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section, and only a few of its traces carry any slip: one release trace under the crest and the bedding beneath the toe block, which is the ploughing pair. The two right-hand panels are the state one sweep past the critical factor rather than a developed mechanism — on a rock this stiff the model moves by microns until it does not, so the deformed section is drawn at tens of thousands of times scale](images/RJ-12.png)
 
 ### ⊘ RJ-15: Partially joint-controlled footwall slope (rj015) {#rj-15}
 
@@ -405,9 +526,13 @@ changes what a faithful transcription is.
   [The dilation problem](#the-dilation-problem).
 - **Problem 1's toe force.** The manual describes a stabilizing force at the toe of the lowest
   block. It is 2013 kN in cases b and d — about twice that block's own weight — and 0.5 kN in cases
-  a and c, which is 0.05% of it and does nothing. The vendor's own rerun models move the force from
-  the toe at (−0.5, 0.866) to the upper-left block corner at (−2.5, 4.330) in all four cases, so
-  the "with joint improvement" factors are not the same load case as the "without" ones.
+  a and c, which is 0.05% of it and does nothing. The force is horizontal and points into the
+  slope in every one of the six models. The vendor's own rerun models move it from the toe at
+  (−0.5, 0.866) to the upper-left block corner at (−2.5, 4.330) in all four cases, so the "with
+  joint improvement" factors are not the same load case as the "without" ones. Cases b and d here
+  carry the force at the **corner**: the toe is the end of the basal joint, where the split gives
+  the node one copy per wedge of material around it and a load applied there has no defined side to
+  act on. Cases a and c carry no load, the 0.5 kN being what it is.
 - **Problem 20's network.** The manual calls it a Voronoi tessellation generated in UDEC and
   imported. The vendor model carries it as 523 digitized traces with no block size, density or seed
   recorded, so nothing published reproduces it.
@@ -415,6 +540,13 @@ changes what a faithful transcription is.
   every exterior node in both directions, and use a convergence tolerance two orders tighter.
 - **Problems 3 and 5 are elastic.** Both files set the plasticity specification to none and carry
   no strength values under it, so the rock cannot yield and only the joints can.
+- **Problems 12 and 14 state their generated network to six decimals.** A trace generated from a
+  stated dip and spacing is clipped to the section, so its ends are computed points on the
+  boundary, and the mesher's own crossing arithmetic carries six decimals: at ten, the outline
+  gains the rounded crossing while the joint keeps its own end 2 × 10⁻⁷ away, and gmsh does not
+  finish recovering the 1D mesh at these two rows' joint spacing. Six decimals is 10⁻⁶ m on a 90 m
+  section. The other four rows of the family mesh as the generator states them and are left that
+  way, so that the meshes their own factors were measured on do not move.
 - **Problems 9 to 14 use two joint strengths, not one.** The network's 1928–1962 elements carry one
   friction angle and the one or two short explicit crest traces carry another — 40°, 20° or 30°
   against the network's 30°, 25° or 20° — so a single quoted joint friction angle for these

@@ -539,7 +539,7 @@ def _leg_fixtures(failures, results):
 
 
 def _leg_terminations(failures, results):
-    """h to l. A joint that ENDS on another, partway along its segment.
+    """h to m. A joint that ENDS on another, partway along its segment.
 
     The point is a vertex of the ending line and of nothing else, so it is one
     point only if the mesher is told to make it one. Each fixture states what the

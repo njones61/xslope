@@ -1841,53 +1841,6 @@ failing band than the three tall ones do.
 
 ![RS2-55: five 1.8 m tiers offset 0.6 m (vp094_fem, Ta = 10.1 kN/m) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. Spreading the same 9 m of height over five tiers instead of three leaves the mechanism where the baseline puts it](images/RS2-55.png)
 
-### 🟢 RS2 Part IV VP51: Four-material slope, water table, tension crack, seismic — 12-method comparison (Zhu et al. 2003) {#p4-vp51}
-
-**Input files:** [rs2_51.xlsx](files/rocscience/rs2_51.xlsx) — Part 4 Verification Problem #51.
-
-> Zhu, D.Y., Lee, C.F. & Jiang, H.D. (2003). "A generalised framework of limit equilibrium
-> methods for slope stability analysis." *Géotechnique* 53(4), 377–395. *(RS2/Slide2 Slope
-> Stability Verification Manual, Part 4, Problem #51.)*
-
-A four-layer 1V:2H slope (toe (0,0) → crest (60,30)) whose strata dip parallel to the face:
-Layer 1 (top, c = 20, φ = 32°, γ = 18.2), Layer 2 (c = 25, φ = 30°, γ = 18.0), Layer 3 (the
-weak band, c = 40, **φ = 18°**, γ = 18.5) and Layer 4 (bottom, c = 40, φ = 28°, γ = 18.8). Pore
-pressure comes from a 9-point piezometric surface connected to every material; a horizontal
-seismic coefficient **k = 0.1** is applied; and a **dry tension crack** of the Rankine active
-depth *h*<sub>c</sub> = 2c/(γ√K<sub>a</sub>) ≈ 3.97 m sits in the top layer. The published task
-is the factor of safety on a **given circular surface** with 100 slices, tolerance 0.001, over
-twelve LEM methods. This is an LEM problem; the RS2 SSRM value of 1.22 in the catalog is an
-independent finite-element mechanism, not the LEM target reproduced here.
-
-**Partial — reconstructed surface.** The vendor `.fez` is an RS2 SSRM model that carries **no LEM
-slip surface**, and the given circle and tension-crack depth are figure-only. The circle here —
-center (32, 36), tangent at y = 1.0 (R = 35), daylighting from the lower face to the back plateau —
-was recovered by inversion against the rigorous methods; geometry, materials, the piezo line and
-k = 0.1 are transcribed from `slope stability #051.fez`. On this surface, at 100 slices:
-
-| Method | XSLOPE | Slide2 | Zhu | Note |
-|---|---|---|---|---|
-| Ordinary (OMS) | 1.092 | 1.145 (−4.6%) | 1.066 (+2.4%) | lands inside the Slide2–Zhu spread |
-| Bishop simplified | 1.316 | 1.278 (+3.0%) | 1.278 (+3.0%) |  |
-| Janbu simplified | 1.196\* | 1.112 | 1.112 | \*XSLOPE reports Janbu **corrected** (f₀ ≈ 1.08); 1.196/1.08 ≈ **1.11** ✓, so the columns are not like-for-like |
-| Corps of Engineers | 1.400 | 1.422 (−1.5%) | 1.377 (+1.7%) | inside the Slide2–Zhu spread |
-| Lowe & Karafiath | 1.244 | 1.288 (−3.4%) | 1.290 (−3.6%) |  |
-| **Spencer** | **1.300** | **1.293** (**+0.5%**) | **1.293** (**+0.5%**) |  |
-| GLE / Morgenstern–Price | 1.282 | 1.304 | 1.303 (−1.6%) | half-sine interslice function; Slide2's column is GLE, which this page's conventions treat as a different method from XSLOPE's M-P, so it stays bare like the Janbu row |
-
-Spencer — the headline LEM value the RS2 manual's Table 51.2 quotes — reproduces to +0.5%, and
-Janbu once the corrected-vs-simplified convention is undone matches to within 0.5%; OMS and Corps
-both land between the Slide2 and Zhu columns. Bishop (+3.0%), Lowe (−3.4%) and M-P (−1.6%) carry
-the residual of fitting a figure-only circle plus method-implementation differences (XSLOPE's M-P
-uses a half-sine interslice function and lands just below Spencer, where Zhu's GLE lands just
-above). An unconstrained circular search does **not** reproduce this problem — it dives into a
-spurious deep mechanism daylighting on the flats through the φ = 18° weak band, so the
-verification is locked as a single fixed circle, not a search.
-
-<!-- test: file=files/rocscience/rs2_51.xlsx, type=single_circle, num_slices=100, fs_oms=1.092, fs_bishop=1.316, fs_janbu=1.196, fs_corps=1.400, fs_lowe=1.244, fs_spencer=1.300, fs_mprice=1.282, benchmark=RS2-P4-VP51 -->
-
-![RS2 Part IV VP51: four-material slope with water table, tension crack and seismic k = 0.1 (Zhu et al. 2003) — inputs (left) and the given-circle Spencer solution FS = 1.30 (right)](images/rs2_51.png)
-
 ### 🟢 RS2-56: Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) {#rs2-56}
 
 New corpus files (no Slide2 counterpart). Built: all five cases.
@@ -2893,6 +2846,53 @@ model publishes none for a power-curve material).
 
 ![RS2 Part IV VP41: Jiang/Baker power-curve slope with r<sub>u</sub> = 0.3, SSRM 1.656 vs RS2 SSRM 1.64 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP41.png)
 
+### 🟢 RS2 Part IV VP51: Four-material slope, water table, tension crack, seismic — 12-method comparison (Zhu et al. 2003) {#p4-vp51}
+
+**Input files:** [rs2_51.xlsx](files/rocscience/rs2_51.xlsx) — Part 4 Verification Problem #51.
+
+> Zhu, D.Y., Lee, C.F. & Jiang, H.D. (2003). "A generalised framework of limit equilibrium
+> methods for slope stability analysis." *Géotechnique* 53(4), 377–395. *(RS2/Slide2 Slope
+> Stability Verification Manual, Part 4, Problem #51.)*
+
+A four-layer 1V:2H slope (toe (0,0) → crest (60,30)) whose strata dip parallel to the face:
+Layer 1 (top, c = 20, φ = 32°, γ = 18.2), Layer 2 (c = 25, φ = 30°, γ = 18.0), Layer 3 (the
+weak band, c = 40, **φ = 18°**, γ = 18.5) and Layer 4 (bottom, c = 40, φ = 28°, γ = 18.8). Pore
+pressure comes from a 9-point piezometric surface connected to every material; a horizontal
+seismic coefficient **k = 0.1** is applied; and a **dry tension crack** of the Rankine active
+depth *h*<sub>c</sub> = 2c/(γ√K<sub>a</sub>) ≈ 3.97 m sits in the top layer. The published task
+is the factor of safety on a **given circular surface** with 100 slices, tolerance 0.001, over
+twelve LEM methods. This is an LEM problem; the RS2 SSRM value of 1.22 in the catalog is an
+independent finite-element mechanism, not the LEM target reproduced here.
+
+**Partial — reconstructed surface.** The vendor `.fez` is an RS2 SSRM model that carries **no LEM
+slip surface**, and the given circle and tension-crack depth are figure-only. The circle here —
+center (32, 36), tangent at y = 1.0 (R = 35), daylighting from the lower face to the back plateau —
+was recovered by inversion against the rigorous methods; geometry, materials, the piezo line and
+k = 0.1 are transcribed from `slope stability #051.fez`. On this surface, at 100 slices:
+
+| Method | XSLOPE | Slide2 | Zhu | Note |
+|---|---|---|---|---|
+| Ordinary (OMS) | 1.092 | 1.145 (−4.6%) | 1.066 (+2.4%) | lands inside the Slide2–Zhu spread |
+| Bishop simplified | 1.316 | 1.278 (+3.0%) | 1.278 (+3.0%) |  |
+| Janbu simplified | 1.196\* | 1.112 | 1.112 | \*XSLOPE reports Janbu **corrected** (f₀ ≈ 1.08); 1.196/1.08 ≈ **1.11** ✓, so the columns are not like-for-like |
+| Corps of Engineers | 1.400 | 1.422 (−1.5%) | 1.377 (+1.7%) | inside the Slide2–Zhu spread |
+| Lowe & Karafiath | 1.244 | 1.288 (−3.4%) | 1.290 (−3.6%) |  |
+| **Spencer** | **1.300** | **1.293** (**+0.5%**) | **1.293** (**+0.5%**) |  |
+| GLE / Morgenstern–Price | 1.282 | 1.304 | 1.303 (−1.6%) | half-sine interslice function; Slide2's column is GLE, which this page's conventions treat as a different method from XSLOPE's M-P, so it stays bare like the Janbu row |
+
+Spencer — the headline LEM value the RS2 manual's Table 51.2 quotes — reproduces to +0.5%, and
+Janbu once the corrected-vs-simplified convention is undone matches to within 0.5%; OMS and Corps
+both land between the Slide2 and Zhu columns. Bishop (+3.0%), Lowe (−3.4%) and M-P (−1.6%) carry
+the residual of fitting a figure-only circle plus method-implementation differences (XSLOPE's M-P
+uses a half-sine interslice function and lands just below Spencer, where Zhu's GLE lands just
+above). An unconstrained circular search does **not** reproduce this problem — it dives into a
+spurious deep mechanism daylighting on the flats through the φ = 18° weak band, so the
+verification is locked as a single fixed circle, not a search.
+
+<!-- test: file=files/rocscience/rs2_51.xlsx, type=single_circle, num_slices=100, fs_oms=1.092, fs_bishop=1.316, fs_janbu=1.196, fs_corps=1.400, fs_lowe=1.244, fs_spencer=1.300, fs_mprice=1.282, benchmark=RS2-P4-VP51 -->
+
+![RS2 Part IV VP51: four-material slope with water table, tension crack and seismic k = 0.1 (Zhu et al. 2003) — inputs (left) and the given-circle Spencer solution FS = 1.30 (right)](images/rs2_51.png)
+
 ### 🟢 RS2 Part IV VP57: Layered slope with weak seam, water table (Pockoski & Duncan slope 3) {#p4-vp57}
 
 Slide2/LEM counterpart: [VP57](rocscience.md#vp57). RS2 Part IV (Table 57.2) re-runs this layered
@@ -3078,56 +3078,6 @@ VP65 it does not.
 
 ![RS2 Part IV VP65: USACE Fig 4-2 dam ponded on the upstream face only, the unconstrained strength reduction failing the upstream slope where RS2's zone-constrained SSRM 2.60 describes the published circle — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP65.png)
 
-### 🟢 RS2 Part IV VP69: USACE steady-seepage embankment (example F-6) {#p4-vp69}
-
-Slide2/LEM counterpart: [VP69](rocscience.md#vp69) (USACE EM 1110-2-1902 example F-6). Own SSRM
-build, with two answers: the model's own global minimum and the vendor's constrained one.
-
-**Input files:** [vp069.xlsx](files/rocscience/vp069.xlsx)
-
-A 112 ft embankment (c′ = 0, φ′ = 34°, γ = 130 pcf) on a granular foundation (c′ = 0, φ′ = 35°,
-γ = 125 pcf) under steady seepage, with the pool at el. 100 and the tailwater ponding the toe at
-el. 22.5. E and ν are the vendor model's own, E = 1×10⁶ psf and ν = 0.4 on both materials, and
-both carry its tensile cap T = 0 — inert on a c = 0 material, whose Mohr-Coulomb apex is already
-at zero.
-
-| Case | XSLOPE SSRM | RS2 SSR | USACE | Slide2 Spencer |
-|---|---|---|---|---|
-| SSRM, under RS2's own SSR Search Area (5 ft mesh) | **1.944** | 1.94 (+0.2%) | 2.01 | 2.026 |
-
-**Where RS2's constraint is.** `slope stability #069.fez` states it twice: an
-`SSR_polygonal_zones` ring flagged as a Search Area, 38 vertices running from the crest down
-through the foundation to the toe and back, and a material partition that leaves only 1 030 of its
-9 626 elements Mohr-Coulomb over that same corridor. Both mean *reduce strength only along the deep
-surface*, and the tag carries the polygon verbatim.
-
-The corridor is a band rather than a region, so it has to be checked against the mesh before it
-can be carried, and it rasterizes faithfully: across the 8 / 6.5 / 5 / 4 ft sweep the elements
-whose centroids fall inside it are 10.4 to 10.7% of the mesh against the vendor's own 10.7%
-Mohr-Coulomb element fraction, and the polygon's area is within 1.8% of the vendor's footprint.
-This is not the one-element-ribbon case that [VP64](#p4-vp64) and [RS2-37](#rs2-37) record but do
-not carry.
-
-**The constrained factor is mesh-sensitive.** Across that same sweep it reads 2.031 / 1.981 /
-1.944 / 1.931, and since the mask is faithful at every one of those meshes the drift is the c = 0
-band continuing to localize, the behavior [RS2-14](#rs2-14) and [RS2-40](#rs2-40) document. The tag
-pins the 5 ft mesh, the coarsest at which the band spans two elements across its thinnest section,
-as a regression lock rather than a converged value.
-
-**Unconstrained, and why a depth filter is the wrong instrument here.** Both zones are c = 0, so
-with every element reduced the mechanism is a shallow cohesionless face skin, the pattern
-[RS2-40](#rs2-40) documents. The `min_slip_depth` filter lifts the factor here too but does not
-settle on one — this 112 ft embankment has no cutoff plateau of the kind RS2-40's 211 ft dam has —
-and a depth-filtered *unconstrained* run is in any case not the experiment RS2 ran. Where the
-vendor model states the constraint outright, carrying it is the closer reproduction.
-
-<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=2.031, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69-m8 -->
-<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.981, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69-m6.5 -->
-<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.931, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69-m4 -->
-<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.944, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69 -->
-
-![RS2 Part IV VP69: USACE F-6 steady-seepage embankment under RS2's own 38-vertex SSR Search Area, SSRM 1.944 vs RS2 SSR 1.94 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP69.png)
-
 ### 🟢 RS2 Part IV VP67: USACE end-of-construction embankment (example F-5) {#p4-vp67}
 
 Slide2/LEM counterpart: [VP67](rocscience.md#vp67) (USACE EM 1110-2-1902 example F-5). This
@@ -3237,6 +3187,56 @@ pair, the caps, the tension-SRF flag, and the three ponded-water load segments.
 **RS2's own SSR Search Area — the specified circle (vp068)**
 
 ![RS2 Part IV VP68 with reduction confined to the vendor's 30-vertex SSR Search Area, SSRM 1.222 against RS2 SSRM 1.17 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the mechanism moved down onto the base-tangent circle the search area draws](images/RS2-P4-VP68-zone.png)
+
+### 🟢 RS2 Part IV VP69: USACE steady-seepage embankment (example F-6) {#p4-vp69}
+
+Slide2/LEM counterpart: [VP69](rocscience.md#vp69) (USACE EM 1110-2-1902 example F-6). Own SSRM
+build, with two answers: the model's own global minimum and the vendor's constrained one.
+
+**Input files:** [vp069.xlsx](files/rocscience/vp069.xlsx)
+
+A 112 ft embankment (c′ = 0, φ′ = 34°, γ = 130 pcf) on a granular foundation (c′ = 0, φ′ = 35°,
+γ = 125 pcf) under steady seepage, with the pool at el. 100 and the tailwater ponding the toe at
+el. 22.5. E and ν are the vendor model's own, E = 1×10⁶ psf and ν = 0.4 on both materials, and
+both carry its tensile cap T = 0 — inert on a c = 0 material, whose Mohr-Coulomb apex is already
+at zero.
+
+| Case | XSLOPE SSRM | RS2 SSR | USACE | Slide2 Spencer |
+|---|---|---|---|---|
+| SSRM, under RS2's own SSR Search Area (5 ft mesh) | **1.944** | 1.94 (+0.2%) | 2.01 | 2.026 |
+
+**Where RS2's constraint is.** `slope stability #069.fez` states it twice: an
+`SSR_polygonal_zones` ring flagged as a Search Area, 38 vertices running from the crest down
+through the foundation to the toe and back, and a material partition that leaves only 1 030 of its
+9 626 elements Mohr-Coulomb over that same corridor. Both mean *reduce strength only along the deep
+surface*, and the tag carries the polygon verbatim.
+
+The corridor is a band rather than a region, so it has to be checked against the mesh before it
+can be carried, and it rasterizes faithfully: across the 8 / 6.5 / 5 / 4 ft sweep the elements
+whose centroids fall inside it are 10.4 to 10.7% of the mesh against the vendor's own 10.7%
+Mohr-Coulomb element fraction, and the polygon's area is within 1.8% of the vendor's footprint.
+This is not the one-element-ribbon case that [VP64](#p4-vp64) and [RS2-37](#rs2-37) record but do
+not carry.
+
+**The constrained factor is mesh-sensitive.** Across that same sweep it reads 2.031 / 1.981 /
+1.944 / 1.931, and since the mask is faithful at every one of those meshes the drift is the c = 0
+band continuing to localize, the behavior [RS2-14](#rs2-14) and [RS2-40](#rs2-40) document. The tag
+pins the 5 ft mesh, the coarsest at which the band spans two elements across its thinnest section,
+as a regression lock rather than a converged value.
+
+**Unconstrained, and why a depth filter is the wrong instrument here.** Both zones are c = 0, so
+with every element reduced the mechanism is a shallow cohesionless face skin, the pattern
+[RS2-40](#rs2-40) documents. The `min_slip_depth` filter lifts the factor here too but does not
+settle on one — this 112 ft embankment has no cutoff plateau of the kind RS2-40's 211 ft dam has —
+and a depth-filtered *unconstrained* run is in any case not the experiment RS2 ran. Where the
+vendor model states the constraint outright, carrying it is the closer reproduction.
+
+<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=2.031, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69-m8 -->
+<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.981, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69-m6.5 -->
+<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.931, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69-m4 -->
+<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.944, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69 -->
+
+![RS2 Part IV VP69: USACE F-6 steady-seepage embankment under RS2's own 38-vertex SSR Search Area, SSRM 1.944 vs RS2 SSR 1.94 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP69.png)
 
 ### 🟢 RS2 Part IV VP70: Submerged homogeneous slope (Duncan & Wright Fig 6.27) {#p4-vp70}
 

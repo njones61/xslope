@@ -193,6 +193,21 @@ manual, a catalog row piggybacking on the section another row built.  Where they
 agree the heading takes their dot; where they disagree `heading_dot_multi` names
 which of those rows speaks for the section.
 
+**Section order** (`order.py`).  The sections a summary table links appear down
+the page in the order the table lists them, so following the table is reading the
+page rather than jumping about.  The table decides the order, as it decides the
+dots — the check only says the page agrees with it — and the order drifts the
+moment a row is written last and appended at the end, which is how it happened.
+
+Only anchored sections a row names are read, so a methodology section or a shared
+discussion may sit anywhere; a row pointing at another page names a section that
+page owns; a section several rows name is ordered by the first of them; and a row
+whose Notes carry the status term *covered* is a cross-reference rather than the
+owner, so it orders nothing.  The report names the pair that is out of order and
+both line numbers.  There is no `--fix`: moving a section means moving its prose,
+its test tag and its figure together, and a mechanical reshuffle is how a caption
+ends up under the wrong image.
+
 ## What a strength-reduction tag says
 
 A `type=fem_ssrm` tag is a locked factor of safety plus everything needed to

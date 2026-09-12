@@ -42,7 +42,23 @@ EXTRA_CASES = [
 #: Rows the page documents as not yet built or blocked, each with the reason. A
 #: row here gets no figure and the audit does not count it as missing.
 NO_FIGURE = {
+    'RJ-1a': 'the stepped base ends each column\'s basal contact partway along its '
+             "neighbour's side joint, and the split has no rule for a joint that "
+             'ends on another',
+    'RJ-1b': 'as RJ-1a, and its 2013 kN toe force is a concentrated line load',
+    'RJ-1c': 'as RJ-1a',
+    'RJ-1d': 'as RJ-1b',
+    'RJ-9': 'the release trace ends on a bedding plane (see RJ-1a)',
+    'RJ-10': 'the release trace ends on a bedding plane (see RJ-1a)',
+    'RJ-11': 'the release trace ends on a bedding plane (see RJ-1a)',
+    'RJ-12': 'the release trace ends on a bedding plane (see RJ-1a)',
+    'RJ-13': 'the release trace ends on a bedding plane (see RJ-1a)',
+    'RJ-14': 'the release trace ends on a bedding plane (see RJ-1a)',
     'RJ-16': 'scores a tilt angle found by a gravity sweep, not a strength reduction',
+    'RJ-17': "the second material's zone is an element-edge staircase in the vendor "
+             'mesh rather than a boundary of its model',
+    'RJ-21': 'a two-stage model whose opening is cut in stage 2, and the FEM has no '
+             'staged excavation',
     'RJ-20': "the vendor's Voronoi network is 523 digitized traces with no block "
              'size or seed, so the input is not reproducible',
     'RJ-22': "exercises RS2's hyperbolic softening joint law, which the interface "

@@ -95,7 +95,11 @@ def edges_from_record(kv, meta):
         stated = int(float(kv.get("max_iter", 12000)))
     except (TypeError, ValueError):
         stated = 12000
-    ceiling = max(audit.DEFAULT_CEILING, stated)
+    try:
+        declared = int(float(kv.get("max_iter_ceiling", audit.DEFAULT_CEILING)))
+    except (TypeError, ValueError):
+        declared = audit.DEFAULT_CEILING
+    ceiling = max(declared, stated)
 
     decided = [t for t in trials if _decided(t, ceiling)]
     stands = [float(t["F"]) for t in decided

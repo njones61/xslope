@@ -1696,7 +1696,7 @@ scored against.
 |---|---|---|
 | **1.037** | 0.99 (+4.7%) | 1.05 |
 
-<!-- test: file=files/rocscience/vp087_fem.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-48, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/vp087_fem.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=500000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-48, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
 
 ![RS2-48: the baseline three-tier geotextile wall (vp087_fem, φ = 34°, Ta = 10 kN/m) built as a dry stack — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The back-face joint of every column has opened, and the band runs from the toe of the lowest column up through the reinforced fill behind them](images/RS2-48.png)
 
@@ -1748,7 +1748,7 @@ refinement step.
 |---|---|---|
 | **0.979** | 0.98 (−0.1%) | 0.93 |
 
-<!-- test: file=files/rocscience/vp089_fem.xlsx, type=fem_ssrm, expected_fs=0.979, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-50, f_stand=0.96875, f_fail=0.98828125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/vp089_fem.xlsx, type=fem_ssrm, expected_fs=0.979, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=500000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-50, f_stand=0.96875, f_fail=0.98828125, check=edges, tier=gate -->
 
 ![RS2-50: shortened 4.2 m geotextile layers (vp089_fem, Ta = 11.4 kN/m) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. Shortening the sheets pulls the mechanism back into the reinforced mass behind their ends](images/RS2-50.png)
 
@@ -1836,7 +1836,7 @@ failing band than the three tall ones do.
 |---|---|---|
 | **1.018** | 1.00 (+1.8%) | 1.04 |
 
-<!-- test: file=files/rocscience/vp094_fem.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-55, f_stand=1.0078125, f_fail=1.02734375, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/vp094_fem.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=500000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-55, f_stand=1.0078125, f_fail=1.02734375, check=edges, tier=gate -->
 
 
 ![RS2-55: five 1.8 m tiers offset 0.6 m (vp094_fem, Ta = 10.1 kN/m) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. Spreading the same 9 m of height over five tiers instead of three leaves the mechanism where the baseline puts it](images/RS2-55.png)

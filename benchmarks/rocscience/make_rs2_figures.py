@@ -117,16 +117,19 @@ TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 # a bracket edge undecided, and are reported without one, so they would otherwise have
 # no figure.
 #
-# The budget is stated, not inherited. solve_fem extends a budget that is still
-# making progress up to max_iterations_ceiling and takes the LARGER of the two, so
-# a tag below 50 000 silently runs to 50 000 — which is where this family's slow
-# equilibria were being cut off, and what was costing RS2-52 ten percent. The
-# family runs at 250 000, at which every trial of every variant reaches a verdict —
-# the longest to do so takes about 153 000 sweeps. 100 000 was tried first, on a
-# two-row measurement, and left an undecided trial on the edge of three brackets.
+# The budget is stated, not inherited, and so is the headroom above it. solve_fem
+# extends a budget that is still making progress up to max_iterations_ceiling and
+# takes the LARGER of the two, so a tag below 50 000 silently runs to 50 000 —
+# which is where this family's slow equilibria were being cut off, and what was
+# costing RS2-52 ten percent — while a tag at 250 000 with no ceiling of its own
+# has a ceiling EQUAL to its budget and cannot extend at all. The family runs at
+# 250 000 with a 500 000 ceiling, so a trial whose residual is still falling at
+# the budget finishes rather than being recorded undecided. A trial that is not
+# improving is unaffected: the extension is conditional on progress.
 #
 _WALL = dict(element_type='tri6', target_size='1.0', tolerance='0.02',
              f_min='0.5', f_max='3.0', max_iter='250000',
+             max_iter_ceiling='500000',
              tension_srf='false', k0='1', ssr_exclude='Blocks')
 
 EXTRA_CASES = [
@@ -518,6 +521,12 @@ def build_and_solve(tag):
         extra['suction_phi_b'] = sp or None
     if tag.get('suction_cap'):
         extra['suction_cap'] = float(tag['suction_cap'])
+    # The headroom a still-improving trial extends into. solve_fem takes
+    # ceiling = max(max_iterations_ceiling, max_iterations), so a row whose budget
+    # is at or above the 50 000 default cannot extend unless its tag says so, and
+    # the figure must solve the same ceiling the tag's lock was cut on.
+    if 'max_iter_ceiling' in tag:
+        extra['max_iterations_ceiling'] = int(tag['max_iter_ceiling'])
 
     with contextlib.redirect_stdout(io.StringIO()):
         sol = solve_ssrm(fem_data,

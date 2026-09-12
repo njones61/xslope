@@ -21,8 +21,10 @@ decided by the budget, and its value is not yet a measurement.
 **The effective ceiling is not the tag's number.** ``solve_fem`` extends a budget
 that is still making progress, up to ``max_iterations_ceiling`` (default 50 000),
 and takes ``ceiling = max(ceiling, max_iterations)`` — so a tag saying
-``max_iter=30000`` actually runs to 50 000, and only a tag above 50 000 states its
-own ceiling. That is what this reports as the effective ceiling.
+``max_iter=30000`` actually runs to 50 000, and a tag above 50 000 with no ceiling
+of its own has a ceiling EQUAL to its budget and cannot extend at all. A tag
+states its headroom with ``max_iter_ceiling``. That is what this reports as the
+effective ceiling.
 
 Most committed sidecars predate the trial record and carry none; those rows are
 listed as NOT CAPTURED, which is a thing to fix by re-running them, not a pass.
@@ -129,7 +131,11 @@ def audit_one(kv, meta):
         stated = int(float(kv.get("max_iter", 12000)))
     except (TypeError, ValueError):
         stated = 12000
-    ceiling = max(DEFAULT_CEILING, stated)
+    try:
+        declared = int(float(kv.get("max_iter_ceiling", DEFAULT_CEILING)))
+    except (TypeError, ValueError):
+        declared = DEFAULT_CEILING
+    ceiling = max(declared, stated)
     rows = []
     for t in trials:
         try:

@@ -1431,6 +1431,14 @@ def build_fem_ssrm_case(test):
         kwargs['failure_criterion'] = test['criterion']
     if 'max_iter' in test:
         kwargs['max_iterations'] = int(test['max_iter'])
+    # The hard stop on budget EXTENSION. solve_fem extends a budget that is still
+    # improving and takes ceiling = max(max_iterations_ceiling, max_iterations), so
+    # a tag whose max_iter is at or above the 50 000 default has a ceiling equal to
+    # its own budget and cannot extend at all: a trial whose residual is still
+    # falling when the budget runs out is cut off there and recorded undecided.
+    # max_iter_ceiling states the headroom, so a slow equilibrium finishes instead.
+    if 'max_iter_ceiling' in test:
+        kwargs['max_iterations_ceiling'] = int(test['max_iter_ceiling'])
     # TEMP (#50): the Dawson per-node criterion needs ~3x the iterations the old rate-based
     # test did (displacement settles ~5k, the per-node max only ~11k). Let the experiment
     # raise the floor without editing 64 tags.
@@ -1826,13 +1834,18 @@ def _edges_pair(test):
 def _trial_ceiling(test):
     """The iteration ceiling a trial on this row actually runs to. ``solve_fem``
     extends a budget that is still improving up to ``max_iterations_ceiling``
-    (50 000) and takes ``max(ceiling, max_iterations)``, so a tag below 50 000
-    does not state its own ceiling and one above it does."""
+    and takes ``max(ceiling, max_iterations)``, so the ceiling is the larger of
+    the tag's own ``max_iter_ceiling`` (absent: the solver's 50 000 default) and
+    its ``max_iter``."""
     try:
         stated = int(float(test.get('max_iter', 12000)))
     except (TypeError, ValueError):
         stated = 12000
-    return max(DEFAULT_TRIAL_CEILING, stated)
+    try:
+        ceiling = int(float(test.get('max_iter_ceiling', DEFAULT_TRIAL_CEILING)))
+    except (TypeError, ValueError):
+        ceiling = DEFAULT_TRIAL_CEILING
+    return max(ceiling, stated)
 
 
 def _trial_at(trials, factor):
@@ -6289,6 +6302,8 @@ def run_preflight_corpus_test(test):
             sel = dict(sel)
             if t.get('max_iter'):
                 sel['max_iterations'] = int(float(t['max_iter']))
+            if t.get('max_iter_ceiling'):
+                sel['max_iterations_ceiling'] = int(float(t['max_iter_ceiling']))
         key = (f, analysis, tuple(sorted(sel.items())))
         if key in cases:
             cases[key] = (analysis, sel, cases[key][2] or field_at_run)

@@ -40,6 +40,11 @@ def _fem_cbar_label(fem_data, base, unit_key):
             return f"{base} ({unit})"
     return base
 
+#: The deformed grid's color on a JOINTED deformation panel. The joint faces are
+#: drawn in the panel's own deformed color over it, so the elements have to give
+#: way — light enough to read as context, dark enough to still carry the shape.
+_DEFORMED_GRID_UNDER_JOINTS = '0.72'
+
 # Median rendered element edge (device px) below which two full interleaved grids
 # (original + deformed) tangle; below it the original mesh collapses to its domain
 # boundary outline so the deformed grid alone carries the deformation.
@@ -768,7 +773,11 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         plot_type: Comma-separated plot types. Valid types:
             'deformation' - deformed mesh overlay
             'displace_mag' - displacement magnitude contours
-            'displace_vector' - displacement vectors at corner nodes
+            'displace_vector' - displacement vectors at corner nodes; on a model
+                whose field carries joint state this panel becomes the scaled
+                deformed mesh with the joint faces drawn, because a jointed
+                model's mechanism is blocks moving as bodies on their joints and
+                an arrow field sampled at nodes does not show that
             'stress' - von Mises stress contours
             'strain' - equivalent strain contours
             'shear_strain' - viscoplastic max shear strain contours
@@ -1066,6 +1075,20 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         if pt == 'displace_mag':
             plot_displacement_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                      cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
+        elif pt == 'displace_vector' and solution_has_joint_state(fem_data, deform_field):
+            # A jointed model's mechanism is block motion: wedges that translate
+            # and rotate as bodies, with every bit of the movement taken up AT
+            # the joints. An arrow field samples that at nodes and says nothing
+            # about the joints themselves, so this panel becomes the scaled
+            # deformed mesh with the faces drawn — where a slipped joint is two
+            # lines that have parted, and a toppling column leans.
+            plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
+                             show_original=show_original, deformed_color=deformed_color,
+                             show_reinforcement=show_reinforcement,
+                             cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
+                             label_elements=label_elements, single_panel=defer_panel_cbar,
+                             at_failure=deform_field.get("_at_failure", False),
+                             joint_faces=True)
         elif pt == 'displace_vector':
             vector_mappable = plot_displacement_vectors(ax, fem_data, deform_field, show_mesh, show_reinforcement,
                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
@@ -1679,7 +1702,8 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
 def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
                        show_original='outline', deformed_color='k', show_reinforcement=True,
                        cbar_shrink=0.8, cbar_labelpad=20, label_elements=False,
-                       single_panel=False, at_failure=False, show_mesh=None):
+                       single_panel=False, at_failure=False, show_mesh=None,
+                       joint_faces=False):
     """
     Plot deformed mesh overlay on original mesh.
 
@@ -1703,6 +1727,12 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
         show_mesh: Legacy boolean alias for ``show_original`` (True→'mesh',
             False→off); prefer ``show_original``. None (default) leaves show_original
             in effect.
+        joint_faces: Draw the two faces of every joint element over the deformed
+            grid, and drop the grid itself to a light gray so they read over it.
+            Both copies of each face are drawn, so a joint that has slipped or
+            opened shows as two lines that no longer lie on each other — which is
+            the whole picture on a jointed model: the blocks move as bodies and
+            the motion is AT the joints, not spread through the elements.
     """
     # Legacy alias: an explicit show_mesh bool maps onto the tri-state so older
     # callers keep working (True == the former full-grid-or-outline behavior).
@@ -1757,10 +1787,19 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
                                linewidth=max(lw, floor_pt), linestyle='--',
                                label='Original (outline)')
 
-    # Plot deformed mesh
-    plot_mesh_lines(ax, fem_data_deformed, color=deformed_color, alpha=1.0,
-                    linewidth=lw, label='Deformed')
-    
+    # Plot deformed mesh. On a jointed model the element edges step back to a
+    # light gray and the joint faces are drawn over them in the deformed color:
+    # the elements are there for context, the joints are the mechanism.
+    draw_faces = joint_faces and bool((fem_data.get("joint_data") or {}).get("n"))
+    plot_mesh_lines(ax, fem_data_deformed,
+                    color=_DEFORMED_GRID_UNDER_JOINTS if draw_faces else deformed_color,
+                    alpha=1.0, linewidth=lw, label='Deformed')
+    if draw_faces:
+        ax.add_collection(LineCollection(
+            _joint_face_segments(fem_data, nodes_deformed),
+            colors=deformed_color, linewidths=max(lw, floor_pt), alpha=1.0,
+            zorder=6.5, label='Joint faces'))
+
     # Plot members in both original and deformed configurations. The two
     # configurations are told apart by COLOR, on both kinds of member: the
     # original is the muted reference (gray reinforcement, the pile's own green)
@@ -2328,6 +2367,44 @@ _JOINT_HAIRLINE_PT = 1.0
 _JOINT_OPEN_MARK_FRACTION = 0.012
 
 
+def solution_has_joint_state(fem_data, solution):
+    """True where this model has joints AND this field measured their state.
+
+    A field reloaded from a sidecar, or one captured before the interface
+    existed, carries the displacements but none of the joint arrays; reading
+    those absent arrays as zeros would report every interface intact, a state
+    nothing measured. So the two questions — does the model have joints, did
+    this field measure them — are answered together, and every drawing that
+    depends on joint state asks this one function.
+    """
+    from .joint import solution_has_joint_state as _measured
+    jd = fem_data.get("joint_data")
+    if jd is None or not jd.get("n"):
+        return False
+    return bool(_measured(solution, jd["n"]))
+
+
+def _joint_face_segments(fem_data, nodes_xy):
+    """The two faces of every joint element, as polylines through ``nodes_xy``.
+
+    Both copies of the split are returned, so a joint that has slipped or opened
+    draws as two lines that no longer lie on each other. The station's midside
+    node goes BETWEEN its corners, so a face on a quadratic edge draws as the
+    curve it is; a two-pair element (no midside) draws as its chord.
+    """
+    jd = fem_data.get("joint_data")
+    if jd is None or not jd.get("n"):
+        return []
+    conn = np.asarray(jd["conn"], dtype=int)
+    w = np.asarray(jd["w"], dtype=float)
+    segs = []
+    for i in range(int(jd["n"])):
+        order = [0, 2, 1] if w[i, 2] > 0.0 else [0, 1]
+        for base in (0, 3):
+            segs.append(nodes_xy[[conn[i, k + base] for k in order], :2])
+    return segs
+
+
 def _joint_spans(fem_data, solution):
     """One record per station span of every jointed line: where it is, what state
     it is in, and how far the two faces have slid.
@@ -2338,12 +2415,9 @@ def _joint_spans(fem_data, solution):
     larger. Drawing them separately would put one line exactly on top of the
     other and report whichever happened to be drawn last.
     """
-    from .joint import solution_has_joint_state
-    jd = fem_data.get("joint_data")
-    if jd is None or not jd.get("n"):
-        return []
-    if not solution_has_joint_state(solution, jd["n"]):
-        return []                # nothing measured: a saved field carries none
+    if not solution_has_joint_state(fem_data, solution):
+        return []      # no joint, or a saved field that measured none of them
+    jd = fem_data["joint_data"]
     conn = np.asarray(jd["conn"], dtype=int)
     side = np.asarray(jd["side"], dtype=int)
     nodes = np.asarray(fem_data["nodes"], dtype=float)

@@ -22,7 +22,8 @@ six lines made joints in memory:
      the jointed lines over the mesh; the results panel draws every joint as a
      hairline colored by slip, with the slip colorbar as its only legend and no
      colorbar where nothing slipped, and draws nothing at all on a model with
-     no joint.
+     no joint. The standard figure's displacement panel is the scaled deformed
+     mesh on a jointed model and the arrow field on every other one.
   d. the faces are offset. The split gives the two soil faces their own nodes,
      so a slipped joint moves them apart in the solved field — which is what
      the deformed mesh and the at-failure capture draw. Measured on the
@@ -301,6 +302,35 @@ def _leg_plots(failures, cache):
         failures.append("an unjointed model had joint states drawn on it")
     plt.close(fig)
     cache["plain"] = (plain, mesh0, fd0, sol0)
+
+    # The standard figure's displacement panel. A jointed model's mechanism is
+    # blocks moving as bodies on their joints, which an arrow field sampled at
+    # nodes does not show, so that panel becomes the scaled deformed mesh with
+    # the joint faces drawn. An unjointed model keeps the arrows.
+    from matplotlib.quiver import Quiver
+    from xslope.plot_fem import plot_fem_results
+    for fd, sol, jointed in ((fem_data, sol, True), (fd0, sol0, False)):
+        fig, axes = _quiet(plot_fem_results, fd, sol,
+                           plot_type=["shear_strain", "displace_vector"],
+                           figsize=(9, 7))
+        ax_d = axes[1]
+        title = ax_d.get_title()
+        arrows = [a for a in ax_d.collections if isinstance(a, Quiver)]
+        if jointed and arrows:
+            failures.append("a jointed model's displacement panel still draws "
+                            "an arrow field")
+        if jointed and "Deformation" not in title:
+            failures.append(f"a jointed model's displacement panel is not the "
+                            f"deformed mesh: {title!r}")
+        if jointed and "Scale" not in title:
+            failures.append(f"the deformed-mesh panel does not print its "
+                            f"exaggeration: {title!r}")
+        if not jointed and not arrows:
+            failures.append("an unjointed model lost its displacement vectors")
+        if not jointed and "Displacement Vectors" not in title:
+            failures.append(f"an unjointed model's displacement panel changed: "
+                            f"{title!r}")
+        plt.close(fig)
 
 
 # --------------------------------------------------------------------------

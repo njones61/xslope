@@ -195,6 +195,207 @@ LV_RING = [(0.0, 0.0), (700.0, 0.0), (700.0, 140.0), (560.0, 140.0),
 LV_JOINT = {'c': 100.0, 'phi': 40.0, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
 
 
+
+# ---------------------------------------------------------------------------
+# Problem 1 — Goodman & Bray block toppling
+#
+# NOT in BUILDERS, and no file is shipped. The section transcribes cleanly — the
+# sixteen column outlines below are the vendor model's own, and the joints are
+# derived from where the columns touch — but the mesh split refuses the result
+# at every target size from 1.0 to 4.0 m:
+#
+#     The mesh edge (0, N) on jointed line 1 is carried by 4 two-dimensional
+#     element(s), not two.
+#
+# The cause is the topology, not the geometry. A stepped base puts each column's
+# basal contact at a point PARTWAY ALONG its downslope neighbour's side joint,
+# so the section has fifteen T-junctions: one joint ending in the interior of
+# another. The split copies a shared node once per wedge of material around it,
+# which is right for a crossing (two joints, four wedges, two elements per edge)
+# and wrong for a termination (three wedges), and the edge at the T comes out
+# carrying four elements. Every crossing in the rest of this corpus is an X.
+#
+# The code is kept because it is the finished transcription: the round that
+# teaches the split about terminations can build these four rows by registering
+# ``rj001a`` and ``rj001c`` and reading the toe force off the manual for b and d.
+# ---------------------------------------------------------------------------
+
+#: Goodman & Bray's sixteen columns, each a closed outline read verbatim
+#: from the vendor model's own joint boundaries. The columns sit on a
+#: STEPPED base: every column's base is 10 m long at 30 degrees and one
+#: metre, measured perpendicular, above its downslope neighbour's.
+GB_BLOCKS = [
+    [(-0.5, 0.866025403784439), (8.16025403784439, 5.86602540378444), (7.66025403784439, 6.73205080756888), (6.16025403784439, 9.33012701892219), (-2.5, 4.33012701892219)],
+    [(7.66025403784439, 6.73205080756888), (16.3205080756888, 11.7320508075689), (15.8205080756888, 12.5980762113533), (12.3205080756888, 18.6602540378444), (3.66025403784439, 13.6602540378444), (6.16025403784439, 9.33012701892219)],
+    [(15.8205080756888, 12.5980762113533), (24.4807621135332, 17.5980762113533), (23.9807621135332, 18.4641016151378), (18.4807621135332, 27.9903810567666), (9.82050807568877, 22.9903810567666), (12.3205080756888, 18.6602540378444)],
+    [(23.9807621135332, 18.4641016151378), (32.6410161513775, 23.4641016151378), (32.1410161513775, 24.3301270189222), (24.6410161513775, 37.3205080756888), (15.9807621135332, 32.3205080756888), (18.4807621135332, 27.9903810567666)],
+    [(32.1410161513775, 24.3301270189222), (40.8012701892219, 29.3301270189222), (40.3012701892219, 30.1961524227066), (30.8012701892219, 46.650635094611), (22.1410161513775, 41.650635094611), (24.6410161513775, 37.3205080756888)],
+    [(40.3012701892219, 30.1961524227066), (48.9615242270663, 35.1961524227066), (48.4615242270663, 36.0621778264911), (36.9615242270663, 55.9807621135332), (28.3012701892219, 50.9807621135332), (30.8012701892219, 46.650635094611)],
+    [(48.4615242270663, 36.0621778264911), (57.1217782649107, 41.0621778264911), (56.6217782649107, 41.9282032302755), (43.1217782649107, 65.3108891324553), (34.4615242270663, 60.3108891324553), (36.9615242270663, 55.9807621135332)],
+    [(56.6217782649107, 41.9282032302755), (65.2820323027551, 46.9282032302755), (64.7820323027551, 47.7942286340599), (49.2820323027551, 74.6410161513775), (40.6217782649107, 69.6410161513775), (43.1217782649107, 65.3108891324553)],
+    [(64.7820323027551, 47.7942286340599), (73.4422863405995, 52.7942286340599), (72.9422863405995, 53.6602540378444), (55.4422863405995, 83.9711431702997), (46.7820323027551, 78.9711431702997), (49.2820323027551, 74.6410161513775)],
+    [(72.9422863405995, 53.6602540378444), (81.6025403784439, 58.6602540378444), (81.1025403784439, 59.5262794416288), (64.1025403784439, 88.9711431702997), (61.6025403784439, 93.3012701892219), (52.9422863405995, 88.3012701892219), (55.4422863405995, 83.9711431702997)],
+    [(81.1025403784439, 59.5262794416288), (89.7627944162882, 64.5262794416288), (89.2627944162882, 65.3923048454133), (75.2627944162882, 89.6410161513776), (72.7627944162882, 93.9711431702997), (64.1025403784439, 88.9711431702997)],
+    [(89.2627944162882, 65.3923048454133), (97.9230484541326, 70.3923048454133), (97.4230484541326, 71.2583302491977), (86.4230484541326, 90.3108891324553), (83.9230484541326, 94.6410161513776), (75.2627944162882, 89.6410161513776)],
+    [(97.4230484541326, 71.2583302491977), (106.083302491977, 76.2583302491977), (105.583302491977, 77.1243556529821), (97.583302491977, 90.9807621135331), (95.083302491977, 95.3108891324553), (86.4230484541326, 90.3108891324553)],
+    [(105.583302491977, 77.1243556529821), (114.243556529821, 82.1243556529821), (113.743556529821, 82.9903810567666), (108.743556529821, 91.6506350946109), (106.243556529821, 95.9807621135331), (97.583302491977, 90.9807621135331)],
+    [(113.743556529821, 82.9903810567666), (122.403810567666, 87.9903810567666), (121.903810567666, 88.856406460551), (119.903810567666, 92.3205080756888), (117.403810567666, 96.6506350946109), (108.743556529821, 91.6506350946109)],
+    [(121.903810567666, 88.856406460551), (130.56406460551, 93.856406460551), (128.56406460551, 97.3205080756888), (119.903810567666, 92.3205080756888)],
+]
+
+
+#: The rectangle the vendor model is cut from. Everything above the column
+#: stack and the crest shelf is a deleted region in the file — 2 100 elements of
+#: air — so the domain built here is the rectangle bounded above by the ground.
+GB_EXT = (-65.2820323027551, -46.650635094611,
+          195.846096908265, 93.856406460551)
+
+
+def _gb_section():
+    """The Goodman & Bray section: its domain, and the joints inside it.
+
+    The vendor file draws sixteen closed column outlines and deletes the air
+    above them. Rebuilt here as seventeen polygons — the sixteen columns and the
+    rock they stand on — whose SHARED edges are the joints: sixteen stepped
+    basal contacts and fifteen column-to-column ones. Deriving the joints from
+    the contacts rather than listing them keeps them exactly where the outlines
+    put them, and a column that touches its neighbour over three metres gets a
+    three metre joint rather than a full-height one.
+
+    Returns ``(domain_ring, joint_segments)``.
+    """
+    from shapely.geometry import Polygon
+    from shapely.ops import linemerge, unary_union
+
+    x0, y0, x1, y1 = GB_EXT
+    cols = [Polygon(b) for b in GB_BLOCKS]
+    stack = unary_union(cols)
+    ring = list(stack.exterior.coords)
+    toe = ring.index((-0.5, 0.866025403784439))
+    crest = ring.index((130.56406460551, 93.856406460551))
+    # The stepped base is the stack's own lower chain, crest back down to toe.
+    chain = ring[crest:toe + 1]
+    base = Polygon([(x0, y0), (x1, y0), (x1, y1)] + list(chain)
+                   + [(0.0, 0.0), (x0, 0.0)])
+
+    polys = [base] + cols
+    segs = []
+    for a in range(len(polys)):
+        for b in range(a + 1, len(polys)):
+            shared = polys[a].boundary.intersection(polys[b].boundary)
+            if shared.is_empty:
+                continue
+            merged = (shared if shared.geom_type == 'LineString'
+                      else linemerge(shared))
+            parts = ([merged] if merged.geom_type == 'LineString'
+                     else list(getattr(merged, 'geoms', [])))
+            for part in parts:
+                if part.geom_type != 'LineString':
+                    continue
+                pts = list(part.coords)
+                # One contact can be a two-segment polyline — a column's base
+                # and the step up to the next one. The sheet holds straight
+                # lines, so it is written as the segments it is made of.
+                for p, q in zip(pts, pts[1:]):
+                    if (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 > 1e-12:
+                        segs.append((p, q))
+    dom = unary_union(polys)
+    return list(dom.exterior.coords), _straight_runs(segs)
+
+
+def _straight_runs(segs, tol=1.0e-9):
+    """Contiguous collinear segments joined into one line each.
+
+    The contacts come out of the union one polygon pair at a time, so the step
+    between two columns' bases and the contact between those columns above it
+    arrive as two segments of one straight plane. Handing the mesher two
+    collinear joint lines that meet end to end puts four elements on the edge at
+    their shared node and the split refuses it; they are one plane and are
+    written as one line.
+    """
+    import math
+
+    def ang(p, q):
+        return math.atan2(q[1] - p[1], q[0] - p[0]) % math.pi
+
+    def key(pt):
+        return (round(pt[0], 9), round(pt[1], 9))
+
+    todo = list(segs)
+    runs = []
+    while todo:
+        p, q = todo.pop(0)
+        a = ang(p, q)
+        grew = True
+        while grew:
+            grew = False
+            for i, (r, t) in enumerate(todo):
+                if abs(((ang(r, t) - a + math.pi / 2) % math.pi)
+                       - math.pi / 2) > 1.0e-6:
+                    continue
+                if key(t) == key(p):
+                    p = r
+                elif key(r) == key(q):
+                    q = t
+                elif key(r) == key(p):
+                    p = t
+                elif key(t) == key(q):
+                    q = r
+                else:
+                    continue
+                todo.pop(i)
+                grew = True
+                break
+        runs.append((p, q))
+    return runs
+
+
+def _gb_case(name, phi_joint):
+    """One of Goodman & Bray's four cases: the shared section at its own joint
+    friction angle."""
+    sd = _base()
+    ring, segs = _gb_section()
+    mats = [_rock('Rock', 25.0, 2.0e7, 0.3, 0.0, 0.0, option='elastic')]
+    _finish(sd, [(ring, 0)], mats)
+    sd['joint_lines'] = [
+        _joint(f'jnt-{i + 1:02d}', p, q, 0.0, phi_joint)
+        for i, (p, q) in enumerate(segs)]
+    # The seed surface is the basal plane the stack stands on, toe to crest.
+    sd['non_circ'] = _surface([(-0.5, 0.866025403784439),
+                               (130.56406460551, 93.856406460551)])
+    return _write(sd, name)
+
+
+def rj001a():
+    """RJ-1a — Goodman & Bray block toppling, case a (vendor `joint #001_a.fez`).
+
+    Sixteen rock columns on a stepped 30 degree base, rising to a crest at
+    (130.564, 93.856) and cut off by the slope face above column ten. The rock
+    is ELASTIC (gamma 25 kN/m^3, E 20 GPa, nu 0.3), so the columns cannot break
+    and the whole mechanism is sliding and rotation on the joints, which is the
+    idealization Goodman & Bray's limit equilibrium makes.
+
+    The joints carry no cohesion and phi = 38.15 degrees — the angle this case
+    is posed at. Referees: Goodman & Bray 1.0 and UDEC 0.99. RS2 reports 0.99
+    without joint improvement and 0.97 with it.
+
+    The manual describes a stabilizing force at the toe of the lowest column. In
+    this case the model carries 0.5 kN, which is 0.05% of that column's own
+    weight and does nothing, so the file is built without it; see the page's
+    departures table.
+    """
+    return _gb_case('rj001a.xlsx', 38.15)
+
+
+def rj001c():
+    """RJ-1c — Goodman & Bray block toppling, case c (vendor `joint #001_c.fez`).
+
+    Case a's section and rock at phi = 38.6598 degrees on the joints, and the
+    same 0.5 kN toe force that does nothing. Referees: Goodman & Bray 1.02 and
+    UDEC 1.01. RS2 reports 1.01 without joint improvement and 0.99 with it.
+    """
+    return _gb_case('rj001c.xlsx', 38.6598)
+
 # ---------------------------------------------------------------------------
 # Problem 2 — Alejano & Alonso block toppling
 # ---------------------------------------------------------------------------

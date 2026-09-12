@@ -85,12 +85,12 @@ joint model whose output is a stress-displacement curve.
 | [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | 1.25 / 1.31 | *reported, no lock* — both edges of the bracket reach the sweep budget without a verdict. |
 | [7](#rj-7) | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | 1.57 / 1.59 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.744 vs UDEC 0.76 (−2.1%) | 0.75 / 0.75 | |
-| 9 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1a | UDEC 1.03 | 1.01 / 1.09 | *planned* — the file is built and meshes; its corpus bracket has not been run. |
-| 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | 0.92 / 1.08 | *planned* — the file is built and meshes; its corpus bracket has not been run. |
+| 9 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1a | UDEC 1.03 (LE 0.40–1.45) | 1.01 / 1.09 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is not yet measured. |
+| 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 (LE 0.43–1.45) | 0.92 / 1.08 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is not yet measured. |
 | 11 | <span class="nodata">⊘</span> | Ploughing sliding slab failure | LE (Alejano) 1.75 · UDEC 1.21 | 1.22 / 1.3 | *planned* — the file is built and meshes; its corpus bracket has not been run. |
 | [12](#rj-12) | <span class="nodata">⊘</span> | Ploughing toppling slab failure | LE (Alejano) 2.0 · UDEC 1.78 | 1.39 / 1.75 | *reported, no lock* — a step of refinement moves the factor, so it is not the section's answer but its mesh's. |
 | 13 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 4 | LE (Alejano) 1.0 · UDEC 1.0 | 1.0 / 1.05 | *planned* — the file is built and meshes; its corpus bracket has not been run. |
-| 14 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | LE (Alejano) 1.0 · UDEC 0.9 | 0.89 / 1.09 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is not yet measured. |
+| [14](#rj-14) | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | LE (Alejano) 1.0 · UDEC 0.9 | 0.89 / 1.09 | *reported, no lock* — a step of refinement moves the factor, as it does on problem 12. |
 | [15](#rj-15) | <span class="nodata">⊘</span> | Partially joint-controlled footwall | LE (Alejano) 1.72 · UDEC 1.6 · Slide2 1.25 | 1.28 / 1.42 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
 | 16 | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | experiment 9° · UDEC 11° | 9° / 7° | *blocked* — the problem scores the TILT ANGLE at which a block grid topples, found by rotating gravity through a staged sweep; XSLOPE's seismic coefficient tilts the load but the row needs the sweep and a toppling criterion, neither of which is a strength reduction. |
 | 17 | <span class="nodata">⊘</span> | Step-path, en-echelon joints | UDEC 1.29 | 1.24 / 1.2 | *blocked* — the vendor model's second, elastic material has no boundary of its own. Recovered from the element-material map it is an 83-vertex staircase of element edges, trending vertical near x = 12 and horizontal near y = 3 with excursions of about one element either side, so the boundary is a property of the vendor's mesh rather than of its model. |
@@ -435,6 +435,30 @@ RS2's own two factors falling between them.
 **Input file:** [rj012.xlsx](files/rocscience/joints/rj012.xlsx).
 
 ![RJ-12: Alejano et al. ploughing toppling slab failure (rj012) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section, and only a few of its traces carry any slip: one release trace under the crest and the bedding beneath the toe block, which is the ploughing pair. The two right-hand panels are the state one sweep past the critical factor rather than a developed mechanism — on a rock this stiff the model moves by microns until it does not, so the deformed section is drawn at tens of thousands of times scale](images/RJ-12.png)
+
+### ⊘ RJ-14: Alejano et al. ploughing sliding slab, example 5 (rj014) {#rj-14}
+
+Example 4's section at 60° with the two joint strengths the other way round: bedding dipping out of
+the face at −60° at 1.5 m spacing at φ = 20° — the weakest bedding of the six — and two release
+traces at φ = 30°, one at the toe below the bench and one from the face down onto the bedding plane
+it releases. The rock is the family's elastic rigid-block stand-in at E = 2 × 10⁸ MPa,
+γ = 25 kN/m³, ν = 0.3. Like problem 12, this row states its generated bedding network to six
+decimals; see the departures table.
+
+The row carries no lock and prints no factor, and as on problem 12 it is the mesh rather than the
+sweep budget that says so. Every trial of both brackets reaches a verdict — the longest takes
+32 926 sweeps of the 250 000 allowed — and a step of refinement to a 2D size of 1.05 m, which
+takes the mesh from 12 316 nodes and 1 819 interface elements to 26 414 and 2 572, moves the
+factor by 0.059. That is three bracket steps where the row's tolerance is one.
+
+Every input class the corpus transcribes was diffed against the vendor model and matches: the
+rock's E, ν and γ, both joint friction angles, the joints' stiffness pair, cohesion and tensile
+cap, the bedding dip and spacing, the release traces' endpoints, and the side restraint the vendor
+clamps in both directions.
+
+**Input file:** [rj014.xlsx](files/rocscience/joints/rj014.xlsx).
+
+![RJ-14: Alejano et al. ploughing sliding slab, example 5 (rj014) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it moves: one bedding plane from the crest to the toe carries the slip, with the release trace at the toe opening as the slab above it slides out over the bench](images/RJ-14.png)
 
 ### ⊘ RJ-15: Partially joint-controlled footwall slope (rj015) {#rj-15}
 

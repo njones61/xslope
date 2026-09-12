@@ -29,6 +29,7 @@ corpus uses, so every stress is multiplied by 1000 and every unit weight by 1000
 Run this script to regenerate every built problem.
 """
 
+import math
 import os
 import sys
 import warnings
@@ -42,6 +43,7 @@ from shapely.geometry import LineString, Polygon                    # noqa: E402
 from xslope.fileio import load_slope_data                           # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx    # noqa: E402
 from xslope.fileio import build_ground_surface_from_polygons        # noqa: E402
+from xslope.joints import cross_jointed, parallel_set               # noqa: E402
 from benchmarks.tag_k0 import apply_tag_k0                          # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -83,15 +85,49 @@ def _base():
     return sd
 
 
-def _rock(name, gamma, E, nu, c, phi, t_cut=0.0):
-    """One Mohr-Coulomb rock, in kPa and kN/m^3."""
+def _rock(name, gamma, E, nu, c, phi, t_cut=0.0, option='mc'):
+    """One rock, in kPa and kN/m^3.
+
+    ``option='elastic'`` is a rock the FEM holds out of the strength reduction
+    entirely — it cannot yield, so only the joints can fail. That is what the
+    vendor's ``Plasticity Specifications: Non`` says, and several of these
+    problems carry it (see :func:`rj002`).
+    """
     # gamma_sat is left unset: none of these models has water, and a saturated
     # unit weight on a dry model is a value nothing reads.
     return {'name': name, 'gamma': gamma, 'gamma_sat': float('nan'),
-            'option': 'mc', 'c': c, 'phi': phi, 'psi': 0.0, 'r_elev': 0.0,
+            'option': option, 'c': c, 'phi': phi, 'psi': 0.0, 'r_elev': 0.0,
             'u': 'none', 'ru': 0.0, 'E': E, 'nu': nu, 't_cut': t_cut,
             'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0,
             'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0}
+
+
+def _offset_through(dip_deg, x, y):
+    """The ``parallel_set`` offset that puts one trace through ``(x, y)``.
+
+    ``offset`` is measured along the set's own normal, and ``offset=0`` is the
+    trace through the origin, so the offset a stated location asks for is that
+    location projected onto the normal. The vendor files state a set as a dip, a
+    spacing and an ``init_joint_loc``, which is exactly this triple.
+    """
+    th = math.radians(float(dip_deg))
+    nx, ny = -math.sin(th), math.cos(th)
+    return float(x) * nx + float(y) * ny
+
+
+def _toe_circle(toe, crest):
+    """A starting circle for a section whose mechanism is not a single plane.
+
+    Centred above mid-slope at the toe elevation plus twice the slope height and
+    passing through the toe, which is the starting circle a user would draw on
+    this section. It is what makes the file a complete slope-stability model;
+    a strength reduction never reads it.
+    """
+    (tx, ty), (cx, cy) = toe, crest
+    xo = 0.5 * (tx + cx)
+    yo = ty + 2.0 * (cy - ty)
+    r = ((xo - tx) ** 2 + (yo - ty) ** 2) ** 0.5
+    return [{'Xo': float(xo), 'Yo': float(yo), 'Depth': 0.0, 'R': float(r)}]
 
 
 def _joint(label, p1, p2, c, phi, kn=KN_STD, ks=KS_STD, t_cut=0.0,
@@ -145,6 +181,236 @@ def _write(sd, name):
     apply_tag_k0(sd, path)
     _write_xlsx(sd, path)
     return name
+
+
+#: The section problems 3 to 7 share: a 700 x 400 m block with a 260 m face at
+#: 55 degrees running from the crest at (377.786, 400) down to the toe at
+#: (560, 140). The four problems differ only in the joint network cut into it.
+LV_RING = [(0.0, 0.0), (700.0, 0.0), (700.0, 140.0), (560.0, 140.0),
+           (377.785587105239, 400.0), (0.0, 400.0)]
+
+#: The joint the same four problems carry: c = 0.1 MPa, phi = 40 degrees. The
+#: manual's tables for problems 3 to 7 state the friction angle and no cohesion
+#: at all; 0.1 MPa is the models' own value and it is what is built.
+LV_JOINT = {'c': 100.0, 'phi': 40.0, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
+
+
+# ---------------------------------------------------------------------------
+# Problem 2 — Alejano & Alonso block toppling
+# ---------------------------------------------------------------------------
+
+def rj002():
+    """RJ-2 — Alejano & Alonso block toppling (vendor `joint #002.fez`).
+
+    A 30 x 19.85 m section whose 9.85 m face rises at 58.65 degrees from
+    (20, 10) to (14, 19.85). A basal joint runs from the face's toe at (20, 10)
+    up to the crest at (2.9393, 19.85) at 30 degrees — the stepped surface the
+    columns topple over — and a set of columns at 64 degrees, 1.6 m apart,
+    passes through that toe. Both carry phi = 31 degrees and no cohesion.
+
+    The rock is ELASTIC (the vendor's ``Plasticity Specifications: Non``), so
+    the columns cannot yield and every mechanism the model has is a joint one.
+    gamma = 25 kN/m^3, E = 20 GPa, nu = 0.3.
+
+    Referees: Goodman & Bray's limit-equilibrium 0.76 and UDEC 0.87. RS2 reports
+    0.86 without joint improvement and 0.82 with it.
+
+    The set's sign is the file's own: its 24 stored segments run at +64 degrees
+    counter-clockwise (ascending to the right, into the slope), which is what
+    makes them columns over a basal plane rather than a second sliding set.
+    """
+    sd = _base()
+    ring = [(0.0, 0.0), (30.0, 0.0), (30.0, 10.0), (20.0, 10.0),
+            (14.0, 19.85), (2.9393, 19.85), (0.0, 19.85)]
+    mats = [_rock('Rock', 25.0, 2.0e7, 0.3, 0.0, 0.0, option='elastic')]
+    _finish(sd, [(ring, 0)], mats)
+    props = {'c': 0.0, 'phi': 31.0, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
+    columns = parallel_set(sd, 64.0, 1.6, offset=_offset_through(64.0, 20.0, 10.0),
+                           label='col', props=props)
+    sd['joint_lines'] = [
+        _joint('basal', (20.0, 10.0), (2.9393, 19.85), 0.0, 31.0),
+    ] + columns
+    # The seed surface is the basal joint: the plane the toppling column stack
+    # stands on. Inert for a strength reduction, and it makes the file complete.
+    sd['non_circ'] = _surface([(20.0, 10.0), (2.9393, 19.85)])
+    return _write(sd, 'rj002.xlsx')
+
+
+# ---------------------------------------------------------------------------
+# Problem 3 — Lorig & Varona forward block toppling
+# ---------------------------------------------------------------------------
+
+def rj003():
+    """RJ-3 — Lorig & Varona forward block toppling (vendor `joint #003.fez`).
+
+    The shared 260 m / 55 degree section cut by two sets: columns at 70 degrees
+    at 20 m spacing, and a cross set at -20 degrees at 30 m, both through the
+    origin. The manual states the two as "70 and 160" degrees, which is the
+    same pair measured the other way round the half circle.
+
+    The rock is ELASTIC, so only the joints can fail. gamma = 26.0946 kN/m^3,
+    E = 9.072 GPa, nu = 0.26. Referee: UDEC 1.13. RS2 reports 1.12 without joint
+    improvement and 1.09 with it.
+    """
+    sd = _base()
+    mats = [_rock('Rock', 26.0946, 9.072e6, 0.26, 0.0, 0.0, option='elastic')]
+    _finish(sd, [(LV_RING, 0)], mats)
+    sd['joint_lines'] = cross_jointed(
+        parallel_set(sd, 70.0, 20.0, label='col', props=LV_JOINT),
+        parallel_set(sd, -20.0, 30.0, label='cross', props=LV_JOINT))
+    sd['circles'] = _toe_circle((560.0, 140.0), (377.785587105239, 400.0))
+    return _write(sd, 'rj003.xlsx')
+
+
+# ---------------------------------------------------------------------------
+# Problem 4 — Lorig & Varona flexural toppling
+# ---------------------------------------------------------------------------
+
+def rj004():
+    """RJ-4 — Lorig & Varona flexural toppling (vendor `joint #004.fez`).
+
+    The shared section cut by ONE set of columns at 70 degrees at 20 m spacing
+    through the origin — problem 3's first set without its cross joints, so the
+    columns bend rather than topple as blocks.
+
+    The rock is Mohr-Coulomb and carries a tensile cutoff of zero, which is what
+    lets a column break in flexure: gamma = 26.1 kN/m^3, E = 9.072 GPa,
+    nu = 0.26, c = 675 kPa, phi = 43 degrees, T = 0. Referee: UDEC 1.3. RS2
+    reports 1.19 without joint improvement and 1.27 with it.
+    """
+    sd = _base()
+    mats = [_rock('Rock', 26.1, 9.072e6, 0.26, 675.0, 43.0, t_cut=0.0)]
+    _finish(sd, [(LV_RING, 0)], mats)
+    sd['joint_lines'] = parallel_set(sd, 70.0, 20.0, label='col', props=LV_JOINT)
+    sd['circles'] = _toe_circle((560.0, 140.0), (377.785587105239, 400.0))
+    return _write(sd, 'rj004.xlsx')
+
+
+# ---------------------------------------------------------------------------
+# Problem 5 — Lorig & Varona backward block toppling
+# ---------------------------------------------------------------------------
+
+def rj005():
+    """RJ-5 — Lorig & Varona backward block toppling (vendor `joint #005.fez`).
+
+    The shared section cut by a set at -55 degrees at 10 m spacing through the
+    toe at (560, 140) — dipping out of the face, so the blocks topple backward —
+    and a horizontal set at 40 m spacing through (0, 400).
+
+    The rock is ELASTIC. gamma = 26.1 kN/m^3, E = 9.072 GPa, nu = 0.26.
+    Referee: UDEC 1.7. RS2 reports 1.65 without joint improvement and 1.86 with
+    it — the widest "joint improvement" spread in the manual.
+    """
+    sd = _base()
+    mats = [_rock('Rock', 26.1, 9.072e6, 0.26, 0.0, 0.0, option='elastic')]
+    _finish(sd, [(LV_RING, 0)], mats)
+    sd['joint_lines'] = cross_jointed(
+        parallel_set(sd, -55.0, 10.0, offset=_offset_through(-55.0, 560.0, 140.0),
+                     label='dip', props=LV_JOINT),
+        parallel_set(sd, 0.0, 40.0, offset=_offset_through(0.0, 0.0, 400.0),
+                     label='bed', props=LV_JOINT))
+    sd['circles'] = _toe_circle((560.0, 140.0), (377.785587105239, 400.0))
+    return _write(sd, 'rj005.xlsx')
+
+
+# ---------------------------------------------------------------------------
+# Problem 6 — plane failure, daylighting discontinuities
+# ---------------------------------------------------------------------------
+
+def rj006():
+    """RJ-6 — plane failure with daylighting discontinuities (`joint #006.fez`).
+
+    The shared section cut by one set at -35 degrees at 10 m spacing through the
+    origin. The joints dip out of the 55 degree face at a shallower angle than
+    the face itself, so every one of them daylights and the slabs between them
+    are free to slide out.
+
+    The rock is Mohr-Coulomb: gamma = 26.1 kN/m^3, E = 9.072 GPa, nu = 0.26,
+    c = 675 kPa, phi = 43 degrees, no tensile capacity. Referee: UDEC 1.27. RS2
+    reports 1.25 without joint improvement and 1.31 with it.
+    """
+    sd = _base()
+    mats = [_rock('Rock', 26.1, 9.072e6, 0.26, 675.0, 43.0, t_cut=0.0)]
+    _finish(sd, [(LV_RING, 0)], mats)
+    sd['joint_lines'] = parallel_set(sd, -35.0, 10.0, label='jnt', props=LV_JOINT)
+    # The seed surface is the daylighting plane itself: the 35 degree joint
+    # through the toe of the face, back to where it reaches the crest plateau.
+    # Inert for a strength reduction, and it makes the file a complete model.
+    sd['non_circ'] = _surface([(188.6478, 400.0), (560.0, 140.0)])
+    return _write(sd, 'rj006.xlsx')
+
+
+# ---------------------------------------------------------------------------
+# Problem 7 — plane failure, non-daylighting discontinuities
+# ---------------------------------------------------------------------------
+
+def rj007():
+    """RJ-7 — plane failure with non-daylighting discontinuities (`joint #007.fez`).
+
+    The same section and the same rock as problem 6, cut by one set at
+    -70 degrees at 20 m spacing through the origin. The joints now dip out of
+    the face STEEPER than the 55 degree face, so none of them daylights: a slab
+    cannot slide out along one without shearing rock, and the slope stands
+    higher than problem 6's.
+
+    Referee: UDEC 1.5. RS2 reports 1.57 without joint improvement and 1.59 with
+    it. The manual's own table prints the slope angle as 5 degrees; the figure
+    and the model are the same 55 degrees problem 6 uses.
+    """
+    sd = _base()
+    mats = [_rock('Rock', 26.1, 9.072e6, 0.26, 675.0, 43.0, t_cut=0.0)]
+    _finish(sd, [(LV_RING, 0)], mats)
+    sd['joint_lines'] = parallel_set(sd, -70.0, 20.0, label='jnt', props=LV_JOINT)
+    sd['circles'] = _toe_circle((560.0, 140.0), (377.785587105239, 400.0))
+    return _write(sd, 'rj007.xlsx')
+
+
+# ---------------------------------------------------------------------------
+# Problem 8 — flexural toppling in a base friction model
+# ---------------------------------------------------------------------------
+
+def rj008():
+    """RJ-8 — flexural toppling, base friction model (vendor `joint #008.fez`).
+
+    Pritchard & Savigny's base-friction table model, scaled up a hundred times:
+    a 72.407 x 36.5 m section whose 30.5 m face rises at 78 degrees from (15, 6)
+    to (21.48, 36.5). Columns at -60 degrees at 5.08 m spacing pass through the
+    crest at (21.48, 36.5); a horizontal joint at y = 6 runs the width of the
+    model under them, and a vertical joint at x = 68.4 closes the back of the
+    column stack.
+
+    The rock is Mohr-Coulomb with a tensile cutoff of 75 kPa — the strength a
+    column has to break in flexure: gamma = 25.506 kN/m^3, E = 22.771 GPa,
+    nu = 0.139, c = 60 kPa, phi = 39 degrees. The joints carry no cohesion,
+    phi = 39 degrees, and a NORMAL stiffness of 1.5e7 kPa/m rather than the
+    set's usual 1e8 — this is the one problem in the corpus whose joints are
+    softer than the standard pair. Referee: UDEC 0.76. RS2 reports 0.75 both
+    with and without joint improvement.
+    """
+    sd = _base()
+    ring = [(0.0, 0.0), (72.407, 0.0), (72.407, 6.0), (72.407, 36.5),
+            (68.4, 36.5), (21.48, 36.5), (15.0, 6.0), (0.0, 6.0)]
+    mats = [_rock('Rock', 25.506, 2.2771e7, 0.139, 60.0, 39.0, t_cut=75.0)]
+    _finish(sd, [(ring, 0)], mats)
+    kn, ks = 1.5e7, 1.0e7
+    props = {'c': 0.0, 'phi': 39.0, 't_cut': 0.0, 'kn': kn, 'ks': ks}
+    # The column set exists only ABOVE the basal joint, which is how the vendor
+    # file states it: its 13 stored segments are clipped to the block bounded
+    # below by y = 6 and on the left by the face, not to the whole section. The
+    # same region generated over the whole section would put columns under the
+    # basal joint, where the model has none.
+    stack = [(15.0, 6.0), (72.407, 6.0), (72.407, 36.5), (21.48, 36.5)]
+    columns = parallel_set(sd, -60.0, 5.08,
+                           offset=_offset_through(-60.0, 21.48, 36.5),
+                           region=stack, label='col', props=props)
+    sd['joint_lines'] = [
+        _joint('base-1', (15.0, 6.0), (68.4, 6.0), 0.0, 39.0, kn=kn, ks=ks),
+        _joint('base-2', (68.4, 6.0), (72.407, 6.0), 0.0, 39.0, kn=kn, ks=ks),
+        _joint('back', (68.4, 36.5), (68.4, 6.0), 0.0, 39.0, kn=kn, ks=ks),
+    ] + columns
+    # The seed surface is the basal joint the column stack stands on.
+    sd['non_circ'] = _surface([(15.0, 6.0), (72.407, 6.0)])
+    return _write(sd, 'rj008.xlsx')
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +492,7 @@ def rj019():
 #: Every builder in this module, in problem-number order. ``verify_rebuild.py``'s
 #: ``joints`` group is this list, so a builder missing here is a corpus file
 #: nothing guards.
-BUILDERS = [rj018, rj019]
+BUILDERS = [rj002, rj003, rj004, rj005, rj006, rj007, rj008, rj018, rj019]
 
 
 if __name__ == '__main__':

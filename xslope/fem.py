@@ -30,7 +30,10 @@ from .joint import (mesh_has_joints as _joint_mesh_has_joints,
                     joint_reduced_strength, joint_reduced_residual_strength,
                     joint_vp_sweep, tie_vp_sweep,
                     joint_internal_force, tie_internal_force,
-                    joint_state, joint_yield_violation, joint_advisories)
+                    joint_state, joint_yield_violation, joint_advisories,
+                    joint_relief_code as _joint_relief_code,
+                    joint_relief_delta, joint_assembled_stiffness,
+                    JOINT_TANGENT_FACTOR)
 from .units import require_gamma_water
 
 
@@ -57,6 +60,9 @@ from .units import require_gamma_water
 #   vp_assemble     build_global_stiffness, once per prepared model
 #   vp_prep         the whole prepared model (assembly + factorization + the
 #                   geometry, pore-pressure and Gauss-point-group precompute)
+#   vp_joint        the per-iteration interface block: the relief's state read and
+#                   any refactorization it asks for, the joint sweep and the
+#                   active-set reading
 #   vp_1d           the per-iteration 1D bar and pile beam body-load corrections
 #   vp_oob          the per-iteration Dawson out-of-balance reading, history copy
 #                   included
@@ -4012,6 +4018,12 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
 
     return {
         "K_factor": K_factor,
+        # The matrix the factorization above was taken of. It is kept so that a
+        # driver which has to CHANGE it — the interface relief, which takes the
+        # shear stiffness out of a slipping pair's assembled block and
+        # refactorizes (`joint_tangent` in solve_fem) — starts from the same
+        # assembly every other path uses instead of building a second one.
+        "K_free": K_free,
         "F_gravity": F_gravity,
         "free_dofs": free_dofs,
         "n_free": n_free,
@@ -4153,6 +4165,65 @@ JOINT_TRACE_SINK = None
 #: pre-rule trial record is reproduced. It is not a solver option and no caller
 #: passes it; a study sets it and puts it back.
 JOINT_VERDICT_ON = True
+
+# === The interface relief ======================================================
+# What the viscoplastic loop costs on a jointed model, and why. The loop is an
+# INITIAL-STIFFNESS fixed point: one factorization of the elastic K serves every
+# sweep, and everything the material cannot carry comes back as a body load. Its
+# error therefore contracts by rho(K^-1 dK), with dK the stiffness the assembly
+# holds that the material does not — and on a jointed model dK is the shear
+# stiffness of every slipping pair and both stiffnesses of every open one. When
+# those pairs are the whole of what holds a block up, K - dK is nearly singular in
+# the block's own sliding mode, rho is within a ten-thousandth of one, and the
+# residual crawls down by that ratio per sweep for as long as the budget lasts.
+# That is the measured picture on RJ-2's standing bracket edge and RJ-18's
+# (r16_joint_solver_speed.md §1): a frozen active set, no soil residual at all,
+# and a joint residual falling by a factor near 0.9996 a sweep.
+#
+# The cure is the one RS2 ships: relieve the slipping pairs' stiffness in the
+# ASSEMBLED matrix and refactorize. That is the interface's own consistent
+# tangent, so the iteration becomes a modified Newton on the active set and the
+# crawl disappears; the active set is re-read every sweep and the matrix rebuilt
+# when it moves. The fixed point does not move — the traction limit, the slip
+# return and the correction's physics are untouched — so the state a trial
+# converges to is the state it converged to before.
+#:
+#: 'slip' relieves; 'off' is the pre-relief loop. This is the module default for
+#: `solve_fem(joint_tangent=...)`, which is what a caller passes to pin it.
+JOINT_TANGENT_DEFAULT = 'off'
+
+#: Sweeps between two rebuilds of the relieved factorization. The active set
+#: moves most in the first sweeps of a trial and settles after; rebuilding on
+#: every move would refactorize hundreds of times through that opening. At this
+#: stride a rebuild is considered only every so often, and only if the set has
+#: actually changed since the last one.
+_JOINT_RELIEF_STRIDE = 25
+
+#: Rebuilds allowed in one trial. A model whose active set never settles would
+#: otherwise pay a factorization every stride for its whole budget; past this
+#: count the relief is put away and the trial finishes on the elastic block,
+#: which is exactly the loop as it ran before the relief existed.
+_JOINT_RELIEF_MAX_REBUILDS = 2000
+
+#: Rebuilds between one widening of the stride and the next (see `_stride`).
+_JOINT_RELIEF_BACKOFF = 25
+
+#: Sweeps the relief may run before it hands the trial to the plain loop whether
+#: or not its state has settled. It bounds what the predictor can cost on a model
+#: it does not help, and it is well past where it helps on the ones it does
+#: (RJ-18's bracket edges settle in 389 and RJ-2's in a few thousand).
+_JOINT_RELIEF_SWEEPS = 20000
+
+#: Consecutive sweeps a pair must hold the same non-sticking state before its
+#: stiffness is relieved. A pair that chatters is therefore never relieved and
+#: never costs a rebuild — and, because restoring a relieved pair's stiffness is
+#: the direction that cannot be delayed, never costs the immediate one either.
+_JOINT_RELIEF_ARM = 5
+
+#: The largest displacement change one relieved sweep may make, as a fraction of
+#: the trial's own elastic response. It bounds the path, not the answer: near the
+#: fixed point the step is far under it and the cap never binds.
+_JOINT_RELIEF_STEP = 0.1
 
 _JOINT_VERDICT_WARMUP = 5000      # sweeps before either verdict may be read
 _JOINT_WINDOW_FRAC = 0.5          # trailing fraction of the history both read
@@ -4993,7 +5064,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               _softened_seed=None, fem_solver=None, _nr_export=None,
               _nr_rescue_rungs=None, _nr_seed_first=False, _corrector=True,
               _finite_guard=False, _finite_guard_u_max=None,
-              joint_slip_stiffness_factor=None):
+              joint_slip_stiffness_factor=None,
+              joint_tangent=None, joint_tangent_factor=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -5287,6 +5359,25 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             diverges (see joint_vp_sweep's ``ks_slip_factor``). OFF by default
             (None), no locked factor of safety is defined with it on, and what
             it does to an answer is measured in r15_joint_convergence.md §3.
+        joint_tangent ('off' | 'slip' | None): THE INTERFACE RELIEF — RS2's
+            "automatically calculate the stiffness of the joint as soon as a joint
+            violates the strength criteria", transplanted where it belongs. A pair
+            at its Mohr-Coulomb limit carries a traction that does not move with
+            its tangential displacement, so its true tangent shear stiffness is
+            zero; an open pair's is zero both ways. 'slip' takes that stiffness
+            out of the ASSEMBLED free matrix — down to `joint_tangent_factor`
+            times the elastic value — and refactorizes whenever the slipping and
+            open set moves, so the iteration runs on the interface's own
+            consistent tangent instead of on its elastic block. The traction
+            limit, the slip return and the correction's physics are untouched and
+            the fixed point is the same state; what changes is how fast the loop
+            reaches it. None takes the module default (`JOINT_TANGENT_DEFAULT`).
+            Inert on a model with no joint.
+        joint_tangent_factor (float or None): The residual stiffness a relieved
+            pair keeps in the matrix, as a fraction of its elastic value. None
+            takes RS2's own 0.01 (xslope.joint.JOINT_TANGENT_FACTOR). It is not
+            zero because a fully relieved joint set can leave the sliding block
+            with no stiffness at all and a singular matrix to factorize.
         fast_kernel ('auto' | bool): Compiled (Cython) constitutive kernel for the
             Mohr-Coulomb Step-6 Gauss-point update.
               * 'auto' (DEFAULT since 2026-07-26) — use the compiled
@@ -6063,6 +6154,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # Everything below is skipped entirely on a model with no jointed line.
     joint_data = fem_data.get("joint_data")
     has_joints = joint_data is not None and joint_data["n"] > 0
+    # None on every model without a joint and on every jointed model whose
+    # interface relief is off, which is what the convergence window reads to know
+    # it has nothing to subtract.
+    joint_relief_load = None
     if has_joints:
         joint_cj_r, joint_tanphi_r = joint_reduced_strength(joint_data, F)
         joint_slip = np.zeros((joint_data["n"], 3))
@@ -6088,6 +6183,36 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         joint_n_changed = 0            # pairs that changed state, this sweep
         joint_sweeps_changed = 0       # sweeps in which any pair changed
         jchg_hist = []
+
+        # ---- The interface relief (see JOINT_TANGENT_DEFAULT) ----
+        _jt_mode = (JOINT_TANGENT_DEFAULT if joint_tangent is None
+                    else str(joint_tangent).strip().lower())
+        if _jt_mode not in ('off', 'open', 'slip'):
+            raise ValueError(f"joint_tangent must be 'off', 'open' or 'slip', "
+                             f"got {joint_tangent!r}")
+        joint_relief_on = _jt_mode in ('open', 'slip')
+        joint_relief_open_only = (_jt_mode == 'open')
+        _jt_factor = (JOINT_TANGENT_FACTOR if joint_tangent_factor is None
+                      else float(joint_tangent_factor))
+        joint_ks_asm = joint_kn_asm = None
+        joint_relief_load = None       # the load the relief alone put there
+        joint_relief_code = None       # the set the factorization stands on
+        joint_n_rebuilds = 0
+        joint_relief_singular = 0
+        joint_relief_certifying = False
+        joint_relief_certify_at = None
+        if joint_relief_on:
+            _K_free_base = prep.get("K_free")
+            if _K_free_base is None:
+                joint_relief_on = False
+            else:
+                # Global DOF -> free-matrix index, for placing the relief.
+                _free_index = np.full(n_dof, -1, dtype=np.int64)
+                _free_index[free_dofs] = np.arange(len(free_dofs))
+                joint_relief_code = np.zeros((joint_data["n"], 3), dtype=np.int8)
+                joint_relief_last = np.zeros((joint_data["n"], 3), dtype=np.int8)
+                joint_relief_run = np.zeros((joint_data["n"], 3), dtype=np.int32)
+                joint_relief_load = np.zeros(n_dof)
         # The free nodes that carry a joint, in the same order and selection the
         # out-of-balance reading uses (`node_has_free`), so the residual can be
         # read on the interface and on the rest of the mesh SEPARATELY. A jointed
@@ -6870,11 +6995,131 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # its whole traction vector, which is the initial-strain form of
             # taking both its stiffnesses to zero.
             if has_joints:
+                _tp = time.perf_counter() if _PROF_ON else None
+                # The relief, BEFORE the sweep and on THIS sweep's interface
+                # state. Two things force both of those. The correction the sweep
+                # adds has to be measured against the stiffness the matrix the
+                # solve at the bottom of the sweep holds, so the rebuild comes
+                # first. And the state has to be the current one, not the
+                # previous sweep's: a pair the matrix has relieved and the
+                # interface has just re-closed is a hundred times too soft for
+                # one sweep, and one sweep at a gain of a hundred is enough to
+                # throw the field away. Reading the state twice costs one pass
+                # over the pairs, which is nothing beside the Gauss points.
+                if joint_relief_on and iteration >= _JOINT_RELIEF_SWEEPS:
+                    # The predictor's backstop: a relieved run that has not
+                    # settled by here hands over anyway, so no trial can spend
+                    # its budget on sweeps no rule is allowed to read.
+                    K_factor = prep["K_factor"]
+                    joint_ks_asm = joint_kn_asm = None
+                    joint_relief_load = None
+                    joint_relief_on = False
+                    joint_relief_certify_at = iteration
+                    loads_hist = loads_hist[-1:]
+                    disp_hist = []
+                    oob_hist = []
+                    jslip_hist = []
+                    jslipn_hist = []
+                    jopen_hist = []
+                    joob_hist = []
+                    soob_hist = []
+                    jchg_hist = []
+                    ufr_best = float('inf')
+                    last_progress_iter = iteration
+                    plateau_iter = None
+                    plateau_ratio = None
+                    if debug_level >= 1:
+                        print(f"  Interface relief handed over at iteration "
+                              f"{iteration} without settling")
+                if joint_relief_on:
+                    joint_relief_load[:] = 0.0
+                    _code_now = _joint_relief_code(joint_state(
+                        joint_data, u, joint_cj_r, joint_tanphi_r,
+                        slip_p=joint_slip, open_prev=joint_open,
+                        slipped=joint_slipped, res_r=joint_res_r,
+                        dil_p=joint_dil))
+                    if joint_relief_open_only:
+                        _code_now = np.where(_code_now == 2, 2, 0).astype(np.int8)
+                    # Hysteresis: a pair is relieved only once it has held the
+                    # same non-sticking state for _JOINT_RELIEF_ARM sweeps, so a
+                    # pair that chatters between slipping and sticking is never
+                    # relieved and never costs a rebuild.
+                    _same = _code_now == joint_relief_last
+                    joint_relief_run = np.where(_same, joint_relief_run + 1, 0)
+                    joint_relief_last = _code_now
+                    _want = np.where((_code_now != 0)
+                                     & (joint_relief_run >= _JOINT_RELIEF_ARM),
+                                     _code_now, 0).astype(np.int8)
+                    # RELIEVING LATE IS SAFE; RESTORING LATE IS NOT. The initial-
+                    # stiffness iteration is stable only while the assembled
+                    # stiffness is at least the material's own tangent: a pair
+                    # the matrix has relieved and the interface has re-stuck
+                    # carries a correction of 0.99 k_s delta_t inverted through
+                    # 0.01 k_s, which is a gain of a hundred and the solve is
+                    # gone in tens of sweeps. So a pair that needs its stiffness
+                    # BACK forces the rebuild on the sweep it needs it, while a
+                    # pair that could newly be relieved waits for the stride.
+                    _unsafe = (((joint_relief_code >= 1) & (_want == 0))
+                               | ((joint_relief_code == 2) & (_want != 2)))
+                    _need = bool(_unsafe.any())
+                    # The stride opens up as the rebuilds mount. A model whose
+                    # set settles pays a handful of factorizations at the stride
+                    # it started on; one whose set keeps drifting pays
+                    # progressively fewer, instead of one every stride for its
+                    # whole budget.
+                    _stride = _JOINT_RELIEF_STRIDE * (
+                        1 + joint_n_rebuilds // _JOINT_RELIEF_BACKOFF)
+                    if (_need or (iteration % _stride == 0
+                                  and not np.array_equal(_want,
+                                                         joint_relief_code))):
+                        if joint_n_rebuilds >= _JOINT_RELIEF_MAX_REBUILDS:
+                            # The set never settled. Rather than pay a
+                            # factorization every stride for the rest of the
+                            # budget, the relief is put away and the trial
+                            # finishes on the elastic block it started on.
+                            if _need:
+                                K_factor = prep["K_factor"]
+                                joint_ks_asm = joint_kn_asm = None
+                                joint_relief_load = None
+                                joint_relief_code[:] = 0
+                                joint_relief_on = False
+                        else:
+                            _r, _c, _v = joint_relief_delta(
+                                joint_data, _want, _jt_factor)
+                            _fr, _fc = _free_index[_r], _free_index[_c]
+                            _keep = (_fr >= 0) & (_fc >= 0)
+                            _dK = csr_matrix(
+                                (_v[_keep], (_fr[_keep], _fc[_keep])),
+                                shape=(len(free_dofs), len(free_dofs)))
+                            try:
+                                _fac, _kind = _factorize_free_stiffness(
+                                    (_K_free_base - _dK).tocsc())
+                            except Exception:
+                                # A relieved set that leaves the block with no
+                                # stiffness at all is a singular matrix, and it
+                                # is also a true statement about the model. The
+                                # relief is put away for this trial and the loop
+                                # carries on where it always did.
+                                joint_relief_singular += 1
+                                K_factor = prep["K_factor"]
+                                joint_ks_asm = joint_kn_asm = None
+                                joint_relief_load = None
+                                joint_relief_code[:] = 0
+                                joint_relief_on = False
+                            else:
+                                K_factor = _fac
+                                joint_relief_code = _want
+                                joint_ks_asm, joint_kn_asm = (
+                                    joint_assembled_stiffness(
+                                        joint_data, _want, _jt_factor))
+                                joint_n_rebuilds += 1
                 n_joint_active, joint_state_last = joint_vp_sweep(
                     joint_data, u, loads, joint_cj_r, joint_tanphi_r,
                     joint_slip, joint_open, slipped=joint_slipped,
                     res_r=joint_res_r, dil_p=joint_dil,
-                    ks_slip_factor=joint_slip_stiffness_factor)
+                    ks_slip_factor=joint_slip_stiffness_factor,
+                    ks_asm=joint_ks_asm, kn_asm=joint_kn_asm,
+                    loads_relief=joint_relief_load)
                 # The active set's movement (see joint_code_prev). 0 sticking,
                 # 1 slipping, 2 open.
                 _jcode = (joint_state_last["slipping"].astype(np.int8)
@@ -6883,6 +7128,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 if joint_n_changed:
                     joint_sweeps_changed += 1
                 joint_code_prev = _jcode
+                if _PROF_ON:
+                    _prof_add("vp_joint", _tp)
                 if tie_data is not None:
                     tie_forces, n_tie_cap = tie_vp_sweep(tie_data, u, loads)
                 if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
@@ -6987,7 +7234,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # the window holds the array itself. The copy this replaces allocated
             # and filled a second n_dof vector per iteration for a value that could
             # not change.
-            loads_hist.append(loads)
+            # Under the interface relief the window reads the load the unrelieved
+            # loop would have built (see joint_vp_sweep's `loads_relief`), so the
+            # convergence test measures the same drift either way. Off the relief
+            # `joint_relief_load` is None and this is the array itself.
+            loads_oob = (loads if joint_relief_load is None
+                         else loads - joint_relief_load)
+            loads_hist.append(loads_oob)
             if len(loads_hist) > oob_window + 1:
                 loads_hist.pop(0)
             # Elementwise from the increment to the per-node resultant, so the
@@ -6999,7 +7252,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # measured np.take(..., out=) form of the same expression ran 1.41x
             # SLOWER than the original at every mesh size tried, so this keeps the
             # allocation and drops the call.
-            np.subtract(loads, loads_hist[0], out=_oob_dload)
+            np.subtract(loads_oob, loads_hist[0], out=_oob_dload)
             _oob_dload /= min(oob_window, len(loads_hist) - 1)
             _oob_dload *= _oob_maskf
             _oob_bx = _oob_dload[_oob_ix]
@@ -7053,6 +7306,27 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             u_free_new = K_factor.solve(loads_free)
             if _PROF_ON:
                 _prof_add("vp_trisolve", _tp)
+
+            # The relieved step, bounded. A relieved matrix is nearly singular in
+            # the sliding block's own mode — that is the whole point of it — so
+            # the first step it takes after a set of pairs is relieved is very
+            # large, and a step that overshoots the fixed point and comes back is
+            # indistinguishable from a runaway to a rule that reads a level
+            # (`_EARLY_FAIL_U_MAX`). Measured on RJ-2's standing bracket edge,
+            # which converges at 6.33 elastic displacements and whose relieved
+            # path passed 8 on the way and was called FAILED. Capping the step at
+            # a fraction of the trial's own elastic response leaves the fixed
+            # point where it is — near it the cap never binds and the step is the
+            # full one — and keeps the path from touching a level it does not
+            # settle at.
+            if joint_relief_on and u_elastic_scale > 0.0 and _u_free_carry is not None:
+                np.subtract(u_free_new, _u_free_carry, out=_conv_buf)
+                _step = float(np.abs(_conv_buf).max())
+                _cap = _JOINT_RELIEF_STEP * u_elastic_scale
+                if _step > _cap:
+                    _conv_buf *= _cap / _step
+                    _conv_buf += _u_free_carry
+                    u_free_new = _conv_buf.copy()
 
             u_new = np.zeros(n_dof)
             u_new[free_dofs] = u_free_new
@@ -7301,6 +7575,47 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     break
 
             if relative_change < tolerance and plastic_settled:
+                # --- the relief certifies its own answer ---------------------
+                # A state the relieved matrix settled on is a state the UNRELIEVED
+                # loop has never seen, and the verdicts on a bracket edge are the
+                # whole product of this solve. So the relief is put away here and
+                # the loop carries on from the state it reached: if that state is
+                # the fixed point, the plain loop is already standing on it and
+                # re-reaches this line in a few sweeps, at a cost of nothing; if
+                # it is not, the plain loop walks off it and the trial ends the
+                # way it would have ended without the relief. Every verdict the
+                # relief produces is therefore a verdict of the loop that defines
+                # every locked factor of safety, and the relief only decides how
+                # many sweeps it took to get there.
+                if joint_relief_on:
+                    K_factor = prep["K_factor"]
+                    joint_ks_asm = joint_kn_asm = None
+                    joint_relief_load = None
+                    joint_relief_on = False
+                    joint_relief_certifying = True
+                    joint_relief_certify_at = iteration
+                    # Every history the rules read is cleared with it: the plain
+                    # loop judges this state on ITS own trace, from here, exactly
+                    # as it would judge a trial that started here.
+                    loads_hist = [loads_oob.copy()]
+                    disp_hist = []
+                    oob_hist = []
+                    jslip_hist = []
+                    jslipn_hist = []
+                    jopen_hist = []
+                    joob_hist = []
+                    soob_hist = []
+                    jchg_hist = []
+                    ufr_best = float('inf')
+                    last_progress_iter = iteration
+                    plateau_iter = None
+                    plateau_ratio = None
+                    u = u_new
+                    _u_free_carry = u_free_new
+                    if debug_level >= 1:
+                        print(f"  Relieved state settled at iteration "
+                              f"{iteration + 1}; the plain loop takes it from here")
+                    continue
                 # --- post-peak softening fixed point -------------------------
                 # The state is in equilibrium. NOW, and only now, ask which bars
                 # have actually yielded: their elastic demand k*delta (forces_1d,
@@ -7413,7 +7728,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # that settles on this very iteration always settles. A trial that fires
             # never reaches the budget check at the top of the loop, so it is never
             # considered for an extension — the two rules meet, but do not interact.
-            if early_failure and iteration % _HYBRID_SAMPLE_EVERY == 0:
+            # THE RELIEF'S OWN SWEEPS ARE NOT READ BY ANY RULE. Every level and
+            # rate in `_early_failure` and in `joint_verdict` is calibrated on the
+            # plain loop's trace — how far a failing slope moves per thousand
+            # sweeps, how fast a converging residual comes down. A relieved sweep
+            # covers a different amount of ground, so those rules read it wrong in
+            # both directions: RJ-2's standing bracket edge was called
+            # `stalled_residual` under one relief policy and converged under
+            # another, on the same model at the same factor. So the relief is a
+            # PREDICTOR — it runs until the state settles or its own budget runs
+            # out, then puts itself away, clears the histories, and the plain loop
+            # decides the trial from that state on its own trace.
+            if (early_failure and not joint_relief_on
+                    and iteration % _HYBRID_SAMPLE_EVERY == 0):
                 _signal = _early_failure(disp_hist, oob_hist, u_elastic_scale)
                 if _signal is not None:
                     converged = False
@@ -7451,7 +7778,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # way it always was; this only ever speaks for a trial that would
             # otherwise spend its whole budget and end undecided. Jointed models
             # only — `jslip_hist` is empty without a joint and the call is skipped.
-            if (has_joints and JOINT_VERDICT_ON
+            if (has_joints and JOINT_VERDICT_ON and not joint_relief_on
                     and iteration % _JOINT_VERDICT_EVERY == 0
                     and iteration >= _JOINT_VERDICT_WARMUP):
                 _jv = joint_verdict(jslip_hist, soob_hist, disp_hist,
@@ -7499,6 +7826,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         if not converged:
             break   # stage failed -> overall failure
 
+    if has_joints and joint_relief_code is not None and debug_level >= 1:
+        print(f"  Interface relief: {joint_n_rebuilds} refactorization(s), "
+              f"{joint_relief_singular} refused as singular, "
+              + ("certified on the plain loop at iteration "
+                 f"{joint_relief_certify_at}" if joint_relief_certifying
+                 else "still on" if joint_relief_on else "put away"))
     if not converged and debug_level >= 1:
         print(f"  Did NOT converge after {total_iterations} iterations "
               f"(max|du|/max|u| = {relative_change:.3e}, exit {exit_reason})")
@@ -12072,7 +12405,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                capture_failure_state=True, capture_max_iterations=None,
                capture_margin=0.15, early_failure=True, fem_solver=None,
                ssrm_driver='bisection', trial_factors=None,
-               joint_slip_stiffness_factor=None):
+               joint_slip_stiffness_factor=None,
+               joint_tangent=None, joint_tangent_factor=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -12140,6 +12474,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             solved one way. RS2's own value is 0.01; see solve_fem's own entry
             for what it does and what it leaves alone. OFF by default (None),
             and no locked factor of safety is defined with it on.
+        joint_tangent, joint_tangent_factor: The interface relief, passed to
+            every trial's solve_fem AND to the in-situ equilibration so the whole
+            run is solved one way. See solve_fem's entries.
         fem_solver (str or None): Which per-trial driver runs, passed to every
             solve_fem trial — 'auto' (the default: the viscoplastic loop with the
             Newton corrector and the yield gate), 'viscoplastic' (that loop alone,
@@ -12640,6 +12977,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             # bisection a starting point its own corrector never produced.
             fem_solver=fem_solver,
             joint_slip_stiffness_factor=joint_slip_stiffness_factor,
+            joint_tangent=joint_tangent,
+            joint_tangent_factor=joint_tangent_factor,
             _prepared=prep)
         equilibration = {
             "converged": bool(eq["converged"]),
@@ -12743,7 +13082,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             early_failure=early_failure, fem_solver=fem_solver,
             _prepared=prep, _init_state=init_state,
             trial_factors=trial_factors,
-            joint_slip_stiffness_factor=joint_slip_stiffness_factor)
+            joint_slip_stiffness_factor=joint_slip_stiffness_factor,
+            joint_tangent=joint_tangent,
+            joint_tangent_factor=joint_tangent_factor)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -12982,7 +13323,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
                  suction_phi_b=None, suction_cap=None, early_failure=True,
                  fem_solver=None, _prepared=None, _init_state=None, hybrid=False,
-                 trial_factors=None, joint_slip_stiffness_factor=None):
+                 trial_factors=None, joint_slip_stiffness_factor=None,
+                 joint_tangent=None, joint_tangent_factor=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -13167,6 +13509,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          _nr_rescue_rungs=_rescue_policy(F)[0],
                          _nr_seed_first=_rescue_policy(F)[1],
                          joint_slip_stiffness_factor=joint_slip_stiffness_factor,
+                         joint_tangent=joint_tangent,
+                         joint_tangent_factor=joint_tangent_factor,
                          _prepared=_prepared, _init_state=_init_state)
 
     F_left = F_min

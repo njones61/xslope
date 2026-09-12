@@ -158,6 +158,17 @@ JOINT_VP_DT = 1.0
 #: changes).
 JOINT_RS2_SLIP_STIFFNESS_FACTOR = 0.01
 
+#: The residual stiffness a RELIEVED pair keeps in the ASSEMBLED matrix, which is
+#: the faithful transplant the note above says RS2's flag needs (see
+#: :func:`joint_relief_delta` and ``joint_tangent`` in ``fem.solve_fem``). RS2's
+#: own 0.01 is used unchanged, and it is not zero for a reason worth keeping: a
+#: joint set relieved to exactly zero shear stiffness can leave the sliding block
+#: with no stiffness at all, and the free stiffness is then singular — which is a
+#: perfectly good description of a collapsing model and a very bad matrix to
+#: factorize. One percent of the elastic stiffness keeps the factorization while
+#: leaving the iteration's contraction at the same one percent.
+JOINT_TANGENT_FACTOR = JOINT_RS2_SLIP_STIFFNESS_FACTOR
+
 #: Newton-Cotes (Lobatto) weights on [0, 1] in the node order the mesh writes,
 #: (start, end, midside): Simpson's rule for the three-pair element and the
 #: trapezoidal rule for the two-pair one.
@@ -489,6 +500,94 @@ def _joint_element_stiffness(w, tx, ty, nx, ny, kn, ks):
     return K
 
 
+def joint_relief_code(st):
+    """The interface's active set as one small integer per pair.
+
+    0 sticking, 1 slipping, 2 open. It is what the assembled stiffness has to
+    agree with (see :func:`joint_relief_delta`), and comparing this sweep's code
+    with the one the factorization was built on is how the driver knows the set
+    has moved.
+    """
+    return (st["slipping"].astype(np.int8) + 2 * st["open"].astype(np.int8))
+
+
+def joint_relief_delta(jd, code, factor):
+    """The stiffness the ASSEMBLED matrix holds that the interface does not.
+
+    A pair at its Mohr-Coulomb limit carries a shear traction that does not
+    depend on its tangential displacement at all, so its true tangent shear
+    stiffness is ZERO; an open pair's is zero in both directions. The assembled
+    joint block carries the full elastic ``k_s`` and ``k_n`` regardless, and the
+    difference is exactly what the viscoplastic correction has to cancel every
+    sweep — which is why the iteration's error contracts by the ratio of that
+    difference to the stiffness it is inverted against, and why a model whose
+    sliding block is held by nothing else crawls.
+
+    This builds that difference as COO triplets, so the driver can subtract it
+    from the free stiffness and refactorize: the pair then carries ``factor``
+    times its elastic stiffness in the matrix (RS2's 0.01), and the correction is
+    measured against the reduced block instead — a modified Newton on the
+    interface's own consistent tangent.
+
+    NOTHING ABOUT WHAT THE JOINT CAN CARRY MOVES. ``tlim``, the slip return and
+    the traction the correction leaves behind are all computed from the TRUE
+    ``k_n`` and ``k_s``; only the matrix the equilibrium iteration is run
+    through changes, and its fixed point is the same state.
+
+    Returns ``(rows, cols, vals)`` in global DOF numbering.
+    """
+    w, dof = jd["w"], jd["dof"]
+    keep = float(factor)
+    e_i, p_i = np.nonzero((w > 0.0) & (code != 0))
+    if e_i.size == 0:
+        z = np.zeros(0)
+        return z.astype(np.int64), z.astype(np.int64), z
+
+    wp = w[e_i, p_i]
+    tx, ty = jd["tx"][e_i], jd["ty"][e_i]
+    nx, ny = jd["nx"][e_i], jd["ny"][e_i]
+    # A slipping pair loses its shear stiffness; an open one loses both.
+    ds = (1.0 - keep) * jd["ks"][e_i]
+    dn = np.where(code[e_i, p_i] == 2, (1.0 - keep) * jd["kn"][e_i], 0.0)
+    d00 = wp * (ds * tx * tx + dn * nx * nx)
+    d01 = wp * (ds * tx * ty + dn * nx * ny)
+    d11 = wp * (ds * ty * ty + dn * ny * ny)
+
+    # The four DOFs of the pair: side a's x and y, side b's x and y.
+    g = np.stack((dof[e_i, 2 * p_i], dof[e_i, 2 * p_i + 1],
+                  dof[e_i, 6 + 2 * p_i], dof[e_i, 7 + 2 * p_i]), axis=1)
+    # [[D, -D], [-D, D]] over those four, as a (m, 4, 4) block.
+    D = np.empty((len(e_i), 2, 2))
+    D[:, 0, 0] = d00
+    D[:, 0, 1] = d01
+    D[:, 1, 0] = d01
+    D[:, 1, 1] = d11
+    blk = np.empty((len(e_i), 4, 4))
+    blk[:, 0:2, 0:2] = D
+    blk[:, 0:2, 2:4] = -D
+    blk[:, 2:4, 0:2] = -D
+    blk[:, 2:4, 2:4] = D
+    rows = np.repeat(g, 4, axis=1).ravel()
+    cols = np.tile(g, (1, 4)).ravel()
+    return rows.astype(np.int64), cols.astype(np.int64), blk.ravel()
+
+
+def joint_assembled_stiffness(jd, code, factor):
+    """``(ks_asm, kn_asm)``, each (n, 3): the stiffness the matrix now holds.
+
+    The companion of :func:`joint_relief_delta` — the correction the sweep adds
+    has to be measured against the same numbers the matrix was factorized with,
+    or the two disagree by the relief and the loop converges to the wrong state.
+    """
+    keep = float(factor)
+    ks = np.repeat(jd["ks"][:, None], 3, axis=1).copy()
+    kn = np.repeat(jd["kn"][:, None], 3, axis=1).copy()
+    relieved = code != 0
+    ks[relieved] *= keep
+    kn[code == 2] *= keep
+    return ks, kn
+
+
 def _build_tie_data(mesh, lines, nodes, dof_offset):
     """The tied ends: a spring from the bar's end node to the soil node there.
 
@@ -657,7 +756,8 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
 
 def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
                    dt_vp=JOINT_VP_DT, slipped=None, res_r=None, dil_p=None,
-                   ks_slip_factor=None):
+                   ks_slip_factor=None, ks_asm=None, kn_asm=None,
+                   loads_relief=None):
     """One viscoplastic sweep over the joints: update the slip, load the residual.
 
     The global stiffness carries every joint's FULL elastic block, so ``K u``
@@ -686,6 +786,13 @@ def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
     is back on its full ``k_s`` on the very next sweep, because the selection is
     read fresh from ``slipping`` each time. ``None`` is off and the arithmetic is
     exactly what it was.
+
+    ``ks_asm`` and ``kn_asm`` are the stiffnesses the ASSEMBLED matrix currently
+    holds, (n, 3) each, when the driver has relieved the slipping and open pairs
+    (:func:`joint_relief_delta`). The correction is `elastic assembled minus what
+    the interface carries`, so it has to be measured against the same numbers the
+    factorization was built on. ``None`` on both is the full elastic block and the
+    arithmetic reduces exactly to what it was.
 
     **It is an over-relaxation, with the stability limit that implies.** At
     ``dt_vp = 1`` one sweep already returns the traction exactly to its limit at
@@ -728,10 +835,20 @@ def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
     # components; closed ones shed the plastic tangential offset, and the plastic
     # normal opening in the other direction — a dilating joint delivers MORE
     # normal traction than K u holds, so its correction is negative.
+    #
+    # The elastic side of that difference is whatever the ASSEMBLED matrix holds,
+    # which is the full block unless the driver has relieved this pair's stiffness
+    # (see joint_relief_delta). Written as `elastic assembled - what the interface
+    # carries`, the two cases are one expression and the relieved form needs no
+    # branch of its own.
     kn = jd["kn"][:, None]
-    corr_t = np.where(st["open"], ks * st["dt"], ks * slip_p)
-    corr_n = np.where(st["open"], kn * st["dn"],
-                      0.0 if dil_p is None else -kn * dil_p)
+    ks_a = ks if ks_asm is None else ks_asm
+    kn_a = kn if kn_asm is None else kn_asm
+    corr_t = np.where(st["open"], ks_a * st["dt"],
+                      ks * slip_p + (ks_a - ks) * st["dt"])
+    corr_n = np.where(st["open"], kn_a * st["dn"],
+                      (kn_a - kn) * st["dn"]
+                      + (0.0 if dil_p is None else -kn * dil_p))
     # Back to global components. The internal force on side a of pair p is
     # w (t_s t - t_n n); the correction carries the same pattern.
     fx = jd["w"] * (corr_t * jd["tx"][:, None] - corr_n * jd["nx"][:, None])
@@ -741,6 +858,25 @@ def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
     np.add.at(loads, dof[:, 1:6:2].ravel(), fy.ravel())
     np.add.at(loads, dof[:, 6:12:2].ravel(), (-fx).ravel())
     np.add.at(loads, dof[:, 7:12:2].ravel(), (-fy).ravel())
+
+    # The part of that correction the RELIEF put there, scattered on its own.
+    #
+    # The solve's convergence test is not a residual: it reads how fast the body
+    # load is still changing (`oob_window` in fem.solve_fem). The relief scales
+    # the elastic half of every relieved pair's correction by its factor, so the
+    # same physical drift produces a body-load rate a hundred times smaller and a
+    # trial that is sliding reads as settled. Subtracting this vector gives back
+    # the load the unrelieved loop would have built, and the convergence test
+    # then measures the same thing under the relief that it measures without it.
+    if loads_relief is not None:
+        dt_ = (ks_a - ks) * st["dt"]
+        dn_ = (kn_a - kn) * st["dn"]
+        gx = jd["w"] * (dt_ * jd["tx"][:, None] - dn_ * jd["nx"][:, None])
+        gy = jd["w"] * (dt_ * jd["ty"][:, None] - dn_ * jd["ny"][:, None])
+        np.add.at(loads_relief, dof[:, 0:6:2].ravel(), gx.ravel())
+        np.add.at(loads_relief, dof[:, 1:6:2].ravel(), gy.ravel())
+        np.add.at(loads_relief, dof[:, 6:12:2].ravel(), (-gx).ravel())
+        np.add.at(loads_relief, dof[:, 7:12:2].ravel(), (-gy).ravel())
     return int(np.count_nonzero(st["slipping"] | st["open"])), st
 
 

@@ -82,7 +82,7 @@ joint model whose output is a stress-displacement curve.
 
 | # | Match | Problem | Referee | Also published | RS2 without / with improvement | Notes |
 |---:|:-:|---|---|---|---|---|
-| [1a](#rj-1a) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1a | Goodman & Bray 1.0 | UDEC 0.99 | 0.99 / 0.97 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
+| [1a](#rj-1a) | 🟡 | Goodman & Bray block toppling, case 1a | SSRM 1.037 vs Goodman & Bray 1.0 (+3.7%) | UDEC 0.99 | 0.99 / 0.97 | |
 | [1b](#rj-1b) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1b | Goodman & Bray 1.0 | UDEC 0.99 | 0.97 / 0.94 | *reported, no lock* — the lower edge of the bracket reaches the sweep budget without a verdict. |
 | [1c](#rj-1c) | 🟡 | Goodman & Bray block toppling, case 1c | SSRM 1.057 vs Goodman & Bray 1.02 (+3.6%) | UDEC 1.01 | 1.01 / 0.99 | |
 | [1d](#rj-1d) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 | UDEC 1.22 | 1.19 / 1.16 | *reported, no lock* — the standing edge of the corpus bracket converges six sweeps past its budget, so it is recorded without a verdict; the refinement step decides every trial and returns the same bracket. |
@@ -166,7 +166,7 @@ row 6. The peak and residual strengths are checked there as well, each against i
 
 ## The Rows
 
-### ⊘ RJ-1a: Goodman & Bray block toppling, case a (rj001a) {#rj-1a}
+### 🟡 RJ-1a: Goodman & Bray block toppling, case a (rj001a) {#rj-1a}
 
 Goodman & Bray's own toppling example, and the section all four of problem 1's cases share: sixteen
 rock columns 10 m wide and 4 to 40 m tall standing on a base that steps up one metre per column at
@@ -184,12 +184,20 @@ each column's basal contact partway along its downslope neighbour's side joint; 
 [where a joint ends on another](#joint-terminations). They carry no cohesion, φ = 38.15° — the angle
 this case is posed at — and the corpus's standard stiffness pair.
 
-The corpus bracket is decided on all nine trials, and its longest takes 84 401 sweeps of the
-250 000 allowed. What keeps the row reported is the refinement step: a 2D size of 7.0 m takes the
-mesh from 2 072 nodes and 67 interface elements to 3 573 and 94, the two meshes bracket factors one
-step apart, and the upper edge of the finer bracket reaches 250 000 sweeps without a verdict. So
-the claim that refinement does not move the factor rests on an edge nothing ruled on, and the row
-prints no factor.
+| XSLOPE SSRM | Goodman & Bray referee | UDEC | RS2 without / with improvement |
+|---|---|---|---|
+| **1.037** | 1.0 (+3.7%) | 0.99 | 0.99 / 0.97 |
+
+<!-- test: file=files/rocscience/joints/rj001a.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=10.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1a, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
+
+The corpus bracket is decided on all nine trials and its longest takes 84 401 sweeps of the
+250 000 allowed. A step of refinement — a 2D size of 7.0 m, which takes the mesh from 2 072
+nodes and 67 interface elements to 3 573 and 94 — moves the factor by one bracket step, inside
+the row's own tolerance, and every trial of that bracket reaches a verdict too.
+
+The trial that used to stop this row was the finer bracket's upper edge. It reached the budget with
+nothing to say; it now comes back FAILED at 225 001 sweeps on a steady slip. The four standing
+trials beside it cost 303 to 309 sweeps each, where the same four cost 3 801 to 109 666 before.
 
 The manual's figure for this case labels the side boundaries as rollers. The model's restraint list
 does not: all 191 of its restrained nodes carry both components fixed, 111 of them on the base and

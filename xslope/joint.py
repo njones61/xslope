@@ -939,6 +939,42 @@ def joint_internal_force(jd, u, cj_r, tanphi_r, want_tangent=False,
     """
     st = joint_state(jd, u, cj_r, tanphi_r, slip_p=slip_p, open_prev=open_prev,
                      slipped=slipped, res_r=res_r, dil_p=dil_p)
+    if (slipped is not None or dil_p is not None) and slip_p is not None:
+        # THE HISTORIES THE STEP ITSELF GROWS. The two that are not functions of
+        # the current displacement — whether a pair has ever reached its limit
+        # (the residual branch) and how far it has ridden up its asperities
+        # (dilation) — are carried in from the sweep, and a Newton step that
+        # slides a pair FURTHER has to advance both or the step is solving a
+        # different problem from the one it was seeded with. Frozen, they read a
+        # block whose joint drops to phi_res as 8.0% stronger than its closed
+        # form and a dilating joint's opening per unit slip as 42.8% over
+        # tan(dil) — both measured by test/joint_element_check.py rows 5 and 6.
+        #
+        # The advance is a return map and therefore a FUNCTION of u, not of the
+        # path the line search took to reach it: the slip the return implies at
+        # this displacement is `(|t_s,trial| - t_lim) / k_s` on the pairs at their
+        # limit, a pair at its limit is on the residual branch, and the opening is
+        # that slip times tan(dil). It feeds back through t_n into t_lim, so it is
+        # taken to a fixed point; two passes settle it on every model measured and
+        # the third is the guard.
+        ks_ = jd["ks"][:, None]
+        for _ in range(3):
+            excess = np.abs(st["ts_trial"]) - st["tlim"]
+            d_slip = np.where(st["slipping"] & (excess > 0.0), excess / ks_, 0.0)
+            slipped_eff = (None if slipped is None
+                           else (slipped | st["slipping"]))
+            dil_eff = (None if dil_p is None
+                       else dil_p + d_slip * jd["tandil"][:, None])
+            st_new = joint_state(jd, u, cj_r, tanphi_r, slip_p=slip_p,
+                                 open_prev=open_prev, slipped=slipped_eff,
+                                 res_r=res_r, dil_p=dil_eff)
+            if np.array_equal(st_new["slipping"], st["slipping"]) and (
+                    dil_p is None or np.allclose(st_new["tn"], st["tn"],
+                                                 rtol=1e-12, atol=0.0)):
+                st = st_new
+                break
+            st = st_new
+        slipped = slipped_eff
     w = jd["w"]
     fx = w * (st["ts"] * jd["tx"][:, None] - st["tn"] * jd["nx"][:, None])
     fy = w * (st["ts"] * jd["ty"][:, None] - st["tn"] * jd["ny"][:, None])

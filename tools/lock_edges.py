@@ -70,7 +70,7 @@ def _decided(trial, ceiling):
         iterations = int(trial.get("iterations", 0))
     except (TypeError, ValueError):
         iterations = 0
-    return (verdict in ("CONVERGED", "FAILED")
+    return (verdict in audit.DECIDED
             and verdict not in UNDECIDED
             and iterations < ceiling
             and trial.get("exit_reason") != "inconclusive")
@@ -98,7 +98,8 @@ def edges_from_record(kv, meta):
     ceiling = max(audit.DEFAULT_CEILING, stated)
 
     decided = [t for t in trials if _decided(t, ceiling)]
-    stands = [float(t["F"]) for t in decided if t.get("verdict") == "CONVERGED"]
+    stands = [float(t["F"]) for t in decided
+              if t.get("verdict") in ("CONVERGED", "JOINT_SETTLED")]
     fails = [float(t["F"]) for t in decided if t.get("verdict") == "FAILED"]
     if not stands:
         return None, "no trial was decided standing"

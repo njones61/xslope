@@ -59,6 +59,15 @@ DEFAULT_CEILING = 50000
 #: Verdicts that mean the trial ran out of budget rather than deciding.
 UNDECIDED = ("STABLE_STUCK", "AMBIGUOUS", "INCONCLUSIVE")
 
+#: Verdicts that ANSWER the standing/failing question, which is not the same list
+#: as "converged or failed". ``JOINT_SETTLED`` is a decision on a jointed trial
+#: whose slip, displacement field and soil residual have all settled and whose
+#: joint residual has stopped falling into a limit cycle no budget brings down
+#: (fem.joint_verdict); it never met the force tolerance and never claims to, but
+#: it stands, and an edge that reads it is answered. run_tests.DECIDED_VERDICTS
+#: is the same list, and the two must not disagree.
+DECIDED = ("CONVERGED", "FAILED", "JOINT_SETTLED")
+
 
 def _kv(line):
     m = TAG.search(line)

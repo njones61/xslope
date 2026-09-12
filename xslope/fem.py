@@ -4099,6 +4099,25 @@ _HYBRID_GROWTH_MIN = 0.02      # elastic displacements gained over the trailing 
 # noise; under it the classifier declines to rule.
 _HYBRID_U_SCALE_FLOOR_FRAC = 1e-6
 
+# === The joint trace ==========================================================
+# A jointed model's undecided trials are not readable from the displacement field
+# alone: the interface mechanism can be moving steadily while max|u| sits inside
+# the elastic scale the classifier measures against (a block sliding a millimetre
+# per thousand sweeps on joints that are all at their limit). So `solve_fem`
+# samples the interface state on the same stride as the displacement history, and
+# setting this to a list collects one record per solve on a jointed model:
+#
+#     import xslope.fem as fem
+#     fem.JOINT_TRACE_SINK = []
+#     ...                       # solve
+#     fem.JOINT_TRACE_SINK[0]['slip']     # total |slip| every 10 sweeps
+#
+# Production leaves it None and nothing is collected; the per-sweep sampling
+# itself is unconditional on a jointed model, because the slip-rate verdict reads
+# it. The sink is for the study that CHOSE that verdict's thresholds, and for any
+# re-measurement of them.
+JOINT_TRACE_SINK = None
+
 # Iterations without a >1% improvement on the best out-of-balance value seen after
 # which the residual is called PLATEAUED. This is a reporting threshold only: a
 # plateau is recorded in the result and the solve keeps running (see the no-progress
@@ -5834,6 +5853,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         joint_dil = (np.zeros((joint_data["n"], 3))
                      if joint_data.get("has_dilation") else None)
         joint_state_last = None
+        # The free nodes that carry a joint, in the same order and selection the
+        # out-of-balance reading uses (`node_has_free`), so the residual can be
+        # read on the interface and on the rest of the mesh SEPARATELY. A jointed
+        # model's residual is dominated by whichever of the two is larger, and a
+        # mechanism that lives entirely in the interfaces is invisible in a single
+        # maximum taken over the lot.
+        _j_dof_flag = np.zeros(n_dof, dtype=bool)
+        _j_dof_flag[np.unique(joint_data["dof"].ravel())] = True
+        _joint_node_free = (_j_dof_flag[node_dof_x]
+                            | _j_dof_flag[node_dof_y])[node_has_free]
+        _soil_node_free = ~_joint_node_free
         tie_data = joint_data.get("ties")
         tie_forces = (np.zeros((tie_data["n"], 2)) if tie_data is not None
                       else np.zeros((0, 2)))
@@ -5999,6 +6029,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # carried across a stage boundary would be measured against the wrong yardstick);
     # the classifier therefore reads the history of whichever stage did not settle.
     disp_hist = []
+    # The joint trace, sampled on the same stride as `disp_hist` and only on a
+    # jointed model (all five lists stay empty otherwise). What it measures, and
+    # why each one is here:
+    #   jslip_hist  total |plastic slip| summed over every node pair — the SIZE of
+    #               the interface mechanism. A slope standing on slipped joints has
+    #               a slip that levels off; one MOVING on them has a slip that keeps
+    #               growing, and the rate it grows at is the mechanism's speed.
+    #   jslipn/jopen counts of pairs slipping and open — how much of the interface
+    #               is active, which separates "a few pairs creeping" from "a whole
+    #               surface running".
+    #   joob/soob   the out-of-balance residual on the joint nodes and on the rest.
+    # Together they are what says whether an undecided trial is a slope in motion
+    # or a solve in difficulty; the slip-rate verdict below reads them.
+    jslip_hist, jslipn_hist, jopen_hist, joob_hist, soob_hist = [], [], [], [], []
     u_elastic_scale = 0.0
     exit_reason = 'iteration_cap'
     gate_failed = False            # a force-settled state the yield gate refused
@@ -6886,6 +6930,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             if iteration % _HYBRID_SAMPLE_EVERY == 0:
                 disp_hist.append(float(norm_u_new))
                 oob_hist.append(float(unbalanced_force_ratio))
+                if has_joints:
+                    jslip_hist.append(float(np.abs(joint_slip).sum()))
+                    if joint_state_last is not None:
+                        jslipn_hist.append(
+                            int(np.count_nonzero(joint_state_last["slipping"])))
+                        jopen_hist.append(
+                            int(np.count_nonzero(joint_state_last["open"])))
+                    else:
+                        jslipn_hist.append(0)
+                        jopen_hist.append(0)
+                    joob_hist.append(float(oob_node[_joint_node_free].max())
+                                     if _joint_node_free.any() else 0.0)
+                    soob_hist.append(float(oob_node[_soil_node_free].max())
+                                     if _soil_node_free.any() else 0.0)
 
             # Force-equilibrium condition. The threshold is ABSOLUTE, which is what
             # makes the test immune to the size of the domain and to the size of the
@@ -7183,6 +7241,23 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # not overturn it: this state settled in force and is outside the surface, so
         # the trial has no admissible field to stand on whatever its displacements did.
         verdict = 'FAILED'
+    # The trace goes to the sink whatever the verdict: a CONVERGED jointed trial is
+    # the control the moving ones are read against, and a study that only collected
+    # the undecided ones would have nothing to compare them to.
+    if JOINT_TRACE_SINK is not None and has_joints:
+        JOINT_TRACE_SINK.append({
+            "F": float(F), "iterations": int(total_iterations),
+            "exit_reason": exit_reason, "converged": bool(converged),
+            "verdict": verdict,
+            "u_elastic_scale": float(u_elastic_scale),
+            "mesh_height": float(mesh_height),
+            "sample_every": int(_HYBRID_SAMPLE_EVERY),
+            "disp": list(disp_hist), "oob": list(oob_hist),
+            "slip": list(jslip_hist), "n_slipping": list(jslipn_hist),
+            "n_open": list(jopen_hist),
+            "oob_joint": list(joob_hist), "oob_soil": list(soob_hist),
+            "n_joint_pairs": int(joint_data["n"] * 3),
+        })
     stable = bool(converged or (failure_criterion == 'hybrid'
                                 and verdict == 'STABLE_STUCK'))
     if not converged and debug_level >= 1:

@@ -108,6 +108,35 @@ citation URL cannot fire. Where a page genuinely needs a banned phrase,
 `voice_allow` names it — `(phrase, distinctive substring of the line)`, both
 required, and an allowance that never fires is reported dead.
 
+**Capability negations** (`capabilities.py`). A row that cannot be built has to
+say why, and the cheapest thing to write is that XSLOPE has no input for it.
+Written from memory that sentence is wrong about as often as it is right: the
+`lloads` sheet has carried a concentrated line load (x, y, P, Angle) since v14
+and `fem.py` applies it, and two public texts still said the loads sheet could
+not carry one. A reader takes such a sentence as the capability inventory it
+looks like, and a blocked row built on it never gets revisited.
+
+So every sentence that negates a capability — *does not carry*, *cannot model*,
+*has no counterpart*, *not supported*, *not implemented*, *has no input* — must
+name a capability on `ABSENT`, the one list of things XSLOPE genuinely does not
+have. Each entry is `(capability, page, marker, evidence)`, and the evidence
+field records where the capability was looked for and not found, so the next
+person to doubt an entry re-runs the grep instead of the reasoning. A sentence
+that reaches no entry fails: either the absence is real and its entry is
+missing, or the page is wrong about XSLOPE and the prose is what changes. An
+entry no sentence cites is reported dead, like every other exemption list here.
+
+A negation fires only when it is about XSLOPE. The sentence must name XSLOPE or
+one of its artifacts — a sheet of the input template, the loader, the importer,
+an engine — except for the phrasings that are about XSLOPE by construction (a
+row's *not supported* verdict, "XSLOPE has no ...", "has no input"). A negation
+whose subject is the source ("a quantity the example does not carry", "storage
+the vendor's model does not have") and one whose object is the verification work
+("cannot carry the comparison", "no published counterpart", "cannot be locked")
+are both left alone, and so is the status legend that merely lists the verdict
+words. Vendors run engines with XSLOPE's names, so "RS2's own SSRM does not
+model it" is read as the vendor's.
+
 **Untagged numbers** (`untagged.py`). A section prints three kinds of number
 that carry an argument: the factor of safety a tag locks, the value the source
 published, and the comparison between them. Anything else shaped like a factor
@@ -318,6 +347,13 @@ the page, not a way to silence the checker, so:
   naming it disagree** — `(anchor, dot)`, and the dot must be one those rows
   actually give the anchor.  Say which of them the section's own locked
   comparisons come from.
+* **`ABSENT` in `capabilities.py` is the one list of capabilities XSLOPE does
+  not have**, and it is not a page config: an absence is a fact about the
+  software, so the same capability carries one entry per page that cites it and
+  the entries sit together. Every entry is written AFTER the grep, and the grep
+  goes in the `evidence` field — which module was read, which template sheet was
+  looked at, what was found instead. "I do not think we have it" is what this
+  check exists to stop.
 * **`tag_exempt` names a coverage lock the page deliberately does not print** —
   a tag that exercises a code path rather than backing a published number. The
   page normally says so in prose; quote that reason in the comment.
@@ -340,7 +376,8 @@ longer matches its figure, a section heading whose dot disagrees with its summar
 row, a tagged value dropped from its section, one element
 of an eleven-value row corrupted on the page or in the tag, a slip-surface
 depth or a support force moved on the page or in the tag, a planted dead
-exemption, a tutorial number moved off the lock it restates — and requires the
+exemption, a tutorial number moved off the lock it restates, a capability
+negation no ABSENT entry covers — and requires the
 checks to catch every one. It also plants edits
 that must **not** be flagged (a value reprinted at a different, correct
 precision), because a check that fails on those would push the pages toward

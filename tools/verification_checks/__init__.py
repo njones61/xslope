@@ -1,12 +1,16 @@
 """Standing checkers for the verification pages under docs/verification.
 
-Three checks run against each page:
+The checks run against each page:
 
   deltas   every printed percentage / absolute FS difference is re-derived from
            two numbers the page prints in the same sentence or table row;
   tags     every value a test tag locks is printed in the section carrying the
            tag, and every value the page presents as locked has a tag behind it;
-  figures  every caption matches the figure it labels.
+  figures  every caption matches the figure it labels;
+  capabilities
+           every sentence that says XSLOPE lacks something names a capability on
+           the one maintained list of genuine absences, each entry carrying the
+           grep that establishes it.
 
 ``tutorials.py`` runs beside them on the tutorial pages under docs/tutorials,
 which carry no configs and no manifest: every factor of safety a tutorial

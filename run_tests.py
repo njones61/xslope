@@ -7893,12 +7893,14 @@ def run_dload_direction_test(test):
 def run_verification_pages_test(test):
     """Standing checks on the verification pages under docs/verification.
 
-    Three checks run per page (tools/verification_checks): every printed
+    The checks run per page (tools/verification_checks): every printed
     percentage and absolute FS difference is re-derived from two numbers the
     page prints in the same sentence or table row; every value a test tag locks
     is printed in the section carrying the tag, and every value the page
     presents as locked has a tag behind it; every caption matches the figure it
-    labels.
+    labels; and every sentence saying XSLOPE lacks a capability names one on the
+    maintained list of genuine absences in capabilities.py, so a blocked row can
+    never rest on an absence nobody grepped for.
 
     Change-gated by tools/verification_checks/certified.json: a page whose
     content hash matches the manifest costs one file read.  A page that has
@@ -7924,7 +7926,7 @@ def run_verification_pages_test(test):
     head = [l for l in lines if 'FAILED' in l or 'manifest is stale' in l]
     noise = ('[precision-note]', '[precision-hedged]')
     detail = [l for l in lines
-              if (l.startswith(('L', 'DEAD', 'ORPHANED'))
+              if (l.startswith(('L', 'DEAD', 'ORPHANED', 'capability:'))
                   or re.match(r'L\d+ ', l))
               and not any(n in l for n in noise)]
     msg = ' | '.join(head + detail[:6])

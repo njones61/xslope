@@ -97,7 +97,7 @@ joint model whose output is a stress-displacement curve.
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | 1.01 / 1.0 | |
 | [19](#rj-19) | <span class="nodata">⊘</span> | Bi-planar step-path failure | UDEC 1.46 | 1.5 / 1.41 | *reported, no lock* — two trials of the bracket reach the sweep budget without a verdict. |
 | 20 | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | 2.21 / 2.37 | *blocked* — the manual states no block size and no seed, and the vendor model carries the tessellation as 523 digitized traces rather than as a generated network, so the input is not reproducible from anything published. |
-| 21 | <span class="nodata">⊘</span> | Shallow excavation, jointed tunnel | UDEC 8.16 | 8.27 / 8.5 | *planned* — a two-stage model whose second stage excavates a 2 m opening. |
+| 21 | <span class="nodata">⊘</span> | Shallow excavation, jointed tunnel | UDEC 8.16 | 8.27 / 8.5 | *blocked* — the second stage of the vendor model excavates a 2 m opening and the strength reduction runs on the excavated state, which carries the stress the first stage left behind; XSLOPE has no staged construction. |
 | 22 | <span class="nodata">⊘</span> | Joint model: hyperbolic softening | — | — | *not supported* — the problem exercises RS2's hyperbolic displacement- and work-softening joint law, which XSLOPE's interface element does not have; it reports no factor of safety. |
 | 23 | <span class="nodata">⊘</span> | Joint model: residual strength and dilation | — | — | *no lock possible* — the problem reports no factor of safety, and its six vendor models all carry `include_dilation: no`. See [The dilation problem](#the-dilation-problem). |
 
@@ -135,22 +135,22 @@ Every junction in the rows that **are** built is a crossing.
 
 ## The Dilation Problem {#the-dilation-problem}
 
-Problem 23 is the manual's statement of the joint constitutive law XSLOPE implements: a
-Mohr-Coulomb interface whose limit falls from $S_{max} = c - \sigma_n \tan\phi$ to
-$S_{res} = c_{res} - \sigma_n \tan\phi_{res}$ once it has slipped, with a dilation angle that opens
-the joint as it slides. It is a two-block shear box — a single horizontal joint, a normal load
-raised from 3 to 9 MPa part way through, and a prescribed shear displacement — and it reports a
-stress-displacement curve rather than a factor of safety, so there is nothing here to lock.
+Problem 23 is not a slope. It is a direct shear test on one joint: two blocks are pressed
+together, first at 3 MPa and then at 9 MPa, and one of them is dragged sideways. What the test
+reports is shear stress against slip, a curve. There is no factor of safety in it and nothing to
+lock. The manual uses the test to show the joint law working — the peak strength, the drop to a
+residual strength once the joint has slipped, and dilation, the opening of the joint as it
+slides.
 
-The six vendor models are named for dilation angles of 0, 10, 20, 20 directional, 20
-non-directional and 30 degrees. All six carry `include_dilation: no`, so the angle their names
-state never reaches the solver and every one of them runs at zero dilation; the only compute-level
-difference among them is the `directional` flag on one. Two of the three "20 degree" cases also
-differ in when the normal load steps from 3 to 9 MPa — stage 22 against stage 15 — so they are not
-a constant-history comparison either. The problem therefore verifies nothing about dilation that
-could be scored, and XSLOPE's dilation is verified instead against the kinematic identity it
-states: on a sliding interface the normal opening per unit slip is $\tan(\text{dil})$
-(`test/joint_element_check.py`, row 6).
+The six vendor models are named for dilation angles of 0, 10, 20, 20, 20 and 30 degrees. Every
+one of them carries `include_dilation: no`. The angle in a file's name never reaches the solver,
+so all six ran at zero dilation. Two of the three 20-degree cases also step the normal load from
+3 to 9 MPa at different points in the test, which makes them different tests. The manual's
+dilation comparison never exercised dilation, so XSLOPE's dilation cannot be scored against it.
+
+XSLOPE's dilation is checked against the kinematics instead. On a sliding joint the opening per
+unit slip is the tangent of the dilation angle, which `test/joint_element_check.py` measures at
+row 6. The peak and residual strengths are checked there as well, each against its closed form.
 
 ---
 

@@ -46,7 +46,7 @@ XSLOPE's own with no published counterpart and takes no dot.
 | [E3](#fhwa-e3) | 🟢 | FHWA MSE wall — sloping backfill, steel strips | Every one of the twelve levels of Table E3-7.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.404 has no published counterpart |
 | [E4](#fhwa-e4) | 🟢 | FHWA MSE wall — level backfill, steel bar mats | All ten levels of Table E4-7.4 within 0.1% of the manual's per-mat pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.536 has no published counterpart |
 | [E5](#fhwa-e5) | 🟢 | FHWA bridge abutment on a spread footing | All eleven levels of Table E5-8.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.637 has no published counterpart |
-| [E6](#fhwa-e6) | 🟢 | FHWA MSE wall — traffic barrier impact | Both layers the impact check covers within 0.3% of the manual's full-length pullout resistance | **built**; the impact loads are tension demands the envelope does not carry, and XSLOPE's searched Spencer 1.542 has no published counterpart |
+| [E6](#fhwa-e6) | 🟢 | FHWA MSE wall — traffic barrier impact | Both layers the impact check covers within 0.3% of the manual's full-length pullout resistance | **built**; the impact loads are tension demands rather than properties of the reinforcement, so they leave the capacity envelope where it stands, and XSLOPE's searched Spencer 1.542 has no published counterpart |
 | [E7](#fhwa-e7) | 🟢 | FHWA MSE wall — seismic loading | All ten levels of Table E7-7 within 0.1% of the manual's reduced seismic pullout resistance | **built**; the example checks capacity against demand rather than solving for a factor of safety, so XSLOPE's searched Spencer 1.122 has no published counterpart |
 
 </div>
@@ -162,13 +162,18 @@ safety below, where the live load is a driving load like any other.
 
 **What is not modeled.** Two limits:
 
-- **Connection strength.** XSLOPE models the reinforcement as a line with a
-  tensile capacity and a bond to the soil; it does not model the
-  geogrid-to-block connection, block shear or facing flexure. The example's
+- **Block shear and facing flexure.** XSLOPE models the reinforcement as a line
+  with a tensile capacity, a bond to the soil and an anchorage capacity at each
+  end. The geogrid-to-block connection is that end capacity: `Tend1` caps the
+  envelope at the face, so a stated connection strength enters there. XSLOPE
+  has no element for block shear or facing flexure. The example's
   Step 7.9 checks the connection and finds capacity-demand ratios of 1.00 to
   1.03 on five of the lower layers — tighter than anything pullout or rupture
-  produces on this wall. Reading the envelope alone is not the whole internal
-  check.
+  produces on this wall.
+  These models set the face end to the layer's own T<sub>max</sub>, which is
+  FHWA's own convention of checking the connection separately, so what the
+  envelope reports is what the resisting side develops. Reading the envelope
+  alone is not the whole internal check.
 - **A pullout resistance factor that varies along one line.** Delta is one value
   per line, so $F^{*}$ may differ from layer to layer but not from end to end of
   a layer. Every reinforcement layer in an MSE wall is horizontal and stands at
@@ -501,7 +506,7 @@ E4 model and no distributed load is entered.
 The impact loads themselves, 2,300 lb/ft of wall for rupture and 1,300 lb/ft for
 pullout on the top layer and 600 lb/ft for both on the second, are tension
 demands added to T<sub>max</sub>. They size the reinforcement; they are not
-properties of it, and the capacity envelope does not carry them.
+properties of it, so they leave the capacity envelope where it stands.
 
 **Input:** [fhwa_e6.xlsx](files/published/fhwa_e6.xlsx) · built by
 `benchmarks/published/build_fhwa_e3_e7.py`

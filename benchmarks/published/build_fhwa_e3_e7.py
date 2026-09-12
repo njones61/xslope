@@ -50,8 +50,9 @@ Tend1 = Tmax at the face end.  FHWA counts only the resisting-zone side of each
 layer; the front side is carried by the facing connection and is checked
 separately.  Setting the face-end anchorage to the layer's own tensile strength
 makes the face branch of the envelope non-governing, so what the resisting side
-develops is what the envelope reports.  XSLOPE does not model the
-panel-to-reinforcement connection, so no connection capacity is entered.
+develops is what the envelope reports.  Tend1 is where a stated connection
+capacity would go instead, and entering one here would put the connection check
+inside the envelope rather than beside it, which is not how the manual reads.
 
 The reinforcement Type vocabulary on the reinforce sheet has no steel-strip or
 bar-mat entry, so these lines are entered as generic tensile lines.  Dir is set

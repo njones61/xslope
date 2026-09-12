@@ -24,6 +24,11 @@ delta the page's own numbers imply, and N5 plants a correct third statement of
 the lock G1 and G1b corrupt, so that each pair tests the rule it names rather
 than the absence of any pairing or of any second statement at all.
 
+The capability block (`C1`, `C2`) plants the claim this check exists for — the
+one that said the loads sheet could not carry a concentrated line load — and a
+fresh absence no entry on the ABSENT list covers.  `NEGATIVE`'s `N6` is their
+control: a sentence citing a LISTED absence must pass.
+
 A closing block covers the tutorial restatement sweep: a number moved off the
 lock a tutorial restates must leave the guarded bucket, and its two controls
 prove the sweep reads agreement rather than flagging every number beside a
@@ -38,7 +43,8 @@ import shutil
 import sys
 import tempfile
 
-from . import certify, deltas, dots, figures, tags, tutorials, voice
+from . import (capabilities, certify, deltas, dots, figures, tags,
+               tutorials, voice)
 from .pages import PAGES
 
 #: A table with no XSLOPE column whose header names an authority: the delta in
@@ -296,10 +302,36 @@ VOICE_MUTATIONS = [
      "Those factors are withdrawn rather than restated.\n"),
 ]
 
+#: Capability negations.  C1 is the sentence the check was written for: the
+#: claim the loads sheet cannot carry a concentrated line load, as rs2_joints
+#: carried it on rows 1b and 1d until 2026-09-12, when the `lloads` sheet and
+#: `fem.py`'s `line_loads` were grepped.  C2 plants a fresh absence nobody has
+#: entered on the ABSENT list.  Both must be caught; `NEGATIVE`'s N6 runs the
+#: other way, with a sentence citing a listed absence, and must pass.
+CAPABILITY_MUTATIONS = [
+    ("rs2_joints", "capabilities", "C1 the line-load claim, restored",
+     "*blocked* — as 1a; its 2013 kN stabilizing toe force enters as a line "
+     "load on the `lloads` sheet.",
+     "*blocked* — as 1a, and its 2013 kN toe force is a concentrated line "
+     "load, which the loads sheet does not carry."),
+    ("rs2_joints", "capabilities", "C2 an unlisted absence",
+     "Every junction in the rows that **are** built is a crossing.",
+     "Every junction in the rows that **are** built is a crossing. XSLOPE has "
+     "no way to state a joint's persistence."),
+]
+
 #: precision is the same lock, and a check that failed on one would push the
 #: pages toward printing tag values verbatim rather than at the precision each
 #: comparison is read at.  Each must leave the check reporting no problem.
 NEGATIVE = [
+    # The control on C1 and C2: a sentence citing an absence the ABSENT list
+    # carries, with the evidence behind it, is what these pages are for.  A
+    # check that flagged that too would say nothing about whether anyone
+    # grepped before writing it.
+    ("rs2_joints", "capabilities", "N6 a sentence citing a listed absence",
+     "Every junction in the rows that **are** built is a crossing.",
+     "Every junction in the rows that **are** built is a crossing. XSLOPE has "
+     "no staged construction, so a model built in two stages is out of reach."),
     ("rocscience_groundwater", "tags",
      "N1 a list element reprinted at the tag's own precision",
      "read 6.35 / 6.55", "read 6.346 / 6.55"),
@@ -431,6 +463,8 @@ def _run(check, path, cfg):
         return voice.run(path, cfg, report=_quiet)
     if check == "dots":
         return dots.run(path, cfg, report=_quiet)
+    if check == "capabilities":
+        return capabilities.run(path, cfg, report=_quiet)
     return figures.run(path, cfg, report=_quiet)
 
 
@@ -505,7 +539,7 @@ def _tutorial_fixtures(fails):
 def main():
     fails = []
     total = 0
-    for mut in MUTATIONS + VOICE_MUTATIONS:
+    for mut in MUTATIONS + VOICE_MUTATIONS + CAPABILITY_MUTATIONS:
         page, check, name, old, new = mut[:5]
         how = mut[5] if len(mut) > 5 else "first"
         total += 1

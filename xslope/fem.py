@@ -4125,10 +4125,13 @@ JOINT_TRACE_SINK = None
 # one thing, and the displacement classifier cannot separate them because the
 # quantity that separates them is the SLIP, which it does not read:
 #
-#   * RJ-19's two edges — the slip gains 15% of its own total over the last
-#     25 000 sweeps, max|u| gains half an elastic displacement over the same
-#     window, and the residual comes down as a slow power law that is still 250
-#     times the tolerance. The block is moving. The honest verdict is FAILED.
+#   * RJ-6's upper edge — the slip rises in a STRAIGHT LINE, 0.58 to 5.86 m, its
+#     rate ratio 1.0002 between the last two quarter-windows, max|u| gaining 0.41
+#     elastic displacements every 25 000 sweeps. The block is sliding on its
+#     joints and the honest verdict is FAILED. The displacement classifier cannot
+#     reach it: u_ratio is 0.786, UNDER the "at elastic scale" line, because the
+#     elastic yardstick on stiff rock loaded from a K0 datum is large. So it reads
+#     one signal without the other and returns AMBIGUOUS.
 #   * RJ-6's lower edge — the slip gains 0.001% of its total over the last
 #     25 000 sweeps, max|u| gains a millionth of an elastic displacement, the
 #     SOIL residual sits at 2.3e-4 against a 1e-3 tolerance, and the pairs still
@@ -4139,11 +4142,12 @@ JOINT_TRACE_SINK = None
 #     `oob_window` average cancels the soil's period-2 flicker and cannot cancel
 #     this one. The slope is standing; only the force test cannot say so.
 #
-# So there are two verdicts to add, and they are read from the same three
-# series — the slip, the soil residual and max|u| — over the same trailing
-# window. Both are asked ONLY of a trial that would otherwise end undecided, and
-# only on a jointed model, so nothing that converges, nothing that fails and
-# nothing without a joint can reach them.
+# So there are two verdicts to add, and they are read from the same four series —
+# the slip, the residual split between the joint nodes and the rest, and max|u| —
+# over the same trailing window. Both are asked ONLY of a trial that would
+# otherwise end undecided, and only on a jointed model, so nothing that
+# converges, nothing that fails and nothing without a joint can reach them.
+
 #: The joint verdict, on. Set False to run the loop exactly as it ran before it
 #: existed — the A/B switch the thresholds were chosen with, and the way any
 #: pre-rule trial record is reproduced. It is not a solver option and no caller

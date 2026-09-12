@@ -42,6 +42,8 @@ EXTRA_CASES = [
      'target_size': '12.0', 'benchmark': 'RJ-3'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj004.xlsx',
      'target_size': '12.0', 'benchmark': 'RJ-4'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj005.xlsx',
+     'target_size': '12.0', 'benchmark': 'RJ-5'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj006.xlsx',
      'target_size': '12.0', 'benchmark': 'RJ-6'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj007.xlsx',

@@ -40,12 +40,24 @@ raises the factor while on problems 17, 18 and 19 it lowers it. XSLOPE reduces t
 rock, which is the *without* setting, and both of RS2's numbers are recorded so a reader can see
 the spread.
 
-**The budget.** A joint reaches equilibrium by growing slip, so a jointed model settles over tens
-of thousands of viscoplastic sweeps where a bonded one settles over hundreds; a strength-reduction
-trial that runs out of sweeps is recorded undecided, the bracket reads that as not standing, and
-the factor comes out low. Every row here states its own sweep budget and its trial record is
-checked (`tools/ssrm_trial_audit.py`), the same rule the [geotextile wall family](rs2.md#rs2-48)
-runs under.
+**The budget, and what it does not buy.** A joint reaches equilibrium by growing slip, so a jointed
+model settles over tens of thousands of viscoplastic sweeps where a bonded one settles over
+hundreds; a strength-reduction trial that runs out of sweeps is recorded undecided, the bracket
+reads that as not standing, and the factor comes out low. Every row here states its own sweep
+budget and its trial record is checked (`tools/ssrm_trial_audit.py`), the same rule the
+[geotextile wall family](rs2.md#rs2-48) runs under.
+
+What a trial costs varies by two orders of magnitude across this corpus. The longest trial to reach
+a verdict takes 3 745 sweeps on problem 8 and 196 201 on problem 18, both at a budget of 250 000.
+Six of the ten rows measured carry at least one trial that does not decide inside that budget, and
+on problem 5 four trials do not, including both edges of its bracket.
+
+That is not, on the evidence, simply a matter of allowing more sweeps. Problem 7's undecided trial
+was re-solved on its own at **four times** the budget — a million sweeps against 250 000 — and came
+back with the same verdict it had before, `STABLE_STUCK`: the model neither converges nor diverges
+there, and the extra sweeps changed nothing about that. An undecided trial of this kind is a
+statement about the convergence criterion, not only about the iteration limit, and a row held back
+by one is not waiting on machine time alone.
 
 `benchmarks/rocscience/build_joint_problems.py` writes the input files, which are named `rjNNN`
 by the manual's own problem number — `rj018.xlsx` is problem 18 — with a letter suffix where the
@@ -69,7 +81,7 @@ joint model whose output is a stress-displacement curve.
 | [2](#rj-2) | 🟢 | Alejano & Alonso block toppling | SSRM 0.764 vs Goodman 0.76 (+0.5%) | 0.86 / 0.82 | |
 | [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | 1.12 / 1.09 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
 | [4](#rj-4) | <span class="nodata">⊘</span> | Lorig & Varona flexural toppling | UDEC 1.3 | 1.19 / 1.27 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
-| 5 | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | 1.65 / 1.86 | *planned* — two crossing sets, 1748 joint elements. |
+| [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | 1.65 / 1.86 | *reported, no lock* — four trials of the bracket, including both its edges, reach the sweep budget without a verdict. |
 | [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | 1.25 / 1.31 | *reported, no lock* — both edges of the bracket reach the sweep budget without a verdict. |
 | [7](#rj-7) | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | 1.57 / 1.59 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.744 vs UDEC 0.76 (−2.1%) | 0.75 / 0.75 | |
@@ -181,6 +193,24 @@ Every transcribed input class matches the vendor model, including the side restr
 **Input file:** [rj004.xlsx](files/rocscience/joints/rj004.xlsx).
 
 ![RJ-4: Lorig & Varona flexural toppling (rj004) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. Here the rock can yield, and it does: a band of shear strain climbs from the toe across the columns, and drawn without exaggeration the columns are bent through that band rather than rotated about it, which is what separates flexural toppling from the block toppling of problem 3](images/RJ-4.png)
+
+### ⊘ RJ-5: Lorig & Varona backward block toppling (rj005) {#rj-5}
+
+The shared 260 m section cut by two sets: one at −55° at 10 m spacing through the toe at
+(560, 140), dipping out of the face so the blocks lean back rather than forward, and a horizontal
+set at 40 m spacing. The rock is elastic — the vendor's `Plasticity Specifications: Non` —
+γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26; the joints carry c = 100 kPa and φ = 40°.
+
+This is the most budget-limited row in the corpus. **Four** of its nine trials reach 250 000 sweeps
+without a verdict, and two of those four are the edges of the final bracket, so the factor the
+bracket encloses is conditioned on the sweep limit at both ends. The row prints no factor and
+carries no lock. It is also the corpus's longest run at about 5.7 hours on the corpus mesh.
+
+Every transcribed input class matches the vendor model, including the side restraint.
+
+**Input file:** [rj005.xlsx](files/rocscience/joints/rj005.xlsx).
+
+![RJ-5: Lorig & Varona backward block toppling (rj005) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own; slip runs along the −55° joints in the wedge behind the face while the horizontal bedding opens, and the deformed section shows the slabs stepping out over one another down the face, each leaning back into the slope as it goes](images/RJ-5.png)
 
 ### ⊘ RJ-6: Plane failure with daylighting discontinuities (rj006) {#rj-6}
 

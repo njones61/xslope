@@ -530,6 +530,16 @@ def build_and_solve(tag):
 
     with contextlib.redirect_stdout(io.StringIO()):
         sol = solve_ssrm(fem_data,
+                         # The NumPy reference path, pinned, never 'auto'. The
+                         # oracle doctrine (fem.solve_fem's fast_kernel doc) is that
+                         # the reference ALONE defines every locked and published
+                         # factor of safety and the compiled kernel only has to
+                         # reproduce it. These runs cut the factors the pages print
+                         # and the sidecars every figure is drawn from, so they are
+                         # definitions: whether a machine happens to carry a built
+                         # kernel must not be able to move one. benchmarks/
+                         # kernel_xcheck.py is where the two paths are compared.
+                         fast_kernel=False,
                          F_min=float(tag.get('f_min', 0.5)),
                          F_max=float(tag.get('f_max', 3.0)),
                          tolerance=float(tag.get('tolerance', 0.02)),

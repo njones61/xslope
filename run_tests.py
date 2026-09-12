@@ -8856,6 +8856,17 @@ MODULE_CHECKS = {
         "properties alone; and an elevation band, whose own edges keep a trace "
         "the section's boundary would drop, beside a region named as a polygon "
         "of Type 'joints'."),
+    'joint_network_dialog': (
+        'joint_network_dialog_check.py',
+        "The Studio's Build network dialog and the joints-editor button that "
+        "opens it: an empty form offers no OK, a dip and a spacing generate the "
+        "set the dialog then hands back row for row, the region and the "
+        "elevation band reach the rows' labels, a name another set is using and "
+        "a pair of sets at one dip are refused in the dialog rather than on OK; "
+        "a set reopens from its rows as the same record, properties included; "
+        "and pressing OK on a reopened set replaces exactly its own rows where "
+        "they were, leaving a hand-entered joint line, the other set and the "
+        "properties alone."),
     'joint_surfaces': (
         'joint_surfaces_check.py',
         "What a jointed line reaches once the reinforce sheet says so: the "
@@ -14782,7 +14793,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'reinforce_mesh_geometry': 2, 'joint_mesh': 3,
               'joint_junction': 5, 'joint_junction_mesh': 3,
               'joint_element': 5, 'joint_surfaces': 4, 'joint_network': 3,
-              'joint_verdict': 1,
+              'joint_network_dialog': 2, 'joint_verdict': 1,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'docs_index_sync': 3, 'assistant_docs_answers': 2,
@@ -15909,6 +15920,11 @@ def main():
         # above, and it rides this scope because what it produces is their input.
         tests.append({'type': 'joint_network',
                       'file': 'the joint network generators',
+                      'method': '-', 'source': 'joint_network'})
+        # The Studio path to those generators: the dialog a user describes a set
+        # in, and the button that writes what it returns onto the sheet.
+        tests.append({'type': 'joint_network_dialog',
+                      'file': 'the Build network dialog',
                       'method': '-', 'source': 'joint_network'})
 
     if args.skip_benchmarks:

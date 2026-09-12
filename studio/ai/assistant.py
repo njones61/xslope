@@ -269,12 +269,14 @@ the canvas re-renders automatically.
   values a seep bc block names by string; 'stage_1'/'stage_2' are the two instants a
   transient rapid drawdown is staged at, and 'stability_time' the instant a stability
   run reads by default. Drive it with `run_tseep()` / `fs_vs_time()`, not by hand.
-- ssr_zones[i] / refine_zones[i]: polygon-sheet overlays that are NOT geometry — they
-  carry no material and never generate slices. ssr_zones = {'kind': 'reduce'|'hold'|
-  'elastic', 'polygon': [(x,y),...], 'label', 'size'}, read only by the SSRM (where
-  strength reduction applies). refine_zones = {'polygon': [(x,y),...], 'size'}, a local
-  target element size inside the ring — the way to resolve a thin band, never a smaller
-  global size.
+- ssr_zones[i] / refine_zones[i] / joint_zones[i]: polygon-sheet overlays that are NOT
+  geometry — they carry no material and never generate slices. ssr_zones = {'kind':
+  'reduce'|'hold'|'elastic', 'polygon': [(x,y),...], 'label', 'size'}, read only by the
+  SSRM (where strength reduction applies). refine_zones = {'polygon': [(x,y),...],
+  'size'}, a local target element size inside the ring — the way to resolve a thin band,
+  never a smaller global size. joint_zones = {'polygon': [(x,y),...], 'label', 'size',
+  'mat_id'}, a region a generated joint set is clipped to (xslope.joints, region=
+  'poly:<label>'); its 'size' and 'mat_id' do nothing and preflight warns about either.
 - scalars: gamma_water, max_depth (elevation of the hard base — the lowest
   elevation the PROBLEM describes, never one you chose; see iron rule 1),
   k_seismic (pseudo-static horizontal seismic coefficient, a fraction of g, applied to
@@ -1116,6 +1118,8 @@ def _settings_line(sd):
         bits.append(f"{len(sd['ssr_zones'])} SSR zone(s)")
     if sd.get("refine_zones"):
         bits.append(f"{len(sd['refine_zones'])} refine zone(s)")
+    if sd.get("joint_zones"):
+        bits.append(f"{len(sd['joint_zones'])} joint region(s)")
     return "Settings: " + "; ".join(bits or ["defaults"])
 
 

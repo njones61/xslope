@@ -5012,7 +5012,8 @@ class _LineEditorDialog(QDialog):
                  preview_draw, pick_resolve, view_state, parent=None,
                  help_text=None, usage_toggles=None, preview_caption=None,
                  field_help=None, unit_labels=None, dynamic_spec=None,
-                 preset_spec=None, dim_rule=None, switch_spec=None):
+                 preset_spec=None, dim_rule=None, switch_spec=None,
+                 extra_buttons=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -5083,6 +5084,15 @@ class _LineEditorDialog(QDialog):
             self._toggles[t] = cb
             top.addWidget(cb)
         top.addStretch(1)
+        # Actions on the whole list rather than on one row of it (the joints
+        # editor's "Build network…"), right-aligned past the stretch so they sit
+        # opposite the view toggles however wide the dialog is.
+        for _text, _tip, _callback in (extra_buttons or []):
+            b = QPushButton(_text)
+            if _tip:
+                b.setToolTip(_tip)
+            b.clicked.connect(lambda _checked=False, cb=_callback: cb(self))
+            top.addWidget(b)
         layout.addLayout(top)
 
         self._stack = QStackedWidget()
@@ -5266,6 +5276,33 @@ class _LineEditorDialog(QDialog):
     def set_view_mode(self, mode):
         """Programmatic view switch (used by the round-trip guard)."""
         self._set_mode(mode)
+
+    def selected_row(self):
+        """The row index the active view has selected, or -1."""
+        if self._mode == "table" and self._table is not None:
+            row = self._table.selected_row()
+        elif self._mode == "list" and self._list_view is not None:
+            row = self._list_view.list.currentRow()
+        else:
+            return -1
+        return row if row is not None and row >= 0 else -1
+
+    def replace_rows(self, rows, select=None):
+        """Rewrite the whole list — what an action that writes many rows at once
+        does (the joints editor's network builder).
+
+        The active view is rebuilt from the new rows and the other one rebuilds
+        itself on the next switch, which is what it already does: both views bind
+        to ``self._rows``, the single source of truth."""
+        self._rows = [dict(r) for r in rows]
+        if self._mode == "table":
+            self._build_table()
+            if select is not None:
+                self._table.select_row(select)
+        else:
+            self._ensure_list()
+            if select is not None and 0 <= select < self._list_view.list.count():
+                self._list_view.list.setCurrentRow(select)
 
     def result_rows(self):
         self._harvest()
@@ -6539,10 +6576,63 @@ class JointsEditor(CategoryEditor):
             preview_caption="Preview shows the joint lines on the section "
                             "(selected line bold with its endpoints; others "
                             "dimmed). Click a line to select it.",
-            field_help=JOINTS_HELP)
+            field_help=JOINTS_HELP,
+            extra_buttons=[(
+                "Build network…",
+                "Generate a whole set of joint lines at once — a dip and a "
+                "spacing, two sets crossing, or a blocky mass — clipped to "
+                "where the set exists. Select a row of a set already built to "
+                "reopen it on that set and change it.",
+                lambda dlg: _build_joint_network(slope_data, dlg))])
 
     def apply(self, slope_data, dlg):
         slope_data["joint_lines"] = dlg.result_rows()
+
+
+def _build_joint_network(slope_data, dlg):
+    """The joints editor's "Build network…" button.
+
+    Opens the network dialog on the set the selected row belongs to — or on a new
+    set when the selection is a hand-entered line or nothing — and writes what it
+    returns into the editor's pending rows. A set that was reopened is REPLACED
+    where it was, so editing a spacing moves the set rather than adding a second
+    copy of it beside the first; anything else is appended.
+
+    Nothing reaches ``slope_data`` here: the editor's OK is still what commits,
+    so Cancel on the editor discards a generated network like any other edit.
+    """
+    from xslope.joints import JointSet, set_name
+    from .network_dialog import BuildNetworkDialog
+
+    rows = dlg.result_rows()
+    selected = dlg.selected_row()
+    jset = None
+    if 0 <= selected < len(rows):
+        name = set_name(rows[selected].get("label"))
+        if name:
+            try:
+                jset = JointSet.from_rows(
+                    [r for r in rows if set_name(r.get("label")) == name])
+            except ValueError:
+                jset = None                   # a label that only looks like one
+
+    nd = BuildNetworkDialog(slope_data, rows, jset, parent=dlg)
+    if nd.exec() != QDialog.Accepted:
+        return
+    fresh = nd.result_rows()
+    editing = nd.editing()
+    if editing is None:
+        at = len(rows)
+        rows = rows + fresh
+    else:
+        # The splice xslope.joints.regenerate makes, on the rows the dialog has
+        # already generated: what OK writes is the network the preview showed,
+        # not a second run of the generator that might not reproduce it.
+        at = min(i for i, r in enumerate(rows)
+                 if set_name(r.get("label")) == editing)
+        kept = [r for r in rows if set_name(r.get("label")) != editing]
+        rows = kept[:at] + fresh + kept[at:]
+    dlg.replace_rows(rows, select=at if fresh else None)
 
 
 # --- geometry: profile lines & polygons (master/detail) --------------------- #

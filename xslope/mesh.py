@@ -3056,6 +3056,123 @@ def _validate_joint_lines(lines, opts, point_constraints=None, polygon_coords=No
                     f"clear the Joint flag on line {li + 1}.")
 
 
+def _snap_joint_line_ends(lines, opts, tol, debug=False):
+    """Pull every jointed line's END onto the jointed line it stops on.
+
+    A joint that ENDS on another — a column's basal contact starting partway
+    along its neighbour's side joint, a release trace running down onto the
+    bedding plane it belongs on — meets it at a point that is a vertex of the
+    ending line and lies in the INTERIOR of a segment of the through line. That
+    point has to be one point, and being one point is an exact-arithmetic
+    question: a tip stated to six decimals lands a part in 10^7 off the trace it
+    belongs on, and a tip whose coordinates are computed from the same angle and
+    spacing as the line it stops on still misses it by a rounding. Either way the
+    two lines do not touch, gmsh is handed a sliver no mesh resolves, and what
+    comes back is a curve whose edge carries four elements or none — or, where
+    the sliver is thinner than its own tolerance, a 1D recovery that does not
+    terminate.
+
+    So a tip within ``tol`` of another jointed line is ON it, and is MOVED there.
+    Two meetings are settled, in this order:
+
+    * **ends that stand together.** Every line end within ``tol`` of another line
+      end is one corner — an L, a chain, or several lines meeting at a point —
+      and they all take the coordinates of the end on the lowest-numbered line,
+      so which of them moves does not depend on the order they are visited in.
+    * **an end on a line's interior.** What is left is a termination, and the
+      end takes the foot of the perpendicular on the nearest such line. The
+      through line is NOT moved: it is the plane the ending line belongs to and
+      it keeps the geometry it was stated with, while the tip moves by at most
+      ``tol``, one part in a million of the section.
+
+    A corner that itself stands on a third line's interior moves as one, so the
+    lines that meet there still meet after the move.
+
+    In place, on ``lines``. Returns the number of ends moved.
+    """
+    idx = sorted(opts)
+    if len(idx) < 2:
+        return 0
+    from shapely.geometry import LineString as _LS, Point as _Pt
+
+    ends = []                                # (line, end index) in visit order
+    at = {}
+    for li in idx:
+        line = lines[li]
+        if not line or len(line) < 2:
+            continue
+        for end in (0, len(line) - 1):
+            ends.append((li, end))
+            at[(li, end)] = (float(line[end][0]), float(line[end][1]))
+
+    # 1. the corners: ends standing within tol of one another are one point
+    home = {e: e for e in ends}
+
+    def _find(e):
+        while home[e] != e:
+            home[e] = home[home[e]]
+            e = home[e]
+        return e
+
+    for a in range(len(ends)):
+        for b in range(a + 1, len(ends)):
+            ea, eb = ends[a], ends[b]
+            if ea[0] == eb[0]:
+                continue                     # a line's own two ends
+            pa, pb = at[ea], at[eb]
+            if math.hypot(pa[0] - pb[0], pa[1] - pb[1]) <= tol:
+                home[_find(eb)] = _find(ea)
+    groups = defaultdict(list)
+    for e in ends:
+        groups[_find(e)].append(e)
+
+    # 2. the terminations: where a group's point stands on another line's
+    #    INTERIOR, the whole group moves onto it. An end that is ALREADY on
+    #    another jointed line is not moved: the two lines meet, the meeting point
+    #    is the intersection, and recomputing it as the foot of a perpendicular
+    #    would shift the geometry by a last-bit rounding for nothing.
+    target = {}
+    for root, group in groups.items():
+        p = at[root]
+        own = set(li for li, _e in group)
+        best = None                          # (distance, the point to move to)
+        for lj in idx:
+            if lj in own or not lines[lj] or len(lines[lj]) < 2:
+                continue
+            seg = _LS([tuple(lines[lj][0]), tuple(lines[lj][-1])])
+            if seg.distance(_Pt(p)) == 0.0:
+                best = None
+                break                        # already on it
+            foot = seg.interpolate(seg.project(_Pt(p)))
+            q = (float(foot.x), float(foot.y))
+            if any(math.hypot(q[0] - float(v[0]), q[1] - float(v[1])) <= tol
+                   for v in lines[lj]):
+                continue                     # a corner, settled above
+            d = math.hypot(q[0] - p[0], q[1] - p[1])
+            if d <= tol and (best is None or d < best[0]):
+                best = (d, q)
+        target[root] = best[1] if best is not None else p
+
+    n_moved = 0
+    for li in idx:
+        line = [tuple(map(float, q[:2])) for q in (lines[li] or [])]
+        if len(line) < 2:
+            continue
+        for end in (0, len(line) - 1):
+            q = target[_find((li, end))]
+            p = line[end]
+            if q == p:
+                continue
+            line[end] = q
+            n_moved += 1
+            if debug:
+                d = math.hypot(q[0] - p[0], q[1] - p[1])
+                print(f"  Joint line {li + 1} end ({p[0]:g}, {p[1]:g}) snapped "
+                      f"{d:.3g} onto the jointed line it stops on")
+        lines[li] = line
+    return n_moved
+
+
 def _insert_joint_junction_points(lines, opts, tol=1e-9, debug=False):
     """Give every meeting point of two jointed lines a vertex on BOTH lines.
 
@@ -3068,13 +3185,24 @@ def _insert_joint_junction_points(lines, opts, tol=1e-9, debug=False):
     which is the geometry gmsh reports as ``intersections in the 1D mesh`` and
     then fails to recover.
 
+    Two kinds of meeting reach here. A CROSSING is found by intersecting the two
+    segments, which is exact: two lines that cross do cross whatever the
+    arithmetic. A TERMINATION — one line ending on another — is not, and
+    :func:`_snap_joint_line_ends` runs first to put the ending line's tip on the
+    line it stops on; every tip lying on another jointed line then becomes a
+    vertex of that line too, so the through line is split there and the T is one
+    point. Several tips on one through line — the fifteen of a stepped base —
+    are inserted in order along it.
+
     In place, on ``lines``; the endpoints are left first and last, so the line's
     own ends are still ``line[0]`` and ``line[-1]``.
     """
     if not opts or len(opts) < 2:
         return 0
-    from shapely.geometry import LineString as _LS
+    from shapely.geometry import LineString as _LS, Point as _Pt
     idx = sorted(opts)
+    snap_tol = _joint_line_tol(lines)
+    _snap_joint_line_ends(lines, opts, snap_tol, debug=debug)
     pts_to_add = defaultdict(list)
     for a in range(len(idx)):
         for b in range(a + 1, len(idx)):
@@ -3089,14 +3217,46 @@ def _insert_joint_junction_points(lines, opts, tol=1e-9, debug=False):
             if shared.geom_type != 'Point':
                 continue                       # the overlap case, refused elsewhere
             p = (float(shared.x), float(shared.y))
+            # A junction AT a line's end is that end's own point, not the
+            # computed intersection: the two agree to a rounding, and inserting
+            # the computed one would put a second point a last bit away from the
+            # tip that is already there — a pair gmsh merges as duplicate nodes,
+            # leaving a collapsed element on the joint.
+            for lk in (li, lj):
+                hit = None
+                for v in (lines[lk][0], lines[lk][-1]):
+                    v = (float(v[0]), float(v[1]))
+                    if math.hypot(p[0] - v[0], p[1] - v[1]) <= snap_tol:
+                        hit = v
+                        break
+                if hit is not None:
+                    p = hit
+                    break
             pts_to_add[li].append(p)
             pts_to_add[lj].append(p)
+    # Every END that stands on another jointed line is a vertex of that line too.
+    # The tip is already on it (the snap above), so this is where a T becomes one
+    # point: the through line carries the tip's own coordinates.
+    for li in idx:
+        if not lines[li] or len(lines[li]) < 2:
+            continue
+        for p in (tuple(map(float, lines[li][0][:2])),
+                  tuple(map(float, lines[li][-1][:2]))):
+            for lj in idx:
+                if lj == li or not lines[lj] or len(lines[lj]) < 2:
+                    continue
+                seg = _LS([tuple(lines[lj][0]), tuple(lines[lj][-1])])
+                if seg.distance(_Pt(p)) <= snap_tol:
+                    pts_to_add[lj].append(p)
     n_inserted = 0
     for li, pts in pts_to_add.items():
         line = [tuple(map(float, q[:2])) for q in lines[li]]
         p1, p2 = line[0], line[-1]
         span = math.hypot(p2[0] - p1[0], p2[1] - p1[1]) or 1.0
-        near = max(tol, 1e-9 * span)
+        # A point this close to a vertex the line already carries IS that vertex:
+        # the same tolerance the snap uses, so two tips that land together on one
+        # through line give it one vertex rather than a segment no mesh resolves.
+        near = max(tol, 1e-9 * span, snap_tol)
         for p in pts:
             if any(math.hypot(p[0] - q[0], p[1] - q[1]) <= near for q in line):
                 continue                       # already a vertex of this line
@@ -5659,6 +5819,13 @@ def test_1d_element_alignment(mesh, reinforcement_lines, tolerance=1e-6, debug=T
     
     return success
 
+#: How close an intersection point has to be to a polygon vertex to BE that
+#: vertex. :func:`line_segment_intersection` rounds its point to six decimals, so
+#: a crossing at a vertex the model states more precisely than that arrives up to
+#: 5e-7 away from it, and anything tighter than this inserts a duplicate.
+_XPT_VERTEX_TOL = 1e-6
+
+
 def add_intersection_points_to_polygons(polygons, lines, debug=False):
     """
     Add intersection points between reinforcement lines and polygon edges to the polygon vertex lists.
@@ -5718,10 +5885,20 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
                         if debug:
                             print(f"Found intersection {intersection} between line {line_idx} segment {i} and polygon {poly_idx} edge {j}")
                         
-                        # Check if intersection point is already a vertex of this polygon
+                        # Check if intersection point is already a vertex of this
+                        # polygon. The tolerance is the ROUNDING the intersection
+                        # itself carries: line_segment_intersection returns its
+                        # point rounded to six decimals, so a crossing AT a vertex
+                        # stated to more decimals than that comes back up to
+                        # 5e-7 away from it. Compared at 1e-8 the polygon gains a
+                        # second vertex a rounding from one it already has, and the
+                        # sliver between the two meshes as a collapsed element —
+                        # which on a jointed line leaves four elements on one of
+                        # its edges.
                         is_vertex = False
                         for vertex in poly_coords:
-                            if abs(vertex[0] - intersection[0]) < 1e-8 and abs(vertex[1] - intersection[1]) < 1e-8:
+                            if (abs(vertex[0] - intersection[0]) < _XPT_VERTEX_TOL
+                                    and abs(vertex[1] - intersection[1]) < _XPT_VERTEX_TOL):
                                 is_vertex = True
                                 break
                         

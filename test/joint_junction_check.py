@@ -27,6 +27,31 @@ one point and are held by the elements on opposite sides of its own line; and
 that the mesh JSON round trip reproduces every array and record. Leg g is the
 refusals that survive.
 
+Five more fixtures (h-m) are TERMINATIONS: a joint that ends on another partway
+along its segment, at a point that is a vertex of the ending line and of nothing
+else. Whether that point is one point is a question about arithmetic rather than
+about topology — a tip stated to six decimals lands a part in 10^7 off the trace
+it belongs on, and a tip computed from the same angle and spacing as the line it
+stops on still misses it by a rounding — so the mesher pulls an end that close
+onto the line it stops on and gives that line the same point. Each fixture states
+what the snap does to it before gmsh runs: how many ends move, and that none
+moves further than the tolerance. The exact fixtures (a-f) must have no end
+moved at all, which is the guard that the rule is inert on everything that
+already worked.
+
+  h. T, the tip a rounding off the line      3 wedges
+  i. T, the tip 1e-7 off the line            3, and the mesh is fixture a's
+  j. two tips on one segment                 3 at each
+  k. the stepped base, three columns         3 at each step, 2 at each corner
+  m. L, the tip 1e-7 off the through line's end   2, and the mesh is fixture c's
+  l. a tip on an existing vertex             2, nothing snapped
+  n. a joint ending on a zone edge AT a twelve-decimal vertex of it
+
+No 2D element in any of them may name one node twice. A collapsed element is what
+a pair of geometry points a rounding apart becomes once the mesher has merged
+them as duplicate nodes, and it carries the same edge twice — which is how an
+edge on a joint comes back with four elements standing on it rather than two.
+
 Three closed-form rows then run the split through the finite element engine:
 
   i.   R2's block on a plane, CUT by a vertical joint into two blocks — a T on
@@ -74,11 +99,12 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 import numpy as np
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString, Point, Polygon
 
 from xslope.fem import build_fem_data, solve_fem, solve_ssrm
 from xslope.fileio import build_reinforce_lines, load_slope_data
-from xslope.mesh import (add_intersection_points_to_polygons,
+from xslope.mesh import (_joint_line_tol, _snap_joint_line_ends,
+                         add_intersection_points_to_polygons,
                          build_mesh_from_polygons, export_mesh_to_json,
                          import_mesh_from_json)
 
@@ -345,9 +371,157 @@ FIXTURES = {
         junctions=[((20.0, 5.0), [math.pi, math.pi / 2, 3 * math.pi / 2], 2, 1)]),
 }
 
+# ---------------------------------------------------------------------------
+# terminations: a joint that ENDS on another, at a point the through line does
+# not carry as a vertex of its own
+# ---------------------------------------------------------------------------
+
+#: The frame the stepped fixtures are drawn in: a base at 30 degrees and columns
+#: standing on it at 120, which is Goodman & Bray's section. Nothing in it is
+#: exactly representable, so a point computed ON a line of this frame misses that
+#: line by a rounding — which is what the shipped stepped base does.
+_TH = math.radians(30.0)
+_D = (math.cos(_TH), math.sin(_TH))
+_N = (-math.sin(_TH), math.cos(_TH))
+
+
+def _P(t, n, origin=(0.0, 0.0)):
+    """The point ``t`` along the base and ``n`` perpendicular to it."""
+    return (origin[0] + t * _D[0] + n * _N[0], origin[1] + t * _D[1] + n * _N[1])
+
+
+def _stepped(ncol=3, w=5.0, step=0.7, h=3.0, origin=(0.0, 0.0)):
+    """The joint lines of a stepped base, the pattern problem 1 is made of.
+
+    Each column stands on its own stretch of base, one ``step`` perpendicular
+    above its downslope neighbour's, so the contact between two columns runs from
+    the lower base plane up: the piece below the upper column's base is the step,
+    the piece above it is the column-to-column contact, and the two are one
+    straight plane, which is how the vendor's outlines give it. The upper
+    column's base therefore BEGINS partway along that plane — a T at a point the
+    plane does not carry as a vertex of its own, once per column.
+    """
+    lines = [[_P(i * w, i * step, origin), _P((i + 1) * w, i * step, origin)]
+             for i in range(ncol)]
+    lines += [[_P(i * w, (i - 1) * step, origin), _P(i * w, i * step + h, origin)]
+              for i in range(1, ncol)]
+    return lines
+
+
+def _stepped_spec(ncol=3, w=5.0, step=0.7, h=3.0):
+    """The stepped base and the junctions to count on it."""
+    lines = _stepped(ncol, w, step, h)
+    up, down, along = (math.atan2(_N[1], _N[0]),
+                       math.atan2(-_N[1], -_N[0]),
+                       math.atan2(_D[1], _D[0]))
+    junctions = [(_P(i * w, i * step), [up, down, along], 3, 2)
+                 for i in range(1, ncol)]                 # the T at each step
+    junctions += [(_P(i * w, (i - 1) * step),
+                   [up, math.atan2(-_D[1], -_D[0])], 2, 2)
+                  for i in range(1, ncol)]                # the L below each step
+    return dict(lines=lines, joints=list(range(len(lines))), junctions=junctions,
+                ring=[(-6.0, -5.0), (16.0, -5.0), (16.0, 14.0), (-6.0, 14.0)])
+
+
+#: The termination fixtures. Each is a joint ENDING on another at a point in the
+#: interior of the through line's own segment, which is the case a crossing rule
+#: alone cannot make: the two lines have to be given the same point before gmsh
+#: sees them, or the mesher is handed a sliver and returns an edge carrying four
+#: elements or none.
+TERMINATIONS = {
+    'h. T, tip a rounding off': dict(
+        # the through line and the tip are computed in the same 30 degree frame,
+        # so the tip is ON the line in intent and a rounding off it in doubles
+        lines=[[_P(0.0, 0.0, (3.0, 2.0)), _P(12.0, 0.0, (3.0, 2.0))],
+               [_P(6.0, 0.0, (3.0, 2.0)), _P(6.0, -3.0, (3.0, 2.0))]],
+        joints=[0, 1],
+        junctions=[(_P(6.0, 0.0, (3.0, 2.0)),
+                    [math.atan2(_D[1], _D[0]), math.atan2(-_D[1], -_D[0]),
+                     math.atan2(-_N[1], -_N[0])], 3, 2)],
+        not_incident=True),
+    'i. T, tip 1e-7 off': dict(
+        lines=[[(2.0, 5.0), (18.0, 5.0)], [(10.0, 5.0 + 1e-7), (10.0, 9.0)]],
+        joints=[0, 1],
+        junctions=[((10.0, 5.0), [0.0, math.pi, math.pi / 2], 3, 2)],
+        snapped=1, same_as='a. T'),
+    'j. two tips on one segment': dict(
+        lines=[[(2.0, 5.0), (18.0, 5.0)], [(7.0, 5.0), (7.0, 9.0)],
+               [(13.0, 5.0), (13.0, 1.0)]],
+        joints=[0, 1, 2],
+        junctions=[((7.0, 5.0), [0.0, math.pi, math.pi / 2], 3, 2),
+                   ((13.0, 5.0), [0.0, math.pi, 3 * math.pi / 2], 3, 2)]),
+    # The stepped base: two terminations and two corners in one section, which is
+    # the topology of a column stack on a stepped base. Both tips are computed
+    # from the same base angle as the plane they stand on and land 3 x 10^-16 off
+    # it, so both snap; and the computed intersection of the two segments lands
+    # 4 x 10^-16 from the tip, so the fixture also pins that the point inserted
+    # into the through line is the TIP's rather than the computed one.
+    'k. stepped base, three columns': {**_stepped_spec(), 'snapped': 2},
+    'm. L, tip 1e-7 off the end': dict(
+        # the nearest point on the through line is its own END, so the tip takes
+        # that vertex rather than a point a hair inside the segment
+        lines=[[(6.0, 5.0), (14.0, 5.0)],
+               [(6.0 + 1e-7, 5.0 + 1e-7), (6.0, 9.0)]],
+        joints=[0, 1],
+        junctions=[((6.0, 5.0), [0.0, math.pi / 2], 2, 2)],
+        snapped=1, same_as='c. L'),
+    'l. tip on an existing vertex': dict(
+        # the tip lands on the through line's own END: an L corner, which the
+        # split has always made, and which the snap must leave alone
+        lines=[[(4.0, 5.0), (14.0, 5.0)], [(14.0, 5.0), (14.0, 9.0)]],
+        joints=[0, 1],
+        junctions=[((14.0, 5.0), [math.pi, math.pi / 2], 2, 2)],
+        snapped=0),
+}
+
+
+def _no_collapsed(mesh, tag, failures):
+    """No 2D element may name one node twice.
+
+    A collapsed element is what a pair of geometry points a rounding apart turns
+    into: the mesher gives each exact coordinate its own point, merges the two as
+    duplicate nodes, and what is left is a triangle with two corners at one node.
+    It has no area, it carries the same edge twice — which is how an edge on a
+    joint comes back with four elements on it rather than two — and nothing
+    downstream can tell it from a real element.
+    """
+    elements = np.asarray(mesh['elements'], dtype=int)
+    types = np.asarray(mesh['element_types'], dtype=int)
+    bad = 0
+    for ei in range(len(elements)):
+        n_corner = 3 if int(types[ei]) in (3, 6) else 4
+        corners = [int(elements[ei, k]) for k in range(n_corner)]
+        if len(set(corners)) != n_corner:
+            bad += 1
+    if bad:
+        failures.append(f"{tag}: {bad} two-dimensional element(s) name one node "
+                        f"twice — a collapsed element, so two geometry points a "
+                        f"rounding apart reached the mesher")
+
+
+def _snapped(spec):
+    """What :func:`_snap_joint_line_ends` does to a fixture, and how far.
+
+    Returns ``(ends moved, the largest move)``, on a copy — so a fixture can say
+    that nothing of its geometry is touched.
+    """
+    lines = [[tuple(map(float, p[:2])) for p in ln] for ln in spec['lines']]
+    before = [list(ln) for ln in lines]
+    tol = _joint_line_tol(lines)
+    moved = _snap_joint_line_ends(lines, {i: {} for i in spec['joints']}, tol)
+    far = 0.0
+    for a, b in zip(before, lines):
+        for p, q in ((a[0], b[0]), (a[-1], b[-1])):
+            far = max(far, math.hypot(p[0] - q[0], p[1] - q[1]))
+    return moved, far, tol
+
 
 def _leg_fixtures(failures, results):
     for tag, spec in FIXTURES.items():
+        moved, _far, _tol = _snapped(spec)
+        if moved:
+            failures.append(f"{tag}: the end snap moved {moved} end(s) of a "
+                            f"fixture whose lines already meet exactly")
         for et in ('tri3', 'tri6'):
             mesh = _build(spec['lines'], spec['joints'], et)
             name = f"{tag} / {et}"
@@ -362,6 +536,107 @@ def _leg_fixtures(failures, results):
                 f"{tag:26s} {et}: {len(mesh['nodes']):5d} nodes, "
                 f"{len(mesh['elements_joint']):3d} joint elements, "
                 f"{len(here)} nodes at the junction")
+
+
+def _leg_terminations(failures, results):
+    """h to l. A joint that ENDS on another, partway along its segment.
+
+    The point is a vertex of the ending line and of nothing else, so it is one
+    point only if the mesher is told to make it one. Each fixture states what the
+    end snap does to it before gmsh runs — how many ends it moves and how far —
+    and then the mesh is held to the same wedge counts, joint pairing and round
+    trip as every other junction.
+    """
+    for tag, spec in TERMINATIONS.items():
+        moved, far, tol = _snapped(spec)
+        want = spec.get('snapped')
+        if want is not None and moved != want:
+            failures.append(f"{tag}: the end snap moved {moved} end(s), not "
+                            f"{want}")
+        if far > tol:
+            failures.append(f"{tag}: the end snap moved an end {far:.3g}, past "
+                            f"its own tolerance of {tol:.3g}")
+        if spec.get('not_incident'):
+            thr = LineString([tuple(spec['lines'][0][0]),
+                              tuple(spec['lines'][0][-1])])
+            tip = Point(tuple(spec['lines'][1][0]))
+            if thr.distance(tip) == 0.0:
+                failures.append(f"{tag}: the tip lies exactly on the through "
+                                "line, so the fixture no longer stands for a "
+                                "termination the arithmetic misses")
+        for et in ('tri3', 'tri6'):
+            mesh = _build(spec['lines'], spec['joints'], et,
+                          ring=spec.get('ring'))
+            name = f"{tag} / {et}"
+            for (p, rays, n_wedges, n_bars) in spec['junctions']:
+                _check_junction(mesh, p, rays, n_wedges, n_bars, name, failures)
+            _counts(mesh, name, failures, spec['lines'], spec['joints'])
+            _check_pairs(mesh, name, failures, spec['lines'])
+            _no_collapsed(mesh, name, failures)
+            _roundtrip(mesh, name, failures)
+            twin = spec.get('same_as')
+            if twin:
+                other = _build(FIXTURES[twin]['lines'], FIXTURES[twin]['joints'],
+                               et)
+                for key in ('nodes', 'elements', 'elements_joint',
+                            'element_side_joint'):
+                    if not np.array_equal(np.asarray(mesh[key]),
+                                          np.asarray(other[key])):
+                        failures.append(
+                            f"{name}: the near miss does not mesh as '{twin}' "
+                            f"does — '{key}' differs, so the snap did not put "
+                            "the tip where the exact fixture has it")
+                        break
+            nodes = np.asarray(mesh['nodes'])
+            here = _at(nodes, spec['junctions'][0][0])
+            results.append(
+                f"{tag:30s} {et}: {len(mesh['nodes']):5d} nodes, "
+                f"{len(mesh['elements_joint']):3d} joint elements, "
+                f"{len(here)} nodes at the first junction"
+                + (f", {moved} end(s) snapped by {far:.3g}" if moved else ""))
+
+
+#: A zone-boundary vertex stated to twelve decimals. Nothing rounds it, so a
+#: crossing computed against it comes back a rounding away.
+_FINE_X = 6.123456789012
+
+
+def _leg_zone_vertex(failures, results):
+    """n. A joint ending on a zone edge AT a vertex stated to twelve decimals.
+
+    The crossing of a constraint line with a polygon edge is inserted as a
+    polygon vertex, and the point that is inserted is rounded to six decimals. So
+    a joint that ends on a zone edge at a vertex the section states more
+    precisely than that meets a polygon which already carries the point — and the
+    insertion has to recognise it, or the zone gains a second vertex 2 x 10^-7
+    from the first and the sliver between them meshes as a collapsed element.
+    """
+    left = [(0.0, 0.0), (_FINE_X, 0.0), (_FINE_X, 5.0), (_FINE_X, 10.0),
+            (0.0, 10.0)]
+    right = [(_FINE_X, 0.0), (14.0, 0.0), (14.0, 10.0), (_FINE_X, 10.0),
+             (_FINE_X, 5.0)]
+    lines = [[(1.0, 5.0), (_FINE_X, 5.0)]]
+    # the crossings of the line with the zone edges become polygon vertices
+    # first, which is what get_material_polygons does for a real model
+    rings = add_intersection_points_to_polygons([left, right], lines)
+    for et in ('tri3', 'tri6'):
+        mesh = _build(lines, [0], et, mats=[(rings[0], 0), (rings[1], 1)])
+        tag = f"n. joint on a zone vertex / {et}"
+        _no_collapsed(mesh, tag, failures)
+        _counts(mesh, tag, failures, lines, [0])
+        _check_pairs(mesh, tag, failures, lines)
+        _roundtrip(mesh, tag, failures)
+        mats = np.asarray(mesh['element_materials'], dtype=int)
+        if len(set(mats.tolist())) != 2:
+            failures.append(f"{tag}: the split lost a material zone")
+        nodes = np.asarray(mesh['nodes'], dtype=float)
+        here = _at(nodes, (_FINE_X, 5.0))
+        # the joint's end is a buried tip standing ON the zone edge: one soil
+        # copy per wedge, and the two zones meet there, so it is not one node
+        results.append(f"n. joint on a zone vertex {et}: "
+                       f"{len(mesh['nodes']):5d} nodes, "
+                       f"{len(mesh['elements_joint']):3d} joint elements, "
+                       f"{len(here)} nodes at the zone vertex")
 
 
 def _leg_material_boundary(failures, results):
@@ -732,6 +1007,8 @@ def run_mesh_legs():
     failures, results = [], []
     t0 = time.time()
     _leg_fixtures(failures, results)
+    _leg_terminations(failures, results)
+    _leg_zone_vertex(failures, results)
     _leg_material_boundary(failures, results)
     _leg_refusals(failures, results)
     print(f"Joint junction check, mesh legs ({time.time() - t0:.0f} s):")
@@ -745,6 +1022,8 @@ def run():
     failures, results = [], []
     t0 = time.time()
     _leg_fixtures(failures, results)
+    _leg_terminations(failures, results)
+    _leg_zone_vertex(failures, results)
     _leg_material_boundary(failures, results)
     _leg_refusals(failures, results)
     _leg_row_i(failures, results)

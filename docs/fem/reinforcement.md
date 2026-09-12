@@ -592,9 +592,14 @@ Joint lines may **meet** — at a T, at a crossing, at a corner, end to end. Whe
 wedges of material around the shared node and gives the node one copy per wedge, so each element keeps the material
 on its own side of every line through the point. That is what makes a block column with a joint on its back face, a
 joint under its base and a course joint at every mortar line into a stack that can slide, part and rock, rather than
-a notched solid. What they may not do is lie **on** one another over a stretch, or run along the outside of the
-section, where there is material on one side only and nothing for the other face to be; preflight refuses both by
-name.
+a notched solid. A joint that ENDS on another — a column's base beginning partway along its neighbour's side joint,
+a release trace running down onto a bedding plane — is that same rule with three wedges instead of four, and it needs
+the two lines to meet at one point: an end that lies within a millionth of the section of another joint line is
+moved onto it, and that line is given a vertex there, before the mesh is built. So a tip stated to fewer decimals
+than the line it belongs on still lands on it. The through line keeps the geometry it was stated with.
+
+What joint lines may not do is lie **on** one another over a stretch, or run along the outside of the section, where
+there is material on one side only and nothing for the other face to be; preflight refuses both by name.
 
 A joint line is finite element geometry: the limit equilibrium engines do not read the joints worksheet at all.
 

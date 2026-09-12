@@ -35,4 +35,14 @@ CONFIG = PageConfig(
     locked_value_re=r"(?:SSRM|FS)\s+\**(\d+\.\d{3})",
 
     figure_mode="panel",
+
+    # A jointed model's composite names its own panels: the displacement-vector
+    # panel is a scaled deformed section, and the strain panel carries the joint
+    # slip overlay. The base classifier reads "shear strain" + "displacement
+    # vector" + "mesh" as the four-panel form and does not know either phrase, so
+    # the two the jointed figures use are declared here.
+    caption_rules=[
+        ("joint slip at the critical srf", "four"),
+        ("deformed section", "four"),
+    ],
 )

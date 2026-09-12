@@ -76,6 +76,7 @@ def _base():
     sd['piezo_phreatic'] = False
     sd['dloads'] = []
     sd['dloads2'] = []
+    sd['line_loads'] = []
     sd['reinforcement_lines'] = []
     sd['reinforce_lines'] = []
     sd['pile_lines'] = []
@@ -122,13 +123,30 @@ def _offset_through(dip_deg, x, y):
     return float(x) * nx + float(y) * ny
 
 
+def _toe_chord(toe, crest):
+    """The seed surface for an ELASTIC section whose mechanism is not one plane.
+
+    A limit-equilibrium surface cannot be sliced on a model whose rock is
+    elastic: an elastic zone cannot fail, so the slicer refuses any surface that
+    crosses one, and the starting circle the house rule draws is refused with it.
+    What the file needs is a surface at all — the loader will not read a model
+    with no failure surface, no mesh and no seepage boundary condition — and a
+    strength reduction never reads it. So an elastic row carries the chord
+    between the two points the house rule draws its circle through, toe to
+    crest, as a non-circular surface.
+    """
+    return _surface([toe, crest])
+
+
 def _toe_circle(toe, crest):
     """A starting circle for a section whose mechanism is not a single plane.
 
     Centred above mid-slope at the toe elevation plus twice the slope height and
     passing through the toe, which is the starting circle a user would draw on
     this section. It is what makes the file a complete slope-stability model;
-    a strength reduction never reads it.
+    a strength reduction never reads it. A section whose rock is ELASTIC takes
+    :func:`_toe_chord` instead — a circle cannot be sliced through a zone that
+    cannot fail.
     """
     (tx, ty), (cx, cy) = toe, crest
     xo = 0.5 * (tx + cx)
@@ -210,25 +228,17 @@ LV_JOINT = {'c': 100.0, 'phi': 40.0, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
 # ---------------------------------------------------------------------------
 # Problem 1 — Goodman & Bray block toppling
 #
-# NOT in BUILDERS, and no file is shipped. The section transcribes cleanly — the
-# sixteen column outlines below are the vendor model's own, and the joints are
-# derived from where the columns touch — but the mesh split refuses the result
-# at every target size from 1.0 to 4.0 m:
+# A stepped base puts each column's basal contact at a point PARTWAY ALONG its
+# downslope neighbour's side joint, so the section carries fifteen terminations:
+# one joint ending in the interior of another. Measured on this geometry, each
+# tip lands 7e-16 to 3e-14 from the plane it belongs on — a rounding, not a gap —
+# and the mesher pulls every end within a millionth of the section onto the line
+# it stops on before gmsh sees either of them, so the two share one point and the
+# split gives the T its three wedges.
 #
-#     The mesh edge (0, N) on jointed line 1 is carried by 4 two-dimensional
-#     element(s), not two.
-#
-# The cause is the topology, not the geometry. A stepped base puts each column's
-# basal contact at a point PARTWAY ALONG its downslope neighbour's side joint,
-# so the section has fifteen T-junctions: one joint ending in the interior of
-# another. The split copies a shared node once per wedge of material around it,
-# which is right for a crossing (two joints, four wedges, two elements per edge)
-# and wrong for a termination (three wedges), and the edge at the T comes out
-# carrying four elements. Every crossing in the rest of this corpus is an X.
-#
-# The code is kept because it is the finished transcription: the round that
-# teaches the split about terminations can build these four rows by registering
-# ``rj001a`` and ``rj001c`` and reading the toe force off the manual for b and d.
+# The four cases differ only in the joint friction angle and in the toe force:
+# a and c carry 0.5 kN, which is 0.05% of the toe column's own weight, and are
+# built without it; b and d carry 2013 kN, which is a line load (see _gb_case).
 # ---------------------------------------------------------------------------
 
 #: Goodman & Bray's sixteen columns, each a closed outline read verbatim
@@ -361,9 +371,33 @@ def _straight_runs(segs, tol=1.0e-9):
     return runs
 
 
-def _gb_case(name, phi_joint):
+#: Where the vendor applies problem 1's stabilizing force, read from the models'
+#: own ``forces:`` block rather than from the manual's text. The base files put it
+#: on node 208 at the TOE of the lowest column; the rerun files move the same
+#: force to node 228, that column's UPPER-LEFT corner. Both are horizontal and
+#: point into the slope: case a and c carry fx = 0.0005 MN, b and d fx = 2.013 MN,
+#: with fy at the rounding of zero (-2.5e-16) in every one of the six files.
+GB_FORCE_TOE = (-0.5, 0.866025403784439)
+GB_FORCE_CORNER = (-2.5, 4.33012701892219)
+
+
+def _gb_case(name, phi_joint, toe_force=0.0):
     """One of Goodman & Bray's four cases: the shared section at its own joint
-    friction angle."""
+    friction angle, and the stabilizing force the case carries.
+
+    ``toe_force`` is the magnitude in kN. It is applied as a LINE LOAD — a
+    concentrated force per unit width at a point, which is what the vendor's
+    ``forces:`` block holds and what the ``lloads`` sheet carries — horizontal,
+    pointing into the slope (Angle 0), at the lowest column's upper-left corner.
+
+    **Which point.** The vendor's base files put the force at the toe,
+    (-0.5, 0.866), and its rerun files move it to the column's upper-left corner,
+    (-2.5, 4.330). The toe is the END OF THE BASAL JOINT: the split copies that
+    node once per wedge of material there, so a load applied to it has no defined
+    side to act on, and the mesher refuses a line load on a jointed line for that
+    reason. The corner stands 4.0 m clear of the nearest joint and on the same
+    column, so it is the point these files carry, and the page says so.
+    """
     sd = _base()
     ring, segs = _gb_section()
     mats = [_rock('Rock', 25.0, 2.0e7, 0.3, 0.0, 0.0, option='elastic')]
@@ -371,6 +405,10 @@ def _gb_case(name, phi_joint):
     sd['joint_lines'] = [
         _joint(f'jnt-{i + 1:02d}', p, q, 0.0, phi_joint)
         for i, (p, q) in enumerate(segs)]
+    if toe_force:
+        sd['line_loads'] = [{'label': 'toe force',
+                             'x': GB_FORCE_CORNER[0], 'y': GB_FORCE_CORNER[1],
+                             'P': float(toe_force), 'angle': 0.0}]
     # The seed surface is the basal plane the stack stands on, toe to crest.
     sd['non_circ'] = _surface([(-0.5, 0.866025403784439),
                                (130.56406460551, 93.856406460551)])
@@ -398,6 +436,19 @@ def rj001a():
     return _gb_case('rj001a.xlsx', 38.15)
 
 
+def rj001b():
+    """RJ-1b — Goodman & Bray block toppling, case b (vendor `joint #001_b.fez`).
+
+    Case a's section and rock at phi = 33.0239 degrees on the joints — the
+    lowest angle of the four — held up by a **2013 kN** horizontal force on the
+    lowest column, which is the case the manual poses as a stabilized stack. The
+    force is a line load (see :func:`_gb_case` for which of the vendor's two
+    application points it carries). Referees: Goodman & Bray 1.0 and UDEC 0.99.
+    RS2 reports 0.97 without joint improvement and 0.94 with it.
+    """
+    return _gb_case('rj001b.xlsx', 33.0239, toe_force=2013.0)
+
+
 def rj001c():
     """RJ-1c — Goodman & Bray block toppling, case c (vendor `joint #001_c.fez`).
 
@@ -406,6 +457,17 @@ def rj001c():
     UDEC 1.01. RS2 reports 1.01 without joint improvement and 0.99 with it.
     """
     return _gb_case('rj001c.xlsx', 38.6598)
+
+
+def rj001d():
+    """RJ-1d — Goodman & Bray block toppling, case d (vendor `joint #001_d.fez`).
+
+    Case c's joint friction angle, 38.6598 degrees, with case b's 2013 kN
+    horizontal force on the lowest column: the same stack, stabilized. Referees:
+    Goodman & Bray 1.23 and UDEC 1.22. RS2 reports 1.19 without joint
+    improvement and 1.16 with it.
+    """
+    return _gb_case('rj001d.xlsx', 38.6598, toe_force=2013.0)
 
 # ---------------------------------------------------------------------------
 # Problem 2 — Alejano & Alonso block toppling
@@ -470,7 +532,7 @@ def rj003():
     sd['joint_lines'] = cross_jointed(
         parallel_set(sd, 70.0, 20.0, label='col', props=LV_JOINT),
         parallel_set(sd, -20.0, 30.0, label='cross', props=LV_JOINT))
-    sd['circles'] = _toe_circle((560.0, 140.0), (377.785587105239, 400.0))
+    sd['non_circ'] = _toe_chord((560.0, 140.0), (377.785587105239, 400.0))
     return _write(sd, 'rj003.xlsx')
 
 
@@ -521,7 +583,7 @@ def rj005():
                      label='dip', props=LV_JOINT),
         parallel_set(sd, 0.0, 40.0, offset=_offset_through(0.0, 0.0, 400.0),
                      label='bed', props=LV_JOINT))
-    sd['circles'] = _toe_circle((560.0, 140.0), (377.785587105239, 400.0))
+    sd['non_circ'] = _toe_chord((560.0, 140.0), (377.785587105239, 400.0))
     return _write(sd, 'rj005.xlsx')
 
 
@@ -629,25 +691,12 @@ def rj008():
 # ---------------------------------------------------------------------------
 # Problems 9 to 14 — Alejano et al. sliding and ploughing slabs
 #
-# NOT in BUILDERS, and no file is shipped, for the reason problem 1 is not:
-# a joint that ends ON another joint. Here the termination is a NEAR one. Each
-# release trace is meant to run from the crest down to a bedding plane, and the
-# vendor states its tip to six decimals, so the tip lands 2e-7 to 2e-6 from the
-# bedding trace it belongs on — a part in 10^7 of the section. That leaves a
-# sliver between the two lines, and the mesher reports it two ways:
-#
-#     rj009, rj010   the two elements on mesh edge (N, N+1) of jointed line 48
-#                    stand on the same side of it (3.3e-08, -0.437)
-#     rj011          the mesh edge (125, 1706) on jointed line 45 is carried by
-#                    4 two-dimensional element(s), not two
-#     rj012          gmsh never returns: "Impossible to recover edge 113 113",
-#                    "2 intersections in the 1D mesh (curves 113 168)", split
-#                    and retry, level after level (recorded by a 300 s alarm)
-#
-# Snapping the tip onto the bedding line would turn the near termination into an
-# exact one, which is problem 1's refusal, so both families want the same thing:
-# a split that knows what to do where one joint ENDS on another. The
-# transcription is kept whole so that round can register these seven functions.
+# Each release trace runs from the crest down onto a bedding plane, and the
+# vendor states its lower tip to six decimals, so the tip lands 2e-7 to 2e-6
+# from the bedding trace it belongs on — a part in 10^7 of the section, and a
+# gap no mesh resolves. The mesher pulls an end that close onto the line it
+# stops on before gmsh sees either of them, which is the same rule problem 1's
+# stepped base needs, so the tip is on the plane and the T is one point.
 # ---------------------------------------------------------------------------
 
 #: Every one of these six models carries TWO joint strengths. The bedding
@@ -698,7 +747,7 @@ ALEJANO = {
 }
 
 
-def _alejano(name):
+def _alejano(name, round6=False):
     """One of the six Alejano slab models.
 
     The rock is ELASTIC at E = 2 x 10^8 MPa, which is not a rock modulus but the
@@ -706,6 +755,17 @@ def _alejano(name):
     blocks, and the manual says outright that "an artificially high modulus of
     2x10^8 MPa was given to the material" to reproduce that, with a tightened
     convergence tolerance to go with it. gamma = 25 kN/m^3, nu = 0.3.
+
+    ``round6`` states the generated network's endpoints to SIX decimals rather
+    than the ten the generator hands back. A generated trace is clipped to the
+    section, so its ends are computed points on the boundary, and the mesher's
+    own crossing arithmetic carries six decimals: at ten, the polygon gains the
+    rounded crossing and the line keeps its own end, 2 x 10^-7 away, and gmsh's
+    1D recovery does not terminate at these rows' spacing. Six decimals is
+    10^-6 m on a 90 m section. It is declared per row rather than for the family
+    because the four rows that do not need it mesh as the generator states them,
+    and restating their networks would move meshes their factors were measured
+    on.
     """
     ring, dip, spacing, phi_bed, phi_rel, release = ALEJANO[name]
     sd = _base()
@@ -716,7 +776,11 @@ def _alejano(name):
         _joint(f'rel-{i + 1:02d}', p, q, 0.0, phi_rel)
         for i, (p, q) in enumerate(release)
     ] + parallel_set(sd, dip, spacing, label='bed', props=bed)
-    sd['circles'] = _toe_circle((0.0, 0.0), (ring[-3][0], ring[-3][1]))
+    if round6:
+        for j in sd['joint_lines']:
+            for k in ('x1', 'y1', 'x2', 'y2'):
+                j[k] = round(float(j[k]), 6)
+    sd['non_circ'] = _toe_chord((0.0, 0.0), (ring[-3][0], ring[-3][1]))
     return _write(sd, name + '.xlsx')
 
 
@@ -760,7 +824,7 @@ def rj012():
     Referee: UDEC 1.78. RS2 reports 1.39 without joint improvement and 1.75 with
     it — the family's widest spread between the two RS2 runs.
     """
-    return _alejano('rj012')
+    return _alejano('rj012', round6=True)
 
 
 def rj013():
@@ -781,7 +845,7 @@ def rj014():
     phi = 30. Referee: UDEC 0.9. RS2 reports 0.89 without joint improvement and
     1.09 with it.
     """
-    return _alejano('rj014')
+    return _alejano('rj014', round6=True)
 
 
 # ---------------------------------------------------------------------------
@@ -894,7 +958,9 @@ def rj019():
 #: Every builder in this module, in problem-number order. ``verify_rebuild.py``'s
 #: ``joints`` group is this list, so a builder missing here is a corpus file
 #: nothing guards.
-BUILDERS = [rj002, rj015, rj003, rj004, rj005, rj006, rj007, rj008, rj018, rj019]
+BUILDERS = [rj001a, rj001b, rj001c, rj001d, rj002, rj015, rj003, rj004, rj005,
+            rj006, rj007, rj008, rj009, rj010, rj011, rj012, rj013, rj014,
+            rj018, rj019]
 
 
 if __name__ == '__main__':

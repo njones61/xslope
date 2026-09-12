@@ -52,23 +52,34 @@ EXTRA_CASES = [
      'target_size': '2.0', 'benchmark': 'RJ-15'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj019.xlsx',
      'target_size': '3.0', 'benchmark': 'RJ-19'},
+    # The termination family: problem 1's stepped base and Alejano's release
+    # traces. Corpus size is the joint spacing, as everywhere else here — the
+    # column width on problem 1, the bedding spacing on 9 to 14.
+    {**_JOINT, 'file': 'files/rocscience/joints/rj001a.xlsx',
+     'target_size': '10.0', 'benchmark': 'RJ-1a'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj001b.xlsx',
+     'target_size': '10.0', 'benchmark': 'RJ-1b'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj001c.xlsx',
+     'target_size': '10.0', 'benchmark': 'RJ-1c'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj001d.xlsx',
+     'target_size': '10.0', 'benchmark': 'RJ-1d'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj009.xlsx',
+     'target_size': '3.0', 'benchmark': 'RJ-9'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj010.xlsx',
+     'target_size': '3.0', 'benchmark': 'RJ-10'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj011.xlsx',
+     'target_size': '1.5', 'benchmark': 'RJ-11'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj012.xlsx',
+     'target_size': '1.5', 'benchmark': 'RJ-12'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj013.xlsx',
+     'target_size': '1.5', 'benchmark': 'RJ-13'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj014.xlsx',
+     'target_size': '1.5', 'benchmark': 'RJ-14'},
 ]
 
 #: Rows the page documents as not yet built or blocked, each with the reason. A
 #: row here gets no figure and the audit does not count it as missing.
 NO_FIGURE = {
-    'RJ-1a': 'the stepped base ends each column\'s basal contact partway along its '
-             "neighbour's side joint, and the split has no rule for a joint that "
-             'ends on another',
-    'RJ-1b': 'as RJ-1a, and its 2013 kN toe force is a concentrated line load',
-    'RJ-1c': 'as RJ-1a',
-    'RJ-1d': 'as RJ-1b',
-    'RJ-9': 'the release trace ends on a bedding plane (see RJ-1a)',
-    'RJ-10': 'the release trace ends on a bedding plane (see RJ-1a)',
-    'RJ-11': 'the release trace ends on a bedding plane (see RJ-1a)',
-    'RJ-12': 'the release trace ends on a bedding plane (see RJ-1a)',
-    'RJ-13': 'the release trace ends on a bedding plane (see RJ-1a)',
-    'RJ-14': 'the release trace ends on a bedding plane (see RJ-1a)',
     'RJ-16': 'scores a tilt angle found by a gravity sweep, not a strength reduction',
     'RJ-17': "the second material's zone is an element-edge staircase in the vendor "
              'mesh rather than a boundary of its model',

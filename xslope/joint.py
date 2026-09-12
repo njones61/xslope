@@ -137,6 +137,27 @@ JOINT_DECIDED_BUDGET = 100000
 #: displacement field, which is the interface twin of the bar's tension cap.
 JOINT_VP_DT = 1.0
 
+#: RS2's value for the joint slip-stiffness factor (see ``ks_slip_factor`` in
+#: :func:`joint_vp_sweep`). Every model in Rocscience's joint verification manual
+#: carries ``joint_stiffness_factor: 0.01`` beside ``joint_stiffness_flag: 1``,
+#: and the manual's Updates page describes the flag as the program
+#: "automatically calculat[ing] the stiffness of the joint as soon as a joint
+#: violates the strength criteria".
+#:
+#: IT IS NOT USABLE AT THIS VALUE IN THIS SCHEME, and the number is here so that
+#: is on the record rather than rediscovered. In an initial-stress viscoplastic
+#: scheme the assembled stiffness still holds the joint's FULL elastic block, so
+#: scaling only the divisor of the slip increment is a pure over-relaxation of the
+#: interface's own fixed-point iteration — and at ``dt_vp = 1`` that iteration is
+#: already AT its stability boundary, because one sweep returns the traction
+#: exactly to the limit. A factor of 0.01 is therefore a relaxation of 100, and it
+#: diverges: on RJ-19's upper bracket edge the in-situ solve reached
+#: max|u| = 3.8e+50 in 41 sweeps. See r15_joint_convergence.md §3 for the sweep
+#: over milder factors and for what a faithful transplant of RS2's fix would need
+#: (the assembled block reduced, and a refactorization each time the slipped set
+#: changes).
+JOINT_RS2_SLIP_STIFFNESS_FACTOR = 0.01
+
 #: Newton-Cotes (Lobatto) weights on [0, 1] in the node order the mesh writes,
 #: (start, end, midside): Simpson's rule for the three-pair element and the
 #: trapezoidal rule for the two-pair one.
@@ -635,7 +656,8 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
 
 
 def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
-                   dt_vp=JOINT_VP_DT, slipped=None, res_r=None, dil_p=None):
+                   dt_vp=JOINT_VP_DT, slipped=None, res_r=None, dil_p=None,
+                   ks_slip_factor=None):
     """One viscoplastic sweep over the joints: update the slip, load the residual.
 
     The global stiffness carries every joint's FULL elastic block, so ``K u``
@@ -653,6 +675,26 @@ def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
     residual one from the next sweep onward, and the slip it takes opens the
     joint by ``|d slip| tan(dil)``.
 
+    ``ks_slip_factor`` scales the stiffness the increment is DIVIDED by on a pair
+    that is at its limit, and nothing else: RS2's "automatically calculate the
+    stiffness of the joint as soon as a joint violates the strength criteria"
+    (:data:`JOINT_RS2_SLIP_STIFFNESS_FACTOR`), read into this formulation. A
+    factor below 1 makes the sweep put more slip into a slipping pair for the same
+    excess traction, so the interface returns to its limit surface in fewer
+    sweeps. Nothing about what the joint can carry moves — ``tlim`` is untouched,
+    the assembled elastic block in ``K`` is untouched, and a pair that re-sticks
+    is back on its full ``k_s`` on the very next sweep, because the selection is
+    read fresh from ``slipping`` each time. ``None`` is off and the arithmetic is
+    exactly what it was.
+
+    **It is an over-relaxation, with the stability limit that implies.** At
+    ``dt_vp = 1`` one sweep already returns the traction exactly to its limit at
+    the current displacement field, so the factor is the relaxation parameter of
+    the interface's fixed-point iteration and 1/factor is how far past the
+    return it is driven. RS2's own 0.01 is a relaxation of 100 and diverges here
+    (max|u| = 3.8e+50 in 41 sweeps on one corpus row). The measured behavior over
+    milder factors is in r15_joint_convergence.md §3.
+
     Mutates ``slip_p`` and ``open_state`` in place, adds into ``loads``, and
     returns the number of pairs that are slipping or open.
     """
@@ -664,7 +706,14 @@ def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
     excess = np.abs(st["ts_trial"]) - st["tlim"]
     grow = st["slipping"] & (excess > 0.0)
     if np.any(grow):
-        d_slip = np.where(grow, dt_vp * excess * np.sign(st["ts_trial"]) / ks, 0.0)
+        # The stiffness the increment is measured against. `ks` itself everywhere
+        # off, and `ks * factor` on the pairs that are AT their limit when the
+        # factor is asked for — which is the only place the increment is non-zero
+        # anyway, so the two forms differ by the factor alone.
+        ks_inc = (ks if ks_slip_factor is None
+                  else np.where(grow, ks * float(ks_slip_factor), ks))
+        d_slip = np.where(grow, dt_vp * excess * np.sign(st["ts_trial"]) / ks_inc,
+                          0.0)
         slip_p += d_slip
         if dil_p is not None:
             # Non-directional: the joint rides up whichever way it slides.

@@ -4960,7 +4960,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               max_iterations_ceiling=50000, early_failure=True, _init_state=None,
               _softened_seed=None, fem_solver=None, _nr_export=None,
               _nr_rescue_rungs=None, _nr_seed_first=False, _corrector=True,
-              _finite_guard=False, _finite_guard_u_max=None):
+              _finite_guard=False, _finite_guard_u_max=None,
+              joint_slip_stiffness_factor=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -5242,6 +5243,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             ~10 times. None (default) = build it here, so a standalone solve_fem is
             bit-identical to the pre-cache path. It holds no F-dependent or per-solve
             state, so a reused prepared model cannot serve a stale strength or geometry.
+        joint_slip_stiffness_factor (float or None): Scale the stiffness a
+            slipping joint pair's viscoplastic slip increment is divided by, so
+            the interface returns to its limit surface in fewer sweeps. RS2's
+            own value is 0.01 (xslope.joint.JOINT_RS2_SLIP_STIFFNESS_FACTOR) and
+            the manual's Updates page is what it is read from. It changes no
+            physics — the traction limit, the assembled elastic block and a
+            re-stuck pair's full stiffness are all untouched; it is an
+            OVER-RELAXATION of the joint's own fixed point, and the iteration is
+            already at its stability boundary at a factor of 1, so RS2's 0.01
+            diverges (see joint_vp_sweep's ``ks_slip_factor``). OFF by default
+            (None), no locked factor of safety is defined with it on, and what
+            it does to an answer is measured in r15_joint_convergence.md §3.
         fast_kernel ('auto' | bool): Compiled (Cython) constitutive kernel for the
             Mohr-Coulomb Step-6 Gauss-point update.
               * 'auto' (DEFAULT since 2026-07-26) — use the compiled
@@ -6816,7 +6829,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 n_joint_active, joint_state_last = joint_vp_sweep(
                     joint_data, u, loads, joint_cj_r, joint_tanphi_r,
                     joint_slip, joint_open, slipped=joint_slipped,
-                    res_r=joint_res_r, dil_p=joint_dil)
+                    res_r=joint_res_r, dil_p=joint_dil,
+                    ks_slip_factor=joint_slip_stiffness_factor)
                 if tie_data is not None:
                     tie_forces, n_tie_cap = tie_vp_sweep(tie_data, u, loads)
                 if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
@@ -12002,7 +12016,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                suction_phi_b=None, suction_cap=None,
                capture_failure_state=True, capture_max_iterations=None,
                capture_margin=0.15, early_failure=True, fem_solver=None,
-               ssrm_driver='bisection', trial_factors=None):
+               ssrm_driver='bisection', trial_factors=None,
+               joint_slip_stiffness_factor=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -12065,6 +12080,11 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             re-checked against the two factors its bracket closed on (see
             run_tests.py's edges mode). Default None = bisect, the only mode that
             produces a factor of safety.
+        joint_slip_stiffness_factor (float or None): Passed to every trial's
+            solve_fem AND to the in-situ equilibration, so the whole run is
+            solved one way. RS2's own value is 0.01; see solve_fem's own entry
+            for what it does and what it leaves alone. OFF by default (None),
+            and no locked factor of safety is defined with it on.
         fem_solver (str or None): Which per-trial driver runs, passed to every
             solve_fem trial — 'auto' (the default: the viscoplastic loop with the
             Newton corrector and the yield gate), 'viscoplastic' (that loop alone,
@@ -12564,6 +12584,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             # it with one solver and then continuing it with another would hand the
             # bisection a starting point its own corrector never produced.
             fem_solver=fem_solver,
+            joint_slip_stiffness_factor=joint_slip_stiffness_factor,
             _prepared=prep)
         equilibration = {
             "converged": bool(eq["converged"]),
@@ -12666,7 +12687,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
             early_failure=early_failure, fem_solver=fem_solver,
             _prepared=prep, _init_state=init_state,
-            trial_factors=trial_factors)
+            trial_factors=trial_factors,
+            joint_slip_stiffness_factor=joint_slip_stiffness_factor)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -12905,7 +12927,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
                  suction_phi_b=None, suction_cap=None, early_failure=True,
                  fem_solver=None, _prepared=None, _init_state=None, hybrid=False,
-                 trial_factors=None):
+                 trial_factors=None, joint_slip_stiffness_factor=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -13089,6 +13111,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          fem_solver=fem_solver,
                          _nr_rescue_rungs=_rescue_policy(F)[0],
                          _nr_seed_first=_rescue_policy(F)[1],
+                         joint_slip_stiffness_factor=joint_slip_stiffness_factor,
                          _prepared=_prepared, _init_state=_init_state)
 
     F_left = F_min

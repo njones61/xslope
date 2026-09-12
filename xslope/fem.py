@@ -4184,10 +4184,29 @@ _JOINT_SETTLED_OOB_FLAT = 0.85    # last quarter's joint residual / the quarter 
 _JOINT_MOVING_SLIP_FRAC = 0.02    # slip gained over the window, over the total
 _JOINT_MOVING_DECAY_MIN = 0.9     # last quarter's slip rate / the quarter before
 _JOINT_MOVING_GROWTH = 0.05       # elastic displacements gained over the window
-# A FAILED verdict gets a longer warm-up than a settled one, and the reason is the
-# same false positive: trials on this corpus are still reaching equilibrium at
-# 16 000, 41 000, 185 000 and 207 000 sweeps, so a rule that ruled on the first few
-# thousand would be ruling on a transient.
+# A FAILED verdict may only be read in the LAST TENTH OF THE BUDGET, and that is
+# the round's hardest-won number. There is no early reading that separates a
+# jointed mechanism from a jointed trial that converges late. RJ-2's standing
+# bracket edge — the trial that defines a shipped lock — reaches force
+# equilibrium at 185 381 sweeps, and on the way there it looks exactly like a
+# runaway on every reading this rule has:
+#
+#     sweeps    slip gained    max|u| gained     rate ratio    max|u|/elastic
+#      25 600         6.3 %            0.166          0.901              2.51
+#      50 000        29.9 %            1.757          6.293              4.26
+#     100 000        23.0 %            2.068          0.026              6.33
+#     185 000         0.09 %           0.009          0.024              6.33
+#
+# At 50 000 sweeps its slip rate is ACCELERATING and it has moved more than four
+# elastic displacements; it then settles and converges. Read at 25 600 sweeps the
+# rule called it a mechanism, which would have moved the RJ-2 lock. So the FAILED
+# reading is not an early exit and does not try to be one: it is a better verdict
+# at the cap, replacing an AMBIGUOUS read off a displacement ratio with a
+# measurement of the thing that is actually moving. A trial that would converge
+# later is still running when the reading is taken, and is never pre-empted.
+_JOINT_MOVING_BUDGET_FRAC = 0.9
+# ...and never before this many sweeps whatever the budget, so a short budget
+# cannot make the reading cheap.
 _JOINT_MOVING_MIN_SWEEPS = 25000
 # How often the two readings are taken. The windows they read are thousands of
 # sweeps wide, so asking every sweep the trace is sampled on would buy no
@@ -4212,7 +4231,7 @@ def _window_rate(series, lo, hi):
 
 
 def joint_verdict(slip_hist, soil_oob_hist, disp_hist, u_elastic_scale,
-                  force_tol, joint_oob_hist=None,
+                  force_tol, joint_oob_hist=None, budget=None,
                   sample_every=_HYBRID_SAMPLE_EVERY,
                   warmup=_JOINT_VERDICT_WARMUP):
     """Read an undecided jointed trial off its interface trace.
@@ -4247,6 +4266,12 @@ def joint_verdict(slip_hist, soil_oob_hist, disp_hist, u_elastic_scale,
             separates a settled model from one still on its way to equilibrium.
             ``None`` withholds 'joint_settled' entirely, because the reading it
             needs is absent.
+        budget (int or None): the trial's CURRENT sweep budget. The FAILED
+            reading is taken only in its last ``_JOINT_MOVING_BUDGET_FRAC``, so a
+            trial that would reach equilibrium later is still running when the
+            reading is due and cannot be pre-empted (see the constant for the
+            trial that proved this necessary). ``None`` withholds the FAILED
+            reading entirely, because the window it is defined on is absent.
         sample_every (int): the sampling stride, used only to turn ``warmup``
             (in sweeps) into a sample count.
         warmup (int): sweeps below which nothing is read. A joint develops its
@@ -4285,7 +4310,10 @@ def joint_verdict(slip_hist, soil_oob_hist, disp_hist, u_elastic_scale,
         if prev > 0.0 and last / prev >= _JOINT_SETTLED_OOB_FLAT:
             return 'joint_settled'
 
-    if (n * sample_every >= _JOINT_MOVING_MIN_SWEEPS
+    if (budget is not None
+            and n * sample_every >= max(
+                _JOINT_MOVING_MIN_SWEEPS,
+                _JOINT_MOVING_BUDGET_FRAC * float(budget))
             and slip_frac >= _JOINT_MOVING_SLIP_FRAC
             and growth >= _JOINT_MOVING_GROWTH):
         q = h + (n - h) // 2
@@ -7403,7 +7431,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     and iteration >= _JOINT_VERDICT_WARMUP):
                 _jv = joint_verdict(jslip_hist, soob_hist, disp_hist,
                                     u_elastic_scale, force_tol,
-                                    joint_oob_hist=joob_hist)
+                                    joint_oob_hist=joob_hist, budget=budget)
                 if _jv is not None:
                     converged = False
                     exit_reason = _jv

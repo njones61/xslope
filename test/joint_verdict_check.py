@@ -17,7 +17,7 @@ undecided trials turned out to be:
 
 What this file locks:
 
-  1. THE MEASURED SET. Seven recorded traces (test/fixtures/joint_traces.json, the
+  1. THE MEASURED SET. Nine recorded traces (test/fixtures/joint_traces.json, the
      per-sweep joint trace of six real bracket-edge trials) replayed through the
      rule sweep by sweep. Each must get the verdict the measurement supports, at
      roughly the sweep it was first supportable. This is the calibration itself,
@@ -72,7 +72,7 @@ def verdict_at_end(t, **kw):
     rather than an earlier sweep at which the unperturbed rule already spoke."""
     return joint_verdict(t['slip'], t['oob_soil'], t['disp'],
                          t['u_elastic_scale'], FORCE_TOL,
-                         joint_oob_hist=t['oob_joint'],
+                         joint_oob_hist=t['oob_joint'], budget=t['budget'],
                          sample_every=t['sample_every'], **kw)
 
 
@@ -86,7 +86,7 @@ def first_verdict(t, **kw):
             continue
         v = joint_verdict(t['slip'][:k], t['oob_soil'][:k], t['disp'][:k],
                           t['u_elastic_scale'], FORCE_TOL,
-                          joint_oob_hist=t['oob_joint'][:k],
+                          joint_oob_hist=t['oob_joint'][:k], budget=t['budget'],
                           sample_every=se, **kw)
         if v is not None:
             return v, k * se
@@ -103,7 +103,7 @@ EXPECTED = {
     'rj006_lo':  ('joint_settled', 40000),
     'rj007_ref': ('joint_settled', 40000),
     # the one undecided edge whose slip is linear: a mechanism
-    'rj006_hi':  ('steady_slip',   30000),
+    'rj006_hi':  ('steady_slip',   50000),
     # three trials the rule must decline. rj007_ctl and rj006_ctl reach force
     # equilibrium on their own (16 072 and 41 721 sweeps) and must be left to;
     # rj019_hi creeps sub-linearly, which at any sweep count inside the corpus
@@ -113,11 +113,18 @@ EXPECTED = {
     'rj006_ctl': (None,            None),
     'rj019_hi':  (None,            None),
     'vp088_lo':  (None,            None),
+    # And the two trials that CONVERGE only after a very long run. RJ-2's is the
+    # one the FAILED reading's budget gate exists for: it gains 30% of its slip
+    # and four elastic displacements by 50 000 sweeps, with an ACCELERATING slip
+    # rate, and then settles and reaches force equilibrium at 185 381. Called a
+    # mechanism, it would move a shipped lock.
+    'rj002_slow': (None,           None),
+    'rj019_slow': (None,           None),
 }
 
 
 def check_measured():
-    print("\n1. the measured set — seven recorded bracket-edge traces")
+    print("\n1. the measured set — nine recorded bracket-edge traces")
     traces = load_traces()
     check("the fixture carries every trace the calibration used",
           set(traces) == set(EXPECTED), sorted(traces))
@@ -237,6 +244,21 @@ def check_mutations():
     got = verdict_at_end(short)
     check("(g) a history shorter than the FAILED clock withdraws steady_slip",
           got != 'steady_slip', f"reads {got}")
+
+    # (h) THE BUDGET GATE, which is the condition that keeps the rule off a trial
+    # that converges late: the same history under a budget ten times longer is
+    # a trial still running, and nothing may be said about it.
+    got = verdict_at_end(dict(f, budget=10 * f['budget']))
+    check("(h) a trial still early in its budget withdraws steady_slip",
+          got != 'steady_slip', f"reads {got}")
+
+    # (i) no budget at all: the FAILED reading is withheld rather than guessed.
+    got = joint_verdict(f['slip'], f['oob_soil'], f['disp'],
+                        f['u_elastic_scale'], FORCE_TOL,
+                        joint_oob_hist=f['oob_joint'], budget=None,
+                        sample_every=f['sample_every'])
+    check("(i) no budget withholds steady_slip entirely", got != 'steady_slip',
+          f"reads {got}")
 
 
 # ===================== 3. inertness =====================

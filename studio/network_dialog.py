@@ -21,7 +21,7 @@ sets at one dip) says so there instead of raising on OK.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFormLayout,
                                QGridLayout, QGroupBox, QHBoxLayout, QLabel,
@@ -136,6 +136,12 @@ class BuildNetworkDialog(QDialog):
         self._generated = []
         self._error = ""
         self._help_by_widget = {}
+        # Regeneration is debounced (see _schedule); the interval is the preview
+        # pane's own, so the picture and the count arrive together.
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.setInterval(160)
+        self._timer.timeout.connect(self._refresh)
 
         layout = QVBoxLayout(self)
         from .editors import _help_label
@@ -205,7 +211,7 @@ class BuildNetworkDialog(QDialog):
         w = QLineEdit()
         w.setToolTip(tooltip)
         w.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        w.textChanged.connect(self._refresh)
+        w.textChanged.connect(self._schedule)
         self._help_by_widget[w] = key
         return w
 
@@ -222,7 +228,7 @@ class BuildNetworkDialog(QDialog):
         self._name.setToolTip(
             "The set's name. Every row it writes is labeled with it, so the set "
             "can be found, reopened and regenerated as one thing.")
-        self._name.textChanged.connect(self._refresh)
+        self._name.textChanged.connect(self._schedule)
         f_set.addRow("Name", self._name)
         self._kind = QComboBox()
         for word, _kind in KIND_ITEMS:
@@ -269,7 +275,7 @@ class BuildNetworkDialog(QDialog):
             "carrying it), or a polygon of Type 'joints' drawn on the polygon "
             "sheet — which is how a set is confined to ground no material "
             "boundary draws.")
-        self._region.currentIndexChanged.connect(self._refresh)
+        self._region.currentIndexChanged.connect(self._schedule)
         f_reg.addRow("Within", self._region)
         band = QWidget()
         hb = QHBoxLayout(band)
@@ -299,7 +305,7 @@ class BuildNetworkDialog(QDialog):
                     w = QComboBox()
                     w.addItems(["", "Yes", "No"])
                     w.setToolTip(JOINTS_HELP[key])
-                    w.currentIndexChanged.connect(self._refresh)
+                    w.currentIndexChanged.connect(self._schedule)
                 else:
                     w = self._edit(key, JOINTS_HELP[key])
                 self._help_by_widget[w] = key
@@ -454,6 +460,30 @@ class BuildNetworkDialog(QDialog):
                 w.setText(_display_number(value))
 
     # -- the live preview --------------------------------------------------
+    def _schedule(self, *_args):
+        """A field changed: regenerate shortly, not on this keystroke.
+
+        Generating is the expensive part — a Voronoi network over a section is a
+        tessellation of thousands of cells — and a half-typed block size is a
+        network nobody asked for. The debounce is the one the preview pane
+        already uses for drawing, applied one step earlier so the typing itself
+        stays responsive. Anything that READS the result flushes it first, so
+        nothing ever sees a stale count.
+        """
+        self._timer.start()
+
+    def _flush(self):
+        """Regenerate now if a change is still pending."""
+        self._timer.stop()
+        self._refresh()
+
+    def accept(self):
+        """OK: never on a set the pending edits have not been generated yet."""
+        self._flush()
+        if not self._generated:
+            return
+        super().accept()
+
     def _refresh(self, *_args):
         """Regenerate the set for the preview and say what it came to."""
         jset = self.result_set()
@@ -538,6 +568,7 @@ class BuildNetworkDialog(QDialog):
     # -- results -----------------------------------------------------------
     def result_rows(self):
         """The rows OK writes: the set, generated and labeled with its record."""
+        self._flush()
         return [dict(r) for r in self._generated]
 
     def editing(self):

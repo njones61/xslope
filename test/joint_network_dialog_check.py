@@ -110,7 +110,9 @@ def _leg_dialog(failures, results):
                         f"({banded[0]['label']!r})")
 
     # A name another set is already using is refused, by name, before OK.
+    # (Regeneration is debounced; reading it back flushes rather than waits.)
     dlg._name.setText('st')
+    dlg._flush()
     if dlg._buttons.button(dlg._buttons.StandardButton.Ok).isEnabled():
         failures.append("dialog: a set name the model already uses was accepted")
     if 'st' not in dlg._status.text():

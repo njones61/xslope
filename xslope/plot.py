@@ -748,7 +748,9 @@ def plot_joint_zones(ax, slope_data, style=None):
     Parameters:
         ax: matplotlib Axes object
         slope_data: dict; reads 'joint_zones' (absent/empty → nothing is drawn)
-        style: optional style sheet (see xslope.style); None → defaults
+        style: accepted for one signature across the plot_* family. A joint
+            region has no style feature of its own: it is drawn in the color of
+            the traces inside it, so that the two read as one thing.
     """
     zones = slope_data.get('joint_zones') or []
     if not zones:

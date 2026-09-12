@@ -6076,6 +6076,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         joint_dil = (np.zeros((joint_data["n"], 3))
                      if joint_data.get("has_dilation") else None)
         joint_state_last = None
+        # The ACTIVE SET, and how often it moves. Every sweep the interface's
+        # constitutive state is read fresh: a pair is sticking (0), slipping (1)
+        # or open (2). The rate at which that set changes is what says whether a
+        # long jointed solve is chattering between states or crawling towards
+        # equilibrium with a fixed set — two different diseases with two
+        # different cures, and the sweep count alone does not separate them. The
+        # comparison is one integer compare over (n, 3) per sweep on a jointed
+        # model and nothing at all without one.
+        joint_code_prev = np.zeros((joint_data["n"], 3), dtype=np.int8)
+        joint_n_changed = 0            # pairs that changed state, this sweep
+        joint_sweeps_changed = 0       # sweeps in which any pair changed
+        jchg_hist = []
         # The free nodes that carry a joint, in the same order and selection the
         # out-of-balance reading uses (`node_has_free`), so the residual can be
         # read on the interface and on the rest of the mesh SEPARATELY. A jointed
@@ -6863,6 +6875,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     joint_slip, joint_open, slipped=joint_slipped,
                     res_r=joint_res_r, dil_p=joint_dil,
                     ks_slip_factor=joint_slip_stiffness_factor)
+                # The active set's movement (see joint_code_prev). 0 sticking,
+                # 1 slipping, 2 open.
+                _jcode = (joint_state_last["slipping"].astype(np.int8)
+                          + 2 * joint_state_last["open"])
+                joint_n_changed = int(np.count_nonzero(_jcode != joint_code_prev))
+                if joint_n_changed:
+                    joint_sweeps_changed += 1
+                joint_code_prev = _jcode
                 if tie_data is not None:
                     tie_forces, n_tie_cap = tie_vp_sweep(tie_data, u, loads)
                 if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
@@ -7168,6 +7188,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                      if _joint_node_free.any() else 0.0)
                     soob_hist.append(float(oob_node[_soil_node_free].max())
                                      if _soil_node_free.any() else 0.0)
+                    jchg_hist.append(int(joint_n_changed))
 
             # Force-equilibrium condition. The threshold is ABSOLUTE, which is what
             # makes the test immune to the size of the domain and to the size of the
@@ -7521,6 +7542,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             "slip": list(jslip_hist), "n_slipping": list(jslipn_hist),
             "n_open": list(jopen_hist),
             "oob_joint": list(joob_hist), "oob_soil": list(soob_hist),
+            "n_changed": list(jchg_hist),
+            "sweeps_changed": int(joint_sweeps_changed),
             "n_joint_pairs": int(joint_data["n"] * 3),
         })
     stable = bool(converged or (failure_criterion == 'hybrid'

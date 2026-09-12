@@ -8305,6 +8305,142 @@
         "k0": 1.0,
         "line_loads": 0,
         "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj002.xlsx",
+      "references": [
+        {
+          "anchor": "rj-2",
+          "checks": [
+            "RJ-2"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-2: Alejano & Alonso block toppling (rj002)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-2"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj008.xlsx",
+      "references": [
+        {
+          "anchor": "rj-8",
+          "checks": [
+            "RJ-8"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-8: Flexural toppling in a base friction model (rj008)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-8"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
           "mc"
         ],
         "n_materials": 1,
@@ -25206,7 +25342,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 354,
+    "models": 356,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -25245,12 +25381,12 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 620,
+    "tags": 622,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 161,
-      "non-circular": 33,
+      "homogeneous": 163,
+      "non-circular": 35,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
@@ -25340,6 +25476,8 @@
       "docs/verification/files/geostudio/gs2_heap.xlsx",
       "docs/verification/files/geostudio/gs2_infil.xlsx",
       "docs/verification/files/rocscience/hammah_hb1.xlsx",
+      "docs/verification/files/rocscience/joints/rj002.xlsx",
+      "docs/verification/files/rocscience/joints/rj008.xlsx",
       "docs/verification/files/rocscience/joints/rj018.xlsx",
       "docs/verification/files/rocscience/rs2_56a.xlsx",
       "docs/verification/files/rocscience/rs2_56b.xlsx",
@@ -25465,6 +25603,8 @@
       "docs/lem/files/xslope_noncircular.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
       "docs/verification/files/geostudio/gs2_33.xlsx",
+      "docs/verification/files/rocscience/joints/rj002.xlsx",
+      "docs/verification/files/rocscience/joints/rj008.xlsx",
       "docs/verification/files/rocscience/joints/rj018.xlsx",
       "docs/verification/files/rocscience/vp008.xlsx",
       "docs/verification/files/rocscience/vp009.xlsx",

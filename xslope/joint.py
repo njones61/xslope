@@ -905,25 +905,40 @@ def tie_vp_sweep(td, u, loads):
     return f_true, int(np.count_nonzero(at_cap))
 
 
-def joint_internal_force(jd, u, cj_r, tanphi_r, want_tangent=False):
+def joint_internal_force(jd, u, cj_r, tanphi_r, want_tangent=False,
+                         slip_p=None, open_prev=None, slipped=None,
+                         res_r=None, dil_p=None, cross=False):
     """The joints' internal force vector contribution, and optionally the tangent.
 
-    The stateless form the Newton driver needs: the shear traction is returned
-    onto the Mohr-Coulomb limit and the normal traction onto the tension cutoff,
-    both as functions of the current displacement alone, so nothing is committed
-    at the end of a step. The tangent drops ``k_s`` on a slipping pair and both
-    stiffnesses on an open one.
+    The form the Newton driver needs: the shear traction is returned onto the
+    Mohr-Coulomb limit and the normal onto the tension cutoff, both as functions
+    of the current displacement, so nothing is committed at the end of a step.
 
-    Residual strength and dilation are histories, and a stateless law cannot
-    carry one: this reads every pair on its PEAK branch with no dilational
-    opening. That is not a limitation of any answer the solver produces, because
-    the Newton corrector is skipped on every jointed model (``_corrector_on``
-    reads ``joint_data is None``) — a slipping pair's shear traction does not
-    depend on displacement, so a displacement-only corrector has nothing to move.
+    **The internal variables are carried, not dropped.** ``slip_p`` is the
+    accumulated plastic tangential offset, ``dil_p`` the accumulated dilational
+    opening, ``slipped`` and ``res_r`` the residual branch and ``open_prev`` the
+    opening history — the same five the viscoplastic sweep keeps. Passed in, they
+    are held FIXED across the Newton step and the law is linearized about them,
+    which is what lets the corrector move a state the sweep grew slip into: the
+    return is then relative to a real internal state instead of to zero slip.
+    All ``None`` is the stateless form, every pair on its peak branch with no
+    slip and no dilation behind it.
+
+    **The tangent.** Sticking: ``k_s`` and ``k_n``. Open: neither. Slipping: the
+    shear traction is ``+-(c_j + t_n tan phi_j)`` and does not move with the
+    tangential displacement at all, so the tangential stiffness is zero — but it
+    DOES move with the normal one, through ``t_n = k_n delta_n``, and
+    ``d t_s / d delta_n = +- k_n tan phi_j`` is a non-symmetric rank-one term.
+    ``cross=True`` supplies it. It is the difference between a tangent whose
+    worst departure from a finite difference is 0.53 and one whose worst is 0.16
+    (r3_surfaces.md §2). The tip-borrowed limit normal (:func:`_limit_normal`)
+    is treated as fixed in the linearization: it is an average over the pairs of
+    one element and it applies to the two pairs at a line's ends only.
 
     Returns ``(f, Ke, state)`` with ``f`` of shape (n, 12).
     """
-    st = joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None)
+    st = joint_state(jd, u, cj_r, tanphi_r, slip_p=slip_p, open_prev=open_prev,
+                     slipped=slipped, res_r=res_r, dil_p=dil_p)
     w = jd["w"]
     fx = w * (st["ts"] * jd["tx"][:, None] - st["tn"] * jd["nx"][:, None])
     fy = w * (st["ts"] * jd["ty"][:, None] - st["tn"] * jd["ny"][:, None])
@@ -937,16 +952,31 @@ def joint_internal_force(jd, u, cj_r, tanphi_r, want_tangent=False):
     if want_tangent:
         ks_eff = np.where(st["slipping"] | st["open"], 0.0, jd["ks"][:, None])
         kn_eff = np.where(st["open"], 0.0, jd["kn"][:, None])
+        # The friction cross term, d t_s / d delta_n, on the slipping pairs that
+        # are in contact and carrying compression. Zero everywhere else, and zero
+        # throughout unless it is asked for.
+        if cross:
+            _tp = (np.where(slipped, res_r[1][:, None], tanphi_r[:, None])
+                   if (slipped is not None and res_r is not None)
+                   else np.broadcast_to(tanphi_r[:, None], ks_eff.shape))
+            b_eff = np.where(st["slipping"] & ~st["open"] & (st["tn"] > 0.0),
+                             np.sign(st["ts"]) * jd["kn"][:, None] * _tp, 0.0)
+        else:
+            b_eff = np.zeros_like(ks_eff)
         Ke = np.zeros((n, 12, 12))
         tx, ty, nx, ny = jd["tx"], jd["ty"], jd["nx"], jd["ny"]
         for p in range(3):
             wp = w[:, p]
-            kse, kne = ks_eff[:, p], kn_eff[:, p]
+            kse, kne, be = ks_eff[:, p], kn_eff[:, p], b_eff[:, p]
             D = np.empty((n, 2, 2))
-            D[:, 0, 0] = wp * (kse * tx * tx + kne * nx * nx)
-            D[:, 0, 1] = wp * (kse * tx * ty + kne * nx * ny)
-            D[:, 1, 0] = D[:, 0, 1]
-            D[:, 1, 1] = wp * (kse * ty * ty + kne * ny * ny)
+            # w (a t(x)t - b t(x)n - c n(x)t + e n(x)n), with a the tangential
+            # stiffness, e the normal one, b the friction cross term and c zero:
+            # the normal traction does not move with the tangential displacement
+            # on any branch.
+            D[:, 0, 0] = wp * (kse * tx * tx + kne * nx * nx - be * tx * nx)
+            D[:, 0, 1] = wp * (kse * tx * ty + kne * nx * ny - be * tx * ny)
+            D[:, 1, 0] = wp * (kse * tx * ty + kne * nx * ny - be * ty * nx)
+            D[:, 1, 1] = wp * (kse * ty * ty + kne * ny * ny - be * ty * ny)
             ia, ib = 2 * p, 6 + 2 * p
             Ke[:, ia:ia + 2, ia:ia + 2] += D
             Ke[:, ia:ia + 2, ib:ib + 2] -= D

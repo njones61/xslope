@@ -4220,6 +4220,26 @@ _JOINT_RELIEF_SWEEPS = 20000
 #: the direction that cannot be delayed, never costs the immediate one either.
 _JOINT_RELIEF_ARM = 5
 
+# === The Newton path on a jointed model ========================================
+# r3_surfaces.md §2 measured why the corrector is skipped on every jointed model:
+# the residual sits entirely on the interface, and a slipping pair's shear
+# traction is pinned at its limit and does not move with the tangential
+# displacement, so a displacement-only corrector has nothing to move. Two things
+# were missing from that reading and both are supplied now — the friction cross
+# term the shipped tangent omits, and the accumulated slip, which the corrector's
+# stateless law threw away and which is the state a grown mechanism lives in. The
+# switch below turns the corrector back on for a jointed model so that the pair
+# can be measured rather than assumed.
+#:
+#: The corrector on a jointed model. OFF: the skip r3 decided stands.
+JOINT_NEWTON_ON = False
+
+#: The friction cross term d t_s / d delta_n = +- k_n tan phi_j in the interface
+#: tangent. It is the consistent tangent and it costs nothing, but it makes the
+#: tangent NON-SYMMETRIC, which only the Newton path's general LU can take — the
+#: viscoplastic loop's factorization is symmetric and never sees it.
+JOINT_NEWTON_CROSS = True
+
 #: The largest displacement change one relieved sweep may make, as a fraction of
 #: the trial's own elastic response. It bounds the path, not the answer: near the
 #: fixed point the step is far under it and the cap never binds.
@@ -5770,6 +5790,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         continue
                     _jg['cj_r'], _jg['tanphi_r'] = joint_reduced_strength(
                         _jg['jd'], F_new)
+                    if _jg.get('slipped') is not None:
+                        _jg['res_r'] = joint_reduced_residual_strength(
+                            _jg['jd'], F_new)
             _nr_export['restrength'] = _restrength
         _nr_kw = dict(
             c_reduced=c_reduced, phi_reduced=phi_reduced,
@@ -5947,7 +5970,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # viscoplastic verdict stands in every case, which is what it did before,
     # so nothing is lost by not spending the attempts.
     _corrector_on = ((_solver == 'auto') and bool(_corrector)
-                     and fem_data.get("joint_data") is None)
+                     and (fem_data.get("joint_data") is None
+                          or JOINT_NEWTON_ON))
     _corr_attempts = []
     _corr_nr_kw = None
     if _corrector_on:
@@ -5985,6 +6009,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         _kw = dict(_corr_nr_kw)
         if softened_now is not None and np.any(softened_now):
             _kw['_softened_seed'] = softened_now
+        if has_joints:
+            # The interface's own internal variables go with the field. Without
+            # them the corrector linearizes a slip-grown state about zero slip,
+            # which is a different problem from the one the sweep is solving.
+            _kw['_nr_joint_state'] = {
+                'slip_p': joint_slip.copy(), 'open_prev': joint_open.copy(),
+                'slipped': None if joint_slipped is None else joint_slipped.copy(),
+                'dil_p': None if joint_dil is None else joint_dil.copy()}
         try:
             _sol = _solve_fem_newton(fem_data, F, prep, _nr_seed_state=_seed, **_kw)
         except Exception as _exc:      # KeyboardInterrupt is a BaseException
@@ -6156,8 +6188,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     has_joints = joint_data is not None and joint_data["n"] > 0
     # None on every model without a joint and on every jointed model whose
     # interface relief is off, which is what the convergence window reads to know
-    # it has nothing to subtract.
+    # it has nothing to subtract. Both are set here rather than inside the jointed
+    # branch so that a model with no joint reaches the same two names.
     joint_relief_load = None
+    joint_relief_on = False
     if has_joints:
         joint_cj_r, joint_tanphi_r = joint_reduced_strength(joint_data, F)
         joint_slip = np.zeros((joint_data["n"], 3))
@@ -9133,7 +9167,7 @@ def _nr_build_bars(fem_data):
     return bars or None
 
 
-def _nr_build_joints(fem_data, F):
+def _nr_build_joints(fem_data, F, state=None, cross=None):
     """The model's interface (joint) element and tie groups, or ``None``.
 
     One group per kind, shaped like the bar groups the same assembly pattern
@@ -9146,8 +9180,20 @@ def _nr_build_joints(fem_data, F):
     if jd is None or jd["n"] == 0:
         return None
     cj_r, tanphi_r = joint_reduced_strength(jd, F)
+    # The interface's internal variables, held fixed across the Newton step and
+    # linearized about (see joint_internal_force). `state` is what the
+    # viscoplastic sweep has grown into this interface by the point the corrector
+    # is handed the field; None is the stateless law, which is the only thing a
+    # cold Newton start has.
+    st = state or {}
     groups = [{'kind': 'joint', 'jd': jd, 'dof': jd['dof'],
-               'cj_r': cj_r, 'tanphi_r': tanphi_r}]
+               'cj_r': cj_r, 'tanphi_r': tanphi_r,
+               'slip_p': st.get('slip_p'), 'open_prev': st.get('open_prev'),
+               'slipped': st.get('slipped'),
+               'res_r': joint_reduced_residual_strength(jd, F)
+                        if st.get('slipped') is not None else None,
+               'dil_p': st.get('dil_p'),
+               'cross': JOINT_NEWTON_CROSS if cross is None else bool(cross)}]
     td = jd.get("ties")
     if td is not None:
         groups.append({'kind': 'tie', 'td': td, 'dof': td['dof']})
@@ -9158,7 +9204,13 @@ def _nr_joint_force(jg, u, want_tangent):
     """One joint or tie group's internal force (and tangent) at displacement ``u``."""
     if jg['kind'] == 'joint':
         f, Ke, st = joint_internal_force(jg['jd'], u, jg['cj_r'], jg['tanphi_r'],
-                                         want_tangent=want_tangent)
+                                         want_tangent=want_tangent,
+                                         slip_p=jg.get('slip_p'),
+                                         open_prev=jg.get('open_prev'),
+                                         slipped=jg.get('slipped'),
+                                         res_r=jg.get('res_r'),
+                                         dil_p=jg.get('dil_p'),
+                                         cross=jg.get('cross', False))
         jg['_state'] = st
     else:
         f, Ke, at_cap = tie_internal_force(jg['td'], u, want_tangent=want_tangent)
@@ -10492,7 +10544,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                       debug_level=0, progress_callback=None,
                       nr_max_iter=_NR_MAX_ITER, nr_min_step=_NR_MIN_STEP,
                       _nr_seed=None, k0=None, _nr_init_state=None,
-                      _nr_seed_state=None, _nr_env_F=None, _softened_seed=None):
+                      _nr_seed_state=None, _nr_env_F=None, _softened_seed=None,
+                      _nr_joint_state=None):
     """One strength-reduction trial by Newton-Raphson (SPIKE; see SPIKE.md).
 
     Returns the same result dictionary solve_fem returns, so the SSRM bisection
@@ -10618,7 +10671,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # current displacement alone -- the shear traction returned onto the
     # Mohr-Coulomb limit, the normal onto the tension cutoff -- so, like the bar,
     # they carry no state across a step.
-    joints = _nr_build_joints(fem_data, F)
+    joints = _nr_build_joints(fem_data, F, state=_nr_joint_state)
     pattern = _nr_prepare_assembly(groups, free_dofs, n_dof, bars=bars,
                                    piles=piles, joints=joints)
 

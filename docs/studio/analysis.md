@@ -748,8 +748,8 @@ a colorbar) instead of solid black.
 On a jointed model the displacement-vector plot is the scaled deformed mesh instead, with both faces of every joint
 drawn over a light element grid: a jointed slope fails by blocks moving as bodies on their joints, and an arrow
 field sampled at nodes misses the parting and sliding that is the whole mechanism. A **Joint state** switch draws
-each joint on the line it runs along, as a hairline colored by how far its faces have slid, gray where it is not
-slipping and ticked across where it has opened.
+each joint on the line it runs along, colored by how far its faces have slid on a green ramp the strain field cannot
+produce, gray where it is not slipping and ticked across where it has opened.
 
 The FEM · Results toolbar also carries **1D Details…**, which opens a non-modal panel
 listing every reinforcement line and pile in the model with a utilization badge, and

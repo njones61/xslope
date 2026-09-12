@@ -2751,14 +2751,33 @@ def _model_span(slope_data):
 #: enough to read as a hatch on the line rather than as geometry of its own.
 JOINT_TICK_FRACTION = 0.009
 
-#: A bar-less joint line's color. Dark rather than the reinforcement gray,
-#: because the line is not a member: it is a surface the two sides slide on, and
-#: a section drawing draws a fault or a bedding plane dark and dashed.
-JOINT_COLOR = '#33383d'
+#: A bar-less joint line's color: a saturated green, the dark end of the hue the
+#: results overlay ramps a joint's slip along, so a joint is one recognizable
+#: thing on every panel it appears on. It was a near-black gray, which is what
+#: a section drawing gives a fault — but over a mesh panel the mesh edges are
+#: black too, and over a results field the ``coolwarm`` ramp owns both blue and
+#: red: green is the one strong hue neither the edges, the zone fills nor the
+#: field can produce.
+JOINT_COLOR = '#0f7d33'
 
-#: A bar-less joint line's weight. Thin: the line says where a surface is, and a
-#: model can carry a network of them.
-JOINT_LINEWIDTH = 1.2
+#: A bar-less joint line's weight. Thin — the line says where a surface is, and
+#: a model can carry a network of them — but heavier than a mesh edge, so it
+#: stands off the grid it is drawn over.
+JOINT_LINEWIDTH = 1.6
+
+#: The white under-stroke a joint trace carries where it is drawn over something
+#: busy: a dense mesh, or a contoured field. Half a point of white on each side
+#: is enough to hold the trace off its background without thickening the mark.
+JOINT_HALO_LINEWIDTH = 0.6
+JOINT_HALO_COLOR = 'white'
+
+
+def joint_halo_effects(linewidth=JOINT_LINEWIDTH):
+    """Path effects drawing a thin white stroke under a joint trace of this
+    weight — the idiom, so the width of the halo is never written out twice."""
+    import matplotlib.patheffects as pe
+    return [pe.Stroke(linewidth=linewidth + 2 * JOINT_HALO_LINEWIDTH,
+                      foreground=JOINT_HALO_COLOR), pe.Normal()]
 
 #: The most joint lines that still get the fault symbol — dashes and ticks. A
 #: tick says "the two sides of this line can move on each other", and each line
@@ -4476,10 +4495,15 @@ def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=T
             ys_j = [float(q[1]) for q in pts]
             has_bar = rec.get("bar", True)
             color_j = 'darkgray' if has_bar else JOINT_COLOR
+            # The bar-less trace is the one drawn straight over the element
+            # edges, so it carries the white under-stroke; the reinforcement
+            # joint is already three points wide and does not need it.
             ax.plot(xs_j, ys_j, color=color_j,
                     linewidth=3 if has_bar else JOINT_LINEWIDTH,
                     linestyle='-' if has_bar else dash_j, alpha=0.95,
-                    zorder=6)
+                    zorder=6,
+                    path_effects=None if has_bar
+                    else joint_halo_effects(JOINT_LINEWIDTH))
             if ticks_j:
                 draw_joint_ticks(ax, xs_j, ys_j, span_j, color_j, alpha=0.95,
                                  zorder=6)

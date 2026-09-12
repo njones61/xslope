@@ -265,7 +265,7 @@ reinforcement — a rock joint, a bedding plane, a block-on-block contact, the b
 of a wall against the soil. Their fields group as **Identity**, **Geometry**,
 **Strength** (c, phi and the tension cutoff the joint parts at) and **Stiffness**
 (kn, ks and the Jred switch that decides whether a strength reduction reduces the
-joint with the soil). The preview draws each line the way the section does, dark
+joint with the soil). The preview draws each line the way the section does, green
 and dashed with short ticks on both sides, with the selected one emphasized. Past
 a handful of lines the ticks come off and the traces go solid — on a generated
 network of hundreds of them the ticks are all you can see — but the selected line

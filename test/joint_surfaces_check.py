@@ -72,11 +72,16 @@ ADHESION, DELTA = 5.0, 25.0
 TARGET_SIZE = 3.0
 SIZE_1D = 2.0
 
-#: The heaviest a joint span may be drawn (points). The overlay was three-point
-#: bars over a four-and-a-half-point black under-stroke, which a model with
-#: hundreds of joints turns into a solid mat over the field; every span is a
-#: hairline now, and this is the bound that keeps it one.
-_HAIRLINE_MAX = 1.5
+#: The heaviest a joint span may be drawn (points), and the heaviest its white
+#: under-stroke may be. The overlay was three-point bars over a four-and-a-half
+#: point black under-stroke, which a model with hundreds of joints turns into a
+#: solid mat over the field. It is thin lines now: a slipping span carries the
+#: reading and takes the weight, an intact one stays out of the way, and only
+#: the slipping one is backed by white so a dark green line still reads over a
+#: dark blue or red patch of field. These are the bounds that keep it that way.
+_SPAN_MAX = 1.6
+_INTACT_MAX = 1.0
+_HALO_MAX = _SPAN_MAX + 1.3
 
 
 def _quiet(fn, *a, **kw):
@@ -233,6 +238,7 @@ def _leg_plots(failures, cache):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from xslope.plot import plot_mesh, plot_reinforcement_lines
+    from xslope import plot_fem as _PF
     from xslope.plot_fem import plot_joint_states
     sd, mesh, fem_data, sol = cache["solved"]
 
@@ -293,6 +299,46 @@ def _leg_plots(failures, cache):
         failures.append(f"the mesh plot does not draw the jointed line: {texts}")
     plt.close(fig)
 
+    # A BAR-LESS joint over the mesh is drawn in the joint color and backed by
+    # white. The element edges are black and the zone fills are the palette's,
+    # so a near-black trace could not be told from an edge; the color that tells
+    # them apart is the family the slip ramp ends on, and the white under-stroke
+    # is what holds the trace off a dense grid. The fixture's own joints carry
+    # bars, so the same mesh is read with its joint records made bar-less — the
+    # station triple is [upper, bar, lower] and a bar-less line records -1 in
+    # the middle of it.
+    from xslope.plot import JOINT_COLOR, JOINT_LINEWIDTH
+    import matplotlib.colors as _mc
+    mesh_bl = dict(mesh)
+    mesh_bl["joints"] = [
+        dict(rec, bar=False,
+             stations=[[int(st[0]), -1, int(st[-1])]
+                       for st in (rec.get("stations") or [])])
+        for rec in (mesh.get("joints") or [])]
+    fig = plt.figure()
+    _quiet(plot_mesh, mesh_bl, materials=sd.get("materials"), fig=fig)
+    ax = fig.axes[0]
+    want = _mc.to_rgba(JOINT_COLOR)
+    # The trace runs through the line's stations; the ticks across it are the
+    # two-point marks in the same color, and they keep their own style.
+    traces = [ln for ln in ax.get_lines()
+              if _mc.to_rgba(ln.get_color()) == want and len(ln.get_xdata()) > 2]
+    if not traces:
+        failures.append("the mesh panel draws no bar-less joint trace in the "
+                        "joint color, so a joint is not told from a mesh edge")
+    for ln in traces:
+        if abs(ln.get_linewidth() - JOINT_LINEWIDTH) > 1e-9:
+            failures.append(f"a mesh-panel joint trace is not the joint weight: "
+                            f"{ln.get_linewidth()}")
+        if not ln.get_path_effects():
+            failures.append("a mesh-panel joint trace carries no white "
+                            "under-stroke over the element edges")
+    if want[1] <= max(want[0], want[2]):
+        failures.append(f"the joint color {JOINT_COLOR} is not green-dominant, "
+                        f"so it is not the family the slip ramp ends on and the "
+                        f"panels no longer agree")
+    plt.close(fig)
+
     # The results overlay: hairlines, no state legend, a colorbar only where
     # something slipped. A network of hundreds of traces is the case this is
     # drawn for, so weight and legend entries are both part of the contract.
@@ -303,8 +349,64 @@ def _leg_plots(failures, cache):
     if not cols:
         failures.append("the results overlay draws no joint")
     widths = [w for c in cols for w in c.get_linewidths()]
-    if widths and max(widths) > _HAIRLINE_MAX:
-        failures.append(f"a joint is drawn heavier than a hairline: {widths}")
+    if widths and max(widths) > _HALO_MAX:
+        failures.append(f"a joint is drawn heavier than a thin line and its "
+                        f"under-stroke: {widths}")
+    # The slipping spans carry the reading, so they take the weight and the
+    # white backing; the intact ones stay lighter and carry none. The three
+    # collections are told apart by color: white is the under-stroke, the
+    # neutral gray is the intact hairline, whatever is left is the slip.
+    import matplotlib.colors as mcolors
+    _white = mcolors.to_rgba(_PF._JOINT_HALO_COLOR)
+    _gray = mcolors.to_rgba(_PF._JOINT_INTACT_COLOR)
+    halo = [c for c in cols if tuple(c.get_colors()[0]) == _white]
+    faint = [c for c in cols if tuple(c.get_colors()[0]) == _gray]
+    slid = [c for c in cols if c not in halo and c not in faint]
+    if not halo:
+        failures.append("the slipping spans carry no white under-stroke, so a "
+                        "dark one over a dark patch of field has nothing to "
+                        "stand off")
+    if not faint:
+        failures.append("the fixture's intact spans are not drawn in the "
+                        "neutral gray")
+    for c in faint:
+        if max(c.get_linewidths()) > _INTACT_MAX:
+            failures.append(f"an intact span is drawn as heavily as a slipping "
+                            f"one: {c.get_linewidths()}")
+    for c in slid:
+        if max(c.get_linewidths()) > _SPAN_MAX:
+            failures.append(f"a slipping span is heavier than the contract: "
+                            f"{c.get_linewidths()}")
+    for c in halo:
+        if max(c.get_linewidths()) <= _SPAN_MAX:
+            failures.append("the under-stroke is no wider than the line it is "
+                            "meant to back")
+        if slid and c.get_zorder() >= min(x.get_zorder() for x in slid):
+            failures.append("the white under-stroke is drawn over its line")
+
+    # The ramp shares no color with the field it is drawn over. The field is
+    # coolwarm — blue through white to red — and the slip ramp is green: every
+    # color on it has green as its strongest channel, which no coolwarm value
+    # has. Measured on the ramps themselves rather than asserted of a name, so
+    # swapping either for another cannot quietly lose the separation.
+    ramp = _PF._joint_slip_cmap()
+    if ramp.name != _PF._JOINT_SLIP_CMAP:
+        failures.append(f"the slip ramp is not the one the module names: "
+                        f"{ramp.name!r} vs {_PF._JOINT_SLIP_CMAP!r}")
+    if specs and getattr(specs[0][0], "cmap", None) is not None:
+        if specs[0][0].cmap.name != ramp.name:
+            failures.append("the colorbar is drawn from a different ramp than "
+                            "the spans, so the reading would not be honest")
+    _ramp = ramp(np.linspace(0.0, 1.0, 64))[:, :3]
+    _sep = float((_ramp[:, 1] - np.maximum(_ramp[:, 0], _ramp[:, 2])).min())
+    if _sep <= 0.1:
+        failures.append(f"the slip ramp is not green-dominant throughout "
+                        f"(worst margin {_sep:.3f}), so it can be read as part "
+                        f"of the coolwarm field under it")
+    _field = plt.get_cmap('coolwarm')(np.linspace(0.0, 1.0, 256))[:, :3]
+    if float((_field[:, 1] - np.maximum(_field[:, 0], _field[:, 2])).max()) > 0.0:
+        failures.append("the field ramp is green-dominant somewhere, so green "
+                        "no longer separates the joints from it")
     labels = [str(t.get_label()) for t in ax.get_lines()]
     if any(s.startswith("Joint (") for s in labels):
         failures.append(f"the overlay still carries state legend entries: "

@@ -22,7 +22,10 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Polygon
 
 from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by name)
-from .plot import adaptive_colorbar_ticks, declared_unit_labels
+from .plot import (adaptive_colorbar_ticks, declared_unit_labels,
+                   JOINT_COLOR, JOINT_LINEWIDTH,
+                   JOINT_HALO_COLOR as _JOINT_HALO_COLOR,
+                   JOINT_HALO_LINEWIDTH as _JOINT_HALO_PT)
 
 
 def _fem_cbar_label(fem_data, base, unit_key):
@@ -1788,8 +1791,10 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
                                label='Original (outline)')
 
     # Plot deformed mesh. On a jointed model the element edges step back to a
-    # light gray and the joint faces are drawn over them in the deformed color:
-    # the elements are there for context, the joints are the mechanism.
+    # light gray and the joint faces are drawn over them in the joint's OWN
+    # color — the same green the section drawings and the slip overlay give a
+    # joint, so it is one recognizable thing on every panel: the elements are
+    # there for context, the joints are the mechanism.
     draw_faces = joint_faces and bool((fem_data.get("joint_data") or {}).get("n"))
     plot_mesh_lines(ax, fem_data_deformed,
                     color=_DEFORMED_GRID_UNDER_JOINTS if draw_faces else deformed_color,
@@ -1797,7 +1802,8 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     if draw_faces:
         ax.add_collection(LineCollection(
             _joint_face_segments(fem_data, nodes_deformed),
-            colors=deformed_color, linewidths=max(lw, floor_pt), alpha=1.0,
+            colors=JOINT_COLOR,
+            linewidths=max(lw, floor_pt, JOINT_LINEWIDTH), alpha=1.0,
             zorder=6.5, label='Joint faces'))
 
     # Plot members in both original and deformed configurations. The two
@@ -2345,21 +2351,43 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
 #: quantity and a second color ramp on the same line would compete with the
 #: field underneath it.
 _JOINT_INTACT_COLOR = '#999999'
-_JOINT_SLIP_CMAP = 'Purples'
+_JOINT_SLIP_CMAP = 'joint_slip'
 _JOINT_OPEN_MARK_COLOR = '#33383d'
 
-#: Where the slip ramp starts on its base colormap. ``Purples`` begins at white,
-#: which a three-point bar over a black under-stroke could carry and a hairline
-#: cannot: over a contoured field a white hairline is not there at all. The ramp
-#: is truncated at its pale end so the smallest slip still reads as slip, and
-#: the colorbar is drawn from the SAME truncated ramp so the reading is honest.
-_JOINT_SLIP_FLOOR = 0.30
+#: The slip ramp itself: bright lime through to dark green. The field under this
+#: overlay is ``coolwarm`` — blue low, WHITE through the middle, red high — so
+#: the ramp has to be a hue the field cannot produce at any of its values; a
+#: purple line sat inside the field's own range at both ends and disappeared
+#: into it. Every color here is green-dominant, which no coolwarm value is.
+#:
+#: Both ends were chosen by rendering, against the toppling set where the slip
+#: runs from the smallest reading to the largest across a field that goes from
+#: dark blue to red through white. A standard ``YlGn`` truncated at its pale end
+#: was the other candidate and lost on its low end: its light yellow-green spans
+#: went soft exactly where the field is at its white middle, and against their
+#: own white under-stroke. A saturated lime does not — it is far from white at
+#: any value, and far from both of the field's ends.
+_JOINT_SLIP_COLORS = ('#aef000', '#3fa62c', '#0a5c1e')
 
-#: Nominal weight (points) of a joint span. A joint has no width and a network
+#: Nominal weight (points) of a joint span that is NOT slipping — the lightest
+#: mark that still says where the surface is. A joint has no width and a network
 #: can carry hundreds of them, so weight is the one thing the drawing cannot
-#: spend: every span is a hairline, floored at one device pixel by the caller so
-#: it stays crisp rather than smearing into a sub-pixel haze.
-_JOINT_HAIRLINE_PT = 1.0
+#: spend; the floor at one device pixel is applied by the caller so the line
+#: stays crisp rather than smearing into a sub-pixel haze.
+_JOINT_HAIRLINE_PT = 0.9
+
+#: Nominal weight (points) of a span that IS slipping. Slip is the reading the
+#: overlay exists to carry, so it takes the extra weight and the intact spans
+#: stay out of the way.
+_JOINT_SLIP_PT = 1.6
+
+#: The white under-stroke is the section drawing's (``plot.JOINT_HALO_*``): half
+#: a point of white on each side keeps a dark green span readable where the field
+#: beneath it goes dark blue or dark red. The intact gray hairlines carry no
+#: halo, so nothing is spent saying that nothing happened.
+
+#: The open mark's weight, unchanged: the tick is the same mark it was.
+_JOINT_OPEN_MARK_PT = 1.0
 
 #: An open mark's half length, as a fraction of the larger domain dimension —
 #: the idiom the inputs plot's joint ticks use, so the mark is the same size on
@@ -2449,12 +2477,11 @@ def _joint_spans(fem_data, solution):
 
 
 def _joint_slip_cmap():
-    """The slip ramp: ``Purples`` with its white end cut off (see
-    ``_JOINT_SLIP_FLOOR``)."""
+    """The slip ramp, built from :data:`_JOINT_SLIP_COLORS` — see the note
+    there for why it is a green one and why it starts saturated."""
     from matplotlib.colors import LinearSegmentedColormap
-    base = plt.get_cmap(_JOINT_SLIP_CMAP)
     return LinearSegmentedColormap.from_list(
-        'joint_slip', base(np.linspace(_JOINT_SLIP_FLOOR, 1.0, 256)))
+        _JOINT_SLIP_CMAP, list(_JOINT_SLIP_COLORS))
 
 
 def _joint_open_marks(spans, scale):
@@ -2507,12 +2534,16 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
     is drawn so that a network of hundreds of traces still leaves the field
     underneath legible:
 
-    * every station span is a HAIRLINE — nominally ``_JOINT_HAIRLINE_PT``,
-      floored at one device pixel so it stays crisp — with no under-stroke;
-    * a span that is slipping is colored by how far its faces have slid, on the
-      ``Purples`` ramp with its white end cut off, and the colorbar IS the
-      legend: no per-state legend entries go on the axes;
-    * a span that is not slipping is a neutral gray hairline;
+    * every station span is a thin line, floored at one device pixel so it
+      stays crisp;
+    * a span that is slipping is colored by how far its faces have slid, on a
+      green ramp the ``coolwarm`` field underneath cannot produce at any of its
+      values (see :data:`_JOINT_SLIP_COLORS`), at :data:`_JOINT_SLIP_PT` over a thin
+      white under-stroke so a dark green line still reads where the field goes
+      dark blue or dark red; the colorbar IS the legend, and no per-state
+      legend entries go on the axes;
+    * a span that is not slipping is a lighter neutral gray hairline with no
+      under-stroke — nothing happened there, and it says so quietly;
     * an OPENED stretch is marked rather than colored: one short tick drawn
       perpendicular to the joint, in a dark neutral, at the middle of each
       continuous run of opened stations (see :func:`_joint_open_marks`), its
@@ -2531,7 +2562,9 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
     if not spans:
         return []
 
-    lw = max(_JOINT_HAIRLINE_PT, _mesh_pixel_floor_pt(ax))
+    floor = _mesh_pixel_floor_pt(ax)
+    lw_intact = max(_JOINT_HAIRLINE_PT, floor)
+    lw_slip = max(_JOINT_SLIP_PT, floor)
     coords = [r["coords"] for r in spans]
     slipping = np.array([bool(r["slipping"]) for r in spans])
     slips = np.array([float(r["slip"]) for r in spans])
@@ -2541,8 +2574,6 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
     if smax > 0.0:
         cmap = _joint_slip_cmap()
         norm = Normalize(vmin=0.0, vmax=smax)
-        colors = [cmap(norm(s)) if sl else _JOINT_INTACT_COLOR
-                  for s, sl in zip(slips, slipping)]
         sm = cm.ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])
         label = _fem_cbar_label(fem_data, 'Joint slip', 'length')
@@ -2551,18 +2582,33 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
             cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
             cbar.set_label(label, rotation=270, labelpad=15, fontsize=10)
     else:
-        colors = _JOINT_INTACT_COLOR
-    # Opaque: a hairline has no weight to spare, and blending it into the field
-    # underneath takes the little contrast a one-pixel line has.
-    ax.add_collection(LineCollection(coords, colors=colors, linewidths=lw,
-                                     alpha=1.0, zorder=6.5))
+        slipping = np.zeros(len(spans), dtype=bool)   # nothing to color
+    # Opaque throughout: a thin line has no contrast to spare, and blending it
+    # into the field underneath takes the little it has. The two states are two
+    # collections, because they carry different weight and only the slipping one
+    # is given the white under-stroke that keeps it off a dark patch of field.
+    intact = [c for c, sl in zip(coords, slipping) if not sl]
+    slid = [c for c, sl in zip(coords, slipping) if sl]
+    if intact:
+        ax.add_collection(LineCollection(
+            intact, colors=_JOINT_INTACT_COLOR, linewidths=lw_intact,
+            alpha=1.0, zorder=6.5))
+    if slid:
+        ax.add_collection(LineCollection(
+            slid, colors=_JOINT_HALO_COLOR,
+            linewidths=lw_slip + 2 * _JOINT_HALO_PT,
+            alpha=1.0, zorder=6.45))
+        ax.add_collection(LineCollection(
+            slid, colors=[cmap(norm(s)) for s, sl in zip(slips, slipping) if sl],
+            linewidths=lw_slip, alpha=1.0, zorder=6.5))
 
     nodes = np.asarray(fem_data["nodes"], dtype=float)
     scale = max(float(np.ptp(nodes[:, 0])), float(np.ptp(nodes[:, 1]))) or 1.0
     marks = _joint_open_marks(spans, scale)
     if marks:
         ax.add_collection(LineCollection(
-            marks, colors=_JOINT_OPEN_MARK_COLOR, linewidths=lw,
+            marks, colors=_JOINT_OPEN_MARK_COLOR,
+            linewidths=max(_JOINT_OPEN_MARK_PT, floor),
             alpha=1.0, zorder=6.6))
     return cbar_specs
 

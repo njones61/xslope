@@ -681,16 +681,19 @@ which refines as the bar elements refine instead of converging.
 
 ### What the results show
 
-The results view draws each interface as a hairline on the line it runs along, colored by how far its two faces have
-slid, on a colorbar titled *Joint slip*. A joint that is not slipping is a neutral gray hairline, and a stretch that
-has **opened** is marked with a short tick across the line rather than given a color of its own, because opening is a
-condition and not a quantity. A model where no joint slipped carries no colorbar. The weight is deliberate: a
-generated network puts hundreds of traces over the field, and anything heavier than a hairline covers what it is
-drawn on. A joint carries no strain of its own, so it appears in the shear-strain field only through what it does to
-the soil beside it; this is its own reading.
+The results view draws each interface as a thin line on the line it runs along, colored by how far its two faces have
+slid, on a colorbar titled *Joint slip*. The ramp is green — bright lime at the smallest slip through to dark green at
+the largest — because the strain field under it runs blue through white to red, and a slip color the field can also
+produce is a slip color you cannot find. A slipping span is backed by a thin white stroke, so it still reads where the
+field goes dark blue or red. A joint that is not slipping is a lighter neutral gray hairline with no backing, and a
+stretch that has **opened** is marked with a short tick across the line rather than given a color of its own, because
+opening is a condition and not a quantity. A model where no joint slipped carries no colorbar. The weight is
+deliberate: a generated network puts hundreds of traces over the field, and anything heavier covers what it is drawn
+on. A joint carries no strain of its own, so it appears in the shear-strain field only through what it does to the
+soil beside it; this is its own reading.
 
 On a jointed model the displacement panel is the scaled deformed mesh rather than an arrow field: the element edges
-in light gray, both faces of every joint over them in black, the undeformed outline dashed behind. That is what a
+in light gray, both faces of every joint over them in the same green, the undeformed outline dashed behind. That is what a
 jointed failure looks like — blocks moving as bodies, with all of the movement taken up at the joints, where a
 slipped or opened joint shows as two lines that no longer lie on each other. An arrow field samples that at nodes
 and misses exactly the thing that happened.

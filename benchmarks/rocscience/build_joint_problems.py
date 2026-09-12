@@ -127,7 +127,11 @@ def _toe_circle(toe, crest):
     xo = 0.5 * (tx + cx)
     yo = ty + 2.0 * (cy - ty)
     r = ((xo - tx) ** 2 + (yo - ty) ** 2) ** 0.5
-    return [{'Xo': float(xo), 'Yo': float(yo), 'Depth': 0.0, 'R': float(r)}]
+    # Depth is the elevation of the circle's lowest point, and the loader reads
+    # it in preference to R, so the two have to agree or the stated radius is
+    # replaced by one that reaches elevation zero.
+    return [{'Xo': float(xo), 'Yo': float(yo), 'Depth': float(yo - r),
+             'R': float(r)}]
 
 
 def _joint(label, p1, p2, c, phi, kn=KN_STD, ks=KS_STD, t_cut=0.0,
@@ -614,6 +618,196 @@ def rj008():
     return _write(sd, 'rj008.xlsx')
 
 
+
+# ---------------------------------------------------------------------------
+# Problems 9 to 14 — Alejano et al. sliding and ploughing slabs
+#
+# NOT in BUILDERS, and no file is shipped, for the reason problem 1 is not:
+# a joint that ends ON another joint. Here the termination is a NEAR one. Each
+# release trace is meant to run from the crest down to a bedding plane, and the
+# vendor states its tip to six decimals, so the tip lands 2e-7 to 2e-6 from the
+# bedding trace it belongs on — a part in 10^7 of the section. That leaves a
+# sliver between the two lines, and the mesher reports it two ways:
+#
+#     rj009, rj010   the two elements on mesh edge (N, N+1) of jointed line 48
+#                    stand on the same side of it (3.3e-08, -0.437)
+#     rj011          the mesh edge (125, 1706) on jointed line 45 is carried by
+#                    4 two-dimensional element(s), not two
+#     rj012          gmsh never returns: "Impossible to recover edge 113 113",
+#                    "2 intersections in the 1D mesh (curves 113 168)", split
+#                    and retry, level after level (recorded by a 300 s alarm)
+#
+# Snapping the tip onto the bedding line would turn the near termination into an
+# exact one, which is problem 1's refusal, so both families want the same thing:
+# a split that knows what to do where one joint ENDS on another. The
+# transcription is kept whole so that round can register these seven functions.
+# ---------------------------------------------------------------------------
+
+#: Every one of these six models carries TWO joint strengths. The bedding
+#: network runs at one friction angle and the one or two short explicit traces
+#: that release the slab at the crest run at another — the vendor states it as a
+#: per-segment ``segment joint property`` index into its own joint list, and a
+#: single quoted joint friction angle for these problems is incomplete.
+#:
+#: (ring, bedding dip, bedding spacing, phi_bedding, phi_release, release traces)
+ALEJANO = {
+    'rj009': ([(58.045, -50.0), (58.045, 0.0), (0.0, 0.0), (-1.4649, 1.74595),
+               (-6.76319540951412, 8.060062428408), (-41.9549, 49.9999),
+               (-141.955, 50.0), (-141.955, -50.0)],
+              -50.0, 3.0, 30.0, 40.0,
+              [((-6.76319540951412, 8.060062428408),
+                (-9.06132845221374, 6.13169959257877)),
+               ((-9.06132845221374, 6.13169959257877), (-1.4649, 1.74595))]),
+    'rj010': ([(58.045, -50.0), (58.045, 0.0), (0.0, 0.0), (-1.4649, 1.74595),
+               (-9.97696, 11.8902), (-41.9549, 49.9999),
+               (-141.955, 50.0), (-141.955, -50.0)],
+              -50.0, 3.0, 30.0, 40.0,
+              [((-9.06132845221374, 6.13169959257877), (-1.4649, 1.74595)),
+               ((-9.97696, 11.8902), (-12.2753, 9.96194))]),
+    'rj011': ([(30.0, -30.0), (30.0, 0.0), (0.0, 0.0),
+               (-2.43625294577519, 2.90341192441329), (-20.9775, 25.0),
+               (-60.0, 25.0), (-60.0, -30.0)],
+              -50.0, 1.5, 30.0, 20.0,
+              [((0.0, 0.0), (-1.14907, -0.964181)),
+               ((-2.43625294577519, 2.90341192441329), (-2.62114, 0.790165))]),
+    'rj012': ([(30.0, -30.0), (30.0, 0.0), (0.0, 0.0),
+               (-2.57111, 4.45329), (-14.4338, 25.0),
+               (-60.0, 25.0), (-60.0, -30.0)],
+              -60.0, 1.5, 30.0, 40.0,
+              [((0.0, 0.0), (-1.29904, -0.75)),
+               ((-2.57111, 4.45329), (-2.79904, 1.84808))]),
+    'rj013': ([(30.0, -30.0), (30.0, 0.0), (0.0, 0.0),
+               (-2.22963, 3.18425), (-17.5052, 25.0),
+               (-60.0, 25.0), (-60.0, -30.0)],
+              -55.0, 1.5, 25.0, 20.0,
+              [((0.0, 0.0), (-1.22852, -0.860663)),
+               ((-2.22963, 3.18425), (-2.42975, 0.854877))]),
+    'rj014': ([(30.0, -30.0), (30.0, 0.0), (0.0, 0.0),
+               (-2.86498, 4.96228), (-14.4338, 25.0),
+               (-60.0, 25.0), (-60.0, -30.0)],
+              -60.0, 1.5, 20.0, 30.0,
+              [((0.0, 0.0), (-1.29928, -0.749584)),
+               ((-2.86498, 4.96228), (-3.09385, 2.35871))]),
+}
+
+
+def _alejano(name):
+    """One of the six Alejano slab models.
+
+    The rock is ELASTIC at E = 2 x 10^8 MPa, which is not a rock modulus but the
+    manual's own device: the UDEC model these are scored against uses RIGID
+    blocks, and the manual says outright that "an artificially high modulus of
+    2x10^8 MPa was given to the material" to reproduce that, with a tightened
+    convergence tolerance to go with it. gamma = 25 kN/m^3, nu = 0.3.
+    """
+    ring, dip, spacing, phi_bed, phi_rel, release = ALEJANO[name]
+    sd = _base()
+    mats = [_rock('Rock', 25.0, 2.0e11, 0.3, 0.0, 0.0, option='elastic')]
+    _finish(sd, [(ring, 0)], mats)
+    bed = {'c': 0.0, 'phi': phi_bed, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
+    sd['joint_lines'] = [
+        _joint(f'rel-{i + 1:02d}', p, q, 0.0, phi_rel)
+        for i, (p, q) in enumerate(release)
+    ] + parallel_set(sd, dip, spacing, label='bed', props=bed)
+    sd['circles'] = _toe_circle((0.0, 0.0), (ring[-3][0], ring[-3][1]))
+    return _write(sd, name + '.xlsx')
+
+
+def rj009():
+    """RJ-9 — Alejano et al. bilinear slab failure, example 1a (`joint #009.fez`).
+
+    A 50 m slope at 50 degrees with bedding at -50 degrees at 3 m spacing
+    (phi = 30) and a release trace under the crest at phi = 40. Sliding on the
+    basal plane combines with sliding on a shallow joint undercut by the face.
+    Referee: UDEC 1.03; the paper's limit equilibrium spans 0.40 to 1.45, which
+    is a range rather than an answer. RS2 reports 1.01 without joint improvement
+    and 1.09 with it.
+    """
+    return _alejano('rj009')
+
+
+def rj010():
+    """RJ-10 — bilinear slab failure, example 1b (vendor `joint #010.fez`).
+
+    Example 1a with the release joint moved upslope, which is the whole
+    difference between the two. Referee: UDEC 1.03. RS2 reports 0.92 without
+    joint improvement and 1.08 with it.
+    """
+    return _alejano('rj010')
+
+
+def rj011():
+    """RJ-11 — ploughing sliding slab failure (vendor `joint #011.fez`).
+
+    A 25 m slope with bedding at -50 degrees at 1.5 m (phi = 30) and two release
+    traces at phi = 20, one of which ends inside the rock at the toe. Referee:
+    UDEC 1.21. RS2 reports 1.22 without joint improvement and 1.30 with it.
+    """
+    return _alejano('rj011')
+
+
+def rj012():
+    """RJ-12 — ploughing toppling slab failure (vendor `joint #012.fez`).
+
+    Bedding at -60 degrees at 1.5 m (phi = 30) with releases at phi = 40.
+    Referee: UDEC 1.78. RS2 reports 1.39 without joint improvement and 1.75 with
+    it — the family's widest spread between the two RS2 runs.
+    """
+    return _alejano('rj012')
+
+
+def rj013():
+    """RJ-13 — ploughing sliding slab, example 4 (vendor `joint #013.fez`).
+
+    Bedding at -55 degrees at 1.5 m (phi = 25) with releases at phi = 20.
+    Referee: UDEC 1.0. RS2 reports 1.0 without joint improvement and 1.05 with
+    it.
+    """
+    return _alejano('rj013')
+
+
+def rj014():
+    """RJ-14 — ploughing sliding slab, example 5 (vendor `joint #014.fez`).
+
+    Example 4's section with the release joint moved and the two strengths the
+    other way round: bedding at -60 degrees at 1.5 m at phi = 20, releases at
+    phi = 30. Referee: UDEC 0.9. RS2 reports 0.89 without joint improvement and
+    1.09 with it.
+    """
+    return _alejano('rj014')
+
+
+# ---------------------------------------------------------------------------
+# Problem 15 — partially joint-controlled footwall slope
+# ---------------------------------------------------------------------------
+
+def rj015():
+    """RJ-15 — partially joint-controlled footwall slope (`joint #015.fez`).
+
+    A 25 m footwall at 40 degrees with bedding dipping the same way at the same
+    angle, 2 m apart, so the slabs are parallel to the face and the failure has
+    to break rock at the toe to get out. That is the one problem in this family
+    whose rock can yield: Mohr-Coulomb, c = 200 kPa, phi = 35 degrees,
+    gamma = 28 kN/m^3, E = 1 GPa, nu = 0.3.
+
+    The stated tensile strength of 1000 kPa is above the Mohr-Coulomb apex
+    c/tan(phi) = 285.6 kPa, so it never binds and the apex governs.
+
+    The joints are also the corpus's softest: k_n = 5 x 10^6 kPa/m and
+    k_s = 5 x 10^5 kPa/m, twenty times below the standard pair, with no cohesion
+    and phi = 25 degrees. Referees: Slide's limit equilibrium 1.25 and UDEC 1.6.
+    RS2 reports 1.28 without joint improvement and 1.42 with it.
+    """
+    sd = _base()
+    ring = [(40.0, -40.0), (40.0, 0.0), (0.0, 0.0), (-47.6701, 40.0),
+            (-100.0, 40.0), (-100.0, -40.0)]
+    mats = [_rock('Rock', 28.0, 1.0e6, 0.3, 200.0, 35.0, t_cut=1000.0)]
+    _finish(sd, [(ring, 0)], mats)
+    props = {'c': 0.0, 'phi': 25.0, 't_cut': 0.0, 'kn': 5.0e6, 'ks': 5.0e5}
+    sd['joint_lines'] = parallel_set(sd, -40.0, 2.0, label='bed', props=props)
+    sd['circles'] = _toe_circle((0.0, 0.0), (-47.6701, 40.0))
+    return _write(sd, 'rj015.xlsx')
+
 # ---------------------------------------------------------------------------
 # Problem 18 — step-path failure through continuous joints
 # ---------------------------------------------------------------------------
@@ -693,7 +887,7 @@ def rj019():
 #: Every builder in this module, in problem-number order. ``verify_rebuild.py``'s
 #: ``joints`` group is this list, so a builder missing here is a corpus file
 #: nothing guards.
-BUILDERS = [rj002, rj003, rj004, rj005, rj006, rj007, rj008, rj018, rj019]
+BUILDERS = [rj002, rj015, rj003, rj004, rj005, rj006, rj007, rj008, rj018, rj019]
 
 
 if __name__ == '__main__':

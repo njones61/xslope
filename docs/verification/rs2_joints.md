@@ -62,10 +62,10 @@ joint model whose output is a stress-displacement curve.
 
 | # | Match | Problem | Referee | RS2 without / with improvement | Notes |
 |---:|:-:|---|---|---|---|
-| 1a | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1a | Goodman & Bray 1.0 · UDEC 0.99 | 0.99 / 0.97 | *planned* — sixteen explicit block outlines and a deleted region above the face. |
-| 1b | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1b | Goodman & Bray 1.0 · UDEC 0.99 | 0.97 / 0.94 | *planned* — as 1a, with the 2013 kN toe force. |
-| 1c | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1c | Goodman & Bray 1.02 · UDEC 1.01 | 1.01 / 0.99 | *planned* — as 1a. |
-| 1d | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 · UDEC 1.22 | 1.19 / 1.16 | *planned* — as 1b. |
+| 1a | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1a | Goodman & Bray 1.0 · UDEC 0.99 | 0.99 / 0.97 | *blocked* — the stepped base puts each column's basal contact partway along its neighbour's side joint; see [where a joint ends on another](#joint-terminations). |
+| 1b | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1b | Goodman & Bray 1.0 · UDEC 0.99 | 0.97 / 0.94 | *blocked* — as 1a, and its 2013 kN toe force is a concentrated line load, which the loads sheet does not carry. |
+| 1c | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1c | Goodman & Bray 1.02 · UDEC 1.01 | 1.01 / 0.99 | *blocked* — as 1a. |
+| 1d | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 · UDEC 1.22 | 1.19 / 1.16 | *blocked* — as 1b. |
 | 2 | <span class="nodata">⊘</span> | Alejano & Alonso block toppling | UDEC 0.87 · Goodman 0.76 | 0.86 / 0.82 | *planned* — a 64° parallel set at 1.6 m over a 30° stepped basal surface, 517 joint elements. |
 | 3 | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | 1.12 / 1.09 | *planned* — two parallel sets, 789 joint elements. |
 | 4 | <span class="nodata">⊘</span> | Lorig & Varona flexural toppling | UDEC 1.3 | 1.19 / 1.27 | *planned* — one 70° set, 489 joint elements. |
@@ -73,15 +73,15 @@ joint model whose output is a stress-displacement curve.
 | 6 | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | 1.25 / 1.31 | *planned* — one −35° set, 1690 joint elements. |
 | 7 | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | 1.57 / 1.59 | *planned* — one −70° set, 594 joint elements. |
 | 8 | <span class="nodata">⊘</span> | Flexural toppling, base friction model | UDEC 0.76 | 0.75 / 0.75 | *planned* — a −60° set at 5.08 m with a horizontal basal joint. |
-| 9 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1a | UDEC 1.03 | 1.01 / 1.09 | *planned* — bedding at 3 m plus a toe release joint, 1957 joint elements. |
-| 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | 0.92 / 1.08 | *planned* — as 9 with the release joint moved upslope. |
-| 11 | <span class="nodata">⊘</span> | Ploughing sliding slab failure | UDEC 1.21 | 1.22 / 1.3 | *planned* — bedding at 1.5 m plus a release joint. |
-| 12 | <span class="nodata">⊘</span> | Ploughing toppling slab failure | UDEC 1.78 | 1.39 / 1.75 | *planned* — bedding at 1.5 m plus a release joint. |
-| 13 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 4 | UDEC 1.0 | 1.0 / 1.05 | *planned* — bedding at 1.5 m plus a 95° release joint. |
-| 14 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | UDEC 0.9 | 0.89 / 1.09 | *planned* — as 13, release joint moved. |
+| 9 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1a | UDEC 1.03 | 1.01 / 1.09 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
+| 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | 0.92 / 1.08 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
+| 11 | <span class="nodata">⊘</span> | Ploughing sliding slab failure | UDEC 1.21 | 1.22 / 1.3 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
+| 12 | <span class="nodata">⊘</span> | Ploughing toppling slab failure | UDEC 1.78 | 1.39 / 1.75 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
+| 13 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 4 | UDEC 1.0 | 1.0 / 1.05 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
+| 14 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | UDEC 0.9 | 0.89 / 1.09 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
 | 15 | <span class="nodata">⊘</span> | Partially joint-controlled footwall | Slide 1.25 · UDEC 1.6 | 1.28 / 1.42 | *planned* — bedding parallel to the face at 2 m, 2143 joint elements. |
 | 16 | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | experiment 9° · UDEC 11° | 9° / 7° | *blocked* — the problem scores the TILT ANGLE at which a block grid topples, found by rotating gravity through a staged sweep; XSLOPE's seismic coefficient tilts the load but the row needs the sweep and a toppling criterion, neither of which is a strength reduction. |
-| 17 | <span class="nodata">⊘</span> | Step-path, en-echelon joints | UDEC 1.29 | 1.24 / 1.2 | *planned* — the vendor model's second, elastic material has no boundary of its own in the file, so the two zones are recoverable only from its element-material map. |
+| 17 | <span class="nodata">⊘</span> | Step-path, en-echelon joints | UDEC 1.29 | 1.24 / 1.2 | *blocked* — the vendor model's second, elastic material has no boundary of its own. Recovered from the element-material map it is an 83-vertex staircase of element edges, trending vertical near x = 12 and horizontal near y = 3 with excursions of about one element either side, so the boundary is a property of the vendor's mesh rather than of its model. |
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | 1.01 / 1.0 | |
 | [19](#rj-19) | <span class="nodata">⊘</span> | Bi-planar step-path failure | UDEC 1.46 | 1.5 / 1.41 | *reported, no lock* — two trials of the bracket reach the sweep budget without a verdict. |
 | 20 | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | 2.21 / 2.37 | *blocked* — the manual states no block size and no seed, and the vendor model carries the tessellation as 523 digitized traces rather than as a generated network, so the input is not reproducible from anything published. |
@@ -92,6 +92,34 @@ joint model whose output is a stress-displacement curve.
 </div>
 
 ---
+
+## Where a Joint Ends on Another Joint {#joint-terminations}
+
+Ten of the manual's twenty-one scorable problems are held out of the corpus by one property of
+their geometry: a joint that stops **on** another joint rather than crossing it.
+
+A joint is an interface, so the mesh has to carry two elements on every edge of it — one on each
+face. Where two joints cross, the shared node sits at the middle of four wedges of rock and the
+split copies it once per wedge, which leaves two elements on each of the four edges leaving it.
+Where one joint *terminates* on another there are three wedges, not four, and the edge at the
+junction comes out carrying four elements. XSLOPE refuses that mesh by name rather than solving
+a section it has meshed wrongly.
+
+Problem 1's four cases meet it exactly. Goodman & Bray's sixteen columns stand on a **stepped**
+base, so each column's basal contact begins partway along its downslope neighbour's side joint:
+fifteen terminations in one section, at every mesh size from 1.0 m to 4.0 m.
+
+Problems 9 to 14 meet it by a rounding. Each of those models runs a short release trace from the
+crest down to a bedding plane, and the vendor states the trace's lower tip to six decimal places,
+so it lands between 2 × 10⁻⁷ and 2 × 10⁻⁶ from the bedding trace it belongs on — a part in 10⁷ of
+the section. What is left between the two lines is a sliver no mesh can resolve: on problems 9 and
+10 both elements on an edge come out on the same side of the joint, one of them with its centroid
+3 × 10⁻⁸ from the line; on problem 11 the edge again carries four elements; on problem 12 gmsh
+does not finish at all, reporting `Impossible to recover edge 113 113` and splitting the offending
+curves level after level. Snapping the tip onto the bedding plane would make the near termination
+an exact one, which is problem 1's case, so both families are waiting on the same thing.
+
+Every junction in the rows that **are** built is a crossing.
 
 ## The Dilation Problem {#the-dilation-problem}
 
@@ -191,6 +219,20 @@ changes what a faithful transcription is.
 - **Problem 22's units.** The joint numbers (c = 143, residual c = 76, load 345) read as kPa in a
   file declared in MPa: at MPa a 143 MPa joint under 345 MPa never slips at the prescribed 0.3 m of
   shear, and at kPa it is an ordinary rock-joint shear test.
+- **The manual states no rock strength for problems 3 to 7.** Their tables carry the slope
+  geometry, the joint friction angle and the rock's tensile strength, and nothing else. The models
+  carry c = 0.675 MPa and φ = 43° on problems 4, 6 and 7, and on problems 3 and 5 no plasticity
+  specification at all — an elastic rock, which only the joints can fail. The same tables state no
+  joint cohesion either, where all five models carry 0.1 MPa.
+- **Problem 8's tensile strength never binds.** The model caps the rock at 75 kPa, and the
+  Mohr-Coulomb apex its own c and φ imply is c/tan φ = 74.1 kPa, so the cap sits above the strength
+  the envelope already has. Problem 15 is the same: a 1000 kPa cap over a 285.6 kPa apex.
+- **Problem 8's joint network is not the whole section.** Its thirteen columns are clipped to the
+  block above the basal joint; generated over the section they would be sixteen, three of them
+  under a plane the model has no columns below.
+- **Problems 9 to 15 run on a rock a thousand times stiffer than steel.** E = 2 × 10⁸ MPa is the
+  manual's own device, and it says so: the UDEC models these are scored against use rigid blocks,
+  and the modulus is how RS2 reproduces one.
 - **No problem from 1 to 21 states a joint residual strength or a dilation angle.** Those appear
   only in problems 22 and 23, and material residual values, where they appear, always equal the
   peak.

@@ -745,9 +745,12 @@ the **Auto size** percent of the mesh height; entering an explicit Scale ×
 dims Auto size until the box returns to Auto. The displacement-vector plot can **color arrows by magnitude** (with
 a colorbar) instead of solid black.
 
-On a jointed model the displacement-vector plot is the scaled deformed mesh instead, with both faces of every joint
-drawn over a light element grid: a jointed slope fails by blocks moving as bodies on their joints, and an arrow
-field sampled at nodes misses the parting and sliding that is the whole mechanism. A **Joint state** switch draws
+On a jointed model the displacement-vector plot is the scaled deformed mesh instead, drawn as the blocks the joints
+cut the section into — each under a faint tint, its joint faces green, the deformed outside of the mesh a dark line
+against the dashed undeformed outline: a jointed slope fails by blocks moving as bodies on their joints, and an arrow
+field sampled at nodes misses the parting and sliding that is the whole mechanism. On a network of more than eight
+jointed lines the element edges come off so the blocks can be seen. Where the displacements are too small to draw the
+mesh is shown undeformed and the title says so. A **Joint state** switch draws
 each joint on the line it runs along, colored by how far its faces have slid on a green ramp the strain field cannot
 produce, gray where it is not slipping and ticked across where it has opened.
 

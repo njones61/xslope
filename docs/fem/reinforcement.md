@@ -692,8 +692,18 @@ deliberate: a generated network puts hundreds of traces over the field, and anyt
 on. A joint carries no strain of its own, so it appears in the shear-strain field only through what it does to the
 soil beside it; this is its own reading.
 
-On a jointed model the displacement panel is the scaled deformed mesh rather than an arrow field: the element edges
-in light gray, both faces of every joint over them in the same green, the undeformed outline dashed behind. That is what a
+On a jointed model the displacement panel is the scaled deformed mesh rather than an arrow field, drawn as the
+**blocks** the joints cut the section into: each block under a faint tint of its own, its joint faces in the same
+green, the outside of the deformed mesh as a dark line against the dashed undeformed outline, and the element edges
+in light gray behind them — until there are more than eight jointed lines, when the edges come off entirely and the
+block outlines carry the panel. A block is a piece of the mesh that moves as one body, found by following element
+adjacency: the split gives the two sides of a joint their own nodes, so they are no longer neighbors, while a joint
+that stops inside the mass leaves the material wrapped around its tip as one block.
+
+The exaggeration is bounded: no point of the deformed mesh is drawn more than 4% of the section away from where it
+started, whatever multiplier that takes, and where the largest displacement is below a hundred-millionth of the
+section there is nothing to draw — the panel shows the undeformed mesh and its title says the deformation is below
+drawing resolution, rather than magnifying the solver's own residue into a shape. That is what a
 jointed failure looks like — blocks moving as bodies, with all of the movement taken up at the joints, where a
 slipped or opened joint shows as two lines that no longer lie on each other. An arrow field samples that at nodes
 and misses exactly the thing that happened.

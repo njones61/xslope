@@ -38,6 +38,12 @@ six lines made joints in memory:
   f. the report table. A jointed run's reinforcement section carries the joints
      table — line, the share of its length at its limit, the peak slip — and an
      unjointed run carries none.
+  h. the blocks. Cutting the element adjacency along the joint faces — which
+     the mesh split has already done, since the two sides carry their own nodes
+     — leaves the bodies the joints cut the section into. Read on two grids
+     whose answer is known by inspection: a rectangle cut through is two blocks,
+     and one whose joint stops inside is one, because the material wraps around
+     the tip. That is what the deformed panel tints and outlines.
   g. the saved field keeps its joints. Slip and the opened record are the
      solve's own history and cannot be recovered from the displacements, so a
      field exported without them reloads as a model whose interfaces went
@@ -82,6 +88,14 @@ SIZE_1D = 2.0
 _SPAN_MAX = 1.6
 _INTACT_MAX = 1.0
 _HALO_MAX = _SPAN_MAX + 1.3
+
+
+def _same_color(collection, color):
+    """Whether every line of a collection is drawn in this color."""
+    import matplotlib.colors as mcolors
+    want = mcolors.to_rgba(color)
+    got = collection.get_colors()
+    return len(got) > 0 and all(tuple(c) == want for c in got)
 
 
 def _quiet(fn, *a, **kw):
@@ -487,7 +501,112 @@ def _leg_plots(failures, cache):
             if not jointed and "Displacement Vectors" not in title:
                 failures.append(f"an unjointed model's {where} displacement "
                                 f"panel changed: {title!r}")
+            # The blocks: a faint tint per body, and the outside of the deformed
+            # mesh as a line of its own. Without the tint two blocks that touch
+            # are one gray field; without the boundary the only thing carrying
+            # the deformed ground surface is the light element grid.
+            from matplotlib.collections import PolyCollection
+            # A Quiver is itself a PolyCollection, so the arrow field is not a
+            # block tint however much it looks like one to isinstance.
+            tints = [c for c in ax_d.collections
+                     if isinstance(c, PolyCollection)
+                     and not isinstance(c, Quiver)]
+            edges = [c for c in ax_d.collections if isinstance(c, LineCollection)
+                     and _same_color(c, _PF._DEFORMED_BOUNDARY_COLOR)]
+            if jointed and not tints:
+                failures.append(f"the {where} deformed panel tints no blocks, "
+                                f"so two bodies that touch read as one")
+            if jointed and not edges:
+                failures.append(f"the {where} deformed panel draws no exterior "
+                                f"boundary, so the moved ground surface is "
+                                f"carried only by the element grid")
+            if not jointed and tints:
+                failures.append(f"an unjointed model's {where} panel was "
+                                f"tinted by block")
             plt.close(fig)
+
+
+    # A NETWORK's deformed panel draws no element edges at all. Past the count
+    # at which the section drawings drop the joint ticks, the grid is all a
+    # reader can see and the block outlines — the reading — are buried in it.
+    # Measured on the fixture with its joints renumbered one per station, which
+    # is what a generated network looks like to the drawing.
+    from xslope.plot import JOINT_TICK_MAX_LINES as _JMAX
+    from xslope.plot_fem import plot_deformed_mesh
+    # The layout loop above rebound sol to the unjointed model's field; the
+    # jointed pair is the fixture's own.
+    _sd, _mesh, fem_data, sol = cache["solved"]
+    n_j = int(fem_data["joint_data"]["n"])
+    net = dict(fem_data)
+    net["joint_data"] = dict(fem_data["joint_data"],
+                             line_id=np.arange(n_j, dtype=int))
+    for fd, dense in ((fem_data, False), (net, True)):
+        n_lines = len(np.unique(np.asarray(fd["joint_data"]["line_id"])))
+        if (n_lines > _JMAX) != dense:
+            failures.append(f"the fixture for the {'dense' if dense else 'few'} "
+                            f"case does not straddle the threshold: {n_lines}")
+        fig, ax = plt.subplots()
+        _quiet(plot_deformed_mesh, ax, fd, sol, 1000.0, joint_faces=True)
+        grid = [c for c in ax.collections if isinstance(c, LineCollection)
+                and _same_color(c, _PF._DEFORMED_GRID_UNDER_JOINTS)]
+        if dense and grid:
+            failures.append(f"a {n_lines}-line network's deformed panel still "
+                            f"draws its element edges over the blocks")
+        if not dense and not grid:
+            failures.append(f"a {n_lines}-line model's deformed panel lost the "
+                            f"light element edges, which it is still readable "
+                            f"with")
+        plt.close(fig)
+
+    # The exaggeration is bounded, and a field with nothing in it says so rather
+    # than being magnified into a shape. Both read off the scale the panel is
+    # actually drawn at.
+    from xslope.plot_fem import (deformation_below_resolution, deformation_scale,
+                                 displacement_magnitude)
+    # The cap binds where a section is no wider than it is tall — the height
+    # rule alone would then swing the crest much further than the ceiling — so
+    # it is read on the fixture AND on a copy squeezed to that shape, where the
+    # two bounds disagree and the smaller has to win.
+    narrow = dict(fem_data)
+    narrow["nodes"] = (np.asarray(fem_data["nodes"], dtype=float)
+                       * np.array([0.1, 1.0]))
+    biggest = float(np.max(displacement_magnitude(fem_data, sol)))
+    for tag, fd in (("the fixture", fem_data), ("a narrow section", narrow)):
+        extent = _PF._section_extent(fd)
+        height = float(np.ptp(np.asarray(fd["nodes"], dtype=float)[:, 1]))
+        moved = deformation_scale(fd, sol) * biggest
+        if moved > _PF._DEFORM_MAX_FRACTION * extent * 1.001:
+            failures.append(f"on {tag} the deformed mesh is drawn with a point "
+                            f"moved {moved / extent:.3f} of the section, past "
+                            f"the {_PF._DEFORM_MAX_FRACTION} cap")
+        if tag == "a narrow section" and \
+                height * 0.15 <= _PF._DEFORM_MAX_FRACTION * extent:
+            failures.append("the narrow copy does not make the two bounds "
+                            "disagree, so the cap is never exercised")
+    quiet_sol = dict(sol)
+    tiny = _PF._DEFORM_NEGLIGIBLE_FRACTION * extent * 1e-2
+    factor = tiny / float(np.max(displacement_magnitude(fem_data, sol)))
+    for key in ("displacements", "displacements_elastic"):
+        if quiet_sol.get(key) is not None:
+            quiet_sol[key] = np.asarray(quiet_sol[key], dtype=float) * factor
+    if not deformation_below_resolution(fem_data, quiet_sol):
+        failures.append("a field whose largest displacement is a hundredth of "
+                        "the negligible threshold is still called drawable")
+    if deformation_scale(fem_data, quiet_sol) != 1.0:
+        failures.append("a below-resolution field is still exaggerated")
+    fig, ax = plt.subplots()
+    _quiet(plot_deformed_mesh, ax, fem_data, quiet_sol,
+           deformation_scale(fem_data, quiet_sol), joint_faces=True)
+    if "below drawing resolution" not in ax.get_title():
+        failures.append(f"an undrawable deformation does not say so: "
+                        f"{ax.get_title()!r}")
+    if "Scale" in ax.get_title():
+        failures.append(f"an undrawable deformation still prints an "
+                        f"exaggeration: {ax.get_title()!r}")
+    plt.close(fig)
+    if deformation_below_resolution(fem_data, sol):
+        failures.append("the fixture's own mechanism reads as below drawing "
+                        "resolution, so the threshold is set over real motion")
 
 
 # --------------------------------------------------------------------------
@@ -719,6 +838,71 @@ def _leg_sidecar(failures, cache):
 
 
 # --------------------------------------------------------------------------
+# h. the blocks a joint cuts
+# --------------------------------------------------------------------------
+
+def _grid_fixture(split_through):
+    """A 2x2 grid of quads, cut along its middle row by one joint.
+
+    ``split_through`` runs the joint the full width — the upper row gets its own
+    copies of all three nodes on the line, and nothing connects the halves. Where
+    it does not, the joint stops at the middle node: only the left node is
+    copied, the middle one is the tip and is shared, and the material wraps
+    around it. Nine nodes, then the copies; no mesher and no solve, so the
+    component rule is read on a shape whose answer is known by inspection.
+    """
+    xy = [(x, y) for y in (0.0, 1.0, 2.0) for x in (0.0, 1.0, 2.0)]
+    if split_through:
+        xy += [(0.0, 1.0), (1.0, 1.0), (2.0, 1.0)]          # 9, 10, 11
+        elements = [[0, 1, 4, 3], [1, 2, 5, 4],
+                    [9, 10, 7, 6], [10, 11, 8, 7]]
+        conn = [[3, 4, -1, 9, 10, -1], [4, 5, -1, 10, 11, -1]]
+    else:
+        xy += [(0.0, 1.0)]                                   # 9 only
+        elements = [[0, 1, 4, 3], [1, 2, 5, 4],
+                    [9, 4, 7, 6], [4, 5, 8, 7]]
+        conn = [[3, 4, -1, 9, 4, -1]]
+    return {"nodes": np.array(xy, dtype=float),
+            "elements": np.array(elements, dtype=int),
+            "element_types": np.array([4, 4, 4, 4], dtype=int),
+            "joint_data": {"n": len(conn), "conn": np.array(conn, dtype=int),
+                           "line_id": np.zeros(len(conn), dtype=int)}}
+
+
+def _leg_blocks(failures, cache):
+    from xslope.mesh import block_boundary_edges, block_components
+
+    through = _grid_fixture(True)
+    comp = block_components(through)
+    if len(set(comp.tolist())) != 2:
+        failures.append(f"a rectangle cut in two by a through-going joint came "
+                        f"back as {len(set(comp.tolist()))} block(s)")
+    elif set(comp[:2]) == set(comp[2:]):
+        failures.append("the two halves of a through-cut rectangle are in the "
+                        "same block")
+    blocks, exterior = block_boundary_edges(through, comp)
+    if sorted(len(v) for v in blocks.values()) != [2, 2]:
+        failures.append(f"the two blocks do not carry two joint faces each: "
+                        f"{ {k: len(v) for k, v in blocks.items()} }")
+    if any(sorted(e[:2]) in ([3, 4], [4, 5]) and len(e) > 2 for e in exterior):
+        failures.append("a joint face was counted as the outside of the mesh")
+    if len(exterior) != 8:
+        failures.append(f"a 2x2 grid has eight edges on its outside, not "
+                        f"{len(exterior)}")
+
+    inside = _grid_fixture(False)
+    comp2 = block_components(inside)
+    if len(set(comp2.tolist())) != 1:
+        failures.append(f"a joint that stops inside the mass cut the section "
+                        f"into {len(set(comp2.tolist()))} blocks; the material "
+                        f"wraps around its tip and nothing can leave")
+    blocks2, _ext2 = block_boundary_edges(inside, comp2)
+    if sum(len(v) for v in blocks2.values()) != 2:
+        failures.append(f"the joint that stops inside lost its faces: "
+                        f"{ {k: len(v) for k, v in blocks2.items()} }")
+
+
+# --------------------------------------------------------------------------
 
 LEGS = (
     ("the loader's column reaches the mesher", _leg_wiring),
@@ -728,6 +912,7 @@ LEGS = (
     ("the saved field keeps its joints", _leg_sidecar),
     ("the detail profile and its figure", _leg_details),
     ("the report's joints table", _leg_report),
+    ("the blocks a joint cuts", _leg_blocks),
 )
 
 

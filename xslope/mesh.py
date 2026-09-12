@@ -5975,3 +5975,174 @@ def extract_constraint_line_geometry(slope_data):
     joint_lines = extract_joint_line_geometry(slope_data)
     return (reinf_lines + pile_lines + joint_lines,
             len(reinf_lines), len(pile_lines))
+
+
+# ---------------------------------------------------------------------------
+# Blocks: what a jointed mesh is cut into
+# ---------------------------------------------------------------------------
+
+#: Corner-node count of each supported element type. The block computation reads
+#: corners only: a midside node is a point ON an edge, never a connection
+#: between two elements.
+_CORNERS_BY_TYPE = {3: 3, 6: 3, 4: 4, 8: 4, 9: 4}
+
+
+def _corner_edge_ring(elem, etype):
+    """The closed ring of corner-node pairs of one element."""
+    n = _CORNERS_BY_TYPE.get(int(etype))
+    if not n:
+        return []
+    ring = [int(elem[k]) for k in range(n)]
+    return [(ring[k], ring[(k + 1) % n]) for k in range(n)]
+
+
+def _joint_face_pairs(fem_data):
+    """The corner-node pairs of every joint face, as a set of sorted pairs.
+
+    Both copies of every split station: the face the material above stands on
+    and the face the material below stands on are different node pairs, and each
+    is an edge with one element on it.
+    """
+    jd = fem_data.get("joint_data")
+    if jd is None or not jd.get("n"):
+        return set()
+    conn = np.asarray(jd["conn"], dtype=int)
+    pairs = set()
+    for i in range(int(jd["n"])):
+        for base in (0, 3):
+            a, b = int(conn[i, base]), int(conn[i, base + 1])
+            pairs.add((a, b) if a < b else (b, a))
+    return pairs
+
+
+def block_components(fem_data):
+    """Which block each element belongs to, on a mesh cut by joints.
+
+    A joint splits the mesh: the material on either side gets its OWN copies of
+    the nodes along the line, so two elements facing each other across a joint
+    no longer share an edge even though they are drawn on top of each other.
+    Blocks therefore fall out of plain edge adjacency — two elements are in one
+    block when a chain of shared corner edges connects them — and the cut along
+    every joint face is already in the connectivity rather than something this
+    has to impose.
+
+    What that means where a joint stops INSIDE the mass: the material wraps
+    around the tip, the wrap is a chain of shared edges, and the two sides come
+    back as one block. Which is the truth about the model — nothing there can
+    slide out as a body — and the joint still draws as an internal line.
+
+    Returns an ``int`` array with one entry per element, numbered from 0 in the
+    order the blocks are first met.
+    """
+    elements = np.asarray(fem_data["elements"], dtype=int)
+    etypes = np.asarray(fem_data["element_types"], dtype=int)
+    n_el = len(elements)
+    by_edge = {}
+    for i in range(n_el):
+        for a, b in _corner_edge_ring(elements[i], etypes[i]):
+            by_edge.setdefault((a, b) if a < b else (b, a), []).append(i)
+
+    # Union-find over elements that share a corner edge.
+    parent = list(range(n_el))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for owners in by_edge.values():
+        if len(owners) < 2:
+            continue
+        r0 = find(owners[0])
+        for j in owners[1:]:
+            rj = find(j)
+            if rj != r0:
+                parent[rj] = r0
+
+    comp = np.full(n_el, -1, dtype=int)
+    seen, nxt = {}, 0
+    for i in range(n_el):
+        r = find(i)
+        if r not in seen:
+            seen[r] = nxt
+            nxt += 1
+        comp[i] = seen[r]
+    return comp
+
+
+def block_boundary_edges(fem_data, comp=None):
+    """Every block's own outline, as node-index polylines.
+
+    An edge with ONE element on it is either a joint face or the outside of the
+    mesh — the split leaves both looking the same — and together they are what
+    bounds a block. They are returned apart, because they are drawn apart: the
+    joint faces are the cut the blocks move on, the exterior is the ground
+    surface and the model's sides.
+
+    Each edge comes back as the node indices along it: ``[corner, midside,
+    corner]`` where the element carries a midside node on that edge, ``[corner,
+    corner]`` where it does not, so a caller draws a quadratic edge as the curve
+    it is, on whichever coordinates it is drawing.
+
+    Returns ``(blocks, exterior)``: ``blocks`` maps a block index (from
+    :func:`block_components`) to its joint-face polylines, ``exterior`` is the
+    flat list of polylines on the outside of the whole mesh.
+    """
+    elements = np.asarray(fem_data["elements"], dtype=int)
+    etypes = np.asarray(fem_data["element_types"], dtype=int)
+    if comp is None:
+        comp = block_components(fem_data)
+    comp = np.asarray(comp, dtype=int)
+    faces = _joint_face_pairs(fem_data)
+
+    # Owners of every corner edge, and the midside node sitting on it: the k-th
+    # edge of a quadratic element carries its (corners + k)-th node.
+    owners, mids = {}, {}
+    for i in range(len(elements)):
+        n = _CORNERS_BY_TYPE.get(int(etypes[i]))
+        if not n:
+            continue
+        quadratic = len(elements[i]) >= 2 * n
+        for k, (a, b) in enumerate(_corner_edge_ring(elements[i], etypes[i])):
+            key = (a, b) if a < b else (b, a)
+            owners.setdefault(key, []).append(i)
+            if quadratic and key not in mids:
+                mids[key] = int(elements[i][n + k])
+
+    def _poly(key):
+        mid = mids.get(key)
+        return [key[0], mid, key[1]] if mid is not None else [key[0], key[1]]
+
+    blocks, exterior = {}, []
+    for key, own in owners.items():
+        if len(own) != 1:
+            continue                      # inside a block
+        if key in faces:
+            blocks.setdefault(int(comp[own[0]]), []).append(_poly(key))
+        else:
+            exterior.append(_poly(key))
+    return blocks, exterior
+
+
+def element_corner_polygons(fem_data, nodes_xy=None):
+    """Every element as the closed polygon of its corner nodes, in ``nodes_xy``.
+
+    The shape an element covers, for filling rather than for solving: midside
+    nodes are left out, so a quadratic element fills as the straight-sided
+    triangle or quad its corners describe. ``nodes_xy`` defaults to the model's
+    own nodes; pass the deformed ones to fill the deformed shape.
+    """
+    if nodes_xy is None:
+        nodes_xy = fem_data["nodes"]
+    nodes_xy = np.asarray(nodes_xy, dtype=float)
+    elements = np.asarray(fem_data["elements"], dtype=int)
+    etypes = np.asarray(fem_data["element_types"], dtype=int)
+    polys = []
+    for i in range(len(elements)):
+        n = _CORNERS_BY_TYPE.get(int(etypes[i]))
+        if not n:
+            polys.append(None)
+            continue
+        polys.append(nodes_xy[[int(elements[i][k]) for k in range(n)], :2])
+    return polys

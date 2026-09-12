@@ -23,7 +23,7 @@ from matplotlib.patches import Polygon
 
 from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by name)
 from .plot import (adaptive_colorbar_ticks, declared_unit_labels,
-                   JOINT_COLOR, JOINT_LINEWIDTH,
+                   JOINT_COLOR, JOINT_LINEWIDTH, JOINT_TICK_MAX_LINES,
                    JOINT_HALO_COLOR as _JOINT_HALO_COLOR,
                    JOINT_HALO_LINEWIDTH as _JOINT_HALO_PT)
 
@@ -47,6 +47,20 @@ def _fem_cbar_label(fem_data, base, unit_key):
 #: drawn in the panel's own deformed color over it, so the elements have to give
 #: way — light enough to read as context, dark enough to still carry the shape.
 _DEFORMED_GRID_UNDER_JOINTS = '0.62'
+
+#: The outside of the deformed mesh, drawn as its own dark line. Without it the
+#: only thing carrying the deformed ground surface is the light element grid,
+#: and the offset against the dashed undeformed outline — the crest that moved,
+#: the face that bulged — is exactly what the panel is read for.
+_DEFORMED_BOUNDARY_COLOR = '#22262b'
+_DEFORMED_BOUNDARY_PT = 1.4
+
+#: The tints the blocks of a jointed mesh are filled with, cycling by block. Very
+#: light and few: the tint says "this much material moves as one body", and three
+#: of them are enough for neighbors to differ while the element edges and the
+#: field stay readable through the fill.
+_BLOCK_TINTS = ('#c8d8ea', '#ecd9c0', '#cfe3c6')
+_BLOCK_TINT_ALPHA = 0.45
 
 # Median rendered element edge (device px) below which two full interleaved grids
 # (original + deformed) tangle; below it the original mesh collapses to its domain
@@ -135,6 +149,20 @@ def _vector_cbar_label(disp_elastic):
             else "Displacement magnitude, |u|")
 
 
+#: The most of the section's larger dimension any point of the deformed mesh may
+#: be drawn to have moved. An exaggeration past this stops being the slope: the
+#: shape says more about the multiplier than about the mechanism. Chosen by
+#: rendering (4%: at the height rule alone a wide section's crest swung far
+#: enough to read as a different slope).
+_DEFORM_MAX_FRACTION = 0.04
+
+#: Below this fraction of the section, a displacement field is residue rather
+#: than mechanism and the panel draws the mesh undeformed, saying so, rather than
+#: exaggerating noise. See :func:`deformation_below_resolution` for the
+#: measurements the number sits between.
+_DEFORM_NEGLIGIBLE_FRACTION = 1e-8
+
+
 def deformation_scale(fem_data, field, deform_percent=15):
     """The exaggeration the deformed-mesh panel is drawn at.
 
@@ -150,16 +178,49 @@ def deformation_scale(fem_data, field, deform_percent=15):
     displacement where the elastic part is known, matching plot_deformed_mesh.
     """
     nodes = fem_data["nodes"]
-    disp = field.get("displacements", np.zeros(2 * len(nodes)))
-    disp_elastic = field.get("displacements_elastic", None)
-    if disp_elastic is not None:
-        disp = disp - disp_elastic
-    u_arr, v_arr = _extract_uv(disp, fem_data)
-    max_disp = np.max(np.sqrt(u_arr**2 + v_arr**2))
+    max_disp = float(np.max(displacement_magnitude(fem_data, field)))
     mesh_height = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
-    if max_disp <= 1e-30:
+    if max_disp <= 1e-30 or deformation_below_resolution(fem_data, field):
         return 1.0
-    return max(1.0, (mesh_height * deform_percent / 100) / max_disp)
+    # Two bounds, and the smaller wins. The first makes the largest displacement
+    # `deform_percent` of the mesh HEIGHT, which is what a reader needs to see a
+    # settlement at all. The second is a ceiling on the whole picture: no point
+    # of the mesh moves further than _DEFORM_MAX_FRACTION of the section's larger
+    # dimension, so a wide section cannot be pulled apart by a rule written for a
+    # tall one, and a mechanism of a few microns cannot be exaggerated into a
+    # shape that is no longer the slope.
+    extent = _section_extent(fem_data)
+    return max(1.0, min(mesh_height * deform_percent / 100,
+                        extent * _DEFORM_MAX_FRACTION) / max_disp)
+
+
+def _section_extent(fem_data):
+    """The section's larger dimension — what "how far did it move" is read
+    against."""
+    nodes = np.asarray(fem_data["nodes"], dtype=float)
+    return max(float(np.ptp(nodes[:, 0])), float(np.ptp(nodes[:, 1]))) or 1.0
+
+
+def deformation_below_resolution(fem_data, field):
+    """True where this field's displacement is too small to draw as a shape.
+
+    An exaggeration is a multiplier on a measurement, and below some measurement
+    there is nothing to multiply: what is left is the solver's own residue, and
+    scaling it to a readable size draws a picture of the residue. The 234-trace
+    block is the case — nothing yielded in it, its viscoplastic displacement is
+    a hundredth of the smallest real mechanism measured on these models, and at
+    the height rule it was drawn at twenty million times, which is what the owner
+    could make nothing of.
+
+    The threshold is a fraction of the section, so it means the same on a 10 m
+    block and a 100 m slope, and it was chosen against measurements rather than
+    picked: RJ-18's three sliding slabs sit at 5.9e-7 of the section and the 60
+    degree toppling set at 8.8e-7, both real — their viscoplastic displacement
+    equals the joint slip the solve measured — while the block network sits at
+    7.4e-9. The line goes between them, not through them.
+    """
+    return (float(np.max(displacement_magnitude(fem_data, field)))
+            <= _DEFORM_NEGLIGIBLE_FRACTION * _section_extent(fem_data))
 
 
 def displacement_magnitude(fem_data, field):
@@ -1790,21 +1851,48 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
                                linewidth=max(lw, floor_pt), linestyle='--',
                                label='Original (outline)')
 
-    # Plot deformed mesh. On a jointed model the element edges step back to a
-    # light gray and the joint faces are drawn over them in the joint's OWN
-    # color — the same green the section drawings and the slip overlay give a
-    # joint, so it is one recognizable thing on every panel: the elements are
-    # there for context, the joints are the mechanism.
+    # Plot deformed mesh. On a jointed model the picture is the BLOCKS: what the
+    # joints cut the mass into, where those pieces went, and which of them moved
+    # as one body. So the elements step back to a light gray under a faint tint
+    # per block, every block's own outline is drawn — its joint faces in the
+    # joint's own green, the outside of the mesh in a dark line of its own — and
+    # the element edges come off entirely once there are enough joints that the
+    # grid is all a reader can see.
     draw_faces = joint_faces and bool((fem_data.get("joint_data") or {}).get("n"))
-    plot_mesh_lines(ax, fem_data_deformed,
-                    color=_DEFORMED_GRID_UNDER_JOINTS if draw_faces else deformed_color,
-                    alpha=1.0, linewidth=lw, label='Deformed')
+    show_edges = True
     if draw_faces:
-        ax.add_collection(LineCollection(
-            _joint_face_segments(fem_data, nodes_deformed),
-            colors=JOINT_COLOR,
-            linewidths=max(lw, floor_pt, JOINT_LINEWIDTH), alpha=1.0,
-            zorder=6.5, label='Joint faces'))
+        from .mesh import block_boundary_edges, block_components
+        comp = block_components(fem_data)
+        blocks, exterior = block_boundary_edges(fem_data, comp)
+        n_jlines = len(np.unique(np.asarray(
+            fem_data["joint_data"]["line_id"], dtype=int)))
+        # The same count at which the section drawings drop the joint ticks: past
+        # it the marks are all there is. Here it is the element grid that becomes
+        # that — on a 234-trace network the blocks are a few elements each and the
+        # edges bury the outlines that are the whole reading.
+        show_edges = n_jlines <= JOINT_TICK_MAX_LINES
+        _draw_block_tints(ax, fem_data, nodes_deformed, comp)
+    if show_edges:
+        plot_mesh_lines(ax, fem_data_deformed,
+                        color=_DEFORMED_GRID_UNDER_JOINTS if draw_faces
+                        else deformed_color,
+                        alpha=1.0, linewidth=lw, label='Deformed')
+    if draw_faces:
+        # The outside of the deformed mesh, as a line of its own: what moved,
+        # against the dashed outline of where it was.
+        if exterior:
+            ax.add_collection(LineCollection(
+                [nodes_deformed[e, :2] for e in exterior],
+                colors=_DEFORMED_BOUNDARY_COLOR,
+                linewidths=max(lw, floor_pt, _DEFORMED_BOUNDARY_PT), alpha=1.0,
+                zorder=6.4, label='Deformed (outline)'))
+        faces = [e for edges in blocks.values() for e in edges]
+        if faces:
+            ax.add_collection(LineCollection(
+                [nodes_deformed[e, :2] for e in faces],
+                colors=JOINT_COLOR,
+                linewidths=max(lw, floor_pt, JOINT_LINEWIDTH), alpha=1.0,
+                zorder=6.5, label='Joint faces'))
 
     # Plot members in both original and deformed configurations. The two
     # configurations are told apart by COLOR, on both kinds of member: the
@@ -1846,8 +1934,15 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     disp_label = 'Viscoplastic Deformation' if disp_elastic is not None else 'Mesh Deformation'
     if at_failure:
         disp_label += ' at Failure'
-    scale_str = f'{deform_scale:.0f}' if deform_scale >= 10 else f'{deform_scale:.1f}'
-    base = f'{disp_label} (Scale = {scale_str}x)'
+    if deformation_below_resolution(fem_data, solution):
+        # Nothing was drawn but the undeformed mesh (deform_scale is 1 here), and
+        # the title says which: a printed exaggeration would claim a shape was
+        # measured, when what the field holds is residue.
+        base = f'{disp_label} below drawing resolution (undeformed)'
+    else:
+        scale_str = (f'{deform_scale:.0f}' if deform_scale >= 10
+                     else f'{deform_scale:.1f}')
+        base = f'{disp_label} (Scale = {scale_str}x)'
     # The at-failure field is the UNCONVERGED state, solved a margin beyond critical to
     # develop the mechanism; _fs_title(at_failure=...) leads with FS — "at Failure"
     # already carries the disclosure, so no trial-F clause.
@@ -2412,25 +2507,27 @@ def solution_has_joint_state(fem_data, solution):
     return bool(_measured(solution, jd["n"]))
 
 
-def _joint_face_segments(fem_data, nodes_xy):
-    """The two faces of every joint element, as polylines through ``nodes_xy``.
+def _draw_block_tints(ax, fem_data, nodes_xy, comp):
+    """Fill each block of a jointed mesh with a faint tint, cycling by block.
 
-    Both copies of the split are returned, so a joint that has slipped or opened
-    draws as two lines that no longer lie on each other. The station's midside
-    node goes BETWEEN its corners, so a face on a quadratic edge draws as the
-    curve it is; a two-pair element (no midside) draws as its chord.
+    Two blocks that touch take different tints, which is the whole job: on a
+    toppling set every column is its own body and the tints are what says so at
+    a glance, while on a section whose joints stop inside the mass most of it
+    comes back as ONE block, takes one tint, and says that too.
     """
-    jd = fem_data.get("joint_data")
-    if jd is None or not jd.get("n"):
-        return []
-    conn = np.asarray(jd["conn"], dtype=int)
-    w = np.asarray(jd["w"], dtype=float)
-    segs = []
-    for i in range(int(jd["n"])):
-        order = [0, 2, 1] if w[i, 2] > 0.0 else [0, 1]
-        for base in (0, 3):
-            segs.append(nodes_xy[[conn[i, k + base] for k in order], :2])
-    return segs
+    from matplotlib.collections import PolyCollection
+    from .mesh import element_corner_polygons
+    polys, colors = [], []
+    for poly, c in zip(element_corner_polygons(fem_data, nodes_xy),
+                       np.asarray(comp, dtype=int)):
+        if poly is None:
+            continue
+        polys.append(poly)
+        colors.append(_BLOCK_TINTS[int(c) % len(_BLOCK_TINTS)])
+    if polys:
+        ax.add_collection(PolyCollection(
+            polys, facecolors=colors, edgecolors='none',
+            alpha=_BLOCK_TINT_ALPHA, zorder=0.5))
 
 
 def _joint_spans(fem_data, solution):

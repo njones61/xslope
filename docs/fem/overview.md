@@ -780,7 +780,7 @@ there, and the displacement gained over the window in the trial's own elastic di
 
 | Evidence | `exit_reason` | Verdict | Effect on the bisection |
 |---|---|---|---|
-| The slip gains ≥ 2% of itself over the window, its rate is **not decaying at all** (the last quarter's rate at least 0.9 of the quarter before), **and** max&#124;u&#124; gains ≥ 0.05 elastic displacements | `steady_slip` | `FAILED` | Failed — the slope is moving on its joints |
+| In the last tenth of the budget: the slip gains ≥ 2% of itself over the window, its rate is **not decaying at all** (the last quarter's rate at least 0.9 of the quarter before), **and** max&#124;u&#124; gains ≥ 0.05 elastic displacements | `steady_slip` | `FAILED` | Failed — the slope is moving on its joints |
 | The slip gains ≤ 0.01% of itself, max&#124;u&#124; gains ≤ 10⁻⁴ elastic displacements, the residual on the nodes carrying *no* joint is under `force_tol` across the window, **and** the joint residual has stopped falling (its window mean at least 0.85 of the previous window's) | `joint_settled` | `JOINT_SETTLED` | **Not** failed: the slope is standing, and the bracket moves up |
 | Anything else | unchanged | unchanged | The [hybrid classifier's](#2-hybrid-hybrid-default) verdict stands |
 
@@ -788,17 +788,27 @@ Both readings are asked only of a trial that would otherwise spend its whole bud
 jointed model — a trial that converges, a trial already failing, and every model without a joint
 reach neither.
 
-The two strict conditions are each there because the looser version was measured wrong. **The rate
-test is 0.9, not "decaying slowly":** a trial that converges after 203,000 sweeps and a trial that
-never converges had gained 16.2% and 18.7% of their slip and 0.375 and 0.488 elastic displacements
-when read at 25,000 sweeps — indistinguishable — and were separated only by the rate, which falls
-away steadily on the one that finishes (0.64 at 25,000 sweeps, 0.44 at 100,000, 0.21 at 200,000) and
-does not move at all on a real mechanism (1.0002). A creep that is merely slowing is therefore left
-to the displacement classifier, which already calls it failed. The `FAILED` reading also waits
-25,000 sweeps before it may speak, for the same reason. **The settled verdict asks the joint residual
-whether it has stopped falling** because without that it caught a trial nine thousand sweeps short of
-a clean convergence: the slip, the field and the soil were already at rest and only the joint
-residual, still coming down 35% per window, said otherwise.
+Each strict condition is there because the looser version was measured wrong.
+
+**The `FAILED` reading is taken only in the last tenth of the trial's budget, and it is not an early
+exit.** There is no early reading that separates a jointed mechanism from a jointed trial that
+converges late. One bracket-edge trial that reaches force equilibrium at 185,381 sweeps has, at
+50,000 sweeps, gained 30% of its slip and 1.76 elastic displacements of movement with an
+*accelerating* slip rate, and sits at 4.3 times its elastic response — every reading a runaway
+produces. It then settles. So the rule waits until a trial that could still converge would have,
+and what it does at the cap is replace an `AMBIGUOUS` verdict read off a displacement ratio with a
+measurement of the thing that is actually moving.
+
+**The rate test is 0.9, not "decaying slowly".** A trial that converges after 203,000 sweeps and one
+that never converges had gained 16.2% and 18.7% of their slip, and 0.375 and 0.488 elastic
+displacements, read at 25,000 sweeps — indistinguishable. They are separated only by the rate, which
+falls away steadily on the one that finishes (0.64 at 25,000 sweeps, 0.44 at 100,000, 0.21 at
+200,000) and does not move at all on a real mechanism (1.0002). A creep that is merely slowing is
+left to the displacement classifier, which already calls it failed.
+
+**The settled verdict asks the joint residual whether it has stopped falling**, because without that
+it caught a trial nine thousand sweeps short of a clean convergence: the slip, the field and the soil
+were already at rest, and only the joint residual, still coming down 35% per window, said otherwise.
 
 A `JOINT_SETTLED` trial does **not** claim convergence: it never met the force tolerance and
 `converged` stays `False`. What it claims is the thing the bracket asks about — that the slope

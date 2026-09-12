@@ -4227,12 +4227,20 @@ _JOINT_RELIEF_ARM = 5
 # displacement, so a displacement-only corrector has nothing to move. Two things
 # were missing from that reading and both are supplied now — the friction cross
 # term the shipped tangent omits, and the accumulated slip, which the corrector's
-# stateless law threw away and which is the state a grown mechanism lives in. The
-# switch below turns the corrector back on for a jointed model so that the pair
-# can be measured rather than assumed.
+# stateless law threw away and which is the state a grown mechanism lives in.
+# With both, the corrector certifies: RJ-2's standing bracket edge, 185 381
+# viscoplastic sweeps on the plain loop, is certified at 300 sweeps in 50 Newton
+# iterations at a force residual of 3.1e-11 with no Gauss point outside its
+# surface, and that row's whole nine-trial bracket closes on the same two factors
+# as its lock. See r16_joint_solver_speed.md §4.
 #:
-#: The corrector on a jointed model. OFF: the skip r3 decided stands.
-JOINT_NEWTON_ON = False
+#: The corrector on a jointed model, ON — the skip r3 decided is lifted. A
+#: refusal changes nothing (the corrector works on a copy of the field and of
+#: every plastic strain), so this can only convert a trial the stopping rules
+#: would have closed into one that is certified standing. False restores the skip
+#: for a whole process; `solve_fem(joint_newton=...)` pins it for one call, and
+#: `fem_solver='viscoplastic'` turns the corrector off on every model.
+JOINT_NEWTON_ON = True
 
 #: The friction cross term d t_s / d delta_n = +- k_n tan phi_j in the interface
 #: tangent. It is the consistent tangent and it costs nothing, but it makes the
@@ -5085,7 +5093,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               _nr_rescue_rungs=None, _nr_seed_first=False, _corrector=True,
               _finite_guard=False, _finite_guard_u_max=None,
               joint_slip_stiffness_factor=None,
-              joint_tangent=None, joint_tangent_factor=None):
+              joint_tangent=None, joint_tangent_factor=None,
+              joint_newton=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -5393,6 +5402,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             the fixed point is the same state; what changes is how fast the loop
             reaches it. None takes the module default (`JOINT_TANGENT_DEFAULT`).
             Inert on a model with no joint.
+        joint_newton (bool or None): Whether the `auto` driver offers a JOINTED
+            state to the Newton corrector. None takes the module default
+            (`JOINT_NEWTON_ON`, ON). The corrector carries the interface's
+            consistent tangent — the friction cross term included — and the
+            sweep's own accumulated slip, and a refusal changes nothing, so this
+            can only convert a trial the stopping rules would have closed into
+            one that is certified standing. False restores the pre-2026-09-12
+            skip for one call; `fem_solver='viscoplastic'` turns the corrector
+            off on every model. Inert without a joint.
         joint_tangent_factor (float or None): The residual stiffness a relieved
             pair keeps in the matrix, as a fraction of its elastic value. None
             takes RS2's own 0.01 (xslope.joint.JOINT_TANGENT_FACTOR). It is not
@@ -5971,7 +5989,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # so nothing is lost by not spending the attempts.
     _corrector_on = ((_solver == 'auto') and bool(_corrector)
                      and (fem_data.get("joint_data") is None
-                          or JOINT_NEWTON_ON))
+                          or (JOINT_NEWTON_ON if joint_newton is None
+                              else bool(joint_newton))))
     _corr_attempts = []
     _corr_nr_kw = None
     if _corrector_on:
@@ -12459,7 +12478,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                capture_margin=0.15, early_failure=True, fem_solver=None,
                ssrm_driver='bisection', trial_factors=None,
                joint_slip_stiffness_factor=None,
-               joint_tangent=None, joint_tangent_factor=None):
+               joint_tangent=None, joint_tangent_factor=None,
+               joint_newton=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -12527,9 +12547,10 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             solved one way. RS2's own value is 0.01; see solve_fem's own entry
             for what it does and what it leaves alone. OFF by default (None),
             and no locked factor of safety is defined with it on.
-        joint_tangent, joint_tangent_factor: The interface relief, passed to
-            every trial's solve_fem AND to the in-situ equilibration so the whole
-            run is solved one way. See solve_fem's entries.
+        joint_tangent, joint_tangent_factor, joint_newton: The interface relief
+            and the corrector's jointed switch, passed to every trial's solve_fem
+            AND to the in-situ equilibration so the whole run is solved one way.
+            See solve_fem's entries.
         fem_solver (str or None): Which per-trial driver runs, passed to every
             solve_fem trial — 'auto' (the default: the viscoplastic loop with the
             Newton corrector and the yield gate), 'viscoplastic' (that loop alone,
@@ -13032,6 +13053,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             joint_slip_stiffness_factor=joint_slip_stiffness_factor,
             joint_tangent=joint_tangent,
             joint_tangent_factor=joint_tangent_factor,
+            joint_newton=joint_newton,
             _prepared=prep)
         equilibration = {
             "converged": bool(eq["converged"]),
@@ -13137,7 +13159,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             trial_factors=trial_factors,
             joint_slip_stiffness_factor=joint_slip_stiffness_factor,
             joint_tangent=joint_tangent,
-            joint_tangent_factor=joint_tangent_factor)
+            joint_tangent_factor=joint_tangent_factor,
+            joint_newton=joint_newton)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -13377,7 +13400,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  suction_phi_b=None, suction_cap=None, early_failure=True,
                  fem_solver=None, _prepared=None, _init_state=None, hybrid=False,
                  trial_factors=None, joint_slip_stiffness_factor=None,
-                 joint_tangent=None, joint_tangent_factor=None):
+                 joint_tangent=None, joint_tangent_factor=None,
+                 joint_newton=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -13564,6 +13588,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          joint_slip_stiffness_factor=joint_slip_stiffness_factor,
                          joint_tangent=joint_tangent,
                          joint_tangent_factor=joint_tangent_factor,
+                         joint_newton=joint_newton,
                          _prepared=_prepared, _init_state=_init_state)
 
     F_left = F_min

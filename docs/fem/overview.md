@@ -942,9 +942,12 @@ has moved the eight that the runaway rule reads.
 **On a jointed model `'auto'` offers the state to the corrector, the same as on any other.** The
 interface's consistent tangent carries the friction cross term
 $\partial t_s/\partial\Delta_n = \pm k_n\tan\phi_j$ — non-symmetric, and only the Newton path's
-general factorization ever sees it — and the corrector's interface law carries the sweep's own
-accumulated slip, dilational opening, residual branch and opening history, held fixed across the
-step and linearized about. It certifies on the same three checks it applies anywhere: one
+general factorization ever sees it — and the corrector's interface law is seeded with the sweep's
+own accumulated slip, dilational opening, residual branch and opening history rather than with a
+pristine interface. The two of those that a Newton step can *grow* — a pair that reaches its limit
+during the step moves onto its residual branch, and one that slides further rides further up its
+asperities — are advanced by the step's own return map, so what the corrector solves is the problem
+it was seeded with. It certifies on the same three checks it applies anywhere: one
 rock-toppling bracket edge that the plain loop takes 185,381 sweeps to converge is certified at 300
 sweeps, at a force residual of $3\times10^{-11}$ with no Gauss point outside its surface, and that
 model's whole bracket closes where it closed before at a thirteenth of the wall-clock cost. A

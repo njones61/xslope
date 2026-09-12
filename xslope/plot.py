@@ -2756,6 +2756,41 @@ JOINT_TICK_FRACTION = 0.009
 #: a section drawing draws a fault or a bedding plane dark and dashed.
 JOINT_COLOR = '#33383d'
 
+#: A bar-less joint line's weight. Thin: the line says where a surface is, and a
+#: model can carry a network of them.
+JOINT_LINEWIDTH = 1.2
+
+#: The most joint lines that still get the fault symbol — dashes and ticks. A
+#: tick says "the two sides of this line can move on each other", and each line
+#: carries four to sixteen of them, so past a handful of lines the ticks are all
+#: a reader sees: at sixteen lines on the rj018 section the traces themselves
+#: are no longer followable, at eight they are, so eight is where the symbol
+#: stops. Above it a joint is a plain thin solid line — what a network needs is
+#: continuous traces you can follow, and the legend carries the count.
+JOINT_TICK_MAX_LINES = 8
+
+#: The dash pattern of a joint line drawn as a fault symbol.
+JOINT_DASHES = (0, (6, 3))
+
+
+def joint_ticks_wanted(n_lines):
+    """Whether a section carrying ``n_lines`` joint lines is drawn with the
+    fault symbol (dashed, ticked) rather than as plain solid traces."""
+    return int(n_lines) <= JOINT_TICK_MAX_LINES
+
+
+def joint_linestyle(n_lines):
+    """The line style joint lines take at this count: see
+    :data:`JOINT_TICK_MAX_LINES`."""
+    return JOINT_DASHES if joint_ticks_wanted(n_lines) else '-'
+
+
+def joint_legend_label(n_lines):
+    """The legend entry for a section's joint lines: the count belongs in it,
+    because at a network's scale the reader cannot count them off the drawing."""
+    n = int(n_lines)
+    return 'Joint' if n == 1 else f'Joint ({n} lines)'
+
 
 def draw_joint_ticks(ax, xs, ys, span, color, alpha=0.8, zorder=None,
                      label=None):
@@ -2876,8 +2911,9 @@ def plot_reinforcement_lines(ax, slope_data, style=None, solution=False):
 
 
 def plot_joint_lines(ax, slope_data, style=None):
-    """Draw the ``joints`` sheet's lines: a dark dashed line with short ticks on
-    both sides, and one legend entry, "Joint".
+    """Draw the ``joints`` sheet's lines: a thin dark dashed line, ticked on both
+    sides where there are few enough of them to read, and one legend entry
+    naming the count.
 
     A joint line has no member in it — it is a surface the material on either
     side can slide along and part on — so it is drawn the way a section drawing
@@ -2885,11 +2921,17 @@ def plot_joint_lines(ax, slope_data, style=None):
     drawn. A reinforcement line that is ALSO a slip surface keeps the
     reinforcement style with the same ticks (see
     :func:`plot_reinforcement_lines`), because the sheet is still there.
+
+    The ticks come off past :data:`JOINT_TICK_MAX_LINES` lines: they are the
+    mark that says a surface can slide, and on a generated network they are all
+    a reader can see. The legend then carries the count instead.
     """
     lines = slope_data.get('joint_lines') or []
     if not lines:
         return
     span = _model_span(slope_data)
+    ticks = joint_ticks_wanted(len(lines))
+    dash = joint_linestyle(len(lines))
     labeled = False
     for j in lines:
         try:
@@ -2897,15 +2939,17 @@ def plot_joint_lines(ax, slope_data, style=None):
             ys = [float(j['y1']), float(j['y2'])]
         except (KeyError, TypeError, ValueError):
             continue
-        ax.plot(xs, ys, color=JOINT_COLOR, linewidth=2.0, linestyle=(0, (6, 3)),
-                alpha=0.9, zorder=5)
-        draw_joint_ticks(ax, xs, ys, span, JOINT_COLOR, alpha=0.9, zorder=5)
+        ax.plot(xs, ys, color=JOINT_COLOR, linewidth=JOINT_LINEWIDTH,
+                linestyle=dash, alpha=0.9, zorder=5)
+        if ticks:
+            draw_joint_ticks(ax, xs, ys, span, JOINT_COLOR, alpha=0.9, zorder=5)
         if not labeled:
-            # The legend swatch carries the tick too, so the entry reads as the
-            # same mark the section carries.
-            ax.plot([], [], color=JOINT_COLOR, linewidth=2.0,
-                    linestyle=(0, (6, 3)), alpha=0.9, marker='|', markersize=11,
-                    markeredgewidth=1.5, label='Joint')
+            # The legend swatch carries whatever mark the section carries, so a
+            # ticked drawing gets a ticked swatch and a plain one does not.
+            ax.plot([], [], color=JOINT_COLOR, linewidth=JOINT_LINEWIDTH,
+                    linestyle=dash, alpha=0.9,
+                    marker='|' if ticks else 'None', markersize=11,
+                    markeredgewidth=1.5, label=joint_legend_label(len(lines)))
             labeled = True
 
 
@@ -4409,12 +4453,16 @@ def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=T
 
     # A jointed line, over the mesh, in the style the inputs plot gives it. The
     # split itself is invisible — the three copies of every station stand at one
-    # point — so the ticks are the only thing that says the mesh is torn there.
+    # point — so the line, and the ticks where there are few enough lines to
+    # carry them, are all that says the mesh is torn there.
     joint_records = mesh.get("joints") or []
     if joint_records:
         node_xy = np.asarray(nodes, dtype=float)
         xmin_j, xmax_j = float(node_xy[:, 0].min()), float(node_xy[:, 0].max())
         span_j = (xmax_j - xmin_j) or 1.0
+        ticks_j = joint_ticks_wanted(len(joint_records))
+        dash_j = joint_linestyle(len(joint_records))
+        n_plain = sum(1 for r in joint_records if not r.get("bar", True))
         drawn_bar = drawn_plain = False
         for rec in joint_records:
             stations = rec.get("stations") or []
@@ -4428,26 +4476,30 @@ def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=T
             ys_j = [float(q[1]) for q in pts]
             has_bar = rec.get("bar", True)
             color_j = 'darkgray' if has_bar else JOINT_COLOR
-            ax.plot(xs_j, ys_j, color=color_j, linewidth=3 if has_bar else 2.0,
-                    linestyle='-' if has_bar else (0, (6, 3)), alpha=0.95,
+            ax.plot(xs_j, ys_j, color=color_j,
+                    linewidth=3 if has_bar else JOINT_LINEWIDTH,
+                    linestyle='-' if has_bar else dash_j, alpha=0.95,
                     zorder=6)
-            draw_joint_ticks(ax, xs_j, ys_j, span_j, color_j, alpha=0.95,
-                             zorder=6)
+            if ticks_j:
+                draw_joint_ticks(ax, xs_j, ys_j, span_j, color_j, alpha=0.95,
+                                 zorder=6)
             drawn_bar = drawn_bar or has_bar
             drawn_plain = drawn_plain or not has_bar
+        _mark = '|' if ticks_j else 'None'
         if drawn_bar:
             legend_elements.append(plt.Line2D([0], [0], color='darkgray',
                                               linewidth=3, alpha=0.95,
-                                              marker='|', markersize=11,
+                                              marker=_mark, markersize=11,
                                               markeredgewidth=1.5,
                                               label='Reinforcement (joint)'))
         if drawn_plain:
             legend_elements.append(plt.Line2D([0], [0], color=JOINT_COLOR,
-                                              linewidth=2.0, alpha=0.95,
-                                              linestyle=(0, (6, 3)),
-                                              marker='|', markersize=11,
+                                              linewidth=JOINT_LINEWIDTH,
+                                              alpha=0.95,
+                                              linestyle=dash_j,
+                                              marker=_mark, markersize=11,
                                               markeredgewidth=1.5,
-                                              label='Joint'))
+                                              label=joint_legend_label(n_plain)))
     
     # Material colors (style overrides → palette default). Mesh material IDs are
     # 1-based (gmsh); the style sheet keys by 0-based mat_id, so map mid-1 — this

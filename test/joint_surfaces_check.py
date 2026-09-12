@@ -248,6 +248,34 @@ def _leg_plots(failures, cache):
         failures.append("a model with no jointed line still says it has one")
     plt.close(fig)
 
+    # The inputs overlay thins out as the count rises: a handful of joint lines
+    # keep the fault symbol (dashes and ticks), a network gets plain traces you
+    # can follow and a legend that counts them.
+    from xslope.plot import JOINT_TICK_MAX_LINES, plot_joint_lines
+
+    def _joint_only(n):
+        return {"joint_lines": [{"x1": 0.0, "y1": float(k), "x2": 50.0,
+                                 "y2": float(k) + 5.0} for k in range(n)]}
+
+    for n, symbol in ((JOINT_TICK_MAX_LINES, True),
+                      (JOINT_TICK_MAX_LINES + 1, False)):
+        fig, ax = plt.subplots()
+        plot_joint_lines(ax, _joint_only(n))
+        labels = [str(t.get_label()) for t in ax.get_lines()
+                  if not str(t.get_label()).startswith("_")]
+        if f"Joint ({n} lines)" not in labels:
+            failures.append(f"the inputs overlay does not count its lines at "
+                            f"{n}: {labels}")
+        ticked = [t for t in ax.get_lines()
+                  if str(t.get_marker()) not in ("None", "", "none")]
+        if symbol and not ticked:
+            failures.append(f"{n} joint lines lost the fault symbol, which is "
+                            f"readable at that count")
+        if not symbol and ticked:
+            failures.append(f"{n} joint lines still carry ticks, which past "
+                            f"{JOINT_TICK_MAX_LINES} is all a reader sees")
+        plt.close(fig)
+
     fig = plt.figure()
     _quiet(plot_mesh, mesh, materials=sd.get("materials"), fig=fig)
     ax = fig.axes[0]

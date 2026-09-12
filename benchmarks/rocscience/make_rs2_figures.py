@@ -87,7 +87,8 @@ from xslope.plot import (
     plot_base_geometry, plot_piezo_line, plot_dloads, plot_tcrack_surface, plot_ssr_zones,
     plot_reinforcement_lines as _plot_input_reinf_lines, plot_joint_lines,
     plot_piles, plot_line_loads,
-    adaptive_colorbar_ticks, adaptive_edge_linewidth, JOINT_COLOR, draw_joint_ticks,
+    adaptive_colorbar_ticks, adaptive_edge_linewidth, JOINT_COLOR, JOINT_LINEWIDTH,
+    draw_joint_ticks, joint_legend_label, joint_linestyle, joint_ticks_wanted,
 )
 from xslope.plot_fem import (
     plot_shear_strain_contours, plot_displacement_vectors,
@@ -803,6 +804,11 @@ def _draw_mesh_panel(ax, fem_data, style, alpha=0.6):
             _span = float(np.max(nodes[:, 0]) - np.min(nodes[:, 0])) or 1.0
             _conn = np.asarray(_jd['conn'], dtype=int)
             _lid = np.asarray(_jd['line_id'], dtype=int)
+            # Ticks say the two sides of a line can move on each other; past a
+            # handful of lines they are all a reader sees, so the line carries
+            # it alone and the legend carries the count (xslope.plot's rule).
+            _ticks = joint_ticks_wanted(len(_lines))
+            _dash = joint_linestyle(len(_lines))
             for li in _lines:
                 sel = np.flatnonzero(_whole & (_lid == li))
                 ends = np.vstack([nodes[_conn[sel, 0], :2], nodes[_conn[sel, 1], :2]])
@@ -811,14 +817,18 @@ def _draw_mesh_panel(ax, fem_data, style, alpha=0.6):
                 d = d / (np.hypot(d[0], d[1]) or 1.0)
                 order = np.argsort(ends @ d)
                 pts = ends[order]
-                ax.plot(pts[:, 0], pts[:, 1], color=JOINT_COLOR, linewidth=1.6,
-                        linestyle=(0, (6, 3)), alpha=0.95, zorder=6)
-                draw_joint_ticks(ax, pts[:, 0], pts[:, 1], _span, JOINT_COLOR,
-                                 alpha=0.95, zorder=6)
-            legend_handles.append(plt.Line2D([0], [0], color=JOINT_COLOR, lw=1.6,
-                                             linestyle=(0, (6, 3)), marker='|',
+                ax.plot(pts[:, 0], pts[:, 1], color=JOINT_COLOR,
+                        linewidth=JOINT_LINEWIDTH, linestyle=_dash,
+                        alpha=0.95, zorder=6)
+                if _ticks:
+                    draw_joint_ticks(ax, pts[:, 0], pts[:, 1], _span, JOINT_COLOR,
+                                     alpha=0.95, zorder=6)
+            legend_handles.append(plt.Line2D([0], [0], color=JOINT_COLOR,
+                                             lw=JOINT_LINEWIDTH,
+                                             linestyle=_dash,
+                                             marker='|' if _ticks else 'None',
                                              markersize=9, markeredgewidth=1.4,
-                                             label=f'Joint ({len(_lines)} lines)'))
+                                             label=joint_legend_label(len(_lines))))
 
     _plot_boundary_conditions(ax, nodes, fem_data['bc_type'], fem_data['bc_values'],
                               legend_handles, 0.03, fem_data.get('roller_x_nodes', set()))

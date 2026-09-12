@@ -2462,7 +2462,10 @@ _JOINT_OPEN_MARK_COLOR = '#33383d'
 #: went soft exactly where the field is at its white middle, and against their
 #: own white under-stroke. A saturated lime does not — it is far from white at
 #: any value, and far from both of the field's ends.
-_JOINT_SLIP_COLORS = ('#aef000', '#3fa62c', '#0a5c1e')
+#:
+#: Dark at zero and bright at the top: the brightest color marks the largest
+#: slip, so the eye lands on the joint that moved the most.
+_JOINT_SLIP_COLORS = ('#0a5c1e', '#3fa62c', '#aef000')
 
 #: Nominal weight (points) of a joint span that is NOT slipping — the lightest
 #: mark that still says where the surface is. A joint has no width and a network

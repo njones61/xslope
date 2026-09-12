@@ -1193,7 +1193,8 @@ def _finish_preview_axes(ax):
 POLYGON_TYPE_ITEMS = list(POLYGON_TYPE_WORDS.items())   # [(word, kind), ...]
 # Display wording for a non-material kind, used in the item list and the preview.
 # 'refine' has no SSR label — it is a meshing overlay, not an analysis one.
-POLYGON_KIND_LABELS = dict(SSR_ZONE_LABELS, refine="Refine")
+POLYGON_KIND_LABELS = dict(SSR_ZONE_LABELS, refine="Refine",
+                           joints="Joint region")
 # kind -> the plot feature whose color the preview borrows, so a zone previews in
 # the same hue plot_inputs draws it in.
 _ZONE_PREVIEW_FEATURE = {"reduce": "ssr_zone_reduce", "hold": "ssr_zone_hold",
@@ -1209,6 +1210,11 @@ def _material_color(style, mat_id, fallback_idx, kind="material"):
     from xslope.style import feature_style, material_style
     if kind == "refine":
         return _REFINE_PREVIEW_COLOR
+    if kind == "joints":
+        # The joint traces' own color, which is what plot_inputs outlines the
+        # region in: the region and the lines inside it read as one thing.
+        from xslope.plot import JOINT_COLOR
+        return JOINT_COLOR
     if kind in _ZONE_PREVIEW_FEATURE:
         return feature_style(style, _ZONE_PREVIEW_FEATURE[kind]).get("color", "black")
     idx = mat_id if mat_id is not None else fallback_idx
@@ -6643,8 +6649,14 @@ class MatGeometryDialog(QDialog):
         # Every field the record carries is edited here, so nothing has to survive as
         # a pass-through — but the copy is still explicit, because a rebuild-from-
         # fields apply() is exactly what silently deletes a key nobody listed.
+        # 'label' and 'stray_mat_id' are pass-through keys a joint-network region
+        # carries: its name, which lives in the polygon sheet's block header, and the
+        # Mat ID preflight reports on a polygon that has no material. Neither is
+        # edited here, and neither may be lost by the rebuild result_lines() does.
         self._lines = [{"mat_id": it.get("mat_id"), "size": it.get("size"),
                         "kind": it.get("kind") or "material",
+                        "label": it.get("label"),
+                        "stray_mat_id": it.get("stray_mat_id"),
                         "coords": [tuple(c) for c in it.get("coords", [])]}
                        for it in (items or [])]
         self._cur = -1
@@ -6973,7 +6985,7 @@ class MatGeometryDialog(QDialog):
     def _add_line(self):
         self._commit_current()
         self._lines.append({"mat_id": 0, "coords": [], "kind": "material",
-                            "size": None})
+                            "size": None, "label": None, "stray_mat_id": None})
         self._refresh_list()
         self.list.setCurrentRow(len(self._lines) - 1)
         self._schedule_preview()
@@ -7005,6 +7017,9 @@ class MatGeometryDialog(QDialog):
                 item["kind"] = ln.get("kind") or "material"
             if ln.get("size") is not None:
                 item["size"] = ln["size"]
+            for _k in ("label", "stray_mat_id"):
+                if ln.get(_k) is not None:
+                    item[_k] = ln[_k]
             out.append(item)
         return out
 
@@ -7104,7 +7119,7 @@ POLYGON_HELP = {
     # lines at the dialog's natural width; the strip is fixed at two lines and clips
     # beyond).
     "mat_id": ("Material assigned to this closed zone. Greyed out for any Type other than 'material': an overlay is not a soil zone, so it has no material — the same rule the polygon sheet applies when it blanks the material-name echo."),
-    "type": ("What kind of region this polygon is. 'material' (the default) is a soil zone. The three SSR types are FEM analysis OVERLAYS — never meshed, never sliced: 'ssr reduce' reduces only inside, 'ssr hold' holds full strength inside, 'ssr elastic' cannot yield inside. 'refine' is neither — it is a pure meshing region and needs a Size."),
+    "type": ("What kind of region this polygon is. 'material' (the default) is a soil zone. The three SSR types are FEM analysis OVERLAYS — never meshed, never sliced: 'ssr reduce' reduces only inside, 'ssr hold' holds full strength inside, 'ssr elastic' cannot yield inside. 'refine' is a pure meshing region and needs a Size. 'joints' marks where a joint network is built."),
     "size": ("Optional target finite-element size inside this polygon, used only when a mesh is generated. Blank = the global target size. Independent of Type: a material zone or an SSR overlay may carry one, and a 'refine' polygon is nothing but one. A Size only ever refines — a value at or above the global size cannot coarsen the mesh."),
 }
 
@@ -7146,6 +7161,14 @@ class PolygonEditor(CategoryEditor):
         for r in (slope_data.get("refine_zones") or []):
             items.append({"mat_id": None, "kind": "refine", "size": r.get("size"),
                           "coords": [tuple(c) for c in (r.get("polygon") or [])]})
+        for r in (slope_data.get("joint_zones") or []):
+            # label and mat_id ride through the editor untouched: the name is the
+            # polygon sheet's block header, which the editor does not offer as a
+            # field, and the stray Mat ID is what preflight reports. Dropping either
+            # here would silently rewrite the file on the next OK.
+            items.append({"mat_id": None, "kind": "joints", "size": r.get("size"),
+                          "label": r.get("label"), "stray_mat_id": r.get("mat_id"),
+                          "coords": [tuple(c) for c in (r.get("polygon") or [])]})
         style = _doc_style(parent)
 
         def preview(ax, polys, selected, _max_depth):
@@ -7154,8 +7177,9 @@ class PolygonEditor(CategoryEditor):
         return MatGeometryDialog(
             "Polygons",
             "Each polygon is a closed region (the ring closes automatically, so list "
-            "each vertex once) — a material zone, an SSR analysis overlay, or a mesh "
-            "refinement region, set by its Type. Select a polygon to edit it.",
+            "each vertex once) — a material zone, an SSR analysis overlay, a mesh "
+            "refinement region, or a joint-network region, set by its Type. Select a "
+            "polygon to edit it.",
             "Polygon", items, slope_data.get("materials") or [], parent, select=select,
             preview_draw=preview,
             preview_caption="Preview shows the pending zones (selected zone filled and "
@@ -7167,7 +7191,7 @@ class PolygonEditor(CategoryEditor):
 
     def apply(self, slope_data, dlg):
         from shapely.geometry import Polygon
-        polys, zones, refines = [], [], []
+        polys, zones, refines, joint_regions = [], [], [], []
         for it in dlg.result_lines():
             coords = it["coords"]
             if len(coords) < 3:
@@ -7181,6 +7205,11 @@ class PolygonEditor(CategoryEditor):
                     continue
                 refines.append({"polygon": [tuple(c) for c in coords],
                                 "size": it["size"]})
+            elif kind == "joints":
+                joint_regions.append({"polygon": [tuple(c) for c in coords],
+                                      "label": it.get("label") or "",
+                                      "size": it.get("size"),
+                                      "mat_id": it.get("stray_mat_id")})
             elif kind in SSR_ZONE_LABELS:
                 zones.append({"kind": kind, "polygon": [tuple(c) for c in coords],
                               "label": SSR_ZONE_LABELS[kind],
@@ -7190,6 +7219,7 @@ class PolygonEditor(CategoryEditor):
                               "size": it.get("size")})
         slope_data["ssr_zones"] = zones
         slope_data["refine_zones"] = refines
+        slope_data["joint_zones"] = joint_regions
         _set_derived_geometry(slope_data, polys)
 
 

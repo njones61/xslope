@@ -5800,6 +5800,48 @@ def _joint_bond_inputs(ctx):
                f"{_AT_REINF}.")
 
 
+# ---- the joint-network regions (polygon sheet, Type 'joints') ---------------
+#
+# A joint region is an authoring input: it says where a generated set exists, and
+# nothing else reads it. So both rules below are about a cell that was filled in
+# expecting it to do something it cannot. A region no set names is NOT one of them
+# -- a region drawn for a set the user has yet to build is an ordinary thing to
+# find in a file, and saying so every run would be noise.
+
+def _joint_region_name(n, zone):
+    label = str((zone or {}).get("label") or "").strip()
+    return f"Joint region {n + 1} ({label!r})" if label else f"Joint region {n + 1}"
+
+
+@rule("joint_region.material_assigned", WARNING, ("*",),
+      "A joint-network region carries no material, so a Mat ID on it does nothing.")
+def _joint_region_material(ctx):
+    for n, z in enumerate(ctx.sd.get("joint_zones") or []):
+        mid = z.get("mat_id")
+        if mid is None:
+            continue
+        yield (f"{_joint_region_name(n, z)} declares Type 'joints' and Mat ID "
+               f"{mid}. A joint region is not a soil zone: it carries no "
+               f"material, is never meshed and never generates slices -- it only "
+               f"says where a joint set exists. The Mat ID does nothing, and if "
+               f"this polygon was meant to BE that soil zone, its Type is the "
+               f"cell to change {_AT_POLYGON}.")
+
+
+@rule("joint_region.size_inert", WARNING, ("fem", "seep"),
+      "A joint-network region's Size refines nothing.")
+def _joint_region_size(ctx):
+    for n, z in enumerate(ctx.sd.get("joint_zones") or []):
+        s = _num(z.get("size"))
+        if s is None:
+            continue
+        yield (f"{_joint_region_name(n, z)} declares Size = {s:g}. A joint "
+               f"region is never meshed as a region, so the size is not applied "
+               f"anywhere: the elements inside it come out at the global target "
+               f"like everything else. Draw a second polygon of Type 'refine' "
+               f"over the same ground to refine the mesh there {_AT_POLYGON}.")
+
+
 # ---------------------------------------------------------------------------
 # Family: magnitude plausibility -- the sniff tests
 #

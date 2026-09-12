@@ -735,6 +735,37 @@ def plot_ssr_zones(ax, slope_data, style=None):
             zorder=1.5, label=legend_label, gid=f'SSR_ZONE_{kind.upper()}'))
 
 
+def plot_joint_zones(ax, slope_data, style=None):
+    """Draw the polygon sheet's joint-network regions: a light dashed outline.
+
+    A joint region says where a joint SET exists — "the sandstone above elevation
+    40", "this block" — when no material boundary draws that region on its own.
+    It carries no material, is never meshed and no solver reads it, so it is drawn
+    the way an annotation is drawn: the joint color the traces inside it use, thin,
+    dashed and unfilled, under every line and label. One legend entry however many
+    regions there are, because they are all the same kind of thing.
+
+    Parameters:
+        ax: matplotlib Axes object
+        slope_data: dict; reads 'joint_zones' (absent/empty → nothing is drawn)
+        style: optional style sheet (see xslope.style); None → defaults
+    """
+    zones = slope_data.get('joint_zones') or []
+    if not zones:
+        return
+    labeled = False
+    for zone in zones:
+        coords = [(float(x), float(y)) for x, y in (zone.get('polygon') or [])]
+        if len(coords) < 3:
+            continue
+        xs = [p[0] for p in coords] + [coords[0][0]]
+        ys = [p[1] for p in coords] + [coords[0][1]]
+        ax.plot(xs, ys, color=JOINT_COLOR, linewidth=1.0, linestyle=(0, (4, 3)),
+                alpha=0.55, zorder=1.5,
+                label=None if labeled else 'Joint region')
+        labeled = True
+
+
 def plot_max_depth(ax, profile_lines, max_depth, style=None):
     """
     Plots a horizontal line representing the maximum depth limit with hash marks.
@@ -3560,6 +3591,7 @@ def plot_inputs(
         # view leave it out for the same reason they leave out the members the
         # other engine carries.
         if mode == "fem":
+            plot_joint_zones(ax, slope_data, style=style)
             plot_joint_lines(ax, slope_data, style=style)
         plot_piles(ax, slope_data, style=style)
 

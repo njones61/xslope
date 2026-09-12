@@ -3128,9 +3128,10 @@ def run_v21_roundtrip_test(test):
     The v21 additions are spread over four sheets and none of them exists on any
     corpus file, so this is the only place they are exercised end to end:
 
-      * polygon sheet — a Size on a material zone, a Size on an SSR overlay, and a
+      * polygon sheet — a Size on a material zone, a Size on an SSR overlay, a
         Type='refine' overlay (which is neither geometry nor an SSR constraint and
-        must come back on its own list);
+        must come back on its own list), and a v27 Type='joints' region with the
+        name a joint set refers to it by;
       * profile sheet — a Size on a profile line (checked on a profile-geometry
         model, since the two geometry forms take different writer branches);
       * dloads / dloads (2) — a per-block Direction, with a 'normal' block beside a
@@ -3170,11 +3171,18 @@ def run_v21_roundtrip_test(test):
 
     refine_ring = box(0.30, 0.20, 0.55, 0.60)
 
+    joint_ring = box(0.12, 0.10, 0.40, 0.50)
+
     def _mut_poly(d):
         d['polygons'][0]['size'] = 1.75
         d['ssr_zones'] = [{'kind': 'reduce', 'polygon': box(0.1, 0.05, 0.9, 0.95),
                            'size': 0.9}]
         d['refine_zones'] = [{'polygon': list(refine_ring), 'size': 0.45}]
+        # v27 joint-network region. Its NAME is the polygon sheet's block header,
+        # which is the only cell on the block that carries it — so a name that did
+        # not survive the save is a region no joint set can be generated for.
+        d['joint_zones'] = [{'polygon': list(joint_ring), 'label': 'North block',
+                             'size': None, 'mat_id': None}]
         d['side_bc'] = 'fixed'
 
     d1, d2 = _roundtrip(base, _mut_poly)
@@ -3193,8 +3201,19 @@ def run_v21_roundtrip_test(test):
             problems.append(f"refine size: {_r[0].get('size')!r} != 0.45")
         problems += _roundtrip_diff([tuple(p) for p in refine_ring],
                                     [tuple(p) for p in _r[0]['polygon']], 'refine ring')
+    _j = d2.get('joint_zones') or []
+    if len(_j) != 1:
+        problems.append(f"joint_zones: {len(_j)} back, expected 1")
+    else:
+        if _j[0].get('label') != 'North block':
+            problems.append(f"joint region name: {_j[0].get('label')!r} != "
+                            f"'North block'")
+        problems += _roundtrip_diff([tuple(p) for p in joint_ring],
+                                    [tuple(p) for p in _j[0]['polygon']],
+                                    'joint region ring')
     if len(d2.get('polygons') or []) != len(d1.get('polygons') or []):
-        problems.append("a refine overlay leaked into the material geometry")
+        problems.append("a refine or joint overlay leaked into the material "
+                        "geometry")
     if d2.get('side_bc') != 'fixed':
         problems.append(f"side_bc: {d2.get('side_bc')!r} != 'fixed'")
 
@@ -3282,11 +3301,11 @@ _EDITOR_MANAGED_KEYS = {
     "joints": ["joint_lines"],
     "line_loads": ["line_loads"],
     "profile": ["profile_lines"],
-    # The polygon editor also owns the polygon sheet's overlay rows — SSR zones and
-    # v21 refine regions. They are edited in the same dialog as the material zones
-    # and split back out by Type on apply, so a dropped or mis-typed overlay has to
-    # fail here.
-    "polygons": ["polygons", "ssr_zones", "refine_zones"],
+    # The polygon editor also owns the polygon sheet's overlay rows — SSR zones, v21
+    # refine regions and v27 joint-network regions. They are edited in the same dialog
+    # as the material zones and split back out by Type on apply, so a dropped or
+    # mis-typed overlay has to fail here.
+    "polygons": ["polygons", "ssr_zones", "refine_zones", "joint_zones"],
     "transient": ["tseep"],
 }
 
@@ -3379,6 +3398,12 @@ def _editor_fixture():
         # never leak into 'polygons'.
         "refine_zones": [{"polygon": [(40.0, 1.0), (55.0, 1.0), (55.0, 8.0),
                                       (40.0, 8.0)], "size": 0.45}],
+        # v27 joint-network region: a polygon a generated joint set is clipped to.
+        # Its name and the Mat ID somebody left on it are carried through the editor
+        # without being edited there, which is what this row is for.
+        "joint_zones": [{"polygon": [(12.0, 2.0), (34.0, 2.0), (34.0, 14.0),
+                                     (12.0, 14.0)],
+                         "label": "North block", "size": None, "mat_id": None}],
         "ground_surface": None, "domain_polygon": None, "tcrack_surface": None,
         "materials": materials,
         "piezo_line": [(0.0, 5.0), (100.0, 5.0)],
@@ -3500,6 +3525,14 @@ def _editor_norm(key, val):
                 for z in (val or [])]
     if key == "refine_zones":
         return [{"size": z.get("size"),
+                 "coords": [tuple(c) for c in (z.get("polygon") or [])]}
+                for z in (val or [])]
+    if key == "joint_zones":
+        # The region's NAME and the stray Mat ID preflight reports on are carried
+        # through the editor without being shown, so both are compared: a
+        # pass-through key is exactly the kind that goes missing unnoticed.
+        return [{"label": z.get("label") or "", "size": z.get("size"),
+                 "mat_id": z.get("mat_id"),
                  "coords": [tuple(c) for c in (z.get("polygon") or [])]}
                 for z in (val or [])]
     return val
@@ -5979,6 +6012,27 @@ PREFLIGHT_RULE_SPECS = [
          control=lambda sd: _pf_joint(sd),
          expect='a reinforced wall'),
     # The INFO: which bonded-bar inputs a jointed line stops reading.
+    # The two joint-network REGIONS rules. Both are about a cell filled in expecting
+    # it to do something the region cannot, so each control is the same region with
+    # that cell empty -- which is the ordinary, silent case.
+    dict(rule='joint_region.material_assigned', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_set(sd, joint_zones=[
+             {'polygon': [(10.0, 0.0), (30.0, 0.0), (30.0, 10.0), (10.0, 10.0)],
+              'label': 'North block', 'size': None, 'mat_id': 2}]),
+         control=lambda sd: _pf_set(sd, joint_zones=[
+             {'polygon': [(10.0, 0.0), (30.0, 0.0), (30.0, 10.0), (10.0, 10.0)],
+              'label': 'North block', 'size': None, 'mat_id': None}]),
+         expect='is not a soil zone'),
+    dict(rule='joint_region.size_inert', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_set(sd, joint_zones=[
+             {'polygon': [(10.0, 0.0), (30.0, 0.0), (30.0, 10.0), (10.0, 10.0)],
+              'label': 'North block', 'size': 0.4, 'mat_id': None}]),
+         control=lambda sd: _pf_set(sd, joint_zones=[
+             {'polygon': [(10.0, 0.0), (30.0, 0.0), (30.0, 10.0), (10.0, 10.0)],
+              'label': 'North block', 'size': None, 'mat_id': None}]),
+         expect='never meshed as a region'),
     dict(rule='joint.bond_inputs_ignored', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_joint(sd),
@@ -10561,8 +10615,8 @@ def run_dxf_roundtrip_test(test):
             _import_dxf(_dxf2, ROUNDTRIP_TEMPLATE, _xl)
             _ver = _tinfo(_xl)[0]
             _fake_mats = [{'name': f'm{i}'} for i in range(64)]
-            _p, _z, _r = _parse_poly(_pd.ExcelFile(_xl), _fake_mats,
-                                     template_version=_ver)
+            _p, _z, _r, _j = _parse_poly(_pd.ExcelFile(_xl), _fake_mats,
+                                         template_version=_ver)
             if len(_p) != n0:
                 problems.append(f"import_dxf wrote {len(_p)} polygon(s), expected {n0}")
         except Exception as _e:

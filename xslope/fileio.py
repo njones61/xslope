@@ -126,12 +126,19 @@ SSR_ZONE_LABELS = {
 # region that carries no material and no analysis meaning, only a local target
 # element size. It is never meshed as a material region, so its Size is REQUIRED
 # (a refine polygon with no size would be a no-op the user could not see).
+#
+# 'joints' is new in v27 and is an AUTHORING region: it marks where a joint network
+# exists, so a generated set can be confined to "this block of rock" when no material
+# boundary draws that block. Like 'refine' it carries no material and is never meshed
+# as a zone; unlike 'refine' it changes nothing about the mesh either. Only
+# :mod:`xslope.joints` reads it, and only when a set names it.
 POLYGON_TYPE_WORDS = {
     'material': 'material',
     'ssr reduce': 'reduce',
     'ssr hold': 'hold',
     'ssr elastic': 'hold_elastic',
     'refine': 'refine',
+    'joints': 'joints',
 }
 
 # === v12 reinforcement support-type presets (reinforce sheet, Type column) ===
@@ -223,10 +230,12 @@ def _parse_polygon_sheet(xls, materials, template_version=20):
                               'polygon': [(x, y), ...], 'label': str,
                               'size': float|None}, ...]
           - refine zones:   [{'polygon': [(x, y), ...], 'size': float}, ...]  (v21 only)
+          - joint zones:    [{'polygon': [(x, y), ...], 'label': str,
+                              'size': float|None, 'mat_id': int|None}, ...]  (v27 only)
         All empty if the sheet is absent or contains no polygons.
     """
     if 'polygon' not in xls.sheet_names:
-        return [], [], []
+        return [], [], [], []
 
     df = xls.parse('polygon', header=None)
     if template_version >= 21:
@@ -238,6 +247,7 @@ def _parse_polygon_sheet(xls, materials, template_version=20):
     polygons = []
     ssr_zones = []
     refine_zones = []
+    joint_zones = []
 
     col = 0
     while col + 1 < df.shape[1]:
@@ -307,6 +317,34 @@ def _parse_polygon_sheet(xls, materials, template_version=20):
                             f"{', '.join(sorted(POLYGON_TYPE_WORDS))} (or leave the "
                             f"Type cell blank for a material zone).")
 
+            if kind == 'joints':
+                # An authoring region for the joint network generators: no material,
+                # no mesh region, no analysis meaning. Its NAME is the block header
+                # (the "Polygon #3" cell, which a user may type over), because that
+                # is the only cell on the block that is neither a formula nor a value
+                # the reader already spends — and a joint set names its region.
+                #
+                # The Mat ID cell is read here only so preflight can say that a
+                # material was assigned to a polygon that carries none; nothing in
+                # the analysis reads it. A blank, a name echo or anything else
+                # non-numeric is None, which is the ordinary case.
+                try:
+                    _stray = int(float(df.iloc[mat_id_row, y_col]))
+                except (ValueError, TypeError, IndexError):
+                    _stray = None
+                # The template's own "Polygon #4" is not a name, it is the block's
+                # number: read as a name it would follow the region to whatever
+                # position it lands in on the next save and disagree with the header
+                # beside it. Only a header somebody typed over is a name.
+                _lbl = '' if re.fullmatch(r'polygon\s*#?\s*\d+', header_val,
+                                          flags=re.IGNORECASE) else header_val
+                joint_zones.append({'polygon': list(coords),
+                                    'label': _lbl,
+                                    'size': size,
+                                    'mat_id': _stray})
+                col += 3
+                continue
+
             if kind == 'refine':
                 # Pure meshing overlay: no material, no analysis meaning, only a
                 # local element size — so without a Size it does nothing at all.
@@ -369,7 +407,7 @@ def _parse_polygon_sheet(xls, materials, template_version=20):
 
         col += 3  # next block (A->D->G->...)
 
-    return polygons, ssr_zones, refine_zones
+    return polygons, ssr_zones, refine_zones, joint_zones
 
 
 def _validate_polygons_no_overlap(polygons):
@@ -1923,7 +1961,7 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     # material regions, must not generate slices and must not shape the domain.
     # Keeping them out of `polygons` here is what makes that true everywhere at
     # once — every downstream consumer reads `polygons`.
-    polygons_from_sheet, ssr_zones, refine_zones = _parse_polygon_sheet(
+    polygons_from_sheet, ssr_zones, refine_zones, joint_zones = _parse_polygon_sheet(
         xls, materials, template_version=_tv)
 
     if polygons_from_sheet:
@@ -2840,6 +2878,11 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     # region and never generate slices. Their only effect is the local target element
     # size inside the ring, applied as a gmsh size field (see mesh.size_regions).
     globals_data["refine_zones"] = refine_zones
+    # v27 joint-network regions (polygon-sheet Type='joints' rows). An authoring
+    # region and nothing else: no material, no mesh region, no slices, no effect on
+    # any solver. A joint set generated with region='poly:<name>' is clipped to it
+    # (see xslope.joints.resolve_region); a region no set names costs nothing.
+    globals_data["joint_zones"] = joint_zones
     globals_data["domain_polygon"] = domain_polygon
     globals_data["ground_surface"] = ground_surface
     globals_data["tcrack_surface"] = tcrack_surface
@@ -3417,18 +3460,31 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
     poly_u = {}
     n_poly_blocks = 0
 
-    def _write_poly_block(coords, kind='material', mat_id=None, size=None):
+    def _write_poly_block(coords, kind='material', mat_id=None, size=None,
+                          label=None):
         """One polygon-sheet block: header, type/Mat ID, optional Size, vertices.
 
         ``kind`` is the in-memory word ('material', 'reduce', 'hold', 'hold_elastic',
-        'refine'). On a v21 destination it is written as the Type word and the Mat ID
-        cell is filled only for a material zone; on v20 and earlier the kind is
-        encoded in the Mat ID as its sentinel, and 'refine' has no representation at
-        all (v21-only concept) so it is refused rather than written as geometry."""
+        'refine', 'joints'). On a v21 destination it is written as the Type word and
+        the Mat ID cell is filled only for a material zone; on v20 and earlier the
+        kind is encoded in the Mat ID as its sentinel, and 'refine' has no
+        representation at all (v21-only concept) so it is refused rather than written
+        as geometry.
+
+        ``label`` is the block header a joint-network region carries as its NAME. It
+        is written in place of the "Polygon #N" the other blocks get, because that
+        cell is where the name was read from."""
         nonlocal n_poly_blocks
         x_col = 1 + n_poly_blocks * 3
         y_col = x_col + 1
-        poly_u[cell_ref(4, x_col)] = f"Polygon #{n_poly_blocks + 1}"  # block header
+        poly_u[cell_ref(4, x_col)] = (str(label) if label
+                                      else f"Polygon #{n_poly_blocks + 1}")
+        if kind == 'joints' and _dest_version < 27:
+            raise ValueError(
+                "This model carries a joint-network region (Type 'joints'), which "
+                f"template version {_dest_version} has no way to express — the Type "
+                "word arrived in version 27. Save to a version 27 (or later) "
+                "template.")
         if _v21_poly:
             poly_u[cell_ref(5, y_col)] = _type_word_by_kind[kind]
             # Mat ID written UNCONDITIONALLY — blank for an overlay — so the blank
@@ -3439,11 +3495,15 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
                 int(mat_id) if kind == 'material' else None)
             poly_u[cell_ref(8, y_col)] = _f(size) if size is not None else None
         else:
-            if kind == 'refine':
+            if kind in ('refine', 'joints'):
+                _what = ("a mesh refinement polygon (Type 'refine')"
+                         if kind == 'refine' else
+                         "a joint-network region (Type 'joints')")
+                _need = 21 if kind == 'refine' else 27
                 raise ValueError(
-                    "This model carries a mesh refinement polygon (Type 'refine'), "
-                    f"which template version {_dest_version} has no way to express. "
-                    "Save to a version 21 (or later) template.")
+                    f"This model carries {_what}, which template version "
+                    f"{_dest_version} has no way to express. Save to a version "
+                    f"{_need} (or later) template.")
             poly_u[cell_ref(_poly_matid_row, y_col)] = (
                 int(mat_id) if kind == 'material' else _sentinel_by_kind[kind])
         pts = list(coords)
@@ -3517,6 +3577,13 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
                 "A mesh refinement polygon (Type 'refine') carries no Size. Its only "
                 "effect is the local target element size, so the size is required.")
         _write_poly_block(zone['polygon'], 'refine', size=zone['size'])
+
+    # v27 joint-network regions. The label is the block header, which is where the
+    # reader takes the region's name from; a region with none gets the ordinary
+    # "Polygon #N" and is named by its number.
+    for zone in slope_data.get('joint_zones') or []:
+        _write_poly_block(zone['polygon'], 'joints', size=zone.get('size'),
+                          label=zone.get('label'))
 
     if poly_u:
         updates['polygon'] = poly_u

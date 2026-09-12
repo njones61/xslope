@@ -1667,6 +1667,15 @@ def _lock_exact_window(expected):
 #: not disagree about what "decided" means.
 UNDECIDED_VERDICTS = ('STABLE_STUCK', 'AMBIGUOUS', 'INCONCLUSIVE')
 
+#: Verdicts that ANSWER the standing/failing question a bracket edge asks.
+#: ``JOINT_SETTLED`` is here because it is a decision and not a budget running
+#: out: it is returned only where the joint slip, the displacement field and the
+#: soil residual have all settled and what remains is the limit cycle on the
+#: joint degrees of freedom, which no budget brings down (fem.joint_verdict). A
+#: trial that reaches it did not meet the force tolerance and never claims to,
+#: so ``converged`` stays False — but it stands, and the edge is answered.
+DECIDED_VERDICTS = ('CONVERGED', 'FAILED', 'JOINT_SETTLED')
+
 #: fem.solve_fem's own hard stop on budget extension (max_iterations_ceiling).
 #: A trial's effective ceiling is the larger of this and its tag's max_iter.
 DEFAULT_TRIAL_CEILING = 50000
@@ -1850,7 +1859,7 @@ def _edge_reading(trials, factor, ceiling):
         return None, False
     verdict = str(trial.get('verdict'))
     iterations = int(trial.get('iterations') or 0)
-    decided = (verdict in ('CONVERGED', 'FAILED')
+    decided = (verdict in DECIDED_VERDICTS
                and verdict not in UNDECIDED_VERDICTS
                and iterations < ceiling
                and trial.get('exit_reason') != 'inconclusive')
@@ -1865,7 +1874,7 @@ def _edges_check(trials, f_stand, f_fail, ceiling):
     at each factor, so a flip says which edge moved and in which direction."""
     v_lo, lo_ok = _edge_reading(trials, f_stand, ceiling)
     v_hi, hi_ok = _edge_reading(trials, f_fail, ceiling)
-    stands = lo_ok and v_lo == 'CONVERGED'
+    stands = lo_ok and v_lo in ('CONVERGED', 'JOINT_SETTLED')
     fails = hi_ok and v_hi == 'FAILED'
     note = (f"F={f_stand:g} {v_lo or 'not solved'}, "
             f"F={f_fail:g} {v_hi or 'not solved'}")
@@ -1886,7 +1895,8 @@ def _edges_check(trials, f_stand, f_fail, ceiling):
 
     flipped = []
     if not stands:
-        flipped.append(_why(f_stand, v_lo, lo_ok, 'CONVERGED', 'standing'))
+        flipped.append(_why(f_stand, v_lo, lo_ok,
+                            'CONVERGED or JOINT_SETTLED', 'standing'))
     if not fails:
         flipped.append(_why(f_fail, v_hi, hi_ok, 'FAILED', 'failing'))
     return False, "; ".join(flipped)
@@ -8746,6 +8756,18 @@ MODULE_CHECKS = {
         "material crossing, the stiffness default (which must carry no result "
         "over two orders of magnitude), and that a model with no jointed line "
         "builds exactly the fem_data it always did."),
+    'joint_verdict': (
+        'joint_verdict_check.py',
+        "How an undecided jointed strength-reduction trial is read. Seven rows "
+        "of the joint corpus were reported without a lock because a bracket "
+        "edge neither converged nor failed at 250 000 sweeps, and one of them "
+        "stayed undecided at a million. The measurement says the undecided "
+        "trials are two different things: a block moving steadily on its joints "
+        "(FAILED) and a slope that has entirely stopped except for a limit "
+        "cycle on the joint degrees of freedom (standing). This replays the six "
+        "recorded traces the two verdicts were calibrated on, perturbs each "
+        "condition one at a time, and holds the rule silent on a model with no "
+        "joint."),
     'joint_network': (
         'joint_network_check.py',
         "The joint NETWORK generators: a parallel set's trace count, its exact "
@@ -14685,6 +14707,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'reinforce_mesh_geometry': 2, 'joint_mesh': 3,
               'joint_junction': 5, 'joint_junction_mesh': 3,
               'joint_element': 5, 'joint_surfaces': 4, 'joint_network': 3,
+              'joint_verdict': 1,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'docs_index_sync': 3, 'assistant_docs_answers': 2,
@@ -15796,6 +15819,10 @@ def main():
         tests.append({'type': 'joint_element',
                       'file': 'the interface (joint) element (closed forms)',
                       'method': '-', 'source': 'joint_element'})
+        # Pure-function: the two verdicts replayed over recorded traces, no solve.
+        tests.append({'type': 'joint_verdict',
+                      'file': 'the verdict on an undecided jointed trial',
+                      'method': '-', 'source': 'joint_verdict'})
         # The path a MODEL takes to the element: the column, the mesher, the
         # plots, the detail panel and the report, on one solve of the shipped
         # reinforcement sample with two of its lines made joints in memory.

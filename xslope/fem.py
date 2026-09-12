@@ -4118,6 +4118,178 @@ _HYBRID_U_SCALE_FLOOR_FRAC = 1e-6
 # re-measurement of them.
 JOINT_TRACE_SINK = None
 
+# === The joint verdict ========================================================
+# What an undecided jointed trial actually is, measured on the corpus that
+# produced them (r15_joint_convergence.md §1: five bracket-edge trials of RJ-6,
+# RJ-7, RJ-19 and the RS2-49 wall re-solved with the trace above). They are not
+# one thing, and the displacement classifier cannot separate them because the
+# quantity that separates them is the SLIP, which it does not read:
+#
+#   * RJ-19's two edges — the slip gains 15% of its own total over the last
+#     25 000 sweeps, max|u| gains half an elastic displacement over the same
+#     window, and the residual comes down as a slow power law that is still 250
+#     times the tolerance. The block is moving. The honest verdict is FAILED.
+#   * RJ-6's lower edge — the slip gains 0.001% of its total over the last
+#     25 000 sweeps, max|u| gains a millionth of an elastic displacement, the
+#     SOIL residual sits at 2.3e-4 against a 1e-3 tolerance, and the pairs still
+#     slipping fall from 87 to 21. Everything about the model has stopped. What
+#     is left is a LIMIT CYCLE on the joint degrees of freedom: the joint
+#     residual oscillates between 2.0e-3 and 2.9e-2 with a period of about 47
+#     sweeps, its mean flat to 2.6% over the last half of the solve. The
+#     `oob_window` average cancels the soil's period-2 flicker and cannot cancel
+#     this one. The slope is standing; only the force test cannot say so.
+#
+# So there are two verdicts to add, and they are read from the same three
+# series — the slip, the soil residual and max|u| — over the same trailing
+# window. Both are asked ONLY of a trial that would otherwise end undecided, and
+# only on a jointed model, so nothing that converges, nothing that fails and
+# nothing without a joint can reach them.
+#: The joint verdict, on. Set False to run the loop exactly as it ran before it
+#: existed — the A/B switch the thresholds were chosen with, and the way any
+#: pre-rule trial record is reproduced. It is not a solver option and no caller
+#: passes it; a study sets it and puts it back.
+JOINT_VERDICT_ON = True
+
+_JOINT_VERDICT_WARMUP = 5000      # sweeps before either verdict may be read
+_JOINT_WINDOW_FRAC = 0.5          # trailing fraction of the history both read
+# SETTLED: the slip has stopped, the field has stopped, and the soil is in
+# equilibrium on the solve's own force tolerance. The levels are three orders of
+# magnitude clear of the measured settled trial (1.1e-5 and 1.2e-6) and two clear
+# of the tightest moving one.
+_JOINT_SETTLED_SLIP_FRAC = 1e-4   # slip gained over the window, over the total
+_JOINT_SETTLED_GROWTH = 1e-4      # elastic displacements gained over the window
+# ...and the joint residual itself has STOPPED FALLING. Without this a trial on its
+# way to a clean convergence is caught on the way: RJ-6's F = 1.2421875 trial
+# reaches force equilibrium at 41 721 sweeps, and by 32 280 its slip and its field
+# are already frozen and its soil residual is under tolerance. What says it is not
+# finished is its joint residual, still coming down 35% per window; the two trials
+# that never finish sit at 0.94 and 0.96 of the previous window at the same point
+# and at 0.97 and 0.9996 by 50 000. So a settled verdict is given only where the
+# limit cycle's mean is flat, and a trial that can still converge is left to.
+_JOINT_SETTLED_OOB_FLAT = 0.85    # last quarter's joint residual / the quarter before
+# MOVING: the slip is still taking a real share of itself every window, its rate
+# is not decaying AT ALL, and the field is gaining with it.
+#
+# The decay level is the strict one, and it is strict because of a measured
+# false positive. RJ-19's F = 1.6328125 trial CONVERGES, at 203 225 sweeps. Read
+# at 25 000 sweeps it has gained 16.2% of its slip and 0.375 elastic
+# displacements — against 18.7% and 0.488 for the trial two bracket steps above
+# it that never converges. On those two readings the two are the same trial. What
+# separates them is only the RATE: the converging one's slip rate falls away
+# steadily (0.637 of the previous window at 25 000 sweeps, 0.438 at 100 000,
+# 0.209 at 200 000) while a real mechanism's does not move at all — 1.0002 on
+# RJ-6's upper edge and 1.000 on RJ-18's, both linear in the slip to four
+# figures. So the FAILED reading is given only to a slip rate that is FLAT, and a
+# sub-linear creep is left to the displacement classifier, which already calls it.
+_JOINT_MOVING_SLIP_FRAC = 0.02    # slip gained over the window, over the total
+_JOINT_MOVING_DECAY_MIN = 0.9     # last quarter's slip rate / the quarter before
+_JOINT_MOVING_GROWTH = 0.05       # elastic displacements gained over the window
+# A FAILED verdict gets a longer warm-up than a settled one, and the reason is the
+# same false positive: trials on this corpus are still reaching equilibrium at
+# 16 000, 41 000, 185 000 and 207 000 sweeps, so a rule that ruled on the first few
+# thousand would be ruling on a transient.
+_JOINT_MOVING_MIN_SWEEPS = 25000
+
+
+def _window_rate(series, lo, hi):
+    """Least-squares slope of ``series[lo:hi]`` against its own index, and the
+    R-squared of that fit. ``(nan, nan)`` where there is no window to fit."""
+    n = hi - lo
+    if n < 4:
+        return float('nan'), float('nan')
+    y = np.asarray(series[lo:hi], dtype=float)
+    x = np.arange(n, dtype=float)
+    a, b = np.polyfit(x, y, 1)
+    ss = float(np.sum((y - y.mean()) ** 2))
+    r2 = 1.0 - float(np.sum((y - (a * x + b)) ** 2)) / ss if ss > 0 else float('nan')
+    return float(a), r2
+
+
+def joint_verdict(slip_hist, soil_oob_hist, disp_hist, u_elastic_scale,
+                  force_tol, joint_oob_hist=None,
+                  sample_every=_HYBRID_SAMPLE_EVERY,
+                  warmup=_JOINT_VERDICT_WARMUP):
+    """Read an undecided jointed trial off its interface trace.
+
+    Returns ``'steady_slip'`` (the interface mechanism is running: FAILED),
+    ``'joint_settled'`` (everything but the joint residual has stopped: the slope
+    is standing) or ``None`` (neither, so nothing is claimed and the displacement
+    classifier's verdict stands unchanged).
+
+    Both readings are taken over the trailing ``_JOINT_WINDOW_FRAC`` of the
+    sampled history, and both are RATIOS — the slip gained over the window
+    against the slip already there, the displacement gained against the trial's
+    own elastic response — so neither carries a length, a stiffness or a mesh
+    size and neither needs retuning per model.
+
+    Parameters:
+        slip_hist (list of float): total |plastic slip| over every node pair,
+            sampled every ``sample_every`` sweeps.
+        soil_oob_hist (list of float): the out-of-balance maximum over the free
+            nodes that carry NO joint, on the same stride. The joint nodes are
+            left out deliberately: their residual is the last sweep's un-returned
+            excess and it limit-cycles on a settled model, so a test that read it
+            could never certify one.
+        disp_hist (list of float): max|u| on the same stride.
+        u_elastic_scale (float): max|u| of the elastic response, the yardstick
+            both displacement readings are taken in.
+        force_tol (float): the solve's own force tolerance, which the soil
+            residual must be under for 'joint_settled'.
+        joint_oob_hist (list of float or None): the out-of-balance maximum over
+            the free nodes that DO carry a joint, on the same stride. Read for
+            one thing only — whether it has stopped falling — which is what
+            separates a settled model from one still on its way to equilibrium.
+            ``None`` withholds 'joint_settled' entirely, because the reading it
+            needs is absent.
+        sample_every (int): the sampling stride, used only to turn ``warmup``
+            (in sweeps) into a sample count.
+        warmup (int): sweeps below which nothing is read. A joint develops its
+            slip over thousands of sweeps and a window inside that is a
+            measurement of the transient, not of the state. The FAILED reading
+            waits longer still (``_JOINT_MOVING_MIN_SWEEPS``).
+    """
+    n = len(slip_hist)
+    if (n < 2 * max(4, int(warmup / max(1, sample_every)) // 2)
+            or n * sample_every < warmup
+            or not u_elastic_scale or u_elastic_scale <= 0.0):
+        return None
+    if len(soil_oob_hist) < n or len(disp_hist) < n:
+        return None
+    if joint_oob_hist is not None and len(joint_oob_hist) < n:
+        return None
+    h = int(n * (1.0 - _JOINT_WINDOW_FRAC))
+    if n - h < 8:
+        return None
+    total = float(slip_hist[-1])
+    if total <= 0.0:
+        return None
+    slip_frac = (total - float(slip_hist[h])) / total
+    growth = (float(disp_hist[-1]) - float(disp_hist[h])) / float(u_elastic_scale)
+
+    # SETTLED first: it is the stricter of the two, and a state that satisfies it
+    # cannot satisfy the moving test (the thresholds are an order of magnitude
+    # apart on both readings), so the order is bookkeeping rather than a rule.
+    if (joint_oob_hist is not None
+            and slip_frac <= _JOINT_SETTLED_SLIP_FRAC
+            and abs(growth) <= _JOINT_SETTLED_GROWTH
+            and max(soil_oob_hist[h:]) <= float(force_tol)):
+        q = h + (n - h) // 2
+        prev = sum(joint_oob_hist[h:q]) / max(1, q - h)
+        last = sum(joint_oob_hist[q:n]) / max(1, n - q)
+        if prev > 0.0 and last / prev >= _JOINT_SETTLED_OOB_FLAT:
+            return 'joint_settled'
+
+    if (n * sample_every >= _JOINT_MOVING_MIN_SWEEPS
+            and slip_frac >= _JOINT_MOVING_SLIP_FRAC
+            and growth >= _JOINT_MOVING_GROWTH):
+        q = h + (n - h) // 2
+        r1, _ = _window_rate(slip_hist, h, q)
+        r2, _ = _window_rate(slip_hist, q, n)
+        if r1 > 0.0 and r2 / r1 >= _JOINT_MOVING_DECAY_MIN:
+            return 'steady_slip'
+    return None
+
+
 # Iterations without a >1% improvement on the best out-of-balance value seen after
 # which the residual is called PLATEAUED. This is a reporting threshold only: a
 # plateau is recorded in the result and the solve keeps running (see the no-progress
@@ -7200,6 +7372,38 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                             return _c
                     break
 
+            # ---- the joint verdict (see `joint_verdict`) ---------------------
+            # Read AFTER the convergence test and after the early-failure watch,
+            # so a trial that settles or runs away on this sweep is decided the
+            # way it always was; this only ever speaks for a trial that would
+            # otherwise spend its whole budget and end undecided. Jointed models
+            # only — `jslip_hist` is empty without a joint and the call is skipped.
+            if (has_joints and JOINT_VERDICT_ON
+                    and iteration % _HYBRID_SAMPLE_EVERY == 0
+                    and iteration >= _JOINT_VERDICT_WARMUP):
+                _jv = joint_verdict(jslip_hist, soob_hist, disp_hist,
+                                    u_elastic_scale, force_tol,
+                                    joint_oob_hist=joob_hist)
+                if _jv is not None:
+                    converged = False
+                    exit_reason = _jv
+                    u = u_new
+                    if debug_level >= 1:
+                        if _jv == 'steady_slip':
+                            print(f"  Interface mechanism at iteration "
+                                  f"{iteration + 1}: the joint slip is still "
+                                  f"growing at a rate that is not decaying and "
+                                  f"max|u| is gaining with it - the slope is "
+                                  f"moving on its joints; FAILED")
+                        else:
+                            print(f"  Joints settled at iteration {iteration + 1}: "
+                                  f"the slip and the displacement field have "
+                                  f"stopped and the soil is in equilibrium "
+                                  f"(residual under {force_tol:.1e}); only the "
+                                  f"joint residual's limit cycle is outstanding, "
+                                  f"and the slope is STANDING")
+                    break
+
             if _PROF_ON:
                 _prof_add("vp_conv", _tpc)
             u = u_new
@@ -7233,6 +7437,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # reach equilibrium and must not claim it.
     if converged:
         verdict, u_ratio, u_growth = 'CONVERGED', None, None
+    elif exit_reason in ('steady_slip', 'joint_settled'):
+        # The joint verdict is a reading of the INTERFACE, and the displacement
+        # classifier is not re-asked: the two measure different things and the
+        # whole reason this exists is that the displacement field cannot separate
+        # a settled jointed model from a moving one. The ratios are still computed
+        # and reported, so the record carries both readings.
+        _, u_ratio, u_growth = classify_nonconvergence(
+            disp_hist, u_elastic_scale, 'iteration_cap', model_height=mesh_height)
+        verdict = 'FAILED' if exit_reason == 'steady_slip' else 'JOINT_SETTLED'
     else:
         verdict, u_ratio, u_growth = classify_nonconvergence(
             disp_hist, u_elastic_scale, exit_reason, model_height=mesh_height)
@@ -7259,7 +7472,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             "n_joint_pairs": int(joint_data["n"] * 3),
         })
     stable = bool(converged or (failure_criterion == 'hybrid'
-                                and verdict == 'STABLE_STUCK'))
+                                and verdict in ('STABLE_STUCK', 'JOINT_SETTLED')))
     if not converged and debug_level >= 1:
         _ur = 'n/a' if u_ratio is None else f"{u_ratio:.2f}x elastic"
         _gr = 'n/a' if u_growth is None else f"{u_growth:+.3f}"
@@ -11564,6 +11777,12 @@ def _verdict_note(sol):
     v = sol.get("verdict") or "FAILED"
     ur = sol.get("u_ratio")
     ur_txt = "" if ur is None else f", max|u| = {ur:.2f}x elastic"
+    if sol.get("exit_reason") == 'steady_slip':
+        return f"FAILED on a steady interface mechanism (joint slip){ur_txt}"
+    if v == 'JOINT_SETTLED':
+        return ("Did NOT meet the force tolerance, but the joints, the "
+                f"displacements and the soil have all settled -> counted "
+                f"STABLE{ur_txt}")
     if v == 'STABLE_STUCK':
         return f"Did NOT converge but STABLE_STUCK -> counted STABLE{ur_txt}"
     if v == 'AMBIGUOUS':

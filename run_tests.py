@@ -8849,7 +8849,13 @@ MODULE_CHECKS = {
         "dip, two sets sharing a label, an unknown material, a misspelt "
         "property); the mesh of a generated cross-jointed block; and a "
         "generated network written to the joints sheet and read back "
-        "unchanged."),
+        "unchanged. Then the SET RECORD the rows' labels carry: every kind's "
+        "parameters, region and elevation band written into a label and read "
+        "back as the same record and the same text; one set regenerated in "
+        "place, leaving the other set, a hand-entered joint line and the "
+        "properties alone; and an elevation band, whose own edges keep a trace "
+        "the section's boundary would drop, beside a region named as a polygon "
+        "of Type 'joints'."),
     'joint_surfaces': (
         'joint_surfaces_check.py',
         "What a jointed line reaches once the reinforce sheet says so: the "

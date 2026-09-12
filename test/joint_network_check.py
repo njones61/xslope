@@ -34,6 +34,16 @@ Legs:
   7. **The round trip.** A generated network written to the ``joints`` sheet and
      read back is the same network, endpoint for endpoint and property for
      property.
+  8. **The set record.** Every kind's parameters, region and elevation band go
+     into one row's Label cell and come back off it as the same record and the
+     same text, so a set can be reopened and regenerated from the file alone.
+  9. **Regeneration.** Editing a set replaces its own rows where they were and
+     touches nothing else — not the other set, not a hand-entered joint line, not
+     the properties the rows carry.
+  10. **The band and the joint region.** A set cut to an elevation band keeps the
+     traces on the band's own edges, where the section's boundary drops them; a
+     set confined to a polygon of Type ``joints`` resolves the same by the
+     region's name and by its number.
 
 Run directly:  PYTHONPATH=. python3 test/joint_network_check.py
 """
@@ -55,7 +65,9 @@ if _ROOT not in sys.path:
 
 from shapely.geometry import LineString, Polygon
 
-from xslope.joints import cross_jointed, parallel_set, resolve_region, voronoi
+from xslope.joints import (JointSet, cross_jointed, parallel_set, regenerate,
+                           resolve_region, set_name, sets_in, short_label,
+                           voronoi)
 
 BOX = Polygon([(0.0, 0.0), (20.0, 0.0), (20.0, 10.0), (0.0, 10.0)])
 
@@ -462,6 +474,235 @@ def _leg_roundtrip(failures, results):
                    f"dilation included")
 
 
+
+def _leg_record(failures, results):
+    """Leg 8: the set record through the label and back.
+
+    Every kind's parameters, its region and its elevation band are written into
+    one row label and read back off it. What is checked is both directions: the
+    record that comes back EQUALS the one that went out, and the label it writes
+    is character for character the label it was read from — a grammar that
+    round-trips the object but not the text would leave two spellings of the same
+    set in one file.
+    """
+    cases = [
+        ('a parallel set',
+         JointSet('bed', 'parallel', {'dip': 30.0, 'spacing': 2.0},
+                  region='Sandstone', band=(40.0, None)),
+         'bed-03|par|dip=30|s=2|reg=mat:Sandstone|band=40:'),
+        ('a parallel set with an offset and a persistence',
+         JointSet('j1', 'parallel',
+                  {'dip': -60.0, 'spacing': 2.5, 'offset': 1.25,
+                   'trace_len': 3.0, 'gap': 1.0}),
+         'j1-03|par|dip=-60|s=2.5|off=1.25|len=3|gap=1'),
+        ('a cross-jointed set',
+         JointSet('x', 'cross',
+                  {'dip': 60.0, 'dip2': -60.0, 'spacing': 2.0,
+                   'spacing2': 3.0, 'offset2': 1.5},
+                  region='poly:North block'),
+         'x-03|crs|dip=60,-60|s=2,3|off=0,1.5|reg=poly:North block'),
+        ('a Voronoi set',
+         JointSet('vor', 'voronoi', {'block_size': 1.5, 'seed': 7},
+                  region=['Sandstone', 'Shale']),
+         'vor-03|vor|blk=1.5|seed=7|reg=mat:Sandstone+Shale'),
+        ('a band below an elevation, with a negative end',
+         JointSet('b', 'parallel', {'dip': 0.0, 'spacing': 1.0},
+                  band=(-10.0, 5.0)),
+         'b-03|par|dip=0|s=1|band=-10:5'),
+    ]
+    for what, jset, expect in cases:
+        label = jset.to_label(3)
+        if label != expect:
+            failures.append(f"record: {what} wrote {label!r}, expected {expect!r}")
+            continue
+        back, index = JointSet.from_label(label)
+        if index != 3:
+            failures.append(f"record: {what} came back as row {index}, not 3")
+        if back != jset:
+            failures.append(f"record: {what} did not survive its own label "
+                            f"({back.params} / {back.region} / {back.band})")
+        if back.to_label(3) != label:
+            failures.append(f"record: {what} rewrote {label!r} as "
+                            f"{back.to_label(3)!r}")
+
+    # The row's own name, and the set it belongs to, read off the label.
+    lbl = 'bed-07|par|dip=30|s=2'
+    if short_label(lbl) != 'bed-07' or set_name(lbl) != 'bed':
+        failures.append(f"record: {lbl!r} reads as {short_label(lbl)!r} / "
+                        f"{set_name(lbl)!r}")
+    # A hand-typed label is not a set, however it is spelled, and regenerate must
+    # never touch one.
+    for typed in ('base joint', 'bed-07', '', 'block 3'):
+        if set_name(typed) != '':
+            failures.append(f"record: the typed label {typed!r} was read as the "
+                            f"set {set_name(typed)!r}")
+
+    # A region that cannot be written down is refused when the label is written,
+    # by name, rather than producing a set nobody can regenerate.
+    try:
+        JointSet('p', 'parallel', {'dip': 0.0, 'spacing': 1.0},
+                 region=Polygon([(0, 0), (5, 0), (5, 5)])).to_label(1)
+        failures.append("record: a bare-polygon region was written into a label")
+    except ValueError as exc:
+        if 'Type' not in str(exc):
+            failures.append(f"record: the bare-polygon refusal does not say what "
+                            f"to draw instead: {exc}")
+
+    # A label that is not a record at all, and a field that is not a field.
+    for bad, why in (('bed-01', 'no record'),
+                     ('bed-01|zzz|dip=0', 'an unknown kind'),
+                     ('bed-01|par|tilt=30', 'an unknown field'),
+                     ('bed-01|par|band=40', 'a band with no colon')):
+        try:
+            JointSet.from_label(bad)
+            failures.append(f"record: {bad!r} ({why}) was read as a set")
+        except ValueError:
+            pass
+    results.append("record      5 set records written into a row label and read "
+                   "back identical, both object and text; a bare-polygon region, "
+                   "an unknown kind, an unknown field and a colon-less band all "
+                   "refused by name")
+
+
+def _leg_regeneration(failures, results):
+    """Leg 9: regenerating one set in place.
+
+    The point of the record is that a set can be edited. What that has to mean is
+    surgical: the set's own rows are replaced where they were, the OTHER set is
+    untouched, a hand-entered joint line is untouched, and the properties the rows
+    carried come back on the new ones — the label carries the geometry, the
+    columns carry the strength.
+    """
+    model = _model()
+    bed = JointSet('bed', 'parallel', {'dip': 0.0, 'spacing': 2.0},
+                   props={'phi': 32.0, 'c': 10.0})
+    steep = JointSet('st', 'parallel', {'dip': 70.0, 'spacing': 4.0},
+                     props={'phi': 28.0})
+    typed = {'label': 'base joint', 'x1': 0.0, 'y1': 0.5, 'x2': 20.0,
+             'y2': 0.5, 'c': 0.0, 'phi': 20.0}
+    model['joint_lines'] = (bed.generate(model) + [dict(typed)]
+                            + steep.generate(model))
+    n_bed = sum(1 for r in model['joint_lines'] if set_name(r['label']) == 'bed')
+    n_steep = sum(1 for r in model['joint_lines'] if set_name(r['label']) == 'st')
+
+    found = sets_in(model)
+    if [name for name, _s, _i in found] != ['bed', 'st']:
+        failures.append(f"regeneration: the model's sets read as "
+                        f"{[n for n, _s, _i in found]}, expected ['bed', 'st']")
+
+    # Halve the spacing: the set regenerates in place, with more rows.
+    tighter = JointSet('bed', 'parallel', {'dip': 0.0, 'spacing': 1.0})
+    fresh = regenerate(model, 'bed', tighter)
+    rows = model['joint_lines']
+    got_bed = [r for r in rows if set_name(r['label']) == 'bed']
+    got_steep = [r for r in rows if set_name(r['label']) == 'st']
+    if len(got_bed) != len(fresh) or len(got_bed) <= n_bed:
+        failures.append(f"regeneration: halving the spacing took bed from "
+                        f"{n_bed} rows to {len(got_bed)}")
+    if len(got_steep) != n_steep:
+        failures.append(f"regeneration: the OTHER set went from {n_steep} rows "
+                        f"to {len(got_steep)}")
+    if sum(1 for r in rows if r['label'] == 'base joint') != 1:
+        failures.append("regeneration: the hand-entered joint line did not survive")
+    if any(abs(float(r['phi']) - 32.0) > 1e-9 or abs(float(r['c']) - 10.0) > 1e-9
+           for r in got_bed):
+        failures.append("regeneration: the set's properties were not carried onto "
+                        "the new rows")
+    # In place: the set's rows are still where they were, ahead of the typed line.
+    if set_name(rows[0]['label']) != 'bed' or rows[len(got_bed)]['label'] != 'base joint':
+        failures.append("regeneration: the fresh rows did not land where the old "
+                        "ones were")
+
+    # No record given at all: the set re-runs exactly as its labels record it.
+    again = regenerate(model, 'bed')
+    if len(again) != len(got_bed):
+        failures.append(f"regeneration: re-running the recorded set gave "
+                        f"{len(again)} rows, not {len(got_bed)}")
+    if [r['label'] for r in again] != [r['label'] for r in got_bed]:
+        failures.append("regeneration: re-running the recorded set changed its "
+                        "labels")
+
+    try:
+        regenerate(model, 'nosuch')
+        failures.append("regeneration: an unknown set name was accepted")
+    except ValueError as exc:
+        if 'bed' not in str(exc):
+            failures.append(f"regeneration: the refusal does not list the model's "
+                            f"own sets: {exc}")
+    results.append(f"regeneration  one set of two replaced in place ({n_bed} rows "
+                   f"-> {len(got_bed)} at half the spacing), the other set, the "
+                   f"hand-entered line and the properties untouched; re-running "
+                   f"the recorded set reproduces it")
+
+
+def _leg_band_and_region(failures, results):
+    """Leg 10: the elevation band, and a joints-polygon region.
+
+    A band is an artificial cut through material, so it differs from the region's
+    own boundary in exactly one way that matters: a trace lying ALONG a band edge
+    is kept, where one lying along the section's boundary is dropped. Both
+    readings are here, on the same set.
+    """
+    model = _model()                      # a 20 x 10 box, two materials
+    band = parallel_set(model, 0.0, 2.0, band=(4.0, 8.0), props={'phi': 30.0})
+    ys = sorted(round(r['y1'], 6) for r in band)
+    if ys != [4.0, 6.0, 8.0]:
+        failures.append(f"band: the horizontal set in the band 4-8 came out at "
+                        f"y = {ys}, expected [4.0, 6.0, 8.0] (the band's own "
+                        f"edges kept)")
+    whole = parallel_set(model, 0.0, 2.0, props={'phi': 30.0})
+    ys_whole = sorted(round(r['y1'], 6) for r in whole)
+    if ys_whole != [2.0, 4.0, 6.0, 8.0]:
+        failures.append(f"band: the same set over the whole section came out at "
+                        f"y = {ys_whole} (the traces on the section's boundary "
+                        f"must be dropped)")
+    for row in band:
+        if row['y1'] < 4.0 - 1e-9 or row['y1'] > 8.0 + 1e-9:
+            failures.append(f"band: {row['label']} lies at y = {row['y1']:g}, "
+                            f"outside the band")
+    # An open-ended band, and one that lies off the section entirely.
+    above = parallel_set(model, 0.0, 2.0, band=(6.0, None), props={'phi': 30.0})
+    if sorted(round(r['y1'], 6) for r in above) != [6.0, 8.0]:
+        failures.append(f"band: the open band above 6 came out at "
+                        f"{sorted(round(r['y1'], 6) for r in above)}")
+    try:
+        parallel_set(model, 0.0, 2.0, band=(50.0, 60.0))
+        failures.append("band: a band above the whole section was accepted")
+    except ValueError as exc:
+        if '50' not in str(exc):
+            failures.append(f"band: the refusal does not name the band: {exc}")
+
+    # The joints polygon, by name and by number: the same region either way.
+    model['joint_zones'] = [
+        {'polygon': [(2.0, 2.0), (18.0, 2.0), (18.0, 8.0), (2.0, 8.0)],
+         'label': 'North block', 'size': None, 'mat_id': None}]
+    by_name = parallel_set(model, 0.0, 2.0, region='poly:North block',
+                           props={'phi': 30.0})
+    by_number = parallel_set(model, 0.0, 2.0, region='poly:1',
+                             props={'phi': 30.0})
+    if not by_name:
+        failures.append("region: the joints polygon produced no trace")
+    if ([(r['x1'], r['y1'], r['x2'], r['y2']) for r in by_name]
+            != [(r['x1'], r['y1'], r['x2'], r['y2']) for r in by_number]):
+        failures.append("region: the joints polygon by name and by number gave "
+                        "different traces")
+    for row in by_name:
+        if not (2.0 - 1e-9 <= row['y1'] <= 8.0 + 1e-9
+                and 2.0 - 1e-9 <= row['x1'] <= 18.0 + 1e-9):
+            failures.append(f"region: {row['label']} runs outside the joint region")
+    try:
+        parallel_set(model, 0.0, 2.0, region='poly:South block')
+        failures.append("region: an unknown joint region name was accepted")
+    except ValueError as exc:
+        if 'North block' not in str(exc):
+            failures.append(f"region: the refusal does not list the model's own "
+                            f"regions: {exc}")
+    results.append(f"band/region  a band keeps the {len(band)} traces inside it "
+                   f"INCLUDING the two on its own edges (the section's boundary "
+                   f"still drops them); a joints polygon by name and by number "
+                   f"resolve to the same {len(by_name)} traces, and an unknown "
+                   f"name is refused with the model's regions listed")
+
 def run():
     """Returns a list of failure strings (empty = pass)."""
     import time
@@ -474,6 +715,9 @@ def run():
     _leg_refusals(failures, results)
     _leg_mesh(failures, results)
     _leg_roundtrip(failures, results)
+    _leg_record(failures, results)
+    _leg_regeneration(failures, results)
+    _leg_band_and_region(failures, results)
     print(f"Joint network generator check ({time.time() - t0:.0f} s):")
     for line in results:
         print("  " + line)

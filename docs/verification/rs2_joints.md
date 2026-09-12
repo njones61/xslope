@@ -25,11 +25,19 @@ scored against, and RS2's own two reported factors.
 **Units.** The vendor models are stated in MPa with unit weight in MN/m³. These files carry the
 metric kPa / kN/m³ the rest of the corpus uses, so every stress is multiplied by a thousand.
 
-**The referee.** Each problem is scored against its own reference solution — a closed form
-(Goodman & Bray, Alejano et al., Lorig & Varona) where the problem has one, and UDEC where that is
-all the manual publishes. Both are strength-reduction or limit-equilibrium answers on the same
-mechanism, so the pairing is like for like. RS2's factors are recorded beside every row and score
-none of them, for the reason the next paragraph gives.
+**The referee.** Each problem is scored against the referee its own manual page names — the answer
+RS2 is verified against there. That is UDEC on every problem but the first, whose four cases are
+Goodman & Bray's Example 1 and whose stabilizing toe force is the force that method computes for
+limit equilibrium, and which the manual scores against Goodman & Bray. Where a source paper
+publishes a limit-equilibrium answer of its own, it is recorded in the column beside the referee,
+labeled, and scores nothing; so is the Slide2 factor Rocscience reports beside problem 15, which is
+the vendor's own companion program on its own model. The reason for that separation is the method:
+XSLOPE's SSRM reduces strength on a continuum with interfaces in it, which is what RS2's SSR and
+UDEC's strength-reduction technique do, and the [shared scoring](index.md#how-the-match-dots-are-scored)
+derives a dot only from a same-method pairing. Problem 1 is the one place a limit equilibrium
+scores here, because it is what the manual scores against there; its UDEC run is recorded beside
+it. RS2's factors are recorded beside every row and score none of them, for the reason the next
+paragraph gives.
 
 **RS2's two factors.** The manual reports each problem twice, *without* and *with* the "joint
 improvement" option. The vendor's rerun models show what that option is: `improve_joint_convergence`
@@ -72,34 +80,34 @@ joint model whose output is a stress-displacement curve.
 
 <div class="corpus-summary match" markdown>
 
-| # | Match | Problem | Referee | RS2 without / with improvement | Notes |
-|---:|:-:|---|---|---|---|
-| [1a](#rj-1a) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1a | Goodman & Bray 1.0 · UDEC 0.99 | 0.99 / 0.97 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
-| [1b](#rj-1b) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1b | Goodman & Bray 1.0 · UDEC 0.99 | 0.97 / 0.94 | *reported, no lock* — the lower edge of the bracket reaches the sweep budget without a verdict. |
-| [1c](#rj-1c) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1c | Goodman & Bray 1.02 · UDEC 1.01 | 1.01 / 0.99 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
-| [1d](#rj-1d) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 · UDEC 1.22 | 1.19 / 1.16 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
-| [2](#rj-2) | 🟢 | Alejano & Alonso block toppling | SSRM 0.764 vs Goodman 0.76 (+0.5%) | 0.86 / 0.82 | |
-| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | 1.12 / 1.09 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
-| [4](#rj-4) | <span class="nodata">⊘</span> | Lorig & Varona flexural toppling | UDEC 1.3 | 1.19 / 1.27 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
-| [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | 1.65 / 1.86 | *reported, no lock* — four trials of the bracket, including both its edges, reach the sweep budget without a verdict. |
-| [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | 1.25 / 1.31 | *reported, no lock* — both edges of the bracket reach the sweep budget without a verdict. |
-| [7](#rj-7) | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | 1.57 / 1.59 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
-| [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.744 vs UDEC 0.76 (−2.1%) | 0.75 / 0.75 | |
-| [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.018 vs UDEC 1.03 (−1.2%) · LE 0.40–1.45 | 1.01 / 1.09 | |
-| 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 (LE 0.43–1.45) | 0.92 / 1.08 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is not yet measured. |
-| [11](#rj-11) | 🔴 | Ploughing sliding slab failure | SSRM 1.213 vs LE (Alejano) 1.75 (−30.7%) · UDEC 1.21 | 1.22 / 1.3 | |
-| [12](#rj-12) | <span class="nodata">⊘</span> | Ploughing toppling slab failure | LE (Alejano) 2.0 · UDEC 1.78 | 1.39 / 1.75 | *reported, no lock* — a step of refinement moves the factor, so it is not the section's answer but its mesh's. |
-| 13 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 4 | LE (Alejano) 1.0 · UDEC 1.0 | 1.0 / 1.05 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is running. |
-| [14](#rj-14) | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | LE (Alejano) 1.0 · UDEC 0.9 | 0.89 / 1.09 | *reported, no lock* — a step of refinement moves the factor, as it does on problem 12. |
-| [15](#rj-15) | <span class="nodata">⊘</span> | Partially joint-controlled footwall | LE (Alejano) 1.72 · UDEC 1.6 · Slide2 1.25 | 1.28 / 1.42 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
-| 16 | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | experiment 9° · UDEC 11° | 9° / 7° | *blocked* — the problem scores the TILT ANGLE at which a block grid topples, found by rotating gravity through a staged sweep; XSLOPE's seismic coefficient tilts the load but the row needs the sweep and a toppling criterion, neither of which is a strength reduction. |
-| 17 | <span class="nodata">⊘</span> | Step-path, en-echelon joints | UDEC 1.29 | 1.24 / 1.2 | *blocked* — the vendor model's second, elastic material has no boundary of its own. Recovered from the element-material map it is an 83-vertex staircase of element edges, trending vertical near x = 12 and horizontal near y = 3 with excursions of about one element either side, so the boundary is a property of the vendor's mesh rather than of its model. |
-| [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | 1.01 / 1.0 | |
-| [19](#rj-19) | <span class="nodata">⊘</span> | Bi-planar step-path failure | UDEC 1.46 | 1.5 / 1.41 | *reported, no lock* — two trials of the bracket reach the sweep budget without a verdict. |
-| 20 | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | 2.21 / 2.37 | *blocked* — the manual states no block size and no seed, and the vendor model carries the tessellation as 523 digitized traces rather than as a generated network, so the input is not reproducible from anything published. |
-| 21 | <span class="nodata">⊘</span> | Shallow excavation, jointed tunnel | UDEC 8.16 | 8.27 / 8.5 | *blocked* — the second stage of the vendor model excavates a 2 m opening and the strength reduction runs on the excavated state, which carries the stress the first stage left behind; XSLOPE has no staged construction. |
-| 22 | <span class="nodata">⊘</span> | Joint model: hyperbolic softening | — | — | *not supported* — the problem exercises RS2's hyperbolic displacement- and work-softening joint law, which XSLOPE's interface element does not have; it reports no factor of safety. |
-| 23 | <span class="nodata">⊘</span> | Joint model: residual strength and dilation | — | — | *no lock possible* — the problem reports no factor of safety, and its six vendor models all carry `include_dilation: no`. See [The dilation problem](#the-dilation-problem). |
+| # | Match | Problem | Referee | Also published | RS2 without / with improvement | Notes |
+|---:|:-:|---|---|---|---|---|
+| [1a](#rj-1a) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1a | Goodman & Bray 1.0 | UDEC 0.99 | 0.99 / 0.97 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
+| [1b](#rj-1b) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1b | Goodman & Bray 1.0 | UDEC 0.99 | 0.97 / 0.94 | *reported, no lock* — the lower edge of the bracket reaches the sweep budget without a verdict. |
+| [1c](#rj-1c) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1c | Goodman & Bray 1.02 | UDEC 1.01 | 1.01 / 0.99 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
+| [1d](#rj-1d) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 | UDEC 1.22 | 1.19 / 1.16 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
+| [2](#rj-2) | 🔴 | Alejano & Alonso block toppling | SSRM 0.764 vs UDEC 0.87 (−12.2%) | LE (Goodman & Bray) 0.76 | 0.86 / 0.82 | |
+| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | — | 1.12 / 1.09 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
+| [4](#rj-4) | <span class="nodata">⊘</span> | Lorig & Varona flexural toppling | UDEC 1.3 | — | 1.19 / 1.27 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
+| [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | — | 1.65 / 1.86 | *reported, no lock* — four trials of the bracket, including both its edges, reach the sweep budget without a verdict. |
+| [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | — | 1.25 / 1.31 | *reported, no lock* — both edges of the bracket reach the sweep budget without a verdict. |
+| [7](#rj-7) | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | — | 1.57 / 1.59 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
+| [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.744 vs UDEC 0.76 (−2.1%) | — | 0.75 / 0.75 | |
+| [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.018 vs UDEC 1.03 (−1.2%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
+| 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | LE (Alejano) 0.43–1.45 | 0.92 / 1.08 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is not yet measured. |
+| [11](#rj-11) | 🟢 | Ploughing sliding slab failure | SSRM 1.213 vs UDEC 1.21 (+0.2%) | LE (Alejano) 1.75 | 1.22 / 1.3 | |
+| [12](#rj-12) | <span class="nodata">⊘</span> | Ploughing toppling slab failure | UDEC 1.78 | LE (Alejano) 2.0 | 1.39 / 1.75 | *reported, no lock* — a step of refinement moves the factor, so it is not the section's answer but its mesh's. |
+| 13 | <span class="nodata">⊘</span> | Ploughing sliding slab, example 4 | UDEC 1.0 | LE (Alejano) 1.0 | 1.0 / 1.05 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is running. |
+| [14](#rj-14) | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | UDEC 0.9 | LE (Alejano) 1.0 | 0.89 / 1.09 | *reported, no lock* — a step of refinement moves the factor, as it does on problem 12. |
+| [15](#rj-15) | <span class="nodata">⊘</span> | Partially joint-controlled footwall | UDEC 1.6 | LE (Alejano) 1.72 · Slide2 (vendor) 1.25 | 1.28 / 1.42 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
+| 16 | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | UDEC 11° | experiment 9° | 9° / 7° | *blocked* — the problem scores the TILT ANGLE at which a block grid topples, found by rotating gravity through a staged sweep; XSLOPE's seismic coefficient tilts the load but the row needs the sweep and a toppling criterion, neither of which is a strength reduction. |
+| 17 | <span class="nodata">⊘</span> | Step-path, en-echelon joints | UDEC 1.29 | — | 1.24 / 1.2 | *blocked* — the vendor model's second, elastic material has no boundary of its own. Recovered from the element-material map it is an 83-vertex staircase of element edges, trending vertical near x = 12 and horizontal near y = 3 with excursions of about one element either side, so the boundary is a property of the vendor's mesh rather than of its model. |
+| [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | — | 1.01 / 1.0 | |
+| [19](#rj-19) | <span class="nodata">⊘</span> | Bi-planar step-path failure | UDEC 1.46 | — | 1.5 / 1.41 | *reported, no lock* — two trials of the bracket reach the sweep budget without a verdict. |
+| 20 | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | — | 2.21 / 2.37 | *blocked* — the manual states no block size and no seed, and the vendor model carries the tessellation as 523 digitized traces rather than as a generated network, so the input is not reproducible from anything published. |
+| 21 | <span class="nodata">⊘</span> | Shallow excavation, jointed tunnel | UDEC 8.16 | — | 8.27 / 8.5 | *blocked* — the second stage of the vendor model excavates a 2 m opening and the strength reduction runs on the excavated state, which carries the stress the first stage left behind; XSLOPE has no staged construction. |
+| 22 | <span class="nodata">⊘</span> | Joint model: hyperbolic softening | — | — | — | *not supported* — the problem exercises RS2's hyperbolic displacement- and work-softening joint law, which XSLOPE's interface element does not have; it reports no factor of safety. |
+| 23 | <span class="nodata">⊘</span> | Joint model: residual strength and dilation | — | — | — | *no lock possible* — the problem reports no factor of safety, and its six vendor models all carry `include_dilation: no`. See [The dilation problem](#the-dilation-problem). |
 
 </div>
 
@@ -246,7 +254,7 @@ does.
 
 ![RJ-1d: Goodman & Bray block toppling, case d (rj001d) — FEM inputs with the 2013 kN toe force, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. As on case b the right-hand panels are one sweep past the critical factor rather than a developed mechanism, so they show where the stack starts to move rather than where it ends up](images/RJ-1d.png)
 
-### 🟢 RJ-2: Alejano & Alonso block toppling (rj002) {#rj-2}
+### 🔴 RJ-2: Alejano & Alonso block toppling (rj002) {#rj-2}
 
 A 30 × 19.85 m section whose 9.85 m face rises at 58.65° from (20, 10) to (14, 19.85). A basal
 joint runs from the toe of that face up to the crest at (2.9393, 19.85) at 30° — the stepped
@@ -255,9 +263,9 @@ toe. Both carry φ = 31° and no cohesion. The rock is elastic (γ = 25 kN/m³, 
 the vendor's own `Plasticity Specifications: Non`, so the columns cannot yield and every mechanism
 the model has is a joint one.
 
-| XSLOPE SSRM | Goodman & Bray referee | UDEC | RS2 without / with improvement |
+| XSLOPE SSRM | UDEC referee | LE (Goodman & Bray) | RS2 without / with improvement |
 |---|---|---|---|
-| **0.764** | 0.76 (+0.5%) | 0.87 | 0.86 / 0.82 |
+| **0.764** | 0.87 (−12.2%) | 0.76 | 0.86 / 0.82 |
 
 <!-- test: file=files/rocscience/joints/rj002.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-2, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
 
@@ -265,9 +273,10 @@ A step of refinement — a 2D size of 0.35 m, which takes the mesh from 11 537 n
 moves the factor by one bracket step, inside the row's own tolerance, and all nine trials of both
 brackets reach a verdict. The longest takes 185 381 sweeps of the 250 000 allowed.
 
-**The two other codes agree with each other, and not with this row.** Alejano & Alonso publish
-Goodman & Bray's limit equilibrium at 0.76 and their own UDEC run at 0.87; RS2 reports 0.86 and
-0.82. XSLOPE lands on the limit equilibrium, and RS2 and UDEC land together above it. That is a
+**The gap to the referee is 12%, and the three continuum codes do not bracket this row.** Alejano
+& Alonso publish Goodman & Bray's limit equilibrium at 0.76 and their own UDEC run at 0.87; RS2
+reports 0.86 and 0.82, so both of its own factors sit above this one rather than straddling it.
+XSLOPE lands on the limit equilibrium, and RS2 and UDEC land together above it. That is a
 difference between codes on one problem, stated here because it is measured, and it is not
 explained: every input class the corpus transcribes was diffed against the vendor model and
 matches. The joints reconstruct from the vendor's own 517 joint elements to 311.4 m of trace,
@@ -432,14 +441,14 @@ the same bracket, edge for edge. Every trial of both brackets reaches a verdict,
 mesh-independent at the corpus size, where problems 12 and 14 are not.
 
 The paper's own limit equilibrium for this problem is a range rather than an answer — 0.40 to 1.45,
-as the manual prints it — so the row is scored against the distinct-element run, which is the rule
-this corpus follows wherever a problem publishes no single closed-form value.
+as the manual prints it — and it is recorded beside the referee rather than scoring, as every source
+limit equilibrium here is. The distinct-element run is what the manual verifies RS2 against.
 
 **Input file:** [rj009.xlsx](files/rocscience/joints/rj009.xlsx).
 
 ![RJ-9: Alejano et al. bilinear slab failure, example 1a (rj009) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it moves: the release trace under the crest carries the brightest slip, a bedding plane below the toe carries the rest, and the deformed section shows the slab between them sliding out over the bench](images/RJ-9.png)
 
-### 🔴 RJ-11: Alejano et al. ploughing sliding slab failure (rj011) {#rj-11}
+### 🟢 RJ-11: Alejano et al. ploughing sliding slab failure (rj011) {#rj-11}
 
 A 25 m slope at 50° with bedding dipping out of the face at −50° at 1.5 m spacing, φ = 30°, and two
 release traces at φ = 20°: one at the toe running below the bench and one from the face down onto
@@ -450,9 +459,9 @@ stand-in at E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3. The lower tip of a rel
 decimals, so it lands a part in 10⁷ from the bedding plane it belongs on; see
 [where a joint ends on another](#joint-terminations).
 
-| XSLOPE SSRM | LE (Alejano) referee | UDEC | RS2 without / with improvement |
+| XSLOPE SSRM | UDEC referee | LE (Alejano) | RS2 without / with improvement |
 |---|---|---|---|
-| **1.213** | 1.75 (−30.7%) | 1.21 | 1.22 / 1.3 |
+| **1.213** | 1.21 (+0.2%) | 1.75 | 1.22 / 1.3 |
 
 <!-- test: file=files/rocscience/joints/rj011.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-11, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
 
@@ -461,12 +470,13 @@ interface elements to 26 052 and 2 524 — does not move the factor at all: 
 the same bracket, edge for edge. Every trial of both brackets reaches a verdict, the longest taking
 61 171 sweeps of the 250 000 allowed.
 
-**The two published referees are half a factor apart, and this row lands on one of them.** Alejano
-et al. publish a limit-equilibrium 1.75 and a UDEC run at 1.21 for the same problem, and RS2's own
-two factors sit beside the UDEC one rather than beside the limit-equilibrium one. The corpus scores
-against the closed form wherever a problem has one, which is what the dot reads; against the
-distinct-element run the same factor reads +0.2%. [Problem 15](#rj-15) has the same shape, with
-three referees on one problem.
+**The manual's two published values are half a factor apart, and this row lands on the one that
+scores it.** Alejano et al. publish a limit-equilibrium 1.75 and a UDEC run at 1.21 for the same
+problem. UDEC is the referee — it is what the manual verifies RS2 against here, and it is the
+same-method pairing — and RS2's own two factors, 1.22 and 1.3, sit beside it rather than beside the
+limit equilibrium, with this row between RS2's lower factor and UDEC's. Against the source paper's
+limit equilibrium the same factor reads −30.7%, which is a cross-method difference and scores
+nothing. [Problem 15](#rj-15) has the same shape, with three published values on one problem.
 
 Every input class the corpus transcribes was diffed against the vendor model and matches: the rock's
 E, ν and γ, both joint friction angles, the joints' stiffness pair, cohesion and tensile cap, the
@@ -544,14 +554,15 @@ no cohesion and φ = 25°.
 
 The manual publishes five factors for this problem, from one paper and three programs:
 
-| LE (Alejano) referee | UDEC-SSRT (Alejano) | RS2 without / with improvement | Slide2 LEM |
+| UDEC-SSRT referee (Alejano) | LE (Alejano) | RS2 without / with improvement | Slide2 LEM (vendor) |
 |---|---|---|---|
-| 1.72 | 1.6 | 1.28 / 1.42 | 1.25 |
+| 1.6 | 1.72 | 1.28 / 1.42 | 1.25 |
 
-The first two are the source paper's own answers, its limit equilibrium and its UDEC run, and the
-limit equilibrium is what scores this row. The last is Rocscience's own companion program run on
-its own model, recorded for completeness and not used as a referee. The five run from 1.25 to
-1.72, a wider spread than separates any two codes anywhere else in this corpus.
+The first two are the source paper's own answers, its UDEC run and its limit equilibrium, and the
+UDEC run is what scores this row: it is what the manual verifies RS2 against, and it is the
+same-method pairing. The last is Rocscience's own companion program on its own model, labeled and
+recorded rather than scoring. The five run from 1.25 to 1.72, a wider spread than separates any two
+codes anywhere else in this corpus.
 
 The row carries no lock, so it prints no factor of its own. The upper edge of its final bracket
 reaches 250 000 sweeps without a verdict, and a bracket edge nothing ruled on cannot define a

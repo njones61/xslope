@@ -548,6 +548,28 @@ slipping interface the shear traction is held at $c_j + t_n \tan\phi_j$ and does
 displacement, so a state the viscoplastic loop reached by growing the slip leaves a corrector — which may only move
 displacements — with nothing to move.
 
+What ends a jointed trial is therefore the viscoplastic loop alone, and the force test it has to pass is measured
+almost entirely on the joints. A trial that neither converges nor fails is read from the **slip** instead — steady
+slip with the field gaining is a slope moving on its joints and is `FAILED`; a slip and a field that have both
+stopped, with the soil in equilibrium, is a slope standing behind a limit cycle no budget brings down. Both readings,
+and why the ordinary displacement evidence cannot make the distinction, are in
+[the joint verdict](overview.md#the-joint-verdict).
+
+### Making a jointed trial cheaper
+
+The slip a sweep puts into a joint is the excess traction over $k_s$, so at $\Delta t = 1$ one sweep returns the
+shear traction exactly to its limit at the current displacement field. `joint_slip_stiffness_factor` scales the
+stiffness that division uses **on the pairs that are at their limit**, and nothing else: the traction limit, the
+assembled elastic block, and a pair that re-sticks are all untouched. A factor below 1 drives the interface past its
+own return and is therefore an over-relaxation, not a change of physics.
+
+It is **off by default**, and the reason is a stability limit rather than a preference. Because one sweep already
+returns the traction exactly, the iteration is *at* its boundary at a factor of 1 and a factor $f$ is a relaxation of
+$1/f$. RS2 sets its equivalent to 0.01 — a relaxation of 100 — and at that value this scheme diverges outright.
+Values near 1 are stable and buy nothing. Reach for the iteration budget and the [joint
+verdict](overview.md#the-joint-verdict) instead; the factor exists so the setting can be reproduced, not because it
+is a knob worth turning.
+
 ## Joints Without Reinforcement
 
 Not every slip surface has a sheet in it. A rock joint, a bedding plane, the contact between a concrete facing block

@@ -755,6 +755,57 @@ boundary pore pressures — rather than the solver knobs. Quadratic **triangles*
 over quad8 for this problem class, because the 2×2 reduced-integration quad has a zero-energy
 hourglass mode that persistent near-surface forcing can excite.
 
+#### A jointed model: the verdict comes from the interface {#the-joint-verdict}
+
+On a model with [interface (joint) elements](reinforcement.md#joints-without-reinforcement) the
+force-equilibrium test above is measured almost entirely on the joints. The residual is the
+increment of the viscoplastic body load, and on a jointed model that increment is the shear traction
+the interface could not hold on the last sweep: measured on a jointed rock slope whose soil residual
+had fallen to $3\times10^{-8}$, the same solve's joint residual was $3\times10^{-2}$ — six orders of
+magnitude apart on one mesh, in one solve.
+
+That matters because the joint residual has a mode of its own. A pair sitting at its slip limit
+alternates between slipping and sticking as the field around it breathes, and the resulting
+oscillation in the body load is **not** the period-2 flicker `oob_window` was built to cancel: its
+period is tens of sweeps, so the ten-sweep average passes it straight through. On a settled jointed
+slope the joint residual therefore oscillates in a band with a **flat mean** — between
+$1.2\times10^{-2}$ and $4.7\times10^{-2}$ on that slope, its mean constant to 0.04% over the last
+half of the solve — and no iteration budget brings it under any tolerance. Such a trial reaches its
+ceiling with nothing wrong with the slope and nothing left for the solver to do.
+
+So a jointed trial that neither converges nor fails is read from the **interface** rather than from
+the displacement field, over the trailing half of its sweep history, in two ratios that carry no
+length, stiffness or mesh size: the slip gained over the window as a fraction of the slip already
+there, and the displacement gained over the window in the trial's own elastic displacements.
+
+| Evidence | `exit_reason` | Verdict | Effect on the bisection |
+|---|---|---|---|
+| The slip gains ≥ 2% of itself over the window, its rate is **not decaying at all** (the last quarter's rate at least 0.9 of the quarter before), **and** max&#124;u&#124; gains ≥ 0.05 elastic displacements | `steady_slip` | `FAILED` | Failed — the slope is moving on its joints |
+| The slip gains ≤ 0.01% of itself, max&#124;u&#124; gains ≤ 10⁻⁴ elastic displacements, the residual on the nodes carrying *no* joint is under `force_tol` across the window, **and** the joint residual has stopped falling (its window mean at least 0.85 of the previous window's) | `joint_settled` | `JOINT_SETTLED` | **Not** failed: the slope is standing, and the bracket moves up |
+| Anything else | unchanged | unchanged | The [hybrid classifier's](#2-hybrid-hybrid-default) verdict stands |
+
+Both readings are asked only of a trial that would otherwise spend its whole budget, and only on a
+jointed model — a trial that converges, a trial already failing, and every model without a joint
+reach neither.
+
+The two strict conditions are each there because the looser version was measured wrong. **The rate
+test is 0.9, not "decaying slowly":** a trial that converges after 203,000 sweeps and a trial that
+never converges had gained 16.2% and 18.7% of their slip and 0.375 and 0.488 elastic displacements
+when read at 25,000 sweeps — indistinguishable — and were separated only by the rate, which falls
+away steadily on the one that finishes (0.64 at 25,000 sweeps, 0.44 at 100,000, 0.21 at 200,000) and
+does not move at all on a real mechanism (1.0002). A creep that is merely slowing is therefore left
+to the displacement classifier, which already calls it failed. The `FAILED` reading also waits
+25,000 sweeps before it may speak, for the same reason. **The settled verdict asks the joint residual
+whether it has stopped falling** because without that it caught a trial nine thousand sweeps short of
+a clean convergence: the slip, the field and the soil were already at rest and only the joint
+residual, still coming down 35% per window, said otherwise.
+
+A `JOINT_SETTLED` trial does **not** claim convergence: it never met the force tolerance and
+`converged` stays `False`. What it claims is the thing the bracket asks about — that the slope
+stands at that strength — and it says so with the interface, the displacement field and the soil all
+measured at rest. The per-trial record carries the verdict and its `exit_reason` like any other, so
+neither reading is ever silent.
+
 ### Finishing a trial with the Newton corrector
 
 The viscoplastic iteration approaches equilibrium from outside the yield surface, and its
@@ -1048,6 +1099,13 @@ instrumentation costs nothing measurable and no extra solves are needed.
 | Beyond elastic scale **and** growing (or the displacement cap was tripped) | `FAILED` | Failed — same as the default criterion |
 | At elastic scale **and** frozen | `STABLE_STUCK` | **Not** failed: the bracket moves up |
 | One signal without the other, or too little history | `AMBIGUOUS` | Failed — the default criterion's verdict stands |
+
+On a model with joints these two signals are not enough, because the quantity that separates a
+settled jointed slope from one sliding on its joints is the **slip**, which the displacement field
+does not report: a rock slope gaining 0.4 elastic displacements of movement every 25,000 sweeps
+reads `AMBIGUOUS` here because its max&#124;u&#124; has not yet passed 1.5× an elastic response set
+by loading stiff rock. Such a trial is read from the interface instead — see
+[the joint verdict](#the-joint-verdict).
 
 Requiring *both* signals in each direction is what keeps this conservative: the hybrid overrides only
 where the evidence is unambiguous, and every trial's verdict, $u_{ratio}$ and growth come back in

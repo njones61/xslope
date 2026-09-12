@@ -456,6 +456,35 @@ def _record_ssr_zone(sd, ssr_zone, fem_data=None):
     return sd
 
 
+@contextlib.contextmanager
+def _reference_kernel():
+    """Pin the bracket's trials to the NumPy reference Mohr-Coulomb kernel.
+
+    `fem.solve_fem`'s own oracle doctrine is that the reference path ALONE defines
+    every locked and published factor of safety, with the compiled kernel required
+    to reproduce it and never to be the definition. These runs cut the factors the
+    verification pages print and write the sidecars every figure is drawn from, so
+    they ARE definitions: whether the machine happens to carry a built kernel must
+    not be able to move one. `benchmarks/kernel_xcheck.py` is where the two paths
+    are compared.
+
+    `solve_ssrm` has no `fast_kernel` parameter — it calls `solve_fem` by bare name
+    — so the flag is threaded by wrapping `fem.solve_fem`, which is the mechanism
+    `kernel_xcheck.py` and `run_tests._force_fast_kernel` both use.
+    """
+    import xslope.fem as _fem
+    orig = _fem.solve_fem
+
+    def _wrap(*a, **k):
+        k['fast_kernel'] = False
+        return orig(*a, **k)
+    _fem.solve_fem = _wrap
+    try:
+        yield
+    finally:
+        _fem.solve_fem = orig
+
+
 def build_and_solve(tag):
     """Build the mesh, run the SSRM bracket, and return the pieces the figure and
     the sidecars need: (sd, fem_data, field, failure, FS, path, mesh, run).
@@ -528,18 +557,8 @@ def build_and_solve(tag):
     if 'max_iter_ceiling' in tag:
         extra['max_iterations_ceiling'] = int(tag['max_iter_ceiling'])
 
-    with contextlib.redirect_stdout(io.StringIO()):
+    with contextlib.redirect_stdout(io.StringIO()), _reference_kernel():
         sol = solve_ssrm(fem_data,
-                         # The NumPy reference path, pinned, never 'auto'. The
-                         # oracle doctrine (fem.solve_fem's fast_kernel doc) is that
-                         # the reference ALONE defines every locked and published
-                         # factor of safety and the compiled kernel only has to
-                         # reproduce it. These runs cut the factors the pages print
-                         # and the sidecars every figure is drawn from, so they are
-                         # definitions: whether a machine happens to carry a built
-                         # kernel must not be able to move one. benchmarks/
-                         # kernel_xcheck.py is where the two paths are compared.
-                         fast_kernel=False,
                          F_min=float(tag.get('f_min', 0.5)),
                          F_max=float(tag.get('f_max', 3.0)),
                          tolerance=float(tag.get('tolerance', 0.02)),

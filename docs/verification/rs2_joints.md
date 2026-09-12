@@ -83,7 +83,7 @@ joint model whose output is a stress-displacement curve.
 | # | Match | Problem | Referee | Also published | RS2 without / with improvement | Notes |
 |---:|:-:|---|---|---|---|---|
 | [1a](#rj-1a) | 🟡 | Goodman & Bray block toppling, case 1a | SSRM 1.037 vs Goodman & Bray 1.0 (+3.7%) | UDEC 0.99 | 0.99 / 0.97 | |
-| [1b](#rj-1b) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1b | Goodman & Bray 1.0 | UDEC 0.99 | 0.97 / 0.94 | *reported, no lock* — the lower edge of the bracket reaches the sweep budget without a verdict. |
+| [1b](#rj-1b) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1b | Goodman & Bray 1.0 | UDEC 0.99 | 0.97 / 0.94 | *reported, no lock* — the standing edge of the corpus bracket converges two sweeps past its budget, so it is recorded without a verdict; the refinement step decides every trial and returns the same factor. |
 | [1c](#rj-1c) | 🟡 | Goodman & Bray block toppling, case 1c | SSRM 1.057 vs Goodman & Bray 1.02 (+3.6%) | UDEC 1.01 | 1.01 / 0.99 | |
 | [1d](#rj-1d) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 | UDEC 1.22 | 1.19 / 1.16 | *reported, no lock* — the standing edge of the corpus bracket converges six sweeps past its budget, so it is recorded without a verdict; the refinement step decides every trial and returns the same bracket. |
 | [2](#rj-2) | 🔴 | Alejano & Alonso block toppling | SSRM 0.764 vs UDEC 0.87 (−12.2%) | LE (Goodman & Bray) 0.76 | 0.86 / 0.82 | |
@@ -219,9 +219,17 @@ what lets a stack on 33° joints stand where case a's needs 38°. It enters as a
 Nothing else about the mechanism changes: the stack still rotates forward over the face on slip up
 every column contact and along the stepped base.
 
-The row carries no lock, so it prints no factor of its own. The lower edge of its final bracket
-reaches 250 000 sweeps without a verdict, and a bracket edge nothing ruled on cannot define a factor
-of safety.
+The row carries no lock and prints no factor, and the trial that stops it is one the corrector
+turned around. At F = 1.007812 the plain loop left the model STABLE_STUCK at the 250 000-sweep
+cap; under the corrector the same trial comes back CONVERGED — at 250 002 sweeps, two past its
+own budget, which the trial record reads as no verdict because the trial reached its ceiling. So
+the corpus bracket is 8 of 9 decided and its standing edge is the undecided one.
+
+A step of refinement — a 2D size of 7.0 m, which takes the mesh from 2 072 nodes and 67 interface
+elements to 3 573 and 94 — decides all nine of its trials and returns the identical factor, with
+that same standing edge reached in 138 840 sweeps. The factor this row brackets is therefore
+corroborated by a bracket nothing in it was cut off, and the row still prints none, because the
+lock would be cut on the corpus mesh and that mesh's edge was not ruled on.
 
 Every input class the corpus transcribes was diffed against the vendor model and matches: the rock's
 E, ν and γ, the joints' stiffness pair, cohesion, friction angle and tensile cap, the 31 contacts the

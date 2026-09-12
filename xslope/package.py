@@ -58,17 +58,19 @@ SEEP_SIDECARS = ("_seep.csv", "_seep2.csv")
 #: A transient march: the frames and the run metadata (written by xslope.seep).
 TSEEP_SIDECARS = ("_tseep.csv", "_tseep_meta.json")
 #: Every file ``xslope.fem.export_fem_solution`` writes beside a model, by suffix —
-#: the converged fields, the at-failure snapshot, the run metadata, and the per-member
-#: force tables for reinforcement and piles, converged and at-failure. Deleting a
-#: solution means deleting ALL of them: the member tables are read back by name, so a
-#: list naming only the nodal files leaves the last run's bar forces on disk to be
-#: grafted onto whatever solution is imported next.
+#: the converged fields, the at-failure snapshot, the run metadata, the per-member
+#: force tables for reinforcement and piles, and a jointed model's interface state,
+#: each converged and at-failure. Deleting a solution means deleting ALL of them: the
+#: member tables are read back by name, so a list naming only the nodal files leaves
+#: the last run's bar forces on disk to be grafted onto whatever solution is imported
+#: next, and the joint tables are read back the same way.
 FEM_SOLUTION_SIDECARS = (
     "_fem_nodes.csv", "_fem_elements.csv", "_fem_meta.json",
-    "_fem_reinf.csv", "_fem_piles.csv",
+    "_fem_reinf.csv", "_fem_piles.csv", "_fem_joints.csv",
     "_fem_failure_nodes.csv", "_fem_failure_elements.csv",
     "_fem_failure_meta.json",
     "_fem_failure_reinf.csv", "_fem_failure_piles.csv",
+    "_fem_failure_joints.csv",
 )
 #: Studio's per-project display styles (studio.document).
 STYLES_SIDECAR = "_styles.json"

@@ -212,7 +212,8 @@ def _fem_pair(folder):
     made = {}
     for name in ("model.xlsx", "model_fem.xlsx",
                  "model_fem_nodes.csv", "model_fem_meta.json",
-                 "model_fem_failure_nodes.csv",
+                 "model_fem_joints.csv",
+                 "model_fem_failure_nodes.csv", "model_fem_failure_joints.csv",
                  "model_fem_fem_nodes.csv", "model_fem_fem_meta.json",
                  "model_notes.txt"):
         path = os.path.join(folder, name)
@@ -236,8 +237,9 @@ def test_attribution():
 
     got = [os.path.basename(p)
            for p in project_files(os.path.join(folder, "model.xlsx"))]
-    want = ["model.xlsx", "model_fem_failure_nodes.csv", "model_fem_meta.json",
-            "model_fem_nodes.csv", "model_notes.txt"]
+    want = ["model.xlsx", "model_fem_failure_joints.csv",
+            "model_fem_failure_nodes.csv", "model_fem_joints.csv",
+            "model_fem_meta.json", "model_fem_nodes.csv", "model_notes.txt"]
     if sorted(got) != sorted(want):
         fails.append(f"model.xlsx collected {sorted(got)}, expected {sorted(want)}")
 

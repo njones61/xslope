@@ -72,7 +72,7 @@ joint model whose output is a stress-displacement curve.
 | 5 | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | 1.65 / 1.86 | *planned* — two crossing sets, 1748 joint elements. |
 | 6 | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | 1.25 / 1.31 | *planned* — one −35° set, 1690 joint elements. |
 | 7 | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | 1.57 / 1.59 | *planned* — one −70° set, 594 joint elements. |
-| 8 | <span class="nodata">⊘</span> | Flexural toppling, base friction model | UDEC 0.76 | 0.75 / 0.75 | *planned* — a −60° set at 5.08 m with a horizontal basal joint. |
+| [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.744 vs UDEC 0.76 (−2.1%) | 0.75 / 0.75 | |
 | 9 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1a | UDEC 1.03 | 1.01 / 1.09 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
 | 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | 0.92 / 1.08 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
 | 11 | <span class="nodata">⊘</span> | Ploughing sliding slab failure | UDEC 1.21 | 1.22 / 1.3 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
@@ -143,6 +143,34 @@ states: on a sliding interface the normal opening per unit slip is $\tan(\text{d
 ---
 
 ## The Rows
+
+### 🟢 RJ-8: Flexural toppling in a base friction model (rj008) {#rj-8}
+
+Pritchard & Savigny's base-friction table model, scaled up a hundred times: a 72.4 × 36.5 m
+section whose 30.5 m face rises at 78° from (15, 6) to (21.48, 36.5). Thirteen columns at −60°,
+5.08 m apart, stand on a horizontal joint at y = 6 that runs the width of the model, with a
+vertical joint at x = 68.4 closing the back of the stack. The rock is Mohr-Coulomb (γ = 25.506
+kN/m³, E = 22.771 GPa, ν = 0.139, c = 60 kPa, φ = 39°). The joints carry no cohesion, φ = 39°, and
+the softest normal stiffness in the corpus bar one: k<sub>n</sub> = 1.5 × 10<sup>7</sup> kPa/m
+against the set's usual 10<sup>8</sup>.
+
+| XSLOPE SSRM | UDEC referee | RS2 without / with improvement |
+|---|---|---|
+| **0.744** | 0.76 (−2.1%) | 0.75 / 0.75 |
+
+<!-- test: file=files/rocscience/joints/rj008.xlsx, type=fem_ssrm, expected_fs=0.744, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-8, f_stand=0.734375, f_fail=0.75390625, check=edges, tier=gate -->
+
+A step of refinement — a 2D size of 1.05 m — moves the factor by exactly zero, and all nine trials
+of both brackets reach a verdict. The budget is not what settles this row: its longest trial takes
+3 639 sweeps of the 250 000 allowed, where the [geotextile wall family](rs2.md#rs2-48) exhausts
+that budget on five trials of eight rows.
+
+The model's stated tensile strength of 75 kPa is above the Mohr-Coulomb apex its own c and φ imply
+(c/tan φ = 74.1 kPa), so the cap never binds and the envelope's own apex governs.
+
+**Input file:** [rj008.xlsx](files/rocscience/joints/rj008.xlsx).
+
+![RJ-8: flexural toppling in a base friction model (rj008) — FEM inputs, mesh, viscoplastic shear strain and displacement vectors at the critical SRF. The strain gathers into one lobe per column along a band that climbs from the toe across the stack, and the columns above that band rotate out over the face while the rock below it is unstrained: the break surface of flexural toppling rather than sliding along any one joint](images/RJ-8.png)
 
 ### 🟢 RJ-18: Step-path failure, continuous joints (rj018) {#rj-18}
 

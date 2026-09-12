@@ -19,9 +19,10 @@ six lines made joints in memory:
      which bonded-bar inputs a jointed line stops reading.
   c. the plots. The inputs plot draws a jointed line in its own style with its
      own legend entry and a bonded one in the ordinary one; the mesh plot draws
-     the jointed lines over the mesh; the results panel draws each interface's
-     state on the line with the slip colorbar, and draws nothing at all on a
-     model with no joint.
+     the jointed lines over the mesh; the results panel draws every joint as a
+     hairline colored by slip, with the slip colorbar as its only legend and no
+     colorbar where nothing slipped, and draws nothing at all on a model with
+     no joint.
   d. the faces are offset. The split gives the two soil faces their own nodes,
      so a slipped joint moves them apart in the solved field — which is what
      the deformed mesh and the at-failure capture draw. Measured on the
@@ -61,6 +62,12 @@ ADHESION, DELTA = 5.0, 25.0
 #: solve of a few seconds and fine enough that a sheet carries ten bar elements.
 TARGET_SIZE = 3.0
 SIZE_1D = 2.0
+
+#: The heaviest a joint span may be drawn (points). The overlay was three-point
+#: bars over a four-and-a-half-point black under-stroke, which a model with
+#: hundreds of joints turns into a solid mat over the field; every span is a
+#: hairline now, and this is the bound that keeps it one.
+_HAIRLINE_MAX = 1.5
 
 
 def _quiet(fn, *a, **kw):
@@ -249,16 +256,36 @@ def _leg_plots(failures, cache):
         failures.append(f"the mesh plot does not draw the jointed line: {texts}")
     plt.close(fig)
 
+    # The results overlay: hairlines, no state legend, a colorbar only where
+    # something slipped. A network of hundreds of traces is the case this is
+    # drawn for, so weight and legend entries are both part of the contract.
+    from matplotlib.collections import LineCollection
     fig, ax = plt.subplots()
     specs = plot_joint_states(ax, fem_data, sol)
-    states = [t.get_label() for t in ax.get_lines()
-              if str(t.get_label()).startswith("Joint (")]
-    if not states:
-        failures.append("the results overlay draws no joint state")
-    if not any("slipping" in s for s in states):
-        failures.append(f"no interface reads as slipping at F = 1: {states}")
-    if not specs or "Joint Slip" not in specs[0][1]:
+    cols = [c for c in ax.collections if isinstance(c, LineCollection)]
+    if not cols:
+        failures.append("the results overlay draws no joint")
+    widths = [w for c in cols for w in c.get_linewidths()]
+    if widths and max(widths) > _HAIRLINE_MAX:
+        failures.append(f"a joint is drawn heavier than a hairline: {widths}")
+    labels = [str(t.get_label()) for t in ax.get_lines()]
+    if any(s.startswith("Joint (") for s in labels):
+        failures.append(f"the overlay still carries state legend entries: "
+                        f"{[s for s in labels if s.startswith('Joint (')]}")
+    if not specs or "Joint slip" not in specs[0][1]:
         failures.append(f"no slip colorbar was offered: {specs}")
+    plt.close(fig)
+
+    # A jointed model where nothing slipped is drawn, but offered no colorbar:
+    # an empty ramp would say a quantity was measured that was not.
+    stuck = dict(sol)
+    stuck["joint_slipping"] = np.zeros_like(np.asarray(sol["joint_slipping"]))
+    stuck["joint_slip"] = np.zeros_like(np.asarray(sol["joint_slip"]))
+    fig, ax = plt.subplots()
+    if plot_joint_states(ax, fem_data, stuck):
+        failures.append("a model with no slipping joint was offered a colorbar")
+    if not [c for c in ax.collections if isinstance(c, LineCollection)]:
+        failures.append("a model with no slipping joint drew no joint at all")
     plt.close(fig)
 
     # And nothing at all where there is no joint.
@@ -270,7 +297,7 @@ def _leg_plots(failures, cache):
     fig, ax = plt.subplots()
     if plot_joint_states(ax, fd0, sol0):
         failures.append("an unjointed model was offered a joint colorbar")
-    if [t for t in ax.get_lines() if str(t.get_label()).startswith("Joint (")]:
+    if [c for c in ax.collections if isinstance(c, LineCollection)]:
         failures.append("an unjointed model had joint states drawn on it")
     plt.close(fig)
     cache["plain"] = (plain, mesh0, fd0, sol0)

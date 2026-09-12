@@ -1658,8 +1658,9 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
     if show_mesh:
         plot_mesh_lines(ax, fem_data, color='gray', alpha=0.3, linewidth=0.3)
     
-    # Plot reinforcement with force visualization, with the joint states drawn
-    # first so they reach the legend plot_reinforcement_forces assembles.
+    # Plot reinforcement with force visualization. The joint hairlines go on
+    # first, under the bars they stand beside; they carry no legend entry of
+    # their own — their colorbar is their legend.
     plot_joint_states(ax, fem_data, solution)
     if show_reinforcement and 'elements_1d' in fem_data:
         plot_reinforcement_forces(ax, fem_data, solution)
@@ -2298,12 +2299,33 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
     return cbar_specs
 
 
-#: Colors for the three states an interface (joint) element can be in. The
-#: slipping ramp carries the magnitude; the other two are single colors, because
-#: "intact" and "open" are conditions rather than quantities.
+#: How a joint reads on a results panel. Slip is the only quantity a joint has,
+#: so slip is the only thing carried by color; a joint that is not slipping is
+#: the neutral gray that says nothing happened, and one that has OPENED is
+#: marked rather than colored, because opening is a condition rather than a
+#: quantity and a second color ramp on the same line would compete with the
+#: field underneath it.
 _JOINT_INTACT_COLOR = '#999999'
-_JOINT_OPEN_COLOR = '#ff7f0e'
 _JOINT_SLIP_CMAP = 'Purples'
+_JOINT_OPEN_MARK_COLOR = '#33383d'
+
+#: Where the slip ramp starts on its base colormap. ``Purples`` begins at white,
+#: which a three-point bar over a black under-stroke could carry and a hairline
+#: cannot: over a contoured field a white hairline is not there at all. The ramp
+#: is truncated at its pale end so the smallest slip still reads as slip, and
+#: the colorbar is drawn from the SAME truncated ramp so the reading is honest.
+_JOINT_SLIP_FLOOR = 0.30
+
+#: Nominal weight (points) of a joint span. A joint has no width and a network
+#: can carry hundreds of them, so weight is the one thing the drawing cannot
+#: spend: every span is a hairline, floored at one device pixel by the caller so
+#: it stays crisp rather than smearing into a sub-pixel haze.
+_JOINT_HAIRLINE_PT = 1.0
+
+#: An open mark's half length, as a fraction of the larger domain dimension —
+#: the idiom the inputs plot's joint ticks use, so the mark is the same size on
+#: a 10 m block and a 100 m slope.
+_JOINT_OPEN_MARK_FRACTION = 0.012
 
 
 def _joint_spans(fem_data, solution):
@@ -2352,19 +2374,81 @@ def _joint_spans(fem_data, solution):
     return list(spans.values())
 
 
+def _joint_slip_cmap():
+    """The slip ramp: ``Purples`` with its white end cut off (see
+    ``_JOINT_SLIP_FLOOR``)."""
+    from matplotlib.colors import LinearSegmentedColormap
+    base = plt.get_cmap(_JOINT_SLIP_CMAP)
+    return LinearSegmentedColormap.from_list(
+        'joint_slip', base(np.linspace(_JOINT_SLIP_FLOOR, 1.0, 256)))
+
+
+def _joint_open_marks(spans, scale):
+    """Perpendicular tick segments marking the OPENED stretches of every line.
+
+    One tick per continuous run of opened stations, not one per station: a line
+    that has parted along half its length parts in one stretch, and a tick at
+    every station of it would draw a comb rather than a mark. Stations of a line
+    are ordered along that line's own direction and split into runs wherever the
+    gap between neighbours exceeds half again the median station length — the
+    spacing that separates two parted stretches from one.
+    """
+    by_line = {}
+    for r in spans:
+        if r["open"]:
+            by_line.setdefault(r["line"], []).append(r)
+    segs = []
+    for rows in by_line.values():
+        mids = np.array([r["coords"].mean(axis=0) for r in rows])
+        vecs = np.array([r["coords"][1] - r["coords"][0] for r in rows])
+        lens = np.hypot(vecs[:, 0], vecs[:, 1])
+        axis = vecs[0] / (lens[0] if lens[0] > 0 else 1.0)
+        t = mids @ axis
+        order = np.argsort(t)
+        gap = 1.5 * float(np.median(lens[lens > 0])) if np.any(lens > 0) else 0.0
+        runs, run = [], [int(order[0])]
+        for a, b in zip(order[:-1], order[1:]):
+            if t[b] - t[a] <= gap:
+                run.append(int(b))
+            else:
+                runs.append(run)
+                run = [int(b)]
+        runs.append(run)
+        half = _JOINT_OPEN_MARK_FRACTION * scale
+        for run in runs:
+            k = run[len(run) // 2]
+            L = lens[k] if lens[k] > 0 else 1.0
+            nx, ny = -vecs[k][1] / L, vecs[k][0] / L
+            mx, my = mids[k]
+            segs.append([(mx - half * nx, my - half * ny),
+                         (mx + half * nx, my + half * ny)])
+    return segs
+
+
 def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
-    """Draw the interface (joint) elements on the line, colored by their state.
+    """Draw the joint (interface) elements as hairlines colored by their slip.
 
     A joint has no strain, so it appears in a shear-strain field only through
-    what it does to the soil beside it. This is the joint's own reading: intact
-    where the two faces are still stuck together, slipping where the shear
-    traction sits on the Mohr-Coulomb limit and the faces are sliding, open where
-    the normal traction passed the tension cutoff and the faces have parted. The
-    slipping stretches are colored by how far they have slid, on a colorbar laid
-    out the way the pile-shear and reinforcement-force bars are.
+    what it does to the soil beside it. This is the joint's own reading, and it
+    is drawn so that a network of hundreds of traces still leaves the field
+    underneath legible:
 
-    Returns the ``(mappable, label)`` specs, empty on a model with no joint, so a
-    caller that stacks colorbars can place this one beside the field bar.
+    * every station span is a HAIRLINE — nominally ``_JOINT_HAIRLINE_PT``,
+      floored at one device pixel so it stays crisp — with no under-stroke;
+    * a span that is slipping is colored by how far its faces have slid, on the
+      ``Purples`` ramp with its white end cut off, and the colorbar IS the
+      legend: no per-state legend entries go on the axes;
+    * a span that is not slipping is a neutral gray hairline;
+    * an OPENED stretch is marked rather than colored: one short tick drawn
+      perpendicular to the joint, in a dark neutral, at the middle of each
+      continuous run of opened stations (see :func:`_joint_open_marks`), its
+      length a fixed fraction of the domain so it reads the same at any scale;
+    * when nothing on the model is slipping there is no colorbar at all and
+      every joint draws gray.
+
+    Returns the ``(mappable, label)`` specs, empty on a model with no joint and
+    on one where no joint slipped, so a caller that stacks colorbars can place
+    this one beside the field bar.
     """
     import matplotlib.cm as cm
     from matplotlib.colors import Normalize
@@ -2373,42 +2457,39 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
     if not spans:
         return []
 
-    intact = [r["coords"] for r in spans
-              if not r["open"] and not r["slipping"]]
-    opened = [r["coords"] for r in spans if r["open"]]
-    sliding = [r for r in spans if r["slipping"] and not r["open"]]
-
-    for lines, color, label in ((intact, _JOINT_INTACT_COLOR, 'Joint (intact)'),
-                                (opened, _JOINT_OPEN_COLOR, 'Joint (open)')):
-        if not lines:
-            continue
-        ax.add_collection(LineCollection(lines, colors='black', linewidths=4.5,
-                                         alpha=0.9, zorder=6.4))
-        ax.add_collection(LineCollection(lines, colors=color, linewidths=3,
-                                         alpha=0.95, zorder=6.5))
-        ax.plot([], [], '-', color=color, linewidth=3, alpha=0.95, label=label)
+    lw = max(_JOINT_HAIRLINE_PT, _mesh_pixel_floor_pt(ax))
+    coords = [r["coords"] for r in spans]
+    slipping = np.array([bool(r["slipping"]) for r in spans])
+    slips = np.array([float(r["slip"]) for r in spans])
 
     cbar_specs = []
-    if sliding:
-        cmap = plt.get_cmap(_JOINT_SLIP_CMAP)
-        smax = max(r["slip"] for r in sliding)
-        norm = Normalize(vmin=0.0, vmax=smax if smax > 0 else 1.0)
-        ax.add_collection(LineCollection([r["coords"] for r in sliding],
-                                         colors='black', linewidths=4.5,
-                                         alpha=0.9, zorder=6.4))
-        ax.add_collection(LineCollection(
-            [r["coords"] for r in sliding],
-            colors=[cmap(norm(r["slip"])) for r in sliding],
-            linewidths=3, alpha=0.95, zorder=6.5))
-        ax.plot([], [], '-', color=cmap(0.75), linewidth=3, alpha=0.95,
-                label='Joint (slipping)')
+    smax = float(slips[slipping].max()) if slipping.any() else 0.0
+    if smax > 0.0:
+        cmap = _joint_slip_cmap()
+        norm = Normalize(vmin=0.0, vmax=smax)
+        colors = [cmap(norm(s)) if sl else _JOINT_INTACT_COLOR
+                  for s, sl in zip(slips, slipping)]
         sm = cm.ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])
-        label = _fem_cbar_label(fem_data, 'Joint Slip', 'length')
+        label = _fem_cbar_label(fem_data, 'Joint slip', 'length')
         cbar_specs.append((sm, label))
         if draw_cbar:
             cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
             cbar.set_label(label, rotation=270, labelpad=15, fontsize=10)
+    else:
+        colors = _JOINT_INTACT_COLOR
+    # Opaque: a hairline has no weight to spare, and blending it into the field
+    # underneath takes the little contrast a one-pixel line has.
+    ax.add_collection(LineCollection(coords, colors=colors, linewidths=lw,
+                                     alpha=1.0, zorder=6.5))
+
+    nodes = np.asarray(fem_data["nodes"], dtype=float)
+    scale = max(float(np.ptp(nodes[:, 0])), float(np.ptp(nodes[:, 1]))) or 1.0
+    marks = _joint_open_marks(spans, scale)
+    if marks:
+        ax.add_collection(LineCollection(
+            marks, colors=_JOINT_OPEN_MARK_COLOR, linewidths=lw,
+            alpha=1.0, zorder=6.6))
     return cbar_specs
 
 
@@ -2751,9 +2832,9 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     # defer the force colorbar the same way and hand its spec back, so the two bars
     # get separate full-height slots instead of colliding in one.
     # A joint carries no strain of its own, so the contour field says nothing
-    # about it. Its state goes on the line, over the bar it stands beside —
-    # drawn FIRST because plot_reinforcement_forces builds the panel's legend
-    # from what is already on the axes when it finishes.
+    # about it. Its state goes on the line as a hairline colored by slip, under
+    # the bar it stands beside, with no legend entry of its own — the slip
+    # colorbar is the legend.
     joint_cbar_specs = (plot_joint_states(ax, fem_data, solution,
                                           draw_cbar=not single_panel)
                         if show_joints else [])

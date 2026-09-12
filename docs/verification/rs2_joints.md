@@ -92,7 +92,7 @@ joint model whose output is a stress-displacement curve.
 | [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | — | 1.65 / 1.86 | *reported, no lock* — four trials of the bracket, including both its edges, reach the sweep budget without a verdict. |
 | [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | — | 1.25 / 1.31 | *reported, no lock* — both edges of the bracket reach the sweep budget without a verdict. |
 | [7](#rj-7) | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | — | 1.57 / 1.59 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
-| [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.744 vs UDEC 0.76 (−2.1%) | — | 0.75 / 0.75 | |
+| [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | — | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.018 vs UDEC 1.03 (−1.2%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
 | 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | LE (Alejano) 0.43–1.45 | 0.92 / 1.08 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is not yet measured. |
 | [11](#rj-11) | 🟢 | Ploughing sliding slab failure | SSRM 1.213 vs UDEC 1.21 (+0.2%) | LE (Alejano) 1.75 | 1.22 / 1.3 | |
@@ -398,14 +398,20 @@ against the set's usual 10<sup>8</sup>.
 
 | XSLOPE SSRM | UDEC referee | RS2 without / with improvement |
 |---|---|---|
-| **0.744** | 0.76 (−2.1%) | 0.75 / 0.75 |
+| **0.764** | 0.76 (+0.5%) | 0.75 / 0.75 |
 
-<!-- test: file=files/rocscience/joints/rj008.xlsx, type=fem_ssrm, expected_fs=0.744, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-8, f_stand=0.734375, f_fail=0.75390625, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj008.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-8, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 1.05 m — moves the factor by exactly zero, and all nine trials
-of both brackets reach a verdict. The budget is not what settles this row: its longest trial takes
-3 639 sweeps of the 250 000 allowed, where the [geotextile wall family](rs2.md#rs2-48) exhausts
-that budget on five trials of eight rows.
+A step of refinement — a 2D size of 1.05 m, which takes the mesh from 5 547 nodes to 10 802 —
+moves the factor by one bracket step, inside the row's own tolerance, and all nine trials of both
+brackets reach a verdict. The budget is not what settles this row: its longest trial takes 1 981
+sweeps of the 250 000 allowed, where the [geotextile wall family](rs2.md#rs2-48) exhausts that
+budget on five trials of eight rows.
+
+The two meshes disagree about one trial, and it is the one the bracket closes on. At F = 0.753906
+the corpus mesh reaches equilibrium in 311 sweeps and the finer mesh runs away in 1 981, so the
+corpus bracket closes a step above the refined one. The row is cut on the corpus mesh, as every row
+here is, with the refinement inside its tolerance.
 
 The model's stated tensile strength of 75 kPa is above the Mohr-Coulomb apex its own c and φ imply
 (c/tan φ = 74.1 kPa), so the cap never binds and the envelope's own apex governs.

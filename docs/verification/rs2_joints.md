@@ -67,11 +67,11 @@ joint model whose output is a stress-displacement curve.
 | 1c | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1c | Goodman & Bray 1.02 · UDEC 1.01 | 1.01 / 0.99 | *blocked* — as 1a. |
 | 1d | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 · UDEC 1.22 | 1.19 / 1.16 | *blocked* — as 1b. |
 | [2](#rj-2) | 🟢 | Alejano & Alonso block toppling | SSRM 0.764 vs Goodman 0.76 (+0.5%) | 0.86 / 0.82 | |
-| 3 | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | 1.12 / 1.09 | *planned* — two parallel sets, 789 joint elements. |
-| 4 | <span class="nodata">⊘</span> | Lorig & Varona flexural toppling | UDEC 1.3 | 1.19 / 1.27 | *planned* — one 70° set, 489 joint elements. |
+| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | 1.12 / 1.09 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
+| [4](#rj-4) | <span class="nodata">⊘</span> | Lorig & Varona flexural toppling | UDEC 1.3 | 1.19 / 1.27 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
 | 5 | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | 1.65 / 1.86 | *planned* — two crossing sets, 1748 joint elements. |
-| 6 | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | 1.25 / 1.31 | *planned* — one −35° set, 1690 joint elements. |
-| 7 | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | 1.57 / 1.59 | *planned* — one −70° set, 594 joint elements. |
+| [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | 1.25 / 1.31 | *reported, no lock* — both edges of the bracket reach the sweep budget without a verdict. |
+| [7](#rj-7) | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | 1.57 / 1.59 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.744 vs UDEC 0.76 (−2.1%) | 0.75 / 0.75 | |
 | 9 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1a | UDEC 1.03 | 1.01 / 1.09 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
 | 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | 0.92 / 1.08 | *blocked* — the release trace ends on a bedding plane; see [where a joint ends on another](#joint-terminations). |
@@ -144,6 +144,81 @@ states: on a sliding interface the normal opening per unit slip is $\tan(\text{d
 
 ## The Rows
 
+### ⊘ RJ-3: Lorig & Varona forward block toppling (rj003) {#rj-3}
+
+The 260 m section at 55° that problems 3 to 7 share, cut by two sets: columns at 70° at 20 m
+spacing and a cross set at −20° at 30 m, both through the origin. The manual states the pair as
+"70 and 160" degrees, which is the same two planes measured the other way round the half circle.
+The rock is elastic — the vendor's `Plasticity Specifications: Non` — so only the joints can fail;
+γ = 26.0946 kN/m³, E = 9072 MPa, ν = 0.26. The joints carry c = 100 kPa and φ = 40°.
+
+The row carries no lock, so it prints no factor of its own. The upper edge of its final bracket
+reaches 250 000 sweeps without a verdict, and a bracket edge nothing ruled on cannot define a
+factor of safety.
+
+Every input class the corpus transcribes was diffed against the vendor model and matches: the
+rock's E, ν and γ, the joints' normal and shear stiffness, cohesion, friction angle and tensile
+cap, the two sets' dips and spacings, and the side restraint the vendor clamps in both directions.
+
+**Input file:** [rj003.xlsx](files/rocscience/joints/rj003.xlsx).
+
+![RJ-3: Lorig & Varona forward block toppling (rj003) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own, so the whole mechanism is on the two sets: the steep 70° joints slip behind the crest while the −20° cross joints open along it, and the deformed section shows the blocks between them rotating forward over the face](images/RJ-3.png)
+
+### ⊘ RJ-4: Lorig & Varona flexural toppling (rj004) {#rj-4}
+
+The same section cut by one set of columns at 70° at 20 m spacing — problem 3's first set without
+its cross joints, so the columns bend rather than topple as blocks. Here the rock is Mohr-Coulomb
+and carries a tensile cutoff of zero, which is what lets a column break in flexure: γ = 26.1 kN/m³,
+E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°.
+
+The corpus bracket is decided on all nine trials. What keeps the row reported is the refinement
+step: one of its trials reaches 250 000 sweeps without a verdict, so the claim that a finer mesh
+does not move the factor is not established, even though the two meshes bracket values one step
+apart. The row prints no factor.
+
+Every transcribed input class matches the vendor model, including the side restraint.
+
+**Input file:** [rj004.xlsx](files/rocscience/joints/rj004.xlsx).
+
+![RJ-4: Lorig & Varona flexural toppling (rj004) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. Here the rock can yield, and it does: a band of shear strain climbs from the toe across the columns, and drawn without exaggeration the columns are bent through that band rather than rotated about it, which is what separates flexural toppling from the block toppling of problem 3](images/RJ-4.png)
+
+### ⊘ RJ-6: Plane failure with daylighting discontinuities (rj006) {#rj-6}
+
+The same section cut by one set at −35° at 10 m spacing through the origin. The joints dip out of
+the 55° face at a shallower angle than the face itself, so every one of them daylights and the
+slabs between them are free to slide out. The rock is Mohr-Coulomb (γ = 26.1 kN/m³, E = 9072 MPa,
+ν = 0.26, c = 675 kPa, φ = 43°, no tensile capacity).
+
+Both edges of the final bracket reach 250 000 sweeps without a verdict — one of them
+`STABLE_STUCK`, the other stopped at the cap — so the factor the bracket encloses is a statement
+about the sweep budget as much as about the slope. The row prints no factor and carries no lock.
+
+Every transcribed input class matches the vendor model, including the side restraint.
+
+**Input file:** [rj006.xlsx](files/rocscience/joints/rj006.xlsx).
+
+![RJ-6: plane failure with daylighting discontinuities (rj006) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. Slip runs the full length of every joint that reaches the face, over a wedge bounded below by the joint through the toe, and the rock between them carries only a faint strain: the slabs slide out along the joints rather than breaking through anything](images/RJ-6.png)
+
+### ⊘ RJ-7: Plane failure with non-daylighting discontinuities (rj007) {#rj-7}
+
+The same section and the same rock as problem 6, cut by one set at −70° at 20 m spacing through
+the origin. The joints now dip out of the face more steeply than the 55° face itself, so none of
+them daylights: a slab cannot slide out along one without shearing rock, and the slope stands
+higher than problem 6's.
+
+The corpus bracket is decided on all nine trials. What keeps the row reported is the refinement
+step, whose lower bracket edge reaches 250 000 sweeps without a verdict — so although the two
+meshes enclose the same factor, the claim that refinement does not move it rests on an edge nothing
+ruled on. The row prints no factor.
+
+Every transcribed input class matches the vendor model, including the side restraint. The manual's
+own table for this problem prints the slope angle as 5°; the figure and the model are the same 55°
+slope problem 6 uses.
+
+**Input file:** [rj007.xlsx](files/rocscience/joints/rj007.xlsx).
+
+![RJ-7: plane failure with non-daylighting discontinuities (rj007) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. No joint reaches the face at a shallower angle than the face itself, so the failure cannot slide out along one: a strong band of shear strain cuts across the steep joints from the toe, and the mass above it moves out over rock it has had to break](images/RJ-7.png)
+
 ### 🟢 RJ-8: Flexural toppling in a base friction model (rj008) {#rj-8}
 
 Pritchard & Savigny's base-friction table model, scaled up a hundred times: a 72.4 × 36.5 m
@@ -170,7 +245,7 @@ The model's stated tensile strength of 75 kPa is above the Mohr-Coulomb apex its
 
 **Input file:** [rj008.xlsx](files/rocscience/joints/rj008.xlsx).
 
-![RJ-8: flexural toppling in a base friction model (rj008) — FEM inputs, mesh, viscoplastic shear strain and displacement vectors at the critical SRF. The strain gathers into one lobe per column along a band that climbs from the toe across the stack, and the columns above that band rotate out over the face while the rock below it is unstrained: the break surface of flexural toppling rather than sliding along any one joint](images/RJ-8.png)
+![RJ-8: flexural toppling in a base friction model (rj008) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. The strain gathers into one lobe per column along a band that climbs from the toe across the stack; above that band the columns are visibly bent rather than merely tilted, and the rock below it is unstrained. That is the break surface of flexural toppling rather than sliding along any one joint](images/RJ-8.png)
 
 ### 🟢 RJ-2: Alejano & Alonso block toppling (rj002) {#rj-2}
 
@@ -241,6 +316,8 @@ above the Mohr-Coulomb apex its own c and φ imply (c/tan φ = 285.6 kPa), so it
 
 **Input file:** [rj015.xlsx](files/rocscience/joints/rj015.xlsx).
 
+![RJ-15: partially joint-controlled footwall slope (rj015) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. The bedding slips over a long stretch behind the face, and the rock's only strain is a small patch at the toe where the slab has to break through to get out — the coupled mechanism the source paper describes](images/RJ-15.png)
+
 ### 🟢 RJ-18: Step-path failure, continuous joints (rj018) {#rj-18}
 
 A 45 × 20 m section of one Mohr-Coulomb rock (γ = 19.62 kN/m³, E = 20 GPa, ν = 0.3, c = 25 kPa,
@@ -262,7 +339,7 @@ trial to decide takes about 226 000 sweeps of the 250 000 allowed.
 
 **Input file:** [rj018.xlsx](files/rocscience/joints/rj018.xlsx).
 
-![RJ-18: step-path failure through three continuous joints (rj018) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. Every joint is slipping along its lower half and open along its upper, and the three slabs between them slide out together down the 36.1° path; the rock itself carries almost no plastic strain](images/RJ-18.png)
+![RJ-18: step-path failure through three continuous joints (rj018) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. Every joint is slipping along its lower half and open along its upper, and the three slabs between them slide out together down the 36.1° path; the rock itself carries almost no plastic strain](images/RJ-18.png)
 
 ### ⊘ RJ-19: Bi-planar step-path failure (rj019) {#rj-19}
 
@@ -282,7 +359,7 @@ the model is what is built.
 
 **Input file:** [rj019.xlsx](files/rocscience/joints/rj019.xlsx).
 
-![RJ-19: bi-planar step-path failure with a rock bridge (rj019) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. Both joints have opened, the basal one is slipping at its lower end, and the only plastic strain in the rock is the patch at the bridge between the two joint tips, where the block above has to break through to move](images/RJ-19.png)
+![RJ-19: bi-planar step-path failure with a rock bridge (rj019) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. Both joints have opened, the basal one is slipping at its lower end, and the only strain in the rock is the patch at the bridge between the two joint tips, where the block above has to break through to move](images/RJ-19.png)
 
 ---
 

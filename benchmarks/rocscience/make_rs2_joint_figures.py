@@ -33,8 +33,21 @@ _JOINT = dict(element_type='tri6', tolerance='0.02', f_min='0.5', f_max='3.0',
               max_iter='250000', tension_srf='false', k0='1')
 
 EXTRA_CASES = [
-    # RJ-19 brackets a factor but two trials of that bracket reach the sweep
-    # budget without a verdict, so the row is reported and carries no tag.
+    # Rows that bracket a factor but cannot lock, because at least one trial of
+    # the bracket that defines it -- or of the refinement step that confirms it --
+    # reaches the sweep budget without a verdict. They carry no tag, so they are
+    # registered here at the settings the page states, and their figures read the
+    # mechanism the same way a locked row's does.
+    {**_JOINT, 'file': 'files/rocscience/joints/rj003.xlsx',
+     'target_size': '12.0', 'benchmark': 'RJ-3'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj004.xlsx',
+     'target_size': '12.0', 'benchmark': 'RJ-4'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj006.xlsx',
+     'target_size': '12.0', 'benchmark': 'RJ-6'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj007.xlsx',
+     'target_size': '12.0', 'benchmark': 'RJ-7'},
+    {**_JOINT, 'file': 'files/rocscience/joints/rj015.xlsx',
+     'target_size': '2.0', 'benchmark': 'RJ-15'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj019.xlsx',
      'target_size': '3.0', 'benchmark': 'RJ-19'},
 ]

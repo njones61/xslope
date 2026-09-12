@@ -616,10 +616,10 @@ class FemResultsDisplayPanel(QWidget):
         self.show_joints = QCheckBox("Joint state")
         self.show_joints.setChecked(True)
         self.show_joints.setToolTip(
-            "Draw each jointed line's interface state — intact, slipping or "
-            "open — on the line, with a colorbar for how far the two faces have "
-            "slid. Nothing to show on a model with no jointed reinforcement "
-            "line.")
+            "Draw every joint as a hairline on the line it runs along, colored "
+            "by how far its two faces have slid, gray where it is not slipping "
+            "and ticked across where it has opened. No colorbar where nothing "
+            "slipped, and nothing at all on a model with no joint.")
         self.label_elements = QCheckBox("Element numbers")
 
         # Displacement-vector-only controls.

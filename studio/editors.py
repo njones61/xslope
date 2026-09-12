@@ -1539,8 +1539,14 @@ def _draw_joints_preview(ax, rows, selected, slope_data, style):
     line from (x1,y1)→(x2,y2), drawn the way the inputs plot draws one — a dark
     dashed line with short ticks on both sides, the section-drawing mark for a
     surface the two sides can slide on. The selected line is bold with endpoint
-    markers; the others are dimmed."""
-    from xslope.plot import plot_base_geometry, draw_joint_ticks, JOINT_COLOR
+    markers; the others are dimmed.
+
+    Past the count the inputs plot stops ticking at, the unselected lines lose
+    the ticks and go solid the same way — on a generated network the ticks are
+    all a reader sees. The SELECTED line keeps the full mark whatever the count,
+    because finding the row you are editing is what this preview is for."""
+    from xslope.plot import (plot_base_geometry, draw_joint_ticks, JOINT_COLOR,
+                             joint_linestyle, joint_ticks_wanted)
     from xslope.style import resolve_style
     rstyle = resolve_style(style)
     try:
@@ -1548,6 +1554,8 @@ def _draw_joints_preview(ax, rows, selected, slope_data, style):
     except Exception:
         pass
     span = _preview_span(ax, slope_data)
+    ticks = joint_ticks_wanted(len(rows))
+    dash = joint_linestyle(len(rows))
     for i, r in enumerate(rows):
         p1, p2 = _xy(r, "x1", "y1"), _xy(r, "x2", "y2")
         if p1 is None or p2 is None:
@@ -1561,10 +1569,11 @@ def _draw_joints_preview(ax, rows, selected, slope_data, style):
                     markerfacecolor=color, markeredgecolor="white", zorder=20)
             draw_joint_ticks(ax, xs, ys, span, color, alpha=0.95, zorder=20)
         else:
-            ax.plot(xs, ys, color=color, linewidth=2.0, linestyle="--",
+            ax.plot(xs, ys, color=color, linewidth=2.0, linestyle=dash,
                     alpha=_PREVIEW_DIM_ALPHA, zorder=6)
-            draw_joint_ticks(ax, xs, ys, span, color,
-                             alpha=_PREVIEW_DIM_ALPHA, zorder=6)
+            if ticks:
+                draw_joint_ticks(ax, xs, ys, span, color,
+                                 alpha=_PREVIEW_DIM_ALPHA, zorder=6)
     _finish_preview_axes(ax)
 
 

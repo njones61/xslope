@@ -266,7 +266,10 @@ of a wall against the soil. Their fields group as **Identity**, **Geometry**,
 **Strength** (c, phi and the tension cutoff the joint parts at) and **Stiffness**
 (kn, ks and the Jred switch that decides whether a strength reduction reduces the
 joint with the soil). The preview draws each line the way the section does, dark
-and dashed with short ticks on both sides, with the selected one emphasized:
+and dashed with short ticks on both sides, with the selected one emphasized. Past
+a handful of lines the ticks come off and the traces go solid — on a generated
+network of hundreds of them the ticks are all you can see — but the selected line
+keeps the full mark whatever the count, so you can always find the row you are on:
 
 ![Joints editor (list view)](images/editing_joints_editor.png)
 

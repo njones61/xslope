@@ -681,11 +681,19 @@ which refines as the bar elements refine instead of converging.
 
 ### What the results show
 
-The results view draws each interface on the line it runs along, colored by its state — intact, slipping or open —
-with a colorbar for how far the two faces have slid. A joint carries no strain of its own, so it appears in the
-shear-strain field only through what it does to the soil beside it; this is its own reading. The deformed mesh and
-the at-failure capture show the two faces at their own displaced positions, which is what a slipped joint looks
-like: the mass sliding on the sheet.
+The results view draws each interface as a hairline on the line it runs along, colored by how far its two faces have
+slid, on a colorbar titled *Joint slip*. A joint that is not slipping is a neutral gray hairline, and a stretch that
+has **opened** is marked with a short tick across the line rather than given a color of its own, because opening is a
+condition and not a quantity. A model where no joint slipped carries no colorbar. The weight is deliberate: a
+generated network puts hundreds of traces over the field, and anything heavier than a hairline covers what it is
+drawn on. A joint carries no strain of its own, so it appears in the shear-strain field only through what it does to
+the soil beside it; this is its own reading.
+
+On a jointed model the displacement panel is the scaled deformed mesh rather than an arrow field: the element edges
+in light gray, both faces of every joint over them in black, the undeformed outline dashed behind. That is what a
+jointed failure looks like — blocks moving as bodies, with all of the movement taken up at the joints, where a
+slipped or opened joint shows as two lines that no longer lie on each other. An arrow field samples that at nodes
+and misses exactly the thing that happened.
 
 **1D Details…** lists every jointed line under a *Joints* heading beside the reinforcement lines, and draws four
 panels along the line: the bar's tension over its capacity, the normal traction the interface carries, the shear

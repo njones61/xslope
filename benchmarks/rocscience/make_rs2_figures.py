@@ -54,6 +54,7 @@ Run from the repo root:
 
 import glob
 import io
+import json
 import os
 import re
 import sys
@@ -1356,6 +1357,24 @@ def make_figure(tag, dpi=150):
     return out, fs
 
 
+def _record_refusal(stem, why):
+    """Write the refusal into the row's run-meta sidecar.
+
+    The refused capture's own files go; what has to stay is the RECORD that the
+    row's failure state was refused and why — it is what keeps the standing-trial
+    title on every later re-render, and what a reader auditing the row's figure
+    reads it off."""
+    path = f'{stem}_fem_meta.json'
+    try:
+        with open(path) as fh:
+            meta = json.load(fh)
+    except OSError:
+        return
+    meta['at_failure_capture_refused'] = why
+    with open(path, 'w') as fh:
+        json.dump(meta, fh, indent=2)
+
+
 def _drop_failure_sidecars(stem):
     """Remove the ``{stem}_fem_failure_*`` files of a refused capture.
 
@@ -1394,7 +1413,7 @@ def make_figure_from_sidecar(tag, dpi=150):
     # the sidecars rather than the reconstructed fields, since the capture's own
     # iteration count and stop reason live in its meta.
     note = None
-    why = scan_stem(stem)
+    why = scan_stem(stem) or meta.get('at_failure_capture_refused')
     if why:
         interval = meta.get('final_interval') or []
         f_standing = solution.get('F') or (interval[0] if interval else None)
@@ -1402,6 +1421,12 @@ def make_figure_from_sidecar(tag, dpi=150):
         print(f'  [{bench}] at-failure capture REFUSED: {why}; drawing the '
               f'{note}', flush=True)
         failure = None
+        # The refusal is recorded with the row and the refused capture removed,
+        # here as on the solving path — otherwise the next re-render would find
+        # the capture again, or (once removed) find no record of why the panels
+        # are the standing field and silently retitle them.
+        _record_refusal(stem, why)
+        _drop_failure_sidecars(stem)
     # The at-failure title needs the FS marker; import carries it via meta, not the
     # reconstructed field — thread it through render_figure's fs arg.
     out = render_figure(bench, sd, fem_data, solution, failure=failure, fs=fs, dpi=dpi,

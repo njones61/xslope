@@ -316,7 +316,7 @@ does.
 
 **Input file:** [rj001d.xlsx](files/rocscience/joints/rj001d.xlsx).
 
-![RJ-1d: Goodman & Bray block toppling, case d (rj001d) — FEM inputs with the 2013 kN toe force, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. As on case b the right-hand panels are one sweep past the critical factor rather than a developed mechanism, so they show where the stack starts to move rather than where it ends up](images/RJ-1d.png)
+![RJ-1d: Goodman & Bray block toppling, case d (rj001d) — FEM inputs with the 2013 kN toe force, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The right-hand panels are the standing edge of the bracket, F = 1.242188: the columns lean forward over the face on slip up every contact, case b's mechanism at the strength this case's toe force holds. The state past the critical factor is not drawn — that capture was stopped in its first sweep, before the section had moved at all](images/RJ-1d.png)
 
 ### 🔴 RJ-2: Alejano & Alonso block toppling (rj002) {#rj-2}
 
@@ -617,7 +617,7 @@ measured.
 
 **Input file:** [rj011.xlsx](files/rocscience/joints/rj011.xlsx).
 
-![RJ-11: Alejano et al. ploughing sliding slab failure (rj011) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. One bedding plane from the crest to the toe carries almost all of the slip, and at its foot the two release traces cut out a small wedge: the deformed section shows that wedge lifted and rotated out over the bench while the slab above it slides down the plane, which is the ploughing mechanism the paper names](images/RJ-11.png)
+![RJ-11: Alejano et al. ploughing sliding slab failure (rj011) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. One bedding plane from the crest to the toe carries almost all of the slip, and at its foot the two release traces cut out a small wedge: the deformed section shows that wedge lifted and rotated out over the bench while the slab above it slides down the plane, which is the ploughing mechanism the paper names. The wedge is driven out and up by the slab above it, and at the panel's exaggeration a movement of centimetres draws as metres, so the block appears to leave the slope](images/RJ-11.png)
 
 ### ⊘ RJ-12: Alejano et al. ploughing toppling slab failure (rj012) {#rj-12}
 
@@ -648,7 +648,7 @@ RS2's own two factors falling between them.
 
 **Input file:** [rj012.xlsx](files/rocscience/joints/rj012.xlsx).
 
-![RJ-12: Alejano et al. ploughing toppling slab failure (rj012) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section, and only a few of its traces carry any slip: one release trace under the crest and the bedding beneath the toe block, which is the ploughing pair. The two right-hand panels are the state one sweep past the critical factor rather than a developed mechanism — on a rock this stiff the model moves by microns until it does not, so the deformed section is drawn at tens of thousands of times scale](images/RJ-12.png)
+![RJ-12: Alejano et al. ploughing toppling slab failure (rj012) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section, and only a few of its traces carry any slip: one release trace under the crest and the bedding beneath the toe block, which is the ploughing pair. The two right-hand panels are the last standing trial of the bracket, the state below the factor rather than past it — on a rock this stiff the model moves by microns until it does not, so the deformed section is drawn at tens of thousands of times scale. The capture past the factor is not drawn: it was stopped in its first sweep, before the section had moved at all](images/RJ-12.png)
 
 ### 🟢 RJ-13: Alejano et al. ploughing sliding slab, example 4 (rj013) {#rj-13}
 

@@ -688,7 +688,7 @@ Slide2 counterpart: [VP26](rocscience.md#vp26).
 
 <!-- test: file=files/rocscience/vp026.xlsx, type=fem_ssrm, expected_fs=1.011, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=0.5, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-21 -->
 
-![RS2-21: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-21.png)
+![RS2-21: FEM inputs, mesh, max shear strain and displacement vectors at the last standing trial below the critical SRF — the loaded strip punching down, the prism heaving out and up on both sides of it](images/RS2-21.png)
 
 ### 🟢 RS2-22: Layered slope with undulating bedrock {#rs2-22}
 

@@ -175,5 +175,6 @@
   "converged": true,
   "iterations": 5207,
   "residual": 2.0963435932238184e-07,
-  "max_displacement": 0.0002924925136301008
+  "max_displacement": 0.0002924925136301008,
+  "at_failure_capture_refused": "capture stopped at iteration 1 (runaway_jump), at or below the 100-iteration floor"
 }

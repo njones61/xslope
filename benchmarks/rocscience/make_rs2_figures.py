@@ -677,13 +677,12 @@ def _refused_capture(failure, field, has_joints=False):
 
 
 def _standing_note(f_standing):
-    """The second title line a refused capture's panels carry. Short by
-    necessity — a panel title is laid out from its own axes' center, so the line
-    has to stay inside the panel's width. WHY the capture was refused is printed
-    by the producer and recorded in the row's section; what the panel has to
-    carry is which field it is drawing."""
+    """The second title line the panels carry when they draw the last standing
+    trial instead of an at-failure capture. It names the field being drawn and
+    nothing else: WHY the capture was refused is the producer's business and is
+    printed to its log and recorded in the row's run meta, never on the page."""
     f = f'F = {f_standing:.3f}' if f_standing is not None else 'F unrecorded'
-    return f'last standing trial, {f} — at-failure capture refused'
+    return f'at the last standing trial, {f}'
 
 
 def _draw_inputs_panel(ax, sd, style):

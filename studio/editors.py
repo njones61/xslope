@@ -32,6 +32,10 @@ from .picking import _line_dist
 # Type column fills Dir/Appl from is the loader's, which is the sheet's.
 from xslope.fileio import (POLYGON_TYPE_WORDS, REINFORCE_TYPE_PRESETS,
                            SEARCH_WINDOW_KEYS, SSR_ZONE_LABELS, SSR_ZONE_SENTINELS)
+# Which joint rows belong to one generated set — the joints editor's Remove set
+# groups by the library's own rule, so it can never disagree with sets_in or with
+# the network dialog's refusal of a name already in use.
+from xslope.joints import set_name
 
 # Column "usage" tags: which analysis a field applies to. Header text is colored
 # to mirror the input template's header coloring (red = LEM-specific inputs,
@@ -452,13 +456,50 @@ class _ClipboardTable(QTableWidget):
         super().keyPressEvent(event)
 
 
+def _add_action_buttons(bar, actions):
+    """Put whole-list actions on a row-editing button bar, and return them.
+
+    An ``action`` is ``(text, tooltip, run, applies)``: ``run()`` does it and
+    ``applies()`` — optional — says whether it can be done to what is selected
+    right now, which is what grays "Remove set" on a hand-entered line. Both are
+    already bound to the editor they act on, so a bar can carry them without
+    knowing what they do.
+
+    Returns the ``(button, applies)`` pairs for :func:`_sync_action_buttons`.
+    """
+    out = []
+    for text, tip, run, applies in (actions or []):
+        b = QPushButton(text)
+        if tip:
+            b.setToolTip(tip)
+        b.clicked.connect(lambda _checked=False, f=run: f())
+        bar.addWidget(b)
+        out.append((b, applies))
+    return tuple(out)
+
+
+def _sync_action_buttons(pairs):
+    """Enable each action that applies to the current selection, disable the rest.
+
+    A rule that raises is read as "does not apply": these are asked while a view
+    is being rebuilt, when the selection is briefly nothing at all, and a button
+    bar is not a place to surface an exception from."""
+    for button, applies in pairs or ():
+        if applies is None:
+            continue
+        try:
+            button.setEnabled(bool(applies()))
+        except Exception:
+            button.setEnabled(False)
+
+
 class _EditableTable(QWidget):
     """A table over a list of dict records with Add/Remove rows. Unshown keys are
     preserved. Reused standalone (TableEditorDialog) and per-tab (TabbedTableEditorDialog)."""
 
     def __init__(self, fields, rows, new_row, parent=None, swatch_state=None,
                  on_change=None, on_select=None, dim_rule=None, unit_labels=None,
-                 preset_spec=None, dim_on_edit=False):
+                 preset_spec=None, dim_on_edit=False, extra_actions=None):
         super().__init__(parent)
         self._fields = fields
         self._new_row = new_row
@@ -546,8 +587,13 @@ class _EditableTable(QWidget):
         rem.clicked.connect(self._remove_rows)
         bar.addWidget(add)
         bar.addWidget(rem)
+        # Removals that act on MORE than the selected row (the joints editor's
+        # Remove set / Remove all), beside the ones that act on it. Empty for
+        # every other table, whose bar is the two buttons it always was.
+        self._extra_actions = _add_action_buttons(bar, extra_actions)
         bar.addStretch(1)
         layout.addLayout(bar)
+        self.sync_extra_actions()
         # What the last paste did, written into the pane under the buttons rather
         # than into a box to dismiss: a paste that filled fewer cells than the block
         # held is something to READ against the rows it landed in. Hidden until
@@ -753,8 +799,13 @@ class _EditableTable(QWidget):
             self._on_change()
 
     def _emit_select(self):
+        self.sync_extra_actions()
         if not self._suppress_notify and self._on_select is not None:
             self._on_select()
+
+    def sync_extra_actions(self):
+        """Re-ask each whole-list action whether it applies to the selection."""
+        _sync_action_buttons(getattr(self, "_extra_actions", ()))
 
     def selected_row(self):
         """Index of the currently selected row, or -1 if none."""
@@ -4569,8 +4620,11 @@ class _LineListView(QWidget):
     def __init__(self, fields, rows, new_row, groups, item_label,
                  preview_draw, pick_resolve, preview_caption=None, parent=None,
                  unit_labels=None, dynamic_spec=None, preset_spec=None,
-                 switch_spec=None):
+                 switch_spec=None, extra_actions=None):
         super().__init__(parent)
+        # Removals that act on more than the selected row, beside Add / Remove
+        # (see _add_action_buttons). Empty for the editors that offer none.
+        self._extra_actions_spec = list(extra_actions or [])
         self._field_by_key = {f.key: f for f in fields}
         # Optional per-line either/or switch inside one group (reinforcement's
         # Pullout: development length OR overburden). It is a VIEW of the row —
@@ -4644,8 +4698,14 @@ class _LineListView(QWidget):
         rem.clicked.connect(self._remove)
         bar.addWidget(add)
         bar.addWidget(rem)
+        self._extra_actions = _add_action_buttons(bar, self._extra_actions_spec)
         v.addLayout(bar)
+        self.sync_extra_actions()
         return w
+
+    def sync_extra_actions(self):
+        """Re-ask each whole-list action whether it applies to the selection."""
+        _sync_action_buttons(getattr(self, "_extra_actions", ()))
 
     def _make_edit(self, key):
         f = self._field_by_key[key]
@@ -4924,6 +4984,8 @@ class _LineListView(QWidget):
     def _on_select(self, idx):
         self._commit()
         self._load(idx)
+        # Which row is selected decides what "Remove set" can do.
+        self.sync_extra_actions()
 
     def _apply_preset(self, *_):
         """Fill the dependent combos from the preset the driver combo now names —
@@ -5013,7 +5075,7 @@ class _LineEditorDialog(QDialog):
                  help_text=None, usage_toggles=None, preview_caption=None,
                  field_help=None, unit_labels=None, dynamic_spec=None,
                  preset_spec=None, dim_rule=None, switch_spec=None,
-                 extra_buttons=None):
+                 extra_buttons=None, row_actions=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -5083,6 +5145,11 @@ class _LineEditorDialog(QDialog):
             cb.toggled.connect(self._on_toggle)
             self._toggles[t] = cb
             top.addWidget(cb)
+        # Removals that act on more than the selected row (the joints editor's
+        # Remove set / Remove all). They go on BOTH views' own row-editing bars,
+        # beside Add and Remove, because that is where a removal is looked for —
+        # and both bars act on this dialog's rows, so the two views stay in step.
+        self._row_actions = list(row_actions or [])
         top.addStretch(1)
         # Actions on the whole list rather than on one row of it (the joints
         # editor's "Build network…"), right-aligned past the stretch so they sit
@@ -5188,7 +5255,8 @@ class _LineEditorDialog(QDialog):
                                      unit_labels=self._unit_labels,
                                      preset_spec=self._preset_spec,
                                      dim_rule=self._dim_rule,
-                                     dim_on_edit=self._dim_rule is not None)
+                                     dim_on_edit=self._dim_rule is not None,
+                                     extra_actions=self._bound_row_actions())
         self._table_preview = PreviewPane(
             lambda ax: self._preview_draw(ax, self._table.result_rows(),
                                           self._table.selected_row()),
@@ -5225,7 +5293,8 @@ class _LineEditorDialog(QDialog):
                 self._item_label, self._preview_draw, self._pick_resolve,
                 preview_caption=self._preview_caption, unit_labels=self._unit_labels,
                 dynamic_spec=self._dynamic_spec, preset_spec=self._preset_spec,
-                switch_spec=self._switch_spec)
+                switch_spec=self._switch_spec,
+                extra_actions=self._bound_row_actions())
             self._list_lay.addWidget(self._list_view)
             # A lazily built list view starts under whatever the toggle bar
             # already says — the same filter the table is showing.
@@ -5255,6 +5324,9 @@ class _LineEditorDialog(QDialog):
                 _grow_dialog_to(self, self._designed_width)
         self._mode = mode
         self._seg[mode].setChecked(True)
+        # The mode is what selected_row() reads, so the row actions are asked
+        # again only once it is set.
+        self._sync_row_actions()
         _set_last_line_view(self._view_state, mode)
 
     def _fit_table_width(self):
@@ -5303,6 +5375,26 @@ class _LineEditorDialog(QDialog):
             self._ensure_list()
             if select is not None and 0 <= select < self._list_view.list.count():
                 self._list_view.list.setCurrentRow(select)
+        self._sync_row_actions()
+
+    def _bound_row_actions(self):
+        """This dialog's row actions, bound to it, for a view's button bar.
+
+        A view's bar knows nothing about what the buttons do: each action is
+        handed over as a pair of no-argument callables closed over the DIALOG, so
+        both views run the same one on the same rows (``result_rows`` harvests
+        whichever view is showing) and a removal made in one is what the other
+        opens on."""
+        return [(text, tip,
+                 (lambda cb=run: cb(self)),
+                 None if applies is None else (lambda rule=applies: rule(self)))
+                for text, tip, run, applies in self._row_actions]
+
+    def _sync_row_actions(self):
+        """Re-ask both views' row actions whether they apply to the selection."""
+        for view in (self._table, self._list_view):
+            if view is not None:
+                view.sync_extra_actions()
 
     def result_rows(self):
         self._harvest()
@@ -6583,10 +6675,74 @@ class JointsEditor(CategoryEditor):
                 "spacing, two sets crossing, or a blocky mass — clipped to "
                 "where the set exists. The rows are added to the list; to "
                 "change a set, remove it and build another.",
-                lambda dlg: _build_joint_network(slope_data, dlg))])
+                lambda dlg: _build_joint_network(slope_data, dlg))],
+            row_actions=[
+                ("Remove set",
+                 "Remove every line of the set the selected row belongs to — a "
+                 "network is removed as one thing, the way it was built. "
+                 "Available on a generated row (bed-01, bed-02, …); a line you "
+                 "entered yourself belongs to no set.",
+                 _remove_joint_set, _joint_set_selected),
+                ("Remove all",
+                 "Remove every joint line in the model, generated and "
+                 "hand-entered alike. Nothing is committed until OK.",
+                 _remove_all_joints, None)])
 
     def apply(self, slope_data, dlg):
         slope_data["joint_lines"] = dlg.result_rows()
+
+
+def _selected_joint_set(dlg):
+    """The set the editor's selected row belongs to, or ``''``."""
+    rows = dlg.result_rows()
+    i = dlg.selected_row()
+    return set_name(rows[i].get("label")) if 0 <= i < len(rows) else ""
+
+
+def _joint_set_selected(dlg):
+    """Whether "Remove set" has a set to remove."""
+    return bool(_selected_joint_set(dlg))
+
+
+def _remove_joint_set(dlg):
+    """"Remove set": every row named for the selected row's set.
+
+    The grouping is ``xslope.joints.set_name`` — the same one ``sets_in`` uses
+    and the same one the network dialog refuses a duplicate name against — so
+    what goes is exactly one network, and a hand-entered line, which belongs to
+    no set, is never caught in it.
+    """
+    name = _selected_joint_set(dlg)
+    if not name:
+        return
+    rows = dlg.result_rows()
+    at = min(i for i, r in enumerate(rows) if set_name(r.get("label")) == name)
+    kept = [r for r in rows if set_name(r.get("label")) != name]
+    dlg.replace_rows(kept, select=min(at, len(kept) - 1) if kept else None)
+
+
+def _remove_all_joints(dlg):
+    """"Remove all": the whole joints list, asked for first.
+
+    Every other removal in these editors takes one row, which is why none of them
+    asks; this one takes work the user may have spent a while on, so it asks the
+    way the generators ask before replacing a table they did not fill in. Nothing
+    reaches the model until the editor's own OK, so Cancel still undoes it.
+    """
+    from PySide6.QtWidgets import QMessageBox
+    rows = dlg.result_rows()
+    if not rows:
+        return
+    n = len(rows)
+    if QMessageBox.question(
+            dlg, "Remove all joint lines",
+            f"Remove all {n} joint line{'' if n == 1 else 's'} from this model?\n\n"
+            f"Generated sets and hand-entered lines alike. The joints editor's "
+            f"Cancel still discards the removal.",
+            QMessageBox.Yes | QMessageBox.Cancel,
+            QMessageBox.Cancel) != QMessageBox.Yes:
+        return
+    dlg.replace_rows([])
 
 
 def _build_joint_network(slope_data, dlg):

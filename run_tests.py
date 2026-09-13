@@ -3548,7 +3548,8 @@ def run_editor_roundtrip_test(test):
     import copy
     os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
     from PySide6.QtWidgets import QApplication
-    from studio.editors import CATEGORY_EDITORS
+    from studio.editors import (CATEGORY_EDITORS, _remove_all_joints,
+                                _remove_joint_set)
 
     app = QApplication.instance() or QApplication([])
     problems = []
@@ -3812,6 +3813,117 @@ def run_editor_roundtrip_test(test):
             w = lv._edits.get(f.key)
             if w is None or not w.toolTip():
                 problems.append(f"{cat}:list-tooltip:{f.key} missing")
+        dlg.deleteLater()
+        app.processEvents()
+
+    # (6) The joints editor's whole-network removals, in BOTH views. A generated
+    #     network is removed the way it was built — as one thing — so the two
+    #     buttons beside Add/Remove are "Remove set" (every row named for the
+    #     selected row's set: xslope.joints.set_name, the same grouping sets_in
+    #     uses) and "Remove all". What is read here is what the user sees and
+    #     what they get: the button is offered only where it applies, it takes
+    #     exactly the network it names, and the other view opens on the result —
+    #     both bars act on the dialog's own rows, not on a copy of them.
+    #     Every other line editor's bar is unchanged, which is the control.
+    from PySide6.QtWidgets import QMessageBox
+
+    j_editor = CATEGORY_EDITORS["joints"]
+
+    def _buttons(view):
+        return {b.text(): b for b, _rule in view._extra_actions}
+
+    def _view_of(dialog, mode):
+        return dialog._table if mode == "table" else dialog._list_view
+
+    def _select(dialog, mode, row):
+        if mode == "table":
+            dialog._table.select_row(row)
+        else:
+            dialog._list_view.list.setCurrentRow(row)
+        app.processEvents()
+
+    sd = _editor_fixture()
+    typed = list(sd["joint_lines"])                  # two hand-entered rows
+    # A generated network, written the way the network dialog writes one: the
+    # rows are the input, and their names are what says they are one set. Spelt
+    # out here rather than generated, because the fixture carries no geometry to
+    # generate against and it is the NAMES this leg reads.
+    generated = [{"label": f"bed-{i + 1:02d}", "x1": 2.0, "y1": 6.0 + i,
+                  "x2": 42.0, "y2": 6.0 + i, "c": 0.0, "phi": 30.0}
+                 for i in range(3)]
+    for mode in ("table", "list"):
+        dlg = j_editor.build(sd, None)
+        dlg.set_view_mode(mode)
+        dlg.replace_rows(typed + generated, select=None)
+        app.processEvents()
+        buttons = _buttons(_view_of(dlg, mode))
+        if set(buttons) != {"Remove set", "Remove all"}:
+            problems.append(f"joints(actions,{mode}): the bar carries "
+                            f"{sorted(buttons)}")
+            dlg.deleteLater()
+            continue
+        _select(dlg, mode, 0)                        # a hand-entered line
+        if buttons["Remove set"].isEnabled():
+            problems.append(f"joints(actions,{mode}): Remove set is offered on a "
+                            f"hand-entered line, which belongs to no set")
+        _select(dlg, mode, len(typed))               # the set's first row
+        if not buttons["Remove set"].isEnabled():
+            problems.append(f"joints(actions,{mode}): Remove set is not offered "
+                            f"on a generated row")
+        _remove_joint_set(dlg)
+        left = dlg.result_rows()
+        if [r.get("label") for r in left] != [r.get("label") for r in typed]:
+            problems.append(f"joints(actions,{mode}): Remove set left "
+                            f"{[r.get('label') for r in left]}, expected the "
+                            f"{len(typed)} hand-entered rows")
+        # The OTHER view is rebuilt from the same rows, not from a stale copy.
+        other = "list" if mode == "table" else "table"
+        dlg.set_view_mode(other)
+        app.processEvents()
+        if [r.get("label") for r in dlg.result_rows()] != [r.get("label")
+                                                           for r in typed]:
+            problems.append(f"joints(actions,{mode}): the {other} view did not "
+                            f"open on the rows the removal left")
+
+        # Remove all asks first: Cancel keeps every row, Yes clears the list.
+        dlg.set_view_mode(mode)
+        dlg.replace_rows(typed + generated, select=None)
+        app.processEvents()
+        _asked = []
+        _question = QMessageBox.question
+        try:
+            QMessageBox.question = staticmethod(
+                lambda *a, **k: (_asked.append(a), QMessageBox.Cancel)[1])
+            _remove_all_joints(dlg)
+            if len(dlg.result_rows()) != len(typed) + len(generated):
+                problems.append(f"joints(actions,{mode}): Cancel on Remove all "
+                                f"removed rows anyway")
+            QMessageBox.question = staticmethod(
+                lambda *a, **k: (_asked.append(a), QMessageBox.Yes)[1])
+            _remove_all_joints(dlg)
+        finally:
+            QMessageBox.question = _question
+        if dlg.result_rows():
+            problems.append(f"joints(actions,{mode}): Remove all left "
+                            f"{len(dlg.result_rows())} rows")
+        if len(_asked) != 2:
+            problems.append(f"joints(actions,{mode}): Remove all asked "
+                            f"{len(_asked)} time(s), expected 2")
+        dlg.deleteLater()
+        app.processEvents()
+
+    #     The control: the editors that declare no row action carry the bar they
+    #     always did, in both views.
+    for cat in ("reinforce", "piles"):
+        sd = _editor_fixture()
+        dlg = CATEGORY_EDITORS[cat].build(sd, None)
+        for mode in ("table", "list"):
+            dlg.set_view_mode(mode)
+            app.processEvents()
+            extra = _buttons(_view_of(dlg, mode))
+            if extra:
+                problems.append(f"{cat}(actions,{mode}): the bar grew "
+                                f"{sorted(extra)}")
         dlg.deleteLater()
         app.processEvents()
 

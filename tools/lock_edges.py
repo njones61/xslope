@@ -64,16 +64,16 @@ def _fmt(value):
 
 
 def _decided(trial, ceiling):
-    """Did this trial reach a verdict inside its budget?"""
-    verdict = str(trial.get("verdict"))
-    try:
-        iterations = int(trial.get("iterations", 0))
-    except (TypeError, ValueError):
-        iterations = 0
-    return (verdict in audit.DECIDED
-            and verdict not in UNDECIDED
-            and iterations < ceiling
-            and trial.get("exit_reason") != "inconclusive")
+    """Did this trial answer the standing/failing question?
+
+    ``ssrm_trial_audit.trial_decided`` is the single implementation: a verdict in
+    the decided set, not inconclusive, and either inside its budget or carrying a
+    corrector certification — an independent driver having reached equilibrium
+    from that trial's own state answers the question whatever the sweep count.
+    The two tools must agree, or a pair this one writes is a pair the audit reads
+    as budget-bound.
+    """
+    return audit.trial_decided(trial, ceiling)
 
 
 def edges_from_record(kv, meta):

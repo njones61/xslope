@@ -71,6 +71,37 @@ UNDECIDED = ("STABLE_STUCK", "AMBIGUOUS", "INCONCLUSIVE")
 DECIDED = ("CONVERGED", "FAILED", "JOINT_SETTLED")
 
 
+def certified(trial):
+    """Did an independent driver CERTIFY this trial's state?
+
+    ``solve_ssrm`` records a ``corrector`` block on a trial only where the Newton
+    corrector reached equilibrium from that trial's own state and the result
+    passed the force, yield and displacement gates, so the key's presence is the
+    certification. A certified trial is ANSWERED however many viscoplastic sweeps
+    it took to get there: the sweep ceiling exists to catch a trial that was cut
+    off with nothing to say, and a certification says the opposite. The ceiling
+    test still governs every trial that carries no certification.
+    """
+    block = trial.get("corrector") if isinstance(trial, dict) else None
+    return isinstance(block, dict) and bool(block)
+
+
+def trial_decided(trial, ceiling):
+    """Did this trial answer the standing/failing question?"""
+    verdict = str(trial.get("verdict"))
+    if verdict not in DECIDED or verdict in UNDECIDED:
+        return False
+    if trial.get("exit_reason") == "inconclusive":
+        return False
+    if certified(trial):
+        return True
+    try:
+        iterations = int(trial.get("iterations", 0))
+    except (TypeError, ValueError):
+        iterations = 0
+    return iterations < ceiling
+
+
 def _kv(line):
     m = TAG.search(line)
     if not m:
@@ -140,13 +171,14 @@ def audit_one(kv, meta):
     for t in trials:
         try:
             rows.append((float(t.get("F")), str(t.get("verdict")),
-                         int(t.get("iterations", 0))))
+                         int(t.get("iterations", 0)),
+                         bool(trial_decided(t, ceiling))))
         except (TypeError, ValueError):
             continue
     if not rows:
         return None
-    undecided = [r for r in rows if r[1] in UNDECIDED or r[2] >= ceiling]
-    decided = [r for r in rows if r not in undecided]
+    undecided = [r for r in rows if not r[3]]
+    decided = [r for r in rows if r[3]]
     # The final bracket's two edges: the highest standing trial and the lowest
     # refused one. A lock is budget-bound when either edge never decided.
     stand = [r for r in rows if r[1] == "CONVERGED"]

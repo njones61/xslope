@@ -1866,15 +1866,24 @@ def _edge_reading(trials, factor, ceiling):
     that verdict inside its budget. One that ran out of budget — STABLE_STUCK,
     AMBIGUOUS, INCONCLUSIVE, or simply at the ceiling — has not answered the
     question, and an unanswered question is never a pass: it is the exact state
-    in which a bracket edge biases the lock it closed on."""
+    in which a bracket edge biases the lock it closed on.
+
+    The exception is a trial the Newton corrector CERTIFIED. Its ``corrector``
+    block says an independent driver reached equilibrium from that trial's own
+    state, inside the force, yield and displacement gates; that answers the
+    question however many viscoplastic sweeps preceded it, so the ceiling test
+    does not apply to it. ``tools/ssrm_trial_audit.py`` and
+    ``tools/lock_edges.py`` read the identical rule, and they must not disagree
+    with this one."""
     trial = _trial_at(trials, factor)
     if trial is None:
         return None, False
     verdict = str(trial.get('verdict'))
     iterations = int(trial.get('iterations') or 0)
+    certified = bool(trial.get('corrector'))
     decided = (verdict in DECIDED_VERDICTS
                and verdict not in UNDECIDED_VERDICTS
-               and iterations < ceiling
+               and (certified or iterations < ceiling)
                and trial.get('exit_reason') != 'inconclusive')
     return verdict, decided
 
@@ -8956,6 +8965,18 @@ MODULE_CHECKS = {
         "material crossing, the stiffness default (which must carry no result "
         "over two orders of magnitude), and that a model with no jointed line "
         "builds exactly the fem_data it always did."),
+    'corrector_certified': (
+        'corrector_certified_check.py',
+        "What makes a bracket edge ANSWERED. A trial that reaches its sweep "
+        "budget with nothing to say is undecided, and a lock closed on one is a "
+        "statement about the budget — but a trial the Newton corrector certified "
+        "at the budget exit HAS been answered, by an independent driver, whatever "
+        "the sweep count before it. Three joint-corpus rows turned on this: their "
+        "standing edges were certified at 250 002, 250 006 and 250 003 sweeps "
+        "against a 250 000 ceiling. This holds the rule, holds the three readers "
+        "of it (the trial audit, lock_edges and the suite's own edge check) to "
+        "the same answer, and holds the certification into a committed sidecar "
+        "without its machine time."),
     'joint_verdict': (
         'joint_verdict_check.py',
         "How an undecided jointed strength-reduction trial is read. Seven rows "
@@ -14927,6 +14948,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'joint_junction': 5, 'joint_junction_mesh': 3,
               'joint_element': 5, 'joint_surfaces': 4, 'joint_network': 3,
               'joint_network_dialog': 2, 'joint_verdict': 1,
+              'corrector_certified': 1,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'docs_index_sync': 3, 'assistant_docs_answers': 2,
@@ -16042,6 +16064,11 @@ def main():
         tests.append({'type': 'joint_verdict',
                       'file': 'the verdict on an undecided jointed trial',
                       'method': '-', 'source': 'joint_verdict'})
+        # Pure-function: what makes a bracket edge answered, and that the three
+        # tools that decide it give one answer. No solve.
+        tests.append({'type': 'corrector_certified',
+                      'file': 'a corrector certification answers a bracket edge',
+                      'method': '-', 'source': 'corrector_certified'})
         # The path a MODEL takes to the element: the column, the mesher, the
         # plots, the detail panel and the report, on one solve of the shipped
         # reinforcement sample with two of its lines made joints in memory.

@@ -183,14 +183,37 @@ _SSRM_RUN_OPTION_KEYS = ("tolerance", "F_min", "F_max", "ssr_exclude")
 _SSRM_TRIAL_COST_KEYS = frozenset((
     "wall", "bracket", "nr_cold_wall", "nr_cold_iterations", "nr_cold_force_evals",
     "nr_rungs", "nr_cold_skipped",
-    # ... and the corrector round's evidence and admissibility reading (SPIKE.md,
-    # "THE CORRECTOR"). They are held out of a committed sidecar for now so that a
-    # regenerated file is byte-identical to one written before this round; whether
-    # a certified edge should CARRY its evidence into the saved record is a
-    # decision about the artifact, not about the solver, and it is the owner's.
-    "corrector", "corrector_attempts", "max_yield_violation",
+    # ... and the corrector round's admissibility bookkeeping (SPIKE.md, "THE
+    # CORRECTOR"), which is about how the answer was reached.
+    "corrector_attempts", "max_yield_violation",
     "n_yield_above_1pct", "yield_flagged", "gate_failed", "gate_deferrals",
     "max_yield_at"))
+
+#: What a corrector CERTIFICATION contributes to a committed trial record, and it
+#: is deliberately a short list. A certification is a fact about the answer — an
+#: independent driver reached equilibrium from this trial's own state, at this
+#: out-of-balance ratio, with no Gauss point this far outside its surface — and the
+#: two tools that decide whether a bracket edge was answered read it (
+#: ``tools/ssrm_trial_audit.py``, ``tools/lock_edges.py``). Everything else the
+#: corrector carries is cost or machine time: ``wall`` and the per-attempt
+#: ``attempts`` log stay out, so a sidecar does not change when the machine does.
+_SSRM_CORRECTOR_KEYS = ("driver_of_record", "checkpoint", "vp_iterations",
+                        "nr_iterations", "nr_force_evals", "oob", "force_tol",
+                        "yield_violation", "yield_tol", "max_disp_deep",
+                        "disp_limit", "disp_frac_height")
+
+
+def _corrector_record(corrector):
+    """The machine-independent half of a trial's corrector certification, or None.
+
+    A trial that was never offered to the corrector, or whose corrector refused,
+    carries nothing here: ``solve_ssrm`` sets ``corrector`` only on a state the
+    corrector CERTIFIED, so the key's presence is the certification.
+    """
+    if not isinstance(corrector, dict) or not corrector:
+        return None
+    kept = {k: corrector[k] for k in _SSRM_CORRECTOR_KEYS if k in corrector}
+    return kept or None
 
 
 def _jsonable(value):
@@ -239,8 +262,20 @@ def ssrm_run_record(result, fem_data=None, options=None):
             # machine-dependent and the rung breakdown is about how the answer was
             # reached rather than what it is. A meta sidecar is a committed artifact,
             # so it carries neither.
-            value = [{k: v for k, v in trial.items() if k not in _SSRM_TRIAL_COST_KEYS}
-                     for trial in value]
+            trimmed = []
+            for trial in value:
+                row = {k: v for k, v in trial.items()
+                       if k not in _SSRM_TRIAL_COST_KEYS}
+                # A certification travels, stripped of its wall times: it is what
+                # says a trial at its sweep ceiling was ANSWERED rather than cut
+                # off, and the readers of this record decide bracket edges on it.
+                cert = _corrector_record(trial.get("corrector"))
+                if cert is None:
+                    row.pop("corrector", None)
+                else:
+                    row["corrector"] = cert
+                trimmed.append(row)
+            value = trimmed
         record[key] = _jsonable(value)
     for key in _SSRM_RUN_OPTION_KEYS:
         value = (options or {}).get(key)

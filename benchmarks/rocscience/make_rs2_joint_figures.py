@@ -145,7 +145,8 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     if '--audit' in args:
         missing, dead = audit()
-        sys.exit(1 if (missing or dead) else 0)
+        bad = F.audit_captures(registered())
+        sys.exit(1 if (missing or dead or bad) else 0)
     from_sidecar = '--from-sidecar' in args
     only = set(a for a in args if not a.startswith('--'))
     cases = registered()

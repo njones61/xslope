@@ -52,6 +52,7 @@ Run from the repo root:
     python benchmarks/rocscience/make_rs2_figures.py --audit    # coverage only
 """
 
+import glob
 import io
 import os
 import re
@@ -95,6 +96,10 @@ from xslope.plot_fem import (
     deformation_scale, solution_has_joint_state,
     plot_reinforcement_lines as _plot_mesh_reinf_lines, _plot_boundary_conditions,
 )
+# What may be drawn as a failure state. The rule lives with the verification
+# checks so the state this producer REFUSES to draw and the state the audit
+# refuses to accept as committed are one rule, not two that can drift apart.
+from tools.verification_checks.captures import refusal_reason, scan_stem
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 RS2_MD = os.path.join(ROOT, 'docs', 'verification', 'rs2.md')
@@ -638,18 +643,46 @@ _RC = {'font.size': 10, 'axes.titlesize': _TITLE_FS, 'axes.labelsize': 10,
        'xtick.labelsize': 9, 'ytick.labelsize': 9, 'legend.fontsize': _LEG_FS}
 
 
-def _at_failure_field(field, failure, fs):
+def _at_failure_field(field, failure, fs, standing_note=None):
     """The field the strain + vector panels render, with the markers the ax-level
     drawers read for their "… at Failure  FS = X" titles — mirroring what
     plot_fem_results builds internally (deform_field / contour_field). The at-failure
-    (unconverged) mechanism when captured, else the converged field."""
+    (unconverged) mechanism when captured, else the converged field.
+
+    ``standing_note`` is set when the capture was REFUSED (see _refused_capture):
+    the panels then render the last standing trial's field, and the note is the
+    second title line saying so, because a panel that substitutes one field for
+    another without naming it is a panel a reader cannot check."""
     base = failure if failure is not None else field
     d = {**base}
     if failure is not None:
         d['_at_failure'] = True
     if fs is not None:
         d['_ssrm_fs'] = fs
+    if standing_note:
+        d['_standing_note'] = standing_note
     return d
+
+
+def _refused_capture(failure, field, has_joints=False):
+    """Why this at-failure capture must not be drawn, or None if it may be.
+
+    Reads the live solution dicts through the same rule the committed sidecars
+    are audited by (tools/verification_checks/captures). ``strain_max`` is left
+    unread here — the displacement reading is what catches a dead field, and on
+    a jointed row a zero viscoplastic strain field is the model rather than a
+    dead solve."""
+    return refusal_reason(failure, field, strain_max=None, has_joint_state=has_joints)
+
+
+def _standing_note(f_standing):
+    """The second title line a refused capture's panels carry. Short by
+    necessity — a panel title is laid out from its own axes' center, so the line
+    has to stay inside the panel's width. WHY the capture was refused is printed
+    by the producer and recorded in the row's section; what the panel has to
+    carry is which field it is drawing."""
+    f = f'F = {f_standing:.3f}' if f_standing is not None else 'F unrecorded'
+    return f'last standing trial, {f} — at-failure capture refused'
 
 
 def _draw_inputs_panel(ax, sd, style):
@@ -1043,6 +1076,16 @@ def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi, 
     for ax in (ax_ul, ax_ur, ax_ll, ax_lr):
         ax.set_title(ax.get_title(), fontsize=_TITLE_FS, pad=_TITLE_PAD)
 
+    # A REFUSED at-failure capture: the two right panels are the last standing
+    # trial's field instead, and their titles say which field they are. The
+    # drawers' own F/FS marker comes off the first line — it names the field the
+    # panel would have drawn, and the note names the one it does.
+    note = afield.get('_standing_note')
+    if note:
+        for ax in (ax_ur, ax_lr):
+            head = re.sub(r'\s{2,}FS?\s*=.*$', '', ax.get_title().split('\n')[0])
+            ax.set_title(f'{head}\n{note}', fontsize=_TITLE_FS, pad=_TITLE_PAD)
+
     # Colorbars live in fixed slots to the RIGHT of the strain panel — separate axes
     # that never steal width from any host, so all four hosts stay equal (the
     # invisible-slot intent of 1043fc3, realized by fixed geometry instead of
@@ -1118,7 +1161,7 @@ def _measure_legend_band(ax, dpi):
 
 
 def render_figure(bench, sd, fem_data, field, failure=None, fs=None,
-                  out_dir=OUT, dpi=150):
+                  out_dir=OUT, dpi=150, standing_note=None):
     """Render the 2×2 composite as ONE figure and save <out_dir>/<bench>.png.
 
     Pure plotting: no solve happens here, so a cached (sd, fem_data, field, failure)
@@ -1130,11 +1173,12 @@ def render_figure(bench, sd, fem_data, field, failure=None, fs=None,
 
     ``failure`` (result['failure_solution']) drives the strain + vector panels — the
     AT-FAILURE mechanism, with ``fs`` in the "… at Failure  FS = X" titles; None
-    falls back to ``field``.
+    falls back to ``field``. ``standing_note`` is the title line the right panels
+    carry when that fallback is a REFUSED capture rather than an absent one.
     """
     os.makedirs(out_dir, exist_ok=True)
     style = resolve_style(None)
-    afield = _at_failure_field(field, failure, fs)
+    afield = _at_failure_field(field, failure, fs, standing_note)
     # One shared padded domain for all four panels — mesh bbox, widened to contain any
     # above-surface / past-toe inputs chrome (see _composite_domain). Computed once so
     # both layout passes and the uniformity gate use the identical domain.
@@ -1271,10 +1315,32 @@ def make_figure(tag, dpi=150):
     # solve-free. Stem is the xlsx path without extension → {stem}_fem_*.csv,
     # except on a second run of a shared file (see SIDECAR_STEM).
     stem = _sidecar_stem(tag, path)
+
+    # A capture that stopped before its viscoplastic state settled is not a
+    # failure state, and must not be drawn as one or committed as one. Refused:
+    # the panels fall back to the last STANDING trial's field and say so, and the
+    # stale sidecars of the refused capture are removed, so nothing downstream can
+    # re-render a picture of a mechanism that never formed.
+    note = None
+    why = _refused_capture(failure, field,
+                           has_joints=solution_has_joint_state(fem_data, failure or {}))
+    if why:
+        f_standing = field.get('F')
+        if f_standing is None:
+            interval = (run or {}).get('final_interval') or []
+            f_standing = interval[0] if interval else None
+        note = _standing_note(f_standing)
+        print(f'  [{bench}] at-failure capture REFUSED: {why}; drawing the '
+              f'{note}', flush=True)
+        failure = None
+        _drop_failure_sidecars(stem)
+
     meta = {'benchmark': bench, 'analysis': 'ssrm', 'FS': float(fs),
             'expected_fs': tag.get('expected_fs'), 'file': tag.get('file'),
             'max_iter': int(tag.get('max_iter', 4000))}
     meta.update(run)
+    if why:
+        meta['at_failure_capture_refused'] = why
     with contextlib.redirect_stdout(io.StringIO()):
         export_fem_solution(fem_data, field, stem, meta=meta,
                             failure_solution=failure)
@@ -1285,8 +1351,19 @@ def make_figure(tag, dpi=150):
         # section that was never solved.
         export_mesh_to_json(mesh, f'{stem}_mesh.json')
 
-    out = render_figure(bench, sd, fem_data, field, failure=failure, fs=fs, dpi=dpi)
+    out = render_figure(bench, sd, fem_data, field, failure=failure, fs=fs, dpi=dpi,
+                        standing_note=note)
     return out, fs
+
+
+def _drop_failure_sidecars(stem):
+    """Remove the ``{stem}_fem_failure_*`` files of a refused capture.
+
+    Leaving them would keep an inadmissible state committed beside a figure that
+    no longer draws it — and the next --from-sidecar re-render would read them
+    straight back in."""
+    for name in glob.glob(f'{stem}_fem_failure_*'):
+        os.remove(name)
 
 
 def make_figure_from_sidecar(tag, dpi=150):
@@ -1312,9 +1389,23 @@ def make_figure_from_sidecar(tag, dpi=150):
     meta = import_fem_meta(stem) or {}
     fs = meta.get('FS', tag.get('expected_fs'))
     fs = float(fs) if fs is not None else None
+    # The same refusal the solving path applies, on the committed capture: a
+    # re-render must not put back a state the rule has ruled out. Read here from
+    # the sidecars rather than the reconstructed fields, since the capture's own
+    # iteration count and stop reason live in its meta.
+    note = None
+    why = scan_stem(stem)
+    if why:
+        interval = meta.get('final_interval') or []
+        f_standing = solution.get('F') or (interval[0] if interval else None)
+        note = _standing_note(f_standing)
+        print(f'  [{bench}] at-failure capture REFUSED: {why}; drawing the '
+              f'{note}', flush=True)
+        failure = None
     # The at-failure title needs the FS marker; import carries it via meta, not the
     # reconstructed field — thread it through render_figure's fs arg.
-    out = render_figure(bench, sd, fem_data, solution, failure=failure, fs=fs, dpi=dpi)
+    out = render_figure(bench, sd, fem_data, solution, failure=failure, fs=fs, dpi=dpi,
+                        standing_note=note)
     return out, fs
 
 
@@ -1376,12 +1467,40 @@ def audit(out_dir=OUT, verbose=True):
     return missing_locked, missing_reported, dead
 
 
+def audit_captures(cases=None, verbose=True):
+    """Committed at-failure captures that must not be drawn as failure states.
+
+    A figure is only as good as the field it was rendered from, and that field is
+    committed beside the case. Every registered row's ``{stem}_fem_failure_*``
+    capture is read through the same rule the producer refuses to draw one by
+    (tools/verification_checks/captures), so a capture that stopped in its first
+    sweep can never sit under a figure again — whoever rendered it, and whether or
+    not the render printed anything. Returns [(benchmark, reason)]."""
+    cases = parse_tags() + EXTRA_CASES if cases is None else cases
+    bad = []
+    for tag in cases:
+        bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
+        if tag.get('figure') == 'inputs':
+            continue
+        stem = _sidecar_stem(tag, os.path.join(ROOT, 'docs', 'verification',
+                                               tag['file']))
+        why = scan_stem(stem)
+        if why:
+            bad.append((bench, why))
+    if verbose:
+        print(f'  INADMISSIBLE at-failure captures: {len(bad)}')
+        for bench, why in bad:
+            print(f'    {bench:22s} {why}')
+    return bad
+
+
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     args = sys.argv[1:]
     if '--audit' in args:
         ml, mr, dead = audit()
-        sys.exit(1 if (ml or mr or dead) else 0)
+        bad = audit_captures()
+        sys.exit(1 if (ml or mr or dead or bad) else 0)
     # --from-sidecar re-renders SOLVE-FREE from the committed sidecars (no solver).
     from_sidecar = '--from-sidecar' in args
     only = set(a for a in args if not a.startswith('--'))

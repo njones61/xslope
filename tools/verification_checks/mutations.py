@@ -536,6 +536,60 @@ def _tutorial_fixtures(fails):
     return total
 
 
+#: The readings of the capture the admissibility rule was cut on — RJ-1d's, which
+#: the finite guard stopped in its first sweep and which was drawn for a while as
+#: that row's failure state. Planted one reading at a time into a SOUND row's
+#: sidecars, so each mutation tests the reading it names.
+CAPTURE_MUTATIONS = [
+    ("stopped capture (RJ-1d's own readings)",
+     {"iterations": 2, "converged": False, "capture_truncated": True,
+      "capture_truncated_at": 1, "capture_truncated_kind": "runaway_jump"}),
+    ("capture moving less than the state it left",
+     {"max_displacement": 1.6961024750084593e-05}),
+]
+
+#: A sound committed capture the mutations are planted into — a jointed row, so
+#: the control also proves the rule does not refuse a zero viscoplastic strain
+#: field on a row whose blocks are elastic and whose mechanism is joint slip.
+CAPTURE_STEM = os.path.join("docs", "verification", "files", "rocscience",
+                            "joints", "rj001c")
+
+
+def _capture_fixtures(fails):
+    """At-failure capture admissibility: a stopped capture must be refused, and a
+    sound one must not be. Fixtures are temp copies; the sidecars are never written."""
+    import glob
+    import json
+
+    from . import captures
+    src = os.path.join(certify.REPO, CAPTURE_STEM)
+    total = 0
+    for name, planted in [("sound capture (control)", None)] + CAPTURE_MUTATIONS:
+        total += 1
+        tmp = tempfile.mkdtemp()
+        try:
+            for f in glob.glob(src + "_fem*"):
+                shutil.copy(f, os.path.join(tmp, os.path.basename(f)))
+            stem = os.path.join(tmp, os.path.basename(src))
+            meta_path = stem + "_fem_failure_meta.json"
+            if planted:
+                meta = json.load(open(meta_path))
+                meta.update(planted)
+                json.dump(meta, open(meta_path, "w"))
+            why = captures.scan_stem(stem)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        if planted is None:
+            print(f"  {'FLAGGED' if why else 'PASSED '} {name} (captures)")
+            if why:
+                fails.append(name + f" (refused a sound capture: {why})")
+        else:
+            print(f"  {'CAUGHT ' if why else 'MISSED '} {name} (captures)")
+            if not why:
+                fails.append(name)
+    return total
+
+
 def main():
     fails = []
     total = 0
@@ -592,6 +646,7 @@ def main():
             fails.append(name)
 
     total += _tutorial_fixtures(fails)
+    total += _capture_fixtures(fails)
 
     print(f"mutations: {total}  missed: {len(fails)}")
     for f in fails:

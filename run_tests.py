@@ -3790,7 +3790,10 @@ def run_editor_roundtrip_test(test):
     #   (b) the dynamic label re-words set -> "per element" / blank -> "per unit width",
     #       joining the declared unit string, and flips live as Spacing/S changes.
     # The joints editor carries per-field help too, but no spacing-scaled field
-    # and so no dynamic label; only the help half applies to it.
+    # and so no dynamic label; only the help half applies to it. It also carries
+    # NO engine toggle: every column of the joints sheet is FEM, so there is
+    # nothing to toggle, and a checkbox whose only effect is to empty the table
+    # is not a control. Both views must then show every column, with no bar.
     for cat in ("joints",):
         editor = CATEGORY_EDITORS[cat]
         for f in editor.FIELDS:
@@ -3798,6 +3801,10 @@ def run_editor_roundtrip_test(test):
                 problems.append(f"{cat}:tooltip:{f.key} is empty")
         sd = _editor_fixture()
         dlg = editor.build(sd, None)
+        if dlg._toggles:
+            problems.append(f"{cat}:toggles: the editor offers "
+                            f"{sorted(dlg._toggles)}, and every column of the "
+                            f"sheet belongs to one engine")
         dlg.set_view_mode("table")
         app.processEvents()
         tbl = dlg._table.table
@@ -3805,6 +3812,9 @@ def run_editor_roundtrip_test(test):
             it = tbl.horizontalHeaderItem(j)
             if it is None or not it.toolTip():
                 problems.append(f"{cat}:header-tooltip:{f.key} missing")
+            if tbl.isColumnHidden(j):
+                problems.append(f"{cat}:hidden-column:{f.key} with no toggle to "
+                                f"show it again")
         dlg.set_view_mode("list")
         lv = dlg._list_view
         lv.list.setCurrentRow(0)
@@ -3813,6 +3823,10 @@ def run_editor_roundtrip_test(test):
             w = lv._edits.get(f.key)
             if w is None or not w.toolTip():
                 problems.append(f"{cat}:list-tooltip:{f.key} missing")
+            cell = lv._cells.get(f.key)
+            if cell is not None and cell.isHidden():
+                problems.append(f"{cat}:hidden-cell:{f.key} with no toggle to "
+                                f"show it again")
         dlg.deleteLater()
         app.processEvents()
 
@@ -3938,6 +3952,11 @@ def run_editor_roundtrip_test(test):
 
         sd = _editor_fixture()
         dlg = editor.build(sd, None)
+        # These two sheets DO split by engine, so they keep the toggle bar: the
+        # control on the joints editor having none.
+        if set(dlg._toggles) != {"lem", "fem"}:
+            problems.append(f"{cat}:toggles: the editor offers "
+                            f"{sorted(dlg._toggles)}, expected lem and fem")
 
         # Table view: every header item has a non-empty tooltip.
         dlg.set_view_mode("table")

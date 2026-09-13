@@ -5134,10 +5134,16 @@ class _LineEditorDialog(QDialog):
         top.addSpacing(24)
         from PySide6.QtCore import QSettings
         s = QSettings("XSlope", "XSlope Studio")
+        # Which engines this sheet's columns are split between. A sheet whose
+        # every column belongs to ONE engine has nothing to toggle — the joints
+        # sheet is FEM only, and a checkbox that must never be cleared (clearing
+        # it empties the table) is not a control, it is a trap — so no bar is
+        # built and the filter stands permanently at that one engine.
+        self._usage_tags = [t for t in (usage_toggles or [])]
         self._toggles = {}
-        if usage_toggles:
+        if len(self._usage_tags) > 1:
             top.addWidget(QLabel("Show parameters for:"))
-        for t in (usage_toggles or []):
+        for t in (self._usage_tags if len(self._usage_tags) > 1 else []):
             cb = QCheckBox(USAGE_TOGGLE_LABEL[t])
             cb.setChecked(bool(s.value(f"editor_toggles/{self._title}/{t}",
                                        True, type=bool)))
@@ -5212,6 +5218,13 @@ class _LineEditorDialog(QDialog):
 
     # --- toggles ---------------------------------------------------------
     def _enabled_usage(self):
+        """The engine tags whose columns are shown.
+
+        With a toggle bar, whatever it says. With none — one engine, nothing to
+        toggle — that engine, always: the filter still runs, and it still shows
+        the universal columns and this sheet's own."""
+        if not self._toggles:
+            return set(self._usage_tags)
         return {t for t, cb in self._toggles.items() if cb.isChecked()}
 
     def _on_toggle(self):
@@ -5300,6 +5313,10 @@ class _LineEditorDialog(QDialog):
             # already says — the same filter the table is showing.
             if getattr(self, "_toggles", None):
                 self._on_toggle()
+            elif getattr(self, "_usage_tags", None):
+                # No bar to read: the sheet's one engine, which is every column
+                # of it (see _enabled_usage).
+                self._list_view.apply_usage_filter(self._enabled_usage())
         else:
             self._list_view.set_rows(self._rows)
 
@@ -6664,7 +6681,7 @@ class JointsEditor(CategoryEditor):
                       "derived from the adjacent soil; the strength reduction "
                       "reduces the joint with the soil unless Jred says No. "
                       "FEM only.",
-            usage_toggles=["lem", "fem"],
+            usage_toggles=["fem"],
             preview_caption="Preview shows the joint lines on the section "
                             "(selected line bold with its endpoints; others "
                             "dimmed). Click a line to select it.",

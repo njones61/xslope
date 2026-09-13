@@ -118,7 +118,7 @@ joint model whose output is a stress-displacement curve.
 | 16 | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | UDEC 11° | experiment 9° | 9° / 7° | *blocked* — the problem scores the TILT ANGLE at which a block grid topples, found by rotating gravity through a staged sweep; XSLOPE's seismic coefficient tilts the load but the row needs the sweep and a toppling criterion, neither of which is a strength reduction. |
 | 17 | <span class="nodata">⊘</span> | Step-path, en-echelon joints | UDEC 1.29 | — | 1.24 / 1.2 | *blocked* — the vendor model's second, elastic material has no boundary of its own. Recovered from the element-material map it is an 83-vertex staircase of element edges, trending vertical near x = 12 and horizontal near y = 3 with excursions of about one element either side, so the boundary is a property of the vendor's mesh rather than of its model. |
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | — | 1.01 / 1.0 | |
-| [19](#rj-19) | <span class="nodata">⊘</span> | Bi-planar step-path failure | UDEC 1.46 | — | 1.5 / 1.41 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict, at the corpus mesh and at a finer one. |
+| [19](#rj-19) | <span class="nodata">⊘</span> | Bi-planar step-path failure | UDEC 1.46 | — | 1.5 / 1.41 | *reported, no lock* — the failing edge of the bracket reaches the sweep budget without a verdict, at the corpus mesh and at a finer one, which return the same bracket otherwise. |
 | 20 | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | — | 2.21 / 2.37 | *blocked* — the manual states no block size and no seed, and the vendor model carries the tessellation as 523 digitized traces rather than as a generated network, so the input is not reproducible from anything published. |
 | 21 | <span class="nodata">⊘</span> | Shallow excavation, jointed tunnel | UDEC 8.16 | — | 8.27 / 8.5 | *blocked* — the second stage of the vendor model excavates a 2 m opening and the strength reduction runs on the excavated state, which carries the stress the first stage left behind; XSLOPE has no staged construction. |
 | 22 | <span class="nodata">⊘</span> | Joint model: hyperbolic softening | — | — | — | *not supported* — the problem exercises RS2's hyperbolic displacement- and work-softening joint law, which XSLOPE's interface element does not have; it reports no factor of safety. |
@@ -741,14 +741,20 @@ discontinuous joints with a rock bridge between them: a basal joint at 28.4° fr
 
 A step of refinement — a 2D size of 2.1 m, which takes the mesh from 3 485 nodes to 6 910 —
 returns the same bracket edge for edge, so the factor this row brackets is not its mesh's. What it
-still is, in part, is its budget's: the upper edge of both brackets reaches 250 000 sweeps without a
-verdict, and the row is reported without a lock.
+still is, in part, is its budget's, and that is the one thing stopping the row: **the FAILING edge
+of both brackets, F = 1.671875, reaches 250 000 sweeps without a verdict**, and a bracket edge
+nothing ruled on cannot define a factor of safety. The row is reported without a lock.
 
-The lower edge is where the two meshes differ, and it is the sharper measurement. On the corpus
-mesh it converges at 250 003 sweeps — three past the budget, so the trial record reads it as
-undecided — and on the finer mesh the same trial converges in 348. A bracket edge that needs a
-quarter of a million sweeps at one mesh and three hundred at a finer one is not a slope that is
-close to failing there.
+Its standing edge is answered, and answered differently by the two meshes. On the corpus mesh
+F = 1.652344 runs the whole budget without meeting its force tolerance and the corrector reaches
+equilibrium from that state at the budget exit, which decides it — see [what answers a bracket
+edge](#what-answers-a-bracket-edge). On the finer mesh the same trial converges in 348 sweeps. A
+bracket edge that needs a quarter of a million sweeps at one mesh and three hundred at a finer one
+is not a slope that is close to failing there.
+
+So this row is the corpus's one clean case of what a certification does NOT do. Five trials of each
+bracket carry one and are read as decided; the failing edge carries none, because the corrector
+refused it, and a refusal is the absence of a verdict rather than a verdict of its own.
 
 The manual's table for this problem states one joint inclination as 59°. Its figure dimensions 56°
 and 28°, and the vendor model's own endpoints give 56.3° and 28.4°, so the table is the outlier and

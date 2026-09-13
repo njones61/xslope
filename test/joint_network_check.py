@@ -44,6 +44,11 @@ Legs:
      traces on the band's own edges, where the section's boundary drops them; a
      set confined to a polygon of Type ``joints`` resolves the same by the
      region's name and by its number.
+  11. **The display name.** A generated row's Label carries the set record, and
+     no reader wants to see it: the 1D details list, the member figures, the
+     report's interface table, preflight's refusals and the joints editor's list
+     all show the ``bed-03`` head of it, while the file keeps the record each
+     row was generated from.
 
 Run directly:  PYTHONPATH=. python3 test/joint_network_check.py
 """
@@ -66,7 +71,7 @@ if _ROOT not in sys.path:
 from shapely.geometry import LineString, Polygon
 
 from xslope.joints import (JointSet, cross_jointed, parallel_set, regenerate,
-                           resolve_region, set_name, sets_in, short_label,
+                           display_label, resolve_region, set_name, sets_in,
                            voronoi)
 
 BOX = Polygon([(0.0, 0.0), (20.0, 0.0), (20.0, 10.0), (0.0, 10.0)])
@@ -527,8 +532,8 @@ def _leg_record(failures, results):
 
     # The row's own name, and the set it belongs to, read off the label.
     lbl = 'bed-07|par|dip=30|s=2'
-    if short_label(lbl) != 'bed-07' or set_name(lbl) != 'bed':
-        failures.append(f"record: {lbl!r} reads as {short_label(lbl)!r} / "
+    if display_label(lbl) != 'bed-07' or set_name(lbl) != 'bed':
+        failures.append(f"record: {lbl!r} reads as {display_label(lbl)!r} / "
                         f"{set_name(lbl)!r}")
     # A hand-typed label is not a set, however it is spelled, and regenerate must
     # never touch one.
@@ -703,6 +708,88 @@ def _leg_band_and_region(failures, results):
                    f"resolve to the same {len(by_name)} traces, and an unknown "
                    f"name is refused with the model's regions listed")
 
+
+def _leg_display_name(failures, results):
+    """Leg 11: the display name — what a PERSON is shown, everywhere.
+
+    A generated row's Label carries the set record, because the sheet has no
+    column to keep it in. Nobody reads a set's parameters off a list of a hundred
+    rows, so every place a joint line is named to a reader prints
+    ``joints.display_label`` of the cell instead — and the stored label, which is
+    what a regeneration reads, is never touched by any of it.
+
+    Each site is read where it is used rather than by inspecting the helper:
+    ``fem_details._line_label`` (the 1D details list, each member figure's title
+    and the report's interface table all name a joint through it), the preflight
+    rule that refuses a blank phi, and the joints editor's list column.
+    """
+    from xslope.fem_details import _line_label
+    from xslope.joints import display_label
+    from xslope.preflight import _Ctx, _joint_phi_missing
+    from xslope.report import _Counter, _joint_table
+
+    model = _model()
+    jset = JointSet('bed', 'parallel', {'dip': 25.0, 'spacing': 2.5},
+                    props={'phi': 30.0})
+    rows = jset.generate(model)
+    if len(rows) < 3:
+        failures.append(f"display: the fixture set generated {len(rows)} rows")
+        return
+
+    # (a) the helper: a set's rows display as their own name, a typed label is
+    #     shown as it was typed, and nothing anywhere rewrites the stored cell.
+    shown = [display_label(r['label']) for r in rows]
+    want = [f"bed-{i + 1:02d}" for i in range(len(rows))]
+    if shown != want:
+        failures.append(f"display: the set's rows display as {shown}, "
+                        f"expected {want}")
+    if any('|' in s for s in shown):
+        failures.append(f"display: a set record reached a display name: {shown}")
+    for typed in ('bedding plane', 'block base', 'bed-07'):
+        if display_label(typed) != typed:
+            failures.append(f"display: the typed label {typed!r} displayed as "
+                            f"{display_label(typed)!r}")
+    if [r['label'] for r in rows] != [jset.to_label(i + 1)
+                                      for i in range(len(rows))]:
+        failures.append("display: the stored labels were altered")
+
+    # (b) the 1D details list, the member figures and the report's interface
+    #     table: all three name a joint through _line_label.
+    fem_data = {'joint_lines': [dict(r) for r in rows],
+                'n_reinforcement_lines': 0, 'n_pile_lines': 0}
+    names = [_line_label(fem_data, model, 'reinforcement', i + 1)
+             for i in range(len(rows))]
+    if names != want:
+        failures.append(f"display: the details/report name is {names}, "
+                        f"expected {want}")
+    table = _joint_table([{'label': names[0], 'length': 4.0,
+                           'slipping': [True, False], 'open': [False, False],
+                           'slip': [0.01, 0.0], 'status': 'slipping',
+                           'units': {}}], _Counter())
+    if table.rows[0][0] != want[0]:
+        failures.append(f"display: the report's interface table names the line "
+                        f"{table.rows[0][0]!r}, expected {want[0]!r}")
+
+    # (c) preflight. The rule that refuses a blank phi names the row it is
+    #     refusing, and it must not recite the set's parameters to do it.
+    blank = dict(rows[2], phi=float('nan'))
+    msg = list(_joint_phi_missing(_Ctx({'joint_lines': [blank]}, 'fem')))
+    if len(msg) != 1 or "('bed-03')" not in msg[0] or '|' in msg[0]:
+        failures.append(f"display: the preflight refusal reads {msg!r}")
+
+    # (d) the joints editor's list column.
+    from studio.editors import _joint_item_label
+    item = _joint_item_label(2, rows[2])
+    if not item.startswith('3. bed-03 (') or '|' in item:
+        failures.append(f"display: the editor's list line reads {item!r}")
+
+    results.append(f"display      the set's {len(rows)} rows are shown as "
+                   f"bed-01…bed-{len(rows):02d} by the details list, the member "
+                   f"figures, the report's interface table, preflight's refusals "
+                   f"and the editor's list, while the file keeps the record each "
+                   f"row was generated from")
+
+
 def run():
     """Returns a list of failure strings (empty = pass)."""
     import time
@@ -718,6 +805,7 @@ def run():
     _leg_record(failures, results)
     _leg_regeneration(failures, results)
     _leg_band_and_region(failures, results)
+    _leg_display_name(failures, results)
     print(f"Joint network generator check ({time.time() - t0:.0f} s):")
     for line in results:
         print("  " + line)

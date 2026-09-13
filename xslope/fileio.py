@@ -29,6 +29,7 @@ from lxml import etree
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
+from .joints import display_label
 from .mesh import import_mesh_from_json, build_polygons
 from .package import MESH_SIDECAR, SEEP_SIDECARS, is_package, unpack
 from .units import (GAMMA_W, infer_system_from_gamma_water, normalize_unit_system,
@@ -2506,10 +2507,13 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
             label = (str(row['label']).strip()
                      if 'label' in joints_df.columns and pd.notna(row.get('label'))
                      else f"Joint {i + 1}")
+            # What is STORED is the whole cell, set record and all; what a
+            # message names the row is the head of it (joints.display_label).
+            shown = display_label(label)
             if (pd.isna(row.get('y1')) or pd.isna(row.get('x2'))
                     or pd.isna(row.get('y2'))):
                 raise ValueError(
-                    f"Joint line '{label}' (joints sheet, Excel row {excel_row}) has "
+                    f"Joint line '{shown}' (joints sheet, Excel row {excel_row}) has "
                     "an x1 but not a complete pair of endpoints. All four of x1, "
                     "y1, x2 and y2 are required.")
             try:
@@ -2553,7 +2557,7 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                 raise
             except Exception as e:
                 raise ValueError(
-                    f"Error processing joint line '{label}' in row {excel_row}: {e}")
+                    f"Error processing joint line '{shown}' in row {excel_row}: {e}")
 
     # === PILE LINES ===
     pile_lines = []

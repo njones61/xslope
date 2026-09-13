@@ -48,6 +48,19 @@ raises the factor while on problems 17, 18 and 19 it lowers it. XSLOPE reduces t
 rock, which is the *without* setting, and both of RS2's numbers are recorded so a reader can see
 the spread.
 
+**What answers a bracket edge.** {#what-answers-a-bracket-edge}
+A bracket asks of each trial factor whether the model stands there, and a trial that runs out of
+sweeps with nothing to say has not answered: a lock closed on one is a statement about the budget.
+There is one exception, and three rows here turn on it. On a jointed model the solver offers the
+viscoplastic loop's own state to a Newton corrector at its checkpoints, the last of them the budget
+exit; where the corrector reaches equilibrium from that state inside its force, yield and
+displacement gates, it records the certification on the trial. That is an independent driver saying
+the model has a static equilibrium at that strength, which answers the question however many sweeps
+preceded it, so such a trial is read as decided whatever its sweep count. A trial with no
+certification is decided only inside its budget, as before, and a corrector REFUSAL is not a
+verdict of any kind — it is the absence of one. `tools/ssrm_trial_audit.py` reports the reading per
+row and `test/corrector_certified_check.py` holds the rule.
+
 **The budget, and what it does not buy.** A joint reaches equilibrium by growing slip, so a jointed
 model settles over tens of thousands of viscoplastic sweeps where a bonded one settles over
 hundreds; a strength-reduction trial that runs out of sweeps is recorded undecided, the bracket
@@ -83,7 +96,7 @@ joint model whose output is a stress-displacement curve.
 | # | Match | Problem | Referee | Also published | RS2 without / with improvement | Notes |
 |---:|:-:|---|---|---|---|---|
 | [1a](#rj-1a) | 🟡 | Goodman & Bray block toppling, case 1a | SSRM 1.037 vs Goodman & Bray 1.0 (+3.7%) | UDEC 0.99 | 0.99 / 0.97 | |
-| [1b](#rj-1b) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1b | Goodman & Bray 1.0 | UDEC 0.99 | 0.97 / 0.94 | *reported, no lock* — the standing edge of the corpus bracket converges two sweeps past its budget, so it is recorded without a verdict; the refinement step decides every trial and returns the same factor. |
+| [1b](#rj-1b) | 🟢 | Goodman & Bray block toppling, case 1b | SSRM 1.018 vs Goodman & Bray 1.0 (+1.8%) | UDEC 0.99 | 0.97 / 0.94 | |
 | [1c](#rj-1c) | 🟡 | Goodman & Bray block toppling, case 1c | SSRM 1.057 vs Goodman & Bray 1.02 (+3.6%) | UDEC 1.01 | 1.01 / 0.99 | |
 | [1d](#rj-1d) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 | UDEC 1.22 | 1.19 / 1.16 | *reported, no lock* — the standing edge of the corpus bracket converges six sweeps past its budget, so it is recorded without a verdict; the refinement step decides every trial and returns the same bracket. |
 | [2](#rj-2) | 🔴 | Alejano & Alonso block toppling | SSRM 0.764 vs UDEC 0.87 (−12.2%) | LE (Goodman & Bray) 0.76 | 0.86 / 0.82 | |
@@ -209,7 +222,7 @@ departures table.
 
 ![RJ-1a: Goodman & Bray block toppling, case a (rj001a) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own, so the whole figure is the joints: slip runs up every column contact and along the stepped base, brightest on the columns at mid-slope, and the deformed section shows the stack rotating forward over the face column by column while the toe column slides out along its own stretch of base](images/RJ-1a.png)
 
-### ⊘ RJ-1b: Goodman & Bray block toppling, case b (rj001b) {#rj-1b}
+### 🟢 RJ-1b: Goodman & Bray block toppling, case b (rj001b) {#rj-1b}
 
 Case a's section and rock with the joints at φ = 33.0239°, the lowest of the four, held up by the
 2013 kN horizontal force the case is posed with — about twice the lowest column's own weight, and
@@ -219,17 +232,24 @@ what lets a stack on 33° joints stand where case a's needs 38°. It enters as a
 Nothing else about the mechanism changes: the stack still rotates forward over the face on slip up
 every column contact and along the stepped base.
 
-The row carries no lock and prints no factor, and the trial that stops it is one the corrector
-turned around. At F = 1.007812 the plain loop left the model STABLE_STUCK at the 250 000-sweep
-cap; under the corrector the same trial comes back CONVERGED — at 250 002 sweeps, two past its
-own budget, which the trial record reads as no verdict because the trial reached its ceiling. So
-the corpus bracket is 8 of 9 decided and its standing edge is the undecided one.
+| XSLOPE SSRM | Goodman & Bray referee | UDEC | RS2 without / with improvement |
+|---|---|---|---|
+| **1.018** | 1.0 (+1.8%) | 0.99 | 0.97 / 0.94 |
+
+<!-- test: file=files/rocscience/joints/rj001b.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=10.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1b, f_stand=1.0078125, f_fail=1.02734375, check=edges, tier=gate -->
+
+The standing edge of this bracket is the one trial in the corpus that reaches its sweep budget and
+is answered anyway. At F = 1.007812 the viscoplastic loop runs the full 250 000 sweeps without
+meeting its force tolerance, and the Newton corrector, handed that state at the budget exit,
+reaches equilibrium in two iterations at an out-of-balance ratio of 1.1 × 10⁻¹¹ with no Gauss point
+outside its surface. That is a stronger statement about the trial than the loop's own convergence
+would have been, and the edge is read as decided on it — see [what answers a bracket
+edge](#what-answers-a-bracket-edge).
 
 A step of refinement — a 2D size of 7.0 m, which takes the mesh from 2 072 nodes and 67 interface
-elements to 3 573 and 94 — decides all nine of its trials and returns the identical factor, with
-that same standing edge reached in 138 840 sweeps. The factor this row brackets is therefore
-corroborated by a bracket nothing in it was cut off, and the row still prints none, because the
-lock would be cut on the corpus mesh and that mesh's edge was not ruled on.
+elements to 3 573 and 94 — returns the identical factor with every trial decided inside its budget,
+the same standing edge taking 138 840 sweeps there. So the two meshes agree, and the finer one
+needs no certification to say so.
 
 Every input class the corpus transcribes was diffed against the vendor model and matches: the rock's
 E, ν and γ, the joints' stiffness pair, cohesion, friction angle and tensile cap, the 31 contacts the

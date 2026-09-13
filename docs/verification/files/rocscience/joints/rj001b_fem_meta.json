@@ -29,7 +29,21 @@
       "ee_suppressed": false,
       "iterations": 302,
       "nr_force_evals": 5,
-      "nr_predictor_iterations": 0
+      "nr_predictor_iterations": 0,
+      "corrector": {
+        "driver_of_record": "corrector",
+        "checkpoint": "vp300",
+        "vp_iterations": 300,
+        "nr_iterations": 2,
+        "nr_force_evals": 5,
+        "oob": 1.1854542913021818e-11,
+        "force_tol": 0.001,
+        "yield_violation": 0.0,
+        "yield_tol": 1e-06,
+        "max_disp_deep": 0.00010959227741532893,
+        "disp_limit": 14.39711431703,
+        "disp_frac_height": 7.612100244678537e-07
+      }
     },
     {
       "F": 3.0,
@@ -97,7 +111,21 @@
       "ee_suppressed": false,
       "iterations": 302,
       "nr_force_evals": 5,
-      "nr_predictor_iterations": 0
+      "nr_predictor_iterations": 0,
+      "corrector": {
+        "driver_of_record": "corrector",
+        "checkpoint": "vp300",
+        "vp_iterations": 300,
+        "nr_iterations": 2,
+        "nr_force_evals": 5,
+        "oob": 1.455539594954436e-11,
+        "force_tol": 0.001,
+        "yield_violation": 0.0,
+        "yield_tol": 1e-06,
+        "max_disp_deep": 4.241425199365094e-05,
+        "disp_limit": 14.39711431703,
+        "disp_frac_height": 2.9460245337831446e-07
+      }
     },
     {
       "F": 0.96875,
@@ -114,7 +142,21 @@
       "ee_suppressed": false,
       "iterations": 302,
       "nr_force_evals": 5,
-      "nr_predictor_iterations": 0
+      "nr_predictor_iterations": 0,
+      "corrector": {
+        "driver_of_record": "corrector",
+        "checkpoint": "vp300",
+        "vp_iterations": 300,
+        "nr_iterations": 2,
+        "nr_force_evals": 5,
+        "oob": 1.4167312861238292e-11,
+        "force_tol": 0.001,
+        "yield_violation": 0.0,
+        "yield_tol": 1e-06,
+        "max_disp_deep": 3.195252172096506e-05,
+        "disp_limit": 14.39711431703,
+        "disp_frac_height": 2.2193698693611952e-07
+      }
     },
     {
       "F": 1.046875,
@@ -148,7 +190,21 @@
       "ee_suppressed": false,
       "iterations": 250002,
       "nr_force_evals": 5,
-      "nr_predictor_iterations": 0
+      "nr_predictor_iterations": 0,
+      "corrector": {
+        "driver_of_record": "corrector",
+        "checkpoint": "rule:iteration_cap",
+        "vp_iterations": 250000,
+        "nr_iterations": 2,
+        "nr_force_evals": 5,
+        "oob": 1.1074567754433286e-11,
+        "force_tol": 0.001,
+        "yield_violation": 0.0,
+        "yield_tol": 1e-06,
+        "max_disp_deep": 0.002344780478336809,
+        "disp_limit": 14.39711431703,
+        "disp_frac_height": 1.6286461485988373e-05
+      }
     },
     {
       "F": 1.02734375,

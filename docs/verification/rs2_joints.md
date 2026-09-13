@@ -98,7 +98,7 @@ joint model whose output is a stress-displacement curve.
 | [1a](#rj-1a) | 🟡 | Goodman & Bray block toppling, case 1a | SSRM 1.037 vs Goodman & Bray 1.0 (+3.7%) | UDEC 0.99 | 0.99 / 0.97 | |
 | [1b](#rj-1b) | 🟢 | Goodman & Bray block toppling, case 1b | SSRM 1.018 vs Goodman & Bray 1.0 (+1.8%) | UDEC 0.99 | 0.97 / 0.94 | |
 | [1c](#rj-1c) | 🟡 | Goodman & Bray block toppling, case 1c | SSRM 1.057 vs Goodman & Bray 1.02 (+3.6%) | UDEC 1.01 | 1.01 / 0.99 | |
-| [1d](#rj-1d) | <span class="nodata">⊘</span> | Goodman & Bray block toppling, case 1d | Goodman & Bray 1.23 | UDEC 1.22 | 1.19 / 1.16 | *reported, no lock* — the standing edge of the corpus bracket converges six sweeps past its budget, so it is recorded without a verdict; the refinement step decides every trial and returns the same bracket. |
+| [1d](#rj-1d) | 🟢 | Goodman & Bray block toppling, case 1d | SSRM 1.252 vs Goodman & Bray 1.23 (+1.8%) | UDEC 1.22 | 1.19 / 1.16 | |
 | [2](#rj-2) | 🔴 | Alejano & Alonso block toppling | SSRM 0.764 vs UDEC 0.87 (−12.2%) | LE (Goodman & Bray) 0.76 | 0.86 / 0.82 | |
 | [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | — | 1.12 / 1.09 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
 | [4](#rj-4) | <span class="nodata">⊘</span> | Lorig & Varona flexural toppling | UDEC 1.3 | — | 1.19 / 1.27 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
@@ -287,22 +287,27 @@ interface Newton corrector does, and it is why this row can be cut at all.
 
 ![RJ-1c: Goodman & Bray block toppling, case c (rj001c) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The mechanism is case a's at half a degree more friction: the same forward rotation of the column stack over the face, and the same slip on every column contact and along the stepped base](images/RJ-1c.png)
 
-### ⊘ RJ-1d: Goodman & Bray block toppling, case d (rj001d) {#rj-1d}
+### 🟢 RJ-1d: Goodman & Bray block toppling, case d (rj001d) {#rj-1d}
 
 Case c's joint friction angle with case b's 2013 kN force: the same stack, stabilized. It is the
 strongest of the four, and the closed form and UDEC agree that it is.
 
-The row carries no lock and prints no factor, and the trial that stops it is one the corrector
-turned around. At F = 1.242188 the plain loop read the model as failing at the 250 000-sweep cap;
-under the corrector the same trial comes back CONVERGED — at 250 006 sweeps, six past its own
-budget, which the trial record reads as no verdict because the trial reached its ceiling. So the
-corpus bracket is 8 of 9 decided and its standing edge is the undecided one.
+| XSLOPE SSRM | Goodman & Bray referee | UDEC | RS2 without / with improvement |
+|---|---|---|---|
+| **1.252** | 1.23 (+1.8%) | 1.22 | 1.19 / 1.16 |
 
-A step of refinement — a 2D size of 7.0 m, which takes the mesh from 2 072 nodes and 67 interface
-elements to 3 573 and 94 — decides all nine of its trials and returns the identical bracket: the
-same standing edge, reached in 191 554 sweeps, and the same failing edge. The factor this row
-brackets is therefore corroborated by a bracket nothing in it was cut off, and it still prints no
-factor, because the lock would be cut on the corpus mesh and that mesh's edge was not ruled on.
+<!-- test: file=files/rocscience/joints/rj001d.xlsx, type=fem_ssrm, expected_fs=1.252, element_type=tri6, target_size=10.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1d, f_stand=1.2421875, f_fail=1.26171875, check=edges, tier=gate -->
+
+The standing edge of this bracket, F = 1.242188, runs the full 250 000 sweeps without meeting its
+force tolerance, and the corrector reaches equilibrium from that state at the budget exit, which is
+what answers it — see [what answers a bracket edge](#what-answers-a-bracket-edge). The plain
+viscoplastic loop read the same trial as failing there, so the factor is one bracket step above
+what that loop gave.
+
+A step of refinement — a 2D size of 7.0 m, which takes the mesh from 2 072 nodes and 67 interface
+elements to 3 573 and 94 — returns the identical bracket edge for edge, with every trial decided
+inside its budget and the same standing edge taking 191 554 sweeps there. Two meshes, one answer,
+and the finer one needs no certification to give it.
 
 Every transcribed input class matches the vendor model, the force reaching the same point case b's
 does.

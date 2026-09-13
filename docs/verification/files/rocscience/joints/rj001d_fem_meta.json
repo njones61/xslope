@@ -29,7 +29,21 @@
       "ee_suppressed": false,
       "iterations": 303,
       "nr_force_evals": 7,
-      "nr_predictor_iterations": 0
+      "nr_predictor_iterations": 0,
+      "corrector": {
+        "driver_of_record": "corrector",
+        "checkpoint": "vp300",
+        "vp_iterations": 300,
+        "nr_iterations": 3,
+        "nr_force_evals": 7,
+        "oob": 1.2170000875857894e-11,
+        "force_tol": 0.001,
+        "yield_violation": 0.0,
+        "yield_tol": 1e-06,
+        "max_disp_deep": 0.0001248622709844223,
+        "disp_limit": 14.39711431703,
+        "disp_frac_height": 8.672729009085225e-07
+      }
     },
     {
       "F": 3.0,
@@ -80,7 +94,21 @@
       "ee_suppressed": false,
       "iterations": 309,
       "nr_force_evals": 34,
-      "nr_predictor_iterations": 0
+      "nr_predictor_iterations": 0,
+      "corrector": {
+        "driver_of_record": "corrector",
+        "checkpoint": "vp300",
+        "vp_iterations": 300,
+        "nr_iterations": 9,
+        "nr_force_evals": 34,
+        "oob": 8.401779156555603e-12,
+        "force_tol": 0.001,
+        "yield_violation": 0.0,
+        "yield_tol": 1e-06,
+        "max_disp_deep": 0.0018656859580509291,
+        "disp_limit": 14.39711431703,
+        "disp_frac_height": 1.295874935051432e-05
+      }
     },
     {
       "F": 1.4375,
@@ -148,7 +176,21 @@
       "ee_suppressed": false,
       "iterations": 250006,
       "nr_force_evals": 26,
-      "nr_predictor_iterations": 0
+      "nr_predictor_iterations": 0,
+      "corrector": {
+        "driver_of_record": "corrector",
+        "checkpoint": "rule:iteration_cap",
+        "vp_iterations": 250000,
+        "nr_iterations": 6,
+        "nr_force_evals": 26,
+        "oob": 1.2725840725523763e-11,
+        "force_tol": 0.001,
+        "yield_violation": 0.0,
+        "yield_tol": 1e-06,
+        "max_disp_deep": 0.015141567711767149,
+        "disp_limit": 14.39711431703,
+        "disp_frac_height": 0.00010517085145220076
+      }
     },
     {
       "F": 1.26171875,

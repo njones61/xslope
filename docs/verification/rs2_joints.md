@@ -105,7 +105,7 @@ joint model whose output is a stress-displacement curve.
 | [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | — | 1.12 / 1.09 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
 | [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | — | 1.19 / 1.27 | |
 | [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | — | 1.65 / 1.86 | *reported, no lock* — four trials of the bracket, including both its edges, reach the sweep budget without a verdict, and the corrector certifies none of them; a finer mesh decides two more and leaves its own standing edge undecided. |
-| [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | — | 1.25 / 1.31 | *reported, no lock* — both edges of the bracket reach the sweep budget without a verdict. |
+| [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | — | 1.25 / 1.31 | *reported, no lock* — every trial of both brackets decides, and a step of refinement moves the factor by twice the row's tolerance. |
 | [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | — | 1.57 / 1.59 | |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | — | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.037 vs UDEC 1.03 (+0.7%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
@@ -440,9 +440,17 @@ the 55° face at a shallower angle than the face itself, so every one of them da
 slabs between them are free to slide out. The rock is Mohr-Coulomb (γ = 26.1 kN/m³, E = 9072 MPa,
 ν = 0.26, c = 675 kPa, φ = 43°, no tensile capacity).
 
-Both edges of the final bracket reach 250 000 sweeps without a verdict — one of them
-`STABLE_STUCK`, the other stopped at the cap — so the factor the bracket encloses is a statement
-about the sweep budget as much as about the slope. The row prints no factor and carries no lock.
+The row prints no factor and carries no lock, and what holds it back is the mesh rather than the
+sweep budget. Every trial of both brackets reaches a verdict — the corpus bracket's longest takes
+225 001 sweeps of the 250 000 allowed, and four of its nine trials are settled by a corrector
+certification — but a step of refinement to a 2D size of 8.4 m, which takes the mesh from 13 134
+nodes and 1 864 interface elements to 25 232 and 2 654, moves the factor by two bracket steps.
+The row's own tolerance is one.
+
+That is the shape [problems 12](#rj-12) and [14](#rj-14) have, and this is the first row outside
+the Alejano family to take it: a factor that is settled, reproducible and not the section's answer
+but its mesh's. What separates the rows that move from the rows that hold is not measured here
+either.
 
 Every transcribed input class matches the vendor model, including the side restraint.
 

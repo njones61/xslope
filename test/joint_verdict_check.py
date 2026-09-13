@@ -285,8 +285,39 @@ def check_inert():
           'steady_slip' != 'joint_settled')
 
 
+def check_churn():
+    """The ACTIVE-SET CHURN reading, which says what the interface was doing at a
+    moment in the solve.
+
+    It is the fraction of node pairs that change state (sticking / slipping /
+    open) per sweep, averaged over a trailing window of the trace, and it is what
+    a corrector attempt's record carries beside its refusal. A refusal from a
+    frozen set and one from a set still making up its mind are different findings
+    (r19), so the reading has to be the trailing window and not the whole history.
+    """
+    print("\n4. the active-set churn reading")
+    churn = fem._joint_churn
+    check("no history reads nothing", churn([], 100) is None)
+    check("no pairs reads nothing", churn([1, 2, 3], 0) is None)
+    check("a frozen set reads zero", churn([0] * 20, 100) == 0.0)
+    check("every pair flipping every sweep reads one",
+          churn([100] * 20, 100) == 1.0)
+    check("half the pairs flipping reads a half", churn([50] * 20, 100) == 0.5)
+    # The window is the point: a set that chattered early and then froze must read
+    # frozen NOW, which is the state a refusal is taken from.
+    settled = [40] * 100 + [0] * 20
+    check("a set that chattered and then froze reads zero over the last ten "
+          "samples", churn(settled, 100, 10) == 0.0)
+    check("...and not over the trailing half",
+          churn(settled, 100) > 0.0)
+    check("the short window is ten samples, a hundred sweeps",
+          fem._JOINT_CHURN_SAMPLES == 10)
+    check("a window longer than the history reads the history",
+          churn([10] * 4, 100, 50) == 0.1)
+
+
 def check_wiring():
-    print("\n4. wiring — the solve's own vocabulary")
+    print("\n5. wiring — the solve's own vocabulary")
     # A JOINT_SETTLED trial counts as STANDING under the hybrid criterion and a
     # steady_slip one does not; both are read off the same table solve_fem uses.
     for verdict, want in (('JOINT_SETTLED', True), ('STABLE_STUCK', True),
@@ -307,6 +338,7 @@ def main():
     check_measured()
     check_mutations()
     check_inert()
+    check_churn()
     check_wiring()
     print("\n" + "=" * 72)
     if FAILURES:

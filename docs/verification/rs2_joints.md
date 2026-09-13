@@ -527,6 +527,9 @@ an admissible static equilibrium at that strength, and the cold-start path does 
 the factor is the strength at which the equilibrium stops existing rather than the strength at
 which that path first runs away. Five of the nine trials of each bracket are certified this way.
 
+RS2's own two factors straddle this row — 1.01 without the joint improvement option and 1.09 with
+it — which is true of only three other problems in this corpus.
+
 The paper's own limit equilibrium for this problem is a range rather than an answer — 0.40 to 1.45,
 as the manual prints it — and it is recorded beside the referee rather than scoring, as every source
 limit equilibrium here is. The distinct-element run is what the manual verifies RS2 against.

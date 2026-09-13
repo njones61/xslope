@@ -112,7 +112,7 @@ joint model whose output is a stress-displacement curve.
 | [12](#rj-12) | <span class="nodata">⊘</span> | Ploughing toppling slab failure | UDEC 1.78 | LE (Alejano) 2.0 | 1.39 / 1.75 | *reported, no lock* — a step of refinement moves the factor, so it is not the section's answer but its mesh's. |
 | [13](#rj-13) | 🟢 | Ploughing sliding slab, example 4 | SSRM 0.998 vs UDEC 1.0 (−0.2%) | LE (Alejano) 1.0 | 1.0 / 1.05 | |
 | [14](#rj-14) | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | UDEC 0.9 | LE (Alejano) 1.0 | 0.89 / 1.09 | *reported, no lock* — a step of refinement moves the factor, as it does on problem 12. |
-| [15](#rj-15) | <span class="nodata">⊘</span> | Partially joint-controlled footwall | UDEC 1.6 | LE (Alejano) 1.72 · Slide2 (vendor) 1.25 | 1.28 / 1.42 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
+| [15](#rj-15) | 🔴 | Partially joint-controlled footwall | SSRM 1.271 vs UDEC 1.6 (−20.6%) | LE (Alejano) 1.72 · Slide2 (vendor) 1.25 | 1.28 / 1.42 | |
 | 16 | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | UDEC 11° | experiment 9° | 9° / 7° | *blocked* — the problem scores the TILT ANGLE at which a block grid topples, found by rotating gravity through a staged sweep; XSLOPE's seismic coefficient tilts the load but the row needs the sweep and a toppling criterion, neither of which is a strength reduction. |
 | 17 | <span class="nodata">⊘</span> | Step-path, en-echelon joints | UDEC 1.29 | — | 1.24 / 1.2 | *blocked* — the vendor model's second, elastic material has no boundary of its own. Recovered from the element-material map it is an 83-vertex staircase of element edges, trending vertical near x = 12 and horizontal near y = 3 with excursions of about one element either side, so the boundary is a property of the vendor's mesh rather than of its model. |
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | — | 1.01 / 1.0 | |
@@ -362,10 +362,6 @@ spacing and a cross set at −20° at 30 m, both through the origin. The manual 
 "70 and 160" degrees, which is the same two planes measured the other way round the half circle.
 The rock is elastic — the vendor's `Plasticity Specifications: Non` — so only the joints can fail;
 γ = 26.0946 kN/m³, E = 9072 MPa, ν = 0.26. The joints carry c = 100 kPa and φ = 40°.
-
-The row carries no lock, so it prints no factor of its own. The upper edge of its final bracket
-reaches 250 000 sweeps without a verdict, and a bracket edge nothing ruled on cannot define a
-factor of safety.
 
 Every input class the corpus transcribes was diffed against the vendor model and matches: the
 rock's E, ν and γ, the joints' normal and shear stiffness, cohesion, friction angle and tensile
@@ -646,7 +642,7 @@ clamps in both directions.
 
 ![RJ-14: Alejano et al. ploughing sliding slab, example 5 (rj014) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it moves: one bedding plane from the crest to the toe carries the slip, with the release trace at the toe opening as the slab above it slides out over the bench](images/RJ-14.png)
 
-### ⊘ RJ-15: Partially joint-controlled footwall slope (rj015) {#rj-15}
+### 🔴 RJ-15: Partially joint-controlled footwall slope (rj015) {#rj-15}
 
 A 25 m footwall at 40° whose bedding dips in the same direction at the same angle, 2 m apart, so
 the slabs lie parallel to the face and a failure has to break rock at the toe to get out. This is
@@ -657,19 +653,28 @@ no cohesion and φ = 25°.
 
 The manual publishes five factors for this problem, from one paper and three programs:
 
-| UDEC-SSRT referee (Alejano) | LE (Alejano) | RS2 without / with improvement | Slide2 LEM (vendor) |
-|---|---|---|---|
-| 1.6 | 1.72 | 1.28 / 1.42 | 1.25 |
+| XSLOPE SSRM | UDEC-SSRT referee (Alejano) | LE (Alejano) | RS2 without / with improvement | Slide2 LEM (vendor) |
+|---|---|---|---|---|
+| **1.271** | 1.6 (−20.6%) | 1.72 | 1.28 / 1.42 | 1.25 |
+
+<!-- test: file=files/rocscience/joints/rj015.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-15, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate -->
 
 The first two are the source paper's own answers, its UDEC run and its limit equilibrium, and the
 UDEC run is what scores this row: it is what the manual verifies RS2 against, and it is the
 same-method pairing. The last is Rocscience's own companion program on its own model, labeled and
 recorded rather than scoring. The five run from 1.25 to 1.72, a wider spread than separates any two
-codes anywhere else in this corpus.
+codes anywhere else in this corpus, and **this row lands beside the two programs rather than beside
+the two the paper published**: RS2's own 1.28 is 0.7% above it, Slide2's 1.25 is 1.7% below it, and
+the UDEC run that scores it is 20.6% above. Nothing here explains that, and nothing is asserted
+about it: every transcribed input class matches the vendor model.
 
-The row carries no lock, so it prints no factor of its own. The upper edge of its final bracket
-reaches 250 000 sweeps without a verdict, and a bracket edge nothing ruled on cannot define a
-factor of safety.
+The trial that used to hold this row back was the upper edge of the corpus bracket. It reached
+250 000 sweeps with nothing to say; under the corrector default it comes back FAILED at 225 001
+sweeps on a steady slip, and every trial of the bracket now decides. A step of refinement — a 2D
+size of 1.4 m, which takes the mesh from 14 964 nodes and 2 179 interface elements to 32 131 and
+3 090 — moves the factor by one bracket step, inside the row's own tolerance, and decides on all
+nine of its trials too, so the lock is cut on the corpus mesh. It is the corpus's longest row: the
+two brackets together take about 6.5 hours.
 
 Every input class that was transcribed matches the vendor model: the rock's E, ν, γ, c, φ and
 tensile cap; the joints' normal and shear stiffness, cohesion, friction angle and tensile cap; and

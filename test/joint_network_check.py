@@ -34,12 +34,12 @@ Legs:
   7. **The round trip.** A generated network written to the ``joints`` sheet and
      read back is the same network, endpoint for endpoint and property for
      property.
-  8. **The set record.** Every kind's parameters, region and elevation band go
-     into one row's Label cell and come back off it as the same record and the
-     same text, so a set can be reopened and regenerated from the file alone.
-  9. **Regeneration.** Editing a set replaces its own rows where they were and
-     touches nothing else — not the other set, not a hand-entered joint line, not
-     the properties the rows carry.
+  8. **Names.** Every kind names its rows ``set-01``, ``set-02``, … and carries
+     nothing else in them: a set is not written down, so the lines ARE the input.
+     A hand-typed label belongs to no set, and an unbuildable set is refused.
+  9. **Grouping.** The rows of one network are found together by that name —
+     which is how a set is removed — with the other set and a hand-entered line
+     left where they are.
   10. **The band and the joint region.** A set cut to an elevation band keeps the
      traces on the band's own edges, where the section's boundary drops them; a
      set confined to a polygon of Type ``joints`` resolves the same by the
@@ -65,9 +65,8 @@ if _ROOT not in sys.path:
 
 from shapely.geometry import LineString, Polygon
 
-from xslope.joints import (JointSet, cross_jointed, parallel_set, regenerate,
-                           resolve_region, set_name, sets_in, short_label,
-                           voronoi)
+from xslope.joints import (JointSet, cross_jointed, parallel_set,
+                           resolve_region, set_name, sets_in, voronoi)
 
 BOX = Polygon([(0.0, 0.0), (20.0, 0.0), (20.0, 10.0), (0.0, 10.0)])
 
@@ -475,103 +474,100 @@ def _leg_roundtrip(failures, results):
 
 
 
-def _leg_record(failures, results):
-    """Leg 8: the set record through the label and back.
+def _leg_names(failures, results):
+    """Leg 8: what a generated row is called, and what that name says.
 
-    Every kind's parameters, its region and its elevation band are written into
-    one row label and read back off it. What is checked is both directions: the
-    record that comes back EQUALS the one that went out, and the label it writes
-    is character for character the label it was read from — a grammar that
-    round-trips the object but not the text would leave two spellings of the same
-    set in one file.
+    A set is not written down: what the file keeps is the lines. So the only
+    thing a generated row carries beyond its geometry and its properties is its
+    NAME — the set's name and its place in the set — and that name is what says
+    which network a row belongs to.
     """
+    model = _model()
+    model['joint_zones'] = [
+        {'polygon': [(2.0, 2.0), (18.0, 2.0), (18.0, 8.0), (2.0, 8.0)],
+         'label': 'North block', 'size': None, 'mat_id': None}]
     cases = [
         ('a parallel set',
          JointSet('bed', 'parallel', {'dip': 30.0, 'spacing': 2.0},
-                  region='Sandstone', band=(40.0, None)),
-         'bed-03|par|dip=30|s=2|reg=mat:Sandstone|band=40:'),
+                  region='Sandstone', props={'phi': 30.0})),
         ('a parallel set with an offset and a persistence',
          JointSet('j1', 'parallel',
                   {'dip': -60.0, 'spacing': 2.5, 'offset': 1.25,
-                   'trace_len': 3.0, 'gap': 1.0}),
-         'j1-03|par|dip=-60|s=2.5|off=1.25|len=3|gap=1'),
+                   'trace_len': 3.0, 'gap': 1.0}, props={'phi': 30.0})),
         ('a cross-jointed set',
          JointSet('x', 'cross',
                   {'dip': 60.0, 'dip2': -60.0, 'spacing': 2.0,
                    'spacing2': 3.0, 'offset2': 1.5},
-                  region='poly:North block'),
-         'x-03|crs|dip=60,-60|s=2,3|off=0,1.5|reg=poly:North block'),
+                  region='poly:North block', props={'phi': 30.0})),
         ('a Voronoi set',
-         JointSet('vor', 'voronoi', {'block_size': 1.5, 'seed': 7},
-                  region=['Sandstone', 'Shale']),
-         'vor-03|vor|blk=1.5|seed=7|reg=mat:Sandstone+Shale'),
-        ('a band below an elevation, with a negative end',
+         JointSet('vor', 'voronoi', {'block_size': 2.0, 'seed': 7},
+                  region=['Sandstone', 'Shale'], props={'phi': 30.0})),
+        ('a set cut to an elevation band',
          JointSet('b', 'parallel', {'dip': 0.0, 'spacing': 1.0},
-                  band=(-10.0, 5.0)),
-         'b-03|par|dip=0|s=1|band=-10:5'),
+                  band=(2.0, 8.0), props={'phi': 30.0})),
     ]
-    for what, jset, expect in cases:
-        label = jset.to_label(3)
-        if label != expect:
-            failures.append(f"record: {what} wrote {label!r}, expected {expect!r}")
+    for what, jset in cases:
+        rows = jset.generate(model)
+        if not rows:
+            failures.append(f"names: {what} generated no row")
             continue
-        back, index = JointSet.from_label(label)
-        if index != 3:
-            failures.append(f"record: {what} came back as row {index}, not 3")
-        if back != jset:
-            failures.append(f"record: {what} did not survive its own label "
-                            f"({back.params} / {back.region} / {back.band})")
-        if back.to_label(3) != label:
-            failures.append(f"record: {what} rewrote {label!r} as "
-                            f"{back.to_label(3)!r}")
+        want = [f"{jset.name}-{i + 1:02d}" for i in range(len(rows))]
+        if [r['label'] for r in rows] != want:
+            failures.append(f"names: {what} named its rows "
+                            f"{[r['label'] for r in rows][:3]}…, expected "
+                            f"{want[:3]}…")
+        if any(set_name(r['label']) != jset.name for r in rows):
+            failures.append(f"names: a row of {what} does not read back as its "
+                            f"own set")
 
-    # The row's own name, and the set it belongs to, read off the label.
-    lbl = 'bed-07|par|dip=30|s=2'
-    if short_label(lbl) != 'bed-07' or set_name(lbl) != 'bed':
-        failures.append(f"record: {lbl!r} reads as {short_label(lbl)!r} / "
-                        f"{set_name(lbl)!r}")
-    # A hand-typed label is not a set, however it is spelled, and regenerate must
-    # never touch one.
-    for typed in ('base joint', 'bed-07', '', 'block 3'):
+    # The name says the set and nothing else: no parameter of the set is in it,
+    # which is what the owner's ruling means — the lines ARE the input.
+    bed = JointSet('bed', 'parallel', {'dip': 30.0, 'spacing': 2.0},
+                   region='Sandstone', band=(2.0, 8.0), props={'phi': 30.0})
+    for row in bed.generate(model):
+        if any(ch in row['label'] for ch in '|='):
+            failures.append(f"names: {row['label']!r} carries more than the "
+                            f"set's name")
+            break
+
+    # A label that names no set — which is what a hand-entered line carries, and
+    # what keeps one out of anything done to a set as a whole.
+    for typed in ('base joint', 'bed', '', 'block 3', 'bed-'):
         if set_name(typed) != '':
-            failures.append(f"record: the typed label {typed!r} was read as the "
+            failures.append(f"names: the typed label {typed!r} was read as the "
                             f"set {set_name(typed)!r}")
+    # A set name may itself carry a dash: the SET is what stands before the last
+    # -NN, so "north-wall-12" is row 12 of "north-wall".
+    if set_name('north-wall-12') != 'north-wall':
+        failures.append(f"names: 'north-wall-12' reads as "
+                        f"{set_name('north-wall-12')!r}")
 
-    # A region that cannot be written down is refused when the label is written,
-    # by name, rather than producing a set nobody can regenerate.
-    try:
-        JointSet('p', 'parallel', {'dip': 0.0, 'spacing': 1.0},
-                 region=Polygon([(0, 0), (5, 0), (5, 5)])).to_label(1)
-        failures.append("record: a bare-polygon region was written into a label")
-    except ValueError as exc:
-        if 'Type' not in str(exc):
-            failures.append(f"record: the bare-polygon refusal does not say what "
-                            f"to draw instead: {exc}")
-
-    # A label that is not a record at all, and a field that is not a field.
-    for bad, why in (('bed-01', 'no record'),
-                     ('bed-01|zzz|dip=0', 'an unknown kind'),
-                     ('bed-01|par|tilt=30', 'an unknown field'),
-                     ('bed-01|par|band=40', 'a band with no colon')):
+    # A set that cannot be described is refused when it is described, by name.
+    for what, build in (
+            ('an unknown kind',
+             lambda: JointSet('p', 'blocky', {'dip': 0.0})),
+            ('an unknown parameter',
+             lambda: JointSet('p', 'parallel', {'tilt': 30.0})),
+            ('an empty name',
+             lambda: JointSet('  ', 'parallel', {'dip': 0.0, 'spacing': 1.0}))):
         try:
-            JointSet.from_label(bad)
-            failures.append(f"record: {bad!r} ({why}) was read as a set")
+            build()
+            failures.append(f"names: {what} was accepted")
         except ValueError:
             pass
-    results.append("record      5 set records written into a row label and read "
-                   "back identical, both object and text; a bare-polygon region, "
-                   "an unknown kind, an unknown field and a colon-less band all "
-                   "refused by name")
+    results.append("names       every kind names its rows set-01, set-02, …, and "
+                   "nothing but the name is in them; a hand-typed label belongs "
+                   "to no set; an unknown kind, an unknown parameter and an "
+                   "empty name are refused")
 
 
-def _leg_regeneration(failures, results):
-    """Leg 9: regenerating one set in place.
+def _leg_grouping(failures, results):
+    """Leg 9: the rows of one network, found together.
 
-    The point of the record is that a set can be edited. What that has to mean is
-    surgical: the set's own rows are replaced where they were, the OTHER set is
-    untouched, a hand-entered joint line is untouched, and the properties the rows
-    carried come back on the new ones — the label carries the geometry, the
-    columns carry the strength.
+    A set is changed by removing it and building another, so the one thing the
+    library owes the editor is the grouping: which rows belong to which network,
+    and nothing else caught up in it — not the other set, not a hand-entered
+    line.
     """
     model = _model()
     bed = JointSet('bed', 'parallel', {'dip': 0.0, 'spacing': 2.0},
@@ -582,57 +578,40 @@ def _leg_regeneration(failures, results):
              'y2': 0.5, 'c': 0.0, 'phi': 20.0}
     model['joint_lines'] = (bed.generate(model) + [dict(typed)]
                             + steep.generate(model))
-    n_bed = sum(1 for r in model['joint_lines'] if set_name(r['label']) == 'bed')
-    n_steep = sum(1 for r in model['joint_lines'] if set_name(r['label']) == 'st')
+    rows = model['joint_lines']
+    n_bed = sum(1 for r in rows if set_name(r['label']) == 'bed')
+    n_steep = sum(1 for r in rows if set_name(r['label']) == 'st')
 
     found = sets_in(model)
-    if [name for name, _s, _i in found] != ['bed', 'st']:
-        failures.append(f"regeneration: the model's sets read as "
-                        f"{[n for n, _s, _i in found]}, expected ['bed', 'st']")
+    if [name for name, _idx in found] != ['bed', 'st']:
+        failures.append(f"grouping: the model's sets read as "
+                        f"{[n for n, _i in found]}, expected ['bed', 'st']")
+    by_name = dict(found)
+    if len(by_name.get('bed', [])) != n_bed or len(by_name.get('st', [])) != n_steep:
+        failures.append(f"grouping: sets_in counted {len(by_name.get('bed', []))} "
+                        f"/ {len(by_name.get('st', []))} rows, expected "
+                        f"{n_bed} / {n_steep}")
+    for name, idx in found:
+        if any(set_name(rows[i]['label']) != name for i in idx):
+            failures.append(f"grouping: a row of {name!r} belongs to another set")
+    if any(rows.index(r) in sum((i for _n, i in found), [])
+           for r in rows if r['label'] == 'base joint'):
+        failures.append("grouping: the hand-entered line was put in a set")
 
-    # Halve the spacing: the set regenerates in place, with more rows.
-    tighter = JointSet('bed', 'parallel', {'dip': 0.0, 'spacing': 1.0})
-    fresh = regenerate(model, 'bed', tighter)
-    rows = model['joint_lines']
-    got_bed = [r for r in rows if set_name(r['label']) == 'bed']
-    got_steep = [r for r in rows if set_name(r['label']) == 'st']
-    if len(got_bed) != len(fresh) or len(got_bed) <= n_bed:
-        failures.append(f"regeneration: halving the spacing took bed from "
-                        f"{n_bed} rows to {len(got_bed)}")
-    if len(got_steep) != n_steep:
-        failures.append(f"regeneration: the OTHER set went from {n_steep} rows "
-                        f"to {len(got_steep)}")
-    if sum(1 for r in rows if r['label'] == 'base joint') != 1:
-        failures.append("regeneration: the hand-entered joint line did not survive")
-    if any(abs(float(r['phi']) - 32.0) > 1e-9 or abs(float(r['c']) - 10.0) > 1e-9
-           for r in got_bed):
-        failures.append("regeneration: the set's properties were not carried onto "
-                        "the new rows")
-    # In place: the set's rows are still where they were, ahead of the typed line.
-    if set_name(rows[0]['label']) != 'bed' or rows[len(got_bed)]['label'] != 'base joint':
-        failures.append("regeneration: the fresh rows did not land where the old "
-                        "ones were")
-
-    # No record given at all: the set re-runs exactly as its labels record it.
-    again = regenerate(model, 'bed')
-    if len(again) != len(got_bed):
-        failures.append(f"regeneration: re-running the recorded set gave "
-                        f"{len(again)} rows, not {len(got_bed)}")
-    if [r['label'] for r in again] != [r['label'] for r in got_bed]:
-        failures.append("regeneration: re-running the recorded set changed its "
-                        "labels")
-
-    try:
-        regenerate(model, 'nosuch')
-        failures.append("regeneration: an unknown set name was accepted")
-    except ValueError as exc:
-        if 'bed' not in str(exc):
-            failures.append(f"regeneration: the refusal does not list the model's "
-                            f"own sets: {exc}")
-    results.append(f"regeneration  one set of two replaced in place ({n_bed} rows "
-                   f"-> {len(got_bed)} at half the spacing), the other set, the "
-                   f"hand-entered line and the properties untouched; re-running "
-                   f"the recorded set reproduces it")
+    # Removing one set: exactly its rows go, in one pass, and the rest of the
+    # list is left in its own order. This is the joints editor's "Remove set".
+    kept = [r for r in rows if set_name(r.get('label')) != 'bed']
+    if len(kept) != len(rows) - n_bed:
+        failures.append(f"grouping: removing 'bed' took {len(rows) - len(kept)} "
+                        f"rows, expected {n_bed}")
+    if sum(1 for r in kept if r['label'] == 'base joint') != 1:
+        failures.append("grouping: removing a set took the hand-entered line "
+                        "with it")
+    if sum(1 for r in kept if set_name(r['label']) == 'st') != n_steep:
+        failures.append("grouping: removing a set took rows of the other one")
+    results.append(f"grouping    {n_bed} + {n_steep} generated rows and a typed "
+                   f"one group as 'bed' and 'st' with the typed line in neither; "
+                   f"removing one set takes exactly its {n_bed} rows")
 
 
 def _leg_band_and_region(failures, results):
@@ -715,8 +694,8 @@ def run():
     _leg_refusals(failures, results)
     _leg_mesh(failures, results)
     _leg_roundtrip(failures, results)
-    _leg_record(failures, results)
-    _leg_regeneration(failures, results)
+    _leg_names(failures, results)
+    _leg_grouping(failures, results)
     _leg_band_and_region(failures, results)
     print(f"Joint network generator check ({time.time() - t0:.0f} s):")
     for line in results:

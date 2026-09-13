@@ -6581,8 +6581,8 @@ class JointsEditor(CategoryEditor):
                 "Build network…",
                 "Generate a whole set of joint lines at once — a dip and a "
                 "spacing, two sets crossing, or a blocky mass — clipped to "
-                "where the set exists. Select a row of a set already built to "
-                "reopen it on that set and change it.",
+                "where the set exists. The rows are added to the list; to "
+                "change a set, remove it and build another.",
                 lambda dlg: _build_joint_network(slope_data, dlg))])
 
     def apply(self, slope_data, dlg):
@@ -6592,47 +6592,23 @@ class JointsEditor(CategoryEditor):
 def _build_joint_network(slope_data, dlg):
     """The joints editor's "Build network…" button.
 
-    Opens the network dialog on the set the selected row belongs to — or on a new
-    set when the selection is a hand-entered line or nothing — and writes what it
-    returns into the editor's pending rows. A set that was reopened is REPLACED
-    where it was, so editing a spacing moves the set rather than adding a second
-    copy of it beside the first; anything else is appended.
+    Opens the network dialog and appends the rows it returns, selecting the first
+    of them. A set is not an object the model keeps — the rows are the input — so
+    nothing here reopens one: changing a network means removing it (Remove set)
+    and building another.
 
     Nothing reaches ``slope_data`` here: the editor's OK is still what commits,
     so Cancel on the editor discards a generated network like any other edit.
     """
-    from xslope.joints import JointSet, set_name
     from .network_dialog import BuildNetworkDialog
 
     rows = dlg.result_rows()
-    selected = dlg.selected_row()
-    jset = None
-    if 0 <= selected < len(rows):
-        name = set_name(rows[selected].get("label"))
-        if name:
-            try:
-                jset = JointSet.from_rows(
-                    [r for r in rows if set_name(r.get("label")) == name])
-            except ValueError:
-                jset = None                   # a label that only looks like one
-
-    nd = BuildNetworkDialog(slope_data, rows, jset, parent=dlg)
+    nd = BuildNetworkDialog(slope_data, rows, parent=dlg)
     if nd.exec() != QDialog.Accepted:
         return
     fresh = nd.result_rows()
-    editing = nd.editing()
-    if editing is None:
-        at = len(rows)
-        rows = rows + fresh
-    else:
-        # The splice xslope.joints.regenerate makes, on the rows the dialog has
-        # already generated: what OK writes is the network the preview showed,
-        # not a second run of the generator that might not reproduce it.
-        at = min(i for i, r in enumerate(rows)
-                 if set_name(r.get("label")) == editing)
-        kept = [r for r in rows if set_name(r.get("label")) != editing]
-        rows = kept[:at] + fresh + kept[at:]
-    dlg.replace_rows(rows, select=at if fresh else None)
+    at = len(rows)
+    dlg.replace_rows(rows + fresh, select=at if fresh else None)
 
 
 # --- geometry: profile lines & polygons (master/detail) --------------------- #

@@ -5,13 +5,14 @@ region it exists in, one property set — and the button beside the joints edito
 list is what opens it. Between them they have to hold three promises:
 
   1. **What the preview shows is what OK writes.** The dialog generates the set
-     as the fields change, counts it, and hands back exactly those rows.
-  2. **A set reopens as itself.** Selecting one of a set's rows and pressing the
-     button fills the dialog in from the row's own label, identically enough that
-     pressing OK without touching anything reproduces the set.
-  3. **Editing a set replaces it in place.** The regenerated rows land where the
-     old ones were; the other set, a hand-entered joint line and the properties
-     the rows carry are untouched.
+     as the fields change, counts it, and hands back exactly those rows — named
+     for the set and nothing more.
+  2. **The next build starts where the last one left off.** A set is not stored,
+     so nothing reopens one; within a session the dialog offers the parameters it
+     was last used with, under a name the model is not already using.
+  3. **The button appends.** The rows land after the ones already there, and
+     nothing that was there — the other set, a hand-entered joint line — moves or
+     changes.
 
 Offscreen Qt, no file and no solver work.
 
@@ -66,7 +67,7 @@ def _leg_dialog(failures, results):
         failures.append("dialog: an empty form generated rows")
     if dlg._buttons.button(dlg._buttons.StandardButton.Ok).isEnabled():
         failures.append("dialog: OK is offered on a form with no parameters")
-    if set_name(dlg._name.text() + '-01|par') == '':
+    if set_name(dlg._name.text() + '-01') == '':
         failures.append(f"dialog: the name it opens on, {dlg._name.text()!r}, is "
                         f"not a usable set name")
     if dlg._name.text() in {set_name(r['label']) for r in sd['joint_lines']}:
@@ -97,16 +98,16 @@ def _leg_dialog(failures, results):
     if not narrowed or len(narrowed) >= len(rows):
         failures.append(f"dialog: confining the set to the joint region took it "
                         f"from {len(rows)} rows to {len(narrowed)}")
-    if 'poly:North block' not in narrowed[0]['label']:
-        failures.append(f"dialog: the region is not in the rows' label "
+    if set_name(narrowed[0]['label']) != dlg._name.text():
+        failures.append(f"dialog: the rows are not named for the set "
                         f"({narrowed[0]['label']!r})")
     dlg._band_lo.setText('8')
     banded = dlg.result_rows()
     if not banded or len(banded) >= len(narrowed):
         failures.append(f"dialog: the elevation band took the set from "
                         f"{len(narrowed)} rows to {len(banded)}")
-    if 'band=8:' not in banded[0]['label']:
-        failures.append(f"dialog: the band is not in the rows' label "
+    if any(ch in banded[0]['label'] for ch in '|='):
+        failures.append(f"dialog: a row carries more than the set's name "
                         f"({banded[0]['label']!r})")
 
     # A name another set is already using is refused, by name, before OK.
@@ -132,42 +133,63 @@ def _leg_dialog(failures, results):
                         f"({dlg._status.text()!r})")
     results.append(f"dialog      an empty form offers no OK; a dip and a spacing "
                    f"give {len(rows)} rows, the joint region {len(narrowed)} and "
-                   f"the band above 8 {len(banded)}, each with the region and the "
-                   f"band in its label; a name in use and a pair at one dip are "
+                   f"the band above 8 {len(banded)}, every row named for the set "
+                   f"and nothing more; a name in use and a pair at one dip are "
                    f"refused in the dialog rather than on OK")
 
 
-def _leg_reopen(failures, results):
-    """Leg 2: a set reopens as itself."""
+def _leg_session_memory(failures, results):
+    """Leg 2: the next build starts where the last one left off.
+
+    Nothing reopens a set — the model does not keep one — so what the dialog owes
+    somebody building a second network is the numbers they just typed, under a
+    name that cannot be written over the first set.
+    """
+    from studio import network_dialog
     from studio.network_dialog import BuildNetworkDialog
 
     sd = _model()
-    original = JointSet('bed', 'parallel',
-                        {'dip': 25.0, 'spacing': 2.5, 'offset': 0.5},
-                        region='poly:North block', band=(6.0, None),
-                        props={'c': 0.0, 'phi': 34.0, 'dil': 5.0, 'jred': 'No'})
-    rows = original.generate(sd)
-    reopened = BuildNetworkDialog(sd, sd['joint_lines'] + rows,
-                                  JointSet.from_rows(rows))
-    back = reopened.result_set()
-    if back is None:
-        failures.append("reopen: the dialog does not describe a set at all")
+    first = BuildNetworkDialog(sd, sd['joint_lines'])
+    for key, value in (('dip', '25'), ('spacing', '2.5'), ('offset', '0.5')):
+        first._param_edits['parallel'][key].setText(value)
+    first._region.setCurrentIndex(first._region.count() - 1)   # the joint region
+    first._band_lo.setText('6')
+    for key, value in (('c', '0'), ('phi', '34'), ('dil', '5')):
+        first._prop_edits[key].setText(value)
+    first._prop_edits['jred'].setCurrentIndex(
+        first._prop_edits['jred'].findText('No'))
+    described = first.result_set()
+    rows = first.result_rows()
+    if described is None or not rows:
+        failures.append("session: the first dialog describes no set")
         return
-    if back != original:
-        failures.append(f"reopen: the set came back as {back.to_label(1)!r}, not "
-                        f"{original.to_label(1)!r}")
-    if reopened.editing() != 'bed':
-        failures.append(f"reopen: the dialog is editing {reopened.editing()!r}")
-    if [r['label'] for r in reopened.result_rows()] != [r['label'] for r in rows]:
-        failures.append("reopen: pressing OK unchanged would not reproduce the set")
-    if back.props.get('jred') != 'No' or float(back.props.get('phi')) != 34.0:
-        failures.append(f"reopen: the properties came back as {back.props}")
-    # Its own name is not a clash with itself.
-    if not reopened._buttons.button(reopened._buttons.StandardButton.Ok).isEnabled():
-        failures.append("reopen: the set's own name was read as a clash")
-    results.append("reopen      a set with a region, a band, an offset and a "
-                   "property set reopens as the same record, down to the row "
-                   "labels OK would write")
+    first.accept()                       # what OK does, without a window
+
+    sd['joint_lines'] = sd['joint_lines'] + rows
+    second = BuildNetworkDialog(sd, sd['joint_lines'])
+    back = second.result_set()
+    if back is None:
+        failures.append("session: the second dialog opened on nothing")
+        return
+    if (back.kind != described.kind or back.params != described.params
+            or back.region != described.region or back.band != described.band):
+        failures.append(f"session: it opened on {back.params} / {back.region} / "
+                        f"{back.band}, not on what was last built")
+    if back.props != described.props:
+        failures.append(f"session: the properties came back as {back.props}")
+    if back.name == described.name:
+        failures.append(f"session: it opened on the name {back.name!r}, which "
+                        f"the model is already using")
+    if back.name in {set_name(r['label']) for r in sd['joint_lines']}:
+        failures.append(f"session: {back.name!r} is a name already in the model")
+    if not second._buttons.button(second._buttons.StandardButton.Ok).isEnabled():
+        failures.append("session: the second set cannot be written")
+    if network_dialog._LAST_SET is None:
+        failures.append("session: nothing was remembered")
+    network_dialog._LAST_SET = None      # a check leaves no state behind
+    results.append(f"session     a second dialog opens on the first's dip, "
+                   f"spacing, offset, region, band and properties, under "
+                   f"{back.name!r} rather than {described.name!r}")
 
 
 def _leg_button(failures, results):
@@ -199,7 +221,7 @@ def _leg_button(failures, results):
 
     network_dialog.BuildNetworkDialog = _Stub
     try:
-        # A new set: appended, nothing else touched.
+        # A set: appended, nothing that was there touched.
         _Stub.fields = {'dip': '0', 'spacing': '4', '_name': 'bed', '_phi': '32'}
         _build_joint_network(sd, editor)
         after = editor.result_rows()
@@ -212,36 +234,35 @@ def _leg_button(failures, results):
         if [r['label'] for r in after[:len(before)]] != [r['label'] for r in before]:
             failures.append("button: a new set did not land after the rows that "
                             "were there")
-
-        # Reopened on that set, at half the spacing: replaced in place.
-        editor.replace_rows(after, select=len(before))       # a row of 'bed'
-        _Stub.fields = {'dip': '0', 'spacing': '2', '_name': 'bed', '_phi': '32'}
-        _build_joint_network(sd, editor)
-        edited = editor.result_rows()
-        n_bed2 = sum(1 for r in edited if set_name(r.get('label')) == 'bed')
-        if n_bed2 <= n_bed:
-            failures.append(f"button: halving the spacing took the set from "
-                            f"{n_bed} rows to {n_bed2}")
-        if sum(1 for r in edited if not set_name(r.get('label'))) != n_typed:
-            failures.append("button: the hand-entered joint line did not survive "
-                            "a regeneration")
-        if sum(1 for r in edited if set_name(r.get('label')) == 'st') != n_steep:
-            failures.append("button: the OTHER set did not survive a regeneration")
-        if len(edited) != len(before) + n_bed2:
-            failures.append(f"button: regenerating left {len(edited)} rows, not "
-                            f"{len(before) + n_bed2} — the old set was not replaced")
-        if [r['label'] for r in edited[:len(before)]] != [r['label'] for r in before]:
-            failures.append("button: regenerating moved the rows around it")
         if any(float(r['phi']) != 32.0
-               for r in edited if set_name(r.get('label')) == 'bed'):
-            failures.append("button: the regenerated rows lost their properties")
+               for r in after if set_name(r.get('label')) == 'bed'):
+            failures.append("button: the set's properties did not reach its rows")
+
+        # A SECOND set beside it: appended in turn, with the first still whole.
+        _Stub.fields = {'dip': '70', 'spacing': '5', '_name': 'cross', '_phi': '30'}
+        _build_joint_network(sd, editor)
+        both = editor.result_rows()
+        n_cross = sum(1 for r in both if set_name(r.get('label')) == 'cross')
+        if n_cross == 0:
+            failures.append("button: the second set was not written")
+        if sum(1 for r in both if set_name(r.get('label')) == 'bed') != n_bed:
+            failures.append("button: building a second set changed the first")
+        if sum(1 for r in both if not set_name(r.get('label'))) != n_typed:
+            failures.append("button: the hand-entered joint line did not survive")
+        if sum(1 for r in both if set_name(r.get('label')) == 'st') != n_steep:
+            failures.append("button: the set already on the sheet did not survive")
+        if len(both) != len(after) + n_cross:
+            failures.append(f"button: {len(after)} rows + {n_cross} generated came "
+                            f"to {len(both)}")
+        if [r['label'] for r in both[:len(after)]] != [r['label'] for r in after]:
+            failures.append("button: the second set moved the rows before it")
     finally:
         network_dialog.BuildNetworkDialog = _Stub.__bases__[0]
-    results.append(f"button      a new set appends {n_bed} rows after the "
-                   f"{len(before)} already there; reopening it at half the "
-                   f"spacing replaces exactly those rows in place with "
-                   f"{n_bed2}, leaving the hand-entered line, the other set and "
-                   f"the properties alone")
+        network_dialog._LAST_SET = None
+    results.append(f"button      a set appends {n_bed} rows after the "
+                   f"{len(before)} already there, and a second appends "
+                   f"{n_cross} more, leaving the first set, the other set and "
+                   f"the hand-entered line exactly where they were")
 
 
 def run():
@@ -253,7 +274,7 @@ def run():
     failures, results = [], []
     t0 = time.time()
     _leg_dialog(failures, results)
-    _leg_reopen(failures, results)
+    _leg_session_memory(failures, results)
     _leg_button(failures, results)
     app.processEvents()
     print(f"Joint network dialog check ({time.time() - t0:.0f} s):")
@@ -270,8 +291,8 @@ def main():
             print(f"  - {f}")
         raise SystemExit(1)
     print("\nThe dialog describes a set, previews exactly what it writes, "
-          "reopens one as itself, and the button replaces an edited set in "
-          "place.")
+          "opens the next one on the last one's parameters, and the button "
+          "appends without disturbing anything already on the sheet.")
 
 
 if __name__ == '__main__':

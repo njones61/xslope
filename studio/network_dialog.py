@@ -6,11 +6,12 @@ as a hundred separate lines. This dialog is that description: a kind, its
 parameters, where the set exists, and one set of joint properties for every trace
 in it. OK writes the rows onto the joints sheet.
 
-The rows carry the description back. Every row's Label holds the set record (see
-:mod:`xslope.joints`), so selecting one of a set's rows in the joints editor and
-pressing the button again REOPENS this dialog on that set, filled in as it was
-built, and OK regenerates it in place: changing a spacing is an edit, not a
-delete-and-redo.
+What is written is the LINES. The description is not stored anywhere — a row
+carries the set's name and its place in it, ``bed-03``, and nothing more — so a
+network is changed the way it was made: remove the set (the joints editor's
+Remove set) and build another. Within one Studio session the dialog reopens on
+the parameters it was last used with, which is a convenience for building a
+second set beside the first, not a record of the first.
 
 The preview draws what OK would write, before it writes it — the traces in the
 joint color over the section, with the model's existing joint lines behind them
@@ -110,8 +111,15 @@ def _num_or_none(text):
         return None
 
 
+#: The description the dialog was last used with, for this Studio session only.
+#: Building a second set beside the first usually means changing one number, and
+#: re-entering nine is not how that is done. It is a convenience, not a record:
+#: nothing reads it back off a file, and a new session starts empty.
+_LAST_SET = None
+
+
 class BuildNetworkDialog(QDialog):
-    """Build (or rebuild) one joint set.
+    """Build one joint set.
 
     Parameters
     ----------
@@ -121,7 +129,8 @@ class BuildNetworkDialog(QDialog):
         The joint lines as the editor currently holds them — what the preview
         draws behind the new set, and what a name collision is checked against.
     jset : JointSet, optional
-        An existing set to reopen. ``None`` builds a new one.
+        A description to open on. Defaults to the one this session last built,
+        with a fresh name; ``JointSet`` is never read back off the model.
     parent : QWidget, optional
     """
 
@@ -130,7 +139,6 @@ class BuildNetworkDialog(QDialog):
         self.setWindowTitle("Build joint network")
         self._sd = slope_data or {}
         self._rows = [dict(r) for r in (rows or [])]
-        self._editing = jset.name if jset is not None else None
         self._generated = []
         self._error = ""
         self._help_by_widget = {}
@@ -147,9 +155,9 @@ class BuildNetworkDialog(QDialog):
             "A joint network is described as a SET — a dip and a spacing, two "
             "sets crossing, or a block size — and resolved into the individual "
             "traces the joints sheet holds, clipped to where the set exists. "
-            "Every row it writes carries the set's parameters in its label, so "
-            "this dialog reopens on the set and regenerates it when something "
-            "changes. The preview shows what OK would write."))
+            "What it writes is the lines: every row is named for the set it came "
+            "from, and a set is changed by removing it and building another. The "
+            "preview shows what OK would write."))
 
         split = QSplitter(Qt.Horizontal)
         split.addWidget(self._build_form())
@@ -179,10 +187,14 @@ class BuildNetworkDialog(QDialog):
         split.setSizes([self._form_scroll.minimumWidth(),
                         self._form_scroll.minimumWidth()])
 
+        # The parameters this session last built with, under a name no set in
+        # this model is using — so a second set opens on the first's numbers and
+        # cannot be written over it.
+        if jset is None:
+            jset = _LAST_SET
         if jset is not None:
             self._load(jset)
-        else:
-            self._name.setText(self._next_name())
+        self._name.setText(self._next_name())
         self._on_kind()
         self._refresh()
         # Opened at the size its own contents ask for rather than at a
@@ -224,8 +236,9 @@ class BuildNetworkDialog(QDialog):
         f_set = QFormLayout(g_set)
         self._name = QLineEdit()
         self._name.setToolTip(
-            "The set's name. Every row it writes is labeled with it, so the set "
-            "can be found, reopened and regenerated as one thing.")
+            "The set's name. Every row it writes is named for it — bed-01, "
+            "bed-02, … — so the network can be found, and removed, as one "
+            "thing.")
         self._name.textChanged.connect(self._schedule)
         f_set.addRow("Name", self._name)
         self._kind = QComboBox()
@@ -427,9 +440,12 @@ class BuildNetworkDialog(QDialog):
             return None
 
     def _load(self, jset):
-        """Fill the form in from an existing set."""
+        """Fill the form in from a description (this session's last, normally).
+
+        The NAME is not taken from it: the caller sets a fresh one, because what
+        this fills in is a starting point for another set and not the set it came
+        from."""
         from .editors import _display_number
-        self._name.setText(jset.name)
         for i, (_word, kind) in enumerate(KIND_ITEMS):
             if kind == jset.kind:
                 self._kind.setCurrentIndex(i)
@@ -439,9 +455,9 @@ class BuildNetworkDialog(QDialog):
         if spec in self._region_specs:
             self._region.setCurrentIndex(self._region_specs.index(spec))
         elif spec is not None:
-            # A region the model no longer carries — a renamed joint region, a
-            # deleted material. Offered as itself so reopening the set does not
-            # silently re-point it at the whole section.
+            # A region this model does not carry — the last set was built on a
+            # different model. Offered as itself rather than silently re-pointed
+            # at the whole section, which would be a different set.
             self._region.addItem(f"{spec} (not in this model)")
             self._region_specs.append(spec)
             self._region.setCurrentIndex(len(self._region_specs) - 1)
@@ -480,6 +496,9 @@ class BuildNetworkDialog(QDialog):
         self._flush()
         if not self._generated:
             return
+        # Remembered for the next build in this session only (see _LAST_SET).
+        global _LAST_SET
+        _LAST_SET = self.result_set()
         super().accept()
 
     def _refresh(self, *_args):
@@ -509,22 +528,22 @@ class BuildNetworkDialog(QDialog):
                         "on a joint that has none.")
             self._status.setText(
                 f"{len(self._generated)} joint line"
-                f"{'' if len(self._generated) == 1 else 's'}"
-                f"{'' if self._editing is None else ', replacing the set'}."
-                + note)
+                f"{'' if len(self._generated) == 1 else 's'}." + note)
         self._preview.schedule()
 
     def _name_clash(self, jset):
-        """The message for a name another set is already using, or ``''``."""
+        """The message for a name another set is already using, or ``''``.
+
+        Two sets under one name would be one network as far as everything that
+        groups rows by name is concerned — the joints editor's Remove set among
+        them — so the second one is refused rather than merged into the first."""
         if jset is None:
             return ""
         taken = {set_name(r.get("label")) for r in self._rows} - {""}
-        if self._editing is not None:
-            taken -= {self._editing}
         if jset.name in taken:
             return (f"This model already has a joint set named "
-                    f"{jset.name!r}. Give this one a different name, or select "
-                    f"one of that set's rows and press Build network to edit it.")
+                    f"{jset.name!r}. Give this one a different name, or remove "
+                    f"that set first (Remove set, in the joints editor).")
         return ""
 
     def _draw(self, ax):
@@ -542,10 +561,7 @@ class BuildNetworkDialog(QDialog):
         span = _preview_span(ax, self._sd)
         # The model's existing joint lines, behind: what is already there, so a
         # second set is placed against the first rather than in the dark.
-        mine = self._editing
         for r in self._rows:
-            if mine is not None and set_name(r.get("label")) == mine:
-                continue                     # this set is being replaced
             try:
                 xs = [float(r["x1"]), float(r["x2"])]
                 ys = [float(r["y1"]), float(r["y2"])]
@@ -565,13 +581,9 @@ class BuildNetworkDialog(QDialog):
 
     # -- results -----------------------------------------------------------
     def result_rows(self):
-        """The rows OK writes: the set, generated and labeled with its record."""
+        """The rows OK writes: the set, generated and named for it."""
         self._flush()
         return [dict(r) for r in self._generated]
-
-    def editing(self):
-        """The name of the set being replaced, or ``None`` for a new one."""
-        return self._editing
 
 
 #: Shared by the band's two fields — one explanation, two widgets.

@@ -8849,24 +8849,26 @@ MODULE_CHECKS = {
         "dip, two sets sharing a label, an unknown material, a misspelt "
         "property); the mesh of a generated cross-jointed block; and a "
         "generated network written to the joints sheet and read back "
-        "unchanged. Then the SET RECORD the rows' labels carry: every kind's "
-        "parameters, region and elevation band written into a label and read "
-        "back as the same record and the same text; one set regenerated in "
-        "place, leaving the other set, a hand-entered joint line and the "
-        "properties alone; and an elevation band, whose own edges keep a trace "
-        "the section's boundary would drop, beside a region named as a polygon "
-        "of Type 'joints'."),
+        "unchanged. Then the NAMES the rows carry: every kind names its rows "
+        "set-01, set-02, … and carries nothing else in them, a hand-typed label "
+        "belongs to no set, an unbuildable set is refused, and the rows of one "
+        "network are found together by that name — which is how a set is "
+        "removed — with the other set and a hand-entered line left where they "
+        "are; and an elevation band, whose own edges keep a trace the section's "
+        "boundary would drop, beside a region named as a polygon of Type "
+        "'joints'."),
     'joint_network_dialog': (
         'joint_network_dialog_check.py',
         "The Studio's Build network dialog and the joints-editor button that "
         "opens it: an empty form offers no OK, a dip and a spacing generate the "
-        "set the dialog then hands back row for row, the region and the "
-        "elevation band reach the rows' labels, a name another set is using and "
-        "a pair of sets at one dip are refused in the dialog rather than on OK; "
-        "a set reopens from its rows as the same record, properties included; "
-        "and pressing OK on a reopened set replaces exactly its own rows where "
-        "they were, leaving a hand-entered joint line, the other set and the "
-        "properties alone."),
+        "set the dialog then hands back row for row — every row named for the "
+        "set and nothing more — the region and the elevation band narrow it, and "
+        "a name another set is using and a pair of sets at one dip are refused "
+        "in the dialog rather than on OK; a second dialog opens on the "
+        "parameters the first was built with, under a name the model is not "
+        "using; and the button appends the rows after the ones already there, "
+        "leaving a hand-entered joint line and every set already on the sheet "
+        "exactly where they were."),
     'joint_surfaces': (
         'joint_surfaces_check.py',
         "What a jointed line reaches once the reinforce sheet says so: the "

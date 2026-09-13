@@ -15,11 +15,11 @@ saved and reloaded like any other input.
                            mesher refuses
     :func:`voronoi`        a blocky mass: a seeded Voronoi tessellation
 
-**The set record.** A generated set is one description that resolved into many
-lines, and editing the description means generating it again. :class:`JointSet`
-is that description, and it rides in the rows' own Label cells — see the grammar
-below :data:`SET_LABEL_SEP` — so a set can be reopened, edited and
-:func:`regenerate`\\ d from the file alone, rather than deleted row by row.
+**The set.** :class:`JointSet` is one description — a kind, its parameters, a
+region — and :meth:`JointSet.generate` resolves it into the rows. Nothing keeps
+the description: what a file holds is the joint lines themselves, which is what
+the mesher, the solver and the reader all work on. A set is changed by removing
+its rows and building another.
 
 **The region.** Every generator clips its traces to a region, which is the whole
 section by default, a named material (or several), a polygon of Type ``joints``
@@ -41,7 +41,9 @@ conjugate pair ``cross_jointed(parallel_set(..., 60), parallel_set(..., -60))``.
 **Labels.** Rows are labeled ``<label>-01``, ``<label>-02``, … in the order the
 traces come out, which is along the set's own normal from the low side. The
 label reaches the plots, the 1D details view and the report, so a network keeps
-one name per set rather than a hundred anonymous lines.
+one name per set rather than a hundred anonymous lines — and :func:`set_name`
+reads the set back off it, which is what lets the rows of one network be found
+and removed together.
 
 **Properties.** ``props`` is applied to every row of the set: any of ``c``,
 ``phi``, ``c_res``, ``phi_res``, ``dil``, ``t_cut``, ``kn``, ``ks`` and ``jred``,
@@ -602,54 +604,23 @@ def voronoi(slope_data, block_size, seed, region=None, label="vor", props=None,
 
 
 # ---------------------------------------------------------------------------
-# The set record, and the label that carries it
+# The set, and the names its rows carry
 # ---------------------------------------------------------------------------
 #
-# A generated set is not a hundred independent lines: it is one description — a
-# dip, a spacing, a region — that RESOLVED into a hundred lines. Editing the
-# spacing means regenerating the set, and regenerating it means knowing what the
-# set was. The joints sheet has no column for that, and the file has no other
-# place to put it, so the description rides in the rows' own Label cells, where
-# it is visible, editable and saved by every path that already saves the sheet.
+# A set is one description — a dip, a spacing, a region — that RESOLVES into many
+# joint lines. What a file keeps is the lines: the rows of the joints sheet are
+# the input, and the mesher, the solver, the report and the reader all work on
+# them. The description itself is not written down, and a set is not a thing the
+# file remembers (the owner's ruling: "why not just store the joints? if you want
+# to recreate them, make another set").
 #
-# The grammar is one line of text:
-#
-#     bed-03|par|dip=30|s=2|reg=mat:Sandstone|band=40:
-#     \____/ \_/ \_____________________________________/
-#       |     |                 |
-#       |     |                 the set's parameters, one per field
-#       |     the kind: par (parallel), crs (cross-jointed), vor (Voronoi)
-#       the row: the set's name, then its position in the set
-#
-# Fields are separated by "|", each a `key=value`. A field at its default is
-# omitted, so the shortest label a set can carry is `bed-03|par|dip=30|s=2`. The
-# fields are:
-#
-#     dip=   degrees, counter-clockwise from +x  (par; `dip=60,-60` for crs)
-#     s=     spacing                             (par; `s=2,3` for crs)
-#     off=   offset across the set's normal, omitted at 0  (crs: `off=0,1`)
-#     len=   persistent trace length  } omitted on a fully persistent set
-#     gap=   the rock bridge between  }
-#     blk=   block size    (vor)
-#     seed=  random seed   (vor)
-#     reg=   mat:<name>[+<name>...] | poly:<name or number>; omitted for the
-#            whole section
-#     band=  <y_min>:<y_max>, either end empty for open (`band=40:`)
-#
-# The band's two ends are separated by a COLON rather than by the dash the plan
-# sketched, because an elevation can be negative and `band=-10-5` cannot be read.
-# Numbers are written with %g, so 2.0 is `2` and a set's label comes out as the
-# same text every time it is generated.
+# What a generated row carries beyond its geometry and its properties is its
+# NAME: the set's name and the row's position in it — "bed-01", "bed-02", … So a
+# network reads as one thing in a list, a message or a table, and the rows of one
+# set can be found together, which is how a set is changed: remove it (Remove
+# set, in the joints editor) and build another.
 
-#: What separates the fields of a set label.
-SET_LABEL_SEP = "|"
-
-#: The word each kind is written with, and what each word means.
-KIND_WORDS = {"parallel": "par", "cross": "crs", "voronoi": "vor"}
-_KIND_BY_WORD = {w: k for k, w in KIND_WORDS.items()}
-
-#: Every parameter a kind takes, with the value that means "not stated". A
-#: parameter at its default is left out of the label.
+#: Every parameter a kind of set takes, with the value that means "not stated".
 _SET_PARAMS = {
     "parallel": {"dip": None, "spacing": None, "offset": 0.0,
                  "trace_len": None, "gap": None},
@@ -660,18 +631,12 @@ _SET_PARAMS = {
 }
 
 
-def _g(value):
-    """A number as it is written in a label: shortest form, no trailing zeros."""
-    return f"{float(value):g}"
-
-
 def _canonical_region(region):
-    """A set's region in the one spelling its label uses.
+    """A set's region in one spelling.
 
-    ``'Sandstone'``, ``['Sandstone', 'Shale']`` and ``'mat:Sandstone'`` all name a
-    material, and a set that came back off a label has to compare equal to the one
-    that was written — so the record keeps a single spelling and the generators go
-    on accepting every one of them.
+    ``'Sandstone'``, ``['Sandstone', 'Shale']`` and ``'mat:Sandstone'`` all name
+    a material, and the generators accept every one of them; a set keeps the
+    explicit form, so two sets described the same way compare equal.
     """
     if region is None:
         return None
@@ -685,74 +650,50 @@ def _canonical_region(region):
                                      if p.strip())
         return f"mat:{text}"
     if isinstance(region, (Polygon, MultiPolygon)):
-        return region                        # to_label refuses it, by name
+        return region
     items = list(region)
     if not all(isinstance(r, str) for r in items):
-        return Polygon(items)                # a coordinate list: same refusal
+        return Polygon(items)                # a coordinate list, given outright
     names = [r.strip() for r in items]
     if not all(names):
         raise ValueError("A joint set's region names an empty material.")
     return "mat:" + "+".join(names)
 
 
-def _label_num(text, field):
-    try:
-        return float(text)
-    except (TypeError, ValueError):
-        raise ValueError(
-            f"The joint set label's {field} is {text!r}, which is not a number.")
-
-
-def short_label(label):
-    """The ``name-nn`` head of a row label, without the set record behind it.
-
-    What a list, a legend or a message shows: the record is there to regenerate
-    the set, not to be read off a drawing.
-    """
-    return str(label or "").split(SET_LABEL_SEP, 1)[0]
-
-
 def set_name(label):
-    """The set a row label belongs to, or ``''`` for a row that is not in one.
+    """The set a row label belongs to, or ``''`` for a row that is in none.
 
-    A row is in a set when its label carries the record — ``bed-03|par|…``. A
-    hand-typed label, however it is spelled, is not a set and is never touched by
-    :func:`regenerate`.
+    A set's rows are named ``bed-01``, ``bed-02``, …, so the set is whatever
+    stands before the last ``-NN``. A label of any other shape — ``'base
+    joint'``, ``'bed'``, ``''`` — names no set, which is what a hand-entered line
+    carries and what keeps it out of anything done to a set as a whole.
     """
-    text = str(label or "")
-    if SET_LABEL_SEP not in text:
-        return ""
-    head = text.split(SET_LABEL_SEP, 1)[0]
-    name, _, index = head.rpartition("-")
-    return name if name and index.isdigit() else ""
+    name, _, index = str(label or "").strip().rpartition("-")
+    return name.strip() if name.strip() and index.isdigit() else ""
 
 
 class JointSet:
-    """One generated joint set: its kind, its parameters, its region and the
-    properties every one of its rows carries.
+    """One joint set: its kind, its parameters, its region and the properties
+    every one of its rows carries.
 
-    The record a Studio dialog fills in and a row label carries. :meth:`generate`
-    turns it into the rows of the ``joints`` sheet; :meth:`from_label` reads it
-    back off any one of them, so a set can be reopened and regenerated from the
-    file alone.
+    What the Build network dialog fills in and :meth:`generate` resolves into the
+    rows of the ``joints`` sheet. Nothing keeps it afterwards — the rows are the
+    input — so a set is changed by removing its rows and building another.
 
     Attributes
     ----------
     name : str
-        The set's name, which is what its rows are labeled with.
+        The set's name. Its rows are named ``<name>-01``, ``<name>-02``, …
     kind : {'parallel', 'cross', 'voronoi'}
     params : dict
         The kind's own parameters; :data:`_SET_PARAMS` lists which each takes.
     region : optional
-        As :func:`resolve_region`. A region given as a bare polygon cannot be
-        written into a label — draw it as a polygon of Type ``joints`` and name
-        it instead, which is what that polygon type is for.
+        As :func:`resolve_region`.
     band : (y_min, y_max), optional
         An elevation band the region is cut to, either end ``None`` for open.
     props : dict, optional
-        The joint properties every row of the set gets. They live in the rows'
-        own columns, not in the label, so editing one row's strength by hand
-        stays an ordinary edit — it is the GEOMETRY the label carries.
+        The joint properties every row of the set gets. They land in the rows'
+        own columns, where one row's strength can still be edited by hand.
     """
 
     def __init__(self, name, kind, params=None, region=None, band=None,
@@ -765,13 +706,7 @@ class JointSet:
         name = str(name).strip()
         if not name:
             raise ValueError(
-                "A joint set needs a name; its rows are labeled with it.")
-        for bad in (SET_LABEL_SEP, "="):
-            if bad in name:
-                raise ValueError(
-                    f"A joint set's name cannot contain {bad!r}: the name and the "
-                    f"set's parameters share the Label cell, separated by that "
-                    f"character.")
+                "A joint set needs a name; its rows are named with it.")
         self.name = name
         self.kind = kind
         self.params = dict(_SET_PARAMS[kind])
@@ -785,7 +720,6 @@ class JointSet:
         self.band = tuple(band) if band is not None else None
         self.props = dict(props or {})
 
-    # -- equality is what a round-trip reads --------------------------------
     def __eq__(self, other):
         if not isinstance(other, JointSet):
             return NotImplemented
@@ -794,149 +728,15 @@ class JointSet:
                 and self.band == other.band)
 
     def __repr__(self):                     # pragma: no cover - debugging aid
-        return f"<JointSet {self.to_label(1)}>"
+        return f"<JointSet {self.name!r} ({self.kind})>"
 
-    # -- the label ----------------------------------------------------------
-    def _region_field(self):
-        """``reg=`` for this set's region, or ``None`` when it is the whole
-        section — which is what a missing field means."""
-        region = self.region
-        if region is None:
-            return None
-        if isinstance(region, str):
-            return f"reg={region}"
-        raise ValueError(
-            "This joint set's region is a bare polygon, which cannot be written "
-            "into the set's label — and a set whose label does not carry its "
-            "region cannot be regenerated. Draw the region on the polygon sheet "
-            "as a polygon of Type 'joints', name it in its block header, and "
-            "give the region as 'poly:<name>'.")
-
-    def _band_field(self):
-        if self.band is None:
-            return None
-        lo, hi = self.band
-        return ("band=" + ("" if lo is None else _g(lo)) + ":"
-                + ("" if hi is None else _g(hi)))
-
-    def to_label(self, index):
+    def row_label(self, index):
         """The Label cell of row ``index`` (1-based) of this set."""
-        p = self.params
-        fields = [f"{self.name}-{int(index):02d}", KIND_WORDS[self.kind]]
-        if self.kind == "voronoi":
-            fields.append(f"blk={_g(p['block_size'])}")
-            fields.append(f"seed={int(p['seed'])}")
-        elif self.kind == "cross":
-            fields.append(f"dip={_g(p['dip'])},{_g(p['dip2'])}")
-            fields.append(f"s={_g(p['spacing'])},{_g(p['spacing2'])}")
-            if float(p["offset"] or 0.0) or float(p["offset2"] or 0.0):
-                fields.append(f"off={_g(p['offset'] or 0.0)},"
-                              f"{_g(p['offset2'] or 0.0)}")
-        else:
-            fields.append(f"dip={_g(p['dip'])}")
-            fields.append(f"s={_g(p['spacing'])}")
-            if float(p["offset"] or 0.0):
-                fields.append(f"off={_g(p['offset'])}")
-        if self.kind != "voronoi" and p.get("trace_len") is not None:
-            fields.append(f"len={_g(p['trace_len'])}")
-            fields.append(f"gap={_g(p.get('gap') or 0.0)}")
-        for extra in (self._region_field(), self._band_field()):
-            if extra:
-                fields.append(extra)
-        return SET_LABEL_SEP.join(fields)
-
-    @classmethod
-    def from_label(cls, label, props=None):
-        """The set a row label describes, and the row's index in it.
-
-        Returns ``(JointSet, index)``. Raises ``ValueError`` on a label carrying
-        no record, so a caller tells a generated row from a typed one by asking
-        :func:`set_name` first.
-        """
-        text = str(label or "").strip()
-        parts = text.split(SET_LABEL_SEP)
-        if len(parts) < 2:
-            raise ValueError(
-                f"{text!r} is not a joint set label: a generated row's Label "
-                f"carries the set's parameters after its name, separated by "
-                f"{SET_LABEL_SEP!r}.")
-        head, kind_word = parts[0].strip(), parts[1].strip().lower()
-        name, _, index = head.rpartition("-")
-        if not name or not index.isdigit():
-            raise ValueError(
-                f"{head!r} is not a joint set row name: it is the set's name and "
-                f"the row's number in it, as 'bed-03'.")
-        kind = _KIND_BY_WORD.get(kind_word)
-        if kind is None:
-            raise ValueError(
-                f"{kind_word!r} is not a joint set kind. The kinds are written "
-                + ", ".join(sorted(_KIND_BY_WORD)) + ".")
-        params, region, band = {}, None, None
-        for field in parts[2:]:
-            key, sep, value = field.partition("=")
-            key = key.strip().lower()
-            if not sep:
-                raise ValueError(
-                    f"{field!r} in a joint set label is not a 'key=value' field.")
-            if key == "reg":
-                region = value.strip()
-            elif key == "band":
-                lo, colon, hi = value.partition(":")
-                if not colon:
-                    raise ValueError(
-                        f"The elevation band {value!r} needs its two ends "
-                        f"separated by ':' — '40:60', or '40:' for open above.")
-                band = (None if not lo.strip() else _label_num(lo, "band"),
-                        None if not hi.strip() else _label_num(hi, "band"))
-            elif key == "dip":
-                bits = value.split(",")
-                params["dip"] = _label_num(bits[0], "dip")
-                if len(bits) > 1:
-                    params["dip2"] = _label_num(bits[1], "dip")
-            elif key == "s":
-                bits = value.split(",")
-                params["spacing"] = _label_num(bits[0], "spacing")
-                if len(bits) > 1:
-                    params["spacing2"] = _label_num(bits[1], "spacing")
-            elif key == "off":
-                bits = value.split(",")
-                params["offset"] = _label_num(bits[0], "offset")
-                if len(bits) > 1:
-                    params["offset2"] = _label_num(bits[1], "offset")
-            elif key == "len":
-                params["trace_len"] = _label_num(value, "trace length")
-            elif key == "gap":
-                params["gap"] = _label_num(value, "gap")
-            elif key == "blk":
-                params["block_size"] = _label_num(value, "block size")
-            elif key == "seed":
-                params["seed"] = int(_label_num(value, "seed"))
-            else:
-                raise ValueError(
-                    f"{key!r} is not a field of a joint set label. The fields "
-                    f"are dip, s, off, len, gap, blk, seed, reg and band.")
-        params = {k: v for k, v in params.items() if k in _SET_PARAMS[kind]}
-        return cls(name, kind, params, region=region, band=band,
-                   props=props), int(index)
-
-    @classmethod
-    def from_rows(cls, rows):
-        """The set a list of generated rows belongs to, properties included.
-
-        The parameters come off the first row's label and the properties off its
-        columns — which is where they live, so a set reopened in the dialog shows
-        the strength its rows actually carry.
-        """
-        rows = list(rows)
-        if not rows:
-            raise ValueError("No rows to read a joint set from.")
-        jset, _index = cls.from_label(rows[0].get("label"))
-        jset.props = {k: rows[0][k] for k in _ROW_DEFAULTS if k in rows[0]}
-        return jset
+        return f"{self.name}-{int(index):02d}"
 
     # -- generating ---------------------------------------------------------
     def generate(self, slope_data):
-        """The rows this set resolves to, each labeled with the record.
+        """The rows this set resolves to, each named for the set.
 
         The same list the generators return, so a generated set is inspected,
         edited, saved and reloaded like a typed one.
@@ -960,7 +760,7 @@ class JointSet:
                         "of its sets.")
             # Generated under throwaway names so cross_jointed's own check — two
             # sets may MEET but may not lie on one another — reads them as a
-            # pair; the record's labels go on below.
+            # pair; the set's own names go on below.
             first = parallel_set(slope_data, p["dip"], p["spacing"],
                                  offset=p.get("offset") or 0.0,
                                  persistence=persistence, region=self.region,
@@ -980,15 +780,16 @@ class JointSet:
                                 label=self.name, props=self.props,
                                 band=self.band)
         for i, row in enumerate(rows):
-            row["label"] = self.to_label(i + 1)
+            row["label"] = self.row_label(i + 1)
         return rows
 
 
 def sets_in(slope_data):
-    """Every generated set in the model, in the order its rows first appear.
+    """Every named set in the model, in the order its rows first appear.
 
-    Returns a list of ``(name, JointSet, [row indices])``. A row whose label
-    carries no record belongs to no set and appears in none of them.
+    Returns a list of ``(name, [row indices])`` — the grouping "Remove set" and
+    anything else that acts on a whole network uses. A row whose label names no
+    set (:func:`set_name`) belongs to none of them and appears in none.
     """
     rows = (slope_data or {}).get("joint_lines") or []
     order, found = [], {}
@@ -997,59 +798,7 @@ def sets_in(slope_data):
         if not name:
             continue
         if name not in found:
-            try:
-                found[name] = (JointSet.from_rows([row]), [])
-            except ValueError:
-                continue                    # a name-shaped label that isn't one
+            found[name] = []
             order.append(name)
-        found[name][1].append(i)
-    return [(name, found[name][0], found[name][1]) for name in order]
-
-
-def regenerate(slope_data, set_id, jset=None, props=None):
-    """Replace every row of one set with a fresh generation, in place.
-
-    This is what editing a network's spacing or dip does: the set's rows are
-    deleted and the set is generated again where they were, so nothing else on
-    the sheet moves and no hand-entered joint line is touched.
-
-    Parameters
-    ----------
-    slope_data : dict
-        The model. ``slope_data['joint_lines']`` is rewritten.
-    set_id : str
-        The set's name — ``'bed'`` for rows labeled ``bed-01|par|…``.
-    jset : JointSet, optional
-        The set as it should now be. ``None`` re-runs the set exactly as its
-        labels record it, which is what regenerating after a geometry change
-        means.
-    props : dict, optional
-        Properties for the new rows. ``None`` keeps what the set's first row
-        carries, so regenerating a set never silently rewrites its strength.
-
-    Returns
-    -------
-    list of dict
-        The rows written.
-    """
-    rows = list((slope_data or {}).get("joint_lines") or [])
-    mine = [i for i, r in enumerate(rows) if set_name(r.get("label")) == set_id]
-    if not mine:
-        present = [name for name, _s, _i in sets_in(slope_data)]
-        raise ValueError(
-            f"No joint set named {set_id!r} in this model. "
-            + (f"Its sets are: {', '.join(repr(n) for n in present)}."
-               if present else
-               "Its joint lines are hand-entered, not generated."))
-    if jset is None:
-        jset = JointSet.from_rows([rows[i] for i in mine])
-    if props is not None:
-        jset.props = dict(props)
-    elif not jset.props:
-        jset.props = {k: rows[mine[0]][k] for k in _ROW_DEFAULTS
-                      if k in rows[mine[0]]}
-    fresh = jset.generate(slope_data)
-    at = mine[0]
-    kept = [r for i, r in enumerate(rows) if i not in set(mine)]
-    slope_data["joint_lines"] = kept[:at] + fresh + kept[at:]
-    return fresh
+        found[name].append(i)
+    return [(name, found[name]) for name in order]

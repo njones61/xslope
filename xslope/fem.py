@@ -5516,12 +5516,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             - stable (bool): Whether the CALLER should treat the slope as standing at
               this F. Equals `converged` on every criterion except 'hybrid', where it
               is also True for a STABLE_STUCK verdict.
-            - verdict (str): 'CONVERGED' | 'FAILED' | 'STABLE_STUCK' | 'AMBIGUOUS'
+            - verdict (str): 'CONVERGED' | 'FAILED' | 'STABLE_STUCK' | 'AMBIGUOUS' |
+              'JOINT_SETTLED' (jointed models only: the interface, the displacement
+              field and the soil have all settled and the slope stands, though the
+              force tolerance was never met - see `joint_verdict`)
             - u_ratio (float or None): max|u| / max|u|_elastic at the end of the solve
             - u_growth (float or None): elastic displacements gained over the trailing
               window of the iteration history (the growth signal)
-            - exit_reason (str): 'converged' | 'iteration_cap' | 'inconclusive' |
-              'disp_limit' | 'diverging' - why this solve stopped
+            - exit_reason (str): why this solve stopped - 'converged' |
+              'iteration_cap' | 'inconclusive' | 'disp_limit' | 'diverging' |
+              'yield_gate' (it settled in force outside the yield surface and the
+              corrector could not find an admissible state either) | 'steady_slip' /
+              'joint_settled' (the two jointed readings, `joint_verdict`)
             - diverging_iteration (int or None): iteration at which the early-failure
               rule fired, and diverging_signal (str or None) which of its two tests
               fired ('runaway' or 'stalled_residual'); None on any other exit
@@ -5999,24 +6005,26 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # function is the loop exactly as it was before this round, which is what
     # fem_solver='viscoplastic' selects.
     #
-    # A JOINTED model is not offered to the corrector. On a slipping interface
-    # pair the shear traction is held at c_j + t_n tan phi_j and is therefore
-    # independent of the tangential displacement, so a state the viscoplastic
-    # loop reached by growing the slip has no variable left for a Newton step
-    # that may only move displacements. Measured on the block-on-a-plane row at
-    # F = 1.3: the residual the corrector reads at the viscoplastic state lives
-    # ENTIRELY on the joint degrees of freedom (the soil residual is exactly
-    # zero) and is the last sweep's un-returned excess -- 0.15% of the mean
-    # interface strength, invisible to the yield gate, and 2.3e-2 in the Dawson
-    # measure against a tolerance of 1e-3. No step along the Newton direction
-    # reduces it: the line search exhausts its backtracks at alpha = 1/256 and
-    # the attempt is refused after two or three iterations. Supplying the
-    # friction cross term the slipping tangent omits (d t_s / d delta_n =
-    # +/- k_n tan phi_j, which takes the tangent's departure from a finite
-    # difference of the element force from 53% to 16%) leaves the trace
-    # identical, step for step, so the tangent is not what refuses it. The
-    # viscoplastic verdict stands in every case, which is what it did before,
-    # so nothing is lost by not spending the attempts.
+    # A JOINTED model IS offered to the corrector (JOINT_NEWTON_ON). An earlier
+    # reading of this file said it could not be: on a slipping pair the shear
+    # traction is held at c_j + t_n tan phi_j and so does not move with the
+    # tangential displacement, and a displacement-only Newton step looked to have
+    # nothing left to move. Two things were missing from that, and both are
+    # supplied now -- the friction cross term the slipping tangent omits
+    # (d t_s / d delta_n = +/- k_n tan phi_j), and the interface's own accumulated
+    # state, which the corrector's stateless law threw away and which is the state
+    # a grown mechanism lives in. With both, the corrector certifies: one
+    # rock-toppling standing bracket edge that the plain loop takes 185 381 sweeps
+    # to converge is certified at 300 (r16_joint_solver_speed.md §4).
+    #
+    # A REFUSAL on a jointed model still decides nothing, and that is measured
+    # rather than assumed: on twenty-six jointed bracket edges, three STANDING
+    # edges are refused at every rung of the ladder -- from an active set in which
+    # no pair changes state -- and then reach equilibrium and are certified, and on
+    # two rows the standing and failing edges' refusals are the same reading in
+    # every field the record carries (r19_corrector_refusal.md). So there is no
+    # checkpoint and no churn level at which a refusal may end a trial, and the
+    # refusal record exists to be read, not to rule.
     _corrector_on = ((_solver == 'auto') and bool(_corrector)
                      and (fem_data.get("joint_data") is None
                           or (JOINT_NEWTON_ON if joint_newton is None

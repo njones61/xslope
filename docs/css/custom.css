@@ -148,6 +148,22 @@
   width: 34%;
 }
 
+/* Seven-column variant: # | dot | problem | referee | also published | RS2 | notes.
+   Add `match7` beside `corpus-summary match` on the wrapping div. Measured on
+   rs2_joints.md: Problem ~35, Referee ~40, Also published ~14, RS2 ~11, Notes ~75
+   characters mean; the split below runs each first line near full and leaves
+   Notes, the longest column, the remainder. The seven widths sum to 100%. */
+.corpus-summary.match7 th:nth-child(3),
+.corpus-summary.match7 td:nth-child(3) { width: 18%; }
+.corpus-summary.match7 th:nth-child(4),
+.corpus-summary.match7 td:nth-child(4) { width: 20%; }
+.corpus-summary.match7 th:nth-child(5),
+.corpus-summary.match7 td:nth-child(5) { width: 9%; }
+.corpus-summary.match7 th:nth-child(6),
+.corpus-summary.match7 td:nth-child(6) { width: 9%; }
+.corpus-summary.match7 th:nth-child(7),
+.corpus-summary.match7 td:nth-child(7) { width: 36%; }
+
 /* Corpus match-key: the insufficient-data symbol is the text glyph U+2298
    (renders in text color = black, unlike the colored emoji dots), scaled up
    to emoji height so it doesn't read as tiny next to them. */

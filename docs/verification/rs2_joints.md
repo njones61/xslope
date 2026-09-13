@@ -93,7 +93,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 factor of safety or a tilt angle; problems 22 and 23 report neither, being shear-box tests of the
 joint model whose output is a stress-displacement curve.
 
-<div class="corpus-summary match" markdown>
+<div class="corpus-summary match match7" markdown>
 
 | # | Match | Problem | Referee | Also published | RS2 without / with improvement | Notes |
 |---:|:-:|---|---|---|---|---|

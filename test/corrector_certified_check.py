@@ -103,6 +103,39 @@ def check_rule():
           audit.trial_decided(trial(verdict="JOINT_SETTLED", iterations=99), C))
 
 
+def check_standing_verdicts():
+    """A JOINT_SETTLED trial STANDS; it is not a refusal.
+
+    The bracket a record ended on is read as the highest standing trial and the
+    lowest refused one. Reading JOINT_SETTLED as a refusal puts the refused edge at
+    the BOTTOM of the bracket on any row that has one, and the row is then reported
+    as checking a pair its own record did not end on — which is what happened to
+    RJ-4, whose F = 0.5 trial settles on its joints."""
+    print("\n1b. Which verdicts stand")
+    import ssrm_trial_audit as audit
+
+    import json
+    import tempfile
+    rec = {"trials": [
+        {"F": 0.5, "verdict": "JOINT_SETTLED", "iterations": 5001},
+        {"F": 1.125, "verdict": "CONVERGED", "iterations": 1024},
+        {"F": 1.30078125, "verdict": "CONVERGED", "iterations": 186870},
+        {"F": 1.3203125, "verdict": "FAILED", "iterations": 75061},
+        {"F": 3.0, "verdict": "FAILED", "iterations": 181},
+    ]}
+    fh = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+    json.dump(rec, fh)
+    fh.close()
+    got = audit.audit_one({"max_iter": "250000"}, fh.name)
+    os.unlink(fh.name)
+    lo, hi = (got or {}).get("edges", (None, None))
+    check("the standing edge is the highest trial that stood",
+          lo == 1.30078125, f"got {lo}")
+    check("the refused edge is the lowest trial that failed",
+          hi == 1.3203125, f"got {hi}")
+    check("every trial is counted decided", (got or {}).get("decided") == 5)
+
+
 def check_readers_agree():
     print("\n2. The three readers agree")
     import ssrm_trial_audit as audit
@@ -167,6 +200,7 @@ def main():
     print("Corrector certification checks")
     print("=" * 72)
     check_rule()
+    check_standing_verdicts()
     check_readers_agree()
     check_record()
     print("\n" + "=" * 72)

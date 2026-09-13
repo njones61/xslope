@@ -181,8 +181,15 @@ def audit_one(kv, meta):
     decided = [r for r in rows if r[3]]
     # The final bracket's two edges: the highest standing trial and the lowest
     # refused one. A lock is budget-bound when either edge never decided.
-    stand = [r for r in rows if r[1] == "CONVERGED"]
-    refuse = [r for r in rows if r[1] not in ("CONVERGED",) ]
+    # A trial STANDS on either standing verdict. JOINT_SETTLED is one: the slip,
+    # the field and the soil residual have all settled and what is left is a limit
+    # cycle on the joint degrees of freedom. Reading it as a refusal put the
+    # "lowest refused" edge at the bottom of the bracket on any row that has one
+    # (RJ-4's F = 0.5), and the row was then reported as checking a pair its own
+    # record did not end on. run_tests._edges_check and lock_edges use the same
+    # two-verdict list, and the three must not disagree.
+    stand = [r for r in rows if r[1] in ("CONVERGED", "JOINT_SETTLED")]
+    refuse = [r for r in rows if r[1] not in ("CONVERGED", "JOINT_SETTLED")]
     edge_lo = max((r[0] for r in stand), default=None)
     edge_hi = min((r[0] for r in refuse), default=None)
     edge_undecided = sum(1 for r in undecided

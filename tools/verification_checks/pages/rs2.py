@@ -42,10 +42,10 @@ CONFIG = PageConfig(
     # shallow rebuild of problem 43 is a different model's number.
     untagged_allow=[
         ('1.19', 'The 1.19 published for this problem'),
-        # RS2-49 is reported without a lock, so its section prints no factor of
-        # its own; these two are the published spread it is reported against.
-        ('1.08', "against its own SSR of 1.08"),
-        ('0.99', 'the referee at 0.99 between them'),
+        # RS2-49's published spread needed two entries here while its section
+        # printed those numbers in prose alone. The section now opens with the
+        # same table a locked row has — referee and RS2 SSR, XSLOPE reading
+        # "no lock" — and an authority column is read as published already.
     ],
 
     abs_bounds=[

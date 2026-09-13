@@ -286,10 +286,10 @@ every LEM method collapses to tan φ / tan β, and [RS2 Part IV VP6](#p4-vp6) is
 the same dam: confining reduction to RS2's upstream SSR *Search* Area holds the mechanism on
 ACADS 2(b)'s specified circle.
 
-**Mesh.** Both rows are locked at the 6.5 m tri6 mesh, 3 166 elements against the vendor model's
-2 204, so XSLOPE's mesh is the finer of the two, and both mechanisms drift mildly downward under
+**Mesh.** Both rows are locked at the 6.5 m tri6 mesh, 3,166 elements against the vendor model's
+2,204, so XSLOPE's mesh is the finer of the two, and both mechanisms drift mildly downward under
 refinement. Everything else matches the vendor `.fea` field by field: geometry, the four zones'
-strengths, E = 50 000 kPa, ν = 0.4, and the per-material tensile caps 0 / 0 / 0 / 85 kPa held
+strengths, E = 50,000 kPa, ν = 0.4, and the per-material tensile caps 0 / 0 / 0 / 85 kPa held
 static under reduction (`tensilestrength_SRF: 0`).
 
 <!-- test: file=files/rocscience/vp005.xlsx, type=mesh_elements, element_type=tri6, target_size=6.5, expected_elements=3166, benchmark=RS2-4-mesh -->
@@ -412,7 +412,7 @@ run through the tag's `elastic_materials`, as [RS2-23](#rs2-23) carries its own.
 | SSRM (1.0 m mesh) | 1.309 | 1.31 (−0.1%) | Bishop 1.24 recorded |
 
 ψ = 0. The tensile caps are the vendor model's — T = 0 on the embankment, 10 kPa on both clays —
-held static through the reduction (`tensilestrength_SRF = 0`), and E = 50 000 kPa / ν = 0.4
+held static through the reduction (`tensilestrength_SRF = 0`), and E = 50,000 kPa / ν = 0.4
 throughout is the vendor model's own.
 
 <!-- test: file=files/rocscience/rs2_9.xlsx, type=fem_ssrm, expected_fs=1.309, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.2, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Embankment (elastic face skin), benchmark=RS2-9 -->
@@ -784,8 +784,8 @@ with a single geosynthetic sheet at the fill base (Borges & Cardoso 2002).
 
 **The sheet is an interface, not a bonded bar.** RS2 does not mesh the section as one body: its
 `#024` models split the solid mesh along the geotextile and join the two faces with frictional slip
-joints (c = 0, φ = 30.96°, k<sub>n</sub> = 100 000 kPa/m, k<sub>s</sub> = 10 000 kPa/m, no tensile
-capacity), with the sheet itself a tension-only member between them (EA = 200 000 kN/m,
+joints (c = 0, φ = 30.96°, k<sub>n</sub> = 100,000 kPa/m, k<sub>s</sub> = 10,000 kPa/m, no tensile
+capacity), with the sheet itself a tension-only member between them (EA = 200,000 kN/m,
 T = 200 kN/m). Its end nodes belong to no solid element, so both ends are free to slide and the
 sheet's whole grip on the ground is the interface. These files carry that construction: the
 reinforcement line is flagged `Joint` and states those four properties, the mesher splits the mesh
@@ -805,8 +805,8 @@ shallow slip on the face instead of the deep-seated mechanism.
 | face strip held elastic, as the vendor models build it | 1.104 |
 | face strip yielding with the rest of the fill | 0.811 |
 
-Both cases are locked at a 1.5 m mesh and again at 2.0 m, which brackets the vendor's own 2 442
-and 2 462 quadratic triangles. The two readings differ by less than the deficit against RS2, and
+Both cases are locked at a 1.5 m mesh and again at 2.0 m, which brackets the vendor's own 2,442
+and 2,462 quadratic triangles. The two readings differ by less than the deficit against RS2, and
 they move in opposite directions, so neither case is riding a trend:
 
 | Case | 2.0 m mesh | 1.5 m mesh |
@@ -847,16 +847,16 @@ Slide2 counterpart: [VP33](rocscience.md#vp33). Built with a caveat.
 
 Geometry, material zonation, unit weights and elastic constants follow the RS2 vendor `.fez`
 (`slope stability #025.fez`): the 15-vertex external boundary, the four internal material
-interfaces, the diagonal Pgc/Kca wedge cut, and ν = 0.4 with E = 50 000 kPa on every zone. The
+interfaces, the diagonal Pgc/Kca wedge cut, and ν = 0.4 with E = 50,000 kPa on every zone. The
 vendor file gives Clayey till (Pgc) φ = 7.5°, equal to the clay-shale.
 
 **Refinement does not close the deficit; it widens it.** The Glacio-fluvial sand band is only
 3.3 m thick, thinner than one element at the tagged 5 m size, so resolution is the natural place to
-look for a −6.8% deficit. It is not there: at a 2.5 m target size the model meshes to 5 239
-elements against the tagged mesh's 1 457 and the strength reduction reads **1.188**, further below
+look for a −6.8% deficit. It is not there: at a 2.5 m target size the model meshes to 5,239
+elements against the tagged mesh's 1,457 and the strength reduction reads **1.188**, further below
 RS2's 1.29 rather than nearer it, with finer meshes continuing in the same direction. Nor is the
-tagged mesh coarse against the vendor's own, which solves this dyke at 3 527 nodes and 1 698
-quadratic triangles against the tag's 3 080 and 1 457.
+tagged mesh coarse against the vendor's own, which solves this dyke at 3,527 nodes and 1,698
+quadratic triangles against the tag's 3,080 and 1,457.
 
 **The corpus file carries one piezometric line where the vendor model carries two.** This is the
 problem RS2 titles *"…with Multiple Phreatic Surfaces"*: its `.fea` assigns one piezometric line to
@@ -944,7 +944,7 @@ the SSRM reduces strength to failure. Material (manual Table 1): c′ = 10 kPa, 
 `.fea` external boundary, with XSLOPE's own steady unsaturated Gardner seepage supplying u because
 the vendor result file is empty. The domain is split into a Mohr-Coulomb corridor near the cut and
 an elastic outer zone, reproducing the vendor's own material partition; both materials carry its
-elastic pair (ν = 0.4, E = 50 000 kPa), and the corridor carries `rock1`'s tensile cap T = 10 kPa,
+elastic pair (ν = 0.4, E = 50,000 kPa), and the corridor carries `rock1`'s tensile cap T = 10 kPa,
 held static through the reduction as the vendor model does.
 
 **Which vendor model these files are built from.** This problem exists in the archive four ways
@@ -1028,7 +1028,7 @@ embankment crest, exactly the theoretical crack depth 2c/γ = 2 × 20 / 19.4 = 2
 removed wedge's weight is put straight back on the cut surface as a vertical surcharge,
 γ z = 39.964 kPa: uniform where the wedge was a full-thickness slab (x = 0–10) and tapering to
 nothing where it thinned out against the 30° face (x = 13.568). Both materials are
-Mohr-Coulomb c = 20 kPa, φ = 0, γ = 19.4 kN/m³, E = 50 000 kPa, ν = 0.4, each capped at
+Mohr-Coulomb c = 20 kPa, φ = 0, γ = 19.4 kN/m³, E = 50,000 kPa, ν = 0.4, each capped at
 T = 20 kPa, and there is no water anywhere in the model.
 
 `rs2_29clay.xlsx` transcribes that model on the vendor's own external boundary. Its toe sits at
@@ -1378,7 +1378,7 @@ cutoff that deep excludes the upper reach of the basal band along with the skin.
 
 **Mesh, and what the deep lock is.** A deep mechanism's factor follows the element size until the
 zone that carries it is resolved, and this dam's still does: the same filtered run gives 1.521 at
-the tagged 12.4 ft mesh (2 223 tri6) and 1.470 at the 8 ft mesh (5 220 tri6). The skin drifts under
+the tagged 12.4 ft mesh (2,223 tri6) and 1.470 at the 8 ft mesh (5,220 tri6). The skin drifts under
 refinement as well, so both rows are **regression locks at the tagged mesh**.
 
 **What the vendor model states.** RS2 models this dam natively rather than by import — the
@@ -1590,7 +1590,7 @@ geotextile layers, joins the halves with frictional slip joints, and runs tensio
 elements along the split, so the load path between the reinforced fill and its sheets passes
 through sliding interfaces. XSLOPE builds it the same way — each sheet is a reinforcement line
 with `Joint = Yes`, on the vendor's interface (Adhesion 0, Delta 28.35°, k<sub>n</sub> =
-k<sub>s</sub> = 100 000), running from the back face of its facing column as the vendor places it,
+k<sub>s</sub> = 100,000), running from the back face of its facing column as the vendor places it,
 with its front end tied to the column at the sheet's own capacity and its back end free to pull
 out.
 
@@ -1606,7 +1606,7 @@ XSLOPE makes that statement directly. The blocks are `elastic` and excluded from
 reduction, and the facing is built the way the paper describes it — a **dry stack**: a joint line
 on each column's back face, one under its base, and a course joint across the column at every
 sheet elevation, all on the blocks' own friction (Adhesion 0, δ = 34°, k<sub>n</sub> =
-k<sub>s</sub> = 100 000, reduced with the soil). Neither the paper nor the vendor `.fez` states a
+k<sub>s</sub> = 100,000, reduced with the soil). Neither the paper nor the vendor `.fez` states a
 block-on-block interface strength, so the blocks' own φ is used. The columns then slide, part and
 rock on their courses instead of standing as one body held up by a cohesion nobody measured.
 
@@ -1708,6 +1708,10 @@ rule for it. Two trials of the bracket reach 250,000 sweeps without a verdict, s
 variant brackets is a statement about the budget as much as about the wall, and the row is reported
 without a lock.
 
+| XSLOPE SSRM | L&H FDM referee | RS2 SSR |
+|---|---|---|
+| *no lock* | 0.99 | 1.08 |
+
 On this variant the published factors do not agree with each other either: RS2's
 limit-equilibrium columns for problem 49 read 0.98 / 0.97 / 0.97 against its own SSR of 1.08, with
 the referee at 0.99 between them. The limit-equilibrium sibling
@@ -1755,9 +1759,13 @@ refinement step.
 #### ⊘ RS2-51: Geotextile wall, dual reinforcement type (vp090_fem) {#rs2-51-wall}
 
 Two geotextile grades in one wall: the lower seven layers at T<sub>a</sub> = 11.0 kN/m, the upper
-eight at 7.5, with the vendor's K<sub>s</sub> = 10 000 on the lower seven against 100 000 above.
+eight at 7.5, with the vendor's K<sub>s</sub> = 10,000 on the lower seven against 100,000 above.
 Every trial of both brackets reaches a verdict, and a step of refinement moves the factor by twice
 the bracket tolerance, so the variant is reported without a lock.
+
+| XSLOPE SSRM | L&H FDM referee | RS2 SSR |
+|---|---|---|
+| *no lock* | 1.01 | 1.00 |
 
 ![RS2-51: two geotextile grades in one wall (vp090_fem, Ta = 11.0 kN/m on the lower seven layers, 7.5 kN/m above) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The geometry is the baseline's; the two grades differ in tensile capacity, anchorage length and interface shear stiffness, not in layout](images/RS2-51-wall.png)
 
@@ -1772,6 +1780,10 @@ the toe and daylights several meters out in the foundation (their Fig. 6, reprod
 of the RS2 manual's problem 52). XSLOPE's refusal is local to the toe of the lowest facing column:
 the strain concentrates in a patch under that corner, the foundation beyond it stays elastic, and
 what gives way is the interfaces rather than the soil.
+
+| XSLOPE SSRM | L&H FDM referee | RS2 SSR |
+|---|---|---|
+| *no lock* | 0.86 | 0.84 |
 
 The paper says of this variant that a circle is a poor description of its shear zone, that a
 three-part wedge through the foundation drops Spencer's factor further, that many deeper
@@ -1797,6 +1809,10 @@ without a verdict on each of the two meshes, and a step of refinement moves the 
 the bracket tolerance. It is the family's least settled row on both counts, and it is reported
 without a lock.
 
+| XSLOPE SSRM | L&H FDM referee | RS2 SSR |
+|---|---|---|
+| *no lock* | 1.01 | 1.03 |
+
 ![RS2-53: pond against the wall (vp092_fem, piezometric line at y = 9 with a 3 m pond on the lower tier, Ta = 9.25 kN/m) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The reinforced fill is modeled free-draining, so pore pressure acts on the foundation only and the pond enters as a distributed load on the lower tier](images/RS2-53.png)
 
 #### ⊘ RS2-54: Geotextile wall, crest surcharge (vp093_fem) {#rs2-54}
@@ -1804,6 +1820,10 @@ without a lock.
 A uniform 20 kPa surcharge on the uppermost tier, running from the back face of the top facing
 column to the far boundary — the vendor model applies it over exactly that reach, and so does this
 file, so nothing bears on the facing itself.
+
+| XSLOPE SSRM | L&H FDM referee | RS2 SSR |
+|---|---|---|
+| *no lock* | 1.02 | 0.92 |
 
 This is the one variant whose two published models are not the same wall. Leshchinsky & Han
 designed the surcharge case at T<sub>a</sub> = 11.6 kN/m: the surcharge "increased the required
@@ -1952,7 +1972,7 @@ Mohr-Coulomb only.)
 **Elastic constants and tensile caps come from the shipped models, not the printed tables.**
 Each section's Table 1 gives ν per case but prints E once, as a merged cell spanning every
 row — "5,000". The models RS2 solved these SSR values with carry two pairs, keyed to the
-material family: (ν, E) = (0.30, 5 000) for the γ = 24 / c = 20 cases and (0.35, 10 000) for
+material family: (ν, E) = (0.30, 5,000) for the γ = 24 / c = 20 cases and (0.35, 10,000) for
 the γ = 18 / c = 5 cases. Every case also carries a real tensile cap, T = c, well inside the
 uncapped Mohr-Coulomb apex (20 against 34.6 kPa on #56 case 5; 5 against 8.66 kPa on #58 case 5).
 Both are transcribed from the models.
@@ -2013,7 +2033,7 @@ the toe. The critical mechanism is a **non-circular** translational slip riding 
 the lens, which is what makes this an SSRM (not a circular-search) problem: an unconstrained
 circular search misfinds the deeper competing surface (FS ≈ 1.9), whereas the SSRM localizes
 the shear band through the c = 1 / φ = 5 lens on its own. Dry — no water table, tension crack,
-seismic or loads. Elastic constants are the published Case-1 values (E = 50 000 kPa, ν = 0.4;
+seismic or loads. Elastic constants are the published Case-1 values (E = 50,000 kPa, ν = 0.4;
 the vendor `.fez` reader does not parse E/ν); ψ = 0 (the Griffiths convention this corpus uses).
 
 | Case | XSLOPE | RS2 SSRM | PLAXIS | Slide2 |
@@ -2021,8 +2041,8 @@ the vendor `.fez` reader does not parse E/ν); ψ = 0 (the Griffiths convention 
 | Case 1 (published moduli), 3 m mesh | 1.572 | 1.57 (+0.1%) | 1.6 (−1.8%) | 1.567 |
 | Case 2 (varying moduli) | — | 1.56 | 1.6 | 1.567 |
 
-The published problem also runs a **Case 2** with varying moduli (GreyClay 20 000, YellowClay/
-Debris 18 000, Waste 2 000 kPa). Since SSRM FS is insensitive to the elastic constants (an E-only
+The published problem also runs a **Case 2** with varying moduli (GreyClay 20,000, YellowClay/
+Debris 18,000, Waste 2,000 kPa). Since SSRM FS is insensitive to the elastic constants (an E-only
 change), Case 2 is not a separate XSLOPE case and the row above carries the vendor columns only.
 
 XSLOPE's SSRM lands on the Slide2 / RS2 SSRM cluster and just below PLAXIS. It is locked as a
@@ -2377,7 +2397,7 @@ The Padina tailings dam, after
 
 A 225 m wide × 77 m tall cross-section of an **eight-material** tailings dam with a
 **phreatic surface**. Twelve zones tile the domain with no gaps or overlaps (union area =
-domain area = 13 262 m²): a Marl base, Marly-Clay and Alluvial-Clay bands, a Counterfill
+domain area = 13,262 m²): a Marl base, Marly-Clay and Alluvial-Clay bands, a Counterfill
 body, the Tailings core (c = 0, φ = 34.8°) and the Rockfill/Fill embankment shells. Pore
 pressure is applied from a single 14-point phreatic surface connected to every material
 (static groundwater — the vendor `.fez` carries no FE seepage solution to read). Strength
@@ -2391,7 +2411,7 @@ this corpus uses).
 
 **The lock is taken at RS2's own discretization.** Every physical input on this eight-material
 section transcribes verbatim, and the mesh is one of the inputs the `.fez` specifies: RS2 solves
-5 224 six-node triangles on 10 687 nodes, where a 3 m target size gives 3 798 on 7 803 nodes. The lock is
+5,224 six-node triangles on 10,687 nodes, where a 3 m target size gives 3,798 on 7,803 nodes. The lock is
 therefore taken at the vendor's own ~2.2 m size, where the SSRM reads **1.306**, +1.2% from RS2's
 1.29 and inside the published 1.29–1.41 band.
 
@@ -2679,7 +2699,7 @@ cross-method readings and do not soften the same-method result.
 
 **The inputs are not the difference.** Every input class was checked against the vendor model
 `slope stability #068_03.fez` this row is built from: the three zone polygons reproduce its own
-meshed material regions to within 0.004 m² of area on 10 288.75 m² of section, the strengths and
+meshed material regions to within 0.004 m² of area on 10,288.75 m² of section, the strengths and
 unit weights match its material records exactly, and there is no groundwater on either side. The
 pseudo-static force matches too — the vendor writes a uniform body force b<sub>x</sub> = −k per
 element, which is k·W acting through each element's centroid, the same line of action as XSLOPE's
@@ -2700,7 +2720,7 @@ That is a strength-reduction target XSLOPE can pair with like for like, on the s
 file, with `k_seismic` = 0.155 g driving toward the face — the sign the vendor model writes as a
 uniform body force b<sub>x</sub> = −k. But the factor never stops moving under mesh refinement. It
 falls at every step of a target-size sweep from 4.0 m down to 1.5 m — a seven-fold increase in
-element count, from 1 593 to 10 803 tri6 — and it is still falling on the finest mesh, crossing
+element count, from 1,593 to 10,803 tri6 — and it is still falling on the finest mesh, crossing
 RS2's own SSR on the way down.
 There is no length scale for the series to converge to: the mechanism rides a thin φ = 15° band,
 and unregularized Mohr-Coulomb fixes no thickness for that band, so each refinement resolves it
@@ -2765,7 +2785,7 @@ sliver band between the two lines is thinner than the slicer resolves, so one el
 both solvers. A T = 0 crest zone opens in tension more readily than the body around it and pulls
 the SRF down. ([RS2-29](#rs2-29)'s clay model reaches the same end by geometry instead, cutting
 the crest away and replacing its weight with a surcharge.) ψ = 0; E and ν are the vendor model's
-own elastics (E = 50 000 kPa, ν = 0.4), inert for the factor of safety.
+own elastics (E = 50,000 kPa, ν = 0.4), inert for the factor of safety.
 
 | Method | XSLOPE | RS2 SSRM | Giam & Donald reference | Slide2 Spencer |
 |---|---|---|---|---|
@@ -2839,7 +2859,7 @@ RS2-14/17b/18b; this problem exercises the two together.
 
 XSLOPE's SSRM lands at **1.656**, +1.0% above RS2's SSRM 1.64 and inside the published LEM cluster.
 It is mesh-stable between the 2.5 m and 1.5 m target sizes. Locked at the 1.5 m mesh. ψ = 0; E and
-ν are the file's inert elastics (E = 8 000 kPa, ν = 0.45, assigned by soil type — the vendor
+ν are the file's inert elastics (E = 8,000 kPa, ν = 0.45, assigned by soil type — the vendor
 model publishes none for a power-curve material).
 
 <!-- test: file=files/rocscience/vp041.xlsx, type=fem_ssrm, expected_fs=1.656, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, k0=1, benchmark=RS2-P4-VP41 -->
@@ -3166,7 +3186,7 @@ sits well below the specified circle; it is locked as the model's own global min
 constrained row that answers RS2's question.
 
 **Mesh.** The unconstrained branch holds at 1.016 under refinement, at the tagged 2.0 ft mesh
-(1 499 tri6) and again at a 1.2 ft mesh (4 132 tri6), and the constrained branch does not
+(1,499 tri6) and again at a 1.2 ft mesh (4,132 tri6), and the constrained branch does not
 survive that refinement at all: the search area's held-at-full-strength surroundings leave the
 confined mechanism with no equilibrium at any strength-reduction factor, the sub-unity limit of the
 `ssr_zone` approximation described on [RS2-64](#rs2-64). The constrained row is therefore locked at
@@ -3207,8 +3227,8 @@ at zero.
 
 **Where RS2's constraint is.** `slope stability #069.fez` states it twice: an
 `SSR_polygonal_zones` ring flagged as a Search Area, 38 vertices running from the crest down
-through the foundation to the toe and back, and a material partition that leaves only 1 030 of its
-9 626 elements Mohr-Coulomb over that same corridor. Both mean *reduce strength only along the deep
+through the foundation to the toe and back, and a material partition that leaves only 1,030 of its
+9,626 elements Mohr-Coulomb over that same corridor. Both mean *reduce strength only along the deep
 surface*, and the tag carries the polygon verbatim.
 
 The corridor is a band rather than a region, so it has to be checked against the mesh before it
@@ -3280,7 +3300,7 @@ transient seepage solve (the same flow solve that feeds the Slide2-LEM curve in
 [vp102t_60](files/rocscience/vp102t_60.xlsx) / [100](files/rocscience/vp102t_100.xlsx) / [300](files/rocscience/vp102t_300.xlsx) / [600](files/rocscience/vp102t_600.xlsx) / [1500.xlsx](files/rocscience/vp102t_1500.xlsx) (drawdown snapshots)
 
 A homogeneous earth dam (c' = 13.8 kPa, φ' = 37°, γ = 18.2 kN/m³). The elastic pair comes from the
-shipped `.fez`, E = 50 000 kPa and ν = 0.4, where both manuals *print* E = 1×10⁵ kPa and ν = 0.3 —
+shipped `.fez`, E = 50,000 kPa and ν = 0.4, where both manuals *print* E = 1×10⁵ kPa and ν = 0.3 —
 one of the places where the vendor's printed table and its own model disagree, and one that a
 strength-reduction factor is insensitive to. ψ = 0 throughout.
 

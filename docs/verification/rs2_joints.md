@@ -69,13 +69,13 @@ budget and its trial record is checked (`tools/ssrm_trial_audit.py`), the same r
 [geotextile wall family](rs2.md#rs2-48) runs under.
 
 What a trial costs varies by two orders of magnitude across this corpus. The longest trial to reach
-a verdict takes 3 745 sweeps on problem 8 and 196 201 on problem 18, both at a budget of 250 000.
+a verdict takes 3,745 sweeps on problem 8 and 196,201 on problem 18, both at a budget of 250,000.
 Six of the ten rows measured carry at least one trial that does not decide inside that budget, and
 on problem 5 four trials do not, including both edges of its bracket.
 
 That is not, on the evidence, simply a matter of allowing more sweeps. [Problem 7](#rj-7)'s
 undecided trial was re-solved on its own at **four times** the budget — a million sweeps against
-250 000 — and came back with the same verdict it had before, `STABLE_STUCK`: the model neither
+250,000 — and came back with the same verdict it had before, `STABLE_STUCK`: the model neither
 converged nor diverged there, and the extra sweeps changed nothing about that. An undecided trial
 of this kind is a statement about the convergence criterion rather than about the iteration limit,
 and what settles one is a reading of the state rather than more machine time — the joint verdict on
@@ -249,7 +249,7 @@ would have been, and the edge is read as decided on it — see [what answers a b
 edge](#what-answers-a-bracket-edge).
 
 A step of refinement — a 2D size of 7.0 m, which takes the mesh from 2 072 nodes and 67 interface
-elements to 3 573 and 94 — returns the identical factor with every trial decided inside its budget,
+elements to 3,573 and 94 — returns the identical factor with every trial decided inside its budget,
 the same standing edge taking 138 840 sweeps there. So the two meshes agree, and the finer one
 needs no certification to say so.
 
@@ -274,15 +274,15 @@ is what the closed form's own pair of answers for cases a and c says as well —
 
 <!-- test: file=files/rocscience/joints/rj001c.xlsx, type=fem_ssrm, expected_fs=1.057, element_type=tri6, target_size=10.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1c, f_stand=1.046875, f_fail=1.06640625, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 7.0 m, which takes the mesh from 2 072 nodes and 67
-interface elements to 3 573 and 94 — moves the factor by one bracket step, inside the row's own
+A step of refinement — a 2D size of 7.0 m, which takes the mesh from 2,072 nodes and 67
+interface elements to 3,573 and 94 — moves the factor by one bracket step, inside the row's own
 tolerance, and every trial of both brackets reaches a verdict. The corpus bracket's longest takes
-82 261 sweeps of the 250 000 allowed, and the refinement's upper edge — the trial that held this
-row back, which used to reach the budget with nothing to say — comes back FAILED at 225 001
+82,261 sweeps of the 250,000 allowed, and the refinement's upper edge — the trial that held this
+row back, which used to reach the budget with nothing to say — comes back FAILED at 225,001
 sweeps on a steady slip.
 
 The four standing trials of that refinement cost 302 to 311 sweeps each, where on the same mesh
-and the same bracket they cost 11 196 to 131 095 before. Shortening a standing trial is what the
+and the same bracket they cost 11,196 to 131,095 before. Shortening a standing trial is what the
 interface Newton corrector does, and it is why this row can be cut at all.
 
 **Input file:** [rj001c.xlsx](files/rocscience/joints/rj001c.xlsx).
@@ -333,9 +333,9 @@ the model has is a joint one.
 
 <!-- test: file=files/rocscience/joints/rj002.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-2, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 0.35 m, which takes the mesh from 11 537 nodes to 21 110 —
+A step of refinement — a 2D size of 0.35 m, which takes the mesh from 11,537 nodes to 21,110 —
 moves the factor by one bracket step, inside the row's own tolerance, and all nine trials of both
-brackets reach a verdict. The longest takes 185 381 sweeps of the 250 000 allowed.
+brackets reach a verdict. The longest takes 185,381 sweeps of the 250,000 allowed.
 
 **The gap to the referee is 12%, and the three continuum codes do not bracket this row.** Alejano
 & Alonso publish Goodman & Bray's limit equilibrium at 0.76 and their own UDEC run at 0.87; RS2
@@ -365,9 +365,13 @@ spacing and a cross set at −20° at 30 m, both through the origin. The manual 
 The rock is elastic — the vendor's `Plasticity Specifications: Non` — so only the joints can fail;
 γ = 26.0946 kN/m³, E = 9072 MPa, ν = 0.26. The joints carry c = 100 kPa and φ = 40°.
 
+| XSLOPE SSRM | UDEC referee | RS2 without / with improvement |
+|---|---|---|
+| *no lock* | 1.13 | 1.12 / 1.09 |
+
 The row carries no lock, so it prints no factor of its own. The FAILING edge of its bracket,
-F = 1.222656, reaches 250 000 sweeps `AMBIGUOUS`, and a bracket edge nothing ruled on cannot
-define a factor of safety. Every other trial decides, the longest of them taking 206 973 sweeps.
+F = 1.222656, reaches 250,000 sweeps `AMBIGUOUS`, and a bracket edge nothing ruled on cannot
+define a factor of safety. Every other trial decides, the longest of them taking 206,973 sweeps.
 
 That edge is one the Newton corrector was offered and refused, as [problem 19](#rj-19)'s failing
 edge is and [problem 5](#rj-5)'s four are. A refusal is the absence of a verdict rather than a
@@ -395,10 +399,10 @@ E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°.
 
 <!-- test: file=files/rocscience/joints/rj004.xlsx, type=fem_ssrm, expected_fs=1.311, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-4, f_stand=1.30078125, f_fail=1.3203125, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 8.4 m, which takes the mesh from 9 993 nodes and 936 interface
-elements to 19 130 and 1 325 — does not move the factor at all: the finer mesh returns the same
-bracket, edge for edge. Every trial of both brackets reaches a verdict, the longest taking 186 870
-sweeps of the 250 000 allowed.
+A step of refinement — a 2D size of 8.4 m, which takes the mesh from 9,993 nodes and 936 interface
+elements to 19,130 and 1,325 — does not move the factor at all: the finer mesh returns the same
+bracket, edge for edge. Every trial of both brackets reaches a verdict, the longest taking 186,870
+sweeps of the 250,000 allowed.
 
 Its lowest trial, F = 0.5, is the corpus's one `JOINT_SETTLED` verdict: the slip, the displacement
 field and the soil residual have all stopped and what is left is a limit cycle on the joint degrees
@@ -418,8 +422,12 @@ The shared 260 m section cut by two sets: one at −55° at 10 m spacing through
 set at 40 m spacing. The rock is elastic — the vendor's `Plasticity Specifications: Non` —
 γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26; the joints carry c = 100 kPa and φ = 40°.
 
+| XSLOPE SSRM | UDEC referee | RS2 without / with improvement |
+|---|---|---|
+| *no lock* | 1.7 | 1.65 / 1.86 |
+
 This is the most budget-limited row in the corpus, and the one row here that nothing in the solver
-has moved. **Four** of its nine corpus trials reach 250 000 sweeps without a verdict, two of them
+has moved. **Four** of its nine corpus trials reach 250,000 sweeps without a verdict, two of them
 the edges of the final bracket, so the factor the bracket encloses is conditioned on the sweep
 limit at both ends. The row prints no factor and carries no lock.
 
@@ -429,8 +437,8 @@ either by reading a steadily slipping interface as failing or by the corrector r
 equilibrium from the loop's own field, neither happens here. A corrector refusal is the absence of
 a verdict, not a verdict of its own, so the trials stay undecided.
 
-A step of refinement — a 2D size of 8.4 m, which takes the mesh from 21 659 nodes and 3 056
-interface elements to 29 765 and 3 514 — decides two more of the nine and brackets a factor one
+A step of refinement — a 2D size of 8.4 m, which takes the mesh from 21,659 nodes and 3,056
+interface elements to 29,765 and 3,514 — decides two more of the nine and brackets a factor one
 step below the corpus mesh's. Two trials still do not decide there, and one of them is the
 standing edge of that bracket, so the finer mesh does not settle the row either and neither
 bracket prints a factor. Between them the two take about 16 hours, more than twice any other row
@@ -449,11 +457,15 @@ the 55° face at a shallower angle than the face itself, so every one of them da
 slabs between them are free to slide out. The rock is Mohr-Coulomb (γ = 26.1 kN/m³, E = 9072 MPa,
 ν = 0.26, c = 675 kPa, φ = 43°, no tensile capacity).
 
+| XSLOPE SSRM | UDEC referee | RS2 without / with improvement |
+|---|---|---|
+| *no lock* | 1.27 | 1.25 / 1.31 |
+
 The row prints no factor and carries no lock, and what holds it back is the mesh rather than the
 sweep budget. Every trial of both brackets reaches a verdict — the corpus bracket's longest takes
-225 001 sweeps of the 250 000 allowed, and four of its nine trials are settled by a corrector
-certification — but a step of refinement to a 2D size of 8.4 m, which takes the mesh from 13 134
-nodes and 1 864 interface elements to 25 232 and 2 654, moves the factor by two bracket steps.
+225,001 sweeps of the 250,000 allowed, and four of its nine trials are settled by a corrector
+certification — but a step of refinement to a 2D size of 8.4 m, which takes the mesh from 13,134
+nodes and 1,864 interface elements to 25,232 and 2,654, moves the factor by two bracket steps.
 The row's own tolerance is one.
 
 That is the shape [problems 12](#rj-12) and [14](#rj-14) have, and this is the first row outside
@@ -480,13 +492,13 @@ higher than problem 6's.
 
 <!-- test: file=files/rocscience/joints/rj007.xlsx, type=fem_ssrm, expected_fs=1.564, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-7, f_stand=1.5546875, f_fail=1.57421875, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 8.4 m, which takes the mesh from 9 986 nodes and 934 interface
-elements to 19 179 and 1 323 — does not move the factor at all: the finer mesh returns the same
-bracket, edge for edge. Every trial of both brackets reaches a verdict, the longest taking 118 821
-sweeps of the 250 000 allowed.
+A step of refinement — a 2D size of 8.4 m, which takes the mesh from 9,986 nodes and 934 interface
+elements to 19,179 and 1,323 — does not move the factor at all: the finer mesh returns the same
+bracket, edge for edge. Every trial of both brackets reaches a verdict, the longest taking 118,821
+sweeps of the 250,000 allowed.
 
 **This row is where the budget argument was settled, and not in the budget's favor.** Its undecided
-trial was once re-solved on its own at four times the budget — a million sweeps against 250 000 —
+trial was once re-solved on its own at four times the budget — a million sweeps against 250,000 —
 and came back `STABLE_STUCK` exactly as before, which showed that an undecided jointed trial of
 this kind is a statement about the convergence criterion rather than about the iteration limit.
 Five of the nine trials of each bracket here are now settled by the Newton corrector reaching
@@ -517,14 +529,14 @@ against the set's usual 10<sup>8</sup>.
 
 <!-- test: file=files/rocscience/joints/rj008.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-8, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 1.05 m, which takes the mesh from 5 547 nodes to 10 802 —
+A step of refinement — a 2D size of 1.05 m, which takes the mesh from 5,547 nodes to 10,802 —
 moves the factor by one bracket step, inside the row's own tolerance, and all nine trials of both
-brackets reach a verdict. The budget is not what settles this row: its longest trial takes 1 981
-sweeps of the 250 000 allowed, where the [geotextile wall family](rs2.md#rs2-48) exhausts that
+brackets reach a verdict. The budget is not what settles this row: its longest trial takes 1,981
+sweeps of the 250,000 allowed, where the [geotextile wall family](rs2.md#rs2-48) exhausts that
 budget on five trials of eight rows.
 
 The two meshes disagree about one trial, and it is the one the bracket closes on. At F = 0.753906
-the corpus mesh reaches equilibrium in 311 sweeps and the finer mesh runs away in 1 981, so the
+the corpus mesh reaches equilibrium in 311 sweeps and the finer mesh runs away in 1,981, so the
 corpus bracket closes a step above the refined one. The row is cut on the corpus mesh, as every row
 here is, with the refinement inside its tolerance.
 
@@ -629,6 +641,10 @@ lifts the toe block and rotates it out; at 60° the rotation rather than the sli
 is what separates this row from problem 11. The rock is elastic at E = 2 × 10⁸ MPa, γ = 25 kN/m³,
 ν = 0.3 — not a rock modulus but the manual's own device for reproducing UDEC's rigid blocks.
 
+| XSLOPE SSRM | UDEC referee | LE (Alejano) | RS2 without / with improvement |
+|---|---|---|---|
+| *no lock* | 1.78 | 2.0 | 1.39 / 1.75 |
+
 The lower tip of each release trace is stated to six decimals, so it lands a part in 10⁷ from the
 bedding plane it belongs on; see [where a joint ends on another](#joint-terminations). This row and
 problem 14 state their generated bedding network to six decimals as well, which is the precision
@@ -694,6 +710,10 @@ it releases. The rock is the family's elastic rigid-block stand-in at E = 2 × 1
 γ = 25 kN/m³, ν = 0.3. Like problem 12, this row states its generated bedding network to six
 decimals; see the departures table.
 
+| XSLOPE SSRM | UDEC referee | LE (Alejano) | RS2 without / with improvement |
+|---|---|---|---|
+| *no lock* | 0.9 | 1.0 | 0.89 / 1.09 |
+
 The row carries no lock and prints no factor, and as on problem 12 it is the mesh rather than the
 sweep budget that says so. Every trial of both brackets reaches a verdict — the longest takes
 32 926 sweeps of the 250 000 allowed — and a step of refinement to a 2D size of 1.05 m, which
@@ -736,10 +756,10 @@ the UDEC run that scores it is 20.6% above. Nothing here explains that, and noth
 about it: every transcribed input class matches the vendor model.
 
 The trial that used to hold this row back was the upper edge of the corpus bracket. It reached
-250 000 sweeps with nothing to say; under the corrector default it comes back FAILED at 225 001
+250,000 sweeps with nothing to say; under the corrector default it comes back FAILED at 225,001
 sweeps on a steady slip, and every trial of the bracket now decides. A step of refinement — a 2D
-size of 1.4 m, which takes the mesh from 14 964 nodes and 2 179 interface elements to 32 131 and
-3 090 — moves the factor by one bracket step, inside the row's own tolerance, and decides on all
+size of 1.4 m, which takes the mesh from 14,964 nodes and 2,179 interface elements to 32,131 and
+3,090 — moves the factor by one bracket step, inside the row's own tolerance, and decides on all
 nine of its trials too, so the lock is cut on the corpus mesh. It is the corpus's longest row: the
 two brackets together take about 6.5 hours.
 
@@ -766,10 +786,10 @@ k<sub>s</sub> = 10<sup>7</sup> kPa/m and are reduced with the rock in the streng
 
 <!-- test: file=files/rocscience/joints/rj018.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-18, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 0.7 m, which takes the mesh from 3 486 nodes and 48 interface
-elements to 6 707 and 66 — does not move the factor at all, and every trial of both brackets
+A step of refinement — a 2D size of 0.7 m, which takes the mesh from 3,486 nodes and 48 interface
+elements to 6,707 and 66 — does not move the factor at all, and every trial of both brackets
 reaches a verdict. The budget is what the row needs rather than what it has to spare: the longest
-trial to decide takes about 226 000 sweeps of the 250 000 allowed.
+trial to decide takes about 226,000 sweeps of the 250,000 allowed.
 
 **Input file:** [rj018.xlsx](files/rocscience/joints/rj018.xlsx).
 
@@ -777,16 +797,20 @@ trial to decide takes about 226 000 sweeps of the 250 000 allowed.
 
 ### ⊘ RJ-19: Bi-planar step-path failure (rj019) {#rj-19}
 
-A 120 × 70 m section of one Mohr-Coulomb rock (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 10 500 kPa,
+A 120 × 70 m section of one Mohr-Coulomb rock (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 10,500 kPa,
 φ = 35°, tensile capacity 200 kPa) with a slope face from (30, 20) to (60, 70), cut by two
 discontinuous joints with a rock bridge between them: a basal joint at 28.4° from (39.0149,
 35.0248) to (63, 48), and an upper joint at 56.3° from (62, 49) to (76, 70). Both carry c = 0,
 φ = 40° and the same stiffness pair as RJ-18. Referee: UDEC 1.46.
 
-A step of refinement — a 2D size of 2.1 m, which takes the mesh from 3 485 nodes to 6 910 —
+| XSLOPE SSRM | UDEC referee | RS2 without / with improvement |
+|---|---|---|
+| *no lock* | 1.46 | 1.5 / 1.41 |
+
+A step of refinement — a 2D size of 2.1 m, which takes the mesh from 3,485 nodes to 6,910 —
 returns the same bracket edge for edge, so the factor this row brackets is not its mesh's. What it
 still is, in part, is its budget's, and that is the one thing stopping the row: **the FAILING edge
-of both brackets, F = 1.671875, reaches 250 000 sweeps without a verdict**, and a bracket edge
+of both brackets, F = 1.671875, reaches 250,000 sweeps without a verdict**, and a bracket edge
 nothing ruled on cannot define a factor of safety. The row is reported without a lock.
 
 Its standing edge is answered, and answered differently by the two meshes. On the corpus mesh

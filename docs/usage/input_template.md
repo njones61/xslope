@@ -959,7 +959,8 @@ column on this sheet is **FEM only** — the limit equilibrium engines do not re
 Each joint line is defined by:
 
 - **Geometry**:<br>
->>Label: Name used in error messages, summaries, and plots (optional)<br>
+>>Label: Name used in error messages, summaries, and plots (optional). A [generated
+set](#joint-sets) names its rows `bed-01`, `bed-02`, … after the set they came from<br>
 >>x1, y1 **[L]**: Start point coordinates<br>
 >>x2, y2 **[L]**: End point coordinates<br>
 - **Strength**:<br>
@@ -998,31 +999,18 @@ The interface element, its constitutive law, the derived stiffnesses and what th
 jointed reinforcement line: see
 [Joints without reinforcement](../fem/reinforcement.md#joints-without-reinforcement).
 
-### Generated sets, and what a Label holds {#joint-sets}
+### Generated sets {#joint-sets}
 
 A jointed rock mass is rarely described one line at a time, so a whole **set** of them can be generated at once —
 from Studio's [Build network](../studio/editing.md#build-network) dialog, or from `xslope.joints` in a script. A
 generated line is an ordinary row on this sheet: it can be read, edited by hand, saved and reloaded like a typed
 one, and nothing downstream can tell the two apart.
 
-What marks it is its **Label**, which carries the description the set was generated from:
-
-```
-bed-03|par|dip=25|s=2.5|off=0.5|reg=poly:North block|band=40:
-```
-
-Reading left to right: the set is named `bed` and this is its third row; `par` says it is a parallel set (`crs` is
-cross-jointed, `vor` is Voronoi); then one `key=value` per parameter, each left out when it is at its default. The
-keys are `dip` (degrees counter-clockwise from horizontal), `s` (spacing), `off` (offset across the set's normal),
-`len` and `gap` (a discontinuous set's trace length and the rock bridge between pieces), `blk` and `seed` (a
-Voronoi set's block size and random seed), `reg` (the region: `mat:<name>`, several joined by `+`, or
-`poly:<name or number>` for a [joint region](#joint-regions)), and `band` (an elevation band, `40:60`, with either
-end left empty for open). A cross-jointed set writes both of its sets into one field: `dip=60,-60|s=2,3`.
-
-The record is what lets a set be **edited**: reopening it regenerates its rows in place instead of asking you to
-delete a hundred of them and start again. The joint properties are not in it — they are in the row's own columns,
-where they can be edited one line at a time — so it is the geometry the Label carries and nothing else. A label
-that is not of this form is a name you chose, and it is never touched by a regeneration.
+What marks it is its **Label**, which is the set's name and the row's place in the set — `bed-01`, `bed-02`, … —
+and that name is what the plots, the messages and the report show. The description the rows were generated from
+is not stored: the joint lines are the input. To change a network, remove it (**Remove set** in Studio's joints
+editor removes every row of the set the selected row belongs to) and build another. A label of any other
+shape — `base joint` — is a name you chose, and it belongs to no set.
 
 ---
 

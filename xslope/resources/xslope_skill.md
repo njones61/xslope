@@ -1105,39 +1105,35 @@ drawn through material, so a trace along one of them is kept. Generated networks
 typed ones do: their traces meet, and the split copies each shared node once per wedge of
 material around it.
 
-**A set that can be edited (`JointSet`).** Build the set as a RECORD and the parameters ride in
-the rows' own labels, so the set can be regenerated later instead of deleted row by row. Use this
-whenever you generate a network from a description — it is what Studio's Build network dialog
-writes, and what reopens it.
+**A whole set at once (`JointSet`).** One description — a kind, its parameters, a region — that
+resolves into the rows. It is what Studio's Build network dialog fills in, and it is not stored
+anywhere: the rows ARE the input. To change a network, remove its rows and build another.
 
 ```python
-from xslope.joints import JointSet, regenerate, sets_in, set_name
+from xslope.joints import JointSet, sets_in, set_name
 
 bed = JointSet('bed', 'parallel',                 # 'parallel' | 'cross' | 'voronoi'
                {'dip': 25.0, 'spacing': 2.5, 'offset': 0.0},
                region='poly:North block',         # or 'mat:Sandstone', or None
                band=(40.0, None),                 # optional elevation band
                props={'phi': 34.0, 'c': 0.0, 'dil': 5.0})
-slope_data['joint_lines'] += bed.generate(slope_data)
-# label -> 'bed-01|par|dip=25|s=2.5|reg=poly:North block|band=40:'
+slope_data['joint_lines'] += bed.generate(slope_data)   # labels 'bed-01', 'bed-02', …
 
-sets_in(slope_data)          # [(name, JointSet, [row indices]), ...]
-regenerate(slope_data, 'bed', JointSet('bed', 'parallel',
-                                       {'dip': 25.0, 'spacing': 1.5},
-                                       region='poly:North block'))
+sets_in(slope_data)          # [(name, [row indices]), ...] — the rows of each network
+set_name('bed-03')           # 'bed'; '' for a hand-entered label like 'base joint'
+# Replace a set: drop its rows, then generate the new one.
+slope_data['joint_lines'] = [r for r in slope_data['joint_lines']
+                             if set_name(r['label']) != 'bed']
+slope_data['joint_lines'] += JointSet('bed2', 'parallel',
+                                      {'dip': 25.0, 'spacing': 1.5},
+                                      region='poly:North block',
+                                      props={'phi': 34.0}).generate(slope_data)
 ```
 
-`regenerate` replaces exactly that set's rows, where they were: another set, a hand-entered joint
-line and the properties the rows carry are untouched. With no record it re-runs the set as its
-labels state it. Parameter keys per kind: parallel `dip`, `spacing`, `offset`, `trace_len`,
-`gap`; cross adds `dip2`, `spacing2`, `offset2`; voronoi takes `block_size` and `seed`.
-
-**The label grammar** (`<name>-<nn>|<kind>|key=value|…`, each field omitted at its default):
-`par` / `crs` / `vor` for the kind, then `dip=` (a cross set writes `dip=60,-60`), `s=`, `off=`,
-`len=`, `gap=`, `blk=`, `seed=`, `reg=` (`mat:<name>[+<name>]` or `poly:<name or number>`) and
-`band=<lo>:<hi>` with either end empty for open. Properties are NOT in the label — they are the
-row's own columns — so `joint_lines` rows gain no new key from any of this. A label that is not
-of this form is a hand-typed name and is never regenerated.
+Parameter keys per kind: parallel `dip`, `spacing`, `offset`, `trace_len`, `gap`; cross adds
+`dip2`, `spacing2`, `offset2`; voronoi takes `block_size` and `seed`. A row's Label is the set's
+name and its place in the set, `bed-03`, and nothing else — `set_name` reads the set back off it,
+which is what groups the rows of one network. A label of any other shape belongs to no set.
 
 **Layout convention** (when the sketch gives spacing but not explicit elevations): the bottom
 line sits **AT the toe/base elevation** (e.g. y=0), then y = s, 2s, … upward; each line starts

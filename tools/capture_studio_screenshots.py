@@ -719,8 +719,9 @@ def capture_joint_network_dialog():
 
 
 def capture_joints_editor_network():
-    """The joints editor after a network was built: the generated rows labeled
-    with the set record, and the Build network button that made them."""
+    """The joints editor after a network was built: the generated rows named for
+    their set, the Build network button that made them, and the Remove set /
+    Remove all buttons that take one network or all of them."""
     from studio.editors import JointsEditor
     from xslope.joints import JointSet
 
@@ -728,15 +729,15 @@ def capture_joints_editor_network():
     jset = JointSet("bed", "parallel", {"dip": 25.0, "spacing": 2.5},
                     region="poly:North block",
                     props={"c": 0.0, "phi": 34.0, "dil": 5.0})
-    d["joint_lines"] = (d.get("joint_lines") or []) + jset.generate(d)
+    typed = d.get("joint_lines") or []
+    first_generated = len(typed)
+    d["joint_lines"] = typed + jset.generate(d)
     dlg = JointsEditor().build(d, None)
     dlg.set_view_mode("table")
-    for cb in dlg._toggles.values():                   # every column, LEM and FEM
-        cb.setChecked(True)
     dlg.resize(1000, 520)
     dlg.show()
     # The preview is collapsed and the dialog widened to whatever the columns
-    # need, measured: the Label column carrying the set record is the subject,
+    # need, measured: the generated rows and their Label column are the subject,
     # and a column cut off at the right edge is the one thing the shot must not
     # do. Two passes, as the two-view editor shots take.
     table = dlg._table.table
@@ -746,6 +747,10 @@ def capture_joints_editor_network():
         chrome = dlg.width() - table.viewport().width()
         dlg.resize(table.horizontalHeader().length() + chrome, dlg.height())
     dlg._table_split.setSizes([dlg.height(), 0])
+    # On one of the generated rows: Remove set acts on the set the selection
+    # belongs to, so a shot of it grayed would show the one state the button is
+    # not in when a network is what you are looking at.
+    dlg._table.select_row(first_generated + 1)
     _settle()
     return _grab(dlg, "editing_joints_network_rows.png", settle=False)
 

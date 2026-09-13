@@ -76,7 +76,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [2.46](#gs-2-46) | 🟢 | Eurocode 7 – Earth Dam | M-P free search 1.073 vs SLOPE/W's composite minimum 1.091 (−1.6%) · Bishop free search 1.074 vs the Smith textbook's Bishop 1.07 (+0.4%) | **built**; DA1-C2 factors with pore pressures from XSLOPE's own finite-element seepage |
 | [2.47](#gs-2-47) | <span class="nodata">⊘</span> | Compound Strength vs Anisotropic Function | | *blocked* — needs a dip-relative strength model |
 | [T01](#seepw-t01) | 🟢 | SEEP/W – Simulating consolidation | Center excess pore pressure within 0.02 kPa of the Terzaghi closed form at 25 / 50 / 75% consolidation (t = 150 / 604 / 1460 s; 9.96 / 7.78 / 3.95 kPa) — 0.2% of the 10 kPa initial excess | **built**; saturated storage S<sub>s</sub>, where SEEP/W's ten exponential time steps lag the closed form at late time |
-| [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.03 m of SEEP/W head at t = 46 800 s (0.4% of the 8 m suction step) | **built**; unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.02 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
+| [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.03 m of SEEP/W head at t = 46,800 s (0.4% of the 8 m suction step) | **built**; unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.02 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
 | [T03](#seepw-t03) | 🟢 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.09–0.23 m through the 30-day drawdown (1.1–2.9% of the 8 m drawdown); the published factor-of-safety-vs-time curve is reproduced at every saved step of both drawdown rates | **built** (both drawdown rates); the reference columns are the vendor's own solved `node.csv` field, sampled with the same probe used on XSLOPE's, and its solved minimum factor of safety per step |
 | [T04](#seepw-t04) | 🟢 | SEEP/W – Leakage from pond with clay liner | Interior head within ±0.02 m of SEEP/W at the near-steady leaking state (0.3% of the 6.5 m pond head) · 0.08–0.14 m low mid-fill (2.1% at worst) | **built**; the residual is in the filling *rate*, on a problem whose timing the saturated-only storage convention governs outright |
 | [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within 0.003 m of SEEP/W at the initial frame and 0.07 m at the high-rate near-steady, over the locked stations | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column, the van Genuchten pair fitted to the vendor's conductivity table over the suctions the column reaches |
@@ -1028,7 +1028,7 @@ circles lie on it.
 
 The canonical hard-infiltration benchmark, and the **unsaturated** counterpart to T01: a
 1 m column, initially dry at a uniform pressure head ψ = −8 m, is ponded at the surface
-(ψ = 0) and a sharp wetting front advances downward over 46 800 s. It exercises the parts
+(ψ = 0) and a sharp wetting front advances downward over 46,800 s. It exercises the parts
 of the transient path T01 does not — the van Genuchten moisture-capacity storage C(ψ)
 (θ_s = 0.363, θ_r = 0.186 so the drainable porosity S_y = 0.177; GeoStudio A = 9.81 kPa
 maps to α = 1.0 /m, n = 1.53) and the van Genuchten–Mualem relative permeability kr(ψ),
@@ -1054,7 +1054,7 @@ semi-analytical profile. XSLOPE reproduces the **wetted zone** behind the front 
 | 0.9 | −0.002 m | −0.003 m (+0.001 m) |
 
 Below the front the two agree to 0.002 m: both hold the dry column at its ψ = −8 m
-initial condition, which barely moves in 46 800 s. The only visible offset is at the front
+initial condition, which barely moves in 46,800 s. The only visible offset is at the front
 itself, where the mid-front (ψ = −4 m) crossing lands at y = 0.397 in XSLOPE against
 y = 0.380 in SEEP/W — the expected **lumped-mass vs consistent-mass front diffusion**,
 XSLOPE's lumped HRZ mass matrix damping the front oscillations SEEP/W's own dry-soil
@@ -1399,16 +1399,16 @@ SEEP/W `node.csv` pore-water pressures are read as the comparison.
 
 | t (s) | Stage base suction (m) | XSLOPE total head at y = 0.02 / 0.06 / 0.10 m | Nearest SEEP/W `node.csv` frame |
 |---|---|---|---|
-| 46 000 | −0.093 | −0.0932 / −0.0932 / −0.0930 | 46 650 s: −0.0932 / −0.0932 / −0.0931 |
-| 132 000 | −0.134 | −0.1341 / −0.1333 / −0.1187 | 133 130 s: −0.1386 / −0.1333 / −0.1190 |
-| 219 600 | −0.175 | −0.1740 / −0.1562 / −0.1292 | 219 600 s: −0.1740 / −0.1560 / −0.1294 |
+| 46,000 | −0.093 | −0.0932 / −0.0932 / −0.0930 | 46,650 s: −0.0932 / −0.0932 / −0.0931 |
+| 132,000 | −0.134 | −0.1341 / −0.1333 / −0.1187 | 133,130 s: −0.1386 / −0.1333 / −0.1190 |
+| 219,600 | −0.175 | −0.1740 / −0.1562 / −0.1292 | 219,600 s: −0.1740 / −0.1560 / −0.1294 |
 
 Both columns carry a gradient through the sample at every reporting time, and they carry the
 same one: 0.0001 m apart at the first stage and 0.0002 m at the last, against the 0.102 m the
 base suction is stepped through over the test.
 
 SEEP/W's 97 saved frames do not fall on XSLOPE's reporting times, and at the middle row that
-matters. The nearest frame to t = 132 000 s is at 133 130 s, 130 s past the fourth step, so
+matters. The nearest frame to t = 132,000 s is at 133,130 s, 130 s past the fourth step, so
 its base station has already begun to follow the new stage suction while XSLOPE's has not:
 that is the whole of the 0.0045 m in that row's first column. The two stations above the base
 have not yet felt the step and are directly comparable, at 0.0000 and 0.0003 m; the base

@@ -515,7 +515,7 @@ reproduces all fourteen digitized station values to 0.010 m rms, while *a* = 277
 reaches enough suction to draw the −0.17 m and −0.20 m contours the figure shows at all.
 
 **The flux boundary behaves exactly.** Total applied inflow is *q*·*L* = 4.44440×10⁻⁵ at every
-mesh size tested, from 243 to 14 867 nodes; the confined form of the same model produces a head
+mesh size tested, from 243 to 14,867 nodes; the confined form of the same model produces a head
 rise of 0.163998 m against the one-dimensional hand calculation
 *q*·(0.4/*k*<sub>B</sub> + 0.1/*k*<sub>A</sub>) = 0.163998 m, agreeing to six figures.
 

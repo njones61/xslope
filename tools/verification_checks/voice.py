@@ -30,6 +30,8 @@ import sys
 #: wrong with them, because the fix differs: a first-person sentence needs a
 #: subject change, a process sentence usually needs deleting.
 BANNED = [
+    # -- numbers: thousands are separated by commas, never by spaces --------
+    (r"\b\d{1,3}(?: \d{3})+\b", "thousands separator: use a comma (12,345)"),
     # -- first person: these pages have no "we" -----------------------------
     (r"\bwe\b", "first person"),
     (r"\bwe['’](?:re|ve|ll|d)\b", "first person"),

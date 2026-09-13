@@ -106,7 +106,7 @@ joint model whose output is a stress-displacement curve.
 | [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | — | 1.25 / 1.31 | *reported, no lock* — both edges of the bracket reach the sweep budget without a verdict. |
 | [7](#rj-7) | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | — | 1.57 / 1.59 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | — | 0.75 / 0.75 | |
-| [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.018 vs UDEC 1.03 (−1.2%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
+| [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.037 vs UDEC 1.03 (+0.7%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
 | 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | LE (Alejano) 0.43–1.45 | 0.92 / 1.08 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is not yet measured. |
 | [11](#rj-11) | 🟢 | Ploughing sliding slab failure | SSRM 1.213 vs UDEC 1.21 (+0.2%) | LE (Alejano) 1.75 | 1.22 / 1.3 | |
 | [12](#rj-12) | <span class="nodata">⊘</span> | Ploughing toppling slab failure | UDEC 1.78 | LE (Alejano) 2.0 | 1.39 / 1.75 | *reported, no lock* — a step of refinement moves the factor, so it is not the section's answer but its mesh's. |
@@ -492,17 +492,24 @@ sliding along the release that the face undercuts. The release trace's lower tip
 decimals, so it lands 2 × 10⁻⁷ from the bedding plane it belongs on; see
 [where a joint ends on another](#joint-terminations).
 
-| XSLOPE SSRM | UDEC referee | Alejano's limit equilibrium | RS2 without / with improvement |
+| XSLOPE SSRM | UDEC referee | LE (Alejano) | RS2 without / with improvement |
 |---|---|---|---|
-| **1.018** | 1.03 (−1.2%) | 0.40–1.45 | 1.01 / 1.09 |
+| **1.037** | 1.03 (+0.7%) | 0.40–1.45 | 1.01 / 1.09 |
 
-<!-- test: file=files/rocscience/joints/rj009.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-9, f_stand=1.0078125, f_fail=1.02734375, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj009.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-9, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 2.1 m, which takes the mesh from 12 620 nodes and 1 806
 interface elements to 26 565 and 2 579 — does not move the factor at all: the finer mesh returns
 the same bracket, edge for edge. Every trial of both brackets reaches a verdict, the longest taking
-78 928 sweeps of the 250 000 allowed. This is the row that shows the family can be
+17 791 sweeps of the 250 000 allowed. This is the row that shows the family can be
 mesh-independent at the corpus size, where problems 12 and 14 are not.
+
+**The bracket closes a step higher than it used to, and it is the same move problem 8 made.** At
+F = 1.027344 the plain viscoplastic loop from a cold start runs away; the corrector, seeded from
+that same path, reaches equilibrium in 338 sweeps. Both are true of the same discrete model — it has
+an admissible static equilibrium at that strength, and the cold-start path does not find it — and
+the factor is the strength at which the equilibrium stops existing rather than the strength at
+which that path first runs away. Five of the nine trials of each bracket are certified this way.
 
 The paper's own limit equilibrium for this problem is a range rather than an answer — 0.40 to 1.45,
 as the manual prints it — and it is recorded beside the referee rather than scoring, as every source

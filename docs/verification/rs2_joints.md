@@ -104,7 +104,7 @@ joint model whose output is a stress-displacement curve.
 | [2](#rj-2) | 🔴 | Alejano & Alonso block toppling | SSRM 0.764 vs UDEC 0.87 (−12.2%) | LE (Goodman & Bray) 0.76 | 0.86 / 0.82 | |
 | [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | — | 1.12 / 1.09 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
 | [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | — | 1.19 / 1.27 | |
-| [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | — | 1.65 / 1.86 | *reported, no lock* — four trials of the bracket, including both its edges, reach the sweep budget without a verdict. |
+| [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | — | 1.65 / 1.86 | *reported, no lock* — four trials of the bracket, including both its edges, reach the sweep budget without a verdict, and the corrector certifies none of them; a finer mesh decides two more and leaves its own standing edge undecided. |
 | [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | — | 1.25 / 1.31 | *reported, no lock* — both edges of the bracket reach the sweep budget without a verdict. |
 | [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | — | 1.57 / 1.59 | |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | — | 0.75 / 0.75 | |
@@ -409,10 +409,23 @@ The shared 260 m section cut by two sets: one at −55° at 10 m spacing through
 set at 40 m spacing. The rock is elastic — the vendor's `Plasticity Specifications: Non` —
 γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26; the joints carry c = 100 kPa and φ = 40°.
 
-This is the most budget-limited row in the corpus. **Four** of its nine trials reach 250 000 sweeps
-without a verdict, and two of those four are the edges of the final bracket, so the factor the
-bracket encloses is conditioned on the sweep limit at both ends. The row prints no factor and
-carries no lock. It is also the corpus's longest run at about 5.7 hours on the corpus mesh.
+This is the most budget-limited row in the corpus, and the one row here that nothing in the solver
+has moved. **Four** of its nine corpus trials reach 250 000 sweeps without a verdict, two of them
+the edges of the final bracket, so the factor the bracket encloses is conditioned on the sweep
+limit at both ends. The row prints no factor and carries no lock.
+
+**The corrector was offered every one of those four trials and certified none of them.** That is
+what separates this row from the rest of the corpus: where a bracket edge elsewhere is settled
+either by reading a steadily slipping interface as failing or by the corrector reaching
+equilibrium from the loop's own field, neither happens here. A corrector refusal is the absence of
+a verdict, not a verdict of its own, so the trials stay undecided.
+
+A step of refinement — a 2D size of 8.4 m, which takes the mesh from 21 659 nodes and 3 056
+interface elements to 29 765 and 3 514 — decides two more of the nine and brackets a factor one
+step below the corpus mesh's. Two trials still do not decide there, and one of them is the
+standing edge of that bracket, so the finer mesh does not settle the row either and neither
+bracket prints a factor. Between them the two take about 16 hours, more than twice any other row
+in this corpus.
 
 Every transcribed input class matches the vendor model, including the side restraint.
 

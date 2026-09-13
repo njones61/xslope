@@ -102,7 +102,7 @@ joint model whose output is a stress-displacement curve.
 | [1c](#rj-1c) | 🟡 | Goodman & Bray block toppling, case 1c | SSRM 1.057 vs Goodman & Bray 1.02 (+3.6%) | UDEC 1.01 | 1.01 / 0.99 | |
 | [1d](#rj-1d) | 🟢 | Goodman & Bray block toppling, case 1d | SSRM 1.252 vs Goodman & Bray 1.23 (+1.8%) | UDEC 1.22 | 1.19 / 1.16 | |
 | [2](#rj-2) | 🔴 | Alejano & Alonso block toppling | SSRM 0.764 vs UDEC 0.87 (−12.2%) | LE (Goodman & Bray) 0.76 | 0.86 / 0.82 | |
-| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | — | 1.12 / 1.09 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
+| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | — | 1.12 / 1.09 | *reported, no lock* — the failing edge of the bracket reaches the sweep budget without a verdict, and the corrector refuses it. |
 | [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | — | 1.19 / 1.27 | |
 | [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | — | 1.65 / 1.86 | *reported, no lock* — four trials of the bracket, including both its edges, reach the sweep budget without a verdict, and the corrector certifies none of them; a finer mesh decides two more and leaves its own standing edge undecided. |
 | [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | — | 1.25 / 1.31 | *reported, no lock* — every trial of both brackets decides, and a step of refinement moves the factor by twice the row's tolerance. |
@@ -364,6 +364,15 @@ spacing and a cross set at −20° at 30 m, both through the origin. The manual 
 "70 and 160" degrees, which is the same two planes measured the other way round the half circle.
 The rock is elastic — the vendor's `Plasticity Specifications: Non` — so only the joints can fail;
 γ = 26.0946 kN/m³, E = 9072 MPa, ν = 0.26. The joints carry c = 100 kPa and φ = 40°.
+
+The row carries no lock, so it prints no factor of its own. The FAILING edge of its bracket,
+F = 1.222656, reaches 250 000 sweeps `AMBIGUOUS`, and a bracket edge nothing ruled on cannot
+define a factor of safety. Every other trial decides, the longest of them taking 206 973 sweeps.
+
+That edge is one the Newton corrector was offered and refused, as [problem 19](#rj-19)'s failing
+edge is and [problem 5](#rj-5)'s four are. A refusal is the absence of a verdict rather than a
+verdict of its own — see [what answers a bracket edge](#what-answers-a-bracket-edge) — so the
+trial stays undecided and the row stays reported.
 
 Every input class the corpus transcribes was diffed against the vendor model and matches: the
 rock's E, ν and γ, the joints' normal and shear stiffness, cohesion, friction angle and tensile

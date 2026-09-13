@@ -4319,6 +4319,36 @@ _JOINT_MOVING_MIN_SWEEPS = 25000
 _JOINT_VERDICT_EVERY = 100
 
 
+#: Samples of the active-set trace that the SHORT churn reading averages, at
+#: `_HYBRID_SAMPLE_EVERY` sweeps apiece. Ten samples is a hundred sweeps, which is
+#: short enough to say what the interface is doing AT a checkpoint rather than what
+#: it did on the way there, and long enough that one sweep's flicker is not the
+#: reading.
+_JOINT_CHURN_SAMPLES = 10
+
+
+def _joint_churn(chg_hist, n_pairs, samples=None):
+    """Active-set CHURN: the fraction of interface node pairs that change state
+    (sticking / slipping / open) per sweep, averaged over the trailing window.
+
+    ``chg_hist`` is the per-sample count of pairs that changed on that sweep
+    (`jchg_hist`), ``n_pairs`` the number of pairs in the model. ``samples`` is how
+    many trailing samples to average — ``None`` averages the trailing HALF of the
+    history, which is the window every other reading in this file uses.
+
+    Returns ``None`` where there is nothing to read: no history, no pairs. A
+    settled interface reads zero; one chattering between states reads the fraction
+    of itself that is flipping, and that is the quantity that separates a Newton
+    refusal worth believing from one taken on a set that has not made up its mind.
+    """
+    if n_pairs is None or int(n_pairs) <= 0 or not chg_hist:
+        return None
+    n = len(chg_hist)
+    k = max(1, n // 2) if samples is None else min(n, max(1, int(samples)))
+    tail = np.asarray(chg_hist[n - k:], dtype=float)
+    return float(tail.mean()) / float(n_pairs)
+
+
 def _window_rate(series, lo, hi):
     """Least-squares slope of ``series[lo:hi]`` against its own index, and the
     R-squared of that fit. ``(nan, nan)`` where there is no window to fit."""
@@ -6063,6 +6093,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             max_disp_deep=(None if _dd is None else float(_dd)),
             disp_limit=(None if _dl is None else float(_dl)),
             wall=_wall)
+        # What the attempt itself did (the inner iteration's own account: which
+        # branch ended it, the residual it started at, ended at and best reached,
+        # and whether its line search ran out of backtracks) and what the INTERFACE
+        # was doing while it ran. Both are here because a refusal is only evidence
+        # about the slope when the state it was refused from had settled: on a
+        # churning active set the corrector is being asked about a model that keeps
+        # changing its mind, which is r4's cold-start caveat in another form.
+        _rec["nr_diag"] = dict(_sol.get("nr_diag") or {})
+        if has_joints:
+            _rec["n_pairs"] = int(joint_data["n"] * 3)
+            _rec["churn"] = _joint_churn(jchg_hist, _rec["n_pairs"],
+                                         _JOINT_CHURN_SAMPLES)
+            _rec["churn_half"] = _joint_churn(jchg_hist, _rec["n_pairs"])
+            _rec["churn_samples"] = len(jchg_hist)
         _corr_attempts.append(_rec)
         if debug_level >= 1:
             print(f"  Newton corrector at {where} ({vp_iterations} viscoplastic "
@@ -10338,7 +10382,7 @@ def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
 def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
                     force_tol, oob_fn, nr_max_iter, u_elastic_scale,
                     debug_level=0, label="", bars=None, piles=None, joints=None,
-                    trans_dofs=None, deep_free=None):
+                    trans_dofs=None, deep_free=None, diag=None):
     """Drive the equilibrium residual to zero at a FIXED external load.
 
     The inner Newton iteration, lifted out of :func:`_solve_fem_newton` verbatim so
@@ -10377,6 +10421,15 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
     ``_NR_DIVERGED`` in a single step — the driver's own divergence factor, reused
     rather than a new threshold — so a step that is good for the deep system does
     not carry the skin to 1e26 and take the reported state with it.
+
+    ``diag``, when a dict is passed, is filled with WHY this increment ended:
+    ``stop`` (the branch that left the loop), the residual it started at, ended at
+    and best reached, and how the line search behaved (``ls_exhausted`` —
+    iterations in which no backtrack down to 1/256 reduced the residual;
+    ``ls_zero`` — iterations in which not one candidate was even eligible, so the
+    step taken was zero). Nothing here is read for a verdict inside this function
+    and no arithmetic depends on it: it is counters, and the caller that needs the
+    refusal ON THE RECORD (`_try_corrector`) is what reads them.
     """
     def _merit(v_free):
         return float(np.linalg.norm(v_free if deep_free is None
@@ -10394,6 +10447,9 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
     r_hist = []
     r_best = float('inf')
     last_progress = 0
+    _stop = 'iteration_cap'    # the branch that ends this increment (see `diag`)
+    _ls_exhausted = 0          # iterations whose line search found no improving step
+    _ls_zero = 0               # ... and iterations in which it took no step at all
     lu = None                  # the live tangent factorization (see below)
     # The column ordering COLAMD derives from this pattern, kept for the whole
     # trial (see _nr_factorize_tangent). The pattern is built once per solve, so
@@ -10425,6 +10481,7 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         r_free = r[free_dofs]
         r_norm = _merit(r_free)
         if not np.isfinite(r_norm):
+            _stop = 'non_finite_residual'
             break
         r_full = np.zeros(n_dof)
         r_full[free_dofs] = r_free
@@ -10437,6 +10494,7 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         # same gate the viscoplastic verdict is read on.
         if r_norm / f_norm < _NR_REL_TOL or oob_here < 0.1 * force_tol:
             ok = True
+            _stop = 'equilibrated'
             break
         prev_r = r_hist[-1] if r_hist else None
         r_hist.append(r_norm)
@@ -10444,7 +10502,10 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
             r_best = r_norm
             last_progress = it
         if it - last_progress > _NR_NO_PROGRESS or r_norm > _NR_DIVERGED * r_best:
-            break                       # no progress: this load is unreachable
+            # no progress: this load is unreachable
+            _stop = ('residual_growth' if r_norm > _NR_DIVERGED * r_best
+                     else 'no_progress')
+            break
 
         if reform:
             _tp = time.perf_counter() if _PROF_ON else None
@@ -10454,12 +10515,14 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
             if _PROF_ON:
                 _prof_add("nr_assemble", _tp)
             if not _nr_tangent_factorable(K):
-                break                   # structurally singular = the limit load
+                _stop = 'singular_pattern'  # structurally singular = the limit load
+                break
             _tp = time.perf_counter() if _PROF_ON else None
             try:
                 lu = _nr_factorize_tangent(K, _order_cache)
             except RuntimeError:
-                break                   # singular tangent = the limit load
+                _stop = 'singular_tangent'  # singular tangent = the limit load
+                break
             finally:
                 if _PROF_ON:
                     _prof_add("nr_factorize", _tp)
@@ -10468,6 +10531,7 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         if _PROF_ON:
             _prof_add("nr_trisolve", _tp)
         if not np.all(np.isfinite(du_free)):
+            _stop = 'non_finite_step'
             break
         du = np.zeros(n_dof)
         du[free_dofs] = du_free
@@ -10487,6 +10551,7 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         # stay small.
         alpha = 1.0
         best_alpha, best_rc = None, np.inf
+        _ls_improved = False
         g_now = (None if deep_free is None
                  else max(float(np.linalg.norm(r_free)), 1e-30))
         for _ls in range(_NR_LS_MAX):
@@ -10508,9 +10573,17 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
             if eligible and rc < best_rc:
                 best_rc, best_alpha = rc, alpha
             if eligible and rc < r_norm:
+                _ls_improved = True
                 break
             alpha *= 0.5
         alpha = best_alpha if best_alpha is not None else 0.0
+        # The two ways the search can come up short, counted (see `diag`): no
+        # backtrack down to 1/256 reduced the residual, and — the harder one — not
+        # one candidate was eligible, so this iteration moved nothing at all.
+        if not _ls_improved:
+            _ls_exhausted += 1
+        if best_alpha is None:
+            _ls_zero += 1
         if _PROF_ON:
             # How much of the Newton step the search actually takes, and how often
             # it runs out of backtracks. Both are bookkeeping.
@@ -10553,6 +10626,17 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         # end the increment, and the failing trials in the benchmark table all
         # terminate at the load-step floor without it.
 
+    if diag is not None:
+        diag.update(
+            stop=_stop, iterations=int(it),
+            r_first=(None if r0_norm is None else float(r0_norm)),
+            r_last=(float(r_hist[-1]) if r_hist else None),
+            r_best=(None if not np.isfinite(r_best) else float(r_best)),
+            r_growth=(float(r_hist[-1] / r_best)
+                      if r_hist and np.isfinite(r_best) and r_best > 0.0
+                      else None),
+            oob=float(oob_here), ls_exhausted=int(_ls_exhausted),
+            ls_zero=int(_ls_zero), ok=bool(ok))
     return ok, u_try, it, n_fe, oob_here, rel_du
 
 
@@ -10806,6 +10890,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     _one_shot = (_nr_seed is not None or _nr_init_state is not None
                  or _nr_seed_state is not None)
     lam = 0.0
+    _last_diag = {}            # the last increment's own reading (see `_nr_diag`)
     dlam = float(_NR_INIT_STEP)
     total_iterations = 0
     n_steps = 0
@@ -10840,11 +10925,17 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         # weight, and lam = 1 is the authored in-situ state. A no-op without K0.
         _nr_set_load_factor(groups, lam_try)
 
+        _inc_diag = {}
         ok, u_try, it, _fe, oob_here, rel_du = _nr_equilibrate(
             groups, pattern, u, f_ext, free_dofs, n_dof, h_eps, force_tol,
             _oob, nr_max_iter, u_elastic_scale, debug_level=debug_level,
             label=f"lam={lam_try:.4f}", bars=bars, piles=piles, joints=joints,
-            trans_dofs=trans_dofs, deep_free=deep_free)
+            trans_dofs=trans_dofs, deep_free=deep_free, diag=_inc_diag)
+        # The LAST increment's own account of why it ended, carried out with the
+        # result. On the seeded corrector path there is exactly one increment (the
+        # whole load, `_one_shot`), so this is that attempt's reading and it is what
+        # certifies a REFUSAL the way the three gates certify an acceptance.
+        _last_diag = dict(_inc_diag, lam=float(lam_try))
         n_force_evals += _fe
         total_iterations += it
         if ok:
@@ -11228,6 +11319,13 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                               'iteration_cap': 'force_tolerance',
                               'displacement_limit': 'displacement_limit'}
                              .get(exit_reason, 'load_step_floor')),
+        # The last load increment's own account of how it ended: which branch left
+        # the inner iteration ('equilibrated', 'no_progress', 'residual_growth',
+        # 'singular_tangent', ...), the residual it started at, ended at and best
+        # reached, and how often its line search found no improving backtrack. On a
+        # seeded attempt there is one increment, so this is the attempt's reading;
+        # it is what a REFUSAL is certified by (see `_try_corrector`).
+        "nr_diag": dict(_last_diag),
         # The bound the final state was measured against (None = bound off).
         "nr_disp_limit": nr_disp_limit,
         # The displacement the bound was READ on, and the skin's own. Without a

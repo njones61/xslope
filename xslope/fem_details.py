@@ -304,15 +304,8 @@ def _line_label(fem_data, slope_data, kind, index):
     if kind == "reinforcement":
         j = _joint_sheet_index(fem_data, index)
         if j is not None:
-            # A generated joint row's Label carries the set record it was built
-            # from; what a list, a figure title or the report's table names it
-            # is the head of that label (xslope.joints.display_label). Stripped
-            # BEFORE the duplicate rule runs, so two rows a reader would see the
-            # same name on are numbered apart.
-            from .joints import display_label
             names = display_labels(
-                [display_label(ln.get("label"))
-                 for ln in fem_data["joint_lines"]], "Joint")
+                [ln.get("label") for ln in fem_data["joint_lines"]], "Joint")
             return names[j]
         labels = list(fem_data.get("reinforce_line_labels", None) or [])
         i, fallback = index - 1, "Line"

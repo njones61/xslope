@@ -1314,13 +1314,8 @@ class _Ctx:
         return int(max(want or 0, ceiling or 50000))
 
     def joint_label(self, i):
-        # A generated row's Label carries the set record the network was built
-        # from, which is not what a message names it: the head of it is
-        # (xslope.joints.display_label), so a rule about one trace of a set reads
-        # "Joint line 12 ('bed-03')" rather than reciting the set's parameters.
-        from .joints import display_label
         try:
-            name = display_label(self.joints[i].get("label"))
+            name = self.joints[i].get("label")
         except (IndexError, AttributeError):
             name = None
         base = f"Joint line {i + 1}"

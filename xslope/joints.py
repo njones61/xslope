@@ -39,12 +39,9 @@ its negative are mirror images about the vertical, which is what makes a
 conjugate pair ``cross_jointed(parallel_set(..., 60), parallel_set(..., -60))``.
 
 **Labels.** Rows are labeled ``<label>-01``, ``<label>-02``, … in the order the
-traces come out, which is along the set's own normal from the low side. That
-head is what a reader is shown — the 1D details view, the report's interface
-table, preflight's messages and the editor's list all print
-:func:`display_label` of the cell, never the set record behind it — so a network
-keeps one name per set rather than a hundred anonymous lines, and the record
-stays in the file where :func:`regenerate` can read it.
+traces come out, which is along the set's own normal from the low side. The
+label reaches the plots, the 1D details view and the report, so a network keeps
+one name per set rather than a hundred anonymous lines.
 
 **Properties.** ``props`` is applied to every row of the set: any of ``c``,
 ``phi``, ``c_res``, ``phi_res``, ``dil``, ``t_cut``, ``kn``, ``ks`` and ``jred``,
@@ -706,21 +703,11 @@ def _label_num(text, field):
             f"The joint set label's {field} is {text!r}, which is not a number.")
 
 
-def display_label(label):
-    """The name a joint line is SHOWN under: everything before the first ``|``.
+def short_label(label):
+    """The ``name-nn`` head of a row label, without the set record behind it.
 
-    A generated row's Label cell carries the whole set record —
-    ``bed-03|par|dip=25|s=2.5`` — because the sheet has no column to keep it in.
-    That record exists to regenerate the set; it is not what a person reads off a
-    drawing, a table or a message. So every place a joint line is named to a
-    reader prints this instead — the 1D details list and its figures, the
-    report's interface table, preflight's messages and the editor's own list —
-    and a hundred-line network reads as ``bed-01 … bed-99`` rather than as a
-    hundred copies of its own parameters.
-
-    A hand-typed label carries no record and is shown exactly as it was typed.
-    Display never alters what is stored: the file keeps the full label, which is
-    what :func:`set_name` and :meth:`JointSet.from_label` read.
+    What a list, a legend or a message shows: the record is there to regenerate
+    the set, not to be read off a drawing.
     """
     return str(label or "").split(SET_LABEL_SEP, 1)[0]
 

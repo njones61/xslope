@@ -6484,15 +6484,7 @@ _JOINT_FORM_GROUPS = [
 
 
 def _joint_item_label(i, row):
-    """One line of the joints editor's list: the row's DISPLAY name and its span.
-
-    A generated row's Label carries the whole set record, which in a 200-pixel
-    list column is a hundred identical rows showing their own parameters and
-    nothing else. The head of it is shown (``xslope.joints.display_label``); the
-    stored label is untouched, and it is in the Label field of the form beside
-    the list — and in the table view's Label column — to be read and edited."""
-    from xslope.joints import display_label
-    name = display_label(row.get("label")) or "joint"
+    name = str(row.get("label") or "joint")
     try:
         return (f"{i + 1}. {name} (x={float(row.get('x1', 0) or 0):g}"
                 f"→{float(row.get('x2', 0) or 0):g})")

@@ -103,7 +103,7 @@ joint model whose output is a stress-displacement curve.
 | [1d](#rj-1d) | 🟢 | Goodman & Bray block toppling, case 1d | SSRM 1.252 vs Goodman & Bray 1.23 (+1.8%) | UDEC 1.22 | 1.19 / 1.16 | |
 | [2](#rj-2) | 🔴 | Alejano & Alonso block toppling | SSRM 0.764 vs UDEC 0.87 (−12.2%) | LE (Goodman & Bray) 0.76 | 0.86 / 0.82 | |
 | [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | — | 1.12 / 1.09 | *reported, no lock* — the upper edge of the bracket reaches the sweep budget without a verdict. |
-| [4](#rj-4) | <span class="nodata">⊘</span> | Lorig & Varona flexural toppling | UDEC 1.3 | — | 1.19 / 1.27 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
+| [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | — | 1.19 / 1.27 | |
 | [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | — | 1.65 / 1.86 | *reported, no lock* — four trials of the bracket, including both its edges, reach the sweep budget without a verdict. |
 | [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | — | 1.25 / 1.31 | *reported, no lock* — both edges of the bracket reach the sweep budget without a verdict. |
 | [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | — | 1.57 / 1.59 | |
@@ -373,17 +373,28 @@ cap, the two sets' dips and spacings, and the side restraint the vendor clamps i
 
 ![RJ-3: Lorig & Varona forward block toppling (rj003) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own, so the whole mechanism is on the two sets: the steep 70° joints slip behind the crest while the −20° cross joints open along it, and the deformed section shows the blocks between them rotating forward over the face](images/RJ-3.png)
 
-### ⊘ RJ-4: Lorig & Varona flexural toppling (rj004) {#rj-4}
+### 🟢 RJ-4: Lorig & Varona flexural toppling (rj004) {#rj-4}
 
 The same section cut by one set of columns at 70° at 20 m spacing — problem 3's first set without
 its cross joints, so the columns bend rather than topple as blocks. Here the rock is Mohr-Coulomb
 and carries a tensile cutoff of zero, which is what lets a column break in flexure: γ = 26.1 kN/m³,
 E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°.
 
-The corpus bracket is decided on all nine trials. What keeps the row reported is the refinement
-step: one of its trials reaches 250 000 sweeps without a verdict, so the claim that a finer mesh
-does not move the factor is not established, even though the two meshes bracket values one step
-apart. The row prints no factor.
+| XSLOPE SSRM | UDEC referee | RS2 without / with improvement |
+|---|---|---|
+| **1.311** | 1.3 (+0.8%) | 1.19 / 1.27 |
+
+<!-- test: file=files/rocscience/joints/rj004.xlsx, type=fem_ssrm, expected_fs=1.311, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-4, f_stand=1.30078125, f_fail=1.3203125, check=edges, tier=gate -->
+
+A step of refinement — a 2D size of 8.4 m, which takes the mesh from 9 993 nodes and 936 interface
+elements to 19 130 and 1 325 — does not move the factor at all: the finer mesh returns the same
+bracket, edge for edge. Every trial of both brackets reaches a verdict, the longest taking 186 870
+sweeps of the 250 000 allowed.
+
+Its lowest trial, F = 0.5, is the corpus's one `JOINT_SETTLED` verdict: the slip, the displacement
+field and the soil residual have all stopped and what is left is a limit cycle on the joint degrees
+of freedom, which no budget brings down. That is a decision and not a budget running out, and the
+bracket reads it as standing.
 
 Every transcribed input class matches the vendor model, including the side restraint.
 

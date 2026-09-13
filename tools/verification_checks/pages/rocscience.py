@@ -20,9 +20,6 @@ CONFIG = PageConfig(
         ('0.86', 'Power-curve case'),
         ('0.152', 'power curve'),
     ],
-    # The Newmark record label "Mammoth Lakes-1 1980" is a name, not a number
-    # with a space for its thousands separator.
-    voice_allow=[("1 198", "Mammoth Lakes-1 1980")],
     name="rocscience",
 
     bounds=[

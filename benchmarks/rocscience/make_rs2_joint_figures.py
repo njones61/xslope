@@ -52,27 +52,15 @@ EXTRA_CASES = [
      'target_size': '2.0', 'benchmark': 'RJ-15'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj019.xlsx',
      'target_size': '3.0', 'benchmark': 'RJ-19'},
-    # The termination family: problem 1's stepped base and Alejano's release
-    # traces. Corpus size is the joint spacing, as everywhere else here — the
-    # column width on problem 1, the bedding spacing on 9 to 14.
-    {**_JOINT, 'file': 'files/rocscience/joints/rj001a.xlsx',
-     'target_size': '10.0', 'benchmark': 'RJ-1a'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj001b.xlsx',
-     'target_size': '10.0', 'benchmark': 'RJ-1b'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj001c.xlsx',
-     'target_size': '10.0', 'benchmark': 'RJ-1c'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj001d.xlsx',
-     'target_size': '10.0', 'benchmark': 'RJ-1d'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj009.xlsx',
-     'target_size': '3.0', 'benchmark': 'RJ-9'},
+    # The termination family's rows that still report. Corpus size is the joint
+    # spacing, as everywhere else here — the bedding spacing on 9 to 14. The four
+    # problem-1 cases and problems 9, 11 and 13 have locked and carry tags of
+    # their own, so they are no longer listed: `registered` would ignore a
+    # duplicate entry anyway, and `--audit` names one that is left behind.
     {**_JOINT, 'file': 'files/rocscience/joints/rj010.xlsx',
      'target_size': '3.0', 'benchmark': 'RJ-10'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj011.xlsx',
-     'target_size': '1.5', 'benchmark': 'RJ-11'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj012.xlsx',
      'target_size': '1.5', 'benchmark': 'RJ-12'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj013.xlsx',
-     'target_size': '1.5', 'benchmark': 'RJ-13'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj014.xlsx',
      'target_size': '1.5', 'benchmark': 'RJ-14'},
 ]
@@ -99,8 +87,24 @@ def parse_tags(path=PAGE):
 
 
 def registered():
-    """Every row this producer is responsible for."""
-    return parse_tags() + EXTRA_CASES
+    """Every row this producer is responsible for, each row ONCE.
+
+    `EXTRA_CASES` exists for rows the page reports without locking, which carry no
+    tag for `parse_tags` to find. A row that later LOCKS gains a tag and keeps its
+    entry here until someone remembers to delete it, and the producer then solves
+    it twice — the second solve overwriting the first's sidecars with the identical
+    answer, at the cost of the whole bracket. The tag wins wherever both exist, so
+    the registration stays right whether or not the list has been tidied.
+    """
+    tagged = parse_tags()
+    have = {t.get('benchmark') for t in tagged}
+    return tagged + [t for t in EXTRA_CASES if t.get('benchmark') not in have]
+
+
+def superseded():
+    """EXTRA_CASES entries whose row now carries a tag — dead registrations."""
+    have = {t.get('benchmark') for t in parse_tags()}
+    return [t.get('benchmark') for t in EXTRA_CASES if t.get('benchmark') in have]
 
 
 def audit(out_dir=None, verbose=True):
@@ -116,6 +120,7 @@ def audit(out_dir=None, verbose=True):
     for bench, why in NO_FIGURE.items():
         if bench in names:
             dead.append((bench, why))
+    stale = superseded()
     if verbose:
         print(f'{len(registered())} registered rows '
               f'({len(EXTRA_CASES)} reported-only); figures in '
@@ -129,7 +134,10 @@ def audit(out_dir=None, verbose=True):
         print(f'  DEAD exemptions: {len(dead)}')
         for bench, why in dead:
             print(f'    {bench:22s} {why}')
-    return missing, dead
+        print(f'  EXTRA_CASES entries superseded by a tag: {len(stale)}')
+        for bench in stale:
+            print(f'    {bench:22s} the row locked; delete its EXTRA_CASES entry')
+    return missing, dead + [(b, 'superseded by a tag') for b in stale]
 
 
 if __name__ == '__main__':

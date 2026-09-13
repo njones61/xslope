@@ -73,12 +73,14 @@ a verdict takes 3 745 sweeps on problem 8 and 196 201 on problem 18, both at a b
 Six of the ten rows measured carry at least one trial that does not decide inside that budget, and
 on problem 5 four trials do not, including both edges of its bracket.
 
-That is not, on the evidence, simply a matter of allowing more sweeps. Problem 7's undecided trial
-was re-solved on its own at **four times** the budget — a million sweeps against 250 000 — and came
-back with the same verdict it had before, `STABLE_STUCK`: the model neither converges nor diverges
-there, and the extra sweeps changed nothing about that. An undecided trial of this kind is a
-statement about the convergence criterion, not only about the iteration limit, and a row held back
-by one is not waiting on machine time alone.
+That is not, on the evidence, simply a matter of allowing more sweeps. [Problem 7](#rj-7)'s
+undecided trial was re-solved on its own at **four times** the budget — a million sweeps against
+250 000 — and came back with the same verdict it had before, `STABLE_STUCK`: the model neither
+converged nor diverged there, and the extra sweeps changed nothing about that. An undecided trial
+of this kind is a statement about the convergence criterion rather than about the iteration limit,
+and what settles one is a reading of the state rather than more machine time — the joint verdict on
+a settled or steadily slipping interface, or the corrector reaching equilibrium from the loop's own
+field. Problem 7 locks on the second of those.
 
 `benchmarks/rocscience/build_joint_problems.py` writes the input files, which are named `rjNNN`
 by the manual's own problem number — `rj018.xlsx` is problem 18 — with a letter suffix where the
@@ -104,7 +106,7 @@ joint model whose output is a stress-displacement curve.
 | [4](#rj-4) | <span class="nodata">⊘</span> | Lorig & Varona flexural toppling | UDEC 1.3 | — | 1.19 / 1.27 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
 | [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | — | 1.65 / 1.86 | *reported, no lock* — four trials of the bracket, including both its edges, reach the sweep budget without a verdict. |
 | [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | — | 1.25 / 1.31 | *reported, no lock* — both edges of the bracket reach the sweep budget without a verdict. |
-| [7](#rj-7) | <span class="nodata">⊘</span> | Plane failure, non-daylighting | UDEC 1.5 | — | 1.57 / 1.59 | *reported, no lock* — one trial of the refinement step reaches the sweep budget without a verdict. |
+| [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | — | 1.57 / 1.59 | |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | — | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.037 vs UDEC 1.03 (+0.7%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
 | 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | LE (Alejano) 0.43–1.45 | 0.92 / 1.08 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is not yet measured. |
@@ -424,17 +426,31 @@ Every transcribed input class matches the vendor model, including the side restr
 
 ![RJ-6: plane failure with daylighting discontinuities (rj006) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. Slip runs the full length of every joint that reaches the face, over a wedge bounded below by the joint through the toe, and the rock between them carries only a faint strain: the slabs slide out along the joints rather than breaking through anything](images/RJ-6.png)
 
-### ⊘ RJ-7: Plane failure with non-daylighting discontinuities (rj007) {#rj-7}
+### 🟡 RJ-7: Plane failure with non-daylighting discontinuities (rj007) {#rj-7}
 
 The same section and the same rock as problem 6, cut by one set at −70° at 20 m spacing through
 the origin. The joints now dip out of the face more steeply than the 55° face itself, so none of
 them daylights: a slab cannot slide out along one without shearing rock, and the slope stands
 higher than problem 6's.
 
-The corpus bracket is decided on all nine trials. What keeps the row reported is the refinement
-step, whose lower bracket edge reaches 250 000 sweeps without a verdict — so although the two
-meshes enclose the same factor, the claim that refinement does not move it rests on an edge nothing
-ruled on. The row prints no factor.
+| XSLOPE SSRM | UDEC referee | RS2 without / with improvement |
+|---|---|---|
+| **1.564** | 1.5 (+4.3%) | 1.57 / 1.59 |
+
+<!-- test: file=files/rocscience/joints/rj007.xlsx, type=fem_ssrm, expected_fs=1.564, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-7, f_stand=1.5546875, f_fail=1.57421875, check=edges, tier=gate -->
+
+A step of refinement — a 2D size of 8.4 m, which takes the mesh from 9 986 nodes and 934 interface
+elements to 19 179 and 1 323 — does not move the factor at all: the finer mesh returns the same
+bracket, edge for edge. Every trial of both brackets reaches a verdict, the longest taking 118 821
+sweeps of the 250 000 allowed.
+
+**This row is where the budget argument was settled, and not in the budget's favor.** Its undecided
+trial was once re-solved on its own at four times the budget — a million sweeps against 250 000 —
+and came back `STABLE_STUCK` exactly as before, which showed that an undecided jointed trial of
+this kind is a statement about the convergence criterion rather than about the iteration limit.
+Five of the nine trials of each bracket here are now settled by the Newton corrector reaching
+equilibrium from the loop's own state, which is what changed. The sweeps were never what the row
+was short of.
 
 Every transcribed input class matches the vendor model, including the side restraint. The manual's
 own table for this problem prints the slope angle as 5°; the figure and the model are the same 55°

@@ -68,10 +68,12 @@ reads that as not standing, and the factor comes out low. Every row here states 
 budget and its trial record is checked (`tools/ssrm_trial_audit.py`), the same rule the
 [geotextile wall family](rs2.md#rs2-48) runs under.
 
-What a trial costs varies by two orders of magnitude across this corpus. The longest trial to reach
-a verdict takes 3,745 sweeps on problem 8 and 196,201 on problem 18, both at a budget of 250,000.
-Six of the ten rows measured carry at least one trial that does not decide inside that budget, and
-on problem 5 four trials do not, including both edges of its bracket.
+What a trial costs varies by two orders of magnitude across this corpus. Every row runs at a budget
+of 250,000 sweeps, and the trial that takes longest to reach a verdict takes 1,221 of them on
+problem 8 and 250,006 on problem 1d — past the budget, because what answers it is a corrector
+certification at the budget's exit rather than anything inside it. Three of the twenty-one rows
+measured carry a trial that does not decide at all, problems 3, 5 and 19, and on problem 5 four do
+not, including both edges of its bracket.
 
 That is not, on the evidence, simply a matter of allowing more sweeps. [Problem 7](#rj-7)'s
 undecided trial was re-solved on its own at **four times** the budget — a million sweeps against

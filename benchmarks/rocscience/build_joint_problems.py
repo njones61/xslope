@@ -43,7 +43,7 @@ from shapely.geometry import LineString, Polygon                    # noqa: E402
 from xslope.fileio import load_slope_data                           # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx    # noqa: E402
 from xslope.fileio import build_ground_surface_from_polygons        # noqa: E402
-from xslope.joints import cross_jointed, parallel_set, voronoi      # noqa: E402
+from xslope.joints import cross_jointed, parallel_set               # noqa: E402
 from benchmarks.tag_k0 import apply_tag_k0                          # noqa: E402
 from rj020_voronoi import EXTERNAL as RJ20_RING, TRACES as RJ20_TRACES  # noqa: E402
 
@@ -1178,11 +1178,18 @@ def rj019():
 # (rj020_voronoi.py). Measured on them: 525 blocks over the 4 400 m^2 section, a
 # mean block area of 8.381 m^2 and a mean block width of 2.895 m.
 #
-# `rj020_generated.xlsx` is the same problem with OUR generator's tessellation at
-# that measured density, which is what a user of XSLOPE would draw on a blocky
-# mass. What the pair measures is how much of the factor belongs to the block
-# scale and how much to one particular tessellation — the question the source
-# paper asks.
+# The same problem with OUR generator's tessellation at that density — the
+# comparison the source paper's question asks for, and what a user of XSLOPE
+# would draw on a blocky mass — is one line here:
+#
+#     sd['joint_lines'] = voronoi(sd, RJ20_BLOCK, seed=20, props=RJ20_JOINT)
+#
+# It is not built as a corpus file because it does not reach a mesh. The
+# generator keeps a trace down to a thousandth of the section diagonal
+# (joints.MIN_TRACE_FRAC), which is 0.106 m here, and the mesher collapses a
+# trace that short onto its own junction and refuses the line. Measured at seeds
+# 20, 21 and 22 and at block sizes 2.895 m and 6 m: every one of them stops the
+# same way (see the round's report).
 # ---------------------------------------------------------------------------
 
 #: The vendor's joint on this problem: c = 0.5 MPa, phi = 20 degrees, no tensile
@@ -1233,28 +1240,12 @@ def rj020():
     return _rj020('rj020.xlsx', lines)
 
 
-def rj020_generated():
-    """Problem 20 with XSLOPE's own tessellation at the vendor's block density.
-
-    Same section, same rock, same joint strength; the network comes from
-    :func:`xslope.joints.voronoi` at a block size of 2.895 m — the mean block
-    width measured on the vendor's traces — with seed 20. It is a different
-    tessellation of the same mass at the same scale, which is the comparison the
-    source paper's question asks for.
-    """
-    def lines(sd):
-        return voronoi(sd, RJ20_BLOCK, seed=20, label='vor',
-                       props=RJ20_JOINT)
-    return _rj020('rj020_generated.xlsx', lines)
-
-
 #: Every builder in this module, in problem-number order. ``verify_rebuild.py``'s
 #: ``joints`` group is this list, so a builder missing here is a corpus file
 #: nothing guards.
 BUILDERS = [rj001a, rj001b, rj001c, rj001d, rj002, rj015, rj003, rj004, rj005,
             rj006, rj007, rj008, rj009, rj010, rj011, rj012, rj013, rj014,
-            rj017, rj017_staircase, rj018, rj019, rj020,
-            rj020_generated]
+            rj017, rj017_staircase, rj018, rj019, rj020]
 
 
 if __name__ == '__main__':

@@ -848,7 +848,8 @@ returns the same two verdicts at the same sweep counts.
 **The row is reported rather than locked**, because what it measures is not a factor of safety: the
 sweep asks whether the model stands at full strength under a stated load, which is a different
 question from the strength reduction every other row here answers, and the corpus's locking rule is
-written for the second. The figure producer draws a bracket, so this row has no figure.
+written for the second. Its figure is drawn the same way — two solves at the two coefficients that
+bracket the tilt, titled by the angle rather than by a factor.
 
 The plate is weightless in the vendor model (`BodyForceSolid: 0` — it is the apparatus, not rock),
 and `build_fem_data` requires a positive unit weight, so it is built at the 27 kN/m³ its own
@@ -856,6 +857,8 @@ property row states. Its weight is carried by its own restraints and the contact
 base of the stack is the weight of the blocks above it.
 
 **Input file:** [rj016.xlsx](files/rocscience/joints/rj016.xlsx).
+
+![RJ-16: Barla et al. tilt-table block toppling (rj016) — FEM inputs with the seismic coefficient that stands for the tilt, mesh with the vendor's rollers, joint slip at the first coefficient the stack goes at, and the deformed section. The slip is on the vertical joints between the columns and on the bedding under the crest of the stack, and the deformed section at 156x shows what that adds up to: every column leaning downslope about its own base, the tall ones at the back furthest over, which is toppling rather than the stack sliding along the plate](images/RJ-16.png)
 
 ### 🟡 RJ-17: Step-path failure, en-echelon joints (rj017) {#rj-17}
 

@@ -40,16 +40,10 @@ EXTRA_CASES = [
     # mechanism the same way a locked row's does.
     {**_JOINT, 'file': 'files/rocscience/joints/rj003.xlsx',
      'target_size': '12.0', 'benchmark': 'RJ-3'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj004.xlsx',
-     'target_size': '12.0', 'benchmark': 'RJ-4'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj005.xlsx',
      'target_size': '12.0', 'benchmark': 'RJ-5'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj006.xlsx',
      'target_size': '12.0', 'benchmark': 'RJ-6'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj007.xlsx',
-     'target_size': '12.0', 'benchmark': 'RJ-7'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj015.xlsx',
-     'target_size': '2.0', 'benchmark': 'RJ-15'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj019.xlsx',
      'target_size': '3.0', 'benchmark': 'RJ-19'},
     # The termination family's rows that still report. Corpus size is the joint
@@ -57,8 +51,6 @@ EXTRA_CASES = [
     # problem-1 cases and problems 9, 11 and 13 have locked and carry tags of
     # their own, so they are no longer listed: `registered` would ignore a
     # duplicate entry anyway, and `--audit` names one that is left behind.
-    {**_JOINT, 'file': 'files/rocscience/joints/rj010.xlsx',
-     'target_size': '3.0', 'benchmark': 'RJ-10'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj012.xlsx',
      'target_size': '1.5', 'benchmark': 'RJ-12'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj014.xlsx',

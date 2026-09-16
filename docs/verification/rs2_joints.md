@@ -109,7 +109,7 @@ joint model whose output is a stress-displacement curve.
 | [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | — | 1.57 / 1.59 | |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | — | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.037 vs UDEC 1.03 (+0.7%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
-| 10 | <span class="nodata">⊘</span> | Bilinear slab failure, example 1b | UDEC 1.03 | LE (Alejano) 0.43–1.45 | 0.92 / 1.08 | *planned* — the corpus bracket is run and decided on every trial; the refinement step a lock needs is not yet measured. |
+| [10](#rj-10) | 🟢 | Bilinear slab failure, example 1b | SSRM 1.037 vs UDEC 1.03 (+0.7%) | LE (Alejano) 0.43–1.45 | 0.92 / 1.08 | |
 | [11](#rj-11) | 🟢 | Ploughing sliding slab failure | SSRM 1.213 vs UDEC 1.21 (+0.2%) | LE (Alejano) 1.75 | 1.22 / 1.3 | |
 | [12](#rj-12) | <span class="nodata">⊘</span> | Ploughing toppling slab failure | UDEC 1.78 | LE (Alejano) 2.0 | 1.39 / 1.75 | *reported, no lock* — a step of refinement moves the factor, so it is not the section's answer but its mesh's. |
 | [13](#rj-13) | 🟢 | Ploughing sliding slab, example 4 | SSRM 0.998 vs UDEC 1.0 (−0.2%) | LE (Alejano) 1.0 | 1.0 / 1.05 | |
@@ -590,6 +590,42 @@ limit equilibrium here is. The distinct-element run is what the manual verifies 
 **Input file:** [rj009.xlsx](files/rocscience/joints/rj009.xlsx).
 
 ![RJ-9: Alejano et al. bilinear slab failure, example 1a (rj009) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it moves: the release trace under the crest carries the brightest slip, a bedding plane below the toe carries the rest, and the deformed section shows the slab between them sliding out over the bench](images/RJ-9.png)
+
+### 🟢 RJ-10: Alejano et al. bilinear slab failure, example 1b (rj010) {#rj-10}
+
+Example 1a with the release joint moved five metres up the face, which the manual says is the whole
+difference between the two problems. The section, the bedding and both friction angles are
+[problem 9](#rj-9)'s: a 50 m slope at 50° cut by bedding dipping out of the face at −50° at 3 m
+spacing at φ = 30°, release at φ = 40°, and the same elastic rigid-block stand-in for the rock at
+E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3.
+
+Moving the release upslope leaves the toe undercut where it was and cuts a second block out of the
+face above it: the trace that ran from the face to the toe in example 1a stays, and a new one leaves
+the face at (−9.977, 11.890) five metres higher. Both end on the bedding plane they are released by;
+see [where a joint ends on another](#joint-terminations).
+
+| XSLOPE SSRM | UDEC referee | LE (Alejano) | RS2 without / with improvement |
+|---|---|---|---|
+| **1.037** | 1.03 (+0.7%) | 0.43–1.45 | 0.92 / 1.08 |
+
+<!-- test: file=files/rocscience/joints/rj010.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-10, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
+
+A step of refinement — a 2D size of 2.1 m, which takes the mesh from 12,608 nodes and 1,806
+interface elements to 26,577 and 2,579 — does not move the factor at all: the finer mesh returns the
+same bracket, edge for edge. Every trial of both brackets reaches a verdict. The corpus bracket's
+longest trial takes 60,715 sweeps of the 250,000 allowed and the refinement's longest takes 18,471,
+and the two brackets get there differently: on the corpus mesh every trial converges or diverges
+under its own steam, while on the finer one the five standing trials are all settled by the Newton
+corrector at 300 sweeps. The bracket is the same either way, which is what the row is cut on.
+
+RS2's own two factors straddle this row — 0.92 without the joint improvement option and 1.08 with it,
+around 1.037 — as they do on [problem 9](#rj-9), [problem 5](#rj-5) and [problem 6](#rj-6) and on no
+other problem here. The paper's own limit equilibrium is again a range rather than an answer, 0.43 to
+1.45, recorded beside the referee rather than scoring.
+
+**Input file:** [rj010.xlsx](files/rocscience/joints/rj010.xlsx).
+
+![RJ-10: Alejano et al. bilinear slab failure, example 1b (rj010) — FEM inputs, mesh, joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and, as in example 1a, almost none of it slips: the release trace high on the face carries the brightest slip, one bedding plane below the toe carries the rest, and the deformed section shows the block between them moving out over the bench](images/RJ-10.png)
 
 ### 🟢 RJ-11: Alejano et al. ploughing sliding slab failure (rj011) {#rj-11}
 

@@ -308,16 +308,21 @@ VOICE_MUTATIONS = [
 #: `fem.py`'s `line_loads` were grepped.  C2 plants a fresh absence nobody has
 #: entered on the ABSENT list.  Both must be caught; `NEGATIVE`'s N6 runs the
 #: other way, with a sentence citing a listed absence, and must pass.
+#: The anchor all three hang on: one sentence of the terminations section, which
+#: every row of the corpus is read against and which no row's own result can
+#: move. A fixture anchored in a row's text goes stale the moment that row is
+#: re-cut, which is how C1, C2 and N6 came to be anchored on text the page no
+#: longer carried.
+CAP_ANCHOR = "An end already on another line is left exactly where it is."
+
 CAPABILITY_MUTATIONS = [
     ("rs2_joints", "capabilities", "C1 the line-load claim, restored",
-     "*blocked* — as 1a; its 2013 kN stabilizing toe force enters as a line "
-     "load on the `lloads` sheet.",
-     "*blocked* — as 1a, and its 2013 kN toe force is a concentrated line "
-     "load, which the loads sheet does not carry."),
+     CAP_ANCHOR,
+     CAP_ANCHOR + " Problem 1's 2013 kN toe force is a concentrated line load, "
+     "which the loads sheet does not carry."),
     ("rs2_joints", "capabilities", "C2 an unlisted absence",
-     "Every junction in the rows that **are** built is a crossing.",
-     "Every junction in the rows that **are** built is a crossing. XSLOPE has "
-     "no way to state a joint's persistence."),
+     CAP_ANCHOR,
+     CAP_ANCHOR + " XSLOPE has no way to state a joint's persistence."),
 ]
 
 #: precision is the same lock, and a check that failed on one would push the
@@ -329,9 +334,9 @@ NEGATIVE = [
     # check that flagged that too would say nothing about whether anyone
     # grepped before writing it.
     ("rs2_joints", "capabilities", "N6 a sentence citing a listed absence",
-     "Every junction in the rows that **are** built is a crossing.",
-     "Every junction in the rows that **are** built is a crossing. XSLOPE has "
-     "no staged construction, so a model built in two stages is out of reach."),
+     CAP_ANCHOR,
+     CAP_ANCHOR + " XSLOPE has no staged construction, so a model built in two "
+     "stages is out of reach."),
     ("rocscience_groundwater", "tags",
      "N1 a list element reprinted at the tag's own precision",
      "read 6.35 / 6.55", "read 6.346 / 6.55"),

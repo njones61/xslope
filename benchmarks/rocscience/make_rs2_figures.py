@@ -94,7 +94,7 @@ from xslope.plot import (
 )
 from xslope.plot_fem import (
     plot_shear_strain_contours, plot_displacement_vectors, plot_deformed_mesh,
-    deformation_scale, solution_has_joint_state,
+    deformation_scale, displacement_magnitude, solution_has_joint_state,
     plot_reinforcement_lines as _plot_mesh_reinf_lines, _plot_boundary_conditions,
 )
 # What may be drawn as a failure state. The rule lives with the verification
@@ -276,6 +276,42 @@ def parse_tags(path=RS2_MD):
                 continue
             cases.append(kv)
     return cases
+
+
+def _shared_stems():
+    """``{stem: n}`` for every stem more than one registered row writes to.
+
+    Four mesh sizes of one workbook, or a depth-filtered variant beside its
+    unfiltered lock, share a stem and so share ``{stem}_fem_meta.json``: the last
+    row rendered leaves its record there and the earlier rows' locks are left
+    pointing at a bracket cut on a different mesh. Those rows get a per-row record
+    as well (``tools/ssrm_trial_audit.row_meta_name``), which is what the trial
+    audit and ``tools/lock_edges.py`` read for them.
+    """
+    counts = {}
+    for tag in parse_tags() + EXTRA_CASES:
+        if tag.get('figure') == 'inputs':
+            continue
+        stem = _sidecar_stem(tag, os.path.normpath(
+            os.path.join(ROOT, 'docs', 'verification', tag['file'])))
+        counts[stem] = counts.get(stem, 0) + 1
+    return {stem: n for stem, n in counts.items() if n > 1}
+
+
+def _write_row_meta(tag, stem, meta):
+    """Write this row's own copy of the run record where the stem is shared.
+
+    Costs a few kilobytes and changes nothing about the field sidecars; what it
+    buys is that every lock on a shared workbook can be audited against the
+    bracket that cut IT rather than against whichever sibling ran last."""
+    if stem not in _shared_stems():
+        return None
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    import ssrm_trial_audit as audit
+    path = audit.row_meta_name(stem, tag)
+    with open(path, 'w') as fh:
+        json.dump(meta, fh, indent=2)
+    return path
 
 
 def _declare_dry_beyond_piezo(sd, mesh):
@@ -994,6 +1030,71 @@ def _composite_domain(fem_data, sd, style):
     return X0, X1, Y0, Y1
 
 
+def _composite_deformation_scale(fem_data, field, domain):
+    """The exaggeration the composite's deformed panel is drawn at.
+
+    `plot_fem.deformation_scale` never returns less than 1.0 — it is an
+    EXAGGERATION, and a field whose displacements are already large is drawn at
+    true scale, which is right for a panel that owns its own figure. In the
+    composite all four panels share one frame, and the field being drawn is the
+    AT-FAILURE capture, whose magnitude says how far past failure the capture ran
+    rather than anything about the slope: the geotextile walls come out of it
+    displaced by tens of meters on a 24 m section. Drawn at true scale in a shared
+    frame, that one panel decides the domain and shrinks the other three to
+    nothing.
+
+    So the composite draws the deformed section at the scale that keeps its
+    largest displacement inside the cushion the domain already carries — above
+    unity where the motion is too small to see, below it where the capture ran
+    away — and `plot_deformed_mesh` prints the number in the panel's title, so
+    what is on the page says what it is.
+    """
+    scale = deformation_scale(fem_data, field)
+    max_disp = float(np.max(displacement_magnitude(fem_data, field)))
+    if max_disp <= 0:
+        return scale
+    X0, X1, Y0, Y1 = domain
+    fitted = min(scale, _PAD_FRAC * max(X1 - X0, Y1 - Y0) / max_disp)
+    # …but never below what the panel's own title can state. It prints the scale
+    # to one decimal below 10x, so anything under 0.1x comes out as "Scale =
+    # 0.0x" — a figure claiming it drew no deformation while drawing one. Where
+    # the fit wants less than that, the panel draws at 0.1x and `_fit_domain`
+    # opens the frame around what that puts on the page.
+    return max(0.1, fitted)
+
+
+def _fit_domain(domain, axes):
+    """Widen the shared domain around what the four panels actually drew.
+
+    `_composite_domain` pads around the mesh at rest and the inputs chrome, which
+    is everything the panels draw on a bonded model. A jointed model's
+    displacement panel draws the mesh where it MOVED to, at the exaggeration
+    `deformation_scale` chose, and a block that slid toward a boundary can reach
+    past a cushion measured on the undeformed section — RS2-24b's crest does. The
+    motion is not predicted here: the first layout pass draws it, this re-pads
+    around the union of the four panels' own data limits, and the second pass
+    lays the figure out on that, so the cushion is uniform around the content
+    rather than around the section at rest. Returns the domain unchanged wherever
+    the drawn content already fits, which is every bonded row.
+    """
+    X0, X1, Y0, Y1 = domain
+    lims = [ax.dataLim for ax in axes]
+    xs0 = [float(d.x0) for d in lims if np.isfinite(d.x0)]
+    xs1 = [float(d.x1) for d in lims if np.isfinite(d.x1)]
+    ys0 = [float(d.y0) for d in lims if np.isfinite(d.y0)]
+    ys1 = [float(d.y1) for d in lims if np.isfinite(d.y1)]
+    if not (xs0 and xs1 and ys0 and ys1):
+        return domain
+    cx0, cx1, cy0, cy1 = min(xs0), max(xs1), min(ys0), max(ys1)
+    if cx0 > X0 and cx1 < X1 and cy0 > Y0 and cy1 < Y1:
+        return domain
+    pad = _PAD_FRAC * max(cx1 - cx0, cy1 - cy0)
+    if pad <= 0:
+        pad = 1.0
+    return (min(X0, cx0 - pad), max(X1, cx1 + pad),
+            min(Y0, cy0 - pad), max(Y1, cy1 + pad))
+
+
 def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi, domain):
     """Build the whole 2×2 composite as ONE figure. Every panel is drawn into an
     axes the composite places at a FIXED rectangle, so with the same imposed limits
@@ -1052,7 +1153,8 @@ def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi, 
     # applies to the standard figure; a row with no joint is unchanged.
     if solution_has_joint_state(fem_data, afield):
         plot_deformed_mesh(
-            ax_lr, fem_data, afield, deformation_scale(fem_data, afield),
+            ax_lr, fem_data, afield, _composite_deformation_scale(
+                fem_data, afield, domain),
             show_reinforcement=True, single_panel=True, joint_faces=True,
             at_failure=afield.get('_at_failure', False))
     else:
@@ -1190,6 +1292,10 @@ def render_figure(bench, sd, fem_data, field, failure=None, fs=None,
             bench, sd, fem_data, afield, style, 1.0, 1.0, dpi, domain)
         leg0 = _measure_legend_band(ax_ul, dpi)
         leg1 = _measure_legend_band(ax_ll, dpi)
+        # …and the content the panels drew, which on a jointed row includes the
+        # deformed section (see _fit_domain). Measured on the same pass, so the
+        # second one lays out on a domain that holds everything.
+        domain = _fit_domain(domain, _axes)
         plt.close(fig)
 
         # Pass 2: final layout with measured leg-bands.
@@ -1350,6 +1456,7 @@ def make_figure(tag, dpi=150):
         # comes out node-for-node the same, so everything downstream reads a
         # section that was never solved.
         export_mesh_to_json(mesh, f'{stem}_mesh.json')
+    _write_row_meta(tag, stem, meta)
 
     out = render_figure(bench, sd, fem_data, field, failure=failure, fs=fs, dpi=dpi,
                         standing_note=note)

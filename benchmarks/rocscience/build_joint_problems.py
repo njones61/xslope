@@ -43,8 +43,9 @@ from shapely.geometry import LineString, Polygon                    # noqa: E402
 from xslope.fileio import load_slope_data                           # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx    # noqa: E402
 from xslope.fileio import build_ground_surface_from_polygons        # noqa: E402
-from xslope.joints import cross_jointed, parallel_set               # noqa: E402
+from xslope.joints import cross_jointed, parallel_set, voronoi      # noqa: E402
 from benchmarks.tag_k0 import apply_tag_k0                          # noqa: E402
+from rj020_voronoi import EXTERNAL as RJ20_RING, TRACES as RJ20_TRACES  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',
                    'docs', 'verification', 'files', 'rocscience', 'joints')
@@ -880,6 +881,218 @@ def rj015():
     return _write(sd, 'rj015.xlsx')
 
 # ---------------------------------------------------------------------------
+# Problem 16 — Barla et al.'s tilt-table block toppling
+#
+# A laboratory test rather than a slope: 9 cm square blocks stacked into a 63
+# degree staircase on a plate, and the plate rotated until the stack topples.
+# The vendor ships ten models, `joint #016_0deg` through `_9deg`, each the same
+# model with the WHOLE section rotated by one more degree and its boundary
+# pinned; the answer is the angle at which the stack stops standing.
+#
+# This file is the vendor's 0-degree model. The rotation is applied here as a
+# horizontal seismic coefficient instead, which is what XSLOPE's finite element
+# engine carries: k pushes -x, toward the face, and a tilt of theta is k =
+# tan(theta). See the page's row for what that does and does not reproduce.
+# ---------------------------------------------------------------------------
+
+#: The block stack: the staircase face on the left, the plate contact at
+#: y = 0.09 below and the backstop at x = 1.35 behind. Verbatim from the vendor
+#: model's own boundaries.
+RJ16_STACK = [(0.09, 0.09), (1.35, 0.09), (1.35, 0.9), (0.45, 0.9),
+              (0.45, 0.72), (0.36, 0.72), (0.36, 0.54), (0.27, 0.54),
+              (0.27, 0.36), (0.18, 0.36), (0.18, 0.18), (0.09, 0.18)]
+
+#: The tilt plate: the strip under the stack and the backstop behind it, one
+#: L-shaped region. The vendor's plate carries `BodyForceSolid: 0` — it is the
+#: apparatus, not rock, and it is weightless. `build_fem_data` requires a
+#: positive unit weight, so the plate is built at the 27 kN/m^3 its own property
+#: row states. Its weight never reaches the stack: the plate is held by the
+#: restraints on its base and sides, and the contact stress along y = 0.09 is
+#: the weight of the blocks above it.
+RJ16_PLATE = [(0.0, 0.0), (1.44, 0.0), (1.44, 0.9), (1.35, 0.9),
+              (1.35, 0.09), (0.0, 0.09)]
+
+
+def rj016():
+    """RJ-16 — Barla et al. tilt-table block toppling (`joint #016_0deg.fez`).
+
+    Fourteen columns of 9 cm blocks, stacked into a 63.4 degree staircase on a
+    stiff plate: thirteen vertical joints at 0.09 m spacing, eight horizontal
+    ones, the plate contact along y = 0.09 and the backstop up x = 1.35, all of
+    them c = 0, phi = 38 degrees, k_n = 5 x 10^6 kPa/m and k_s = 5 x 10^5 kPa/m
+    — the softest pair in the corpus. The blocks are elastic at E = 350 MPa,
+    nu = 0.2, gamma = 28 kN/m^3; the plate is elastic at E = 200 GPa.
+
+    The vendor restrains this model with ROLLERS, not the clamped sides the rest
+    of the manual uses: its base nodes read `tx: free ty: 0` and its sides
+    `tx: 0 ty: free`, with the two base corners pinned.
+
+    Referee: UDEC 11 degrees. The experiment toppled at 9, and RS2 reports 9
+    without joint improvement and 7 with it.
+    """
+    sd = _base()
+    sd['side_bc'] = 'rollers'
+    mats = [_rock('Block', 28.0, 3.5e5, 0.2, 0.0, 0.0, option='elastic'),
+            _rock('Plate', 27.0, 2.0e8, 0.2, 0.0, 0.0, option='elastic')]
+    _finish(sd, [(RJ16_STACK, 0), (RJ16_PLATE, 1)], mats)
+    props = {'c': 0.0, 'phi': 38.0, 't_cut': 0.0, 'kn': 5.0e6, 'ks': 5.0e5}
+    rows = []
+    # The block grid: thirteen vertical joints and eight horizontal ones, each
+    # read from the vendor's own joint-network segment list.
+    for i, (x, y_top) in enumerate([(0.18, 0.18), (0.27, 0.36), (0.36, 0.54),
+                                    (0.45, 0.72), (0.54, 0.9), (0.63, 0.9),
+                                    (0.72, 0.9), (0.81, 0.9), (0.9, 0.9),
+                                    (0.99, 0.9), (1.08, 0.9), (1.17, 0.9),
+                                    (1.26, 0.9)]):
+        rows.append(_joint(f'col-{i + 1:02d}', (x, 0.09), (x, y_top),
+                           props['c'], props['phi'],
+                           kn=props['kn'], ks=props['ks']))
+    for i, (x_left, y) in enumerate([(0.18, 0.18), (0.18, 0.27), (0.27, 0.36),
+                                     (0.27, 0.45), (0.36, 0.54), (0.36, 0.63),
+                                     (0.45, 0.72), (0.45, 0.81)]):
+        rows.append(_joint(f'bed-{i + 1:02d}', (x_left, y), (1.35, y),
+                           props['c'], props['phi'],
+                           kn=props['kn'], ks=props['ks']))
+    # The two contacts with the plate, which are also the material boundary.
+    rows.append(_joint('plate', (0.09, 0.09), (1.35, 0.09),
+                       props['c'], props['phi'],
+                       kn=props['kn'], ks=props['ks']))
+    rows.append(_joint('backstop', (1.35, 0.09), (1.35, 0.9),
+                       props['c'], props['phi'],
+                       kn=props['kn'], ks=props['ks']))
+    sd['joint_lines'] = rows
+    # The seed surface: the staircase face itself, toe to crest. A strength
+    # reduction never reads it, and an elastic section cannot be sliced.
+    sd['non_circ'] = _toe_chord((0.09, 0.09), (0.45, 0.9))
+    return _write(sd, 'rj016.xlsx')
+
+
+# ---------------------------------------------------------------------------
+# Problem 17 — step-path failure through en-echelon joints
+#
+# The section, the rock and the joint strength are problem 18's. Two things are
+# different: the joints are three short planes stepping up the face instead of
+# three that run through it, and the vendor confines the strength reduction to a
+# rectangle. That rectangle is stated in the model file as an `SSR_polygonal_zones`
+# block, and RS2 applies it by holding every element whose centroid falls outside
+# it linear elastic — the file carries an auto-generated elastic twin of the rock
+# (`rock2`, the same modulus, `Plasticity Specifications: Non`) on 1 173 of its
+# 2 579 elements, and the manual's Figure 17.1 draws the rectangle as a dashed box
+# labeled "SSR Search Area".
+#
+# Two files are built from that one model. `rj017.xlsx` carries the rectangle the
+# vendor states, applied the way RS2 applies it — by element centroid, on our own
+# mesh. `rj017_staircase.xlsx` carries the zone as the VENDOR'S mesh resolved it:
+# the outline of those 1 173 elements, which is the same rectangle rasterized onto
+# element edges. The pair measures what the rasterization is worth.
+# ---------------------------------------------------------------------------
+
+#: Problem 17's external boundary, verbatim from the vendor model. It is problem
+#: 18's section: a 45 x 20 m block whose face rises from (17, 8.2) to (26.9, 20).
+RJ17_RING = [(45.0, 0.0), (45.0, 20.0), (30.0, 20.0), (26.9, 20.0),
+             (17.0, 8.2), (0.0, 8.2), (0.0, 0.0)]
+
+#: The vendor's SSR search area, verbatim from the `SSR_polygonal_zones` block of
+#: `joint #017.fez`. Strength reduction applies INSIDE it; everything outside is
+#: held elastic. Its top edge, 20.532, is above the model's own crest at 20.
+RJ17_SSR_ZONE = [(12.221, 3.19011), (40.2504, 3.19011),
+                 (40.2504, 20.532), (12.221, 20.532)]
+
+#: The same zone as the vendor's mesh carries it: the outline of every element the
+#: model assigns to its elastic twin, read from the element-material map and its
+#: collinear runs collapsed. Eighty-four vertices, seventy-eight of them on the
+#: staircase itself and six on the model's own outline, which is what the polygon
+#: closes along. The staircase wanders about half an element either side of the
+#: stated rectangle — x from 11.85 to 12.73 where the rectangle says 12.221, and
+#: y from 2.73 to 3.66 where it says 3.19011.
+RJ17_SSR_STAIRCASE = [
+    (0.000000, 8.200000), (12.041667, 8.200000), (12.732287, 7.391343),
+    (11.853017, 7.354552), (12.183209, 6.566077), (12.305157, 5.728941),
+    (12.450368, 4.983233), (12.152971, 4.233591), (11.895557, 3.647739),
+    (12.653424, 3.535422), (13.274461, 3.102569), (13.959161, 2.998824),
+    (14.496145, 3.607723), (14.861818, 2.791255), (15.309258, 3.534494),
+    (15.612795, 2.979583), (16.140216, 3.454560), (16.893886, 2.898417),
+    (17.631592, 3.662955), (17.764761, 2.725674), (18.271237, 3.198496),
+    (18.823805, 3.160376), (19.399061, 3.476548), (20.029911, 3.076577),
+    (20.646724, 3.645589), (20.762537, 2.799851), (21.300233, 3.304812),
+    (22.122502, 3.434502), (23.036428, 3.119942), (23.698111, 3.530458),
+    (23.778471, 2.741206), (24.541737, 3.358853), (25.324808, 2.770619),
+    (25.541844, 3.764913), (26.203749, 2.995031), (26.887199, 3.487555),
+    (27.581711, 3.273312), (28.180976, 3.107579), (28.688489, 3.384462),
+    (29.565301, 3.306129), (30.469012, 3.282390), (31.058497, 2.946877),
+    (31.632117, 3.402206), (32.372038, 3.398315), (33.155704, 3.087173),
+    (33.734806, 3.419331), (34.475085, 3.335526), (35.124881, 2.951040),
+    (35.333254, 3.637172), (35.899515, 2.922651), (36.893385, 3.075338),
+    (37.736554, 3.342655), (38.527608, 3.387563), (39.475463, 3.298180),
+    (40.294942, 2.775926), (40.452723, 3.639875), (40.443589, 4.300896),
+    (40.105249, 4.845125), (40.467326, 5.519350), (40.075684, 6.227522),
+    (40.617239, 6.717877), (39.846561, 7.141889), (40.588968, 7.339139),
+    (40.239325, 7.946132), (40.262382, 8.811903), (40.369498, 9.798386),
+    (40.518283, 10.753185), (39.836058, 11.287467), (40.661493, 11.559455),
+    (40.132380, 12.059475), (40.429216, 12.772547), (40.415079, 13.549590),
+    (40.392513, 14.194621), (39.876920, 14.731626), (40.410549, 15.503505),
+    (40.117585, 16.150965), (40.308568, 16.991383), (40.086158, 17.835149),
+    (40.336873, 18.646723), (40.170506, 19.416224), (40.000000, 20.000000),
+    (45.000000, 20.000000), (45.000000, 0.000000), (0.000000, 0.000000),
+]
+
+
+def _rj017(name, elastic_ring):
+    """Problem 17 with its held-elastic region stated as ``elastic_ring``."""
+    sd = _base()
+    mats = [_rock('Rock', 19.62, 2.0e7, 0.3, 25.0, 25.0, t_cut=0.0)]
+    _finish(sd, [(RJ17_RING, 0)], mats)
+    # Three en-echelon steps, each read from its own joint boundary in the vendor
+    # file. They carry problem 18's joint: c = 1 kPa, phi = 35, the standard
+    # stiffness pair, and no tensile capacity.
+    sd['joint_lines'] = [
+        _joint('step-1', (18.33, 9.37), (22.33, 12.25), 1.0, 35.0),
+        _joint('step-2', (22.33, 13.5), (26.26, 16.0), 1.0, 35.0),
+        _joint('step-3', (26.26, 17.16), (29.33, 19.33), 1.0, 35.0),
+    ]
+    # The search area as an analysis overlay: 'SSR elastic' holds every element
+    # whose centroid is inside the ring linear elastic and out of the reduction,
+    # which is what the vendor's elastic twin does. The ring is the COMPLEMENT of
+    # the search area, because that is the region the vendor holds.
+    sd['ssr_zones'] = [{'kind': 'hold_elastic',
+                        'polygon': [(float(x), float(y)) for x, y in elastic_ring]}]
+    sd['circles'] = _toe_circle((17.0, 8.2), (26.9, 20.0))
+    return _write(sd, name)
+
+
+def rj017():
+    """RJ-17 — step-path failure, en-echelon joints (vendor `joint #017.fez`).
+
+    A 45 x 20 m section whose face rises from (17, 8.2) to (26.9, 20) — problem
+    18's — cut by three en-echelon joints at 36.1 degrees that stop short of one
+    another: (18.33, 9.37) to (22.33, 12.25), (22.33, 13.5) to (26.26, 16), and
+    (26.26, 17.16) to (29.33, 19.33). The rock bridges between them are what a
+    step-path failure has to break. The rock is Mohr-Coulomb (gamma 19.62
+    kN/m^3, E 20 GPa, nu 0.3, c 25 kPa, phi 25, no tensile capacity); the joints
+    carry c = 1 kPa, phi = 35 and the standard stiffness pair. Referee: UDEC
+    1.29. RS2 reports 1.24 without joint improvement and 1.20 with it.
+
+    The strength reduction is confined to the vendor's own SSR search area
+    (RJ17_SSR_ZONE), stated in the model file and drawn on the manual's Figure
+    17.1; the rest of the model is held elastic.
+    """
+    elastic = Polygon(RJ17_RING).difference(Polygon(RJ17_SSR_ZONE))
+    return _rj017('rj017.xlsx', list(elastic.exterior.coords)[:-1])
+
+
+def rj017_staircase():
+    """Problem 17 with the search area as the VENDOR'S mesh resolved it.
+
+    Same model as :func:`rj017` in every other respect. The held-elastic region
+    is the outline of the 1 173 elements the vendor file assigns to its elastic
+    twin rather than the rectangle those elements approximate, so the pair
+    measures how much of the answer rides on where a mesh puts the edge of a
+    search area.
+    """
+    return _rj017('rj017_staircase.xlsx', RJ17_SSR_STAIRCASE)
+
+
+# ---------------------------------------------------------------------------
 # Problem 18 — step-path failure through continuous joints
 # ---------------------------------------------------------------------------
 
@@ -955,12 +1168,93 @@ def rj019():
     return _write(sd, 'rj019.xlsx')
 
 
+# ---------------------------------------------------------------------------
+# Problem 20 — Hammah & Yacoub's blocky slope, tessellated into Voronoi blocks
+#
+# The tessellation was generated in UDEC and imported into RS2, so the vendor
+# model carries it as 523 joint boundaries rather than as a network anything can
+# regenerate, and the manual publishes neither a block size nor a seed. The
+# traces ARE the statement of the network, and they are transcribed verbatim
+# (rj020_voronoi.py). Measured on them: 525 blocks over the 4 400 m^2 section, a
+# mean block area of 8.381 m^2 and a mean block width of 2.895 m.
+#
+# `rj020_generated.xlsx` is the same problem with OUR generator's tessellation at
+# that measured density, which is what a user of XSLOPE would draw on a blocky
+# mass. What the pair measures is how much of the factor belongs to the block
+# scale and how much to one particular tessellation — the question the source
+# paper asks.
+# ---------------------------------------------------------------------------
+
+#: The vendor's joint on this problem: c = 0.5 MPa, phi = 20 degrees, no tensile
+#: capacity, and the corpus's standard stiffness pair.
+RJ20_JOINT = {'c': 500.0, 'phi': 20.0, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
+
+#: The mean block width measured on the vendor's own traces: the square root of
+#: their mean block area (8.381 m^2 over 525 blocks). It is the corpus mesh size
+#: for this row and the block size the generated variant is drawn at.
+RJ20_BLOCK = 2.895
+
+
+def _rj020(name, joint_lines):
+    """Problem 20's section and rock, with the joint network given."""
+    sd = _base()
+    mats = [_rock('Rock', 27.0, 2.0e7, 0.3, 1000.0, 35.0, t_cut=0.0)]
+    _finish(sd, [(RJ20_RING, 0)], mats)
+    sd['joint_lines'] = joint_lines(sd)
+    # The seed surface. A blocky mass has no one plane to fail on, so the file
+    # carries the starting circle a user would draw through the toe at (10, 10)
+    # and the crest at (30, 70). A strength reduction never reads it.
+    sd['circles'] = _toe_circle((10.0, 10.0), (30.0, 70.0))
+    return _write(sd, name)
+
+
+def rj020():
+    """RJ-20 — Hammah & Yacoub Voronoi slope (vendor `joint #020.fez`).
+
+    An 80 x 70 m section with a 60 m face at 71.6 degrees from the toe at
+    (10, 10) to the crest at (30, 70), the whole of it tessellated into 525
+    Voronoi blocks. The rock is Mohr-Coulomb (gamma 27 kN/m^3, E 20 GPa,
+    nu 0.3, c = 1 000 kPa, phi = 35, no tensile capacity); every block wall is a
+    joint at c = 500 kPa, phi = 20 with the standard stiffness pair. Referee:
+    UDEC 2.46. RS2 reports 2.21 without joint improvement and 2.37 with it.
+
+    The network is the vendor's own, transcribed trace for trace: 523 joint
+    boundaries, 1 177 segments, one row of the joints sheet each. Every block
+    corner is a three-way junction of them.
+    """
+    def lines(sd):
+        rows = []
+        for i, trace in enumerate(RJ20_TRACES):
+            for k in range(len(trace) - 1):
+                rows.append(_joint(f'vor-{i + 1:03d}-{k + 1}',
+                                   trace[k], trace[k + 1],
+                                   RJ20_JOINT['c'], RJ20_JOINT['phi']))
+        return rows
+    return _rj020('rj020.xlsx', lines)
+
+
+def rj020_generated():
+    """Problem 20 with XSLOPE's own tessellation at the vendor's block density.
+
+    Same section, same rock, same joint strength; the network comes from
+    :func:`xslope.joints.voronoi` at a block size of 2.895 m — the mean block
+    width measured on the vendor's traces — with seed 20. It is a different
+    tessellation of the same mass at the same scale, which is the comparison the
+    source paper's question asks for.
+    """
+    def lines(sd):
+        return voronoi(sd, RJ20_BLOCK, seed=20, label='vor',
+                       props=RJ20_JOINT)
+    return _rj020('rj020_generated.xlsx', lines)
+
+
 #: Every builder in this module, in problem-number order. ``verify_rebuild.py``'s
 #: ``joints`` group is this list, so a builder missing here is a corpus file
 #: nothing guards.
 BUILDERS = [rj001a, rj001b, rj001c, rj001d, rj002, rj015, rj003, rj004, rj005,
             rj006, rj007, rj008, rj009, rj010, rj011, rj012, rj013, rj014,
-            rj018, rj019]
+            rj017, rj017_staircase, rj018, rj019, rj020,
+            rj020_generated]
 
 
 if __name__ == '__main__':

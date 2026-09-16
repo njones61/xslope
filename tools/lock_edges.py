@@ -38,6 +38,13 @@ Usage:
     python tools/lock_edges.py --page docs/verification/rs2.md --write
     python tools/lock_edges.py --benchmark RS2-48,RJ-18 --write
     python tools/lock_edges.py --missing              # list the locks with no record
+    python tools/lock_edges.py --benchmark FEM-1-ssrm --recut   # cut one, then write it
+
+``--recut`` is for the locks no figure producer draws: it re-solves the tag's own
+bracket on the reference kernel, writes the record the run closed on, and then
+writes the pair. Where a producer DOES draw the row, run the producer instead —
+its run writes the figure and the record together, so the picture on the page and
+the pair in the tag come off one bracket.
 """
 from __future__ import annotations
 
@@ -48,6 +55,7 @@ import os
 import sys
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.join(_ROOT, "tools"))
 
 import ssrm_trial_audit as audit          # noqa: E402  (path set above)
@@ -135,6 +143,70 @@ def edges_from_record(kv, meta):
     return (f_stand, f_fail), None
 
 
+def recut(page, kv, overrides, capture=False):
+    """Re-cut one lock's bracket and persist the trial record it closed on.
+
+    For the rows whose figures a producer draws, the producer's own run is the
+    re-cut: it solves the bracket, writes the fields and the record together, and
+    the figure on the page is then the mechanism that record describes. This is
+    the path for the rest — a sweep point the page plots rather than figures, a
+    row with no figure at all — where there is a lock to check and nothing that
+    would redraw anything.
+
+    The bracket is built by ``run_tests.build_fem_ssrm_case``, the suite's own
+    tag-to-model mapping, so the trials recorded here are the trials the suite
+    runs; and it is solved on the pure-NumPy reference kernel, the path a locked
+    factor is defined by. The at-failure capture is skipped — it is an extra solve
+    past the bracket, and nothing here draws a field.
+
+    Returns ``(FS, record_path)``.
+    """
+    import run_tests as RT
+    import xslope.fem as _fem
+    from xslope.fem import solve_ssrm, ssrm_run_record
+
+    def _key(tag):
+        """What identifies one row among the rows of a page: the workbook, the
+        discretization, the bracket and the lock. Two tags agreeing on all four
+        are the same run asked for twice."""
+        out = [os.path.basename(str(tag.get('file'))),
+               str(tag.get('benchmark', '')), str(tag.get('element_type', ''))]
+        for key in ('target_size', 'f_min', 'f_max', 'expected_fs'):
+            value = tag.get(key)
+            out.append('' if value in (None, '') else f"{float(value):.10g}")
+        return tuple(out)
+
+    tests = [t for t in RT.parse_test_tags(page) if t.get('type') == 'fem_ssrm']
+    want = [t for t in tests if _key(t) == _key(kv)]
+    if len(want) != 1:
+        raise SystemExit(f"{kv.get('benchmark') or kv['file']}: the tag matched "
+                         f"{len(want)} runnable rows on {os.path.basename(page)}")
+    test = want[0]
+
+    fem_data, kwargs, f_min, f_max, tol = RT.build_fem_ssrm_case(test)
+    kwargs.setdefault('capture_failure_state', capture)
+    with RT._force_fast_kernel(_fem, False):
+        result = solve_ssrm(fem_data, F_min=f_min, F_max=f_max, tolerance=tol,
+                            debug_level=0, **kwargs)
+    if not result.get('converged'):
+        raise SystemExit(f"{kv.get('benchmark') or kv['file']}: the bracket did "
+                         f"not close: {result.get('error')}")
+
+    record = ssrm_run_record(result, fem_data=fem_data, options={
+        'tolerance': tol, 'F_min': f_min, 'F_max': f_max,
+        'ssr_exclude': kwargs.get('ssr_exclude'),
+    })
+    meta = {'benchmark': kv.get('benchmark'), 'analysis': 'ssrm',
+            'FS': float(result['FS']), 'expected_fs': kv.get('expected_fs'),
+            'file': kv.get('file'), 'max_iter': int(float(kv.get('max_iter', 4000))),
+            'record_only': True}
+    meta.update(record)
+    path = audit.row_meta_name(audit.stem_path(page, kv, overrides), kv)
+    with open(path, "w") as fh:
+        json.dump(meta, fh, indent=2)
+    return float(result['FS']), path
+
+
 def write_edges(page, line_no, f_stand, f_fail):
     """Append the two fields and ``check=edges`` to one tag, in place.
 
@@ -177,7 +249,14 @@ def main(argv=None):
                     help="write the tags (default: report only)")
     ap.add_argument("--missing", action="store_true",
                     help="list the locks with no usable trial record and exit")
+    ap.add_argument("--recut", action="store_true",
+                    help="re-solve the selected locks' brackets and persist the "
+                         "trial record each closed on (for rows no figure "
+                         "producer draws); implies --write")
     args = ap.parse_args(argv)
+    if args.recut and not (args.benchmark or args.page):
+        ap.error("--recut needs --benchmark or --page: a re-cut is minutes of "
+                 "solving per row, and naming the rows is asking for them")
 
     pages = args.page or sorted(
         set(glob.glob(os.path.join(_ROOT, "docs", "**", "*.md"), recursive=True)))
@@ -197,6 +276,15 @@ def main(argv=None):
             already.append((name, page, line_no))
             continue
         meta = audit.meta_path(page, kv, overrides)
+        if args.recut and (wanted is not None or args.page):
+            import time
+            t0 = time.time()
+            fs, meta = recut(page, kv, overrides)
+            exp = float(kv["expected_fs"]) if kv.get("expected_fs") else None
+            moved = f"  lock={exp:g} d={fs - exp:+.4f}" if exp is not None else ""
+            print(f"recut {name:24s} FS={fs:.4f}{moved}  "
+                  f"({time.time() - t0:.0f}s)  {os.path.relpath(meta, _ROOT)}",
+                  flush=True)
         if not meta:
             blocked.append((name, page, "no meta sidecar beside the model"))
             continue
@@ -229,7 +317,7 @@ def main(argv=None):
         print(f"\n{len(blocked)} lock(s) stay in bracket mode "
               f"(--missing lists them with reasons)")
 
-    if args.write and ready:
+    if (args.write or args.recut) and ready:
         # Highest line first, so a rewrite cannot move a line this pass has yet to
         # read. (It cannot today — the fields are appended in place — but a tool
         # that edits files by line number should not depend on that.)

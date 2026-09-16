@@ -285,12 +285,45 @@ passes; it fails only if the checker raises. A tutorial legitimately re-runs a
 sample under settings the sample's own tag does not use, so every finding is a
 sentence someone reads before it is a defect.
 
+## Re-cutting a lock so it can be checked on its edges
+
+A strength-reduction lock is checked on two solves rather than nine once its tag
+carries the bracket it was cut on (`f_stand`, `f_fail`, `check=edges`). Those
+fields are never written by hand: `tools/lock_edges.py` reads them off the trial
+record the run that cut the lock persisted, so a lock with no record stays in
+bracket mode until a run makes one. `--missing` is the worklist.
+
+Which run makes it depends on what draws the row:
+
+- **A row a figure producer draws** is re-cut by running that producer
+  (`benchmarks/rocscience/make_rs2_figures.py RS2-14`,
+  `benchmarks/make_griffiths_figures.py xslope_griffiths3_r1`,
+  `tools/make_fem_docs_sidecars.py noncircular`). One run writes the fields, the
+  figure and the record together, so the picture on the page and the pair in the
+  tag come off one bracket.
+- **A row nothing draws** — a sweep point the page plots rather than figures, a
+  row with no figure — is re-cut by `tools/lock_edges.py --recut`, which solves
+  the tag's own bracket through `run_tests.build_fem_ssrm_case` on the reference
+  kernel and writes the record alone.
+
+Both write the record beside the model. A workbook several rows run on — four
+mesh sizes of one model, a filtered variant beside its unfiltered lock — has one
+`{stem}_fem_meta.json` and several locks wanting it, so each of those rows also
+gets `{stem}_fem_meta_{row}.json`, the record of that row's own run, and that is
+what the audit and `lock_edges` read for it.
+
+The re-cut re-measures the lock. Where the new bracket no longer straddles the
+value the tag carries, the lock has MOVED: the tag is left alone and the row is
+reported, because changing a published factor is a decision about the page and
+not a step in a re-cut.
+
 ## Running them
 
 ```bash
 python tools/lock_edges.py                                   # what can be checked on its edges
 python tools/lock_edges.py --missing                         # and what cannot, with reasons
 python tools/lock_edges.py --write                           # write the pairs into the tags
+python tools/lock_edges.py --page docs/... --benchmark X --recut   # cut the bracket, then write it
 python tools/ssrm_trial_audit.py --all                       # which locks were cut at the ceiling
 python -m tools.verification_checks.certify                  # all six pages
 python -m tools.verification_checks.certify rs2 seep         # named pages

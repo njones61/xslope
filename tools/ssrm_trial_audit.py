@@ -136,15 +136,59 @@ def tags(pages):
     return out
 
 
-def meta_path(page, kv, overrides):
-    """The meta sidecar a row's run writes, or None where the path does not
-    resolve."""
+def row_slug(kv):
+    """A file-name-safe name for ONE row of a workbook that carries several.
+
+    The benchmark id where the tag names one. An untagged row — a sweep point the
+    page plots rather than figures — is named by the discretization and the
+    bracket it was searched in, which is what one sweep point differs from the
+    next by. Not by the lock: a re-cut that moves the value would then orphan the
+    record of the run that moved it.
+    """
+    name = kv.get("benchmark")
+    if not name:
+        name = (f"{kv.get('element_type', 'tri6')}-{kv.get('target_size', 'auto')}"
+                f"-f{kv.get('f_min', '')}-{kv.get('f_max', '')}")
+    return re.sub(r"[^a-z0-9]+", "-", str(name).lower()).strip("-")
+
+
+def row_meta_name(stem, kv):
+    """The per-row trial record's path for one tag beside ``stem``.
+
+    ``{stem}_fem_meta.json`` holds the record of whatever run wrote the fields
+    beside it, and a workbook carrying several rows — four mesh sizes of one
+    model, a filtered variant beside its unfiltered lock — has one such file and
+    several locks wanting it. The later run's record then stands where the
+    earlier lock's was, and the earlier row reads a bracket that belongs to a
+    different mesh. The per-row file carries the record of THIS tag's own run,
+    and nothing else reads it, so each lock on a shared workbook can be audited
+    and edge-checked against the bracket that actually cut it.
+    """
+    return f"{stem}_fem_meta_{row_slug(kv)}.json"
+
+
+def stem_path(page, kv, overrides):
+    """The sidecar stem a row's run writes under — the workbook without its
+    extension, or the override the RS2 producer registers for a second run on a
+    shared workbook. Whether anything is there yet is not asked."""
     stem = overrides.get(kv.get("benchmark", ""))
     book = os.path.normpath(os.path.join(os.path.dirname(page), kv["file"]))
     if stem:
-        path = os.path.join(os.path.dirname(book), stem)
-    else:
-        path = os.path.splitext(book)[0]
+        return os.path.join(os.path.dirname(book), stem)
+    return os.path.splitext(book)[0]
+
+
+def meta_path(page, kv, overrides):
+    """The meta sidecar carrying this row's trial record, or None where neither
+    the per-row file nor the workbook's own resolves.
+
+    The per-row record wins where one exists: on a workbook several rows run on,
+    it is the only file that is this row's.
+    """
+    path = stem_path(page, kv, overrides)
+    per_row = row_meta_name(path, kv)
+    if os.path.exists(per_row):
+        return per_row
     meta = path + "_fem_meta.json"
     return meta if os.path.exists(meta) else None
 

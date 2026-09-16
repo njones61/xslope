@@ -60,7 +60,9 @@ EXTRA_CASES = [
 #: Rows the page documents as not yet built or blocked, each with the reason. A
 #: row here gets no figure and the audit does not count it as missing.
 NO_FIGURE = {
-    'RJ-16': 'scores a tilt angle found by a gravity sweep, not a strength reduction',
+    'RJ-16': 'is measured by sweeping a seismic coefficient at full strength for '
+             'the tilt angle at which the stack goes, and this producer draws a '
+             'strength-reduction bracket',
     'RJ-17': "the second material's zone is an element-edge staircase in the vendor "
              'mesh rather than a boundary of its model',
     'RJ-21': 'a two-stage model whose opening is cut in stage 2, and the FEM has no '

@@ -115,7 +115,7 @@ joint model whose output is a stress-displacement curve.
 | [13](#rj-13) | 🟢 | Ploughing sliding slab, example 4 | SSRM 0.998 vs UDEC 1.0 (−0.2%) | LE (Alejano) 1.0 | 1.0 / 1.05 | |
 | [14](#rj-14) | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | UDEC 0.9 | LE (Alejano) 1.0 | 0.89 / 1.09 | *reported, no lock* — a step of refinement moves the factor, as it does on problem 12. |
 | [15](#rj-15) | 🔴 | Partially joint-controlled footwall | SSRM 1.271 vs UDEC 1.6 (−20.6%) | LE (Alejano) 1.72 · Slide2 (vendor) 1.25 | 1.28 / 1.42 | |
-| 16 | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | UDEC 11° | experiment 9° | 9° / 7° | *blocked* — the problem scores the TILT ANGLE at which a block grid topples, found by rotating gravity through a staged sweep; XSLOPE's seismic coefficient tilts the load but the row needs the sweep and a toppling criterion, neither of which is a strength reduction. |
+| [16](#rj-16) | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | UDEC 11° | Experiment 9° | 9° / 7° | *reported, no lock* — the problem scores a tilt angle rather than a factor of safety. Swept as a seismic coefficient at full strength, the stack stands at 8.40° and topples at 8.55°. |
 | 17 | <span class="nodata">⊘</span> | Step-path, en-echelon joints | UDEC 1.29 | — | 1.24 / 1.2 | *blocked* — the vendor model's second, elastic material has no boundary of its own. Recovered from the element-material map it is an 83-vertex staircase of element edges, trending vertical near x = 12 and horizontal near y = 3 with excursions of about one element either side, so the boundary is a property of the vendor's mesh rather than of its model. |
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | — | 1.01 / 1.0 | |
 | [19](#rj-19) | <span class="nodata">⊘</span> | Bi-planar step-path failure | UDEC 1.46 | — | 1.5 / 1.41 | *reported, no lock* — the failing edge of the bracket reaches the sweep budget without a verdict, at the corpus mesh and at a finer one, which return the same bracket otherwise. |
@@ -807,6 +807,53 @@ above the Mohr-Coulomb apex its own c and φ imply (c/tan φ = 285.6 kPa), so it
 **Input file:** [rj015.xlsx](files/rocscience/joints/rj015.xlsx).
 
 ![RJ-15: partially joint-controlled footwall slope (rj015) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. The bedding slips over a long stretch behind the face, and the rock's only strain is a small patch at the toe where the slab has to break through to get out — the coupled mechanism the source paper describes](images/RJ-15.png)
+
+### <span class="nodata">⊘</span> RJ-16: Barla et al. tilt-table block toppling (rj016) {#rj-16}
+
+A laboratory test rather than a slope. Fourteen columns of 9 cm blocks are stacked into a 63.4°
+staircase on a plate, and the plate is tilted until the stack topples; what the problem reports is
+the angle at which it goes. The blocks are elastic (E = 350 MPa, ν = 0.2, γ = 28 kN/m³) on a plate
+that is elastic and effectively rigid (E = 200 GPa), and the 23 joints — thirteen vertical, eight
+horizontal, the plate contact along the base of the stack and the backstop behind it — carry no
+cohesion, φ = 38°, and the softest stiffness pair in the corpus: k<sub>n</sub> = 5 × 10<sup>6</sup>
+and k<sub>s</sub> = 5 × 10<sup>5</sup> kPa/m. This is also the one model in the manual the vendor
+restrains with rollers rather than clamping.
+
+The vendor tilts the model itself: ten files, `#016_0deg` through `#016_9deg`, each the whole
+section rotated one degree further with its boundary pinned. XSLOPE turns the load instead. The
+finite element engine carries a horizontal seismic coefficient k, applied as a body force kγ whose
+sign is its direction, so a tilt of θ is k = tan θ toward the face, and the row is measured by
+sweeping k at full strength — F = 1, no reduction — until the stack stops standing. Every point is
+one solve on the corpus mesh, 0.09 m, which is the block size.
+
+| XSLOPE tilt | UDEC referee | Experiment | RS2 without / with improvement |
+|---|---|---|---|
+| **8.5°** | 11° | 9° | 9° / 7° |
+
+The stack stands at k = 0.1477, which is 8.40°, and goes at k = 0.1504, which is 8.55°. It stands
+at every coefficient the sweep tried below that and fails at every one above, through 0.35, and
+each verdict is the solver's own: the standing trials are certified by the Newton corrector at 300
+sweeps, and the failing ones diverge inside a hundred.
+
+**A coefficient is not a rotation, and here the difference is measurable and measures zero.**
+Tilting the model by θ turns the body force through θ and leaves its magnitude at γ; a coefficient
+k = tan θ turns it through the same angle and multiplies its magnitude by 1/cos θ, which is 1.1% at
+8.5°. On this model that cannot move the answer, because every joint carries zero cohesion and no
+block can yield, so what the state depends on is the direction of the body force and not its size.
+Re-solving the two bracketing coefficients with every unit weight scaled by 1.011 and then by 0.5
+returns the same two verdicts at the same sweep counts.
+
+**The row is reported rather than locked**, because what it measures is not a factor of safety: the
+sweep asks whether the model stands at full strength under a stated load, which is a different
+question from the strength reduction every other row here answers, and the corpus's locking rule is
+written for the second. The figure producer draws a bracket, so this row has no figure.
+
+The plate is weightless in the vendor model (`BodyForceSolid: 0` — it is the apparatus, not rock),
+and `build_fem_data` requires a positive unit weight, so it is built at the 27 kN/m³ its own
+property row states. Its weight is carried by its own restraints and the contact stress along the
+base of the stack is the weight of the blocks above it.
+
+**Input file:** [rj016.xlsx](files/rocscience/joints/rj016.xlsx).
 
 ### 🟢 RJ-18: Step-path failure, continuous joints (rj018) {#rj-18}
 

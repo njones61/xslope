@@ -13,7 +13,14 @@ CONFIG = PageConfig(
     whitelist=[
     ],
 
+    # Problem 16 is scored in a tilt angle, and the numbers its section prints
+    # are seismic COEFFICIENTS and one unit-weight scale factor -- inputs to the
+    # sweep, shaped like factors of safety and not one.
     untagged_allow=[
+        ('0.1477', 'The stack stands at k'),
+        ('0.1504', 'The stack stands at k'),
+        ('0.35', 'fails at every one above'),
+        ('1.011', 'every unit weight scaled by'),
     ],
 
     abs_bounds=[

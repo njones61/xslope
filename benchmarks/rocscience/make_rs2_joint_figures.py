@@ -53,6 +53,10 @@ EXTRA_CASES = [
     # duplicate entry anyway, and `--audit` names one that is left behind.
     {**_JOINT, 'file': 'files/rocscience/joints/rj012.xlsx',
      'target_size': '1.5', 'benchmark': 'RJ-12'},
+    # Problem 20's Voronoi mass. Corpus size is the mean BLOCK width measured on
+    # the vendor's own traces, this row's stand-in for a joint spacing.
+    {**_JOINT, 'file': 'files/rocscience/joints/rj020.xlsx',
+     'target_size': '2.895', 'benchmark': 'RJ-20'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj014.xlsx',
      'target_size': '1.5', 'benchmark': 'RJ-14'},
 ]
@@ -63,12 +67,8 @@ NO_FIGURE = {
     'RJ-16': 'is measured by sweeping a seismic coefficient at full strength for '
              'the tilt angle at which the stack goes, and this producer draws a '
              'strength-reduction bracket',
-    'RJ-17': "the second material's zone is an element-edge staircase in the vendor "
-             'mesh rather than a boundary of its model',
     'RJ-21': 'a two-stage model whose opening is cut in stage 2, and the FEM has no '
              'staged excavation',
-    'RJ-20': "the vendor's Voronoi network is 523 digitized traces with no block "
-             'size or seed, so the input is not reproducible',
     'RJ-22': "exercises RS2's hyperbolic softening joint law, which the interface "
              'element does not have, and reports no factor of safety',
     'RJ-23': 'reports a stress-displacement curve rather than a factor of safety',

@@ -21,6 +21,8 @@ CONFIG = PageConfig(
         ('0.1504', 'The stack stands at k'),
         ('0.35', 'fails at every one above'),
         ('1.011', 'every unit weight scaled by'),
+        # problem 17's staircase runs in metres of the section, not in factors
+        ('3.66', 'where it says 3.19011'),
     ],
 
     abs_bounds=[

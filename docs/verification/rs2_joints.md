@@ -116,7 +116,7 @@ joint model whose output is a stress-displacement curve.
 | [14](#rj-14) | <span class="nodata">⊘</span> | Ploughing sliding slab, example 5 | UDEC 0.9 | LE (Alejano) 1.0 | 0.89 / 1.09 | *reported, no lock* — a step of refinement moves the factor, as it does on problem 12. |
 | [15](#rj-15) | 🔴 | Partially joint-controlled footwall | SSRM 1.271 vs UDEC 1.6 (−20.6%) | LE (Alejano) 1.72 · Slide2 (vendor) 1.25 | 1.28 / 1.42 | |
 | [16](#rj-16) | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | UDEC 11° | Experiment 9° | 9° / 7° | *reported, no lock* — the problem scores a tilt angle rather than a factor of safety. Swept as a seismic coefficient at full strength, the stack stands at 8.40° and topples at 8.55°. |
-| 17 | <span class="nodata">⊘</span> | Step-path, en-echelon joints | UDEC 1.29 | — | 1.24 / 1.2 | *blocked* — the vendor model's second, elastic material has no boundary of its own. Recovered from the element-material map it is an 83-vertex staircase of element edges, trending vertical near x = 12 and horizontal near y = 3 with excursions of about one element either side, so the boundary is a property of the vendor's mesh rather than of its model. |
+| [17](#rj-17) | 🟡 | Step-path, en-echelon joints | SSRM 1.213 vs UDEC 1.29 (−6.0%) | — | 1.24 / 1.2 | |
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | — | 1.01 / 1.0 | |
 | [19](#rj-19) | <span class="nodata">⊘</span> | Bi-planar step-path failure | UDEC 1.46 | — | 1.5 / 1.41 | *reported, no lock* — the failing edge of the bracket reaches the sweep budget without a verdict, at the corpus mesh and at a finer one, which return the same bracket otherwise. |
 | 20 | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | — | 2.21 / 2.37 | *blocked* — the manual states no block size and no seed, and the vendor model carries the tessellation as 523 digitized traces rather than as a generated network, so the input is not reproducible from anything published. |
@@ -816,8 +816,8 @@ the angle at which it goes. The blocks are elastic (E = 350 MPa, ν = 0.2, γ = 
 that is elastic and effectively rigid (E = 200 GPa), and the 23 joints — thirteen vertical, eight
 horizontal, the plate contact along the base of the stack and the backstop behind it — carry no
 cohesion, φ = 38°, and the softest stiffness pair in the corpus: k<sub>n</sub> = 5 × 10<sup>6</sup>
-and k<sub>s</sub> = 5 × 10<sup>5</sup> kPa/m. This is also the one model in the manual the vendor
-restrains with rollers rather than clamping.
+and k<sub>s</sub> = 5 × 10<sup>5</sup> kPa/m. The 0° model is also restrained with rollers, where
+the manual's slope models are clamped on their sides.
 
 The vendor tilts the model itself: ten files, `#016_0deg` through `#016_9deg`, each the whole
 section rotated one degree further with its boundary pinned. XSLOPE turns the load instead. The
@@ -854,6 +854,54 @@ property row states. Its weight is carried by its own restraints and the contact
 base of the stack is the weight of the blocks above it.
 
 **Input file:** [rj016.xlsx](files/rocscience/joints/rj016.xlsx).
+
+### 🟡 RJ-17: Step-path failure, en-echelon joints (rj017) {#rj-17}
+
+[Problem 18](#rj-18)'s section — a 45 × 20 m block of one Mohr-Coulomb rock (γ = 19.62 kN/m³,
+E = 20 GPa, ν = 0.3, c = 25 kPa, φ = 25°, no tensile capacity) whose face rises from (17, 8.2) to
+(26.9, 20) — cut by three joints at 36.1° that stop short of one another instead of running
+through: (18.33, 9.37) to (22.33, 12.25), (22.33, 13.5) to (26.26, 16), and (26.26, 17.16) to
+(29.33, 19.33). The rock bridges between them are what a step-path failure has to break through,
+and they are why this slope stands where problem 18's continuous joints let it go. The joints carry
+problem 18's own strength: c = 1 kPa, φ = 35°, and the corpus's standard stiffness pair.
+
+**The strength reduction is confined to a rectangle.** The vendor model carries an SSR search area —
+a polygon from (12.221, 3.19011) to (40.2504, 20.532), which the manual's geometry figure draws as
+a dashed box — and RS2 applies it by holding every element whose centroid falls outside it linear
+elastic. The model file shows that done: an auto-generated elastic twin of the rock, the same
+modulus and no plasticity of its own, on 1,173 of its 2,579 elements. XSLOPE states the same
+constraint as a polygon overlay on the model, classified by the same element-centroid test, so what
+is transcribed is the rectangle the vendor states.
+
+| XSLOPE SSRM | UDEC referee | RS2 without / with improvement |
+|---|---|---|
+| **1.213** | 1.29 (−6.0%) | 1.24 / 1.2 |
+
+<!-- test: file=files/rocscience/joints/rj017.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-17, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
+
+A step of refinement — a 2D size of 0.7 m, which takes the mesh from 3,284 nodes and 14 interface
+elements to 6,484 and 21 — moves the factor by one bracket step, inside the row's own tolerance, to
+1.193. Every trial of both brackets reaches a verdict. The row is cut on the corpus mesh, as every
+row here is.
+
+Four of the nine trials of each bracket are settled by something other than the force test: two are
+certified by the Newton corrector 300 sweeps in, the standing edge among them, and the two just
+above that edge run to 225,001 sweeps and are read as failed on a steadily slipping interface.
+
+**The same zone, transcribed the way the vendor's mesh resolved it, is the same model.** The
+element map of the vendor file is that rectangle rasterized onto element edges: a staircase
+wandering about half an element either side of it, from x = 11.85 to 12.73 where the rectangle says
+12.221 and from y = 2.73 to 3.66 where it says 3.19011. Transcribed as an 84-vertex ring and run as
+a file of its own, it holds 693 elements of this mesh elastic where the rectangle holds 694 — the
+zone is an analysis overlay and never meshed, so both files mesh identically and only the
+membership can differ — and the bracket comes back identical trial for trial, sweep count for sweep
+count. What a mesh does to the edge of a search area is worth one element here, and nothing at all
+to the factor.
+
+**Input files:** [rj017.xlsx](files/rocscience/joints/rj017.xlsx), and the staircase variant
+[rj017_staircase.xlsx](files/rocscience/joints/rj017_staircase.xlsx).
+
+![RJ-17: step-path failure with en-echelon joints (rj017) — FEM inputs with the vendor's search area drawn as the held-elastic region around it, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. All three joints slip along their whole length, and the strain runs between them: a band climbs from the toe of the face through the rock bridge below the lowest joint and on past the upper two, which is the step-path the problem is named for — shear along the joints and broken rock between them](images/RJ-17.png)
 
 ### 🟢 RJ-18: Step-path failure, continuous joints (rj018) {#rj-18}
 
@@ -940,7 +988,14 @@ changes what a faithful transcription is.
   imported. The vendor model carries it as 523 digitized traces with no block size, density or seed
   recorded, so nothing published reproduces it.
 - **Problem 16's boundary conditions.** The 0° case runs on rollers; the nine tilted cases pin
-  every exterior node in both directions, and use a convergence tolerance two orders tighter.
+  every exterior node in both directions, and use a convergence tolerance two orders tighter. The
+  tilt plate carries no body force in any of the ten: it is apparatus, not rock.
+- **Problem 17 confines its strength reduction.** The model carries an SSR search area — a
+  rectangle from (12.221, 3.19011) to (40.2504, 20.532), stated in the file and drawn as a dashed
+  box on the manual's geometry figure — and RS2 applies it by holding every element outside it
+  linear elastic, which the file shows as an auto-generated elastic twin of the rock on 1,173 of
+  its 2,579 elements. The manual's tables say nothing about it, and a transcription that left it
+  out would be reducing the strength of the whole section.
 - **Problems 3 and 5 are elastic.** Both files set the plasticity specification to none and carry
   no strength values under it, so the rock cannot yield and only the joints can.
 - **Problems 12 and 14 state their generated network to six decimals.** A trace generated from a

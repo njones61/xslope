@@ -121,7 +121,7 @@ joint model whose output is a stress-displacement curve.
 | [17](#rj-17) | 🟡 | Step-path, en-echelon joints | SSRM 1.213 vs UDEC 1.29 (−6.0%) | — | 1.24 / 1.2 | |
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | — | 1.01 / 1.0 | |
 | [19](#rj-19) | <span class="nodata">⊘</span> | Bi-planar step-path failure | UDEC 1.46 | — | 1.5 / 1.41 | *reported, no lock* — the failing edge of the bracket reaches the sweep budget without a verdict, at the corpus mesh and at a finer one, which return the same bracket otherwise. |
-| 20 | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | — | 2.21 / 2.37 | *blocked* — the manual states no block size and no seed, and the vendor model carries the tessellation as 523 digitized traces rather than as a generated network, so the input is not reproducible from anything published. |
+| [20](#rj-20) | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | — | 2.21 / 2.37 | *reported, no lock* — four trials of the bracket reach the sweep budget without a verdict, both of the edges it closes on among them, and the corrector certifies none of them. |
 | 21 | <span class="nodata">⊘</span> | Shallow excavation, jointed tunnel | UDEC 8.16 | — | 8.27 / 8.5 | *blocked* — the second stage of the vendor model excavates a 2 m opening and the strength reduction runs on the excavated state, which carries the stress the first stage left behind; XSLOPE has no staged construction. |
 | 22 | <span class="nodata">⊘</span> | Joint model: hyperbolic softening | — | — | — | *not supported* — the problem exercises RS2's hyperbolic displacement- and work-softening joint law, which XSLOPE's interface element does not have; it reports no factor of safety. |
 | 23 | <span class="nodata">⊘</span> | Joint model: residual strength and dilation | — | — | — | *no lock possible* — the problem reports no factor of safety, and its six vendor models all carry `include_dilation: no`. See [The dilation problem](#the-dilation-problem). |
@@ -970,6 +970,52 @@ the model is what is built.
 
 ---
 
+### ⊘ RJ-20: Hammah & Yacoub Voronoi slope (rj020) {#rj-20}
+
+An 80 × 70 m section with a 60 m face at 71.6°, from the toe at (10, 10) to the crest at (30, 70),
+tessellated into Voronoi blocks over the whole of it. The rock is Mohr-Coulomb (γ = 27 kN/m³,
+E = 20 GPa, ν = 0.3, c = 1,000 kPa, φ = 35°, no tensile capacity) and every block wall is a joint at
+c = 500 kPa, φ = 20° with the corpus's standard stiffness pair. The paper this comes from asks how
+the failure of a slope in blocky rock changes with the scale of its blocks; the manual's answer at
+this scale is UDEC's 2.46, with RS2 reporting 2.21 without joint improvement and 2.37 with it.
+
+**The network is in the model file.** The tessellation was generated in UDEC and imported, so RS2
+holds it as 523 joint boundaries — polylines of two to seven points — rather than as anything a
+block size and a seed regenerate. They are transcribed verbatim: 1,177 segments, one row of the
+joints sheet each, and every block corner a three-way junction of them. Measured on the traces
+themselves: 525 blocks over the section, a mean block area of 8.381 m² and a mean block width of
+2.895 m. That width is this row's mesh size — the block scale, standing in for the joint spacing
+every other row meshes at — and it gives 10,864 nodes, 3,567 elements and 4,582 interface elements
+against the vendor's own 3,251 elements.
+
+| XSLOPE SSRM | UDEC referee | RS2 without / with improvement |
+|---|---|---|
+| *no lock* | 2.46 | 2.21 / 2.37 |
+
+The row prints no factor, and what holds it back is the sweep budget. Five of the nine trials
+decide: three stand, each settled by the joint verdict on a slip field that has stopped growing,
+and two fail by running away. The other four reach 250,000 sweeps with nothing to say — and both of
+the trials the bisection closes on are among them, one exiting `STABLE_STUCK` and the other
+inconclusive. The corrector certified none of them. A factor closed on two such trials would be a
+statement about the budget rather than about the slope, which is the rule the whole corpus is read
+under. The bracket and the at-failure capture together take 3.7 hours, the longest single run here.
+
+What the figure shows is worth the row on its own: the slip picks its way from the toe up through
+the block walls on a curved path to the crest, and the only rock strained is a patch at the toe
+where the path has to turn. A mass of blocks at this scale fails on a surface, not along any
+plane it contains — which is the observation the source paper is about.
+
+**How much of that is the block size and how much is this particular tessellation** is the paper's
+own question, and answering it takes a second network of the same blocks drawn another way. The one
+`xslope.joints.voronoi` draws at that block size stops in the mesher: the generator keeps a trace
+down to a thousandth of the section diagonal, 0.106 m here, and a trace that short is pulled onto
+its own junction, where the line it leaves has no length left. Three seeds and two block sizes stop
+the same way, so this row is scored on the vendor's own tessellation alone.
+
+**Input file:** [rj020.xlsx](files/rocscience/joints/rj020.xlsx).
+
+![RJ-20: Hammah & Yacoub Voronoi slope (rj020) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The slip runs from the toe up through the block walls on a curved path to the crest, taking whichever wall of each block lies nearest that line, and the rock carries almost no strain except a patch at the toe where the path turns: the mass fails on a surface picked out of the tessellation rather than along any one joint in it](images/RJ-20.png)
+
 ## Where the Vendor Models Depart from the Manual
 
 Each of these was found by reading the `.fez` against the manual page it belongs to, and each
@@ -990,8 +1036,9 @@ changes what a faithful transcription is.
   the node one copy per wedge of material around it and a load applied there has no defined side to
   act on. Cases a and c carry no load, the 0.5 kN being what it is.
 - **Problem 20's network.** The manual calls it a Voronoi tessellation generated in UDEC and
-  imported. The vendor model carries it as 523 digitized traces with no block size, density or seed
-  recorded, so nothing published reproduces it.
+  imported, and publishes no block size, density or seed for it. The model file carries it as 523
+  joint boundaries — 1,177 segments — so those traces are the only statement of the network there
+  is, and they are what [RJ-20](#rj-20) transcribes.
 - **Problem 16's boundary conditions.** The 0° case runs on rollers; the nine tilted cases pin
   every exterior node in both directions, and use a convergence tolerance two orders tighter. The
   tilt plate carries no body force in any of the ten: it is apparatus, not rock.

@@ -916,6 +916,61 @@ def _leg_untouched(failures, results):
 
 
 # --------------------------------------------------------------------------
+# The slip a corrector-certified state publishes
+# --------------------------------------------------------------------------
+
+def _leg_certified_slip(failures, results):
+    """A solution the Newton corrector certifies reports the slip it holds.
+
+    The corrector returns the shear traction about the slip it was handed, so
+    on every closed pair t_s = k_s (dt - slip) is an identity of the reported
+    state, and a pair at its limit has slipped by a nonzero amount. Read on the
+    direct-shear slab loaded to its limit, on the cold corrector and on the
+    default driver: the published `joint_slip` must satisfy the identity and
+    must not be the zero field the corrector once returned in its place.
+    """
+    d, fem_data, geom = slab_model(**ROW1)
+    jd = fem_data['joint_data']
+    inside, upper = _slab_masks(fem_data, geom)
+    live = inside[:, None] & (jd['w'] > 0.0)
+    # The cold corrector stands the slab at k = 0.4 with a few pairs returned
+    # onto their limit, and the default driver at k = 0.5 with the whole live
+    # interface there; both dictionaries must publish the slip they hold.
+    for driver, k in (('newton', 0.4), ('auto', 0.5)):
+        fem_data['k_seismic'] = k
+        with contextlib.redirect_stdout(io.StringIO()):
+            sol = solve_fem(fem_data, F=1.0, max_iterations=8000,
+                            fast_kernel=False, fem_solver=driver)
+        if not sol['converged']:
+            failures.append(f"certified slip: the slab does not stand at "
+                            f"k = {k:g} on the '{driver}' driver")
+            continue
+        dt, _dn = joint_kinematics(jd, sol['displacements'])
+        slip = np.asarray(sol['joint_slip'])
+        ts, ks = sol['joint_ts'], jd['ks'][:, None]
+        closed = live & ~sol['joint_open']
+        want = ks * (dt - slip)
+        scale = max(float(np.max(np.abs(ts[closed]))), 1e-12)
+        err = float(np.max(np.abs(ts[closed] - want[closed]))) / scale
+        if err > 1e-6:
+            failures.append(f"certified slip ({driver}): t_s is not "
+                            f"k_s (dt - slip) on the closed pairs (worst "
+                            f"{err:.2e} of the peak traction)")
+        slipping = sol['joint_slipping'] & live
+        n_slip = int(np.count_nonzero(slipping))
+        if n_slip == 0:
+            failures.append(f"certified slip ({driver}): no pair is at its "
+                            f"limit at k = {k:g}, so the leg reads nothing")
+        elif float(np.max(np.abs(slip[slipping]))) <= 0.0:
+            failures.append(f"certified slip ({driver}): {n_slip} pairs are at "
+                            f"their limit and the published slip is zero on "
+                            f"every one")
+        results.append(f"certified slip  {driver}: {n_slip} pairs at the limit, "
+                       f"peak slip {float(np.max(np.abs(slip[live]))):.3e} m, "
+                       f"t_s = k_s (dt - slip) to {err:.1e}")
+
+
+# --------------------------------------------------------------------------
 # The tension cutoff and the tied end
 # --------------------------------------------------------------------------
 
@@ -1079,6 +1134,7 @@ def run():
     _leg_pullout(failures, results)
     _leg_infinite(failures, results)
     _leg_opening_and_ties(failures, results)
+    _leg_certified_slip(failures, results)
     _leg_crossing_stiffness(failures, results)
     _leg_untouched(failures, results)
     _leg_stiffness(failures, results)

@@ -9306,6 +9306,30 @@ def _nr_build_joints(fem_data, F, state=None, cross=None):
     return groups
 
 
+def _nr_joint_slip(joints, st):
+    """The accumulated plastic slip of every pair at the reported state, (n, 3).
+
+    The corrector carries the sweep's slip as an internal variable and returns
+    the shear traction about it, so the slip a certified state holds is the
+    slip it was handed plus whatever the return put in: on a closed pair that
+    is ``dt - t_s / k_s`` exactly (elastic pairs recover ``slip_p`` from it, a
+    slipping pair its advance), and an open pair keeps the slip it parted with,
+    because nothing advances it while the faces are apart. Published so a
+    certified standing solution reads the same slip field the sweep would have
+    reported, instead of zeros.
+    """
+    if st is None:
+        return np.zeros((0, 3))
+    slip_p = None
+    for jg in (joints or ()):
+        if jg.get('kind') == 'joint':
+            slip_p = jg.get('slip_p')
+            ks = jg['jd']['ks'][:, None]
+    slip_p = np.zeros(st["tn"].shape) if slip_p is None else np.asarray(slip_p)
+    closed = np.divide(st["ts"], ks, out=np.zeros_like(st["ts"]), where=ks > 0.0)
+    return np.where(st["open"], slip_p, st["dt"] - closed)
+
+
 def _nr_joint_force(jg, u, want_tangent):
     """One joint or tie group's internal force (and tangent) at displacement ``u``."""
     if jg['kind'] == 'joint':
@@ -11465,8 +11489,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "joint_ts": _j_state["ts"] if _j_state is not None else np.zeros((0, 3)),
         "joint_tlim": (_j_state["tlim"] if _j_state is not None
                        else np.zeros((0, 3))),
-        "joint_slip": np.zeros((0, 3)) if _j_state is None else np.zeros(
-            _j_state["tn"].shape),
+        "joint_slip": _nr_joint_slip(joints, _j_state),
         "joint_open": (_j_state["open"] if _j_state is not None
                        else np.zeros((0, 3), dtype=bool)),
         "joint_slipping": (_j_state["slipping"] if _j_state is not None

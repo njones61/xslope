@@ -441,6 +441,62 @@ def _leg_plots(failures, cache):
         failures.append("a model with no slipping joint drew no joint at all")
     plt.close(fig)
 
+    # The panel the joints get when nothing else can happen. A jointed model
+    # whose every material is linear elastic accumulates no viscoplastic strain
+    # anywhere, so the strain panel would be a flat field with a scale invented
+    # for it; that panel is the slip's instead, and it says so in its title. The
+    # rule reads the MATERIALS, so it is asserted by flipping them on the same
+    # solved model rather than by planting a small field.
+    from xslope.plot_fem import (JOINT_SLIP_PANEL_LABEL, SHEAR_STRAIN_LABEL,
+                                 plot_shear_strain_contours)
+
+    fig, ax = plt.subplots()
+    plot_shear_strain_contours(ax, fem_data, sol, single_panel=True)
+    if SHEAR_STRAIN_LABEL not in ax.get_title():
+        failures.append(f"a model that can yield lost the strain panel: "
+                        f"{ax.get_title()!r}")
+    plt.close(fig)
+
+    fd_el = dict(fem_data)
+    fd_el["elastic_materials"] = list(fem_data.get("material_names") or [])
+    if not _PF._joint_slip_panel(fd_el):
+        failures.append("an all-elastic jointed model is not read as a slip panel")
+    if _PF._joint_slip_panel(fem_data):
+        failures.append("a model that can yield is read as a slip panel")
+    fig, ax = plt.subplots()
+    mappable, _ = plot_shear_strain_contours(ax, fd_el, sol, single_panel=True)
+    if JOINT_SLIP_PANEL_LABEL not in ax.get_title():
+        failures.append(f"an all-elastic jointed model still names the strain "
+                        f"field: {ax.get_title()!r}")
+    if mappable is not None:
+        failures.append("the slip panel contoured a field and offered its scale, "
+                        "where the field it would scale is zero by construction")
+    plt.close(fig)
+
+    # The opened tick is the one mark on that panel with no colorbar to explain
+    # it, and the results plots carry no legend, so the panel's own subtitle
+    # carries the key — on a figure that draws a tick and on no other.
+    opened = dict(sol)
+    opened["joint_open"] = np.ones_like(np.asarray(sol["joint_open"]))
+    shut = dict(sol)
+    shut["joint_open"] = np.zeros_like(np.asarray(sol["joint_open"]))
+    if not _PF._joint_open_note(fem_data, opened):
+        failures.append("a model with an opened joint offers no key for the tick")
+    if _PF._joint_open_note(fem_data, shut):
+        failures.append("a model with nothing opened still keys the tick")
+    fig, ax = plt.subplots()
+    plot_shear_strain_contours(ax, fem_data, opened, single_panel=True)
+    if "opened" not in ax.get_title():
+        failures.append(f"the opened tick is drawn with nothing saying what it "
+                        f"is: {ax.get_title()!r}")
+    plt.close(fig)
+    fig, ax = plt.subplots()
+    plot_shear_strain_contours(ax, fem_data, shut, single_panel=True)
+    if "opened" in ax.get_title():
+        failures.append(f"a panel with no tick on it carries the tick's key: "
+                        f"{ax.get_title()!r}")
+    plt.close(fig)
+
     # And nothing at all where there is no joint.
     from xslope.fem import build_fem_data, solve_fem
     plain = _model(jointed=())

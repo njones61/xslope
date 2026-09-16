@@ -139,6 +139,10 @@ def _fs_title(base, F, fs=None, at_failure=False):
 #: strain".
 SHEAR_STRAIN_LABEL = "Viscoplastic shear strain"
 
+#: What the same panel is called on a model that has no viscoplastic strain to
+#: draw — see :func:`_joint_slip_panel`.
+JOINT_SLIP_PANEL_LABEL = "Joint slip"
+
 
 def _vector_cbar_label(disp_elastic):
     """The displacement-vector colorbar's label, naming the field it colors: the
@@ -2626,6 +2630,44 @@ def _joint_open_marks(spans, scale):
     return segs
 
 
+def _joint_slip_panel(fem_data):
+    """Whether the strain panel of this model is the JOINT SLIP panel.
+
+    A jointed model whose every material is linear elastic cannot accumulate
+    viscoplastic strain anywhere: nothing can yield, and the whole mechanism is
+    slip and opening on the interfaces. The field the panel would contour is
+    zero by construction, so the panel is given to the joints instead — the body
+    flat, the slip overlay carrying the reading, and the slip colorbar the scale.
+
+    The decision is read from the MATERIALS, never from the size of the field.
+    A model draws the same panel whatever a particular solve happened to leave in
+    it, and a nearly-zero strain field on a model that could have yielded still
+    draws as the strain it is.
+    """
+    if not (fem_data.get("joint_data") or {}):
+        return False
+    names = [str(n) for n in (fem_data.get("material_names") or [])]
+    elastic = {str(n) for n in (fem_data.get("elastic_materials") or [])}
+    return bool(names) and all(n in elastic for n in names)
+
+
+def _joint_open_note(fem_data, solution):
+    """The key for the opened-joint tick, or "" where no tick is drawn.
+
+    The results plots carry no legend, so the one mark on this panel that is not
+    on its colorbar says what it means in the panel's own subtitle. It appears
+    only on a figure that actually draws a tick.
+    """
+    spans = _joint_spans(fem_data, solution)
+    if not spans:
+        return ""
+    nodes = np.asarray(fem_data["nodes"], dtype=float)
+    scale = max(float(np.ptp(nodes[:, 0])), float(np.ptp(nodes[:, 1]))) or 1.0
+    if not _joint_open_marks(spans, scale):
+        return ""
+    return "tick across a joint marks a stretch that opened"
+
+
 def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
     """Draw the joint (interface) elements as hairlines colored by their slip.
 
@@ -3040,9 +3082,19 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
             print("Warning: Shear strain data not available")
             return None, []
 
+    # On a model that can only fail on its joints the strain field is zero by
+    # construction, and this panel is the joints' (see _joint_slip_panel). The
+    # field handed to the contour routine is then an explicit zero rather than a
+    # field of numerical dust, so the body draws flat and no scale is invented
+    # for something that never happened.
+    slip_panel = show_joints and _joint_slip_panel(fem_data)
+    panel_label = JOINT_SLIP_PANEL_LABEL if slip_panel else SHEAR_STRAIN_LABEL
+    field = (np.zeros(len(elements), dtype=float) if slip_panel
+             else vp_shear_strain)
+
     # show_mesh draws the element edges over the contours (reinforcement is drawn
     # separately below with force-based coloring, so it stays False here).
-    mappable = _plot_nodal_contours(ax, fem_data, vp_shear_strain, SHEAR_STRAIN_LABEL,
+    mappable = _plot_nodal_contours(ax, fem_data, field, panel_label,
                         show_mesh, False, cbar_shrink, cbar_labelpad,
                         colormap=cmap or 'coolwarm', label_elements=label_elements,
                         draw_cbar=not single_panel, vmin=vmin, vmax=vmax)
@@ -3066,7 +3118,7 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
 
     F = solution.get("F", None)
     at_failure = solution.get("_at_failure", False)
-    title = SHEAR_STRAIN_LABEL
+    title = panel_label
     if at_failure:
         title += ' at Failure'
     # at_failure when plot_fem_results routed this panel onto the at-failure field
@@ -3074,6 +3126,11 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     # deformation/displace_vector panels so the figure tells one story.
     title = _fs_title(_fallback_clause(solution, title), F,
                       solution.get("_ssrm_fs"), at_failure=at_failure)
+    # The opened-joint tick is the one mark here that no colorbar explains, so
+    # the panel says what it is. Only on a figure that draws one.
+    note = _joint_open_note(fem_data, solution) if show_joints else ""
+    if note:
+        title = f'{title}\n{note}'
     ax.set_title(title, fontsize=12, pad=15)
     return mappable, reinf_cbar_specs
 

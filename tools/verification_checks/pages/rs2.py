@@ -108,6 +108,15 @@ CONFIG = PageConfig(
     ],
 
     figure_mode="panel",
+
+    # On a jointed model the composite's fourth panel is the scaled deformed
+    # mesh rather than an arrow field — the blocks the joints cut, drawn where
+    # they moved to — so those captions name that panel instead of the
+    # displacement vectors the base classifier reads as the four-panel form.
+    caption_rules=[
+        ("the deformed mesh at the critical srf", "four"),
+    ],
+
     # Figures that are not model/mechanism plots: their captions describe a
     # diagnostic, so no panel form is claimed and none is required.
     caption_exempt={

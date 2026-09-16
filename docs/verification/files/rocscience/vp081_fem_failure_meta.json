@@ -2,9 +2,14 @@
   "F": 1.4123437499999998,
   "converged": false,
   "iterations": 16000,
-  "max_displacement": 12.950370140005276,
+  "max_displacement": 12.950370079282893,
   "algorithm": "Griffiths & Lane (1999) Viscoplastic",
-  "residual": 6.242084368822851e-05,
-  "unbalanced_force_ratio": 3.2067812232085404,
-  "plastic_fraction": 0.6182991860791468
+  "residual": 6.242077260975551e-05,
+  "unbalanced_force_ratio": 3.2067814480135732,
+  "plastic_fraction": 0.6182991860791468,
+  "capture_truncated": false,
+  "capture_truncated_at": null,
+  "capture_truncated_reason": null,
+  "capture_truncated_kind": null,
+  "capture_truncated_max_u": null
 }

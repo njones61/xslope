@@ -202,6 +202,7 @@ def recut(page, kv, overrides, capture=False):
             'record_only': True}
     meta.update(record)
     path = audit.row_meta_name(audit.stem_path(page, kv, overrides), kv)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as fh:
         json.dump(meta, fh, indent=2)
     return float(result['FS']), path

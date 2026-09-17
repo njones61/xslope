@@ -293,10 +293,19 @@ def test_attribution():
             fails.append(f"vp032c.xlsx collected {sorted(plain)}, and it has no "
                          f"companions of its own: the sibling's set leaked into it")
         sib = [os.path.basename(p) for p in project_files(vp032c_fem)]
-        fem_results = [n for n in sib if n.startswith("vp032c_fem_fem")]
-        if len(fem_results) != 8:
-            fails.append(f"vp032c_fem.xlsx collected {len(fem_results)} of its 8 FEM "
-                         f"result files: {sib}")
+        fem_results = sorted(n for n in sib if n.startswith("vp032c_fem_fem"))
+        # What it should collect is what the writers wrote and the loaders read
+        # back, which the module names — so the expectation is the suffix list
+        # filtered by what is on disk, not a count written once. This model is
+        # jointed, and a jointed solution ships the two interface tables beside
+        # the nodal ones.
+        want_results = sorted(
+            "vp032c_fem" + suffix for suffix in P.FEM_SOLUTION_SIDECARS
+            if os.path.exists(os.path.join(os.path.dirname(vp032c_fem),
+                                           "vp032c_fem" + suffix)))
+        if fem_results != want_results:
+            fails.append(f"vp032c_fem.xlsx collected {fem_results}, and the FEM "
+                         f"result files beside it are {want_results}")
         if "vp032c.xlsx" in sib:
             fails.append("vp032c_fem's package carries the neighbouring workbook")
         # And it survives the round trip as something the FEM loader can still read.

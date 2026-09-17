@@ -309,6 +309,7 @@ def _write_row_meta(tag, stem, meta):
     sys.path.insert(0, os.path.join(ROOT, 'tools'))
     import ssrm_trial_audit as audit
     path = audit.row_meta_name(stem, tag)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w') as fh:
         json.dump(meta, fh, indent=2)
     return path

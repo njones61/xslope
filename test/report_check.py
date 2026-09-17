@@ -14086,7 +14086,14 @@ def test_the_field_state_toggles():
     for label, extra, wanted, panels in cases:
         report, planned = built(extra)
         sources = [f.source for f in report.figures()]
-        panel_figures = [s for s in sources if s not in ("fem model", "fem mesh")]
+        # The state panels are what the toggles select. The model, the mesh and
+        # the strength-reduction search are drawn once per run whatever state is
+        # asked for — the search figure appears for any run whose record carries
+        # its trials, which is every run cut since the record was persisted, and
+        # it is still there when both states are switched off.
+        panel_figures = [s for s in sources
+                         if s not in ("fem model", "fem mesh")
+                         and not s.endswith(" search")]
         if len(panel_figures) != panels:
             fails.append(f"{label}: {len(panel_figures)} result panels, expected "
                          f"{panels}: {panel_figures}")

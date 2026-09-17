@@ -8342,6 +8342,142 @@
           "lf"
         ]
       },
+      "model": "docs/verification/files/rocscience/joints/rj001a.xlsx",
+      "references": [
+        {
+          "anchor": "rj-1a",
+          "checks": [
+            "RJ-1a"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-1a: Goodman & Bray block toppling, case a (rj001a)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-1a"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 1,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj001b.xlsx",
+      "references": [
+        {
+          "anchor": "rj-1b",
+          "checks": [
+            "RJ-1b"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-1b: Goodman & Bray block toppling, case b (rj001b)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-1b"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
       "model": "docs/verification/files/rocscience/joints/rj001c.xlsx",
       "references": [
         {
@@ -8355,6 +8491,74 @@
           "source_md": "docs/verification/rs2_joints.md",
           "title": "RJ-1c: Goodman & Bray block toppling, case c (rj001c)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-1c"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 1,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj001d.xlsx",
+      "references": [
+        {
+          "anchor": "rj-1d",
+          "checks": [
+            "RJ-1d"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-1d: Goodman & Bray block toppling, case d (rj001d)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-1d"
         }
       ],
       "topics": [
@@ -8427,6 +8631,140 @@
       ],
       "topics": [
         "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj004.xlsx",
+      "references": [
+        {
+          "anchor": "rj-4",
+          "checks": [
+            "RJ-4"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-4: Lorig & Varona flexural toppling (rj004)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-4"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj007.xlsx",
+      "references": [
+        {
+          "anchor": "rj-7",
+          "checks": [
+            "RJ-7"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-7: Plane failure with non-daylighting discontinuities (rj007)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-7"
+        }
+      ],
+      "topics": [
         "homogeneous"
       ]
     },
@@ -8546,23 +8884,361 @@
           "lf"
         ]
       },
-      "model": "docs/verification/files/rocscience/joints/rj012.xlsx",
+      "model": "docs/verification/files/rocscience/joints/rj009.xlsx",
       "references": [
         {
-          "anchor": "rj-12",
+          "anchor": "rj-9",
           "checks": [
-            "RJ-12"
+            "RJ-9"
           ],
           "level": 3,
           "page": "verification/rs2_joints/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2_joints.md",
-          "title": "RJ-12: Alejano et al. ploughing toppling slab failure (rj012)",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-12"
+          "title": "RJ-9: Alejano et al. bilinear slab failure, example 1a (rj009)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-9"
         }
       ],
       "topics": [
         "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj010.xlsx",
+      "references": [
+        {
+          "anchor": "rj-10",
+          "checks": [
+            "RJ-10"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-10: Alejano et al. bilinear slab failure, example 1b (rj010)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-10"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj011.xlsx",
+      "references": [
+        {
+          "anchor": "rj-11",
+          "checks": [
+            "RJ-11"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-11: Alejano et al. ploughing sliding slab failure (rj011)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-11"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj013.xlsx",
+      "references": [
+        {
+          "anchor": "rj-13",
+          "checks": [
+            "RJ-13"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-13: Alejano et al. ploughing sliding slab, example 4 (rj013)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-13"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj015.xlsx",
+      "references": [
+        {
+          "anchor": "rj-15",
+          "checks": [
+            "RJ-15"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-15: Partially joint-controlled footwall slope (rj015)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-15"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 1,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj017.xlsx",
+      "references": [
+        {
+          "anchor": "rj-17",
+          "checks": [
+            "RJ-17"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-17: Step-path failure, en-echelon joints (rj017)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-17"
+        }
+      ],
+      "topics": [
         "homogeneous"
       ]
     },
@@ -25478,7 +26154,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 358,
+    "models": 368,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -25517,12 +26193,12 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 624,
+    "tags": 634,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 165,
-      "non-circular": 37,
+      "homogeneous": 175,
+      "non-circular": 43,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
@@ -25612,10 +26288,20 @@
       "docs/verification/files/geostudio/gs2_heap.xlsx",
       "docs/verification/files/geostudio/gs2_infil.xlsx",
       "docs/verification/files/rocscience/hammah_hb1.xlsx",
+      "docs/verification/files/rocscience/joints/rj001a.xlsx",
+      "docs/verification/files/rocscience/joints/rj001b.xlsx",
       "docs/verification/files/rocscience/joints/rj001c.xlsx",
+      "docs/verification/files/rocscience/joints/rj001d.xlsx",
       "docs/verification/files/rocscience/joints/rj002.xlsx",
+      "docs/verification/files/rocscience/joints/rj004.xlsx",
+      "docs/verification/files/rocscience/joints/rj007.xlsx",
       "docs/verification/files/rocscience/joints/rj008.xlsx",
-      "docs/verification/files/rocscience/joints/rj012.xlsx",
+      "docs/verification/files/rocscience/joints/rj009.xlsx",
+      "docs/verification/files/rocscience/joints/rj010.xlsx",
+      "docs/verification/files/rocscience/joints/rj011.xlsx",
+      "docs/verification/files/rocscience/joints/rj013.xlsx",
+      "docs/verification/files/rocscience/joints/rj015.xlsx",
+      "docs/verification/files/rocscience/joints/rj017.xlsx",
       "docs/verification/files/rocscience/joints/rj018.xlsx",
       "docs/verification/files/rocscience/rs2_56a.xlsx",
       "docs/verification/files/rocscience/rs2_56b.xlsx",
@@ -25741,10 +26427,16 @@
       "docs/lem/files/xslope_noncircular.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
       "docs/verification/files/geostudio/gs2_33.xlsx",
+      "docs/verification/files/rocscience/joints/rj001a.xlsx",
+      "docs/verification/files/rocscience/joints/rj001b.xlsx",
       "docs/verification/files/rocscience/joints/rj001c.xlsx",
+      "docs/verification/files/rocscience/joints/rj001d.xlsx",
       "docs/verification/files/rocscience/joints/rj002.xlsx",
       "docs/verification/files/rocscience/joints/rj008.xlsx",
-      "docs/verification/files/rocscience/joints/rj012.xlsx",
+      "docs/verification/files/rocscience/joints/rj009.xlsx",
+      "docs/verification/files/rocscience/joints/rj010.xlsx",
+      "docs/verification/files/rocscience/joints/rj011.xlsx",
+      "docs/verification/files/rocscience/joints/rj013.xlsx",
       "docs/verification/files/rocscience/joints/rj018.xlsx",
       "docs/verification/files/rocscience/vp008.xlsx",
       "docs/verification/files/rocscience/vp009.xlsx",

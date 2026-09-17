@@ -152,8 +152,18 @@ def row_slug(kv):
     return re.sub(r"[^a-z0-9]+", "-", str(name).lower()).strip("-")
 
 
+#: Where a per-row trial record lives: a directory beside the models rather than
+#: a file beside one of them. A project package collects a workbook's companions
+#: by globbing ``{stem}_*``, so a record named for the row would be collected by
+#: every workbook whose stem is a prefix of this one's (``vp032c`` picking up
+#: ``vp032c_fem``'s), and it is not a companion of any of them: it is a
+#: verification artifact, read by the audit and by lock_edges and by nothing the
+#: package loads. One directory keeps it out of every glob.
+ROW_RECORD_DIR = "trial_records"
+
+
 def row_meta_name(stem, kv):
-    """The per-row trial record's path for one tag beside ``stem``.
+    """The per-row trial record's path for one tag whose fields sit at ``stem``.
 
     ``{stem}_fem_meta.json`` holds the record of whatever run wrote the fields
     beside it, and a workbook carrying several rows — four mesh sizes of one
@@ -161,10 +171,11 @@ def row_meta_name(stem, kv):
     several locks wanting it. The later run's record then stands where the
     earlier lock's was, and the earlier row reads a bracket that belongs to a
     different mesh. The per-row file carries the record of THIS tag's own run,
-    and nothing else reads it, so each lock on a shared workbook can be audited
-    and edge-checked against the bracket that actually cut it.
+    so each lock on a shared workbook can be audited and edge-checked against the
+    bracket that actually cut it.
     """
-    return f"{stem}_fem_meta_{row_slug(kv)}.json"
+    return os.path.join(os.path.dirname(stem), ROW_RECORD_DIR,
+                        f"{os.path.basename(stem)}_fem_meta_{row_slug(kv)}.json")
 
 
 def stem_path(page, kv, overrides):

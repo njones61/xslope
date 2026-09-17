@@ -494,31 +494,12 @@ sides so it can be told from a bonded one.
 
 ### The interface element
 
-Each interface element is a zero-thickness joint (Goodman, Taylor & Brekke, 1968). Its state is the relative
-displacement of the two faces, resolved into a normal component $\Delta_n$ (closing, compression positive) and a
-tangential component $\Delta_t$ (sliding), and its constitutive law is a traction-displacement relation:
-
-$$
-t_n = k_n \Delta_n, \qquad t_s = k_s \Delta_t, \qquad |t_s| \le c_j + t_n \tan\phi_j
-$$
-
-with $c_j$ and $\phi_j$ the line's `Adhesion` and `Delta`. Slip past the limit is perfectly plastic: the shear
-traction stays at the limit while the tangential offset grows. A normal traction below the tension cutoff — zero on
-a reinforcement line, because a soil-geosynthetic contact carries no tension — **opens** the joint, which then
-carries neither traction until the faces come back into contact.
-
-The tractions are integrated at the element's own nodes rather than at Gauss points. Gauss quadrature on a
-zero-thickness interface produces traction oscillations that grow with the penalty stiffness; nodal integration
-does not, and the traction spread along an element measured on the direct-shear case *falls* from 15% to 1.8% when
-$k_n$ is multiplied by a hundred.
-
-$k_n$ and $k_s$ are penalty stiffnesses: large enough that an intact joint does not visibly deform, small enough
-not to ill-condition the system. Left blank they are derived as $E_{adj}/d_v$ and $G_{adj}/d_v$ over a virtual
-thickness $d_v = 0.1\,L_{1D}$, with $E_{adj}$ and $G_{adj}$ those of the softer of the two soils the element stands
-between. The factor of safety is insensitive to them — it moves by about 1.5% over two orders of magnitude — but
-the **cost** is not: the slip a viscoplastic sweep puts into a joint is the excess traction divided by $k_s$, so a
-model that states a $k_n$ / $k_s$ an order of magnitude above the derived default needs its iteration limit raised
-by the same factor, or the strength reduction reports the iteration budget instead of the slope.
+Each interface element is a zero-thickness joint (Goodman, Taylor & Brekke, 1968) whose state is the relative
+displacement of the two faces — sliding and closing — and whose law is a traction-displacement relation with a
+Mohr-Coulomb limit on the shear and a tension cutoff on the normal. On a reinforcement line $c_j$ and $\phi_j$ are
+the line's `Adhesion` and `Delta`, and the tension cutoff is zero, because a soil-geosynthetic contact carries no
+tension. The element, its stiffnesses $k_n$ and $k_s$ and the default they take when the line leaves them blank
+are described under [the interface element](joints.md#the-interface-element).
 
 ### Ends, ties and the bar
 
@@ -537,62 +518,27 @@ On a jointed line the bar keeps its own law — tension only, rupture at $T_{max
 stated — **minus the bond-slip cap**. The grip on the soil is now the interface traction the joints integrate, so
 applying the pullout envelope as well would count it twice; `Lp1` and `Lp2` are not read there. Preflight says so.
 
-### Strength reduction
+### Strength reduction, and what decides a jointed trial
 
 A strength reduction divides $c_j$ and $\tan\phi_j$ by the trial factor along with the soil's, on every jointed
 line unless that line sets `Jred = No`. The stiffnesses $k_n$ and $k_s$, the ties and $T_{max}$ are structural and
 are not reduced, exactly as the bar's properties are not.
 
-A jointed model takes the viscoplastic solver's verdict directly: the Newton corrector is not offered one. On a
-slipping interface the shear traction is held at $c_j + t_n \tan\phi_j$ and does not depend on the tangential
-displacement, so a state the viscoplastic loop reached by growing the slip leaves a corrector — which may only move
-displacements — with nothing to move.
-
-What ends a jointed trial is therefore the viscoplastic loop alone, and the force test it has to pass is measured
-almost entirely on the joints. A trial that neither converges nor fails is read from the **slip** instead — steady
-slip with the field gaining is a slope moving on its joints and is `FAILED`; a slip and a field that have both
-stopped, with the soil in equilibrium, is a slope standing behind a limit cycle no budget brings down. Both readings,
-and why the ordinary displacement evidence cannot make the distinction, are in
-[the joint verdict](overview.md#the-joint-verdict).
-
-### Making a jointed trial cheaper
-
-The slip a sweep puts into a joint is the excess traction over $k_s$, so at $\Delta t = 1$ one sweep returns the
-shear traction exactly to its limit at the current displacement field. `joint_slip_stiffness_factor` scales the
-stiffness that division uses **on the pairs that are at their limit**, and nothing else: the traction limit, the
-assembled elastic block, and a pair that re-sticks are all untouched. A factor below 1 drives the interface past its
-own return and is therefore an over-relaxation, not a change of physics.
-
-It is **off by default**, and the reason is a stability limit rather than a preference. Because one sweep already
-returns the traction exactly, the iteration is *at* its boundary at a factor of 1 and a factor $f$ is a relaxation of
-$1/f$. RS2 sets its equivalent to 0.01 — a relaxation of 100 — and at that value this scheme diverges outright.
-Values near 1 are stable and buy nothing. Reach for the iteration budget and the [joint
-verdict](overview.md#the-joint-verdict) instead; the factor exists so the setting can be reproduced, not because it
-is a knob worth turning.
+A jointed model reaches equilibrium by growing slip, so it takes tens of thousands of viscoplastic sweeps where a
+bonded one takes hundreds, and a trial that runs out of them is undecided rather than failed. What that costs, what
+budget to allow and how such a trial is read are under [running a jointed model](joints.md#running-a-jointed-model).
 
 ## Joints Without Reinforcement
 
 Not every slip surface has a sheet in it. A rock joint, a bedding plane, the contact between a concrete facing block
 and the one beneath it, the back of a retaining wall against the soil it holds: each is a surface two bodies meet on
-and can slide along, with no member between them. Those go on the **joints** worksheet, one row per line:
+and can slide along, with no member between them. Those go on the **joints** worksheet, one row per line, and they
+are the subject of [Joints and interface elements](joints.md) — the mesh split, the element, the strength, the
+residual branch and the dilation a rock joint states, and what the results show.
 
-| column | what it is |
-|---|---|
-| `Label` | the name the plots, the details view and the report use |
-| `x1`, `y1`, `x2`, `y2` | the line's endpoints |
-| `c` | the interface's cohesion (blank = 0) |
-| `phi` | its friction angle, in degrees — required |
-| `c_res`, `phi_res` | what it drops to once it has slipped (blank = the peak, i.e. no residual branch) |
-| `dil` | its dilation angle, in degrees: a unit of slip opens it by $\tan$`dil` (blank = 0) |
-| `t_cut` | the tension cutoff at which the two faces part (blank = 0) |
-| `kn`, `ks` | the penalty stiffnesses (blank = derived, as above) |
-| `Jred` | blank or **Yes** reduces the joint with the soil in a strength reduction; **No** holds it |
-
-The mesh split, the interface element, the derived stiffnesses and the strength reduction are all exactly what a
-jointed reinforcement line gets, described above. Two things this sheet states that the reinforce sheet does not
-are described under [Residual strength and dilation](#residual-strength-and-dilation) below. The other difference
-is that there is no bar between the two faces, so a station carries two coincident nodes instead of three and
-**one** interface element spans them instead of two:
+The mesh split is the one difference worth drawing here. A joints-sheet line has nothing between its faces, so a
+station carries two coincident nodes and **one** interface element spans them, where a jointed reinforcement line
+carries three nodes and two:
 
 ```
   Joint = Yes on a sheet             a joints-sheet line
@@ -605,57 +551,10 @@ is that there is no bar between the two faces, so a station carries two coincide
 ```
 
 A sheet's two interfaces act in series, so the pair carries the stated stiffness twice over; a joints-sheet line
-carries it once, which is what a single contact is. Neither difference reaches the strength: `c` and `phi` are the
-Mohr-Coulomb limit the faces slide at either way. The tension cutoff is a column of its own here, where a
-reinforcement line's is fixed at zero, because a rock joint may hold a little tension across it and a
-soil-geosynthetic contact does not.
-
-Joint lines may **meet** — at a T, at a crossing, at a corner, end to end. Where they do, the mesh split counts the
-wedges of material around the shared node and gives the node one copy per wedge, so each element keeps the material
-on its own side of every line through the point. That is what makes a block column with a joint on its back face, a
-joint under its base and a course joint at every mortar line into a stack that can slide, part and rock, rather than
-a notched solid. A joint that ENDS on another — a column's base beginning partway along its neighbour's side joint,
-a release trace running down onto a bedding plane — is that same rule with three wedges instead of four, and it needs
-the two lines to meet at one point: an end that lies within a millionth of the section of another joint line is
-moved onto it, and that line is given a vertex there, before the mesh is built. So a tip stated to fewer decimals
-than the line it belongs on still lands on it. The through line keeps the geometry it was stated with.
-
-What joint lines may not do is lie **on** one another over a stretch, or run along the outside of the section, where
-there is material on one side only and nothing for the other face to be; preflight refuses both by name.
-
-A joint line is finite element geometry: the limit equilibrium engines do not read the joints worksheet at all.
-
-### Residual Strength and Dilation
-
-A rock joint is not a smooth plane, and two of its columns say so.
-
-**`c_res` and `phi_res`** are the strength the joint keeps once it has slipped. A rough surface shears through its
-asperities the first time it reaches its limit and does not rebuild them, so the drop is instantaneous and
-permanent: the pair's limit falls from
-
-$$S_{peak} = c + t_n \tan\phi \qquad\text{to}\qquad S_{res} = c_{res} + t_n \tan\phi_{res}$$
-
-on the sweep after the one that first found it at its limit, and it stays on the residual branch for the rest of the
-run even where it later closes or unloads. A blank leaves the joint on its peak strength throughout, which is what a
-joint with no residual branch is. Neither residual may exceed its peak; preflight refuses one that does. A strength
-reduction divides both branches by the trial factor, on the same `Jred` switch, so a joint that opts out of the
-reduction opts both branches out.
-
-**`dil`** is the dilation angle. A rough joint rides up on its asperities as it slides, so a slip increment
-$|\Delta u_s|$ opens it by $|\Delta u_s| \tan(\text{dil})$. That opening is a plastic normal offset: the elastic
-part of the normal displacement, and with it the normal traction
-
-$$t_n = k_n (\Delta_n + u_{open})$$
-
-grows while the joint slides. Where the material around the joint holds it closed, that is dilatant hardening —
-sliding builds normal stress and with it shear strength. Where the sliding block is free to lift, it lifts instead,
-and the normal traction stays at whatever equilibrium with the block's weight requires. The dilation is
-**non-directional**: the joint opens whichever way it slides, and it does not die out with accumulated
-slip — a joint that slides a long way keeps riding up at the stated angle. A blank is zero and the normal
-traction is $k_n \Delta_n$ exactly.
-
-Neither column exists on the reinforce sheet. A soil-geosynthetic contact is a frictional interface with one
-strength, and the sheet between its two faces is what carries the mechanism.
+carries it once, which is what a single contact is. Neither difference reaches the strength: the two numbers are the
+Mohr-Coulomb limit the faces slide at either way. Two columns the joints sheet has and the reinforce sheet does not
+are the residual strength and the dilation angle of a rough rock joint; a soil-geosynthetic contact is a frictional
+interface with one strength, and the sheet between its two faces is what carries the mechanism.
 
 ### Both kinds in one model
 
@@ -708,38 +607,9 @@ which refines as the bar elements refine instead of converging.
 
 ### What the results show
 
-The results view draws each interface as a thin line on the line it runs along, colored by how far its two faces have
-slid, on a colorbar titled *Joint slip*. The ramp is green — bright lime at the smallest slip through to dark green at
-the largest — because the strain field under it runs blue through white to red, and a slip color the field can also
-produce is a slip color you cannot find. A slipping span is backed by a thin white stroke, so it still reads where the
-field goes dark blue or red. A joint that is not slipping is a lighter neutral gray hairline with no backing, and a
-stretch that has **opened** is marked with a short tick across the line rather than given a color of its own, because
-opening is a condition and not a quantity. A model where no joint slipped carries no colorbar. The weight is
-deliberate: a generated network puts hundreds of traces over the field, and anything heavier covers what it is drawn
-on. A joint carries no strain of its own, so it appears in the shear-strain field only through what it does to the
-soil beside it; this is its own reading.
-
-On a jointed model the displacement panel is the scaled deformed mesh rather than an arrow field, drawn as the
-**blocks** the joints cut the section into: each block under a faint tint of its own, its joint faces in the same
-green, the outside of the deformed mesh as a dark line against the dashed undeformed outline, and the element edges
-in light gray behind them — until there are more than eight jointed lines, when the edges come off entirely and the
-block outlines carry the panel. A block is a piece of the mesh that moves as one body, found by following element
-adjacency: the split gives the two sides of a joint their own nodes, so they are no longer neighbors, while a joint
-that stops inside the mass leaves the material wrapped around its tip as one block.
-
-The exaggeration is bounded: no point of the deformed mesh is drawn more than 4% of the section away from where it
-started, whatever multiplier that takes, and where the largest displacement is below a hundred-millionth of the
-section there is nothing to draw — the panel shows the undeformed mesh and its title says the deformation is below
-drawing resolution, rather than magnifying the solver's own residue into a shape. That is what a
-jointed failure looks like — blocks moving as bodies, with all of the movement taken up at the joints, where a
-slipped or opened joint shows as two lines that no longer lie on each other. An arrow field samples that at nodes
-and misses exactly the thing that happened.
-
-**1D Details…** lists every jointed line under a *Joints* heading beside the reinforcement lines, and draws four
-panels along the line: the bar's tension over its capacity, the normal traction the interface carries, the shear
-traction with the Mohr-Coulomb limit $c_j + t_n \tan\phi_j$ drawn beside it, and the slip. Where the two shear
-curves meet is where the interface is at its limit. A generated report carries the same reading as a table: the
-share of each line's length standing at its limit, and the largest offset the two faces reached.
+A bonded run's own evidence is above, under [inspecting the results](#inspecting-the-results). What a jointed run
+draws instead — the slip along each interface, the deformed section as the blocks the joints cut it into, and the
+tractions along each line — is under [what the results show](joints.md#what-the-results-show).
 
 ## References
 
@@ -748,7 +618,5 @@ Duncan, J.M., & Wright, S.G. (2005). *Soil Strength and Slope Stability*. John W
 Griffiths, D.V., & Lane, P.A. (1999). Slope stability analysis by finite elements. *Geotechnique*, 49(3), 387-403.
 
 Goodman, R.E., Taylor, R.L., & Brekke, T.L. (1968). A model for the mechanics of jointed rock. *Journal of the Soil Mechanics and Foundations Division*, 94(SM3), 637-659.
-
-Schellekens, J.C.J., & de Borst, R. (1993). On the numerical integration of interface elements. *International Journal for Numerical Methods in Engineering*, 36(1), 43-66.
 
 Smith, I.M., & Griffiths, D.V. (2004). *Programming the Finite Element Method* (4th ed.). John Wiley & Sons.

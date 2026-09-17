@@ -483,7 +483,7 @@ the 0.3 to 0.7 usually quoted for geosynthetics. Click **OK**, then
 **0.031** of factor of safety, 2.0% — half again the 0.021 between
 Spencer's 1.587 and the elastic-perfectly-plastic 1.566.
 
-<!-- test: file=files/xslope_reinforced_slope.xlsx, type=fem_ssrm, expected_fs=1.535, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-2-ssrm -->
+<!-- test: file=files/xslope_reinforced_slope.xlsx, type=fem_ssrm, expected_fs=1.535, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-2-ssrm, f_stand=1.53125, f_fail=1.5390625, check=edges -->
 
 Where the cost comes from is plain in the two solutions. Without a residual, a
 layer that reaches its 800 lb/ft keeps carrying it, and at the

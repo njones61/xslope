@@ -381,7 +381,7 @@ nine solves. Seven bisection steps is not luck: each one halves the bracket, so
 from a starting width of 1.0 it takes seven halvings to get under the 0.01
 tolerance, and seven is what it took.
 
-<!-- test: file=files/xslope_ssrm_embankment.xlsx, type=fem_ssrm, expected_fs=1.3711, element_type=tri6, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-1-ssrm -->
+<!-- test: file=files/xslope_ssrm_embankment.xlsx, type=fem_ssrm, expected_fs=1.3711, element_type=tri6, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-1-ssrm, f_stand=1.3671875, f_fail=1.375, check=edges -->
 
 **The iteration column is where the physics is.** Trials well below the critical
 factor settle almost immediately — 56 iterations at *F* = 1.00, 124 at 1.25.

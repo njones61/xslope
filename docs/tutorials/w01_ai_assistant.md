@@ -474,7 +474,7 @@ The session saved
 [w1_elastic_fem_after.xlsx](files/w1_elastic_fem_after.xlsx); the exchange is in
 [w1_elastic_fem_transcript.md](files/w1_elastic_fem_transcript.md).
 
-<!-- test: file=files/w1_elastic_fem_after.xlsx, type=fem_ssrm, expected_fs=1.270, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=W-1-ssrm -->
+<!-- test: file=files/w1_elastic_fem_after.xlsx, type=fem_ssrm, expected_fs=1.270, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=W-1-ssrm, f_stand=1.265625, f_fail=1.2734375, check=edges -->
 
 ### Check its work
 

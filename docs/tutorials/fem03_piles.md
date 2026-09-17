@@ -128,7 +128,7 @@ the body of the slope and comes out on the crest 10 to 15 ft behind its edge —
 the same surface Spencer found, drawn as a band of strain rather than a line,
 and reaching a few feet farther back.
 
-<!-- test: file=files/xslope_pile_wall_start.xlsx, type=fem_ssrm, expected_fs=1.137, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-bare-ssrm -->
+<!-- test: file=files/xslope_pile_wall_start.xlsx, type=fem_ssrm, expected_fs=1.137, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-bare-ssrm, f_stand=1.1328125, f_fail=1.140625, check=edges -->
 
 The two engines are 0.012 apart on the bare slope, the strength reduction run
 reading the lower of the two. Every larger difference
@@ -264,7 +264,7 @@ Leave everything else as it is and click **Run**.
 
 **FS = 1.363**. Spencer's method gave 1.842 on the same file.
 
-<!-- test: file=../lem/files/xslope_piles.xlsx, type=fem_ssrm, expected_fs=1.363, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-piles-ssrm -->
+<!-- test: file=../lem/files/xslope_piles.xlsx, type=fem_ssrm, expected_fs=1.363, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-piles-ssrm, f_stand=1.359375, f_fail=1.3671875, check=edges -->
 
 ![The mechanism at failure, with the pile rows colored by shear force](images/fem03_fem_shear_piles.png){width=1000}
 
@@ -571,7 +571,7 @@ already `1.00` to `2.00`. Click
 
 **FS = 1.723**. The wall takes the slope from 1.137 to 1.723.
 
-<!-- test: file=files/xslope_pile_wall.xlsx, type=fem_ssrm, expected_fs=1.723, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-wall-ssrm -->
+<!-- test: file=files/xslope_pile_wall.xlsx, type=fem_ssrm, expected_fs=1.723, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-wall-ssrm, f_stand=1.71875, f_fail=1.7265625, check=edges -->
 
 ![The mechanism with the wall in place](images/fem03_wall_shear_fixed.png){width=1000}
 

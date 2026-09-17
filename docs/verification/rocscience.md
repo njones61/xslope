@@ -2598,9 +2598,9 @@ spacings, and [VP54](#vp54). See
 
 **Sources:** Cai & Ugai (2000), the three-dimensional shear-strength-reduction results.
 
-<!-- test: file=files/rocscience/vp106a_fem.xlsx, type=fem_ssrm, expected_fs=1.136, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.85, f_max=1.45, max_iter=16000, benchmark=VP106-FEM-nopile -->
-<!-- test: file=files/rocscience/vp106c_fem.xlsx, type=fem_ssrm, expected_fs=1.578, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=VP106-FEM-free -->
-<!-- test: file=files/rocscience/vp106c_fem_fix.xlsx, type=fem_ssrm, expected_fs=1.594, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.9, max_iter=16000, benchmark=VP106-FEM-fixed -->
+<!-- test: file=files/rocscience/vp106a_fem.xlsx, type=fem_ssrm, expected_fs=1.136, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.85, f_max=1.45, max_iter=16000, benchmark=VP106-FEM-nopile, f_stand=1.13125, f_fail=1.140625, check=edges -->
+<!-- test: file=files/rocscience/vp106c_fem.xlsx, type=fem_ssrm, expected_fs=1.578, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=VP106-FEM-free, f_stand=1.575, f_fail=1.58125, check=edges -->
+<!-- test: file=files/rocscience/vp106c_fem_fix.xlsx, type=fem_ssrm, expected_fs=1.594, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.9, max_iter=16000, benchmark=VP106-FEM-fixed, f_stand=1.590625, f_fail=1.59765625, check=edges -->
 
 ## 🟢 VP107: Retaining walls, gabion walls, supports {#vp107}
 

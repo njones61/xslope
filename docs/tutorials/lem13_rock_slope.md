@@ -232,7 +232,7 @@ than the search above.
 solved both with the generalized criterion and with an equivalent Mohr-Coulomb
 fit.
 
-<!-- test: file=files/xslope_rock_slope.xlsx, type=fem_ssrm, expected_fs=1.153, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.8, f_max=1.6, k0=1, benchmark=LEM-13-ssrm -->
+<!-- test: file=files/xslope_rock_slope.xlsx, type=fem_ssrm, expected_fs=1.153, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.8, f_max=1.6, k0=1, benchmark=LEM-13-ssrm, f_stand=1.15, f_fail=1.15625, check=edges -->
 
 ![The mechanism at failure](images/lem13_shear_strain.png){width=1000}
 

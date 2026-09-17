@@ -2,7 +2,7 @@
   "benchmark": "RJ-9",
   "analysis": "ssrm",
   "FS": 1.037109375,
-  "expected_fs": "1.018",
+  "expected_fs": "1.037",
   "file": "files/rocscience/joints/rj009.xlsx",
   "max_iter": 250000,
   "failure_criterion": "hybrid",

@@ -164,6 +164,27 @@
 .corpus-summary.match7 th:nth-child(7),
 .corpus-summary.match7 td:nth-child(7) { width: 36%; }
 
+/* Eight-column variant: # | dot | problem | referee | RS2 vs referee |
+   also published | RS2 without/with | notes. Add `match8` beside
+   `corpus-summary match` on the wrapping div. It is `match7` with the
+   same-method deviation split out of the notes into a column of its own, so
+   the two deviations a row is read on sit side by side. Measured on
+   rs2_joints.md: Problem ~35, Referee ~44, RS2 vs referee ~22, Also published
+   ~17, RS2 without/with ~11, Notes ~70 characters mean. The eight widths sum
+   to 100%, which `table-layout: fixed` needs. */
+.corpus-summary.match8 th:nth-child(3),
+.corpus-summary.match8 td:nth-child(3) { width: 14%; }
+.corpus-summary.match8 th:nth-child(4),
+.corpus-summary.match8 td:nth-child(4) { width: 22%; }
+.corpus-summary.match8 th:nth-child(5),
+.corpus-summary.match8 td:nth-child(5) { width: 14%; }
+.corpus-summary.match8 th:nth-child(6),
+.corpus-summary.match8 td:nth-child(6) { width: 10%; }
+.corpus-summary.match8 th:nth-child(7),
+.corpus-summary.match8 td:nth-child(7) { width: 8%; }
+.corpus-summary.match8 th:nth-child(8),
+.corpus-summary.match8 td:nth-child(8) { width: 24%; }
+
 /* Corpus match-key: the insufficient-data symbol is the text glyph U+2298
    (renders in text color = black, unlike the colored emoji dots), scaled up
    to emoji height so it doesn't read as tiny next to them. */

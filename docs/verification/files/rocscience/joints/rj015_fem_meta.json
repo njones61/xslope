@@ -2,7 +2,7 @@
   "benchmark": "RJ-15",
   "analysis": "ssrm",
   "FS": 1.271484375,
-  "expected_fs": null,
+  "expected_fs": "1.271",
   "file": "files/rocscience/joints/rj015.xlsx",
   "max_iter": 250000,
   "failure_criterion": "hybrid",
@@ -80,7 +80,21 @@
       "ee_suppressed": false,
       "iterations": 307,
       "nr_force_evals": 23,
-      "nr_predictor_iterations": 0
+      "nr_predictor_iterations": 0,
+      "corrector": {
+        "driver_of_record": "corrector",
+        "checkpoint": "vp300",
+        "vp_iterations": 300,
+        "nr_iterations": 7,
+        "nr_force_evals": 23,
+        "oob": 2.773241524251466e-06,
+        "force_tol": 0.001,
+        "yield_violation": 2.824999301844096e-16,
+        "yield_tol": 1e-06,
+        "max_disp_deep": 0.002361979703112811,
+        "disp_limit": 8.0,
+        "disp_frac_height": 2.952474628891014e-05
+      }
     },
     {
       "F": 1.4375,
@@ -131,7 +145,21 @@
       "ee_suppressed": false,
       "iterations": 307,
       "nr_force_evals": 23,
-      "nr_predictor_iterations": 0
+      "nr_predictor_iterations": 0,
+      "corrector": {
+        "driver_of_record": "corrector",
+        "checkpoint": "vp300",
+        "vp_iterations": 300,
+        "nr_iterations": 7,
+        "nr_force_evals": 23,
+        "oob": 3.166598370181856e-11,
+        "force_tol": 0.001,
+        "yield_violation": 1.9774032343846774e-16,
+        "yield_tol": 1e-06,
+        "max_disp_deep": 0.0038829247408064815,
+        "disp_limit": 8.0,
+        "disp_frac_height": 4.853655926008102e-05
+      }
     },
     {
       "F": 1.2421875,
@@ -148,7 +176,21 @@
       "ee_suppressed": false,
       "iterations": 307,
       "nr_force_evals": 24,
-      "nr_predictor_iterations": 0
+      "nr_predictor_iterations": 0,
+      "corrector": {
+        "driver_of_record": "corrector",
+        "checkpoint": "vp300",
+        "vp_iterations": 300,
+        "nr_iterations": 7,
+        "nr_force_evals": 24,
+        "oob": 8.23332908573346e-12,
+        "force_tol": 0.001,
+        "yield_violation": 4.3180521558880995e-16,
+        "yield_tol": 1e-06,
+        "max_disp_deep": 0.004758691440836342,
+        "disp_limit": 8.0,
+        "disp_frac_height": 5.9483643010454276e-05
+      }
     },
     {
       "F": 1.26171875,
@@ -165,7 +207,21 @@
       "ee_suppressed": false,
       "iterations": 320,
       "nr_force_evals": 100,
-      "nr_predictor_iterations": 0
+      "nr_predictor_iterations": 0,
+      "corrector": {
+        "driver_of_record": "corrector",
+        "checkpoint": "vp300",
+        "vp_iterations": 300,
+        "nr_iterations": 20,
+        "nr_force_evals": 100,
+        "oob": 4.4402296424360304e-05,
+        "force_tol": 0.001,
+        "yield_violation": 3.3332380123398693e-16,
+        "yield_tol": 1e-06,
+        "max_disp_deep": 0.00906581192970713,
+        "disp_limit": 8.0,
+        "disp_frac_height": 0.00011332264912133913
+      }
     }
   ],
   "tolerance": 0.02,

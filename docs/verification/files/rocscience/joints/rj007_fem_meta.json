@@ -2,7 +2,7 @@
   "benchmark": "RJ-7",
   "analysis": "ssrm",
   "FS": 1.564453125,
-  "expected_fs": null,
+  "expected_fs": "1.564",
   "file": "files/rocscience/joints/rj007.xlsx",
   "max_iter": 250000,
   "failure_criterion": "hybrid",

@@ -6,5 +6,10 @@
   "algorithm": "Griffiths & Lane (1999) Viscoplastic",
   "residual": 5.998091782939595e-05,
   "unbalanced_force_ratio": 0.864709500843314,
-  "plastic_fraction": 0.4088098918083462
+  "plastic_fraction": 0.4088098918083462,
+  "capture_truncated": false,
+  "capture_truncated_at": null,
+  "capture_truncated_reason": null,
+  "capture_truncated_kind": null,
+  "capture_truncated_max_u": null
 }

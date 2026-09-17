@@ -669,12 +669,15 @@ def rj008():
     _finish(sd, [(ring, 0)], mats)
     kn, ks = 1.5e7, 1.0e7
     props = {'c': 0.0, 'phi': 39.0, 't_cut': 0.0, 'kn': kn, 'ks': ks}
-    # The column set exists only ABOVE the basal joint, which is how the vendor
-    # file states it: its 13 stored segments are clipped to the block bounded
-    # below by y = 6 and on the left by the face, not to the whole section. The
-    # same region generated over the whole section would put columns under the
-    # basal joint, where the model has none.
-    stack = [(15.0, 6.0), (72.407, 6.0), (72.407, 36.5), (21.48, 36.5)]
+    # The column set exists only inside the block the basal joint and the back
+    # joint bound, which is how the vendor file states it: its 12 stored column
+    # chains are clipped below by y = 6, on the left by the face and on the
+    # right by the back joint at x = 68.4, not to the whole section. Generated
+    # over the section the set would put columns under the basal joint and
+    # behind the back joint, where the model has none: the three highest would
+    # each run on past x = 68.4 into the strip the vendor leaves uncut, adding
+    # 24 m of trace the vendor has no counterpart for.
+    stack = [(15.0, 6.0), (68.4, 6.0), (68.4, 36.5), (21.48, 36.5)]
     columns = parallel_set(sd, -60.0, 5.08,
                            offset=_offset_through(-60.0, 21.48, 36.5),
                            region=stack, label='col', props=props)
@@ -856,9 +859,11 @@ def rj014():
 def rj015():
     """RJ-15 — partially joint-controlled footwall slope (`joint #015.fez`).
 
-    A 25 m footwall at 40 degrees with bedding dipping the same way at the same
+    A 40 m footwall at 40 degrees with bedding dipping the same way at the same
     angle, 2 m apart, so the slabs are parallel to the face and the failure has
-    to break rock at the toe to get out. That is the one problem in this family
+    to break rock at the toe to get out. The manual's table prints the slope
+    height as 25 m; the vendor's own section is 40 m high, which is also the
+    height the source paper states, and the section is what is built. That is the one problem in this family
     whose rock can yield: Mohr-Coulomb, c = 200 kPa, phi = 35 degrees,
     gamma = 28 kN/m^3, E = 1 GPa, nu = 0.3.
 

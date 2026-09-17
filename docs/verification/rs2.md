@@ -833,7 +833,7 @@ and the profile-line section they are locked against.
 
 ![RS2-24a: the 7 m Borges & Cardoso embankment on its basal geotextile, the sheet built as RS2 builds it — the mesh split along it and the two faces sliding on a frictional interface — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states](images/RS2-24a.png)
 
-![RS2-24b: the 8.75 m case, same construction — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states](images/RS2-24b.png)
+![RS2-24b: the 8.75 m case, same construction — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-24b.png)
 
 ### 🔴 RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003) {#rs2-25}
 

@@ -308,12 +308,14 @@ VOICE_MUTATIONS = [
 #: `fem.py`'s `line_loads` were grepped.  C2 plants a fresh absence nobody has
 #: entered on the ABSENT list.  Both must be caught; `NEGATIVE`'s N6 runs the
 #: other way, with a sentence citing a listed absence, and must pass.
-#: The anchor all three hang on: one sentence of the terminations section, which
+#: The anchor all three hang on: one sentence of the page's methodology, which
 #: every row of the corpus is read against and which no row's own result can
 #: move. A fixture anchored in a row's text goes stale the moment that row is
 #: re-cut, which is how C1, C2 and N6 came to be anchored on text the page no
-#: longer carried.
-CAP_ANCHOR = "An end already on another line is left exactly where it is."
+#: longer carried; the terminations section that held it next moved to
+#: docs/fem/joints.md, which is why it is a methodology sentence now.
+CAP_ANCHOR = ("a corrector refusal is not a verdict of any kind: "
+              "it is the absence of one.")
 
 CAPABILITY_MUTATIONS = [
     ("rs2_joints", "capabilities", "C1 the line-load claim, restored",

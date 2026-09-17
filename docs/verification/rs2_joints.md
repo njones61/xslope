@@ -4,145 +4,73 @@ The [RS2 Joint Verification Manual](https://www.rocscience.com/help/rs2/verifica
 (Rocscience) publishes 23 problems on jointed rock: block and flexural toppling, plane failure,
 Alejano's sliding and ploughing slabs, step-path failure, a Voronoi-tessellated mass, a jointed
 tunnel, and two shear-box problems that exercise the joint's own constitutive law rather than a
-slope. Every one of them is a mesh split along discontinuities with interface elements carrying
-the traction between the faces, which is what XSLOPE's [joint lines](../fem/reinforcement.md#joints-without-reinforcement)
-are. The rows below verify XSLOPE's FEM/**SSRM** solver on that corpus.
+slope. Every one of them is a mesh split along discontinuities with interface elements carrying the
+traction between the faces, which is what XSLOPE's [joint lines](../fem/joints.md) are; how they are
+modeled, and the reach of the element that carries them, is documented there. The rows below verify
+XSLOPE's FEM/**SSRM** solver on that corpus.
 
-The wall and embankment rows that use the same element but reach it through the reinforce
-sheet's `Joint` column are on the [RS2 corpus page](rs2.md) — [RS2-24](rs2.md#rs2-24) and
-[RS2-48–55](rs2.md#rs2-48). Full bibliographic details for the author-year citations here are on
-the shared [References](references.md) page.
-
-## What the Interface Element Models
-
-Every joint in this corpus is a split in the mesh with an interface element across it, and what a
-row can say is bounded by what that element does. It is a small-strain interface between fixed node
-pairs: a pair carries compression across the joint and Coulomb shear along it, opens when the normal
-traction goes into tension, slips when the shear reaches its limit, and re-closes when the two faces
-meet again. A pair keeps the partner it started with for the whole solve.
-
-So blocks slide on their contacts, open at them, rock about them and re-seat on them — and where a
-mechanism keeps its contacts, the answer is rigid-block statics. The four ploughing slab problems,
-[11](#rj-11) to [14](#rj-14), are the demonstration: each is two rigid blocks on four contacts, and
-each has a bound, the highest factor at which those blocks admit any set of contact forces lying
-inside their friction cones. Three of the four land on that bound and the fourth just under it, and
-each row prints both numbers.
-
-What the element cannot do follows from the same construction. A corner cannot run along a face, so
-a contact cannot migrate or shorten as a block moves; no new contact forms between two faces that
-were not paired to begin with; rotations stay small, the element being written on the undeformed
-section; there is no excavation stage; and the joint law is Coulomb with residual strength and
-dilation rather than a hyperbolic or work-softening one.
-
-That reach covers block toppling, flexural toppling, plane failure, step-path failure through rock
-bridges, ploughing slabs and a Voronoi-tessellated mass — every mechanism here that moves a little
-on joints the section already carries — and it is why problem 21, whose opening is excavated in a
-second stage, and problems 22 and 23, which exercise a softening joint law, are outside the corpus
-rather than in it. It also sets one standing qualification on the referees. A distinct-element code
-runs blocks that are free to travel until they meet contacts this element has no way to form, so
-where such a run is what a row is scored against, the difference between the two kinematics is part
-of the gap.
+The wall and embankment rows that use the same element but reach it through the reinforce sheet's
+`Joint` column are on the [RS2 corpus page](rs2.md) — [RS2-24](rs2.md#rs2-24) and
+[RS2-48–55](rs2.md#rs2-48). Full bibliographic details for the author-year citations here are on the
+shared [References](references.md) page.
 
 ## Methodology
 
-**Where the inputs come from.** Geometry, materials, joint properties, restraints and loads are
-read from the vendor's own `.fez` model rather than from the manual's tables. The manual's tables
-carry errata the models do not — problem 7's slope angle is printed as 5° where its figure and its
-model are 55°, and problem 19's joint inclination is printed as 59° where both give 56° — and the
-model is what RS2 solved. The manual supplies what the tables are for: the referee each problem is
-scored against, and RS2's own two reported factors.
+How the manual's problems reach this corpus:
 
-**Units.** The vendor models are stated in MPa with unit weight in MN/m³. These files carry the
-metric kPa / kN/m³ the rest of the corpus uses, so every stress is multiplied by a thousand.
-
-**The referee.** Where a closed-form rigid-block limit equilibrium exists for a problem, that is
-what scores it, recomputed from the inputs the model carries rather than quoted from the source:
-Goodman & Bray's iterative column analysis on problem 1's four cases and on problem 2, Alejano's
-ploughing equation on problems 11 to 14, and Alejano's footwall equations on problem 15. Each of
-those is validated on the source's own worked examples before it is used, and each row records both
-the recomputed value and the one its source prints. Where no closed form exists the referee is the
-one the manual names, which is UDEC in every such case.
-
-On the ploughing slabs the closed form is checked against statics first. A limit-equilibrium formula
-prices one mechanism and may be conservative, but it may not exceed what rigid-block statics admits:
-the two blocks each of those problems cuts out have a **bound**, the highest factor at which they
-admit any set of contact forces lying inside their friction cones. So the referee for problems 11 to
-14 is Alejano's Eq. (7) where it sits on or under that bound, which is problems 12, 13 and 14, and
-the bound itself on problem 11, where Eq. (7) stands half again above it.
-
-A closed form is scored first because it is reproducible: it follows from the geometry, the weights
-and the friction angles every party agrees on, and any reader can check it. UDEC is not that. It is
-a distinct-element code whose blocks are free to travel, whose contacts migrate and re-form as they
-go, and whose published runs here state neither their block stiffnesses nor their corner rounding;
-where it is the only independent answer a problem has, it is the referee, and where a closed form
-sits beside it the two are both recorded. The Slide2 factor Rocscience reports beside problem 15 is
-the vendor's own companion program on its own model, recorded and labeled.
-
-**Apples to apples.** Every row carries XSLOPE's deviation from its referee beside RS2's deviation
-from the same referee. RS2's "without joint improvement" factor is the vendor's default and the same
-method family as XSLOPE's — a strength reduction on a continuum with interfaces in it — so it is the
-yardstick for how close a finite element code of this kind gets on this problem, and the target is
-to be at least as close as it is. Where RS2 misses a referee by as much as XSLOPE does, what the row
-records is a limit of the method family rather than of either program, and its text names the
-kinematics the referee assumes and neither code follows. RS2's own factors score no row: the two it
-reports for each problem are two different analyses, as the next paragraph says.
-
-**RS2's two factors.** The manual reports each problem twice, *without* and *with* the "joint
-improvement" option. The vendor's rerun models show what that option is: `improve_joint_convergence`
-turns on, the convergence criterion and the SRF convergence type change, `CoupledSSR` turns **off**
-— so the joints are no longer reduced with the rock — and the iteration limit and tolerance go back
-to their defaults. It is a different analysis, not a better-converged one, and on problem 4 it
-raises the factor while on problems 17, 18 and 19 it lowers it. XSLOPE reduces the joint with the
-rock, which is the *without* setting, and both of RS2's numbers are recorded so a reader can see
-the spread.
-
-**What answers a bracket edge.** {#what-answers-a-bracket-edge}
-A bracket asks of each trial factor whether the model stands there, and a trial that runs out of
-sweeps with nothing to say has not answered: a lock closed on one is a statement about the budget.
-Two readings answer a trial the force tolerance alone does not. In the standing direction, the
-solver offers the viscoplastic loop's own state to a Newton corrector at its checkpoints, and where
-the corrector reaches equilibrium from that state inside its force, yield and displacement gates it
-records the certification on the trial — an independent driver saying the model has a static
-equilibrium at that strength, which answers the question however many sweeps preceded it. In the
-failing direction, an interface still growing its slip at a steady rate while the displacement field
-goes nowhere is read as failing. On five rows here — problems 1a, 1c, 6, 15 and 17 — it is the
-failing edge of the bracket that the second reading settles, at 225,001 sweeps. A trial with neither
-reading is decided only inside its budget, and a corrector REFUSAL is not a verdict of any kind: it
-is the absence of one. `tools/ssrm_trial_audit.py` reports the reading per row and
-`test/corrector_certified_check.py` holds the rule.
-
-**The budget, and what it does not buy.** A joint reaches equilibrium by growing slip, so a jointed
-model settles over tens of thousands of viscoplastic sweeps where a bonded one settles over
-hundreds; a strength-reduction trial that runs out of sweeps is recorded undecided, the bracket
-reads that as not standing, and the factor comes out low. Every row here states its own sweep
-budget and its trial record is checked (`tools/ssrm_trial_audit.py`), the same rule the
-[geotextile wall family](rs2.md#rs2-48) runs under.
-
-What a trial costs varies by more than two orders of magnitude across this corpus. Every row runs at
-a budget of 250,000 sweeps; the row whose slowest trial is cheapest is problem 8, at 1,221 sweeps,
-and the five rows named above are the dearest, at 225,001. Three of the twenty-one rows measured
-carry a trial that does not decide at all, problems 3, 5 and 20, and on problems 5 and 20 four do
-not, including both edges of each bracket.
-
-That is not, on the evidence, simply a matter of allowing more sweeps. [Problem 7](#rj-7)'s
-undecided trial, re-solved on its own at **four times** the budget — a million sweeps against
-250,000 — returns the same verdict, `STABLE_STUCK`: the model neither converges nor diverges there,
-and the extra sweeps change nothing about that. An undecided trial
-of this kind is a statement about the convergence criterion rather than about the iteration limit,
-and what settles one is a reading of the state rather than more machine time — the joint verdict on
-a settled or steadily slipping interface, or the corrector reaching equilibrium from the loop's own
-field. Problem 7 locks on the second of those.
-
-**The mesh.** Every row is meshed at its own joint spacing — the column width, the bedding spacing,
-the mean block width of a tessellation — so that one element spans the rock between one
-discontinuity and the next, and every row states what a step of refinement does to its factor.
-Problem 1's four cases are the one exception. At their block width of 10 m that rule puts about one
-element across a column, which is not enough to settle the traction on a contact, so those four are
-cut at a 2D size of 5 m, where three successively finer meshes return the same bracket.
-
-`benchmarks/rocscience/build_joint_problems.py` writes the input files, which are named `rjNNN`
-by the manual's own problem number — `rj018.xlsx` is problem 18 — with a letter suffix where the
-manual letters its cases. `make_rs2_joint_figures.py` writes the figures.
+- Geometry, materials, joint properties, restraints and loads are read from the vendor's own `.fez`
+  model rather than from the manual's tables, which carry errata the models do not; the differences
+  are listed under [where the vendor models depart from the
+  manual](#where-the-vendor-models-depart-from-the-manual). The manual is the source of the referee
+  each problem is scored against and of RS2's own two reported factors. The vendor models are stated
+  in MPa with unit weight in MN/m³; these files carry the metric kPa and kN/m³ the rest of the
+  corpus uses.
+- **The referee.** Where a closed-form rigid-block limit equilibrium exists for a problem, that is
+  what scores it, recomputed from the inputs the model carries rather than quoted from the source
+  and validated first on the source's own worked examples: Goodman & Bray's iterative column
+  analysis on problem 1's four cases and on problem 2, Alejano's ploughing equation on problems 11
+  to 14, and Alejano's footwall equations on problem 15. Where no closed form exists the referee is
+  the one the manual names, which is UDEC in every such case. Each row records both the recomputed
+  value and the one its source prints, and the Slide2 factor Rocscience reports beside problem 15 is
+  recorded and labeled as the vendor's own companion program.
+- **The rigid-block bound.** A limit-equilibrium formula prices one mechanism and may be
+  conservative, but it may not exceed what rigid-block statics admits: the two blocks each ploughing
+  problem cuts out have a highest factor at which they admit any set of contact forces lying inside
+  their friction cones. So the referee for problems 11 to 14 is Alejano's Eq. (7) where it sits on
+  or under that bound, which is problems 12, 13 and 14, and the bound itself on problem 11, where
+  Eq. (7) stands half again above it.
+- **Apples to apples.** Every row carries XSLOPE's deviation from its referee beside RS2's deviation
+  from the same referee. RS2's "without joint improvement" factor is the vendor's default and the
+  same method family as XSLOPE's — a strength reduction on a continuum with interfaces in it — so it
+  is the yardstick for how close a finite element code of this kind gets. The manual reports each
+  problem twice, and the "with joint improvement" run turns `CoupledSSR` **off** so that the joints
+  are no longer reduced with the rock, which makes it a different analysis rather than a
+  better-converged one. XSLOPE reduces the joint with the rock, which is the *without* setting, and
+  both of RS2's numbers are recorded so a reader can see the spread.
+- **The mesh.** Every row is meshed at its own joint spacing — the column width, the bedding
+  spacing, the mean block width of a tessellation — so that one element spans the rock between one
+  discontinuity and the next, and every row states what a step of refinement does to its factor.
+  Problem 1's four cases are the exception: at their block width of 10 m that rule puts about one
+  element across a column, so those four are cut at a 2D size of 5 m, where three successively finer
+  meshes return the same bracket.
+- **The budget.** A joint reaches equilibrium by growing slip, so a jointed model settles over tens
+  of thousands of viscoplastic sweeps where a bonded one settles over hundreds; a trial that runs
+  out of sweeps is recorded undecided, the bracket reads that as not standing, and the factor comes
+  out low. Every row here runs at a budget of 250,000 sweeps and states its own trial record, which
+  `tools/ssrm_trial_audit.py` reports and `test/corrector_certified_check.py` holds to the rule
+  below.
+- **What answers a bracket edge.** {#what-answers-a-bracket-edge}
+  A bracket asks of each trial factor whether the model stands there, and a trial that runs out of
+  sweeps with nothing to say has not answered. Two readings answer one the force tolerance alone
+  does not. In the standing direction, the solver offers the viscoplastic loop's own state to a
+  Newton corrector at its checkpoints, and where the corrector reaches equilibrium from that state
+  inside its force, yield and displacement gates it records the certification on the trial. In the
+  failing direction, an interface still growing its slip at a steady rate while the displacement
+  field goes nowhere is read as failing. A trial with neither reading is decided only inside its
+  budget, and a corrector refusal is not a verdict of any kind: it is the absence of one.
+- `benchmarks/rocscience/build_joint_problems.py` writes the input files, which are named `rjNNN` by
+  the manual's own problem number — `rj018.xlsx` is problem 18 — with a letter suffix where the
+  manual letters its cases. `make_rs2_joint_figures.py` writes the figures.
 
 ## Status
 
@@ -186,58 +114,6 @@ joint model whose output is a stress-displacement curve.
 
 ---
 
-## Where a Joint Ends on Another Joint {#joint-terminations}
-
-Ten of the manual's twenty-one scorable problems turn on one property of their geometry: a joint
-that stops **on** another joint rather than crossing it.
-
-A joint is an interface, so the mesh carries two elements on every edge of it, one on each face,
-and the split gives every node on a jointed curve one copy per wedge of material around it — four
-at a crossing, where the shared node sits at the middle of four wedges of rock, and three at a
-termination. The wedge count is read from the mesh's own topology, so a termination needs nothing
-of its own there. What it needs is for the two lines to meet at **one point**: the meeting point
-is a vertex of the ending line and of nothing else, and the mesher only places a node where the
-geometry carries one.
-
-Whether they meet at one point is a question about arithmetic rather than about the drawing. Two
-tips that are meant to lie on a line land beside it instead — Goodman & Bray's fifteen column
-contacts by between 7 × 10⁻¹⁶ and 3 × 10⁻¹⁴, because they are computed from the same base angle
-the line is, and Alejano's release traces by between 2 × 10⁻⁷ and 2 × 10⁻⁶, because the vendor
-states their lower tip to six decimals — and the sliver between the two lines is thinner than any
-mesh resolves. So **every jointed line's end within a millionth of the section of another jointed
-line is moved onto it**, and the line it stops on is given a vertex at that same point, before the
-mesher runs. The through line is not moved: it is the plane the ending line belongs to and it keeps
-the geometry it was stated with. An end already on another line is left exactly where it is.
-
-Problem 1's stepped base is fifteen such terminations in one section — each column's basal contact
-begins partway along its downslope neighbour's side joint — and problems 9 to 14 are one or two
-each, where a release trace runs from the crest down onto the bedding plane that releases it.
-
-Problem 8's twelve columns end on a joint the same way — the nine lowest on the basal joint beneath
-them and the three highest on the back joint that closes the stack — and there the tips land on the
-line exactly; every other junction in the corpus is a crossing.
-
-## The Dilation Problem {#the-dilation-problem}
-
-Problem 23 is not a slope. It is a direct shear test on one joint: two blocks are pressed
-together, first at 3 MPa and then at 9 MPa, and one of them is dragged sideways. What the test
-reports is shear stress against slip, a curve. There is no factor of safety in it and nothing to
-lock. The manual uses the test to show the joint law working — the peak strength, the drop to a
-residual strength once the joint has slipped, and dilation, the opening of the joint as it
-slides.
-
-The six vendor models are named for dilation angles of 0, 10, 20, 20, 20 and 30 degrees. Every
-one of them carries `include_dilation: no`. The angle in a file's name never reaches the solver,
-so all six ran at zero dilation. Two of the three 20-degree cases also step the normal load from
-3 to 9 MPa at different points in the test, which makes them different tests. The manual's
-dilation comparison never exercised dilation, so XSLOPE's dilation cannot be scored against it.
-
-XSLOPE's dilation is checked against the kinematics instead. On a sliding joint the opening per
-unit slip is the tangent of the dilation angle, which `test/joint_element_check.py` measures at
-row 6. The peak and residual strengths are checked there as well, each against its closed form.
-
----
-
 ## The Rows
 
 ### 🟢 RJ-1a: Goodman & Bray block toppling, case a (rj001a) {#rj-1a}
@@ -255,7 +131,7 @@ sixteen column outlines and the rock beneath them make: 31 contacts over 460.0 m
 straight lines, so a pair of columns that touches over three metres gets a three-metre joint rather
 than a full-height one. Fifteen of those contacts **end on** another, because a stepped base begins
 each column's basal contact partway along its downslope neighbour's side joint; see
-[where a joint ends on another](#joint-terminations). They carry no cohesion, φ = 38.15° — the angle
+[where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint). They carry no cohesion, φ = 38.15° — the angle
 this case is posed at — and the corpus's standard stiffness pair.
 
 The referee is Goodman & Bray's own iterative column analysis, recomputed on this section rather
@@ -283,23 +159,19 @@ edge. The closed form's other three assumptions the solution obeys exactly: ever
 force and in moment on the interface tractions alone, every closed side pair is at its friction
 limit, and the base reaction of every toppling block sits on its downslope corner.
 
-**The mesh moves this row by one bisection step, and the lock is cut past that step.** At the block
+**The mesh moves this row by one bisection step, and the lock stands past that step.** At the block
 width of 10 m — 2,072 nodes and 67 interface elements — the bracket reads 1.037; at 2D sizes of
-7.0 m, 5.0 m and 3.5 m it reads 1.018, and the three finer meshes agree with one another. The lock
-is cut at 5.0 m, where the bracket is decided on all nine trials: the failing edge is read as failed
+7.0 m, 5.0 m and 3.5 m it reads 1.018, and the three finer meshes agree with one another. The row
+is locked at 5.0 m, where the bracket is decided on all nine trials: the failing edge is read as failed
 on a steadily slipping interface at 225,001 sweeps of the 250,000 allowed, and four of the five
 standing trials are certified by the Newton corrector 302 to 311 sweeps in. What refinement does to the interface is let each contact open a
 little further, so the thrust it carries sits a little higher and implies a little less: the closed
 form the measured heights imply is 1.0279 at 10 m and 1.0271 at 5.0 m, and 1.02734375 — the value
 the two readings straddle — is one of the bisection's own grid points.
 
-The finer bracket's upper edge is read as failed on a steadily slipping interface at 225,001
-sweeps, and the four standing trials beside it cost 303 to 309 sweeps each. Shortening a standing
-trial that way is what the interface Newton corrector does, and it is what lets this row be cut.
-
 The manual's figure for this case labels the side boundaries as rollers. The model's restraint list
 does not: all 191 of its restrained nodes carry both components fixed, 111 of them on the base and
-80 on the two sides. The model is what is transcribed. Its stabilizing toe force is 0.5 kN against a
+80 on the two sides. The restraints follow the model. Its stabilizing toe force is 0.5 kN against a
 toe column weighing about a thousand times that, and the file carries no load at all; see the
 departures table.
 
@@ -324,17 +196,13 @@ The thrust heights here are not case a's. The toe force pushes the two lowest co
 their own step risers and carries those two thrusts far down their faces, and given this case's own
 measured heights the recursion returns **1.0078**, which is this row's standing edge.
 
-The thrust heights here are not case a's. The toe force pushes the two lowest columns back into
-their own step risers and carries those two thrusts far down their faces, and given this case's own
-measured heights the recursion returns **1.0078**, which is this row's standing edge.
-
 | XSLOPE SSRM | Goodman & Bray referee | RS2 vs referee | UDEC | RS2 without / with improvement |
 |---|---|---|---|---|
 | **1.018** | 1.0000 (+1.8%) | 0.97 vs 1.0000 (−3.0%) | 0.99 (+2.8%) | 0.97 / 0.94 |
 
 <!-- test: file=files/rocscience/joints/rj001b.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1b, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
 
-The mesh does not move this row. At the block width of 10 m and at the 5.0 m the lock is cut on it
+The mesh does not move this row. At the block width of 10 m and at the 5.0 m of its lock it
 returns the same factor, and at 5.0 m every trial of the bracket decides inside its own budget: the
 standing edge converges under its own steam at 115,020 sweeps and the longest trial to reach a
 verdict takes 177,381 of the 250,000 allowed. Case a's one-step move with refinement is not
@@ -342,7 +210,7 @@ available here, for the reason the toe force gives: on this case the factor sits
 kilonewtons per metre of extra capacity is worth under two points of factor of safety, and the
 interface change refinement makes is smaller than that.
 
-Every input class the corpus transcribes was diffed against the vendor model and matches: the rock's
+Every input class matches the vendor model: the rock's
 E, ν and γ, the joints' stiffness pair, cohesion, friction angle and tensile cap, the 31 contacts the
 column outlines make, the side restraint the vendor clamps in both directions, and the force's
 magnitude and direction.
@@ -368,7 +236,7 @@ returns **1.0469**, that mesh's own standing edge — case a's mechanism and cas
 a degree of friction further on.
 
 **The mesh moves this row the same way it moves case a.** At the block width of 10 m the bracket
-reads 1.057; at the 5.0 m the lock is cut on it reads 1.037, one bisection step down and inside the
+reads 1.057; at the 5.0 m of its lock it reads 1.037, one bisection step down and inside the
 row's own tolerance. Every trial of the 5.0 m bracket decides: five stand, four of them certified by
 the Newton corrector 302 to 312 sweeps in, and the failing edge is read as failed on a steadily
 slipping interface at 225,001 sweeps of the 250,000 allowed.
@@ -394,14 +262,13 @@ contact.
 
 <!-- test: file=files/rocscience/joints/rj001d.xlsx, type=fem_ssrm, expected_fs=1.252, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1d, tier=gate, f_stand=1.2421875, f_fail=1.26171875, check=edges -->
 
-The mesh does not move this row either: the block width of 10 m and the 5.0 m the lock is cut on
+The mesh does not move this row either: the block width of 10 m and the 5.0 m of its lock
 return the same bracket, edge for edge, and at 5.0 m every trial decides inside its own budget — the
 standing edge converging at 181,301 sweeps and the failing edge running away at 147,501. Like case
 b, this case is posed where the toe-force curve is steep, so the interface change that refinement
 makes cannot carry it across a bracket step.
 
-Every transcribed input class matches the vendor model, the force reaching the same point case b's
-does.
+Every input class matches the vendor model, the force reaching the same point case b's does.
 
 **Input file:** [rj001d.xlsx](files/rocscience/joints/rj001d.xlsx).
 
@@ -441,8 +308,7 @@ the two can be interrogated on this problem: the manual states nothing about the
 settings, no block rounding, no deformability and no stiffness, where the rigid-block note it gives
 for problems 9 to 14 is the only statement of the kind it makes anywhere.
 
-Every input class the corpus transcribes was diffed against the vendor model and matches. The joints
-reconstruct from the vendor's own 517 joint elements to 311.4 m of trace, 291.7 m at 64° and 19.7 m
+The joints reconstruct from the vendor's own 517 joint elements to 311.4 m of trace, 291.7 m at 64° and 19.7 m
 at 30°, against this file's 311.4 m at the same angles over the same extent; the rock's E, ν and γ,
 the joints' k<sub>n</sub>, k<sub>s</sub>, c, φ and tensile cap, and the clamped side restraint all
 match.
@@ -476,7 +342,7 @@ That edge is one the Newton corrector was offered and refused, as [problem 5](#r
 verdict of its own — see [what answers a bracket edge](#what-answers-a-bracket-edge) — so the
 trial stays undecided and the row stays reported.
 
-Every input class the corpus transcribes was diffed against the vendor model and matches: the
+Every input class matches the vendor model: the
 rock's E, ν and γ, the joints' normal and shear stiffness, cohesion, friction angle and tensile
 cap, the two sets' dips and spacings, and the side restraint the vendor clamps in both directions.
 
@@ -658,7 +524,7 @@ The face and the bedding dip at the same angle, so no slab can slide out along a
 mechanism is the bilinear one the problem is named for, sliding on a basal plane combined with
 sliding along the release that the face undercuts. The release trace's lower tip is stated to six
 decimals, so it lands 2 × 10⁻⁷ from the bedding plane it belongs on; see
-[where a joint ends on another](#joint-terminations).
+[where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | LE (Alejano) | RS2 without / with improvement |
 |---|---|---|---|---|
@@ -700,7 +566,7 @@ E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3.
 Moving the release upslope leaves the toe undercut where it was and cuts a second block out of the
 face above it: the trace that ran from the face to the toe in example 1a stays, and a new one leaves
 the face at (−9.977, 11.890) five metres higher. Both end on the bedding plane they are released by;
-see [where a joint ends on another](#joint-terminations).
+see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | LE (Alejano) | RS2 without / with improvement |
 |---|---|---|---|---|
@@ -734,7 +600,7 @@ a primary discontinuity combining with sliding on a joint sub-parallel to the fa
 toe block and eventually rotates it out of the slope. The rock is the family's elastic rigid-block
 stand-in at E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3. The lower tip of a release trace is stated to six
 decimals, so it lands a part in 10⁷ from the bedding plane it belongs on; see
-[where a joint ends on another](#joint-terminations).
+[where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
 
 | XSLOPE SSRM | Rigid-block bound referee | RS2 vs referee | UDEC | Alejano Eq. (7) | RS2 without / with improvement |
 |---|---|---|---|---|---|
@@ -755,7 +621,7 @@ above that, so it cannot be what scores this row and the bound is the referee in
 three on the bound. [Problem 15](#rj-15) has the same shape at a problem where no bound is
 available.
 
-Every input class the corpus transcribes was diffed against the vendor model and matches: the rock's
+Every input class matches the vendor model: the rock's
 E, ν and γ, both joint friction angles, the joints' stiffness pair, cohesion and tensile cap, the
 bedding dip and spacing, the release traces' endpoints, and the side restraint the vendor clamps in
 both directions.
@@ -787,7 +653,7 @@ on its other worked examples.
 <!-- test: file=files/rocscience/joints/rj012.xlsx, type=fem_ssrm, expected_fs=2.033, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-12, f_stand=2.0234375, f_fail=2.04296875, check=edges, tier=gate -->
 
 The lower tip of each release trace is stated to six decimals, so it lands a part in 10⁷ from the
-bedding plane it belongs on; see [where a joint ends on another](#joint-terminations). This row and
+bedding plane it belongs on; see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint). This row and
 problem 14 state their generated bedding network to six decimals as well, which is the precision
 the mesher's own crossing arithmetic carries — see the departures table.
 
@@ -816,7 +682,7 @@ bedding and a weaker one — sliding on the primary discontinuity combining with
 sub-parallel to the face, which lifts the toe block. The rock is the family's elastic rigid-block
 stand-in at E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3. The lower tip of each release trace is stated to
 six decimals, so it lands a part in 10⁷ from the bedding plane it belongs on; see
-[where a joint ends on another](#joint-terminations).
+[where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
 
 Alejano's Eq. (7) recomputed on this problem's inputs gives **1.0002**, its sliding mode governing,
 and the paper prints 1.00 for the same example. It sits on the rigid-block bound for these two
@@ -833,7 +699,7 @@ interface elements to 26,079 and 2,539 — does not move the factor at all: the 
 the same bracket, edge for edge. Every trial of both brackets reaches a verdict, the longest taking
 23,161 sweeps of the 250,000 allowed.
 
-Every input class the corpus transcribes was diffed against the vendor model and matches: the
+Every input class matches the vendor model: the
 rock's E, ν and γ, both joint friction angles, the joints' stiffness pair, cohesion and tensile
 cap, the bedding dip and spacing, the release traces' endpoints, and the side restraint the vendor
 clamps in both directions.
@@ -874,7 +740,7 @@ to 26,414 and 2,572, gives 1.232; and a second step to 0.735 m gives 1.232 again
 edge for edge on all three. Every trial of every one of those brackets reaches a verdict, the
 longest taking 15,511 sweeps of the 250,000 allowed.
 
-Every input class the corpus transcribes was diffed against the vendor model and matches: the
+Every input class matches the vendor model: the
 rock's E, ν and γ, both joint friction angles, the joints' stiffness pair, cohesion and tensile
 cap, the bedding dip and spacing, the release traces' endpoints, and the side restraint the vendor
 clamps in both directions.
@@ -919,10 +785,10 @@ The upper edge of the corpus bracket is read as failed on a steadily slipping in
 sweeps, and every trial of the bracket decides. A step of refinement — a 2D
 size of 1.4 m, which takes the mesh from 14,964 nodes and 2,179 interface elements to 32,131 and
 3,090 — moves the factor by one bracket step, inside the row's own tolerance, and decides on all
-nine of its trials too, so the lock is cut on the corpus mesh. It is the corpus's longest row: its
+nine of its trials too, so the row is locked on the corpus mesh. It is the corpus's longest row: its
 bracket and at-failure capture together take about an hour and a half.
 
-Every input class that was transcribed matches the vendor model: the rock's E, ν, γ, c, φ and
+Every input class matches the vendor model: the rock's E, ν, γ, c, φ and
 tensile cap; the joints' normal and shear stiffness, cohesion, friction angle and tensile cap; and
 the side restraint the vendor clamps in both directions. The stated tensile strength of 1000 kPa is
 above the Mohr-Coulomb apex its own c and φ imply (c/tan φ = 285.6 kPa), so it never binds.
@@ -1130,10 +996,9 @@ decide: three stand, each settled by the joint verdict on a slip field that has 
 and two fail by running away. The other four reach 250,000 sweeps with nothing to say — and both of
 the trials the bisection closes on are among them, one exiting `STABLE_STUCK` and the other
 inconclusive. The corrector certified none of them. A factor closed on two such trials would be a
-statement about the budget rather than about the slope, which is the rule the whole corpus is read
-under. The bracket and the at-failure capture together take 3.7 hours, the longest single run here.
+statement about the budget rather than about the slope. The bracket and the at-failure capture together take 3.7 hours, the longest single run here.
 
-What the figure shows is worth the row on its own: the slip picks its way from the toe up through
+The figure shows how a mass of blocks at this scale fails: the slip picks its way from the toe up through
 the block walls on a curved path to the crest, and the only rock strained is a patch at the toe
 where the path has to turn. A mass of blocks at this scale fails on a surface, not along any
 plane it contains — which is the observation the source paper is about.
@@ -1148,6 +1013,23 @@ the same way, so this row is scored on the vendor's own tessellation alone.
 **Input file:** [rj020.xlsx](files/rocscience/joints/rj020.xlsx).
 
 ![RJ-20: Hammah & Yacoub Voronoi slope (rj020) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The slip runs from the toe up through the block walls on a curved path to the crest, taking whichever wall of each block lies nearest that line, and the rock carries almost no strain except a patch at the toe where the path turns: the mass fails on a surface picked out of the tessellation rather than along any one joint in it](images/RJ-20.png)
+
+## The Dilation Problem {#the-dilation-problem}
+
+Problem 23 is a direct shear test on one joint rather than a slope: two blocks are pressed together,
+first at 3 MPa and then at 9 MPa, and one of them is dragged sideways. What it reports is shear
+stress against slip, a curve, so there is no factor of safety in it to lock. The manual uses the
+test to show the joint law working — the peak strength, the drop to a residual strength once the
+joint has slipped, and dilation.
+
+The six vendor models are named for dilation angles of 0, 10, 20, 20, 20 and 30 degrees, and every
+one of them carries `include_dilation: no`. The angle in a file's name never reaches the solver, so
+all six ran at zero dilation, and two of the three 20-degree cases also step the normal load from 3
+to 9 MPa at different points in the test, which makes them different tests. The manual's dilation
+comparison therefore never exercised dilation, and XSLOPE's dilation cannot be scored against it.
+It is checked against the kinematics instead: on a sliding joint the opening per unit slip is the
+tangent of the dilation angle, which `test/joint_element_check.py` measures at row 6, and the peak
+and residual strengths are checked there as well, each against its closed form.
 
 ## Where the Vendor Models Depart from the Manual
 

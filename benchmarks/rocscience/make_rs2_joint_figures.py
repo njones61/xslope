@@ -45,21 +45,14 @@ EXTRA_CASES = [
      'target_size': '12.0', 'benchmark': 'RJ-5'},
     {**_JOINT, 'file': 'files/rocscience/joints/rj006.xlsx',
      'target_size': '12.0', 'benchmark': 'RJ-6'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj019.xlsx',
-     'target_size': '3.0', 'benchmark': 'RJ-19'},
-    # The termination family's rows that still report. Corpus size is the joint
-    # spacing, as everywhere else here — the bedding spacing on 9 to 14. The four
-    # problem-1 cases and problems 9, 11 and 13 have locked and carry tags of
-    # their own, so they are no longer listed: `registered` would ignore a
-    # duplicate entry anyway, and `--audit` names one that is left behind.
-    {**_JOINT, 'file': 'files/rocscience/joints/rj012.xlsx',
-     'target_size': '1.5', 'benchmark': 'RJ-12'},
     # Problem 20's Voronoi mass. Corpus size is the mean BLOCK width measured on
-    # the vendor's own traces, this row's stand-in for a joint spacing.
+    # the vendor's own traces, this row's stand-in for a joint spacing. The rest
+    # of the termination family — the four problem-1 cases and problems 9 and 11
+    # to 14 — have locked and carry tags of their own, so they are not listed
+    # here: `registered` would ignore a duplicate entry anyway, and `--audit`
+    # names one that is left behind.
     {**_JOINT, 'file': 'files/rocscience/joints/rj020.xlsx',
      'target_size': '2.895', 'benchmark': 'RJ-20'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj014.xlsx',
-     'target_size': '1.5', 'benchmark': 'RJ-14'},
 ]
 
 #: Rows measured by a SWEEP rather than by a bracket. Problem 16 is scored in the

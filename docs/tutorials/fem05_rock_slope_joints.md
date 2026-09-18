@@ -35,7 +35,7 @@ is inert and the surfaces carry everything.
 **Objectives** — Learn how the discontinuities in a rock slope are entered as
 joint lines, how to check a jointed answer against a closed-form solution, how to
 generate a joint network instead of typing one, and which rock slope problems
-this method reaches.
+this method can solve.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">elastic rock</span><span class="tg-pill">joints worksheet</span><span class="tg-pill">bedding plane</span><span class="tg-pill">release joint</span><span class="tg-pill">plane failure</span><span class="tg-pill">closed-form check</span><span class="tg-pill">strength reduction</span><span class="tg-pill">hybrid criterion</span><span class="tg-pill">sweep budget</span><span class="tg-pill">joint region</span><span class="tg-pill">generated network</span><span class="tg-pill">parallel set</span><span class="tg-pill">block toppling</span><span class="tg-pill">joint slip</span><span class="tg-pill">deformed blocks</span></p>
 <div class="tgm-model" markdown>

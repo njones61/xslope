@@ -7,7 +7,7 @@ a line the finite element mesh is split along, with an interface element carryin
 between the two faces. The faces can then slide on each other, part, and come back together, which
 a single bonded mesh cannot do.
 
-![A rock slope cut by two joint lines: a bedding plane dipping out of the face and a vertical release joint, with the rock modeled as an elastic material](images/joints_rock_slope.png){width=900}
+![A rock cut in bedded rock: a bedding set dipping out of the face, a steeper cross-joint set and two release joints, cutting the mass into blocks, with blocks shed onto the benches and a talus at the toe](images/joints_rock_slope.png){width=900}
 
 Joint lines come from two places. A line on the **joints** worksheet is a joint and nothing else —
 the rock joint, the bedding plane, the block contact above. A line on the **reinforce** worksheet
@@ -40,7 +40,7 @@ interface friction. Those are reinforce-sheet lines with `Joint = Yes`; which of
 representations a sheet wants is set out under
 [Bonded bar or joint?](reinforcement.md#bonded-bar-or-joint).
 
-![A six-course block wall on slip joints: joints under the base, behind the back face and at every course line, with three geogrid layers tied into the facing](images/joints_block_wall.png){width=900}
+![A segmental block wall: the blocks stand on a joint under the base, a joint on the back face against the fill and a joint at every course line, with geogrid layers tied into the courses and running back through the reinforced fill](images/joints_block_wall.png){width=900}
 
 ## The Split Mesh
 
@@ -51,7 +51,7 @@ A node where one joint line ends on another has three wedges and becomes three. 
 the copy on its own side of every line through the point, so the wedges are free to move relative to
 one another, and the interface elements between the copies are what hold them together.
 
-![Three joint arrangements: a line, a crossing and a termination, with the wedges of material drawn pulled apart and the node copies marked](images/joint_mesh_split.png){width=900}
+![The mesh around one node on a joint line, at a crossing of two joint lines and at a termination, with the wedges drawn pulled apart along the joint traces and one node copy standing in each](images/joint_mesh_split.png){width=760}
 
 The split is invisible on a mesh plot, because the copies stand at one point; a jointed line is
 drawn in its own style so it can be told from a bonded one.
@@ -84,7 +84,7 @@ thickness. Its state is the relative displacement of the two faces, resolved alo
 chord into a tangential component $\Delta_t$ (sliding) and a normal component $\Delta_n$ (closing,
 compression positive).
 
-![The interface element: three node pairs joined by a normal and a shear stiffness, and the relative displacement of the two faces resolved into sliding and closing](images/joint_element.png){width=900}
+![The interface element between two elements of the mesh: its three node pairs, the normal and shear stiffness carried at one pair, and the relative movement of its two faces resolved into sliding and closing](images/joint_element.png){width=920}
 
 While the joint is intact its tractions are elastic,
 
@@ -122,7 +122,7 @@ Past the tension cutoff it **opens**: both tractions and both stiffnesses go to 
 nothing until the two faces come back into contact, when it closes again and carries traction as
 before.
 
-![The joint's strength envelope: the Coulomb limit on the shear traction, the tension cutoff at which the joint opens, and the residual envelope it drops to once it has slipped](images/joint_envelope.png){width=820}
+![The joint's strength envelope: the Coulomb limit on the shear traction in either direction, the cohesion intercept, the tension cutoff at which the joint opens, and the residual envelope it drops to once it has slipped](images/joint_envelope.png){width=800}
 
 A joints-sheet line states `c`, `phi` and `t_cut` in columns of its own. A jointed reinforcement
 line takes its `Adhesion` and `Delta` as $c_j$ and $\phi_j$, and its tension cutoff is zero: a

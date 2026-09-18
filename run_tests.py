@@ -8965,6 +8965,19 @@ MODULE_CHECKS = {
         "material crossing, the stiffness default (which must carry no result "
         "over two orders of magnitude), and that a model with no jointed line "
         "builds exactly the fem_data it always did."),
+    'dynamic_relaxation': (
+        'dynamic_relaxation_check.py',
+        "The explicit dynamic-relaxation driver, and that it changes nothing "
+        "switched off. Every node is given a mass, Newton's second law is "
+        "integrated forward by central differences and the motion is damped, so "
+        "a slope that can stand comes to rest and one that cannot keeps moving. "
+        "Four legs: an unjointed elastic block settles to the direct elastic "
+        "solution to 1e-6 under all three damping options; Goodman & Bray's "
+        "block stands at k = 0.40 and topples at 0.42 against b/h = 0.400; the "
+        "block-on-a-plane and infinite-slope closed forms come back at the "
+        "tolerances the interface element check already holds; and with the "
+        "driver unselected a jointed sweep solve is byte-identical to a pristine "
+        "package built from the branch it was written on."),
     'corrector_certified': (
         'corrector_certified_check.py',
         "What makes a bracket edge ANSWERED. A trial that reaches its sweep "
@@ -14948,6 +14961,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'joint_junction': 5, 'joint_junction_mesh': 3,
               'joint_element': 5, 'joint_surfaces': 4, 'joint_network': 3,
               'joint_network_dialog': 2, 'joint_verdict': 1,
+              'dynamic_relaxation': 4,
               'corrector_certified': 1,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
@@ -16064,6 +16078,11 @@ def main():
         tests.append({'type': 'joint_verdict',
                       'file': 'the verdict on an undecided jointed trial',
                       'method': '-', 'source': 'joint_verdict'})
+        # The second per-trial engine: three solving legs and one identity leg
+        # that rebuilds a pristine package to compare the sweep path against.
+        tests.append({'type': 'dynamic_relaxation',
+                      'file': 'the explicit dynamic-relaxation driver',
+                      'method': '-', 'source': 'dynamic_relaxation'})
         # What makes a bracket edge answered, and that the three tools that decide
         # it give one answer — pure-function, plus two small solves for the K0
         # step's own certification (seconds).

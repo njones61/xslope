@@ -239,10 +239,25 @@ def _slab_masks(fem_data, geom, margin=4.0):
     return inside, jd['side'] == 1
 
 
-def _solve(fem_data, F=1.0, max_iterations=8000):
+#: Which per-trial driver the rows below solve on. ``None`` is the shipped
+#: default and is what the joints tier runs; every closed form, every tolerance
+#: and every row is unchanged by it. It exists so the same rows can be put to a
+#: non-default engine and held to the SAME numbers — the validation ladder's
+#: rung (iii) for the explicit dynamic driver. Set it with ``--driver dynamic``
+#: or the environment variable ``XSLOPE_JOINT_CHECK_DRIVER``.
+#:
+#: ``_leg_untouched`` is unaffected because it builds a model and never solves,
+#: and the ``dil = 0`` bit-exactness comparison inside ``_leg_dilation`` stays an
+#: identity between two runs of whichever engine is selected, which is what it
+#: was always asking.
+DRIVER = os.environ.get('XSLOPE_JOINT_CHECK_DRIVER') or None
+
+
+def _solve(fem_data, F=1.0, max_iterations=8000, driver=None):
     with contextlib.redirect_stdout(io.StringIO()):
         return solve_fem(fem_data, F=F, max_iterations=max_iterations,
-                         fast_kernel=False)
+                         fast_kernel=False,
+                         fem_solver=(DRIVER if driver is None else driver))
 
 
 def _ssrm(fem_data, F_min=1.0, F_max=2.5, tolerance=0.005, budget=1.0, **kw):
@@ -258,6 +273,7 @@ def _ssrm(fem_data, F_min=1.0, F_max=2.5, tolerance=0.005, budget=1.0, **kw):
     # fixed budget would read that cost as an answer.
     kw.setdefault('max_iterations', int(3000 * budget))
     kw.setdefault('max_iterations_ceiling', int(6000 * budget))
+    kw.setdefault('fem_solver', DRIVER)
     with contextlib.redirect_stdout(io.StringIO()):
         return solve_ssrm(fem_data, F_min=F_min, F_max=F_max,
                           tolerance=tolerance, **kw)
@@ -1146,6 +1162,12 @@ def run():
 
 
 def main():
+    global DRIVER
+    if '--driver' in sys.argv:
+        DRIVER = sys.argv[sys.argv.index('--driver') + 1]
+    if DRIVER:
+        print(f"Interface element check on fem_solver={DRIVER!r} "
+              f"(the shipped rows, the shipped tolerances).")
     failures = run()
     if failures:
         print("\nFAILURES:")

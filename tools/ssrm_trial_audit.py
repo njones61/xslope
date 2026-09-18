@@ -61,6 +61,14 @@ DEFAULT_CEILING = 50000
 #: Verdicts that mean the trial ran out of budget rather than deciding.
 UNDECIDED = ("STABLE_STUCK", "AMBIGUOUS", "INCONCLUSIVE")
 
+#: Exit reasons that mean the same thing on the side of the SOLVER rather than of
+#: the verdict: the trial stopped without answering. ``inconclusive`` is the
+#: viscoplastic sweep's; ``dr_undecided`` and ``dr_stalled`` are the dynamic
+#: driver's two (the residual still falling at the step ceiling, and the residual
+#: flat with the motion flat). A trial that carries one of these has not decided,
+#: whatever verdict string rides with it.
+UNDECIDED_EXITS = ("inconclusive", "dr_undecided", "dr_stalled")
+
 #: Verdicts that ANSWER the standing/failing question, which is not the same list
 #: as "converged or failed". ``JOINT_SETTLED`` is a decision on a jointed trial
 #: whose slip, displacement field and soil residual have all settled and whose
@@ -91,7 +99,7 @@ def trial_decided(trial, ceiling):
     verdict = str(trial.get("verdict"))
     if verdict not in DECIDED or verdict in UNDECIDED:
         return False
-    if trial.get("exit_reason") == "inconclusive":
+    if trial.get("exit_reason") in UNDECIDED_EXITS:
         return False
     if certified(trial):
         return True

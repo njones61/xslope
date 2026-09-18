@@ -5622,6 +5622,292 @@
     },
     {
       "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 1,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_base_geotextile_bonded.xlsx",
+      "references": [
+        {
+          "anchor": "when-a-sheet-is-a-slip-surface-and-when-it-is-bonded",
+          "checks": [
+            "FEM-3-sheet-bonded-ssrm"
+          ],
+          "level": 2,
+          "page": "tutorials/fem03_block_wall_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_block_wall_joints.md",
+          "title": "When a sheet is a slip surface, and when it is bonded",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#when-a-sheet-is-a-slip-surface-and-when-it-is-bonded"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 1,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_base_geotextile_jointed.xlsx",
+      "references": [
+        {
+          "anchor": "when-a-sheet-is-a-slip-surface-and-when-it-is-bonded",
+          "checks": [
+            "FEM-3-sheet-jointed-ssrm"
+          ],
+          "level": 2,
+          "page": "tutorials/fem03_block_wall_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_block_wall_joints.md",
+          "title": "When a sheet is a slip surface, and when it is bonded",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#when-a-sheet-is-a-slip-surface-and-when-it-is-bonded"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 4,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_block_wall.xlsx",
+      "references": [
+        {
+          "anchor": "tutorial-fem-3-a-block-wall-on-slip-joints",
+          "checks": [
+            "FEM-3-blocks-ssrm"
+          ],
+          "level": 1,
+          "page": "tutorials/fem03_block_wall_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_block_wall_joints.md",
+          "title": "Tutorial FEM-3 — A Block Wall on Slip Joints",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#tutorial-fem-3-a-block-wall-on-slip-joints"
+        }
+      ],
+      "topics": []
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 4,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 3,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_block_wall_grid.xlsx",
+      "references": [
+        {
+          "anchor": "tutorial-fem-3-a-block-wall-on-slip-joints",
+          "checks": [
+            "FEM-3-grid-ssrm"
+          ],
+          "level": 1,
+          "page": "tutorials/fem03_block_wall_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_block_wall_joints.md",
+          "title": "Tutorial FEM-3 — A Block Wall on Slip Joints",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#tutorial-fem-3-a-block-wall-on-slip-joints"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
         "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
@@ -6259,6 +6545,152 @@
         "dloads": 0,
         "element_type": "tri6",
         "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 1,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_liner_bonded.xlsx",
+      "references": [
+        {
+          "anchor": "when-a-sheet-is-a-slip-surface-and-when-it-is-bonded",
+          "checks": [
+            "FEM-3-liner-bonded-ssrm"
+          ],
+          "level": 2,
+          "page": "tutorials/fem03_block_wall_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_block_wall_joints.md",
+          "title": "When a sheet is a slip surface, and when it is bonded",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#when-a-sheet-is-a-slip-surface-and-when-it-is-bonded"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 1,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_liner_jointed.xlsx",
+      "references": [
+        {
+          "anchor": "when-a-sheet-is-a-slip-surface-and-when-it-is-bonded",
+          "checks": [
+            "FEM-3-liner-jointed-ssrm"
+          ],
+          "level": 2,
+          "page": "tutorials/fem03_block_wall_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_block_wall_joints.md",
+          "title": "When a sheet is a slip surface, and when it is bonded",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#when-a-sheet-is-a-slip-surface-and-when-it-is-bonded"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
         "homogeneous": true,
         "k0": null,
         "line_loads": 0,
@@ -6542,6 +6974,73 @@
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_rock_joints.xlsx",
+      "references": [
+        {
+          "anchor": "tutorial-fem-5-a-rock-slope-on-its-joints",
+          "checks": [
+            "FEM-5-slab-ssrm"
+          ],
+          "level": 1,
+          "page": "tutorials/fem05_rock_slope_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem05_rock_slope_joints.md",
+          "title": "Tutorial FEM-5 — A Rock Slope on Its Joints",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem05_rock_slope_joints/#tutorial-fem-5-a-rock-slope-on-its-joints"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
         "hoek_brown": true,
         "homogeneous": true,
         "k0": 1.0,
@@ -6598,6 +7097,73 @@
           "source_md": "docs/tutorials/lem13_rock_slope.md",
           "title": "Opening the model",
           "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem13_rock_slope/#opening-the-model"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_rock_toppling.xlsx",
+      "references": [
+        {
+          "anchor": "running-the-toppling-stack",
+          "checks": [
+            "FEM-5-topple-ssrm"
+          ],
+          "level": 2,
+          "page": "tutorials/fem05_rock_slope_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem05_rock_slope_joints.md",
+          "title": "Running the toppling stack",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem05_rock_slope_joints/#running-the-toppling-stack"
         }
       ],
       "topics": [
@@ -26358,7 +26924,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 371,
+    "models": 379,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -26370,7 +26936,9 @@
       "tutorials/combo03_fs_vs_time/",
       "tutorials/fem01_strength_reduction/",
       "tutorials/fem02_reinforcement/",
+      "tutorials/fem03_block_wall_joints/",
       "tutorials/fem04_piles/",
+      "tutorials/fem05_rock_slope_joints/",
       "tutorials/lem03_layered_slope/",
       "tutorials/lem04_water_in_the_slope/",
       "tutorials/lem05_weak_layer_noncircular/",
@@ -26397,16 +26965,16 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 637,
+    "tags": 645,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 178,
+      "homogeneous": 180,
       "non-circular": 46,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
-      "reinforcement": 28,
+      "reinforcement": 33,
       "seepage-coupled": 74,
       "seismic": 11,
       "soil-nails": 5,
@@ -26481,7 +27049,9 @@
       "docs/tutorials/files/xslope_dam_infiltration_storm.xlsx",
       "docs/tutorials/files/xslope_pile_wall.xlsx",
       "docs/tutorials/files/xslope_pile_wall_start.xlsx",
+      "docs/tutorials/files/xslope_rock_joints.xlsx",
       "docs/tutorials/files/xslope_rock_slope.xlsx",
+      "docs/tutorials/files/xslope_rock_toppling.xlsx",
       "docs/tutorials/files/xslope_ssrm_embankment.xlsx",
       "docs/tutorials/files/xslope_ssrm_embankment_start.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
@@ -26720,6 +27290,11 @@
     ],
     "reinforcement": [
       "docs/lem/files/xslope_reinforce.xlsx",
+      "docs/tutorials/files/xslope_base_geotextile_bonded.xlsx",
+      "docs/tutorials/files/xslope_base_geotextile_jointed.xlsx",
+      "docs/tutorials/files/xslope_block_wall_grid.xlsx",
+      "docs/tutorials/files/xslope_liner_bonded.xlsx",
+      "docs/tutorials/files/xslope_liner_jointed.xlsx",
       "docs/tutorials/files/xslope_reinforced_slope.xlsx",
       "docs/tutorials/files/xslope_reinforced_slope_start.xlsx",
       "docs/verification/files/geostudio/gs2_18.xlsx",

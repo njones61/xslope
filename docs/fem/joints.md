@@ -92,16 +92,17 @@ interface free of the oscillation Gauss quadrature produces there (Schellekens &
 
 ### Stiffness
 
-$k_n$ and $k_s$ are penalty stiffnesses: large enough that an intact joint does not visibly deform,
-small enough not to ill-condition the system. Stated on the line, they are used as stated. Left
-blank, they are derived as $E_{adj}/d_v$ and $G_{adj}/d_v$ over a virtual thickness
-$d_v = 0.1\,L_{1D}$, with $E_{adj}$ and $G_{adj}$ those of the **softer** of the two materials the
-element stands between — which differ where a line crosses a material boundary.
+A joint has two stiffnesses: one across it, how hard the two faces press together before they
+compress, and one along it, how hard they resist sliding before the joint slips. They are not soil
+properties. They exist so that an unbroken joint behaves like solid rock, and they need to be just
+large enough for that and no larger. Enter them on the joints sheet as `kn` and `ks`; left blank,
+they are set from the stiffness of the softer of the two materials the joint runs between (which
+can differ from one end of a line to the other where it crosses a material boundary).
 
-The factor of safety is insensitive to the pair: it moves by about 1.5% over two orders of
-magnitude. The **cost** is not. The slip a viscoplastic sweep puts into a joint is the shear above
-the limit divided by $k_s$, so a model that states stiffnesses an order of magnitude above the
-derived default needs its iteration budget raised by the same factor.
+The factor of safety hardly depends on them: over a hundredfold range it changes by about 1.5%.
+What they change is run time. A joint ten times stiffer takes about ten times as many iterations to
+settle, so a model that states stiffnesses well above the defaults needs its iteration budget
+raised to match.
 
 ### Strength
 

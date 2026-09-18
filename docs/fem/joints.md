@@ -214,7 +214,10 @@ One row per line: a `Label`, the endpoints `x1, y1, x2, y2`, and the properties 
 `c_res`, `phi_res`, `dil`, `t_cut`, `kn`, `ks` and `Jred`. Only `phi` and the endpoints are
 required; every other column is blank for the ordinary case. The columns and their units are
 documented with the rest of the template under
-[Worksheet: joints](../usage/input_template.md#worksheet-joints).
+[Worksheet: joints](../usage/input_template.md#worksheet-joints). In Studio the same rows are
+edited in the joints editor, as a table or one line at a time with the section drawn beside it.
+
+![The joints editor in Studio: the lines of a model, one selected, with its properties and the section beside it](../studio/images/editing_joints_editor.png){width=900}
 
 ### Generating a network of joints
 
@@ -232,8 +235,6 @@ You also say where the pattern applies: the whole section, one material, or a re
 yourself. A drawn region is a polygon on the polygon sheet with its **Type** set to `joints` (see
 [joint regions](../usage/input_template.md#joint-regions) on the template page), and it can be
 limited to a band of elevations. Outside the region no joints are written.
-
-![The joints editor in Studio, listing the lines of a model](../studio/images/editing_joints_editor.png){width=900}
 
 In Studio this is the [Build network](../studio/editing.md#build-network) button on the joints
 editor: choose the pattern, enter its numbers, pick the region, and the canvas previews the joints

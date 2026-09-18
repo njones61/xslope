@@ -21,26 +21,27 @@ worksheet at all.
 
 ## When a Model Needs a Joint
 
-A joint belongs where the mechanism **runs along** a surface rather than cutting through it.
+A joint belongs where failure **runs along** a surface rather than cutting across it.
 
 **Rock.** A jointed rock mass fails on its discontinuities, not through intact rock: block and
 flexural toppling of a columnar face, a plane failure on a bedding plane that daylights, a step-path
 surface running from one joint to the next through short rock bridges, a slab ploughing into the
-block below it. The rock itself is often elastic in such a model, so every mechanism it has is a
-joint mechanism.
+block below it. The rock itself is often modeled as elastic, so every way such a slope can fail is
+a movement on its joints.
 
-**Blocks and walls.** A segmental block wall is a stack of discrete units: a joint under the base,
-a joint on the back face against the fill, and a joint at every course line make it a stack that can
-slide, part and rock, instead of a notched solid. The same applies to a gravity or gabion wall and
-to the contact between a structure and the ground.
+**Blocks and walls.** A segmental block wall is a stack of separate blocks. Modeled as one solid
+it cannot move the way a stack does. With a joint under the bottom block, a joint on the back of the
+wall against the fill, and a joint between every course of blocks, the blocks can slide on one
+another, separate, and tip. The same applies to a gravity or gabion wall, and to the contact between
+a structure and the ground it stands on.
 
 **Sheets that are the slip surface.** A base geotextile under an embankment on soft clay, a smooth
 geomembrane or liner, the wrapped face of a reinforced wall: the fill slides *on* the sheet at the
-interface friction. Those are reinforce-sheet lines with `Joint = Yes`; which of the two
-representations a sheet wants is set out under
+interface friction. Those are reinforce-sheet lines with `Joint = Yes`; which of the two a sheet
+needs is set out under
 [Bonded bar or joint?](reinforcement.md#bonded-bar-or-joint).
 
-![A segmental block wall: the blocks stand on a joint under the base, a joint on the back face against the fill and a joint at every course line, with geogrid layers tied into the courses and running back through the reinforced fill](images/joints_block_wall.png){width=900}
+![A segmental block wall: the blocks stand on a joint under the base, a joint on the back face against the fill and a joint between every course of blocks, with geogrid layers tied into the blocks and running back through the reinforced fill](images/joints_block_wall.png){width=900}
 
 ## The Split Mesh
 
@@ -55,13 +56,13 @@ hold them together.
 ![The mesh around one node on a joint line, at a crossing of two joint lines and at a termination, with the pieces of material drawn pulled apart along the joint traces and one node copy standing in each](images/joint_mesh_split.png){width=760}
 
 The split is invisible on a mesh plot, because the copies stand at one point; a jointed line is
-drawn in its own style so it can be told from a bonded one.
+drawn in a style of its own, so it can be told from a line the mesh is not split along.
 
 ### Where a joint ends on another joint
 
-A joint that stops **on** another joint — a column's base beginning partway along its neighbor's
-side joint, a release trace running down onto the bedding plane that releases it — needs the two
-lines to meet at exactly one point, because the mesher only places a node where the geometry carries
+A joint that stops **on** another joint — the base of one rock column starting partway along its
+neighbor's side joint, a release joint running down onto the bedding plane beneath it — needs the
+two lines to meet at exactly one point, because the mesher only places a node where the geometry carries
 one. Whether they meet is a question of arithmetic rather than of the drawing: an endpoint computed
 from the same angle as the line it belongs on can miss it by a part in a thousand billion, and one
 stated to six decimals by a part in a million, and the sliver between the two lines is thinner than
@@ -69,13 +70,12 @@ any mesh resolves.
 
 So **every jointed line's end within a millionth of the section of another jointed line is moved
 onto it**, and the line it stops on is given a vertex at that same point, before the mesh is built.
-The through line is not moved: it is the plane the ending line belongs to, and it keeps the geometry
-it was stated with. An end already on another line is left exactly where it is.
+The line that carries on through is not moved: it keeps the geometry it was given. An end already on another line is left exactly where it is.
 
 Two things a joint line may not do, both refused by name in the [model
-checks](../usage/preflight.md): lie **on** another joint line over a stretch, and run along the
-outside of the section, where there is material on one side only and nothing for the other face to
-be.
+checks](../usage/preflight.md): lie **on** another joint line along part of its length, and run
+along the outer boundary of the section, where there is material on one side only and nothing for
+the other face of the joint to be.
 
 ## The Interface Element
 
@@ -164,10 +164,10 @@ accumulated slip: a joint that slides a long way keeps riding up at the stated a
 ### Strength reduction
 
 A strength reduction divides $c_j$ and $\tan\phi_j$ by the trial factor along with the soil's, on
-both the peak and the residual branch, on every jointed line unless that line sets `Jred = No` —
-which holds a joint at full strength through the reduction, for a construction detail rather than a
-geotechnical surface. The stiffnesses $k_n$ and $k_s$ are structural and are not reduced, exactly as
-the bar's properties are not.
+both the peak and the residual branch, on every jointed line unless that line sets `Jred = No`,
+which holds the joint at full strength through the reduction — for a joint that stands for a
+construction detail rather than for a geological surface. The stiffnesses $k_n$ and $k_s$ are not
+strengths, so they are not reduced, any more than the bar's are.
 
 ## What the Method Can and Cannot Model
 
@@ -178,19 +178,19 @@ partner it started with for the whole solve.
 
 ![What a fixed node pair carries — sliding, opening, rocking and re-closing on the same contact — and what it does not: a contact that migrates, and a new contact between faces that were never paired](images/joint_reach.png){width=950}
 
-So blocks slide on their contacts, open at them, rock about them and re-seat on them, and where a
-mechanism keeps its contacts the answer is rigid-block statics. What the element does not reach
-follows from the same construction: a corner cannot run along a face, so a contact cannot migrate or
-shorten as a block moves; no new contact forms between two faces that were not paired to begin with;
-rotations stay small, the element being written on the undeformed section; there is no excavation
-stage; and the joint law is Coulomb with residual strength and dilation rather than a hyperbolic or
-work-softening one.
+So blocks slide on their contacts, open at them, tip about them and settle back onto them, and
+where the blocks keep the same contacts throughout, the answer is the one rigid-block statics gives.
+What the element cannot do follows from the same construction: a corner cannot travel along a face,
+so a contact cannot move or shorten as a block moves; no new contact forms between two faces that
+were not paired to begin with; rotations have to stay small, because the element is written on the
+undeformed geometry; there is no excavation stage; and the joint obeys Mohr-Coulomb with a residual
+strength and a dilation angle, rather than a hyperbolic or work-softening law.
 
-That reach covers the mechanisms a jointed slope usually turns on — block toppling, flexural
-toppling, plane failure, step-path failure through rock bridges, ploughing slabs, a tessellated
-block mass, a block wall sliding and rocking on its courses, an embankment sliding on its base
-sheet. It does not cover a mass that travels far enough to find contacts the section does not
-already carry, which is what a distinct-element code is for.
+That covers the mechanisms a jointed slope usually fails by — block toppling, flexural toppling,
+plane failure, step-path failure through rock bridges, ploughing slabs, a mass cut into many small
+blocks, a block wall sliding and tipping on its courses, an embankment sliding on its base sheet. It
+does not cover a mass that moves far enough to come to rest against surfaces the section does not
+already carry; that is what a distinct-element code is for.
 
 The element's own law — the peak limit, the residual drop and the opening a dilating joint produces
 per unit of slip — is checked against its closed forms by `test/joint_element_check.py`.

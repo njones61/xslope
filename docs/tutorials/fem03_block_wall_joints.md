@@ -13,7 +13,7 @@ wall as far stronger than it is.
 
 This tutorial shows how to put each of those contacts into the model as a **slip
 joint** — a line the mesh is split along, with an interface element carrying the
-traction between the two faces — and then runs the wall twice: standing on its
+normal and shear stress between the two faces — and then runs the wall twice: standing on its
 own blocks, and with three layers of geogrid tied into the facing.
 
 Then it takes up a second question, which comes up on every model with a
@@ -86,7 +86,7 @@ copy for each piece of material around it, so the material on one side of a join
 is a separate body from the material on the other. The copies are held together
 by an interface element, which carries compression across the joint and
 Coulomb shear along it. When the shear reaches its limit the two faces **slip**
-past each other; when the normal traction goes into tension the joint **opens**
+past each other; when the normal stress goes into tension the joint **opens**
 and carries nothing, until the faces meet again and it closes.
 
 That is what makes a stack of blocks behave like a stack of blocks. Without the

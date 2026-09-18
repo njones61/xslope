@@ -3,9 +3,9 @@
 A **joint** is a surface two bodies meet on and can slide along: a rock joint, a bedding plane, the
 contact between one facing block and the next, the back of a retaining wall against the soil it
 holds, a geosynthetic sheet the fill above it can slide on. XSLOPE models one as a **joint line** —
-a line the finite element mesh is split along, with an interface element carrying the traction
-between the two faces. The faces can then slide on each other, part, and come back together, which
-a single bonded mesh cannot do.
+a line the finite element mesh is split along, with an interface element carrying the normal and
+shear stress between the two faces (mechanics texts call these the tractions). The faces can then
+slide on each other, part, and come back together, which a single bonded mesh cannot do.
 
 ![A rock cut in bedded rock: a bedding set dipping out of the face and daylighting in it, a steeper cross-joint set and two release joints, which between them cut the mass into blocks, with a talus of shed blocks at the toe](images/joints_rock_slope.png){width=900}
 
@@ -80,15 +80,16 @@ compression positive).
 
 ![The interface element between two elements of the mesh: its three node pairs, the normal and shear stiffness carried at one pair, and the relative movement of its two faces resolved into sliding and closing](images/joint_element.png){width=920}
 
-While the joint is intact its tractions are elastic,
+While the joint is intact the normal and shear stress on it, $t_n$ and $t_s$, grow with that
+movement:
 
 $$t_n = k_n \Delta_n, \qquad t_s = k_s \Delta_t,$$
 
 and they are integrated at the element's own **nodes** (Newton-Cotes, or Lobatto) rather than at
 Gauss points: $L/6$, $L/6$, $2L/3$ on the three-pair element, $L/2$, $L/2$ on the two-pair one.
-Nodal integration keeps the node pairs uncoupled, which is what keeps the traction along a stiff
+Nodal integration keeps the node pairs uncoupled, which is what keeps the stress along a stiff
 interface free of the oscillation Gauss quadrature produces there (Schellekens & de Borst, 1993).
-The traction spread along an element, measured on a direct shear test, *falls* from 15% to 1.8%
+The spread of stress along an element, measured on a direct shear test, *falls* from 15% to 1.8%
 when $k_n$ is multiplied by a hundred.
 
 ### Stiffness
@@ -100,23 +101,23 @@ $d_v = 0.1\,L_{1D}$, with $E_{adj}$ and $G_{adj}$ those of the **softer** of the
 element stands between — which differ where a line crosses a material boundary.
 
 The factor of safety is insensitive to the pair: it moves by about 1.5% over two orders of
-magnitude. The **cost** is not. The slip a viscoplastic sweep puts into a joint is the excess
-traction divided by $k_s$, so a model that states stiffnesses an order of magnitude above the
+magnitude. The **cost** is not. The slip a viscoplastic sweep puts into a joint is the shear above
+the limit divided by $k_s$, so a model that states stiffnesses an order of magnitude above the
 derived default needs its iteration budget raised by the same factor.
 
 ### Strength
 
-The shear traction is limited by Mohr-Coulomb,
+The shear stress on the joint is limited by Mohr-Coulomb,
 
 $$|t_s| \le c_j + t_n \tan\phi_j ,$$
 
-and the normal traction by a **tension cutoff** `t_cut`. Past the shear limit the joint **slips**:
-the traction stays at the limit while the tangential offset grows, which is perfectly plastic slip.
-Past the tension cutoff it **opens**: both tractions and both stiffnesses go to zero, and it carries
-nothing until the two faces come back into contact, when it closes again and carries traction as
-before.
+and the normal stress by a **tension cutoff** `t_cut`. Past the shear limit the joint **slips**:
+the shear stress stays at the limit while the tangential offset grows, which is perfectly plastic
+slip. Past the tension cutoff it **opens**: both stresses and both stiffnesses go to zero, and it
+carries nothing until the two faces come back into contact, when it closes again and carries stress
+as before.
 
-![The joint's strength envelope: the Coulomb limit on the shear traction in either direction, the cohesion intercept, the tension cutoff at which the joint opens, and the residual envelope it drops to once it has slipped](images/joint_envelope.png){width=800}
+![The joint's strength envelope: the Coulomb limit on the shear stress in either direction, the cohesion intercept, the tension cutoff at which the joint opens, and the residual envelope it drops to once it has slipped](images/joint_envelope.png){width=800}
 
 A joints-sheet line states `c`, `phi` and `t_cut` in columns of its own. A jointed reinforcement
 line takes its `Adhesion` and `Delta` as $c_j$ and $\phi_j$, and its tension cutoff is zero: a
@@ -131,7 +132,7 @@ $c + t_n \tan\phi$ to $c_{res} + t_n \tan\phi_{res}$ on the sweep after the one 
 pair at its limit — and **permanent**: the pair stays on the residual branch for the rest of the
 run, even where it later closes or unloads.
 
-![Shear traction against slip: elastic at k_s to the peak limit, then an immediate and permanent drop to the residual limit](images/joint_residual.png){width=820}
+![Shear stress against slip: elastic at k_s to the peak limit, then an immediate and permanent drop to the residual limit](images/joint_residual.png){width=820}
 
 Blank residuals mean no residual branch, and the peak carries throughout. Neither residual may
 exceed its peak.
@@ -140,17 +141,17 @@ exceed its peak.
 
 A rough joint rides up on its asperities as it slides. `dil` is that angle: a slip increment
 $|\Delta_t|$ opens the joint by $|\Delta_t| \tan(\text{dil})$, accumulated as a plastic normal
-offset $u_{open}$, so the elastic part of the normal closing — and with it the normal traction
+offset $u_{open}$, so the elastic part of the normal closing — and with it the normal stress
 
 $$t_n = k_n (\Delta_n + u_{open})$$
 
 — grows while the joint slides.
 
-![Dilation: the block rides up the asperities as it slides, opening the joint; held closed it builds normal traction, free to lift it rises instead](images/joint_dilation.png){width=950}
+![Dilation: the block rides up the asperities as it slides, opening the joint; held closed it builds normal stress, free to lift it rises instead](images/joint_dilation.png){width=950}
 
 Where the material around the joint holds it closed, that is **dilatant hardening**: sliding builds
 normal stress and with it shear strength. Where the sliding block is free to lift, it lifts instead,
-and the normal traction stays at whatever equilibrium with the block's weight requires. The dilation
+and the normal stress stays at whatever equilibrium with the block's weight requires. The dilation
 is **non-directional** — the joint opens whichever way it slides — and it does not decay with
 accumulated slip: a joint that slides a long way keeps riding up at the stated angle. Blank is zero.
 
@@ -165,7 +166,7 @@ strengths, so they are not reduced, any more than the bar's are.
 ## What the Method Can and Cannot Model
 
 The element is a small-strain interface between **fixed node pairs**. A pair carries compression
-across the joint and Coulomb shear along it, opens when the normal traction goes into tension, slips
+across the joint and Coulomb shear along it, opens when the normal stress goes into tension, slips
 when the shear reaches its limit, and re-closes when the two faces meet again — and it keeps the
 partner it started with for the whole solve.
 
@@ -240,11 +241,13 @@ six-course block wall with three geogrid layers needs about 36,000 sweeps per tr
 default one trial of its bracket is read as standing where more sweeps show it still moving, so the
 factor of safety comes out too high.
 
-The slip a sweep puts into a joint is the excess traction divided by $k_s$, and
+The slip a sweep puts into a joint is the shear above the limit divided by $k_s$, and
 `joint_slip_stiffness_factor` scales the stiffness used in that division on the pairs that are at
-their limit — the traction limit, the assembled elastic stiffness and a pair that re-sticks are all
+their limit — the shear-strength limit, the assembled elastic stiffness and a pair that re-sticks are
+all
 untouched. It is **off by default**, and the reason is a stability limit rather than a preference:
-one sweep already returns the traction exactly to its limit at the current displacement field, so
+one sweep already returns the shear stress exactly to its limit at the current displacement field,
+so
 the iteration sits at its boundary and a factor $f$ is a relaxation of $1/f$. Values near 1 are
 stable and buy nothing, and a factor of 0.01 diverges outright. Reach for the budget instead.
 
@@ -292,8 +295,8 @@ movement taken up at the joints, where a slipped or opened joint shows as two li
 lie on each other. An arrow field samples that at nodes and misses exactly the thing that happened.
 
 **1D Details…** lists every jointed line under a *Joints* heading and draws four panels along the
-line: the bar's tension over its capacity where the line carries one, the normal traction the
-interface carries, the shear traction with the Mohr-Coulomb limit $c_j + t_n \tan\phi_j$ drawn
+line: the bar's tension over its capacity where the line carries one, the normal stress the
+interface carries, the shear stress with the Mohr-Coulomb limit $c_j + t_n \tan\phi_j$ drawn
 beside it, and the slip. Where the two shear curves meet is where the interface is at its limit. A
 generated report carries the same reading as a table: the share of each line's length standing at
 its limit, and the largest offset the two faces reached.

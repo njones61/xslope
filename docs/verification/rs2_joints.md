@@ -5,7 +5,8 @@ The [RS2 Joint Verification Manual](https://www.rocscience.com/help/rs2/verifica
 Alejano's sliding and plowing slabs (spelled "ploughing" in the papers and the manual), step-path failure, a Voronoi-tessellated mass, a jointed
 tunnel, and two shear-box problems that exercise the joint's own constitutive law rather than a
 slope. Every one of them is a mesh split along discontinuities with interface elements carrying the
-traction between the faces, which is what XSLOPE's [joint lines](../fem/joints.md) are; how they are
+normal and shear stress between the faces, which is what XSLOPE's [joint lines](../fem/joints.md)
+are; how they are
 modeled, and the reach of the element that carries them, is documented there. The rows below verify
 XSLOPE's FEM/**SSRM** solver on that corpus.
 
@@ -158,11 +159,11 @@ the four is within a rounding of the value the manual prints for it.
 **The excess over the closed form is one assumption, and it is where the thrust between two columns
 acts.** Goodman & Bray hand each column-to-column thrust to the top corner of its contact. A contact
 cannot do that: the two columns lean together, the face parts from the block's base upward and stays
-closed only over its upper quarter to half, and the traction there is distributed, so the resultant
+closed only over its upper quarter to half, and the stress there is distributed, so the resultant
 stands a tenth to a sixth of the face below the corner. Given those heights read off the solved
 state, and nothing else changed, the same recursion returns **1.0279**, the bottom of this row's
 own bracket. The closed form's other three assumptions the solution obeys exactly: every block
-balances in force and in moment on the interface tractions alone, every closed side pair is at its friction
+balances in force and in moment on the interface stresses alone, every closed side pair is at its friction
 limit, and the base reaction of every toppling block sits on its downslope corner.
 
 **The mesh moves this row by one step of the search, and no further.** At the block width of 10 m —

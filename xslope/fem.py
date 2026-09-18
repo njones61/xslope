@@ -10931,7 +10931,7 @@ def _dr_step_margin(m, rowsum, dt=_DR_DT):
     return float(np.min(b)) if b.size else float('inf')
 
 
-def _dr_advance_joints(joints):
+def _dr_advance_joints(joints, u):
     """Advance the interface's internal variables one step, as the sweep does.
 
     Four variables move, and each moves by exactly the increment
@@ -10939,9 +10939,19 @@ def _dr_advance_joints(joints):
     tangential offset grows by ``(|t_s,trial| - t_lim) sign / k_s`` on a slipping
     pair, the dilational opening by ``|d slip| tan(dil)``, a pair that has reached
     its limit is marked so it keeps the residual branch, and the opening record
-    becomes what the state just read. The state itself was computed by
-    :func:`joint_internal_force` in this step's internal-force pass, so nothing is
-    evaluated twice and no second copy of the law exists.
+    becomes what the state just read.
+
+    **The state read here is the sweep's, not the force pass's.**
+    :func:`joint_internal_force` takes the law to a fixed point in the dilation
+    and the residual branch before it writes a traction — which is right for the
+    FORCE, because the traction must be the fully returned one — and the ``t_lim``
+    that comes back has already risen by the dilation the step is about to put in.
+    Measuring the increment against that raised limit understates it, and the
+    understatement is measurable: the interface element check's dilation row reads
+    0.3062 of opening per unit slip against ``tan(dil)`` = 0.3640, -15.9 %, where
+    the sweep reads it inside 5 %. So the advance is taken from
+    :func:`joint_state` at the internal variables the step STARTED from, which is
+    the state ``joint_vp_sweep`` reads, and the two engines grow the same joint.
 
     Returns the number of pairs slipping or open, for the trace.
     """
@@ -10949,10 +10959,11 @@ def _dr_advance_joints(joints):
     for jg in (joints or ()):
         if jg.get('kind') != 'joint':
             continue
-        st = jg.get('_state')
-        if st is None:
-            continue
         jd = jg['jd']
+        st = joint_state(jd, u, jg['cj_r'], jg['tanphi_r'],
+                         slip_p=jg.get('slip_p'), open_prev=jg.get('open_prev'),
+                         slipped=jg.get('slipped'), res_r=jg.get('res_r'),
+                         dil_p=jg.get('dil_p'))
         np.copyto(jg['open_prev'], st['open'])
         ks = jd['ks'][:, None]
         excess = np.abs(st['ts_trial']) - st['tlim']
@@ -11565,7 +11576,7 @@ def _solve_fem_dynamic(fem_data, F, prep, *, c_reduced, phi_reduced,
         for grp in groups:
             grp['_u'] = u
         _nr_commit_plastic_strain(groups)
-        n_active = _dr_advance_joints(joints)
+        n_active = _dr_advance_joints(joints, u)
 
         # ---- damping, and the step ------------------------------------------
         if damping == 'local':

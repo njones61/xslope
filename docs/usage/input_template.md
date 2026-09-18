@@ -990,10 +990,11 @@ which is the usual choice.<br>
 
 Joint lines may **meet** — at a T, at a crossing, at a corner, end to end — and where they do the split copies the
 shared node once per wedge of material around it, so each element keeps the material on its own side of every line
-through the point. That is what turns a facing column with a joint on its back face, a joint under its base and a
-course joint at every mortar line into a stack that can slide and rock rather than a notched solid. What two joint
-lines may not do is lie **on** one another over a stretch, or run along the outside of the section, where there is
-material on one side only and nothing for the other face of the joint to be; preflight refuses both by name.
+through the point. That is what lets a facing column with a joint on its back face, a joint under its base and a
+joint between every course of blocks slide and tip the way a stack of blocks does, instead of behaving as one solid.
+What two joint lines may not do is lie **on** one another along part of their length, or run along the outer
+boundary of the section, where there is material on one side only and nothing for the other face of the joint to be;
+preflight refuses both by name.
 
 The interface element, its constitutive law, the derived stiffnesses and what the results show are the same as for a
 jointed reinforcement line: see

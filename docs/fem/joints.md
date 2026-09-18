@@ -151,8 +151,9 @@ exceed its peak.
 
 ### Dilation
 
-A rough joint rides up over the bumps on its surface as it slides. `dil` is that angle: every unit of slip
-opens the joint by tan(dil) units, and that opening is permanent. Where the joint is held shut, the
+A rough joint rides up over the bumps on its surface as it slides. `dil` is that angle. As the joint slips it also
+opens, in proportion to the slip: an opening of $\Delta_n = \Delta_t \tan(\text{dil})$ for a slip
+of $\Delta_t$, and that opening is permanent. Where the joint is held shut, the
 opening it cannot make is taken up as extra compression across it, so the normal stress on the
 joint grows while it slides.
 

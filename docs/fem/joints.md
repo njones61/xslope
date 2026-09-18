@@ -111,8 +111,8 @@ line to the other, and so can the derived stiffness.
 How much the factor of safety depends on them depends on the mechanism. For a block sliding on a
 plane it changes by about 1.5% over a hundredfold range of stiffness. For a stack of columns that
 lean on one another, the joints' give is part of how the load passes from column to column, and
-the factor moved by about 4% over the same range on the toppling problem of the
-[joint corpus](../verification/rs2_joints.md#rj-2). What they always change is run time. A joint ten times stiffer takes about ten times as many iterations to
+the factor moved by about 4% over the same range on a toppling problem of the RS2 joint
+verification set. What they always change is run time. A joint ten times stiffer takes about ten times as many iterations to
 settle, so a model that states stiffnesses well above the defaults needs its iteration budget
 raised to match.
 

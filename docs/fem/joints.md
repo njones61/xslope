@@ -94,9 +94,16 @@ stress along a stiff interface free of the oscillation Gauss quadrature produces
 A joint has two stiffnesses: one across it, how hard the two faces press together before they
 compress, and one along it, how hard they resist sliding before the joint slips. They are not soil
 properties. They exist so that an unbroken joint behaves like solid rock, and they need to be just
-large enough for that and no larger. Enter them on the joints sheet as `kn` and `ks`; left blank,
-they are set from the stiffness of the softer of the two materials the joint runs between (which
-can differ from one end of a line to the other where it crosses a material boundary).
+large enough for that and no larger. Enter them on the joints sheet as `kn` and `ks`. Left blank,
+they are derived from the softer of the two materials the joint runs between: the normal stiffness
+is that material's Young's modulus divided by a notional joint thickness, the shear stiffness its
+shear modulus divided by the same thickness, and the thickness is one tenth of the joint element's
+length,
+
+$$k_n = \frac{E}{d_v}, \qquad k_s = \frac{G}{d_v}, \qquad d_v = 0.1\,L_{elem}.$$
+
+Where a joint line crosses a material boundary, the softer material can differ from one end of the
+line to the other, and so can the derived stiffness.
 
 The factor of safety hardly depends on them: over a hundredfold range it changes by about 1.5%.
 What they change is run time. A joint ten times stiffer takes about ten times as many iterations to

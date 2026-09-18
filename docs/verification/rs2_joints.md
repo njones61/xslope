@@ -2,7 +2,7 @@
 
 The [RS2 Joint Verification Manual](https://www.rocscience.com/help/rs2/verification-theory/verification-manuals)
 (Rocscience) publishes 23 problems on jointed rock: block and flexural toppling, plane failure,
-Alejano's sliding and ploughing slabs, step-path failure, a Voronoi-tessellated mass, a jointed
+Alejano's sliding and plowing slabs (spelled "ploughing" in the papers and the manual), step-path failure, a Voronoi-tessellated mass, a jointed
 tunnel, and two shear-box problems that exercise the joint's own constitutive law rather than a
 slope. Every one of them is a mesh split along discontinuities with interface elements carrying the
 traction between the faces, which is what XSLOPE's [joint lines](../fem/joints.md) are; how they are
@@ -26,11 +26,11 @@ shared [References](references.md) page.
 - **The referee.** Where a closed-form rigid-block limit equilibrium exists for a problem, that is
   what scores it, recomputed from the inputs the model carries rather than quoted from the source:
   Goodman & Bray's iterative column analysis on problem 1's four cases and on problem 2, Alejano's
-  ploughing equation on problems 11 to 14, and Alejano's footwall equations on problem 15. Where no
+  plowing equation on problems 11 to 14, and Alejano's footwall equations on problem 15. Where no
   closed form exists the referee is the one the manual names, which is UDEC in every such case. Each row records both the recomputed
   value and the one its source prints.
 - **The rigid-block bound.** A limit-equilibrium formula prices one mechanism and may be
-  conservative, but it cannot exceed what rigid-block statics admits: the two blocks each ploughing
+  conservative, but it cannot exceed what rigid-block statics admits: the two blocks each plowing
   problem cuts out have a highest factor at which they admit any set of contact forces lying inside
   their friction cones. The referee for problems 11 to 14 is therefore Alejano's Eq. (7) where it
   sits on or under that bound, which is problems 12, 13 and 14, and the bound itself on problem 11,
@@ -102,10 +102,10 @@ joint model whose output is a stress-displacement curve.
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | 0.75 vs 0.76 (−1.3%) | — | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.037 vs UDEC 1.03 (+0.7%) | 1.01 vs 1.03 (−1.9%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
 | [10](#rj-10) | 🟢 | Bilinear slab failure, example 1b | SSRM 1.037 vs UDEC 1.03 (+0.7%) | 0.92 vs 1.03 (−10.7%) | LE (Alejano) 0.43–1.45 | 0.92 / 1.08 | |
-| [11](#rj-11) | 🟢 | Ploughing sliding slab failure | SSRM 1.213 vs rigid-block bound 1.2148 (−0.1%) | 1.22 vs 1.2148 (+0.4%) | UDEC 1.21 (+0.2%) · Alejano Eq. (7) 1.7582 | 1.22 / 1.3 | Alejano's Eq. (7) returns a factor above the bound on this problem, so the bound is what scores it; all three programs sit on the bound. |
-| [12](#rj-12) | 🟡 | Ploughing toppling slab failure | SSRM 2.033 vs Alejano Eq. (7) 1.9659 (+3.4%) | 1.39 vs 1.9659 (−29.3%) | UDEC 1.78 (+14.2%) · Alejano prints 2.00 | 1.39 / 1.75 | |
-| [13](#rj-13) | 🟢 | Ploughing sliding slab, example 4 | SSRM 0.998 vs Alejano Eq. (7) 1.0002 (−0.2%) | 1.0 vs 1.0002 (0.0%) | UDEC 1.0 (−0.2%) · Alejano prints 1.0 | 1.0 / 1.05 | |
-| [14](#rj-14) | 🟢 | Ploughing sliding slab, example 5 | SSRM 1.232 vs Alejano Eq. (7) 1.2034 (+2.4%) | 0.89 vs 1.2034 (−26.0%) | UDEC 0.9 (+36.9%) · Alejano prints 1.00 | 0.89 / 1.09 | The 1.00 the paper prints for this example does not follow from the inputs it prints; Eq. (7) on them gives 1.2034. |
+| [11](#rj-11) | 🟢 | Plowing sliding slab failure | SSRM 1.213 vs rigid-block bound 1.2148 (−0.1%) | 1.22 vs 1.2148 (+0.4%) | UDEC 1.21 (+0.2%) · Alejano Eq. (7) 1.7582 | 1.22 / 1.3 | Alejano's Eq. (7) returns a factor above the bound on this problem, so the bound is what scores it; all three programs sit on the bound. |
+| [12](#rj-12) | 🟡 | Plowing toppling slab failure | SSRM 2.033 vs Alejano Eq. (7) 1.9659 (+3.4%) | 1.39 vs 1.9659 (−29.3%) | UDEC 1.78 (+14.2%) · Alejano prints 2.00 | 1.39 / 1.75 | |
+| [13](#rj-13) | 🟢 | Plowing sliding slab, example 4 | SSRM 0.998 vs Alejano Eq. (7) 1.0002 (−0.2%) | 1.0 vs 1.0002 (0.0%) | UDEC 1.0 (−0.2%) · Alejano prints 1.0 | 1.0 / 1.05 | |
+| [14](#rj-14) | 🟢 | Plowing sliding slab, example 5 | SSRM 1.232 vs Alejano Eq. (7) 1.2034 (+2.4%) | 0.89 vs 1.2034 (−26.0%) | UDEC 0.9 (+36.9%) · Alejano prints 1.00 | 0.89 / 1.09 | The 1.00 the paper prints for this example does not follow from the inputs it prints; Eq. (7) on them gives 1.2034. |
 | [15](#rj-15) | 🔴 | Partially joint-controlled footwall | SSRM 1.271 vs Alejano Eqs. (9)–(10) 1.7985 (−29.3%) | 1.28 vs 1.7985 (−28.8%) | UDEC 1.6 (−20.6%) · Alejano prints 1.72 · Slide2 (vendor) 1.25 | 1.28 / 1.42 | The closed form drives a wedge out through a single 2 m bed and its factor rises with bed thickness; the three programs free to search for a surface agree at 1.25–1.28. |
 | [16](#rj-16) | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | UDEC 11° | 9° vs 11° (−18.2%) | Experiment 9° | 9° / 7° | *reported, no lock* — the problem scores a tilt angle rather than a factor of safety. Swept as a seismic coefficient at full strength, the stack stands at 8.40° and topples at 8.55°. |
 | [17](#rj-17) | 🟡 | Step-path, en-echelon joints | SSRM 1.213 vs UDEC 1.29 (−6.0%) | 1.24 vs 1.29 (−3.9%) | — | 1.24 / 1.2 | No closed form: three rock bridges decide the factor, and both finite element codes read them below the distinct-element run, 2.1 points apart. |
@@ -556,11 +556,11 @@ other problem here. The paper's own limit equilibrium is again a range rather th
 
 ![RJ-10: Alejano et al. bilinear slab failure, example 1b (rj010) — FEM inputs, mesh, joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and, as in example 1a, almost none of it slips: the release trace high on the face carries the brightest slip, one bedding plane below the toe carries the rest, and the deformed section shows the block between them moving out over the bench](images/RJ-10.png)
 
-### 🟢 RJ-11: Alejano et al. ploughing sliding slab failure (rj011) {#rj-11}
+### 🟢 RJ-11: Alejano et al. plowing sliding slab failure (rj011) {#rj-11}
 
 A 25 m slope at 50° with bedding dipping out of the face at −50° at 1.5 m spacing, φ = 30°, and two
 release traces at φ = 20°: one at the toe running below the bench and one from the face down onto
-the bedding plane that releases the toe block. Ploughing failure is the paper's name for sliding on
+the bedding plane that releases the toe block. Plowing failure is the paper's name for sliding on
 a primary discontinuity combining with sliding on a joint sub-parallel to the face, which lifts the
 toe block and eventually rotates it out of the slope. The rock is the family's elastic rigid-block
 stand-in at E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3. The lower tip of a release trace is stated to six
@@ -593,13 +593,13 @@ both directions.
 
 **Input file:** [rj011.xlsx](files/rocscience/joints/rj011.xlsx).
 
-![RJ-11: Alejano et al. ploughing sliding slab failure (rj011) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. One bedding plane from the crest to the toe carries almost all of the slip, and at its foot the two release traces cut out a small wedge: the deformed section shows that wedge lifted and rotated out over the bench while the slab above it slides down the plane, which is the ploughing mechanism the paper names. The wedge is driven out and up by the slab above it, and at the panel's exaggeration a movement of centimetres draws as metres, so the block appears to leave the slope](images/RJ-11.png)
+![RJ-11: Alejano et al. plowing sliding slab failure (rj011) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. One bedding plane from the crest to the toe carries almost all of the slip, and at its foot the two release traces cut out a small wedge: the deformed section shows that wedge lifted and rotated out over the bench while the slab above it slides down the plane, which is the plowing mechanism the paper names. The wedge is driven out and up by the slab above it, and at the panel's exaggeration a movement of centimetres draws as metres, so the block appears to leave the slope](images/RJ-11.png)
 
-### 🟡 RJ-12: Alejano et al. ploughing toppling slab failure (rj012) {#rj-12}
+### 🟡 RJ-12: Alejano et al. plowing toppling slab failure (rj012) {#rj-12}
 
 A 25 m slope at 60° cut by bedding dipping out of the face at −60° at 1.5 m spacing, φ = 30°, with
 two short release traces at φ = 40°: one at the toe running below the bench, and one from the face
-down onto the bedding plane that releases the toe block. Ploughing failure is the paper's name for
+down onto the bedding plane that releases the toe block. Plowing failure is the paper's name for
 sliding on a primary discontinuity combining with sliding on a joint sub-parallel to the face, which
 lifts the toe block and rotates it out; at 60° the rotation rather than the sliding governs, which
 is what separates this row from problem 11. The rock is elastic at E = 2 × 10⁸ MPa, γ = 25 kN/m³,
@@ -635,9 +635,9 @@ sliding — every source agrees on.
 
 **Input file:** [rj012.xlsx](files/rocscience/joints/rj012.xlsx).
 
-![RJ-12: Alejano et al. ploughing toppling slab failure (rj012) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section, and only a few of its traces carry any slip: one release trace under the crest and the bedding beneath the toe block, which is the ploughing pair. The two right-hand panels are the last standing trial of the bracket, the state below the factor rather than past it — on a rock this stiff the model moves by microns until it does not, so the deformed section is drawn at tens of thousands of times scale. The capture past the factor is not drawn: it was stopped in its first sweep, before the section had moved at all](images/RJ-12.png)
+![RJ-12: Alejano et al. plowing toppling slab failure (rj012) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section, and only a few of its traces carry any slip: one release trace under the crest and the bedding beneath the toe block, which is the plowing pair. The two right-hand panels are the last standing trial of the bracket, the state below the factor rather than past it — on a rock this stiff the model moves by microns until it does not, so the deformed section is drawn at tens of thousands of times scale. The capture past the factor is not drawn: it was stopped in its first sweep, before the section had moved at all](images/RJ-12.png)
 
-### 🟢 RJ-13: Alejano et al. ploughing sliding slab, example 4 (rj013) {#rj-13}
+### 🟢 RJ-13: Alejano et al. plowing sliding slab, example 4 (rj013) {#rj-13}
 
 A 25 m slope at 55° cut by bedding dipping out of the face at −55° at 1.5 m spacing, φ = 25°, with
 two release traces at φ = 20°: one at the toe running below the bench and one from the face down
@@ -670,9 +670,9 @@ clamps in both directions.
 
 **Input file:** [rj013.xlsx](files/rocscience/joints/rj013.xlsx).
 
-![RJ-13: Alejano et al. ploughing sliding slab, example 4 (rj013) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it carries slip: one bedding plane from the crest down to the toe does, and the two release traces at its foot cut out the toe block, which the deformed section shows lifted and pushed out over the bench while the slab above it slides down the plane](images/RJ-13.png)
+![RJ-13: Alejano et al. plowing sliding slab, example 4 (rj013) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it carries slip: one bedding plane from the crest down to the toe does, and the two release traces at its foot cut out the toe block, which the deformed section shows lifted and pushed out over the bench while the slab above it slides down the plane](images/RJ-13.png)
 
-### 🟢 RJ-14: Alejano et al. ploughing sliding slab, example 5 (rj014) {#rj-14}
+### 🟢 RJ-14: Alejano et al. plowing sliding slab, example 5 (rj014) {#rj-14}
 
 Example 4's section at 60° with the two joint strengths the other way round: bedding dipping out of
 the face at −60° at 1.5 m spacing at φ = 20° — the weakest bedding of the six — and two release
@@ -711,7 +711,7 @@ clamps in both directions.
 
 **Input file:** [rj014.xlsx](files/rocscience/joints/rj014.xlsx).
 
-![RJ-14: Alejano et al. ploughing sliding slab, example 5 (rj014) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it moves: one bedding plane from the crest to the toe carries the slip, with the release trace at the toe opening as the slab above it slides out over the bench](images/RJ-14.png)
+![RJ-14: Alejano et al. plowing sliding slab, example 5 (rj014) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it moves: one bedding plane from the crest to the toe carries the slip, with the release trace at the toe opening as the slab above it slides out over the bench](images/RJ-14.png)
 
 ### 🔴 RJ-15: Partially joint-controlled footwall slope (rj015) {#rj-15}
 

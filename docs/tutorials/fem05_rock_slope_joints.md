@@ -391,7 +391,7 @@ them and settle back onto them, and as long as the blocks keep the same contacts
 throughout, the answer the run gives is the answer rigid-block statics gives —
 which is exactly what part 1 demonstrated to three figures. Plane failure, block
 and flexural toppling, a step-path surface running from one joint to the next, a
-slab ploughing into the block below it, and a mass cut into many small blocks are
+slab plowing into the block below it, and a mass cut into many small blocks are
 all within reach.
 
 What it cannot do follows from the same construction. A corner cannot travel

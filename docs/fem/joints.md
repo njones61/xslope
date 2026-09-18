@@ -25,7 +25,7 @@ A joint belongs where failure **runs along** a surface rather than cutting acros
 
 **Rock.** A jointed rock mass fails on its discontinuities, not through intact rock: block and
 flexural toppling of a columnar face, a plane failure on a bedding plane that daylights, a step-path
-surface running from one joint to the next through short rock bridges, a slab ploughing into the
+surface running from one joint to the next through short rock bridges, a slab plowing into the
 block below it. The rock itself is often modeled as elastic, so every way such a slope can fail is
 a movement on its joints.
 
@@ -187,7 +187,7 @@ undeformed geometry; there is no excavation stage; and the joint obeys Mohr-Coul
 strength and a dilation angle, rather than a hyperbolic or work-softening law.
 
 That covers the mechanisms a jointed slope usually fails by — block toppling, flexural toppling,
-plane failure, step-path failure through rock bridges, ploughing slabs, a mass cut into many small
+plane failure, step-path failure through rock bridges, plowing slabs, a mass cut into many small
 blocks, a block wall sliding and tipping on its courses, an embankment sliding on its base sheet. It
 does not cover a mass that moves far enough to come to rest against surfaces the section does not
 already carry; that is what a distinct-element code is for.

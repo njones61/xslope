@@ -1,7 +1,7 @@
 """Builders for the RS2 JOINT-analysis verification corpus (docs/verification/rs2_joints.md).
 
 Rocscience's *RS2 Joint Verification* manual carries 23 problems on jointed rock:
-block and flexural toppling, plane failure, Alejano's sliding and ploughing slabs,
+block and flexural toppling, plane failure, Alejano's sliding and plowing slabs,
 step-path failure, a Voronoi-tessellated mass, a jointed tunnel, and two problems
 that exercise the joint's own constitutive law rather than a slope. Twenty-one of
 them report a factor of safety (or, for problem 16, a tilt angle); problems 22 and
@@ -693,7 +693,7 @@ def rj008():
 
 
 # ---------------------------------------------------------------------------
-# Problems 9 to 14 — Alejano et al. sliding and ploughing slabs
+# Problems 9 to 14 — Alejano et al. sliding and plowing slabs
 #
 # Each release trace runs from the crest down onto a bedding plane, and the
 # vendor states its lower tip to six decimals, so the tip lands 2e-7 to 2e-6
@@ -812,7 +812,7 @@ def rj010():
 
 
 def rj011():
-    """RJ-11 — ploughing sliding slab failure (vendor `joint #011.fez`).
+    """RJ-11 — plowing sliding slab failure (vendor `joint #011.fez`).
 
     A 25 m slope with bedding at -50 degrees at 1.5 m (phi = 30) and two release
     traces at phi = 20, one of which ends inside the rock at the toe. Referee:
@@ -822,7 +822,7 @@ def rj011():
 
 
 def rj012():
-    """RJ-12 — ploughing toppling slab failure (vendor `joint #012.fez`).
+    """RJ-12 — plowing toppling slab failure (vendor `joint #012.fez`).
 
     Bedding at -60 degrees at 1.5 m (phi = 30) with releases at phi = 40.
     Referee: UDEC 1.78. RS2 reports 1.39 without joint improvement and 1.75 with
@@ -832,7 +832,7 @@ def rj012():
 
 
 def rj013():
-    """RJ-13 — ploughing sliding slab, example 4 (vendor `joint #013.fez`).
+    """RJ-13 — plowing sliding slab, example 4 (vendor `joint #013.fez`).
 
     Bedding at -55 degrees at 1.5 m (phi = 25) with releases at phi = 20.
     Referee: UDEC 1.0. RS2 reports 1.0 without joint improvement and 1.05 with
@@ -842,7 +842,7 @@ def rj013():
 
 
 def rj014():
-    """RJ-14 — ploughing sliding slab, example 5 (vendor `joint #014.fez`).
+    """RJ-14 — plowing sliding slab, example 5 (vendor `joint #014.fez`).
 
     Example 4's section with the release joint moved and the two strengths the
     other way round: bedding at -60 degrees at 1.5 m at phi = 20, releases at

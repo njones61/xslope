@@ -6617,10 +6617,11 @@ JOINTS_HELP = {
     "phi_res": "Residual joint friction angle, degrees (blank = same as phi). "
                "The strength the joint keeps once it has slipped.",
     "dil": "Joint dilation angle, degrees (blank = 0). A rough joint rides up "
-           "on its asperities as it slides: a unit of slip opens it by "
-           "tan(dil).",
+           "over the bumps on its surface as it slides: the opening is the "
+           "slip times tan(dil).",
     "t_cut": "Tension cutoff (blank = 0). The joint opens when the normal "
-             "traction passes it, and closes again when the faces meet.",
+             "stress on it passes into tension beyond this value, and closes "
+             "again when the faces meet.",
     "kn": "Joint normal stiffness (blank = from soil E and size).",
     "ks": "Joint shear stiffness (blank = from soil G and size).",
     "jred": "Reduce joint strength in SSRM (blank = Yes). No keeps a "
@@ -6672,7 +6673,7 @@ class JointsEditor(CategoryEditor):
                       "contact, a wall-soil interface. The finite element mesh "
                       "splits along it and the two faces slide on the "
                       "Mohr-Coulomb strength c and phi, parting where the normal "
-                      "traction passes t_cut. A reinforcement line that is also a "
+                      "stress on the joint passes t_cut in tension. A reinforcement line that is also a "
                       "slip surface belongs on the reinforce sheet with its Joint "
                       "column set instead, so that the sheet between the two "
                       "faces is still there. A joint that is weaker once it has "

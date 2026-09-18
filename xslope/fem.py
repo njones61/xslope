@@ -12410,10 +12410,17 @@ def _ssrm_progress(callback, done, total, label):
             pass
 
 
-def _verdict_note(sol):
+def _verdict_note(sol, hybrid=True):
     """One-line trial outcome for the SSRM log, naming the hybrid verdict when the
     trial did not converge. Reads the same on the default criterion as it always
-    has ("Converged" / "Did NOT converge") with the displacement evidence appended."""
+    has ("Converged" / "Did NOT converge") with the displacement evidence appended.
+
+    ``hybrid`` is the criterion the bisection is running under, and it is what
+    decides the second half of a JOINT_SETTLED or STABLE_STUCK line. Only the
+    hybrid criterion reads a trial's verdict (see ``_stable``); under the
+    non-convergence criterion a trial that settled is still counted as a
+    failure, and the line says which of the two happened rather than claiming a
+    reading the search did not make."""
     if sol.get("converged"):
         return "Converged"
     if sol.get("exit_reason") == 'inconclusive':
@@ -12423,12 +12430,15 @@ def _verdict_note(sol):
     ur_txt = "" if ur is None else f", max|u| = {ur:.2f}x elastic"
     if sol.get("exit_reason") == 'steady_slip':
         return f"FAILED on a steady interface mechanism (joint slip){ur_txt}"
+    # What the bisection did with a verdict the criterion in force may not read.
+    counted = ("counted STABLE" if hybrid else
+               "counted FAILED (this run's criterion reads convergence alone)")
     if v == 'JOINT_SETTLED':
         return ("Did NOT meet the force tolerance, but the joints, the "
-                f"displacements and the soil have all settled -> counted "
-                f"STABLE{ur_txt}")
+                f"displacements and the soil have all settled -> {counted}"
+                f"{ur_txt}")
     if v == 'STABLE_STUCK':
-        return f"Did NOT converge but STABLE_STUCK -> counted STABLE{ur_txt}"
+        return f"Did NOT converge but STABLE_STUCK -> {counted}{ur_txt}"
     if v == 'AMBIGUOUS':
         return f"Did NOT converge (AMBIGUOUS evidence -> failed{ur_txt})"
     return f"Did NOT converge ({v}{ur_txt})"
@@ -13793,7 +13803,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             if _inconclusive(sol_probe):
                 _note_inconclusive(F_probe, sol_probe)
             if debug_level >= 1:
-                print(f"    -> {_verdict_note(sol_probe)} "
+                print(f"    -> {_verdict_note(sol_probe, hybrid)} "
                       f"({sol_probe['iterations']} iters)")
         _ssrm_progress(progress_callback, len(factors) * SUBDIV,
                        len(factors) * SUBDIV, "probe complete")
@@ -13944,12 +13954,12 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                 i_lo = i_mid
                 last_converged_solution = solution
                 if debug_level >= 1:
-                    print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
+                    print(f"    -> {_verdict_note(solution, hybrid)} ({solution['iterations']} iters)")
             else:
                 i_hi = i_mid
                 failed_edge_solution = solution
                 if debug_level >= 1:
-                    print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
+                    print(f"    -> {_verdict_note(solution, hybrid)} ({solution['iterations']} iters)")
             iteration += 1
         F_left, F_right = i_lo * grid, i_hi * grid
     else:
@@ -13983,12 +13993,12 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                 F_left = F_mid
                 last_converged_solution = solution
                 if debug_level >= 1:
-                    print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
+                    print(f"    -> {_verdict_note(solution, hybrid)} ({solution['iterations']} iters)")
             else:
                 F_right = F_mid
                 failed_edge_solution = solution
                 if debug_level >= 1:
-                    print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
+                    print(f"    -> {_verdict_note(solution, hybrid)} ({solution['iterations']} iters)")
 
             iteration += 1
 

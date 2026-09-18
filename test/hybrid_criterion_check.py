@@ -28,6 +28,8 @@ What this file locks:
 Run directly:  PYTHONPATH=. python3 test/hybrid_criterion_check.py
 Exits non-zero on any failure.
 """
+import contextlib
+import io
 import os
 import sys
 
@@ -529,6 +531,57 @@ def check_early_failure_wiring():
           f"{sol_off['max_displacement']:.3g} vs {sol['max_displacement']:.3g}")
 
 
+def check_log_wording():
+    """The trial log says what the bracket did with the trial, not what some
+    other criterion would have done with it.
+
+    A settled or frozen trial is counted as standing only under the hybrid
+    criterion. Under the default one the same trial moves the bracket DOWN, and
+    a log line reading "counted STABLE" beside a bracket that just stepped down
+    tells the reader the opposite of what happened.
+    """
+    print("\n8. the trial log names the criterion's own reading")
+
+    stuck = _stub_solution(1.5, 'stuck')
+    settled = dict(stuck, verdict='JOINT_SETTLED', exit_reason='no_progress')
+
+    for name, sol in (("STABLE_STUCK", stuck), ("JOINT_SETTLED", settled)):
+        yes = fem._verdict_note(sol, hybrid=True)
+        no = fem._verdict_note(sol, hybrid=False)
+        check(f"{name} under hybrid is counted stable",
+              "counted STABLE" in yes, yes)
+        check(f"{name} under the default criterion is counted failed",
+              "counted FAILED" in no and "counted STABLE" not in no, no)
+
+    # The wording is unchanged for every trial whose reading the criterion does
+    # not enter: a converged trial, a real failure, and the steady interface
+    # mechanism, which is a failure under both.
+    for kind, article in (('converged', 'a'), ('failed', 'a'),
+                          ('ambiguous', 'an')):
+        sol = _stub_solution(1.5, kind)
+        check(f"{article} {kind} trial reads the same either way",
+              fem._verdict_note(sol, True) == fem._verdict_note(sol, False),
+              fem._verdict_note(sol, True))
+
+    # And the driver passes its own criterion down, so the printed log agrees
+    # with the bracket it is printed beside.
+    def kinds(F):
+        return 'converged' if F < 1.4 else ('stuck' if F < 1.8 else 'failed')
+
+    for hybrid, want in ((True, "counted STABLE"), (False, "counted FAILED")):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            with _stub_solve_fem(kinds):
+                fem._ssrm_displacement_limit(
+                    {}, F_min=1.0, F_max=2.0, tolerance=0.05,
+                    max_disp_factor=None, debug_level=1, hybrid=hybrid)
+        log = buf.getvalue()
+        got = [ln.strip() for ln in log.splitlines() if "STABLE_STUCK" in ln]
+        check(f"the run log under hybrid={hybrid} says {want!r}",
+              bool(got) and all(want in ln for ln in got),
+              got[0] if got else "no STABLE_STUCK trial was logged")
+
+
 def main():
     print("=" * 72)
     print("Hybrid failure-criterion checks")
@@ -540,6 +593,7 @@ def main():
     check_budget_extension()
     check_early_failure()
     check_early_failure_wiring()
+    check_log_wording()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"FAILED ({len(FAILURES)}): " + ", ".join(FAILURES))

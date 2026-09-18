@@ -36,8 +36,9 @@ another, separate, and tip. The same applies to a gravity or gabion wall, and to
 a structure and the ground it stands on.
 
 **Sheets that are the slip surface.** A base geotextile under an embankment on soft clay, a smooth
-geomembrane or liner, the wrapped face of a reinforced wall: the fill slides *on* the sheet at the
-interface friction. Those are reinforce-sheet lines with `Joint = Yes`; which of the two a sheet
+geomembrane or liner, a wrap-around geotextile wall (no facing blocks: each lift of fill sits on its
+sheet, which is folded back over the face and buried under the next lift): the fill slides *on* the
+sheet at the interface friction. Those are reinforce-sheet lines with `Joint = Yes`; which of the two a sheet
 needs is set out under
 [Bonded bar or joint?](reinforcement.md#bonded-bar-or-joint).
 

@@ -216,20 +216,33 @@ required; every other column is blank for the ordinary case. The columns and the
 documented with the rest of the template under
 [Worksheet: joints](../usage/input_template.md#worksheet-joints).
 
-### Joint regions and generated networks
+### Generating a network of joints
 
-A jointed rock mass is rarely described one line at a time. A polygon whose **Type** is `joints` is
-a [joint region](../usage/input_template.md#joint-regions) — an authoring region that says where a
-generated network exists, optionally narrowed to an elevation band. Networks are generated from
-`xslope.joints`: `parallel_set` for one set at a dip and spacing, `cross_jointed` for two sets
-crossed, and `voronoi` for a tessellated block mass with no preferred orientation.
+A jointed rock mass has hundreds of joints, and nobody enters them one line at a time. Instead you
+describe the pattern and the program writes the lines for you:
+
+- **Parallel set.** One family of joints at a given dip and spacing, such as bedding planes every
+  2 m dipping 35° out of the face.
+- **Cross-jointed.** Two such families crossing, such as bedding plus a steeper joint set, which
+  cuts the rock into blocks.
+- **Voronoi.** A random pattern of blocks of a given size, for a rock mass with no preferred joint
+  direction.
+
+You also say where the pattern applies: the whole section, one material, or a region you draw
+yourself. A drawn region is a polygon on the polygon sheet with its **Type** set to `joints` (see
+[joint regions](../usage/input_template.md#joint-regions) on the template page), and it can be
+limited to a band of elevations. Outside the region no joints are written.
 
 ![The joints editor in Studio, listing the lines of a model](../studio/images/editing_joints_editor.png){width=900}
 
-Studio's [Build network](../studio/editing.md#build-network) dialog is the same three generators
-with the canvas previewing the traces before they are written. The output is ordinary rows on the
-joints worksheet, labeled `set-01`, `set-02` and so on: the lines are the input, and the recipe that
-made them is not stored. A network is changed by removing it and building another.
+In Studio this is the [Build network](../studio/editing.md#build-network) button on the joints
+editor: choose the pattern, enter its numbers, pick the region, and the canvas previews the joints
+before anything is written. In a script the same three patterns are the functions `parallel_set`,
+`cross_jointed` and `voronoi` in `xslope.joints`.
+
+What gets written is ordinary rows on the joints worksheet, labeled `set-01`, `set-02` and so on.
+The lines are the model; the pattern that made them is not remembered. To change a network, remove
+the set and build another.
 
 ![The Build network dialog: the kind of network, its parameters, and the region it is clipped to](../studio/images/editing_joint_network_dialog.png){width=760}
 

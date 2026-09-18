@@ -7,7 +7,7 @@ a line the finite element mesh is split along, with an interface element carryin
 between the two faces. The faces can then slide on each other, part, and come back together, which
 a single bonded mesh cannot do.
 
-![A rock cut in bedded rock: a bedding set dipping out of the face, a steeper cross-joint set and two release joints, cutting the mass into blocks, with blocks shed onto the benches and a talus at the toe](images/joints_rock_slope.png){width=900}
+![A rock cut in bedded rock: a bedding set dipping out of the face and daylighting in it, a steeper cross-joint set and two release joints, which between them cut the mass into blocks, with a talus of shed blocks at the toe](images/joints_rock_slope.png){width=900}
 
 Joint lines come from two places. A line on the **joints** worksheet is a joint and nothing else —
 the rock joint, the bedding plane, the block contact above. A line on the **reinforce** worksheet

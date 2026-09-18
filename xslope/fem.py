@@ -4816,10 +4816,10 @@ _CORRECTOR_RULE_EXITS = ('inconclusive', 'iteration_cap', 'runaway', 'disp_limit
 # The equilibration is a jointed solve at full strength like any other and it creeps
 # like one: on the RS2 joint corpus it costs 250 000 sweeps on RJ-20, 218 417 on
 # RS2-49, 168 021 on RJ-13, 141 861 on RJ-1b and 109 199 on RJ-3, paid once per row
-# per bracket. Twenty of the twenty-six rows settle inside the three fixed rungs, and
-# on the six that do not the corrector is refused at all three and then not asked
-# again until the solve ends — the ladder stops at 3 000 sweeps, and everything past
-# that is the sweep crawling to the fixed point unattended.
+# per bracket. Eighteen of the twenty-six rows settle inside the three fixed rungs,
+# and on the eight that do not the corrector is refused at all three and then not
+# asked again until the solve ends — the ladder stops at 3 000 sweeps, and everything
+# past that is the sweep crawling to the fixed point unattended.
 #
 # The continued rungs cost one Newton attempt each (a second or so, and a refusal
 # costs nothing but that) and are asked of states the loop passes through anyway.

@@ -306,6 +306,8 @@ marked with a short tick across the line rather than given a color, because open
 and not a quantity. A model where no joint slipped carries no colorbar. The weight is deliberate: a
 generated network puts hundreds of traces over the field.
 
+![Joint slip on a toppling stack at its critical factor: each joint colored by how far its faces have slid, gray where it has not slipped, a short tick across it where it has opened](../tutorials/images/fem05_joint_slip_topple.png){width=900}
+
 On a jointed model the displacement panel is the scaled deformed mesh rather than an arrow field,
 drawn as the **blocks** the joints cut the section into — each block under a faint tint of its own,
 its joint faces in the same green, the outside of the deformed mesh as a dark line against the
@@ -314,6 +316,8 @@ element adjacency: the split gives the two sides of a joint their own nodes, so 
 neighbors. That is what a jointed failure looks like — blocks moving as bodies, with all of the
 movement taken up at the joints, where a slipped or opened joint shows as two lines that no longer
 lie on each other. An arrow field samples that at nodes and misses exactly the thing that happened.
+
+![The deformed mesh of the same stack, drawn as blocks: each block moves as one body, the joints between them shown in green, and the dashed outline is the undeformed section](../tutorials/images/fem05_fem_blocks_topple.png){width=900}
 
 **1D Details…** lists every jointed line under a *Joints* heading and draws four panels along the
 line: the bar's tension over its capacity where the line carries one, the normal stress the

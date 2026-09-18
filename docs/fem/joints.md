@@ -108,8 +108,11 @@ $$k_n = \frac{E}{d_v}, \qquad k_s = \frac{G}{d_v}, \qquad d_v = 0.1\,L_{elem}.$$
 Where a joint line crosses a material boundary, the softer material can differ from one end of the
 line to the other, and so can the derived stiffness.
 
-The factor of safety hardly depends on them: over a hundredfold range it changes by about 1.5%.
-What they change is run time. A joint ten times stiffer takes about ten times as many iterations to
+How much the factor of safety depends on them depends on the mechanism. For a block sliding on a
+plane it changes by about 1.5% over a hundredfold range of stiffness. For a stack of columns that
+lean on one another, the joints' give is part of how the load passes from column to column, and
+the factor moved by about 4% over the same range on the toppling problem of the
+[joint corpus](../verification/rs2_joints.md#rj-2). What they always change is run time. A joint ten times stiffer takes about ten times as many iterations to
 settle, so a model that states stiffnesses well above the defaults needs its iteration budget
 raised to match.
 

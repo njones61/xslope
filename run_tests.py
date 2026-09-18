@@ -8971,13 +8971,15 @@ MODULE_CHECKS = {
         "switched off. Every node is given a mass, Newton's second law is "
         "integrated forward by central differences and the motion is damped, so "
         "a slope that can stand comes to rest and one that cannot keeps moving. "
-        "Four legs: an unjointed elastic block settles to the direct elastic "
+        "Five legs: an unjointed elastic block settles to the direct elastic "
         "solution to 1e-6 under all three damping options; Goodman & Bray's "
-        "block stands at k = 0.40 and topples at 0.42 against b/h = 0.400; "
-        "Goodman direct shear comes back at the tolerances the interface element "
-        "check already holds; and with the driver unselected a jointed sweep "
-        "solve is byte-identical to a pristine package built from the branch it "
-        "was written on."),
+        "block stands at k = 0.40 and topples at 0.42 against b/h = 0.400; the "
+        "verdict rule is read by the loop alone, with the Newton corrector "
+        "switched off, on the cases a standing slope has to survive and on the "
+        "one runaway it has to catch; Goodman direct shear comes back at the "
+        "tolerances the interface element check already holds; and with the "
+        "driver unselected a jointed sweep solve is byte-identical to a pristine "
+        "package built from the branch it was written on."),
     'corrector_certified': (
         'corrector_certified_check.py',
         "What makes a bracket edge ANSWERED. A trial that reaches its sweep "

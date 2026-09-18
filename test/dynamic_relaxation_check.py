@@ -22,22 +22,38 @@ Four legs:
      displacement level at all, so a threshold this sharp — 0.15 % of the weight
      separates the two sides of the sliding form — is the guard against damping
      that makes a failing slope look at rest.
-  3. **Goodman direct shear.** ``test/joint_element_check.py``'s row 1 run on the
+  3. **The verdict rule, with the loop left to read it alone.** Every case in
+     this leg runs with the Newton corrector switched OFF, because with it on a
+     standing single block is certified at the first step rung -- 300 steps --
+     before the verdict's own 500-step window has closed even once, and a rule
+     that reads a standing slope as failing is invisible. The elastic block at
+     the shipped start must read standing; the toppling block at ``k = 0.38`` and
+     ``k = 0.40``, both standing by the closed form, must not be read
+     ``diverging``; the sliding block must stand at ``k = 0.55`` and ``k = 0.57``
+     and be read ``diverging`` at ``k = 0.58``.
+  4. **Goodman direct shear.** ``test/joint_element_check.py``'s row 1 run on the
      dynamic driver at the tolerances that check already holds the sweep to: the
      elastic branch, every slipping pair exactly on the Mohr-Coulomb limit, the
      slip load against its closed form, and no traction oscillation at a hundred
      times the normal stiffness.
 
      The two STRENGTH-REDUCTION rows — the block on an inclined plane
-     (``FS = tan phi_j / tan beta``) and the infinite-slope form — are held out
-     of this check for now, and deliberately: measured on the dynamic driver they
-     return 1.3530 against 1.5863 (-14.7 %) and 1.4702 against 1.5837 (-7.2 %),
-     both far outside the 3 % the check holds. That is the failing test reading a
-     standing trial as failing, which biases a bisection low; it is a known open
-     ruling and not a moving target, and the two rows join this check when the
-     rule is settled. Run them meanwhile with
+     (``FS = tan phi_j / tan beta``) and the infinite-slope form — pass on the
+     dynamic driver and are still not here, for cost alone: they return 1.5874
+     against 1.5863 (+0.07 %) and 1.5581 against 1.5837 (-1.62 %), inside the 3 %
+     the check holds, and the two bisections take 656 s and 405 s because a
+     standing trial on the explicit path needs 8,565 to 20,181 steps to satisfy
+     the standing test. Run them with
      ``python3 test/joint_element_check.py --driver dynamic``.
-  4. **Switched off, nothing moved.** With the driver unselected, a jointed
+
+     They read -14.70 % and -7.17 % until round A2, and the cause was not the
+     verdict: re-run on the settled rule they were unmoved to four figures. It
+     was the bisection's budget, which is the sweep's 3,000 iterations scaled
+     with ``k_s``, and on this driver 3,000 steps is less work than a STANDING
+     trial needs — so every trial above 1.3530 ended its budget, reported FAILED,
+     and walked the bracket down. ``joint_element_check._ssrm`` now gives the
+     dynamic driver a flat budget.
+  5. **Switched off, nothing moved.** With the driver unselected, a jointed
      sweep solve is byte-identical to the same solve on a pristine package built
      from ``git show joints-fix:``. The comparison is on the raw bytes of the
      displacement, stress and interface fields, not on a tolerance.
@@ -202,7 +218,94 @@ def _leg_threshold(failures, results):
 
 
 # --------------------------------------------------------------------------
-# Leg 3 — two closed forms, on the element check's own rows
+# Leg 3 — the verdict rule, with the loop left to read it alone
+# --------------------------------------------------------------------------
+
+def _leg_verdict(failures, results):
+    """The cases round A measured the verdict wrong on, corrector OFF.
+
+    The corrector is switched off on every case here and that is the whole point:
+    with it on, every standing single block is certified at the first step rung,
+    300 steps, before the verdict's own 500-step window has closed even once, so
+    a rule that reads a standing slope as failing is invisible. Round A's
+    measurement of that is section 7.1 of its report; these are the cases it
+    named, run against the rule that replaced the one it refuted.
+
+    Four readings, and each is a regression guard on a defect that was measured:
+
+      * the elastic block at the SHIPPED start reads standing. Started at its own
+        elastic answer it never moves, so its peak kinetic energy is round-off and
+        the kinetic floor -- a ratio to that peak -- could never be met: the block
+        spent a 40,000-step budget reading `dr_undecided` with a residual of
+        1e-12;
+      * the toppling block at k = 0.38 and k = 0.40, both standing by the closed
+        form and by the sweep, must not be read `diverging`. The design's rule
+        read them failing at 950 and 1,150 steps;
+      * the sliding block at k = 0.55 and k = 0.57 stands, read by the loop alone
+        rather than by the corrector;
+      * the sliding block at k = 0.58 -- a real runaway, its kinetic energy and
+        its displacement both growing quadratically -- is still read `diverging`,
+        and the step it costs is recorded, because this is the case the sweep
+        never decided at all.
+    """
+    # the elastic block at the shipped start: standing, by the loop alone
+    fd = _elastic_block(1.0)
+    with contextlib.redirect_stdout(io.StringIO()):
+        sol = solve_fem(fd, F=1.0, max_iterations=5000,
+                        max_iterations_ceiling=5000, fast_kernel=False,
+                        fem_solver='dynamic', _corrector=False)
+    if not sol['converged']:
+        failures.append(
+            f"leg 3: the elastic block started at its own elastic answer does "
+            f"not read standing with the corrector off (exit "
+            f"{sol.get('exit_reason')}, {sol.get('dr_steps')} steps, "
+            f"out-of-balance {sol.get('unbalanced_force_ratio'):.1e})")
+    results.append(f"verdict  elastic block, shipped start: "
+                   f"{sol.get('exit_reason')} at {sol.get('dr_steps')} steps")
+
+    # the two standing toppling blocks round A read as failing
+    for k in (0.38, 0.40):
+        fd = _block_on_joint(k, ts=0.2)
+        with contextlib.redirect_stdout(io.StringIO()):
+            sol = solve_fem(fd, F=1.0, max_iterations=5000,
+                            max_iterations_ceiling=5000, tension_srf=False,
+                            k0=None, fast_kernel=False, fem_solver='dynamic',
+                            _corrector=False)
+        if sol.get('exit_reason') == 'diverging':
+            failures.append(
+                f"leg 3: the toppling block at k = {k:.2f} (b/h = 0.400) stands "
+                f"by the closed form and the loop read it `diverging` at "
+                f"{sol.get('dr_steps')} steps with the corrector off")
+        results.append(f"verdict  topple k = {k:.2f}, corrector off: "
+                       f"{sol.get('exit_reason')} at {sol.get('dr_steps')} steps")
+
+    # the sliding threshold, both sides, read by the loop alone
+    for k, want in ((0.55, True), (0.57, True), (0.58, False)):
+        fd = _block_on_joint(k, b=1.5, h=1.0, phi_j=30.0, ts=0.2)
+        with contextlib.redirect_stdout(io.StringIO()):
+            sol = solve_fem(fd, F=1.0, max_iterations=20000,
+                            max_iterations_ceiling=20000, tension_srf=False,
+                            k0=None, fast_kernel=False, fem_solver='dynamic',
+                            _corrector=False)
+        exit_reason = sol.get('exit_reason')
+        stands = bool(sol['converged'])
+        if want and not stands:
+            failures.append(
+                f"leg 3: the sliding block at k = {k:.2f} (tan phi = 0.5774) "
+                f"stands and the loop read it {exit_reason} at "
+                f"{sol.get('dr_steps')} steps with the corrector off")
+        if not want and exit_reason != 'diverging':
+            failures.append(
+                f"leg 3: the sliding block at k = {k:.2f} runs away -- its "
+                f"kinetic energy and its displacement both grow quadratically -- "
+                f"and the loop read it {exit_reason} at {sol.get('dr_steps')} "
+                f"steps rather than `diverging`")
+        results.append(f"verdict  slide  k = {k:.2f}, corrector off: "
+                       f"{exit_reason} at {sol.get('dr_steps')} steps")
+
+
+# --------------------------------------------------------------------------
+# Leg 4 — two closed forms, on the element check's own rows
 # --------------------------------------------------------------------------
 
 def _leg_closed_forms(failures, results):
@@ -218,13 +321,13 @@ def _leg_closed_forms(failures, results):
     finally:
         J.DRIVER = saved
     for f in f1:
-        failures.append("leg 3 (dynamic): " + f)
+        failures.append("leg 4 (dynamic): " + f)
     for r in r1:
         results.append("closed   " + r)
 
 
 # --------------------------------------------------------------------------
-# Leg 4 — switched off, nothing moved
+# Leg 5 — switched off, nothing moved
 # --------------------------------------------------------------------------
 
 _PROBE = r'''
@@ -335,6 +438,7 @@ def run():
         failures.append("resolve_fem_solver does not accept 'dynamic'")
     _leg_static(failures, results)
     _leg_threshold(failures, results)
+    _leg_verdict(failures, results)
     _leg_closed_forms(failures, results)
     _leg_switched_off(failures, results)
     print(f"Dynamic relaxation check ({time.time() - t0:.0f} s):")

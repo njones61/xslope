@@ -679,21 +679,54 @@ def _joints_network_model():
     return d
 
 
+def _rock_slope_model():
+    """A rock cut with a 60-degree face and one rock material, built in memory.
+
+    The network shot's subject is a bedding set over a whole rock slope, and no
+    committed model is one: the sample models are soil slopes, and a set drawn on
+    one reads as hatching rather than as bedding. The section is a polygon and a
+    material, so the preview draws exactly what a rock cut looks like, and the
+    sample files stay untouched.
+    """
+    from shapely.geometry import LineString, Polygon
+    from xslope.fileio import load_slope_data
+
+    d = _quiet(load_slope_data, JOINTS)
+    pts = [(0.0, 0.0), (62.0, 0.0), (62.0, 26.0), (36.0, 26.0), (24.0, 5.0),
+           (0.0, 5.0)]
+    rock = dict(d["materials"][0])
+    rock.update({"name": "rock", "gamma": 26.0, "option": "mc", "c": 400.0,
+                 "phi": 40.0, "E": 5.0e6, "nu": 0.25, "t_cut": 0.0, "u": "none",
+                 "ru": 0.0})
+    d["materials"] = [rock]
+    d["polygons"] = [{"polygon": Polygon(pts), "mat_id": 0, "size": None}]
+    d["domain_polygon"] = Polygon(pts)
+    d["ground_surface"] = LineString([(0.0, 5.0), (24.0, 5.0), (36.0, 26.0),
+                                      (62.0, 26.0)])
+    d["profile_lines"] = []
+    d["max_depth"] = 0.0
+    d["unit_system"] = "si"
+    d["gamma_water"] = 9.81
+    for key in ("joint_lines", "joint_zones", "reinforce_lines",
+                "reinforcement_lines", "pile_lines", "dloads", "dloads2",
+                "dload_dirs", "dload2_dirs", "circles", "non_circ", "line_loads",
+                "piezo_line", "piezo_line2", "refine_zones", "ssr_zones"):
+        d[key] = []
+    return d
+
+
 def capture_joint_network_dialog():
-    """The Build network dialog: a cross-jointed set in a named joint region,
-    with the traces it resolves to previewed beside the parameters."""
+    """The Build network dialog: a bedding set over a rock cut, with the traces it
+    resolves to previewed beside the parameters."""
     from studio.network_dialog import BuildNetworkDialog
 
-    d = _joints_network_model()
+    d = _rock_slope_model()
     dlg = BuildNetworkDialog(d, d.get("joint_lines") or [], None)
     dlg._name.setText("bed")
-    dlg._kind.setCurrentIndex(1)                       # cross-jointed
-    for key, value in (("dip", "25"), ("spacing", "2.5"), ("offset", "0"),
-                       ("dip2", "-65"), ("spacing2", "3"), ("offset2", "0")):
-        dlg._param_edits["cross"][key].setText(value)
-    dlg._region.setCurrentIndex(dlg._region.count() - 1)   # the joint region
-    for key, value in (("c", "0"), ("phi", "34"), ("dil", "5"),
-                       ("t_cut", "0")):
+    dlg._kind.setCurrentIndex(0)                       # parallel set
+    for key, value in (("dip", "-35"), ("spacing", "2.5"), ("offset", "0")):
+        dlg._param_edits["parallel"][key].setText(value)
+    for key, value in (("c", "0"), ("phi", "38"), ("dil", "5"), ("t_cut", "0")):
         dlg._prop_edits[key].setText(value)
     dlg.show()
     _settle()

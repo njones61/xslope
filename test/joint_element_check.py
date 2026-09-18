@@ -83,7 +83,8 @@ if _ROOT not in sys.path:
 import numpy as np
 from shapely.geometry import LineString, Polygon
 
-from xslope.fem import build_fem_data, solve_fem, solve_ssrm
+from xslope.fem import (build_fem_data, resolve_fem_solver, solve_fem,
+                        solve_ssrm)
 from xslope.fileio import (build_reinforce_lines, load_slope_data,
                            reinforce_available_tension)
 from xslope.joint import (_joint_element_stiffness, joint_kinematics,
@@ -271,8 +272,25 @@ def _ssrm(fem_data, F_min=1.0, F_max=2.5, tolerance=0.005, budget=1.0, **kw):
     # a joint is the excess traction divided by k_s, so a ten-times stiffer
     # interface needs ten times the sweeps to travel the same distance, and a
     # fixed budget would read that cost as an answer.
-    kw.setdefault('max_iterations', int(3000 * budget))
-    kw.setdefault('max_iterations_ceiling', int(6000 * budget))
+    #
+    # On the explicit dynamic driver neither number applies. The slip a step puts
+    # into a joint is set by the nodal mass and not by ``k_s``, so the stiffness
+    # scaling is a property of the sweep alone; and 3,000 steps is not a cap on
+    # this driver, it is less than the work a STANDING trial needs. Measured on
+    # this very model (``rA_data/a2/out/incline_probe.json``): at F = 1.40, 1.45,
+    # 1.50, 1.55 and 1.58 -- every one of them below the closed form's 1.5863, so
+    # every one of them standing -- the trial reads `dr_undecided` at a 3,000-step
+    # budget and `converged` at a 60,000-step one, taking 8,565 to 20,181 steps to
+    # satisfy the standing test. A trial that ends its budget reports FAILED, so
+    # at the sweep's budget the bisection walks the bracket down and returns the
+    # budget rather than the slope: 1.3530 against 1.5863. The dynamic path
+    # therefore gets a flat budget sized to the explicit settle.
+    if resolve_fem_solver(kw.get('fem_solver', DRIVER)) == 'dynamic':
+        kw.setdefault('max_iterations', 60000)
+        kw.setdefault('max_iterations_ceiling', 120000)
+    else:
+        kw.setdefault('max_iterations', int(3000 * budget))
+        kw.setdefault('max_iterations_ceiling', int(6000 * budget))
     kw.setdefault('fem_solver', DRIVER)
     with contextlib.redirect_stdout(io.StringIO()):
         return solve_ssrm(fem_data, F_min=F_min, F_max=F_max,
@@ -373,8 +391,29 @@ def _leg_goodman(failures, results):
     # coefficient just under the limit a penalty interface creeps, and how many
     # sweeps that creep is allowed decides a convergence bracket without saying
     # anything about the joint.
+    #
+    # The state read has to be ON the sliding branch, and on the explicit dynamic
+    # driver that is not automatic. At k = 0.90 the slab slides, compresses its
+    # own void columns, and comes to REST against them: the trial converges at
+    # 17,626 steps with 6.92 m of slide, a residual under tolerance and NOT ONE
+    # pair at its limit, so the traction there is 0.4518 sigma and is not a
+    # plateau at all. That is a real equilibrium, and the sweep reads the same
+    # load `diverging` at 861 iterations, which is the sweep's early-failure rule
+    # firing on a state that exists. So the branch is asserted rather than
+    # assumed, and the dynamic driver is read while the interface is still
+    # mobilized: at 2,000 steps 58 of the 66 live pairs are at their limit and
+    # the traction reads 0.5233 sigma (rA_data/a2/out/goodman_probe.json).
     fem_data['k_seismic'] = 0.90
-    sol_hi = _solve(fem_data)
+    _hi_kw = ({'max_iterations': 2000}
+              if resolve_fem_solver(DRIVER) == 'dynamic' else {})
+    sol_hi = _solve(fem_data, **_hi_kw)
+    mobilized = (np.abs(sol_hi['joint_ts']) >= sol_hi['joint_tlim'] - 1e-9)
+    frac = float(np.count_nonzero(mobilized[live])) / max(1, int(live.sum()))
+    if frac < 0.75:
+        failures.append(
+            f"row 1: only {100*frac:.0f}% of the live joint pairs are at their "
+            f"limit in the state the slip load is read from, so it is not on the "
+            f"sliding branch and the mean traction there is not the plateau")
     plateau = float(np.mean(np.abs(sol_hi['joint_ts'][live])))
     k_slip = plateau / sigma
     # The tolerance is the normal traction the interface actually develops:

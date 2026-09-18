@@ -173,9 +173,11 @@ enough for the limit to matter is on a slope that has already failed.
 ### Strength reduction
 
 A strength reduction divides $c_j$ and $\tan\phi_j$ by the trial factor along with the soil's, on
-both the peak and the residual branch, on every jointed line unless that line sets `Jred = No`,
-which holds the joint at full strength through the reduction — for a joint that stands for a
-construction detail rather than for a geological surface. The stiffnesses `kn` and `ks` are not
+both the peak and the residual branch, on every jointed line. A line that sets `Jred = No` is
+left at full strength while everything else is weakened. Use that for a contact whose strength is
+known and not in question, such as a wall's base on a prepared bedding or a liner with a measured
+interface friction; a natural joint whose strength is uncertain is part of the margin the search is
+looking for, and should be reduced with the rock. The stiffnesses `kn` and `ks` are not
 strengths, so they are not reduced, any more than the bar's are.
 
 ## What the Method Can and Cannot Model

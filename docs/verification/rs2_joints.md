@@ -26,8 +26,8 @@ How the manual's problems reach this corpus:
   in MPa with unit weight in MN/m³; these files carry the metric kPa and kN/m³ the rest of the
   corpus uses.
 - **The referee.** Where a closed-form rigid-block limit equilibrium exists for a problem, that is
-  what scores it, recomputed from the inputs the model carries rather than quoted from the source
-  and validated first on the source's own worked examples: Goodman & Bray's iterative column
+  what scores it, recomputed from the inputs the model carries rather than quoted from the source:
+  Goodman & Bray's iterative column
   analysis on problem 1's four cases and on problem 2, Alejano's ploughing equation on problems 11
   to 14, and Alejano's footwall equations on problem 15. Where no closed form exists the referee is
   the one the manual names, which is UDEC in every such case. Each row records both the recomputed
@@ -54,23 +54,32 @@ How the manual's problems reach this corpus:
   element across a column, so those four are cut at a 2D size of 5 m, where three successively finer
   meshes return the same bracket.
 - **The budget.** A joint reaches equilibrium by growing slip, so a jointed model settles over tens
-  of thousands of viscoplastic sweeps where a bonded one settles over hundreds; a trial that runs
-  out of sweeps is recorded undecided, the bracket reads that as not standing, and the factor comes
-  out low. Every row here runs at a budget of 250,000 sweeps and states its own trial record, which
-  `tools/ssrm_trial_audit.py` reports and `test/corrector_certified_check.py` holds to the rule
-  below.
-- **What answers a bracket edge.** {#what-answers-a-bracket-edge}
-  A bracket asks of each trial factor whether the model stands there, and a trial that runs out of
-  sweeps with nothing to say has not answered. Two readings answer one the force tolerance alone
-  does not. In the standing direction, the solver offers the viscoplastic loop's own state to a
-  Newton corrector at its checkpoints, and where the corrector reaches equilibrium from that state
-  inside its force, yield and displacement gates it records the certification on the trial. In the
-  failing direction, an interface still growing its slip at a steady rate while the displacement
-  field goes nowhere is read as failing. A trial with neither reading is decided only inside its
-  budget, and a corrector refusal is not a verdict of any kind: it is the absence of one.
-- `benchmarks/rocscience/build_joint_problems.py` writes the input files, which are named `rjNNN` by
-  the manual's own problem number — `rj018.xlsx` is problem 18 — with a letter suffix where the
-  manual letters its cases. `make_rs2_joint_figures.py` writes the figures.
+  of thousands of viscoplastic sweeps where a bonded one settles over hundreds. Every row here runs
+  at a budget of 250,000 sweeps. A trial that runs out of sweeps without deciding is recorded as
+  undecided; a bracket with an undecided edge is reported rather than locked.
+- **How a trial is decided.** {#what-answers-a-bracket-edge}
+  A trial stands when the solver reaches equilibrium at that factor, either because the sweeps
+  converge on their own or because the Newton corrector, offered the sweep's state at its
+  checkpoints, reaches equilibrium from it within its force, yield and displacement tolerances.
+  A trial fails when the displacement runs away, or when the interface keeps growing its slip at a
+  steady rate while the rest of the field goes nowhere. Each row's trial record names which of
+  these decided each of its edges.
+- The input files are named `rjNNN` by the manual's own problem number, `rj018.xlsx` for problem
+  18, with a letter suffix where the manual letters its cases.
+
+<!--
+For maintainers (kept out of the page text):
+- Every row's trial record is written by the figure producer or tools/lock_edges.py; the audit is
+  tools/ssrm_trial_audit.py and test/corrector_certified_check.py holds the records to the decision
+  rule above. A corrector refusal is not a verdict: a refused trial is decided only by the sweep's
+  own readings inside its budget, never by the refusal itself (r19, r22, r30 in the private reports).
+- benchmarks/rocscience/build_joint_problems.py writes the input files and
+  benchmarks/rocscience/make_rs2_joint_figures.py the figures, sidecars and records; builders are
+  authoritative, corpus workbooks are never patched by hand.
+- The referee values are recomputed by the scripts under the private reports r25 and r27
+  (Goodman & Bray, Alejano Eqs. 7 and 9–10, the rigid-block bound), validated on the sources' own
+  worked examples before use.
+-->
 
 ## Status
 

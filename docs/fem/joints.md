@@ -319,10 +319,12 @@ lie on each other. An arrow field samples that at nodes and misses exactly the t
 
 ![The deformed mesh of the same stack, drawn as blocks: each block moves as one body, the joints between them shown in green, and the dashed outline is the undeformed section](../tutorials/images/fem05_fem_blocks_topple.png){width=900}
 
-**1D Details…** lists every jointed line under a *Joints* heading and draws four panels along the
-line: the bar's tension over its capacity where the line carries one, the normal stress the
-interface carries, the shear stress with the Mohr-Coulomb limit $c_j + t_n \tan\phi_j$ drawn
-beside it, and the slip. Where the two shear curves meet is where the interface is at its limit. A
+**1D Details…** lists every jointed line, from the joints sheet and from the reinforce sheet
+alike, under a *Joints* heading, and draws panels along each line: the normal stress on the
+interface, the shear stress with its Mohr-Coulomb limit drawn beside it, and the slip. A
+reinforcement line that is also a joint gets a fourth panel above those, the bar's tension against
+its capacity; a joints-sheet line has no bar and shows the three. Where the shear stress meets its
+limit is where the interface is slipping. A
 generated report carries the same reading as a table: the share of each line's length standing at
 its limit, and the largest offset the two faces reached.
 

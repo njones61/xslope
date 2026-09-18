@@ -328,7 +328,7 @@ limit is where the interface is slipping. A
 generated report carries the same reading as a table: the share of each line's length standing at
 its limit, and the largest offset the two faces reached.
 
-![1D Details for one geogrid layer of a block wall built as a slip surface: the bar's tension against its capacity, the normal stress on the interface, the shear stress against its Mohr-Coulomb limit, and the slip along the line](../tutorials/images/fem03_1d_details.png){width=900}
+![1D Details for a reinforcement line built as a slip surface, a geogrid layer in a block wall. Because this line carries a bar, it has the four panels: the bar's tension against its capacity, then the normal stress on the interface, the shear stress against its Mohr-Coulomb limit, and the slip along the line. A joints-sheet line has no bar and shows the last three only](../tutorials/images/fem03_1d_details.png){width=900}
 
 ## References
 

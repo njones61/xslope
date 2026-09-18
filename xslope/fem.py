@@ -10860,12 +10860,39 @@ _DR_START = 'elastic'         # 'elastic', 'zero' or 'datum' (see _solve_fem_dyn
 _DR_WINDOW = _OOB_TREND_WINDOW          # 500 steps
 _DR_KE_FLOOR = 1e-6                     # kinetic energy against its own peak
 _DR_SETTLED_GROWTH = _JOINT_SETTLED_GROWTH   # 1e-4 elastic displacements
-_DR_MOVING_GROWTH = _JOINT_MOVING_GROWTH     # 0.05 elastic displacements
-# "Not falling" and "still moving" over the window. The design names 0.9 for both
+# "Not falling" and "still at its own peak" over the window. The design names 0.9
 # and attributes it to `_JOINT_SETTLED_OOB_FLAT`, which is 0.85; the number the
 # design's test is written with is the one implemented, under its own name, so the
 # two readings stay separable.
 _DR_FLAT_RATIO = 0.9
+# How many CONSECUTIVE checks the failing test's three readings must all hold
+# before the trial is called failing.
+#
+# This is the round A2 repair, and it replaces a growth level that did not
+# transfer. Measured on twenty-one legs -- fifteen single-block traces, two of
+# them run to 400,000 steps, and six corpus legs -- every one recorded to its
+# budget with nothing able to end it early, so a rule's whole history is visible
+# rather than the part before it cut itself off:
+#
+#   * a block creeping into a new equilibrium on a penalty interface moves in
+#     stick-slip jerks, so the three deceleration readings are satisfied at a
+#     scattering of checks whether the block stands or topples -- 250 to 3,800 of
+#     them per trial on both sides of every threshold. A delay cannot help: at
+#     2,000, 5,000 and 10,000 steps a warmup leaves ten of the thirteen standing
+#     legs read as failing, because the check that lands on a jerk simply lands
+#     later;
+#   * what separates the two is that a slope coming apart never stops satisfying
+#     them. The longest UNINTERRUPTED run on a standing leg is 5 checks, and the
+#     one genuine runaway in the set reaches 731 consecutive checks and has not
+#     broken when its budget ends;
+#   * the kinetic-peak reading is what makes that gap wide. On the three
+#     deceleration readings alone the longest standing run is 30 checks -- found
+#     only by running a standing block to 400,000 steps -- so a persistence
+#     threshold on those three has no safe value at all.
+#
+# Twenty is four times the worst standing run measured and a thirty-sixth of the
+# runaway's. It costs 950 steps after the first satisfied check.
+_DR_FAIL_PERSIST = 20
 _DR_CHECK_EVERY = 50                    # steps between failing-test evaluations
 _DR_SAMPLE_EVERY = _HYBRID_SAMPLE_EVERY # steps between oob/displacement samples
 
@@ -10980,13 +11007,27 @@ def _dr_advance_joints(joints, u):
 
 
 def _dr_stand_test(r_win, ke_win, u_win, ke_peak, u_elastic_scale,
-                   force_tol, window):
-    """Is the slope standing? All three of the design's section 2.2 readings."""
+                   force_tol, window, travelled=True):
+    """Is the slope standing? All three of the design's section 2.2 readings.
+
+    The kinetic line is asked only once the trial has a peak worth reading, which
+    is what ``travelled`` carries. ``E_k <= eta E_k,peak`` is meaningless when the
+    trial never had a peak: the engine's default start is the model's own elastic
+    answer, so an elastic model never moves at all, its peak kinetic energy is
+    round-off, and round-off over round-off is O(1) forever. Rung (i)'s block at
+    the shipped start reads `dr_undecided` for its whole 40,000-step budget on
+    that line alone, with a residual of 1e-12 and a field that has not moved in
+    the last digit. The caller passes ``travelled`` false while the field has
+    never left its starting value by more than ``_DR_SETTLED_GROWTH`` elastic
+    displacements — the third line's own threshold, so no new number enters, and
+    a trial below it has not moved, which is the thing the kinetic line exists to
+    detect.
+    """
     if len(r_win) < window:
         return False
     if max(r_win) > force_tol:
         return False
-    if ke_peak > 0.0 and max(ke_win) > _DR_KE_FLOOR * ke_peak:
+    if travelled and ke_peak > 0.0 and max(ke_win) > _DR_KE_FLOOR * ke_peak:
         return False
     if u_elastic_scale > 0.0:
         if abs(u_win[-1] - u_win[0]) / u_elastic_scale > _DR_SETTLED_GROWTH:
@@ -10994,31 +11035,48 @@ def _dr_stand_test(r_win, ke_win, u_win, ke_peak, u_elastic_scale,
     return True
 
 
-def _dr_fail_test(r_win, ke_win, u_win, u_elastic_scale, window):
-    """Is the slope failing? All four of the design's section 2.3 readings.
+def _dr_fail_test(r_win, ke_win, u_win, ke_peak, window):
+    """Is the slope failing, at this one check? Three readings, all required.
 
-    There is NO absolute displacement level in this test, and that is deliberate:
-    the shipped early-failure rule fires on max|u| past a multiple of the elastic
-    response, and it has a measured false positive — it closed a jointed trial
-    141,000 sweeps short of a real equilibrium. What separates the two cases is
-    whether the motion is decelerating, which a scheme with velocities can read
-    and a relaxation cannot.
+    1. the kinetic energy's running peak was set inside the window — the slope is
+       still setting new speed records;
+    2. the residual is not falling over the window;
+    3. the second half of the window gained at least as much displacement as the
+       first — the motion is not decelerating.
+
+    There is NO absolute displacement level in this test, and no fraction of the
+    elastic response either. The shipped early-failure rule fires on max|u| past a
+    multiple of the elastic response and has a measured false positive — it closed
+    a jointed trial 141,000 sweeps short of a real equilibrium — and the design's
+    own fourth line, a gain of 0.05 elastic displacements over the window, is the
+    same mistake in a shorter costume: it is calibrated against the interface
+    verdict's window, which is the trailing tenth of a 250,000-sweep trial, and a
+    growth fraction does not transfer between windows of different length. It read
+    a toppling block's 1.2 % per window as standing for 40,000 steps.
+
+    Reading 1 is the one that carries the information, and it is a pure ratio to
+    the trial's own peak: a mechanism coming apart keeps accelerating, so it keeps
+    beating its own kinetic record, while a slope settling into a new equilibrium
+    set its record during the start-up transient and never beats it again. On the
+    A2 test set the three deceleration readings alone are satisfied at about 40 %
+    of the checks whether a creeping block stands or topples, and adding reading 1
+    takes the standing cases to at most five satisfied checks in a row.
+
+    **This is one check.** The verdict needs ``_DR_FAIL_PERSIST`` of them in a
+    row; the caller counts, because what separates a slope coming apart from a
+    slope settling is that the first one never stops satisfying these three.
     """
-    if len(r_win) < window or u_elastic_scale <= 0.0:
+    if len(r_win) < window:
+        return False
+    if not (ke_peak > 0.0 and max(ke_win) >= _DR_FLAT_RATIO * ke_peak):
         return False
     h = window // 2
     r_first = sum(r_win[:h]) / h
     r_second = sum(r_win[h:2 * h]) / h
     if not (r_first > 0.0 and r_second / r_first >= _DR_FLAT_RATIO):
         return False
-    k_first = sum(ke_win[:h]) / h
-    k_second = sum(ke_win[h:2 * h]) / h
-    if not (k_first > 0.0 and k_second / k_first >= _DR_FLAT_RATIO):
-        return False
     u0, um, u1 = u_win[0], u_win[h], u_win[-1]
-    if not ((u1 - um) >= (um - u0)):
-        return False
-    return (u1 - u0) / u_elastic_scale >= _DR_MOVING_GROWTH
+    return (u1 - um) >= (um - u0)
 
 
 def _nr_1d_report(fem_data, bars, piles):
@@ -11271,11 +11329,19 @@ def _solve_fem_dynamic(fem_data, F, prep, *, c_reduced, phi_reduced,
 
     **The verdict.** Standing when the unbalanced-force ratio has held below
     ``force_tol`` for a whole window AND the kinetic energy is below its floor
-    against its own peak AND the field has stopped growing. Failing when the
-    residual is not falling, the kinetic energy is not falling, and the motion is
-    not decelerating, with no absolute displacement level anywhere in the test.
-    Neither, at the budget: ``dr_undecided`` while the residual still falls,
-    ``dr_stalled`` when it does not.
+    against its own peak AND the field has stopped growing. Failing when, at
+    ``_DR_FAIL_PERSIST`` consecutive checks in a row, the kinetic energy is still
+    setting new records against its own peak AND the residual is not falling AND
+    the motion is not decelerating — with no absolute displacement level anywhere
+    in the test, and no fraction of the elastic response either. Neither, at the
+    budget: ``dr_undecided`` while the residual still falls, ``dr_stalled`` when
+    it does not.
+
+    What the persistence is for, and why the design's fourth line was replaced by
+    it, is measured in :data:`_DR_FAIL_PERSIST`: the three readings alone are
+    satisfied at a scattering of checks on a block creeping into a new
+    equilibrium as well as on one coming apart, and what tells the two apart is
+    that the second one never stops satisfying them.
 
     **The corrector composes unchanged.** The state is offered to the same bounded
     Newton attempt the sweep offers its rungs to, at the same three gates, the
@@ -11540,6 +11606,13 @@ def _solve_fem_dynamic(fem_data, F, prep, *, c_reduced, phi_reduced,
     diverging_step = None
     r_full = np.zeros(n_dof)
     max_u = 0.0
+    # How far the field has ever been from where this trial started, in elastic
+    # displacements. It gates the standing test's kinetic line and nothing else:
+    # see `_dr_stand_test`.
+    u_start = None
+    u_reach = 0.0
+    # Consecutive checks at which all three of the failing test's readings held.
+    fail_run = 0
 
     while True:
         if step >= budget:
@@ -11605,6 +11678,9 @@ def _solve_fem_dynamic(fem_data, F, prep, *, c_reduced, phi_reduced,
             exit_reason = 'nonfinite'
             break
         max_u = _nr_umax(u - u_datum, trans_dofs)
+        if u_start is None:
+            u_start = max_u
+        u_reach = max(u_reach, abs(max_u - u_start))
         step += 1
 
         # ---- the readings ----------------------------------------------------
@@ -11635,17 +11711,23 @@ def _solve_fem_dynamic(fem_data, F, prep, *, c_reduced, phi_reduced,
             break
 
         # ---- the verdict -----------------------------------------------------
+        _travelled = (u_elastic_scale > 0.0
+                      and u_reach / u_elastic_scale > _DR_SETTLED_GROWTH)
         if _dr_stand_test(r_win, ke_win, u_win, ke_peak, u_elastic_scale,
-                          force_tol, _DR_WINDOW):
+                          force_tol, _DR_WINDOW, travelled=_travelled):
             converged = True
             exit_reason = 'converged'
             break
-        if step % _DR_CHECK_EVERY == 0 and _dr_fail_test(
-                list(r_win), list(ke_win), list(u_win), u_elastic_scale,
-                _DR_WINDOW):
-            exit_reason = 'diverging'
-            diverging_step = step
-            break
+        if step % _DR_CHECK_EVERY == 0:
+            if _dr_fail_test(list(r_win), list(ke_win), list(u_win), ke_peak,
+                             _DR_WINDOW):
+                fail_run += 1
+            else:
+                fail_run = 0
+            if fail_run >= _DR_FAIL_PERSIST:
+                exit_reason = 'diverging'
+                diverging_step = step
+                break
 
         # ---- the corrector's offers ------------------------------------------
         if corr_nr_kw is not None:

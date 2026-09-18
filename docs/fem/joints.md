@@ -85,10 +85,9 @@ movement:
 
 $$t_n = k_n \Delta_n, \qquad t_s = k_s \Delta_t,$$
 
-and they are integrated at the element's own **nodes** (Newton-Cotes, or Lobatto) rather than at
-Gauss points: $L/6$, $L/6$, $2L/3$ on the three-pair element, $L/2$, $L/2$ on the two-pair one.
-Nodal integration keeps the node pairs uncoupled, which is what keeps the stress along a stiff
-interface free of the oscillation Gauss quadrature produces there (Schellekens & de Borst, 1993).
+and they are integrated at the element's own nodes rather than at Gauss points, which keeps the
+stress along a stiff interface free of the oscillation Gauss quadrature produces there
+(Schellekens & de Borst, 1993).
 
 ### Stiffness
 
@@ -119,7 +118,8 @@ as before.
 ![The joint's strength envelope: the Coulomb limit on the shear stress in either direction, the cohesion intercept, the tension cutoff at which the joint opens, and the residual envelope it drops to once it has slipped](images/joint_envelope.png){width=800}
 
 A joints-sheet line states `c`, `phi` and `t_cut` in columns of its own. A jointed reinforcement
-line takes its `Adhesion` and `Delta` as $c_j$ and $\phi_j$, and its tension cutoff is zero: a
+line takes its `Adhesion` and `Delta` as the joint's cohesion and friction angle, and its tension
+cutoff is zero: a
 soil-geosynthetic contact carries no tension, where a rock joint may hold a little.
 
 ### Residual strength
@@ -138,13 +138,10 @@ exceed its peak.
 
 ### Dilation
 
-A rough joint rides up on its asperities as it slides. `dil` is that angle: a slip increment
-$|\Delta_t|$ opens the joint by $|\Delta_t| \tan(\text{dil})$, accumulated as a plastic normal
-offset $u_{open}$, so the elastic part of the normal closing — and with it the normal stress
-
-$$t_n = k_n (\Delta_n + u_{open})$$
-
-— grows while the joint slides.
+A rough joint rides up on its asperities as it slides. `dil` is that angle: every unit of slip
+opens the joint by tan(dil) units, and that opening is permanent. Where the joint is held shut, the
+opening it cannot make is taken up as extra compression across it, so the normal stress on the
+joint grows while it slides.
 
 ![Dilation: the block rides up the asperities as it slides, opening the joint; held closed it builds normal stress, free to lift it rises instead](images/joint_dilation.png){width=950}
 
@@ -159,7 +156,7 @@ accumulated slip: a joint that slides a long way keeps riding up at the stated a
 A strength reduction divides $c_j$ and $\tan\phi_j$ by the trial factor along with the soil's, on
 both the peak and the residual branch, on every jointed line unless that line sets `Jred = No`,
 which holds the joint at full strength through the reduction — for a joint that stands for a
-construction detail rather than for a geological surface. The stiffnesses $k_n$ and $k_s$ are not
+construction detail rather than for a geological surface. The stiffnesses `kn` and `ks` are not
 strengths, so they are not reduced, any more than the bar's are.
 
 ## What the Method Can and Cannot Model
@@ -234,21 +231,11 @@ not standing, and the factor of safety comes out low — a reading of the budget
 slope.
 
 Raise `max_iterations` on `solve_fem()` and `solve_ssrm()`, or the sweep limit in Studio's Run FEM
-dialog, from its default of 12,000. The model checks warn below **100,000**, which is a floor rather
-than a sufficiency; allowing more costs almost nothing, because a trial that decides stops. A
-six-course block wall with three geogrid layers needs about 36,000 sweeps per trial, and run at the
-default one trial of its bracket is read as standing where more sweeps show it still moving, so the
-factor of safety comes out too high.
-
-The slip a sweep puts into a joint is the shear above the limit divided by $k_s$, and
-`joint_slip_stiffness_factor` scales the stiffness used in that division on the pairs that are at
-their limit — the shear-strength limit, the assembled elastic stiffness and a pair that re-sticks are
-all
-untouched. It is **off by default**, and the reason is a stability limit rather than a preference:
-one sweep already returns the shear stress exactly to its limit at the current displacement field,
-so
-the iteration sits at its boundary and a factor $f$ is a relaxation of $1/f$. Values near 1 are
-stable and buy nothing, and a factor of 0.01 diverges outright. Reach for the budget instead.
+dialog, from its default of 12,000 to **100,000**. The model checks warn below that number.
+Allowing more costs almost nothing, because a trial that settles stops early. A six-course block
+wall with three geogrid layers, run at the default, reads one trial of its bracket as standing where
+more sweeps show it still moving, so its factor of safety comes out too high; at 36,000 sweeps it
+comes out too low; at 100,000 it is settled.
 
 ### How a trial is decided
 

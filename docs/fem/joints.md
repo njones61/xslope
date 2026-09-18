@@ -94,8 +94,9 @@ stress along a stiff interface free of the oscillation Gauss quadrature produces
 A joint has two stiffnesses. The normal stiffness `kn` acts across the joint: how much the two
 faces compress together under a given normal stress. The shear stiffness `ks` acts along it: how
 far the faces shift past each other under a given shear stress before the joint slips. They are not
-soil properties. They exist so that an unbroken joint behaves like solid rock, and they need to be
-just large enough for that and no larger. Enter them on the joints sheet in those columns. Left
+soil properties. They exist so that a joint that has not slipped or opened behaves as if it were
+not there, its two faces moving together like the material on either side, whether that is rock on
+rock or fill on a geosynthetic sheet; they need to be just large enough for that and no larger. Enter them on the joints sheet in those columns. Left
 blank,
 they are derived from the softer of the two materials the joint runs between: the normal stiffness
 is that material's Young's modulus divided by a notional joint thickness, the shear stiffness its

@@ -10860,8 +10860,6 @@ _DR_START = 'elastic'         # 'elastic', 'zero' or 'datum' (see _solve_fem_dyn
 _DR_WINDOW = _OOB_TREND_WINDOW          # 500 steps
 _DR_KE_FLOOR = 1e-6                     # kinetic energy against its own peak
 _DR_SETTLED_GROWTH = _JOINT_SETTLED_GROWTH   # 1e-4 elastic displacements
-# Kept for the record and NOT read by the failing test; see _dr_fail_test for
-# the measurement that took it out.
 _DR_MOVING_GROWTH = _JOINT_MOVING_GROWTH     # 0.05 elastic displacements
 # "Not falling" and "still moving" over the window. The design names 0.9 for both
 # and attributes it to `_JOINT_SETTLED_OOB_FLAT`, which is 0.85; the number the
@@ -10986,31 +10984,14 @@ def _dr_stand_test(r_win, ke_win, u_win, ke_peak, u_elastic_scale,
 
 
 def _dr_fail_test(r_win, ke_win, u_win, u_elastic_scale, window):
-    """Is the slope failing? Three readings over the window, and no fourth.
+    """Is the slope failing? All four of the design's section 2.3 readings.
 
-    The residual is not falling, the kinetic energy is not falling, and the
-    motion is not decelerating. **There is no displacement level in this test at
-    all**, which is the whole reason it exists: the shipped early-failure rule
-    fires on max|u| past a multiple of the elastic response and has a measured
-    false positive — it closed a jointed trial 141,000 sweeps short of a real
-    equilibrium. What separates a slope rolling slowly to the bottom of a very
-    flat bowl from one coming apart is whether it is decelerating, which a scheme
-    with velocities can read and a relaxation cannot.
-
-    The design writes a fourth line, `(max|u|_end - max|u|_start) /
-    max|u|_elastic >= _JOINT_MOVING_GROWTH`, in the same section that says the
-    test carries no displacement level. The two cannot both hold, and the
-    measurement says the fourth line is the one to drop: `_JOINT_MOVING_GROWTH`
-    is calibrated against the interface verdict's window, the trailing tenth of a
-    250,000-sweep trial, and a growth FRACTION does not transfer to a 500-step
-    window. Measured on the toppling block at the 0.10 m mesh, k = 0.42, which
-    the closed form says topples: the first three readings are satisfied through
-    the whole run and the fourth refuses at every sample, because the block gains
-    about 1.2 % of an elastic displacement per window and never the 5 % asked
-    for. With the fourth line the trial spends its entire 40,000-step budget and
-    ends `dr_stalled`; without it, it is decided `diverging` at 1,600 steps. On
-    the six single-block cases the two rules agree everywhere else, step for
-    step, and both standing cases stand under both.
+    There is NO absolute displacement level in this test, and that is deliberate:
+    the shipped early-failure rule fires on max|u| past a multiple of the elastic
+    response, and it has a measured false positive — it closed a jointed trial
+    141,000 sweeps short of a real equilibrium. What separates the two cases is
+    whether the motion is decelerating, which a scheme with velocities can read
+    and a relaxation cannot.
     """
     if len(r_win) < window or u_elastic_scale <= 0.0:
         return False
@@ -11024,7 +11005,9 @@ def _dr_fail_test(r_win, ke_win, u_win, u_elastic_scale, window):
     if not (k_first > 0.0 and k_second / k_first >= _DR_FLAT_RATIO):
         return False
     u0, um, u1 = u_win[0], u_win[h], u_win[-1]
-    return (u1 - um) >= (um - u0)
+    if not ((u1 - um) >= (um - u0)):
+        return False
+    return (u1 - u0) / u_elastic_scale >= _DR_MOVING_GROWTH
 
 
 def _nr_1d_report(fem_data, bars, piles):
@@ -11521,12 +11504,6 @@ def _solve_fem_dynamic(fem_data, F, prep, *, c_reduced, phi_reduced,
         _sol["dr_mass_scaled"] = True
         _sol["dr_mass_scale"] = mass_scale
         _sol["dr_start"] = start
-        _sol["dr_ke_peak"] = float(ke_peak)
-        _sol["dr_step_margin"] = float(step_margin)
-        # The interface verdict's reading on the trace so far, recorded beside a
-        # certified stand exactly as it is beside a loop verdict. It decides
-        # nothing on either.
-        _sol["dr_joint_verdict_parallel"] = _dr_parallel_verdict()
         return _sol
 
     # ---- the settle ----------------------------------------------------------
@@ -11539,25 +11516,6 @@ def _solve_fem_dynamic(fem_data, F, prep, *, c_reduced, phi_reduced,
     oob_hist = []
     disp_hist = []
     jslip_hist, jslipn_hist, jopen_hist, joob_hist, soob_hist = [], [], [], [], []
-
-    def _dr_parallel_verdict():
-        """`joint_verdict`'s reading on this trial's own trace, or None.
-
-        The owner's ruling for this round: the interface verdict keeps running in
-        parallel on the dynamic path as a cross-check. It reads, from slip and
-        displacement histories, what this engine measures directly, and it is
-        recorded beside the dynamic verdict and decides nothing.
-        """
-        if not (joint_verdict_parallel and has_joints and jslip_hist):
-            return None
-        try:
-            return joint_verdict(
-                jslip_hist, soob_hist, disp_hist, u_elastic_scale, force_tol,
-                joint_oob_hist=joob_hist, budget=budget,
-                sample_every=_DR_SAMPLE_EVERY)
-        except Exception as _exc:
-            return f"error: {type(_exc).__name__}"
-
     ke_peak = 0.0
     ke = 0.0
     ke_prev = None
@@ -11666,12 +11624,8 @@ def _solve_fem_dynamic(fem_data, F, prep, *, c_reduced, phi_reduced,
             break
 
         # ---- the verdict -----------------------------------------------------
-        # The window scan is skipped wherever the current sample already exceeds
-        # the tolerance: that sample is IN the window, so the test cannot pass.
-        # Same answer, and the scan then runs only on a settling trial.
-        if R <= force_tol and _dr_stand_test(
-                r_win, ke_win, u_win, ke_peak, u_elastic_scale,
-                force_tol, _DR_WINDOW):
+        if _dr_stand_test(r_win, ke_win, u_win, ke_peak, u_elastic_scale,
+                          force_tol, _DR_WINDOW):
             converged = True
             exit_reason = 'converged'
             break
@@ -11757,7 +11711,15 @@ def _solve_fem_dynamic(fem_data, F, prep, *, c_reduced, phi_reduced,
     # `joint_verdict` in parallel, this round only (the owner's ruling on question
     # 6). It reads, from slip and displacement histories, what this engine measures
     # directly; it is recorded beside the dynamic verdict and decides nothing.
-    jv_parallel = _dr_parallel_verdict()
+    jv_parallel = None
+    if joint_verdict_parallel and has_joints and jslip_hist:
+        try:
+            jv_parallel = joint_verdict(
+                jslip_hist, soob_hist, disp_hist, u_elastic_scale, force_tol,
+                joint_oob_hist=joob_hist, budget=budget,
+                sample_every=_DR_SAMPLE_EVERY)
+        except Exception as _exc:
+            jv_parallel = f"error: {type(_exc).__name__}"
 
     if debug_level >= 1:
         print(f"  Dynamic relaxation (F={F:.3f}): "

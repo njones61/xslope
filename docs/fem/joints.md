@@ -96,8 +96,8 @@ faces compress together under a given normal stress. The shear stiffness `ks` ac
 far the faces shift past each other under a given shear stress before the joint slips. They are not
 soil properties. They exist so that a joint that has not slipped or opened behaves as if it were
 not there, its two faces moving together like the material on either side, whether that is rock on
-rock or fill on a geosynthetic sheet; they need to be just large enough for that and no larger. Enter them on the joints sheet in those columns. Left
-blank,
+rock or fill on a geosynthetic sheet; they need to be just large enough for that and no larger. Enter them in the `kn` and `ks` columns of the joints
+sheet, or of the reinforce sheet for a reinforcement line that is a slip surface. Left blank,
 they are derived from the softer of the two materials the joint runs between: the normal stiffness
 is that material's Young's modulus divided by a notional joint thickness, the shear stiffness its
 shear modulus divided by the same thickness, and the thickness is one tenth of the joint element's

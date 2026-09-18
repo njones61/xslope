@@ -156,7 +156,7 @@ opens the joint by tan(dil) units, and that opening is permanent. Where the join
 opening it cannot make is taken up as extra compression across it, so the normal stress on the
 joint grows while it slides.
 
-![Dilation: the block rides up the asperities as it slides, opening the joint; held closed it builds normal stress, free to lift it rises instead](images/joint_dilation.png){width=950}
+![Dilation: the block rides up over the bumps on the joint surface as it slides, opening the joint; held closed it builds normal stress, free to lift it rises instead](images/joint_dilation.png){width=950}
 
 Where the material around the joint holds it closed, that is **dilatant hardening**: sliding builds
 normal stress and with it shear strength. Where the sliding block is free to lift, it lifts instead,

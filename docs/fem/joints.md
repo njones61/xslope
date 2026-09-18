@@ -162,11 +162,13 @@ joint grows while it slides.
 Where the material around the joint holds it closed, that is **dilatant hardening**: sliding builds
 normal stress and with it shear strength. Where the sliding block is free to lift, it lifts instead,
 and the normal stress stays at whatever equilibrium with the block's weight requires. The joint opens whichever direction it slides, since the opening depends on how far it slips and
-not on which way. A real joint stops dilating once it has climbed or sheared off its bumps, so its
-opening is limited to about the bump height; the law here has no such limit and keeps opening at
-the stated angle for as long as the joint slides. That simplification is harmless at the slips a
-standing model reaches, which are millimeters, and a joint that slides far enough for the limit to
-matter is on a slope that has already failed. Blank is zero.
+not on which way. Blank is zero.
+
+**There is no limit on the opening.** A real joint stops dilating once it has climbed or sheared
+off its bumps, so its opening is limited to about the bump height. The law here has no such limit
+and keeps opening at the stated angle for as long as the joint slides. That simplification is
+harmless at the slips a standing model reaches, which are millimeters, and a joint that slides far
+enough for the limit to matter is on a slope that has already failed.
 
 ### Strength reduction
 

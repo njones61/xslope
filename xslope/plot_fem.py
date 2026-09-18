@@ -598,18 +598,30 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
                           edgecolor="none", label=label)
         )
 
-    # Plot 1D elements (reinforcement truss + pile beam) using LineCollection
+    # Plot 1D elements (reinforcement truss + pile beam + joint trace) using
+    # LineCollection. A bar-less joint line — a row of the joints sheet — has 1D
+    # elements of its own but no member between its faces, so it is drawn as the
+    # joint it is rather than counted as reinforcement. The split itself cannot
+    # show on a mesh plot (the node copies stand at one point), so this trace is
+    # the only thing that tells a jointed line from a line the mesh is not split
+    # along, which is what docs/fem/joints.md says a mesh plot does.
     elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
     pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(len(elements_1d), dtype=bool))
+    barless_mask = _barless_mask(fem_data, len(elements_1d))
     n_reinf_plotted = 0
     n_pile_plotted = 0
+    n_joint_plotted = 0
     if len(elements_1d) > 0:
         reinf_segs = []
         pile_segs = []
+        joint_segs = []
         for elem_idx in range(len(elements_1d)):
             elem_nodes_1d = elements_1d[elem_idx]
             seg = [nodes[elem_nodes_1d[0]], nodes[elem_nodes_1d[1]]]
-            if pile_elem_mask[elem_idx]:
+            if barless_mask[elem_idx]:
+                joint_segs.append(seg)
+                n_joint_plotted += 1
+            elif pile_elem_mask[elem_idx]:
                 pile_segs.append(seg)
                 n_pile_plotted += 1
             else:
@@ -626,6 +638,14 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
             ax.add_collection(lc)
             legend_handles.append(
                 plt.Line2D([0], [0], color='green', lw=3.5, label=f'Pile ({n_pile_plotted} elements)')
+            )
+        if joint_segs:
+            lc = LineCollection(joint_segs, colors=JOINT_COLOR,
+                                linewidths=JOINT_LINEWIDTH, zorder=5, gid='JOINTS')
+            ax.add_collection(lc)
+            legend_handles.append(
+                plt.Line2D([0], [0], color=JOINT_COLOR, lw=JOINT_LINEWIDTH,
+                           label=f'Joint ({n_joint_plotted} elements)')
             )
 
     # Plot boundary conditions
@@ -677,6 +697,8 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
         parts.append(f"{n_reinf_plotted} reinforcement")
     if n_pile_plotted > 0:
         parts.append(f"{n_pile_plotted} pile")
+    if n_joint_plotted > 0:
+        parts.append(f"{n_joint_plotted} joint")
     title = f"FEM Mesh with Material Zones ({', '.join(parts)})"
     
     if show_title:

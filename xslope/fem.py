@@ -405,7 +405,13 @@ def _fem_reinforcement_dataframe(fem_data, solution):
         return None
     n_1d = len(elements_1d)
     pile_elem_mask = _as_len(fem_data.get("pile_elem_mask", np.zeros(n_1d)), n_1d, bool)
-    reinf_idx = np.where(~pile_elem_mask)[0]
+    # A bar-less joint line — a row of the joints sheet — has 1D elements of its
+    # own and no member between its faces, so it has no bar force and no capacity
+    # to mobilize. Its rows would be a per-bar force table for traces that carry
+    # no bar, every force and every capacity zero. What the line did is written by
+    # the joints sidecar instead.
+    barless = _as_len(fem_data.get("barless_1d_mask", np.zeros(n_1d)), n_1d, bool)
+    reinf_idx = np.where(~pile_elem_mask & ~barless)[0]
     if len(reinf_idx) == 0:
         return None
 

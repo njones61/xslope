@@ -54,6 +54,11 @@ six lines made joints in memory:
      Non-convergence, because a near-critical trial on a jointed model settles
      into slip the other criterion can only read as failure. A criterion the
      user has already chosen this session still wins.
+  j. a bar-less joint trace is not a bar. A joints-sheet line has 1D elements
+     of its own with no member between its faces, and both readers of
+     ``elements_1d`` have to know it: the mesh plot, which drew the trace red
+     and counted it as reinforcement, and the reinforcement sidecar, which
+     wrote a per-bar force row for it with every force and every capacity zero.
 
 Run directly:  PYTHONPATH=. python3 test/joint_surfaces_check.py
 """
@@ -1024,6 +1029,66 @@ def _leg_run_dialog(failures, cache):
 
 
 # --------------------------------------------------------------------------
+# j. a joints-sheet line's 1D elements are not a member
+# --------------------------------------------------------------------------
+
+def _leg_barless(failures, cache):
+    """A joints-sheet line has 1D elements of its own and no bar between its
+    faces, so nothing that reports on members may report on it.
+
+    Both places that split ``elements_1d`` read the same ``barless_1d_mask``:
+    the mesh plot, which drew the trace red and counted it as reinforcement, and
+    the reinforcement sidecar, which wrote a per-bar force row for it with every
+    force and every capacity zero. The fixture's own lines all carry bars, so
+    the mask is flipped on a copy of its fem_data — which is exactly what a
+    joints-sheet line produces — and the two readers are asked again.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from xslope.fem import _fem_reinforcement_dataframe as _reinf_df
+    from xslope.plot_fem import plot_fem_data
+    _sd, _mesh, fem_data, sol = cache["solved"]
+
+    n_1d = len(fem_data["elements_1d"])
+    if not n_1d:
+        failures.append("the fixture carries no 1D elements to read")
+        return
+
+    # As built: every line carries a bar, so nothing is bar-less.
+    df = _quiet(_reinf_df, fem_data, sol)
+    if df is None or len(df) != n_1d:
+        failures.append(f"the bonded fixture's sidecar lost rows: "
+                        f"{0 if df is None else len(df)} of {n_1d}")
+    _quiet(plot_fem_data, fem_data)
+    title = plt.gcf().axes[0].get_title()
+    if "reinforcement" not in title:
+        failures.append(f"a bar on the mesh plot stopped being reinforcement: "
+                        f"{title!r}")
+    plt.close("all")
+
+    # The same elements declared bar-less: a joints-sheet line.
+    barless = dict(fem_data)
+    barless["barless_1d_mask"] = np.ones(n_1d, dtype=bool)
+    if _quiet(_reinf_df, barless, sol) is not None:
+        failures.append("a bar-less joint line was written into the "
+                        "reinforcement sidecar as a member with no force")
+    _quiet(plot_fem_data, barless)
+    title = plt.gcf().axes[0].get_title()
+    if "reinforcement" in title:
+        failures.append(f"the mesh plot counts a joint trace as reinforcement: "
+                        f"{title!r}")
+    if f"{n_1d} joint" not in title:
+        failures.append(f"the mesh plot does not name the joint trace: "
+                        f"{title!r}")
+    labels = [h.get_label() for h in plt.gcf().legends[0].legend_handles] \
+        if plt.gcf().legends else []
+    if labels and not any(str(t).startswith("Joint (") for t in labels):
+        failures.append(f"the mesh plot has no joint legend entry: {labels}")
+    plt.close("all")
+
+
+# --------------------------------------------------------------------------
 
 LEGS = (
     ("the loader's column reaches the mesher", _leg_wiring),
@@ -1035,6 +1100,7 @@ LEGS = (
     ("the report's joints table", _leg_report),
     ("the blocks a joint cuts", _leg_blocks),
     ("the Run FEM dialog opens on Hybrid", _leg_run_dialog),
+    ("a bar-less joint trace is not a bar", _leg_barless),
 )
 
 

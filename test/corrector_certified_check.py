@@ -11,9 +11,16 @@ including the one at the budget exit; where it reaches equilibrium inside the
 force, yield and displacement gates, `solve_ssrm` records a `corrector` block on
 that trial. That block says an INDEPENDENT driver found a static equilibrium from
 this trial's state. It answers the standing question whatever the sweep count
-preceding it, and three rows of the RS2 joint corpus turned on exactly this: their
-standing edges were certified at 250 002, 250 006 and 250 003 sweeps against a
-250 000 ceiling, and were being read as though nothing had ruled on them.
+preceding it, and rows of the corpus turn on exactly this: RS2-52's standing edge
+is certified after 258 605 sweeps and RS2-53's at 500 000 — both past the 250 000
+sweeps their tags budget — and RJ-4's after 186 859. Read on the sweep count alone
+they would be trials nothing had ruled on.
+
+The same corrector is offered the K0 IN-SITU EQUILIBRATION, which is a solve at
+full strength before any trial and on a jointed model is where a row's sweeps go.
+Its ladder is continued past the trials' three rungs (`_K0_CORRECTOR_CHECKPOINTS`),
+because the equilibration's product is a state and not a verdict: certifying it
+earlier changes what the step costs, not what a bracket reads.
 
 What this file locks:
 
@@ -33,6 +40,11 @@ What this file locks:
      certification into a committed sidecar (or the readers above cannot see it)
      and must NOT carry the machine time with it (or a sidecar changes when the
      machine does).
+
+  4. THE K0 STEP. Its ladder is the trials' ladder continued, it certifies a
+     jointed model's in-situ state and says where, and on an unjointed model it
+     is inert — the same equilibration, reached at the same sweep, with the
+     switch on and off.
 """
 import os
 import sys
@@ -49,6 +61,15 @@ def check(label, ok, detail=""):
     if not ok:
         FAILURES.append(label)
 
+
+#: The jointed model the K0 leg reads: a slab on a cohesionless plane at 20 degrees
+#: whose friction angle is two degrees above it. The in-situ field has a slope to
+#: redistribute against and the interface is close enough to its limit that the
+#: sweep does not settle inside the first checkpoint, so the corrector is actually
+#: asked for something — it certifies at `vp300`, where the plain sweep would have
+#: run to 311.
+K0_SLAB = dict(beta=20.0, HV=3.0, phi_j=22.0, cj=0.0, ts=3.0, s1d=3.0,
+               E_void=100.0)
 
 CERT = {"driver_of_record": "corrector", "checkpoint": "vp_exit",
         "vp_iterations": 250000, "nr_iterations": 6, "nr_force_evals": 26,
@@ -195,6 +216,105 @@ def check_record():
           "corrector" not in got3)
 
 
+def _k0_equilibration(fem_data, ladder_on=True):
+    """One SSRM's in-situ equilibration: its record, and the ladder the step was
+    handed.
+
+    `trial_factors` keeps it to a single trial after the equilibration, which is
+    the cheapest way to reach the step through the path that owns the switch.
+    """
+    import contextlib
+    import io
+    from xslope import fem
+
+    seen = {"n": 0, "rungs": "not called"}
+    orig = fem.solve_fem
+
+    def wrapped(*a, **k):
+        seen["n"] += 1
+        if seen["n"] == 1:
+            seen["rungs"] = k.get("_corrector_rungs")
+        return orig(*a, **k)
+
+    was = fem.K0_CORRECTOR_LADDER_ON
+    fem.K0_CORRECTOR_LADDER_ON = ladder_on
+    fem.solve_fem = wrapped
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            res = fem.solve_ssrm(fem_data, F_min=1.0, F_max=1.5, k0=1.0,
+                                 trial_factors=[1.0], max_iterations=6000,
+                                 max_iterations_ceiling=6000,
+                                 capture_failure_state=False, debug_level=0)
+    finally:
+        fem.K0_CORRECTOR_LADDER_ON = was
+        fem.solve_fem = orig
+    return res.get("k0_equilibration") or {}, seen["rungs"]
+
+
+def check_k0_step():
+    """The equilibration is a solve like any other, and the corrector is offered
+    it like any other — with the ladder continued, because the step's product is
+    a state rather than a verdict (see fem._K0_CORRECTOR_CHECKPOINTS)."""
+    print("\n4. The K0 in-situ equilibration")
+    import warnings
+
+    from xslope import fem
+
+    n = len(fem._CORRECTOR_CHECKPOINTS)
+    check("the K0 ladder is the trials' ladder, continued",
+          fem._K0_CORRECTOR_CHECKPOINTS[:n] == fem._CORRECTOR_CHECKPOINTS
+          and len(fem._K0_CORRECTOR_CHECKPOINTS) > n,
+          f"{fem._K0_CORRECTOR_CHECKPOINTS}")
+    check("the continued rungs are the ones a creeping equilibration reaches",
+          min(fem._K0_CORRECTOR_CHECKPOINTS[n:]) >= 10000)
+
+    # A JOINTED model: a slab on a plane at 20 degrees, where the K0 field has a
+    # slope to redistribute against and the sweep does not settle at once.
+    sys.path.insert(0, os.path.join(_ROOT, "test"))
+    from joint_element_check import slab_model
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        _d, jointed, _g = slab_model(**K0_SLAB)
+        eq, rungs = _k0_equilibration(jointed)
+    check("the jointed step is handed the continued ladder",
+          tuple(rungs or ()) == fem._K0_CORRECTOR_CHECKPOINTS, f"{rungs}")
+    check("a jointed in-situ state is established", bool(eq.get("stable")),
+          f"{eq.get('verdict')} in {eq.get('iterations')} sweep(s)")
+    check("the corrector certified it, and the record says where",
+          str(eq.get("certified_at") or "").startswith(("vp", "rule:", "gate:")),
+          f"at {eq.get('certified_at')}, {eq.get('nr_iterations')} Newton "
+          f"iteration(s)")
+    _, off_rungs = _k0_equilibration(jointed, ladder_on=False)
+    check("and with the switch off it runs the trials' three rungs",
+          off_rungs is None, f"{off_rungs}")
+
+    # An UNJOINTED model is never handed the continued ladder, so the switch
+    # cannot reach it: the same equilibration, at the same sweep, either way.
+    from xslope.fem import build_fem_data
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import build_mesh_from_polygons, get_material_polygons
+
+    base = os.path.join(_ROOT, 'docs', 'fem', 'files', 'xslope_griffiths1.xlsx')
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sd = load_slope_data(base)
+        mesh = build_mesh_from_polygons(get_material_polygons(sd),
+                                        target_size=2.0, element_type='tri6')
+        plain = build_fem_data(sd, mesh)
+        on, on_rungs = _k0_equilibration(plain, ladder_on=True)
+        off, _ = _k0_equilibration(plain, ladder_on=False)
+    check("an unjointed step is never handed the continued ladder",
+          on_rungs is None, f"{on_rungs}")
+    keys = ("iterations", "converged", "verdict", "certified_at", "n_plastic",
+            "max_displacement", "unbalanced_force_ratio")
+    check("so its equilibration is the same with the switch on and off",
+          all(on.get(k) == off.get(k) for k in keys)
+          and bool(on.get("converged")),
+          f"{on.get('iterations')} sweep(s), max|u| = "
+          f"{on.get('max_displacement', float('nan')):.6g}")
+
+
 def main():
     print("=" * 72)
     print("Corrector certification checks")
@@ -203,6 +323,7 @@ def main():
     check_standing_verdicts()
     check_readers_agree()
     check_record()
+    check_k0_step()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"FAILED ({len(FAILURES)}): " + ", ".join(FAILURES))

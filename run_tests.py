@@ -16064,8 +16064,9 @@ def main():
         tests.append({'type': 'joint_verdict',
                       'file': 'the verdict on an undecided jointed trial',
                       'method': '-', 'source': 'joint_verdict'})
-        # Pure-function: what makes a bracket edge answered, and that the three
-        # tools that decide it give one answer. No solve.
+        # What makes a bracket edge answered, and that the three tools that decide
+        # it give one answer — pure-function, plus two small solves for the K0
+        # step's own certification (seconds).
         tests.append({'type': 'corrector_certified',
                       'file': 'a corrector certification answers a bracket edge',
                       'method': '-', 'source': 'corrector_certified'})

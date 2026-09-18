@@ -161,9 +161,8 @@ joint grows while it slides.
 
 Where the material around the joint holds it closed, that is **dilatant hardening**: sliding builds
 normal stress and with it shear strength. Where the sliding block is free to lift, it lifts instead,
-and the normal stress stays at whatever equilibrium with the block's weight requires. The dilation
-is **non-directional** — the joint opens whichever way it slides — and it does not decay with
-accumulated slip: a joint that slides a long way keeps riding up at the stated angle. Blank is zero.
+and the normal stress stays at whatever equilibrium with the block's weight requires. The joint opens whichever direction it slides, since the opening depends on how far it slips and
+not on which way, and it keeps opening at the same angle however far it slides. Blank is zero.
 
 ### Strength reduction
 

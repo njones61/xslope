@@ -256,24 +256,27 @@ stable and buy nothing, and a factor of 0.01 diverges outright. Reach for the bu
 
 ### How a trial is decided
 
-A jointed trial's force residual is measured almost entirely on the joints, and a pair sitting at
-its slip limit alternates between slipping and sticking as the field around it breathes. The
-resulting oscillation has a flat mean that no iteration budget brings under any tolerance, so a
-jointed trial that neither converges nor fails is read from the **interface** instead of from the
-displacement field: slip still growing at an undecaying rate while the field gains is a slope moving
-on its joints, and slip and field both stopped with the soil in equilibrium is a slope standing
-behind a limit cycle. [The joint verdict](overview.md#the-joint-verdict) gives both readings and
-their thresholds.
+On a jointed model almost all of the out-of-balance force sits on the joints, and a pair of faces
+at its slip limit alternates between slipping and sticking as the material around it breathes. What
+that leaves is a steady back-and-forth the sweeps never damp out, so its average never falls under
+a force tolerance no matter how many sweeps are allowed. A jointed trial that neither converges nor
+runs away is therefore read from the **joints** rather than from the displacement field: slip still
+growing at an undiminishing rate while the slope keeps moving is a slope failing on its joints, and
+slip and movement both stopped with the soil in equilibrium is a slope standing behind that
+back-and-forth. [The joint verdict](overview.md#the-joint-verdict) gives both readings and their
+thresholds.
 
 The standing reading counts only under the default `hybrid`
 [failure criterion](overview.md#ssrm-failure-criteria); under `non_convergence` a trial that has
-settled behind a limit cycle is still a non-converged trial, and the bracket reads it as failed.
+stopped moving but never converged is still a non-converged trial, and the search reads it as
+failed.
 
-The [Newton corrector](overview.md#finishing-a-trial-with-the-newton-corrector) is offered the
-viscoplastic loop's own state on a jointed model as on any other, seeded with the accumulated slip,
-dilational opening and residual branch the loop reached. Where it finds equilibrium at that
-strength, it certifies the trial in a few hundred sweeps. A refusal changes nothing: it is the
-absence of a verdict, not a failure.
+A jointed trial is also handed to the [Newton
+corrector](overview.md#finishing-a-trial-with-the-newton-corrector), which starts from the state
+the sweeps have reached — the slip, the opening and the residual strength each joint has arrived at
+— and looks for equilibrium at that strength directly. Where it finds one, the trial stands,
+usually within a few hundred more sweeps. Where it does not, the trial is left as the sweeps read
+it: not finding an equilibrium this way is not evidence that none exists.
 
 ### What the results show
 

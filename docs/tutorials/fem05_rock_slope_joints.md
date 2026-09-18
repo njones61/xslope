@@ -378,7 +378,7 @@ machine and a schedule that can take it.
 
 ---
 
-## What this method reaches, and what it does not
+## What this method can and cannot do
 
 The interface element is a small-strain contact between **fixed pairs of nodes**.
 Each pair carries compression across the joint and Coulomb shear along it, opens
@@ -424,7 +424,7 @@ This tutorial covered:
   does and does not depend on.
 - A joint set generated from a dip and a spacing over a joint region, and the
   toppling mechanism the set produces on a slope that slid before.
-- What a fixed-pair interface element reaches, and where a different tool is
+- What this kind of joint element can model, and where a different tool is
   needed.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.

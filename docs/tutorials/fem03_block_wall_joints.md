@@ -172,7 +172,7 @@ back face against the reinforced fill, and one between each pair of courses.
 The three friction angles differ because the three contacts do. The base is
 block on compacted foundation soil at 34°; the back face is block against
 granular fill at 30°, the lowest of the three because the fill is what has to
-slide past it; the course lines are block on block at 35°, the manufacturer's
+slide past it; the course joints are block on block at 35°, the manufacturer's
 value for a dry, keyless unit.
 
 ![The seven joint lines on the Inputs plot](images/fem03_inputs_joints.png){width=1000}
@@ -257,9 +257,9 @@ the picture suggests:
 | course-02 to course-05 | none | — |
 
 **The wall failed on its back face.** The block column has slid down past the
-fill along its own back, five times as far as it has slid forward on its base, and the
-top four course lines have not moved on each other at all — the four upper
-courses are travelling as one piece. Modeling the contacts separately is what
+fill along its own back, five times as far as it has slid forward on its base,
+and the top four course joints have not moved on each other at all — the four
+upper courses are travelling as one piece. Modeling the contacts separately is what
 makes that visible. A wall meshed as a single solid can only bend, and would have
 had nothing to say about which of its seven surfaces was carrying the failure.
 
@@ -280,8 +280,8 @@ in the next section is for.
 
 Three layers of geogrid go in on the **reinforce** worksheet, reached from the
 Inputs tree under **Reinforcement**. They sit on the 0.6 m, 1.8 m and 3.0 m
-course lines — every second course — and run 3.0 m back into the reinforced fill,
-which is about 0.8 of the wall height and ordinary practice.
+course joints — every second course — and run 3.0 m back into the reinforced
+fill, which is about 0.8 of the wall height and ordinary practice.
 
 The columns a wall sheet needs, in the order they appear on the editor:
 

@@ -2684,6 +2684,174 @@ SHOTS.update({
 
 
 # --------------------------------------------------------------------------- #
+# FEM-5 — A Rock Slope on Its Joints
+#
+# Three dialogs, one for each thing the page asks the reader to do that a
+# worksheet cannot show: type two joint lines into the joints editor, run the
+# strength reduction at the settings a jointed model needs, and describe a whole
+# column set in one form instead of typing forty lines.
+# --------------------------------------------------------------------------- #
+FEM05_SLAB = os.path.join(REPO_ROOT,
+                          "docs/tutorials/files/xslope_rock_joints.xlsx")
+FEM05_TOPPLE = os.path.join(REPO_ROOT,
+                            "docs/tutorials/files/xslope_rock_toppling.xlsx")
+#: The mesh the page builds for both halves: quadratic triangles at 1.5 m.
+FEM05_ELEMENT_TYPE = "tri6"
+FEM05_TARGET_SIZE = 1.5
+#: Run FEM, as the page has the reader set it.  The failure criterion is NOT in
+#: this list, and that is the point of the shot: the dialog opens on Hybrid by
+#: itself when the model it is given carries a joint, so what is photographed is
+#: the choice the reader does not have to make.  The bracket and the tolerance are
+#: the dialog's own; the sweep budget is raised to 100,000, which is the model
+#: checks' floor for a jointed model and the box's own ceiling.
+FEM05_BRACKET = (1.0, 2.0)
+FEM05_TOLERANCE = 0.01
+FEM05_MAX_ITERATIONS = 100000
+#: The set the page's second half builds: 110 degrees is 70 degrees dipping INTO
+#: the face, at 1.5 m centers, over the joint region the polygon sheet carries.
+FEM05_SET = {"name": "col", "dip": "110", "spacing": "1.5", "offset": "1.25"}
+FEM05_REGION = "Toppling zone"
+
+
+def _fem05_meshed(path):
+    """The model with a SPLIT mesh attached — the state Build Mesh leaves behind,
+    and the only state Studio's Run FEM action is reachable in.
+
+    ``extract_joint_options`` is what makes it a jointed mesh rather than a mesh
+    with lines drawn on it: it tells the mesher which constraint lines to split
+    along.  Run FEM's own dialog reads the same function to decide which failure
+    criterion to open on, so a shot taken on a mesh built without it would
+    photograph the wrong default.
+    """
+    from xslope.mesh import (build_mesh_from_polygons,
+                             extract_constraint_line_geometry,
+                             extract_joint_options,
+                             extract_point_constraints,
+                             extract_size_regions, get_material_polygons)
+
+    data = _load(path)
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(data)
+    with contextlib.redirect_stdout(io.StringIO()):
+        data["mesh"] = build_mesh_from_polygons(
+            get_material_polygons(data, reinf_lines=lines),
+            FEM05_TARGET_SIZE, FEM05_ELEMENT_TYPE, lines=lines or None,
+            element_size_1d=data.get("element_size_1d"),
+            point_constraints=extract_point_constraints(data),
+            size_regions=extract_size_regions(data),
+            joint_lines=extract_joint_options(data))
+    return data
+
+
+def fem05_joints_editor():
+    """The joints editor, table view, with the two lines of part 1 in it.
+
+    The table is taken out to Jred, its last column, rather than to the last
+    column the two rows fill.  Everything past t_cut is BLANK on both rows and the
+    page is telling the reader to leave it blank — the normal and shear
+    stiffnesses derived from the rock around the joint, the strength reduction
+    reducing the joint with it — so a shot cut off at t_cut would photograph a
+    table whose empty cells are the instruction.
+
+    No usage band is set: every field of a joint line is FEM-only, so the editor
+    shows one band and there is nothing to untick.
+    """
+    from studio.editors import JointsEditor
+
+    dlg = JointsEditor().build(_load(FEM05_SLAB), None)
+    return _grab(_line_table(dlg, through="jred"),
+                 "fem05_studio_joints_editor.png")
+
+
+def fem05_run_fem():
+    """Run FEM on the meshed slab model, at the page's settings.
+
+    Only the bracket, the tolerance and the sweep budget are passed.  The failure
+    criterion is left to the dialog, which opens a jointed model on Hybrid and
+    every other model on Non-convergence, so the shot shows the reader the box
+    already reading what their model needs.
+    """
+    from studio.dialogs import RunFemDialog
+
+    data = _fem05_meshed(FEM05_SLAB)
+    dlg = RunFemDialog(defaults={"analysis": "ssrm",
+                                 "F_min": FEM05_BRACKET[0],
+                                 "F_max": FEM05_BRACKET[1],
+                                 "tolerance": FEM05_TOLERANCE,
+                                 "max_iterations": FEM05_MAX_ITERATIONS},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem05_studio_run_fem.png")
+
+
+def fem05_build_network():
+    """Build network, describing the column set the page's second half generates.
+
+    The dialog is opened on the model as it stands BEFORE the set exists — the
+    base plane and nothing else — because that is the state the reader is in when
+    they press the button, and because a dialog opened on the finished file would
+    have to name the set something other than ``col`` to avoid writing over the
+    rows already there.
+
+    ``_flush`` is called rather than waited on: the preview and the count are
+    regenerated on a debounce, and reading them back flushes the timer.
+    """
+    from studio import network_dialog
+    from studio.network_dialog import BuildNetworkDialog
+
+    data = _load(FEM05_TOPPLE)
+    # The base plane is the hand-entered row the builder puts first; the rows
+    # after it are the set this dialog is being photographed describing.
+    data["joint_lines"] = [dict(data["joint_lines"][0])]
+    # The dialog reopens on whatever this session last built (see _LAST_SET), so
+    # a capture clears it: the shot has to be of the page's set, not of the last
+    # one some other producer in this process happened to describe.
+    network_dialog._LAST_SET = None
+
+    dlg = BuildNetworkDialog(data, data["joint_lines"], None)
+    dlg._name.setText(FEM05_SET["name"])
+    dlg._kind.setCurrentIndex(0)                       # Parallel set
+    edits = dlg._param_edits["parallel"]
+    for key in ("dip", "spacing", "offset"):
+        edits[key].setText(FEM05_SET[key])
+    region = "Joint region: %s" % FEM05_REGION
+    index = [dlg._region.itemText(i) for i in range(dlg._region.count())]
+    dlg._region.setCurrentIndex(index.index(region))
+    dlg._prop_edits["c"].setText("0")
+    dlg._prop_edits["phi"].setText("35")
+    dlg._flush()
+    # The dialog opens at the height its form asks for capped by the screen, and
+    # an offscreen screen is not the reader's: the property group — the c and phi
+    # the page has the reader type — falls below the scroll. The height is grown
+    # by the form's own measured deficit, the idiom ``_list_view`` uses.
+    dlg.show()
+    _settle()
+    scroll = dlg._form_scroll
+    # Twice, for the reason ``_mat_table`` gives: the chrome measured against the
+    # opening dialog is not the chrome of the taller one the first pass produces,
+    # and one pass leaves the last row of the property grid under the scroll.
+    for _ in range(3):
+        deficit = max(0, scroll.widget().sizeHint().height()
+                      - scroll.viewport().height())
+        if not deficit:
+            break
+        dlg.resize(dlg.width(), dlg.height() + deficit)
+        _settle()
+    out = _grab(dlg, "fem05_studio_build_network.png")
+    network_dialog._LAST_SET = None      # a capture leaves no session state behind
+    print("   %s -> %d trace(s): %s"
+          % (region, len(dlg.result_rows()), dlg._status.text()))
+    return out
+
+
+SHOTS.update({
+    "fem05_joints_editor": fem05_joints_editor,
+    "fem05_run_fem": fem05_run_fem,
+    "fem05_build_network": fem05_build_network,
+})
+
+
+# --------------------------------------------------------------------------- #
 # COMBO-1 — Seepage into Stability
 #
 # The reader opens a finished file and runs it three ways, so these shots

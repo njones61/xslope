@@ -5579,6 +5579,362 @@ def fem04_wall():
 
 
 # --------------------------------------------------------------------------- #
+# FEM-5 — A Rock Slope on Its Joints
+#
+# The page runs one section twice. Part 1 cuts a single slab out of the face with
+# two lines — a bedding plane that daylights at the toe and a release joint behind
+# the crest — and the answer is one a reader checks with a calculator, because the
+# rock is elastic and the strength reduction has nothing but the joints to divide.
+# Part 2 replaces them with a base plane and a generated set of steep columns, and
+# the mechanism stops being a slab sliding and becomes columns tipping on it.
+#
+# Both models are built by ``tools/build_rock_joints.py``; nothing here edits one.
+# Every figure is drawn at the settings the page tells the reader to enter, and
+# the numbers printed beside them are what those settings measure.
+#
+# The inputs plots are drawn in the FEM view (``mode="fem"``), which is the view
+# Studio shows a finite element model in and the only one that draws a joint line:
+# the joints worksheet is finite element geometry, and the limit equilibrium view
+# leaves it out the way it leaves out anything the slices do not read.
+# --------------------------------------------------------------------------- #
+FEM05_START = os.path.join(REPO_ROOT,
+                           "docs/tutorials/files/xslope_rock_joints_start.xlsx")
+FEM05_SLAB = os.path.join(REPO_ROOT,
+                          "docs/tutorials/files/xslope_rock_joints.xlsx")
+FEM05_TOPPLE = os.path.join(REPO_ROOT,
+                            "docs/tutorials/files/xslope_rock_toppling.xlsx")
+#: Build Mesh, at the page's own settings and the files' own declaration:
+#: quadratic triangles at 1.5 m. Quadratic is a requirement rather than a
+#: preference — an interface element spans three node pairs on a tri6 edge and two
+#: on a tri3 one — and the size is what puts a node pair about every metre along a
+#: joint, which is the resolution the slip is read at.
+FEM05_ELEMENT_TYPE = "tri6"
+FEM05_TARGET_SIZE = 1.5
+#: Run FEM: bracket [1.0, 2.0], the dialog's own 0.01 bisection tolerance, and
+#: ``hybrid`` — which is the criterion the dialog opens on for a jointed model and
+#: NOT the ``non_convergence`` the bonded pages run. On a jointed model almost all
+#: of the out-of-balance force sits on the joints, and a pair of faces at its limit
+#: alternates between slipping and sticking as the rock around it breathes, so a
+#: standing trial never converges on force alone; ``hybrid`` reads the slip and the
+#: displacement field together (docs/fem/joints.md, "How a trial is decided").
+FEM05_CRITERION = "hybrid"
+FEM05_F_MIN, FEM05_F_MAX = 1.0, 2.0
+FEM05_TOLERANCE = 0.01
+#: 100,000 sweeps a trial, which is the model checks' floor for a jointed model and
+#: the Run FEM dialog's own ceiling. A joint reaches equilibrium by growing slip a
+#: little per sweep, so a jointed trial settles over tens of thousands of sweeps
+#: where a bonded one settles over hundreds; a trial that runs out of budget is
+#: recorded undecided and read as not standing, which reports the budget rather
+#: than the slope. Allowing more costs nothing on a trial that decides, because a
+#: trial that decides stops — the slab's standing trials each take about 300.
+FEM05_MAX_ITERATIONS = 100000
+#: The spacings the cost table walks, the file's own 1.5 m in the middle. Halving
+#: the spacing of a set doubles its traces, and every trace is a line the mesh is
+#: split along: the table is what that costs in nodes, in interface elements and in
+#: the wall time of one viscoplastic trial.
+FEM05_SPACINGS = (3.0, 1.5, 0.75)
+#: The blocky-mass figure: ``voronoi`` over the same joint region, at a block size
+#: and a seed. Nothing is solved on it and no workbook is written — the page shows
+#: it as a picture of what the third generator produces. 2 m over the 60.5 m² zone
+#: is about fifteen blocks, which is a mass a reader can still count the cells of
+#: at the width the figure is placed at; the model's own 1.5 m spacing would put
+#: ninety traces in the same wedge.
+FEM05_VORONOI_BLOCK = 2.0
+FEM05_VORONOI_SEED = 7
+
+
+def _rock_joints_module():
+    """Import ``tools/build_rock_joints.py`` as a module (it is a script).
+
+    The column set is regenerated from the builder's OWN dip, offset, region and
+    properties in the spacing table below, so each swept set is the shipped set
+    with one number changed rather than a second description of it that could
+    drift away from the first.
+    """
+    path = os.path.join(REPO_ROOT, "tools", "build_rock_joints.py")
+    spec = importlib.util.spec_from_file_location("build_rock_joints", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _fem05_mesh(model):
+    """The mesh Studio's Build Mesh dialog builds for a jointed model.
+
+    The joint lines are carried in twice, and both are needed: as constraint
+    lines, so every trace lies on element edges, and through
+    ``extract_joint_options``, which is what tells the mesher to SPLIT the mesh
+    along them and give every node on a trace one copy per piece of material
+    around it. Without the second the traces are meshed and bonded, and the model
+    has no joints in it at all.
+    """
+    from xslope.mesh import (build_mesh_from_polygons,
+                             extract_constraint_line_geometry,
+                             extract_joint_options,
+                             extract_point_constraints,
+                             extract_size_regions, get_material_polygons)
+
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(model)
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            get_material_polygons(model, reinf_lines=lines),
+            FEM05_TARGET_SIZE, FEM05_ELEMENT_TYPE, lines=lines or None,
+            element_size_1d=model.get("element_size_1d"),
+            point_constraints=extract_point_constraints(model),
+            size_regions=extract_size_regions(model),
+            joint_lines=extract_joint_options(model))
+
+
+def _fem05_solve(model, mesh):
+    """One strength reduction at the page's settings, on the reference kernel.
+
+    ``fast_kernel=False`` is pinned the way every producer of a committed number
+    pins it: the compiled Mohr-Coulomb kernel is built on some machines and not
+    others, and a figure has to carry the answer the reference path gives.
+    Returns ``(fem_data, result, seconds)``.
+    """
+    import time
+
+    import run_tests as RT
+    import xslope.fem as _fem
+    from xslope.fem import build_fem_data, solve_ssrm
+
+    fem_data = build_fem_data(model, mesh)
+    t0 = time.time()
+    with RT._force_fast_kernel(_fem, False):
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = solve_ssrm(fem_data, F_min=FEM05_F_MIN, F_max=FEM05_F_MAX,
+                                tolerance=FEM05_TOLERANCE, debug_level=0,
+                                failure_criterion=FEM05_CRITERION,
+                                max_iterations=FEM05_MAX_ITERATIONS)
+    return fem_data, result, time.time() - t0
+
+
+def _fem05_counts(label, model, mesh, fem_data):
+    """What the meshed model came to: the three counts the page prints."""
+    jd = fem_data.get("joint_data") or {}
+    print("   %-9s %d nodes · %d elements · %d joint elements on %d jointed "
+          "line(s) · %d row(s) on the joints sheet · %s at %g %s"
+          % (label, len(mesh["nodes"]), len(mesh["elements"]),
+             int(jd.get("n", 0)), len(jd.get("jointed_lines", []) or []),
+             len(model.get("joint_lines") or []), model["element_type"],
+             model["target_size"], declared_unit_labels(model)["length"]))
+
+
+def _fem05_report(label, result, seconds):
+    """The bracket walk: what each trial was asked, and what it answered."""
+    print("   %-9s FS %.4f from [%.6f, %.6f] (width %.6f) after %d bisection "
+          "step(s) · %.0f s"
+          % (label, result["FS"], result["final_interval"][0],
+             result["final_interval"][1], result["interval_width"],
+             result["iterations_ssrm"], seconds))
+    for tr in result["trials"]:
+        print("        F %.4f  %-6s  %-13s  %s sweeps"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+    last = result["last_solution"]
+    print("        last standing trial F %.4f · %s · %s sweeps (%s)"
+          % (last.get("F", float("nan")),
+             "equilibrium" if last.get("converged") else "no equilibrium",
+             last.get("iterations"), last.get("exit_reason")))
+
+
+def _fem05_joints(model, fem_data, result):
+    """What every jointed line is doing at the last standing trial.
+
+    Read station by station rather than element by element: a quadratic interface
+    element carries three node pairs and shares its end pairs with the element
+    next along it, so counting slots would count the shared pairs twice.
+    ``fem_details.joint_profile`` keys its record by the split node itself, which
+    makes exactly one record per node pair on the line.
+    """
+    import numpy as np
+
+    from xslope import fem_details
+
+    last = result["last_solution"]
+    units = declared_unit_labels(model)["length"]
+    for line_id in fem_details.joint_line_ids(fem_data, last):
+        prof = fem_details.joint_profile(fem_data, last, line_id,
+                                         slope_data=model,
+                                         field_state="converged")
+        slipping = np.asarray(prof["slipping"], dtype=bool)
+        slip = np.asarray(prof["slip"], dtype=float)
+        opened = np.asarray(prof["open"], dtype=bool)
+        print("   joint     %-11s %d of %d node pair(s) slipping · largest slip "
+              "%.6f %s · %d open · peak |ts|/limit %s · %s"
+              % (prof["label"], int(slipping.sum()), len(slip),
+                 float(slip.max()) if len(slip) else float("nan"), units,
+                 int(opened.sum()),
+                 "n/a" if prof["peak_utilization"] is None
+                 else "%.3f" % prof["peak_utilization"], prof["status"]))
+
+
+def fem05_plots():
+    """The rock arc: the section as the reader opens it, the two joint lines they
+    type into it, the split mesh, and the strength reduction that slides the slab
+    off the face — then the same four for the generated column set that tips on
+    its base plane instead, and one picture of the third generator's blocky mass.
+
+    Printed rather than drawn: the mesh and interface counts of both models, both
+    bracket walks trial by trial, and how far each jointed line has slipped at the
+    last standing trial.
+    """
+    import copy as _copy
+
+    from xslope import joints as xjoints
+    from xslope.plot_fem import plot_fem_data, plot_fem_results
+
+    # ---- the section as it opens, and the joints typed into it -------------- #
+    start = load_slope_data(FEM05_START)
+    _u = declared_unit_labels(start)
+    mat = start["materials"][0]
+    print("   rock        %s: γ %g %s · %s · E %g %s · ν %g · %d joint line(s)"
+          % (mat["name"], mat["gamma"], _u["unit_weight"], mat["option"],
+             mat["E"], _u["stress"], mat["nu"], len(start["joint_lines"])))
+    capture("fem05_inputs_start.png", plot_inputs, start, mode="fem",
+            title="Slope Geometry and Inputs")
+
+    slab = load_slope_data(FEM05_SLAB)
+    for row in slab["joint_lines"]:
+        print("   joint line  %-11s (%.4f, %.4f) to (%.4f, %.4f) · c %s %s · "
+              "φ %g° · t_cut %s · kn %s · ks %s"
+              % (row["label"], row["x1"], row["y1"], row["x2"], row["y2"],
+                 row["c"], _u["stress"], row["phi"], row["t_cut"], row["kn"],
+                 row["ks"]))
+    capture("fem05_inputs_joints.png", plot_inputs, slab, mode="fem",
+            title="Slope Geometry and Inputs")
+
+    # ---- part 1: the slab --------------------------------------------------- #
+    mesh = _fem05_mesh(slab)
+    fem_data, result, seconds = _fem05_solve(slab, mesh)
+    _fem05_counts("slab", slab, mesh, fem_data)
+    capture("fem05_mesh.png", plot_fem_data, fem_data)
+    _fem05_report("slab", result, seconds)
+    _fem05_joints(slab, fem_data, result)
+    # ``shear_strain`` is the panel asked for; ``joint_slip`` is what comes back.
+    # The rock is elastic, so there is no viscoplastic strain anywhere for the
+    # contour to draw, and ``plot_fem_results`` renames the panel and drops the
+    # strain colorbar rather than filling the section with a flat zero. The file
+    # is named for what it shows: the joints carrying all of the movement, which
+    # is the whole reading of a slope whose rock cannot yield.
+    capture("fem05_joint_slip.png", plot_fem_results, fem_data,
+            result["last_solution"], plot_type="shear_strain", fs=result["FS"])
+    capture("fem05_fem_blocks.png", plot_fem_results, fem_data,
+            result["last_solution"], plot_type="displace_vector",
+            fs=result["FS"])
+
+    # ---- part 2: the generated column set ----------------------------------- #
+    topple = load_slope_data(FEM05_TOPPLE)
+    zone = (topple.get("joint_zones") or [{}])[0]
+    print("   network     %d row(s) on the joints sheet · joint region %r"
+          % (len(topple["joint_lines"]), zone.get("label")))
+    capture("fem05_inputs_network.png", plot_inputs, topple, mode="fem",
+            title="Slope Geometry and Inputs")
+
+    mesh_t = _fem05_mesh(topple)
+    fem_t, result_t, seconds_t = _fem05_solve(topple, mesh_t)
+    _fem05_counts("toppling", topple, mesh_t, fem_t)
+    capture("fem05_mesh_network.png", plot_fem_data, fem_t)
+    _fem05_report("toppling", result_t, seconds_t)
+    _fem05_joints(topple, fem_t, result_t)
+    capture("fem05_joint_slip_topple.png", plot_fem_results, fem_t,
+            result_t["last_solution"], plot_type="shear_strain",
+            fs=result_t["FS"])
+    capture("fem05_fem_blocks_topple.png", plot_fem_results, fem_t,
+            result_t["last_solution"], plot_type="displace_vector",
+            fs=result_t["FS"])
+
+    # ---- the third generator, as a picture ---------------------------------- #
+    # The blocky mass is drawn and not run: it stands on the page beside the
+    # parallel set to show what a rock mass with no through-going orientation is
+    # described as. The traces go onto a COPY of the toppling model — same
+    # section, same joint region — and no workbook is written for it, because
+    # nothing on the page opens one.
+    vor = _copy.deepcopy(topple)
+    traces = xjoints.voronoi(vor, block_size=FEM05_VORONOI_BLOCK,
+                             seed=FEM05_VORONOI_SEED,
+                             region="poly:%s" % zone.get("label"), label="vor",
+                             props={"c": 0.0, "phi": topple["joint_lines"][0]["phi"]})
+    vor["joint_lines"] = list(traces)
+    print("   voronoi     block size %g %s · seed %d · region %r → %d trace(s)"
+          % (FEM05_VORONOI_BLOCK, _u["length"], FEM05_VORONOI_SEED,
+             zone.get("label"), len(traces)))
+    capture("fem05_inputs_voronoi.png", plot_inputs, vor, mode="fem",
+            title="Slope Geometry and Inputs")
+
+
+def fem05_spacing():
+    """What a closer joint set costs, measured rather than asserted.
+
+    The toppling model's column set is regenerated at three spacings — the file's
+    own 1.5 m, twice it and half it — from ``tools/build_rock_joints.py``'s own
+    dip, offset, region and properties, so each row is the shipped model with one
+    number changed. Nothing is written: the rows go onto a copy of the model in
+    memory, and the workbooks on disk are untouched.
+
+    The time reported is ONE trial of ``solve_fem`` at F = 1.0 — a single
+    viscoplastic solve at full strength, not a bracket — because that is the unit
+    a strength reduction spends its budget in, and it is the same unit at every
+    spacing.
+    """
+    import copy as _copy
+    import time
+
+    import run_tests as RT
+    import xslope.fem as _fem
+    from xslope import joints as xjoints
+    from xslope.fem import build_fem_data, solve_fem
+
+    bld = _rock_joints_module()
+    base_model = load_slope_data(FEM05_TOPPLE)
+    # The base plane is the hand-entered row the builder puts first; every row
+    # after it is the generated set, which is what the sweep replaces.
+    base_plane = base_model["joint_lines"][0]
+    print("   base plane  %-11s (%.4f, %.4f) to (%.4f, %.4f) · φ %g°"
+          % (base_plane["label"], base_plane["x1"], base_plane["y1"],
+             base_plane["x2"], base_plane["y2"], base_plane["phi"]))
+    print("   set         dip %g° · offset %g m · region %r · φ %g°"
+          % (bld.COL_DIP, bld.COL_OFFSET, bld.REGION_LABEL, bld.COL_PHI))
+
+    rows = []
+    for spacing in FEM05_SPACINGS:
+        model = _copy.deepcopy(base_model)
+        traces = xjoints.parallel_set(
+            model, dip_deg=bld.COL_DIP, spacing=spacing, offset=bld.COL_OFFSET,
+            region="poly:%s" % bld.REGION_LABEL, label="col",
+            props={"c": 0.0, "phi": bld.COL_PHI})
+        model["joint_lines"] = [dict(base_plane)] + list(traces)
+        mesh = _fem05_mesh(model)
+        fem_data = build_fem_data(model, mesh)
+        jd = fem_data.get("joint_data") or {}
+        t0 = time.time()
+        with RT._force_fast_kernel(_fem, False):
+            with contextlib.redirect_stdout(io.StringIO()):
+                sol = solve_fem(fem_data, F=1.0, debug_level=0,
+                                max_iterations=FEM05_MAX_ITERATIONS)
+        seconds = time.time() - t0
+        rows.append((spacing, len(traces), len(mesh["nodes"]),
+                     len(mesh["elements"]), int(jd.get("n", 0)), seconds,
+                     sol.get("iterations")))
+        print("   spacing %-5g %d traces · %d nodes · %d elements · %d joint "
+              "elements · %.2f s for one F = 1.0 trial (%s sweeps, %s)"
+              % (spacing, len(traces), len(mesh["nodes"]), len(mesh["elements"]),
+                 int(jd.get("n", 0)), seconds, sol.get("iterations"),
+                 "equilibrium" if sol.get("converged") else "no equilibrium"))
+
+    # Seconds to two places, because at this size the answer is a fraction of one:
+    # a trial at F = 1.0 stands, and a trial that stands stops after a few hundred
+    # sweeps. What a strength reduction spends its time on is the trials that do
+    # NOT stand, which run to the budget — so this column measures how the cost of
+    # one sweep grows with the set, not how long a bracket takes.
+    print("\n   | Spacing | Traces | Nodes | Joint elements | Sweeps | One trial at F = 1 |")
+    print("   | --- | --- | --- | --- | --- | --- |")
+    for spacing, n_traces, n_nodes, _n_el, n_joint, seconds, sweeps in rows:
+        print("   | %g m | %d | %d | %d | %s | %.2f s |"
+              % (spacing, n_traces, n_nodes, n_joint, sweeps, seconds))
+
+
+# --------------------------------------------------------------------------- #
 # COMBO-1 — Seepage into Stability
 #
 # One file, three engines, one mesh. The group runs the page's whole sequence in
@@ -6846,6 +7202,8 @@ GROUPS = {
     "fem04_tip": fem04_tip,
     "fem04_spacing": fem04_spacing,
     "fem04_wall": fem04_wall,
+    "fem05_plots": fem05_plots,
+    "fem05_spacing": fem05_spacing,
     "combo01_plots": combo01_plots,
     "combo02_plots": combo02_plots,
     "combo02_seep": combo02_seep,

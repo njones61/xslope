@@ -89,8 +89,6 @@ and they are integrated at the element's own **nodes** (Newton-Cotes, or Lobatto
 Gauss points: $L/6$, $L/6$, $2L/3$ on the three-pair element, $L/2$, $L/2$ on the two-pair one.
 Nodal integration keeps the node pairs uncoupled, which is what keeps the stress along a stiff
 interface free of the oscillation Gauss quadrature produces there (Schellekens & de Borst, 1993).
-The spread of stress along an element, measured on a direct shear test, *falls* from 15% to 1.8%
-when $k_n$ is multiplied by a hundred.
 
 ### Stiffness
 

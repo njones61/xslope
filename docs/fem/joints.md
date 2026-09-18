@@ -61,22 +61,14 @@ drawn in a style of its own, so it can be told from a line the mesh is not split
 
 ### Where a joint ends on another joint
 
-A joint that stops **on** another joint — the base of one rock column starting partway along its
-neighbor's side joint, a release joint running down onto the bedding plane beneath it — needs the
-two lines to meet at exactly one point, because the mesher only places a node where the geometry carries
-one. Whether they meet is a question of arithmetic rather than of the drawing: an endpoint computed
-from the same angle as the line it belongs on can miss it by a part in a thousand billion, and one
-stated to six decimals by a part in a million, and the sliver between the two lines is thinner than
-any mesh resolves.
+Joints may meet: a release joint can end on a bedding plane, and a block's base can start partway
+along its neighbor's side. Where two joint lines are meant to meet but the coordinates miss by a
+hair, the end is moved onto the other line before the mesh is built, so nothing has to be entered
+to more decimals than the drawing gives.
 
-So **every jointed line's end within a millionth of the section of another jointed line is moved
-onto it**, and the line it stops on is given a vertex at that same point, before the mesh is built.
-The line that carries on through is not moved: it keeps the geometry it was given. An end already on another line is left exactly where it is.
-
-Two things a joint line may not do, both refused by name in the [model
-checks](../usage/preflight.md): lie **on** another joint line along part of its length, and run
-along the outer boundary of the section, where there is material on one side only and nothing for
-the other face of the joint to be.
+Two things a joint line may not do, and the model checks refuse both by name: run along another
+joint line for part of its length, and run along the outer boundary of the section, where there is
+rock on one side only.
 
 ## The Interface Element
 

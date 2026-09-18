@@ -667,8 +667,8 @@ class RunFemDialog(QDialog):
         self.failure_criterion = QComboBox()
         for key, label in FEM_FAILURE_CRITERIA:
             self.failure_criterion.addItem(label, key)
-        cidx = self.failure_criterion.findData(defaults.get("failure_criterion",
-                                                            "non_convergence"))
+        cidx = self.failure_criterion.findData(
+            defaults.get("failure_criterion") or self._opening_criterion())
         if cidx >= 0:
             self.failure_criterion.setCurrentIndex(cidx)
         form.addRow("Failure criterion", self.failure_criterion)
@@ -829,6 +829,34 @@ class RunFemDialog(QDialog):
             reason = self.seep_time.problem()
         self._ok.setEnabled(reason is None)
         self._ok.setToolTip(reason or "")
+
+    def _opening_criterion(self):
+        """The failure criterion the dialog opens on for the model it was given.
+
+        A model with a joint in it opens on Hybrid; everything else opens on
+        Non-convergence, which is what every model without one has always used.
+
+        A strength-reduction trial on a jointed model often neither settles nor
+        runs away. The joints slip a fixed amount each sweep while the
+        displacement field stops growing, which is a slope standing still behind
+        an interface that never quite balances. Non-convergence cannot tell that
+        apart from a slope that is moving, so on a block wall it counts every
+        near-critical trial as a failure, walks the lower bound down to the
+        floor, and reports no factor of safety at all. Hybrid reads the slip and
+        the field and reports one.
+
+        Whether the model carries a joint is read with
+        :func:`xslope.mesh.extract_joint_options`, so the dialog and the mesher
+        count the same lines — both sheets, and nothing that would not be split.
+        A model the reader is still building can be refused by it, and a model
+        nothing can be read from opens on Non-convergence.
+        """
+        from xslope.mesh import extract_joint_options
+        try:
+            jointed = extract_joint_options(self._sd or {})
+        except Exception:
+            jointed = None
+        return "hybrid" if jointed else "non_convergence"
 
     def _has_reducible_tensile_cap(self):
         """Whether some material declares a tensile cutoff above zero.

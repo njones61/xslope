@@ -49,6 +49,11 @@ six lines made joints in memory:
      field exported without them reloads as a model whose interfaces went
      quiet. The round trip is exact, and a file that is not this model's is
      refused whole.
+  i. the Run FEM dialog. A model with a joint in it opens the dialog on the
+     Hybrid failure criterion and every other model opens it on
+     Non-convergence, because a near-critical trial on a jointed model settles
+     into slip the other criterion can only read as failure. A criterion the
+     user has already chosen this session still wins.
 
 Run directly:  PYTHONPATH=. python3 test/joint_surfaces_check.py
 """
@@ -61,6 +66,8 @@ import sys
 import warnings
 
 import numpy as np
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -959,6 +966,64 @@ def _leg_blocks(failures, cache):
 
 
 # --------------------------------------------------------------------------
+# i. the Run FEM dialog opens on the criterion the model needs
+# --------------------------------------------------------------------------
+
+def _leg_run_dialog(failures, cache):
+    """A jointed model opens the Run FEM dialog on Hybrid.
+
+    Under Non-convergence a near-critical trial on a jointed model counts as a
+    failure whatever its joints are doing, so the bisection walks its lower
+    bound to the floor and the run reports no factor of safety. The dialog
+    reads the model the way the mesher does — either sheet's lines — and opens
+    on the criterion that can rule on it.
+    """
+    from PySide6.QtWidgets import QApplication
+    from studio.dialogs import RunFemDialog
+
+    app = QApplication.instance() or QApplication([])   # noqa: F841
+    sd, _mesh, _fem_data, _sol = cache["solved"]
+
+    dlg = _quiet(RunFemDialog, defaults={}, slope_data=sd,
+                 material_names=[m.get("name") for m in sd.get("materials") or []])
+    if dlg.failure_criterion.currentData() != "hybrid":
+        failures.append(f"a jointed model opens the Run FEM dialog on "
+                        f"{dlg.failure_criterion.currentData()!r}, not 'hybrid'")
+    dlg.deleteLater()
+
+    # The same model with its Joint columns cleared is an ordinary bonded one.
+    plain = _model(jointed=())
+    dlg2 = _quiet(RunFemDialog, defaults={}, slope_data=plain,
+                  material_names=[m.get("name") for m in plain.get("materials") or []])
+    if dlg2.failure_criterion.currentData() != "non_convergence":
+        failures.append(f"a model with no joint opens the Run FEM dialog on "
+                        f"{dlg2.failure_criterion.currentData()!r}, not "
+                        f"'non_convergence'")
+    dlg2.deleteLater()
+
+    # A criterion already chosen this session is not overwritten by the model.
+    dlg3 = _quiet(RunFemDialog, defaults={"failure_criterion": "non_convergence"},
+                  slope_data=sd,
+                  material_names=[m.get("name") for m in sd.get("materials") or []])
+    if dlg3.failure_criterion.currentData() != "non_convergence":
+        failures.append("the model's own default overrode a criterion the user "
+                        "had already chosen this session")
+    dlg3.deleteLater()
+
+    # The joints sheet is the other source, and is read the same way.
+    sheet = _model(jointed=())
+    sheet["joint_lines"] = [{"label": "bedding", "x1": 0.0, "y1": 0.0,
+                             "x2": 10.0, "y2": 5.0, "phi": 35.0}]
+    dlg4 = _quiet(RunFemDialog, defaults={}, slope_data=sheet,
+                  material_names=[m.get("name") for m in sheet.get("materials") or []])
+    if dlg4.failure_criterion.currentData() != "hybrid":
+        failures.append("a model whose joints are on the joints sheet opens "
+                        "the Run FEM dialog on "
+                        f"{dlg4.failure_criterion.currentData()!r}, not 'hybrid'")
+    dlg4.deleteLater()
+
+
+# --------------------------------------------------------------------------
 
 LEGS = (
     ("the loader's column reaches the mesher", _leg_wiring),
@@ -969,6 +1034,7 @@ LEGS = (
     ("the detail profile and its figure", _leg_details),
     ("the report's joints table", _leg_report),
     ("the blocks a joint cuts", _leg_blocks),
+    ("the Run FEM dialog opens on Hybrid", _leg_run_dialog),
 )
 
 

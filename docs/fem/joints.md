@@ -326,6 +326,8 @@ beside it, and the slip. Where the two shear curves meet is where the interface 
 generated report carries the same reading as a table: the share of each line's length standing at
 its limit, and the largest offset the two faces reached.
 
+![1D Details for one geogrid layer of a block wall built as a slip surface: the bar's tension against its capacity, the normal stress on the interface, the shear stress against its Mohr-Coulomb limit, and the slip along the line](../tutorials/images/fem03_1d_details.png){width=900}
+
 ## References
 
 Goodman, R.E., Taylor, R.L., & Brekke, T.L. (1968). A model for the mechanics of jointed rock.

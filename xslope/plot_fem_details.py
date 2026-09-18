@@ -580,7 +580,7 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
     # --- normal traction ---------------------------------------------------
     ax_n.axhline(0.0, color="0.6", linewidth=0.8)
     ax_n.plot(s, profile["tn"], "-", color=C_FORCE, linewidth=1.5)
-    ax_n.set_ylabel(_axis_label("Normal traction\n(compression +)",
+    ax_n.set_ylabel(_axis_label("Normal stress\n(compression +)",
                                 u.get("stress")), fontsize=9)
     ax_n.grid(True, **GRID)
 
@@ -589,7 +589,7 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
     tlim = np.asarray(profile["tlim"], dtype=float)
     lim, = ax_s.plot(s, tlim, "--", color=C_ENVELOPE, linewidth=1.3)
     mob, = ax_s.plot(s, ts, "-", color=C_FORCE, linewidth=1.6)
-    h, l = [lim, mob], ["Mohr-Coulomb limit", "Shear traction"]
+    h, l = [lim, mob], ["Mohr-Coulomb limit", "Shear stress"]
     slipping = np.asarray(profile["slipping"], dtype=bool)
     opened = np.asarray(profile["open"], dtype=bool)
     if slipping.any():
@@ -603,7 +603,7 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
         h.append(m)
         l.append("Open")
     ax_s.legend(h, l, loc="best", fontsize=8, frameon=False)
-    ax_s.set_ylabel(_axis_label("Shear traction", u.get("stress")), fontsize=9)
+    ax_s.set_ylabel(_axis_label("Shear stress", u.get("stress")), fontsize=9)
     ax_s.grid(True, **GRID)
 
     # --- slip --------------------------------------------------------------

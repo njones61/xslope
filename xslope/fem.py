@@ -4810,6 +4810,37 @@ _CORRECTOR_CHECKPOINTS = (300, 1000, 3000)
 # the ladder keeps every exit; SPIKE.md's "THE LADDER AND THE YIELD GATE" carries the
 # candidate ladders and their numbers.
 _CORRECTOR_RULE_EXITS = ('inconclusive', 'iteration_cap', 'runaway', 'disp_limit')
+# The same ladder, continued, for the K0 IN-SITU EQUILIBRATION of a jointed model
+# (see solve_ssrm's equilibration solve and K0_CORRECTOR_LADDER_ON).
+#
+# The equilibration is a jointed solve at full strength like any other and it creeps
+# like one: on the RS2 joint corpus it costs 250 000 sweeps on RJ-20, 218 417 on
+# RS2-49, 168 021 on RJ-13, 141 861 on RJ-1b and 109 199 on RJ-3, paid once per row
+# per bracket. Twenty of the twenty-six rows settle inside the three fixed rungs, and
+# on the six that do not the corrector is refused at all three and then not asked
+# again until the solve ends — the ladder stops at 3 000 sweeps, and everything past
+# that is the sweep crawling to the fixed point unattended.
+#
+# The continued rungs cost one Newton attempt each (a second or so, and a refusal
+# costs nothing but that) and are asked of states the loop passes through anyway.
+# Measured over the corpus they cut the equilibration to 30 002 sweeps on RJ-1b,
+# 30 014 on RS2-49, 30 011 on RS2-48 and 10 033 on RJ-3 — 1.08 million sweeps to
+# 646 000 over the 26 rows, an hour and 48 minutes of solve to an hour and 11. RJ-13
+# and RJ-20 are refused at every rung, new ones included, and are unchanged.
+#
+# What makes a continued ladder admissible HERE and not in a trial is that the
+# equilibration has no verdict to bias: a trial's certification decides whether the
+# slope stands at that strength, so an attempt manufactured at a budget makes the
+# answer a function of the budget (r30's rejected time cutoff), while the
+# equilibration's only product is an equilibrium state — force-balanced and
+# yield-admissible under the same three gates, or refused. Which sweep it is reached
+# at changes what the step COSTS, not what it MEANS.
+_K0_CORRECTOR_CHECKPOINTS = (300, 1000, 3000, 10000, 30000, 100000, 300000)
+#: The continued ladder on a jointed model's K0 in-situ equilibration, ON. False runs
+#: the equilibration on the three fixed rungs, like a trial. A refusal changes nothing
+#: either way (the corrector works on a copy of the field), and an unjointed model is
+#: unaffected: its equilibration settles in hundreds of sweeps, inside the fixed rungs.
+K0_CORRECTOR_LADDER_ON = True
 # The yield gate, ASSERTED on a corrector state before it may end a trial. The
 # reading is the invariant-form Mohr-Coulomb function over every Gauss point as a
 # fraction of the local strength scale (see _solve_fem_newton's "the verdict's own
@@ -5156,6 +5187,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               max_iterations_ceiling=50000, early_failure=True, _init_state=None,
               _softened_seed=None, fem_solver=None, _nr_export=None,
               _nr_rescue_rungs=None, _nr_seed_first=False, _corrector=True,
+              _corrector_rungs=None,
               _finite_guard=False, _finite_guard_u_max=None,
               joint_slip_stiffness_factor=None,
               joint_tangent=None, joint_tangent_factor=None,
@@ -5407,6 +5439,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             equilibrated configuration, while stresses and structural forces remain
             functions of the absolute displacement. Requires k0 and the same prepared
             model the state was produced with.
+        _corrector_rungs (sequence of int or None): INTERNAL. The sweep counts at
+            which this call offers the corrector, in place of the shipped ladder
+            ``_CORRECTOR_CHECKPOINTS``. Only the SCHEDULE changes: the attempt, the
+            three gates and the refusal handling are the same as a trial's. It is
+            what solve_ssrm's K0 in-situ equilibration continues its ladder with (see
+            ``_K0_CORRECTOR_CHECKPOINTS`` and ``K0_CORRECTOR_LADDER_ON``).
         elastic_mask (array of bool or None): Per-element mask (length n_elements)
             marking elements that are PURE LINEAR ELASTIC — held out of the
             plastic-correction loop entirely. A True element accumulates no
@@ -6064,6 +6102,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                      and (fem_data.get("joint_data") is None
                           or (JOINT_NEWTON_ON if joint_newton is None
                               else bool(joint_newton))))
+    # The rungs this call offers the corrector, which is the shipped ladder unless the
+    # caller names its own: solve_ssrm's K0 in-situ equilibration continues it (see
+    # _K0_CORRECTOR_CHECKPOINTS). Nothing else about the attempt changes with it.
+    _corrector_ladder = (tuple(int(r) for r in _corrector_rungs)
+                         if _corrector_rungs else _CORRECTOR_CHECKPOINTS)
     _corr_attempts = []
     _corr_nr_kw = None
     if _corrector_on:
@@ -7953,7 +7996,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # The plastic history is now developed enough to be worth correcting.
             # Nothing about the viscoplastic state is changed by the attempt: it is
             # copied out, and a refusal returns here with the loop untouched.
-            if _corrector_on and (iteration + 1) in _CORRECTOR_CHECKPOINTS:
+            if _corrector_on and (iteration + 1) in _corrector_ladder:
                 _c = _try_corrector(
                     u, gp_groups, f"vp{iteration + 1}",
                     total_iterations + iteration + 1,
@@ -12868,7 +12911,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             STABLE on the run's own failure criterion; if it does not, the slope does
             not stand at full strength with that initial stress (FS < 1), a warning
             is issued and the bisection proceeds without a carried in-situ state.
-            The result dict carries ``k0_equilibration`` with the outcome either way.
+            The result dict carries ``k0_equilibration`` with the outcome either way,
+            including ``certified_at`` — the checkpoint at which the Newton corrector
+            certified the in-situ state, or None where the sweep settled it by itself.
         elastic_materials (list of str or None): Material names whose elements are
             treated as PURE LINEAR ELASTIC — they skip the plastic-correction loop
             entirely and can never yield, mirroring RS2's "Plasticity
@@ -13185,9 +13230,19 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     # datum and reduces strength from there, which is what strength reduction means.
     # Cost is one extra solve per SSRM, shared by all ~10 trials and by the capture.
     #
-    # If the equilibration itself will not converge, the slope does not stand at full
-    # strength (FS < 1) and there is no in-situ state to carry. The bisection then
-    # runs on the legacy sequencing and finds the sub-unity factor of safety.
+    # The equilibration is a solve like any other, so the Newton corrector is offered
+    # its state at checkpoints exactly as it is offered a trial's, with the same three
+    # gates and the same refusal handling. On a JOINTED model the ladder is continued
+    # past 3 000 sweeps (_K0_CORRECTOR_CHECKPOINTS), because that is where a jointed
+    # equilibration's cost is: the rows that creep here are refused at all three fixed
+    # rungs and then crawl for another hundred thousand sweeps or more with nothing
+    # asked of them. A certification is an equilibrium under the same gates, reached
+    # sooner; a refusal leaves the sweep exactly where it was.
+    #
+    # If the equilibration itself will not converge — and is not certified — the slope
+    # does not stand at full strength (FS < 1) and there is no in-situ state to carry.
+    # The bisection then runs on the legacy sequencing and finds the sub-unity factor
+    # of safety, with every trial starting cold.
     init_state = None
     equilibration = None
     if k0 is not None:
@@ -13218,7 +13273,12 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             joint_tangent=joint_tangent,
             joint_tangent_factor=joint_tangent_factor,
             joint_newton=joint_newton,
+            _corrector_rungs=(
+                _K0_CORRECTOR_CHECKPOINTS
+                if (K0_CORRECTOR_LADDER_ON
+                    and fem_data.get("joint_data") is not None) else None),
             _prepared=prep)
+        _eq_cert = eq.get("corrector") or {}
         equilibration = {
             "converged": bool(eq["converged"]),
             "stable": bool(eq["stable"]),
@@ -13227,6 +13287,12 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             "max_displacement": float(eq["max_displacement"]),
             "n_plastic": int(np.count_nonzero(eq["plastic_elements"])),
             "unbalanced_force_ratio": float(eq["unbalanced_force_ratio"]),
+            # Whether the state carried into the trials is one the corrector
+            # certified, and at which checkpoint — so a run can be read for how the
+            # in-situ state was reached as well as whether it was reached at all.
+            # None on an equilibration the sweep settled by itself.
+            "certified_at": (_eq_cert.get("checkpoint") or None),
+            "nr_iterations": (_eq_cert.get("nr_iterations") or None),
         }
         # The state counts as established on the SAME standard the bisection uses to
         # call a slope standing — `stable`, which under the default criterion also

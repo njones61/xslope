@@ -724,7 +724,10 @@ def capture_joint_network_dialog():
     dlg = BuildNetworkDialog(d, d.get("joint_lines") or [], None)
     dlg._name.setText("bed")
     dlg._kind.setCurrentIndex(0)                       # parallel set
-    for key, value in (("dip", "-35"), ("spacing", "2.5"), ("offset", "0")):
+    # The face descends to the LEFT, so the bedding has to as well to daylight in
+    # it — the case a user reaches for slip joints over. The dialog's dip is
+    # counter-clockwise from horizontal, so that is the positive sign here.
+    for key, value in (("dip", "35"), ("spacing", "2.5"), ("offset", "0")):
         dlg._param_edits["parallel"][key].setText(value)
     for key, value in (("c", "0"), ("phi", "38"), ("dil", "5"), ("t_cut", "0")):
         dlg._prop_edits[key].setText(value)

@@ -44,14 +44,15 @@ representations a sheet wants is set out under
 
 ## The Split Mesh
 
-Where a joint line runs, the mesher gives every node on it **one copy per wedge of material around
-it**. A node in the middle of a line has material above and below, so it becomes two nodes at the
-same point. A node where two joint lines cross sits at the middle of four wedges and becomes four.
-A node where one joint line ends on another has three wedges and becomes three. Each element keeps
-the copy on its own side of every line through the point, so the wedges are free to move relative to
-one another, and the interface elements between the copies are what hold them together.
+Where a joint line runs, the mesher gives every node on it **one copy for each piece of material
+around it**. A node in the middle of a line has material above and below, so it becomes two nodes at
+the same point, one on each side. Where two joint lines cross, the node sits at the middle of four
+wedges of material and becomes four; where one joint line ends on another, three wedges and three
+copies. Each element keeps the copy on its own side of every line through the point, so the pieces
+are free to move relative to one another, and the interface elements between the copies are what
+hold them together.
 
-![The mesh around one node on a joint line, at a crossing of two joint lines and at a termination, with the wedges drawn pulled apart along the joint traces and one node copy standing in each](images/joint_mesh_split.png){width=760}
+![The mesh around one node on a joint line, at a crossing of two joint lines and at a termination, with the pieces of material drawn pulled apart along the joint traces and one node copy standing in each](images/joint_mesh_split.png){width=760}
 
 The split is invisible on a mesh plot, because the copies stand at one point; a jointed line is
 drawn in its own style so it can be told from a bonded one.

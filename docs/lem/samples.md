@@ -432,7 +432,7 @@ unconservatively high factor of safety.
 #### LEM vs. FEM Comparison
 
 The same model solved with the finite element engine (see
-[Tutorial FEM-3](../tutorials/fem03_piles.md)) reads FS = 1.363 with the
+[Tutorial FEM-4](../tutorials/fem04_piles.md)) reads FS = 1.363 with the
 piles and 1.137 without them, where Spencer reads 1.842 with them and 1.149 without. The two engines
 credit the same row by factors of 1.20 and 1.60. That gap is an idealization, not a numerical difference:
 a plane-strain finite element model has no space between the piles, so it represents the row as a

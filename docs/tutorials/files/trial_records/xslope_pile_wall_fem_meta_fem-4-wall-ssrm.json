@@ -1,5 +1,5 @@
 {
-  "benchmark": "FEM-3-wall-ssrm",
+  "benchmark": "FEM-4-wall-ssrm",
   "analysis": "ssrm",
   "FS": 1.72265625,
   "expected_fs": "1.723",

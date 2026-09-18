@@ -1,5 +1,5 @@
 {
-  "benchmark": "FEM-3-bare-ssrm",
+  "benchmark": "FEM-4-bare-ssrm",
   "analysis": "ssrm",
   "FS": 1.13671875,
   "expected_fs": "1.137",

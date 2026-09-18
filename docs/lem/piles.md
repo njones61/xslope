@@ -331,7 +331,7 @@ A pile row can be put into either of XSLOPE's engines, but the two are not alter
 
 For a **continuous member** the beam formulation is an exact description rather than an idealization, its $EA$ and $EI$ already are per unit width, and it returns internal actions that a limit equilibrium analysis cannot produce at all. That path is measured end to end against GeoStudio's SIGMA/W sheet pile wall example, where XSLOPE reads 1.020 without the wall against their about 1.025 and recovers the published moment and shear distributions in shape and turning point; with the wall in place it reads 1.647 against their about 1.4 — see [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) and [Applicability](../fem/piles.md#applicability-continuous-walls-and-discrete-pile-rows) in the FEM pile documentation.
 
-For a **discrete row** the limit equilibrium route is the one whose mechanism is the real one. The size of the difference is measured on the pile model of [the sample problem](samples.md#10-slope-stabilized-with-piles) and [FEM-3](../tutorials/fem03_piles.md) — a 1:1 slope in c = 200 psf, $\phi$ = 20° soil with two rows of 2 ft drilled shafts at 6 ft spacing — which is solved by both engines on the same section, soil and pile rows:
+For a **discrete row** the limit equilibrium route is the one whose mechanism is the real one. The size of the difference is measured on the pile model of [the sample problem](samples.md#10-slope-stabilized-with-piles) and [FEM-4](../tutorials/fem04_piles.md) — a 1:1 slope in c = 200 psf, $\phi$ = 20° soil with two rows of 2 ft drilled shafts at 6 ft spacing — which is solved by both engines on the same section, soil and pile rows:
 
 | | Without piles | With piles | Credit for the row |
 |---|---|---|---|

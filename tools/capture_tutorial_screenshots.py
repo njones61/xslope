@@ -2498,32 +2498,32 @@ SHOTS.update({
 
 
 # --------------------------------------------------------------------------- #
-# FEM-3 — Piles: LEM against FEM
+# FEM-4 — Piles: LEM against FEM
 # --------------------------------------------------------------------------- #
 #: The discrete row: one model, two sample pages.  The page links the
 #: limit-equilibrium copy and enters the mesh and the bracket by hand, so every
 #: dialog below is photographed on a mesh built here at the page's own settings
 #: rather than on a committed companion.
-FEM03_PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
+FEM04_PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
 #: The continuous wall: the completed file of the page's second half, written by
 #: ``tools/build_pile_wall_tutorial.py`` on the same slope.
-FEM03_WALL_DONE = os.path.join(REPO_ROOT,
+FEM04_WALL_DONE = os.path.join(REPO_ROOT,
                                "docs/tutorials/files/xslope_pile_wall.xlsx")
 #: The mesh the page builds for both models, and the finer 1D element size its
 #: optional refinement step enters.
-FEM03_ELEMENT_TYPE = "tri6"
-FEM03_TARGET_SIZE = 2.0
-FEM03_REFINED_1D = 0.5
+FEM04_ELEMENT_TYPE = "tri6"
+FEM04_TARGET_SIZE = 2.0
+FEM04_REFINED_1D = 0.5
 #: The strength-reduction settings the page runs every trial at.  The bracket
 #: reaches 2.0 because the socketed runs stand at 1.6 and above; everything else
 #: is the dialog as it opens.
-FEM03_BRACKET = (1.0, 2.0)
-FEM03_TOLERANCE = 0.01
-FEM03_MAX_ITERATIONS = 12000
-FEM03_CRITERION = "non_convergence"
+FEM04_BRACKET = (1.0, 2.0)
+FEM04_TOLERANCE = 0.01
+FEM04_MAX_ITERATIONS = 12000
+FEM04_CRITERION = "non_convergence"
 
 
-def _fem03_meshed(path, element_size_1d=None):
+def _fem04_meshed(path, element_size_1d=None):
     """The model with a mesh attached — the state Build Mesh leaves behind, and
     the only state Studio's Run FEM action is reachable in.
 
@@ -2540,14 +2540,14 @@ def _fem03_meshed(path, element_size_1d=None):
     with contextlib.redirect_stdout(io.StringIO()):
         data["mesh"] = build_mesh_from_polygons(
             get_material_polygons(data, reinf_lines=lines),
-            FEM03_TARGET_SIZE, FEM03_ELEMENT_TYPE, lines=lines or None,
+            FEM04_TARGET_SIZE, FEM04_ELEMENT_TYPE, lines=lines or None,
             element_size_1d=element_size_1d,
             point_constraints=extract_point_constraints(data),
             size_regions=extract_size_regions(data))
     return data
 
 
-def fem03_piles_table():
+def fem04_piles_table():
     """The two pile rows with BOTH usage bands shown — every column the two
     engines read, side by side.
 
@@ -2565,30 +2565,30 @@ def fem03_piles_table():
     """
     from studio.editors import PilesEditor
 
-    dlg = PilesEditor().build(_load(FEM03_PILES), None)
+    dlg = PilesEditor().build(_load(FEM04_PILES), None)
     for _tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
         cb.setChecked(True)
     return _grab(_line_table(dlg, through="tip_fixity"),
-                 "fem03_studio_piles_table.png")
+                 "fem04_studio_piles_table.png")
 
 
-def fem03_run_fem_piles():
+def fem04_run_fem_piles():
     """Run FEM on the meshed pile model: strength reduction over the page's
     bracket, with the checks column beside it."""
     from studio.dialogs import RunFemDialog
 
-    data = _fem03_meshed(FEM03_PILES)
+    data = _fem04_meshed(FEM04_PILES)
     dlg = RunFemDialog(defaults={"analysis": "ssrm",
-                                 "F_min": FEM03_BRACKET[0],
-                                 "F_max": FEM03_BRACKET[1],
-                                 "tolerance": FEM03_TOLERANCE},
+                                 "F_min": FEM04_BRACKET[0],
+                                 "F_max": FEM04_BRACKET[1],
+                                 "tolerance": FEM04_TOLERANCE},
                        material_names=[m.get("name") for m in data["materials"]],
                        slope_data=data)
     dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "fem03_studio_run_fem_piles.png")
+    return _grab(dlg, "fem04_studio_run_fem_piles.png")
 
 
-def fem03_wall_row():
+def fem04_wall_row():
     """The one row the reader adds, in the editor's table view: the wall's two
     endpoints, its axial and bending section constants entered directly, spacing
     1, a moment capacity, and D and Vcap left empty.
@@ -2600,12 +2600,12 @@ def fem03_wall_row():
     """
     from studio.editors import PilesEditor
 
-    dlg = _fem_only(PilesEditor().build(_load(FEM03_WALL_DONE), None))
+    dlg = _fem_only(PilesEditor().build(_load(FEM04_WALL_DONE), None))
     return _grab(_line_table(dlg, through="tip_fixity"),
-                 "fem03_studio_wall_row.png")
+                 "fem04_studio_wall_row.png")
 
 
-def fem03_build_mesh_1d():
+def fem04_build_mesh_1d():
     """Build Mesh with the page's optional refinement entered: tri6 at 2 ft, and
     a 1D element size of 0.5 ft.
 
@@ -2617,31 +2617,31 @@ def fem03_build_mesh_1d():
     """
     from studio.dialogs import BuildMeshDialog
 
-    dlg = BuildMeshDialog(defaults={"element_type": FEM03_ELEMENT_TYPE,
-                                    "target_size": FEM03_TARGET_SIZE,
+    dlg = BuildMeshDialog(defaults={"element_type": FEM04_ELEMENT_TYPE,
+                                    "target_size": FEM04_TARGET_SIZE,
                                     "auto_size": False,
-                                    "element_size_1d": FEM03_REFINED_1D})
+                                    "element_size_1d": FEM04_REFINED_1D})
     dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "fem03_studio_build_mesh_1d.png")
+    return _grab(dlg, "fem04_studio_build_mesh_1d.png")
 
 
-def fem03_run_fem_wall():
+def fem04_run_fem_wall():
     """Run FEM on the meshed wall model, at the bracket the page's numbers are
     measured over."""
     from studio.dialogs import RunFemDialog
 
-    data = _fem03_meshed(FEM03_WALL_DONE)
+    data = _fem04_meshed(FEM04_WALL_DONE)
     dlg = RunFemDialog(defaults={"analysis": "ssrm",
-                                 "F_min": FEM03_BRACKET[0],
-                                 "F_max": FEM03_BRACKET[1],
-                                 "tolerance": FEM03_TOLERANCE},
+                                 "F_min": FEM04_BRACKET[0],
+                                 "F_max": FEM04_BRACKET[1],
+                                 "tolerance": FEM04_TOLERANCE},
                        material_names=[m.get("name") for m in data["materials"]],
                        slope_data=data)
     dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "fem03_studio_run_fem_wall.png")
+    return _grab(dlg, "fem04_studio_run_fem_wall.png")
 
 
-def fem03_wall_details():
+def fem04_wall_details():
     """The 1D Details panel on the wall with its tip fixed: lateral displacement,
     shear, bending moment and soil reaction down its length.
 
@@ -2657,29 +2657,29 @@ def fem03_wall_details():
     from studio.fem_details_dialog import FemDetailsDialog
     from xslope.fem import build_fem_data, solve_ssrm
 
-    data = _fem03_meshed(FEM03_WALL_DONE)
+    data = _fem04_meshed(FEM04_WALL_DONE)
     data["pile_lines"][0]["tip_fixity"] = "fixed"
     with contextlib.redirect_stdout(io.StringIO()):
         fem_data = build_fem_data(data, data["mesh"])
-        result = solve_ssrm(fem_data, F_min=FEM03_BRACKET[0],
-                            F_max=FEM03_BRACKET[1], tolerance=FEM03_TOLERANCE,
-                            debug_level=0, failure_criterion=FEM03_CRITERION,
-                            max_iterations=FEM03_MAX_ITERATIONS)
+        result = solve_ssrm(fem_data, F_min=FEM04_BRACKET[0],
+                            F_max=FEM04_BRACKET[1], tolerance=FEM04_TOLERANCE,
+                            debug_level=0, failure_criterion=FEM04_CRITERION,
+                            max_iterations=FEM04_MAX_ITERATIONS)
     dlg = FemDetailsDialog(fem_data, result["last_solution"], data,
-                           model_path=FEM03_WALL_DONE,
+                           model_path=FEM04_WALL_DONE,
                            failure_solution=result.get("failure_solution"))
     dlg.resize(1140, 660)
     dlg.list.setCurrentRow(dlg.list.count() - 1)
-    return _grab(dlg, "fem03_studio_wall_1d_details.png")
+    return _grab(dlg, "fem04_studio_wall_1d_details.png")
 
 
 SHOTS.update({
-    "fem03_piles_table": fem03_piles_table,
-    "fem03_run_fem_piles": fem03_run_fem_piles,
-    "fem03_wall_row": fem03_wall_row,
-    "fem03_build_mesh_1d": fem03_build_mesh_1d,
-    "fem03_run_fem_wall": fem03_run_fem_wall,
-    "fem03_wall_details": fem03_wall_details,
+    "fem04_piles_table": fem04_piles_table,
+    "fem04_run_fem_piles": fem04_run_fem_piles,
+    "fem04_wall_row": fem04_wall_row,
+    "fem04_build_mesh_1d": fem04_build_mesh_1d,
+    "fem04_run_fem_wall": fem04_run_fem_wall,
+    "fem04_wall_details": fem04_wall_details,
 })
 
 

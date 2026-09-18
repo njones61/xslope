@@ -83,14 +83,14 @@ TAGGED = {
 
 #: Models whose sample section is gone from the page but whose companions are
 #: still fixtures. The reinforced slope and the two pile models were written up
-#: on ``docs/fem/samples.md`` until the tutorials FEM-2 and FEM-3 built and ran
+#: on ``docs/fem/samples.md`` until the tutorials FEM-2 and FEM-4 built and ran
 #: the same models step by step; the sections went, the workbooks stayed —
 #: ``ROUNDTRIP_FILES``, the FEM preflight bases, ``report_check``,
 #: ``fem_1d_details_check`` and ``nr_ssrm_check`` all open them by path — and so
 #: their companions still have to be rebuildable. What the retired tags specified
 #: is kept here in the same shape a parsed tag has, so ``build_tagged`` reads one
 #: or the other and solves the same run either way. These are no longer
-#: regression locks: FEM-2 and FEM-3 lock the same models at their own brackets,
+#: regression locks: FEM-2 and FEM-4 lock the same models at their own brackets,
 #: and the factors of safety below are what these brackets produced.
 RETIRED = {
     "reinforce": {"expected_fs": 1.534, "element_type": "tri6", "target_size": 2.0,

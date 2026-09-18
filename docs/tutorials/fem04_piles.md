@@ -1,9 +1,9 @@
 ---
-title: "Tutorial FEM-3 — Piles: LEM vs FEM"
+title: "Tutorial FEM-4 — Piles: LEM vs FEM"
 description: "Two rows of drilled shafts and a sheet pile wall on the same slope, each put through both of XSLOPE's engines — why a plane-strain finite element model turns a discrete pile row into a continuous wall, what the pile tip and the shafts' own moment capacity do to what the two engines say about the same shafts, and the moment, shear and deflection a wall carries, which no limit equilibrium analysis can report."
 ---
 
-# Tutorial FEM-3 — Piles: LEM vs FEM
+# Tutorial FEM-4 — Piles: LEM vs FEM
 
 Here we look at which of XSLOPE's two engines models which kind of pile, and why
 that is a question about the structural member itself — the pile row or the wall
@@ -76,7 +76,7 @@ minutes, depending on the machine; only the slow ones are called out below.
 
 ## The slope
 
-![A 20 ft clay slope stabilized by two rows of 2 ft drilled shafts at 6 ft centers](images/fem03_piles_problem_sketch.png){width=1000}
+![A 20 ft clay slope stabilized by two rows of 2 ft drilled shafts at 6 ft centers](images/fem04_piles_problem_sketch.png){width=1000}
 
 The slope is a single medium-stiff clay — γ = 120 pcf, c = 200 psf, φ = 20° —
 standing 20 ft at 1:1 over a rigid base 10 ft below the toe, with no water in
@@ -98,13 +98,13 @@ Before either member goes in, we run the slope with nothing in it, both ways. Do
 [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx) and open it with
 **File → Open…** — the same slope with no structural line in it at all:
 
-![The bare slope: the same section with nothing in it](images/fem03_inputs_wall.png){width=1000}
+![The bare slope: the same section with nothing in it](images/fem04_inputs_wall.png){width=1000}
 
 The mode strip opens on **LEM**. **Run → Run LEM…**, `Spencer`, `Auto search`,
 40 slices, **Run**: **FS = 1.149**, the same search we run on this bare slope in
 [LEM-12](lem12_piles.md#what-the-two-rows-are-worth).
 
-![Spencer's critical circle on the bare slope](images/fem03_lem_solution_bare.png){width=1000}
+![Spencer's critical circle on the bare slope](images/fem04_lem_solution_bare.png){width=1000}
 
 The critical circle enters at the toe and exits on the crest about 6 ft behind
 its edge, bottoming at the toe elevation rather than below it — the shallow
@@ -121,14 +121,14 @@ It takes longer than the piled runs that follow, because a slope closer to
 failing takes more iterations at each trial to decide.
 **FS = 1.137**.
 
-![The strength-reduction mechanism at failure on the bare slope](images/fem03_fem_shear_bare.png){width=1000}
+![The strength-reduction mechanism at failure on the bare slope](images/fem04_fem_shear_bare.png){width=1000}
 
 The shear band starts at the toe, where the strain is highest, runs up through
 the body of the slope and comes out on the crest 10 to 15 ft behind its edge —
 the same surface Spencer found, drawn as a band of strain rather than a line,
 and reaching a few feet farther back.
 
-<!-- test: file=files/xslope_pile_wall_start.xlsx, type=fem_ssrm, expected_fs=1.137, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-bare-ssrm, f_stand=1.1328125, f_fail=1.140625, check=edges -->
+<!-- test: file=files/xslope_pile_wall_start.xlsx, type=fem_ssrm, expected_fs=1.137, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-4-bare-ssrm, f_stand=1.1328125, f_fail=1.140625, check=edges -->
 
 The two engines are 0.012 apart on the bare slope, the strength reduction run
 reading the lower of the two. Every larger difference
@@ -151,7 +151,7 @@ Download [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx) and open it with
 **File → Open…**. The mode strip opens on **LEM**, which is where our first run
 happens.
 
-![The pile model as it opens: two rows through the face and the starting circle](images/fem03_inputs_piles.png){width=1000}
+![The pile model as it opens: two rows through the face and the starting circle](images/fem04_inputs_piles.png){width=1000}
 
 The Inputs plot draws the section, the two pile rows as green bars running from
 the face down to the hatched maximum-depth line at elevation −10, and the dashed
@@ -161,7 +161,7 @@ Open **Piles** in the **Inputs** dock and press **Table view**. Leave both
 **Show parameters for:** toggles ticked, because this model is the case where
 both bands matter at once:
 
-![The two pile rows with both usage bands shown](images/fem03_studio_piles_table.png)
+![The two pile rows with both usage bands shown](images/fem04_studio_piles_table.png)
 
 The columns are colored by which engine reads them. Red is limit equilibrium
 only: `H`, the stated pile force, and `Appl`, how that force enters the
@@ -207,7 +207,7 @@ because it satisfies both force and moment equilibrium, which makes it the
 closest limit equilibrium statement of what a strength reduction run solves.
 Click **Run**.
 
-![Spencer's critical circle, with the two pile crossings marked](images/fem03_lem_solution_piles.png){width=1000}
+![Spencer's critical circle, with the two pile crossings marked](images/fem04_lem_solution_piles.png){width=1000}
 
 **FS = 1.842**, on a deep circle that leaves the ground 13.5 ft beyond the toe
 and exits on the crest at x = 35. The two red dots are where it crosses the pile
@@ -235,7 +235,7 @@ The mesh comes out at **3,180 nodes and 1,521 triangles**, with the two pile
 rows carried in as constraints and discretized into **18 beam elements** — 8 on
 the lower row and 10 on the upper one:
 
-![The pile-row mesh: tri6 at 2 ft, the two rows as chains of beam elements on element edges](images/fem03_mesh_piles.png){width=1000}
+![The pile-row mesh: tri6 at 2 ft, the two rows as chains of beam elements on element edges](images/fem04_mesh_piles.png){width=1000}
 
 The two rows are drawn in green, each a chain of beam elements lying on
 triangle edges and sharing nodes with the clay on both sides; the base is fixed
@@ -249,7 +249,7 @@ not geometry.
 
 Click **Run → Run FEM…**
 
-![Run FEM on the meshed pile model](images/fem03_studio_run_fem_piles.png)
+![Run FEM on the meshed pile model](images/fem04_studio_run_fem_piles.png)
 
 **Model checks** finds no problems, and **Run** is enabled. One note sits under
 that line: the two pile rows carry a diameter with no `Area` or `I`, so the
@@ -264,9 +264,9 @@ Leave everything else as it is and click **Run**.
 
 **FS = 1.363**. Spencer's method gave 1.842 on the same file.
 
-<!-- test: file=../lem/files/xslope_piles.xlsx, type=fem_ssrm, expected_fs=1.363, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-piles-ssrm, f_stand=1.359375, f_fail=1.3671875, check=edges -->
+<!-- test: file=../lem/files/xslope_piles.xlsx, type=fem_ssrm, expected_fs=1.363, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-4-piles-ssrm, f_stand=1.359375, f_fail=1.3671875, check=edges -->
 
-![The mechanism at failure, with the pile rows colored by shear force](images/fem03_fem_shear_piles.png){width=1000}
+![The mechanism at failure, with the pile rows colored by shear force](images/fem04_fem_shear_piles.png){width=1000}
 
 The contours are viscoplastic shear strain — the shearing left after the elastic
 response is subtracted — and the two pile lines are drawn in green, each beam
@@ -312,7 +312,7 @@ the same answer here, and `fixed` is the only setting that changes anything.
 
 **Results → 1D Details** on the upper row shows what the pinned shaft is doing:
 
-![The upper row's 1D Details at failure with the tip pinned: a straight-line rotation about the toe, moment zero at both ends and peaking mid-shaft at 44% of capacity](images/fem03_piles_profile_pinned.png){width=1000}
+![The upper row's 1D Details at failure with the tip pinned: a straight-line rotation about the toe, moment zero at both ends and peaking mid-shaft at 44% of capacity](images/fem04_piles_profile_pinned.png){width=1000}
 
 The lateral displacement is a straight line from the head to zero at the toe: the
 shaft swings about its pin as a rigid bar. The moment is zero at both ends and
@@ -327,7 +327,7 @@ a fixity change, as it survived the spacing change. Run the same bracket again.
 worth more is the shafts' own capacity: six of the 18 beam elements now stand at
 their moment capacity, none at their shear capacity.
 
-![The pile rows with both tips fixed, at the captured mechanism: a compact band of shear strain around and below the two socketed toes](images/fem03_fem_shear_piles_fixed.png){width=1000}
+![The pile rows with both tips fixed, at the captured mechanism: a compact band of shear strain around and below the two socketed toes](images/fem04_fem_shear_piles_fixed.png){width=1000}
 
 The title records that this capture stopped at iteration 38: the displacements
 ran away past the bound the capture allows, so the run kept the last finite
@@ -343,7 +343,7 @@ are, and what moves has to pass under them.
 Open **Results → 1D Details** on the upper row again and set **Field state** to
 **Last converged**, the last state at which the slope stood in equilibrium:
 
-![The upper row's 1D Details with the tip fixed, at the last converged state: bending against the restraint, the moment at capacity from 16 ft down to the toe](images/fem03_piles_profile_fixed.png){width=1000}
+![The upper row's 1D Details with the tip fixed, at the last converged state: bending against the restraint, the moment at capacity from 16 ft down to the toe](images/fem04_piles_profile_fixed.png){width=1000}
 
 The head moves 0.19 ft and the displacement profile is curved: the shaft is
 bending, not rotating about a pin. The moment is zero at the free head, reaches
@@ -389,7 +389,7 @@ between about 2 and 8, so the 3 ft point sits below the band and raises the
 [LEM-12](lem12_piles.md#what-the-spacing-is-worth). Each limit equilibrium point
 is its own Spencer search, because spacing changes which surface governs.
 
-![Factor of safety against pile spacing: the limit equilibrium curve and the two strength reduction lines](images/fem03_spacing_sweep.png){width=800}
+![Factor of safety against pile spacing: the limit equilibrium curve and the two strength reduction lines](images/fem04_spacing_sweep.png){width=800}
 
 The limit equilibrium answer falls from 2.193 to 1.409 over that range, 36%.
 With the tips pinned the strength reduction answer barely moves: 1.363 at 3 ft
@@ -487,7 +487,7 @@ what end condition they could carry it.
 
 ## The continuous wall
 
-![A 20 ft clay slope with a PZ-27 sheet pile wall at x = 10 from the face to the rigid base](images/fem03_wall_problem_sketch.png){width=1000}
+![A 20 ft clay slope with a PZ-27 sheet pile wall at x = 10 from the face to the rigid base](images/fem04_wall_problem_sketch.png){width=1000}
 
 The second half is the case the finite element engine is right for: a member
 that really is continuous out of plane. It is the same slope as above — the same
@@ -530,7 +530,7 @@ view**, and click **Add row**. The new row opens with its **Label** reading
 `Pile`; type `sheet pile wall` over it, which is the name the results panels
 use.
 
-![The wall row: S = 1, no diameter, section constants entered directly](images/fem03_studio_wall_row.png)
+![The wall row: S = 1, no diameter, section constants entered directly](images/fem04_studio_wall_row.png)
 
 Enter the geometry — `x1` 10, `y1` 10, `x2` 10, `y2` −10 — then `E`
 `4176000000`, which the cell redisplays as `4.176e+09`, `I` `0.00888` and `Area`
@@ -558,11 +558,11 @@ with it in place. **Run → Build Mesh…** and **Build**. The mesh comes out at
 **3,157 nodes and 1,510 triangles**, one triangle more than the bare slope, with
 the wall discretized into **10 beam elements** over its 20 ft:
 
-![The wall mesh: tri6 at 2 ft, the wall as a chain of 10 beam elements](images/fem03_mesh_wall.png){width=1000}
+![The wall mesh: tri6 at 2 ft, the wall as a chain of 10 beam elements](images/fem04_mesh_wall.png){width=1000}
 
 Click **Run → Run FEM…**
 
-![Run FEM on the meshed wall model](images/fem03_studio_run_fem_wall.png)
+![Run FEM on the meshed wall model](images/fem04_studio_run_fem_wall.png)
 
 **Model checks** finds no problems, and carries no note this time: the wall
 states its own `I` and `Area`, so nothing is derived. The bracket is
@@ -571,9 +571,9 @@ already `1.00` to `2.00`. Click
 
 **FS = 1.723**. The wall takes the slope from 1.137 to 1.723.
 
-<!-- test: file=files/xslope_pile_wall.xlsx, type=fem_ssrm, expected_fs=1.723, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-wall-ssrm, f_stand=1.71875, f_fail=1.7265625, check=edges -->
+<!-- test: file=files/xslope_pile_wall.xlsx, type=fem_ssrm, expected_fs=1.723, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-4-wall-ssrm, f_stand=1.71875, f_fail=1.7265625, check=edges -->
 
-![The mechanism with the wall in place](images/fem03_wall_shear_fixed.png){width=1000}
+![The mechanism with the wall in place](images/fem04_wall_shear_fixed.png){width=1000}
 
 The band takes much the route the pile model's did — up from the toe, over the
 wall, and out on the crest behind it — and it concentrates in two places, at the
@@ -588,7 +588,7 @@ report. Click **1D Details…** on the results toolbar and select the wall in th
 list on the left. Set **Field state** to **Last converged**, which is the state
 the numbers below are read at.
 
-![Lateral displacement, shear, moment and soil reaction down the wall: a cantilever fixed at the base](images/fem03_wall_profiles_fixed.png){width=1000}
+![Lateral displacement, shear, moment and soil reaction down the wall: a cantilever fixed at the base](images/fem04_wall_profiles_fixed.png){width=1000}
 
 Four profiles, all plotted against depth below the pile head, which is at
 elevation 10 — so a depth of 14.00 ft on these axes is elevation −4.00.
@@ -608,7 +608,7 @@ the toe.
 
 Switch **Field state** to **At failure**, which is the state the panel opens on:
 
-![The wall's profiles at failure: the moment at the toe on its capacity](images/fem03_wall_profiles_fixed_failure.png){width=1000}
+![The wall's profiles at failure: the moment at the toe on its capacity](images/fem04_wall_profiles_fixed_failure.png){width=1000}
 
 The extra movement takes the toe the last 9% to its capacity: the moment there
 reaches the whole 90,600 lb·ft/ft, one beam element has yielded in bending, and
@@ -627,7 +627,7 @@ wall can be meshed finer than the soil without refining the whole model:
 **1D element size** on the Build Mesh dialog sets the element length along
 every reinforcement and pile line on its own.
 
-![Build Mesh with a 1D element size of 0.5 ft](images/fem03_studio_build_mesh_1d.png)
+![Build Mesh with a 1D element size of 0.5 ft](images/fem04_studio_build_mesh_1d.png)
 
 **Run → Build Mesh…**, enter `0.5` in **1D element size**, and **Build**. The
 wall is now **40 beam elements**, and the soil mesh refines with it, from 1,510
@@ -639,7 +639,7 @@ against 90,600. Both moved: the answer came down 0.047, and the toe moment that
 stood at 91% of capacity on ten beam elements stands at 82% on forty. The
 profiles say where the rest of the run time went:
 
-![The same profiles on 40 beam elements](images/fem03_wall_profiles_refined.png){width=1000}
+![The same profiles on 40 beam elements](images/fem04_wall_profiles_refined.png){width=1000}
 
 The moment curve is the same shape, stopping farther short of the capacity line.
 The shear and soil reaction curves are the ones that change: at

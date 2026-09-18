@@ -375,7 +375,7 @@ The panel is non-modal and reads the solution it was opened with, and works the 
 its saved sidecar files as on a fresh solve.
 
 The screenshot above is a strength reduction run on the two pile rows built in
-[FEM-3](../tutorials/fem03_piles.md), read at the mechanism it developed.
+[FEM-4](../tutorials/fem04_piles.md), read at the mechanism it developed.
 
 ## References
 

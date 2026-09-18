@@ -3388,14 +3388,14 @@
         {
           "anchor": "opening-the-model-and-reading-the-pile-rows",
           "checks": [
-            "FEM-3-piles-ssrm"
+            "FEM-4-piles-ssrm"
           ],
           "level": 3,
-          "page": "tutorials/fem03_piles/",
+          "page": "tutorials/fem04_piles/",
           "resolution": "input-link",
-          "source_md": "docs/tutorials/fem03_piles.md",
+          "source_md": "docs/tutorials/fem04_piles.md",
           "title": "Opening the model and reading the pile rows",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_piles/#opening-the-model-and-reading-the-pile-rows"
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem04_piles/#opening-the-model-and-reading-the-pile-rows"
         },
         {
           "anchor": "opening-the-model",
@@ -6305,16 +6305,16 @@
       "model": "docs/tutorials/files/xslope_pile_wall.xlsx",
       "references": [
         {
-          "anchor": "tutorial-fem-3-piles-lem-vs-fem",
+          "anchor": "tutorial-fem-4-piles-lem-vs-fem",
           "checks": [
-            "FEM-3-wall-ssrm"
+            "FEM-4-wall-ssrm"
           ],
           "level": 1,
-          "page": "tutorials/fem03_piles/",
+          "page": "tutorials/fem04_piles/",
           "resolution": "input-link",
-          "source_md": "docs/tutorials/fem03_piles.md",
-          "title": "Tutorial FEM-3 — Piles: LEM vs FEM",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_piles/#tutorial-fem-3-piles-lem-vs-fem"
+          "source_md": "docs/tutorials/fem04_piles.md",
+          "title": "Tutorial FEM-4 — Piles: LEM vs FEM",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem04_piles/#tutorial-fem-4-piles-lem-vs-fem"
         }
       ],
       "topics": [
@@ -6375,15 +6375,15 @@
         {
           "anchor": "the-slope-on-its-own",
           "checks": [
-            "FEM-3-bare-ssrm",
+            "FEM-4-bare-ssrm",
             "circular_search"
           ],
           "level": 3,
-          "page": "tutorials/fem03_piles/",
+          "page": "tutorials/fem04_piles/",
           "resolution": "input-link",
-          "source_md": "docs/tutorials/fem03_piles.md",
+          "source_md": "docs/tutorials/fem04_piles.md",
           "title": "The slope on its own",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_piles/#the-slope-on-its-own"
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem04_piles/#the-slope-on-its-own"
         }
       ],
       "topics": [
@@ -9088,6 +9088,74 @@
           "lf"
         ]
       },
+      "model": "docs/verification/files/rocscience/joints/rj012.xlsx",
+      "references": [
+        {
+          "anchor": "rj-12",
+          "checks": [
+            "RJ-12"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-12: Alejano et al. ploughing toppling slab failure (rj012)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-12"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
       "model": "docs/verification/files/rocscience/joints/rj013.xlsx",
       "references": [
         {
@@ -9101,6 +9169,74 @@
           "source_md": "docs/verification/rs2_joints.md",
           "title": "RJ-13: Alejano et al. ploughing sliding slab, example 4 (rj013)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-13"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj014.xlsx",
+      "references": [
+        {
+          "anchor": "rj-14",
+          "checks": [
+            "RJ-14"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-14: Alejano et al. ploughing sliding slab, example 5 (rj014)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-14"
         }
       ],
       "topics": [
@@ -9303,6 +9439,74 @@
           "source_md": "docs/verification/rs2_joints.md",
           "title": "RJ-18: Step-path failure, continuous joints (rj018)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-18"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj019.xlsx",
+      "references": [
+        {
+          "anchor": "rj-19",
+          "checks": [
+            "RJ-19"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-19: Bi-planar step-path failure (rj019)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-19"
         }
       ],
       "topics": [
@@ -26154,7 +26358,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 368,
+    "models": 371,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -26166,7 +26370,7 @@
       "tutorials/combo03_fs_vs_time/",
       "tutorials/fem01_strength_reduction/",
       "tutorials/fem02_reinforcement/",
-      "tutorials/fem03_piles/",
+      "tutorials/fem04_piles/",
       "tutorials/lem03_layered_slope/",
       "tutorials/lem04_water_in_the_slope/",
       "tutorials/lem05_weak_layer_noncircular/",
@@ -26193,12 +26397,12 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 634,
+    "tags": 637,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 175,
-      "non-circular": 43,
+      "homogeneous": 178,
+      "non-circular": 46,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
@@ -26299,10 +26503,13 @@
       "docs/verification/files/rocscience/joints/rj009.xlsx",
       "docs/verification/files/rocscience/joints/rj010.xlsx",
       "docs/verification/files/rocscience/joints/rj011.xlsx",
+      "docs/verification/files/rocscience/joints/rj012.xlsx",
       "docs/verification/files/rocscience/joints/rj013.xlsx",
+      "docs/verification/files/rocscience/joints/rj014.xlsx",
       "docs/verification/files/rocscience/joints/rj015.xlsx",
       "docs/verification/files/rocscience/joints/rj017.xlsx",
       "docs/verification/files/rocscience/joints/rj018.xlsx",
+      "docs/verification/files/rocscience/joints/rj019.xlsx",
       "docs/verification/files/rocscience/rs2_56a.xlsx",
       "docs/verification/files/rocscience/rs2_56b.xlsx",
       "docs/verification/files/rocscience/rs2_57a.xlsx",
@@ -26436,8 +26643,11 @@
       "docs/verification/files/rocscience/joints/rj009.xlsx",
       "docs/verification/files/rocscience/joints/rj010.xlsx",
       "docs/verification/files/rocscience/joints/rj011.xlsx",
+      "docs/verification/files/rocscience/joints/rj012.xlsx",
       "docs/verification/files/rocscience/joints/rj013.xlsx",
+      "docs/verification/files/rocscience/joints/rj014.xlsx",
       "docs/verification/files/rocscience/joints/rj018.xlsx",
+      "docs/verification/files/rocscience/joints/rj019.xlsx",
       "docs/verification/files/rocscience/vp008.xlsx",
       "docs/verification/files/rocscience/vp009.xlsx",
       "docs/verification/files/rocscience/vp017.xlsx",

@@ -2036,13 +2036,13 @@ def check_k0_initial_stress():
 
 # The pile cases (SPIKE.md, "PILES"), both at the mesh their own test tags carry.
 #
-# The FEM-3 tutorial's sheet pile wall is the one that holds an end — its tip is
+# The FEM-4 tutorial's sheet pile wall is the one that holds an end — its tip is
 # FIXED — so it is what the fixity and capacity legs run on.
 PILE_MODEL = (Path(__file__).resolve().parents[1] / 'docs' / 'tutorials' / 'files'
               / 'xslope_pile_wall.xlsx')
 PILE_SIZE = 2.0
 # The FEM pile model: two pile rows, both capacities finite, both ends free. The
-# tutorial lock is FS 1.363 (docs/tutorials/fem03_piles.md). The pair below is a bracket
+# tutorial lock is FS 1.363 (docs/tutorials/fem04_piles.md). The pair below is a bracket
 # around that lock measured COLD — a bare solve_fem at each strength, which is what
 # this check runs — and both drivers agree on both ends of it: they stand at
 # 1.35625 and fail at 1.375. Four solves instead of two whole bisections, for the

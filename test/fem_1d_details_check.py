@@ -1423,7 +1423,7 @@ def test_the_pile_is_read_at_every_node_it_stands_on():
 # returned was NaN — which the engine handed on in silence, so the figures drew
 # an empty slope and the pile panel annotated it "peak nan% of limit".
 #
-# The specimen was FEM-3's tip-fixed pile configuration. The sample below is the
+# The specimen was FEM-4's tip-fixed pile configuration. The sample below is the
 # same defect on a model the suite can afford: the shipped FEM piles file with
 # both rows' toes fixed, which turns the same runaway on and reaches a non-finite
 # field inside the capture's own default iteration budget.
@@ -1441,7 +1441,7 @@ _RUNAWAY_ITERS = 1600
 #: sample. The band is wide because the number is a property of the model and not of
 #: the rule: the classifier stops on the SHAPE of the runaway, and how far the
 #: section has moved by the time that shape is unmistakable depends on how fast this
-#: slope comes apart. Measured here at 24x, and on FEM-3's tip-fixed rows — the
+#: slope comes apart. Measured here at 24x, and on FEM-4's tip-fixed rows — the
 #: specimen this stands in for — at 44x the field at full strength.
 _RUNAWAY_U_RATIO_MAX = 60.0
 
@@ -1725,7 +1725,7 @@ def test_a_stopped_capture_is_published_and_named():
 
     The bound is a multiple of what the section moved at the last strength it
     stood at, so the state kept is a few iterations into the collapse — measured
-    on FEM-3's tip-fixed rows, a coherent toe mechanism at 11x the converged
+    on FEM-4's tip-fixed rows, a coherent toe mechanism at 11x the converged
     displacement, two iterations before the same solve blows up. So it is drawn,
     its readings are quoted, and every panel says which iteration they were read
     at (ruled 2026-09-04, revised).

@@ -1,7 +1,7 @@
-"""Build Tutorial FEM-3's wall PAIR: a continuous sheet pile wall on the pile
+"""Build Tutorial FEM-4's wall PAIR: a continuous sheet pile wall on the pile
 tutorial's own slope.
 
-FEM-3's first half puts two rows of drilled shafts through both engines.  Its
+FEM-4's first half puts two rows of drilled shafts through both engines.  Its
 second half is the case the finite element engine is right for — a member that
 really is continuous out of plane, whose section constants are already per foot
 of wall and whose stiffness is therefore not smeared over a spacing.  Keeping

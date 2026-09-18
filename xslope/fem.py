@@ -4935,7 +4935,7 @@ _FINITE_GUARD_U_FACTOR = 10.0
 # 2.0 stands 85% above, and none of the three is touched — their captures run their
 # full budget and their fields are unchanged to the last digit.
 #
-# On the runaway they are set against — FEM-3's tip-fixed pile rows — growth compounds
+# On the runaway they are set against — FEM-4's tip-fixed pile rows — growth compounds
 # at 1.2 to 1.4 per iteration for twenty iterations together, so the compounding test
 # ends that capture at iteration 38 and the state kept is the mechanism: max|u| 0.445
 # ft, peak viscoplastic shear strain 0.098 in a band between and below the two rows.
@@ -12940,7 +12940,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             anything a healthy capture does — the largest single-iteration growth
             over the whole 12,000-iteration budget is 1.08 on Griffiths & Lane 6 dry,
             1.05 on FEM-1's embankment and 1.03 on FEM-2's reinforced slope, all
-            three of which run their budget out and are unchanged by this. On FEM-3's
+            three of which run their budget out and are unchanged by this. On FEM-4's
             tip-fixed pile rows, where growth compounds at 1.2 to 1.4 an iteration,
             the capture ends at iteration 38 on a coherent mechanism at 0.445 ft; the
             same solve left alone reaches 594 ft. A capture stopped there IS the

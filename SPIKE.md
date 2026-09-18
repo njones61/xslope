@@ -4784,16 +4784,21 @@ Carrying piles without changing the bound would silently compare a length
 against a radian.
 
 The eight locked models, with the lock each carries (`docs/verification/`,
-`docs/fem/samples.md`, `docs/tutorials/fem03_piles.md`; every one at
+`docs/fem/samples.md`, `docs/tutorials/fem04_piles.md`; every one at
 tolerance 0.01):
+
+The piles tutorial was FEM-3 when this round ran. It became FEM-4 on
+2026-09-18, when a block wall on slip joints took the FEM-3 slot, and its three
+benchmark tags were renamed with it; the page and the tags are named below by
+what they are called now.
 
 | Benchmark | Model | Lock | What it exercises |
 |---|---|---|---|
 | SIGMAW-SRS-wall | `gs2_wall` | 1.647 | sheet pile wall, an elastic material, `t_cut` = 0 on two soils, a c = 0 layer |
 | VP106-FEM-free | `vp106c_fem` | 1.472 | pile row at S = 2.4, free head and tip |
 | VP106-FEM-fixed | `vp106c_fem_fix` | 1.587 | the same row with the head rotation HELD |
-| FEM-3-wall-ssrm | `xslope_pile_wall` | 1.559 | sheet pile wall, tip FIXED, a finite `M_cap` |
-| FEM-3-piles-ssrm | `xslope_piles` | 1.379 | two pile rows, finite `V_cap` AND `M_cap` |
+| FEM-4-wall-ssrm | `xslope_pile_wall` | 1.559 | sheet pile wall, tip FIXED, a finite `M_cap` |
+| FEM-4-piles-ssrm | `xslope_piles` | 1.379 | two pile rows, finite `V_cap` AND `M_cap` |
 | (FEM sample) | `xslope_piles_fem` | 1.380 | the same two rows |
 | SSRM-TORGGLER | `xslope_torggler_3a_plate` | 1.195 | a 7.5 m plate, no capacities |
 | SSRM-TORGGLER | `xslope_torggler_3b_plate` | 1.673 | a 15 m plate over a weak band |
@@ -5197,9 +5202,9 @@ Newton force evaluations, one constitutive pass each.
 
 | Benchmark | Model | Elements | Lock | Tol | VP FS | VP − lock | Newton FS | Newton − lock | driver gap | VP work | N-R work |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| FEM-3-piles-ssrm | `xslope_piles` | 1521 | 1.379 | 0.01 | 1.3789063 | −0.0001 | **1.3789063** | −0.0001 | **0.0000** | 20,534 | 32,057 |
+| FEM-4-piles-ssrm | `xslope_piles` | 1521 | 1.379 | 0.01 | 1.3789063 | −0.0001 | **1.3789063** | −0.0001 | **0.0000** | 20,534 | 32,057 |
 | (FEM sample) | `xslope_piles_fem` | 1521 | 1.380 | 0.01 | 1.3796875 | −0.0003 | **1.3796875** | −0.0003 | **0.0000** | 20,054 | 27,736 |
-| FEM-3-wall-ssrm | `xslope_pile_wall` | 1510 | 1.559 | 0.01 | 1.5585938 | −0.0004 | **1.8007813** | +0.2418 **(out)** | 0.2422 | 13,094 | 26,436 |
+| FEM-4-wall-ssrm | `xslope_pile_wall` | 1510 | 1.559 | 0.01 | 1.5585938 | −0.0004 | **1.8007813** | +0.2418 **(out)** | 0.2422 | 13,094 | 26,436 |
 | VP106-FEM-free | `vp106c_fem` | 1591 | 1.472 | 0.01 | 1.4718750 | −0.0001 | **1.5781250** | +0.1061 **(out)** | 0.1063 | 38,370 | 33,172 |
 | VP106-FEM-fixed | `vp106c_fem_fix` | 1591 | 1.587 | 0.01 | 1.5871094 | +0.0001 | **1.5941406** | +0.0071 | 0.0070 | 104,508 | 32,515 |
 | SSRM-TORGGLER | `xslope_torggler_3a_plate` | 6834 | 1.195 | 0.01 | 1.1945313 | −0.0005 | **1.1945313** | −0.0005 | **0.0000** | 33,442 | 28,067 |
@@ -8868,7 +8873,7 @@ corrector edge (28 of 191). No row reads lower than the shipped viscoplastic val
 at all, let alone by a bisection cell. Every one of the 28 carries its evidence:
 the worst yield violation over all 28 deciding edges is 2.2e-08 of local strength
 and the largest displacement is 0.099 of the model height, inside the 0.1 H bound.
-The moves run from +0.0126 (SSRM-G5) to +0.2340 (FEM-3-wall-ssrm).
+The moves run from +0.0126 (SSRM-G5) to +0.2340 (FEM-4-wall-ssrm).
 
 **2. Work — NOT met.** 0.827x against a 0.6x target. Inconclusive trials fell 35 to
 3 rather than to zero, and the formerly-inconclusive rows run at 0.531 rather than
@@ -8912,7 +8917,7 @@ every one with a certified edge. Ordered by the move:
 
 | i | benchmark | page | lock | tol | vp | hybrid | move |
 |---|---|---|---|---|---|---|---|
-| 10 | FEM-3-wall-ssrm | fem03_piles.md | 1.559 | 0.01 | 1.55859 | 1.79297 | +0.2340 |
+| 10 | FEM-4-wall-ssrm | fem04_piles.md | 1.559 | 0.01 | 1.55859 | 1.79297 | +0.2340 |
 | 80 | RS2-40-d80 | rs2.md | 1.470 | 0.02 | 1.48672 | 1.55547 | +0.0855 |
 | 79 | RS2-40-d50 | rs2.md | 1.470 | 0.02 | 1.48672 | 1.55547 | +0.0855 |
 | 107 | RS2-64b | rs2.md | 6.486 | 0.02 | 6.50586 | 6.56445 | +0.0785 |
@@ -8947,7 +8952,7 @@ holding the reported factor of safety DOWN. Second, uniform-high is exactly what
 the review warned would look like an improvement and is not automatically one — on
 the vendor comparison the Newton-high readings were closer to the source on 30 of
 57 rows and further on 25, and the largest moves were on the reinforced and piled
-rows, which is where FEM-3-wall-ssrm's +0.234 sits. The corrector's states are
+rows, which is where FEM-4-wall-ssrm's +0.234 sits. The corrector's states are
 admissible in the discrete model; whether the published value should follow them is
 the owner's call, and it is a different question from whether the solver is right.
 
@@ -9292,8 +9297,8 @@ above 3,000. The corrector was asked 2,961 times for 10,475 s, of which the gate
   no published source at all. The set does not move the corpus toward the vendors
   on balance, and that is worth weighing against the fact that every value in it
   is certified admissible where the old one was not.
-* **Two tutorials print a number in the table**: `fem03_piles.md`
-  (FEM-3-wall-ssrm, 1.559 to 1.793) and `fem02_reinforcement.md` (FEM-2-ssrm,
+* **Two tutorials print a number in the table**: `fem04_piles.md`
+  (FEM-4-wall-ssrm, 1.559 to 1.793) and `fem02_reinforcement.md` (FEM-2-ssrm,
   1.496 to 1.535). Both are full updates — prose and figures — not number swaps.
   The rest of the table lands on `docs/verification/rs2.md` (27 rows),
   `rocscience.md` (14), `ssrm.md` (8), `geostudio.md` (4) and
@@ -9304,7 +9309,7 @@ above 3,000. The corrector was asked 2,961 times for 10,475 s, of which the gate
 | i | benchmark | page | lock ± tol | vp | auto | move | decided by |
 |---|---|---|---|---|---|---|---|
 | 114 | RS2-65-m3 | rs2.md | 1.294 ± 0.02 | 1.29375 | 0.67734 | -0.61641 | yield gate |
-| 10 | FEM-3-wall-ssrm | fem03_piles.md | 1.559 ± 0.01 | 1.55859 | 1.79297 | +0.23438 | corrector at `rule:runaway` |
+| 10 | FEM-4-wall-ssrm | fem04_piles.md | 1.559 ± 0.01 | 1.55859 | 1.79297 | +0.23438 | corrector at `rule:runaway` |
 | 144 | RS2-P4-VP69-m4 | rs2.md | 1.931 ± 0.02 | 1.93125 | 1.70625 | -0.22500 | yield gate |
 | 115 | RS2-65 | rs2.md | 1.306 ± 0.02 | 1.30625 | 1.20625 | -0.10000 | yield gate |
 | 190 | SSRM-TORGGLER | ssrm.md | 1.673 ± 0.01 | 1.67266 | 1.74297 | +0.07031 | corrector at `vp3000` |

@@ -137,8 +137,8 @@ soil-geosynthetic contact carries no tension, where a rock joint may hold a litt
 
 ### Residual strength
 
-A rough surface shears through its asperities the first time it reaches its limit and does not
-rebuild them, so a joint that has slipped may be weaker than one that has not. `c_res` and
+A rough joint surface shears off its bumps and ridges (its asperities, in rock-mechanics terms) the
+first time it slips and does not grow them back, so a joint that has slipped may be weaker than one that has not. `c_res` and
 `phi_res` state what it keeps. The drop is **immediate** — the limit falls from
 $c + t_n \tan\phi$ to $c_{res} + t_n \tan\phi_{res}$ on the sweep after the one that first found the
 pair at its limit — and **permanent**: the pair stays on the residual branch for the rest of the
@@ -151,7 +151,7 @@ exceed its peak.
 
 ### Dilation
 
-A rough joint rides up on its asperities as it slides. `dil` is that angle: every unit of slip
+A rough joint rides up over the bumps on its surface as it slides. `dil` is that angle: every unit of slip
 opens the joint by tan(dil) units, and that opening is permanent. Where the joint is held shut, the
 opening it cannot make is taken up as extra compression across it, so the normal stress on the
 joint grows while it slides.

@@ -609,7 +609,7 @@ if they agree the question is settled.
 The model checks flag the bonded liner before it is run. Open the file and the
 checks column beside the Run FEM dialog shows three warnings on the liner:
 
-![The model checks on the bonded liner](images/fem03_preflight_liner.png){width=760}
+![The model checks on the bonded liner](images/fem03_preflight_liner.png){width=1000}
 
 The sheet lies on a material boundary over its whole length. It is within five
 degrees of horizontal and spans the full width of the fill above it. Its Delta

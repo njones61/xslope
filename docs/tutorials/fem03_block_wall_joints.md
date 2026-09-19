@@ -418,6 +418,18 @@ face's slip falls from **70 mm to 13 mm** and the base's from **13 mm to under
 fails by sliding down its own back, but it slides a fifth as far before the
 model stops standing.
 
+![Viscoplastic shear strain at the critical factor with the geogrid in place](images/fem03_fem_shear_grid.png){width=1000}
+
+The shear strain panel says the same thing about the soil. Part 1's band ran up
+from the heel of the wall through the reinforced fill with strains near 0.17;
+here the band is in the same place but faint, and the scale tops out near 0.06.
+The three layers have not moved the surface the fill wants to fail on. They have
+held the mass behind the facing together so that far less of it is straining
+at the critical factor, and the joint slip scale beside the strain scale has
+dropped from 70 mm to 13 mm with it. The bars themselves show dark on the
+reinforcement force scale: they carry little tension, which the next panel
+makes exact.
+
 **1D Details…** draws what one layer is doing along its length. Here is the
 middle one:
 

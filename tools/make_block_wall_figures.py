@@ -444,6 +444,8 @@ def fem03_grid():
     capture("fem03_fem_blocks_grid.png", plot_fem_results, fem_data,
             result["last_solution"], plot_type="displace_vector",
             fs=result["FS"])
+    capture("fem03_fem_shear_grid.png", plot_fem_results, fem_data,
+            result["last_solution"], plot_type="shear_strain", fs=result["FS"])
 
     last = result["last_solution"]
     rows = fem_details.list_lines(fem_data, last, grid)

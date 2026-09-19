@@ -249,9 +249,8 @@ outline dashed behind, and the whole thing exaggerated by the scale printed in
 the title. Read it first. The block column has leaned away from the fill behind
 it, and the fill has come forward into the gap.
 
-A column leaning out of the fill looks like a wall sliding forward on its base,
-or tipping about its toe. The slip on the joint faces says otherwise. Read
-contact by contact, the one doing the work is the back face:
+The slip on the joint faces puts numbers on that. Read contact by contact, the
+one doing the work is the back face:
 
 | contact | spans slipping | largest slip |
 | --- | :---: | :---: |

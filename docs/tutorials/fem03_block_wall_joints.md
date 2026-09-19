@@ -246,11 +246,11 @@ On a jointed model the displacement panel is the deformed section drawn as the
 **blocks** the joints cut it into — each block under a faint tint of its own,
 the joint faces in green colored by how far they have slid, the undeformed
 outline dashed behind, and the whole thing exaggerated by the scale printed in
-the title. The element grid is left out on purpose. On a jointed model the
-movement happens at the joints, not spread through the elements, so the grid
-would only hide the faces that carry the story. Read the panel first. The block
-column has leaned away from the fill behind it, and the fill has come forward
-into the gap.
+the title. The element grid steps back to a light gray under the blocks: on a
+jointed model the movement happens at the joints, not spread through the
+elements, so the faces carry the story and the grid only shows how each block
+deformed inside them. Read the panel first. The block column has leaned away
+from the fill behind it, and the fill has come forward into the gap.
 
 The slip on the joint faces puts numbers on that. **1D Details…** on the results
 toolbar opens one contact at a time and draws its normal stress, its shear

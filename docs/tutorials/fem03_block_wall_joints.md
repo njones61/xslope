@@ -606,8 +606,10 @@ if they agree the question is settled.
 
 ### What the model checks say before anything is run
 
-The model checks flag the bonded liner before it is run. Open the file and the
-checks column beside the Run FEM dialog shows three warnings on the liner:
+The model checks catch the wrong choice before anything is run. Open the
+bonded liner file, the one with `Joint` blank, and the checks column beside the
+Run FEM dialog shows three warnings on the liner, each saying that this sheet
+should be a slip surface and is entered as a bonded bar:
 
 ![The model checks on the bonded liner](images/fem03_preflight_liner.png){width=1000}
 
@@ -616,7 +618,7 @@ degrees of horizontal and spans the full width of the fill above it. Its Delta
 of 10° is less than 0.6 of the 32° friction angle of the soil around it, which
 makes it a smooth interface rather than a soil-geosynthetic contact. All three
 warnings point to the same thing: this is a plane the fill can slide on, and a
-bonded bar cannot model that.
+bonded bar cannot model that. Set `Joint` to Yes and the warnings go away.
 
 ### Why the wall's own sheets could not be run both ways
 

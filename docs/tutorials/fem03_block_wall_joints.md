@@ -509,7 +509,7 @@ Tmax = 100 kN/m, EA = 2000 kN/m.
 
 ![Shear strain, base geotextile as a bonded bar](images/fem03_shear_sheet_bonded.png){width=1000}
 
-The band runs up through the fill and **across** the sheet. Then `Joint = Yes`,
+Then `Joint = Yes`,
 the sheet as a slip surface,
 [xslope_base_geotextile_jointed.xlsx](files/xslope_base_geotextile_jointed.xlsx):
 
@@ -519,14 +519,8 @@ the sheet as a slip surface,
 
 ![Shear strain, the same sheet as a slip surface](images/fem03_shear_sheet_jointed.png){width=1000}
 
-The two agree exactly, and the strain fields say why. The failure surface
-goes down through the soft clay and comes back up through the fill, crossing
-the sheet once on its way. On each side of that crossing the fill above the
-sheet and the clay below it move as one mass, so along the sheet's length the
-soil does not move relative to the sheet at all. A slip surface only differs
-from a bonded bar when soil moves along it: that is when its Adhesion and
-Delta are called on, and here they never are. The sheet does the same thing in
-both runs, carrying tension across the one surface that cuts it.
+The two agree exactly: on this section, entering the sheet as a slip surface
+changes nothing about the factor of safety.
 
 ### A smooth geomembrane liner on a firm foundation
 

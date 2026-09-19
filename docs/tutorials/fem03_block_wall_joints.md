@@ -246,7 +246,7 @@ nearer twelve on an install that does not carry the
 
 >>**FS = 1.137**
 
-![The deformed blocks at the critical factor: the block column has leaned out away from the fill behind it](images/fem03_fem_blocks.png){width=1000}
+![The deformed blocks at the critical factor: the block column has leaned out away from the fill behind it](images/fem03_fem_blocks_failure.png){width=1000}
 
 On a jointed model the displacement panel is the deformed section drawn as the
 **blocks** the joints cut it into — each block under a faint tint of its own,
@@ -258,7 +258,8 @@ elements, so the faces carry the story and the grid only shows how each block
 deformed inside them. Read the panel first. The block column has leaned away
 from the fill behind it, and the fill has come forward into the gap.
 
-The slip on the joint faces puts numbers on that. **1D Details…** on the results
+The slip on the joint faces puts numbers on that, read at the last converged
+state, the wall still standing. **1D Details…** on the results
 toolbar opens one contact at a time and draws its normal stress, its shear
 stress against the Coulomb limit with the slipping stations marked, and its
 slip along the line. Here is the back face's:
@@ -287,7 +288,7 @@ upper courses are travelling as one piece. Modeling the contacts separately is w
 makes that visible. A wall meshed as a single solid can only bend, and would have
 had nothing to say about which of its seven surfaces was carrying the failure.
 
-![Viscoplastic shear strain at the critical factor](images/fem03_fem_shear.png){width=1000}
+![Viscoplastic shear strain at the critical factor](images/fem03_fem_shear_failure.png){width=1000}
 
 The shear strain shows where the soil is working. The reinforced fill behind the
 blocks is straining along a surface that runs up from the heel of the wall, which
@@ -401,7 +402,7 @@ reports
 
 >>**FS = 1.246**
 
-![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid.png){width=1000}
+![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=1000}
 
 This panel has no element grid where Part 1's did. The blocks panel drops the
 grid once a model carries more than eight jointed lines, because on a jointed
@@ -424,17 +425,15 @@ face's slip falls from **70 mm to 13 mm** and the base's from **13 mm to under
 fails by sliding down its own back, but it slides a fifth as far before the
 model stops standing.
 
-![Viscoplastic shear strain at the critical factor with the geogrid in place](images/fem03_fem_shear_grid.png){width=1000}
+![Viscoplastic shear strain at the critical factor with the geogrid in place](images/fem03_fem_shear_grid_failure.png){width=1000}
 
 The shear strain panel says the same thing about the soil. Part 1's band ran up
-from the heel of the wall through the reinforced fill with strains near 0.17;
-here the band is in the same place but faint, and the scale tops out near 0.06.
+from the heel of the wall through the reinforced fill with strains near 0.05;
+here the band is in the same place but faint, and the scale tops out near 0.04.
 The three layers have not moved the surface the fill wants to fail on. They have
-held the mass behind the facing together so that far less of it is straining
-at the critical factor, and the joint slip scale beside the strain scale has
-dropped from 70 mm to 13 mm with it. The bars themselves show dark on the
-reinforcement force scale: they carry little tension, which the next panel
-makes exact.
+held the mass behind the facing together so that less of it is straining at
+failure. The bars themselves show dark on the reinforcement force scale: they
+carry little tension, which the next panel makes exact.
 
 **1D Details…** draws what one layer is doing along its length. Here is the
 middle one:

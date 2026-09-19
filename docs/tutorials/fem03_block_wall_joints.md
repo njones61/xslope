@@ -314,7 +314,11 @@ column. Tres stays blank; the three layers are alike.
 
 Lp1 and Lp2 are 0 and grayed: Adhesion and Delta are filled, so the pullout
 capacity comes from the overburden and the development lengths are not in use.
-kn, ks and Jred stay blank. Type, Dir and Appl are read only by the limit
+**kn** and **ks** stay blank so the interface takes its stiffness from the
+fill the sheet lies in, as the wall's own joints do. **Jred** stays blank so
+the strength reduction weakens this interface along with the soil, which is
+right for a soil-geosynthetic contact: a sheet slipping through fill is a soil
+failure, not a construction detail. Type, Dir and Appl are read only by the limit
 equilibrium methods, so they do not matter to this run; the completed file has
 Type set to Geosynthetic, which is harmless. When the three rows are in, the
 editor looks like this:

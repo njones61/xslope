@@ -466,7 +466,21 @@ show both halves of it. Each is an embankment 5 m high with one sheet under it,
 each is built twice with the `Joint` cell as the only difference, and each is run
 at the settings this page has used throughout.
 
-![The Part 3 embankment: 5 m high on 2:1 slopes with a 12 m crest, on a 4 m foundation, with one 32 m sheet under it; the foundation and the sheet are given for both cases](images/fem03_sheet_problem_sketch.png){width=1000}
+![The Part 3 embankment: 5 m high on 2:1 slopes with a 12 m crest, on a 4 m foundation, with one 32 m sheet under it](images/fem03_sheet_problem_sketch.png){width=1000}
+
+The fill is the same in both cases. The foundation and the sheet are what
+change:
+
+| zone | case | γ (kN/m³) | c (kPa) | φ (°) | E (MPa) | ν |
+| --- | --- | :---: | :---: | :---: | :---: | :---: |
+| embankment fill | both | 20 | 0 | 34 | 25 | 0.3 |
+| foundation | base geotextile: soft clay | 17 | 20 | 0 | 8 | 0.35 |
+| foundation | liner: firm soil | 20 | 30 | 32 | 50 | 0.3 |
+
+| sheet | Tmax (kN/m) | Adhesion (kPa) | Delta (°) | EA (kN/m) | ends |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| base geotextile | 100 | 5 | 20 | 2000 | both free |
+| liner | 50 | 0.5 | 10 | 2000 | both free |
 
 The first is a **base geotextile** under an embankment on soft clay
 ([bonded](files/xslope_base_geotextile_bonded.xlsx),

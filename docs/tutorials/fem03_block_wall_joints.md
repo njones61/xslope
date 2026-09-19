@@ -111,72 +111,54 @@ polygons, and an empty joints worksheet. Units are metric.
 ![The starter file: the block courses, the two fill zones and the foundation, with no joints entered](images/fem03_inputs_start.png){width=1000}
 
 The joints worksheet is reached from the Inputs tree under **Joints**. Each row
-is one line. This section enters the wall's seven contacts one column at a time,
-in the order the columns appear on the editor; the screenshot below shows the
-editor as it looks once all seven are in.
+is one line: a label, the two endpoints, and the strength of the contact. The wall
+has seven contacts: one under the base of the block column, one on its back face
+against the reinforced fill, and one between each pair of courses. Enter the seven
+rows below, or paste them straight into the worksheet.
+
+| Label | x1 | y1 | x2 | y2 | c | phi |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| base | 8.0 | 0.0 | 9.2 | 0.0 | 0 | 34 |
+| back face | 9.2 | 0.0 | 9.2 | 3.6 | 0 | 30 |
+| course-01 | 8.0 | 0.6 | 9.2 | 0.6 | 0 | 35 |
+| course-02 | 8.0 | 1.2 | 9.2 | 1.2 | 0 | 35 |
+| course-03 | 8.0 | 1.8 | 9.2 | 1.8 | 0 | 35 |
+| course-04 | 8.0 | 2.4 | 9.2 | 2.4 | 0 | 35 |
+| course-05 | 8.0 | 3.0 | 9.2 | 3.0 | 0 | 35 |
+
+Every other column stays blank. When the seven rows are in, the editor looks like
+this:
 
 ![The joints editor with the wall's seven contacts entered](images/fem03_studio_joints_editor.png){width=900}
-
-**Label** names the line. It is what the model checks, the results panels and the
-report use when they have something to say about it, so a name that identifies
-the contact — `base`, `back face`, `course-01` — pays for itself the first time a
-check fires.
-
-**x1, y1, x2, y2** are the two endpoints. A joint line is straight; a contact
-that turns a corner is entered as two lines meeting at the corner.
-
-**c** and **phi** are the strength of the surface, in the same units as a soil's
-cohesion and friction angle. `phi` is required; `c` left blank is a cohesionless
-contact, which is what a dry block contact and a block-on-granular-fill contact
-both are. All seven lines here take `c` = 0.
-
-**c_res** and **phi_res** are the strength the surface keeps after it has slipped
-once, for a rough joint that shears through its asperities and does not rebuild
-them. Blank means no drop: the peak strength carries throughout, which is the
-ordinary case for a manufactured block face.
-
-**dil** is the dilation angle — how far a rough surface rides up on itself as it
-slides. Blank is zero.
-
-**t_cut** is the tension the joint can carry across itself before it opens. Blank
-is unlimited, which is almost never what a contact does, so a block contact
-states **0**: two blocks resting on one another carry no tension at all.
-
-**kn** and **ks** are the normal and shear stiffness of the contact. Left blank
-they are derived from the softer of the two materials the line runs between,
-which is what a contact between a stiff block and a soil should use, so they are
-left blank here.
-
-**Jred** decides whether the strength reduction weakens this joint along with
-everything else. Blank means yes, which is right for a soil or rock contact. It
-is set to `No` only for a joint that stands for a construction detail rather than
-a real surface — a manufactured shear key, say — and none of these do.
-
-The wall has seven contacts: one under the base of the block column, one on its
-back face against the reinforced fill, and one between each pair of courses.
-
-| Label | x | y | phi |
-| --- | ---: | ---: | :---: |
-| base | 8.00 | 0.00 | 34 |
-|  | 9.20 | 0.00 |  |
-| back face | 9.20 | 0.00 | 30 |
-|  | 9.20 | 3.60 |  |
-| course-01 | 8.00 | 0.60 | 35 |
-|  | 9.20 | 0.60 |  |
-| course-02 | 8.00 | 1.20 | 35 |
-|  | 9.20 | 1.20 |  |
-| course-03 | 8.00 | 1.80 | 35 |
-|  | 9.20 | 1.80 |  |
-| course-04 | 8.00 | 2.40 | 35 |
-|  | 9.20 | 2.40 |  |
-| course-05 | 8.00 | 3.00 | 35 |
-|  | 9.20 | 3.00 |  |
 
 The three friction angles differ because the three contacts do. The base is
 block on compacted foundation soil at 34°; the back face is block against
 granular fill at 30°, the lowest of the three because the fill is what has to
 slide past it; the course joints are block on block at 35°, the manufacturer's
-value for a dry, keyless unit.
+value for a dry, keyless unit. All seven have no cohesion: a dry block contact
+and a block-on-granular-fill contact are both cohesionless, and `c` = 0 and a
+blank `c` mean the same thing.
+
+The columns left blank each have a meaning worth knowing:
+
+- **x1, y1, x2, y2** are the two endpoints. A joint line is straight; a contact
+  that turns a corner is entered as two lines meeting at the corner.
+- **c_res** and **phi_res** are the strength the surface keeps after it has
+  slipped once, for a rough joint that shears off its surface roughness and does
+  not rebuild it. Blank means no drop: the peak strength carries throughout,
+  which is the ordinary case for a manufactured block face.
+- **dil** is the dilation angle, how far a rough surface rides up on itself as it
+  slides. Blank is zero.
+- **t_cut** is the tension the joint can carry across itself before it opens.
+  Blank is zero, and zero is right for a block contact: two blocks resting on one
+  another carry no tension at all.
+- **kn** and **ks** are the normal and shear stiffness of the contact. Left blank
+  they are derived from the softer of the two materials the line runs between,
+  which is what a contact between a stiff block and a soil should use.
+- **Jred** decides whether the strength reduction weakens this joint along with
+  everything else. Blank means yes, which is right for a soil or rock contact. It
+  is set to `No` only for a joint that stands for a construction detail rather
+  than a real surface, a manufactured shear key, say, and none of these do.
 
 ![The seven joint lines on the Inputs plot](images/fem03_inputs_joints.png){width=1000}
 

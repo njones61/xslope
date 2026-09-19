@@ -1224,7 +1224,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                              show_reinforcement=show_reinforcement,
                              cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
                              label_elements=label_elements, single_panel=defer_panel_cbar,
-                             at_failure=deform_field.get("_at_failure", False))
+                             at_failure=deform_field.get("_at_failure", False),
+                             joint_faces=show_joints, block_grid=block_grid)
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
@@ -1268,7 +1269,9 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         # A single-panel deformation view carries its Original/Deformed legend inside
         # the axes too (empty corner above the profile), so Studio matches the stack.
         if plot_types[0] == 'deformation':
-            _place_deform_legend(axes[0], show_legend)
+            # The block look (tints, dark outline, dashed original) carries its
+            # meaning in the drawing and takes no legend, like the blocks panel.
+            _place_deform_legend(axes[0], show_legend and not show_joints)
         try:
             fig.tight_layout()
         except Exception:
@@ -1311,7 +1314,9 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         # Original/Deformed legend inside the deformation panel (zero layout height),
         # replacing the old full-width legend band between panels.
         if plot_types[0] == 'deformation':
-            _place_deform_legend(axes[0], show_legend)
+            # The block look (tints, dark outline, dashed original) carries its
+            # meaning in the drawing and takes no legend, like the blocks panel.
+            _place_deform_legend(axes[0], show_legend and not show_joints)
         try:
             # The figure this stack was opened at was sized from an estimated
             # axes width; the colorbar slots just placed are what that estimate
@@ -1331,7 +1336,9 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         # Legacy multi-panel (non-default combos): inline colorbars already drawn;
         # just drop the deformation legend inside its panel.
         if plot_types and plot_types[0] == 'deformation':
-            _place_deform_legend(axes[0], show_legend)
+            # The block look (tints, dark outline, dashed original) carries its
+            # meaning in the drawing and takes no legend, like the blocks panel.
+            _place_deform_legend(axes[0], show_legend and not show_joints)
 
     if save_png:
         fig.savefig('fem_results.png', dpi=dpi, bbox_inches='tight')
@@ -1918,9 +1925,14 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     # joint's own green, the outside of the mesh in a dark line of its own — and
     # the element edges come off entirely once there are enough joints that the
     # grid is all a reader can see.
-    draw_faces = joint_faces and bool((fem_data.get("joint_data") or {}).get("n"))
+    # The same look on a model with no joint: one block, one tint, the grid in
+    # light gray under it and the deformed outline dark against the dashed
+    # original — so a bonded and a jointed run of one section draw alike, and
+    # the only difference on the page is the faces the joints add.
+    block_look = bool(joint_faces)
+    draw_faces = block_look and bool((fem_data.get("joint_data") or {}).get("n"))
     show_edges = True
-    if draw_faces:
+    if block_look:
         from .mesh import block_boundary_edges, block_components
         comp = block_components(fem_data)
         blocks, exterior = block_boundary_edges(fem_data, comp)
@@ -1931,10 +1943,10 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
         _draw_block_tints(ax, fem_data, nodes_deformed, comp)
     if show_edges:
         plot_mesh_lines(ax, fem_data_deformed,
-                        color=_DEFORMED_GRID_UNDER_JOINTS if draw_faces
+                        color=_DEFORMED_GRID_UNDER_JOINTS if block_look
                         else deformed_color,
                         alpha=1.0, linewidth=lw, label='Deformed')
-    if draw_faces:
+    if block_look:
         # The outside of the deformed mesh, as a line of its own: what moved,
         # against the dashed outline of where it was.
         if exterior:
@@ -1943,7 +1955,8 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
                 colors=_DEFORMED_BOUNDARY_COLOR,
                 linewidths=max(lw, floor_pt, _DEFORMED_BOUNDARY_PT), alpha=1.0,
                 zorder=6.4, label='Deformed (outline)'))
-        faces = [e for edges in blocks.values() for e in edges]
+        faces = ([e for edges in blocks.values() for e in edges]
+                 if draw_faces else [])
         if faces:
             ax.add_collection(LineCollection(
                 [nodes_deformed[e, :2] for e in faces],

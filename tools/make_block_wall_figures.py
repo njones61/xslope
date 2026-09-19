@@ -395,8 +395,8 @@ def fem03_wall():
     _counts("wall", wall, mesh, fem_data)
     _report("wall", result, seconds)
     _joints(wall, fem_data, result, dump="wall")
-    _both_states("fem03_fem_blocks.png", fem_data, result, "displace_vector")
-    _both_states("fem03_fem_shear.png", fem_data, result, "shear_strain")
+    _pair("fem03_fem_blocks.png", "fem03_fem_shear.png", fem_data, result,
+          "displace_vector")
     _keep_solution("wall", fem_data, result)
 
     # The back face's 1D details: the panel the page's slip table is read from,
@@ -439,8 +439,8 @@ def fem03_grid():
     _counts("wall + grid", grid, mesh, fem_data)
     _report("wall + grid", result, seconds)
     _joints(grid, fem_data, result, dump="grid")
-    _both_states("fem03_fem_blocks_grid.png", fem_data, result, "displace_vector")
-    _both_states("fem03_fem_shear_grid.png", fem_data, result, "shear_strain")
+    _pair("fem03_fem_blocks_grid.png", "fem03_fem_shear_grid.png", fem_data,
+          result, "displace_vector")
     _keep_solution("wall_grid", fem_data, result)
 
     last = result["last_solution"]
@@ -518,9 +518,8 @@ def fem03_sheets():
         # The deformation panel first (the blocks with their faces on a jointed
         # model, the deformed mesh on a bonded one), then the strain panel,
         # each in both field states.
-        _both_states(name.replace("fem03_shear_", "fem03_deform_"), fem_data,
-                     result, _deform_panel(fem_data))
-        _both_states(name, fem_data, result, "shear_strain")
+        _pair(name.replace("fem03_shear_", "fem03_deform_"), name, fem_data,
+              result, _deform_panel(fem_data))
         _keep_solution(label, fem_data, result)
 
 
@@ -544,6 +543,45 @@ def _both_states(name, fem_data, result, plot_type):
         capture(name.replace(".png", "_failure.png"), plot_fem_results, fem_data,
                 result["last_solution"], plot_type=plot_type, fs=result["FS"],
                 failure_solution=fail, field_state="failure")
+
+
+def _pair(deform_name, strain_name, fem_data, result, deform_type):
+    """A deformation panel and a strain panel that sit one above the other on
+    the page, in both field states, saved so that they MATCH: the same image
+    size, the same section frame, the same font size.
+
+    The strain panel carries colorbars, which take their width from its axes;
+    saved on its own, a deformation panel with no colorbar comes out narrower
+    and the page then scales the two differently. So each deformation figure
+    takes the strain figure's size and axes position, and both are saved to
+    the strain figure's own tight box — the deformation panel simply has empty
+    paper where the colorbars would be."""
+    import matplotlib.pyplot as plt
+    from xslope.plot_fem import plot_fem_results
+
+    fail = result.get("failure_solution")
+    states = [("converged", "")] + ([("failure", "_failure")] if fail is not None else [])
+    for state, suffix in states:
+        kw = dict(fs=result["FS"], failure_solution=fail, field_state=state)
+        with contextlib.redirect_stdout(io.StringIO()):
+            plt.close("all")
+            plot_fem_results(fem_data, result["last_solution"],
+                             plot_type=[deform_type], **kw)
+            fig_d = plt.gcf()
+            plt.close("all")
+            plot_fem_results(fem_data, result["last_solution"],
+                             plot_type=["shear_strain"], **kw)
+            fig_s = plt.gcf()
+        fig_s.canvas.draw()
+        box = fig_s.get_tightbbox(fig_s.canvas.get_renderer())
+        ax_s = fig_s.axes[0]
+        fig_d.set_size_inches(fig_s.get_size_inches())
+        fig_d.axes[0].set_position(ax_s.get_position())
+        for fig, name in ((fig_s, strain_name), (fig_d, deform_name)):
+            out = os.path.join(OUT_DIR, name.replace(".png", suffix + ".png"))
+            fig.savefig(out, dpi=200, bbox_inches=box.padded(0.1))
+            print("-> %s" % os.path.basename(out))
+        plt.close("all")
 
 
 def _keep_solution(label, fem_data, result):

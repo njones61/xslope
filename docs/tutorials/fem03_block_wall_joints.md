@@ -536,9 +536,10 @@ nothing slides on it.
 
 ### A smooth geomembrane liner on a firm foundation
 
-The second version turns the first one around. It keeps the same fill and the
-same embankment, but puts the weakness in the sheet, so that the failure
-surface can run along the sheet if the model lets it.
+The second version turns the first one around. The embankment and its fill
+are unchanged. The foundation is made strong and the sheet's interface is made
+weak, so that the failure surface can run along the sheet if the model lets
+it.
 
 The soft clay becomes a firm foundation, 5 m deep in this pair, γ = 20 kN/m³,
 c′ = 30 kPa, φ′ = 32°, E = 50 MPa, ν = 0.3, stronger than the fill above it.

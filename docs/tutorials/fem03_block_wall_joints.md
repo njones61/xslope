@@ -240,7 +240,7 @@ nearer twelve on an install that does not carry the
 
 >>**FS = 1.137**
 
-![The deformed blocks at the critical factor: the block column has leaned out away from the fill behind it](images/fem03_fem_blocks.png){width=1000}
+![The deformed blocks at the critical factor: the block column has leaned out away from the fill behind it](images/fem03_fem_blocks.png){width=940}
 
 On a jointed model the displacement panel is the deformed section drawn as the
 **blocks** the joints cut it into — each block under a faint tint of its own,
@@ -395,7 +395,7 @@ reports
 
 >>**FS = 1.238**
 
-![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid.png){width=1000}
+![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid.png){width=862}
 
 This panel has no element grid where Part 1's did. The blocks panel drops the
 grid once a model carries more than eight jointed lines, because on a jointed
@@ -508,7 +508,7 @@ Run it first with `Joint` blank, the sheet as a bonded bar,
 
 >>**FS = 1.566**
 
-![Deformed mesh, base geotextile as a bonded bar](images/fem03_deform_sheet_bonded.png){width=1000}
+![Deformed mesh, base geotextile as a bonded bar](images/fem03_deform_sheet_bonded.png){width=823}
 
 ![Shear strain, base geotextile as a bonded bar](images/fem03_shear_sheet_bonded.png){width=1000}
 
@@ -520,7 +520,7 @@ the sheet as a slip surface,
 
 >>**FS = 1.559**
 
-![The deformed blocks with the geotextile as a slip surface, its two faces colored by slip](images/fem03_deform_sheet_jointed.png){width=1000}
+![The deformed blocks with the geotextile as a slip surface, its two faces colored by slip](images/fem03_deform_sheet_jointed.png){width=823}
 
 ![Shear strain, the same sheet as a slip surface](images/fem03_shear_sheet_jointed.png){width=1000}
 
@@ -557,7 +557,7 @@ Run it the same two ways. First `Joint` blank, the liner as a bonded bar,
 
 >>**FS = 2.167**
 
-![Deformed mesh, the liner as a bonded bar](images/fem03_deform_liner_bonded.png){width=1000}
+![Deformed mesh, the liner as a bonded bar](images/fem03_deform_liner_bonded.png){width=829}
 
 ![Shear strain, the liner as a bonded bar: the band runs down both slope faces](images/fem03_shear_liner_bonded.png){width=1000}
 
@@ -571,7 +571,7 @@ both slope faces at 2.17. Then `Joint = Yes`, the liner as a slip surface,
 
 >>**FS = 1.285**
 
-![The deformed blocks with the liner as a slip surface: two wedges of fill sliding out on it](images/fem03_deform_liner_jointed.png){width=1000}
+![The deformed blocks with the liner as a slip surface: two wedges of fill sliding out on it](images/fem03_deform_liner_jointed.png){width=829}
 
 ![Shear strain, the same liner as a slip surface: the strain collects where each wedge meets the sheet](images/fem03_shear_liner_jointed.png){width=1000}
 

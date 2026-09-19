@@ -309,8 +309,8 @@ into the facing, runs the same wall again, and reads what the sheets add.
 
 Three layers of geogrid go in on the **reinforce** worksheet, reached from the
 Inputs tree under **Reinforcement**. They sit on the 0.6 m, 1.8 m and 3.0 m
-course joints — every second course — and run 3.0 m back into the reinforced
-fill, which is about 0.8 of the wall height and ordinary practice.
+course joints — every second course — and run 5.0 m back into the reinforced
+fill, about 1.4 times the wall height.
 
 Open the editor, switch it to **Table view**, and on the **Show parameters for**
 row untick **LEM** and tick **FEM**. That hides the columns the limit equilibrium
@@ -319,9 +319,9 @@ needs. Then enter the three rows below, or paste them into the worksheet.
 
 | Label | x1 | y1 | x2 | y2 |
 | --- | :---: | :---: | :---: | :---: |
-| grid-01 | 9.2 | 0.6 | 12.2 | 0.6 |
-| grid-02 | 9.2 | 1.8 | 12.2 | 1.8 |
-| grid-03 | 9.2 | 3.0 | 12.2 | 3.0 |
+| grid-01 | 9.2 | 0.6 | 14.2 | 0.6 |
+| grid-02 | 9.2 | 1.8 | 14.2 | 1.8 |
+| grid-03 | 9.2 | 3.0 | 14.2 | 3.0 |
 
 Then the properties, one row per layer. The columns run from Tmax to Joint in
 the order the FEM view shows them, so a paste lands each value in its own
@@ -385,7 +385,7 @@ Same wall, same seven joints, same mesh settings, three sheets added. Rebuild
 the mesh with **Run → Build Mesh…** at the same settings as Part 1, tri6 at
 0.8 m with the 0.3 m block size still on the polygons worksheet.
 
-The mesh grows to **2,103 nodes, 927 elements and 72 joint elements on 10 jointed
+The mesh grows to **2,139 nodes, 927 elements and 90 joint elements on 10 jointed
 lines**. Each jointed sheet adds a jointed line of its own, and it splits the
 mesh twice over — the sheet has soil above it and soil below it, so it carries
 two interfaces, one against each.
@@ -397,9 +397,9 @@ from 1.0 to 2.0, tolerance 0.01, **Max iterations per trial** at 100,000 and the
 failure criterion on Hybrid. Press **Run**. It takes about eleven minutes, and
 reports
 
-<!-- test: file=files/xslope_block_wall_grid.xlsx, type=fem_ssrm, expected_fs=1.238, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-grid-ssrm -->
+<!-- test: file=files/xslope_block_wall_grid.xlsx, type=fem_ssrm, expected_fs=1.246, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-grid-ssrm -->
 
->>**FS = 1.238**
+>>**FS = 1.246**
 
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid.png){width=1000}
 
@@ -417,7 +417,7 @@ their deformed position. Along most of each sheet the soil faces lie on the bar
 and hide it; where the faces have slid along the bar, at the facing, the red
 shows through.
 
-Against 1.137 for the same wall without them, the three layers are worth 0.101 of
+Against 1.137 for the same wall without them, the three layers are worth 0.109 of
 factor of safety, and the joint slip says exactly where it came from. The back
 face's slip falls from **70 mm to 13 mm** and the base's from **13 mm to under
 1 mm**. The back face is still the contact with the most slip, so the wall still

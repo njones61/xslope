@@ -100,7 +100,7 @@ BLOCK_SIZE = 0.3                    # m, on each block polygon
 PHI_BASE, PHI_BACK, PHI_COURSE = 34.0, 30.0, 35.0
 
 SHEET_Y = (0.6, 1.8, 3.0)           # the course lines the layers sit on
-SHEET_LEN = 3.0
+SHEET_LEN = 5.0
 SHEET_TMAX = 40.0
 SHEET_TIE = 40.0                    # connection capacity at the block column
 

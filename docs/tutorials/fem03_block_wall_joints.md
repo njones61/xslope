@@ -242,15 +242,22 @@ nearer twelve on an install that does not carry the
 
 ![The deformed blocks at the critical factor: the block column has leaned out away from the fill behind it](images/fem03_fem_blocks.png){width=1000}
 
-On a jointed model the displacement panel is the deformed mesh drawn as the
-**blocks** the joints cut the section into — each block under a faint tint of its
-own, the joint faces in green colored by how far they have slid, the undeformed
+On a jointed model the displacement panel is the deformed section drawn as the
+**blocks** the joints cut it into — each block under a faint tint of its own,
+the joint faces in green colored by how far they have slid, the undeformed
 outline dashed behind, and the whole thing exaggerated by the scale printed in
-the title. Read it first. The block column has leaned away from the fill behind
-it, and the fill has come forward into the gap.
+the title. The element grid is left out on purpose. On a jointed model the
+movement happens at the joints, not spread through the elements, so the grid
+would only hide the faces that carry the story. Read the panel first. The block
+column has leaned away from the fill behind it, and the fill has come forward
+into the gap.
 
-The slip on the joint faces puts numbers on that. Read contact by contact, the
-one doing the work is the back face:
+The slip on the joint faces puts numbers on that. **1D Details…** on the results
+toolbar opens one contact at a time and draws its normal stress, its shear
+stress against the Coulomb limit with the slipping stations marked, and its
+slip along the line. Reading each of the seven that way gives the count of
+slipping stations and the largest slip on each, and the one doing the work is
+the back face:
 
 | contact | spans slipping | largest slip |
 | --- | :---: | :---: |
@@ -360,21 +367,34 @@ sets out the rule.
 
 ### What the geogrid adds
 
-Same wall, same seven joints, same mesh settings, three sheets added. Rebuild the
-mesh and run it at the same settings as before.
+Same wall, same seven joints, same mesh settings, three sheets added. Rebuild
+the mesh with **Run → Build Mesh…** at the same settings as Part 1, tri6 at
+0.8 m with the 0.3 m block size still on the polygons worksheet.
 
 The mesh grows to **2,103 nodes, 927 elements and 72 joint elements on 10 jointed
 lines**. Each jointed sheet adds a jointed line of its own, and it splits the
 mesh twice over — the sheet has soil above it and soil below it, so it carries
 two interfaces, one against each.
 
-It takes about eleven minutes, and reports
+![The mesh with the three geogrid layers in place: ten jointed lines, the seven wall contacts and the three sheets](images/fem03_mesh_grid.png){width=1000}
+
+Then open **Run → Run FEM…** and run it exactly as Part 1 did: SSRM, the bracket
+from 1.0 to 2.0, tolerance 0.01, **Max iterations per trial** at 100,000 and the
+failure criterion on Hybrid. Press **Run**. It takes about eleven minutes, and
+reports
 
 <!-- test: file=files/xslope_block_wall_grid.xlsx, type=fem_ssrm, expected_fs=1.238, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-grid-ssrm -->
 
 >>**FS = 1.238**
 
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid.png){width=1000}
+
+The three sheets show as green lines, the two faces of each sheet's interface
+colored by their slip, with the sheet's original position in gray behind. The
+short red lengths just behind the facing are the bars themselves, drawn red in
+their deformed position. Along most of each sheet the soil faces lie on the bar
+and hide it; where the faces have slid along the bar, at the facing, the red
+shows through.
 
 Against 1.137 for the same wall without them, the three layers are worth 0.101 of
 factor of safety, and the joint slip says exactly where it came from. The back

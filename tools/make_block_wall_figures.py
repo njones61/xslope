@@ -370,7 +370,9 @@ def fem03_inputs():
     # The grid model's mesh is not drawn — the page shows one mesh — but its
     # counts are what say the three layers cost what the page claims they do.
     mesh_g = _mesh(grid, FEM03_TARGET_SIZE)
-    _counts("wall + grid", grid, mesh_g, build_fem_data(grid, mesh_g))
+    fem_data_g = build_fem_data(grid, mesh_g)
+    _counts("wall + grid", grid, mesh_g, fem_data_g)
+    capture("fem03_mesh_grid.png", plot_fem_data, fem_data_g)
 
 
 # --------------------------------------------------------------------------- #
@@ -398,6 +400,22 @@ def fem03_wall():
             fs=result["FS"])
     capture("fem03_fem_shear.png", plot_fem_results, fem_data,
             result["last_solution"], plot_type="shear_strain", fs=result["FS"])
+
+    # The back face's 1D details: the panel the page's slip table is read from,
+    # shown for the contact that carries the failure so the reader can see the
+    # slip curve and the slipping stations the table counts.
+    from xslope import fem_details
+    from xslope.plot_fem_details import plot_detail
+
+    last = result["last_solution"]
+    for line_id in fem_details.joint_line_ids(fem_data, last):
+        prof = fem_details.joint_profile(fem_data, last, line_id,
+                                         slope_data=wall, field_state="converged")
+        if str(prof.get("label", "")).strip().lower() == "back face":
+            capture("fem03_1d_details_back_face.png", plot_detail, prof)
+            break
+    else:
+        raise SystemExit("no joint line labelled 'back face' on the wall")
 
 
 # --------------------------------------------------------------------------- #

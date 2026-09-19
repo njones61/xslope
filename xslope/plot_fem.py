@@ -611,6 +611,19 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
     n_reinf_plotted = 0
     n_pile_plotted = 0
     n_joint_plotted = 0
+    # A reinforcement line whose Joint column reads yes is split along like a
+    # joint line, and carries two interface elements per span (soil above
+    # against the bar, bar against soil below). Its bars are drawn in the
+    # reinforcement style with the joint ticks the inputs plot gives a jointed
+    # sheet, so the mesh plot tells a jointed sheet from a bonded one; and the
+    # title's joint count is the interface-element count the mesh dialog
+    # reports, which includes them, not just the bar-less joint lines.
+    jd = fem_data.get("joint_data") or {}
+    jointed_line_ids = set(int(v) for v in (jd.get("jointed_lines") or []))
+    line_of_1d = np.asarray(fem_data.get("element_materials_1d",
+                                         np.zeros(len(elements_1d))), dtype=int)
+    n_joint_total = int(jd.get("n", 0) or 0)
+    jointed_reinf_segs = []
     if len(elements_1d) > 0:
         reinf_segs = []
         pile_segs = []
@@ -627,11 +640,26 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
             else:
                 reinf_segs.append(seg)
                 n_reinf_plotted += 1
+                if (elem_idx < len(line_of_1d)
+                        and int(line_of_1d[elem_idx]) in jointed_line_ids):
+                    jointed_reinf_segs.append(seg)
         if reinf_segs:
             lc = LineCollection(reinf_segs, colors='red', linewidths=2.5, zorder=5, gid='REINFORCEMENT')
             ax.add_collection(lc)
             legend_handles.append(
                 plt.Line2D([0], [0], color='red', lw=2.5, label=f'Reinforcement ({n_reinf_plotted} elements)')
+            )
+        if jointed_reinf_segs:
+            from .plot import draw_joint_ticks
+            span = float(np.ptp(nodes[:, 0])) if len(nodes) else 1.0
+            for seg in jointed_reinf_segs:
+                draw_joint_ticks(ax, [seg[0][0], seg[1][0]], [seg[0][1], seg[1][1]],
+                                 span, 'red', alpha=0.9, zorder=5)
+            n_sheet_joint = n_joint_total - n_joint_plotted
+            legend_handles.append(
+                plt.Line2D([0], [0], color='red', lw=2.5, marker='|', markersize=7,
+                           markeredgewidth=1.0,
+                           label=f'Jointed reinforcement ({n_sheet_joint} joint elements)')
             )
         if pile_segs:
             lc = LineCollection(pile_segs, colors='green', linewidths=3.5, zorder=5, gid='PILES')
@@ -697,8 +725,8 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
         parts.append(f"{n_reinf_plotted} reinforcement")
     if n_pile_plotted > 0:
         parts.append(f"{n_pile_plotted} pile")
-    if n_joint_plotted > 0:
-        parts.append(f"{n_joint_plotted} joint")
+    if max(n_joint_total, n_joint_plotted) > 0:
+        parts.append(f"{max(n_joint_total, n_joint_plotted)} joint")
     title = f"FEM Mesh with Material Zones ({', '.join(parts)})"
     
     if show_title:

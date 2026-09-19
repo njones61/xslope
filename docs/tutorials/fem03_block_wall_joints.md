@@ -20,8 +20,14 @@ Then it takes up a second question, which comes up on every model with a
 geosynthetic in it. A sheet can be modeled two ways: as a **bar bonded into the
 soil**, which carries tension across whatever surface cuts through it, or as a
 **slip surface**, which the soil above it can slide along. The two give very
-different answers, and part 3 runs a pair of small models to show when each is
+different answers, and Part 3 runs a pair of small models to show when each is
 the right one.
+
+The tutorial runs in three parts. **Part 1** builds the wall on its slip joints
+with no geogrid and runs it, so the joints can be seen working on their own.
+**Part 2** ties three geogrid layers into the same wall and runs it again.
+**Part 3** leaves the wall and uses a pair of small models to show when a sheet
+should be a bonded bar and when it should be a slip surface.
 
 Strength reduction, meshing and the convergence controls are covered in
 [FEM-1](fem01_strength_reduction.md); reinforcement lines, the capacity envelope
@@ -102,7 +108,13 @@ the joints worksheet are in
 
 ---
 
-## Entering the wall's contacts
+## Part 1 — The wall on its slip joints, without geogrid
+
+The wall goes in first with nothing holding it but its own blocks: the seven
+slip joints and no reinforcement. This run shows what the joints do by
+themselves, and it is the baseline the geogrid is measured against in Part 2.
+
+### Entering the wall's contacts
 
 Open [xslope_block_wall_start.xlsx](files/xslope_block_wall_start.xlsx) with
 **File → Open…**. It carries the section, the four materials and the six block
@@ -170,7 +182,7 @@ What the columns mean, in the order they appear on the editor:
 
 ---
 
-## Building the mesh
+### Building the mesh
 
 Build the mesh with **Run → Build Mesh…**: element type **tri6** and a global
 target size of **0.8 m**.
@@ -192,7 +204,7 @@ over it in their own style. That style is the only sign that the split happened.
 
 ---
 
-## Running the wall alone
+### Running the wall alone
 
 Open **Run → Run FEM…**. The analysis is **SSRM**, the bracket is *F* from
 **1.0** to **2.0** and the tolerance is **0.01**, all of which are the defaults.
@@ -267,7 +279,12 @@ in the next section is for.
 
 ---
 
-## Adding the geogrid
+## Part 2 — The same wall with geogrid
+
+Part 1's wall stands on its own blocks. This part ties three layers of geogrid
+into the facing, runs the same wall again, and reads what the sheets add.
+
+### Entering the three layers
 
 Three layers of geogrid go in on the **reinforce** worksheet, reached from the
 Inputs tree under **Reinforcement**. They sit on the 0.6 m, 1.8 m and 3.0 m
@@ -299,14 +316,14 @@ sheet — and Tend2 is blank, because the far end is simply buried.
 
 **Joint** reads **Yes** on all three. The sheets lie on the contact between the
 blocks and the fill and run back through the fill on horizontal planes, which is
-exactly the geometry a mass can slide out along. [Part 3](#when-a-sheet-is-a-slip-surface-and-when-it-is-bonded)
+exactly the geometry a mass can slide out along. [Part 3](#part-3-when-a-sheet-is-a-slip-surface-and-when-it-is-bonded)
 sets out the rule.
 
 ![The three layers running back from the block column](images/fem03_inputs_grid.png){width=1000}
 
 ---
 
-## What the geogrid adds
+### What the geogrid adds
 
 Same wall, same seven joints, same mesh settings, three sheets added. Rebuild the
 mesh and run it at the same settings as before.
@@ -346,7 +363,7 @@ layers with free front ends would have been worth much less.
 
 ---
 
-## When a sheet is a slip surface, and when it is bonded
+## Part 3 — When a sheet is a slip surface, and when it is bonded
 
 Every model with a geosynthetic in it has to answer one question: does the
 failure surface **cut across** the sheet, or can it **run along** it?
@@ -450,7 +467,7 @@ a bonded bar standing on one of those nodes would keep one wedge's copy and lose
 the material on the other side of the joint. It has no defined side to attach to,
 and both the model checks and the mesher refuse it by name.
 
-That is why part 3's comparison is made on two small models that carry no other
+That is why Part 3's comparison is made on two small models that carry no other
 joint line, rather than on the wall itself. On a wall the sheets are jointed, and
 the question does not arise.
 

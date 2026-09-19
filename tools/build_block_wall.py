@@ -255,6 +255,10 @@ def build_wall_grid():
 
 # ---- part 3 -----------------------------------------------------------------
 
+#: Cohesion of the part 3 embankment fill, kPa. See build_base_geotextile.
+EMB_FILL_C = 5.0
+
+
 def emb_polygons(clay_y0):
     return [
         poly([(0.0, clay_y0), (EMB_X1, clay_y0), (EMB_X1, 0.0), (0.0, 0.0)], 0),
@@ -266,11 +270,16 @@ def emb_polygons(clay_y0):
 def build_base_geotextile(is_joint):
     """An embankment on soft clay over a base geotextile.  The critical surface
     cuts up through the fill and crosses the sheet, so the sheet carries tension
-    across it either way it is modeled."""
+    across it either way it is modeled.
+
+    The fill carries EMB_FILL_C of cohesion: a cohesionless fill at 34 degrees
+    on 2:1 slopes fails on its own face at tan(34)/tan(26.6) = 1.35, shallower
+    than anything through the clay, and that face governed every run of the
+    first cut of these models without touching the sheet."""
     sd = _base()
     t = sd["materials"][0]
     mats = [mat(t, "soft clay", gamma=17.0, c=20.0, phi=0.0, E=8000.0, nu=0.35),
-            mat(t, "embankment fill", gamma=20.0, c=0.0, phi=34.0,
+            mat(t, "embankment fill", gamma=20.0, c=EMB_FILL_C, phi=34.0,
                 E=25000.0, nu=0.3)]
     line = [sheet("base geotextile", (EMB_TOE_L, 0.0), (EMB_TOE_R, 0.0),
                   t_max=100.0, adhesion=5.0, delta=20.0, E=2.0e6,
@@ -288,14 +297,15 @@ def build_liner(is_joint):
     t = sd["materials"][0]
     mats = [mat(t, "foundation", gamma=20.0, c=30.0, phi=32.0,
                 E=50000.0, nu=0.3),
-            mat(t, "embankment fill", gamma=20.0, c=0.0, phi=34.0,
+            mat(t, "embankment fill", gamma=20.0, c=EMB_FILL_C, phi=34.0,
                 E=25000.0, nu=0.3)]
     line = [sheet("liner", (EMB_TOE_L, 0.0), (EMB_TOE_R, 0.0),
                   t_max=50.0, adhesion=0.5, delta=10.0, E=2.0e6,
                   is_joint=is_joint)]
-    return model(mats, emb_polygons(-5.0),
-                 {"Xo": 30.0, "Yo": 15.0, "Depth": -5.0, "R": 20.0},
-                 EMB_TARGET_SIZE, reinforcement_lines=line, max_depth=-5.0)
+    # The same 4 m foundation as the geotextile pair: one section, one sketch.
+    return model(mats, emb_polygons(-4.0),
+                 {"Xo": 30.0, "Yo": 15.0, "Depth": -4.0, "R": 19.0},
+                 EMB_TARGET_SIZE, reinforcement_lines=line, max_depth=-4.0)
 
 
 BUILDS = {

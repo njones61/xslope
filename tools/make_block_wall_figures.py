@@ -395,11 +395,9 @@ def fem03_wall():
     _counts("wall", wall, mesh, fem_data)
     _report("wall", result, seconds)
     _joints(wall, fem_data, result, dump="wall")
-    capture("fem03_fem_blocks.png", plot_fem_results, fem_data,
-            result["last_solution"], plot_type="displace_vector",
-            fs=result["FS"])
-    capture("fem03_fem_shear.png", plot_fem_results, fem_data,
-            result["last_solution"], plot_type="shear_strain", fs=result["FS"])
+    _both_states("fem03_fem_blocks.png", fem_data, result, "displace_vector")
+    _both_states("fem03_fem_shear.png", fem_data, result, "shear_strain")
+    _keep_solution("wall", fem_data, result)
 
     # The back face's 1D details: the panel the page's slip table is read from,
     # shown for the contact that carries the failure so the reader can see the
@@ -441,11 +439,9 @@ def fem03_grid():
     _counts("wall + grid", grid, mesh, fem_data)
     _report("wall + grid", result, seconds)
     _joints(grid, fem_data, result, dump="grid")
-    capture("fem03_fem_blocks_grid.png", plot_fem_results, fem_data,
-            result["last_solution"], plot_type="displace_vector",
-            fs=result["FS"])
-    capture("fem03_fem_shear_grid.png", plot_fem_results, fem_data,
-            result["last_solution"], plot_type="shear_strain", fs=result["FS"])
+    _both_states("fem03_fem_blocks_grid.png", fem_data, result, "displace_vector")
+    _both_states("fem03_fem_shear_grid.png", fem_data, result, "shear_strain")
+    _keep_solution("wall_grid", fem_data, result)
 
     last = result["last_solution"]
     rows = fem_details.list_lines(fem_data, last, grid)
@@ -515,8 +511,46 @@ def fem03_sheets():
         _report(label, result, seconds)
         if (fem_data.get("joint_data") or {}).get("n"):
             _joints(model, fem_data, result)
+        # Both field states, so the page can choose: the last converged trial
+        # (the slope still standing) and the captured at-failure state (the
+        # mechanism). The solve itself is kept beside the report so either can
+        # be redrawn without re-solving.
+        fail = result.get("failure_solution")
         capture(name, plot_fem_results, fem_data, result["last_solution"],
-                plot_type="shear_strain", fs=result["FS"])
+                plot_type="shear_strain", fs=result["FS"], failure_solution=fail,
+                field_state="converged")
+        if fail is not None:
+            capture(name.replace(".png", "_failure.png"), plot_fem_results,
+                    fem_data, result["last_solution"], plot_type="shear_strain",
+                    fs=result["FS"], failure_solution=fail, field_state="failure")
+        _keep_solution(label, fem_data, result)
+
+
+def _both_states(name, fem_data, result, plot_type):
+    """One results panel in both field states: the last converged trial under
+    ``name`` and the captured at-failure state under ``name`` + ``_failure``."""
+    from xslope.plot_fem import plot_fem_results
+
+    fail = result.get("failure_solution")
+    capture(name, plot_fem_results, fem_data, result["last_solution"],
+            plot_type=plot_type, fs=result["FS"], failure_solution=fail,
+            field_state="converged")
+    if fail is not None:
+        capture(name.replace(".png", "_failure.png"), plot_fem_results, fem_data,
+                result["last_solution"], plot_type=plot_type, fs=result["FS"],
+                failure_solution=fail, field_state="failure")
+
+
+def _keep_solution(label, fem_data, result):
+    """Pickle a part 3 solve under the private campaign directory so both field
+    states can be redrawn and compared without the solve."""
+    import pickle
+
+    d = os.path.join(os.path.expanduser("~"), "python_projects", "xslope_private",
+                     "reports", "campaign_joints_2026-09", "fem03_part3_solutions")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "%s.pkl" % label.replace(" ", "_")), "wb") as fh:
+        pickle.dump({"fem_data": fem_data, "result": result}, fh)
 
 
 GROUPS = {

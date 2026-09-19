@@ -876,6 +876,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
+                    block_grid=None,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
                     scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None,
                     mesh_on_fields=False, fs=None, failure_solution=None,
@@ -901,6 +902,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             'shear_strain' - viscoplastic max shear strain contours
             'yield' - Mohr-Coulomb yield function contours
         deform_percent: Target deformation as percentage of mesh height (default 15).
+        block_grid: On a jointed model's deformation panel, whether the element
+            grid is drawn under the blocks; None follows :func:`block_grid_default`.
         show_mesh: Show mesh lines where the mesh IS the content — the deformation
             panel's original-vs-deformed grid (and the displace_vector panel's edge
             context). It does NOT overlay edges on the filled-field contour panels
@@ -1206,7 +1209,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                              cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
                              label_elements=label_elements, single_panel=defer_panel_cbar,
                              at_failure=deform_field.get("_at_failure", False),
-                             joint_faces=True)
+                             joint_faces=True, block_grid=block_grid)
         elif pt == 'displace_vector':
             vector_mappable = plot_displacement_vectors(ax, fem_data, deform_field, show_mesh, show_reinforcement,
                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
@@ -1821,7 +1824,7 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
                        show_original='outline', deformed_color='k', show_reinforcement=True,
                        cbar_shrink=0.8, cbar_labelpad=20, label_elements=False,
                        single_panel=False, at_failure=False, show_mesh=None,
-                       joint_faces=False):
+                       joint_faces=False, block_grid=None):
     """
     Plot deformed mesh overlay on original mesh.
 
@@ -1845,6 +1848,9 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
         show_mesh: Legacy boolean alias for ``show_original`` (True→'mesh',
             False→off); prefer ``show_original``. None (default) leaves show_original
             in effect.
+        block_grid: On a jointed model, whether the light-gray element grid is
+            drawn under the blocks. None (default) follows
+            :func:`block_grid_default`; True or False is the user's own choice.
         joint_faces: Draw the two faces of every joint element over the deformed
             grid, and drop the grid itself to a light gray so they read over it.
             Both copies of each face are drawn, so a joint that has slipped or
@@ -1918,13 +1924,10 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
         from .mesh import block_boundary_edges, block_components
         comp = block_components(fem_data)
         blocks, exterior = block_boundary_edges(fem_data, comp)
-        n_jlines = len(np.unique(np.asarray(
-            fem_data["joint_data"]["line_id"], dtype=int)))
-        # The same count at which the section drawings drop the joint ticks: past
-        # it the marks are all there is. Here it is the element grid that becomes
-        # that — on a 234-trace network the blocks are a few elements each and the
-        # edges bury the outlines that are the whole reading.
-        show_edges = n_jlines <= JOINT_TICK_MAX_LINES
+        # The grid's default follows the jointed-line count (see
+        # block_grid_default); an explicit block_grid is the user's override.
+        show_edges = (block_grid_default(fem_data) if block_grid is None
+                      else bool(block_grid))
         _draw_block_tints(ax, fem_data, nodes_deformed, comp)
     if show_edges:
         plot_mesh_lines(ax, fem_data_deformed,
@@ -2176,6 +2179,24 @@ PILE_COLOR = 'green'
 #: reinforcement's own geometry color is gray. Original and deformed piles were
 #: both drawn in green and could not be told apart at any exaggeration.
 PILE_DEFORMED_COLOR = 'red'
+
+
+def block_grid_default(fem_data):
+    """Whether the deformed-blocks panel draws its element grid by default.
+
+    The grid comes off past :data:`JOINT_TICK_MAX_LINES` jointed lines — the
+    same count at which the section drawings drop their joint ticks — because
+    on a generated network the blocks are a few elements each and the grid
+    buries the block outlines that are the whole reading. Below it the grid
+    shows how each block deformed inside its faces. Studio reads this to set
+    the "Element edges" box when a jointed result comes up; the user can then
+    set the box either way.
+    """
+    jd = (fem_data or {}).get("joint_data") or {}
+    if not jd.get("n"):
+        return True
+    n_jlines = len(np.unique(np.asarray(jd["line_id"], dtype=int)))
+    return n_jlines <= JOINT_TICK_MAX_LINES
 
 
 def _barless_mask(fem_data, n):

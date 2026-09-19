@@ -607,7 +607,9 @@ class FemResultsDisplayPanel(QWidget):
         self.element_edges.setChecked(self._edges_state.get(self._current_pt, False))
         self.element_edges.setToolTip(
             "Overlay the mesh element edges (light gray). On the deformation plot "
-            "this is the original, undeformed mesh.")
+            "this is the original, undeformed mesh. On a jointed model's "
+            "deformation plot it is the deformed grid under the blocks, on by "
+            "default up to eight jointed lines and off past that; set it either way.")
         self.show_reinforcement = QCheckBox("Reinforcement")
         self.show_reinforcement.setChecked(True)
         # The interface (joint) elements' own reading, on a model whose mesh was
@@ -685,6 +687,20 @@ class FemResultsDisplayPanel(QWidget):
                 self.scale_vectors, self.displacement_tolerance,
                 self.color_by_magnitude)
 
+    def set_block_grid_default(self, flag):
+        """Set the deformation plot's "Element edges" default for a new jointed
+        result from the plotter's own rule (``block_grid_default``): on up to
+        eight jointed lines, off past that. Called once per result, so a user's
+        own setting survives view switches and re-renders and yields only to
+        the next solve."""
+        flag = bool(flag)
+        self._edges_state["displace_vector"] = flag
+        if self._current_pt == "displace_vector":
+            self.element_edges.blockSignals(True)
+            self.element_edges.setChecked(flag)
+            self.element_edges.blockSignals(False)
+            self._sync_enabled()
+
     def _on_plot_type(self, *_):
         # "Element edges" carries a per-type default and remembers the user's
         # toggle per plot type: save the state we're leaving, load the one we're
@@ -749,6 +765,9 @@ class FemResultsDisplayPanel(QWidget):
             "show_mesh": edges,
             "mesh_on_fields": edges,
             "plot_elements": edges,
+            # A jointed model's deformation panel reads the same box for the
+            # grid under its blocks; the plotter ignores it everywhere else.
+            "block_grid": edges,
             "show_reinforcement": self.show_reinforcement.isChecked(),
             "show_joints": self.show_joints.isChecked(),
             "label_elements": self.label_elements.isChecked(),

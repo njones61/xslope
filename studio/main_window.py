@@ -2605,6 +2605,13 @@ class MainWindow(QMainWindow):
         bundle = self.doc.results.get("fem_solution")
         panel = self._display_panels.get(self.fem_results_canvas)
         if bundle and panel and self.fem_results_canvas is not None:
+            # A new result sets the deformation plot's element-edges default
+            # from the plotter's jointed-line rule; the same result re-rendered
+            # keeps whatever the user set.
+            if getattr(panel, "_grid_default_for", None) is not id(bundle):
+                from xslope.plot_fem import block_grid_default
+                panel.set_block_grid_default(block_grid_default(bundle["fem_data"]))
+                panel._grid_default_for = id(bundle)
             try:
                 self.fem_results_canvas.render_fem_results(
                     bundle["fem_data"], bundle["solution"],

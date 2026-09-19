@@ -401,7 +401,9 @@ This panel has no element grid where Part 1's did. The blocks panel drops the
 grid once a model carries more than eight jointed lines, because on a jointed
 network the blocks are a few elements each and the grid would bury their
 outlines. The wall alone had seven jointed lines; the three sheets make ten.
-Everything else is drawn as before. The three sheets show as green lines, the
+That only sets the default: **Element edges** in the display panel puts the
+grid back, or takes it off the Part 1 panel. Everything else is drawn as
+before. The three sheets show as green lines, the
 two faces of each sheet's interface colored by their slip, with the sheet's
 original position in gray behind. The
 short red lengths just behind the facing are the bars themselves, drawn red in

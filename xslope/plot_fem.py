@@ -1209,7 +1209,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                              cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
                              label_elements=label_elements, single_panel=defer_panel_cbar,
                              at_failure=deform_field.get("_at_failure", False),
-                             joint_faces=True, block_grid=block_grid)
+                             joint_faces=show_joints, block_grid=block_grid)
         elif pt == 'displace_vector':
             vector_mappable = plot_displacement_vectors(ax, fem_data, deform_field, show_mesh, show_reinforcement,
                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
@@ -3229,9 +3229,13 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     # about it. Its state goes on the line as a hairline colored by slip, under
     # the bar it stands beside, with no legend entry of its own — the slip
     # colorbar is the legend.
+    # On a model with soil that can strain, the joints' reading belongs on the
+    # deformation panel, where the faces are drawn; put here as well, on top
+    # of the bars' force overlay, it was one thing too many on one line. The
+    # overlay stays only where this panel is the joints' own (slip_panel).
     joint_cbar_specs = (plot_joint_states(ax, fem_data, solution,
                                           draw_cbar=not single_panel)
-                        if show_joints else [])
+                        if (show_joints and slip_panel) else [])
     reinf_cbar_specs = []
     if show_reinforcement and 'elements_1d' in fem_data:
         reinf_cbar_specs = plot_reinforcement_forces(
@@ -3250,7 +3254,8 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
                       solution.get("_ssrm_fs"), at_failure=at_failure)
     # The opened-joint tick is the one mark here that no colorbar explains, so
     # the panel says what it is. Only on a figure that draws one.
-    note = _joint_open_note(fem_data, solution) if show_joints else ""
+    note = (_joint_open_note(fem_data, solution)
+            if (show_joints and slip_panel) else "")
     if note:
         title = f'{title}\n{note}'
     ax.set_title(title, fontsize=12, pad=15)

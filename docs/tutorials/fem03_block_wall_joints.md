@@ -508,6 +508,8 @@ Run it first with `Joint` blank, the sheet as a bonded bar,
 
 >>**FS = 1.566**
 
+![Deformed mesh, base geotextile as a bonded bar](images/fem03_deform_sheet_bonded.png){width=1000}
+
 ![Shear strain, base geotextile as a bonded bar](images/fem03_shear_sheet_bonded.png){width=1000}
 
 Then `Joint = Yes`,
@@ -517,6 +519,8 @@ the sheet as a slip surface,
 <!-- test: file=files/xslope_base_geotextile_jointed.xlsx, type=fem_ssrm, expected_fs=1.559, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-jointed-ssrm -->
 
 >>**FS = 1.559**
+
+![The deformed blocks with the geotextile as a slip surface, its two faces colored by slip](images/fem03_deform_sheet_jointed.png){width=1000}
 
 ![Shear strain, the same sheet as a slip surface](images/fem03_shear_sheet_jointed.png){width=1000}
 
@@ -553,7 +557,9 @@ Run it the same two ways. First `Joint` blank, the liner as a bonded bar,
 
 >>**FS = 2.167**
 
-![Shear strain, the liner as a bonded bar: the band cuts through the fill](images/fem03_shear_liner_bonded.png){width=1000}
+![Deformed mesh, the liner as a bonded bar](images/fem03_deform_liner_bonded.png){width=1000}
+
+![Shear strain, the liner as a bonded bar: the band runs down both slope faces](images/fem03_shear_liner_bonded.png){width=1000}
 
 The bonded model has no way for the fill to move along the liner. The
 foundation is too strong to fail and the sheet is held to the soil on both
@@ -565,7 +571,9 @@ both slope faces at 2.17. Then `Joint = Yes`, the liner as a slip surface,
 
 >>**FS = 1.285**
 
-![Shear strain, the same liner as a slip surface: the band runs along it](images/fem03_shear_liner_jointed.png){width=1000}
+![The deformed blocks with the liner as a slip surface: two wedges of fill sliding out on it](images/fem03_deform_liner_jointed.png){width=1000}
+
+![Shear strain, the same liner as a slip surface: the strain collects where each wedge meets the sheet](images/fem03_shear_liner_jointed.png){width=1000}
 
 The jointed model lets the fill slide out along the liner instead. Two wedges
 of fill, one each side, shear down from the crest edges onto the liner and

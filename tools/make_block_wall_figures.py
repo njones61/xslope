@@ -515,15 +515,20 @@ def fem03_sheets():
         # (the slope still standing) and the captured at-failure state (the
         # mechanism). The solve itself is kept beside the report so either can
         # be redrawn without re-solving.
-        fail = result.get("failure_solution")
-        capture(name, plot_fem_results, fem_data, result["last_solution"],
-                plot_type="shear_strain", fs=result["FS"], failure_solution=fail,
-                field_state="converged")
-        if fail is not None:
-            capture(name.replace(".png", "_failure.png"), plot_fem_results,
-                    fem_data, result["last_solution"], plot_type="shear_strain",
-                    fs=result["FS"], failure_solution=fail, field_state="failure")
+        # The deformation panel first (the blocks with their faces on a jointed
+        # model, the deformed mesh on a bonded one), then the strain panel,
+        # each in both field states.
+        _both_states(name.replace("fem03_shear_", "fem03_deform_"), fem_data,
+                     result, _deform_panel(fem_data))
+        _both_states(name, fem_data, result, "shear_strain")
         _keep_solution(label, fem_data, result)
+
+
+def _deform_panel(fem_data):
+    """The deformation panel a model gets: the blocks (displace_vector routes
+    there on a jointed model) or the deformed mesh on a model with no joint."""
+    return ("displace_vector" if (fem_data.get("joint_data") or {}).get("n")
+            else "deformation")
 
 
 def _both_states(name, fem_data, result, plot_type):

@@ -618,11 +618,10 @@ class FemResultsDisplayPanel(QWidget):
         self.show_joints = QCheckBox("Joint state")
         self.show_joints.setChecked(True)
         self.show_joints.setToolTip(
-            "Draw every joint as a thin line on the line it runs along, colored "
-            "by how far its two faces have slid, on a green ramp the strain "
-            "field cannot produce; gray where it is not slipping and ticked "
-            "across where it has opened. No colorbar where nothing slipped, "
-            "and nothing at all on a model with no joint.")
+            "On the deformation plot of a jointed model, draw the two faces of "
+            "every joint over the blocks, colored by how far they have slid. "
+            "Off, the blocks are drawn without their faces. On a model whose only "
+            "strength is its joints the strain plot carries the same reading.")
         self.label_elements = QCheckBox("Element numbers")
 
         # Displacement-vector-only controls.

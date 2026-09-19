@@ -73,9 +73,11 @@ declaring it elastic means the strength reduction has nothing in the block to
 weaken, which is the truth of the problem. The wall's strength is the strength of
 its contacts, not of its blocks.
 
-The face is vertical. A real segmental wall is built with a batter, and a
-battered wall has a stepped back face — twelve joint lines instead of seven —
-which changes the arithmetic without changing anything this page teaches.
+The wall is drawn with a vertical face. Real segmental walls are usually built
+with a small batter, each course set back a little from the one below. That puts
+a step in the back face at every course, and each step needs its own joint line.
+The extra lines add entry work but change nothing about how the model is built or
+read, so this tutorial keeps the face vertical.
 
 ---
 

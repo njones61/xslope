@@ -486,14 +486,16 @@ The fill is the same in both: γ = 20 kN/m³, c′ = 0, φ′ = 34°, E = 25 MPa
 
 ### A base geotextile on soft clay
 
-The foundation is soft clay, γ = 17 kN/m³, c = 20 kPa, φ = 0, E = 8 MPa,
-ν = 0.35. The sheet is a base geotextile with Tmax = 100 kN/m, an interface of
-a = 5 kPa and δ = 20°, EA = 2000 kN/m, both ends free. The clay is the weak part
-of this section and the sheet's interface is not.
+**Foundation.** Soft clay: γ = 17 kN/m³, c = 20 kPa, φ = 0, E = 8 MPa,
+ν = 0.35. The clay is the weak part of this section.
 
-Run it first as a bonded bar,
-[xslope_base_geotextile_bonded.xlsx](files/xslope_base_geotextile_bonded.xlsx),
-with `Joint` blank:
+**Sheet.** A base geotextile at the base of the fill, 32 m long, both ends free:
+Tmax = 100 kN/m, EA = 2000 kN/m.
+
+**Interface.** Adhesion = 5 kPa, Delta = 20°. Stronger than the clay under it.
+
+**Joint.** Two runs. First `Joint` blank, the sheet as a bonded bar,
+[xslope_base_geotextile_bonded.xlsx](files/xslope_base_geotextile_bonded.xlsx):
 
 <!-- test: file=files/xslope_base_geotextile_bonded.xlsx, type=fem_ssrm, expected_fs=1.356, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-bonded-ssrm -->
 
@@ -501,8 +503,8 @@ with `Joint` blank:
 
 ![Shear strain, base geotextile as a bonded bar](images/fem03_shear_sheet_bonded.png){width=1000}
 
-The band runs up through the fill and **across** the sheet. Now the same file
-with `Joint = Yes`,
+The band runs up through the fill and **across** the sheet. Then `Joint = Yes`,
+the sheet as a slip surface,
 [xslope_base_geotextile_jointed.xlsx](files/xslope_base_geotextile_jointed.xlsx):
 
 <!-- test: file=files/xslope_base_geotextile_jointed.xlsx, type=fem_ssrm, expected_fs=1.356, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-jointed-ssrm -->
@@ -518,12 +520,17 @@ tension across a surface that cuts it.
 
 ### A smooth geomembrane liner on a firm foundation
 
-The foundation is now firm, γ = 20 kN/m³, c′ = 30 kPa, φ′ = 32°, E = 50 MPa,
-ν = 0.3, and the sheet is a smooth liner with Tmax = 50 kN/m, an interface of
-a = 0.5 kPa and δ = 10°, EA = 2000 kN/m, both ends free. Nothing in this section
-is weak except the liner itself.
+**Foundation.** Firm soil: γ = 20 kN/m³, c′ = 30 kPa, φ′ = 32°, E = 50 MPa,
+ν = 0.3.
 
-As a bonded bar, [xslope_liner_bonded.xlsx](files/xslope_liner_bonded.xlsx):
+**Sheet.** A smooth geomembrane liner at the base of the fill, 32 m long, both
+ends free: Tmax = 50 kN/m, EA = 2000 kN/m.
+
+**Interface.** Adhesion = 0.5 kPa, Delta = 10°. Nothing in this section is weak
+except this.
+
+**Joint.** Two runs again. First `Joint` blank, the liner as a bonded bar,
+[xslope_liner_bonded.xlsx](files/xslope_liner_bonded.xlsx):
 
 <!-- test: file=files/xslope_liner_bonded.xlsx, type=fem_ssrm, expected_fs=1.371, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-liner-bonded-ssrm -->
 
@@ -532,8 +539,9 @@ As a bonded bar, [xslope_liner_bonded.xlsx](files/xslope_liner_bonded.xlsx):
 ![Shear strain, the liner as a bonded bar: the band cuts through the fill](images/fem03_shear_liner_bonded.png){width=1000}
 
 The bonded model has no way for the fill to move along the liner, so it puts
-the strain in the soil above the sheet and reports the slope on that. As a slip
-surface, [xslope_liner_jointed.xlsx](files/xslope_liner_jointed.xlsx):
+the strain in the soil above the sheet and reports the slope on that. Then
+`Joint = Yes`, the liner as a slip surface,
+[xslope_liner_jointed.xlsx](files/xslope_liner_jointed.xlsx):
 
 <!-- test: file=files/xslope_liner_jointed.xlsx, type=fem_ssrm, expected_fs=1.059, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-liner-jointed-ssrm -->
 

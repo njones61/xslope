@@ -494,16 +494,16 @@ change:
 | base geotextile | 100 | 5 | 20 | 2000 | both free |
 | liner | 50 | 0.5 | 10 | 2000 | both free |
 
-The first is a **base geotextile** under an embankment on soft clay
-([bonded](files/xslope_base_geotextile_bonded.xlsx),
-[jointed](files/xslope_base_geotextile_jointed.xlsx)). The clay is weak
-(c = 20 kPa, φ = 0) and the sheet's interface is not (a = 5 kPa, δ = 20°), so the
-critical surface cuts up through the fill and across the sheet.
+The first is a **base geotextile** under an embankment on soft clay. The clay
+is the weak part of that section and the sheet's interface is not, so the
+critical surface cuts up through the fill and across the sheet. The second is a
+**smooth geomembrane liner** under the same embankment on a firm foundation.
+Nothing in that section is weak except the liner itself. The four files:
 
-The second is a **smooth geomembrane liner** under the same embankment on a firm
-foundation ([bonded](files/xslope_liner_bonded.xlsx),
-[jointed](files/xslope_liner_jointed.xlsx)). Nothing in that section is weak
-except the liner itself: δ = 10° against a foundation at φ = 32°.
+| model | as a bonded bar | as a slip surface |
+| --- | --- | --- |
+| base geotextile on soft clay | [xslope_base_geotextile_bonded.xlsx](files/xslope_base_geotextile_bonded.xlsx) | [xslope_base_geotextile_jointed.xlsx](files/xslope_base_geotextile_jointed.xlsx) |
+| smooth geomembrane liner | [xslope_liner_bonded.xlsx](files/xslope_liner_bonded.xlsx) | [xslope_liner_jointed.xlsx](files/xslope_liner_jointed.xlsx) |
 
 <!-- test: file=files/xslope_base_geotextile_bonded.xlsx, type=fem_ssrm, expected_fs=1.356, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-bonded-ssrm -->
 

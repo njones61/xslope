@@ -581,7 +581,10 @@ Then `Joint = Yes`, the liner as a slip surface,
 The jointed model lets the fill slide out along the liner instead. Two wedges
 of fill, one each side, shear down from the crest edges onto the liner and
 slide outward on it: 30 of its 55 spans slip, and the strain in the fill
-collects where each wedge meets the sheet. That is what a fill on a smooth
+collects where each wedge meets the sheet. The liner itself carries almost no
+tension, dark blue along its whole length on the force scale. The fill slides
+over it rather than gripping it, so the membrane's own strength never comes
+into play and a stronger one would not help. That is what a fill on a smooth
 membrane does, and it is far weaker than the slope faces: 1.285 against 2.167,
 forty percent less. The bonded model never saw it, and reported the slope far
 safer than it is.

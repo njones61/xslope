@@ -129,7 +129,7 @@ against the reinforced fill, and one between each pair of courses. Enter the sev
 rows below, or paste them straight into the worksheet.
 
 | Label | x1 | y1 | x2 | y2 | c | phi |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | base | 8.0 | 0.0 | 9.2 | 0.0 | 0 | 34 |
 | back face | 9.2 | 0.0 | 9.2 | 3.6 | 0 | 30 |
 | course-01 | 8.0 | 0.6 | 9.2 | 0.6 | 0 | 35 |
@@ -289,11 +289,31 @@ into the facing, runs the same wall again, and reads what the sheets add.
 Three layers of geogrid go in on the **reinforce** worksheet, reached from the
 Inputs tree under **Reinforcement**. They sit on the 0.6 m, 1.8 m and 3.0 m
 course joints — every second course — and run 3.0 m back into the reinforced
-fill, which is about 0.8 of the wall height and ordinary practice.
+fill, which is about 0.8 of the wall height and ordinary practice. Enter the
+three rows below, or paste them into the worksheet.
 
-The columns a wall sheet needs, in the order they appear on the editor:
+| Label | x1 | y1 | x2 | y2 |
+| --- | :---: | :---: | :---: | :---: |
+| grid-01 | 9.2 | 0.6 | 12.2 | 0.6 |
+| grid-02 | 9.2 | 1.8 | 12.2 | 1.8 |
+| grid-03 | 9.2 | 3.0 | 12.2 | 3.0 |
 
-![The reinforcement editor with the three geogrid layers](images/fem03_studio_reinforce_editor.png){width=900}
+All three layers share one set of properties:
+
+| Tmax | Adhesion | Delta | Tend1 | Tend2 | E | Area | Joint |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 40 | 1 | 30 | 40 | 0 | 1000000 | 0.001 | Yes |
+
+Every other column stays blank. Type, Dir and Appl are read only by the limit
+equilibrium methods, so they do not matter to this run; the completed file has
+Type set to Geosynthetic, which is harmless. When the three rows are in, the
+editor looks like this:
+
+![The reinforcement editor's table view with the three geogrid layers: label, endpoints, capacity, pullout law and end capacities](images/fem03_studio_reinforce_editor_a.png){width=975}
+
+![The same three rows, continued: spacing, the FEM-only stiffness columns and Joint reading Yes](images/fem03_studio_reinforce_editor_b.png){width=551}
+
+What the columns a sheet needs mean, in the order they appear on the editor:
 
 **Tmax** is the tensile capacity of the sheet, 40 kN/m — what it can carry before
 it ruptures.
@@ -312,7 +332,8 @@ is what sets how much.
 it can pull out of the soil, and the only thing holding it is the grip along its
 length. A filled end is tied at the stated capacity. Here **Tend1 = 40 kN/m** —
 the end at the block column is bolted to the facing at the full capacity of the
-sheet — and Tend2 is blank, because the far end is simply buried.
+sheet — and **Tend2 = 0**, because the far end is simply buried and nothing holds
+it but the soil.
 
 **Joint** reads **Yes** on all three. The sheets lie on the contact between the
 blocks and the fill and run back through the fill on horizontal planes, which is

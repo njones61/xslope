@@ -138,8 +138,56 @@ def fem03_reinforce_editor():
     from studio.editors import ReinforcementEditor
 
     dlg = _fem_only(ReinforcementEditor().build(_load(FEM03_GRID), None))
-    return _grab(_line_table(dlg, through="jred"),
-                 "fem03_studio_reinforce_editor.png")
+    _line_table(dlg, through="jred")
+    return _table_halves(dlg, "fem03_studio_reinforce_editor",
+                         split_after="tend2", last="jred")
+
+
+def _table_halves(dlg, stem, split_after, last):
+    """Photograph a line editor's table in two halves, each at 1:1.
+
+    A reinforcement table carries too many columns for one page-width image:
+    shrunk to fit, its text is unreadable.  Two crops of the same grab — the
+    columns through ``split_after``, then the rest through ``last`` — each fit
+    the page at native size.  Both keep the header and every row, and the first
+    keeps the view toggle and usage band above the table so the reader sees
+    which band is on.  Column edges are MEASURED off the header, so a column
+    added to the editor lands in the right half without a tuned pixel.
+    """
+    from PySide6.QtCore import QPoint
+
+    dlg.show()
+    _settle()
+    pm = dlg.grab()
+    tbl = dlg._table.table
+    hh = tbl.horizontalHeader()
+    keys = [f.key for f in dlg._fields]
+    vp = tbl.viewport()
+    origin = vp.mapTo(dlg, QPoint(0, 0))
+    top = origin.y() - hh.height()
+    bottom = origin.y() + sum(tbl.rowHeight(r) for r in range(tbl.rowCount()))
+    pad = 6
+
+    def x_after(key):
+        c = keys.index(key)
+        return origin.x() + hh.sectionPosition(c) + hh.sectionSize(c)
+
+    # The toggle row sits above the table: measured as the gap between the
+    # dialog's top and the header, minus the help text (the first widget).
+    toggle_top = top - 30
+    left = pm.copy(0, max(0, toggle_top), x_after(split_after) + pad,
+                   bottom - max(0, toggle_top) + pad)
+    x0 = x_after(split_after) + 1
+    right = pm.copy(x0, top - pad, x_after(last) - x0 + pad,
+                    bottom - top + 2 * pad)
+    outs = []
+    for half, img in (("a", left), ("b", right)):
+        out = os.path.join(OUT_DIR, "%s_%s.png" % (stem, half))
+        img.save(out)
+        print("-> %s_%s.png" % (stem, half))
+        outs.append(out)
+    dlg.close()
+    return outs
 
 
 def fem03_run_fem():

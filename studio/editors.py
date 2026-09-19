@@ -850,8 +850,14 @@ class _EditableTable(QWidget):
                 combo = QComboBox()
                 combo.addItems(f.choices)
                 _txt = f.to_text(val)
-                if _txt in f.choices:
-                    combo.setCurrentText(_txt)
+                # The loader lower-cases a free-text option cell ('Yes' reaches
+                # here as 'yes'), so the match is case-blind: a Joint or Jred
+                # that reads yes on the sheet shows Yes in the cell rather than
+                # a blank combo that would write a blank back on save.
+                _hit = next((c for c in f.choices
+                             if c.lower() == str(_txt).lower()), None)
+                if _hit is not None:
+                    combo.setCurrentText(_hit)
                 # A preset driver fills its dependent columns BEFORE the general
                 # notify, so one edit is one redraw of the finished row. Connected
                 # here (after the initial setCurrentText above) so populating a table
@@ -3886,7 +3892,10 @@ class _MaterialListView(QWidget):
             if isinstance(w, QComboBox):
                 w.blockSignals(True)
                 txt = self._field_by_key[key].to_text(val)
-                j = w.findText(txt)
+                # Case-blind: the loader lower-cases option cells ('Yes' arrives
+                # as 'yes'), and a miss here would show a blank and commit a
+                # blank back over the file's value.
+                j = w.findText(txt, Qt.MatchFixedString)
                 w.setCurrentIndex(j if j >= 0 else 0)
                 w.blockSignals(False)
             else:
@@ -4943,7 +4952,10 @@ class _LineListView(QWidget):
             w.blockSignals(True)
             if isinstance(w, QComboBox):
                 txt = self._field_by_key[key].to_text(val)
-                j = w.findText(txt)
+                # Case-blind: the loader lower-cases option cells ('Yes' arrives
+                # as 'yes'), and a miss here would show a blank and commit a
+                # blank back over the file's value.
+                j = w.findText(txt, Qt.MatchFixedString)
                 w.setCurrentIndex(j if j >= 0 else 0)
             else:
                 # NaN is "unset" throughout the templates (e.g. t_res, E, area on
@@ -5007,7 +5019,7 @@ class _LineListView(QWidget):
         for key, value in zip(self._preset["fills"], preset):
             w = self._edits.get(key)
             if isinstance(w, QComboBox):
-                j = w.findText(value)
+                j = w.findText(value, Qt.MatchFixedString)
                 if j >= 0:
                     w.setCurrentIndex(j)     # its own edit signal commits the row
 
@@ -7578,19 +7590,27 @@ class ReinforcementEditor(CategoryEditor):
         Field("y1", "y1", tooltip=REINFORCE_HELP["y1"]),
         Field("x2", "x2", tooltip=REINFORCE_HELP["x2"]),
         Field("y2", "y2", tooltip=REINFORCE_HELP["y2"]),
+        # usage="lem": the support preset and the force direction and
+        # application it fills are read by the limit equilibrium methods
+        # alone — the finite element bar acts along its own axis and carries
+        # what its stiffness and capacity give it — so the FEM toggle hides
+        # them, as the template's own column coloring says.
         Field("type", "Type", "choice",
-              choices=[""] + list(REINFORCE_TYPE_PRESETS), applies=LF,
+              choices=[""] + list(REINFORCE_TYPE_PRESETS), usage="lem",
               tooltip=REINFORCE_HELP["type"]),
-        Field("dir", "Dir", "choice", choices=["tangent", "axial"], applies=LF,
+        Field("dir", "Dir", "choice", choices=["tangent", "axial"], usage="lem",
               tooltip=REINFORCE_HELP["dir"]),
-        Field("appl", "Appl", "choice", choices=["active", "passive"], applies=LF,
+        Field("appl", "Appl", "choice", choices=["active", "passive"], usage="lem",
               tooltip=REINFORCE_HELP["appl"]),
         # Field order past Type/Dir/Appl mirrors the reinforce sheet's columns
         # (Tmax, Lp1, Lp2, Tend1, Tend2, Spacing, then the FEM-only tail) so a
         # block copied from the sheet or the docs' tables pastes straight in.
-        Field("t_max", "Tmax", usage="lem", tooltip=REINFORCE_HELP["t_max"]),
-        Field("lp1", "Lp1", usage="lem", tooltip=REINFORCE_HELP["lp1"]),
-        Field("lp2", "Lp2", usage="lem", tooltip=REINFORCE_HELP["lp2"]),
+        # applies=LF: the finite element bar reads Tmax as its capacity and the
+        # development lengths and end capacities for its pullout, exactly as the
+        # limit equilibrium methods do, so neither usage toggle may hide them.
+        Field("t_max", "Tmax", applies=LF, tooltip=REINFORCE_HELP["t_max"]),
+        Field("lp1", "Lp1", applies=LF, tooltip=REINFORCE_HELP["lp1"]),
+        Field("lp2", "Lp2", applies=LF, tooltip=REINFORCE_HELP["lp2"]),
         # The overburden pullout law. applies=LF, like Spacing: both engines read
         # it, so neither usage toggle may hide it. The sheet colors the whole
         # envelope block one red; the editor leaves the both-engines members of
@@ -7602,8 +7622,8 @@ class ReinforcementEditor(CategoryEditor):
               tooltip=REINFORCE_HELP["adhesion"]),
         Field("delta", "Delta", "optfloat", applies=LF,
               tooltip=REINFORCE_HELP["delta"]),
-        Field("tend1", "Tend1", usage="lem", tooltip=REINFORCE_HELP["tend1"]),
-        Field("tend2", "Tend2", usage="lem", tooltip=REINFORCE_HELP["tend2"]),
+        Field("tend1", "Tend1", applies=LF, tooltip=REINFORCE_HELP["tend1"]),
+        Field("tend2", "Tend2", applies=LF, tooltip=REINFORCE_HELP["tend2"]),
         Field("spacing", "Spacing", applies=LF, tooltip=REINFORCE_HELP["spacing"]),
         Field("t_res", "Tres", usage="fem", tooltip=REINFORCE_HELP["t_res"]),
         # E is a Young's modulus (stress). Area (a cross-section, length²) has no

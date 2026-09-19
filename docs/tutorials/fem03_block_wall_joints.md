@@ -492,15 +492,18 @@ The fill is the same in both: γ = 20 kN/m³, c′ = 0, φ′ = 34°, E = 25 MPa
 
 ### A base geotextile on soft clay
 
-**Foundation.** Soft clay: γ = 17 kN/m³, c = 20 kPa, φ = 0, E = 8 MPa,
-ν = 0.35. The clay is the weak part of this section.
+The first version is the case where the failure surface has to cut across the
+sheet. The embankment sits on soft clay, γ = 17 kN/m³, c = 20 kPa, φ = 0,
+E = 8 MPa, ν = 0.35, and the clay is the weak part of the section: whatever
+fails here fails through it.
 
-**Sheet.** A base geotextile at the base of the fill, 32 m long, both ends free:
-Tmax = 100 kN/m, EA = 2000 kN/m.
+The sheet is a base geotextile laid on the clay under the whole fill, 32 m long
+with both ends free, Tmax = 100 kN/m and EA = 2000 kN/m. Its interface with the
+soil, Adhesion = 5 kPa and Delta = 20°, is stronger than the clay beneath it,
+so the fill has no reason to slide along the sheet when it can shear the clay
+instead.
 
-**Interface.** Adhesion = 5 kPa, Delta = 20°. Stronger than the clay under it.
-
-**Joint.** Two runs. First `Joint` blank, the sheet as a bonded bar,
+Run it first with `Joint` blank, the sheet as a bonded bar,
 [xslope_base_geotextile_bonded.xlsx](files/xslope_base_geotextile_bonded.xlsx):
 
 <!-- test: file=files/xslope_base_geotextile_bonded.xlsx, type=fem_ssrm, expected_fs=1.356, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-bonded-ssrm -->
@@ -531,16 +534,22 @@ the factor of safety.
 
 ### A smooth geomembrane liner on a firm foundation
 
-**Foundation.** Firm soil: γ = 20 kN/m³, c′ = 30 kPa, φ′ = 32°, E = 50 MPa,
-ν = 0.3.
+The second version turns the first one around. It keeps the same fill and the
+same geometry, but takes away the weak foundation and puts the weakness in the
+sheet instead, so that the failure surface can run along the sheet if the model
+lets it.
 
-**Sheet.** A smooth geomembrane liner at the base of the fill, 32 m long, both
-ends free: Tmax = 50 kN/m, EA = 2000 kN/m.
+The soft clay becomes a firm foundation, γ = 20 kN/m³, c′ = 30 kPa, φ′ = 32°,
+E = 50 MPa, ν = 0.3, stronger than the fill above it. Nothing fails through
+that.
 
-**Interface.** Adhesion = 0.5 kPa, Delta = 10°. Nothing in this section is weak
-except this.
+The base geotextile becomes a smooth geomembrane liner, still 32 m long with
+both ends free, Tmax = 50 kN/m and EA = 2000 kN/m. Its interface is the weakest
+thing in the section: Adhesion = 0.5 kPa and Delta = 10°, against a fill at
+φ′ = 34° and a foundation at φ′ = 32°. If the fill can slide along the liner,
+that is where the embankment will fail.
 
-**Joint.** Two runs again. First `Joint` blank, the liner as a bonded bar,
+Run it the same two ways. First `Joint` blank, the liner as a bonded bar,
 [xslope_liner_bonded.xlsx](files/xslope_liner_bonded.xlsx):
 
 <!-- test: file=files/xslope_liner_bonded.xlsx, type=fem_ssrm, expected_fs=1.371, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-liner-bonded-ssrm -->

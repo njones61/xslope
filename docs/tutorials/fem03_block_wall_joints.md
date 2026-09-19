@@ -565,7 +565,9 @@ Run it the same two ways. First `Joint` blank, the liner as a bonded bar,
 The bonded model has no way for the fill to move along the liner. The
 foundation is too strong to fail and the sheet is held to the soil on both
 faces, so the weakest thing left is the fill itself, and the strain runs down
-both slope faces at 2.17. Then `Joint = Yes`, the liner as a slip surface,
+both slope faces at 2.17.
+
+Then `Joint = Yes`, the liner as a slip surface,
 [xslope_liner_jointed.xlsx](files/xslope_liner_jointed.xlsx):
 
 <!-- test: file=files/xslope_liner_jointed.xlsx, type=fem_ssrm, expected_fs=1.285, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-liner-jointed-ssrm -->

@@ -19,7 +19,7 @@ from math import degrees, sin, cos, sqrt, asin, tan
 
 
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, issparse
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, identity as _sp_identity, issparse
 from scipy.sparse.linalg import splu
 import shapely
 from shapely.geometry import LineString, Point, Polygon
@@ -10161,6 +10161,7 @@ def _nr_tangent_factorable(K):
 # Newton-Raphson controls. These are the spike's defaults; every one of them is a
 # solver control, not a modeling choice, and none of them changes what the trial
 # means — only how hard the solver works before it declares the load unreachable.
+_NR_TANGENT_SHIFT = 1e-12  # relative diagonal shift on the corrector's tangent; see the reform site
 _NR_MAX_ITER = 150         # Newton iterations allowed inside ONE load increment
 _NR_MIN_STEP = 1.0 / 64    # smallest load increment; below it the load is unreachable
 # A load increment is abandoned when it makes NO PROGRESS — no improvement on the
@@ -10633,6 +10634,21 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
             if not _nr_tangent_factorable(K):
                 _stop = 'singular_pattern'  # structurally singular = the limit load
                 break
+            # A tangent can be NUMERICALLY singular with a full pattern: a mass
+            # held to the rest of the mesh only by interface pairs that are all
+            # slipping has no tangent stiffness against sliding as a body, and
+            # its rows are nonzero but dependent. SuperLU does not always raise
+            # on that — under COLAMD it builds an empty supernode and dies
+            # inside OpenBLAS ("lda must be >= MAX(N,1)"), taking the process
+            # with it (the jointed base-geotextile embankment at F = 1.52, on
+            # its 1,000-pass rung). A shift of _NR_TANGENT_SHIFT times the
+            # largest diagonal keeps every pivot away from exact zero; a
+            # singular mode then gives an enormous step, which the increment's
+            # own tests refuse, instead of a crash. On a well-conditioned
+            # tangent the shift is below the arithmetic's own noise.
+            _shift = _NR_TANGENT_SHIFT * float(np.max(np.abs(K.diagonal())))
+            if _shift > 0.0:
+                K = K + _sp_identity(K.shape[0], format="csc") * _shift
             _tp = time.perf_counter() if _PROF_ON else None
             try:
                 lu = _nr_factorize_tangent(K, _order_cache)

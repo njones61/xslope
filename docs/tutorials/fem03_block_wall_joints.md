@@ -126,8 +126,9 @@ rows below, or paste them straight into the worksheet.
 | course-04 | 8.0 | 2.4 | 9.2 | 2.4 | 0 | 35 |
 | course-05 | 8.0 | 3.0 | 9.2 | 3.0 | 0 | 35 |
 
-Every other column stays blank. When the seven rows are in, the editor looks like
-this:
+Every other column stays blank. The editor shows a blank tension cutoff as 0,
+which is what a blank means: the joint carries no tension. When the seven rows
+are in, the editor looks like this:
 
 ![The joints editor with the wall's seven contacts entered](images/fem03_studio_joints_editor.png){width=900}
 
@@ -136,8 +137,7 @@ block on compacted foundation soil at 34°; the back face is block against
 granular fill at 30°, the lowest of the three because the fill is what has to
 slide past it; the course joints are block on block at 35°, the manufacturer's
 value for a dry, keyless unit. All seven have no cohesion: a dry block contact
-and a block-on-granular-fill contact are both cohesionless, and `c` = 0 and a
-blank `c` mean the same thing.
+and a block-on-granular-fill contact are both cohesionless.
 
 The columns left blank each have a meaning worth knowing:
 

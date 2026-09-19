@@ -397,8 +397,13 @@ reports
 
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid.png){width=1000}
 
-The three sheets show as green lines, the two faces of each sheet's interface
-colored by their slip, with the sheet's original position in gray behind. The
+This panel has no element grid where Part 1's did. The blocks panel drops the
+grid once a model carries more than eight jointed lines, because on a jointed
+network the blocks are a few elements each and the grid would bury their
+outlines. The wall alone had seven jointed lines; the three sheets make ten.
+Everything else is drawn as before. The three sheets show as green lines, the
+two faces of each sheet's interface colored by their slip, with the sheet's
+original position in gray behind. The
 short red lengths just behind the facing are the bars themselves, drawn red in
 their deformed position. Along most of each sheet the soil faces lie on the bar
 and hide it; where the faces have slid along the bar, at the facing, the red

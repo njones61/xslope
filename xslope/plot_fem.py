@@ -1920,13 +1920,11 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
         blocks, exterior = block_boundary_edges(fem_data, comp)
         n_jlines = len(np.unique(np.asarray(
             fem_data["joint_data"]["line_id"], dtype=int)))
-        # The element grid comes off only when it would bury the block outlines
-        # that are the whole reading: on a generated network of dozens of traces
-        # the blocks are a few elements each, and on a mesh so fine that its
-        # rendered edges tangle. A wall on seven contacts and the same wall with
-        # three jointed sheets are one drawing, not two, so the ticks' cutoff
-        # (eight lines) is not the grid's.
-        show_edges = (not tangle) and n_jlines <= _BLOCK_GRID_MAX_JOINT_LINES
+        # The same count at which the section drawings drop the joint ticks: past
+        # it the marks are all there is. Here it is the element grid that becomes
+        # that — on a 234-trace network the blocks are a few elements each and the
+        # edges bury the outlines that are the whole reading.
+        show_edges = n_jlines <= JOINT_TICK_MAX_LINES
         _draw_block_tints(ax, fem_data, nodes_deformed, comp)
     if show_edges:
         plot_mesh_lines(ax, fem_data_deformed,
@@ -2178,12 +2176,6 @@ PILE_COLOR = 'green'
 #: reinforcement's own geometry color is gray. Original and deformed piles were
 #: both drawn in green and could not be told apart at any exaggeration.
 PILE_DEFORMED_COLOR = 'red'
-
-
-#: The most jointed lines a deformed-blocks panel still draws the element grid
-#: under. Past it the blocks are a few elements each and the grid buries their
-#: outlines; below it the grid shows how each block deformed inside its faces.
-_BLOCK_GRID_MAX_JOINT_LINES = 40
 
 
 def _barless_mask(fem_data, n):

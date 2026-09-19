@@ -429,8 +429,16 @@ being stretched, and it is nowhere near rupture. The panels below say what it is
 doing instead: the interface reaches its Mohr-Coulomb limit at one station,
 immediately behind the block column, and nowhere else. What the geogrid
 contributes on this wall, it contributes by tying the block column to a mass of
-fill that will not move — which is why **Tend1** mattered, and why the same three
-layers with free front ends would have been worth much less.
+fill that will not move — which is why **Tend1** is the number that matters.
+
+It also says how little the jointing of the sheets matters here. Nothing slides
+along them: the slip is zero beyond the first stretch, and over the rest of
+the length the two faces carry their shear below the limit, which is grip, not
+sliding. The sheets are jointed because they end on the back-face joint and a
+bonded bar cannot stand on a split node; on this wall the interface elements
+act as a stiff bond and a bonded bar with the same tie would give much the
+same answer. Part 3 is where jointing changes the answer, and its models show
+why.
 
 ---
 

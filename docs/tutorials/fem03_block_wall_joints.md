@@ -255,9 +255,17 @@ into the gap.
 The slip on the joint faces puts numbers on that. **1D Details…** on the results
 toolbar opens one contact at a time and draws its normal stress, its shear
 stress against the Coulomb limit with the slipping stations marked, and its
-slip along the line. Reading each of the seven that way gives the count of
-slipping stations and the largest slip on each, and the one doing the work is
-the back face:
+slip along the line. Here is the back face's:
+
+![1D details of the back face at the critical factor: the normal stress along the contact, the shear stress sitting on the Coulomb limit with 28 of 30 stations marked slipping and both ends open, and the slip growing from the base to 70 mm near the top](images/fem03_1d_details_back_face.png){width=1000}
+
+The middle panel marks every station that is slipping, which is all but the
+two open ends, and the shear stress sits on the Coulomb limit at each of them,
+so the dashed limit line lies under the solid one. The bottom panel is the slip
+itself, growing from the base of the column to 70 mm just below the top.
+Reading each of the seven contacts the same way gives the count of slipping
+stations and the largest slip on each, and the one doing the work is the back
+face:
 
 | contact | spans slipping | largest slip |
 | --- | :---: | :---: |

@@ -1203,13 +1203,13 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             # about the joints themselves, so this panel becomes the scaled
             # deformed mesh with the faces drawn — where a slipped joint is two
             # lines that have parted, and a toppling column leans.
-            plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
+            reinf_cbar_specs = plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
                              show_original=show_original, deformed_color=deformed_color,
                              show_reinforcement=show_reinforcement,
                              cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
                              label_elements=label_elements, single_panel=defer_panel_cbar,
                              at_failure=deform_field.get("_at_failure", False),
-                             joint_faces=show_joints, block_grid=block_grid)
+                             joint_faces=show_joints, block_grid=block_grid) or []
         elif pt == 'displace_vector':
             vector_mappable = plot_displacement_vectors(ax, fem_data, deform_field, show_mesh, show_reinforcement,
                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
@@ -1219,13 +1219,13 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                                     vector_max=vector_max,
                                     single_panel=defer_panel_cbar)
         elif pt == 'deformation':
-            plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
+            reinf_cbar_specs = plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
                              show_original=show_original, deformed_color=deformed_color,
                              show_reinforcement=show_reinforcement,
                              cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
                              label_elements=label_elements, single_panel=defer_panel_cbar,
                              at_failure=deform_field.get("_at_failure", False),
-                             joint_faces=show_joints, block_grid=block_grid)
+                             joint_faces=show_joints, block_grid=block_grid) or []
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
@@ -1931,6 +1931,7 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     # the only difference on the page is the faces the joints add.
     block_look = bool(joint_faces)
     draw_faces = block_look and bool((fem_data.get("joint_data") or {}).get("n"))
+    face_cbar_specs = []
     show_edges = True
     if block_look:
         from .mesh import block_boundary_edges, block_components
@@ -1955,14 +1956,10 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
                 colors=_DEFORMED_BOUNDARY_COLOR,
                 linewidths=max(lw, floor_pt, _DEFORMED_BOUNDARY_PT), alpha=1.0,
                 zorder=6.4, label='Deformed (outline)'))
-        faces = ([e for edges in blocks.values() for e in edges]
-                 if draw_faces else [])
-        if faces:
-            ax.add_collection(LineCollection(
-                [nodes_deformed[e, :2] for e in faces],
-                colors=JOINT_COLOR,
-                linewidths=max(lw, floor_pt, JOINT_LINEWIDTH), alpha=1.0,
-                zorder=6.5, label='Joint faces'))
+        if draw_faces:
+            face_cbar_specs = _draw_joint_faces(ax, fem_data, solution,
+                                                nodes_deformed, blocks,
+                                                max(lw, floor_pt, JOINT_LINEWIDTH))
 
     # Plot members in both original and deformed configurations. The two
     # configurations are told apart by COLOR, on both kinds of member: the
@@ -2019,6 +2016,7 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     title = _fs_title(_fallback_clause(solution, base), F,
                       solution.get("_ssrm_fs"), at_failure=at_failure)
     ax.set_title(title, fontsize=12, pad=15)
+    return face_cbar_specs
 
 
 def _add_element_labels(ax, fem_data):
@@ -2596,6 +2594,59 @@ def solution_has_joint_state(fem_data, solution):
     if jd is None or not jd.get("n"):
         return False
     return bool(_measured(solution, jd["n"]))
+
+
+def _draw_joint_faces(ax, fem_data, solution, nodes_deformed, blocks, lw):
+    """Draw the two faces of every joint element on the deformed mesh, each face
+    at its own deformed position and colored by the element's slip.
+
+    This is the joints' reading on the deformation panel: where the faces have
+    parted or slid they are drawn apart, and the green ramp says how far. A face
+    that is not slipping is the neutral gray hairline. Returns the colorbar
+    spec for the ramp, or nothing when no joint slipped or the solution carries
+    no joint state (then the faces are drawn plain, in the joint's own green).
+    """
+    import matplotlib.cm as cm
+    from matplotlib.colors import Normalize
+
+    jd = fem_data["joint_data"]
+    conn = np.asarray(jd["conn"], dtype=int)
+    n = int(jd["n"])
+    if not solution_has_joint_state(fem_data, solution):
+        faces = [e for edges in blocks.values() for e in edges]
+        if faces:
+            ax.add_collection(LineCollection(
+                [nodes_deformed[e, :2] for e in faces], colors=JOINT_COLOR,
+                linewidths=lw, alpha=1.0, zorder=6.5))
+        return []
+    slip = np.abs(np.asarray(solution.get("joint_slip", np.zeros((n, 3))),
+                             dtype=float)).reshape(n, -1)
+    slipping = np.asarray(solution.get("joint_slipping",
+                                       np.zeros((n, 3), dtype=bool))).reshape(n, -1)
+    w = np.asarray(jd["w"], dtype=float).reshape(n, -1) > 0.0
+    s_el = np.where(w, slip, 0.0).max(axis=1)
+    sl_el = np.any(slipping & w, axis=1)
+    segs_a = [nodes_deformed[conn[i, 0:2], :2] for i in range(n)]
+    segs_b = [nodes_deformed[conn[i, 3:5], :2] for i in range(n)]
+    smax = float(s_el[sl_el].max()) if sl_el.any() else 0.0
+    specs = []
+    if smax > 0.0:
+        cmap = _joint_slip_cmap()
+        norm = Normalize(vmin=0.0, vmax=smax)
+        sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        specs.append((sm, _fem_cbar_label(fem_data, 'Joint slip', 'length')))
+        colors = [cmap(norm(v)) if ok else _JOINT_INTACT_COLOR
+                  for v, ok in zip(s_el, sl_el)]
+    else:
+        colors = [_JOINT_INTACT_COLOR] * n
+    for segs in (segs_a, segs_b):
+        ax.add_collection(LineCollection(
+            segs, colors=_JOINT_HALO_COLOR, linewidths=lw + 2 * _JOINT_HALO_PT,
+            alpha=1.0, zorder=6.45))
+        ax.add_collection(LineCollection(
+            segs, colors=colors, linewidths=lw, alpha=1.0, zorder=6.5))
+    return specs
 
 
 def _draw_block_tints(ax, fem_data, nodes_xy, comp):

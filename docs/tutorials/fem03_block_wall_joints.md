@@ -289,8 +289,12 @@ into the facing, runs the same wall again, and reads what the sheets add.
 Three layers of geogrid go in on the **reinforce** worksheet, reached from the
 Inputs tree under **Reinforcement**. They sit on the 0.6 m, 1.8 m and 3.0 m
 course joints — every second course — and run 3.0 m back into the reinforced
-fill, which is about 0.8 of the wall height and ordinary practice. Enter the
-three rows below, or paste them into the worksheet.
+fill, which is about 0.8 of the wall height and ordinary practice.
+
+Open the editor, switch it to **Table view**, and on the **Show parameters for**
+row untick **LEM** and tick **FEM**. That hides the columns the limit equilibrium
+methods use and nothing else reads, so the table carries only what this run
+needs. Then enter the three rows below, or paste them into the worksheet.
 
 | Label | x1 | y1 | x2 | y2 |
 | --- | :---: | :---: | :---: | :---: |

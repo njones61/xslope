@@ -616,6 +616,13 @@ class FemResultsDisplayPanel(QWidget):
         # split along a line. A joint carries no strain, so it does not appear in
         # the strain field at all; this draws its state on the line itself.
         self.show_joints = QCheckBox("Joint state")
+        # The faces' weight on the deformation plot, in points: a thin trace
+        # disappears on a wide section, a heavy one hides the blocks.
+        from xslope.plot_fem import JOINT_FACE_LINEWIDTH
+        self.joint_width = _dspin(0.5, 10.0, JOINT_FACE_LINEWIDTH, 0.5, decimals=1)
+        self.joint_width.setToolTip(
+            "Width of the joint faces drawn on the deformation plot, in points.")
+        self.joint_width.valueChanged.connect(lambda *_: self.changed.emit())
         self.show_joints.setChecked(True)
         self.show_joints.setToolTip(
             "On the deformation plot of a jointed model, draw the two faces of "
@@ -652,6 +659,7 @@ class FemResultsDisplayPanel(QWidget):
         form.addRow("", self.element_edges)
         form.addRow("", self.show_reinforcement)
         form.addRow("", self.show_joints)
+        form.addRow("Joint width (pt)", self.joint_width)
         form.addRow("", self.label_elements)
         form.addRow("", self.plot_boundary)
         form.addRow("", self.plot_nodes)
@@ -769,6 +777,7 @@ class FemResultsDisplayPanel(QWidget):
             "block_grid": edges,
             "show_reinforcement": self.show_reinforcement.isChecked(),
             "show_joints": self.show_joints.isChecked(),
+            "joint_linewidth": float(self.joint_width.value()),
             "label_elements": self.label_elements.isChecked(),
             "plot_boundary": self.plot_boundary.isChecked(),
             "plot_nodes": self.plot_nodes.isChecked(),

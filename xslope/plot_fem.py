@@ -876,7 +876,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
-                    block_grid=None,
+                    block_grid=None, joint_linewidth=None,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
                     scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None,
                     mesh_on_fields=False, fs=None, failure_solution=None,
@@ -904,6 +904,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         deform_percent: Target deformation as percentage of mesh height (default 15).
         block_grid: On a jointed model's deformation panel, whether the element
             grid is drawn under the blocks; None follows :func:`block_grid_default`.
+        joint_linewidth: Width in points of the joint faces on that panel; None
+            takes :data:`JOINT_FACE_LINEWIDTH`.
         show_mesh: Show mesh lines where the mesh IS the content — the deformation
             panel's original-vs-deformed grid (and the displace_vector panel's edge
             context). It does NOT overlay edges on the filled-field contour panels
@@ -1209,7 +1211,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                              cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
                              label_elements=label_elements, single_panel=defer_panel_cbar,
                              at_failure=deform_field.get("_at_failure", False),
-                             joint_faces=show_joints, block_grid=block_grid) or []
+                             joint_faces=show_joints, block_grid=block_grid,
+                             joint_linewidth=joint_linewidth) or []
         elif pt == 'displace_vector':
             vector_mappable = plot_displacement_vectors(ax, fem_data, deform_field, show_mesh, show_reinforcement,
                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
@@ -1225,7 +1228,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                              cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
                              label_elements=label_elements, single_panel=defer_panel_cbar,
                              at_failure=deform_field.get("_at_failure", False),
-                             joint_faces=show_joints, block_grid=block_grid) or []
+                             joint_faces=show_joints, block_grid=block_grid,
+                             joint_linewidth=joint_linewidth) or []
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
@@ -1831,7 +1835,7 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
                        show_original='outline', deformed_color='k', show_reinforcement=True,
                        cbar_shrink=0.8, cbar_labelpad=20, label_elements=False,
                        single_panel=False, at_failure=False, show_mesh=None,
-                       joint_faces=False, block_grid=None):
+                       joint_faces=False, block_grid=None, joint_linewidth=None):
     """
     Plot deformed mesh overlay on original mesh.
 
@@ -1858,6 +1862,8 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
         block_grid: On a jointed model, whether the light-gray element grid is
             drawn under the blocks. None (default) follows
             :func:`block_grid_default`; True or False is the user's own choice.
+        joint_linewidth: Width of the joint faces in points; None takes
+            :data:`JOINT_FACE_LINEWIDTH`.
         joint_faces: Draw the two faces of every joint element over the deformed
             grid, and drop the grid itself to a light gray so they read over it.
             Both copies of each face are drawn, so a joint that has slipped or
@@ -1957,9 +1963,9 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
                 linewidths=max(lw, floor_pt, _DEFORMED_BOUNDARY_PT), alpha=1.0,
                 zorder=6.4, label='Deformed (outline)'))
         if draw_faces:
-            face_cbar_specs = _draw_joint_faces(ax, fem_data, solution,
-                                                nodes_deformed, blocks,
-                                                max(lw, floor_pt, JOINT_LINEWIDTH))
+            face_cbar_specs = _draw_joint_faces(
+                ax, fem_data, solution, nodes_deformed, blocks,
+                max(floor_pt, float(joint_linewidth or JOINT_FACE_LINEWIDTH)))
 
     # Plot members in both original and deformed configurations. The two
     # configurations are told apart by COLOR, on both kinds of member: the
@@ -2680,6 +2686,11 @@ def _draw_block_tints(ax, fem_data, nodes_xy, comp):
             polys, facecolors=colors, edgecolors='none',
             alpha=_BLOCK_TINT_ALPHA, zorder=0.5))
 
+
+#: Width, in points, of a joint face on the deformation panel. Studio's display
+#: panel overrides it per view ("Joint width"); a face reads at this weight on a
+#: page figure where the 1.6 pt trace of the inputs plot was too thin to see.
+JOINT_FACE_LINEWIDTH = 2.6
 
 #: How far, in points, each face of a jointed sheet is drawn from the bar.
 _JOINT_FACE_OFFSET_PT = 3.2

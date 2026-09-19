@@ -317,6 +317,7 @@ class MplCanvas(QWidget):
             show_mesh=opts.get("show_mesh", True),
             mesh_on_fields=opts.get("mesh_on_fields", False),
             block_grid=opts.get("block_grid"),
+            joint_linewidth=opts.get("joint_linewidth"),
             show_reinforcement=opts.get("show_reinforcement", True),
             show_joints=opts.get("show_joints", True),
             label_elements=opts.get("label_elements", False),

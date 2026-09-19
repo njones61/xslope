@@ -751,9 +751,11 @@ against the dashed undeformed outline: a jointed slope fails by blocks moving as
 field sampled at nodes misses the parting and sliding that is the whole mechanism. On a network of more than eight
 jointed lines the element edges come off so the blocks can be seen; that sets the **Element edges** box for the
 result, and the box overrides it either way. Where the displacements are too small to draw the
-mesh is shown undeformed and the title says so. A **Joint state** switch draws
-each joint on the line it runs along, colored by how far its faces have slid on a green ramp the strain field cannot
-produce, gray where it is not slipping and ticked across where it has opened.
+mesh is shown undeformed and the title says so. A **Joint state** switch draws the two faces of every joint on
+that deformed mesh, each where the deformation has put it and colored by how far the faces have slid on a green
+ramp, gray where the joint is not slipping, with a slip colorbar; **Joint width** sets the weight of those faces
+in points, since a thin face disappears on a wide section. On a model whose only strength is its joints the
+strain plot carries the same reading, ticked across where a joint has opened.
 
 The FEM · Results toolbar also carries **1D Details…**, which opens a non-modal panel
 listing every reinforcement line and pile in the model with a utilization badge, and

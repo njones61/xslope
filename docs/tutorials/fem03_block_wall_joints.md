@@ -139,10 +139,15 @@ slide past it; the course joints are block on block at 35°, the manufacturer's
 value for a dry, keyless unit. All seven have no cohesion: a dry block contact
 and a block-on-granular-fill contact are both cohesionless.
 
-The columns left blank each have a meaning worth knowing:
+What the columns mean, in the order they appear on the editor:
 
+- **Label** names the line. The model checks, the results panels and the report
+  use it whenever they have something to say about a joint, so a name that
+  identifies the contact pays for itself the first time a check fires.
 - **x1, y1, x2, y2** are the two endpoints. A joint line is straight; a contact
   that turns a corner is entered as two lines meeting at the corner.
+- **c** and **phi** are the strength of the surface, in the same units as a
+  soil's cohesion and friction angle. `phi` is required.
 - **c_res** and **phi_res** are the strength the surface keeps after it has
   slipped once, for a rough joint that shears off its surface roughness and does
   not rebuild it. Blank means no drop: the peak strength carries throughout,

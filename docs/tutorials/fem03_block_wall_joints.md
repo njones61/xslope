@@ -111,8 +111,9 @@ polygons, and an empty joints worksheet. Units are metric.
 ![The starter file: the block courses, the two fill zones and the foundation, with no joints entered](images/fem03_inputs_start.png){width=1000}
 
 The joints worksheet is reached from the Inputs tree under **Joints**. Each row
-is one line, and its columns are walked here in the order they appear on the
-editor.
+is one line. This section enters the wall's seven contacts one column at a time,
+in the order the columns appear on the editor; the screenshot below shows the
+editor as it looks once all seven are in.
 
 ![The joints editor with the wall's seven contacts entered](images/fem03_studio_joints_editor.png){width=900}
 

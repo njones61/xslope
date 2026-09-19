@@ -474,73 +474,85 @@ That is `Joint = Yes`, and the interface's Adhesion and Delta become the strengt
 of the surface the mass slides on.
 
 Getting it wrong in the second case is not a small error, and two small models
-show both halves of it. Each is an embankment 5 m high with one sheet under it,
-each is built twice with the `Joint` cell as the only difference, and each is run
-at the settings this page has used throughout.
+show both halves of it, one at a time. Each is the same embankment, 5 m high on
+2:1 slopes with a 12 m crest, on a 4 m foundation, with one 32 m sheet under
+it. Each is built twice with the `Joint` cell as the only difference, and each
+is run at the settings this page has used throughout.
 
 ![The Part 3 embankment: 5 m high on 2:1 slopes with a 12 m crest, on a 4 m foundation, with one 32 m sheet under it](images/fem03_sheet_problem_sketch.png){width=1000}
 
-The fill is the same in both cases. The foundation and the sheet are what
-change:
+The fill is the same in both: γ = 20 kN/m³, c′ = 0, φ′ = 34°, E = 25 MPa,
+ν = 0.3. The foundation and the sheet are what change.
 
-| zone | case | γ (kN/m³) | c (kPa) | φ (°) | E (MPa) | ν |
-| --- | --- | :---: | :---: | :---: | :---: | :---: |
-| embankment fill | both | 20 | 0 | 34 | 25 | 0.3 |
-| foundation | base geotextile: soft clay | 17 | 20 | 0 | 8 | 0.35 |
-| foundation | liner: firm soil | 20 | 30 | 32 | 50 | 0.3 |
+### A base geotextile on soft clay
 
-| sheet | Tmax (kN/m) | Adhesion (kPa) | Delta (°) | EA (kN/m) | ends |
-| --- | :---: | :---: | :---: | :---: | :---: |
-| base geotextile | 100 | 5 | 20 | 2000 | both free |
-| liner | 50 | 0.5 | 10 | 2000 | both free |
+The foundation is soft clay, γ = 17 kN/m³, c = 20 kPa, φ = 0, E = 8 MPa,
+ν = 0.35. The sheet is a base geotextile with Tmax = 100 kN/m, an interface of
+a = 5 kPa and δ = 20°, EA = 2000 kN/m, both ends free. The clay is the weak part
+of this section and the sheet's interface is not.
 
-The first is a **base geotextile** under an embankment on soft clay
-([bonded](files/xslope_base_geotextile_bonded.xlsx),
-[jointed](files/xslope_base_geotextile_jointed.xlsx)). The clay is weak
-(c = 20 kPa, φ = 0) and the sheet's interface is not (a = 5 kPa, δ = 20°), so the
-critical surface cuts up through the fill and across the sheet.
-
-The second is a **smooth geomembrane liner** under the same embankment on a firm
-foundation ([bonded](files/xslope_liner_bonded.xlsx),
-[jointed](files/xslope_liner_jointed.xlsx)). Nothing in that section is weak
-except the liner itself: δ = 10° against a foundation at φ = 32°.
+Run it first as a bonded bar,
+[xslope_base_geotextile_bonded.xlsx](files/xslope_base_geotextile_bonded.xlsx),
+with `Joint` blank:
 
 <!-- test: file=files/xslope_base_geotextile_bonded.xlsx, type=fem_ssrm, expected_fs=1.356, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-bonded-ssrm -->
 
+>>**FS = 1.356**
+
+![Shear strain, base geotextile as a bonded bar](images/fem03_shear_sheet_bonded.png){width=1000}
+
+The band runs up through the fill and **across** the sheet. Now the same file
+with `Joint = Yes`,
+[xslope_base_geotextile_jointed.xlsx](files/xslope_base_geotextile_jointed.xlsx):
+
 <!-- test: file=files/xslope_base_geotextile_jointed.xlsx, type=fem_ssrm, expected_fs=1.356, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-jointed-ssrm -->
+
+>>**FS = 1.356**
+
+![Shear strain, the same sheet as a slip surface](images/fem03_shear_sheet_jointed.png){width=1000}
+
+The two agree exactly, and the strain fields say why: the band crosses the
+sheet in both, so whether the sheet is a bar or a surface changes nothing.
+Either way the soil above and below it move together and the sheet is loaded in
+tension across a surface that cuts it.
+
+### A smooth geomembrane liner on a firm foundation
+
+The foundation is now firm, γ = 20 kN/m³, c′ = 30 kPa, φ′ = 32°, E = 50 MPa,
+ν = 0.3, and the sheet is a smooth liner with Tmax = 50 kN/m, an interface of
+a = 0.5 kPa and δ = 10°, EA = 2000 kN/m, both ends free. Nothing in this section
+is weak except the liner itself.
+
+As a bonded bar, [xslope_liner_bonded.xlsx](files/xslope_liner_bonded.xlsx):
 
 <!-- test: file=files/xslope_liner_bonded.xlsx, type=fem_ssrm, expected_fs=1.371, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-liner-bonded-ssrm -->
 
+>>**FS = 1.371**
+
+![Shear strain, the liner as a bonded bar: the band cuts through the fill](images/fem03_shear_liner_bonded.png){width=1000}
+
+The bonded model has no way for the fill to move along the liner, so it puts
+the strain in the soil above the sheet and reports the slope on that. As a slip
+surface, [xslope_liner_jointed.xlsx](files/xslope_liner_jointed.xlsx):
+
 <!-- test: file=files/xslope_liner_jointed.xlsx, type=fem_ssrm, expected_fs=1.059, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-liner-jointed-ssrm -->
+
+>>**FS = 1.059**
+
+![Shear strain, the same liner as a slip surface: the band runs along it](images/fem03_shear_liner_jointed.png){width=1000}
+
+The jointed model lets the fill slide out along the liner instead: the strain
+band collapses onto the sheet itself at both toes and 22 of its 55 spans slip,
+up to 3.6 mm. That is what a mass on a smooth membrane does, and it costs a
+fifth of the factor of safety. The bonded model reported a slope safer than
+the model says it is.
+
+### The rule
 
 | model | interface δ | as a bonded bar | as a slip surface |
 | --- | :---: | :---: | :---: |
 | base geotextile on soft clay | 20° | 1.356 | 1.356 |
 | smooth geomembrane liner | 10° | 1.371 | 1.059 |
-
-On the geotextile the two models agree exactly. On the liner they are **0.312**
-apart, and the bonded one is the higher of the two — it reports a slope that is
-safer than the model says it is.
-
-The four shear strain fields say why. In the geotextile pair the band runs up
-through the fill and **across** the sheet in both models, so whether the sheet is
-a bar or a surface changes nothing: either way the soil above and below it move
-together and the sheet is loaded in tension across a surface that cuts it.
-
-![Shear strain, base geotextile as a bonded bar](images/fem03_shear_sheet_bonded.png){width=1000}
-
-![Shear strain, the same sheet as a slip surface](images/fem03_shear_sheet_jointed.png){width=1000}
-
-In the liner pair they part company. The bonded model has no way for the fill to
-move along the liner, so it puts the strain in the soil above the sheet and
-reports the slope on that. The jointed model lets the fill slide out along the
-liner instead: the strain band collapses onto the sheet itself at both toes and
-22 of its 55 spans slip, up to 3.6 mm. That is what a mass on a smooth membrane
-does, and it costs a fifth of the factor of safety:
-
-![Shear strain, the liner as a bonded bar: the band cuts through the fill](images/fem03_shear_liner_bonded.png){width=1000}
-
-![Shear strain, the same liner as a slip surface: the band runs along it](images/fem03_shear_liner_jointed.png){width=1000}
 
 Between them the two pairs bracket the rule. Where the surface has to cut
 across the sheet, a bonded bar is adequate and cheaper — the jointed model

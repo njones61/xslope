@@ -519,8 +519,15 @@ the sheet as a slip surface,
 
 ![Shear strain, the same sheet as a slip surface](images/fem03_shear_sheet_jointed.png){width=1000}
 
-The two agree exactly: on this section, entering the sheet as a slip surface
-changes nothing about the factor of safety.
+The two agree exactly, and the strain field says why. The failure surface
+starts at the crest, goes down through the fill, crosses the sheet, runs through
+the soft clay, and comes up through the foundation just outside the toe, the
+same on both sides. The sheet is **crossed**, not slid along: it is loaded in
+tension across that surface, which a bonded bar and a slip surface both do the
+same way. The slip surface only behaves differently where soil moves along the
+sheet, and the few millimetres of slip near the sheet's ends are not where this
+section fails. So entering the sheet as a slip surface changes nothing about
+the factor of safety.
 
 ### A smooth geomembrane liner on a firm foundation
 

@@ -588,17 +588,17 @@ if they agree the question is settled.
 
 ### What the model checks say before anything is run
 
-The bonded liner does not have to be run to be caught. Open it and the checks
-column beside the Run FEM dialog carries three findings, each naming the line:
+The model checks flag the bonded liner before it is run. Open the file and the
+checks column beside the Run FEM dialog shows three warnings on the liner:
 
 ![The model checks on the bonded liner](images/fem03_preflight_liner.png){width=760}
 
-The sheet lies on a material boundary over its whole length; it is within five
-degrees of horizontal and spans the full width of the mass above it; and its
-Delta of 10° is under 0.6 of the 32° friction angle of the soil around it, which
-is a smooth interface rather than a soil-geosynthetic contact. Each of the three
-is a way of saying the same thing: this is a plane the mass can slide on, and a
-bonded bar cannot represent that.
+The sheet lies on a material boundary over its whole length. It is within five
+degrees of horizontal and spans the full width of the fill above it. Its Delta
+of 10° is less than 0.6 of the 32° friction angle of the soil around it, which
+makes it a smooth interface rather than a soil-geosynthetic contact. All three
+warnings point to the same thing: this is a plane the fill can slide on, and a
+bonded bar cannot model that.
 
 ### Why the wall's own sheets could not be run both ways
 

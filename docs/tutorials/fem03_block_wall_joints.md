@@ -399,8 +399,9 @@ shows through.
 Against 1.137 for the same wall without them, the three layers are worth 0.101 of
 factor of safety, and the joint slip says exactly where it came from. The back
 face's slip falls from **70 mm to 13 mm** and the base's from **13 mm to under
-1 mm**. The contact that was carrying the failure is still the one carrying it,
-and it is carrying a fifth as much.
+1 mm**. The back face is still the contact with the most slip, so the wall still
+fails by sliding down its own back, but it slides a fifth as far before the
+model stops standing.
 
 **1D Details…** draws what one layer is doing along its length. Here is the
 middle one:

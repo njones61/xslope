@@ -2780,9 +2780,13 @@ def _model_span(slope_data):
     return 100.0
 
 
-#: A joint tick's half-length, as a fraction of the width of the section. Short
+#: A joint tick's half-length, as a fraction of the width of the section. Short:
+#: the ticks on a 1.2 m course joint of a block wall were as long as the block
+#: was high and the wall read as a cross-hatched smudge; a third of that length
+#: still says "two faces that can move on each other" and stays clear of the
+#: neighbouring joints.
 #: enough to read as a hatch on the line rather than as geometry of its own.
-JOINT_TICK_FRACTION = 0.009
+JOINT_TICK_FRACTION = 0.003
 
 #: A bar-less joint line's color: a saturated green, the dark end of the hue the
 #: results overlay ramps a joint's slip along, so a joint is one recognizable
@@ -2821,8 +2825,10 @@ def joint_halo_effects(linewidth=JOINT_LINEWIDTH):
 #: continuous traces you can follow, and the legend carries the count.
 JOINT_TICK_MAX_LINES = 8
 
-#: The dash pattern of a joint line drawn as a fault symbol.
-JOINT_DASHES = (0, (6, 3))
+#: A joint line's trace is solid whether or not it carries ticks: the ticks are
+#: the symbol, and a dashed trace under them added nothing but noise on a
+#: short joint.
+JOINT_DASHES = '-'
 
 
 def joint_ticks_wanted(n_lines):
@@ -2869,14 +2875,15 @@ def draw_joint_ticks(ax, xs, ys, span, color, alpha=0.8, zorder=None,
     total = float(s[-1])
     if total <= 0:
         return
-    # A tick is a mark ON the line, so it is never longer than a quarter of the
-    # line it marks. Without that bound a short joint — a course across a 0.3 m
-    # facing column — carries ticks longer than itself and reads as a smudge.
-    half = min(JOINT_TICK_FRACTION * span, 0.25 * total)
-    # One tick every four half-lengths, between four and sixteen of them, so a
-    # short sheet and a long one both read as hatched rather than as a comb or
+    # A tick is a mark ON the line, so it is never longer than an eighth of the
+    # line it marks (a quarter across, both sides together). Without that bound
+    # a short joint — a course across a 0.3 m facing column — carries ticks
+    # longer than itself and reads as a smudge.
+    half = min(JOINT_TICK_FRACTION * span, 0.12 * total)
+    # One tick every five half-lengths, between three and eight of them, so a
+    # short sheet and a long one both read as marked rather than as a comb or
     # as two lonely marks.
-    n = int(min(16, max(4, round(total / (4.0 * half)))))
+    n = int(min(8, max(3, round(total / (5.0 * half)))))
     at = np.linspace(0.0, total, n + 2)[1:-1]
     xi = np.interp(at, s, pts[:, 0])
     yi = np.interp(at, s, pts[:, 1])
@@ -2888,7 +2895,7 @@ def draw_joint_ticks(ax, xs, ys, span, color, alpha=0.8, zorder=None,
     for k in range(n):
         ax.plot([xi[k] - half * nx[k], xi[k] + half * nx[k]],
                 [yi[k] - half * ny[k], yi[k] + half * ny[k]],
-                color=color, linewidth=1.5, alpha=alpha, solid_capstyle='butt',
+                color=color, linewidth=1.0, alpha=alpha, solid_capstyle='butt',
                 zorder=zorder, label=(label if k == 0 else None))
 
 
@@ -2963,7 +2970,7 @@ def plot_reinforcement_lines(ax, slope_data, style=None, solution=False):
 
 
 def plot_joint_lines(ax, slope_data, style=None):
-    """Draw the ``joints`` sheet's lines: a thin dark dashed line, ticked on both
+    """Draw the ``joints`` sheet's lines: a thin dark solid line, ticked on both
     sides where there are few enough of them to read, and one legend entry
     naming the count.
 
@@ -3000,8 +3007,8 @@ def plot_joint_lines(ax, slope_data, style=None):
             # ticked drawing gets a ticked swatch and a plain one does not.
             ax.plot([], [], color=JOINT_COLOR, linewidth=JOINT_LINEWIDTH,
                     linestyle=dash, alpha=0.9,
-                    marker='|' if ticks else 'None', markersize=11,
-                    markeredgewidth=1.5, label=joint_legend_label(len(lines)))
+                    marker='|' if ticks else 'None', markersize=7,
+                    markeredgewidth=1.0, label=joint_legend_label(len(lines)))
             labeled = True
 
 

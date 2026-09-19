@@ -456,28 +456,34 @@ why.
 
 ## Part 3 — When a sheet is a slip surface, and when it is bonded
 
-Every model with a geosynthetic in it has to answer one question: does the
-failure surface **cut across** the sheet, or can it **run along** it?
+Part 3 leaves the wall. The question it takes up came out of Part 2, where the
+geogrid layers were entered with `Joint = Yes`, and it applies to every model
+with a geosynthetic in it: should a sheet be a **bonded bar** or a **slip
+surface**? The two are one cell apart on the reinforce worksheet and can give
+very different answers. To show when each is right, this part builds a simpler
+problem than the wall: an embankment on a foundation with a single sheet at its
+base, and nothing else in the section that could slide.
 
-**Bonded** is right where the surface cuts across. Geogrid interlocked in
-granular fill, a nail wall, a circular surface through a reinforced slope: the
-soil above each layer and the soil below it move together, and the layer carries
-tension across the surface that cuts it. That is a reinforcement line with
-`Joint` blank or `No`, and it is what [FEM-2](fem02_reinforcement.md) uses
+A sheet is entered one of two ways:
+
+- **Bonded**, `Joint` blank or `No`. The soil above the sheet and the soil below
+  it move together, and the sheet carries tension across whatever failure
+  surface cuts through it. This is what [FEM-2](fem02_reinforcement.md) uses
+  throughout: geogrid interlocked in granular fill, a nail wall, a circular
+  surface through a reinforced slope.
+- **A slip surface**, `Joint = Yes`. The mesh splits along the sheet, and the
+  soil above it can slide along it. The sheet's Adhesion and Delta become the
+  strength of that surface. This is fill sliding over a smooth geomembrane, a
+  woven geotextile on sand whose interface friction is well below the soil's
+  own, or the fill of Part 2 running out over the sheets of a block-faced wall.
+
+Which is right depends on where the failure surface wants to go: **across** the
+sheet, or **along** it. Getting it wrong in the second case is not a small
+error. Two versions of the embankment show both halves of that, one at a time.
+The embankment is 5 m high on 2:1 slopes with a 12 m crest, on a 4 m foundation,
+with one 32 m sheet under it. Each version is built twice with the `Joint` cell
+as the only difference, and each is run at the settings this page has used
 throughout.
-
-**A slip surface** is right where the surface can run along the sheet. Fill
-sliding over a smooth geomembrane or liner, a woven geotextile on sand whose
-interface friction is well below the soil's own, a base geotextile under an
-embankment on soft clay, fill running out over the sheets of a block-faced wall.
-That is `Joint = Yes`, and the interface's Adhesion and Delta become the strength
-of the surface the mass slides on.
-
-Getting it wrong in the second case is not a small error, and two small models
-show both halves of it, one at a time. Each is the same embankment, 5 m high on
-2:1 slopes with a 12 m crest, on a 4 m foundation, with one 32 m sheet under
-it. Each is built twice with the `Joint` cell as the only difference, and each
-is run at the settings this page has used throughout.
 
 ![The Part 3 embankment: 5 m high on 2:1 slopes with a 12 m crest, on a 4 m foundation, with one 32 m sheet under it](images/fem03_sheet_problem_sketch.png){width=1000}
 

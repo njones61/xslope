@@ -60,7 +60,7 @@ _DEFORMED_BOUNDARY_PT = 1.4
 #: of them are enough for neighbors to differ while the element edges and the
 #: field stay readable through the fill.
 _BLOCK_TINTS = ('#c8d8ea', '#ecd9c0', '#cfe3c6')
-_BLOCK_TINT_ALPHA = 0.45
+_BLOCK_TINT_ALPHA = 0.22
 
 # Median rendered element edge (device px) below which two full interleaved grids
 # (original + deformed) tangle; below it the original mesh collapses to its domain
@@ -2599,22 +2599,31 @@ def solution_has_joint_state(fem_data, solution):
 
 
 def _draw_block_tints(ax, fem_data, nodes_xy, comp):
-    """Fill each block of a jointed mesh with a faint tint, cycling by block.
+    """Fill the deformed mesh with a faint tint per MATERIAL zone, the same
+    colors the inputs and mesh plots give the zones.
 
-    Two blocks that touch take different tints, which is the whole job: on a
-    toppling set every column is its own body and the tints are what says so at
-    a glance, while on a section whose joints stop inside the mass most of it
-    comes back as ONE block, takes one tint, and says that too.
+    The tint used to cycle by block, so a bonded and a jointed run of one
+    section drew differently — one tint over the whole mesh against a tint per
+    block. By material the two draw alike, and the blocks are still read from
+    the faces drawn between them. ``comp`` is accepted for the callers that
+    computed it and is not used for color.
     """
     from matplotlib.collections import PolyCollection
     from .mesh import element_corner_polygons
+    from .style import material_style, resolve_style
+    mats = np.asarray(fem_data.get("element_materials",
+                                   np.ones(len(fem_data["elements"]))), dtype=int)
+    # Mesh material ids are 1-based (gmsh); the style sheet keys by the 0-based
+    # mat_id, as the mesh plot does, so the zones take the Inputs view's colors.
+    st = resolve_style(None)
+    color_of = {int(m): material_style(st, int(m) - 1)["color"]
+                for m in np.unique(mats)}
     polys, colors = [], []
-    for poly, c in zip(element_corner_polygons(fem_data, nodes_xy),
-                       np.asarray(comp, dtype=int)):
+    for poly, m in zip(element_corner_polygons(fem_data, nodes_xy), mats):
         if poly is None:
             continue
         polys.append(poly)
-        colors.append(_BLOCK_TINTS[int(c) % len(_BLOCK_TINTS)])
+        colors.append(color_of[int(m)])
     if polys:
         ax.add_collection(PolyCollection(
             polys, facecolors=colors, edgecolors='none',

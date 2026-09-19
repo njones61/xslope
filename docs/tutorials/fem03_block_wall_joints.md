@@ -302,13 +302,19 @@ needs. Then enter the three rows below, or paste them into the worksheet.
 | grid-02 | 9.2 | 1.8 | 12.2 | 1.8 |
 | grid-03 | 9.2 | 3.0 | 12.2 | 3.0 |
 
-All three layers share one set of properties:
+Then the properties, one row per layer. The columns run from Tmax to Joint in
+the order the FEM view shows them, so a paste lands each value in its own
+column. Tres stays blank; the three layers are alike.
 
-| Tmax | Adhesion | Delta | Tend1 | Tend2 | E | Area | Joint |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 40 | 1 | 30 | 40 | 0 | 1000000 | 0.001 | Yes |
+| Tmax | Lp1 | Lp2 | Adhesion | Delta | Tend1 | Tend2 | Spacing | Tres | E | Area | Joint |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 40 | 0 | 0 | 1 | 30 | 40 | 0 | 1 |  | 1000000 | 0.001 | Yes |
+| 40 | 0 | 0 | 1 | 30 | 40 | 0 | 1 |  | 1000000 | 0.001 | Yes |
+| 40 | 0 | 0 | 1 | 30 | 40 | 0 | 1 |  | 1000000 | 0.001 | Yes |
 
-Every other column stays blank. Type, Dir and Appl are read only by the limit
+Lp1 and Lp2 are 0 and grayed: Adhesion and Delta are filled, so the pullout
+capacity comes from the overburden and the development lengths are not in use.
+kn, ks and Jred stay blank. Type, Dir and Appl are read only by the limit
 equilibrium methods, so they do not matter to this run; the completed file has
 Type set to Geosynthetic, which is harmless. When the three rows are in, the
 editor looks like this:

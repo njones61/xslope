@@ -520,9 +520,10 @@ the sheet as a slip surface,
 ![Shear strain, the same sheet as a slip surface](images/fem03_shear_sheet_jointed.png){width=1000}
 
 The two agree exactly, and the strain fields say why: the band crosses the
-sheet in both, so whether the sheet is a bar or a surface changes nothing.
-Either way the soil above and below it move together and the sheet is loaded in
-tension across a surface that cuts it.
+sheet in both runs. The soil above the sheet and the soil below it move
+together, and the sheet is loaded in tension across the surface that cuts it.
+Whether that sheet is entered as a bonded bar or as a slip surface makes no
+difference, because nothing tries to slide along it.
 
 ### A smooth geomembrane liner on a firm foundation
 

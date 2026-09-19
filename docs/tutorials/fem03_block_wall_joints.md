@@ -519,11 +519,14 @@ the sheet as a slip surface,
 
 ![Shear strain, the same sheet as a slip surface](images/fem03_shear_sheet_jointed.png){width=1000}
 
-The two agree exactly, and the strain fields say why: the band crosses the
-sheet in both runs. The soil above the sheet and the soil below it move
-together, and the sheet is loaded in tension across the surface that cuts it.
-Whether that sheet is entered as a bonded bar or as a slip surface makes no
-difference, because nothing tries to slide along it.
+The two agree exactly, and the strain fields say why. The failure surface
+goes down through the soft clay and comes back up through the fill, crossing
+the sheet once on its way. On each side of that crossing the fill above the
+sheet and the clay below it move as one mass, so along the sheet's length the
+soil does not move relative to the sheet at all. A slip surface only differs
+from a bonded bar when soil moves along it: that is when its Adhesion and
+Delta are called on, and here they never are. The sheet does the same thing in
+both runs, carrying tension across the one surface that cuts it.
 
 ### A smooth geomembrane liner on a firm foundation
 

@@ -126,9 +126,10 @@ rows below, or paste them straight into the worksheet.
 | course-04 | 8.0 | 2.4 | 9.2 | 2.4 | 0 | 35 |
 | course-05 | 8.0 | 3.0 | 9.2 | 3.0 | 0 | 35 |
 
-Every other column stays blank. The editor shows a blank tension cutoff as 0,
-which is what a blank means: the joint carries no tension. When the seven rows
-are in, the editor looks like this:
+A new row in the editor opens with `c`, `phi` and `t_cut` at 0 and every other
+column blank. Enter the label, the endpoints and `phi`; leave `t_cut` at 0, since
+a block contact carries no tension, and leave the rest blank. When the seven
+rows are in, the editor looks like this:
 
 ![The joints editor with the wall's seven contacts entered](images/fem03_studio_joints_editor.png){width=900}
 

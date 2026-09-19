@@ -71,13 +71,19 @@ The wall stands **3.6 m** high in **six 0.6 m courses** of modular block
 fill behind it and a 2:1 backfill slope rising 2 m above the crest. The section
 is 24 m wide.
 
-Four materials. Three are ordinary Mohr-Coulomb soils — the foundation, the
-reinforced fill and the retained fill — with the unit weights, strengths and
-elastic pairs on the drawing. The fourth is the block, and it is declared
-**elastic**: a concrete unit is far stronger than anything around it, and
-declaring it elastic means the strength reduction has nothing in the block to
-weaken, which is the truth of the problem. The wall's strength is the strength of
-its contacts, not of its blocks.
+Four materials. Three are ordinary Mohr-Coulomb soils, the foundation, the
+reinforced fill and the retained fill. The fourth is the block, and it is
+declared **elastic**: a concrete unit is far stronger than anything around it,
+and declaring it elastic means the strength reduction has nothing in the block
+to weaken, which is the truth of the problem. The wall's strength is the
+strength of its contacts, not of its blocks.
+
+| material | γ (kN/m³) | c′ (kPa) | φ′ (°) | E (MPa) | ν |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| foundation | 20 | 15 | 30 | 40 | 0.3 |
+| reinforced fill | 20 | 0 | 36 | 50 | 0.3 |
+| retained fill | 19 | 5 | 28 | 25 | 0.3 |
+| block | 23 | elastic | elastic | 10,000 | 0.2 |
 
 The wall is drawn with a vertical face. Real segmental walls are usually built
 with a small batter, each course set back a little from the one below. That puts

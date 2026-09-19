@@ -2608,6 +2608,48 @@ def _draw_block_tints(ax, fem_data, nodes_xy, comp):
             alpha=_BLOCK_TINT_ALPHA, zorder=0.5))
 
 
+#: How far, in points, each face of a jointed sheet is drawn from the bar.
+_JOINT_FACE_OFFSET_PT = 3.2
+
+
+def _spans_on_bars(fem_data, spans):
+    """Per span, whether its line carries a bar (a jointed reinforcement sheet)
+    rather than being a bar-less joint line."""
+    n1d = len(fem_data.get("elements_1d", []))
+    barless = _barless_mask(fem_data, n1d)
+    line_of = np.asarray(fem_data.get("element_materials_1d", np.zeros(n1d)),
+                         dtype=int)
+    bar_lines = set(int(v) for v in line_of[~barless]) if n1d else set()
+    return [int(r["line"]) in bar_lines for r in spans]
+
+
+def _offset_sheet_spans(ax, coords, slipping, slips, on_bar):
+    """Draw a jointed sheet's spans as two lines, one each side of the bar.
+
+    The offset is fixed in points and applied in display space, so it is the
+    same width at any scale and stays perpendicular to the sheet whatever the
+    axes' aspect."""
+    if not any(on_bar):
+        return coords, slipping, slips
+    d_px = _JOINT_FACE_OFFSET_PT * (ax.figure.dpi or 100.0) / 72.0
+    to_disp = ax.transData.transform
+    to_data = ax.transData.inverted().transform
+    out_c, out_s, out_v = [], [], []
+    for c, sl, v, ob in zip(coords, slipping, slips, on_bar):
+        if not ob:
+            out_c.append(c); out_s.append(sl); out_v.append(v)
+            continue
+        p = to_disp(np.asarray(c, dtype=float))
+        t = p[1] - p[0]
+        L = float(np.hypot(*t))
+        if L <= 0.0:
+            continue
+        nrm = np.array([-t[1], t[0]]) / L * d_px
+        for sgn in (1.0, -1.0):
+            out_c.append(to_data(p + sgn * nrm)); out_s.append(sl); out_v.append(v)
+    return out_c, np.asarray(out_s, dtype=bool), np.asarray(out_v, dtype=float)
+
+
 def _joint_spans(fem_data, solution):
     """One record per station span of every jointed line: where it is, what state
     it is in, and how far the two faces have slid.
@@ -2800,6 +2842,15 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
     # into the field underneath takes the little it has. The two states are two
     # collections, because they carry different weight and only the slipping one
     # is given the white under-stroke that keeps it off a dark patch of field.
+    # A span on a jointed SHEET shares its chord with the bar's own force
+    # overlay, which is three points wide with a black outline: a hairline
+    # drawn down its middle is invisible, and its green is read as the bar's
+    # "inactive" green. So on a bar-carrying line each span is drawn twice,
+    # a few points either side of the bar — where the two faces are — and
+    # the bar keeps the middle. A bar-less joint line keeps the single line.
+    on_bar = _spans_on_bars(fem_data, spans)
+    coords, slipping, slips = _offset_sheet_spans(ax, coords, slipping, slips,
+                                                  on_bar)
     intact = [c for c, sl in zip(coords, slipping) if not sl]
     slid = [c for c, sl in zip(coords, slipping) if sl]
     if intact:

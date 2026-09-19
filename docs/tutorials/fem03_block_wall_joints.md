@@ -602,17 +602,16 @@ bonded bar cannot represent that.
 
 ### Why the wall's own sheets could not be run both ways
 
-The wall of parts 1 and 2 cannot be run bonded, and a reader who tries it will
-meet the refusal rather than a result. A sheet whose front end stops on the back
-face of the block column **touches** that joint line. The mesh splits along a
-jointed line and copies every node on it once per wedge of material around it, so
-a bonded bar standing on one of those nodes would keep one wedge's copy and lose
-the material on the other side of the joint. It has no defined side to attach to,
-and both the model checks and the mesher refuse it by name.
+The geogrid layers in Part 2 cannot be run as bonded bars. Each layer ends on
+the back face of the block column, which is a joint line. The mesh splits along
+a joint line, so every node on it exists twice, once for the blocks and once for
+the fill. A bonded bar has to attach to one node, and at the back face there is
+no single node to attach to. The model checks report this, and the mesher will
+not build it.
 
-That is why Part 3's comparison is made on two small models that carry no other
-joint line, rather than on the wall itself. On a wall the sheets are jointed, and
-the question does not arise.
+That is why the comparison in Part 3 uses two small models with no other joint
+line in them. On a wall like this one the sheets have to be jointed, so the
+question does not come up.
 
 ---
 

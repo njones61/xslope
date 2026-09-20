@@ -2922,17 +2922,17 @@ def check_corrector(fem_data):
       * and a CONVERGED viscoplastic state must be ADMISSIBLE. A state that settles
         in force and fails the yield reading is handed to the corrector; where the
         corrector certifies an admissible field the trial stands on that, and where
-        it refuses too the trial is FAILED — `converged` False, `stable` False under
-        every criterion, `exit_reason` 'yield_gate' — but only once the loop has
+        it refuses too the trial is UNDECIDED — `converged` False, `stable` False,
+        verdict `AMBIGUOUS`, `exit_reason` 'yield_gate' — but only once the loop has
         stopped changing. While the out-of-balance is still improving the gate is
         disarmed: the same trial with the same two gates shut carries on, records
         the reading as a deferral, and is decided by the budget instead.
 
     The refusal property is the safety property the corrector rests on: it can only
     ever convert a rule-decided refusal into a certified stand, so the corrector
-    cannot read lower than the driver it wraps. The yield gate is the one thing here
-    that CAN read lower, and it is meant to: a slope stands on an admissible field or
-    it does not stand.
+    cannot read lower than the driver it wraps. The yield gate refuses an
+    inadmissible field as proof of standing, but a refused correction proves no
+    failure field and therefore decides neither direction.
     """
     fails = []
 
@@ -3129,9 +3129,9 @@ def check_corrector(fem_data):
         _fem._VP_YIELD_GATE = -1.0
         gated = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET)
         # ... and with the corrector's own gate shut as well, nothing can be
-        # certified, so there is no admissible field anywhere. What happens then
+        # certified, so this route produces no admissible field. What happens then
         # depends on whether the gate is ARMED (_vp_gate_armed): a state the loop
-        # has stopped changing is FAILED on the spot, and a state it is still
+        # has stopped changing is UNDECIDED on the spot, and a state it is still
         # working on is carried past. Both are exercised — the arming rule forced
         # on for the first, and the shipped rule for the second, on the same trial.
         _saved_c_gate = _fem._CORRECTOR_YIELD_TOL
@@ -3139,7 +3139,7 @@ def check_corrector(fem_data):
             _fem._CORRECTOR_YIELD_TOL = -1.0
             deferred = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET)
             _fem._vp_gate_armed = lambda *a, **k: True
-            failed = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET)
+            undecided = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET)
             hybrid = _solve(CORR_SETTLES_F, 'auto', CORR_BUDGET,
                             failure_criterion='hybrid')
         finally:
@@ -3162,21 +3162,21 @@ def check_corrector(fem_data):
             f"inadmissible converged state may not end a trial")
     if gated['converged']:
         fails += _gates(gated, f"F = {CORR_SETTLES_F} through the yield gate")
-    for sol, name in ((failed, "the default criterion"),
+    for sol, name in ((undecided, "the default criterion"),
                       (hybrid, "failure_criterion='hybrid'")):
         if sol['converged'] or sol.get('stable') or not sol.get('gate_failed'):
             fails.append(
                 f"with both yield gates unreachable at F = {CORR_SETTLES_F} under "
                 f"{name} the trial came back converged={sol['converged']}, "
                 f"stable={sol.get('stable')}, gate_failed={sol.get('gate_failed')}, "
-                f"exit {sol['exit_reason']!r}: with no admissible field anywhere the "
-                f"trial has to be FAILED")
-        elif sol['exit_reason'] != 'yield_gate' or sol.get('verdict') != 'FAILED':
+                f"exit {sol['exit_reason']!r}: a refused correction from an "
+                f"inadmissible settled field has to be undecided")
+        elif sol['exit_reason'] != 'yield_gate' or sol.get('verdict') != 'AMBIGUOUS':
             fails.append(
-                f"the gate-failed trial at F = {CORR_SETTLES_F} under {name} reports "
+                f"the gate-undecided trial at F = {CORR_SETTLES_F} under {name} reports "
                 f"exit {sol['exit_reason']!r} / verdict {sol.get('verdict')!r} "
-                f"instead of 'yield_gate' / 'FAILED', so nothing downstream can say "
-                f"WHY it failed")
+                f"instead of 'yield_gate' / 'AMBIGUOUS', so downstream cannot "
+                f"carry the uncertainty with its reason")
     # ... and under the SHIPPED arming rule the same trial, with the same two gates
     # shut, may not end at the state it first settles on: the loop is still working
     # there, so that state is not the fixed point a refusal would be a verdict about.

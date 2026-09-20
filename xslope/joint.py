@@ -111,6 +111,19 @@ import numpy as np
 #: element length (PLAXIS's idiom): k_n = E_adj / d_v, k_s = G_adj / d_v.
 JOINT_VIRTUAL_THICKNESS_FRAC = 0.1
 
+#: Optional ceiling on each joint stiffness component, as a multiple of the
+#: adjacent zones' own normal stiffness. ``None`` preserves the authored model.
+#:
+#: The ceiling follows the UDEC conditioning rule
+#:
+#:     k <= multiple x max[ (K + 4G/3) / dz ]
+#:
+#: over the zones adjacent to each joint element, with ``dz`` the zone extent
+#: along that joint element's normal. Normal and shear stiffness are clipped
+#: independently: this is a numerical upper bound on each component, not a rule
+#: for preserving the authored ``k_n / k_s`` ratio.
+JOINT_STIFFNESS_CAP = None
+
 #: The iteration budget a jointed model needs before a strength-reduction trial
 #: can be trusted to have decided.
 #:
@@ -212,6 +225,73 @@ def _node_element_map(elements, element_types, n_nodes):
         for k in range(int(element_types[ei])):
             out[int(elements[ei, k])].append(ei)
     return out
+
+
+def _element_corners(nodes, elements, element_types):
+    """Corner coordinates per 2D element, padded to four, with a live mask.
+
+    A tri6 is its three corner nodes and a quad8 its four: mid-side nodes lie on
+    the element edges and do not widen its extent.
+    """
+    n_elem = len(elements)
+    xy = np.zeros((n_elem, 4, 2))
+    live = np.zeros((n_elem, 4), dtype=bool)
+    et = np.asarray(element_types, dtype=int)
+    n_corner = np.where((et == 3) | (et == 6), 3, 4)
+    for k in range(4):
+        take = n_corner > k
+        if not np.any(take):
+            continue
+        idx = np.asarray(elements)[take, k].astype(int)
+        xy[take, k] = nodes[idx, :2]
+        live[take, k] = True
+    return xy, live
+
+
+def _joint_stiffness_cap(nodes, elements, element_types, element_materials,
+                         E_by_mat, nu_by_mat, node_elems, conn, nx, ny,
+                         multiple):
+    """Return the UDEC-style stiffness ceiling for every joint element.
+
+    The adjacent set contains the 2D elements standing on either face of the
+    split interface. ``dz`` is each adjacent element's extent along this joint
+    element's normal. A joint element with no adjacent 2D element gets ``inf``;
+    :func:`build_joint_data` separately refuses that malformed mesh.
+    """
+    E = np.asarray(E_by_mat, dtype=float)
+    nu = np.asarray(nu_by_mat, dtype=float)
+    K_b = E / (3.0 * (1.0 - 2.0 * nu))
+    G = E / (2.0 * (1.0 + nu))
+    modulus = (K_b + 4.0 * G / 3.0)[np.asarray(element_materials, dtype=int) - 1]
+
+    xy, live = _element_corners(nodes, elements, element_types)
+
+    pair_i, pair_e = [], []
+    for i in range(len(conn)):
+        touch = set()
+        for c in range(6):
+            nd = int(conn[i, c])
+            if nd >= 0:
+                touch.update(node_elems[nd])
+        pair_i.extend([i] * len(touch))
+        pair_e.extend(sorted(touch))
+    if not pair_i:
+        return np.full(len(conn), np.inf)
+    pair_i = np.asarray(pair_i, dtype=int)
+    pair_e = np.asarray(pair_e, dtype=int)
+
+    proj = (xy[pair_e, :, 0] * nx[pair_i][:, None]
+            + xy[pair_e, :, 1] * ny[pair_i][:, None])
+    lv = live[pair_e]
+    hi = np.max(np.where(lv, proj, -np.inf), axis=1)
+    lo = np.min(np.where(lv, proj, np.inf), axis=1)
+    dz = hi - lo
+    with np.errstate(divide="ignore", invalid="ignore"):
+        val = np.where(dz > 0.0, modulus[pair_e] / dz, 0.0)
+
+    worst = np.zeros(len(conn))
+    np.maximum.at(worst, pair_i, val)
+    return np.where(worst > 0.0, float(multiple) * worst, np.inf)
 
 
 def _dof_pair(node, dof_offset):
@@ -453,6 +533,37 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
             ks[sel] = float(_ks)
         jred[sel] = str(line.get("jred", "yes") or "yes").strip().lower() != "no"
 
+    # Optional conditioning ceiling. It is applied after all line properties so
+    # stated and derived stiffnesses are treated alike. Each component is clipped
+    # against the same adjacent-zone ceiling; clipping one never changes the other.
+    cap_record = None
+    if JOINT_STIFFNESS_CAP is not None:
+        ceiling = _joint_stiffness_cap(
+            nodes, elements, element_types, element_materials,
+            E_by_mat, nu_by_mat, node_elems, conn, nx, ny,
+            JOINT_STIFFNESS_CAP)
+
+        def _clip_component(values):
+            with np.errstate(divide="ignore", invalid="ignore"):
+                ratio = np.where(np.isfinite(ceiling), values / ceiling, 0.0)
+            bound = ratio > 1.0
+            record = {
+                "n_bound": int(np.count_nonzero(bound)),
+                "max_reduction": (float(np.max(ratio[bound]))
+                                  if np.any(bound) else 1.0),
+            }
+            return np.minimum(values, ceiling), record
+
+        kn, kn_record = _clip_component(kn)
+        ks, ks_record = _clip_component(ks)
+        cap_record = {
+            "multiple": float(JOINT_STIFFNESS_CAP),
+            "dz": "normal extent of the adjacent element",
+            "n_joint": int(n),
+            "kn": kn_record,
+            "ks": ks_record,
+        }
+
     K = _joint_element_stiffness(w, tx, ty, nx, ny, kn, ks)
 
     jd = {
@@ -470,6 +581,8 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
         "jred": jred, "tip": tip, "K": K,
         "jointed_lines": sorted(set(int(v) for v in line_id)),
     }
+    if cap_record is not None:
+        jd["stiffness_cap"] = cap_record
     ties = _build_tie_data(mesh, lines, nodes, dof_offset)
     if ties is not None:
         jd["ties"] = ties

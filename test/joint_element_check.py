@@ -1122,6 +1122,96 @@ def _leg_crossing_stiffness(failures, results):
                    "derived default")
 
 
+def _leg_stiffness_cap(failures, results):
+    """The optional ceiling clips normal and shear stiffness independently.
+
+    These builds do not solve. They prove that the switch is inert when off,
+    that either component can bind without moving the other, and that the
+    element matrix is rebuilt from the clipped values.
+    """
+    import xslope.joint as _J
+
+    p = ROW3
+    rings = [[(0.0, p['H']), (p['W'], p['H']),
+              (p['W'], 0.0), (0.0, 0.0)]]
+    line = [(p['x1'], p['y_sheet']), (p['x2'], p['y_sheet'])]
+    rings = add_intersection_points_to_polygons(rings, [line])
+    mats = [_material('soil', c=1.0e5, phi=35.0, E=E_SOIL)]
+    high, low = 1.0e12, 1.0
+
+    def _build(kn, ks, cap):
+        keep = _J.JOINT_STIFFNESS_CAP
+        _J.JOINT_STIFFNESS_CAP = cap
+        try:
+            _d, _m, fd = _finish(
+                _base(), [(rings[0], 0)], Polygon(rings[0]),
+                LineString([(0.0, p['H']), (p['W'], p['H'])]),
+                0.0, mats, line, p['adhesion'], p['delta'], p['ts'], p['s1d'],
+                kn=kn, ks=ks)
+        finally:
+            _J.JOINT_STIFFNESS_CAP = keep
+        return fd['joint_data']
+
+    off_n = _build(high, low, None)
+    on_n = _build(high, low, 10.0)
+    on_s = _build(low, high, 10.0)
+
+    if 'stiffness_cap' in off_n:
+        failures.append("cap: a build with the ceiling off still carries a record")
+    if not (np.all(off_n['kn'] == high) and np.all(off_n['ks'] == low)):
+        failures.append("cap: the off build does not preserve the stated values")
+
+    for name, jd, bound_key, fixed_key, fixed_value in (
+            ('normal', on_n, 'kn', 'ks', low),
+            ('shear', on_s, 'ks', 'kn', low)):
+        rec = jd.get('stiffness_cap') or {}
+        bound = rec.get(bound_key) or {}
+        fixed = rec.get(fixed_key) or {}
+        if bound.get('n_bound') != jd['n'] or bound.get('max_reduction', 1.0) <= 1.0:
+            failures.append(f"cap: the high {name} component did not bind on all "
+                            f"{jd['n']} joint elements: {bound!r}")
+        if fixed.get('n_bound') != 0 or fixed.get('max_reduction') != 1.0:
+            failures.append(f"cap: clipping the {name} component reports a change "
+                            f"to the other component: {fixed!r}")
+        if not np.all(jd[fixed_key] == fixed_value):
+            failures.append(f"cap: clipping the {name} component changed "
+                            f"{fixed_key}")
+        want_K = _joint_element_stiffness(
+            jd['w'], jd['tx'], jd['ty'], jd['nx'], jd['ny'], jd['kn'], jd['ks'])
+        if not np.array_equal(jd['K'], want_K):
+            failures.append(f"cap: the {name}-clipped element matrix was not "
+                            "rebuilt from its recorded stiffnesses")
+
+    results.append(
+        f"cap  normal-only and shear-only builds each bind all {on_n['n']} "
+        "joint elements without moving the other component; off preserves both")
+
+    # The corpus row that motivated the ceiling must actually reach it on its
+    # committed mesh. This is a build-only reading, not a solve.
+    rj3 = os.path.join(_ROOT, 'docs', 'verification', 'files', 'rocscience',
+                       'joints', 'rj003.xlsx')
+    if not os.path.exists(rj3):
+        results.append("cap  RJ-3 is absent; no corpus binding was read")
+        return
+    keep = _J.JOINT_STIFFNESS_CAP
+    _J.JOINT_STIFFNESS_CAP = 10.0
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            sd = load_slope_data(rj3)
+            fd3 = build_fem_data(sd, sd.get('mesh'))
+    finally:
+        _J.JOINT_STIFFNESS_CAP = keep
+    jd3 = fd3.get('joint_data') or {}
+    rec3 = jd3.get('stiffness_cap') or {}
+    kn3 = rec3.get('kn') or {}
+    if not kn3.get('n_bound'):
+        failures.append("cap: the ceiling does not bind RJ-3 normal stiffness")
+    results.append(
+        f"cap  RJ-3: normal bound {kn3.get('n_bound', 0)} of "
+        f"{rec3.get('n_joint', 0)}, shear bound "
+        f"{(rec3.get('ks') or {}).get('n_bound', 0)}")
+
+
 def run():
     """Returns a list of failure strings (empty = pass)."""
     failures, results = [], []
@@ -1138,6 +1228,7 @@ def run():
     _leg_crossing_stiffness(failures, results)
     _leg_untouched(failures, results)
     _leg_stiffness(failures, results)
+    _leg_stiffness_cap(failures, results)
     print("Interface (joint) element check "
           f"({time.time() - t0:.0f} s):")
     for line in results:

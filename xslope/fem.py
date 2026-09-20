@@ -169,7 +169,10 @@ _FEM_SOLVE_META_KEYS = ("converged", "iterations", "residual",
 # so a writer that persisted only the field dropped every one of them, and a
 # reloaded run could say nothing about how its answer was reached.
 _SSRM_RUN_RESULT_KEYS = ("failure_criterion", "method", "final_interval",
-                         "interval_width", "iterations_ssrm", "trials")
+                         "interval_width", "iterations_ssrm", "trials",
+                         # Present only when the optional interface-stiffness
+                         # ceiling was enabled for this model.
+                         "joint_stiffness_cap")
 
 # The same, for the options the CALLER chose: the tolerance the search was driven
 # to (solve_ssrm takes it as a kwarg and does not return it), the search range,
@@ -4722,11 +4725,13 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
     Parameters:
         disp_hist (list of float): max|u| sampled every ``sample_every`` iterations.
         u_elastic_scale (float): max|u| of the purely elastic solution for this trial.
-        exit_reason (str): 'iteration_cap', 'inconclusive', 'disp_limit' or
-            'diverging' ('no_progress' is still accepted and read as
+        exit_reason (str): 'iteration_cap', 'inconclusive', 'yield_gate',
+            'disp_limit' or 'diverging' ('no_progress' is still accepted and read as
             'iteration_cap'; solve_fem no longer ends a solve on a no-progress
             plateau). 'disp_limit' and 'diverging' are evidence in their own right
-            and return FAILED.
+            and return FAILED. 'yield_gate' means force settled outside the yield
+            surface and the corrector refused; it returns AMBIGUOUS because that
+            state proves neither standing nor failure.
         sample_every (int): sampling stride (documentation only; the window is a
             fraction of the sample count, so the stride does not enter the maths).
         model_height (float or None): mesh height, used only to floor the elastic
@@ -4765,6 +4770,13 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
     k = max(2, int(round(n * _HYBRID_WINDOW_FRAC)))
     growth = (float(disp_hist[-1]) - float(disp_hist[n - k])) / float(u_elastic_scale)
     growing = growth > _HYBRID_GROWTH_MIN
+
+    # A force-settled state outside the yield surface cannot certify standing,
+    # but a corrector refusal does not prove that no admissible equilibrium exists.
+    # Keep this on the existing undecided verdict so the bisection's uncertainty
+    # path, rather than either bracket verdict, consumes it.
+    if exit_reason == 'yield_gate':
+        return 'AMBIGUOUS', u_ratio, growth
 
     # The early-failure rule (see _early_failure) is a failure verdict already made,
     # on thresholds no trial that reaches equilibrium has been observed to reach.
@@ -4861,8 +4873,9 @@ _CORRECTOR_YIELD_TOL = 1e-6
 # relaxes is yield — so a trial that settles in force with a Gauss point far outside
 # the surface is not a verdict about the slope, it is a verdict about the stopping
 # rule. A state that fails this gate is handed to the corrector; where the corrector
-# certifies an admissible field the trial stands on that, and where it refuses too the
-# trial is FAILED.
+# certifies an admissible field the trial stands on that. Where it refuses, the
+# inadmissible state proves no stand and the refusal proves no failure, so the trial
+# is undecided.
 #
 # The threshold is NOT `_CORRECTOR_YIELD_TOL`, and the reason is measured. Over the
 # 266 CONVERGED viscoplastic trials on the 191-row corpus the reading distributes:
@@ -5605,7 +5618,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             - exit_reason (str): why this solve stopped - 'converged' |
               'iteration_cap' | 'inconclusive' | 'disp_limit' | 'diverging' |
               'yield_gate' (it settled in force outside the yield surface and the
-              corrector could not find an admissible state either) | 'steady_slip' /
+              corrector refused, leaving the trial undecided) | 'steady_slip' /
               'joint_settled' (the two jointed readings, `joint_verdict`)
             - diverging_iteration (int or None): iteration at which the early-failure
               rule fired, and diverging_signal (str or None) which of its two tests
@@ -7884,7 +7897,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                             gate_failed = True
                             if debug_level >= 1:
                                 print("  The corrector refused; a slope does not "
-                                      "stand on an inadmissible field - FAILED")
+                                      "stand on an inadmissible field, but the "
+                                      "trial is undecided")
                             break
                     if _gv > _VP_YIELD_GATE:
                         # Refused, and the loop is still improving: no verdict. The
@@ -8044,11 +8058,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     else:
         verdict, u_ratio, u_growth = classify_nonconvergence(
             disp_hist, u_elastic_scale, exit_reason, model_height=mesh_height)
-    if gate_failed:
-        # The yield gate is not a displacement reading and the hybrid criterion may
-        # not overturn it: this state settled in force and is outside the surface, so
-        # the trial has no admissible field to stand on whatever its displacements did.
-        verdict = 'FAILED'
     # The trace goes to the sink whatever the verdict: a CONVERGED jointed trial is
     # the control the moving ones are read against, and a study that only collected
     # the undecided ones would have nothing to compare them to.
@@ -8354,7 +8363,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         "yield_flagged": bool(converged and _n_above_y > 0),
         # True where this trial settled in FORCE and the yield gate refused the state
         # it settled on, and the corrector could not reach an admissible one either
-        # (see _VP_YIELD_GATE). The trial is FAILED, and this is why.
+        # (see _VP_YIELD_GATE). The trial is undecided, and this records why.
         "gate_failed": bool(gate_failed),
         # How many times this trial settled in force with an inadmissible field while
         # the loop was still improving, and carried on rather than ending on the gate
@@ -12500,6 +12509,9 @@ def _verdict_note(sol, hybrid=True):
         return "Converged"
     if sol.get("exit_reason") == 'inconclusive':
         return "INCONCLUSIVE at the iteration ceiling (still improving)"
+    if sol.get("exit_reason") == 'yield_gate':
+        return ("INCONCLUSIVE: force settled outside the yield surface and the "
+                "corrector refused")
     v = sol.get("verdict") or "FAILED"
     ur = sol.get("u_ratio")
     ur_txt = "" if ur is None else f", max|u| = {ur:.2f}x elastic"
@@ -13478,6 +13490,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         # read for whether the initial state was established at all.
         result["k0_equilibration"] = equilibration
 
+    # Record whether the optional interface-stiffness ceiling reached this model.
+    # The key is absent with the switch off and on models without joints.
+    _joint_cap = ((fem_data.get("joint_data") or {}).get("stiffness_cap")
+                  if isinstance(fem_data, dict) else None)
+    if _joint_cap is not None:
+        result["joint_stiffness_cap"] = dict(_joint_cap)
+
     # === Post-bracket capture of the at-failure (unconverged) mechanism ===
     # The bisection keeps only the last CONVERGED field, which is sub-critical and
     # reads as diffuse settlement. The deformed-mesh figures Griffiths & Lane plot are
@@ -13720,20 +13739,26 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         return bool(sol.get("stable", sol["converged"])) if hybrid else bool(sol["converged"])
 
     def _inconclusive(sol):
-        """Did this trial run out of CEILING rather than out of progress?
+        """Did this trial stop without proving either bracket direction?
 
-        Such a trial is neither converged nor failed: the residual was still coming
-        down when the hard ceiling stopped it. Counting it as a failure is what the
-        no-progress exit used to do, and it biases the factor of safety low, so the
-        bisection refuses to rule on it. A criterion that CAN rule on it — the
-        hybrid's STABLE_STUCK verdict — is left to do so, so this asks only about
-        trials the bisection would otherwise have counted as failures."""
-        return sol.get("exit_reason") == 'inconclusive' and not _stable(sol)
+        This includes a still-improving solve stopped by its hard ceiling and a
+        force-settled, yield-inadmissible state whose corrector refused. Counting
+        either as failure biases the factor of safety low, so the bisection carries
+        it as upper uncertainty. A criterion that can rule — the hybrid's
+        STABLE_STUCK verdict — is left to do so."""
+        return (sol.get("exit_reason") in ('inconclusive', 'yield_gate')
+                and not _stable(sol))
 
     def _note_inconclusive(F, sol):
-        msg = (f"SSRM: trial F = {F:.4f} is inconclusive at the iteration ceiling "
-               f"({sol.get('iterations', 0)} iterations, out-of-balance still "
-               f"falling) - raise max_iterations_ceiling to decide it. It is NOT "
+        if sol.get("exit_reason") == 'yield_gate':
+            why = ("force equilibrium settled outside the yield surface and the "
+                   "corrector refused an admissible replacement")
+        else:
+            why = (f"the iteration ceiling stopped it after "
+                   f"{sol.get('iterations', 0)} iterations while the "
+                   "out-of-balance was still falling; raise "
+                   f"max_iterations_ceiling to decide it")
+        msg = (f"SSRM: trial F = {F:.4f} is inconclusive: {why}. It is NOT "
                f"counted as a failure: the bracket's upper edge carries this trial "
                f"as an uncertainty rather than a measured failure, and the factor of "
                f"safety is reported as the bracket midpoint, as on any other run.")

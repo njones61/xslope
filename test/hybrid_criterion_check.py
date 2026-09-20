@@ -89,6 +89,13 @@ def check_classifier():
     check("displacement cap tripped -> FAILED regardless of history",
           v == 'FAILED')
 
+    # A force-settled field outside the yield surface is not a standing field,
+    # while a corrector refusal is not a proof of failure.
+    v, _, _ = classify_nonconvergence([10.0 + i for i in range(40)], 1.0,
+                                      'yield_gate')
+    check("yield-gate refusal -> AMBIGUOUS even on growing displacement",
+          v == 'AMBIGUOUS')
+
     # Degenerate inputs must never claim STABLE_STUCK.
     v, ur, g = classify_nonconvergence([], 0.0, 'iteration_cap')
     check("no elastic scale -> AMBIGUOUS, no numbers",
@@ -138,6 +145,10 @@ def _stub_solution(F, kind):
         return {"converged": False, "stable": False, "verdict": "AMBIGUOUS",
                 "u_ratio": 1.4, "u_growth": 0.0, "exit_reason": "inconclusive",
                 "iterations": 50000}
+    if kind == 'yield_gate':
+        return {"converged": False, "stable": False, "verdict": "AMBIGUOUS",
+                "u_ratio": 1.4, "u_growth": 0.0, "exit_reason": "yield_gate",
+                "iterations": 1800, "gate_failed": True}
     return {"converged": False, "stable": False, "verdict": "FAILED",
             "u_ratio": 12.0, "u_growth": 3.0, "exit_reason": "iteration_cap",
             "iterations": 1600}
@@ -242,6 +253,19 @@ def check_wiring():
           f"note={res_inc.get('note')}")
     check("the factor of safety comes from a trial that reached equilibrium",
           res_inc['last_solution']['converged'] is True)
+
+    # A yield-gate refusal uses that same uncertainty route, while retaining the
+    # distinct exit reason in both the trial table and the explanatory note.
+    def kinds_gate(F):
+        return 'converged' if F < 1.4 else ('yield_gate' if F < 1.8 else 'failed')
+
+    res_gate, _ = _bisect(kinds_gate, hybrid=False)
+    gate_rows = [t for t in res_gate['trials']
+                 if t.get('exit_reason') == 'yield_gate']
+    check("a yield-gate refusal is carried as bracket uncertainty",
+          bool(gate_rows) and bool(res_gate.get('inconclusive'))
+          and 'yield surface' in (res_gate.get('note') or ''),
+          f"note={res_gate.get('note')}")
 
     # The criterion is threaded down to every trial, not just to the driver.
     _, stub = _bisect(kinds, hybrid=True)

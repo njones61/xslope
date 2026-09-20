@@ -45,6 +45,10 @@ What this file locks:
      jointed model's in-situ state and says where, and on an unjointed model it
      is inert — the same equilibration, reached at the same sweep, with the
      switch on and off.
+
+  5. A REFUSAL'S RESIDUAL. A failed one-shot corrector publishes the residual of
+     the state it actually returned. It must agree with `nr_diag['oob']`, not the
+     zero that `last_oob` was initialized to before the attempt.
 """
 import os
 import sys
@@ -315,6 +319,47 @@ def check_k0_step():
           f"{on.get('max_displacement', float('nan')):.6g}")
 
 
+def check_refusal_residual():
+    """A refused seeded increment reports that increment's nonzero residual."""
+    print("\n5. A refused corrector's residual")
+    import contextlib
+    import io
+    import math
+
+    import run_tests as rt
+    from xslope import fem
+
+    page = os.path.join(_ROOT, "docs", "tutorials",
+                        "fem03_block_wall_joints.md")
+    tag = next(t for t in rt.parse_test_tags(page)
+               if t.get("benchmark") == "FEM-3-sheet-jointed-ssrm")
+    tag = dict(tag)
+    tag["file"] = os.path.normpath(
+        os.path.join(os.path.dirname(page), tag["file"]))
+    with contextlib.redirect_stdout(io.StringIO()):
+        fem_data, kwargs, _fmin, _fmax, tol = rt.build_fem_ssrm_case(tag)
+    kwargs = dict(kwargs)
+    kwargs.update(max_iterations=300, max_iterations_ceiling=300,
+                  capture_failure_state=False)
+    with contextlib.redirect_stdout(io.StringIO()):
+        with rt._force_fast_kernel(fem, False):
+            result = fem.solve_ssrm(
+                fem_data, F_min=1.0, F_max=2.0, tolerance=tol,
+                debug_level=1, trial_factors=[1.5546875], **kwargs)
+    attempt = next(a for a in result["trials"][0]["corrector_attempts"]
+                   if not a.get("certified"))
+    public = attempt.get("oob")
+    diagnostic = (attempt.get("nr_diag") or {}).get("oob")
+    check("the fixture reaches a refused corrector",
+          attempt.get("exit_reason") == "diverging",
+          f"{attempt.get('at')}: {attempt.get('exit_reason')}")
+    check("the refusal publishes a finite, nonzero out-of-balance",
+          public is not None and math.isfinite(public) and public > 0.0,
+          f"{public}")
+    check("the public and inner diagnostic readings are the same attempt",
+          public == diagnostic, f"{public} / {diagnostic}")
+
+
 def main():
     print("=" * 72)
     print("Corrector certification checks")
@@ -324,6 +369,7 @@ def main():
     check_readers_agree()
     check_record()
     check_k0_step()
+    check_refusal_residual()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"FAILED ({len(FAILURES)}): " + ", ".join(FAILURES))

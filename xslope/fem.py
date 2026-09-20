@@ -11070,14 +11070,20 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         _last_diag = dict(_inc_diag, lam=float(lam_try))
         n_force_evals += _fe
         total_iterations += it
+        # Publish the residual of the state this increment actually returned,
+        # whether it converged or refused.  On a seeded corrector there is one
+        # whole-load increment; leaving ``last_oob`` at its initialized zero on
+        # that increment's failure made every refusal print an apparent exact
+        # equilibrium while ``nr_diag['oob']`` correctly reported the nonzero
+        # residual from the same attempt.
+        last_oob = oob_here
+        last_rel_du = rel_du
         if ok:
             u = u_try
             for grp in groups:
                 grp['_u'] = u
             _nr_commit_plastic_strain(groups)
             lam = lam_try
-            last_oob = oob_here
-            last_rel_du = rel_du
             n_steps += 1
             step_iters.append(it)
             if it <= _NR_COMFORT:
@@ -11149,6 +11155,10 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         total_iterations += _it
         n_force_evals += _fe
         n_cuts += _cuts
+        # As above, a refused softening step must report its own residual rather
+        # than the equilibrium value from before the capacity drop.
+        last_oob = _oobs
+        last_rel_du = _rels
         if not _ok:
             converged = False
             exit_reason = 'diverging'

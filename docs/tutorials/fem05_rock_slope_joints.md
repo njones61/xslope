@@ -91,10 +91,9 @@ weights in kN/m³, and strengths and stiffnesses in kPa.
 
 ![The starter file: the section as one polygon of rock, with nothing on the joints worksheet](images/fem05_inputs_start.png){width=1000}
 
-The section is entered as a single closed polygon rather than as profile lines,
-because its ground surface turns a corner at the crest and again at the toe and a
-polygon states those vertices directly. The rock's properties are already filled
-in. The joints worksheet is empty; we fill it next.
+The section is entered as a single closed polygon of rock; a profile line would
+have done as well, and either way the mesh is one zone. The rock's properties
+are already filled in. The joints worksheet is empty; we fill it next.
 
 ---
 

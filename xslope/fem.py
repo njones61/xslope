@@ -4878,6 +4878,32 @@ K0_CORRECTOR_LADDER_ON = True
 # Converged corrector states measure 1e-8 or better on it, so this is a fence and
 # not a tolerance being leaned on.
 _CORRECTOR_YIELD_TOL = 1e-6
+# The HOLD TEST on a jointed model's certificate.
+#
+# A state the corrector certifies is force-balanced and yield-admissible, which an
+# equilibrium on the far side of a limit point is too: a jointed mechanism can pass
+# within a tenth of an elastic displacement of an admissible equilibrium and keep
+# going, and the corrector, asked about a state on that path, lands on the
+# equilibrium it passed (opus_review_2026-09-24.md §2.4). So on a model with joints a
+# certificate is accepted only if the plain sweep, started ON the certified state
+# with its joint history, converges there: it is then a fixed point of the same
+# iteration that defines every locked verdict, and not only a root of the residual.
+# A state the sweep walks off is not certified, and the trial goes on exactly as it
+# does after any refusal. Unjointed models never run it (JOINT_HOLD_TEST_ON gates it
+# to `joint_data["n"] > 0`), so no lock without a joint can move.
+#
+# `_CORRECTOR_HOLD_SWEEPS` is the sweep allowance the continuation gets. The one
+# measured hold took 171 sweeps (RS2-48, §2.4); the allowance is the top rung of the
+# trial ladder, so a hold that needs longer than the ladder does to reach it counts
+# as not holding. `_CORRECTOR_HOLD_DRIFT` is how far, in elastic displacements of
+# the trial (`u_elastic_scale`), the continuation may carry the state and still
+# have converged IN PLACE: the corrector hands over a state within force_tol of
+# balance, whose residual the sweep removes by moving of order force_tol elastic
+# displacements, so a hundredth is ten times that and well inside the 0.078 u_el the
+# runaway path's closest approach measured.
+JOINT_HOLD_TEST_ON = True
+_CORRECTOR_HOLD_SWEEPS = 3000
+_CORRECTOR_HOLD_DRIFT = 0.01
 # The same gate, on a VISCOPLASTIC state that is about to be called CONVERGED.
 #
 # A converged state must be admissible. The force gate cannot see a yield violation —
@@ -5207,6 +5233,62 @@ def _mc_apex_tension_cap(c_by_elem, phi_by_elem, exclude=None):
                     / np.where(ok, tanphi, 1.0), np.inf)
 
 
+def corrector_hold_test(fem_data, F, state, softened=None, **solve_kw):
+    """Continue the plain sweep from a certified state; does it stay there?
+
+    INTERNAL: the hold test on a jointed model's corrector certificate (see
+    JOINT_HOLD_TEST_ON). ``state`` is the corrector's own end state (its result's
+    ``_nr_state``: the absolute field, the plastic strain per Gauss-point group and
+    the joint history it ends with). It is handed to the viscoplastic driver as a
+    carried state, so the continuation starts on the certified stress field and
+    measures its displacement from it, at the same strength ``F`` and with the same
+    solve settings (``solve_kw``, which must include the trial's ``_prepared``),
+    but with no corrector and no interface relief: the loop that defines every
+    locked verdict. ``softened`` is the post-peak bar set the state was grown on.
+
+    The state HOLDS when that loop converges within ``_CORRECTOR_HOLD_SWEEPS``
+    sweeps having moved no more than ``_CORRECTOR_HOLD_DRIFT`` elastic
+    displacements. Returns a record whose ``held`` says which; any other ending,
+    an exception included, is ``held=False`` and nothing more.
+    """
+    _t0 = time.perf_counter()
+    _out = dict(held=False, verdict=None, exit_reason=None, sweeps=0,
+                drift=None, drift_u_el=None, u_elastic_scale=None,
+                oob=None, sweep_allowance=int(_CORRECTOR_HOLD_SWEEPS),
+                drift_tol_u_el=float(_CORRECTOR_HOLD_DRIFT), wall=0.0)
+    if state is None:
+        _out["verdict"] = "no state"
+        return _out
+    if softened is not None and not np.any(softened):
+        softened = None
+    _hs = {"u": state["u"], "evp": state["evp"], "joint": state.get("joint"),
+           "_hold": True}
+    _kw = dict(solve_kw)
+    _kw.update(max_iterations=int(_CORRECTOR_HOLD_SWEEPS),
+               max_iterations_ceiling=int(_CORRECTOR_HOLD_SWEEPS),
+               _init_state=_hs, _softened_seed=softened,
+               fem_solver='viscoplastic', joint_tangent='off',
+               progress_callback=None)
+    try:
+        _h = solve_fem(fem_data, F=F, **_kw)
+    except Exception as _exc:      # KeyboardInterrupt is a BaseException
+        _out["verdict"] = f"{type(_exc).__name__}: {_exc}"[:200]
+        _out["wall"] = time.perf_counter() - _t0
+        return _out
+    _ue = float(_h.get("u_elastic_scale") or 0.0)
+    _drift = float(_h.get("max_displacement", np.inf))
+    _drift_rel = (_drift / _ue) if _ue > 0.0 else float("inf")
+    _out.update(
+        verdict=_h.get("verdict"), exit_reason=_h.get("exit_reason"),
+        sweeps=int(_h.get("iterations", 0) or 0), drift=_drift,
+        drift_u_el=float(_drift_rel), u_elastic_scale=_ue,
+        oob=float(_h.get("unbalanced_force_ratio", np.nan)),
+        wall=time.perf_counter() - _t0)
+    _out["held"] = (bool(_h.get("converged"))
+                    and _drift_rel <= float(_CORRECTOR_HOLD_DRIFT))
+    return _out
+
+
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, dt_scale=1.0,
               force_tol=1e-3, oob_window=10,
@@ -5469,7 +5551,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             ratio and the hybrid criterion's history are all relative to the
             equilibrated configuration, while stresses and structural forces remain
             functions of the absolute displacement. Requires k0 and the same prepared
-            model the state was produced with.
+            model the state was produced with. On a jointed model the state also
+            carries the interface's own history under ``"joint"`` (``slip_p``,
+            ``open_prev``, ``slipped``, ``dil_p``), which seeds the trial's slip,
+            opening, residual and dilation records, so a pair that slid while the
+            state settled starts the trial with the offset it slid by rather than
+            being loaded back onto its limit.
         _corrector_rungs (sequence of int or None): INTERNAL. The sweep counts at
             which this call offers the corrector, in place of the shipped ladder
             ``_CORRECTOR_CHECKPOINTS``. Only the SCHEDULE changes: the attempt, the
@@ -5761,7 +5848,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     _init_evp = None
     _init_u = None
     if _init_state is not None:
-        if sv0_gp is None:
+        # The corrector's hold test (see JOINT_HOLD_TEST_ON) starts the plain sweep on
+        # a certified state whether or not the model carries a K0 field; without one
+        # the stress is D (B u - evp) and the state is as complete as it is with one.
+        if sv0_gp is None and not _init_state.get("_hold"):
             raise ValueError("_init_state was given without k0; an equilibrated "
                              "initial state has no meaning without the K0 "
                              "formulation.")
@@ -6201,6 +6291,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         _gate_disp = (_dl is None or (_dd is not None and _dd <= _dl))
         _certified = bool(_sol.get("converged")) and _gate_force and _gate_yield \
             and _gate_disp
+        # The hold test (see JOINT_HOLD_TEST_ON): on a jointed model a certified
+        # state must also be one the plain sweep stays on.
+        _hold = None
+        if _certified and has_joints and JOINT_HOLD_TEST_ON:
+            _hold = _hold_test(_sol)
+            _certified = bool(_hold["held"])
         _rec = dict(
             at=where, vp_iterations=int(vp_iterations), certified=_certified,
             nr_iterations=int(_sol.get("iterations", 0) or 0),
@@ -6210,6 +6306,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             max_disp_deep=(None if _dd is None else float(_dd)),
             disp_limit=(None if _dl is None else float(_dl)),
             wall=_wall)
+        if _hold is not None:
+            _rec["hold"] = _hold
         # What the attempt itself did (the inner iteration's own account: which
         # branch ended it, the residual it started at, ended at and best reached,
         # and whether its line search ran out of backtracks) and what the INTERFACE
@@ -6229,6 +6327,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             print(f"  Newton corrector at {where} ({vp_iterations} viscoplastic "
                   f"passes): "
                   + ("CERTIFIED" if _certified else
+                     "refused (the plain sweep did not hold the state: "
+                     f"{_hold['verdict']}, {_hold['sweeps']} sweeps, drift "
+                     f"{_hold['drift_u_el']} u_el)" if _hold is not None else
                      f"refused ({_sol.get('exit_reason')})")
                   + f" — {_rec['nr_iterations']} Newton iteration(s), "
                     f"out-of-balance {_oob:.2e}, worst yield {_yv:.2e}, "
@@ -6261,10 +6362,71 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             "disp_frac_height": (None if (_dd is None or mesh_height <= 0)
                                  else float(_dd) / float(mesh_height)),
             "wall": _wall,
+            # The hold test's reading on a jointed model, None on every other.
+            "hold": _hold,
             "attempts": list(_corr_attempts),
         }
         _sol["corrector_attempts"] = list(_corr_attempts)
         return _sol
+
+    def _hold_test(_sol):
+        """The hold test on this trial's certified state (see corrector_hold_test)."""
+        _st = _sol.get("_nr_state")
+        return corrector_hold_test(
+            fem_data, F, _st, softened=_sol.get("softened_1d_elements"),
+            debug_level=max(0, debug_level - 1),
+            tolerance=tolerance, max_disp_factor=max_disp_factor,
+            tension_cutoff=tension_cutoff, dt_scale=dt_scale,
+            force_tol=force_tol, oob_window=oob_window,
+            early_exit=early_exit, min_slip_depth=min_slip_depth,
+            ssr_exclude_mask=ssr_exclude_mask,
+            tension_cap_by_elem=tension_cap_by_elem,
+            tension_srf=tension_srf, elastic_mask=elastic_mask,
+            suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+            _prepared=prep, fast_kernel=fast_kernel,
+            failure_criterion=failure_criterion, k0=k0,
+            early_failure=early_failure,
+            joint_slip_stiffness_factor=joint_slip_stiffness_factor)
+        _soft = _sol.get("softened_1d_elements")
+        if _soft is not None and not np.any(_soft):
+            _soft = None
+        _hs = {"u": _st["u"], "evp": _st["evp"], "joint": _st.get("joint"),
+               "_hold": True}
+        try:
+            _h = solve_fem(
+                fem_data, F=F, debug_level=max(0, debug_level - 1),
+                max_iterations=int(_CORRECTOR_HOLD_SWEEPS),
+                max_iterations_ceiling=int(_CORRECTOR_HOLD_SWEEPS),
+                tolerance=tolerance, max_disp_factor=max_disp_factor,
+                tension_cutoff=tension_cutoff, dt_scale=dt_scale,
+                force_tol=force_tol, oob_window=oob_window,
+                early_exit=early_exit, min_slip_depth=min_slip_depth,
+                ssr_exclude_mask=ssr_exclude_mask,
+                tension_cap_by_elem=tension_cap_by_elem,
+                tension_srf=tension_srf, elastic_mask=elastic_mask,
+                suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                _prepared=prep, fast_kernel=fast_kernel,
+                failure_criterion=failure_criterion, k0=k0,
+                early_failure=early_failure, _init_state=_hs,
+                _softened_seed=_soft, fem_solver='viscoplastic',
+                joint_slip_stiffness_factor=joint_slip_stiffness_factor,
+                joint_tangent='off')
+        except Exception as _exc:      # KeyboardInterrupt is a BaseException
+            _out["verdict"] = f"{type(_exc).__name__}: {_exc}"[:200]
+            _out["wall"] = time.perf_counter() - _t0
+            return _out
+        _ue = float(_h.get("u_elastic_scale") or 0.0)
+        _drift = float(_h.get("max_displacement", np.inf))
+        _drift_rel = (_drift / _ue) if _ue > 0.0 else np.inf
+        _out.update(
+            verdict=_h.get("verdict"), exit_reason=_h.get("exit_reason"),
+            sweeps=int(_h.get("iterations", 0) or 0), drift=_drift,
+            drift_u_el=float(_drift_rel), u_elastic_scale=_ue,
+            oob=float(_h.get("unbalanced_force_ratio", np.nan)),
+            wall=time.perf_counter() - _t0)
+        _out["held"] = bool(_h.get("converged")) and \
+            _drift_rel <= float(_CORRECTOR_HOLD_DRIFT)
+        return _out
 
     if debug_level >= 1:
         print(f"  c: {c_by_elem[0]:.1f} -> {c_reduced[0]:.1f}")
@@ -6384,6 +6546,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                          if joint_res_r is not None else None)
         joint_dil = (np.zeros((joint_data["n"], 3))
                      if joint_data.get("has_dilation") else None)
+        # A carried-in state (see _init_state) brings the interface's history with
+        # it: the slip each pair had already taken, which pairs were open, which had
+        # reached their limit and how far each had ridden up. Without it the pairs
+        # that slid while the state settled would be loaded back onto their limit in
+        # the first sweep, which is a kick the settled state never had.
+        _jh_in = None if _init_state is None else _init_state.get("joint")
+        if _jh_in is not None:
+            _seed_joint_history(joint_data["n"], _jh_in, joint_slip, joint_open,
+                                joint_slipped, joint_dil)
         joint_state_last = None
         # The ACTIVE SET, and how often it moves. Every sweep the interface's
         # constitutive state is read fresh: a pair is sticking (0), slipping (1)
@@ -8126,7 +8297,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     if sv0_gp is not None:
         k0_state = {"u": u.copy(),
                     "evp": [grp['evp'].copy() for grp in gp_groups],
-                    "F": float(F), "converged": bool(converged)}
+                    "F": float(F), "converged": bool(converged),
+                    # The interface's history is part of the state on a jointed
+                    # model: the tractions are k_s (dt - slip) and k_n (dn + dil),
+                    # so u alone does not reconstruct them.
+                    "joint": (None if not has_joints else {
+                        "slip_p": joint_slip.copy(),
+                        "open_prev": joint_open.copy(),
+                        "slipped": (None if joint_slipped is None
+                                    else joint_slipped.copy()),
+                        "dil_p": (None if joint_dil is None
+                                  else joint_dil.copy())})}
 
     # ---- Step 10: Compute final stresses, strains, plastic elements ----
     final_stresses = np.zeros((n_elements, 4))  # [sig_x, sig_y, tau_xy, sig_vm] compression-positive
@@ -9398,6 +9579,65 @@ def _nr_joint_slip(joints, st):
     slip_p = np.zeros(st["tn"].shape) if slip_p is None else np.asarray(slip_p)
     closed = np.divide(st["ts"], ks, out=np.zeros_like(st["ts"]), where=ks > 0.0)
     return np.where(st["open"], slip_p, st["dt"] - closed)
+
+
+def _nr_joint_history(joints, st):
+    """The interface history a Newton state hands on, or ``None`` without joints.
+
+    The same four arrays the viscoplastic sweep keeps (``slip_p``, ``open_prev``,
+    ``slipped``, ``dil_p``), read at the reported state so that a solve seeded with
+    them sees the tractions this state holds. The Newton law holds its internal
+    variables fixed across the step and returns the traction about them, so the
+    history at the end is the history it was handed advanced by the return at the
+    final displacement: the slip is :func:`_nr_joint_slip`, a pair at its limit is
+    on the residual branch, and the slip the return put in opens a dilating joint
+    by that slip times tan(dil). ``slipped`` and ``dil_p`` stay ``None`` where the
+    step itself carried neither, which is what the sweep allocates on a model that
+    states neither.
+    """
+    if st is None:
+        return None
+    jg = next((g for g in (joints or ()) if g.get('kind') == 'joint'), None)
+    if jg is None:
+        return None
+    jd = jg['jd']
+    ks = jd['ks'][:, None]
+    slip = _nr_joint_slip(joints, st)
+    excess = np.abs(st['ts_trial']) - st['tlim']
+    adv = np.where(st['slipping'] & (excess > 0.0),
+                   np.divide(excess, ks, out=np.zeros_like(excess), where=ks > 0.0),
+                   0.0)
+    slipped = (None if jg.get('slipped') is None
+               else (np.asarray(jg['slipped'], dtype=bool) | st['slipping']))
+    dil = (None if jg.get('dil_p') is None
+           else np.asarray(jg['dil_p'], dtype=float) + adv * jd['tandil'][:, None])
+    return {'slip_p': np.array(slip, dtype=float, copy=True),
+            'open_prev': np.array(st['open'], dtype=bool, copy=True),
+            'slipped': slipped, 'dil_p': dil}
+
+
+def _seed_joint_history(n, hist, slip, open_, slipped, dil):
+    """Write a carried interface history into a solve's own (n, 3) records.
+
+    ``hist`` is the ``"joint"`` entry of a carried state (see solve_fem's
+    ``_init_state``). A record the solve does not keep (``slipped`` or ``dil`` is
+    ``None`` on a model that states no residual strength or no dilation) takes
+    nothing, and a history that does not carry one leaves the solve's zeros.
+    """
+    def _take(dst, key, dtype):
+        src = hist.get(key)
+        if dst is None or src is None:
+            return
+        src = np.asarray(src, dtype=dtype)
+        if src.shape != (n, 3):
+            raise ValueError(
+                f"the carried joint history's {key!r} is {src.shape}, not ({n}, 3); "
+                "the state must be produced on the same prepared model.")
+        dst[...] = src
+    _take(slip, 'slip_p', float)
+    _take(open_, 'open_prev', bool)
+    _take(slipped, 'slipped', bool)
+    _take(dil, 'dil_p', float)
 
 
 def _nr_joint_force(jg, u, want_tangent):
@@ -10927,6 +11167,14 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # current displacement alone -- the shear traction returned onto the
     # Mohr-Coulomb limit, the normal onto the tension cutoff -- so, like the bar,
     # they carry no state across a step.
+    # A state handed in carries the interface's history (see _init_state); an
+    # explicit `_nr_joint_state` (the corrector's) wins, then the state the solve
+    # STARTS from (a predictor seed), then the in-situ state it is measured from.
+    if _nr_joint_state is None:
+        for _src in (_nr_seed_state, _nr_init_state):
+            if _src is not None and _src.get("joint") is not None:
+                _nr_joint_state = _src["joint"]
+                break
     joints = _nr_build_joints(fem_data, F, state=_nr_joint_state)
     pattern = _nr_prepare_assembly(groups, free_dofs, n_dof, bars=bars,
                                    piles=piles, joints=joints)
@@ -11442,10 +11690,16 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # meaning as the viscoplastic driver's `_k0_state`, over the same Gauss-point
     # groups in the same order, so either driver's state can seed the other.
     nr_k0_state = None
+    _nr_hist = _nr_joint_history(joints, _j_state)
     if groups and groups[0].get('sig0') is not None:
         nr_k0_state = {"u": u.copy(),
                        "evp": [g['ep'].copy() for g in groups],
-                       "F": float(F), "converged": bool(converged)}
+                       "F": float(F), "converged": bool(converged),
+                       "joint": _nr_hist}
+    # The same state with or without K0, for the corrector's hold test (see
+    # JOINT_HOLD_TEST_ON), which starts the plain sweep on it on any model.
+    nr_end_state = ({"u": u.copy(), "evp": [g['ep'].copy() for g in groups],
+                     "joint": _nr_hist} if groups else None)
     u_ratio = (max_disp / u_elastic_scale) if u_elastic_scale > 0 else None
     verdict = 'CONVERGED' if converged else 'FAILED'
 
@@ -11470,6 +11724,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "u_elastic_scale": u_elastic_scale,
         "exit_reason": exit_reason,
         "_k0_state": nr_k0_state,
+        "_nr_state": nr_end_state,
         "plateau_iteration": None,
         "plateau_ratio": None,
         "diverging_iteration": (total_iterations if not converged else None),

@@ -352,9 +352,13 @@ row. The description that produced them is not
 stored, so a set is changed by deleting its rows and building another.
 
 The base of the stack is typed by hand, because it is one surface rather than a
-set: a **base plane** dipping 30° out of the face, from (9.000, 6.887) at its
-upper tip down to the toe at (20.928, 0.000), cohesionless at φ = 35°. The
-generated traces take the same strength.
+set: a **base plane** dipping 30° out of the face, from its upper tip down to
+the toe, cohesionless at φ = 35°. Enter the row below in the joints editor, or
+paste it in; the generated traces take the same strength.
+
+| Label | x1 | y1 | x2 | y2 | c | phi |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
+| base plane | 9.000 | 6.887 | 20.928 | 0.000 | 0 | 35 |
 
 ![The generated network on the Inputs plot: five columns standing on the base plane](images/fem05_inputs_network.png){width=1000}
 

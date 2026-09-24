@@ -382,7 +382,7 @@ about a minute and a half and reports
 
 >>**FS = 1.105**
 
-![Joint slip on the toppling stack: the base plane and the joints between the columns](images/fem05_joint_slip_topple.png){width=1000}
+![Joint slip on the toppling stack: the base plane slipping along most of its length, the column joints opened along their lower parts and in contact only at their tops](images/fem05_joint_slip_topple.png){width=1000}
 
 ![The deformed blocks: the columns lean out over the base plane rather than sliding along it](images/fem05_fem_blocks_topple.png){width=1000}
 
@@ -394,6 +394,17 @@ the joint in front. That is **block toppling**, and it is the mechanism the
 method was built for: every bit of the movement is taken up on the contacts, and
 the factor of safety is the factor by which the contacts have to be weakened
 before the stack starts to go over.
+
+The joint slip figure shows the same mechanism as contact states. Each column
+joint has opened along its lower part and is in contact only near the top: a
+column pivoting forward on its toe lifts off the joint behind it at the base and
+leans on the column in front at the crest, and the short green lengths there,
+slips of 1 to 3 mm, are the two columns sliding against each other as they lean.
+The base plane reads differently. It is slipping along most of its length, up to
+8 mm, the largest slip in the model, as the columns' feet slide forward on it
+while they rotate, and it has opened under the lowest column near the toe, where
+that column has lifted off it. Nothing on the plot says the stack is sliding
+away as one body; everything says it is going over.
 
 ---
 

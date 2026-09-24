@@ -125,14 +125,15 @@ joint's x = 12 it stands
 above the base. That point is where the two lines meet: the release joint runs
 from it straight up to the ground surface at elevation 12.
 
-| Label | x | y |
-| --- | ---: | ---: |
-| bedding | 12.000 | 6.252 |
-|  | 20.928 | 0.000 |
-| release | 12.000 | 6.252 |
-|  | 12.000 | 12.000 |
+Enter the two rows below, or paste them straight into the worksheet.
 
-Both rows take `c` = 0 and `phi` = 40. With them entered, the Inputs plot draws
+| Label | x1 | y1 | x2 | y2 | c | phi |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
+| bedding | 12.000 | 6.252 | 20.928 | 0.000 | 0 | 40 |
+| release | 12.000 | 6.252 | 12.000 | 12.000 | 0 | 40 |
+
+A new row opens with `c`, `phi` and `t_cut` at 0 and every other column blank;
+leave `t_cut` at 0 and the rest blank. With the two rows in, the Inputs plot draws
 each joint line in a style of its own, so a line the mesh will be split along can
 be told at a glance from a line it will not:
 

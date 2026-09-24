@@ -222,10 +222,9 @@ apart: two thin lines with a gap between them, along the whole length that
 parted. The key in the corner names the three states a joint can be in — closed
 and not slipping, slipping, opened. The release joint
 has opened along nearly its whole height, from where it meets the bedding plane
-up to about 1.4 m below the crest — the slab has pulled away from the rock behind
-it, which is what a release joint is for — and only that top 1.4 m is still
-closed and sliding, the one green length on it. The bedding plane shows one
-short parted stretch of its own at the toe, at its daylighting end.
+up to just under the crest — the slab has pulled away from the rock behind it,
+which is what a release joint is for — and only its top, under the crest, is
+still closed and sliding, the one green length on it.
 
 **Deformed mesh** is the second picture. On a jointed model it is the deformed
 section drawn as the **blocks** the joints cut it into, with the slab under a
@@ -278,13 +277,17 @@ dip, a spacing, and how far the joints persist — and the same slope with a set
 joints through it fails by a different mechanism entirely.
 
 Two inputs make a set. The first says *where* in the section the set exists,
-and there are three ways to say it: leave the region blank and the set fills the
-whole section; name a material, or several, and the set fills the zones that
-carry it — a bedding set confined to one rock unit; or draw a **joint region**,
-a polygon whose **Type** is `joints`, for ground no material boundary outlines.
-A joint region is only an outline: it carries no material and no strength of its
-own. This model needs one, because the columns belong to the wedge of rock above
-the base plane, which is not a material of its own.
+and there are three ways to say it:
+
+- **Nothing.** Leave the region blank and the set fills the whole section.
+- **A material**, or several. The set fills the zones that carry it — a bedding
+  set confined to one rock unit.
+- **A joint region**: a polygon whose **Type** is `joints`, for ground that no
+  material boundary outlines. It is only an outline, with no material and no
+  strength of its own.
+
+This model needs the third, because the columns belong to the wedge of rock
+above the base plane, which is not a material of its own.
 
 The region is entered in the polygons editor, reached from the Inputs tree
 under **Polygons**, the same editor the section itself is in. Add a polygon, set

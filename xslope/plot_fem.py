@@ -2541,7 +2541,6 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
 #: field underneath it.
 _JOINT_INTACT_COLOR = '#999999'
 _JOINT_SLIP_CMAP = 'joint_slip'
-_JOINT_OPEN_MARK_COLOR = '#33383d'
 
 #: The slip ramp itself: bright lime through to dark green. The field under this
 #: overlay is ``coolwarm`` — blue low, WHITE through the middle, red high — so
@@ -2572,19 +2571,16 @@ _JOINT_HAIRLINE_PT = 0.9
 #: overlay exists to carry, so it takes the extra weight and the intact spans
 #: stay out of the way.
 _JOINT_SLIP_PT = 1.6
+#: The white gap, in points, between the two thin lines an OPENED stretch is
+#: drawn as: the faces drawn apart, along the whole stretch that parted.
+_JOINT_OPEN_GAP_PT = 1.4
 
 #: The white under-stroke is the section drawing's (``plot.JOINT_HALO_*``): half
 #: a point of white on each side keeps a dark green span readable where the field
 #: beneath it goes dark blue or dark red. The intact gray hairlines carry no
 #: halo, so nothing is spent saying that nothing happened.
 
-#: The open mark's weight, unchanged: the tick is the same mark it was.
-_JOINT_OPEN_MARK_PT = 1.0
 
-#: An open mark's half length, as a fraction of the larger domain dimension —
-#: the idiom the inputs plot's joint ticks use, so the mark is the same size on
-#: a 10 m block and a 100 m slope.
-_JOINT_OPEN_MARK_FRACTION = 0.012
 
 
 def solution_has_joint_state(fem_data, solution):
@@ -2709,21 +2705,23 @@ def _spans_on_bars(fem_data, spans):
     return [int(r["line"]) in bar_lines for r in spans]
 
 
-def _offset_sheet_spans(ax, coords, slipping, slips, on_bar):
+def _offset_sheet_spans(ax, coords, slipping, slips, on_bar, opened=None):
     """Draw a jointed sheet's spans as two lines, one each side of the bar.
 
     The offset is fixed in points and applied in display space, so it is the
     same width at any scale and stays perpendicular to the sheet whatever the
     axes' aspect."""
+    if opened is None:
+        opened = np.zeros(len(coords), dtype=bool)
     if not any(on_bar):
-        return coords, slipping, slips
+        return coords, slipping, slips, np.asarray(opened, dtype=bool)
     d_px = _JOINT_FACE_OFFSET_PT * (ax.figure.dpi or 100.0) / 72.0
     to_disp = ax.transData.transform
     to_data = ax.transData.inverted().transform
-    out_c, out_s, out_v = [], [], []
-    for c, sl, v, ob in zip(coords, slipping, slips, on_bar):
+    out_c, out_s, out_v, out_o = [], [], [], []
+    for c, sl, v, ob, op in zip(coords, slipping, slips, on_bar, opened):
         if not ob:
-            out_c.append(c); out_s.append(sl); out_v.append(v)
+            out_c.append(c); out_s.append(sl); out_v.append(v); out_o.append(op)
             continue
         p = to_disp(np.asarray(c, dtype=float))
         t = p[1] - p[0]
@@ -2733,7 +2731,9 @@ def _offset_sheet_spans(ax, coords, slipping, slips, on_bar):
         nrm = np.array([-t[1], t[0]]) / L * d_px
         for sgn in (1.0, -1.0):
             out_c.append(to_data(p + sgn * nrm)); out_s.append(sl); out_v.append(v)
-    return out_c, np.asarray(out_s, dtype=bool), np.asarray(out_v, dtype=float)
+            out_o.append(op)
+    return (out_c, np.asarray(out_s, dtype=bool), np.asarray(out_v, dtype=float),
+            np.asarray(out_o, dtype=bool))
 
 
 def _joint_spans(fem_data, solution):
@@ -2768,15 +2768,33 @@ def _joint_spans(fem_data, solution):
         if rec is None:
             rec = spans[key] = {
                 "line": int(jd["line_id"][i]),
-                "coords": nodes[conn[i, 0:2], :2],
-                "open": False, "slipping": False, "slip": 0.0}
+                # the element's three stations: start, end, midside
+                "xy": nodes[conn[i, 0:3], :2],
+                "open_st": np.zeros(3, dtype=bool),
+                "slip_st": np.zeros(3, dtype=bool),
+                "slip_v": np.zeros(3, dtype=float)}
         active = w[i]
-        rec["open"] = rec["open"] or bool(np.any(opened[i] & active))
-        rec["slipping"] = rec["slipping"] or bool(np.any(slipping[i] & active))
-        if np.any(active):
-            rec["slip"] = max(rec["slip"],
-                              float(np.max(np.abs(slip[i][active]))))
-    return list(spans.values())
+        rec["open_st"] |= (opened[i] & active)
+        rec["slip_st"] |= (slipping[i] & active)
+        rec["slip_v"] = np.maximum(rec["slip_v"],
+                                   np.where(active, np.abs(slip[i]), 0.0))
+    # Each station span is drawn as its two halves, start-to-midside and
+    # midside-to-end, so a state can be read at the resolution the element
+    # measured it. A half has OPENED only when both of its stations have — a
+    # single parted station between two that are still in contact is below
+    # what the drawing can honestly show — and a half that has not opened is
+    # slipping when either of its stations is.
+    out = []
+    for rec in spans.values():
+        xy, op, sl, sv = rec["xy"], rec["open_st"], rec["slip_st"], rec["slip_v"]
+        for (p, q) in ((0, 2), (2, 1)):
+            is_open = bool(op[p] and op[q])
+            out.append({"line": rec["line"],
+                        "coords": np.array([xy[p], xy[q]]),
+                        "open": is_open,
+                        "slipping": bool((sl[p] or sl[q]) and not is_open),
+                        "slip": float(max(sv[p], sv[q]))})
+    return out
 
 
 def _joint_slip_cmap():
@@ -2785,48 +2803,6 @@ def _joint_slip_cmap():
     from matplotlib.colors import LinearSegmentedColormap
     return LinearSegmentedColormap.from_list(
         _JOINT_SLIP_CMAP, list(_JOINT_SLIP_COLORS))
-
-
-def _joint_open_marks(spans, scale):
-    """Perpendicular tick segments marking the OPENED stretches of every line.
-
-    One tick per continuous run of opened stations, not one per station: a line
-    that has parted along half its length parts in one stretch, and a tick at
-    every station of it would draw a comb rather than a mark. Stations of a line
-    are ordered along that line's own direction and split into runs wherever the
-    gap between neighbours exceeds half again the median station length — the
-    spacing that separates two parted stretches from one.
-    """
-    by_line = {}
-    for r in spans:
-        if r["open"]:
-            by_line.setdefault(r["line"], []).append(r)
-    segs = []
-    for rows in by_line.values():
-        mids = np.array([r["coords"].mean(axis=0) for r in rows])
-        vecs = np.array([r["coords"][1] - r["coords"][0] for r in rows])
-        lens = np.hypot(vecs[:, 0], vecs[:, 1])
-        axis = vecs[0] / (lens[0] if lens[0] > 0 else 1.0)
-        t = mids @ axis
-        order = np.argsort(t)
-        gap = 1.5 * float(np.median(lens[lens > 0])) if np.any(lens > 0) else 0.0
-        runs, run = [], [int(order[0])]
-        for a, b in zip(order[:-1], order[1:]):
-            if t[b] - t[a] <= gap:
-                run.append(int(b))
-            else:
-                runs.append(run)
-                run = [int(b)]
-        runs.append(run)
-        half = _JOINT_OPEN_MARK_FRACTION * scale
-        for run in runs:
-            k = run[len(run) // 2]
-            L = lens[k] if lens[k] > 0 else 1.0
-            nx, ny = -vecs[k][1] / L, vecs[k][0] / L
-            mx, my = mids[k]
-            segs.append([(mx - half * nx, my - half * ny),
-                         (mx + half * nx, my + half * ny)])
-    return segs
 
 
 def _joint_slip_panel(fem_data):
@@ -2850,23 +2826,6 @@ def _joint_slip_panel(fem_data):
     return bool(names) and all(n in elastic for n in names)
 
 
-def _joint_open_note(fem_data, solution):
-    """The key for the opened-joint tick, or "" where no tick is drawn.
-
-    The results plots carry no legend, so the one mark on this panel that is not
-    on its colorbar says what it means in the panel's own subtitle. It appears
-    only on a figure that actually draws a tick.
-    """
-    spans = _joint_spans(fem_data, solution)
-    if not spans:
-        return ""
-    nodes = np.asarray(fem_data["nodes"], dtype=float)
-    scale = max(float(np.ptp(nodes[:, 0])), float(np.ptp(nodes[:, 1]))) or 1.0
-    if not _joint_open_marks(spans, scale):
-        return ""
-    return "tick across a joint marks a stretch that opened"
-
-
 def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None):
     """Draw the joint (interface) elements as hairlines colored by their slip.
 
@@ -2885,10 +2844,11 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None):
       legend entries go on the axes;
     * a span that is not slipping is a lighter neutral gray hairline with no
       under-stroke — nothing happened there, and it says so quietly;
-    * an OPENED stretch is marked rather than colored: one short tick drawn
-      perpendicular to the joint, in a dark neutral, at the middle of each
-      continuous run of opened stations (see :func:`_joint_open_marks`), its
-      length a fixed fraction of the domain so it reads the same at any scale;
+    * an OPENED stretch is drawn as its two faces apart — two gray hairlines
+      with a white gap of :data:`_JOINT_OPEN_GAP_PT` between them, along the
+      whole stretch that parted — rather than colored, because opening is a
+      condition and not a quantity; a key in the panel's corner names the
+      three states;
     * when nothing on the model is slipping there is no colorbar at all and
       every joint draws gray.
 
@@ -2940,10 +2900,12 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None):
     # a few points either side of the bar — where the two faces are — and
     # the bar keeps the middle. A bar-less joint line keeps the single line.
     on_bar = _spans_on_bars(fem_data, spans)
-    coords, slipping, slips = _offset_sheet_spans(ax, coords, slipping, slips,
-                                                  on_bar)
-    intact = [c for c, sl in zip(coords, slipping) if not sl]
-    slid = [c for c, sl in zip(coords, slipping) if sl]
+    opened = np.array([bool(r["open"]) for r in spans])
+    coords, slipping, slips, opened = _offset_sheet_spans(
+        ax, coords, slipping, slips, on_bar, opened)
+    intact = [c for c, sl, op in zip(coords, slipping, opened) if not sl and not op]
+    slid = [c for c, sl, op in zip(coords, slipping, opened) if sl and not op]
+    parted = [c for c, op in zip(coords, opened) if op]
     if intact:
         ax.add_collection(LineCollection(
             intact, colors=_JOINT_INTACT_COLOR, linewidths=lw_intact,
@@ -2954,17 +2916,42 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None):
             linewidths=lw_slip + 2 * _JOINT_HALO_PT,
             alpha=1.0, zorder=6.45))
         ax.add_collection(LineCollection(
-            slid, colors=[cmap(norm(s)) for s, sl in zip(slips, slipping) if sl],
+            slid, colors=[cmap(norm(s)) for s, sl, op in zip(slips, slipping, opened)
+                          if sl and not op],
             linewidths=lw_slip, alpha=1.0, zorder=6.5))
-
-    nodes = np.asarray(fem_data["nodes"], dtype=float)
-    scale = max(float(np.ptp(nodes[:, 0])), float(np.ptp(nodes[:, 1]))) or 1.0
-    marks = _joint_open_marks(spans, scale)
-    if marks:
+    # An OPENED stretch is drawn as its two faces apart: a gray line the width
+    # of two hairlines and the gap, with a white line the width of the gap down
+    # its middle, along the whole stretch that parted. Opening is a condition,
+    # not a quantity, so it gets a symbol rather than a color.
+    gap = max(_JOINT_OPEN_GAP_PT, floor)
+    if parted:
         ax.add_collection(LineCollection(
-            marks, colors=_JOINT_OPEN_MARK_COLOR,
-            linewidths=max(_JOINT_OPEN_MARK_PT, floor),
-            alpha=1.0, zorder=6.6))
+            parted, colors=_JOINT_INTACT_COLOR, linewidths=2 * lw_intact + gap,
+            alpha=1.0, zorder=6.55))
+        ax.add_collection(LineCollection(
+            parted, colors='white', linewidths=gap, alpha=1.0, zorder=6.6))
+
+    # The key: the three states a joint can be in on this panel. The colorbar
+    # carries the slip; the key names what the line styles mean.
+    from matplotlib.lines import Line2D
+    from matplotlib.legend_handler import HandlerTuple
+    handles, labels = [], []
+    if intact:
+        handles.append(Line2D([0], [0], color=_JOINT_INTACT_COLOR, lw=lw_intact))
+        labels.append("closed, not slipping")
+    if slid:
+        handles.append(Line2D([0], [0], color=cmap(0.7), lw=lw_slip))
+        labels.append("slipping (color = slip)")
+    if parted:
+        handles.append((Line2D([0], [0], color=_JOINT_INTACT_COLOR,
+                               lw=2 * lw_intact + gap),
+                        Line2D([0], [0], color='white', lw=gap)))
+        labels.append("opened")
+    if handles:
+        ax.legend(handles, labels, loc="lower right", fontsize=8, frameon=True,
+                  framealpha=0.92, edgecolor="#cccccc", borderpad=0.6,
+                  handlelength=2.6,
+                  handler_map={tuple: HandlerTuple(ndivide=1, pad=0.0)})
     return cbar_specs
 
 
@@ -3346,12 +3333,6 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     # deformation/displace_vector panels so the figure tells one story.
     title = _fs_title(_fallback_clause(solution, title), F,
                       solution.get("_ssrm_fs"), at_failure=at_failure)
-    # The opened-joint tick is the one mark here that no colorbar explains, so
-    # the panel says what it is. Only on a figure that draws one.
-    note = (_joint_open_note(fem_data, solution)
-            if (show_joints and slip_panel) else "")
-    if note:
-        title = f'{title}\n{note}'
     ax.set_title(title, fontsize=12, pad=15)
     return mappable, reinf_cbar_specs
 

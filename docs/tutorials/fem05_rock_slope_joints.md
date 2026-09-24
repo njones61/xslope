@@ -471,7 +471,7 @@ to stay small, because the element is written on the undeformed section. And the
 joint obeys Mohr-Coulomb with a residual strength and a dilation angle rather
 than a softening law.
 
-The short version for practice. The factor of safety this method reports is
+**The short version for practice.** The factor of safety this method reports is
 valid: it is the factor by which the joint strengths can be reduced before the
 mass starts to move, which is the same quantity the closed forms and a distinct
 element strength reduction report, and on the problems that have a closed form

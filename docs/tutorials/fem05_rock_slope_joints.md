@@ -134,8 +134,7 @@ Enter the two rows below, or paste them straight into the worksheet.
 
 A new row opens with `c`, `phi` and `t_cut` at 0 and every other column blank;
 leave `t_cut` at 0 and the rest blank. With the two rows in, the Inputs plot draws
-each joint line in a style of its own, so a line the mesh will be split along can
-be told at a glance from a line it will not:
+the joint lines in their own style, distinct from profile lines and reinforcement:
 
 ![The two joint lines on the Inputs plot, drawn in the joint line style](images/fem05_inputs_joints.png){width=1000}
 

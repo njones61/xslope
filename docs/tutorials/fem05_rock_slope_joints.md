@@ -477,6 +477,7 @@ they come to rest, or what they strike on the way. Those questions need a
 distinct element program such as UDEC, in which blocks separate, rotate through
 large angles and make new contacts as they go, or a rockfall program that
 follows each block down the slope.
+
 [Joints and Interface Elements](../fem/joints.md) carries the formulation, the
 full input list and the rest of the reading.
 

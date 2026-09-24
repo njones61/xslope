@@ -1243,7 +1243,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                 ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                 cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
                 cmap=cmap, single_panel=defer_panel_cbar, vmin=vmin, vmax=vmax,
-                show_joints=show_joints)
+                show_joints=show_joints, joint_linewidth=joint_linewidth)
             single_cbar_label = SHEAR_STRAIN_LABEL
         elif pt == 'yield':
             plot_yield_function_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
@@ -2867,7 +2867,7 @@ def _joint_open_note(fem_data, solution):
     return "tick across a joint marks a stretch that opened"
 
 
-def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
+def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None):
     """Draw the joint (interface) elements as hairlines colored by their slip.
 
     A joint has no strain, so it appears in a shear-strain field only through
@@ -2905,7 +2905,12 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
 
     floor = _mesh_pixel_floor_pt(ax)
     lw_intact = max(_JOINT_HAIRLINE_PT, floor)
-    lw_slip = max(_JOINT_SLIP_PT, floor)
+    # On the joints' own panel (no field under it) the slipped lengths draw at
+    # the joint-face width the deformed-blocks panel uses, and the same
+    # `joint_linewidth` option (Studio's Joint width) sets both; over a strain
+    # field they stay at _JOINT_SLIP_PT so the field is not buried.
+    lw_slip = max(float(linewidth) if linewidth is not None else _JOINT_SLIP_PT,
+                  floor)
     coords = [r["coords"] for r in spans]
     slipping = np.array([bool(r["slipping"]) for r in spans])
     slips = np.array([float(r["slip"]) for r in spans])
@@ -3262,7 +3267,8 @@ def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
 
 def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                               cbar_shrink=0.8, cbar_labelpad=20, label_elements=False, cmap=None,
-                              single_panel=False, vmin=None, vmax=None, show_joints=True):
+                              single_panel=False, vmin=None, vmax=None, show_joints=True,
+                              joint_linewidth=None):
     """
     Plot viscoplastic max shear strain contours.
 
@@ -3320,7 +3326,9 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     # of the bars' force overlay, it was one thing too many on one line. The
     # overlay stays only where this panel is the joints' own (slip_panel).
     joint_cbar_specs = (plot_joint_states(ax, fem_data, solution,
-                                          draw_cbar=not single_panel)
+                                          draw_cbar=not single_panel,
+                                          linewidth=(joint_linewidth
+                                                     or JOINT_FACE_LINEWIDTH))
                         if (show_joints and slip_panel) else [])
     reinf_cbar_specs = []
     if show_reinforcement and 'elements_1d' in fem_data:

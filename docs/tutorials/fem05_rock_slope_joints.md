@@ -283,6 +283,8 @@ on its bedding plane, Part 2 puts a **base plane** a little deeper, at 30°, and
 fills the wedge of rock above it — the block that Part 1 slid as one piece —
 with a generated set of joints, so that it becomes a stack of columns instead.
 
+![The Part 2 problem: the same 12 m face at 60°, a base plane dipping 30° from 9 m behind the crest to the toe, and above it a joint region filled by a set of columns dipping 110° at 1.5 m spacing](images/fem05_problem_sketch_topple.png){width=1000}
+
 Two inputs make a set. The first says *where* in the section the set exists,
 and there are three ways to say it:
 

@@ -4589,7 +4589,16 @@ _OOB_TREND_MIN = 0.01          # the later window must be this much lower (1%)
 _EARLY_FAIL_WINDOW = 2000      # iterations in the trailing window read by (b)
 _EARLY_FAIL_WARMUP = 500       # (b) may not fire before this iteration
 _EARLY_FAIL_GAIN = 1.0         # (b): elastic displacements gained over that window
-_EARLY_FAIL_U_MAX = 8.0        # (f): elastic displacements, the absolute runaway level
+# (f): elastic displacements, the absolute runaway level. Raised from 8 to 15 on
+# 2026-09-23 (r37): two locked failing edges, RJ-2 at 8.52 and RS2-50 at 14.08
+# elastic displacements, are stable admissible equilibria that the level test at
+# 8 had cut short; nothing measured that genuinely runs away stops below 15.
+_EARLY_FAIL_U_MAX = 15.0
+# The trend test, (b) below, is retired (r37): it was wrong on two of the three
+# locks it decided, it made a marginal trial's verdict depend on the path the
+# loop took to it (rD), and it bought only 14,000-15,000 sweeps over the level
+# test where it was right. Its code stays behind this switch for the record.
+_EARLY_FAIL_TREND_TEST = False
 
 
 def _early_failure(disp_hist, oob_hist, u_elastic_scale,
@@ -4633,7 +4642,10 @@ def _early_failure(disp_hist, oob_hist, u_elastic_scale,
     if d_now >= u_max * u_elastic_scale and gaining:
         return 'runaway'
 
-    # (b) residual stalled while the field keeps moving
+    # (b) residual stalled while the field keeps moving — retired, see
+    # _EARLY_FAIL_TREND_TEST.
+    if not _EARLY_FAIL_TREND_TEST:
+        return None
     k = max(2, int(window // max(1, sample_every)))     # samples in the window
     if i < k or i < (warmup // max(1, sample_every)):
         return None

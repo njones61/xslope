@@ -213,6 +213,18 @@ flat gray, and the only colorbar the slip on the joints, in metres.
 
 ![The joint slip at the critical factor: the bedding plane bright along nearly its whole length, the release joint gray with a tick where it has opened](images/fem05_joint_slip.png){width=1000}
 
+The color is the slip, and it reads the way the slab moved: along the bedding
+plane it grows from 0.18 mm at the release joint to 0.39 mm at the toe, the
+whole plane sliding as one surface. The release joint is gray because it has not
+slid; it has **opened**. A joint whose two faces have parted carries no normal
+stress and so no shear, and the panel draws a short tick across each stretch
+that has parted, which is what the line under the title says. The release joint
+has opened along nearly its whole height, from where it meets the bedding plane
+up to about 1.4 m below the crest — the slab has pulled away from the rock behind
+it, which is what a release joint is for — and only that top 1.4 m is still
+closed and sliding, the one green length on it. The bedding plane has a tick of
+its own at the toe, where one short stretch at its daylighting end has parted.
+
 **Deformed mesh** is the second picture. On a jointed model it is the deformed
 section drawn as the **blocks** the joints cut it into, with the slab under a
 tint of its own, the joint faces colored by how far they have slid, and the

@@ -305,8 +305,9 @@ ground surface to (9, 12) above the tip.
 | 9.000 | 12.000 |
 
 The second input to build a joint network is the **Build network…** dialog,
-reached from the button beside the joints editor's list, which says *what* the
-set is.
+which says *what* the set is. Open the joints editor from the Inputs tree under
+**Joints**, as in Part 1, and press the **Build network…** button beside its
+list of rows.
 
 ![The Build network dialog describing the column set](images/fem05_studio_build_network.png){width=760}
 

@@ -276,6 +276,13 @@ rock mass is not described one line at a time: it is described by **sets** — a
 dip, a spacing, and how far the joints persist — and the same slope with a set of
 joints through it fails by a different mechanism entirely.
 
+Part 2 keeps the same slope: the same 12 m face, the same elastic rock, the
+same starter file. Open [xslope_rock_joints_start.xlsx](files/xslope_rock_joints_start.xlsx)
+again, or delete Part 1's two rows from the joints editor. In place of the slab
+on its bedding plane, Part 2 puts a **base plane** a little deeper, at 30°, and
+fills the wedge of rock above it — the block that Part 1 slid as one piece —
+with a generated set of joints, so that it becomes a stack of columns instead.
+
 Two inputs make a set. The first says *where* in the section the set exists,
 and there are three ways to say it:
 

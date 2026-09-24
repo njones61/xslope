@@ -360,6 +360,10 @@ paste it in; the generated traces take the same strength.
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | base plane | 9.000 | 6.887 | 20.928 | 0.000 | 0 | 35 |
 
+Close the joints editor. The Inputs plot now shows six joint lines — the base
+plane and the five columns standing on it — with the joint region's outline
+dashed behind them:
+
 ![The generated network on the Inputs plot: five columns standing on the base plane](images/fem05_inputs_network.png){width=1000}
 
 ---

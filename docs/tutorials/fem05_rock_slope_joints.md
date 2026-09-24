@@ -310,6 +310,14 @@ set is.
 
 ![The Build network dialog describing the column set](images/fem05_studio_build_network.png){width=760}
 
+**Name** is the set's name, and it matters more than it looks. Keep it short:
+`col`. Every row the dialog writes is named from it — `col-01`, `col-02`, and
+so on, in the order the traces come out — and that name follows the rows onto
+the Inputs plot, the results panels, the 1D details view and the report, so a
+network of a hundred lines reads as one set rather than a hundred anonymous
+rows. It is also how the set is found again: the rows of one network can be
+selected and removed together by their name.
+
 **Kind** selects the generator. `Parallel set` is one set of parallel traces at a
 stated dip; the other two are `Cross-jointed`, which crosses two sets, and
 `Voronoi`, which fills the region with a tessellated block mass at no preferred
@@ -326,9 +334,10 @@ and **Offset** shifts the whole set along its own normal, 1.25 m, which is how a
 set is moved without changing its spacing — here to put the traces where they
 leave a whole column at each end rather than a sliver.
 
-**Region** picks the polygon the traces are clipped to, `Toppling zone`, and
-**Label** is the stem the generated rows are named from: `col-01`, `col-02`, and
-so on.
+**Within** is where the set exists, the choice from the list above: the whole
+section, a material, or a joint region. Pick `Toppling zone`. **Elevation band**
+cuts whatever is chosen there to a range of elevations — "the sandstone above
+elevation 40" — and is left open at both ends here.
 
 The dialog previews the traces on the canvas as the fields change, and **OK**
 writes exactly what the preview showed. Over this region that set comes to

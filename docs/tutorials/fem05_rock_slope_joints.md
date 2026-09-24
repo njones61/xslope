@@ -329,10 +329,13 @@ into it. **110°** here is a set standing 70° from horizontal and leaning back
 into the slope, which is what makes the rock above the base plane a stack of
 columns rather than a pile of slabs.
 
-**Spacing** is the perpendicular distance between one trace and the next, 1.5 m,
-and **Offset** shifts the whole set along its own normal, 1.25 m, which is how a
-set is moved without changing its spacing — here to put the traces where they
-leave a whole column at each end rather than a sliver.
+**Spacing** is the perpendicular distance between one trace and the next,
+1.5 m. **Offset** says where the traces sit: with an offset of 0, one trace of
+the set passes through the origin (0, 0) and the rest stand at multiples of the
+spacing either side of it; the offset shifts that whole pattern along the set's
+own normal by the distance given. 1.25 m here moves the traces to where they
+leave a whole column at each end of the region rather than a sliver. Changing
+the offset moves the set; it does not change the spacing.
 
 **Within** is where the set exists, the choice from the list above: the whole
 section, a material, or a joint region. Pick `Toppling zone`. **Elevation band**

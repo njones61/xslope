@@ -40,10 +40,13 @@ shared [References](references.md) page.
   from the same referee. RS2's "without joint improvement" factor is the vendor's default and the
   same method family as XSLOPE's — a strength reduction on a continuum with interfaces in it — so it
   is the yardstick for how close a finite element code of this kind gets. The manual reports each
-  problem twice, and the "with joint improvement" run stops reducing the joints along with the rock,
-  which makes it a different analysis rather than a better-converged one. XSLOPE reduces the joint
-  with the rock, which is the *without* setting, and both of RS2's numbers are recorded so a reader
-  can see the spread.
+  problem twice. The "with joint improvement" run is the same model — the same mesh, joints,
+  strengths, stiffnesses and restraints, and the joints are still reduced with the rock — solved by
+  a different scheme: the vendor's `Improve Joint Convergence` option, which recalculates a joint's
+  stiffness once it has exceeded its strength, together with an accelerated initial stiffness and
+  a force-and-energy convergence test. Where the two settings disagree, the vendor's own answer
+  depends on how it was solved rather than on the problem, and that spread is the honest width of
+  the vendor's answer. Both of RS2's numbers are recorded in every row so a reader can see it.
 - **The mesh.** Every row is meshed at its own joint spacing — the column width, the bedding
   spacing, the mean block width of a tessellation — so that one element spans the rock between one
   discontinuity and the next, and every row states what a step of refinement does to its factor.
@@ -94,11 +97,11 @@ joint model whose output is a stress-displacement curve.
 | [1b](#rj-1b) | 🟢 | Goodman & Bray block toppling, case 1b | SSRM 1.018 vs Goodman & Bray 1.0000 (+1.8%) | 0.97 vs 1.0000 (−3.0%) | UDEC 0.99 (+2.8%) | 0.97 / 0.94 | |
 | [1c](#rj-1c) | 🟢 | Goodman & Bray block toppling, case 1c | SSRM 1.037 vs Goodman & Bray 1.0185 (+1.8%) | 1.01 vs 1.0185 (−0.8%) | UDEC 1.01 (+2.7%) | 1.01 / 0.99 | |
 | [1d](#rj-1d) | 🟢 | Goodman & Bray block toppling, case 1d | SSRM 1.252 vs Goodman & Bray 1.2308 (+1.7%) | 1.19 vs 1.2308 (−3.3%) | UDEC 1.22 (+2.6%) | 1.19 / 1.16 | |
-| [2](#rj-2) | 🟢 | Alejano & Alonso block toppling | SSRM 0.764 vs Goodman & Bray 0.7734 (−1.2%) | 0.86 vs 0.7734 (+11.2%) | UDEC 0.87 (−12.2%) | 0.86 / 0.82 | UDEC and RS2 both stand above the closed form; the manual states no UDEC settings for this model. |
-| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | UDEC 1.13 | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | *reported, no lock* — the trial at the top of the bracket, F = 1.222656, does not settle within the 250,000-sweep budget, so the search cannot close. |
+| [2](#rj-2) | 🟢 | Alejano & Alonso block toppling | SSRM 0.783 vs Goodman & Bray 0.7734 (+1.2%) | 0.86 vs 0.7734 (+11.2%) | UDEC 0.87 (−10.0%) | 0.86 / 0.82 | All three programs stand above the closed form, this one by a percent and the other two by a tenth; the manual states no UDEC settings for this model. |
+| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | SSRM 1.213 reported vs UDEC 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | *reported, no lock* — the trial at the top of the bracket, F = 1.222656, does not settle within the 250,000-sweep budget, so the search cannot close. The vendor's two settings disagree with each other. |
 | [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | — | 1.19 / 1.27 | |
-| [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | UDEC 1.7 | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | *reported, no lock* — four of the nine trials do not settle within the 250,000-sweep budget, two of them the ends of the bracket; a finer mesh settles two more and leaves an end of its own bracket unsettled. |
-| [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | UDEC 1.27 | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | *reported, no lock* — every trial settles, but a step of mesh refinement moves the factor by twice the row's tolerance. |
+| [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | SSRM 1.818 reported vs UDEC 1.7 (+6.9%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | *reported, no lock* — four of the nine trials do not settle within the 250,000-sweep budget, two of them the ends of the bracket; a finer mesh settles two more and leaves an end of its own bracket unsettled. The reported value sits between the vendor's two settings. |
+| [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | SSRM 1.271 reported vs UDEC 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | *reported, no lock* — every trial settles, but a step of mesh refinement moves the factor by twice the row's tolerance. The reported value sits between the vendor's two settings. |
 | [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | — | 1.57 / 1.59 | Both finite element codes land above the referee, on the same side and within half a point of each other. |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | 0.75 vs 0.76 (−1.3%) | — | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.037 vs UDEC 1.03 (+0.7%) | 1.01 vs 1.03 (−1.9%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
@@ -295,18 +298,19 @@ triangle above it, weighing 1,361.8 kN/m. The recursion gives **0.7734**, agains
 
 | XSLOPE SSRM | Goodman & Bray referee | RS2 vs referee | UDEC | RS2 without / with improvement |
 |---|---|---|---|---|
-| **0.764** | 0.7734 (−1.2%) | 0.86 vs 0.7734 (+11.2%) | 0.87 (−12.2%) | 0.86 / 0.82 |
+| **0.783** | 0.7734 (+1.2%) | 0.86 vs 0.7734 (+11.2%) | 0.87 (−10.0%) | 0.86 / 0.82 |
 
-<!-- test: file=files/rocscience/joints/rj002.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-2, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj002.xlsx, type=fem_ssrm, expected_fs=0.783, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-2, f_stand=0.7734375, f_fail=0.79296875, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 0.35 m, which takes the mesh from 11,537 nodes to 21,110 —
 moves the factor by one step of the search, inside the row's own tolerance, and all nine trials
-settle on both meshes; the longest trial takes 6,281 sweeps of the 250,000 allowed.
+decide on both meshes; the longest, the standing edge of the bracket, takes 144,462 sweeps of the
+250,000 allowed.
 
 **The two programs that are not the closed form land together above it.** Alejano & Alonso publish
-their own UDEC run at 0.87 beside their Goodman & Bray 0.76, and RS2 reports 0.86 and 0.82: both of
-the other programs stand above the recomputed closed form, where this row sits below it. Neither of
-the two can be interrogated on this problem: the manual states nothing about the model's UDEC
+their own UDEC run at 0.87 beside their Goodman & Bray 0.76, and RS2 reports 0.86 and 0.82: all
+three programs stand above the recomputed closed form, this row by 1.2% and the other two by a
+tenth. Neither of the two can be interrogated on this problem: the manual states nothing about the model's UDEC
 settings, no block rounding, no deformability and no stiffness, where the rigid-block note it gives
 for problems 9 to 14 is the only statement of the kind it makes anywhere.
 
@@ -316,8 +320,7 @@ the joints' k<sub>n</sub>, k<sub>s</sub>, c, φ and tensile cap, and the clamped
 match.
 
 The relief RS2 applies to a slipping joint's stiffness is off here as it is on every row of this
-corpus — see the departures table. Turned on, it moves this row's factor UP, toward UDEC, where on
-the problem 1 stacks it moves the factor down.
+corpus — see the departures table. Turned on, it returns this row's bracket unchanged, end for end.
 
 **Input file:** [rj002.xlsx](files/rocscience/joints/rj002.xlsx).
 
@@ -325,7 +328,8 @@ the problem 1 stacks it moves the factor down.
 
 ### ⊘ RJ-3: Lorig & Varona forward block toppling (rj003) {#rj-3}
 
-The 260 m section at 55° that problems 3 to 7 share, cut by two sets: columns at 70° at 20 m
+Problems 3 to 6 are the toppling and plane-failure examples of Lorig & Varona (2004). The 260 m
+section at 55° that problems 3 to 7 share, cut by two sets: columns at 70° at 20 m
 spacing and a cross set at −20° at 30 m, both through the origin. The manual states the pair as
 "70 and 160" degrees, which is the same two planes measured the other way round the half circle.
 The rock is elastic — the vendor's `Plasticity Specifications: Non` — so only the joints can fail;
@@ -333,12 +337,19 @@ The rock is elastic — the vendor's `Plasticity Specifications: Non` — so onl
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| *no lock* | 1.13 | 1.12 vs 1.13 (−0.9%) | 1.12 / 1.09 |
+| 1.213 *reported, no lock* | 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | 1.12 / 1.09 |
 
-The row prints no factor of its own. The trial at F = 1.222656, the top of the bracket the search
-closes on, does not settle within the 250,000-sweep budget, so the search cannot close. Every other
-trial settles, the longest of them in 206,973 sweeps. [Problem 5](#rj-5) and [problem 20](#rj-20)
-are reported rather than locked for the same reason.
+The row reports a factor but does not lock one. The search brackets 1.213 between 1.203, where
+the slope stands, and 1.222656, where the trial does not settle within the 250,000-sweep budget:
+the slope neither comes to rest nor runs away there, so the top of the bracket is a statement
+about the budget and the search cannot close. Every other trial settles, the longest of them in
+206,973 sweeps. [Problem 5](#rj-5) and [problem 20](#rj-20) are reported rather than locked for
+the same reason.
+
+The reported value stands above UDEC and above the vendor's default. The vendor's own two
+solution schemes give 1.12 and 1.09 for this problem, so the vendor's answer moves with how it is
+solved; this is one of the three problems the vendor reruns under its `Improve Joint
+Convergence` option, described under [Methodology](#methodology).
 
 Every input class matches the vendor model: the
 rock's E, ν and γ, the joints' normal and shear stiffness, cohesion, friction angle and tensile
@@ -381,11 +392,16 @@ set at 40 m spacing. The rock is elastic — the vendor's `Plasticity Specificat
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| *no lock* | 1.7 | 1.65 vs 1.7 (−2.9%) | 1.65 / 1.86 |
+| 1.818 *reported, no lock* | 1.7 (+6.9%) | 1.65 vs 1.7 (−2.9%) | 1.65 / 1.86 |
 
 This row is the corpus's hardest to settle. Four of its nine trials do not settle within the
-250,000-sweep budget, and two of the four are the ends of the bracket, so the search cannot close
-and the row prints no factor.
+250,000-sweep budget, and two of the four are the ends of the bracket, 1.808594 and 1.828125, so
+the search cannot close: the row reports the bracket's midpoint but does not lock it.
+
+The reported value stands above UDEC and above the vendor's default, and between the vendor's
+own two numbers: its two solution schemes give 1.65 and 1.86 on the same model, the widest spread
+in the manual. The vendor needed its `Improve Joint Convergence` option to rerun
+this problem, and it reaches a different answer with it.
 
 A step of refinement — a 2D size of 8.4 m, which takes the mesh from 21,659 nodes and 3,056
 interface elements to 29,765 and 3,514 — settles two more of the nine and brackets a factor one
@@ -408,12 +424,17 @@ slabs between them are free to slide out. The rock is Mohr-Coulomb (γ = 26.1 kN
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| *no lock* | 1.27 | 1.25 vs 1.27 (−1.6%) | 1.25 / 1.31 |
+| 1.271 *reported, no lock* | 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | 1.25 / 1.31 |
 
-The row prints no factor, and what holds it back is the mesh rather than the budget. Every trial
-settles, the longest in 225,001 sweeps of the 250,000 allowed, but a step of refinement to a 2D
-size of 8.4 m — which takes the mesh from 13,134 nodes and 1,864 interface elements to 25,232 and
-2,654 — moves the factor by two steps of the search, where the row's tolerance is one.
+The row reports a factor but does not lock one, and what holds it back is the mesh rather than
+the budget. Every trial settles, the longest in 225,001 sweeps of the 250,000 allowed, but a step
+of refinement to a 2D size of 8.4 m — which takes the mesh from 13,134 nodes and 1,864 interface
+elements to 25,232 and 2,654 — moves the factor by two steps of the search, where the row's
+tolerance is one.
+
+The reported value matches UDEC and sits between the vendor's two numbers, 1.25 and 1.31: the
+vendor's own answer moves with its solution scheme on this model by more than the mesh moves
+XSLOPE's.
 
 It is the only row in the corpus whose factor moves with the mesh: repeatable, but an answer that
 belongs to the mesh rather than to the slope. Every other row that states a refinement step either
@@ -1059,13 +1080,13 @@ changes what a faithful transcription is.
 - **Every model relieves a slipping joint's stiffness.** All 23 vendor files carry
   `joint_stiffness_flag: 1` with `joint_stiffness_factor: 0.01`: the stiffness of a joint past its
   strength criterion is dropped a hundredfold in the assembled matrix. XSLOPE has the same relief
-  (`joint_tangent`, at the vendor's own factor) and the corpus runs without it. Turned on, it takes
-  [problem 1a](#rj-1a)'s bracket down two steps of the search, onto the factor RS2 and UDEC both report
-  for that case, so it is the departure that places the two of them below the closed form on the
-  toppling rows. It is off here because of what it does to the
-  iteration on a column stack, where almost every closed pair is slipping: taking all but a
-  hundredth of the interface shear stiffness out of the matrix leaves the assembly with very little
-  lateral stiffness in it, and the model runs away rather than settling sooner.
+  (`joint_tangent`, at the vendor's own factor) and the corpus runs without it. It changes how the
+  solver reaches a state, not the state it reaches, so on a model whose trials decide either way it
+  returns the same bracket: [problem 1a](#rj-1a) and [problem 2](#rj-2) lock on the same two trials
+  with it on and off, and on problem 1a it reaches the failing verdict in a tenth of the sweeps. On
+  the reinforced walls and embankments of the [RS2 corpus](rs2.md) and the FEM-3 tutorial it does
+  move brackets, by one to four steps of the search in either direction, which is why it is a
+  switch rather than the default and why every row here is run without it.
 - **Every model reduces the rock's tensile strength with the trial factor.** All 23 vendor files
   carry `tensilestrength_SRF: 1`, so RS2 divides the tensile cap by the trial factor as it divides
   cohesion and friction. The corpus runs that setting on [problem 19](#rj-19), the one problem where

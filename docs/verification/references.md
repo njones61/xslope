@@ -203,6 +203,9 @@ Engineers).
   slopes based on the Hoek–Brown failure criterion. *International Journal of
   Rock Mechanics & Mining Sciences* 45(5), 689–700.
   [doi:10.1016/j.ijrmms.2007.08.010](https://doi.org/10.1016/j.ijrmms.2007.08.010)
+- Lorig, L. & Varona, P. (2004). Numerical analysis. In Wyllie, D.C. & Mah,
+  C.W. (eds), *Rock Slope Engineering: Civil and Mining*, 4th ed., Spon Press,
+  London, 218–244.
 - Loukidis, D., Bandini, P. & Salgado, R. (2003). Stability of seismically
   loaded slopes using limit analysis. *Géotechnique* 53(5), 463–479.
   [doi:10.1680/geot.2003.53.5.463](https://doi.org/10.1680/geot.2003.53.5.463)

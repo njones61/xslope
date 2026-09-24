@@ -521,17 +521,17 @@ Then `Joint = Yes`,
 the sheet as a slip surface,
 [xslope_base_geotextile_jointed.xlsx](files/xslope_base_geotextile_jointed.xlsx):
 
-<!-- test: file=files/xslope_base_geotextile_jointed.xlsx, type=fem_ssrm, expected_fs=1.559, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-jointed-ssrm -->
+<!-- test: file=files/xslope_base_geotextile_jointed.xlsx, type=fem_ssrm, expected_fs=1.566, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-jointed-ssrm -->
 
->>**FS = 1.559**
+>>**FS = 1.566**
 
 ![The deformed blocks with the geotextile as a slip surface, its two faces colored by slip](images/fem03_deform_sheet_jointed.png){width=1000}
 
 ![Shear strain, the same sheet as a slip surface](images/fem03_shear_sheet_jointed.png){width=1000}
 
-The two agree to within one bisection step, and the strain fields show the
-same failure in both. The soft clay squeezes out from under the embankment: the
-strain sits deep in the clay under both shoulders and comes up outside the
+The two agree exactly, and the strain fields show the same failure in both.
+The soft clay squeezes out from under the embankment: the strain sits deep in
+the clay under both shoulders and comes up outside the
 toes, while the fill above rides on it almost intact. The sheet lies across
 that mechanism and is stretched by it, to its full 100 kN/m over the middle of
 its length in both runs. Very little soil moves along it: 8 of its 55 spans
@@ -598,7 +598,7 @@ safer than it is.
 
 | model | interface δ | as a bonded bar | as a slip surface |
 | --- | :---: | :---: | :---: |
-| base geotextile on soft clay | 20° | 1.566 | 1.559 |
+| base geotextile on soft clay | 20° | 1.566 | 1.566 |
 | smooth geomembrane liner | 10° | 2.167 | 1.285 |
 
 Between them the two pairs bracket the rule. Where the failure does not run

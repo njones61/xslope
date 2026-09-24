@@ -23,6 +23,19 @@ CONFIG = PageConfig(
         ('1.011', 'every unit weight scaled by'),
         # problem 17's staircase runs in metres of the section, not in factors
         ('3.66', 'where it says 3.19011'),
+        # problem 2: the 0.76 is what Alejano & Alonso PRINT for their own
+        # Goodman & Bray recursion; the page recomputes it as 0.7734.
+        ('0.76', 'against the 0.76 Alejano'),
+        ('0.76', 'their Goodman & Bray 0.76,'),
+        # problems 3, 5 and 6 are reported without a lock (the search does not
+        # decide, or the mesh moves the answer): the value is the midpoint of
+        # the bracket in the committed run record (rj003/rj005/rj006_fem_meta),
+        # shown beside the vendor's two numbers by ruling, never tagged.
+        ('1.213', 'reported, no lock'),
+        ('1.213', 'The search brackets 1.213 between 1.203'),
+        ('1.203', 'The search brackets 1.213 between 1.203'),
+        ('1.818', 'reported, no lock'),
+        ('1.271', 'reported, no lock'),
     ],
 
     abs_bounds=[

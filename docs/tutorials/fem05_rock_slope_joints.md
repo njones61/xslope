@@ -382,18 +382,17 @@ about a minute and a half and reports
 
 >>**FS = 1.105**
 
-![Joint slip on the toppling stack: the base plane slipping along most of its length, the column joints opened along their lower parts and in contact only at their tops](images/fem05_joint_slip_topple.png){width=1000}
-
 ![The deformed blocks: the columns lean out over the base plane rather than sliding along it](images/fem05_fem_blocks_topple.png){width=1000}
 
-Read the deformed-block figure first. The columns are separate bodies and they
-move as bodies, but they do not slide down the base plane the way part 1's slab
+The columns are separate bodies and they move as bodies, but they do not slide down the base plane the way part 1's slab
 slid down its bedding plane. Each column rotates
 forward about its own downslope corner, opening the joint behind it and closing
 the joint in front. That is **block toppling**, and it is the mechanism the
 method was built for: every bit of the movement is taken up on the contacts, and
 the factor of safety is the factor by which the contacts have to be weakened
 before the stack starts to go over.
+
+![Joint slip on the toppling stack: the base plane slipping along most of its length, the column joints opened along their lower parts and in contact only at their tops](images/fem05_joint_slip_topple.png){width=1000}
 
 The joint slip figure shows the same mechanism as contact states. Each column
 joint has opened along its lower part and is in contact only near the top: a

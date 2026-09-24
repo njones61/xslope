@@ -113,9 +113,11 @@ def _fs_title(base, F, fs=None, at_failure=False):
 
     Normal (converged) panels are rendered at the LAST CONVERGED strength-reduction
     factor (``solution['F']``); the reported factor of safety is the SSRM bracket
-    midpoint (``result['FS']``), which at a wide tolerance can round differently. When
-    both are known and differ at two-decimal display, the title names both; otherwise
-    it keeps the simple ``F = X.XX`` form (or just ``base`` when no F is available).
+    midpoint (``result['FS']``), which is half a bisection step above it. Factors are
+    printed to three decimals, the convention every LEM result uses, so the two
+    differ whenever the bracket is wider than 0.001 and the title then names both;
+    it keeps the simple ``F = X.XXX`` form only when they agree at that precision
+    (or just ``base`` when no F is available).
 
     ``at_failure`` marks a panel rendering the UNCONVERGED at-failure field (captured
     a margin beyond critical). It leads with the factor of safety and stops there —
@@ -123,12 +125,12 @@ def _fs_title(base, F, fs=None, at_failure=False):
     parenthetical naming the trial F would only repeat that disclosure as noise.
     """
     if at_failure and fs is not None:
-        return f"{base}  FS = {fs:.2f}"
+        return f"{base}  FS = {fs:.3f}"
     if F is None:
         return base
-    if fs is None or f"{fs:.2f}" == f"{F:.2f}":
-        return f"{base}  F={F:.2f}"
-    return f"{base}  FS = {fs:.2f} (rendered at last converged F = {F:.2f})"
+    if fs is None or f"{fs:.3f}" == f"{F:.3f}":
+        return f"{base}  F = {F:.3f}"
+    return f"{base}  FS = {fs:.3f} (last converged F = {F:.3f})"
 
 
 #: What the viscoplastic maximum shear strain field is called — the name the
@@ -943,7 +945,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         fs: Optional SSRM factor of safety (the bracket-midpoint result['FS']). When
             given and it differs at display rounding from the last-converged F the
             field was rendered at (solution['F']), the panel titles name both — e.g.
-            "FS = 0.45 (rendered at last converged F = 0.43)". When omitted or equal
+            "FS = 0.455 (last converged F = 0.445)". When omitted or equal
             at two decimals, titles keep the simple "F = X.XX" form.
         failure_solution: Optional at-failure (unconverged) solve_fem field captured by
             solve_ssrm (result['failure_solution']). When given, the deformation and

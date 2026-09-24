@@ -304,9 +304,9 @@ ground surface to (9, 12) above the tip.
 | 14.000 | 12.000 |
 | 9.000 | 12.000 |
 
-The second is the **Build network…** dialog, reached from the button beside the
-joints editor's list, which says *what* the set is. Its fields are walked in the
-order they appear on it.
+The second input to build a joint network is the **Build network…** dialog,
+reached from the button beside the joints editor's list, which says *what* the
+set is. Its fields are walked here in the order they appear on it.
 
 ![The Build network dialog describing the column set](images/fem05_studio_build_network.png){width=760}
 

@@ -410,7 +410,7 @@ away as one body; everything says it is going over.
 
 ### What a network costs
 
-A set is cheap to describe and not cheap to solve. Every trace splits the mesh,
+A joint network is cheap to describe and not cheap to solve. Every trace splits the mesh,
 every split copies the nodes along it, and every pair of copies carries an
 interface element that has to reach an equilibrium of its own. Here is the same
 region at three spacings, meshed at the same 1.5 m target size:

@@ -199,9 +199,19 @@ strength and a dilation angle, rather than a hyperbolic or work-softening law.
 
 That covers the mechanisms a jointed slope usually fails by — block toppling, flexural toppling,
 plane failure, step-path failure through rock bridges, plowing slabs, a mass cut into many small
-blocks, a block wall sliding and tipping on its courses, an embankment sliding on its base sheet. It
-does not cover a mass that moves far enough to come to rest against surfaces the section does not
-already carry; that is what a distinct-element code is for.
+blocks, a block wall sliding and tipping on its courses, an embankment sliding on its base sheet.
+
+**The short version for practice.** The factor of safety a jointed strength reduction reports is
+valid: it is the factor by which the joint strengths can be reduced before the mass starts to move,
+which is the same quantity the closed forms and a distinct element strength reduction report. On
+the problems that have a closed form the method reproduces them — a slab on a daylighting bedding
+plane to within a bisection step of tan φ / tan β, the block toppling stacks of Goodman & Bray to
+within a few percent ([Tutorial FEM-5](../tutorials/fem05_rock_slope_joints.md) works the first by
+hand). What the method does not answer is anything about the movement after that point: how far
+the blocks travel, where they come to rest, or what they strike on the way. The deformed section
+at failure shows the mechanism that starts, not the run-out. Those questions need a distinct
+element program such as UDEC, in which blocks separate, rotate through large angles and make new
+contacts as they go, or a rockfall program that follows each block down the slope.
 
 The element's own law — the peak limit, the residual drop and the opening a dilating joint produces
 per unit of slip — is checked against its closed forms by `test/joint_element_check.py`.

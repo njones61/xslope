@@ -343,9 +343,11 @@ cuts whatever is chosen there to a range of elevations — "the sandstone above
 elevation 40" — and is left open at both ends here.
 
 The dialog previews the traces on the canvas as the fields change, and **OK**
-writes exactly what the preview showed. Over this region that set comes to
-**five** traces. They are ordinary rows on the joints worksheet from then on, and
-can be edited like any other row. The description that produced them is not
+writes exactly what the preview showed to the joints worksheet — the same
+worksheet the two lines of Part 1 were typed into — one row per trace, named
+`col-01` onward. Over this region that set comes to **five** traces, so five
+rows. They are ordinary rows from then on, and can be edited like any other
+row. The description that produced them is not
 stored, so a set is changed by deleting its rows and building another.
 
 The base of the stack is typed by hand, because it is one surface rather than a

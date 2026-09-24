@@ -471,12 +471,19 @@ to stay small, because the element is written on the undeformed section. And the
 joint obeys Mohr-Coulomb with a residual strength and a dilation angle rather
 than a softening law.
 
-The short version for practice: this method answers whether a jointed mass
-starts to move, and on which surfaces — not how far the blocks travel, where
-they come to rest, or what they strike on the way. Those questions need a
-distinct element program such as UDEC, in which blocks separate, rotate through
-large angles and make new contacts as they go, or a rockfall program that
-follows each block down the slope.
+The short version for practice. The factor of safety this method reports is
+valid: it is the factor by which the joint strengths can be reduced before the
+mass starts to move, which is the same quantity the closed forms and a distinct
+element strength reduction report, and on the problems that have a closed form
+it reproduces them — Part 1's slab to within a bisection step of tan φ / tan β,
+and the block toppling stacks of the verification corpus to within a few
+percent of Goodman & Bray. What the method does not answer is anything about
+the movement after that point: how far the blocks travel, where they come to
+rest, or what they strike on the way. The deformed section at failure shows
+the mechanism that starts, not the run-out. Those questions need a distinct
+element program such as UDEC, in which blocks separate, rotate through large
+angles and make new contacts as they go, or a rockfall program that follows
+each block down the slope.
 
 [Joints and Interface Elements](../fem/joints.md) carries the formulation, the
 full input list and the rest of the reading.

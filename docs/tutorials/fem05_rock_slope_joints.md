@@ -384,7 +384,8 @@ about a minute and a half and reports
 
 ![The deformed blocks: the columns lean out over the base plane rather than sliding along it](images/fem05_fem_blocks_topple.png){width=1000}
 
-The columns are separate bodies and they move as bodies, but they do not slide down the base plane the way part 1's slab
+Read the deformed-block figure first. The columns are separate bodies and they
+move as bodies, but they do not slide down the base plane the way Part 1's slab
 slid down its bedding plane. Each column rotates
 forward about its own downslope corner, opening the joint behind it and closing
 the joint in front. That is **block toppling**, and it is the mechanism the

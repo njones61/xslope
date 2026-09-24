@@ -971,6 +971,137 @@ def _leg_certified_slip(failures, results):
 
 
 # --------------------------------------------------------------------------
+# The settled state's joint history, carried into a trial; the hold test
+# --------------------------------------------------------------------------
+
+#: A block on a plane just steeper than its joint can hold without help from
+#: the ends: tan 21 / tan 20 = 1.0547. Settling the K0 field at full strength
+#: slides the pairs near the slab's ends onto their limit, so the settled state
+#: carries real slip, and one bisection step past 1.0547 the block runs.
+ROW_HIST = dict(ROW2, phi_j=21.0)
+
+
+def _settled(fem_data, prep):
+    """The K0 in-situ state at full strength, as solve_ssrm settles it."""
+    from xslope import fem as _fem
+    with contextlib.redirect_stdout(io.StringIO()):
+        eq = solve_fem(fem_data, F=1.0, k0=1.0, _prepared=prep,
+                       fast_kernel=False, max_disp_factor=None,
+                       max_iterations=20000, max_iterations_ceiling=20000,
+                       _corrector_rungs=_fem._K0_CORRECTOR_CHECKPOINTS)
+    return eq
+
+
+def _leg_history_carried(failures, results):
+    """A trial at F = 1 from the settled state does not move.
+
+    The settled state is an equilibrium at full strength, so a trial at F = 1
+    started on it has nothing to do. That holds only if the trial starts with
+    the slip the joints took while the state settled: with the slip zeroed, the
+    pairs that slid are loaded back onto their limit and the block moves. Read on
+    both drivers a trial can run on, and, as the control that makes the leg
+    falsifiable, with the history dropped.
+    """
+    from xslope import fem as _fem
+    _d, fd, g = slab_model(**ROW_HIST)
+    prep = _fem._prepare_fem_model(fd, k0=1.0)
+    eq = _settled(fd, prep)
+    st = eq['_k0_state']
+    jh = (st or {}).get('joint')
+    if not eq['converged'] or jh is None:
+        failures.append("history: the settled state was not reached, or carries "
+                        "no joint history")
+        return
+    n_slid = int(np.count_nonzero(np.abs(jh['slip_p']) > 1e-9))
+    if n_slid == 0:
+        failures.append("history: no pair slid while the state settled, so the "
+                        "leg reads nothing")
+    kw = dict(k0=1.0, _prepared=prep, fast_kernel=False, max_disp_factor=None,
+              max_iterations=20000, max_iterations_ceiling=20000)
+    moved = {}
+    for label, state in (('carried', st), ('dropped', dict(st, joint=None))):
+        for driver in ('auto', 'newton'):
+            with contextlib.redirect_stdout(io.StringIO()):
+                tr = solve_fem(fd, F=1.0, fem_solver=driver, _init_state=state,
+                               **kw)
+            moved[(label, driver)] = float(tr['max_displacement'])
+            if label != 'carried':
+                continue
+            if not tr['converged']:
+                failures.append(f"history ({driver}): the trial at F = 1 from "
+                                f"the settled state does not converge")
+            if tr['max_displacement'] >= 1e-9:
+                failures.append(
+                    f"history ({driver}): the trial at F = 1 from the settled "
+                    f"state moves {tr['max_displacement']:.3e} m (must be "
+                    f"< 1e-9)")
+            if driver == 'auto' and tr.get('corrector') is not None:
+                failures.append("history (auto): the trial at F = 1 needed the "
+                                "corrector to stand on its own settled state")
+            if driver == 'auto':
+                results.append(f"history  carried: F = 1 from the settled state "
+                               f"converges in {tr['iterations']} sweeps, moves "
+                               f"{tr['max_displacement']:.1e} m "
+                               f"({n_slid} pairs slid while settling)")
+    # The control: the same trial with the slip zeroed must move, or the leg
+    # cannot tell the fix from its absence.
+    if max(moved[('dropped', 'auto')], moved[('dropped', 'newton')]) < 1e-7:
+        failures.append("history: with the history dropped the trial does not "
+                        "move either, so the fixture does not discriminate")
+    results.append(f"history  dropped: the same trial moves "
+                   f"{moved[('dropped', 'auto')]:.1e} m (sweep) / "
+                   f"{moved[('dropped', 'newton')]:.1e} m (Newton)")
+
+
+def _leg_hold_test(failures, results):
+    """The hold test accepts a state the plain sweep stays on, and refuses one
+    it walks off.
+
+    The settled block at F = 1 is a fixed point of the sweep: continued at F = 1
+    it must hold. The same state one bisection step past the closed form
+    (F = 1.08 against 1.0547) is a block on a joint past its limit: continued
+    there it must not. A corrector-certified trial on a jointed model carries
+    the reading on its corrector record.
+    """
+    from xslope import fem as _fem
+    _d, fd, g = slab_model(**ROW_HIST)
+    prep = _fem._prepare_fem_model(fd, k0=1.0)
+    eq = _settled(fd, prep)
+    st = eq['_k0_state']
+    hk = dict(k0=1.0, _prepared=prep, fast_kernel=False, max_disp_factor=None)
+    with contextlib.redirect_stdout(io.StringIO()):
+        keep = _fem.corrector_hold_test(fd, 1.0, st, **hk)
+        drift = _fem.corrector_hold_test(fd, 1.08, st, **hk)
+    if not keep['held']:
+        failures.append(f"hold: the settled state at F = 1 is refused "
+                        f"({keep['verdict']}, {keep['sweeps']} sweeps, drift "
+                        f"{keep['drift_u_el']} u_el)")
+    if drift['held']:
+        failures.append(f"hold: the block past its limit (F = 1.08) is accepted "
+                        f"({drift['verdict']}, drift {drift['drift_u_el']} u_el)")
+    results.append(f"hold  F = 1: held in {keep['sweeps']} sweeps, drift "
+                   f"{keep['drift_u_el']:.1e} u_el; F = 1.08: refused "
+                   f"({drift['verdict']}, {drift['sweeps']} sweeps, drift "
+                   f"{drift['drift_u_el']:.2f} u_el)")
+    # On the trial path: a certified jointed trial records the hold it passed.
+    with contextlib.redirect_stdout(io.StringIO()):
+        tr = solve_fem(fd, F=1.03, _init_state=st, max_iterations=20000,
+                       max_iterations_ceiling=20000, **hk)
+    c = tr.get('corrector') or {}
+    h = c.get('hold')
+    if not c:
+        failures.append("hold: the trial at F = 1.03 was not certified, so the "
+                        "record is not read")
+    elif h is None or not h.get('held') or not h.get('sweeps'):
+        failures.append(f"hold: the certified trial's corrector record carries "
+                        f"no passed hold test ({h})")
+    else:
+        results.append(f"hold  certified trial F = 1.03: {c['checkpoint']}, "
+                       f"hold {h['sweeps']} sweeps, drift "
+                       f"{h['drift_u_el']:.1e} u_el")
+
+
+# --------------------------------------------------------------------------
 # The tension cutoff and the tied end
 # --------------------------------------------------------------------------
 
@@ -1225,6 +1356,8 @@ def run():
     _leg_infinite(failures, results)
     _leg_opening_and_ties(failures, results)
     _leg_certified_slip(failures, results)
+    _leg_history_carried(failures, results)
+    _leg_hold_test(failures, results)
     _leg_crossing_stiffness(failures, results)
     _leg_untouched(failures, results)
     _leg_stiffness(failures, results)

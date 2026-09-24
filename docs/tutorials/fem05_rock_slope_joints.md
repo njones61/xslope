@@ -182,9 +182,10 @@ mesh in their own style instead, which is how to tell that the split happened.
 
 Open **Run → Run FEM…**. The analysis is **SSRM**, the bracket is *F* from
 **1.0** to **2.0** and the tolerance is **0.01**, all of which are the defaults.
-Two settings further down the dialog, **Max iterations per trial** and **Failure
-criterion**, need changing from their defaults for a jointed model;
-[FEM-3](fem03_block_wall_joints.md#running-the-wall-alone) explains why.
+Two settings further down the dialog matter for a jointed model: **Max iterations
+per trial**, which has to be raised, and **Failure criterion**, which the dialog
+has already set to Hybrid;
+[FEM-3](fem03_block_wall_joints.md#running-the-wall-alone) explains both.
 
 ![Run FEM on the meshed slab: SSRM, the default bracket, a raised sweep budget and the Hybrid criterion](images/fem05_studio_run_fem.png){width=760}
 

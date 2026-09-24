@@ -203,18 +203,22 @@ nearer three on an install that does not carry the
 
 >>**FS = 1.199**
 
-Two figures come out of it, and neither is the shear strain field the other
-finite element tutorials read. The rock is elastic, so no part of it can strain
-plastically and there is no strain field to draw. Everything that happened,
-happened on the two lines, and the results panel says so: the section is a flat
-gray and the only colorbar is **Joint slip**, in metres.
+The results view shows one panel at a time, picked from **Plot type** in the
+display panel: **Shear strain**, **Deformed mesh** or **Displacement vectors**,
+the same three every finite element tutorial reads. On this model they come down
+to two pictures. The rock is elastic, so no part of it can strain plastically
+and there is no strain field to draw; everything that happened, happened on the
+two lines, and **Shear strain** draws as **Joint slip** instead: the section a
+flat gray, and the only colorbar the slip on the joints, in metres.
 
 ![The joint slip at the critical factor: the bedding plane bright along nearly its whole length, the release joint gray with a tick where it has opened](images/fem05_joint_slip.png){width=1000}
 
-The second is the panel a jointed model draws in place of the displacement arrow
-field: the deformed mesh, drawn as the **blocks** the joints cut the section
-into, with the slab under a tint of its own, the joint faces colored by how far
-they have slid, and the undeformed outline dashed behind it.
+**Deformed mesh** is the second picture. On a jointed model it is the deformed
+section drawn as the **blocks** the joints cut it into, with the slab under a
+tint of its own, the joint faces colored by how far they have slid, and the
+undeformed outline dashed behind it. (**Displacement vectors** draws these same
+blocks on a jointed model: an arrow field sampled at the nodes cannot show
+bodies moving on their joints.)
 
 ![The deformed blocks at the critical factor: the slab has moved down the bedding plane and away from the release joint](images/fem05_fem_blocks.png){width=1000}
 

@@ -211,34 +211,33 @@ and there is no strain field to draw; everything that happened, happened on the
 two lines, and **Shear strain** draws as **Joint slip** instead: the section a
 flat gray, and the only colorbar the slip on the joints, in metres.
 
-![The joint slip at the critical factor: the bedding plane bright along nearly its whole length, the release joint gray with a tick where it has opened](images/fem05_joint_slip.png){width=1000}
+![The joint slip at the critical factor: the bedding plane bright along nearly its whole length, the release joint drawn as two parted lines where it has opened](images/fem05_joint_slip.png){width=1000}
 
 The color is the slip, and it reads the way the slab moved: along the bedding
 plane it grows from 0.18 mm at the release joint to 0.39 mm at the toe, the
 whole plane sliding as one surface. The release joint is gray because it has not
 slid; it has **opened**. A joint whose two faces have parted carries no normal
-stress and so no shear, and the panel draws a short tick across each stretch
-that has parted, which is what the line under the title says. The release joint
+stress and so no shear, and the panel draws a parted stretch as its two faces
+apart: two thin lines with a gap between them, along the whole length that
+parted. The key in the corner names the three states a joint can be in — closed
+and not slipping, slipping, opened. The release joint
 has opened along nearly its whole height, from where it meets the bedding plane
 up to about 1.4 m below the crest — the slab has pulled away from the rock behind
 it, which is what a release joint is for — and only that top 1.4 m is still
-closed and sliding, the one green length on it. The bedding plane has a tick of
-its own at the toe, where one short stretch at its daylighting end has parted.
+closed and sliding, the one green length on it. The bedding plane shows one
+short parted stretch of its own at the toe, at its daylighting end.
 
 **Deformed mesh** is the second picture. On a jointed model it is the deformed
 section drawn as the **blocks** the joints cut it into, with the slab under a
 tint of its own, the joint faces colored by how far they have slid, and the
-undeformed outline dashed behind it. (**Displacement vectors** draws these same
-blocks on a jointed model: an arrow field sampled at the nodes cannot show
-bodies moving on their joints.)
+undeformed outline dashed behind it. On a jointed model, **Displacement
+vectors** shows this same picture.
 
 ![The deformed blocks at the critical factor: the slab has moved down the bedding plane and away from the release joint](images/fem05_fem_blocks.png){width=1000}
 
 The slab has moved as one body. It slid down the bedding plane and parted from
 the release joint, and every bit of that movement was taken up on the two lines;
-nothing inside the slab deformed at all. An arrow field sampled at the nodes
-would have shown the same rigid translation and missed the thing that produced
-it.
+nothing inside the slab deformed at all.
 
 ---
 
@@ -263,17 +262,11 @@ plane and a dip of β = 35°,
 
 against the run's **1.199**.
 
-The joint slip figure says the second thing. At the last standing trial,
-**16 of the bedding plane's 17 node pairs are slipping**, with the two faces
-0.39 mm apart at the most. On the release joint **one pair of nine is slipping
-and eight have opened**. The bedding plane is carrying the whole mechanism; the
-release joint is not sliding at all, it is parting — the slab stands away from
-it, which is what the tick across the line marks. A vertical surface under a
-slab that is moving down and out has the slab's weight pulling away from it
-rather than along it, so there is almost no shear on it to resist. That is why
-its friction angle is not in the hand check — and the model agrees: change the
-release joint's `phi` from 40° to 25° and run again, and the factor of safety
-comes back 1.199.
+The hand check uses only the bedding plane's friction angle. The release
+joint's does not appear, and the joint slip figure shows why: the release joint
+has opened, and an open joint carries no normal force, so it has no friction to
+offer whatever its φ. The model agrees. Change the release joint's `phi` from
+40° to 25° and run again: the factor of safety comes back **1.199**, unchanged.
 
 ---
 
@@ -284,10 +277,22 @@ rock mass is not described one line at a time: it is described by **sets** — a
 dip, a spacing, and how far the joints persist — and the same slope with a set of
 joints through it fails by a different mechanism entirely.
 
-Two inputs make a set. The first is a **joint region**: a polygon whose **Type**
-is `joints`, which says *where* in the section the set exists. Only the region's
-outline matters; it carries no material and no strength of its own. The one on
-this model covers the wedge of rock above the base plane:
+Two inputs make a set. The first says *where* in the section the set exists,
+and there are three ways to say it: leave the region blank and the set fills the
+whole section; name a material, or several, and the set fills the zones that
+carry it — a bedding set confined to one rock unit; or draw a **joint region**,
+a polygon whose **Type** is `joints`, for ground no material boundary outlines.
+A joint region is only an outline: it carries no material and no strength of its
+own. This model needs one, because the columns belong to the wedge of rock above
+the base plane, which is not a material of its own.
+
+The region is entered in the polygons editor, reached from the Inputs tree
+under **Polygons**, the same editor the section itself is in. Add a polygon, set
+its **Type** to `joints`, name it `Toppling zone`, and enter four vertices. The
+shape is the wedge the base plane cuts off, the counterpart of Part 1's slab:
+from the base plane's upper tip at (9, 6.887), down the plane to the toe at
+(20.928, 0), up the face to the crest at (14, 12), and back along the ground
+surface to (9, 12) above the tip.
 
 | Joint region | x | y |
 | --- | ---: | ---: |

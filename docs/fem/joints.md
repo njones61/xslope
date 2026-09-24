@@ -302,11 +302,12 @@ Each interface is drawn as a thin line on the line it runs along, colored by how
 have slid, on a colorbar titled *Joint slip*: a green ramp, because the strain field under it runs
 blue through white to red. A slipping span is backed by a thin white stroke so it reads over a dark
 field; a joint that is not slipping is a neutral gray hairline; a stretch that has **opened** is
-marked with a short tick across the line rather than given a color, because opening is a condition
-and not a quantity. A model where no joint slipped carries no colorbar. The weight is deliberate: a
-generated network puts hundreds of traces over the field.
+drawn as its two faces apart — two thin lines with a white gap between them, along the whole
+stretch that parted — rather than given a color, because opening is a condition and not a quantity.
+A key in the corner of the panel names the three states. A model where no joint slipped carries no
+colorbar. The weight is deliberate: a generated network puts hundreds of traces over the field.
 
-![Joint slip on a toppling stack at its critical factor: each joint colored by how far its faces have slid, gray where it has not slipped, a short tick across it where it has opened](../tutorials/images/fem05_joint_slip_topple.png){width=900}
+![Joint slip on a toppling stack at its critical factor: each joint colored by how far its faces have slid, gray where it has not slipped, drawn as two lines with a gap between them where it has opened](../tutorials/images/fem05_joint_slip_topple.png){width=900}
 
 On a jointed model the displacement panel is the scaled deformed mesh rather than an arrow field,
 drawn as the **blocks** the joints cut the section into — each block under a faint tint of its own,

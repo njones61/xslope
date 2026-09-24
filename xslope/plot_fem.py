@@ -946,7 +946,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             given and it differs at display rounding from the last-converged F the
             field was rendered at (solution['F']), the panel titles name both — e.g.
             "FS = 0.455 (last converged F = 0.445)". When omitted or equal
-            at two decimals, titles keep the simple "F = X.XX" form.
+            at three decimals, titles keep the simple "F = X.XXX" form.
         failure_solution: Optional at-failure (unconverged) solve_fem field captured by
             solve_ssrm (result['failure_solution']). When given, the deformation and
             displacement-vector panels render it — the runaway rotational mechanism

@@ -13,11 +13,11 @@ run as **joint lines** — lines the mesh is split along, with an interface elem
 holding the two faces together — and how to read the answer a strength reduction
 gives when the joints are the only thing it can weaken.
 
-We do it twice on the same face. First on a slope cut by two joints, where the
-mechanism is a single slab sliding out and the factor of safety can be checked
-by hand on the back of an envelope. Then on the same slope cut by a whole set of
-them, generated from a dip and a spacing rather than typed one line at a time,
-where the rock breaks into columns that tip instead of sliding.
+We do it twice on the same face. **Part 1** takes a slope cut by two joints,
+where the mechanism is a single slab sliding out and the factor of safety can be
+checked by hand on the back of an envelope. **Part 2** takes the same slope cut
+by a whole set of them, generated from a dip and a spacing rather than typed one
+line at a time, where the rock breaks into columns that tip instead of sliding.
 
 Strength reduction itself, the mesh and the convergence controls are covered in
 [FEM-1](fem01_strength_reduction.md), and are not repeated here. There is a
@@ -53,7 +53,15 @@ reduction beside it, so it can be opened and read without running anything
 
 ---
 
-## The problem
+## Part 1 — A slab on two joints
+
+The first pass is the simplest jointed slope there is: one slab, sitting on a
+bedding plane it can slide along, with a release joint behind it that lets it
+go. It is small enough to check by hand, and that is the point. The run has to
+reproduce a number we can work out on paper before the method is trusted on
+anything larger.
+
+### The slope and its two joints
 
 ![A 12 m rock face at 60 degrees, cut by a bedding plane dipping 35 degrees out of the face and a vertical release joint 2 m behind the crest](images/fem05_problem_sketch.png){width=1000}
 
@@ -74,7 +82,7 @@ worked out on paper and compared against the run's, which
 
 ---
 
-## Opening the starter file
+### Opening the starter file
 
 Download
 [xslope_rock_joints_start.xlsx](files/xslope_rock_joints_start.xlsx) and open it
@@ -90,7 +98,7 @@ in. The joints worksheet is empty; we fill it next.
 
 ---
 
-## Entering the two joint lines
+### Entering the two joint lines
 
 A joint line is a straight segment with a strength on it. Studio keeps them on
 the **joints** worksheet, which is reached from the Inputs tree under
@@ -133,7 +141,7 @@ be told at a glance from a line it will not:
 
 ---
 
-## Why the rock is elastic
+### Why the rock is elastic
 
 The rock carries the **elastic** strength option, and that turns this run into a
 test of the joints. A strength reduction divides every strength it can
@@ -150,7 +158,7 @@ model should start.
 
 ---
 
-## Building the mesh
+### Building the mesh
 
 Build the mesh with **Run → Build Mesh…**: element type **tri6** and a target
 size of **1.5 m**, which is about an eighth of the height of the face and fine
@@ -171,7 +179,7 @@ mesh in their own style instead, which is how to tell that the split happened.
 
 ---
 
-## Running the slab
+### Running the slab
 
 Open **Run → Run FEM…**. The analysis is **SSRM**, the bracket is *F* from
 **1.0** to **2.0** and the tolerance is **0.01**, all of which are the defaults.
@@ -217,7 +225,7 @@ it.
 
 ---
 
-## Checking the answer by hand
+### Checking the answer by hand
 
 A slab sliding on a plane has a factor of safety short enough to write on one
 line, so we can work it out before looking at what the run reported.
@@ -252,7 +260,7 @@ comes back 1.199.
 
 ---
 
-## Part 2 — generating a joint network
+## Part 2 — Generating a joint network
 
 One slab on two lines is the smallest jointed problem there is. A real jointed
 rock mass is not described one line at a time: it is described by **sets** — a
@@ -312,7 +320,7 @@ generated traces take the same strength.
 
 ---
 
-## Running the toppling stack
+### Running the toppling stack
 
 The completed model is
 [xslope_rock_toppling.xlsx](files/xslope_rock_toppling.xlsx). Mesh it at the same
@@ -339,7 +347,7 @@ before the stack starts to go over.
 
 ---
 
-## What a network costs
+### What a network costs
 
 A set is cheap to describe and not cheap to solve. Every trace splits the mesh,
 every split copies the nodes along it, and every pair of copies carries an

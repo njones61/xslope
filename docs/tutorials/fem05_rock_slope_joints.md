@@ -370,11 +370,13 @@ dashed behind them:
 
 ### Running the toppling stack
 
-The completed model is
-[xslope_rock_toppling.xlsx](files/xslope_rock_toppling.xlsx). Mesh it at the same
-tri6 and 1.5 m, and it comes to **1,071 nodes, 452 elements, and 41 joint
-elements on 6 jointed lines** — six lines from one typed row and five generated
-ones. Run it at the same settings as part 1. It takes about a minute and a half.
+The joints have changed, so the mesh has to be built again: **Run → Build
+Mesh…**, **tri6** at **1.5 m** as before. The dialog reports **1,071 nodes, 452
+elements, and 41 joint elements on 6 jointed lines** — six lines from one typed
+row and five generated ones. Then **Run → Run FEM…** with the same settings as
+Part 1: SSRM, the bracket from 1.0 to 2.0, tolerance 0.01, **Max iterations per
+trial** at 100,000, and the failure criterion on Hybrid. Press **Run**. It takes
+about a minute and a half and reports
 
 <!-- test: file=files/xslope_rock_toppling.xlsx, type=fem_ssrm, expected_fs=1.105, element_type=tri6, target_size=1.5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-5-topple-ssrm -->
 

@@ -471,9 +471,12 @@ to stay small, because the element is written on the undeformed section. And the
 joint obeys Mohr-Coulomb with a residual strength and a dilation angle rather
 than a softening law.
 
-The short version for practice: this method answers whether a jointed mass starts
-to move, and on which surfaces — not where the blocks end up. A run-out analysis
-is a different tool.
+The short version for practice: this method answers whether a jointed mass
+starts to move, and on which surfaces — not how far the blocks travel, where
+they come to rest, or what they strike on the way. Those questions need a
+distinct element program such as UDEC, in which blocks separate, rotate through
+large angles and make new contacts as they go, or a rockfall program that
+follows each block down the slope.
 [Joints and Interface Elements](../fem/joints.md) carries the formulation, the
 full input list and the rest of the reading.
 

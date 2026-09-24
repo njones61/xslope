@@ -72,7 +72,9 @@ H = 12.0                 # height of the face
 FACE_DIP = 60.0          # face angle, degrees from horizontal
 CREST_X = 14.0           # crest of the face
 TOE_X = CREST_X + H / math.tan(math.radians(FACE_DIP))
-X1 = 44.0                # right edge of the section
+X1 = 26.0                # right edge of the section, 5 m past the toe: the rock is
+                         # elastic and both mechanisms are behind the face, so
+                         # that is all the ground the model needs
 Y0 = -3.0                # bottom of the section
 
 GAMMA = 26.0             # kN/m3
@@ -192,10 +194,33 @@ def build_toppling():
     return sd
 
 
+#: The blocky-mass variant: the same region and base plane, filled by the
+#: Voronoi generator at this block size and seed (the figure producer draws the
+#: same tessellation), so the page can show what the generator's picture solves to.
+VORONOI_BLOCK = 2.0
+VORONOI_SEED = 7
+
+
+def build_voronoi():
+    """Part 2's blocky mass: the base plane typed by hand and the toppling zone
+    filled by the Voronoi generator instead of the column set."""
+    region = {"polygon": [(BASE_TIP_X, BASE_TIP_Y), (TOE_X, 0.0),
+                          (CREST_X, H), (BASE_TIP_X, H)],
+              "label": REGION_LABEL, "size": None}
+    sd = model(joint_zones=[region])
+    rows = xjoints.voronoi(sd, block_size=VORONOI_BLOCK, seed=VORONOI_SEED,
+                           region=f"poly:{REGION_LABEL}", label="vor",
+                           props={"c": 0.0, "phi": COL_PHI})
+    base = joint("base plane", (BASE_TIP_X, BASE_TIP_Y), (TOE_X, 0.0), COL_PHI)
+    sd["joint_lines"] = [base] + list(rows)
+    return sd
+
+
 BUILDS = {
     "start": ("xslope_rock_joints_start.xlsx", build_start),
     "slab": ("xslope_rock_joints.xlsx", build_slab),
     "toppling": ("xslope_rock_toppling.xlsx", build_toppling),
+    "voronoi": ("xslope_rock_voronoi.xlsx", build_voronoi),
 }
 
 

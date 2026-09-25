@@ -6749,7 +6749,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     rejected_latch=0, rejected_dilation=0,
                     resets=0, resets_pair=0, resets_gp=0,
                     largest_alpha=1.0, smallest_alpha=1.0,
-                    sum_alpha_accepted=0.0)
+                    sum_alpha_accepted=0.0,
+                    # How the formula's raw value fell: below zero (clamped
+                    # to the minimum), in [min, 1), above 1, and at the cap.
+                    raw_negative=0, raw_below_one=0, raw_above_one=0,
+                    raw_at_max=0)
         _acc_ref_evp = [np.empty_like(g_['evp']) for g_ in gp_groups]
         _acc_ref_slip = np.empty_like(joint_slip) if has_joints else None
         _acc_ref_dil = (np.empty_like(joint_dil)
@@ -7864,6 +7868,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         if _acc_den > 0.0:
                             _alpha = (-_acc_a_prev * float(_acc_h_prev @ _acc_dh)
                                       / _acc_den)
+                            if _alpha < 0.0:
+                                _acc['raw_negative'] += 1
+                            elif _alpha < 1.0:
+                                _acc['raw_below_one'] += 1
+                            elif _alpha >= _ACCEL_ALPHA_MAX:
+                                _acc['raw_at_max'] += 1
+                            else:
+                                _acc['raw_above_one'] += 1
                             _alpha = float(min(max(_alpha, _ACCEL_ALPHA_MIN),
                                                _ACCEL_ALPHA_MAX))
                 if _alpha != 1.0 and has_joints:

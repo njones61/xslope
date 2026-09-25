@@ -13,8 +13,11 @@ wall as far stronger than it is.
 
 This tutorial shows how to put each of those contacts into the model as a **slip
 joint** — a line the mesh is split along, with an interface element carrying the
-normal and shear stress between the two faces — and then runs the wall twice: standing on its
-own blocks, and with three layers of geogrid tied into the facing.
+normal and shear stress between the two faces — and then runs the wall, 3.6 m of
+six block courses with a 2:1 backfill slope behind it, twice: standing on its own
+blocks, and with three layers of geogrid tied into the facing.
+
+![A 3.6 m segmental block wall of six 0.6 m courses on a 3.2 m foundation, with three geogrid layers tied into the blocks and a 2:1 backfill slope behind it](images/fem03_problem_sketch.png){width=1000}
 
 Then it takes up a second question, which comes up on every model with a
 geosynthetic in it. A sheet can be modeled two ways: as a **bar bonded into the
@@ -34,11 +37,6 @@ Strength reduction, meshing and the convergence controls are covered in
 and the axial stiffness a bar needs are covered in
 [FEM-2](fem02_reinforcement.md) and [LEM-8](lem08_reinforced_slope.md). Neither
 is repeated here.
-
-The problem is a 3.6 m segmental block wall of six courses on a foundation, with
-three geogrid layers tied into the blocks and a 2:1 backfill slope behind it.
-
-![A 3.6 m segmental block wall of six 0.6 m courses on a 3.2 m foundation, with three geogrid layers tied into the blocks and a 2:1 backfill slope behind it](images/fem03_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

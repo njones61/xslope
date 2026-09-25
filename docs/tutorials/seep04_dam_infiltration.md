@@ -27,6 +27,8 @@ dam does when the weather changes, and close by letting the rain start and stop:
 the same three boundaries driven from a schedule rather than a number, marched
 through 600 days of storm and recovery.
 
+![The dam, the reservoir, the toe drain, and the rain falling on the exposed surface](images/seep04_problem_sketch.png){width=1000}
+
 In [SEEP-2](seep02_johnson_dam.md) we built an unconfined dam from nothing, and
 [SEEP-1](seep01_sheetpile.md) covers what a seepage analysis computes; we repeat
 neither here. We start from a **starter file** that already carries the
@@ -35,11 +37,6 @@ the drain, and the rain. (To skip the construction, download the completed file
 below and pick the page back up at [Building the mesh](#building-the-mesh). That
 file already carries the rain, so the dry-weather run in between is one to read
 rather than to repeat — running it on the completed file returns the wet answer.)
-
-The problem is a 12 m dam with symmetric 2:1 faces, a reservoir on one side, a
-toe drain, and rain falling on the exposed surface.
-
-![The dam, the reservoir, the toe drain, and the rain falling on the exposed surface](images/seep04_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

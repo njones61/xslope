@@ -9,7 +9,10 @@ Here we look at which of XSLOPE's two engines models which kind of pile, and why
 that is a question about the structural member itself — the pile row or the wall
 — rather than a matter of preference.
 Both engines read the same pile rows out of the same file, and they build
-different things from them.
+different things from them. The example is the slope of LEM-12: 20 ft of clay at
+1:1, held by two rows of 2 ft drilled shafts at 6 ft centers.
+
+![A 20 ft clay slope stabilized by two rows of 2 ft drilled shafts at 6 ft centers](images/fem04_piles_problem_sketch.png){width=1000}
 
 A **limit equilibrium** method adds one force where a trial surface crosses a
 pile. With the **Ito & Matsui (1975)** method that force is not entered: it is
@@ -39,11 +42,6 @@ Run FEM dialog are covered in [FEM-1](fem01_strength_reduction.md). Neither is
 repeated here. [LEM-9](lem09_tieback_wall.md) is useful background for the second
 half, where a wall appears: there the soldier pile is entered the other way, with
 the force stated directly per foot of wall.
-
-The problem is a 20 ft clay slope at 1:1, stabilized by two rows of 2 ft drilled
-shafts at 6 ft centers.
-
-![A 20 ft clay slope stabilized by two rows of 2 ft drilled shafts at 6 ft centers](images/fem04_piles_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

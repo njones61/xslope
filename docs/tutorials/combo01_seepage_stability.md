@@ -23,9 +23,6 @@ We work on the Johnson Reservoir dam, already built. In
 the seepage physics through in detail; here we open the finished workbook and
 spend the page on the three runs and the one column that connects them.
 
-The problem is the Johnson Reservoir dam of SEEP-2, carried from its seepage
-solution into a stability analysis.
-
 ![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>

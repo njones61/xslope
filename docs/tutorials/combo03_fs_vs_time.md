@@ -19,9 +19,6 @@ and leaves the downstream slope weaker. In **Part 2** we repeat the exercise as
 a rapid drawdown at every instant on [COMBO-2](combo02_rapid_drawdown.md)'s
 Johnson Reservoir dam, whose clay core needs an undrained treatment.
 
-The problem is the zoned dam of SEEP-3, its factor of safety followed through the
-drawdown.
-
 ![The dam, its two zones, and the properties that make them behave differently](images/seep03_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>

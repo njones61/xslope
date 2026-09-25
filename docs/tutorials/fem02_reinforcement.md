@@ -24,6 +24,8 @@ yield, which is what every mainstream finite element code assumes unless told
 otherwise, and once with a residual capacity that takes effect after the layer
 ruptures.
 
+![A 24 ft reinforced sand fill: six geogrid layers developing their tension over 4 ft at each end, a cohesive face band, and a crest surcharge](images/fem02_problem_sketch.png){width=1000}
+
 Work through [LEM-8](lem08_reinforced_slope.md) first if you have not: that is
 where we built this model, and it covers reinforcement lines, the capacity
 envelope and pullout lengths, all of which we lean on here. Strength reduction,
@@ -33,11 +35,6 @@ repeated here. We start from a **starter file** that carries the whole
 LEM-8 model, so the inputs we add are the ones the finite
 element engine needs and the limit equilibrium engine does not: the soils' two
 elastic properties, and three columns on every reinforcement line.
-
-The problem is a 24 ft reinforced sand fill at 1.25:1, with six geogrid layers, a
-cohesive face band and a 240 psf surcharge on the crest.
-
-![A 24 ft reinforced sand fill: six geogrid layers developing their tension over 4 ft at each end, a cohesive face band, and a crest surcharge](images/fem02_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

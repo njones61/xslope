@@ -13,11 +13,15 @@ run as **joint lines** — lines the mesh is split along, with an interface elem
 holding the two faces together — and how to read the answer a strength reduction
 gives when the joints are the only thing it can weaken.
 
-We do it twice on the same face. **Part 1** takes a slope cut by two joints,
-where the mechanism is a single slab sliding out and the factor of safety can be
-checked by hand on the back of an envelope. **Part 2** takes the same slope cut
-by a whole set of them, generated from a dip and a spacing rather than typed one
-line at a time, where the rock breaks into columns that tip instead of sliding.
+We do it twice on the same face, a 12 m rock cut at 60°. **Part 1** takes the
+slope cut by two joints — a bedding plane dipping 35° out of the face and a
+vertical release joint 2 m behind the crest — where the mechanism is a single
+slab sliding out and the factor of safety can be checked by hand on the back of
+an envelope. **Part 2** takes the same slope cut by a whole set of them,
+generated from a dip and a spacing rather than typed one line at a time, where
+the rock breaks into columns that tip instead of sliding.
+
+![A 12 m rock face at 60 degrees, cut by a bedding plane dipping 35 degrees out of the face and a vertical release joint 2 m behind the crest](images/fem05_problem_sketch.png){width=800}
 
 Strength reduction itself, the mesh and the convergence controls are covered in
 [FEM-1](fem01_strength_reduction.md), and are not repeated here. There is a
@@ -25,11 +29,6 @@ second way to model a rock slope, in which the rock mass gets a strength of its
 own and no discontinuities are drawn at all; that is
 [LEM-13](lem13_rock_slope.md), and it answers a different question. Here the rock
 is inert and the surfaces carry everything.
-
-The problem is a 12 m rock face cut at 60°, with a bedding plane dipping 35° out
-of the face and a vertical release joint 2 m behind the crest.
-
-![A 12 m rock face at 60 degrees, cut by a bedding plane dipping 35 degrees out of the face and a vertical release joint 2 m behind the crest](images/fem05_problem_sketch.png){width=800}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

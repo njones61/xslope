@@ -9,6 +9,8 @@ In [COMBO-1](combo01_seepage_stability.md) we ran the Johnson Reservoir dam unde
 a standing reservoir. Here we lower that reservoir 50 ft over 45 days, after five
 days at full pool, so the pool reaches its residual level at day 50.
 
+![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
+
 Lowering a pool removes the water pressing on the upstream face, which was
 holding the slope up. If the soil behind the face could shed its own pore water
 just as fast, nothing much would happen: the driving weight and the resisting
@@ -27,11 +29,6 @@ lines with no seepage behind them; in **Part 2** we replace the lines with two
 steady-state seepage solutions, one at each pool; in **Part 3** we replace those
 with a single transient seepage run and read the two states out of it. Then we
 set the three answers side by side.
-
-The problem is the Johnson Reservoir dam again, with its reservoir drawn down
-rapidly.
-
-![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

@@ -21,7 +21,7 @@ enough to read by hand: one soil, no water table inside the ground, and a flow n
 whose channel count comes out a whole number, so the discharge can be read off it
 by counting lines.
 
-![Sheetpile with clay blanket](../seep/images/clay_blanket.png){width=700}
+![The sheetpile wall driven into the silt foundation, the clay blanket upstream of it, and the two water levels](images/seep01_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

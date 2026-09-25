@@ -201,7 +201,7 @@ once per run, from the run's record of its trials: every trial's maximum
 displacement against its factor, marked by whether the section stood under it,
 with the factor of safety and the final bracket. It is drawn only where that
 record carries the displacements, and where the failing edge of the bracket was
-a trial that ran out of sweeps with the section still moving, the paragraph
+a trial that ran out of sweeps with the section still moving slowly, the paragraph
 beside it says the factor of safety is set by the sweep budget.
 
 **Reinforcement forces** and **Pile forces** are written where the run solved

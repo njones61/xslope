@@ -1680,14 +1680,21 @@ as `xslope.plot_fem.plot_ssrm_curve(ax, record)`. Below is the embankment from
 
 **Reading it.** A flat run of displacements that turns up in a sharp knee is a strength limit: the
 section settled at every factor below the knee and could not above it, and the factor of safety
-sits at the knee. A steady climb with no knee is a different result. The section kept moving at
-every strength the search tried, so the factor it reports is where the sweep budget stopped the
-failing trial rather than where the slope gave way, and a longer budget may move it. The run's
-closing summary says the same in words. It is printed as the last lines of every strength
-reduction run and returned as `result['summary']`, and it names how each bracket edge was
-decided. When the failing edge is a budget verdict it reads *stopped at the N-sweep budget with
-the section still moving*, says the factor of safety is the budget's, and quotes the displacement
-and its growth over the last quarter of the trial's sweeps.
+sits at the knee. The failing trial there was running away when it stopped, whether a divergence
+test or the sweep budget stopped it. A steady climb with no knee is a different result. The
+section kept moving at every strength the search tried, and the failing trial was still moving
+slowly when the sweep budget stopped it, so the factor it reports is where the budget stopped
+that trial rather than where the slope gave way, and a longer budget may move it. An open marker
+can sit below a filled one: it marks where its trial stopped, not where it was going.
+
+The run's closing summary says the same in words. It is printed as the last lines of every
+strength reduction run and returned as `result['summary']`, and it names how each bracket edge was
+decided. A failing trial that ran out of sweeps while running away is reported as *decided by the
+displacement evidence* — a failure in progress, not a budget effect. One that was still moving
+slowly reads *stopped at the N-sweep budget with the section still moving*, says the factor of
+safety is the budget's, and says why the trial was counted as failed. Both quote the largest
+displacement, its multiple of the elastic response and its growth over the last quarter of the
+trial's sweeps.
 
 ## Exported files
 

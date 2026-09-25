@@ -342,35 +342,55 @@ def _failing_edge_sentences(F, trial, count, unit):
                 f"no admissible state. It is carried as an open question, not as "
                 f"a measured failure.")
 
-    # Everything else stopped because it ran out of sweeps.
+    # Everything else stopped because it ran out of sweeps, and the trial's own
+    # verdict — recorded on every criterion — says what it was doing when it did.
     budget = ("This factor of safety is the budget's, not the slope's, and a "
               "longer budget may move it.")
+    verdict = trial.get("verdict")
     growth = _finite_or_none(trial.get("growth"))
     moving = growth is not None and growth > _HYBRID_GROWTH_MIN
-    if moving:
-        said = (f"The failing edge was decided by the sweep budget: {at} stopped "
-                f"at the {n:,}-{count[:-1]} budget with the section still moving. "
-                f"{budget}")
-        u = _finite_or_none(trial.get("max_displacement"))
-        ratio = _finite_or_none(trial.get("u_ratio"))
-        if u is not None and ratio:
-            grew = growth * u / ratio
-            last = int(round(n * _HYBRID_WINDOW_FRAC))
-            unit_txt = f" {unit}" if unit else ""
-            said += (f" When it stopped, the largest displacement was "
-                     f"{u:.3g}{unit_txt} and it had grown by {grew:.3g}{unit_txt} "
-                     f"over the last {last:,} {count}.")
-        return said
+    u = _finite_or_none(trial.get("max_displacement"))
+    ratio = _finite_or_none(trial.get("u_ratio"))
+    unit_txt = f" {unit}" if unit else ""
+    last = int(round(n * _HYBRID_WINDOW_FRAC))
+
+    def _evidence(grown_word):
+        """"its largest displacement was X, R times the elastic response, and
+        <grown_word> by G over the last N sweeps", or "" without the numbers."""
+        if u is None or not ratio or growth is None:
+            return ""
+        grew = growth * u / ratio
+        return (f"its largest displacement was {u:.3g}{unit_txt}, {ratio:.1f} "
+                f"times the elastic response, {grown_word} by {grew:.3g}{unit_txt} "
+                f"over the last {last:,} {count}")
+
     if why == "inconclusive":
         return (f"The failing edge was decided by the sweep budget: {at} stopped "
                 f"at the {n:,}-{count[:-1]} ceiling while its out-of-balance force "
                 f"was still falling, so it is carried as an open question, not as "
                 f"a measured failure. {budget}")
-    if growth is not None:
+    if verdict == "FAILED":
+        # Running away when the budget stopped it: the displacement evidence
+        # decided this edge, and more sweeps would only have let it run further.
+        ev = _evidence("and still growing")
+        return (f"The failing edge was decided by the displacement evidence: {at} "
+                f"ran out of sweeps at the {n:,}-{count[:-1]} budget while running "
+                f"away" + (f" — {ev}" if ev else "") + ". That is a failure in "
+                f"progress, not a budget effect.")
+    if verdict in ("STABLE_STUCK", "JOINT_SETTLED") or (growth is not None
+                                                         and not moving):
         return (f"The failing edge was decided by the sweep budget: {at} stopped "
                 f"at the {n:,}-{count[:-1]} budget without meeting the force "
                 f"tolerance, with the section no longer moving. This run's "
                 f"criterion counts that as failing. {budget}")
+    if moving:
+        # AMBIGUOUS, or no verdict: still moving, but slowly.
+        ev = _evidence("grown")
+        return (f"The failing edge was decided by the sweep budget: {at} stopped "
+                f"at the {n:,}-{count[:-1]} budget with the section still moving"
+                + (f", but slowly — {ev}: too fast for the criterion to call it "
+                   f"settled and too slow to call it a failure, so it was counted "
+                   f"as failed" if ev else "") + f". {budget}")
     return (f"The failing edge was decided by the sweep budget: {at} stopped at "
             f"the {n:,}-{count[:-1]} budget without reaching equilibrium. {budget}")
 
@@ -381,9 +401,14 @@ def ssrm_run_summary(result, fem_data=None):
     It states the factor of safety and the bracket it is the midpoint of, how
     each edge of that bracket was decided — the standing edge by the trial that
     stood there, the failing edge by the way its trial ended — and the wall time.
-    When the failing edge is a trial that ran out of sweeps with the section still
-    moving, it says so in those words, says the number is the budget's, and quotes
-    the displacement and its growth from the trial record. :func:`solve_ssrm`
+    A failing-edge trial that ran out of sweeps is read by its own verdict. One
+    that was running away (verdict FAILED) is a failure in progress, and the
+    summary says so without calling the number the budget's. One that was still
+    moving but slowly (AMBIGUOUS, or no verdict) is the budget's verdict: the
+    summary says it stopped at the budget with the section still moving, that
+    the number is the budget's, and why it was counted as failed. Both quote the
+    displacement, its multiple of the elastic response and its growth from the
+    trial record. :func:`solve_ssrm`
     prints it at the end of every run and returns it as ``result['summary']``.
     """
     r = result or {}

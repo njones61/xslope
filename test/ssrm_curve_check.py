@@ -276,20 +276,39 @@ def _summary(failing, **extra):
 
 def check_summary():
     print("\n4. the closing summary")
-    s = _summary({"exit_reason": "iteration_cap", "verdict": "FAILED",
+    # A trial still moving, but slowly, when its budget ran out (AMBIGUOUS).
+    s = _summary({"exit_reason": "iteration_cap", "verdict": "AMBIGUOUS",
                   "growth": 0.5, "u_ratio": 5.0, "max_displacement": 0.25})
     check("it opens on the answer and its bracket",
           s.startswith("The factor of safety is 1.375, the midpoint of the "
                        "bracket from F = 1.3500 to F = 1.4000."), s)
     check("the standing edge is the trial that converged",
           "converged in 812 sweeps" in s, s)
-    check("a budget verdict is named in those words",
-          "stopped at the 100,000-sweep budget with the section still moving" in s,
-          s)
+    check("a slow budget stop is named in those words",
+          "stopped at the 100,000-sweep budget with the section still moving, "
+          "but slowly" in s, s)
     check("and the number is said to be the budget's",
           "the budget's, not the slope's, and a longer budget may move it" in s, s)
-    check("with the displacement and its growth from the record",
-          "0.25 m" in s and "0.025 m" in s and "last 25,000 sweeps" in s, s)
+    check("and why it was counted as failed",
+          "too slow to call it a failure, so it was counted as failed" in s, s)
+    check("with the displacement, its elastic multiple and its growth",
+          "0.25 m" in s and "5.0 times the elastic response" in s
+          and "0.025 m" in s and "last 25,000 sweeps" in s, s)
+
+    # A trial running away when its budget ran out (FAILED).
+    s = _summary({"exit_reason": "iteration_cap", "verdict": "FAILED",
+                  "growth": 0.74, "u_ratio": 4.88, "max_displacement": 0.277},
+                 failure_criterion="non_convergence")
+    check("a runaway at the budget is decided by the displacement evidence",
+          "decided by the displacement evidence" in s
+          and "ran out of sweeps at the 100,000-sweep budget while running away"
+          in s, s)
+    check("and is called a failure in progress",
+          "That is a failure in progress, not a budget effect." in s, s)
+    check("and the number is NOT called the budget's", "the budget's" not in s, s)
+    check("with the displacement, its elastic multiple and its growth",
+          "0.277 m, 4.9 times the elastic response, and still growing by 0.042 m"
+          in s, s)
     check("and the wall time", s.endswith("The run took 11 min 4 s."), s)
 
     s = _summary({"exit_reason": "diverging", "verdict": "FAILED",

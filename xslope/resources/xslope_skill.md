@@ -1996,19 +1996,21 @@ still improving is reported `inconclusive` and is NOT counted as a failure: `sol
 on below it and reports `result['FS']` as the midpoint of `final_interval`, exactly as on any
 other run. The difference is that the bracket's upper edge is an undecided trial rather than a
 measured failure, which `result['inconclusive']` lists and `result['note']` states in a sentence.
-Raise the ceiling or loosen `tolerance` if you see one.
-
-**Read the closing summary and the curve before quoting the number.** Every run ends with
-`result['summary']`, printed as its last lines. When it says the failing edge **stopped at the
-N-sweep budget with the section still moving**, the factor of safety is the budget's, not the
-slope's, and a longer budget may move it. The `'ssrm_curve'` plot shows the same thing: a flat
-run of displacements and a sharp knee is a strength limit; a steady climb with no knee means the
-section never stopped moving and the reported number is where the budget cut off the failing
-trial. Say so to the user rather than reporting the number bare. At the other end, a trial whose movement is
+Raise the ceiling or loosen `tolerance` if you see one. At the other end, a trial whose movement is
 clearly running away — past 8 times its own elastic displacement and still growing, or a flat
 residual over 2000 iterations while the field gains a whole elastic displacement — is declared
 failed at that point rather than spending the rest of its budget (`exit_reason = 'diverging'`;
 `early_failure=False` turns it off).
+
+**Read the closing summary and the curve before quoting the number.** Every run ends with
+`result['summary']`, printed as its last lines. A failing edge that ran out of sweeps is read two
+ways. **Running away** (the trial's verdict is FAILED, several times its elastic displacement and
+still growing) is a failure in progress: the summary says so and the number stands. **Stopped at
+the N-sweep budget with the section still moving, but slowly** means the factor of safety is the
+budget's, not the slope's, and a longer budget may move it. The `'ssrm_curve'` plot shows the same
+thing: a flat run of displacements and a sharp knee is a strength limit; a steady climb with no
+knee means the section never stopped moving and the reported number is where the budget cut off
+the failing trial. In that second case say so to the user rather than reporting the number bare.
 
 **How a trial is decided.** The viscoplastic loop drives the solve and builds the plastic history.
 At 300, 1,000 and 3,000 iterations, and again wherever one of the stopping rules above would end

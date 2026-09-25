@@ -722,9 +722,10 @@ The run produces **FEM · Data** (mesh + boundary conditions + reinforcement) an
 **FEM · Results** (deformation, shear strain, displacement vectors, and displacement
 vs F). An SSRM run reports the factor of safety and can be **cancelled** mid-run. It
 ends with a closing summary in the Log: the factor of safety and its bracket, how
-each edge of the bracket was decided, and the wall time. When the failing edge is a
-trial that ran out of sweeps with the section still moving, the summary says so in
-those words and says the factor of safety is the budget's, not the slope's. The solution is
+each edge of the bracket was decided, and the wall time. A failing edge that ran out
+of sweeps while running away is reported as a failure in progress. One that ran out
+of sweeps with the section still moving, but slowly, is reported in those words, and
+the summary says the factor of safety is the budget's, not the slope's. The solution is
 exported alongside the model so it can be restored on the next Open without
 re-solving — including the at-failure mechanism snapshot (a second CSV pair) and,
 for a model with reinforcement or piles, the per-element structural results

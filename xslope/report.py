@@ -9070,7 +9070,7 @@ def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
 
 def _failing_edge_on_budget(record):
     """``(F, sweeps)`` for a run whose failing bracket edge is a trial that ran out
-    of sweeps with the section still moving, else ``None`` — the reading
+    of sweeps with the section still moving slowly, else ``None`` — the reading
     :func:`xslope.fem.ssrm_run_summary` gives the same trial."""
     interval = record.get("final_interval")
     if not interval:
@@ -9080,7 +9080,11 @@ def _failing_edge_on_budget(record):
                          if isinstance(t, dict)], float(interval[1]), False)
     if trial is None or trial.get("exit_reason") in (
             "diverging", "disp_limit", "displacement_limit", "steady_slip",
-            "nonfinite", "yield_gate"):
+            "nonfinite", "yield_gate", "inconclusive"):
+        return None
+    # A trial running away when its budget stopped it is a failure in progress,
+    # not a budget effect; only a slowly moving one leaves the number the budget's.
+    if trial.get("verdict") in ("FAILED", "STABLE_STUCK", "JOINT_SETTLED"):
         return None
     growth = _num(trial.get("growth"))
     if growth is None or growth <= _HYBRID_GROWTH_MIN:

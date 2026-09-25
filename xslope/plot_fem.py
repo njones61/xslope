@@ -120,11 +120,17 @@ def _fs_title(base, F, fs=None, at_failure=False):
     (or just ``base`` when no F is available).
 
     ``at_failure`` marks a panel rendering the UNCONVERGED at-failure field (captured
-    a margin beyond critical). It leads with the factor of safety and stops there —
-    "at Failure" already discloses the field is the unconverged trial state, so a
-    parenthetical naming the trial F would only repeat that disclosure as noise.
+    a margin beyond critical). It names that trial's F and the factor of safety it
+    stands past, so the picture of a failing state is never read as failure AT the
+    factor of safety.
     """
     if at_failure and fs is not None:
+        # The at-failure field is a trial PAST the factor of safety (the capture
+        # margin above it), so the title names that trial's F and the factor it
+        # stands past: a picture of a failing wall labelled with the standing
+        # factor alone reads as "it failed at FS".
+        if F is not None and f"{fs:.3f}" != f"{F:.3f}":
+            return f"{base}  F = {F:.3f} (past FS = {fs:.3f})"
         return f"{base}  FS = {fs:.3f}"
     if F is None:
         return base

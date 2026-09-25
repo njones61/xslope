@@ -149,7 +149,7 @@ column blank. Enter the label, the endpoints and `phi`; leave `t_cut` at 0, sinc
 a block contact carries no tension, and leave the rest blank. When the seven
 rows are in, the editor looks like this:
 
-![The joints editor with the wall's seven contacts entered](images/fem03_studio_joints_editor.png){width=900}
+![The joints editor with the wall's seven contacts entered](images/fem03_studio_joints_editor.png){width=1102}
 
 The three friction angles differ because the three contacts do. The base is
 block on compacted foundation soil at 34°; the back face is block against
@@ -217,7 +217,7 @@ Open **Run → Run FEM…**. The analysis is **SSRM**, the bracket is *F* from
 Two rows further down there is one setting to change, and one below it to leave
 alone once you know what it does.
 
-![Run FEM on the meshed wall, with the sweep budget raised](images/fem03_studio_run_fem.png){width=760}
+![Run FEM on the meshed wall, with the sweep budget raised](images/fem03_studio_run_fem.png){width=860}
 
 **Max iterations per trial — change it to 100,000.** A joint reaches equilibrium
 by growing slip, a little on each pass of the solver, so a jointed model settles

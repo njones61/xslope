@@ -104,7 +104,7 @@ the **joints** worksheet, which is reached from the Inputs tree under
 **Joints**, and every row is one line: a label, the two endpoints, and the
 strength of the surface between the two faces.
 
-![The joints editor with the two rows of this model entered](images/fem05_studio_joints_editor.png){width=900}
+![The joints editor with the two rows of this model entered](images/fem05_studio_joints_editor.png){width=1102}
 
 Only the endpoints and `phi` have to be filled in. `c` blank is a cohesionless
 joint, and the rest of the row — the residual strengths, the dilation angle, the
@@ -187,7 +187,7 @@ per trial**, which has to be raised, and **Failure criterion**, which the dialog
 has already set to Hybrid;
 [FEM-3](fem03_block_wall_joints.md#running-the-wall-alone) explains both.
 
-![Run FEM on the meshed slab: SSRM, the default bracket, a raised sweep budget and the Hybrid criterion](images/fem05_studio_run_fem.png){width=760}
+![Run FEM on the meshed slab: SSRM, the default bracket, a raised sweep budget and the Hybrid criterion](images/fem05_studio_run_fem.png){width=818}
 
 Set **Max iterations per trial** to **100,000**: a joint reaches equilibrium by
 growing slip, a little on each pass, so a jointed model needs tens of thousands
@@ -319,7 +319,7 @@ which says *what* the set is. Open the joints editor from the Inputs tree under
 **Joints**, as in Part 1, and press the **Build network…** button beside its
 list of rows.
 
-![The Build network dialog describing the column set](images/fem05_studio_build_network.png){width=760}
+![The Build network dialog describing the column set](images/fem05_studio_build_network.png){width=840}
 
 **Name** is the set's name, and it matters more than it looks. Keep it short:
 `col`. Every row the dialog writes is named from it — `col-01`, `col-02`, and

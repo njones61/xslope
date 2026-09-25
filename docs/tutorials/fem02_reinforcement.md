@@ -34,6 +34,11 @@ LEM-8 model, so the inputs we add are the ones the finite
 element engine needs and the limit equilibrium engine does not: the soils' two
 elastic properties, and three columns on every reinforcement line.
 
+The problem is a 24 ft reinforced sand fill at 1.25:1, with six geogrid layers, a
+cohesive face band and a 240 psf surcharge on the crest.
+
+![A 24 ft reinforced sand fill: six geogrid layers developing their tension over 4 ft at each end, a cohesive face band, and a crest surcharge](images/fem02_problem_sketch.png){width=1000}
+
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Finite element (strength reduction)</p></div>
@@ -63,8 +68,6 @@ step below is done on either one
 ---
 
 ## The problem
-
-![A 24 ft reinforced sand fill: six geogrid layers developing their tension over 4 ft at each end, a cohesive face band, and a crest surcharge](images/fem02_problem_sketch.png){width=1000}
 
 The fill stands **24 ft** high at **1.25:1** on a foundation that runs 10 ft
 below the toe, with a **240 psf** surcharge over the 70 ft of crest behind it.

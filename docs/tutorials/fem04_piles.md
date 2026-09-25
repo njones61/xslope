@@ -40,6 +40,11 @@ repeated here. [LEM-9](lem09_tieback_wall.md) is useful background for the secon
 half, where a wall appears: there the soldier pile is entered the other way, with
 the force stated directly per foot of wall.
 
+The problem is a 20 ft clay slope at 1:1, stabilized by two rows of 2 ft drilled
+shafts at 6 ft centers.
+
+![A 20 ft clay slope stabilized by two rows of 2 ft drilled shafts at 6 ft centers](images/fem04_piles_problem_sketch.png){width=1000}
+
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Finite element (strength reduction)</p></div>
@@ -75,8 +80,6 @@ minutes, depending on the machine; only the slow ones are called out below.
 ---
 
 ## The slope
-
-![A 20 ft clay slope stabilized by two rows of 2 ft drilled shafts at 6 ft centers](images/fem04_piles_problem_sketch.png){width=1000}
 
 The slope is a single medium-stiff clay — γ = 120 pcf, c = 200 psf, φ = 20° —
 standing 20 ft at 1:1 over a rigid base 10 ft below the toe, with no water in

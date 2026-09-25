@@ -30,6 +30,12 @@ problem turns on. (To skip the construction and go straight to the analysis,
 download the completed file below and pick the page back up at
 [Building the mesh](#building-the-mesh).)
 
+The problem is the Johnson Reservoir dam: a zoned section 750 ft long and 180 ft
+tall at the crest, a sand shell over a clay core on a 100 ft foundation, with the
+reservoir standing against its upstream face.
+
+![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
+
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Seepage</p></div>
@@ -48,8 +54,6 @@ and how to scale a flow net on a zoned section.
 ---
 
 ## The problem
-
-![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
 
 The section is 750 ft long and 180 ft tall at the crest. A 100 ft foundation runs
 the whole length of it, on rock at elevation 0. The embankment sits on that

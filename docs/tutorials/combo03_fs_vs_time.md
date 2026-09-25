@@ -19,6 +19,11 @@ and leaves the downstream slope weaker. In **Part 2** we repeat the exercise as
 a rapid drawdown at every instant on [COMBO-2](combo02_rapid_drawdown.md)'s
 Johnson Reservoir dam, whose clay core needs an undrained treatment.
 
+The problem is the zoned dam of SEEP-3, its factor of safety followed through the
+drawdown.
+
+![The dam, its two zones, and the properties that make them behave differently](images/seep03_problem_sketch.png){width=1000}
+
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Seepage + limit equilibrium (drained, and rapid drawdown)</p></div>
@@ -61,8 +66,6 @@ so the seepage work is already done; only the strengths are missing. We will ope
 type the strengths in, run one instant, and then sweep all nineteen.
 
 ### The dam and the drawdown
-
-![The dam, its two zones, and the properties that make them behave differently](images/seep03_problem_sketch.png){width=1000}
 
 The section is 110 m long and 22 m tall at the crest, on rock at elevation 0,
 both faces sloping at about 2.3:1. A clay **core** runs from the rock to 4 m

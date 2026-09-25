@@ -35,6 +35,11 @@ and the axial stiffness a bar needs are covered in
 [FEM-2](fem02_reinforcement.md) and [LEM-8](lem08_reinforced_slope.md). Neither
 is repeated here.
 
+The problem is a 3.6 m segmental block wall of six courses on a foundation, with
+three geogrid layers tied into the blocks and a 2:1 backfill slope behind it.
+
+![A 3.6 m segmental block wall of six 0.6 m courses on a 3.2 m foundation, with three geogrid layers tied into the blocks and a 2:1 backfill slope behind it](images/fem03_problem_sketch.png){width=1000}
+
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Finite element</p></div>
@@ -63,8 +68,6 @@ where it uses them
 ---
 
 ## The problem
-
-![A 3.6 m segmental block wall of six 0.6 m courses on a 3.2 m foundation, with three geogrid layers tied into the blocks and a 2:1 backfill slope behind it](images/fem03_problem_sketch.png){width=1000}
 
 The wall stands **3.6 m** high in **six 0.6 m courses** of modular block
 **1.2 m deep**, on a 3.2 m foundation, with a 6 m zone of reinforced granular

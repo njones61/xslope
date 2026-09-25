@@ -36,6 +36,11 @@ below and pick the page back up at [Building the mesh](#building-the-mesh). That
 file already carries the rain, so the dry-weather run in between is one to read
 rather than to repeat — running it on the completed file returns the wet answer.)
 
+The problem is a 12 m dam with symmetric 2:1 faces, a reservoir on one side, a
+toe drain, and rain falling on the exposed surface.
+
+![The dam, the reservoir, the toe drain, and the rain falling on the exposed surface](images/seep04_problem_sketch.png){width=1000}
+
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Seepage</p></div>
@@ -72,8 +77,6 @@ of the page; it ships with its mesh and its solved march beside it
 ---
 
 ## The problem
-
-![The dam, the reservoir, the toe drain, and the rain falling on the exposed surface](images/seep04_problem_sketch.png){width=1000}
 
 The dam is 12 m high with a 4 m crest and symmetric 2:1 faces, 52 m across the
 base, sitting on rock at elevation 0. Its ground surface runs from the upstream

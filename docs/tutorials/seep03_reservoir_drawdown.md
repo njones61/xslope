@@ -33,6 +33,11 @@ it. (To skip the construction and go straight to the analysis, download the
 completed file below and pick the page back up at
 [Building the mesh](#building-the-mesh).)
 
+The problem is a 22 m zoned dam on rock, 110 m long, with a clay core and a
+reservoir that is drawn down on a schedule.
+
+![The dam, its two zones, and the properties that make them behave differently](images/seep03_problem_sketch.png){width=1000}
+
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Seepage</p></div>
@@ -59,8 +64,6 @@ the construction and start at [Building the mesh](#building-the-mesh)
 ---
 
 ## The problem
-
-![The dam, its two zones, and the properties that make them behave differently](images/seep03_problem_sketch.png){width=1000}
 
 The dam is 110 m long and 22 m tall at the crest, sitting on rock at
 elevation 0, with both faces sloping at about 2.3:1. Inside the embankment is a

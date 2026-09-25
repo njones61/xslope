@@ -26,6 +26,11 @@ own and no discontinuities are drawn at all; that is
 [LEM-13](lem13_rock_slope.md), and it answers a different question. Here the rock
 is inert and the surfaces carry everything.
 
+The problem is a 12 m rock face cut at 60°, with a bedding plane dipping 35° out
+of the face and a vertical release joint 2 m behind the crest.
+
+![A 12 m rock face at 60 degrees, cut by a bedding plane dipping 35 degrees out of the face and a vertical release joint 2 m behind the crest](images/fem05_problem_sketch.png){width=800}
+
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Finite element</p></div>
@@ -64,8 +69,6 @@ reproduce a number we can work out on paper before the method is trusted on
 anything larger.
 
 ### The slope and its two joints
-
-![A 12 m rock face at 60 degrees, cut by a bedding plane dipping 35 degrees out of the face and a vertical release joint 2 m behind the crest](images/fem05_problem_sketch.png){width=800}
 
 The face stands **12 m** high, cut at **60°**, on a 26 m section with 3 m of
 rock below the toe. There is one material, and it is declared **elastic**: no

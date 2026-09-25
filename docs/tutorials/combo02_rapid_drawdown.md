@@ -28,6 +28,11 @@ steady-state seepage solutions, one at each pool; in **Part 3** we replace those
 with a single transient seepage run and read the two states out of it. Then we
 set the three answers side by side.
 
+The problem is the Johnson Reservoir dam again, with its reservoir drawn down
+rapidly.
+
+![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
+
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium + seepage</p></div>
@@ -147,8 +152,6 @@ and the pore pressure inside the dam can never disagree about where it stood.
 ---
 
 ## The dam
-
-![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
 
 The section is 750 ft long: a 100 ft foundation on rock at elevation 0, and an
 80 ft embankment on it with a crest at elevation 180. A sand shell rises 2:1

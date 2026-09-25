@@ -31,6 +31,11 @@ start from a **starter file** that already
 carries the section, the soil strength and one starting circle, so the only
 inputs we add are the ones the finite element side needs.
 
+The problem is a 50 ft embankment on a rigid base, with a 60 ft crest platform
+and a 2:1 face.
+
+![The embankment, its soil, and the elastic properties added later on this page](images/fem01_problem_sketch.png){width=1000}
+
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Finite element</p></div>
@@ -101,8 +106,6 @@ iteration underneath all of it.
 ---
 
 ## The problem
-
-![The embankment, its soil, and the elastic properties added later on this page](images/fem01_problem_sketch.png){width=1000}
 
 The embankment stands **50 ft** high on a rigid base at elevation 0, with a
 60 ft crest platform and a **2:1** face running down to a toe at x = 160. It is

@@ -23,6 +23,11 @@ We work on the Johnson Reservoir dam, already built. In
 the seepage physics through in detail; here we open the finished workbook and
 spend the page on the three runs and the one column that connects them.
 
+The problem is the Johnson Reservoir dam of SEEP-2, carried from its seepage
+solution into a stability analysis.
+
+![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
+
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Seepage + limit equilibrium + finite element</p></div>
@@ -46,8 +51,6 @@ three runs below from scratch
 ---
 
 ## The dam
-
-![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
 
 The section is 750 ft long. A 100 ft foundation runs its whole length on rock at
 elevation 0, and an 80 ft embankment sits on that foundation: a shell rising at

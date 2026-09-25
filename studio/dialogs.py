@@ -798,6 +798,12 @@ class RunFemDialog(QDialog):
         # re-evaluates them (joint.iteration_budget_low) rather than only the button.
         self.max_iterations.valueChanged.connect(self._recheck)
         self.max_iterations_ceiling.valueChanged.connect(self._recheck)
+        # The ceiling is the hard stop on the budget's extension, so a budget
+        # raised above it would read as a contradiction on the dialog ("100,000
+        # per trial, ceiling 50,000") even though the solver takes the larger of
+        # the two. Keep the ceiling at or above the budget as the budget moves.
+        self.max_iterations.valueChanged.connect(self._lift_ceiling)
+        self._lift_ceiling(self.max_iterations.value())
         self.preflight.changed.connect(self._sync_run)
         # The chosen instant is part of what the checks are told, so it re-evaluates
         # them rather than only the button.
@@ -818,6 +824,11 @@ class RunFemDialog(QDialog):
                                if self.seep_time is not None else None),
                 "max_iterations": self.max_iterations.value(),
                 "max_iterations_ceiling": self.max_iterations_ceiling.value()}
+
+    def _lift_ceiling(self, budget):
+        """Raise the iteration ceiling to the budget when the budget passes it."""
+        if int(budget) > self.max_iterations_ceiling.value():
+            self.max_iterations_ceiling.setValue(int(budget))
 
     def _recheck(self):
         self.preflight.refresh()

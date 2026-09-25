@@ -8977,6 +8977,13 @@ MODULE_CHECKS = {
         "of it (the trial audit, lock_edges and the suite's own edge check) to "
         "the same answer, and holds the certification into a committed sidecar "
         "without its machine time."),
+    'ssrm_curve': (
+        'ssrm_curve_check.py',
+        "The strength reduction run's own record of itself: every trial carries "
+        "the displacement it reached, the saved meta gives the trials back, the "
+        "displacement-vs-F plot draws them, and the closing summary says how "
+        "each bracket edge was decided, including when the failing edge was "
+        "only the sweep budget's verdict."),
     'joint_verdict': (
         'joint_verdict_check.py',
         "How an undecided jointed strength-reduction trial is read. Seven rows "
@@ -14948,7 +14955,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'joint_junction': 5, 'joint_junction_mesh': 3,
               'joint_element': 5, 'joint_surfaces': 4, 'joint_network': 3,
               'joint_network_dialog': 2, 'joint_verdict': 1,
-              'corrector_certified': 1,
+              'corrector_certified': 1, 'ssrm_curve': 2,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'docs_index_sync': 3, 'assistant_docs_answers': 2,
@@ -16070,6 +16077,12 @@ def main():
         tests.append({'type': 'corrector_certified',
                       'file': 'a corrector certification answers a bracket edge',
                       'method': '-', 'source': 'corrector_certified'})
+        # The trial record's displacement, its round trip through the meta
+        # sidecar, the displacement-vs-F plot and the closing summary — one small
+        # strength reduction run (seconds) and synthetic records.
+        tests.append({'type': 'ssrm_curve',
+                      'file': 'the displacement curve and the closing summary',
+                      'method': '-', 'source': 'ssrm_curve'})
         # The path a MODEL takes to the element: the column, the mesher, the
         # plots, the detail panel and the report, on one solve of the shipped
         # reinforcement sample with two of its lines made joints in memory.

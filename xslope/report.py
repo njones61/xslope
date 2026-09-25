@@ -858,10 +858,11 @@ DEFAULT_OPTIONS = {
                                       # stiffnesses, which no LEM method reads
     "fem_mesh_figure": True,          # the mesh the section was solved on
     "fem_figure": True,
-    "fem_convergence_figure": True,   # the search that reached the factor of
-                                      # safety: every trial, and the interval
-                                      # still open after each — drawn only where
-                                      # the run kept a trial record
+    "fem_convergence_figure": True,   # displacement vs F: every trial's
+                                      # maximum displacement against its factor,
+                                      # with the factor of safety and the final
+                                      # bracket — drawn only where the run's
+                                      # trial record carries displacements
     "fem_state_failure": True,        # which field state the result panels draw:
     "fem_state_converged": False,     # the mechanism at failure, the last
                                       # converged trial, or both, on one scale
@@ -7975,6 +7976,12 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
 #: imported because report.py loads without matplotlib and plot_fem does not.
 #: The field had four names: this caption said "Maximum shear strain", which is
 #: the name of the OTHER strain column.
+#:
+#: The fourth is not a field. It is drawn from the run's trial record — every
+#: trial's maximum displacement against its factor — once per run rather than
+#: once per field state, and only where the record carries the displacements
+#: (:func:`_fem_search_figure`). Its name is
+#: :data:`xslope.plot_fem.SSRM_CURVE_LABEL`, written out for the same reason.
 FEM_PANELS = (
     ("shear_strain", "Viscoplastic shear strain",
      "the viscoplastic shear strain — where the section is shearing"),
@@ -7982,7 +7989,15 @@ FEM_PANELS = (
      "the deformed mesh over the original section"),
     ("displace_vector", "Displacement vectors",
      "the displacement at every node as an arrow — how the section is moving"),
+    ("ssrm_curve", "Displacement vs F",
+     "the maximum displacement of every trial against its strength reduction "
+     "factor"),
 )
+
+#: The panels drawn from a solved FIELD, once per field state: every entry of
+#: :data:`FEM_PANELS` but the displacement curve, which is drawn from the trials.
+FEM_FIELD_PANELS = tuple(entry for entry in FEM_PANELS
+                         if entry[0] != "ssrm_curve")
 
 #: The published page each kind of one-dimensional member is modelled after.
 #: Both formulations differ from the limit equilibrium treatment of the same
@@ -8845,7 +8860,7 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     if opts["fem_figure"]:
         for state in states:
             named_state = field_state_label(state)
-            for panel, caption, shows in FEM_PANELS:
+            for panel, caption, shows in FEM_FIELD_PANELS:
                 stem = (f"fem_{tag}_{panel}" if len(states) == 1
                         else f"fem_{tag}_{panel}_{state}")
                 path = os.path.join(figure_dir, f"{stem}.png")
@@ -8964,11 +8979,11 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     for _panel, _state, figure in figures:
         sub.blocks.append(figure)
 
-    # How the factor of safety was reached, where the run kept a record of its
-    # trials: the paragraph above the section says the search halves an interval,
-    # and this is that search. A run that kept no trials — a displacement
-    # catastrophe run keeps none, and so does one saved before the record was
-    # persisted — has nothing to draw and no sentence about it.
+    # The fourth plot, where the run kept a record of its trials with their
+    # displacements: every trial's maximum displacement against its factor. A run
+    # that kept no trials — a displacement catastrophe run keeps none, and so does
+    # one saved before the record was persisted, or before trials carried their
+    # displacement — has nothing to draw and no sentence about it.
     search = _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress)
     if search is not None:
         sub.blocks.append(search[0])
@@ -8999,45 +9014,78 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
 
 
 def _fem_search_drawn(bundle, opts):
-    """Will this run's block carry the search figure? The option, and whether the
-    run kept trials to draw — the one question, asked by the builder and by
-    :func:`planned_figures`, so the count and the build cannot disagree."""
+    """Will this run's block carry the displacement-vs-F figure? The option, and
+    whether the run kept trials with displacements to draw — the one question,
+    asked by the builder and by :func:`planned_figures`, so the count and the
+    build cannot disagree."""
     if not opts["fem_convergence_figure"]:
         return False
     if str(bundle.get("analysis")) != "ssrm":
         return False
     try:
-        from .plot_fem import ssrm_has_convergence_history
-        return ssrm_has_convergence_history(ssrm_record(bundle))
+        from .plot_fem import ssrm_curve_unavailable
+        return ssrm_curve_unavailable(ssrm_record(bundle)) is None
     except Exception:
         return False
 
 
 def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
-    """``(sentence, figure)`` for the search that reached the factor of safety, or
-    ``None``."""
+    """``(sentence, figure)`` for the displacement of every trial against its
+    strength reduction factor, or ``None``."""
     if not _fem_search_drawn(bundle, opts):
         return None
-    from .plot_fem import plot_ssrm_convergence, ssrm_trials
+    from .plot_fem import plot_ssrm_curve, ssrm_curve_points
     record = ssrm_record(bundle)
-    path = os.path.join(figure_dir, f"fem_{tag}_search.png")
+    fem_data = bundle.get("fem_data") or {}
+    path = os.path.join(figure_dir, f"fem_{tag}_ssrm_curve.png")
+    caption, shows = next((c, s) for p, c, s in FEM_PANELS if p == "ssrm_curve")
 
     def draw(fig):
-        plot_ssrm_convergence(record, fig=fig, show_title=False)
+        ax = fig.add_subplot(111)
+        plot_ssrm_curve(ax, record, fem_data=fem_data, show_title=False)
+        fig.tight_layout()
 
     if progress:
-        progress("the strength reduction search")
+        progress(f"the {caption.lower()} plot")
     if not _render(draw, path, opts):
         return None
-    figure = Figure(path, "Strength reduction search", counter.next_figure(),
-                    source=f"fem {tag} search")
+    figure = Figure(path, f"{caption} — strength reduction analysis",
+                    counter.next_figure(), source=f"fem {tag} ssrm_curve")
     where, links = cite("Figure", figure.number)
-    trials = len(ssrm_trials(record))
-    return (Prose(
-        f"The strength reduction search is shown in {where}. It plots each of "
-        f"the {trials} trials at its own reduction factor, marked by whether "
-        f"the section stood under that factor, with the bracket that remained "
-        f"after each trial.", links=links), figure)
+    points = ssrm_curve_points(record)
+    open_ = any(not p["stood"] for p in points)
+    said = (f"{where} shows {shows}, for each of the {len(points)} trials the "
+            f"search solved. Filled markers are trials the section stood under"
+            + ("; an open marker is a trial it did not, drawn at the displacement "
+               "that trial had when it stopped" if open_ else "") + ".")
+    budget = _failing_edge_on_budget(record)
+    if budget is not None:
+        F, sweeps = budget
+        said += (f" The trial at the failing edge, F = {F:.3f}, stopped at its "
+                 f"{sweeps:,}-sweep budget with the section still moving, so this "
+                 f"factor of safety is set by the sweep budget rather than by a "
+                 f"failure of the section.")
+    return Prose(said, links=links), figure
+
+
+def _failing_edge_on_budget(record):
+    """``(F, sweeps)`` for a run whose failing bracket edge is a trial that ran out
+    of sweeps with the section still moving, else ``None`` — the reading
+    :func:`xslope.fem.ssrm_run_summary` gives the same trial."""
+    interval = record.get("final_interval")
+    if not interval:
+        return None
+    from .fem import _HYBRID_GROWTH_MIN, _edge_trial
+    trial = _edge_trial([t for t in (record.get("trials") or [])
+                         if isinstance(t, dict)], float(interval[1]), False)
+    if trial is None or trial.get("exit_reason") in (
+            "diverging", "disp_limit", "displacement_limit", "steady_slip",
+            "nonfinite", "yield_gate"):
+        return None
+    growth = _num(trial.get("growth"))
+    if growth is None or growth <= _HYBRID_GROWTH_MIN:
+        return None
+    return float(trial["F"]), int(trial.get("iterations") or 0)
 
 
 #: What each failure criterion decides, in one sentence, keyed by the value
@@ -9679,7 +9727,7 @@ def planned_figures(slope_data, solutions, opts):
             # subsection draws from, so a run drawn twice is counted twice and one
             # whose second state fell back onto the first is counted once.
             if opts["fem_figure"]:
-                n += len(FEM_PANELS) * len(_fem_states(bundle, opts))
+                n += len(FEM_FIELD_PANELS) * len(_fem_states(bundle, opts))
             n += 1 if _fem_search_drawn(bundle, opts) else 0
             state = _fem_primary_state(bundle, opts)
             for kind, spec in DETAIL_KINDS.items():

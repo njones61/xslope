@@ -235,6 +235,205 @@ def _jsonable(value):
     return value
 
 
+def _finite_or_none(value):
+    """``value`` as a float, or None where it is missing or not a finite number."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if np.isfinite(value) else None
+
+
+def _ssrm_duration(seconds):
+    """A wall time the way a person says it: "48 s", "11 min 4 s", "2 h 5 min"."""
+    seconds = max(0.0, float(seconds))
+    if seconds < 10:
+        return f"{seconds:.1f} s"
+    if seconds < 60:
+        return f"{seconds:.0f} s"
+    minutes, secs = divmod(int(round(seconds)), 60)
+    if minutes < 60:
+        return f"{minutes} min {secs} s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours} h {minutes} min"
+
+
+def _trial_stood(trial):
+    """Whether the search counted a recorded trial as standing. The bisection
+    records ``stable``; a record without it carries ``converged``, and the Newton
+    ramp records only its ``verdict``."""
+    if trial.get("stable") is not None:
+        return bool(trial["stable"])
+    if trial.get("converged") is not None:
+        return bool(trial["converged"])
+    return trial.get("verdict") == "CONVERGED"
+
+
+def _edge_trial(trials, F, stood):
+    """The last trial solved at ``F`` that the search counted as ``stood``."""
+    for trial in reversed(trials):
+        tF = _finite_or_none(trial.get("F"))
+        if (tF is not None and abs(tF - F) <= 1e-9 * max(1.0, abs(F))
+                and _trial_stood(trial) is stood):
+            return trial
+    return None
+
+
+def _ssrm_length_unit(fem_data):
+    """The declared length unit ("m", "ft"), or "" where the model declares none."""
+    try:
+        from .units import labels, normalize_unit_system
+        system = normalize_unit_system((fem_data or {}).get("unit_system"))
+        if system is None:
+            return ""
+        return labels(system, (fem_data or {}).get("time_unit")).get("length") or ""
+    except Exception:
+        return ""
+
+
+def _standing_edge_sentence(F, trial, trials, count):
+    """How the bracket's standing edge was decided, in one sentence."""
+    if trial is None:
+        below = [t for t in trials if _trial_stood(t)
+                 and (_finite_or_none(t.get("F")) or 0.0) < F]
+        if below:
+            best = max(below, key=lambda t: float(t["F"]))
+            return (f"The standing edge, F = {F:.4f}, was not solved itself: it "
+                    f"is a grid point below the trial at F = {float(best['F']):.4f}, "
+                    f"which stood.")
+        return f"No trial at F = {F:.4f} is recorded as standing."
+    n = int(trial.get("iterations") or 0)
+    if trial.get("converged") or trial.get("verdict") == "CONVERGED":
+        how = (", finished by the Newton corrector"
+               if trial.get("corrector") else "")
+        return (f"The standing edge held: the trial at F = {F:.4f} converged in "
+                f"{n:,} {count}{how}.")
+    if trial.get("verdict") == "JOINT_SETTLED":
+        why = "its joints and displacements had stopped"
+    else:
+        why = "its displacements had stopped at elastic scale"
+    return (f"The standing edge held: the trial at F = {F:.4f} did not meet the "
+            f"force tolerance within {n:,} {count}, but {why}, so the hybrid "
+            f"criterion counted it as standing.")
+
+
+def _failing_edge_sentences(F, trial, count, unit):
+    """How the bracket's failing edge was decided, in one to three sentences."""
+    if trial is None:
+        return f"No trial at F = {F:.4f} is recorded as failing."
+    n = int(trial.get("iterations") or 0)
+    why = trial.get("exit_reason")
+    at = f"the trial at F = {F:.4f}"
+    if why == "diverging":
+        return (f"The failing edge was decided by divergence: {at} diverged at "
+                f"{count[:-1]} {n:,}.")
+    if why in ("disp_limit", "displacement_limit"):
+        return (f"The failing edge was decided by the displacement limit: {at} "
+                f"passed it at {count[:-1]} {n:,}.")
+    if why == "steady_slip":
+        return (f"The failing edge was decided by the joints: {at} was sliding "
+                f"steadily on them at {count[:-1]} {n:,}.")
+    if why == "nonfinite":
+        return (f"The failing edge was decided by the arithmetic: {at} stopped "
+                f"at {count[:-1]} {n:,} when its numbers stopped being finite.")
+    if why == "yield_gate":
+        return (f"The failing edge is undecided: {at} settled in force outside "
+                f"the yield surface at {count[:-1]} {n:,}, and the corrector found "
+                f"no admissible state. It is carried as an open question, not as "
+                f"a measured failure.")
+
+    # Everything else stopped because it ran out of sweeps.
+    budget = ("This factor of safety is the budget's, not the slope's, and a "
+              "longer budget may move it.")
+    growth = _finite_or_none(trial.get("growth"))
+    moving = growth is not None and growth > _HYBRID_GROWTH_MIN
+    if moving:
+        said = (f"The failing edge was decided by the sweep budget: {at} stopped "
+                f"at the {n:,}-{count[:-1]} budget with the section still moving. "
+                f"{budget}")
+        u = _finite_or_none(trial.get("max_displacement"))
+        ratio = _finite_or_none(trial.get("u_ratio"))
+        if u is not None and ratio:
+            grew = growth * u / ratio
+            last = int(round(n * _HYBRID_WINDOW_FRAC))
+            unit_txt = f" {unit}" if unit else ""
+            said += (f" When it stopped, the largest displacement was "
+                     f"{u:.3g}{unit_txt} and it had grown by {grew:.3g}{unit_txt} "
+                     f"over the last {last:,} {count}.")
+        return said
+    if why == "inconclusive":
+        return (f"The failing edge was decided by the sweep budget: {at} stopped "
+                f"at the {n:,}-{count[:-1]} ceiling while its out-of-balance force "
+                f"was still falling, so it is carried as an open question, not as "
+                f"a measured failure. {budget}")
+    if growth is not None:
+        return (f"The failing edge was decided by the sweep budget: {at} stopped "
+                f"at the {n:,}-{count[:-1]} budget without meeting the force "
+                f"tolerance, with the section no longer moving. This run's "
+                f"criterion counts that as failing. {budget}")
+    return (f"The failing edge was decided by the sweep budget: {at} stopped at "
+            f"the {n:,}-{count[:-1]} budget without reaching equilibrium. {budget}")
+
+
+def ssrm_run_summary(result, fem_data=None):
+    """The closing summary of a strength reduction run, as a short paragraph.
+
+    It states the factor of safety and the bracket it is the midpoint of, how
+    each edge of that bracket was decided — the standing edge by the trial that
+    stood there, the failing edge by the way its trial ended — and the wall time.
+    When the failing edge is a trial that ran out of sweeps with the section still
+    moving, it says so in those words, says the number is the budget's, and quotes
+    the displacement and its growth from the trial record. :func:`solve_ssrm`
+    prints it at the end of every run and returns it as ``result['summary']``.
+    """
+    r = result or {}
+    trials = [t for t in (r.get("trials") or []) if isinstance(t, dict)]
+    count = ("iterations" if r.get("failure_criterion") == "newton_ramp"
+             else "sweeps")
+    elapsed = _finite_or_none(r.get("elapsed_time"))
+    took = f"The run took {_ssrm_duration(elapsed)}." if elapsed is not None else ""
+
+    def _join(*parts):
+        return " ".join(p for p in parts if p)
+
+    if r.get("probe"):
+        said = []
+        for t in trials:
+            F = float(t["F"])
+            n = int(t.get("iterations") or 0)
+            said.append(f"F = {F:.4f} {'stood' if _trial_stood(t) else 'did not stand'} "
+                        f"({n:,} {count}).")
+        return _join("This run solved the named trials and computes no factor of "
+                     "safety from them.", *said, took)
+
+    FS = _finite_or_none(r.get("FS"))
+    interval = r.get("final_interval")
+    if not r.get("converged") or FS is None or not interval:
+        why = str(r.get("error") or "The search did not close on a bracket.")
+        if why.startswith("SSRM") and ": " in why:
+            why = why.split(": ", 1)[1]
+        why = why[:1].upper() + why[1:]
+        return _join("No factor of safety was found.", why, took)
+
+    lo, hi = float(interval[0]), float(interval[1])
+    head = (f"The factor of safety is {FS:.3f}, the midpoint of the bracket from "
+            f"F = {lo:.4f} to F = {hi:.4f}.")
+    if r.get("sweep_F") is not None:
+        return _join(head, "Both edges were set by the displacement catastrophe "
+                     "criterion: the plastic displacement jumped most sharply "
+                     "between them.", took)
+    if not trials:
+        return _join(head, "The run kept no record of its trials, so how each "
+                     "edge was decided is not known.", took)
+    unit = _ssrm_length_unit(fem_data)
+    return _join(head,
+                 _standing_edge_sentence(lo, _edge_trial(trials, lo, True),
+                                         trials, count),
+                 _failing_edge_sentences(hi, _edge_trial(trials, hi, False),
+                                         count, unit),
+                 took)
+
+
 def ssrm_run_record(result, fem_data=None, options=None):
     """What a strength reduction run chose and what its trials found, as meta.
 
@@ -13949,6 +14148,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     if debug_level >= 1:
         print(f"  SSRM completed in {elapsed:.1f} seconds")
 
+    # The closing summary: the answer, how each edge of its bracket was decided,
+    # and the wall time, in words. Printed on every run, whatever the debug level,
+    # because it is the one place a reader learns that a failing edge was the
+    # sweep budget's verdict rather than the slope's.
+    result["summary"] = ssrm_run_summary(result, fem_data)
+    print(f"\n{result['summary']}")
+
     return result
 
 
@@ -14025,17 +14231,17 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
 
     def _note_inconclusive(F, sol):
         if sol.get("exit_reason") == 'yield_gate':
-            why = ("force equilibrium settled outside the yield surface and the "
-                   "corrector refused an admissible replacement")
+            why = ("It settled in force outside the yield surface, and the "
+                   "corrector found no admissible state to put in its place.")
+            then = ""
         else:
-            why = (f"the iteration ceiling stopped it after "
-                   f"{sol.get('iterations', 0)} iterations while the "
-                   "out-of-balance was still falling; raise "
-                   f"max_iterations_ceiling to decide it")
-        msg = (f"SSRM: trial F = {F:.4f} is inconclusive: {why}. It is NOT "
-               f"counted as a failure: the bracket's upper edge carries this trial "
-               f"as an uncertainty rather than a measured failure, and the factor of "
-               f"safety is reported as the bracket midpoint, as on any other run.")
+            why = (f"It reached the {int(sol.get('iterations', 0)):,}-sweep "
+                   f"ceiling while its out-of-balance force was still falling.")
+            then = " Raise the iteration ceiling to decide it."
+        msg = (f"SSRM: the trial at F = {F:.4f} is inconclusive. {why} It is not "
+               f"counted as a failure. It becomes the bracket's upper edge as an "
+               f"open question, and the factor of safety is still the bracket "
+               f"midpoint.{then}")
         inconclusive.append({"F": float(F), "iterations": int(sol.get("iterations", 0)),
                              "message": msg})
         print(f"\n{msg}")
@@ -14050,6 +14256,11 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "verdict": sol.get("verdict"),
             "u_ratio": sol.get("u_ratio"),
             "growth": sol.get("u_growth"),
+            # How far the section had moved when this trial stopped, by whatever
+            # route it stopped: the solve's own max_displacement, the quantity a
+            # saved field's meta records under the same name and the Newton ramp
+            # records on its trials. None where the arithmetic gave out.
+            "max_displacement": _finite_or_none(sol.get("max_displacement")),
             "exit_reason": sol.get("exit_reason"),
             # The residual went flat before this trial stopped (None if it never did).
             "plateau_iteration": sol.get("plateau_iteration"),
@@ -14276,10 +14487,10 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     n_expand = 0
     while _stable(solution_max):
         if F_right >= f_max_ceiling - 1e-9 or n_expand >= max_expand:
-            msg = (f"SSRM: the slope still reaches equilibrium at F = {F_right:.2f} "
-                   f"(raised to the ceiling while auto-bracketing), so the factor of safety "
-                   f"exceeds this. Raise F_max / f_max_ceiling, or the slope may deform "
-                   f"ductilely without a displacement catastrophe.")
+            msg = (f"SSRM: the slope still stands at F = {F_right:.2f}, the highest "
+                   f"factor the search may try. The factor of safety is above it. "
+                   f"Raise F max, or the ceiling (f_max_ceiling), to find it. A slope "
+                   f"that keeps deforming without ever running away also ends here.")
             print(f"\n{msg}")
             return {"converged": False, "FS": None, "last_solution": solution_max,
                     "error": msg, "trials": trials}

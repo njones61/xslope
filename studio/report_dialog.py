@@ -180,8 +180,8 @@ CONTENT_TREE = [
           "plot as the FEM data view."),
          ("fem_figure", "Shear strain, deformed mesh and displacement plots",
           "The viscoplastic shear strain, the deformed mesh and the "
-          "displacement vectors — the three plots the finite element results "
-          "view offers, in that order."),
+          "displacement vectors — the first three plots the finite element "
+          "results view offers, in that order."),
          ("fem_state_failure", "Result plots at failure",
           "Draw the result plots from the mechanism at failure — the developed "
           "state a strength reduction run captures beyond its critical factor. "
@@ -191,11 +191,12 @@ CONTENT_TREE = [
           "Draw the result plots from the last trial that reached equilibrium. "
           "Tick it alongside the one above to get both, each variable on one "
           "scale across the pair so the two states are read against each other."),
-         ("fem_convergence_figure", "Strength reduction search plot",
-          "Every trial the strength reduction run solved, at the factor it was "
-          "solved at and marked by whether the section stood under it, with the "
-          "interval still open after each. Only where the run kept a record of "
-          "its trials."),
+         ("fem_convergence_figure", "Displacement vs F plot",
+          "The fourth plot the finite element results view offers: the maximum "
+          "displacement of every trial the strength reduction run solved, "
+          "against its factor, marked by whether the section stood under it, "
+          "with the factor of safety and the final bracket. Only where the run's "
+          "trial record carries the displacements."),
          ("fem_reinforcement", "Reinforcement forces",
           "Declared capacity, and the axial force and utilization at the point "
           "each reinforcement line is most utilized. Only where the model "

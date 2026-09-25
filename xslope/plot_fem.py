@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import LineCollection
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.patches import Polygon
+from matplotlib.patches import Patch, Polygon
 
 from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by name)
 from .plot import (adaptive_colorbar_ticks, declared_unit_labels,
@@ -884,7 +884,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                     mesh_on_fields=False, fs=None, failure_solution=None,
                     show_original='outline', deformed_color='k', deform_scale=None,
                     field_state=None, strain_state=None, color_by_magnitude=False, vector_cmap='viridis',
-                    vmin=None, vmax=None, vector_max=None, show_joints=True):
+                    vmin=None, vmax=None, vector_max=None, show_joints=True,
+                    ssrm_record=None):
     """
     Plot FEM results with various visualization options.
 
@@ -903,6 +904,14 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             'strain' - equivalent strain contours
             'shear_strain' - viscoplastic max shear strain contours
             'yield' - Mohr-Coulomb yield function contours
+            'ssrm_curve' - the maximum displacement of every strength reduction
+                trial against its F, drawn from ``ssrm_record`` on its own axes
+                (no section, no colorbar); see :func:`plot_ssrm_curve`
+        ssrm_record: The strength reduction run the 'ssrm_curve' panel is drawn
+            from — :func:`xslope.fem.solve_ssrm`'s result, or the meta sidecar
+            a saved run was written with (:func:`xslope.fem.import_fem_meta`).
+            Asking for the panel without a record that carries at least two
+            trials with a displacement raises ``ValueError`` with the reason.
         deform_percent: Target deformation as percentage of mesh height (default 15).
         block_grid: On a jointed model's deformation panel, whether the element
             grid is drawn under the blocks; None follows :func:`block_grid_default`.
@@ -1044,12 +1053,19 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         plot_types = [plot_type.strip().lower()]
     else:
         plot_types = [pt.strip().lower() for pt in plot_type]
-    valid_types = ['displace_mag', 'displace_vector', 'deformation', 'stress', 'strain', 'shear_strain', 'yield']
+    valid_types = ['displace_mag', 'displace_vector', 'deformation', 'stress', 'strain', 'shear_strain', 'yield',
+                   'ssrm_curve']
     
     # Validate plot types
     for pt in plot_types:
         if pt not in valid_types:
             raise ValueError(f"Unknown plot_type: '{pt}'. Valid types: {valid_types}")
+    # The displacement curve is drawn from the run's trial record, not from the
+    # field: refuse up front, with the reason, rather than draw an empty axes.
+    if 'ssrm_curve' in plot_types:
+        _why = ssrm_curve_unavailable(ssrm_record)
+        if _why:
+            raise ValueError(_why)
     
     # Auto-calculate deformation scale so max displacement is deform_percent of the mesh
     # height, measured on the field the deformation panel actually renders (the at-
@@ -1084,7 +1100,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     # whose internal colorbar we can suppress; any other field type falls back to the
     # legacy inline colorbars so nothing else regresses.
     single = n_plots == 1
-    _deferrable = {'deformation', 'shear_strain', 'displace_vector'}
+    _deferrable = {'deformation', 'shear_strain', 'displace_vector', 'ssrm_curve'}
     defer_cbars = (not single) and all(pt in _deferrable for pt in plot_types)
 
     own_fig = fig is None
@@ -1107,7 +1123,11 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         # and the colorbar matches its height.
         data_w = (x_max - x_min) + 2 * x_margin
         data_h = (y_max - y_min) + 2 * y_margin
-        if data_w > 0:
+        if plot_types[0] == 'ssrm_curve':
+            # A curve, not a section: no data aspect to follow, so the figure's
+            # own proportions, capped at the height asked for.
+            single_height = float(np.clip(0.55 * figsize[0], 2.0, figsize[1]))
+        elif data_w > 0:
             single_height = figsize[0] * (data_h / data_w)
             # Clamp to a sensible range so very flat/steep slopes stay readable
             single_height = float(np.clip(single_height, 2.0, figsize[1]))
@@ -1192,6 +1212,15 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         # Explicit override from the caller (the Studio colorbar-size control).
         if cbar_shrink is not None:
             cb_shrink = cbar_shrink
+
+        # The displacement curve is not a section: its own axes, its own limits,
+        # no equal aspect and no colorbar.
+        if pt == 'ssrm_curve':
+            _interval = (ssrm_record or {}).get("final_interval")
+            plot_ssrm_curve(ax, ssrm_record, fs=fs, final_interval=_interval,
+                            fem_data=fem_data, show_title=show_title,
+                            show_legend=show_legend)
+            continue
 
         # Filled-field contour panels take ``mesh_on_fields`` (opt-in edge overlay,
         # default off) so the fill reads clean; the deformation panel keeps
@@ -3067,15 +3096,6 @@ def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8), save_
     return fig, axes
 
 
-#: What the search figure draws each trial as. A trial the section STOOD under
-#: moves the lower end of the interval up; one it did not moves the upper end
-#: down. Two marks, so the closing is readable in grayscale as well as in color.
-_TRIAL_STYLE = {
-    True: ("#2e7d32", "o", "the section stood"),
-    False: ("#c62828", "v", "the section did not stand"),
-}
-
-
 def ssrm_trials(record):
     """The per-trial record a strength reduction run kept, oldest first.
 
@@ -3101,12 +3121,12 @@ def ssrm_trials(record):
 
 
 def ssrm_has_convergence_history(record):
-    """True when a run's record carries enough trials to draw the search closing.
+    """True when a run's record holds a search at all: two trials or more.
 
-    The question asked before :func:`plot_ssrm_convergence` is called, so a caller
-    counts the figures it will get right. A displacement catastrophe run keeps no
-    trial record at all, and a run restored from a file written before the record
-    was persisted keeps none either.
+    A displacement catastrophe run keeps no trial record, and a run restored from
+    a file written before the record was persisted keeps none either. The
+    displacement curve asks the stricter question, whether the trials carry their
+    displacements (:func:`ssrm_curve_unavailable`).
     """
     return len(ssrm_trials(record)) >= 2
 
@@ -3135,94 +3155,218 @@ def ssrm_interval_history(record):
     return history
 
 
-def plot_ssrm_convergence(record, fs=None, tolerance=None, figsize=(7.4, 4.4),
-                          fig=None, show_title=True, show_legend=True,
-                          save_png=False, dpi=300):
-    """How the strength reduction search closed on the factor of safety.
+#: What the fourth finite element results plot is called — in the results view's
+#: plot list, in the report's caption for it, and as ``plot_fem_results``'s
+#: ``plot_type`` key ``"ssrm_curve"``.
+SSRM_CURVE_LABEL = "Displacement vs F"
 
-    One axes: every trial the run solved, at the factor it was solved at, marked
-    by whether the section stood under it; the interval the search had narrowed
-    to after each of them, shaded behind them; and the factor of safety the run
-    reported, ruled across. Read left to right it is the search closing.
+#: Its title on the figure.
+SSRM_CURVE_TITLE = "Displacement vs strength reduction factor"
+
+#: How a trial that did not stand ended, keyed by its ``exit_reason``, as the
+#: key names it. A reason not listed ran out of sweeps: the solve stops on
+#: convergence, on a displacement or divergence test, or at its budget.
+_SSRM_CURVE_ENDINGS = {
+    "diverging": ("diverging", "v"),
+    "disp_limit": ("past the displacement limit", "^"),
+    "displacement_limit": ("past the displacement limit", "^"),
+    "steady_slip": ("sliding steadily on its joints", "D"),
+    "yield_gate": ("settled outside the yield surface", "D"),
+}
+_SSRM_CURVE_BUDGET = ("did not converge within the sweep budget", "s")
+_SSRM_CURVE_STOOD_COLOR = "#1f4e79"
+_SSRM_CURVE_FELL_COLOR = "#c62828"
+
+
+def ssrm_curve_points(record):
+    """The trials a strength reduction run recorded a displacement for, sorted by F.
+
+    Each is ``{"F", "max_displacement", "stood", "converged", "ending"}``, where
+    ``ending`` is the key's words for how a trial that did not stand ended (None
+    for one that stood). A trial with no finite displacement — a record written before trials
+    carried one, or a trial whose arithmetic gave out — has no place on the curve
+    and is left off it.
+    """
+    points = []
+    for trial in ((record or {}).get("trials") or []):
+        if not isinstance(trial, dict):
+            continue
+        try:
+            F = float(trial.get("F"))
+            u = float(trial.get("max_displacement"))
+        except (TypeError, ValueError):
+            continue
+        if not (np.isfinite(F) and np.isfinite(u)):
+            continue
+        if trial.get("stable") is not None:
+            stood = bool(trial["stable"])
+        elif trial.get("converged") is not None:
+            stood = bool(trial["converged"])
+        else:
+            stood = trial.get("verdict") == "CONVERGED"
+        ending = None
+        if not stood:
+            ending = _SSRM_CURVE_ENDINGS.get(trial.get("exit_reason"),
+                                             _SSRM_CURVE_BUDGET)[0]
+        converged = bool(trial.get("converged",
+                                   trial.get("verdict") == "CONVERGED"))
+        points.append({"F": F, "max_displacement": u, "stood": stood,
+                       "converged": converged, "ending": ending})
+    points.sort(key=lambda p: p["F"])
+    return points
+
+
+def ssrm_curve_unavailable(record):
+    """Why ``record`` cannot be drawn as a displacement curve, in one line, or None.
+
+    A single finite element solve keeps no trial record; a run saved before the
+    trials carried their displacement keeps trials with nothing to plot.
+    """
+    trials = (record or {}).get("trials") or []
+    if not trials:
+        return ("No strength reduction trials are recorded for this result, so "
+                "there is no displacement curve to draw.")
+    if len(ssrm_curve_points(record)) < 2:
+        return ("This run's trials do not record their displacements (it was "
+                "saved before they did); solve it again to draw the curve.")
+    return None
+
+
+def _ssrm_curve_legend(ax, handles, labels, title):
+    """The key, in the joint-slip panel's styling, in the first corner of the axes
+    the drawing leaves empty — tested against the drawn points, the lines joining
+    them and the factor-of-safety rule — or outside the axes on the right where no
+    corner is clear."""
+    from matplotlib.legend_handler import HandlerTuple
+    style = dict(fontsize=8, frameon=True, framealpha=0.92, edgecolor="#cccccc",
+                 borderpad=0.6, handlelength=2.6, title=title, title_fontsize=8,
+                 handler_map={tuple: HandlerTuple(ndivide=1, pad=0.0)})
+    fig = ax.figure
+    canvas = fig.canvas
+    if not hasattr(canvas, "get_renderer"):
+        # A bare Figure (the report's, a test's) has no renderer until a canvas
+        # gives it one; Agg is the canvas savefig would use.
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        canvas = FigureCanvasAgg(fig)
+    canvas.draw()
+    renderer = canvas.get_renderer()
+    # Everything drawn, as display points: the markers, the lines sampled along
+    # their length, and the vertical rules.
+    pts = []
+    for line in ax.lines:
+        xy = np.column_stack([np.asarray(line.get_xdata(), float),
+                              np.asarray(line.get_ydata(), float)])
+        if line.get_transform() != ax.transData:
+            xy = line.get_transform().transform(xy)
+        else:
+            xy = ax.transData.transform(xy)
+        for a, b in zip(xy[:-1], xy[1:]):
+            pts.extend(a + (b - a) * t for t in np.linspace(0.0, 1.0, 24))
+        pts.extend(xy)
+    pts = np.asarray(pts, float) if pts else np.zeros((0, 2))
+    for loc in ("upper left", "lower right", "upper right", "lower left"):
+        leg = ax.legend(handles, labels, loc=loc, **style)
+        box = leg.get_window_extent(renderer).padded(4)
+        inside = ((pts[:, 0] >= box.x0) & (pts[:, 0] <= box.x1)
+                  & (pts[:, 1] >= box.y0) & (pts[:, 1] <= box.y1)) if len(pts) else []
+        if not np.any(inside):
+            return leg
+        leg.remove()
+    return ax.legend(handles, labels, loc="upper left", bbox_to_anchor=(1.0, 1.0),
+                     **style)
+
+
+def plot_ssrm_curve(ax, record, fs=None, final_interval=None, fem_data=None,
+                    show_title=True, show_legend=True):
+    """The maximum displacement of every strength reduction trial against its F.
+
+    One marker per trial, sorted by F and joined by a thin line: filled where the
+    section stood, open where it did not, with the key naming how each open one
+    ended. An open marker sits at the displacement its trial had when it stopped,
+    which for a trial cut off by its sweep budget is wherever the budget happened
+    to leave it. The reported factor of safety is ruled as a vertical line and the
+    final bracket is shaded behind it.
+
+    Read it for its shape: a flat run and a sharp knee is a strength limit; a
+    steady climb with no knee means the section kept moving at every strength the
+    search tried, and the factor of safety came from where the sweep budget
+    stopped the failing trial rather than from the slope.
 
     ``record`` is :func:`xslope.fem.solve_ssrm`'s result or the meta sidecar a
-    saved run was written with. ``fs`` and ``tolerance`` default to the record's
-    own. Ask :func:`ssrm_has_convergence_history` first: a run that kept no trial
-    record — a displacement catastrophe run keeps none — cannot be drawn, and
-    raises rather than producing an empty axes.
-
-    This read ``F_history`` and ``convergence_history``, which solve_ssrm has
-    never emitted under any criterion, so it drew nothing on every run there has
-    ever been.
-
-    Returns ``(fig, ax)``.
+    saved run was written with (:func:`xslope.fem.ssrm_run_record`, restored by
+    :func:`xslope.fem.import_fem_meta`). ``fs`` and ``final_interval`` default to
+    the record's own. ``fem_data`` supplies the declared length unit for the axis
+    label. Raises ``ValueError`` with a one-line reason
+    (:func:`ssrm_curve_unavailable`) where the record has fewer than two trials
+    with a displacement.
     """
-    trials = ssrm_trials(record)
-    if len(trials) < 2:
-        raise ValueError("this run kept no trial record to draw: "
-                         f"{len(trials)} trial(s) with a factor on them")
-    intervals = ssrm_interval_history(record)
+    from matplotlib.lines import Line2D
+    why = ssrm_curve_unavailable(record)
+    if why:
+        raise ValueError(why)
+    points = ssrm_curve_points(record)
     if fs is None:
         fs = (record or {}).get("FS")
-    if tolerance is None:
-        tolerance = (record or {}).get("tolerance")
+    if final_interval is None:
+        final_interval = (record or {}).get("final_interval")
 
-    own_fig = fig is None
-    if own_fig:
-        fig = plt.figure(figsize=figsize)
-    else:
-        fig.clear()
-    ax = fig.subplots(1, 1)
+    Fs = [p["F"] for p in points]
+    us = [p["max_displacement"] for p in points]
+    ax.plot(Fs, us, "-", color="0.45", lw=1.0, zorder=2)
 
-    steps = list(range(1, len(trials) + 1))
+    handles, labels = [], []
+    stood = [p for p in points if p["stood"]]
+    if stood:
+        ax.plot([p["F"] for p in stood], [p["max_displacement"] for p in stood],
+                "o", color=_SSRM_CURVE_STOOD_COLOR, ms=6.5, ls="none", zorder=4)
+        handles.append(Line2D([0], [0], marker="o", ls="none", ms=6.5,
+                              color=_SSRM_CURVE_STOOD_COLOR))
+        # A trial the hybrid criterion counted as standing without converging
+        # (its displacements had stopped) is still a standing trial, and the key
+        # does not claim convergence for it.
+        labels.append("stood (converged)" if all(p["converged"] for p in stood)
+                      else "stood")
+    endings = []
+    for p in points:
+        if p["ending"] is not None and p["ending"] not in endings:
+            endings.append(p["ending"])
+    markers = {label: marker for label, marker in
+               list(_SSRM_CURVE_ENDINGS.values()) + [_SSRM_CURVE_BUDGET]}
+    for ending in endings:
+        mine = [p for p in points if p["ending"] == ending]
+        ax.plot([p["F"] for p in mine], [p["max_displacement"] for p in mine],
+                markers[ending], mfc="white", mec=_SSRM_CURVE_FELL_COLOR, mew=1.5,
+                ms=6.5, ls="none", zorder=4)
+        handles.append(Line2D([0], [0], marker=markers[ending], ls="none", ms=6.5,
+                              mfc="white", mec=_SSRM_CURVE_FELL_COLOR, mew=1.5))
+        labels.append(ending)
 
-    # The interval, behind everything: a band from the low end to the high end,
-    # held flat across the trial that produced it (step='post'), so its width at
-    # any trial is the width the search had reached by then.
-    band = [(n, lo, hi) for n, (lo, hi) in zip(steps, intervals)
-            if lo is not None and hi is not None and hi > lo]
-    if band:
-        bx = [n for n, _lo, _hi in band] + [band[-1][0] + 0.5]
-        blo = [lo for _n, lo, _hi in band] + [band[-1][1]]
-        bhi = [hi for _n, _lo, hi in band] + [band[-1][2]]
-        ax.fill_between(bx, blo, bhi, step="post", color="#7f8c9a", alpha=0.18,
-                        linewidth=0, label="the interval still open")
-
-    # The trials themselves, in the order they were solved.
-    ax.plot(steps, [t["F"] for t in trials], "-", color="0.55", lw=1.0,
-            zorder=2)
-    for stood in (True, False):
-        color, marker, label = _TRIAL_STYLE[stood]
-        xs = [n for n, t in zip(steps, trials) if t["stood"] is stood]
-        ys = [t["F"] for t in trials if t["stood"] is stood]
-        if xs:
-            ax.plot(xs, ys, marker, color=color, ms=6, ls="none", label=label,
-                    zorder=3)
-
+    if final_interval is not None and len(final_interval) == 2:
+        lo, hi = float(final_interval[0]), float(final_interval[1])
+        if hi > lo:
+            ax.axvspan(lo, hi, color="#7f8c9a", alpha=0.18, lw=0, zorder=1)
+            handles.append(Patch(facecolor="#7f8c9a", alpha=0.18, edgecolor="none"))
+            labels.append("final bracket")
     if fs is not None:
-        note = f"FS = {float(fs):.3f}"
-        if tolerance is not None:
-            note += f" ± {float(tolerance) / 2:g}"
-        ax.axhline(float(fs), color="#1f4e79", ls="--", lw=1.6, zorder=4,
-                   label=note)
+        ax.axvline(float(fs), color="#1f4e79", ls="--", lw=1.4, zorder=3)
+        handles.append(Line2D([0], [0], color="#1f4e79", ls="--", lw=1.4))
+        labels.append(f"FS = {float(fs):.3f}")
 
-    ax.set_xlabel("Trial, in the order it was solved")
-    ax.set_ylabel("Strength reduction factor $F$")
-    ax.set_xlim(0.5, len(trials) + 0.5)
-    ax.set_xticks(steps)
+    ax.set_xlabel("Strength reduction factor, F")
+    ax.set_ylabel(_fem_cbar_label(fem_data, "Maximum displacement", "length"))
+    # Displacement is measured from zero, so the axis is too: a flat branch then
+    # reads as flat rather than being stretched to fill the height.
+    top = max(us)
+    ax.set_ylim(0.0, top * 1.1 if top > 0 else 1.0)
+    ax.margins(x=0.06)
     ax.grid(alpha=0.25)
     if show_title:
-        ax.set_title("Strength reduction search", fontsize=11)
-    if show_legend:
-        ax.legend(loc="best", fontsize=8.5, framealpha=0.9)
-
-    try:
-        fig.tight_layout()
-    except Exception:
-        pass
-    if save_png:
-        fig.savefig('plot_ssrm_convergence.png', dpi=dpi, bbox_inches='tight')
-    return fig, ax
+        ax.set_title(SSRM_CURVE_TITLE, fontsize=12, pad=15)
+    if show_legend and handles:
+        title = ("open marker: displacement when the trial stopped"
+                 if endings else None)
+        _ssrm_curve_legend(ax, handles, labels, title)
+    return ax
 
 
 def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,

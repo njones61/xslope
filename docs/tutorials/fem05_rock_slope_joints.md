@@ -44,10 +44,12 @@ the section and the rock with nothing on the joints worksheet; this is the file
 the page starts from
 
 **Completed models** — [xslope_rock_joints.xlsx](files/xslope_rock_joints.xlsx),
-part 1's slab on its two joint lines, and
+part 1's slab on its two joint lines,
 [xslope_rock_toppling.xlsx](files/xslope_rock_toppling.xlsx), part 2's generated
-column set. The toppling model ships with its mesh and its solved strength
-reduction beside it, so it can be opened and read without running anything
+column set, and [xslope_rock_voronoi.xlsx](files/xslope_rock_voronoi.xlsx), the
+same zone as a Voronoi block mass. The toppling model ships with its mesh and its
+solved strength reduction beside it, so it can be opened and read without running
+anything
 </div>
 </div>
 
@@ -450,15 +452,39 @@ and check that the answer has stopped moving before trusting the fine one.
 The `Voronoi` generator sits at the far end of that trade. It fills a region with
 a tessellated block mass at no preferred orientation, which is the right picture
 of a blocky rock mass with no dominant joint set. Over this slope's toppling
-zone, at a block size of 2 m, it writes **58 joint lines** — about fifteen cells
-— where the parallel set wrote five:
+zone, at a block size of 2 m (and a seed of 7 — a tessellation is random, and the
+seed is what makes it the same one twice), it writes **50 joint lines** — about
+fifteen cells — where the parallel set wrote five. The base plane is typed in as
+before. The completed model is
+[xslope_rock_voronoi.xlsx](files/xslope_rock_voronoi.xlsx).
 
-![The same region filled by the Voronoi generator instead: about fifteen blocks and 58 joint lines](images/fem05_inputs_voronoi.png){width=900}
+![The same region filled by the Voronoi generator instead: about fifteen blocks and 50 joint lines on the base plane](images/fem05_inputs_voronoi.png){width=900}
 
-That is a picture of the generator rather than a model to run here. The
-mechanism it describes is real, but a section with that many contacts in it is a
-run measured in hours rather than minutes, and the place to meet it is on a
-machine and a schedule that can take it.
+Meshed at the same 1.5 m it comes to **1,303 nodes, 531 elements and 82 joint
+elements**, twice the interfaces of the column set, and run at the same settings
+it takes about **nine minutes** on the reference solver. The search reports
+
+>>**FS = 1.113**
+
+but read that with the trials beside it. The mass stands at 1.0625, where it
+settles in 309 sweeps, and fails at 1.117; the two trials in between, at 1.094
+and 1.109, used their whole 100,000 sweeps without settling and were read as
+standing because they had stopped moving. So the factor lies between 1.06 and
+1.12, close to the column set's 1.105, and the figures show why the two agree
+in number and differ in kind:
+
+![Joint slip on the Voronoi mass: the base plane slipping end to end, a chain of block walls slipping from its upper tip up to the crest, and the walls nearest the face opened](images/fem05_joint_slip_voronoi.png){width=900}
+
+![The deformed Voronoi blocks: the mass slides out along the base plane as a broken slab rather than toppling](images/fem05_fem_blocks_voronoi.png){width=900}
+
+The base plane carries the slide again, slipping along its whole length and
+most at the toe, but the mass above it does not topple. With no set of columns
+to rotate, the blocks slide out along the base plane as one broken slab: a chain
+of walls from the plane's upper tip up to the crest slips as the mass shears off
+the rock behind it, the walls nearest the face open as the front blocks pull
+ahead, and the walls inside the mass stay closed. A blocky mass with no dominant
+set fails as a slide on whatever surface bounds it below, which is what the
+tessellation was built to show.
 
 ---
 

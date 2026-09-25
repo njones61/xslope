@@ -1694,7 +1694,10 @@ the bracket. When the trial at the top hit the iteration limit, the summary says
 still moving fast (*the slope was failing; more iterations would only have let it move further*)
 or still moving slowly (*the factor of safety depends on the iteration limit here*). Both quote
 the largest displacement, its multiple of the elastic value and how much it grew over the last
-quarter of the trial's iterations.
+quarter of the trial's iterations. A trial ended by any other rule is reported with the reading
+that ended it: how much the joint slip grew and whether its rate slowed, the displacement reached
+as a multiple of the elastic value, the displacement against the displacement limit, or how far
+the out-of-balance force fell before the iteration ceiling.
 
 ## Exported files
 

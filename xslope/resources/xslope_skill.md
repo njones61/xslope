@@ -2010,7 +2010,9 @@ and the number stands. **Still moving, but slowly** means the factor of safety d
 iteration limit, and raising Max iterations per trial may change it. The `'ssrm_curve'` plot
 shows the same thing: a flat run of displacements and a sharp knee is a strength limit; a steady
 climb with no knee means the slope never stopped moving. In that second case say so to the user
-rather than reporting the number bare.
+rather than reporting the number bare. Any other ending is quoted with the reading that fired it
+(joint slip growth and rate, the elastic multiple reached, the displacement against its limit);
+pass those numbers on rather than paraphrasing them.
 
 **How a trial is decided.** The viscoplastic loop drives the solve and builds the plastic history.
 At 300, 1,000 and 3,000 iterations, and again wherever one of the stopping rules above would end

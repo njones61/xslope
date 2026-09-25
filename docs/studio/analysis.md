@@ -725,7 +725,9 @@ ends with a closing summary in the Log: the factor of safety and its bracket, wh
 happened at each end of the bracket, and the wall time. When the trial at the top of
 the bracket hit the iteration limit while the slope was still moving slowly, the
 summary says the factor of safety depends on the iteration limit, and that raising
-**Max iterations per trial** may change it. The solution is
+**Max iterations per trial** may change it. A trial ended by any other rule is
+reported with the numbers that ended it, such as how much the joint slip grew over
+the last stretch of iterations. The solution is
 exported alongside the model so it can be restored on the next Open without
 re-solving — including the at-failure mechanism snapshot (a second CSV pair) and,
 for a model with reinforcement or piles, the per-element structural results

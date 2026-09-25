@@ -119,6 +119,14 @@ def check_trial_record():
           summary[:80])
     check("the summary is printed, once, as the run's last words",
           log.rstrip().endswith(summary) and log.count(summary) == 1)
+    div = [t for t in trials if t.get("exit_reason") == "diverging"]
+    check("a trial ended by a rule records the reading that fired it",
+          bool(div) and all((t.get("stop_reading") or {}).get("rule")
+                            == "diverging" and t["stop_reading"].get("u_ratio")
+                            for t in div),
+          f"{[t.get('stop_reading') for t in div]}")
+    check("a converged trial records no reading",
+          all(t.get("stop_reading") is None for t in trials if t.get("converged")))
     check("the summary says what happened at each end, and the wall time",
           "reached equilibrium" in summary and "did not:" in summary
           and "The run took" in summary, summary)
@@ -375,6 +383,88 @@ def check_summary():
     check("a probe names each trial and no factor of safety",
           "At F = 1.3000 the slope reached equilibrium" in s
           and "At F = 1.4000 the slope did not reach equilibrium" in s, s)
+
+    # Every rule's reading, quoted in one clause.
+    s = _summary({"exit_reason": "steady_slip", "verdict": "FAILED",
+                  "iterations": 90001,
+                  "stop_reading": {"rule": "steady_slip", "window": 45000,
+                                   "slip_frac": 0.06, "growth": 0.4,
+                                   "rate_ratio": 1.02, "iteration": 90001}})
+    check("sliding on the joints quotes the slip and its rate",
+          "At F = 1.4000 it did not: over the last 45,000 iterations the joint "
+          "slip grew 6% and its rate did not slow, so the run stopped waiting at "
+          "iteration 90,001 and counted the slope as sliding." in s, s)
+    s = _summary({"exit_reason": "steady_slip", "verdict": "FAILED",
+                  "iterations": 90001,
+                  "stop_reading": {"rule": "steady_slip", "window": 45000,
+                                   "slip_frac": 0.0042, "growth": 0.4,
+                                   "rate_ratio": 0.93, "iteration": 90001}})
+    check("a slip under 1% and a slightly slower rate are quoted as they are",
+          "grew 0.42% and its rate slowed by only 7%" in s, s)
+    s = _summary({"exit_reason": "diverging", "verdict": "FAILED",
+                  "iterations": 341,
+                  "stop_reading": {"rule": "diverging", "signal": "runaway",
+                                   "u_ratio": 15.12, "iteration": 341,
+                                   "window": 2000, "gain": 3.0}})
+    check("running away quotes the elastic multiple",
+          "At F = 1.4000 it did not: the largest displacement reached 15.1 times "
+          "the elastic value at iteration 341." in s, s)
+    s = _summary({"exit_reason": "disp_limit", "verdict": "FAILED",
+                  "iterations": 640,
+                  "stop_reading": {"rule": "disp_limit", "displacement": 0.85,
+                                   "limit": 0.5, "iteration": 640}})
+    check("the displacement limit quotes the displacement and the limit",
+          "At F = 1.4000 it did not: the displacement reached 0.85 m at iteration "
+          "640, past the limit of 0.5 m." in s, s)
+    s = _summary({"exit_reason": "inconclusive", "verdict": "AMBIGUOUS",
+                  "stop_reading": {"rule": "inconclusive", "oob_from": 0.0031,
+                                   "oob_to": 0.0024, "window": 1000,
+                                   "force_tol": 0.001}})
+    check("the iteration ceiling quotes the fall of the out-of-balance force",
+          "still falling (from 0.0031 to 0.0024 over the last 1,000 iterations). "
+          "That is neither an equilibrium nor a failure" in s, s)
+    settled = {"F": 1.35, "stable": True, "converged": False,
+               "verdict": "JOINT_SETTLED", "iterations": 60000,
+               "exit_reason": "joint_settled",
+               "stop_reading": {"rule": "joint_settled", "window": 15000,
+                                "slip_frac": 0.00004, "growth": 0.001,
+                                "soil_oob": 0.0004, "force_tol": 0.001}}
+    s = _said(fem.ssrm_run_summary({
+        "converged": True, "FS": 1.375, "final_interval": (1.35, 1.40),
+        "trials": [settled, {"F": 1.40, "stable": False, "iterations": 300,
+                             "exit_reason": "diverging", "verdict": "FAILED"}]}))
+    check("settled joints quote the slip's growth",
+          "At F = 1.3500 the joint slip and the displacements had stopped (the "
+          "slip grew 0.004% over the last 15,000 iterations) while the joint "
+          "forces kept flickering, so it was counted as standing." in s, s)
+    old_file = dict(settled)
+    old_file.pop("stop_reading")
+    s = _said(fem.ssrm_run_summary({
+        "converged": True, "FS": 1.375, "final_interval": (1.35, 1.40),
+        "trials": [old_file, {"F": 1.40, "stable": False, "iterations": 300,
+                              "exit_reason": "steady_slip", "verdict": "FAILED"}]}))
+    check("a record saved before readings gets the earlier sentences",
+          "its joints and displacements had stopped, so it was counted as "
+          "standing" in s
+          and "the slope was sliding steadily on its joints at iteration 300." in s,
+          s)
+
+    # The joint rule reports its reading without changing when it fires.
+    traces = os.path.join(_HERE, "test", "fixtures", "joint_traces.json")
+    with open(traces) as f:
+        rows = json.load(f)
+    same, filled = True, True
+    for t in rows.values():
+        args = (t["slip"], t["oob_soil"], t["disp"], t["u_elastic_scale"], 1e-3)
+        kw = dict(joint_oob_hist=t["oob_joint"], budget=t["budget"],
+                  sample_every=t["sample_every"])
+        reading = {}
+        plain = fem.joint_verdict(*args, **kw)
+        read = fem.joint_verdict(*args, reading=reading, **kw)
+        same &= plain == read
+        filled &= (reading.get("rule") == read) if read else not reading
+    check("joint_verdict fires the same with a reading asked for", same)
+    check("and fills the reading exactly when it fires", filled)
 
     # The run's own summary from section 1 joins the synthetic ones.
     _f, result, _log = _solved()

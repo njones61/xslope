@@ -14482,8 +14482,10 @@ def test_the_displacement_curve_draws_the_trials():
         fails.append(f"{marked} trials are marked, of {len(record['trials'])}")
     labels = [t.get_text() for t in (ax.get_legend().get_texts()
                                      if ax.get_legend() else [])]
-    for wanted in ("stood", "did not converge within the sweep budget",
-                   "diverging", "past the displacement limit", "FS = 1.375"):
+    for wanted in ("reached equilibrium",
+                   "stopped at the iteration limit, still moving",
+                   "displacements ran away", "past the displacement limit",
+                   "FS = 1.375"):
         if not any(wanted in l for l in labels):
             fails.append(f"the key does not name {wanted!r}: {labels}")
     try:
@@ -14504,9 +14506,9 @@ def test_the_displacement_curve_draws_the_trials():
     if f"for each of the {len(record['trials'])} trials" not in said:
         fails.append(f"the report does not say how many trials the curve "
                      f"draws: {said!r}")
-    if "set by the sweep budget" not in said:
-        fails.append("a run whose failing edge ran out of sweeps with the "
-                     "section still moving is not said to be the budget's")
+    if "depends on the iteration limit" not in said:
+        fails.append("a run whose top trial hit the iteration limit while the "
+                     "slope was still moving slowly is not said to depend on it")
     planned, drawn = _planned_matches(report, "fem", bundle=carried)
     if planned != drawn:
         fails.append(f"a report carrying the curve planned {planned} figures "

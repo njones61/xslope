@@ -9055,22 +9055,25 @@ def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
     points = ssrm_curve_points(record)
     open_ = any(not p["stood"] for p in points)
     said = (f"{where} shows {shows}, for each of the {len(points)} trials the "
-            f"search solved. Filled markers are trials the section stood under"
-            + ("; an open marker is a trial it did not, drawn at the displacement "
-               "that trial had when it stopped" if open_ else "") + ".")
-    budget = _failing_edge_on_budget(record)
-    if budget is not None:
-        F, sweeps = budget
-        said += (f" The trial at the failing edge, F = {F:.3f}, stopped at its "
-                 f"{sweeps:,}-sweep budget with the section still moving, so this "
-                 f"factor of safety is set by the sweep budget rather than by a "
-                 f"failure of the section.")
+            f"search solved. The line joins the trials in which the slope reached "
+            f"equilibrium"
+            + ("; an open marker is a trial that was stopped before it did, drawn "
+               "where it was when it was stopped, still moving" if open_ else "")
+            + ".")
+    limited = _failing_edge_on_budget(record)
+    if limited is not None:
+        F, iterations = limited
+        said += (f" At F = {F:.3f}, the top of the bracket, the trial hit the "
+                 f"{iterations:,}-iteration limit while the slope was still moving "
+                 f"slowly. The factor of safety depends on the iteration limit "
+                 f"here.")
     return Prose(said, links=links), figure
 
 
 def _failing_edge_on_budget(record):
-    """``(F, sweeps)`` for a run whose failing bracket edge is a trial that ran out
-    of sweeps with the section still moving slowly, else ``None`` — the reading
+    """``(F, iterations)`` for a run whose failing bracket edge is a trial the
+    iteration limit stopped while the slope was still moving slowly, else
+    ``None`` — the reading
     :func:`xslope.fem.ssrm_run_summary` gives the same trial."""
     interval = record.get("final_interval")
     if not interval:
@@ -9082,8 +9085,8 @@ def _failing_edge_on_budget(record):
             "diverging", "disp_limit", "displacement_limit", "steady_slip",
             "nonfinite", "yield_gate", "inconclusive"):
         return None
-    # A trial running away when its budget stopped it is a failure in progress,
-    # not a budget effect; only a slowly moving one leaves the number the budget's.
+    # A trial still moving fast when the iteration limit stopped it was failing;
+    # only one still moving slowly leaves the answer depending on the limit.
     if trial.get("verdict") in ("FAILED", "STABLE_STUCK", "JOINT_SETTLED"):
         return None
     growth = _num(trial.get("growth"))

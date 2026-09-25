@@ -1970,9 +1970,9 @@ F_max = 2.0   # Upper FS bound (should not converge)
 result = solve_ssrm(fem_data, F_min=F_min, F_max=F_max, tolerance=0.05,
                     debug_level=1)
 
-# solve_ssrm prints result['summary'] as its last words: the FS, how each bracket
-# edge was decided, and the wall time. Quote it; it says when the number is only
-# the sweep budget's.
+# solve_ssrm prints result['summary'] as its last words: the FS, what happened at
+# each end of the bracket, and the wall time. Quote it; it says when the answer
+# depends on the iteration limit.
 if result.get("converged", False):
     print(f"\nFactor of Safety: {result['FS']:.2f}")
     print_reinforcement_summary(fem_data, result['last_solution'])
@@ -2003,14 +2003,14 @@ failed at that point rather than spending the rest of its budget (`exit_reason =
 `early_failure=False` turns it off).
 
 **Read the closing summary and the curve before quoting the number.** Every run ends with
-`result['summary']`, printed as its last lines. A failing edge that ran out of sweeps is read two
-ways. **Running away** (the trial's verdict is FAILED, several times its elastic displacement and
-still growing) is a failure in progress: the summary says so and the number stands. **Stopped at
-the N-sweep budget with the section still moving, but slowly** means the factor of safety is the
-budget's, not the slope's, and a longer budget may move it. The `'ssrm_curve'` plot shows the same
-thing: a flat run of displacements and a sharp knee is a strength limit; a steady climb with no
-knee means the section never stopped moving and the reported number is where the budget cut off
-the failing trial. In that second case say so to the user rather than reporting the number bare.
+`result['summary']`, printed as its last lines. When the trial at the top of the bracket hit the
+iteration limit, the summary reads it one of two ways. **Still moving fast** (the trial's verdict
+is FAILED: several times its elastic displacement and still growing) means the slope was failing,
+and the number stands. **Still moving, but slowly** means the factor of safety depends on the
+iteration limit, and raising Max iterations per trial may change it. The `'ssrm_curve'` plot
+shows the same thing: a flat run of displacements and a sharp knee is a strength limit; a steady
+climb with no knee means the slope never stopped moving. In that second case say so to the user
+rather than reporting the number bare.
 
 **How a trial is decided.** The viscoplastic loop drives the solve and builds the plastic history.
 At 300, 1,000 and 3,000 iterations, and again wherever one of the stopping rules above would end

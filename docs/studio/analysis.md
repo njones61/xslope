@@ -721,11 +721,11 @@ SSRM analysis, since a single trial has no bracket to capture beyond.
 The run produces **FEM · Data** (mesh + boundary conditions + reinforcement) and
 **FEM · Results** (deformation, shear strain, displacement vectors, and displacement
 vs F). An SSRM run reports the factor of safety and can be **cancelled** mid-run. It
-ends with a closing summary in the Log: the factor of safety and its bracket, how
-each edge of the bracket was decided, and the wall time. A failing edge that ran out
-of sweeps while running away is reported as a failure in progress. One that ran out
-of sweeps with the section still moving, but slowly, is reported in those words, and
-the summary says the factor of safety is the budget's, not the slope's. The solution is
+ends with a closing summary in the Log: the factor of safety and its bracket, what
+happened at each end of the bracket, and the wall time. When the trial at the top of
+the bracket hit the iteration limit while the slope was still moving slowly, the
+summary says the factor of safety depends on the iteration limit, and that raising
+**Max iterations per trial** may change it. The solution is
 exported alongside the model so it can be restored on the next Open without
 re-solving — including the at-failure mechanism snapshot (a second CSV pair) and,
 for a model with reinforcement or piles, the per-element structural results
@@ -751,9 +751,10 @@ dims Auto size until the box returns to Auto. The displacement-vector plot can *
 a colorbar) instead of solid black.
 
 **Displacement vs F** plots the maximum displacement of every trial the strength
-reduction run solved against its factor: filled markers for trials the section
-stood under, open markers for the ones it did not, with the factor of safety as a
-dashed line over the shaded final bracket. It is drawn from the run's own record of
+reduction run solved against its factor. Filled markers are trials in which the
+slope reached equilibrium, joined by a line. Open markers are trials that were
+stopped before it did, drawn where they were when they were stopped, with no line
+through them. The factor of safety is a dashed line over the shaded final bracket. It is drawn from the run's own record of
 its trials, so the section controls (element edges, field state, the deformation
 and vector controls, the member and joint overlays) are dimmed for it. A single
 solve, or a solution saved before trials recorded their displacement, shows a

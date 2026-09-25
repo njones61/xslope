@@ -1669,32 +1669,32 @@ plot_fem_results(fem_data, solution, plot_type='shear_strain')
 
 Every strength reduction trial records the largest displacement it reached, and the `ssrm_curve`
 panel plots those displacements against the trials' factors, sorted by $F$. A filled marker is a
-trial the section stood under. An open marker is one it did not, drawn at the displacement the
-trial had when it stopped, and the key says how it stopped: **did not converge within the sweep
-budget**, **diverging**, or **past the displacement limit**. The reported factor of safety is the
-dashed vertical line, and the final bracket is shaded behind it. The same plot is available alone
-as `xslope.plot_fem.plot_ssrm_curve(ax, record)`. Below is the embankment from
+trial in which the slope reached equilibrium, and the line joins only those. An open marker is a
+trial that was stopped before it reached equilibrium. It is drawn at the point where it was
+stopped, while the slope was still moving, with no line through it. The key says how it was
+stopped: **stopped at the iteration limit, still moving**, **displacements ran away**, or **past
+the displacement limit**. The reported factor of safety is the dashed vertical line, and the final
+bracket is shaded behind it. The same plot is available alone as
+`xslope.plot_fem.plot_ssrm_curve(ax, record)`. Below is the embankment from
 [FEM-1](../tutorials/fem01_strength_reduction.md) at that page's settings:
 
 ![fem01_ssrm_curve.png](images/fem01_ssrm_curve.png){width=800}
 
-**Reading it.** A flat run of displacements that turns up in a sharp knee is a strength limit: the
-section settled at every factor below the knee and could not above it, and the factor of safety
-sits at the knee. The failing trial there was running away when it stopped, whether a divergence
-test or the sweep budget stopped it. A steady climb with no knee is a different result. The
-section kept moving at every strength the search tried, and the failing trial was still moving
-slowly when the sweep budget stopped it, so the factor it reports is where the budget stopped
-that trial rather than where the slope gave way, and a longer budget may move it. An open marker
-can sit below a filled one: it marks where its trial stopped, not where it was going.
+**Reading it.** A flat run of displacements that turns up in a sharp knee is a strength limit. The
+slope reached equilibrium at every factor below the knee and could not above it, and the factor of
+safety sits at the knee. The trial above the knee was still moving fast when it was stopped. A
+steady climb with no knee is a different result. The slope kept moving at every strength the
+search tried, and the trial at the top of the bracket was still moving slowly when the iteration
+limit stopped it. The factor of safety then depends on the iteration limit, and raising Max
+iterations per trial may change it.
 
 The run's closing summary says the same in words. It is printed as the last lines of every
-strength reduction run and returned as `result['summary']`, and it names how each bracket edge was
-decided. A failing trial that ran out of sweeps while running away is reported as *decided by the
-displacement evidence* — a failure in progress, not a budget effect. One that was still moving
-slowly reads *stopped at the N-sweep budget with the section still moving*, says the factor of
-safety is the budget's, and says why the trial was counted as failed. Both quote the largest
-displacement, its multiple of the elastic response and its growth over the last quarter of the
-trial's sweeps.
+strength reduction run and returned as `result['summary']`. It says what happened at each end of
+the bracket. When the trial at the top hit the iteration limit, the summary says whether it was
+still moving fast (*the slope was failing; more iterations would only have let it move further*)
+or still moving slowly (*the factor of safety depends on the iteration limit here*). Both quote
+the largest displacement, its multiple of the elastic value and how much it grew over the last
+quarter of the trial's iterations.
 
 ## Exported files
 

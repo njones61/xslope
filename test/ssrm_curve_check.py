@@ -15,14 +15,15 @@ What this file locks:
      curve says why it cannot be drawn.
 
   3. THE PLOT. plot_ssrm_curve on a synthetic record holding a converged trial,
-     one stopped by the sweep budget, one diverging and one past the displacement
+     one stopped by the iteration limit, one diverging and one past the displacement
      limit: every trial marked, each ending named in the key, the factor of
      safety ruled. plot_fem_results draws it alone and as the fourth of four
      stacked panels, and refuses a record it cannot draw with the reason.
 
-  4. THE SUMMARY. ssrm_run_summary says how each bracket edge was decided, in
-     each of the forms the failing edge can take, and says in so many words when
-     the failing edge was the sweep budget's verdict.
+  4. THE SUMMARY. ssrm_run_summary says what happened at each end of the
+     bracket, in each of the ways the trial at the top can end, in the Run
+     dialog's words; it says when the answer depends on the iteration limit, and
+     no summary uses "budget", "edge", "sweep" or "verdict".
 
 Run directly:  PYTHONPATH=. python3 test/ssrm_curve_check.py
 Exits non-zero on any failure.
@@ -118,8 +119,8 @@ def check_trial_record():
           summary[:80])
     check("the summary is printed, once, as the run's last words",
           log.rstrip().endswith(summary) and log.count(summary) == 1)
-    check("the summary names both edges and the wall time",
-          "standing edge" in summary and "failing edge" in summary
+    check("the summary says what happened at each end, and the wall time",
+          "reached equilibrium" in summary and "did not:" in summary
           and "The run took" in summary, summary)
 
 
@@ -209,14 +210,21 @@ def check_plot():
                  if line.get_linestyle() == "None")
     check("every trial is marked", marked == len(_RECORD["trials"]),
           f"{marked} of {len(_RECORD['trials'])}")
+    joined = [line for line in ax.lines if line.get_linestyle() == "-"]
+    stood = sorted(t["F"] for t in _RECORD["trials"] if t["stable"])
+    check("the line joins only the trials that reached equilibrium",
+          len(joined) == 1 and list(joined[0].get_xdata()) == stood,
+          f"{[list(l.get_xdata()) for l in joined]}")
     labels = [t.get_text() for t in ax.get_legend().get_texts()]
-    for wanted in ("stood (converged)",
-                   "did not converge within the sweep budget", "diverging",
+    for wanted in ("reached equilibrium",
+                   "stopped at the iteration limit, still moving",
+                   "displacements ran away",
                    "past the displacement limit", "final bracket", "FS = 1.375"):
         check(f"the key names {wanted!r}", wanted in labels, f"{labels}")
     title = ax.get_legend().get_title().get_text()
-    check("the key says where an open marker sits", "when the trial stopped" in title,
-          title)
+    check("the key says where an open marker sits",
+          title == "open marker: where the trial was when it was stopped, "
+                   "still moving", title)
     check("the axes are titled", ax.get_title() == SSRM_CURVE_TITLE)
     check("the displacement axis carries the declared length unit",
           ax.get_ylabel().endswith("(m)"), ax.get_ylabel())
@@ -262,6 +270,15 @@ def check_plot():
 
 # ===================== 4. the summary =====================
 
+_SUMMARIES = []
+
+
+def _said(s):
+    """Keep every summary this file produces, for the jargon check at the end."""
+    _SUMMARIES.append(s)
+    return s
+
+
 def _summary(failing, **extra):
     trials = [{"F": 1.35, "stable": True, "converged": True,
                "verdict": "CONVERGED", "iterations": 812,
@@ -271,70 +288,106 @@ def _summary(failing, **extra):
     result = dict({"converged": True, "FS": 1.375,
                    "final_interval": (1.35, 1.40), "trials": trials,
                    "failure_criterion": "hybrid", "elapsed_time": 664.0}, **extra)
-    return fem.ssrm_run_summary(result, {"unit_system": "SI"})
+    return _said(fem.ssrm_run_summary(result, {"unit_system": "SI"}))
 
 
 def check_summary():
     print("\n4. the closing summary")
-    # A trial still moving, but slowly, when its budget ran out (AMBIGUOUS).
+    del _SUMMARIES[:]
+    limit = ("The factor of safety depends on the iteration limit here. Raise "
+             "Max iterations per trial and it may change.")
+
+    # Still moving, but slowly, when the iteration limit stopped it (AMBIGUOUS).
     s = _summary({"exit_reason": "iteration_cap", "verdict": "AMBIGUOUS",
                   "growth": 0.5, "u_ratio": 5.0, "max_displacement": 0.25})
     check("it opens on the answer and its bracket",
           s.startswith("The factor of safety is 1.375, the midpoint of the "
-                       "bracket from F = 1.3500 to F = 1.4000."), s)
-    check("the standing edge is the trial that converged",
-          "converged in 812 sweeps" in s, s)
-    check("a slow budget stop is named in those words",
-          "stopped at the 100,000-sweep budget with the section still moving, "
-          "but slowly" in s, s)
-    check("and the number is said to be the budget's",
-          "the budget's, not the slope's, and a longer budget may move it" in s, s)
+                       "bracket F = 1.3500 to 1.4000."), s)
+    check("the bottom of the bracket reached equilibrium",
+          "At F = 1.3500 the slope reached equilibrium in 812 iterations." in s, s)
+    check("a slow stop at the limit is named in those words",
+          "At F = 1.4000 it did not: the trial hit the 100,000-iteration limit "
+          "while still moving, but slowly" in s, s)
     check("and why it was counted as failed",
-          "too slow to call it a failure, so it was counted as failed" in s, s)
+          "That is too much movement to call the slope settled and too little to "
+          "call it a failure, so the trial was counted as failed." in s, s)
+    check("and that the answer depends on the limit", limit in s, s)
     check("with the displacement, its elastic multiple and its growth",
-          "0.25 m" in s and "5.0 times the elastic response" in s
-          and "0.025 m" in s and "last 25,000 sweeps" in s, s)
+          "its largest displacement was 0.25 m, 5.0 times the elastic value, and "
+          "had grown by 0.025 m over the last 25,000 iterations" in s, s)
+    check("and the wall time", s.endswith("The run took 11 min 4 s."), s)
 
-    # A trial running away when its budget ran out (FAILED).
+    # Still moving fast when the iteration limit stopped it (FAILED).
     s = _summary({"exit_reason": "iteration_cap", "verdict": "FAILED",
                   "growth": 0.74, "u_ratio": 4.88, "max_displacement": 0.277},
                  failure_criterion="non_convergence")
-    check("a runaway at the budget is decided by the displacement evidence",
-          "decided by the displacement evidence" in s
-          and "ran out of sweeps at the 100,000-sweep budget while running away"
-          in s, s)
-    check("and is called a failure in progress",
-          "That is a failure in progress, not a budget effect." in s, s)
-    check("and the number is NOT called the budget's", "the budget's" not in s, s)
-    check("with the displacement, its elastic multiple and its growth",
-          "0.277 m, 4.9 times the elastic response, and still growing by 0.042 m"
-          in s, s)
-    check("and the wall time", s.endswith("The run took 11 min 4 s."), s)
+    check("a fast-moving stop at the limit says the slope was failing",
+          "the trial hit the 100,000-iteration limit while still moving fast — "
+          "its largest displacement was 0.277 m, 4.9 times the elastic value, "
+          "and had grown by 0.042 m" in s
+          and "The slope was failing; more iterations would only have let it "
+              "move further." in s, s)
+    check("and does not say the answer depends on the limit",
+          "depends on the iteration limit" not in s, s)
 
     s = _summary({"exit_reason": "diverging", "verdict": "FAILED",
-                  "iterations": 2501})
-    check("a diverging edge says so, with its sweep",
-          "diverged at sweep 2,501" in s and "budget" not in s, s)
+                  "iterations": 2231})
+    check("a diverging trial says the displacements ran away",
+          "At F = 1.4000 it did not: the displacements ran away at iteration "
+          "2,231." in s, s)
     s = _summary({"exit_reason": "disp_limit", "verdict": "FAILED",
                   "iterations": 640})
-    check("a displacement-limit edge says so, with its sweep",
-          "passed it at sweep 640" in s and "displacement limit" in s, s)
+    check("a displacement-limit trial says so, with its iteration",
+          "it passed the displacement limit at iteration 640." in s, s)
+    s = _summary({"exit_reason": "inconclusive", "verdict": "AMBIGUOUS",
+                  "growth": 0.01, "u_ratio": 1.1, "max_displacement": 0.05})
+    check("an inconclusive trial is an open question",
+          "the trial hit the 100,000-iteration limit with its out-of-balance "
+          "force still falling. That is neither an equilibrium nor a failure, so "
+          "the factor of safety carries it as an open question." in s, s)
     s = _summary({"exit_reason": "iteration_cap", "verdict": "STABLE_STUCK",
                   "growth": 0.0, "u_ratio": 1.02, "max_displacement": 0.05},
                  failure_criterion="non_convergence")
-    check("a budget stop with the section no longer moving is not called moving",
-          "still moving" not in s and "no longer moving" in s, s)
-    s = fem.ssrm_run_summary({"converged": False, "FS": None, "trials": [],
-                              "error": "SSRM: the slope still stands at F = 10.00, "
-                                       "the highest factor the search may try.",
-                              "elapsed_time": 42.0})
+    check("a stop with the displacements stopped is not called moving",
+          "moving" not in s and "with its displacements stopped" in s, s)
+    stood = {"F": 1.35, "stable": True, "converged": False,
+             "verdict": "STABLE_STUCK", "iterations": 100000,
+             "exit_reason": "iteration_cap"}
+    s = _said(fem.ssrm_run_summary({
+        "converged": True, "FS": 1.375, "final_interval": (1.35, 1.40),
+        "trials": [stood, {"F": 1.40, "stable": False, "iterations": 300,
+                           "exit_reason": "diverging", "verdict": "FAILED"}]}))
+    check("a trial that stood without meeting the tolerance is counted standing",
+          "At F = 1.3500 the slope did not meet the force tolerance within "
+          "100,000 iterations, but its displacements had stopped, so it was "
+          "counted as standing." in s, s)
+    s = _said(fem.ssrm_run_summary({
+        "converged": False, "FS": None, "trials": [],
+        "error": "SSRM: the slope still reaches equilibrium at F = 10.00, the top "
+                 "of the range the search may try, so the factor of safety is "
+                 "above it.", "elapsed_time": 42.0}))
     check("a run with no answer says so", s.startswith(
-        "No factor of safety was found. The slope still stands at F = 10.00"), s)
-    s = fem.ssrm_run_summary({"probe": True, "trials": [
+        "No factor of safety was found. The slope still reaches equilibrium at "
+        "F = 10.00"), s)
+    s = _said(fem.ssrm_run_summary({"probe": True, "trials": [
         {"F": 1.3, "stable": True, "iterations": 300},
-        {"F": 1.4, "stable": False, "iterations": 4000}]})
+        {"F": 1.4, "stable": False, "iterations": 4000}]}))
     check("a probe names each trial and no factor of safety",
-          "F = 1.3000 stood" in s and "F = 1.4000 did not stand" in s, s)
+          "At F = 1.3000 the slope reached equilibrium" in s
+          and "At F = 1.4000 the slope did not reach equilibrium" in s, s)
+
+    # The run's own summary from section 1 joins the synthetic ones.
+    _f, result, _log = _solved()
+    _SUMMARIES.append(result.get("summary") or "")
+    import re
+    jargon = [(w, s) for s in _SUMMARIES
+              for w in ("budget", "edge", "sweep", "verdict")
+              if re.search(w, s, re.IGNORECASE)]
+    check("no summary says budget, edge, sweep or verdict", not jargon,
+          f"{jargon[:1]}")
+    contrast = [s for s in _SUMMARIES if re.search(r", not (by |the )", s)]
+    check("no summary is built on an 'X, not Y' contrast", not contrast,
+          f"{contrast[:1]}")
 
 
 def run():

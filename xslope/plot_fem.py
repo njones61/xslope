@@ -3164,16 +3164,17 @@ SSRM_CURVE_LABEL = "Displacement vs F"
 SSRM_CURVE_TITLE = "Displacement vs strength reduction factor"
 
 #: How a trial that did not stand ended, keyed by its ``exit_reason``, as the
-#: key names it. A reason not listed ran out of sweeps: the solve stops on
-#: convergence, on a displacement or divergence test, or at its budget.
+#: key names it. A reason not listed was stopped by the iteration limit: the
+#: solve stops on equilibrium, on a displacement or divergence test, or there.
 _SSRM_CURVE_ENDINGS = {
-    "diverging": ("diverging", "v"),
+    "diverging": ("displacements ran away", "v"),
     "disp_limit": ("past the displacement limit", "^"),
     "displacement_limit": ("past the displacement limit", "^"),
     "steady_slip": ("sliding steadily on its joints", "D"),
     "yield_gate": ("settled outside the yield surface", "D"),
+    "nonfinite": ("calculation stopped producing numbers", "X"),
 }
-_SSRM_CURVE_BUDGET = ("did not converge within the sweep budget", "s")
+_SSRM_CURVE_BUDGET = ("stopped at the iteration limit, still moving", "s")
 _SSRM_CURVE_STOOD_COLOR = "#1f4e79"
 _SSRM_CURVE_FELL_COLOR = "#c62828"
 
@@ -3280,17 +3281,16 @@ def plot_ssrm_curve(ax, record, fs=None, final_interval=None, fem_data=None,
                     show_title=True, show_legend=True):
     """The maximum displacement of every strength reduction trial against its F.
 
-    One marker per trial, sorted by F and joined by a thin line: filled where the
-    section stood, open where it did not, with the key naming how each open one
-    ended. An open marker sits at the displacement its trial had when it stopped,
-    which for a trial cut off by its sweep budget is wherever the budget happened
-    to leave it. The reported factor of safety is ruled as a vertical line and the
+    One marker per trial, sorted by F. Filled markers are trials in which the
+    slope reached equilibrium, joined by a thin line. Open markers are trials
+    that were stopped before it did, drawn with no line through them at the
+    displacement they had when they were stopped, and the key names how each
+    ended. The reported factor of safety is ruled as a vertical line and the
     final bracket is shaded behind it.
 
-    Read it for its shape: a flat run and a sharp knee is a strength limit; a
-    steady climb with no knee means the section kept moving at every strength the
-    search tried, and the factor of safety came from where the sweep budget
-    stopped the failing trial rather than from the slope.
+    Read it for its shape. A flat run and a sharp knee is a strength limit. A
+    steady climb with no knee means the slope kept moving at every strength the
+    search tried, and the factor of safety depends on the iteration limit.
 
     ``record`` is :func:`xslope.fem.solve_ssrm`'s result or the meta sidecar a
     saved run was written with (:func:`xslope.fem.ssrm_run_record`, restored by
@@ -3310,12 +3310,16 @@ def plot_ssrm_curve(ax, record, fs=None, final_interval=None, fem_data=None,
     if final_interval is None:
         final_interval = (record or {}).get("final_interval")
 
-    Fs = [p["F"] for p in points]
     us = [p["max_displacement"] for p in points]
-    ax.plot(Fs, us, "-", color="0.45", lw=1.0, zorder=2)
-
     handles, labels = [], []
     stood = [p for p in points if p["stood"]]
+    # The line joins only the trials in which the slope reached equilibrium. A
+    # trial that was stopped still moving sits where it was when it was stopped,
+    # which is not where it was going, and a line through it would read as the
+    # displacement going back down.
+    if len(stood) > 1:
+        ax.plot([p["F"] for p in stood], [p["max_displacement"] for p in stood],
+                "-", color="0.45", lw=1.0, zorder=2)
     if stood:
         ax.plot([p["F"] for p in stood], [p["max_displacement"] for p in stood],
                 "o", color=_SSRM_CURVE_STOOD_COLOR, ms=6.5, ls="none", zorder=4)
@@ -3324,8 +3328,8 @@ def plot_ssrm_curve(ax, record, fs=None, final_interval=None, fem_data=None,
         # A trial the hybrid criterion counted as standing without converging
         # (its displacements had stopped) is still a standing trial, and the key
         # does not claim convergence for it.
-        labels.append("stood (converged)" if all(p["converged"] for p in stood)
-                      else "stood")
+        labels.append("reached equilibrium" if all(p["converged"] for p in stood)
+                      else "reached equilibrium or stopped moving")
     endings = []
     for p in points:
         if p["ending"] is not None and p["ending"] not in endings:
@@ -3363,7 +3367,8 @@ def plot_ssrm_curve(ax, record, fs=None, final_interval=None, fem_data=None,
     if show_title:
         ax.set_title(SSRM_CURVE_TITLE, fontsize=12, pad=15)
     if show_legend and handles:
-        title = ("open marker: displacement when the trial stopped"
+        title = ("open marker: where the trial was when it was stopped, "
+                 "still moving"
                  if endings else None)
         _ssrm_curve_legend(ax, handles, labels, title)
     return ax

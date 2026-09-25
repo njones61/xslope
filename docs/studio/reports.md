@@ -184,8 +184,8 @@ the factor of safety. **Loads** and the members' finite element properties
 follow, in a section each.
 
 **Results** — the factor of safety and how it was reached, then the viscoplastic
-shear strain, the deformed mesh and the displacement vectors: the same three
-plots the results view offers, in the same order. Which field they are drawn
+shear strain, the deformed mesh, the displacement vectors and displacement vs F:
+the same four plots the results view offers, in the same order. Which field they are drawn
 from is a choice:
 
 | Field state | Default | What is drawn |
@@ -196,9 +196,13 @@ from is a choice:
 
 A run that captured no at-failure snapshot falls back to the converged field and
 the report says so, rather than printing the same three panels twice under two
-headings. Where a strength reduction run kept a record of its trials, a search
-figure follows: every trial at the factor it was solved at, marked by whether
-the section stood under it, with the interval still open after each.
+headings. The field state applies to the first three; displacement vs F is drawn
+once per run, from the run's record of its trials: every trial's maximum
+displacement against its factor, marked by whether the section stood under it,
+with the factor of safety and the final bracket. It is drawn only where that
+record carries the displacements, and where the failing edge of the bracket was
+a trial that ran out of sweeps with the section still moving, the paragraph
+beside it says the factor of safety is set by the sweep budget.
 
 **Reinforcement forces** and **Pile forces** are written where the run solved
 members of that kind and its saved fields carry their forces — a solution that

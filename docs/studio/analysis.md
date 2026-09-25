@@ -719,8 +719,12 @@ safety and the bracket are unaffected either way. The controls are gated to the
 SSRM analysis, since a single trial has no bracket to capture beyond.
 
 The run produces **FEM · Data** (mesh + boundary conditions + reinforcement) and
-**FEM · Results** (deformation, shear strain, displacement vectors). An SSRM run
-reports the factor of safety and can be **cancelled** mid-run. The solution is
+**FEM · Results** (deformation, shear strain, displacement vectors, and displacement
+vs F). An SSRM run reports the factor of safety and can be **cancelled** mid-run. It
+ends with a closing summary in the Log: the factor of safety and its bracket, how
+each edge of the bracket was decided, and the wall time. When the failing edge is a
+trial that ran out of sweeps with the section still moving, the summary says so in
+those words and says the factor of safety is the budget's, not the slope's. The solution is
 exported alongside the model so it can be restored on the next Open without
 re-solving — including the at-failure mechanism snapshot (a second CSV pair) and,
 for a model with reinforcement or piles, the per-element structural results
@@ -744,6 +748,16 @@ prints, whose **Auto** default picks whatever draws the largest displacement at
 the **Auto size** percent of the mesh height; entering an explicit Scale ×
 dims Auto size until the box returns to Auto. The displacement-vector plot can **color arrows by magnitude** (with
 a colorbar) instead of solid black.
+
+**Displacement vs F** plots the maximum displacement of every trial the strength
+reduction run solved against its factor: filled markers for trials the section
+stood under, open markers for the ones it did not, with the factor of safety as a
+dashed line over the shaded final bracket. It is drawn from the run's own record of
+its trials, so the section controls (element edges, field state, the deformation
+and vector controls, the member and joint overlays) are dimmed for it. A single
+solve, or a solution saved before trials recorded their displacement, shows a
+one-line note in place of the plot. How to read the curve is set out in
+[Displacement vs F](../fem/overview.md#displacement-vs-f).
 
 On a jointed model the displacement-vector plot is the scaled deformed mesh instead, drawn as the blocks the joints
 cut the section into — each under a faint tint, its joint faces green, the deformed outside of the mesh a dark line

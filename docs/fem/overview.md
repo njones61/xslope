@@ -1609,6 +1609,7 @@ elements as designed.
 | `stress` | Von Mises stress contours with yielded elements highlighted. |
 | `strain` | Von Mises equivalent strain contours from total strains. |
 | `yield` | Mohr-Coulomb yield function contours; positive values are yielding. |
+| `ssrm_curve` | Displacement vs F: the maximum displacement of every strength reduction trial against its factor, drawn from the run record passed as `ssrm_record` (see [Displacement vs F](#displacement-vs-f)). |
 
 The default is `['deformation', 'shear_strain', 'displace_vector']`. The example below is the
 non-circular problem from [FEM Samples](samples.md) Problem 3, where a thin weak clay layer controls
@@ -1643,14 +1644,18 @@ Common options:
 - `cmap`, `cbar_shrink` — the shear-strain color ramp and the colorbar length.
 - `show_reinforcement` (default `True`), `label_elements`, `figsize` (default `(12, 8)`),
   `save_png`, `save_dxf`, `dpi` (default 300).
+- `ssrm_record` — the run the `ssrm_curve` panel is drawn from: `solve_ssrm()`'s result, or
+  `import_fem_meta(stem)` for a saved run.
 
-A typical SSRM call passes the captured at-failure field so the panels show the collapse mechanism:
+A typical SSRM call passes the captured at-failure field so the panels show the collapse mechanism,
+and the run itself for the fourth panel:
 
 ```python
 plot_fem_results(fem_data, result['last_solution'],
-                 plot_type=['deformation', 'shear_strain', 'displace_vector'],
+                 plot_type=['deformation', 'shear_strain', 'displace_vector', 'ssrm_curve'],
                  fs=result['FS'],
                  failure_solution=result.get('failure_solution'),
+                 ssrm_record=result,
                  save_png=True)
 ```
 
@@ -1659,6 +1664,30 @@ A single plot type may be given as a string rather than a list:
 ```python
 plot_fem_results(fem_data, solution, plot_type='shear_strain')
 ```
+
+### Displacement vs F
+
+Every strength reduction trial records the largest displacement it reached, and the `ssrm_curve`
+panel plots those displacements against the trials' factors, sorted by $F$. A filled marker is a
+trial the section stood under. An open marker is one it did not, drawn at the displacement the
+trial had when it stopped, and the key says how it stopped: **did not converge within the sweep
+budget**, **diverging**, or **past the displacement limit**. The reported factor of safety is the
+dashed vertical line, and the final bracket is shaded behind it. The same plot is available alone
+as `xslope.plot_fem.plot_ssrm_curve(ax, record)`. Below is the embankment from
+[FEM-1](../tutorials/fem01_strength_reduction.md) at that page's settings:
+
+![fem01_ssrm_curve.png](images/fem01_ssrm_curve.png){width=800}
+
+**Reading it.** A flat run of displacements that turns up in a sharp knee is a strength limit: the
+section settled at every factor below the knee and could not above it, and the factor of safety
+sits at the knee. A steady climb with no knee is a different result. The section kept moving at
+every strength the search tried, so the factor it reports is where the sweep budget stopped the
+failing trial rather than where the slope gave way, and a longer budget may move it. The run's
+closing summary says the same in words. It is printed as the last lines of every strength
+reduction run and returned as `result['summary']`, and it names how each bracket edge was
+decided. When the failing edge is a budget verdict it reads *stopped at the N-sweep budget with
+the section still moving*, says the factor of safety is the budget's, and quotes the displacement
+and its growth over the last quarter of the trial's sweeps.
 
 ## Exported files
 
@@ -1681,6 +1710,7 @@ force and pile shear colorbars without re-solving.
 | `*_mesh.json` | Finite element mesh definition used by the analysis, so the mesh can be reused. |
 | `*_fem_nodes.csv` | One row per node containing displacement results. |
 | `*_fem_elements.csv` | One row per 2D element containing stress, strain, and yielding results. |
+| `*_fem_meta.json` | The run record: the factor of safety, the options and criterion, the final bracket, and every strength reduction trial with its verdict and maximum displacement, which the Displacement vs F plot is drawn from after a reload (`import_fem_meta(stem)`). |
 | `*_fem_reinf.csv` | One row per reinforcement 1D element: ids, endpoints, axial force, capacities, the cap the solve enforced, mobilization, and failure flags. |
 | `*_fem_piles.csv` | One row per pile beam element: ids, endpoints, axial/shear forces, end moments, structural capacities, and yield flags. |
 | `*_fem_failure_nodes.csv` | At-failure nodal displacements, same columns as `*_fem_nodes.csv`. |

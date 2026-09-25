@@ -276,6 +276,41 @@ def _report(label, result, seconds, units=""):
     print(result["summary"])
 
 
+def _layer_loads(model, fem_data, result):
+    """Each geogrid sheet's peak bar tension against its capacity at the last
+    standing trial, as a percentage, read from the sheet's joint profile (which
+    carries ``bar_T`` and ``bar_cap`` at the bar's own element centroids)."""
+    import numpy as np
+
+    from xslope import fem_details
+
+    last = result["last_solution"]
+    force = declared_unit_labels(model)["force_per_len"]
+    print("layer loads:")
+    print("   at the last standing trial, F %.4f" % last.get("F", float("nan")))
+    # The capacity is the one at the station the peak sits at (a pullout-limited
+    # end carries less than the sheet's Tmax); the last column is the highest
+    # T/cap at any station, which differs from the first ratio only where it does.
+    print("   %-8s %12s %12s %8s %14s"
+          % ("sheet", "peak T", "capacity", "T/cap", "max T/cap"))
+    for row in fem_details.list_lines(fem_data, last, model):
+        if row["kind"] != "joint" or not str(row["label"]).startswith("grid-"):
+            continue
+        prof = fem_details.joint_profile(fem_data, last, row["index"],
+                                         slope_data=model, field_state="converged")
+        T = np.abs(np.asarray(prof["bar_T"], dtype=float))
+        cap = np.asarray(prof["bar_cap"], dtype=float)
+        if not len(T):
+            print("   %-8s no bar stations" % row["label"])
+            continue
+        k = int(np.argmax(T))
+        ratio = np.where(cap > 1e-12, T / np.where(cap > 1e-12, cap, 1.0), np.nan)
+        print("   %-8s %12.4f %12.4f %7.1f%% %13.1f%%   (%s)"
+              % (row["label"], T[k], cap[k],
+                 100.0 * T[k] / cap[k] if cap[k] > 1e-12 else float("nan"),
+                 100.0 * float(np.nanmax(ratio)), force))
+
+
 def _curve(name, fem_data, result):
     """The displacement-vs-F figure: every trial's largest displacement against
     its F, drawn by the standard plot call from the run's own result, at the
@@ -479,6 +514,7 @@ def fem03_grid():
           result, "displace_vector")
     _keep_solution("wall_grid", fem_data, result)
     _curve("fem03_ssrm_curve_grid.png", fem_data, result)
+    _layer_loads(grid, fem_data, result)
 
     last = result["last_solution"]
     rows = fem_details.list_lines(fem_data, last, grid)
@@ -529,6 +565,7 @@ def fem03_grid_long():
                                        max_iterations=FEM03_LONG_MAX_ITERATIONS)
     _counts("wall + grid", grid, mesh, fem_data)
     _report("grid 500k", result, seconds, declared_unit_labels(grid)["length"])
+    _layer_loads(grid, fem_data, result)
     print("   wall time   %.0f s (%.1f min)" % (seconds, seconds / 60.0))
 
 

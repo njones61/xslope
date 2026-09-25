@@ -45,11 +45,11 @@ is repeated here.
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how the contacts in a block wall are entered as slip
-joints, what a strength reduction does to them, how a geosynthetic layer behaves
-as a bonded bar against the same layer as a slip surface, and when each is the
-right model.
+joints, what a strength reduction does to them, how to tell a wall that fails
+from one that keeps moving, how a geosynthetic layer behaves as a bonded bar
+against the same layer as a slip surface, and when each is the right model.
 </div>
-<p><span class="tg-pill">four materials</span><span class="tg-pill">slip joints</span><span class="tg-pill">joints worksheet</span><span class="tg-pill">interface element</span><span class="tg-pill">block wall</span><span class="tg-pill">elastic blocks</span><span class="tg-pill">local element size</span><span class="tg-pill">geogrid</span><span class="tg-pill">end ties</span><span class="tg-pill">bonded bar</span><span class="tg-pill">jointed sheet</span><span class="tg-pill">hybrid criterion</span><span class="tg-pill">sweep budget</span><span class="tg-pill">joint slip</span><span class="tg-pill">deformed blocks</span><span class="tg-pill">1D details</span></p>
+<p><span class="tg-pill">four materials</span><span class="tg-pill">slip joints</span><span class="tg-pill">joints worksheet</span><span class="tg-pill">interface element</span><span class="tg-pill">block wall</span><span class="tg-pill">elastic blocks</span><span class="tg-pill">local element size</span><span class="tg-pill">geogrid</span><span class="tg-pill">end ties</span><span class="tg-pill">bonded bar</span><span class="tg-pill">jointed sheet</span><span class="tg-pill">hybrid criterion</span><span class="tg-pill">iteration limit</span><span class="tg-pill">joint slip</span><span class="tg-pill">deformed blocks</span><span class="tg-pill">1D details</span></p>
 <div class="tgm-model" markdown>
 **Starter file** — [xslope_block_wall_start.xlsx](files/xslope_block_wall_start.xlsx),
 the section, the four materials and the six block courses, with nothing on the
@@ -218,16 +218,17 @@ Open **Run → Run FEM…**. The analysis is **SSRM**, the bracket is *F* from
 Two rows further down there is one setting to change, and one below it to leave
 alone once you know what it does.
 
-![Run FEM on the meshed wall, with the sweep budget raised](images/fem03_studio_run_fem.png){width=860}
+![Run FEM on the meshed wall, with the iteration limit raised](images/fem03_studio_run_fem.png){width=860}
 
 **Max iterations per trial — change it to 100,000.** A joint reaches equilibrium
-by growing slip, a little on each pass of the solver, so a jointed model settles
-over tens of thousands of passes where a model without joints settles over
-hundreds. A trial that runs out of passes before it has settled is recorded as
-not standing, and the factor of safety then comes out low — a reading of the
-budget rather than of the wall. The model checks in the column beside the dialog
-say so while the budget is left lower. Raising it costs very little, because a
-trial that has settled stops there and does not use the rest.
+by growing slip, a little on each iteration of the solver, so a jointed model
+settles over tens of thousands of iterations where a model without joints settles
+over hundreds. A trial that hits the limit before it has settled is counted as
+not standing, and the factor of safety then comes out low, because the limit
+stopped the trial before the wall had finished moving. The model checks in the
+column beside the dialog say so while the limit is left lower. Raising it costs
+very little, because a trial that has settled stops there and does not use the
+rest.
 
 **Failure criterion — leave it on Hybrid.** The dialog opens on Hybrid for any
 model that carries a joint, and this is why. A near-critical trial on a jointed
@@ -294,6 +295,28 @@ had nothing to say about which of its seven surfaces was carrying the failure.
 The shear strain shows where the soil is working. The reinforced fill behind the
 blocks is straining along a surface that runs up from the heel of the wall, which
 is the mass the facing has to hold back.
+
+The fourth plot in the results view, **Displacement vs F**, shows the search
+itself: every strength it tried, with the largest displacement the wall reached
+there.
+
+![Displacement against strength reduction factor for the wall alone: the wall comes to rest at 1.0, 1.125 and 1.133, and slides steadily on its joints at every strength above](images/fem03_ssrm_curve.png){width=1000}
+
+A filled point is a strength at which the wall came to rest, and the line joins
+those. An open point is a trial the run stopped while the wall was still moving,
+drawn where it was when stopped. The wall rests at F = 1.0 and 1.125 with under
+6 cm of movement, and at 1.133 with 8 cm. At 1.141, and at every strength above
+it, the joints slide steadily and the wall never comes to rest. That is a wall
+with a strength limit, and the factor of safety is where the resting points end.
+The Log says the same in words at the end of every strength reduction run:
+
+> The factor of safety is 1.137, the midpoint of the bracket F = 1.1328 to
+> 1.1406. At F = 1.1328 the slope reached equilibrium in 363 iterations,
+> finished by the Newton corrector. At F = 1.1406 it did not: the slope was
+> sliding steadily on its joints at iteration 90,001.
+
+Read this summary on every run. Part 2 is a run where it says something
+different.
 
 A factor of safety of 1.137 is not a design margin for a retaining wall. The
 blocks are doing what a gravity wall does — standing on their own weight — and on
@@ -652,8 +675,8 @@ This tutorial covered:
   contact's friction angle comes from.
 - A local element size on the block polygons, which resolves a 0.6 m course
   without refining the whole section.
-- The sweep budget a jointed run needs, and what leaving it at the default does
-  to the answer.
+- The iteration limit a jointed run needs, and how the displacement-vs-F plot
+  and the closing summary tell a wall that fails from one that keeps moving.
 - The wall standing on its own blocks against the same wall with three geogrid
   layers tied into the facing.
 - The question every geosynthetic model has to answer — does the surface cut

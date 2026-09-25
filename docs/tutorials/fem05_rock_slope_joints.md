@@ -21,7 +21,7 @@ an envelope. **Part 2** takes the same slope cut by a whole set of them,
 generated from a dip and a spacing rather than typed one line at a time, where
 the rock breaks into columns that tip instead of sliding.
 
-![A 12 m rock face at 60 degrees, cut by a bedding plane dipping 35 degrees out of the face and a vertical release joint 2 m behind the crest](images/fem05_problem_sketch.png){width=800}
+![The face the tutorial starts from: 12 m of elastic rock cut at 60°, with no joints yet](images/fem05_problem_sketch_bare.png){width=800}
 
 Strength reduction itself, the mesh and the convergence controls are covered in
 [FEM-1](fem01_strength_reduction.md), and are not repeated here. There is a
@@ -68,6 +68,8 @@ reproduce a number we can work out on paper before the method is trusted on
 anything larger.
 
 ### The slope and its two joints
+
+![A 12 m rock face at 60 degrees, cut by a bedding plane dipping 35 degrees out of the face and a vertical release joint 2 m behind the crest](images/fem05_problem_sketch.png){width=800}
 
 The face stands **12 m** high, cut at **60°**, on a 26 m section with 3 m of
 rock below the toe. There is one material, and it is declared **elastic**: no

@@ -65,7 +65,7 @@ anything larger.
 
 ![A 12 m rock face at 60 degrees, cut by a bedding plane dipping 35 degrees out of the face and a vertical release joint 2 m behind the crest](images/fem05_problem_sketch.png){width=1000}
 
-The face stands **12 m** high, cut at **60°**, on a 44 m section with 3 m of
+The face stands **12 m** high, cut at **60°**, on a 26 m section with 3 m of
 rock below the toe. There is one material, and it is declared **elastic**: no
 cohesion, no friction angle, just a unit weight of 26 kN/m³ and the elastic pair
 E = 5,000 MPa and ν = 0.25.
@@ -165,7 +165,7 @@ enough to put a dozen interface elements on the two joint lines. Quadratic
 elements are a requirement for a stability mesh rather than a preference, for the
 reason [FEM-1](fem01_strength_reduction.md) gives.
 
-The dialog reports what it built: **900 nodes, 398 elements, and 12 joint
+The dialog reports what it built: **768 nodes, 344 elements, and 12 joint
 elements on 2 jointed lines.**
 
 ![The mesh, with the two jointed lines drawn over it](images/fem05_mesh.png){width=1000}
@@ -214,13 +214,14 @@ flat gray, and the only colorbar the slip on the joints, in metres.
 ![The joint slip at the critical factor: the bedding plane bright along nearly its whole length, the release joint drawn as two parted lines where it has opened](images/fem05_joint_slip.png){width=1000}
 
 The color is the slip, and it reads the way the slab moved: along the bedding
-plane it grows from 0.18 mm at the release joint to 0.39 mm at the toe, the
+plane it grows from 0.14 mm at the release joint to 0.39 mm at the toe, the
 whole plane sliding as one surface. The release joint is gray because it has not
 slid; it has **opened**. A joint whose two faces have parted carries no normal
 stress and so no shear, and the panel draws a parted stretch as its two faces
 apart: two thin lines with a gap between them, along the whole length that
-parted. The key in the corner names the three states a joint can be in — closed
-and not slipping, slipping, opened. The release joint
+parted. The key in the corner names the states on the panel, slipping and
+opened; a joint that is closed and not slipping would draw as a thin gray line
+and take a third entry, and there is none here. The release joint
 has opened along nearly its whole height, from where it meets the bedding plane
 up to just under the crest — the slab has pulled away from the rock behind it,
 which is what a release joint is for — and only its top, under the crest, is
@@ -380,12 +381,12 @@ dashed behind them:
 ### Running the toppling stack
 
 The joints have changed, so the mesh has to be built again: **Run → Build
-Mesh…**, **tri6** at **1.5 m** as before. The dialog reports **1,071 nodes, 452
+Mesh…**, **tri6** at **1.5 m** as before. The dialog reports **947 nodes, 402
 elements, and 41 joint elements on 6 jointed lines** — six lines from one typed
 row and five generated ones. Then **Run → Run FEM…** with the same settings as
 Part 1: SSRM, the bracket from 1.0 to 2.0, tolerance 0.01, **Max iterations per
 trial** at 100,000, and the failure criterion on Hybrid. Press **Run**. It takes
-about a minute and a half and reports
+about two minutes — nearer three without the compiled kernel — and reports
 
 <!-- test: file=files/xslope_rock_toppling.xlsx, type=fem_ssrm, expected_fs=1.105, element_type=tri6, target_size=1.5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-5-topple-ssrm -->
 
@@ -405,15 +406,19 @@ before the stack starts to go over.
 ![Joint slip on the toppling stack: the base plane slipping along most of its length, the column joints opened along their lower parts and in contact only at their tops](images/fem05_joint_slip_topple.png){width=1000}
 
 The joint slip figure shows the same mechanism as contact states. Each column
-joint has opened along its lower part and is in contact only near the top: a
-column pivoting forward on its toe lifts off the joint behind it at the base and
-leans on the column in front at the crest, and the short green lengths there,
-slips of 1 to 3 mm, are the two columns sliding against each other as they lean.
-The base plane reads differently. It is slipping along most of its length, up to
-8 mm, the largest slip in the model, as the columns' feet slide forward on it
-while they rotate, and it has opened under the lowest column near the toe, where
-that column has lifted off it. Nothing on the plot says the stack is sliding
-away as one body; everything says it is going over.
+joint has opened along most of its length and is in contact only near the top:
+a column pivoting forward on its toe lifts off the joint behind it and leans on
+the column in front at the crest, and the short green lengths at the tops,
+slips of 1.5 to 3 mm, are the two columns sliding against each other as they
+lean. The lowest column, the one at the face, is the exception: it is the block
+the others push on, and its joint is in contact and sliding in patches along
+its whole height. The base plane is a patchwork of the two states. It has
+opened along the stretch under the lowest column and between the column feet,
+where each column's base has lifted off it, and it is slipping where the feet
+still bear — 8.4 mm under the lowest column, the largest slip in the model,
+falling to 2 mm under the fourth — with only a faint slide, under 0.2 mm, along
+its upper third behind the last column. Nothing on the plot says the stack is
+sliding away as one body; everything says it is going over.
 
 ---
 
@@ -426,16 +431,17 @@ region at three spacings, meshed at the same 1.5 m target size:
 
 | Spacing | Traces | Nodes | Joint elements |
 | --- | :---: | :---: | :---: |
-| 3 m | 2 | 966 | 25 |
-| 1.5 m | 5 | 1,071 | 41 |
-| 0.75 m | 11 | 1,133 | 70 |
+| 3 m | 2 | 834 | 25 |
+| 1.5 m | 5 | 947 | 41 |
+| 0.75 m | 11 | 1,001 | 70 |
 
-The node count barely moves, because the region is a small part of a 44 m
+The node count barely moves, because the region is a small part of a 26 m
 section. The interface count is what grows, and it is the interfaces that set
 the cost: a joint reaches equilibrium by growing slip a little at a time, so the
 sweeps a trial needs go up with them. On the shipped model at 1.5 m the trials
-that stand settle in a few hundred sweeps, while the two that fail run 21,241
-and 27,641 — and there are twice as many interfaces to carry at 0.75 m.
+that stand settle in a few hundred sweeps, while the two that fail nearest the
+answer run 72,561 sweeps and the whole 100,000 allowed — and there are twice as
+many interfaces to carry at 0.75 m.
 
 So start coarse. Describe the set at a spacing two or three times what the rock
 really has, get the mechanism and the factor of safety, and only then refine —

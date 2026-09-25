@@ -5603,6 +5603,8 @@ FEM05_SLAB = os.path.join(REPO_ROOT,
                           "docs/tutorials/files/xslope_rock_joints.xlsx")
 FEM05_TOPPLE = os.path.join(REPO_ROOT,
                             "docs/tutorials/files/xslope_rock_toppling.xlsx")
+FEM05_VORONOI = os.path.join(REPO_ROOT,
+                             "docs/tutorials/files/xslope_rock_voronoi.xlsx")
 #: Build Mesh, at the page's own settings and the files' own declaration:
 #: quadratic triangles at 1.5 m. Quadratic is a requirement rather than a
 #: preference — an interface element spans three node pairs on a tri6 edge and two
@@ -5633,9 +5635,10 @@ FEM05_MAX_ITERATIONS = 100000
 #: split along: the table is what that costs in nodes, in interface elements and in
 #: the wall time of one viscoplastic trial.
 FEM05_SPACINGS = (3.0, 1.5, 0.75)
-#: The blocky-mass figure: ``voronoi`` over the same joint region, at a block size
-#: and a seed. Nothing is solved on it and no workbook is written — the page shows
-#: it as a picture of what the third generator produces. 2 m over the 60.5 m² zone
+#: The blocky-mass model: ``voronoi`` over the same joint region, at a block size
+#: and a seed, as ``tools/build_rock_joints.py`` writes it to
+#: ``xslope_rock_voronoi.xlsx``. The two numbers here are for the printout; the
+#: solve reads the workbook. 2 m over the 60.5 m² zone
 #: is about fifteen blocks, which is a mass a reader can still count the cells of
 #: at the width the figure is placed at; the model's own 1.5 m spacing would put
 #: ninety traces in the same wedge.
@@ -5767,21 +5770,30 @@ def _fem05_joints(model, fem_data, result):
                  int(opened.sum()),
                  "n/a" if prof["peak_utilization"] is None
                  else "%.3f" % prof["peak_utilization"], prof["status"]))
+        # Station by station, bottom to top: the state each node pair is in
+        # (open, slipping or closed) and its slip, which is what the page's
+        # prose reads when it says where along a line the joint has parted.
+        order = np.lexsort((np.asarray(prof["x"], dtype=float),
+                            np.asarray(prof["y"], dtype=float)))
+        for i in order:
+            state = ("open" if opened[i] else
+                     "slipping" if slipping[i] else "closed")
+            print("             %-11s (%.3f, %.3f)  %-8s  slip %.4f mm"
+                  % ("", prof["x"][i], prof["y"][i], state,
+                     abs(float(slip[i])) * 1000.0))
 
 
 def fem05_plots():
     """The rock arc: the section as the reader opens it, the two joint lines they
     type into it, the split mesh, and the strength reduction that slides the slab
     off the face — then the same four for the generated column set that tips on
-    its base plane instead, and one picture of the third generator's blocky mass.
+    its base plane instead, and the third generator's blocky mass solved at the
+    same settings.
 
-    Printed rather than drawn: the mesh and interface counts of both models, both
-    bracket walks trial by trial, and how far each jointed line has slipped at the
-    last standing trial.
+    Printed rather than drawn: the mesh and interface counts of the three models,
+    each bracket walk trial by trial, and every jointed line's state station by
+    station at the last standing trial.
     """
-    import copy as _copy
-
-    from xslope import joints as xjoints
     from xslope.plot_fem import plot_fem_data, plot_fem_results
 
     # ---- the section as it opens, and the joints typed into it -------------- #
@@ -5844,23 +5856,44 @@ def fem05_plots():
             result_t["last_solution"], plot_type="displace_vector",
             fs=result_t["FS"])
 
-    # ---- the third generator, as a picture ---------------------------------- #
-    # The blocky mass is drawn and not run: it stands on the page beside the
-    # parallel set to show what a rock mass with no through-going orientation is
-    # described as. The traces go onto a COPY of the toppling model — same
-    # section, same joint region — and no workbook is written for it, because
-    # nothing on the page opens one.
-    vor = _copy.deepcopy(topple)
-    traces = xjoints.voronoi(vor, block_size=FEM05_VORONOI_BLOCK,
-                             seed=FEM05_VORONOI_SEED,
-                             region="poly:%s" % zone.get("label"), label="vor",
-                             props={"c": 0.0, "phi": topple["joint_lines"][0]["phi"]})
-    vor["joint_lines"] = list(traces)
-    print("   voronoi     block size %g %s · seed %d · region %r → %d trace(s)"
+    # ---- the third generator: the Voronoi model ---------------------------- #
+    # ``xslope_rock_voronoi.xlsx`` is the toppling model's section and joint
+    # region with the column set replaced by the Voronoi generator's traces at a
+    # 2 m block size, seed 7, on the same base plane. It is solved at the page's
+    # own settings and drawn the way the toppling pair is.
+    vor = load_slope_data(FEM05_VORONOI)
+    print("   voronoi     block size %g %s · seed %d · region %r → %d row(s) on "
+          "the joints sheet (base plane + %d trace(s))"
           % (FEM05_VORONOI_BLOCK, _u["length"], FEM05_VORONOI_SEED,
-             zone.get("label"), len(traces)))
+             zone.get("label"), len(vor["joint_lines"]),
+             len(vor["joint_lines"]) - 1))
     capture("fem05_inputs_voronoi.png", plot_inputs, vor, mode="fem",
             title="Slope Geometry and Inputs")
+
+    mesh_v = _fem05_mesh(vor)
+    fem_v, result_v, seconds_v = _fem05_solve(vor, mesh_v)
+    _fem05_counts("voronoi", vor, mesh_v, fem_v)
+    if result_v.get("converged"):
+        _fem05_report("voronoi", result_v, seconds_v)
+    else:
+        # No bracket resolved at the page's settings: say which trials stood and
+        # which did not, at the budget the page gives, rather than raise it.
+        print("   voronoi   no factor of safety · %s · %.0f s"
+              % (result_v.get("error"), seconds_v))
+        for tr in result_v.get("trials") or []:
+            print("        F %.4f  %-6s  %-13s  %s sweeps"
+                  % (tr["F"], tr.get("role"), tr.get("verdict"),
+                     tr.get("iterations")))
+    if result_v.get("last_solution") is not None and result_v.get("FS") is not None:
+        _fem05_joints(vor, fem_v, result_v)
+        capture("fem05_joint_slip_voronoi.png", plot_fem_results, fem_v,
+                result_v["last_solution"], plot_type="shear_strain",
+                fs=result_v["FS"])
+        capture("fem05_fem_blocks_voronoi.png", plot_fem_results, fem_v,
+                result_v["last_solution"], plot_type="displace_vector",
+                fs=result_v["FS"])
+    else:
+        print("   voronoi   no standing trial — no result panels drawn")
 
 
 def fem05_spacing():

@@ -4297,6 +4297,44 @@ JOINT_NEWTON_CROSS = True
 #: fixed point the step is far under it and the cap never binds.
 _JOINT_RELIEF_STEP = 0.1
 
+# === The accelerated sweep (a step multiplier on the initial-stiffness loop) ===
+# The viscoplastic loop IS the initial-stiffness method: one elastic factorization,
+# the out-of-balance load re-applied every sweep. Where that iteration converges
+# slowly along one mode (RJ-2's standing edge: spectral radius 0.99947 with the
+# active set frozen, r16 §1) a scalar multiplier on each sweep's increment,
+# chosen from the last two increments (Irons & Tuck 1969; Aitken relaxation),
+# shortens the approach without moving the fixed point. opus_review_2026-09-24.md
+# §1.2-1.4 is the specification and the harness prototype's measurement:
+#
+#   * g_k = u~_{k+1} - u_k on the free dofs, u~ this sweep's back-substitution;
+#     the formula reads the two-sweep mean (g_k + g_{k-1})/2 on a model whose soil
+#     can yield, which cancels the period-2 yield-surface flicker (see oob_window);
+#   * alpha_k = -alpha_{k-1} h_{k-1}.(h_k - h_{k-1}) / |h_k - h_{k-1}|^2, clamped
+#     to [_ACCEL_ALPHA_MIN, _ACCEL_ALPHA_MAX], alpha = 1 before sweep
+#     _ACCEL_START and on any sweep where a joint pair or a Gauss point changed
+#     status;
+#   * u_{k+1} = u_k + alpha_k g_k, and every internal variable's increment of the
+#     sweep (each Gauss point's evp, each pair's slip_p and dil_p) scaled by the
+#     same alpha_k, so the carried state is the one the plain sweep would build
+#     from the scaled increment. Bars, piles and ties are stateless caps;
+#   * the SAFEGUARD: alpha != 1 is rejected when the scaled state would change any
+#     pair's status (open / slipping), trip the permanent residual latch, or add
+#     dilation (history that cannot be undone);
+#   * the readings: CHECON reads the unscaled increment g_k; the out-of-balance
+#     window averages the unscaled per-sweep body-load increments, so an accepted
+#     step's jump in the carried load vector is never read as a residual;
+#   * off in the K0 in-situ solve (every trial's datum), exclusive of the
+#     interface relief, the corrector and its hold test unchanged.
+#
+#: Module default for `solve_fem(accelerate=...)` / `solve_ssrm(accelerate=...)`.
+#: OFF: no locked factor of safety is defined with it on.
+ACCELERATE_DEFAULT = False
+#: The multiplier's clamp. [0.2, 50] measured better than RS2's [0.2, 5] (review §1.3).
+_ACCEL_ALPHA_MIN = 0.2
+_ACCEL_ALPHA_MAX = 50.0
+#: Sweeps run plain before the multiplier may differ from 1.
+_ACCEL_START = 300
+
 _JOINT_VERDICT_WARMUP = 5000      # sweeps before either verdict may be read
 _JOINT_WINDOW_FRAC = 0.5          # trailing fraction of the history both read
 # SETTLED: the slip has stopped, the field has stopped, and the soil is in
@@ -5274,7 +5312,7 @@ def corrector_hold_test(fem_data, F, state, softened=None, **solve_kw):
                max_iterations_ceiling=int(_CORRECTOR_HOLD_SWEEPS),
                _init_state=_hs, _softened_seed=softened,
                fem_solver='viscoplastic', joint_tangent='off',
-               progress_callback=None)
+               accelerate=False, progress_callback=None)
     try:
         _h = solve_fem(fem_data, F=F, **_kw)
     except Exception as _exc:      # KeyboardInterrupt is a BaseException
@@ -5311,7 +5349,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               _finite_guard=False, _finite_guard_u_max=None,
               joint_slip_stiffness_factor=None,
               joint_tangent=None, joint_tangent_factor=None,
-              joint_newton=None):
+              joint_newton=None, accelerate=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -5639,6 +5677,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             one that is certified standing. False restores the pre-2026-09-12
             skip for one call; `fem_solver='viscoplastic'` turns the corrector
             off on every model. Inert without a joint.
+        accelerate (bool or None): THE ACCELERATED SWEEP — a step multiplier on
+            each viscoplastic sweep's increment, taken from the last two
+            increments and clamped to [0.2, 50], with every internal variable's
+            increment of the sweep scaled by the same factor and a safeguard that
+            refuses any step that would change a joint pair's status (see
+            ACCELERATE_DEFAULT for the whole rule). The fixed point is the plain
+            sweep's; what changes is how many sweeps reach it. None takes the
+            module default (`ACCELERATE_DEFAULT`, OFF). Exclusive of the
+            interface relief. The result carries what the multiplier did under
+            ``"accelerate"`` when it is on, and no such key when it is off.
         joint_tangent_factor (float or None): The residual stiffness a relieved
             pair keeps in the matrix, as a fraction of its elastic value. None
             takes RS2's own 0.01 (xslope.joint.JOINT_TANGENT_FACTOR). It is not
@@ -6354,6 +6402,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # way to this seed (see _vp_gate_armed). It belongs to the trial, not to the
         # driver that finished it, so a corrector-certified result reports it too.
         _sol["gate_deferrals"] = int(gate_deferrals)
+        if _acc is not None:
+            _sol["accelerate"] = dict(_acc)
         _sol["corrector"] = {
             "driver_of_record": "corrector",
             "checkpoint": where,
@@ -6676,6 +6726,35 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 grp[_k] = _sg[_k]
         gp_groups.append(grp)
 
+    # ---- The accelerated sweep (see ACCELERATE_DEFAULT) ----
+    # `_acc` is None with it off, and every line below that reads it is then
+    # skipped, so the plain loop runs exactly the arithmetic it always did.
+    _acc_on = bool(ACCELERATE_DEFAULT if accelerate is None else accelerate)
+    _acc = None
+    if _acc_on:
+        if joint_relief_on:
+            raise ValueError(
+                "accelerate and the interface relief (joint_tangent='slip' or "
+                "'open') are exclusive: run one or the other.")
+        # The two-sweep mean is read on a model whose soil can yield, where the
+        # yield-surface flicker is period 2 (see oob_window); a model whose
+        # every Gauss point is elastic has no flicker to cancel.
+        _acc_mean = any(not (g_.get('has_elastic') and bool(np.all(g_['elastic'])))
+                        for g_ in gp_groups)
+        _acc = dict(on=True, start=int(_ACCEL_START),
+                    alpha_min=float(_ACCEL_ALPHA_MIN),
+                    alpha_max=float(_ACCEL_ALPHA_MAX),
+                    two_sweep_mean=bool(_acc_mean),
+                    accepted=0, rejected=0, rejected_status=0,
+                    rejected_latch=0, rejected_dilation=0,
+                    resets=0, resets_pair=0, resets_gp=0,
+                    largest_alpha=1.0, smallest_alpha=1.0,
+                    sum_alpha_accepted=0.0)
+        _acc_ref_evp = [np.empty_like(g_['evp']) for g_ in gp_groups]
+        _acc_ref_slip = np.empty_like(joint_slip) if has_joints else None
+        _acc_ref_dil = (np.empty_like(joint_dil)
+                        if (has_joints and joint_dil is not None) else None)
+
     # ---- Compiled Mohr-Coulomb kernel ('auto' by default; NumPy path is the oracle) ----
     # When fast_kernel is on, MC-only groups (no power-curve / Hoek-Brown Gauss
     # points) run their Step-6 constitutive update in the compiled kernel; every
@@ -6972,6 +7051,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # Reset per STAGE: base_loads changes at a stage boundary, so a history carried
         # across it would measure a load step, not a residual.
         loads_hist = [base_loads.copy()]
+        if _acc is not None:
+            # The accelerated sweep's own records, reset per stage with the
+            # window. `_acc_L` is the body load the carried state balances (the
+            # scaled one after an accepted step); `_acc_S` is the running sum of
+            # the UNSCALED per-sweep increments, which is what the window reads.
+            _acc_L = base_loads.copy()
+            _acc_S = base_loads.copy()
+            _acc_g_prev = None
+            _acc_h_prev = None
+            _acc_a_prev = 1.0
+            _acc_active_prev = None
+            _acc_gnorm = 0.0
         ufr_best = float('inf')        # lowest out-of-balance seen this stage
         last_progress_iter = 0         # iteration of last meaningful improvement
         gate_tried = False             # the yield gate has spent its one corrector
@@ -7058,6 +7149,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 for _buf, _grp in zip(evp_safe, gp_groups):
                     np.copyto(_buf, _grp['evp'])
                 guard_have_safe = True
+            # The accelerated sweep scales THIS sweep's internal-variable
+            # increments, so it keeps the state the sweep starts from.
+            if _acc is not None:
+                for _buf, _grp in zip(_acc_ref_evp, gp_groups):
+                    np.copyto(_buf, _grp['evp'])
+                if _acc_ref_slip is not None:
+                    np.copyto(_acc_ref_slip, joint_slip)
+                if _acc_ref_dil is not None:
+                    np.copyto(_acc_ref_dil, joint_dil)
 
             # Build body load correction from accumulated viscoplastic strains
             _tp = time.perf_counter() if _PROF_ON else None
@@ -7632,7 +7732,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # `joint_relief_load` is None and this is the array itself.
             loads_oob = (loads if joint_relief_load is None
                          else loads - joint_relief_load)
-            loads_hist.append(loads_oob)
+            if _acc is None:
+                loads_hist.append(loads_oob)
+            else:
+                # The accelerated sweep: the window reads the running sum of the
+                # UNSCALED increments. The carried load jumps by (alpha - 1) times
+                # an increment at every accepted step, and a window differencing
+                # the carried vector across that jump would read it as residual.
+                # With alpha = 1 throughout this sums to the plain window's value.
+                _acc_d = loads_oob - _acc_L
+                _acc_S = _acc_S + _acc_d
+                loads_hist.append(_acc_S)
             if len(loads_hist) > oob_window + 1:
                 loads_hist.pop(0)
             # Elementwise from the increment to the per-node resultant, so the
@@ -7644,7 +7754,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # measured np.take(..., out=) form of the same expression ran 1.41x
             # SLOWER than the original at every mesh size tried, so this keeps the
             # allocation and drops the call.
-            np.subtract(loads_oob, loads_hist[0], out=_oob_dload)
+            np.subtract(loads_oob if _acc is None else loads_hist[-1],
+                        loads_hist[0], out=_oob_dload)
             _oob_dload /= min(oob_window, len(loads_hist) - 1)
             _oob_dload *= _oob_maskf
             _oob_bx = _oob_dload[_oob_ix]
@@ -7719,6 +7830,92 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     _conv_buf *= _cap / _step
                     _conv_buf += _u_free_carry
                     u_free_new = _conv_buf.copy()
+
+            # ---- the accelerated sweep (see ACCELERATE_DEFAULT) ----
+            if _acc is not None:
+                _acc_prev = (u[free_dofs] if _u_free_carry is None
+                             else _u_free_carry)
+                _acc_g = u_free_new - _acc_prev
+                _acc_gnorm = float(np.abs(_acc_g).max()) if _acc_g.size else 0.0
+                # Status this sweep: a Gauss point is active when the sweep moved
+                # its plastic strain (either kernel), a pair by its sticking /
+                # slipping / open code (`joint_n_changed`).
+                _acc_act = [np.any(_grp['evp'] != _buf, axis=1)
+                            for _grp, _buf in zip(gp_groups, _acc_ref_evp)]
+                _acc_gp_chg = (_acc_active_prev is not None and any(
+                    bool(np.any(_a != _b))
+                    for _a, _b in zip(_acc_act, _acc_active_prev)))
+                _acc_active_prev = _acc_act
+                _acc_pair_chg = bool(has_joints and joint_n_changed)
+                _acc_h = (_acc_g if (not _acc['two_sweep_mean']
+                                     or _acc_g_prev is None)
+                          else 0.5 * (_acc_g + _acc_g_prev))
+                _alpha = 1.0
+                if iteration >= _ACCEL_START:
+                    if _acc_pair_chg or _acc_gp_chg:
+                        _acc['resets'] += 1
+                        if _acc_pair_chg:
+                            _acc['resets_pair'] += 1
+                        if _acc_gp_chg:
+                            _acc['resets_gp'] += 1
+                    elif _acc_h_prev is not None:
+                        _acc_dh = _acc_h - _acc_h_prev
+                        _acc_den = float(_acc_dh @ _acc_dh)
+                        if _acc_den > 0.0:
+                            _alpha = (-_acc_a_prev * float(_acc_h_prev @ _acc_dh)
+                                      / _acc_den)
+                            _alpha = float(min(max(_alpha, _ACCEL_ALPHA_MIN),
+                                               _ACCEL_ALPHA_MAX))
+                if _alpha != 1.0 and has_joints:
+                    # The safeguard: the scaled state may not change any pair's
+                    # status, trip the residual latch or add dilation.
+                    _why = None
+                    if (_acc_ref_dil is not None
+                            and bool(np.any(joint_dil != _acc_ref_dil))):
+                        _why = 'rejected_dilation'
+                    else:
+                        _u_try = u.copy()
+                        _u_try[free_dofs] = _acc_prev + _alpha * _acc_g
+                        _s_try = _acc_ref_slip + _alpha * (joint_slip
+                                                           - _acc_ref_slip)
+                        _st_try = joint_state(
+                            joint_data, _u_try, joint_cj_r, joint_tanphi_r,
+                            slip_p=_s_try, open_prev=joint_open,
+                            slipped=joint_slipped, res_r=joint_res_r,
+                            dil_p=joint_dil)
+                        if (bool(np.any(_st_try["open"]
+                                        != joint_state_last["open"]))
+                                or bool(np.any(_st_try["slipping"]
+                                               != joint_state_last["slipping"]))):
+                            _why = 'rejected_status'
+                        elif (joint_slipped is not None and bool(np.any(
+                                _st_try["slipping"] & ~joint_slipped))):
+                            _why = 'rejected_latch'
+                    if _why is not None:
+                        _acc['rejected'] += 1
+                        _acc[_why] += 1
+                        _alpha = 1.0
+                if _alpha != 1.0:
+                    for _grp, _buf in zip(gp_groups, _acc_ref_evp):
+                        _e = _grp['evp']
+                        _e -= _buf
+                        _e *= _alpha
+                        _e += _buf
+                    if _acc_ref_slip is not None:
+                        joint_slip -= _acc_ref_slip
+                        joint_slip *= _alpha
+                        joint_slip += _acc_ref_slip
+                    u_free_new = _acc_prev + _alpha * _acc_g
+                    _acc_L = _acc_L + _alpha * _acc_d
+                    _acc['accepted'] += 1
+                    _acc['sum_alpha_accepted'] += _alpha
+                    _acc['largest_alpha'] = max(_acc['largest_alpha'], _alpha)
+                    _acc['smallest_alpha'] = min(_acc['smallest_alpha'], _alpha)
+                else:
+                    _acc_L = loads_oob
+                _acc_g_prev = _acc_g
+                _acc_h_prev = _acc_h
+                _acc_a_prev = _alpha
 
             u_new = np.zeros(n_dof)
             u_new[free_dofs] = u_free_new
@@ -7818,6 +8015,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             np.subtract(u_free_new, _u_free_prev, out=_conv_buf)
             np.abs(_conv_buf, out=_conv_buf)
             norm_diff = _conv_buf.max()
+            if _acc is not None:
+                # CHECON reads the sweep's own increment, not the scaled one.
+                norm_diff = _acc_gnorm
             if _datum_is_zero:
                 # x - 0.0 is exactly x for every finite x, and |-0.0| = |0.0|, so
                 # the datum subtraction is skipped rather than approximated.
@@ -8569,6 +8769,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # the loop was still improving, and carried on rather than ending on the gate
         # (see _vp_gate_armed). Zero on a trial the gate never read.
         "gate_deferrals": int(gate_deferrals),
+        # What the accelerated sweep's multiplier did (see ACCELERATE_DEFAULT);
+        # the key is absent with it off.
+        **({} if _acc is None else {"accelerate": dict(_acc)}),
         # Every corrector attempt this trial made and what it read, including the
         # ones that refused — a refusal decides nothing, but it is the measurement
         # that says whether the corrector is earning its cost. Empty on the plain
@@ -13014,7 +13217,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                ssrm_driver='bisection', trial_factors=None,
                joint_slip_stiffness_factor=None,
                joint_tangent=None, joint_tangent_factor=None,
-               joint_newton=None):
+               joint_newton=None, accelerate=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -13086,6 +13289,10 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             and the corrector's jointed switch, passed to every trial's solve_fem
             AND to the in-situ equilibration so the whole run is solved one way.
             See solve_fem's entries.
+        accelerate (bool or None): The accelerated sweep (see solve_fem's entry
+            and ACCELERATE_DEFAULT), passed to every trial's solve_fem. The
+            in-situ equilibration always runs the plain sweep: its state is every
+            trial's datum. None takes the module default (OFF).
         fem_solver (str or None): Which per-trial driver runs, passed to every
             solve_fem trial — 'auto' (the default: the viscoplastic loop with the
             Newton corrector and the yield gate), 'viscoplastic' (that loop alone,
@@ -13601,6 +13808,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             joint_tangent=joint_tangent,
             joint_tangent_factor=joint_tangent_factor,
             joint_newton=joint_newton,
+            # The in-situ state is every trial's datum and is path-dependent, so
+            # it is always settled on the plain sweep (see ACCELERATE_DEFAULT).
+            accelerate=False,
             _corrector_rungs=(
                 _K0_CORRECTOR_CHECKPOINTS
                 if (K0_CORRECTOR_LADDER_ON
@@ -13718,7 +13928,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             joint_slip_stiffness_factor=joint_slip_stiffness_factor,
             joint_tangent=joint_tangent,
             joint_tangent_factor=joint_tangent_factor,
-            joint_newton=joint_newton)
+            joint_newton=joint_newton, accelerate=accelerate)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -13966,7 +14176,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  fem_solver=None, _prepared=None, _init_state=None, hybrid=False,
                  trial_factors=None, joint_slip_stiffness_factor=None,
                  joint_tangent=None, joint_tangent_factor=None,
-                 joint_newton=None):
+                 joint_newton=None, accelerate=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -14090,6 +14300,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "yield_flagged": bool(sol.get("yield_flagged", False)),
             "gate_failed": bool(sol.get("gate_failed", False)),
             "gate_deferrals": int(sol.get("gate_deferrals", 0) or 0),
+            # What the accelerated sweep did on this trial; absent with it off.
+            **({} if sol.get("accelerate") is None
+               else {"accelerate": sol["accelerate"]}),
         })
         if _stable(sol):
             _carried[0] = (float(F) if _carried[0] is None
@@ -14159,7 +14372,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          joint_slip_stiffness_factor=joint_slip_stiffness_factor,
                          joint_tangent=joint_tangent,
                          joint_tangent_factor=joint_tangent_factor,
-                         joint_newton=joint_newton,
+                         joint_newton=joint_newton, accelerate=accelerate,
                          _prepared=_prepared, _init_state=_init_state)
 
     F_left = F_min

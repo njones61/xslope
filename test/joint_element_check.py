@@ -1101,6 +1101,80 @@ def _leg_hold_test(failures, results):
                        f"{h['drift_u_el']:.1e} u_el")
 
 
+def _leg_accelerated(failures, results):
+    """The accelerated sweep ends where the plain sweep ends, in fewer sweeps.
+
+    Rows 2 and 4 near their closed forms, on the plain viscoplastic loop (no
+    corrector, so every sweep of the approach is the loop's own): with the step
+    multiplier on (``accelerate=True``) each trial must converge on the plain
+    trial's end state, to within the force tolerance in elastic displacements,
+    and in fewer sweeps. The joints change status on the way in (pairs start and
+    stop slipping as the block settles), so the safeguard must have refused
+    steps whose scaled state would have flipped a pair. The strength reduction
+    on both rows must return the plain run's factor. With the switch off the
+    result carries no ``accelerate`` record.
+    """
+    kw = dict(max_iterations=40000, max_iterations_ceiling=40000,
+              fast_kernel=False, fem_solver='viscoplastic')
+    for label, row, F in (('row 2', ROW2, 1.56), ('row 4', ROW4, 1.5)):
+        _d, fd, g = slab_model(**row)
+        with contextlib.redirect_stdout(io.StringIO()):
+            off = solve_fem(fd, F=F, **kw)
+            on = solve_fem(fd, F=F, accelerate=True, **kw)
+        acc = on.get('accelerate') or {}
+        if 'accelerate' in off:
+            failures.append(f"accelerate ({label}): the plain trial carries an "
+                            f"accelerate record")
+        if not (off['converged'] and on['converged']):
+            failures.append(f"accelerate ({label}) F = {F}: plain "
+                            f"{off['verdict']}, accelerated {on['verdict']}; "
+                            f"both must converge")
+            continue
+        u_el = float(off['u_elastic_scale'])
+        du = float(np.max(np.abs(np.asarray(on['displacements'])
+                                 - np.asarray(off['displacements']))))
+        dslip = float(np.max(np.abs(np.asarray(on['joint_slip'])
+                                    - np.asarray(off['joint_slip']))))
+        if du > 1e-3 * u_el:
+            failures.append(f"accelerate ({label}) F = {F}: the end state is "
+                            f"{du / u_el:.2e} u_el from the plain one "
+                            f"(must be <= 1e-3)")
+        if on['iterations'] >= off['iterations']:
+            failures.append(f"accelerate ({label}) F = {F}: {on['iterations']} "
+                            f"sweeps against the plain {off['iterations']}")
+        if not acc.get('accepted'):
+            failures.append(f"accelerate ({label}): no step was accelerated")
+        if not acc.get('rejected_status'):
+            failures.append(f"accelerate ({label}): the safeguard refused no "
+                            f"step, so the status fixture reads nothing")
+        results.append(
+            f"accelerate  {label} F = {F}: {off['iterations']} -> "
+            f"{on['iterations']} sweeps, end state within {du / u_el:.1e} u_el "
+            f"(slip {dslip:.1e} m); {acc.get('accepted')} steps accepted, "
+            f"{acc.get('rejected_status')} refused for a pair's status, "
+            f"largest {acc.get('largest_alpha'):g}")
+    # The factor. Read at ten times the closed-form rows' own sweep budget: at
+    # their 3,000 a trial near the closed form ends undecided at the cap, and
+    # the displacement evidence it is then read on is a per-sweep distance
+    # calibrated on the plain loop, which an accelerated sweep does not cover at
+    # the same rate (measured: row 2 1.6196 plain against 1.6606 accelerated at
+    # 3,000; 1.5903 both at 30,000, every trial the same verdict).
+    for label, row in (('row 2', ROW2), ('row 4', ROW4)):
+        _d, fd, g = slab_model(**row)
+        fs = {}
+        for acc in (False, True):
+            res = _ssrm(fd, F_min=1.0, F_max=2.5, tolerance=0.02, budget=10.0,
+                        accelerate=acc)
+            fs[acc] = res.get('FS')
+        if fs[False] is None or fs[True] != fs[False]:
+            failures.append(f"accelerate ({label}): the strength reduction "
+                            f"returns {fs[True]} with the switch on against "
+                            f"{fs[False]} off")
+        else:
+            results.append(f"accelerate  {label} SSRM FS = {fs[True]:.4f} on "
+                            f"and off (tolerance 0.02, 30,000-sweep budget)")
+
+
 # --------------------------------------------------------------------------
 # The tension cutoff and the tied end
 # --------------------------------------------------------------------------
@@ -1358,6 +1432,7 @@ def run():
     _leg_certified_slip(failures, results)
     _leg_history_carried(failures, results)
     _leg_hold_test(failures, results)
+    _leg_accelerated(failures, results)
     _leg_crossing_stiffness(failures, results)
     _leg_untouched(failures, results)
     _leg_stiffness(failures, results)

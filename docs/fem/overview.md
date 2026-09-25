@@ -500,8 +500,12 @@ That redistribution belongs to **establishing the in-situ state**, not to streng
 the SSRM runs them as the two separate steps they are. A $K_0$ analysis begins with one
 **full-strength equilibration solve**: the $K_0$ field settles against the real geometry at
 unreduced strength, and every bisection trial then starts from the resulting stress state, with a
-zero displacement datum, and reduces strength from there. The equilibration is solved once and
-shared by all trials, and its outcome is returned in `result['k0_equilibration']`.
+zero displacement datum, and reduces strength from there. On a jointed model the state carried
+into each trial includes every joint's slip history — how far each pair has slid, whether it stands
+open, and its residual and dilation state — so a joint that slid while the slope settled starts
+the trial where the settling left it, not pushed back onto its limit as if it had never moved. The
+equilibration is solved once and shared by all trials, and its outcome is returned in
+`result['k0_equilibration']`.
 
 Run the two steps together instead and every trial repeats the in-situ redistribution against soil
 already weakened by $F$, then charges the displacement and plastic strain it produces to the trial.
@@ -839,7 +843,14 @@ A state the corrector returns ends the trial as standing only when it passes thr
 >- **Displacement** — the translational movement below a tenth of the model height, read on the deep
 >  degrees of freedom wherever a `min_slip_depth` filter is in force.
 
-**A corrector refusal is not a verdict.** Where any of the three fails, or the Newton solve does not
+On a jointed model a fourth check follows, the **hold test**: the viscoplastic sweep is restarted
+from the certified state, with its joint history, and the certificate stands only if that sweep
+reads the state as standing within 3,000 more sweeps having moved it by no more than a hundredth
+of an elastic displacement. A Newton equilibrium on a set of contacts can be a saddle — a state the
+sweep leaves as soon as it is allowed to — and the hold test is what separates it from a state the
+slope stays on. Models without joints never run it.
+
+**A corrector refusal is not a verdict.** Where any of the checks fails, or the Newton solve does not
 converge, the attempt is recorded and control returns to the viscoplastic loop with nothing about
 its state changed — the corrector works on a copy of the displacement field and of every plastic
 strain, so a refused attempt leaves no mark on the iteration that continues. The loop then runs on

@@ -302,7 +302,9 @@ failed.
 A jointed trial is also handed to the [Newton
 corrector](overview.md#finishing-a-trial-with-the-newton-corrector), which starts from the state
 the sweeps have reached — the slip, the opening and the residual strength each joint has arrived at
-— and looks for equilibrium at that strength directly. Where it finds one, the trial stands,
+— and looks for equilibrium at that strength directly. Where it finds one, the sweeps are
+restarted from it to confirm that the slope stays there (the
+[hold test](overview.md#finishing-a-trial-with-the-newton-corrector)), and the trial stands,
 usually within a few hundred more sweeps. Where it does not, the trial is left as the sweeps read
 it: not finding an equilibrium this way is not evidence that none exists.
 

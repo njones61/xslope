@@ -2782,7 +2782,7 @@ def fem05_joints_editor():
     from studio.editors import JointsEditor
 
     dlg = JointsEditor().build(_load(FEM05_SLAB), None)
-    return _grab(_grow_preview(_line_table(dlg, through="jred"), 260),
+    return _grab(_grow_preview(_line_table(dlg, through="jred"), 140),
                  "fem05_studio_joints_editor.png")
 
 

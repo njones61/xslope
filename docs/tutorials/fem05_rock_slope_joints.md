@@ -89,7 +89,7 @@ Download
 with **File → Open…**. Its units are metric, so lengths read in metres, unit
 weights in kN/m³, and strengths and stiffnesses in kPa.
 
-![The starter file: the section as one polygon of rock, with nothing on the joints worksheet](images/fem05_inputs_start.png){width=800}
+![The starter file: the section as one polygon of rock, with nothing on the joints worksheet](images/fem05_inputs_start.png){width=900}
 
 The section is entered as a single closed polygon of rock; a profile line would
 have done as well, and either way the mesh is one zone. The rock's properties
@@ -136,7 +136,7 @@ A new row opens with `c`, `phi` and `t_cut` at 0 and every other column blank;
 leave `t_cut` at 0 and the rest blank. With the two rows in, the Inputs plot draws
 the joint lines in their own style, distinct from profile lines and reinforcement:
 
-![The two joint lines on the Inputs plot, drawn in the joint line style](images/fem05_inputs_joints.png){width=800}
+![The two joint lines on the Inputs plot, drawn in the joint line style](images/fem05_inputs_joints.png){width=900}
 
 ---
 
@@ -168,7 +168,7 @@ reason [FEM-1](fem01_strength_reduction.md) gives.
 The dialog reports what it built: **768 nodes, 344 elements, and 12 joint
 elements on 2 jointed lines.**
 
-![The mesh, with the two jointed lines drawn over it](images/fem05_mesh.png){width=800}
+![The mesh, with the two jointed lines drawn over it](images/fem05_mesh.png){width=900}
 
 Along a joint line the mesher gives every node one copy for each piece of
 material around it, so the rock above the bedding plane and the rock below it no
@@ -211,7 +211,7 @@ and there is no strain field to draw; everything that happened, happened on the
 two lines, and **Shear strain** draws as **Joint slip** instead: the section a
 flat gray, and the only colorbar the slip on the joints, in metres.
 
-![The joint slip at the critical factor: the bedding plane bright along nearly its whole length, the release joint drawn as two parted lines where it has opened](images/fem05_joint_slip.png){width=800}
+![The joint slip at the critical factor: the bedding plane bright along nearly its whole length, the release joint drawn as two parted lines where it has opened](images/fem05_joint_slip.png){width=900}
 
 The color is the slip, and it reads the way the slab moved: along the bedding
 plane it grows from 0.14 mm at the release joint to 0.39 mm at the toe, the
@@ -233,7 +233,7 @@ tint of its own, the joint faces colored by how far they have slid, and the
 undeformed outline dashed behind it. On a jointed model, **Displacement
 vectors** shows this same picture.
 
-![The deformed blocks at the critical factor: the slab has moved down the bedding plane and away from the release joint](images/fem05_fem_blocks.png){width=800}
+![The deformed blocks at the critical factor: the slab has moved down the bedding plane and away from the release joint](images/fem05_fem_blocks.png){width=900}
 
 The slab has moved as one body. It slid down the bedding plane and parted from
 the release joint, and every bit of that movement was taken up on the two lines;
@@ -374,7 +374,7 @@ Close the joints editor. The Inputs plot now shows six joint lines — the base
 plane and the five columns standing on it — with the joint region's outline
 dashed behind them:
 
-![The generated network on the Inputs plot: five columns standing on the base plane](images/fem05_inputs_network.png){width=800}
+![The generated network on the Inputs plot: five columns standing on the base plane](images/fem05_inputs_network.png){width=900}
 
 ---
 
@@ -392,7 +392,7 @@ about two minutes — nearer three without the compiled kernel — and reports
 
 >>**FS = 1.105**
 
-![The deformed blocks: the columns lean out over the base plane rather than sliding along it](images/fem05_fem_blocks_topple.png){width=800}
+![The deformed blocks: the columns lean out over the base plane rather than sliding along it](images/fem05_fem_blocks_topple.png){width=900}
 
 Read the deformed-block figure first. The columns are separate bodies and they
 move as bodies, but they do not slide down the base plane the way Part 1's slab
@@ -403,7 +403,7 @@ method was built for: every bit of the movement is taken up on the contacts, and
 the factor of safety is the factor by which the contacts have to be weakened
 before the stack starts to go over.
 
-![Joint slip on the toppling stack: the base plane slipping along most of its length, the column joints opened along their lower parts and in contact only at their tops](images/fem05_joint_slip_topple.png){width=800}
+![Joint slip on the toppling stack: the base plane slipping along most of its length, the column joints opened along their lower parts and in contact only at their tops](images/fem05_joint_slip_topple.png){width=900}
 
 The joint slip figure shows the same mechanism as contact states. Each column
 joint has opened along most of its length and is in contact only near the top:
@@ -453,7 +453,7 @@ of a blocky rock mass with no dominant joint set. Over this slope's toppling
 zone, at a block size of 2 m, it writes **58 joint lines** — about fifteen cells
 — where the parallel set wrote five:
 
-![The same region filled by the Voronoi generator instead: about fifteen blocks and 58 joint lines](images/fem05_inputs_voronoi.png){width=800}
+![The same region filled by the Voronoi generator instead: about fifteen blocks and 58 joint lines](images/fem05_inputs_voronoi.png){width=900}
 
 That is a picture of the generator rather than a model to run here. The
 mechanism it describes is real, but a section with that many contacts in it is a

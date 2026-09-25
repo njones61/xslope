@@ -4886,7 +4886,8 @@ _CORRECTOR_YIELD_TOL = 1e-6
 # going, and the corrector, asked about a state on that path, lands on the
 # equilibrium it passed (opus_review_2026-09-24.md §2.4). So on a model with joints a
 # certificate is accepted only if the plain sweep, started ON the certified state
-# with its joint history, converges there: it is then a fixed point of the same
+# with its joint history, stays there (reads it as standing and has moved it by
+# no more than _CORRECTOR_HOLD_DRIFT; see corrector_hold_test): it is then a fixed point of the same
 # iteration that defines every locked verdict, and not only a root of the residual.
 # A state the sweep walks off is not certified, and the trial goes on exactly as it
 # does after any refusal. Unjointed models never run it (JOINT_HOLD_TEST_ON gates it
@@ -5246,9 +5247,14 @@ def corrector_hold_test(fem_data, F, state, softened=None, **solve_kw):
     but with no corrector and no interface relief: the loop that defines every
     locked verdict. ``softened`` is the post-peak bar set the state was grown on.
 
-    The state HOLDS when that loop converges within ``_CORRECTOR_HOLD_SWEEPS``
-    sweeps having moved no more than ``_CORRECTOR_HOLD_DRIFT`` elastic
-    displacements. Returns a record whose ``held`` says which; any other ending,
+    The state HOLDS when that loop reads it as standing (``stable``, the trial's
+    own standard under its failure criterion) at the end of
+    ``_CORRECTOR_HOLD_SWEEPS`` sweeps or sooner, having moved no more than
+    ``_CORRECTOR_HOLD_DRIFT`` elastic displacements. ``converged`` alone is not
+    the reading: the continuation measures its displacement from the state it
+    starts on, so on a state that does not move at all the loop's relative-change
+    test divides round-off by round-off and need not fire (FEM-5-topple at
+    1.1015625: 3,000 sweeps, 5.5e-12 elastic displacements moved, STABLE_STUCK). Returns a record whose ``held`` says which; any other ending,
     an exception included, is ``held=False`` and nothing more.
     """
     _t0 = time.perf_counter()
@@ -5284,7 +5290,8 @@ def corrector_hold_test(fem_data, F, state, softened=None, **solve_kw):
         drift_u_el=float(_drift_rel), u_elastic_scale=_ue,
         oob=float(_h.get("unbalanced_force_ratio", np.nan)),
         wall=time.perf_counter() - _t0)
-    _out["held"] = (bool(_h.get("converged"))
+    _out["stable"] = bool(_h.get("stable"))
+    _out["held"] = (bool(_h.get("stable"))
                     and _drift_rel <= float(_CORRECTOR_HOLD_DRIFT))
     return _out
 

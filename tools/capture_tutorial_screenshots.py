@@ -198,6 +198,30 @@ def _line_table(dlg, through):
     return dlg
 
 
+def _grow_preview(dlg, extra):
+    """Give a line editor's section preview ``extra`` pixels more height.
+
+    ``_line_table`` sizes the dialog to the TABLE, and the preview under it keeps
+    whatever height is left — on a short, wide section that is a strip in which
+    the section fits by its height and draws small. The table's rows are kept;
+    the extra goes to the preview pane, and the canvas refits to it.
+    """
+    from PySide6.QtWidgets import QSplitter
+
+    tbl = dlg._table.table
+    dlg.resize(dlg.width(), dlg.height() + extra)
+    for sp in dlg.findChildren(QSplitter):
+        sizes = sp.sizes()
+        if len(sizes) == 2 and sp.isAncestorOf(tbl):
+            sp.setSizes([sizes[0], sizes[1] + extra])
+    _settle()
+    canvas = getattr(dlg, "_preview", None) or getattr(dlg, "_canvas", None)
+    if canvas is not None and hasattr(canvas, "fit"):
+        canvas.fit()
+        _settle()
+    return dlg
+
+
 @contextlib.contextmanager
 def _app_defaults():
     """Run a capture against the app's OWN defaults, not this machine's stored ones.
@@ -2758,7 +2782,7 @@ def fem05_joints_editor():
     from studio.editors import JointsEditor
 
     dlg = JointsEditor().build(_load(FEM05_SLAB), None)
-    return _grab(_line_table(dlg, through="jred"),
+    return _grab(_grow_preview(_line_table(dlg, through="jred"), 260),
                  "fem05_studio_joints_editor.png")
 
 

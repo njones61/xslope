@@ -71,6 +71,13 @@ from shapely.ops import unary_union
 #: reasonable size, and a zero-length one is a mesher failure.
 MIN_TRACE_FRAC = 1.0e-3
 
+#: A Voronoi cell wall shorter than this fraction of the block size is a sliver of
+#: the tessellation — two seeds that happened to fall almost in line — not a joint.
+#: Below it the wall is dropped and the two cells share a rock bridge. The mesher
+#: snaps a line's ends onto boundary points within a twentieth of the element
+#: size, and a wall shorter than that collapses to nothing when it does.
+VORONOI_MIN_WALL_FRAC = 0.1
+
 #: How close to a vertex of the region a clipped endpoint may land before it is
 #: SNAPPED onto it, as a fraction of the region's diameter.
 #:
@@ -561,7 +568,7 @@ def voronoi(slope_data, block_size, seed, region=None, label="vor", props=None,
 
     minx, miny, maxx, maxy = poly.bounds
     diag = math.hypot(maxx - minx, maxy - miny)
-    min_len = MIN_TRACE_FRAC * diag
+    min_len = max(MIN_TRACE_FRAC * diag, VORONOI_MIN_WALL_FRAC * float(block_size))
     bnd_tol = BOUNDARY_TOL_FRAC * diag
     snap_tol = SNAP_TOL_FRAC * diag
     boundary = _boundary_of(whole)             # see parallel_set: the band's edges

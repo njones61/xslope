@@ -1853,6 +1853,21 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             poly_pts_arr = np.array(poly_pts_list)
             for line_idx in range(len(lines)):
                 snapped = list(lines[line_idx])
+                if len(snapped) >= 2:
+                    _x0, _y0 = snapped[0]
+                    _x1, _y1 = snapped[-1]
+                    _chord = float(np.hypot(_x1 - _x0, _y1 - _y0))
+                    # A line no longer than the snap tolerance cannot be meshed as a
+                    # line: snapping either end would fold it onto the other, and
+                    # gmsh is then handed a curve of no length. Say so rather than
+                    # fail on the arithmetic downstream.
+                    if _chord <= snap_tol:
+                        raise ValueError(
+                            f"Line {line_idx + 1} is {_chord:.4g} long, no longer than "
+                            f"the mesher's snap tolerance ({snap_tol:.4g}, a twentieth "
+                            f"of the element size {target_size:g}); a line that short "
+                            f"cannot be meshed. Remove it, lengthen it, or refine the "
+                            f"mesh until it spans more than a twentieth of an element.")
                 for i in [0, len(snapped) - 1]:  # snap endpoints only
                     px, py = snapped[i]
                     dists = np.sqrt((poly_pts_arr[:, 0] - px)**2 + (poly_pts_arr[:, 1] - py)**2)

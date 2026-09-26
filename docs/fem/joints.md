@@ -238,8 +238,7 @@ each end station plus two thirds of the middle one, is the force the element act
 transfers, it runs smoothly, and a ten times stiffer interface does not change it. It
 disappears where the interface slips, because every slipping station is held at its own
 Mohr-Coulomb limit, which follows the normal stress. Read a gripping stretch by its element
-averages, not station by station; the 1D details panel draws them as the lighter line through
-the stations, on the normal and the shear panels.
+averages, not station by station.
 
 The element's own law — the peak limit, the residual drop and the opening a dilating joint produces
 per unit of slip — is checked against its closed forms by `test/joint_element_check.py`.

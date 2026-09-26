@@ -501,18 +501,20 @@ tension, which the next panel makes exact.
 **1D Details…** draws what one layer is doing along its length. Here is the
 middle one:
 
-![The middle layer's 1D details: the bar's tension far below its capacity, and the interface at its Mohr-Coulomb limit only at the facing](images/fem03_1d_details.png){width=1000}
+![The middle layer's 1D details: the bar's tension peaking at 30% of its capacity mid-length, and the interface at its Mohr-Coulomb limit only at the facing end](images/fem03_1d_details.png){width=1000}
 
-Look at the top panel first. The bar's capacity is a flat 40 kN/m along the
-whole layer, and its tension never gets above **30%** of it. The sheet is
-carrying load, and it is nowhere near rupture. The panels below say what it is
-doing instead: the interface reaches its Mohr-Coulomb limit at one station,
-immediately behind the block column, and nowhere else. What the geogrid
-contributes on this wall, it contributes by tying the block column to a mass of
-fill that will not move — which is why **Tend1** is the number that matters.
-The other number on that panel is the 70% of capacity the layer still has in
-hand. That is the reason this wall does not fail, and the next section is about
-it.
+The top panel is the bar's tension along its length against its capacity, a
+flat 40 kN/m. The tension peaks at 12 kN/m near the middle of the sheet, **30%**
+of capacity: the sheet is carrying real load and has plenty in hand. The three
+panels below are the interface between the sheet and the soil: the normal
+stress on it, the shear stress against its Mohr-Coulomb limit, and the slip.
+The shear stress reaches the limit in one place only, at the facing end, where
+the interface has opened and slid 2 mm. Everywhere else the soil grips the
+sheet, with the shear well below the limit and no slip. So the geogrid works as
+a tie: anchored in fill that does not move, it holds the block column back, and
+the force in that tie at the facing is the **Tend1** column of the details
+table. The 70% of capacity the layer has in hand is what keeps this wall from
+failing, as the next section explains.
 
 It also says how little the jointing of the sheets matters here. Nothing slides
 along them: the slip is zero beyond the first stretch, and over the rest of

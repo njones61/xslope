@@ -4344,8 +4344,18 @@ _ACCEL_ALPHA_MAX = 50.0
 _ACCEL_START = 300
 #: AUTO-OFF. Over the trailing `_ACCEL_OFF_WINDOW` sweeps, if more than
 #: `_ACCEL_OFF_FRACTION` of the accelerated steps proposed were refused by the
-#: safeguard, acceleration is switched off for the rest of the trial: the joints
-#: are changing state on nearly every step, which is where it cannot help.
+#: safeguard, acceleration is switched off for the rest of the trial.
+#:
+#: The window opens only after the joint warm-up: at `_JOINT_VERDICT_WARMUP`
+#: sweeps, or earlier at the first sweep after `_ACCEL_START` with no pair
+#: changing state over the last `_JOINT_CHURN_SAMPLES` samples. And a step refused
+#: because it would change a pair's state (`rejected_status`, `rejected_latch`) is
+#: not counted in it, as proposed or as refused. Early in a trial the joints are
+#: still finding their states and the safeguard refuses most steps for that
+#: reason; counted from sweep 0, the rule fired at its first reading, sweep 1,999,
+#: on 15 of 17 long trials and took the whole speed-up with it (rK_accel_fix.md).
+#: What is left to count is a step refused for the dilation the sweep itself added,
+#: history the scaled step cannot undo, which is where acceleration cannot help.
 _ACCEL_OFF_WINDOW = 2000
 _ACCEL_OFF_FRACTION = 0.5
 
@@ -6421,7 +6431,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         if _acc is not None:
             _sol["accelerate"] = dict(_acc)
             _sol["acceleration"] = {"on": True,
-                                    "switched_off_at": _acc['switched_off_at']}
+                                    "switched_off_at": _acc['switched_off_at'],
+                                    "off_reading": _acc['off_reading']}
         _sol["corrector"] = {
             "driver_of_record": "corrector",
             "checkpoint": where,
@@ -6771,7 +6782,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     # How the formula's raw value fell: below zero (clamped
                     # to the minimum), in [min, 1), above 1, and at the cap.
                     raw_negative=0, raw_below_one=0, raw_above_one=0,
-                    raw_at_max=0, switched_off_at=None)
+                    raw_at_max=0, switched_off_at=None,
+                    # The auto-off window's opening sweep, and the reading that
+                    # switched acceleration off (None while it has not).
+                    off_window_opened_at=None, off_reading=None)
         _acc_ref_evp = [np.empty_like(g_['evp']) for g_ in gp_groups]
         _acc_ref_slip = np.empty_like(joint_slip) if has_joints else None
         _acc_ref_dil = (np.empty_like(joint_dil)
@@ -7090,6 +7104,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             _acc_win = collections.deque(maxlen=int(_ACCEL_OFF_WINDOW))
             _acc_win_acc = 0
             _acc_win_rej = 0
+            # The window opens after the joint warm-up (see _ACCEL_OFF_WINDOW):
+            # the last sweep a pair changed state, and whether it is open.
+            _acc_last_pair_chg = 0
+            _acc_win_open = False
         ufr_best = float('inf')        # lowest out-of-balance seen this stage
         last_progress_iter = 0         # iteration of last meaningful improvement
         gate_tried = False             # the yield gate has spent its one corrector
@@ -7903,6 +7921,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                 _acc['raw_above_one'] += 1
                             _alpha = float(min(max(_alpha, _ACCEL_ALPHA_MIN),
                                                _ACCEL_ALPHA_MAX))
+                if _acc_pair_chg:
+                    _acc_last_pair_chg = iteration
                 if _alpha != 1.0 and has_joints:
                     # The safeguard: the scaled state may not change any pair's
                     # status, trip the residual latch or add dilation.
@@ -7955,8 +7975,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 _acc_g_prev = _acc_g
                 _acc_h_prev = _acc_h
                 _acc_a_prev = _alpha
-                # Auto-off (see _ACCEL_OFF_WINDOW).
-                if _acc['switched_off_at'] is None:
+                # Auto-off (see _ACCEL_OFF_WINDOW). A refusal for a pair's
+                # state is not counted, as proposed or as refused.
+                if _acc_outcome == 2 and _why in ('rejected_status',
+                                                  'rejected_latch'):
+                    _acc_outcome = 0
+                if (not _acc_win and _acc['switched_off_at'] is None
+                        and iteration >= _ACCEL_START and not _acc_win_open):
+                    _quiet = (_JOINT_CHURN_SAMPLES * _HYBRID_SAMPLE_EVERY)
+                    if (iteration >= _JOINT_VERDICT_WARMUP
+                            or iteration - _acc_last_pair_chg >= _quiet):
+                        _acc_win_open = True
+                        _acc['off_window_opened_at'] = int(iteration)
+                if _acc['switched_off_at'] is None and _acc_win_open:
                     if len(_acc_win) == _acc_win.maxlen:
                         _old = _acc_win[0]
                         _acc_win_acc -= (_old == 1)
@@ -7968,10 +7999,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                             and _acc_win_rej > _ACCEL_OFF_FRACTION
                             * (_acc_win_acc + _acc_win_rej)):
                         _acc['switched_off_at'] = int(iteration)
+                        _acc['off_reading'] = dict(
+                            iteration=int(iteration),
+                            window=int(_ACCEL_OFF_WINDOW),
+                            proposed=int(_acc_win_acc + _acc_win_rej),
+                            refused=int(_acc_win_rej),
+                            fraction=float(_ACCEL_OFF_FRACTION),
+                            window_opened_at=_acc['off_window_opened_at'])
                         if debug_level >= 1:
                             print(f"  Acceleration switched off at iteration "
-                                  f"{iteration}: most of its steps were being "
-                                  f"rejected")
+                                  f"{iteration}: of the "
+                                  f"{_acc_win_acc + _acc_win_rej:,} accelerated "
+                                  f"steps proposed over the last "
+                                  f"{_ACCEL_OFF_WINDOW:,} iterations, "
+                                  f"{_acc_win_rej:,} were refused")
 
             u_new = np.zeros(n_dof)
             u_new[free_dofs] = u_free_new
@@ -8830,7 +8871,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         **({} if _acc is None else {
             "accelerate": dict(_acc),
             "acceleration": {"on": True,
-                             "switched_off_at": _acc['switched_off_at']}}),
+                             "switched_off_at": _acc['switched_off_at'],
+                             "off_reading": _acc['off_reading']}}),
         # Every corrector attempt this trial made and what it read, including the
         # ones that refused — a refusal decides nothing, but it is the measurement
         # that says whether the corrector is earning its cost. Empty on the plain

@@ -1046,6 +1046,23 @@ def joint_profile(fem_data, solution, line_id, slope_data=None,
     if not rows:
         return blank
 
+    # The element averages: each interface element's three pairs weighted one
+    # sixth, two thirds, one sixth (Simpson, the element's own nodal weights) —
+    # the force the element actually transfers, keyed by its middle pair's node
+    # and, where the two faces meet, the larger of the two, as the rows are.
+    elem_rows = {}
+    for i in np.flatnonzero(line_of == line_id):
+        if not all(w[i, p] for p in range(3)):
+            continue
+        mid = int(conn[i, 3 + 1] if side[i] == 1 else conn[i, 1])
+        ts_avg = (abs(ts[i, 0]) + 4.0 * abs(ts[i, 1]) + abs(ts[i, 2])) / 6.0
+        tn_avg = (tn[i, 0] + 4.0 * tn[i, 1] + tn[i, 2]) / 6.0
+        e = elem_rows.setdefault(mid, {"ts": 0.0, "tn": 0.0})
+        if ts_avg >= e["ts"]:
+            e["ts"] = float(ts_avg)
+        if abs(tn_avg) >= abs(e["tn"]):
+            e["tn"] = float(tn_avg)
+
     ids = np.array(sorted(rows), dtype=int)
     pts = nodes[ids, :2]
     # Distance from end 1: the stations run along a straight line, so the
@@ -1092,10 +1109,19 @@ def joint_profile(fem_data, solution, line_id, slope_data=None,
         bar_s, bar_T, bar_cap = prof["s"], prof["T"], prof["t_allow"]
     else:
         bar_s = bar_T = bar_cap = empty
+    # The element averages, placed at their middle pair's station.
+    s_of_node = {int(n_): float(s_) for n_, s_ in zip(ids, sdist)}
+    elem_ids = [n_ for n_ in sorted(elem_rows, key=lambda n_: s_of_node.get(n_, 0.0))
+                if n_ in s_of_node]
+    elem_s = np.array([s_of_node[n_] for n_ in elem_ids], dtype=float)
+    elem_ts = np.array([elem_rows[n_]["ts"] for n_ in elem_ids], dtype=float)
+    elem_tn = np.array([elem_rows[n_]["tn"] for n_ in elem_ids], dtype=float)
+
     return {
         "kind": "joint", "index": int(line_id), "label": label,
         "length": length,
         "s": sdist, "x": pts[:, 0], "y": pts[:, 1],
+        "elem_s": elem_s, "elem_ts": elem_ts, "elem_tn": elem_tn,
         "tn": np.array([r["tn"] for r in rec]),
         "ts": ts_a, "tlim": tlim_a,
         "slip": np.array([r["slip"] for r in rec]),

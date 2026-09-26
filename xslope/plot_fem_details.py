@@ -580,6 +580,13 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
     # --- normal traction ---------------------------------------------------
     ax_n.axhline(0.0, color="0.6", linewidth=0.8)
     ax_n.plot(s, profile["tn"], "-", color=C_FORCE, linewidth=1.5)
+    elem_s = np.asarray(profile.get("elem_s", []), dtype=float)
+    if len(elem_s) >= 2:
+        # The element averages (one sixth, two thirds, one sixth of the three
+        # stations): the force each element transfers, which runs smoothly where
+        # the station values zigzag on a gripping interface.
+        ax_n.plot(elem_s, profile["elem_tn"], "-", color=C_FORCE, linewidth=2.6,
+                  alpha=0.35, solid_capstyle="round")
     ax_n.set_ylabel(_axis_label("Normal stress\n(compression +)",
                                 u.get("stress")), fontsize=9)
     ax_n.grid(True, **GRID)
@@ -590,6 +597,11 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
     lim, = ax_s.plot(s, tlim, "--", color=C_ENVELOPE, linewidth=1.3)
     mob, = ax_s.plot(s, ts, "-", color=C_FORCE, linewidth=1.6)
     h, l = [lim, mob], ["Mohr-Coulomb limit", "Shear stress"]
+    if len(elem_s) >= 2:
+        avg, = ax_s.plot(elem_s, profile["elem_ts"], "-", color=C_FORCE,
+                         linewidth=2.6, alpha=0.35, solid_capstyle="round")
+        h.append(avg)
+        l.append("Element average")
     slipping = np.asarray(profile["slipping"], dtype=bool)
     opened = np.asarray(profile["open"], dtype=bool)
     if slipping.any():

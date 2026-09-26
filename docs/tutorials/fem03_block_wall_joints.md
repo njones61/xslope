@@ -520,8 +520,11 @@ The sheets are entered as jointed sheets (`Joint = Yes`) because they end on
 the wall's back-face joint. The mesh is split along that joint, so every node
 on it exists twice, one copy on each side, and a bonded bar cannot be attached
 to a node like that; the program refuses it when the mesh is built. On this
-wall the jointing makes almost no difference to the answer: nothing slides
-along the sheets beyond the first few centimeters at the facing, so the
+wall the jointing makes almost no difference to the answer. Sliding along a
+sheet would show in the 1D details as the shear stress sitting on the
+Mohr-Coulomb limit over a length of the sheet, with the slip rising along that
+length, and in the blocks panel as the sheet's faces turning green along it.
+Here that happens only in the first few centimeters at the facing, so the
 interface acts as a stiff bond and a bonded bar would give much the same
 result. Part 3 is about the models where jointing does change the answer.
 

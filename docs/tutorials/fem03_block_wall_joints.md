@@ -450,12 +450,13 @@ plot is a wall giving way. The closing summary says so:
 > Raise Max iterations per trial and it may change.
 
 It does change. With **Max iterations per trial** at 500,000 the same search
-reports **[[LONG_FS]]**. The wall is standing at that strength too, having moved
-[[LONG_DISP]] cm, and the geogrid is carrying [[LONG_LOAD]] of its capacity.
-Neither number is a strength the wall runs out of; they are the strengths at
-which two different iteration limits stopped waiting. What is going on, and what
-a factor of safety means for a wall like this, is taken up after the panels,
-which show what the wall is doing at the trial the search stopped on.
+runs for an hour and a half and reports **1.395**. The wall is standing at that
+strength too, having moved 4 cm, and the geogrid is carrying a fifth of its
+capacity. Given 2.4 million iterations it comes to rest at 1.86 as well. None of
+these is a strength the wall runs out of; each is the strength at which one
+iteration limit stopped waiting. What is going on, and what a factor of safety
+means for a wall like this, is taken up after the panels, which show what the
+wall is doing at the trial the search stopped on.
 
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=1000}
 
@@ -522,12 +523,13 @@ does that within the search's range. Every time the facing moves it stretches
 the three layers, and stretched geogrid pulls back: load moves off the sliding
 contacts and into the sheets, the wall slows, and it comes to rest again a
 little further out. With the soil at 80% of its strength the layers carry 8% of
-their capacity; at [[LONG_F_STAND]] they carry [[LONG_LOAD]]. The strength at
-which they would run out lies beyond the top of the search range, [[LONG_LOAD_REASON]].
-So in the range a strength reduction covers, this wall has no strength limit.
-It has a movement that grows with every step of strength taken from the soil,
-and the search reports whichever strength its iteration limit happened to stop
-it at: 1.246 at the default limit, [[LONG_FS]] at five times that.
+their capacity; at 1.39 they carry a fifth. The strength at which they would
+run out lies beyond the top of the search range: from 1.25 to 1.39 the load in
+them rose from 8% to 20% of capacity, with the rest still in hand. So in the
+range a strength reduction covers, this wall has no strength limit. It has a
+movement that grows with every step of strength taken from the soil, and the
+search reports whichever strength its iteration limit happened to stop it at:
+1.246 at the default limit, 1.395 at five times that.
 
 That makes the factor of safety of a reinforced wall a different kind of number
 from Part 1's. The question the strength reduction can answer is not at what
@@ -535,10 +537,9 @@ strength the wall fails but at what strength it has moved more than the design
 allows, and the movement the design allows is the engineer's input. The
 Displacement vs F plot is where it is read: draw the allowable movement across
 the plot, and the strength at which the resting points cross it is the wall's
-factor of safety on that criterion. On a 3.6 m block wall, [[LONG_DISP]] cm of
-movement is already more than most designs accept, so that factor lies between
-1.25 and [[LONG_FS]] for this wall, and where in that range is a design
-decision.
+factor of safety on that criterion. On a 3.6 m wall, 4 cm is about 1% of the height, the kind of movement a wall
+specification sets a limit on, so that factor lies between 1.25 and 1.39 for
+this wall, and where in that range is a design decision.
 
 Two things follow for practice. Report the movement with the number: "stands
 past F = 1.25 with 2 cm of movement and the geogrid at 8% of capacity" says what

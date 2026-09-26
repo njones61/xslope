@@ -748,11 +748,12 @@ still improving at the ceiling is exactly the one a locally quadratic iteration 
 the default driver an inconclusive trial is rare, and it survives only where the corrector also
 refuses. The bisection does
 not count it as a failure — that is what biases a factor of safety low. It carries on below the
-inconclusive $F$, and the factor of safety is the final bracket's midpoint, exactly as on any other
-run. What the inconclusive trial changes is the meaning of the bracket's upper edge: an undecided
-trial rather than a measured failure. The result says so — `inconclusive` lists the trials and
-`note` names the last of them in a sentence, which is also printed to the log. Raise the ceiling or
-loosen the bisection tolerance to resolve it.
+inconclusive $F$. `inconclusive` lists such trials and `note` names the last of them in a sentence,
+which is also printed to the log. When an inconclusive trial is still the top of the final bracket,
+the search found no failure, so it reports the factor of safety as at least the bracket's bottom,
+the highest strength the slope was confirmed to stand at (`fs_is_lower_bound = True`), because a
+midpoint would stand on a failure no trial showed. Raise the ceiling or Max iterations per trial to
+go further.
 
 A **no-progress plateau** — 1500 iterations without improving on the lowest out-of-balance value
 seen by more than 1% — is recorded (`plateau_iteration`, `plateau_ratio`) and **does not stop the
@@ -1307,7 +1308,9 @@ Its principal arguments:
 >  steps each way) — so a wrong guess still finds the factor of safety, and a good guess simply
 >  brackets on the first try.<br>
 >- **`tolerance`** (0.01): the bisection stops when the bracket is narrower than this. The reported
->  FS is the bracket midpoint (± tolerance/2); the bracket is returned in `final_interval`.<br>
+>  FS is the bracket midpoint (± tolerance/2), or the bracket's bottom as a lower bound
+>  (`fs_is_lower_bound`) when the top is an undecided trial; the bracket is returned in
+>  `final_interval`.<br>
 >- **`grid`** (`None`): bisect over a **fixed global grid** of this step instead of halving the
 >  supplied bracket. Because the failure threshold sits between two fixed grid points — a property of
 >  the slope and mesh, not of the bracket — every starting bracket then converges to the same cell and
@@ -1724,7 +1727,9 @@ safety sits at the knee. The trial above the knee was still moving fast when it 
 steady climb with no knee is a different result. The slope kept moving at every strength the
 search tried, and the trial at the top of the bracket was still moving slowly when the iteration
 limit stopped it. The factor of safety then depends on the iteration limit, and raising Max
-iterations per trial may change it.
+iterations per trial may change it. A run whose top trial ended undecided found no failure, so the
+dashed line sits at the highest strength the slope came to rest at and the key reads "FS ≥": no
+trial above that strength was shown to fail.
 
 The run's closing summary says the same in words. It is printed as the last lines of every
 strength reduction run and returned as `result['summary']`. It says what happened at each end of

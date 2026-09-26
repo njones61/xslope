@@ -645,6 +645,13 @@ class FemRunner(RunnerThread):
                                      # deformation/vector panels render (None if absent).
                                      "failure_solution": result.get("failure_solution"),
                                      "FS": fs, "analysis": "ssrm",
+                                     # True where the run found no failure and
+                                     # FS is the lower bound it confirmed: every
+                                     # place Studio shows the factor then reads
+                                     # "FS ≥ X". The run record carries it too,
+                                     # so a reopened run reads the same.
+                                     "fs_is_lower_bound": bool(
+                                         result.get("fs_is_lower_bound")),
                                      "meta": ssrm_run_record(result, fem_data,
                                                              opts)})
         except AnalysisCancelled:

@@ -273,7 +273,9 @@ A joint reaches equilibrium by **growing slip**, a little per sweep, so a jointe
 tens of thousands of viscoplastic sweeps where a bonded one settles over hundreds. A
 strength-reduction trial that runs out of sweeps is recorded undecided, the bracket reads that as
 not standing, and the factor of safety comes out low — a reading of the budget rather than of the
-slope.
+slope. When the undecided trial is still the top of the final bracket, the run found no failure and
+reports the factor of safety as "at least" the highest strength the slope came to rest at, since no
+trial above it was shown to fail.
 
 Raise `max_iterations` on `solve_fem()` and `solve_ssrm()`, or the sweep limit in Studio's Run FEM
 dialog, from its default of 12,000 to **100,000**. The model checks warn below that number.

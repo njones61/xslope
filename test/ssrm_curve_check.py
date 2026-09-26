@@ -25,6 +25,19 @@ What this file locks:
      dialog's words; it says when the answer depends on the iteration limit, and
      no summary uses "budget", "edge", "sweep" or "verdict".
 
+  6. THE TAG READER. run_tests.py reads ``fs_bound=lower`` off a tag, fails a
+     row whose run reports the other kind of answer, refuses any other value,
+     and on a lower-bound row checked by its edges asks the top trial to be
+     still undecided and reports the standing edge.
+
+  5. THE LOWER BOUND. A run whose top trial ended undecided reports the
+     bracket's bottom as a lower bound: its summary leads with "No failure was
+     found." and says "The factor of safety is at least X" (cut down to two
+     decimals); the curve rules "FS ≥ X" at the confirmed strength; the result
+     panels read "FS ≥ X" and the undecided trial's panel "Last trial
+     (undecided)  FS ≥ X"; the run record carries the flag only where it is
+     true.
+
 Run directly:  PYTHONPATH=. python3 test/ssrm_curve_check.py
 Exits non-zero on any failure.
 """
@@ -349,11 +362,10 @@ def check_summary():
           "it passed the displacement limit at iteration 640." in s, s)
     s = _summary({"exit_reason": "inconclusive", "verdict": "AMBIGUOUS",
                   "growth": 0.01, "u_ratio": 1.1, "max_displacement": 0.05})
-    check("an inconclusive trial is left undecided",
-          "the slope was still moving and still settling when the "
-          "100,000-iteration limit came, and the solver could not confirm that "
-          "it comes to rest. The trial is left undecided, neither a failure nor "
-          "a confirmed rest." in s, s)
+    check("an undecided trial in a record saved before the bound says so",
+          "At F = 1.4000 it was still creeping, more slowly all the time, when "
+          "the 100,000-iteration limit came, so the run could not tell whether "
+          "it would stop." in s and "neither" not in s, s)
     s = _summary({"exit_reason": "iteration_cap", "verdict": "STABLE_STUCK",
                   "growth": 0.0, "u_ratio": 1.02, "max_displacement": 0.05},
                  failure_criterion="non_convergence")
@@ -421,9 +433,9 @@ def check_summary():
                   "stop_reading": {"rule": "inconclusive", "oob_from": 0.0031,
                                    "oob_to": 0.0024, "window": 1000,
                                    "force_tol": 0.001}})
-    check("the iteration ceiling quotes the fall of the out-of-balance force",
-          "limit came (the leftover force fell by 23% over the last 1,000 iterations), "
-          "and the solver could not confirm that it comes to rest" in s, s)
+    check("an undecided trial does not quote the leftover force",
+          "leftover" not in s and "%" not in s
+          and "so the run could not tell whether it would stop." in s, s)
     settled = {"F": 1.35, "stable": True, "converged": False,
                "verdict": "JOINT_SETTLED", "iterations": 60000,
                "exit_reason": "joint_settled",
@@ -481,11 +493,199 @@ def check_summary():
           f"{contrast[:1]}")
 
 
+# ===================== 5. the lower bound =====================
+
+def _grid_like(top_exit="inconclusive", stood=None, top_extra=None):
+    """A synthetic run shaped like the FEM-3 geogrid wall at its page settings:
+    three strengths the slope came to rest at, a top trial that ended
+    undecided, and trials above it that failed."""
+    if stood is None:
+        stood = [(1.0, 0.01744), (1.5, 0.06231), (1.5625, 0.07668)]
+    trials = [{"F": F, "stable": True, "converged": True,
+               "verdict": "CONVERGED", "iterations": 100037,
+               "exit_reason": "converged", "max_displacement": u,
+               "acceleration": {"on": True}} for F, u in stood]
+    trials += [
+        {"F": 2.0, "stable": False, "converged": False, "verdict": "FAILED",
+         "iterations": 90000, "exit_reason": "not_slowing",
+         "max_displacement": 0.1808, "acceleration": {"on": True}},
+        dict({"F": 1.5703125, "stable": False, "converged": False,
+              "verdict": "FAILED", "iterations": 100000,
+              "exit_reason": top_exit, "max_displacement": 0.07661,
+              "acceleration": {"on": True}}, **(top_extra or {})),
+    ]
+    lo = max(F for F, _u in stood)
+    return {"converged": True, "FS": lo, "fs_is_lower_bound": True,
+            "final_interval": (lo, 1.5703125), "trials": trials,
+            "failure_criterion": "hybrid", "elapsed_time": 1376.0}
+
+
+def check_lower_bound():
+    print("\n5. the lower bound")
+    import matplotlib.figure as mplfig
+    from xslope.plot_fem import _fs_title, plot_fem_results, plot_ssrm_curve
+
+    rec = _grid_like()
+    check("the top trial is found undecided",
+          (fem.ssrm_undecided_top(dict(rec, fs_is_lower_bound=False)) or {}).get("F")
+          == 1.5703125)
+    s = _said(fem.ssrm_run_summary(rec, {"unit_system": "SI"}))
+    want = ("No failure was found. The slope came to rest at every strength "
+            "tried up to F = 1.5625, moving further each time; at that strength "
+            "it had moved 0.0767 m. At F = 1.5703 it was still creeping, more "
+            "slowly all the time, when the 100,000-iteration limit came, so the "
+            "run could not tell whether it would stop. The factor of safety is at "
+            "least 1.56. To go further, raise Max iterations per trial. "
+            "Convergence acceleration was on. The run took 22 min 56 s.")
+    check("the lower-bound summary reads as ruled", s == want, s)
+    s = _said(fem.ssrm_run_summary(_grid_like(top_exit="yield_gate"),
+                                   {"unit_system": "SI"}))
+    check("a top trial outside the yield surface says so, with no advice to "
+          "raise the limit",
+          "At F = 1.5703 the forces balanced at iteration 100,000 with the "
+          "stresses outside the yield surface, and no admissible state was found, "
+          "so the run could not tell whether the slope would stand. The factor of "
+          "safety is at least 1.56. Convergence" in s, s)
+    s = _said(fem.ssrm_run_summary(
+        _grid_like(stood=[(1.0, 0.03), (1.5, 0.02), (1.5625, 0.0767)]),
+        {"unit_system": "SI"}))
+    check("a movement that did not grow each time is not said to",
+          "moving further each time" not in s
+          and "tried up to F = 1.5625; at that strength it had moved 0.0767 m." in s,
+          s)
+    s = _said(fem.ssrm_run_summary(_grid_like(stood=[(1.5625, 0.0767)])))
+    check("a single strength that stood is named alone",
+          "The slope came to rest at F = 1.5625; at that strength it had moved "
+          "0.0767." in s, s)
+    s = _said(fem.ssrm_run_summary(_grid_like(), {"unit_system": "SI"}))
+    check("no number above the bound is printed as the answer",
+          "1.566" not in s and "midpoint" not in s, s)
+    check("the bound is cut down, never rounded up",
+          fem.ssrm_bound_text(1.5699) == "1.56"
+          and fem.ssrm_fs_text(1.5625, True, 3) == "FS ≥ 1.562"
+          and fem.ssrm_fs_text(1.5664) == "FS = 1.566")
+
+    # The run record carries the flag only where it is true.
+    check("the run record carries the bound",
+          fem.ssrm_run_record(rec).get("fs_is_lower_bound") is True)
+    check("and a run that ended on a failure writes no such key",
+          "fs_is_lower_bound" not in fem.ssrm_run_record(
+              dict(rec, fs_is_lower_bound=False)))
+
+    # The curve: the ruled line at the confirmed strength, labelled as a bound.
+    fig = mplfig.Figure(figsize=(9.0, 5.0))
+    ax = fig.add_subplot(111)
+    plot_ssrm_curve(ax, rec, fem_data={"unit_system": "SI"})
+    labels = [t.get_text() for t in ax.get_legend().get_texts()]
+    check("the curve's key reads FS ≥ 1.562", "FS ≥ 1.562" in labels, f"{labels}")
+    ruled = [l for l in ax.lines if l.get_linestyle() == "--"]
+    check("and the line sits at the confirmed strength",
+          len(ruled) == 1 and abs(float(ruled[0].get_xdata()[0]) - 1.5625) < 1e-12,
+          f"{[l.get_xdata() for l in ruled]}")
+    fig = mplfig.Figure(figsize=(9.0, 5.0))
+    ax = fig.add_subplot(111)
+    plot_ssrm_curve(ax, dict(rec, FS=1.566, fs_is_lower_bound=False))
+    labels = [t.get_text() for t in ax.get_legend().get_texts()]
+    check("a midpoint run keeps FS =", "FS = 1.566" in labels, f"{labels}")
+
+    # The result panels.
+    check("a lower-bound panel title reads FS ≥",
+          _fs_title("Viscoplastic shear strain", 1.5625, 1.5625, lower=True)
+          == "Viscoplastic shear strain  FS ≥ 1.56")
+    check("the undecided trial's panel reads Last trial (undecided)",
+          _fs_title("Viscoplastic shear strain", 1.5703, 1.5625, at_failure=True,
+                    lower=True, undecided=True)
+          == "Viscoplastic shear strain  Last trial (undecided)  FS ≥ 1.56")
+    check("a run that ended on a failure keeps 'at Failure  FS = X'",
+          _fs_title("Viscoplastic shear strain at Failure", 1.5, 1.566,
+                    at_failure=True) == "Viscoplastic shear strain at Failure  "
+                                        "FS = 1.566")
+    fem_data = _griffiths_coarse()
+    _f, result, _log = _solved()
+    solution = result["last_solution"]
+    titles = {}
+    for state in ("failure", "converged"):
+        for pt in ("shear_strain", "deformation", "displace_mag"):
+            fig = mplfig.Figure(figsize=(8.0, 5.0))
+            with contextlib.redirect_stdout(io.StringIO()):
+                plot_fem_results(fem_data, solution, plot_type=[pt], fig=fig,
+                                 fs=1.3671875, fs_is_lower_bound=True,
+                                 failure_solution=dict(solution,
+                                                       undecided_trial=True),
+                                 field_state=state)
+            titles[(state, pt)] = fig.axes[0].get_title()
+    check("drawn, the undecided trial's panels say so and carry the bound",
+          titles[("failure", "shear_strain")].endswith(
+              "  Last trial (undecided)  FS ≥ 1.36")
+          and titles[("failure", "deformation")].endswith(
+              "  Last trial (undecided)  FS ≥ 1.36")
+          and titles[("failure", "displace_mag")].endswith(
+              "  Last trial (undecided)")
+          and not any("at Failure" in t for t in titles.values()),
+          f"{titles}")
+    check("and the converged panels carry the bound",
+          titles[("converged", "shear_strain")].endswith("  FS ≥ 1.36"),
+          titles[("converged", "shear_strain")])
+
+
+# ===================== 6. the tag reader =====================
+
+def check_tag_reader():
+    print("\n6. the tag reader")
+    import run_tests as rt
+
+    with tempfile.TemporaryDirectory() as d:
+        page = os.path.join(d, "page.md")
+        with open(page, "w") as fh:
+            fh.write("<!-- test: file=files/x.xlsx, type=fem_ssrm, "
+                     "expected_fs=1.5625, fs_bound=lower, tolerance=0.01, "
+                     "benchmark=LB -->\n"
+                     "<!-- test: file=files/x.xlsx, type=fem_ssrm, "
+                     "expected_fs=1.566, tolerance=0.01, benchmark=MID -->\n")
+        tags = {t["benchmark"]: t for t in rt.parse_test_tags(page)}
+    lb, mid = tags["LB"], tags["MID"]
+    check("the tag carries the field",
+          lb.get("fs_bound") == "lower" and lb["expected_fs"] == 1.5625, f"{lb}")
+    check("fs_bound=lower reads as a lower bound, its absence as a midpoint",
+          rt._fs_bound_lower(lb) is True and rt._fs_bound_lower(mid) is False)
+    bound_run = {"converged": True, "FS": 1.5625, "fs_is_lower_bound": True}
+    mid_run = {"converged": True, "FS": 1.566, "fs_is_lower_bound": False}
+    check("a lower-bound run passes a lower-bound tag",
+          rt._fs_bound_mismatch(lb, bound_run) is None)
+    check("a midpoint run fails it, with the reason",
+          "midpoint" in (rt._fs_bound_mismatch(lb, mid_run) or ""),
+          rt._fs_bound_mismatch(lb, mid_run))
+    check("a lower-bound run fails a midpoint tag",
+          "lower bound" in (rt._fs_bound_mismatch(mid, bound_run) or ""),
+          rt._fs_bound_mismatch(mid, bound_run))
+    check("a midpoint run passes a midpoint tag",
+          rt._fs_bound_mismatch(mid, mid_run) is None)
+    check("any other value is refused",
+          "lower" in (rt._fs_bound_mismatch(dict(lb, fs_bound="upper"),
+                                            bound_run) or ""))
+    stood = {"F": 1.5625, "stable": True, "converged": True,
+             "verdict": "CONVERGED", "iterations": 300, "exit_reason": "converged"}
+    undecided = {"F": 1.5703125, "stable": False, "converged": False,
+                 "verdict": "FAILED", "iterations": 100000,
+                 "exit_reason": "inconclusive"}
+    failed = dict(undecided, exit_reason="diverging", iterations=400)
+    ok, note = rt._edges_check([stood, undecided], 1.5625, 1.5703125, 100000,
+                               lower=True)
+    check("a lower-bound lock's edges hold while its top stays undecided", ok,
+          note)
+    ok, note = rt._edges_check([stood, failed], 1.5625, 1.5703125, 100000,
+                               lower=True)
+    check("and do not once the top trial fails", not ok, note)
+    ok, _note = rt._edges_check([stood, undecided], 1.5625, 1.5703125, 100000)
+    check("a midpoint lock's edges never close on an undecided top", not ok)
+
+
 def run():
     """Every check; returns the list of failures (empty = pass), the entry point
     run_tests.py's module checks call."""
     del FAILURES[:]
-    for fn in (check_trial_record, check_round_trip, check_plot, check_summary):
+    for fn in (check_trial_record, check_round_trip, check_plot, check_summary,
+               check_lower_bound, check_tag_reader):
         try:
             fn()
         except Exception as exc:                              # noqa: BLE001

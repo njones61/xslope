@@ -585,7 +585,9 @@ class FemResultsDisplayPanel(QWidget):
         # Universal (deformation / shear-strain / displace_vector alike): which field
         # the panel renders when an at-failure (unconverged) field was captured by
         # SSRM. "At failure" (default) renders the developed collapse mechanism —
-        # deformation gets the at-failure mesh + "…at Failure  FS = X" title,
+        # deformation gets the at-failure mesh + "…at Failure  FS = X" title
+        # (on a run that found no failure, the undecided top trial, titled
+        # "…Last trial (undecided)  FS ≥ X"),
         # displace_vector the at-failure arrows, shear-strain the at-failure band —
         # so every panel tells the SAME story. "Last converged" switches ALL of them
         # to the sub-critical converged solution instead (deformation's own auto-

@@ -7,6 +7,7 @@ docs/parametric/ and docs/tutorials/ for test tags of the form:
 
     <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, expected_fs=1.234, num_slices=30 -->
     <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=quad8, target_size=3.5, tolerance=0.025 -->
+    <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.5625, fs_bound=lower, target_size=0.8, tolerance=0.01 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=40.062, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=28.6, element_type=tri6, target_size=2.0, tolerance=0.01 -->
     <!-- test: file=files/foo.xlsx, type=seep_head, points=2:2:4.05;4:2:4.15, tolerance=0.02 -->
@@ -20,6 +21,11 @@ docs/parametric/ and docs/tutorials/ for test tags of the form:
     <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.248 -->
     <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, rapid=true, seep=transient, size_divisions=100, expected_fs=1.016 -->
     <!-- test: file=files/foo.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, expected_first=1.4563, critical_time=50, min_fs=1.0157 -->
+
+``fs_bound=lower`` marks a strength reduction lock whose run found no failure:
+the top of its final bracket is an undecided trial, the run reports the bracket's
+bottom as a lower bound (``result['fs_is_lower_bound']``), and ``expected_fs`` is
+that bound. The row fails if the run's kind of answer differs from the tag's.
 
 ``seep=steady`` / ``seep=transient`` RUN the model's own seepage before the
 stability analysis and stage its pore pressures, instead of reading a solved
@@ -433,6 +439,10 @@ def _roundtrip_diff(a, b, path=''):
     return out
 
 
+#: Tag fields spelled ``fs_*`` that are not a per-method factor of safety.
+_FS_TAG_FIELDS = frozenset(('fs_bound',))
+
+
 def parse_test_tags(md_path):
     """Parse <!-- test: ... --> tags from a markdown file.
 
@@ -480,9 +490,11 @@ def parse_test_tags(md_path):
 
         # Expand a compact multi-method tag (fs_oms=..., fs_bishop=..., ...) into
         # one test per method; otherwise keep the single tag as-is.
-        fs_keys = [k for k in params if k.startswith('fs_')]
+        # ``fs_bound`` is not a method: it says what kind of answer the lock is.
+        fs_keys = [k for k in params
+                   if k.startswith('fs_') and k not in _FS_TAG_FIELDS]
         if fs_keys:
-            shared = {k: v for k, v in params.items() if not k.startswith('fs_')}
+            shared = {k: v for k, v in params.items() if k not in fs_keys}
             for k in fs_keys:
                 t = dict(shared)
                 t['method'] = k[3:]      # fs_<method> tag -> solver function name
@@ -1564,9 +1576,45 @@ def run_fem_test(test, fast_kernel=None):
                                 debug_level=0, **kwargs)
 
     if result.get('converged', False):
+        bound_err = _fs_bound_mismatch(test, result)
+        if bound_err is not None:
+            return None, bound_err
         return result['FS'], None
     else:
         return None, f"SSRM failed: {result.get('error', 'Unknown error')}"
+
+
+def _fs_bound_lower(test):
+    """Does this ``fem_ssrm`` tag lock a LOWER BOUND (``fs_bound=lower``)?
+
+    A strength reduction whose final bracket ends on an undecided trial found no
+    failure, and reports the bracket's bottom as a lower bound
+    (``result['fs_is_lower_bound']``). Its tag says so with ``fs_bound=lower``
+    and carries the bound as ``expected_fs``. Absent, the lock is a midpoint.
+    Raises ValueError on any other value, so a misspelt tag is reported rather
+    than read as a midpoint."""
+    value = str(test.get('fs_bound', '') or '').strip().lower()
+    if value in ('', 'midpoint'):
+        return False
+    if value == 'lower':
+        return True
+    raise ValueError(f"fs_bound={test.get('fs_bound')!r}: the one value a tag "
+                     f"may carry is 'lower'")
+
+
+def _fs_bound_mismatch(test, result):
+    """The error for a run whose kind of answer is not the one the tag locks —
+    a lower bound where the tag holds a midpoint, or the reverse — else None."""
+    try:
+        want = _fs_bound_lower(test)
+    except ValueError as exc:
+        return str(exc)
+    got = bool(result.get('fs_is_lower_bound'))
+    if want == got:
+        return None
+    return (f"the run reported {'a lower bound' if got else 'a midpoint'} "
+            f"(FS {'>=' if got else '='} {result.get('FS')}); the tag locks "
+            f"{'a lower bound (fs_bound=lower)' if want else 'a midpoint'}")
 
 
 class _force_fast_kernel:
@@ -1888,16 +1936,28 @@ def _edge_reading(trials, factor, ceiling):
     return verdict, decided
 
 
-def _edges_check(trials, f_stand, f_fail, ceiling):
+def _edges_check(trials, f_stand, f_fail, ceiling, lower=False):
     """Does the lock's bracket still close where it closed? ``(ok, note)``.
 
     ``ok`` requires both trials to be decided AND to fall the way the lock says:
     standing at ``f_stand``, failing at ``f_fail``. ``note`` names what happened
-    at each factor, so a flip says which edge moved and in which direction."""
+    at each factor, so a flip says which edge moved and in which direction.
+
+    ``lower`` is a lower-bound lock (``fs_bound=lower``): its top trial is the
+    undecided one the bound was cut on, so what must hold there is that it is
+    STILL undecided (an ending in ``xslope.fem.SSRM_UNDECIDED_EXITS``) — a trial
+    that now fails or stands has moved the answer."""
     v_lo, lo_ok = _edge_reading(trials, f_stand, ceiling)
     v_hi, hi_ok = _edge_reading(trials, f_fail, ceiling)
     stands = lo_ok and v_lo in ('CONVERGED', 'JOINT_SETTLED')
-    fails = hi_ok and v_hi == 'FAILED'
+    if lower:
+        from xslope.fem import SSRM_UNDECIDED_EXITS
+        top = _trial_at(trials, f_fail) or {}
+        fails = (top.get('exit_reason') in SSRM_UNDECIDED_EXITS
+                 and not top.get('stable'))
+        v_hi = top.get('exit_reason') or v_hi
+    else:
+        fails = hi_ok and v_hi == 'FAILED'
     note = (f"F={f_stand:g} {v_lo or 'not solved'}, "
             f"F={f_fail:g} {v_hi or 'not solved'}")
     if stands and fails:
@@ -1920,7 +1980,11 @@ def _edges_check(trials, f_stand, f_fail, ceiling):
         flipped.append(_why(f_stand, v_lo, lo_ok,
                             'CONVERGED or JOINT_SETTLED', 'standing'))
     if not fails:
-        flipped.append(_why(f_fail, v_hi, hi_ok, 'FAILED', 'failing'))
+        if lower:
+            flipped.append(f"the undecided edge F={f_fail:g} now reads "
+                           f"{v_hi or 'not solved'}, not undecided")
+        else:
+            flipped.append(_why(f_fail, v_hi, hi_ok, 'FAILED', 'failing'))
     return False, "; ".join(flipped)
 
 
@@ -1976,7 +2040,12 @@ def _run_fem_ssrm_edges(test, pair):
     f_stand, f_fail = pair
     reference_only = bool(test.get('_reference_only', False))
     ceiling = _trial_ceiling(test)
-    mid = 0.5 * (f_stand + f_fail)
+    try:
+        lower = _fs_bound_lower(test)
+    except ValueError as exc:
+        return None, str(exc), None
+    # A lower-bound lock IS its standing edge; every other lock the midpoint.
+    mid = f_stand if lower else 0.5 * (f_stand + f_fail)
 
     kernels = [] if (reference_only or not _fast_kernel_available()) else [True]
     kernels.append(False)
@@ -1987,7 +2056,7 @@ def _run_fem_ssrm_edges(test, pair):
         if err is not None:
             notes.append(f"{which}: {err}")
             continue
-        ok, note = _edges_check(trials, f_stand, f_fail, ceiling)
+        ok, note = _edges_check(trials, f_stand, f_fail, ceiling, lower=lower)
         if ok:
             return mid, None, ('edges', f'edges hold on the {which} ({note})')
         notes.append(f"{which}: {note}")
@@ -8366,7 +8435,9 @@ def run_lock_edges_test(test):
     * ``f_stand < expected_fs <= f_fail``. The lock is the midpoint of its final
       bracket, so it lies between the edges — a pair that does not straddle it
       belongs to some other run of some other model, which is exactly what a
-      sidecar written before a re-lock is;
+      sidecar written before a re-lock is. A lower-bound lock
+      (``fs_bound=lower``) IS its standing edge, so there it is
+      ``expected_fs == f_stand``;
     * ``f_fail - f_stand <= 2 x tolerance``. The bisection stops when the bracket
       is narrower than the tolerance, so a wider pair is not a final bracket: it
       is two trials from somewhere in the middle of the search, and they would
@@ -8402,7 +8473,16 @@ def run_lock_edges_test(test):
                 problems.append(f"{name}: check=edges on a tag with no expected_fs")
                 continue
             expected = float(expected)
-            if not (f_stand < expected <= f_fail):
+            try:
+                lower = _fs_bound_lower(t)
+            except ValueError as exc:
+                problems.append(f"{name}: {exc}")
+                continue
+            if lower:
+                if abs(expected - f_stand) > 1e-9 * max(1.0, abs(f_stand)):
+                    problems.append(f"{name}: a lower-bound lock {expected:g} is "
+                                    f"not its standing edge {f_stand:g}")
+            elif not (f_stand < expected <= f_fail):
                 problems.append(f"{name}: edges [{f_stand:g}, {f_fail:g}] do not "
                                 f"straddle the lock {expected:g}")
             if (f_fail - f_stand) > 2.0 * tol + 1e-12:

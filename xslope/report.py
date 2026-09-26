@@ -1137,6 +1137,7 @@ def _fem_sidecar_bundle(stem, slope_data, notes):
     # section says about how the run was solved is read off it rather than
     # assumed, and a fact it does not carry is not stated.
     return {"fem_data": fem_data, "solution": solution, "FS": meta.get("FS"),
+            "fs_is_lower_bound": bool(meta.get("fs_is_lower_bound")),
             "analysis": analysis, "failure_solution": failure, "meta": meta}
 
 
@@ -8757,6 +8758,17 @@ FEM_FIELD_STATES = (("failure", "fem_state_failure"),
 #: control ("at failure", "last converged") and not as the start of a sentence.
 FEM_STATE_LEADS = {"failure": "At failure",
                    "converged": "At the last converged trial"}
+#: The "failure" state's lead and name on a run that found no failure, whose
+#: failure field is the undecided top trial of its final bracket.
+FEM_UNDECIDED_LEAD = "At the last trial, which the search could not decide"
+FEM_UNDECIDED_NAME = "last trial (undecided)"
+
+
+def _fs_is_lower_bound(bundle):
+    """Did this run find no failure, so that its factor of safety is a lower
+    bound? Read off the bundle, then the run record it carries."""
+    return bool(bundle.get("fs_is_lower_bound")
+                or (bundle.get("meta") or {}).get("fs_is_lower_bound"))
 
 
 def _fem_states(bundle, opts):
@@ -8794,7 +8806,7 @@ def _fem_primary_state(bundle, opts):
     return states[0] if states else "converged"
 
 
-def _fem_state_sentence(states, wanted, ssrm):
+def _fem_state_sentence(states, wanted, ssrm, lower=False):
     """What the panels below are drawn from, in the words the results view's own
     Field state control uses.
 
@@ -8806,6 +8818,15 @@ def _fem_state_sentence(states, wanted, ssrm):
     if not states:
         return ""
     missed = "failure" in wanted and "failure" not in states
+    if lower and "failure" in states:
+        # A run that found no failure draws its undecided top trial there.
+        if len(states) > 1:
+            return ("The plots below are drawn twice: first the last trial the "
+                    "search solved, which it could not decide, and then the last "
+                    "trial that reached equilibrium. Each state is drawn on its "
+                    "own scale.")
+        return ("The plots below show the last trial the search solved, which "
+                "it could not decide.")
     if states == ["failure"]:
         return ("The plots below show the mechanism at failure — the trial at "
                 "which the section could not reach equilibrium.")
@@ -8857,9 +8878,11 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     # drawn — the rule the paired seepage sets follow, and for the same reason: a
     # caption reading "at failure" on the only field there is qualifies nothing.
     figures = []
+    lower = ssrm and _fs_is_lower_bound(bundle)
     if opts["fem_figure"]:
         for state in states:
-            named_state = field_state_label(state)
+            named_state = (FEM_UNDECIDED_NAME if (lower and state == "failure")
+                           else field_state_label(state))
             for panel, caption, shows in FEM_FIELD_PANELS:
                 stem = (f"fem_{tag}_{panel}" if len(states) == 1
                         else f"fem_{tag}_{panel}_{state}")
@@ -8873,6 +8896,7 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
                     # time and at a different rounding from the paragraph above.
                     plot_fem_results(fem_data, solution, plot_type=[panel],
                                      fig=fig, fs=_num(bundle.get("FS")),
+                                     fs_is_lower_bound=lower,
                                      failure_solution=failure, show_title=False,
                                      field_state=state,
                                      deform_scale=scales[state]["deform_scale"],
@@ -8914,7 +8938,9 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
             wheres.append(where)
         if not named:
             continue
-        lead = f"{FEM_STATE_LEADS[state]}, " if len(states) > 1 else ""
+        lead_words = (FEM_UNDECIDED_LEAD if (lower and state == "failure")
+                      else FEM_STATE_LEADS[state])
+        lead = f"{lead_words}, " if len(states) > 1 else ""
         if described:
             draw = "show" if len(wheres) > 1 else "shows"
             said = (f"{lead}{_join(wheres)} {draw} the same "
@@ -8937,11 +8963,23 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     if ssrm and fs is not None:
         # The state sentence is empty where no panels were asked for: there is
         # then no field drawn to say anything about.
-        state = _fem_state_sentence(states, wanted, ssrm)
-        sub.blocks.append(Prose(
-            f"The shear strength reduction method gives a factor of safety of "
-            f"{fs:.3f}." + (f" {state}" if state else "") + drawn,
-            bold=[f"{fs:.3f}"], links=links))
+        state = _fem_state_sentence(states, wanted, ssrm, lower=lower)
+        if lower:
+            # The search found no failure, so the number is the highest
+            # strength the slope was confirmed to stand at: a lower bound, cut
+            # down to the closing summary's two decimals.
+            from .fem import ssrm_bound_text
+            bound = ssrm_bound_text(fs)
+            sub.blocks.append(Prose(
+                f"The shear strength reduction search found no failure, so it "
+                f"gives a lower bound on the factor of safety: at least {bound}."
+                + (f" {state}" if state else "") + drawn,
+                bold=[bound], links=links))
+        else:
+            sub.blocks.append(Prose(
+                f"The shear strength reduction method gives a factor of safety of "
+                f"{fs:.3f}." + (f" {state}" if state else "") + drawn,
+                bold=[f"{fs:.3f}"], links=links))
     else:
         F = _num(solution.get("F"))
         at = f" at a strength reduction factor of {F:.3f}" if F is not None else ""
@@ -9060,6 +9098,14 @@ def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
             + ("; an open marker is a trial that was stopped before it did, drawn "
                "where it was when it was stopped, still moving" if open_ else "")
             + ".")
+    interval = record.get("final_interval")
+    if record.get("fs_is_lower_bound") and interval:
+        # The ruled line is the lower bound; say what it is and why.
+        said += (f" The dashed line marks the lower bound on the factor of "
+                 f"safety, F = {float(interval[0]):.4f}, the highest strength at "
+                 f"which the slope came to rest. The trial above it, at "
+                 f"F = {float(interval[1]):.4f}, ended undecided, so the search "
+                 f"found no failure.")
     limited = _failing_edge_on_budget(record)
     if limited is not None:
         F, iterations = limited
@@ -9186,7 +9232,8 @@ FEM_MODEL_LEADS = {True: "Each trial is solved by the finite element method.",
 #: itself. The keys are :func:`xslope.fem.ssrm_run_record`'s, which is what a
 #: saved run's meta sidecar carries and what a live run hands over on its bundle.
 SSRM_RECORD_KEYS = ("trials", "FS", "tolerance", "final_interval",
-                    "failure_criterion", "method", "ssr_zones", "ssr_exclude")
+                    "failure_criterion", "method", "ssr_zones", "ssr_exclude",
+                    "fs_is_lower_bound")
 
 
 def ssrm_record(bundle):

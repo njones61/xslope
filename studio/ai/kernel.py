@@ -1296,19 +1296,18 @@ class PythonKernel:
                 bundle = {"fem_data": fem_data, "solution": result["last_solution"],
                           "failure_solution": result.get("failure_solution"),
                           "FS": result.get("FS"), "analysis": "ssrm",
+                          "fs_is_lower_bound": bool(result.get("fs_is_lower_bound")),
                           "meta": ssrm_run_record(result, fem_data, {})}
-                print(f"SSRM: FS = {result['FS']:.3f}")
-                if result.get("note"):
-                    # The factor of safety is the bracket midpoint however the
-                    # bracket closed, so an undecided upper edge is invisible in
-                    # the number itself.
-                    print(f"  {result['note']}")
+                from xslope.fem import ssrm_fs_text
+                print(f"SSRM: "
+                      f"{ssrm_fs_text(result['FS'], bundle['fs_is_lower_bound'])}")
             _store_result("fem_solution", bundle,
                           show=[("_show_fem_data", (fem_data,)),
                                 ("_show_fem_results", ())])
             if plot:
                 from xslope.plot_fem import plot_fem_results
                 plot_fem_results(fem_data, bundle["solution"], fs=bundle["FS"],
+                                 fs_is_lower_bound=bundle["fs_is_lower_bound"],
                                  failure_solution=bundle.get("failure_solution"),
                                  fig=plt.figure(figsize=(11, 7)))
             return bundle

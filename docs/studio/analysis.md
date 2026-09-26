@@ -644,10 +644,10 @@ standing. Movement that does not slow is counted as sliding. Movement still dyin
 that the corrector cannot finish, or with no clear trend, is given another
 Max iterations' worth, up to the **Iteration ceiling** (50000); at the ceiling a trial
 whose out-of-balance force is still falling is *inconclusive* — neither settled nor
-failed — and the run says so in the Log rather than counting it as a failure. The
-factor of safety is still the final bracket's midpoint, as on any other run; what
-changes is that the bracket's upper edge is an undecided trial rather than a measured
-failure, which the Log states beside the answer. The closing summary quotes the
+failed — and the run says so in the Log rather than counting it as a failure. When
+that trial is still the top of the final bracket, the run found no failure, so the
+answer reads "FS ≥" the highest strength the slope came to rest at: no trial above it
+was shown to fail. The closing summary quotes the
 reading that decided each end of the bracket. Raise the ceiling, or loosen the SSRM
 tolerance, when a trial is inconclusive, and raise Max iterations per trial when the
 summary says the factor of safety depends on the iteration limit.

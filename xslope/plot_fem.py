@@ -107,7 +107,26 @@ def _fallback_clause(solution, title):
     return title
 
 
-def _fs_title(base, F, fs=None, at_failure=False):
+#: What a panel drawing the undecided top trial of a run that found no failure
+#: says in place of "at Failure": the field is the last trial the search solved,
+#: and the search could not decide it.
+UNDECIDED_TRIAL_TITLE = "Last trial (undecided)"
+
+
+def _failure_words(solution, fs_follows=False):
+    """The state words a panel title carries for the field it draws: " at
+    Failure" for the captured at-failure field, the undecided-trial words for
+    the top trial of a run that found no failure (where ``fs_follows`` is False;
+    :func:`_fs_title` places them before the factor of safety otherwise), and
+    nothing for a converged field."""
+    if not solution.get("_at_failure", False):
+        return ""
+    if solution.get("_undecided", False):
+        return "" if fs_follows else f"  {UNDECIDED_TRIAL_TITLE}"
+    return " at Failure"
+
+
+def _fs_title(base, F, fs=None, at_failure=False, lower=False, undecided=False):
     """Result-panel title that keeps the SSRM factor of safety and the rendered
     viscoplastic state unambiguous.
 
@@ -123,7 +142,16 @@ def _fs_title(base, F, fs=None, at_failure=False):
     a margin beyond critical). It leads with the factor of safety and stops there —
     "at Failure" already discloses the field is the unconverged trial state, so a
     parenthetical naming the trial F would only repeat that disclosure as noise.
+
+    ``lower`` marks a run that found no failure, whose ``fs`` is a lower bound:
+    every panel then reads "FS ≥ X" (two decimals, cut down), and the panel
+    drawing the undecided top trial (``undecided``) reads
+    "Last trial (undecided)  FS ≥ X".
     """
+    if lower and fs is not None:
+        from .fem import ssrm_fs_text
+        state = f"  {UNDECIDED_TRIAL_TITLE}" if (at_failure and undecided) else ""
+        return f"{base}{state}  {ssrm_fs_text(fs, True)}"
     if at_failure and fs is not None:
         return f"{base}  FS = {fs:.3f}"
     if F is None:
@@ -885,7 +913,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                     show_original='outline', deformed_color='k', deform_scale=None,
                     field_state=None, strain_state=None, color_by_magnitude=False, vector_cmap='viridis',
                     vmin=None, vmax=None, vector_max=None, show_joints=True,
-                    ssrm_record=None):
+                    ssrm_record=None, fs_is_lower_bound=None):
     """
     Plot FEM results with various visualization options.
 
@@ -956,6 +984,11 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             field was rendered at (solution['F']), the panel titles name both — e.g.
             "FS = 0.455 (last converged F = 0.445)". When omitted or equal
             at three decimals, titles keep the simple "F = X.XXX" form.
+        fs_is_lower_bound: True for a run that found no failure
+            (``result['fs_is_lower_bound']``): ``fs`` is then the lower bound it
+            confirmed, every title reads "FS ≥ X", and ``failure_solution`` is
+            the undecided top trial, titled "Last trial (undecided)" in place of
+            "at Failure". None reads it off ``ssrm_record``.
         failure_solution: Optional at-failure (unconverged) solve_fem field captured by
             solve_ssrm (result['failure_solution']). When given, the deformation and
             displacement-vector panels render it — the runaway rotational mechanism
@@ -1005,8 +1038,12 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     # Carry the SSRM factor of safety into the solution the panels see, so titles can
     # name BOTH it and the last-converged F the field was rendered at. Shallow copy:
     # shares the arrays, never mutates the caller's dict (result['last_solution']).
+    if fs_is_lower_bound is None:
+        fs_is_lower_bound = bool((ssrm_record or {}).get("fs_is_lower_bound"))
+    fs_is_lower_bound = bool(fs_is_lower_bound)
     if fs is not None:
-        solution = {**solution, "_ssrm_fs": fs}
+        solution = {**solution, "_ssrm_fs": fs,
+                    "_ssrm_fs_lower": fs_is_lower_bound}
 
     # ``field_state`` is the SINGLE switch governing EVERY result panel — deformation,
     # displace_vector, and the filled-contour panels (displace_mag / stress / strain /
@@ -1034,9 +1071,15 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         _fallback = bool(failure_solution.get("capture_failed"))
         failure_field = {**failure_solution,
                          "_at_failure": not _fallback,
-                         "_capture_fallback": _fallback}
+                         "_capture_fallback": _fallback,
+                         # On a run that found no failure the field is the
+                         # undecided top trial, and is titled as that.
+                         "_undecided": (not _fallback and (
+                             fs_is_lower_bound
+                             or bool(failure_solution.get("undecided_trial"))))}
         if fs is not None:
             failure_field["_ssrm_fs"] = fs
+            failure_field["_ssrm_fs_lower"] = fs_is_lower_bound
     else:
         failure_field = solution
 
@@ -1219,7 +1262,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             _interval = (ssrm_record or {}).get("final_interval")
             plot_ssrm_curve(ax, ssrm_record, fs=fs, final_interval=_interval,
                             fem_data=fem_data, show_title=show_title,
-                            show_legend=show_legend)
+                            show_legend=show_legend,
+                            fs_is_lower_bound=fs_is_lower_bound)
             continue
 
         # Filled-field contour panels take ``mesh_on_fields`` (opt-in edge overlay,
@@ -1450,9 +1494,7 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
         _add_element_labels(ax, fem_data)
     
     ax.set_aspect('equal')
-    title = 'Displacement Magnitude Contours'
-    if solution.get("_at_failure", False):
-        title += ' at Failure'
+    title = 'Displacement Magnitude Contours' + _failure_words(solution)
     ax.set_title(_fallback_clause(solution, title))
 
 
@@ -1749,7 +1791,9 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     # by plot_fem_results): leads with FS; "at Failure" already discloses the state.
     title = _fs_title(_fallback_clause(solution, title), F,
                       solution.get("_ssrm_fs"),
-                      at_failure=solution.get("_at_failure", False))
+                      at_failure=solution.get("_at_failure", False),
+                      lower=solution.get("_ssrm_fs_lower", False),
+                      undecided=solution.get("_undecided", False))
     ax.set_title(title, fontsize=12, pad=15)
 
     return mappable if single_panel else None
@@ -1856,9 +1900,8 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
         _add_element_labels(ax, fem_data)
     
     ax.set_aspect('equal')
-    title = 'von Mises Stress (Red outline = Yielding/Plastic Elements)'
-    if solution.get("_at_failure", False):
-        title += ' at Failure'
+    title = ('von Mises Stress (Red outline = Yielding/Plastic Elements)'
+             + _failure_words(solution))
     ax.set_title(_fallback_clause(solution, title))
 
 
@@ -2036,7 +2079,7 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     # When used as a standalone plot, matplotlib will auto-scale appropriately
     F = solution.get("F", None)
     disp_label = 'Viscoplastic Deformation' if disp_elastic is not None else 'Mesh Deformation'
-    if at_failure:
+    if at_failure and not solution.get("_undecided", False):
         disp_label += ' at Failure'
     if deformation_below_resolution(fem_data, solution):
         # Nothing was drawn but the undeformed mesh (deform_scale is 1 here), and
@@ -2051,7 +2094,9 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     # develop the mechanism; _fs_title(at_failure=...) leads with FS — "at Failure"
     # already carries the disclosure, so no trial-F clause.
     title = _fs_title(_fallback_clause(solution, base), F,
-                      solution.get("_ssrm_fs"), at_failure=at_failure)
+                      solution.get("_ssrm_fs"), at_failure=at_failure,
+                      lower=solution.get("_ssrm_fs_lower", False),
+                      undecided=solution.get("_undecided", False))
     ax.set_title(title, fontsize=12, pad=15)
     return face_cbar_specs
 
@@ -3280,7 +3325,7 @@ def _ssrm_curve_legend(ax, handles, labels, title):
 
 
 def plot_ssrm_curve(ax, record, fs=None, final_interval=None, fem_data=None,
-                    show_title=True, show_legend=True):
+                    show_title=True, show_legend=True, fs_is_lower_bound=None):
     """The maximum displacement of every strength reduction trial against its F.
 
     One marker per trial, sorted by F. Filled markers are trials in which the
@@ -3288,7 +3333,10 @@ def plot_ssrm_curve(ax, record, fs=None, final_interval=None, fem_data=None,
     that were stopped before it did, drawn with no line through them at the
     displacement they had when they were stopped, and the key names how each
     ended. The reported factor of safety is ruled as a vertical line and the
-    final bracket is shaded behind it.
+    final bracket is shaded behind it. On a run that found no failure
+    (``fs_is_lower_bound``, read off the record when None) the line sits at the
+    highest strength the slope was confirmed to stand at and the key reads
+    "FS ≥ X", three decimals cut down.
 
     Read it for its shape. A flat run and a sharp knee is a strength limit. A
     steady climb with no knee means the slope kept moving at every strength the
@@ -3311,6 +3359,8 @@ def plot_ssrm_curve(ax, record, fs=None, final_interval=None, fem_data=None,
         fs = (record or {}).get("FS")
     if final_interval is None:
         final_interval = (record or {}).get("final_interval")
+    if fs_is_lower_bound is None:
+        fs_is_lower_bound = bool((record or {}).get("fs_is_lower_bound"))
 
     us = [p["max_displacement"] for p in points]
     handles, labels = [], []
@@ -3356,7 +3406,8 @@ def plot_ssrm_curve(ax, record, fs=None, final_interval=None, fem_data=None,
     if fs is not None:
         ax.axvline(float(fs), color="#1f4e79", ls="--", lw=1.4, zorder=3)
         handles.append(Line2D([0], [0], color="#1f4e79", ls="--", lw=1.4))
-        labels.append(f"FS = {float(fs):.3f}")
+        from .fem import ssrm_fs_text
+        labels.append(ssrm_fs_text(float(fs), bool(fs_is_lower_bound), 3))
 
     ax.set_xlabel("Strength reduction factor, F")
     ax.set_ylabel(_fem_cbar_label(fem_data, "Maximum displacement", "length"))
@@ -3476,14 +3527,14 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
 
     F = solution.get("F", None)
     at_failure = solution.get("_at_failure", False)
-    title = panel_label
-    if at_failure:
-        title += ' at Failure'
+    title = panel_label + _failure_words(solution, fs_follows=True)
     # at_failure when plot_fem_results routed this panel onto the at-failure field
     # (field_state='failure', the default): leads with FS, matching the
     # deformation/displace_vector panels so the figure tells one story.
     title = _fs_title(_fallback_clause(solution, title), F,
-                      solution.get("_ssrm_fs"), at_failure=at_failure)
+                      solution.get("_ssrm_fs"), at_failure=at_failure,
+                      lower=solution.get("_ssrm_fs_lower", False),
+                      undecided=solution.get("_undecided", False))
     ax.set_title(title, fontsize=12, pad=15)
     return mappable, reinf_cbar_specs
 
@@ -3652,9 +3703,8 @@ def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_re
         plot_reinforcement_lines(ax, fem_data, solution)
     
     # Add title indicating yield state
-    title = 'Yield Function (Red: F>0 Yielding/Plastic, Blue: F<0 Elastic)'
-    if solution.get("_at_failure", False):
-        title += ' at Failure'
+    title = ('Yield Function (Red: F>0 Yielding/Plastic, Blue: F<0 Elastic)'
+             + _failure_words(solution))
     ax.set_title(_fallback_clause(solution, title), fontsize=12, pad=15)
     
     # Add statistics to the plot

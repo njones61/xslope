@@ -280,6 +280,60 @@ def _edge_trial(trials, F, stood):
     return None
 
 
+#: The trial endings that leave a strength UNDECIDED: still settling when the
+#: iteration limit came ('inconclusive'), and balanced in force with stresses
+#: outside the yield surface where no admissible state was found ('yield_gate').
+#: The search carries such a trial as the top of its bracket and does not count
+#: it as a failure. A trial the failure criterion itself rules on when the limit
+#: stops it (FAILED, AMBIGUOUS, and the slowing trial whose rest could not be
+#: confirmed) is counted as failed, and is not in this set.
+SSRM_UNDECIDED_EXITS = ('inconclusive', 'yield_gate')
+
+
+def ssrm_undecided_top(result):
+    """The trial at the top of a run's final bracket, where that trial ended
+    undecided (:data:`SSRM_UNDECIDED_EXITS`); None on every other run.
+
+    A run whose top trial is undecided found no failure above the strength it
+    confirmed: its factor of safety is a LOWER BOUND, the bracket's bottom
+    (see :func:`solve_ssrm`, ``fs_is_lower_bound``). Read off the trial record,
+    so a live result and a saved run record give the same answer.
+    """
+    r = result or {}
+    interval = r.get("final_interval")
+    if not interval or r.get("probe") or r.get("sweep_F") is not None:
+        return None
+    hi = _finite_or_none(interval[1])
+    if hi is None:
+        return None
+    trials = [t for t in (r.get("trials") or []) if isinstance(t, dict)]
+    top = _edge_trial(trials, hi, False)
+    if top is not None and top.get("exit_reason") in SSRM_UNDECIDED_EXITS:
+        return top
+    return None
+
+
+def ssrm_bound_text(fs, decimals=2):
+    """A lower bound on the factor of safety, cut DOWN to ``decimals`` places
+    (1.5625 -> "1.56", 1.0977 -> "1.09"), so the printed number is never above
+    the strength the run confirmed."""
+    scale = 10 ** int(decimals)
+    value = np.floor(float(fs) * scale + 1e-9) / scale
+    return f"{value:.{int(decimals)}f}"
+
+
+def ssrm_fs_text(fs, lower=False, decimals=None):
+    """The factor of safety as a label: "FS = 1.566", or "FS ≥ 1.56" where the
+    run found no failure and ``fs`` is the lower bound it confirmed.
+
+    ``decimals`` defaults to three for a value and two for a bound (the closing
+    summary's precision); a bound is cut down, never rounded up.
+    """
+    if lower:
+        return f"FS ≥ {ssrm_bound_text(fs, 2 if decimals is None else decimals)}"
+    return f"FS = {float(fs):.{3 if decimals is None else int(decimals)}f}"
+
+
 def _ssrm_length_unit(fem_data):
     """The declared length unit ("m", "ft"), or "" where the model declares none."""
     try:
@@ -390,14 +444,9 @@ def _failing_edge_sentences(F, trial, count, unit):
                 f"{one} {n:,}.")
     refused = _stop_reading(trial, "slowing_refused")
     if refused is not None and why == "iteration_cap":
-        inc = refused.get("increments") or [1.0, 1.0]
-        fell = 1.0 - (inc[-1] / inc[0]) if inc[0] > 0 else 0.0
-        return (f"At F = {F:.4f} the slope was still moving at the limit, but "
-                f"slowing (the movement per {int(refused.get('block', 0)):,} "
-                f"{count} fell by {_ssrm_pct(fell)} over the last "
-                f"{int(refused.get('window', 0)):,}); the corrector could not "
-                f"find the balanced state from there, so the trial was counted "
-                f"as failed. {_SSRM_SET_BY_LIMIT}")
+        return (f"At F = {F:.4f} the slope was still creeping at the limit but "
+                f"slowing; the solver could not confirm that it comes to rest, "
+                f"so the trial was counted as failed. {_SSRM_SET_BY_LIMIT}")
     if why == "not_slowing":
         rd = _stop_reading(trial, "not_slowing")
         if rd is not None:
@@ -407,24 +456,8 @@ def _failing_edge_sentences(F, trial, count, unit):
     if why == "nonfinite":
         return (f"{did_not} the calculation stopped producing finite numbers at "
                 f"{one} {n:,}.")
-    open_question = ("The trial is left undecided, neither a failure nor a "
-                     "confirmed rest.")
-    if why == "yield_gate":
-        return (f"At F = {F:.4f} the trial settled in force outside the yield "
-                f"surface at {one} {n:,}, and the Newton corrector found no "
-                f"admissible state. {open_question}")
-    if why == "inconclusive":
-        rd = _stop_reading(trial, "inconclusive")
-        fell = ""
-        if rd is not None:
-            a, b = float(rd["oob_from"]), float(rd["oob_to"])
-            pct = (a - b) / a * 100.0 if a > 0 else 0.0
-            by = f"by {pct:.0f}%" if pct >= 0.5 else "by under 1%"
-            fell = (f" (the leftover force fell {by} over the last "
-                    f"{int(rd['window']):,} {count})")
-        return (f"At F = {F:.4f} the slope was still moving and still settling "
-                f"when the {n:,}-{one} limit came{fell}, and the solver could not "
-                f"confirm that it comes to rest. {open_question}")
+    if why in SSRM_UNDECIDED_EXITS:
+        return _undecided_sentence(F, trial, count)
 
     # Everything else was stopped by the iteration limit, and the trial's own
     # classification — recorded on every criterion — says what the slope was
@@ -467,6 +500,45 @@ def _failing_edge_sentences(F, trial, count, unit):
     return f"{hit} without reaching equilibrium. {_SSRM_SET_BY_LIMIT}"
 
 
+def _undecided_sentence(F, trial, count):
+    """What happened to a trial that ended undecided, in one sentence."""
+    one = count[:-1]
+    n = int(trial.get("iterations") or 0)
+    if trial.get("exit_reason") == "yield_gate":
+        return (f"At F = {F:.4f} the forces balanced at {one} {n:,} with the "
+                f"stresses outside the yield surface, and no admissible state was "
+                f"found, so the run could not tell whether the slope would stand.")
+    return (f"At F = {F:.4f} it was still creeping, more slowly all the time, "
+            f"when the {n:,}-{one} limit came, so the run could not tell whether "
+            f"it would stop.")
+
+
+def _came_to_rest_sentence(lo, trials, count, unit):
+    """The bottom of a lower-bound run's bracket: every strength the slope came
+    to rest at, whether it moved further at each, and how far it had moved at
+    the highest."""
+    edge = _edge_trial(trials, lo, True)
+    if edge is None:
+        return _standing_edge_sentence(lo, None, trials, count, unit)
+    # The last record at each strength that stood, lowest strength first.
+    at = {}
+    for t in trials:
+        F = _finite_or_none(t.get("F"))
+        if F is not None and F <= lo + 1e-9 * max(1.0, abs(lo)) and _trial_stood(t):
+            at[F] = t
+    moved = [_finite_or_none(at[F].get("max_displacement")) for F in sorted(at)]
+    if len(at) > 1:
+        said = f"The slope came to rest at every strength tried up to F = {lo:.4f}"
+        if None not in moved and all(b > a for a, b in zip(moved, moved[1:])):
+            said += ", moving further each time"
+    else:
+        said = f"The slope came to rest at F = {lo:.4f}"
+    u = _finite_or_none(edge.get("max_displacement"))
+    if u is not None:
+        said += f"; at that strength it had moved {u:.3g}" + (f" {unit}" if unit else "")
+    return said + "."
+
+
 def ssrm_run_summary(result, fem_data=None):
     """The closing summary of a strength reduction run, as a short paragraph.
 
@@ -475,6 +547,15 @@ def ssrm_run_summary(result, fem_data=None):
     equilibrium (or was counted as standing); at the top, how the trial ended —
     and the wall time, in the words of the Run dialog ("iterations", "the
     iteration limit", "Max iterations per trial").
+
+    A run whose top trial ended undecided (``result['fs_is_lower_bound']``)
+    leads with that finding instead: no failure was found, the slope came to
+    rest at every strength tried up to the bracket's bottom (and whether it
+    moved further each time, and how far it had moved there), what the top
+    trial was doing when it stopped, and that the factor of safety is at least
+    the bottom, cut down to two decimals. Where the iteration limit stopped the
+    top trial, the summary says that raising Max iterations per trial goes
+    further.
 
     A trial at the top that hit the iteration limit is read by the classification
     the solver recorded for it. One still moving fast (FAILED) was failing, and
@@ -532,6 +613,19 @@ def ssrm_run_summary(result, fem_data=None):
         return _join("No factor of safety was found.", why, took)
 
     lo, hi = float(interval[0]), float(interval[1])
+    unit = _ssrm_length_unit(fem_data)
+    accelerated = ("Convergence acceleration was on."
+                   if any((t.get("acceleration") or {}).get("on")
+                          for t in trials) else "")
+    top = _edge_trial(trials, hi, False) if r.get("fs_is_lower_bound") else None
+    if top is not None:
+        bound = (f"The factor of safety is at least {ssrm_bound_text(FS)}."
+                 + (" To go further, raise Max iterations per trial."
+                    if top.get("exit_reason") == "inconclusive" else ""))
+        return _join("No failure was found.",
+                     _came_to_rest_sentence(lo, trials, count, unit),
+                     _undecided_sentence(hi, top, count), bound, accelerated,
+                     took)
     head = (f"The factor of safety is {FS:.3f}, the midpoint of the bracket "
             f"F = {lo:.4f} to {hi:.4f}.")
     if r.get("sweep_F") is not None:
@@ -541,10 +635,6 @@ def ssrm_run_summary(result, fem_data=None):
     if not trials:
         return _join(head, "The run kept no record of its trials, so what "
                      "happened at either end of the bracket is not known.", took)
-    unit = _ssrm_length_unit(fem_data)
-    accelerated = ("Convergence acceleration was on."
-                   if any((t.get("acceleration") or {}).get("on")
-                          for t in trials) else "")
     return _join(head,
                  _standing_edge_sentence(lo, _edge_trial(trials, lo, True),
                                          trials, count, unit),
@@ -602,6 +692,10 @@ def ssrm_run_record(result, fem_data=None, options=None):
         value = (options or {}).get(key)
         if value is not None and value != []:
             record[key] = _jsonable(value)
+    # Recorded only where it is true, so a run that ended on a failure writes the
+    # record it always wrote: a reader takes the key's absence as a midpoint.
+    if (result or {}).get("fs_is_lower_bound"):
+        record["fs_is_lower_bound"] = True
 
     # The zones, from wherever the run got them: an explicit search-area polygon
     # passed as ssr_zone IS a reduce zone, and is counted as one, so the record
@@ -5058,23 +5152,15 @@ def creep_trend(marks, u_elastic_scale, block, slip_hist=None,
 
 
 def _creep_slowing_clause(rd, unit=""):
-    """'still moving at iteration N, but slowing (...); the corrector found ...,
-    so it was counted as standing at U' — the trend reading that stood a trial."""
+    """'the slope was still creeping at iteration N but slowing; the solver
+    confirmed that it comes to rest, at U, and counted it as standing' — the
+    trend reading that stood a trial."""
     u = f" {unit}" if unit else ""
-    inc = rd.get('increments') or [1.0, 1.0]
-    fell = 1.0 - (inc[-1] / inc[0]) if inc[0] > 0 else 0.0
-    hold = (rd.get('corrector') or {}).get('hold')
-    stays = ", and that it stays there" if (hold and hold.get('held')) else ""
-    if rd.get('seed') == 'extrapolated':
-        where = f", {float(rd.get('extrapolated') or 0.0):.3g}{u} further on"
-    else:
-        where = ""
-    return (f"the slope was still moving at iteration "
-            f"{int(rd.get('iteration', 0)):,}, but slowing (the movement per "
-            f"{int(rd.get('block', 0)):,} iterations had fallen {_ssrm_pct(fell)} over "
-            f"the last {int(rd.get('window', 0)):,}). The solver checked whether it "
-            f"comes to rest and found that it does{where}{stays}, so it was counted "
-            f"as standing at {float(rd.get('max_displacement') or 0.0):.3g}{u}")
+    return (f"the slope was still creeping at iteration "
+            f"{int(rd.get('iteration', 0)):,} but slowing; the solver confirmed "
+            f"that it comes to rest, at "
+            f"{float(rd.get('max_displacement') or 0.0):.3g}{u}, and counted it "
+            f"as standing")
 
 
 def _creep_sliding_clause(rd):
@@ -13398,14 +13484,22 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
     # therefore the convention of every locked and published factor of safety here.
     # See the note at _RAMP_DF_GROW.
     FS = 0.5 * (F_stands + F_refused)
+    # A refused step that ended undecided put no failure above the carried
+    # strength: the answer is then that strength, as a lower bound.
+    lower_bound = ssrm_undecided_top(
+        {"final_interval": (F_stands, F_refused), "trials": trials}) is not None
+    if lower_bound:
+        FS = F_stands
     restrength(groups, F_stands, joints=joints)
     if debug_level >= 1:
         print(f"  Ramp limit: {F_stands:.4f} carried, {F_refused:.4f} refused "
-              f"-> FS = {FS:.4f} ({n_steps} steps, {n_retries} retries, "
+              f"-> {ssrm_fs_text(FS, lower_bound, 4)} ({n_steps} steps, "
+              f"{n_retries} retries, "
               f"{total_iters} iterations, {total_fevals} force evaluations)")
     return {
         "converged": True,
         "FS": float(FS),
+        "fs_is_lower_bound": bool(lower_bound),
         "last_solution": last_solution,
         "iterations_ssrm": n_steps,
         "final_interval": (float(F_stands), float(F_refused)),
@@ -14311,11 +14405,11 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             attempted at that exit, and a trial still improving at the ceiling is
             exactly the one a locally quadratic iteration can finish, so an
             inconclusive trial survives only where the corrector also refuses. The
-            bisection carries on below it, the
-            factor of safety is reported as the final bracket's midpoint exactly as
-            on any other run, and the result carries 'inconclusive' and a 'note'
-            recording that the bracket's upper edge is undecided rather than a
-            measured failure.
+            bisection carries on below it and does not count it as a failure.
+            Where an undecided trial is still the top of the final bracket, the
+            search found no failure: the factor of safety is the bracket's
+            bottom, reported as a lower bound (``fs_is_lower_bound``). The result
+            carries 'inconclusive' and a 'note' on every run that met one.
 
         convergence_tol (float): Convergence tolerance passed to solve_fem
         max_disp_factor (float): Displacement limit (fraction of mesh height) used as a
@@ -14547,9 +14641,16 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             the very displacement its curve is made of.
 
     Returns:
-        dict: Result with keys FS, converged, last_solution, final_interval, and —
-            when capture_failure_state is on — failure_solution (the at-failure
-            unconverged field for the deformation/vector figures).
+        dict: Result with keys FS, fs_is_lower_bound, converged, last_solution,
+            final_interval, and — when capture_failure_state is on —
+            failure_solution (the at-failure unconverged field for the
+            deformation/vector figures). ``fs_is_lower_bound`` is True where the
+            trial at the top of the final bracket ended undecided
+            (:data:`SSRM_UNDECIDED_EXITS`): no failure was found, FS is the
+            bracket's bottom, the highest strength the slope was confirmed to
+            stand at, and failure_solution is that undecided trial's own field
+            (marked ``undecided_trial``) in place of an at-failure capture. It is
+            False on every other run, whose FS is the bracket's midpoint.
     """
 
     t_start = time.perf_counter()
@@ -14998,7 +15099,16 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     # developed regime (see capture_margin). This changes nothing about FS / the
     # bracket / last_solution — it only ADDS 'failure_solution', so results are
     # bit-identical when this is off.
-    if (capture_failure_state and result.get("converged")
+    # A run whose top trial ended undecided found no failure, so there is no
+    # at-failure state to capture. What stands above its answer is that trial,
+    # and its own field is what the "failure" panels draw, titled for what it is.
+    result["fs_is_lower_bound"] = bool(result.get("fs_is_lower_bound"))
+    _undecided_field = result.pop("undecided_solution", None)
+    if result["fs_is_lower_bound"]:
+        if capture_failure_state and _undecided_field is not None:
+            result["failure_solution"] = {**_undecided_field,
+                                          "undecided_trial": True}
+    elif (capture_failure_state and result.get("converged")
             and result.get("final_interval") is not None
             and result.get("FS") is not None):
         F_edge = result["final_interval"][1]
@@ -15239,25 +15349,27 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         either as failure biases the factor of safety low, so the bisection carries
         it as upper uncertainty. A criterion that can rule — the hybrid's
         STABLE_STUCK verdict — is left to do so."""
-        return (sol.get("exit_reason") in ('inconclusive', 'yield_gate')
+        return (sol.get("exit_reason") in SSRM_UNDECIDED_EXITS
                 and not _stable(sol))
+
+    # The latest undecided trial and its field: where it is still the top of the
+    # final bracket, the run found no failure, and the figures show this trial.
+    _last_undecided = [None]
 
     def _note_inconclusive(F, sol):
         if sol.get("exit_reason") == 'yield_gate':
-            why = ("It settled in force outside the yield surface, and the "
-                   "Newton corrector found no admissible state to put in its "
-                   "place.")
+            why = ("The forces balanced with the stresses outside the yield "
+                   "surface, and no admissible state was found.")
             then = ""
         else:
-            why = (f"It hit the {int(sol.get('iterations', 0)):,}-iteration "
-                   f"limit with its out-of-balance force still falling.")
-            then = " Raise the iteration ceiling to decide it."
-        msg = (f"SSRM: the trial at F = {F:.4f} is inconclusive. {why} That is "
-               f"neither an equilibrium nor a failure, so it is not counted as a "
-               f"failure: the factor of safety carries it as an open question at "
-               f"the top of the bracket, and is still the bracket midpoint.{then}")
+            why = (f"It was still creeping when the "
+                   f"{int(sol.get('iterations', 0)):,}-iteration limit came.")
+            then = " Raise Max iterations per trial to decide it."
+        msg = (f"SSRM: the trial at F = {F:.4f} is undecided. {why} The search "
+               f"does not count it as a failure and carries on below it.{then}")
         inconclusive.append({"F": float(F), "iterations": int(sol.get("iterations", 0)),
                              "message": msg})
+        _last_undecided[0] = (float(F), sol)
         print(f"\n{msg}")
         return msg
 
@@ -15638,20 +15750,31 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     # the grid-cell center when grid bisection is used);
     # the full bracket is returned in 'final_interval'.
     #
-    # An INCONCLUSIVE trial does not change how the number is reported: the midpoint
-    # is still the estimate, +/- half the bracket. What changes is what the bracket's
-    # upper edge means - an undecided trial rather than a measured failure - and that
-    # is disclosed in 'inconclusive', in 'note', and on the log.
-    critical_FS = 0.5 * (F_left + F_right)
+    # A bracket whose top is an UNDECIDED trial has no failure above it: the search
+    # found none. The answer is then the bottom of the bracket, the highest strength
+    # the slope was confirmed to stand at, reported as a lower bound
+    # ('fs_is_lower_bound'). 'final_interval' still says where the search stopped.
+    undecided = _last_undecided[0]
+    lower_bound = (undecided is not None
+                   and abs(undecided[0] - F_right) <= 1e-12 * max(1.0, abs(F_right)))
+    critical_FS = F_left if lower_bound else 0.5 * (F_left + F_right)
 
-    _ssrm_progress(progress_callback, _total() * SUBDIV, _total() * SUBDIV, f"FS = {critical_FS:.3f}")
+    _ssrm_progress(progress_callback, _total() * SUBDIV, _total() * SUBDIV,
+                   ssrm_fs_text(critical_FS, lower_bound))
     if debug_level >= 1:
-        print(f"\n  SSRM result: FS = {critical_FS:.4f}")
+        print(f"\n  SSRM result: "
+              + (f"FS ≥ {ssrm_bound_text(critical_FS, 4)}" if lower_bound
+                 else f"FS = {critical_FS:.4f}"))
         print(f"  Final interval: [{F_left:.4f}, {F_right:.4f}]")
 
     return {
         "converged": True,
         "FS": critical_FS,
+        "fs_is_lower_bound": bool(lower_bound),
+        # The undecided top trial's own field, on a lower-bound run: the one
+        # state above the answer the search solved, drawn in place of an
+        # at-failure capture there is no failure to take.
+        "undecided_solution": undecided[1] if lower_bound else None,
         "last_solution": last_converged_solution,
         "iterations_ssrm": iteration,
         "final_interval": (F_left, F_right),
@@ -15664,10 +15787,10 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         # growth, exit_reason, iterations. Populated on every criterion so an A/B
         # between criteria costs no extra solves.
         "trials": trials,
-        # Trials the iteration ceiling could not decide (empty on a clean run). When
-        # this is non-empty the reported FS is still the bracket midpoint, but the
-        # bracket's upper edge is an UNCERTAINTY rather than a measured failure, and
-        # `note` says so in words.
+        # Trials the search could not decide (empty on a clean run). Where the
+        # last of them is still the top of the final bracket the reported FS is
+        # the bracket's bottom, a lower bound (`fs_is_lower_bound`); `note` says
+        # what the latest one was doing, in words.
         "inconclusive": inconclusive,
         "note": (inconclusive[-1]["message"] if inconclusive else None),
         "failure_criterion": ("hybrid" if hybrid else

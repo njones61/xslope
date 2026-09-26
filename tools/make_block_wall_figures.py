@@ -254,9 +254,10 @@ def _counts(label, model, mesh, fem_data):
 def _report(label, result, seconds, units=""):
     """The bracket walk: what each trial was asked, how it ended, and how far the
     section had moved when it stopped; then the run's closing summary."""
-    print("   %-11s FS %.4f from [%.6f, %.6f] (width %.6f) after %d bisection "
+    print("   %-11s FS %s%.4f from [%.6f, %.6f] (width %.6f) after %d bisection "
           "step(s) · %.0f s"
-          % (label, result["FS"], result["final_interval"][0],
+          % (label, ">= " if result.get("fs_is_lower_bound") else "",
+             result["FS"], result["final_interval"][0],
              result["final_interval"][1], result["interval_width"],
              result["iterations_ssrm"], seconds))
     for tr in result["trials"]:
@@ -626,13 +627,15 @@ def _both_states(name, fem_data, result, plot_type):
     from xslope.plot_fem import plot_fem_results
 
     fail = result.get("failure_solution")
+    lower = bool(result.get("fs_is_lower_bound"))
     capture(name, plot_fem_results, fem_data, result["last_solution"],
             plot_type=plot_type, fs=result["FS"], failure_solution=fail,
-            field_state="converged")
+            field_state="converged", fs_is_lower_bound=lower)
     if fail is not None:
         capture(name.replace(".png", "_failure.png"), plot_fem_results, fem_data,
                 result["last_solution"], plot_type=plot_type, fs=result["FS"],
-                failure_solution=fail, field_state="failure")
+                failure_solution=fail, field_state="failure",
+                fs_is_lower_bound=lower)
 
 
 def _pair(deform_name, strain_name, fem_data, result, deform_type):
@@ -652,7 +655,8 @@ def _pair(deform_name, strain_name, fem_data, result, deform_type):
     fail = result.get("failure_solution")
     states = [("converged", "")] + ([("failure", "_failure")] if fail is not None else [])
     for state, suffix in states:
-        kw = dict(fs=result["FS"], failure_solution=fail, field_state=state)
+        kw = dict(fs=result["FS"], failure_solution=fail, field_state=state,
+                  fs_is_lower_bound=bool(result.get("fs_is_lower_bound")))
         with contextlib.redirect_stdout(io.StringIO()):
             plt.close("all")
             plot_fem_results(fem_data, result["last_solution"],

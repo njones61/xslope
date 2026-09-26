@@ -340,6 +340,7 @@ class MplCanvas(QWidget):
             displacement_tolerance=opts.get("displacement_tolerance", 0.5),
             color_by_magnitude=opts.get("color_by_magnitude", False),
             fs=opts.get("fs"),
+            fs_is_lower_bound=opts.get("fs_is_lower_bound"),
             ssrm_record=opts.get("ssrm_record"),
             legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig))
 

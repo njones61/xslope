@@ -1581,6 +1581,7 @@ class MainWindow(QMainWindow):
         analysis = meta.get("analysis") or meta.get("analysis_type") or "loaded"
         self.doc.results["fem_solution"] = {
             "fem_data": fem_data, "solution": solution, "FS": meta.get("FS"),
+            "fs_is_lower_bound": bool(meta.get("fs_is_lower_bound")),
             "analysis": analysis,
             "failure_solution": failure_solution,
             # The whole record the run kept of itself, carried the way a live run
@@ -1591,7 +1592,9 @@ class MainWindow(QMainWindow):
         self._show_fem_data(fem_data)
         self._show_fem_results()
         fs = meta.get("FS")
-        fs_note = f" (SSRM FS = {fs:.3f})" if isinstance(fs, (int, float)) else ""
+        from xslope.fem import ssrm_fs_text
+        fs_note = (f" (SSRM {ssrm_fs_text(fs, bool(meta.get('fs_is_lower_bound')))})"
+                   if isinstance(fs, (int, float)) else "")
         print(f"Restored saved FEM solution from {os.path.basename(stem)}_fem_*.csv{fs_note}.")
 
     def _render(self):
@@ -2546,7 +2549,10 @@ class MainWindow(QMainWindow):
         if self.fem_results_canvas is not None:
             self.view_tabs.setCurrentWidget(self.fem_results_canvas)
         if bundle.get("FS") is not None:
-            self.statusBar().showMessage(f"FEM done — SSRM FS = {bundle['FS']:.3f}")
+            from xslope.fem import ssrm_fs_text
+            self.statusBar().showMessage(
+                f"FEM done — SSRM "
+                f"{ssrm_fs_text(bundle['FS'], bool(bundle.get('fs_is_lower_bound')))}")
         else:
             conv = bundle["solution"].get("converged")
             self.statusBar().showMessage(f"FEM single solve done (converged={conv}).")
@@ -2616,6 +2622,7 @@ class MainWindow(QMainWindow):
                 self.fem_results_canvas.render_fem_results(
                     bundle["fem_data"], bundle["solution"],
                     {**panel.options(), "fs": bundle.get("FS"),
+                     "fs_is_lower_bound": bool(bundle.get("fs_is_lower_bound")),
                      "failure_solution": bundle.get("failure_solution"),
                      # The run's own record — its trials, bracket and factor of
                      # safety — which the displacement-vs-F curve is drawn from.

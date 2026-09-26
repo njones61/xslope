@@ -223,18 +223,19 @@ def check_sentences():
     summary = fem.ssrm_run_summary(_run(trials, 1.25, 1.2578125),
                                    fem_data={"unit_system": "si"})
     print("    " + summary)
-    check("the standing edge is quoted by its slowing movement",
-          "was still moving at iteration 100,000, but slowing" in summary
-          and "had fallen 59% over the last 50,000" in summary)
-    check("from the estimated resting state, with the hold test",
-          "The solver checked whether it comes to rest and found that it does, "
-          "0.0006 m further on, and that it stays there" in summary
-          and "counted as standing at 0.023 m" in summary)
+    check("the standing edge confirmed after slowing, in one sentence",
+          "At F = 1.2500 the slope was still creeping at iteration 100,000 but "
+          "slowing; the solver confirmed that it comes to rest, at 0.023 m, and "
+          "counted it as standing." in summary, summary)
+    standing = summary.split(" At F = 1.2578")[0]
+    check("with no percentage, no distance further on, no 'stays there'",
+          not any(w in standing for w in ("%", "further on", "stays there",
+                                          "fallen")), standing)
     s_as_is = fem.creep_sentence(dict(slowing, seed='as_is'), 1.25, "m")
-    check("from where it was, when the block-end state itself certified",
-          "found that it does, and that it stays there, so it was counted as "
-          "standing at 0.023 m."
-          in s_as_is, s_as_is)
+    check("the same sentence whichever state the rest was confirmed from",
+          s_as_is == "At F = 1.2500 the slope was still creeping at iteration "
+          "100,000 but slowing; the solver confirmed that it comes to rest, at "
+          "0.023 m, and counted it as standing.", s_as_is)
     check("the failing edge is counted as sliding, with its ratio",
           "At F = 1.2578 it did not: over the last 50,000 iterations the "
           "movement did not slow (each block of 10,000 iterations moved the "
@@ -256,16 +257,17 @@ def check_sentences():
     ]
     summary = fem.ssrm_run_summary(_run(trials, 1.2421875, 1.25))
     print("    " + summary)
-    check("slowing at the limit with the corrector refused: its own sentence",
-          "At F = 1.2500 the slope was still moving at the limit, but slowing "
-          "(the movement per 10,000 iterations fell by 59% over the last "
-          "50,000); the corrector could not find the balanced state from there, "
-          "so the trial was counted as failed. The factor of safety depends on "
-          "the iteration limit here. Raise Max iterations per trial and it may "
-          "change." in summary)
-    check("and in the Run dialog's words",
-          not any(w in summary.lower()
-                  for w in ("budget", "sweep", "verdict", " edge")))
+    check("slowing at the limit with its rest unconfirmed: its own sentence",
+          "At F = 1.2500 the slope was still creeping at the limit but slowing; "
+          "the solver could not confirm that it comes to rest, so the trial was "
+          "counted as failed. The factor of safety depends on the iteration "
+          "limit here. Raise Max iterations per trial and it may change."
+          in summary, summary)
+    top = summary[summary.index("At F = 1.2500"):]
+    check("and in the Run dialog's words, naming no mechanism",
+          not any(w in top.lower()
+                  for w in ("budget", "sweep", "verdict", " edge", "corrector",
+                            "seed", "hold test", "out-of-balance", "%")), top)
     s = fem.creep_sentence(dict(sliding, ratio=1.0004), 1.375)
     check("a ratio that rounds to 1.00 reads as not slowing",
           "did not slow (each block of 10,000 iterations moved the slope 100% "

@@ -526,7 +526,8 @@ Mohr-Coulomb limit over a length of the sheet, with the slip rising along that
 length, and in the blocks panel as the sheet's faces turning green along it.
 Here that happens only in the first few centimeters at the facing, so the
 interface acts as a stiff bond and a bonded bar would give much the same
-result. Part 3 is about the models where jointing does change the answer.
+result. Part 3 is about the models where jointing the sheet itself does change
+the answer.
 
 ### What the factor of safety means for this wall
 

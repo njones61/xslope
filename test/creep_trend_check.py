@@ -225,6 +225,29 @@ def check_sentences():
     low = summary.lower()
     check("in the Run dialog's words",
           not any(w in low for w in ("budget", "sweep", "verdict", " edge")))
+    refused = dict(rule='slowing_refused', window=50000, block=10000,
+                   iteration=100000, ratio=0.8,
+                   increments=[0.0185, 0.0140, 0.0111, 0.0091, 0.0075])
+    trials = [
+        {"F": 1.2421875, "stable": True, "converged": True,
+         "verdict": "CONVERGED", "iterations": 1083, "exit_reason": "converged",
+         "corrector": {"checkpoint": "vp1000"}},
+        {"F": 1.25, "stable": False, "converged": False, "verdict": "AMBIGUOUS",
+         "iterations": 100000, "exit_reason": "iteration_cap", "u_ratio": 1.25,
+         "growth": 0.022, "stop_reading": refused},
+    ]
+    summary = fem.ssrm_run_summary(_run(trials, 1.2421875, 1.25))
+    print("    " + summary)
+    check("slowing at the limit with the corrector refused: its own sentence",
+          "At F = 1.2500 the slope was still moving at the limit, but slowing "
+          "(the movement per 10,000 iterations fell by 59% over the last "
+          "50,000); the corrector could not find the balanced state from there, "
+          "so the trial was counted as failed. The factor of safety depends on "
+          "the iteration limit here. Raise Max iterations per trial and it may "
+          "change." in summary)
+    check("and in the Run dialog's words",
+          not any(w in summary.lower()
+                  for w in ("budget", "sweep", "verdict", " edge")))
     growing = dict(sliding, ratio=1.2)
     s = fem.creep_sentence(growing, 1.3)
     check("a growing movement says it grew", "the movement per iteration grew "

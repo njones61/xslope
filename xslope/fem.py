@@ -388,6 +388,16 @@ def _failing_edge_sentences(F, trial, count, unit):
                     f"and counted the slope as sliding.")
         return (f"{did_not} the slope was sliding steadily on its joints at "
                 f"{one} {n:,}.")
+    refused = _stop_reading(trial, "slowing_refused")
+    if refused is not None and why == "iteration_cap":
+        inc = refused.get("increments") or [1.0, 1.0]
+        fell = 1.0 - (inc[-1] / inc[0]) if inc[0] > 0 else 0.0
+        return (f"At F = {F:.4f} the slope was still moving at the limit, but "
+                f"slowing (the movement per {int(refused.get('block', 0)):,} "
+                f"{count} fell by {_ssrm_pct(fell)} over the last "
+                f"{int(refused.get('window', 0)):,}); the corrector could not "
+                f"find the balanced state from there, so the trial was counted "
+                f"as failed. {_SSRM_SET_BY_LIMIT}")
     if why == "not_slowing":
         rd = _stop_reading(trial, "not_slowing")
         if rd is not None:
@@ -477,7 +487,9 @@ def ssrm_run_summary(result, fem_data=None):
     limit, the out-of-balance force's fall (the iteration ceiling), the slip's
     growth while the joints settled (counted as standing), and the trend of the
     movement at the iteration limit: slowing, with the corrector's balanced state
-    that far on (counted as standing), or not slowing (counted as sliding). A trial saved
+    that far on (counted as standing); slowing, with the corrector unable to find
+    the balanced state from there (counted as failed, and the factor of safety
+    depends on the limit); or not slowing (counted as sliding). A trial saved
     before readings were recorded gets the shorter sentence it always had.
     :func:`solve_ssrm` prints the summary at the end of every run and returns it
     as ``result['summary']``.
@@ -7862,6 +7874,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                   f"({unbalanced_force_ratio:.2e} against tolerance "
                                   f"{force_tol:.1e}) - INCONCLUSIVE, neither "
                                   f"converged nor failed")
+                    if exit_reason == 'iteration_cap' and _tr == 'dying':
+                        # Slowing, but the corrector could not finish it from
+                        # the extrapolated seed: the reading is kept for the
+                        # closing summary, and the classifier rules below.
+                        stop_reading = dict(_rd, rule='slowing_refused')
                     # The loop is about to end this trial on a RULE — the ceiling or
                     # the budget-extension heuristic declining — rather than on the
                     # slope. One bounded corrector attempt from the state it reached

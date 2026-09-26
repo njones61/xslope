@@ -5056,7 +5056,10 @@ def _creep_sliding_clause(rd):
     window = int(rd.get('window', 0))
     r = rd.get('ratio')
     if r is not None and np.isfinite(r) and r >= _CREEP_DYING_MAX:
-        what = ("the movement per iteration grew" if r >= 1.0 else
+        # 'grew' is the growing class (a ratio of 1/0.9 or more a block); a
+        # ratio that rounds to 1.00 reads as not slowing.
+        what = ("the movement per iteration grew"
+                if r >= 1.0 / _CREEP_DYING_MAX else
                 "the movement per iteration did not slow")
         return (f"over the last {window:,} iterations {what} (ratio {r:.2f}), so "
                 f"the trial was counted as sliding")

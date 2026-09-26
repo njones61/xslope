@@ -266,6 +266,9 @@ def check_sentences():
     check("and in the Run dialog's words",
           not any(w in summary.lower()
                   for w in ("budget", "sweep", "verdict", " edge")))
+    s = fem.creep_sentence(dict(sliding, ratio=1.0004), 1.375)
+    check("a ratio that rounds to 1.00 reads as not slowing",
+          "did not slow (ratio 1.00)" in s, s)
     growing = dict(sliding, ratio=1.2)
     s = fem.creep_sentence(growing, 1.3)
     check("a growing movement says it grew", "the movement per iteration grew "

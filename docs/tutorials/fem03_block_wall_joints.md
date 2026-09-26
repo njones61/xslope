@@ -480,13 +480,13 @@ faces of its interface: gray along most of its length, where the soil grips the
 sheet, and green over the short lengths where the soil has slid along it, at
 the facing on all three and near the far end of the middle and lower sheets.
 
-The joint slip says what the layers have done to the wall's movement. At the
-last strength the wall stands at, 1.5625, the back face has slid **40 mm** and
-the base **10 mm**. The wall alone had slid 70 mm and 13 mm at its own last
-resting strength, 1.133, with less than half as much strength taken from the
-soil. The back face is still the contact with the most slip, but the wall is not
-sliding down it: it is standing, with the layers holding the block column to the
-fill.
+The joint slip puts numbers on what the layers do. With the soil at 64% of its
+strength (F = 1.5625), the back face has slid **40 mm** and the base **10 mm**,
+and the wall is at rest. Without the layers, the wall had slid 70 mm and 13 mm
+with the soil still at 88% of its strength (F = 1.133), and the next step down
+in strength brought it down. The layers have turned a wall that slides down its
+own back face into one that stands, on a much weaker soil, having slid little
+more than half as far.
 
 ![Viscoplastic shear strain at the critical factor with the geogrid in place](images/fem03_fem_shear_grid_failure.png){width=1000}
 

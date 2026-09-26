@@ -349,10 +349,11 @@ def check_summary():
           "it passed the displacement limit at iteration 640." in s, s)
     s = _summary({"exit_reason": "inconclusive", "verdict": "AMBIGUOUS",
                   "growth": 0.01, "u_ratio": 1.1, "max_displacement": 0.05})
-    check("an inconclusive trial is an open question",
-          "the trial hit the 100,000-iteration limit with its out-of-balance "
-          "force still falling. That is neither an equilibrium nor a failure, so "
-          "the factor of safety carries it as an open question." in s, s)
+    check("an inconclusive trial is left undecided",
+          "the slope was still moving and still settling when the "
+          "100,000-iteration limit came, and the solver could not confirm that "
+          "it comes to rest. The trial is left undecided, neither a failure nor "
+          "a confirmed rest." in s, s)
     s = _summary({"exit_reason": "iteration_cap", "verdict": "STABLE_STUCK",
                   "growth": 0.0, "u_ratio": 1.02, "max_displacement": 0.05},
                  failure_criterion="non_convergence")
@@ -421,8 +422,8 @@ def check_summary():
                                    "oob_to": 0.0024, "window": 1000,
                                    "force_tol": 0.001}})
     check("the iteration ceiling quotes the fall of the out-of-balance force",
-          "still falling, by 23% over the last 1,000 iterations. "
-          "That is neither an equilibrium nor a failure" in s, s)
+          "limit came (the leftover force fell by 23% over the last 1,000 iterations), "
+          "and the solver could not confirm that it comes to rest" in s, s)
     settled = {"F": 1.35, "stable": True, "converged": False,
                "verdict": "JOINT_SETTLED", "iterations": 60000,
                "exit_reason": "joint_settled",

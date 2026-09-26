@@ -319,8 +319,9 @@ The Log says the same in words at the end of every strength reduction run:
 > The factor of safety is 1.137, the midpoint of the bracket F = 1.1328 to
 > 1.1406. At F = 1.1328 the slope reached equilibrium in 363 iterations,
 > finished by the Newton corrector. At F = 1.1406 it did not: over the last
-> 50,000 iterations the movement per iteration did not slow (ratio 0.92), so the
-> trial was counted as sliding. Convergence acceleration was on.
+> 50,000 iterations the movement did not slow (each block of 10,000 iterations
+> moved the slope 92% as far as the one before), so the trial was counted as
+> sliding. Convergence acceleration was on.
 
 Read this summary on every run. Part 2 is a run where it says something
 different.
@@ -437,38 +438,34 @@ Read the search before the panels this time. Here is the Displacement vs F plot:
 
 ![Displacement against strength reduction factor with the geogrid in place: the wall comes to rest at 1.0, 1.5 and 1.5625, the trials just above were still slowing when the limit came, and only at 2.0 did the movement fail to slow](images/fem03_ssrm_curve_grid.png){width=1000}
 
-In Part 1 the resting points ended where the joints began to slide. Here they do
-not end that way. The wall comes to rest at 1.0, at 1.5 and at 1.5625, its
-movement growing from 1.7 cm to 7.7 cm along the way, and the last of those took
-the whole 100,000-iteration limit and the corrector to finish. The four trials
-just above it, from 1.57 to 1.75, were still moving when the limit came, but
-slowing: the run cannot tell whether they would come to rest, so it carries them
-as open questions, and the search stopped at the first of them. Only at 2.0 did
-the movement fail to slow, which the run counts as sliding. Nothing on this plot
-is a wall giving way. The closing summary says so:
+Nothing on this plot is a wall giving way. The filled points are the strengths
+at which the wall came to rest: 1.0, 1.5 and 1.56, with its movement growing
+from 2 cm to 8 cm. Above 1.56 the wall was still creeping when the run's
+iteration limit arrived, more slowly all the time, and the program cannot say
+whether it would have stopped. So it reports the last strength it is sure of,
+1.566, and says in the Log that the trial above was left unfinished:
 
 > The factor of safety is 1.566, the midpoint of the bracket F = 1.5625 to
 > 1.5703. At F = 1.5625 the slope was still moving at iteration 100,000, but
-> slowing (the movement per 10,000 iterations fell by 81% over the last 50,000);
-> the corrector found the balanced state from the estimated resting state,
-> 0.00445 m further on, and the hold test confirmed it, so it was counted as
-> standing at 0.0767 m. At F = 1.5703 the trial hit the 100,000-iteration limit
-> with its out-of-balance force still falling, by 1% over the last 1,000
-> iterations. That is neither an equilibrium nor a failure, so the factor of
-> safety carries it as an open question. Convergence acceleration was on.
+> slowing (the movement per 10,000 iterations had fallen 81% over the last
+> 50,000). The solver checked whether it comes to rest and found that it does,
+> 0.00445 m further on, and that it stays there, so it was counted as standing
+> at 0.0767 m. At F = 1.5703 the slope was still moving and still settling when
+> the 100,000-iteration limit came (the leftover force fell by 1% over the last
+> 1,000 iterations), and the solver could not confirm that it comes to rest. The
+> trial is left undecided, neither a failure nor a confirmed rest. Convergence
+> acceleration was on.
 
-The number is real as far as it goes: the wall stands at 1.5625 with the hold
-test's confirmation, and the search stopped only because the next trial had not
-finished moving when its limit came. Raise **Max iterations per trial** and the
-open questions above 1.57 get answered, one way or the other, and the number
-moves with them. Untick **Accelerate convergence** and it moves down: the plain
-solver reports 1.246 on this wall, because without the longer steps it is not
-close enough to rest at 1.25 for the corrector to finish that trial, and its
-summary says so in the same words. Given 2.4 million iterations the plain solver
-comes to rest at 1.86 as well. None of these is a strength the wall runs out of;
-each is the strength at which one iteration limit stopped waiting. What is going
-on, and what a factor of safety means for a wall like this, is taken up after the
-panels, which show what the wall is doing at the trial the search stopped on.
+Two things to take from that. First, 1.566 is not the strength at which this
+wall fails. It is the last strength the run had time to confirm. Give it more
+iterations and the number rises. Run it without the accelerator (untick the box
+in the Run FEM dialog) and it falls to 1.246, because the plain solver needs far
+longer to bring the wall to rest, and the same summary tells you so. Given
+2.4 million iterations the plain solver confirms the wall at rest at 1.86.
+Second, the wall never fails anywhere in the range searched: even at 2.0, where
+the run gives up on it, it is sliding slowly, not collapsing. What that means for
+a factor of safety is taken up after the panels, which show what the wall is
+doing at the trial the search stopped on.
 
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=1000}
 
@@ -560,7 +557,7 @@ there and pin where. Where in that range is a design decision.
 Two things follow for practice. Report the movement with the number: "stands
 at F = 1.56 with 7.7 cm of movement and the geogrid at a third of capacity" is
 what the analysis found. And read the closing summary on every reinforced wall:
-*still moving at the limit, but slowing* and *an open question* are the program
+*still moving at the limit, but slowing* and *left undecided* are the program
 telling you that you are looking at this kind of wall. A limit equilibrium analysis of the same wall, with the layers
 entered as reinforcement, asks the strength question directly and does not
 depend on movement at all; [FEM-2](fem02_reinforcement.md) runs a reinforced

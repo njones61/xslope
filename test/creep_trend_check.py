@@ -225,21 +225,21 @@ def check_sentences():
     print("    " + summary)
     check("the standing edge is quoted by its slowing movement",
           "was still moving at iteration 100,000, but slowing" in summary
-          and "fell by 59% over the last 50,000" in summary)
+          and "had fallen 59% over the last 50,000" in summary)
     check("from the estimated resting state, with the hold test",
-          "the corrector found the balanced state from the estimated resting "
-          "state, 0.0006 m further on" in summary
-          and "the hold test confirmed it" in summary
+          "The solver checked whether it comes to rest and found that it does, "
+          "0.0006 m further on, and that it stays there" in summary
           and "counted as standing at 0.023 m" in summary)
     s_as_is = fem.creep_sentence(dict(slowing, seed='as_is'), 1.25, "m")
     check("from where it was, when the block-end state itself certified",
-          "the corrector found the balanced state from where it was and the "
-          "hold test confirmed it, so it was counted as standing at 0.023 m."
+          "found that it does, and that it stays there, so it was counted as "
+          "standing at 0.023 m."
           in s_as_is, s_as_is)
     check("the failing edge is counted as sliding, with its ratio",
           "At F = 1.2578 it did not: over the last 50,000 iterations the "
-          "movement per iteration did not slow (ratio 0.96), so the trial was "
-          "counted as sliding." in summary)
+          "movement did not slow (each block of 10,000 iterations moved the "
+          "slope 96% as far as the one before), so the trial was counted as "
+          "sliding." in summary)
     low = summary.lower()
     check("in the Run dialog's words",
           not any(w in low for w in ("budget", "sweep", "verdict", " edge")))
@@ -268,7 +268,8 @@ def check_sentences():
                   for w in ("budget", "sweep", "verdict", " edge")))
     s = fem.creep_sentence(dict(sliding, ratio=1.0004), 1.375)
     check("a ratio that rounds to 1.00 reads as not slowing",
-          "did not slow (ratio 1.00)" in s, s)
+          "did not slow (each block of 10,000 iterations moved the slope 100% "
+          "as far as the one before)" in s, s)
     acc_trials = [dict(t, acceleration={"on": True, "switched_off_at": None})
                   for t in trials]
     s_acc = fem.ssrm_run_summary(_run(acc_trials, 1.2421875, 1.25))
@@ -277,17 +278,20 @@ def check_sentences():
     check("a plain run does not", "acceleration" not in summary)
     growing = dict(sliding, ratio=1.2)
     s = fem.creep_sentence(growing, 1.3)
-    check("a growing movement says it grew", "the movement per iteration grew "
-          "(ratio 1.20)" in s, s)
+    check("a growing movement says it grew", "the movement grew (each block of "
+          "10,000 iterations moved the slope 120% as far as the one before)"
+          in s, s)
     slip = dict(rule='not_slowing', window=50000, ratio=0.5, slip_frac=0.05,
                 slip_ratio=0.99)
     s = fem.creep_sentence(slip, 1.3)
     check("a slip that did not slow is quoted by the slip",
-          "the joint slip grew 5% and its rate did not slow (ratio 0.99)" in s, s)
+          "the joint slip grew 5% and its rate did not slow (99% of the rate "
+          "before)" in s, s)
     note = fem._verdict_note({"converged": False, "exit_reason": "not_slowing",
                               "verdict": "FAILED", "u_ratio": 1.74,
                               "stop_reading": sliding})
-    check("the SSRM log line names it", "the movement did not slow (ratio 0.96)"
+    check("the SSRM log line names it", "the movement did not slow (each block "
+          "of 10,000 iterations moved the slope 96% as far as the one before)"
           in note, note)
 
 

@@ -407,8 +407,8 @@ def _failing_edge_sentences(F, trial, count, unit):
     if why == "nonfinite":
         return (f"{did_not} the calculation stopped producing finite numbers at "
                 f"{one} {n:,}.")
-    open_question = ("That is neither an equilibrium nor a failure, so the factor "
-                     "of safety carries it as an open question.")
+    open_question = ("The trial is left undecided, neither a failure nor a "
+                     "confirmed rest.")
     if why == "yield_gate":
         return (f"At F = {F:.4f} the trial settled in force outside the yield "
                 f"surface at {one} {n:,}, and the Newton corrector found no "
@@ -420,9 +420,11 @@ def _failing_edge_sentences(F, trial, count, unit):
             a, b = float(rd["oob_from"]), float(rd["oob_to"])
             pct = (a - b) / a * 100.0 if a > 0 else 0.0
             by = f"by {pct:.0f}%" if pct >= 0.5 else "by under 1%"
-            fell = f", {by} over the last {int(rd['window']):,} {count}"
-        return (f"At F = {F:.4f} the trial hit the {n:,}-{one} limit with its "
-                f"out-of-balance force still falling{fell}. {open_question}")
+            fell = (f" (the leftover force fell {by} over the last "
+                    f"{int(rd['window']):,} {count})")
+        return (f"At F = {F:.4f} the slope was still moving and still settling "
+                f"when the {n:,}-{one} limit came{fell}, and the solver could not "
+                f"confirm that it comes to rest. {open_question}")
 
     # Everything else was stopped by the iteration limit, and the trial's own
     # classification — recorded on every criterion — says what the slope was
@@ -5062,19 +5064,17 @@ def _creep_slowing_clause(rd, unit=""):
     inc = rd.get('increments') or [1.0, 1.0]
     fell = 1.0 - (inc[-1] / inc[0]) if inc[0] > 0 else 0.0
     hold = (rd.get('corrector') or {}).get('hold')
-    held = " and the hold test confirmed it" if (hold and hold.get('held')) else ""
+    stays = ", and that it stays there" if (hold and hold.get('held')) else ""
     if rd.get('seed') == 'extrapolated':
-        held = "," + held if held else held
-        where = (f"from the estimated resting state, "
-                 f"{float(rd.get('extrapolated') or 0.0):.3g}{u} further on")
+        where = f", {float(rd.get('extrapolated') or 0.0):.3g}{u} further on"
     else:
-        where = "from where it was"
+        where = ""
     return (f"the slope was still moving at iteration "
             f"{int(rd.get('iteration', 0)):,}, but slowing (the movement per "
-            f"{int(rd.get('block', 0)):,} iterations fell by {_ssrm_pct(fell)} over "
-            f"the last {int(rd.get('window', 0)):,}); the corrector found the "
-            f"balanced state {where}{held}, so it was counted as standing at "
-            f"{float(rd.get('max_displacement') or 0.0):.3g}{u}")
+            f"{int(rd.get('block', 0)):,} iterations had fallen {_ssrm_pct(fell)} over "
+            f"the last {int(rd.get('window', 0)):,}). The solver checked whether it "
+            f"comes to rest and found that it does{where}{stays}, so it was counted "
+            f"as standing at {float(rd.get('max_displacement') or 0.0):.3g}{u}")
 
 
 def _creep_sliding_clause(rd):
@@ -5086,14 +5086,16 @@ def _creep_sliding_clause(rd):
     if r is not None and np.isfinite(r) and r >= _CREEP_DYING_MAX:
         # 'grew' is the growing class (a ratio of 1/0.9 or more a block); a
         # ratio that rounds to 1.00 reads as not slowing.
-        what = ("the movement per iteration grew"
-                if r >= 1.0 / _CREEP_DYING_MAX else
-                "the movement per iteration did not slow")
-        return (f"over the last {window:,} iterations {what} (ratio {r:.2f}), so "
-                f"the trial was counted as sliding")
+        block = int(rd.get('block', 0) or 0)
+        each = (f"each block of {block:,} iterations" if block else "each block of iterations")
+        what = ("the movement grew" if r >= 1.0 / _CREEP_DYING_MAX
+                else "the movement did not slow")
+        return (f"over the last {window:,} iterations {what} ({each} moved the "
+                f"slope {r * 100:.0f}% as far as the one before), so the trial was "
+                f"counted as sliding")
     sr = rd.get('slip_ratio')
-    sr_txt = (f" (ratio {float(sr):.2f})" if sr is not None and np.isfinite(sr)
-              else "")
+    sr_txt = (f" ({float(sr) * 100:.0f}% of the rate before)"
+              if sr is not None and np.isfinite(sr) else "")
     return (f"over the last {window:,} iterations the joint slip grew "
             f"{_ssrm_pct(rd.get('slip_frac') or 0.0)} and its rate did not "
             f"slow{sr_txt}, so the trial was counted as sliding")
@@ -13987,10 +13989,9 @@ def _verdict_note(sol, hybrid=True):
         return f"FAILED on a steady interface mechanism (joint slip){ur_txt}"
     if sol.get("exit_reason") == 'not_slowing':
         rd = sol.get("stop_reading") or {}
-        r = rd.get("ratio")
-        r_txt = "" if r is None or not np.isfinite(r) else f" (ratio {r:.2f})"
-        return (f"FAILED: over the last {int(rd.get('window', 0)):,} iterations "
-                f"the movement did not slow{r_txt}{ur_txt}")
+        if rd:
+            return f"FAILED: {_creep_sliding_clause(rd)}{ur_txt}"
+        return f"FAILED: the movement did not slow{ur_txt}"
     # What the bisection did with a verdict the criterion in force may not read.
     counted = ("counted STABLE" if hybrid else
                "counted FAILED (this run's criterion reads convergence alone)")

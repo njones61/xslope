@@ -11,7 +11,7 @@ against the foundation's 800. Nothing in the geometry says how deep the failure
 surface will go — **the contact between the two layers decides that**, and the
 model has to be built so the search can ask about both sides of it.
 
-![Simple slope with multiple layers](../lem/sample_images/simple_mult_layers.png){width=700}
+![The layered slope: a 20 ft embankment with a 2:1 face on a 10 ft foundation over rigid rock](images/lem03_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -127,8 +127,8 @@ Build a model for a 20 ft embankment with a 2:1 face on a 10 ft foundation layer
 - **Two materials, the fill first.** The order fixes the Mat IDs, and the profile
   lines reference materials by ID — so an embankment entered second is a section
   built upside down.
-- **φ = 0 in both.** The drawing gives a cohesion and no friction angle, which is
-  an undrained strength; it never says so. If a friction angle appeared, say:
+- **φ = 0 in both.** The drawing gives each soil a cohesion and φ = 0, which is an
+  undrained strength, though it never uses the word. If a friction angle appeared, say:
   *"Both strengths are undrained. Set phi to 0 in both materials and leave the
   pore pressure option at none."*
 - **Two profile lines, one per material.** The ground surface on material 1, and

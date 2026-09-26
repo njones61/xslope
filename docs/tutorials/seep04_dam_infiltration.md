@@ -27,6 +27,8 @@ dam does when the weather changes, and close by letting the rain start and stop:
 the same three boundaries driven from a schedule rather than a number, marched
 through 600 days of storm and recovery.
 
+![The dam, the reservoir, the toe drain, and the rain falling on the exposed surface](images/seep04_problem_sketch.png){width=1000}
+
 In [SEEP-2](seep02_johnson_dam.md) we built an unconfined dam from nothing, and
 [SEEP-1](seep01_sheetpile.md) covers what a seepage analysis computes; we repeat
 neither here. We start from a **starter file** that already carries the
@@ -72,8 +74,6 @@ of the page; it ships with its mesh and its solved march beside it
 ---
 
 ## The problem
-
-![The dam, the reservoir, the toe drain, and the rain falling on the exposed surface](images/seep04_problem_sketch.png){width=1000}
 
 The dam is 12 m high with a 4 m crest and symmetric 2:1 faces, 52 m across the
 base, sitting on rock at elevation 0. Its ground surface runs from the upstream

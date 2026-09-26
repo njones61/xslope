@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from xslope.colormaps import RAMP_CHOICES
-from xslope.plot_fem import SHEAR_STRAIN_LABEL
+from xslope.plot_fem import SHEAR_STRAIN_LABEL, SSRM_CURVE_LABEL
 from .dialogs import SEEP_VARIABLES
 
 # Size of the gradient preview swatch shown beside each colormap name.
@@ -33,7 +33,10 @@ _CMAP_ICON_SIZE = QSize(72, 14)
 # beside it and the report's caption for the same figure also carry: this list
 # read "Shear strain", which is neither that name nor the name of the other
 # strain field it could be confused with.
-# The report prints these same three plots, under these same names, in this same
+# The fourth is not a field: it is the strength reduction run's own trials, the
+# maximum displacement of each against its F, drawn from the run record
+# (SSRM_CURVE_LABEL, the one name the plot, this list and the report use).
+# The report prints these same four plots, under these same names, in this same
 # order (xslope.report.FEM_PANELS) — held together by
 # test_fem_panels_mirror_the_fem_view. The deformation entry read "Deformation"
 # while the report captioned the same plot "Deformed mesh".
@@ -41,6 +44,7 @@ FEM_PLOT_TYPES = [
     ("shear_strain", SHEAR_STRAIN_LABEL),
     ("deformation", "Deformed mesh"),
     ("displace_vector", "Displacement vectors"),
+    ("ssrm_curve", SSRM_CURVE_LABEL),
 ]
 
 
@@ -529,9 +533,10 @@ class FemResultsDisplayPanel(QWidget):
     """Display options for an FEM results plot: plot type, deformation scale, and
     the mesh/reinforcement/vector toggles. Controls dim to the active plot type —
     color ramp + colorbar for shear strain, deform scale for deformation, and the
-    boundary/node/vector controls for displacement vectors. A single "Element
-    edges" toggle drives the mesh overlay in every plot type (the undeformed mesh
-    on the deformation plot)."""
+    boundary/node/vector controls for displacement vectors, and every section
+    control for the displacement-vs-F curve, which draws the run's trials rather
+    than the mesh. A single "Element edges" toggle drives the mesh overlay in
+    every section plot (the undeformed mesh on the deformation plot)."""
 
     changed = Signal()
 
@@ -601,7 +606,7 @@ class FemResultsDisplayPanel(QWidget):
         # of the user's choice): off for the contour/vector plots (keep them
         # clean), on for the deformation plot (the undeformed reference).
         self._edges_state = {"shear_strain": False, "deformation": True,
-                               "displace_vector": False}
+                               "displace_vector": False, "ssrm_curve": False}
         self._current_pt = self.plot_type.currentData()
         self.element_edges = QCheckBox("Element edges")
         self.element_edges.setChecked(self._edges_state.get(self._current_pt, False))
@@ -743,6 +748,12 @@ class FemResultsDisplayPanel(QWidget):
         self.cmap.setEnabled(pt == "shear_strain")
         self.field_state.setEnabled(
             pt in ("shear_strain", "deformation", "displace_vector"))
+        # The displacement curve draws the run's trials, not the section: none of
+        # the mesh, member or joint overlays has anything to draw on it.
+        section = pt != "ssrm_curve"
+        for w in (self.element_edges, self.show_reinforcement, self.show_joints,
+                  self.joint_width, self.label_elements):
+            w.setEnabled(section)
         for w in (self.deform_percent, self.deform_scale,
                   self.show_original, self.deformed_color):
             w.setEnabled(pt == "deformation")

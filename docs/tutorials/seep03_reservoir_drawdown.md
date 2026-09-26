@@ -16,13 +16,15 @@ sequence rather than as a picture, so we close on how one is read: as
 frames on a play bar, as a head history at a point, and as a ledger of water
 crossing the boundary against water leaving storage.
 
-The example is a small earth dam with a granular shell and a clay core, holding a
-reservoir at elevation 18 m, which is then lowered to equal the tailwater
-elevation over 45 days. It
-is a good vehicle for these questions because the two zones drain at very
-different rates: the shell follows the pool down, the core does not, and the
-head left inside the core after the drawdown ends is what a rapid-drawdown
-stability check has to account for.
+The example is a small earth dam on rock, 22 m tall and 110 m long, with a
+granular shell and a clay core, holding a reservoir at elevation 18 m, which is
+then lowered to equal the tailwater elevation over 45 days. It is a good vehicle
+for these questions because the two zones drain at very different rates: the
+shell follows the pool down, the core does not, and the head left inside the core
+after the drawdown ends is what a rapid-drawdown stability check has to account
+for.
+
+![The dam, its two zones, and the properties that make them behave differently](images/seep03_problem_sketch.png){width=1000}
 
 In [Tutorial SEEP-2](seep02_johnson_dam.md) we built a zoned dam from nothing and
 solved the steady unconfined flow through it, and we do not repeat that work
@@ -59,8 +61,6 @@ the construction and start at [Building the mesh](#building-the-mesh)
 ---
 
 ## The problem
-
-![The dam, its two zones, and the properties that make them behave differently](images/seep03_problem_sketch.png){width=1000}
 
 The dam is 110 m long and 22 m tall at the crest, sitting on rock at
 elevation 0, with both faces sloping at about 2.3:1. Inside the embankment is a

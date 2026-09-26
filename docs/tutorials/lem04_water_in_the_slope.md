@@ -12,7 +12,7 @@ pore pressure on the failure surface, and the water is the input the answer
 turns on: the critical circle reads **1.667 with the pore pressures switched
 off and 1.301 with them on.**
 
-![Slope with three layers and a piezometric line](../lem/sample_images/method_slices_problem.png){width=700}
+![The slope: 44 ft in three soils on a rigid base, with the piezometric line falling from behind the crest to the toe](images/lem04_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -53,7 +53,7 @@ zero:
 columns for the Mohr-Coulomb pair, and `u` says which stresses they are measured
 against.
 
-The third soil — the drawing's **Foundation** — is the one to watch: a soft
+The third soil — the drawing's **soil 3 (foundation)** — is the one to watch: a soft
 clay, φ′ = 12°, carrying almost all of its strength as cohesion. It is weaker
 than the two layers above it, and it is where the critical surface goes.
 
@@ -145,9 +145,9 @@ Whichever you choose, rejoin at [Running the analysis](#running-the-analysis).
 
 ## A — Building it with the AI assistant {#a-building-it-with-the-ai-assistant}
 
-The problem drawing above carries the layers, the strengths and the water
-line, but not the coordinates. Paste it into the chat box with the
-numbers, or describe the whole model:
+The problem drawing above carries the layers, the strengths, the water line and
+the dimensions, but not the coordinates the profile lines take. Paste it into the
+chat box with the numbers, or describe the whole model:
 
 <div class="prompt-block" markdown>
 ```text

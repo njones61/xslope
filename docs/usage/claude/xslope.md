@@ -1970,14 +1970,20 @@ F_max = 2.0   # Upper FS bound (should not converge)
 result = solve_ssrm(fem_data, F_min=F_min, F_max=F_max, tolerance=0.05,
                     debug_level=1)
 
+# solve_ssrm prints result['summary'] as its last words: the FS, what happened at
+# each end of the bracket, and the wall time. Quote it; it says when the answer
+# depends on the iteration limit.
 if result.get("converged", False):
     print(f"\nFactor of Safety: {result['FS']:.2f}")
-    if result.get("note"):          # a trial the iteration ceiling could not decide
-        print(result["note"])
     print_reinforcement_summary(fem_data, result['last_solution'])
     print_pile_summary(fem_data, result['last_solution'])
+    # 'ssrm_curve' is the fourth panel: every trial's maximum displacement vs F,
+    # drawn from the run record passed as ssrm_record.
     plot_fem_results(fem_data, result['last_solution'],
-                     plot_type=['deformation', 'shear_strain', 'displace_vector'], save_png=True)
+                     plot_type=['deformation', 'shear_strain', 'displace_vector',
+                                'ssrm_curve'],
+                     fs=result['FS'], failure_solution=result.get('failure_solution'),
+                     ssrm_record=result, save_png=True)
 else:
     print(f"SSRM failed: {result.get('error', 'Unknown error')}")
 ```
@@ -1995,6 +2001,18 @@ clearly running away — past 8 times its own elastic displacement and still gro
 residual over 2000 iterations while the field gains a whole elastic displacement — is declared
 failed at that point rather than spending the rest of its budget (`exit_reason = 'diverging'`;
 `early_failure=False` turns it off).
+
+**Read the closing summary and the curve before quoting the number.** Every run ends with
+`result['summary']`, printed as its last lines. When the trial at the top of the bracket hit the
+iteration limit, the summary reads it one of two ways. **Still moving fast** (the trial's verdict
+is FAILED: several times its elastic displacement and still growing) means the slope was failing,
+and the number stands. **Still moving, but slowly** means the factor of safety depends on the
+iteration limit, and raising Max iterations per trial may change it. The `'ssrm_curve'` plot
+shows the same thing: a flat run of displacements and a sharp knee is a strength limit; a steady
+climb with no knee means the slope never stopped moving. In that second case say so to the user
+rather than reporting the number bare. Any other ending is quoted with the reading that fired it
+(joint slip growth and rate, the elastic multiple reached, the displacement against its limit);
+pass those numbers on rather than paraphrasing them.
 
 **How a trial is decided.** The viscoplastic loop drives the solve and builds the plastic history.
 At 300, 1,000 and 3,000 iterations, and again wherever one of the stopping rules above would end

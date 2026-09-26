@@ -15,11 +15,14 @@ answer, the base material a flow net drawn on a zoned section has to be scaled
 to, and what the iteration does when the conductivity curve is steep enough to
 give it trouble.
 
-The example is the Johnson Reservoir dam: an 80 ft embankment with a shell, a
-clay core keyed 40 ft into the foundation, and 60 ft of water behind it. It is a
-better vehicle for these questions than a one-soil section, because a zoned dam is
-where the base material stops being obvious and where the conductivities are far
-enough apart that the choices show up in the numbers.
+The example is the Johnson Reservoir dam: a 750 ft section with an 80 ft
+embankment on a 100 ft foundation, a sand shell over a clay core keyed 40 ft into
+the foundation, and 60 ft of water behind it. It is a better vehicle for these
+questions than a one-soil section, because a zoned dam is where the base material
+stops being obvious and where the conductivities are far enough apart that the
+choices show up in the numbers.
+
+![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
 
 In [Tutorial SEEP-1](seep01_sheetpile.md) we built a one-soil model three
 different ways and solved a confined problem on it. Here we build this dam too —
@@ -48,8 +51,6 @@ and how to scale a flow net on a zoned section.
 ---
 
 ## The problem
-
-![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
 
 The section is 750 ft long and 180 ft tall at the crest. A 100 ft foundation runs
 the whole length of it, on rock at elevation 0. The embankment sits on that

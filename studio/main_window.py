@@ -2616,7 +2616,12 @@ class MainWindow(QMainWindow):
                 self.fem_results_canvas.render_fem_results(
                     bundle["fem_data"], bundle["solution"],
                     {**panel.options(), "fs": bundle.get("FS"),
-                     "failure_solution": bundle.get("failure_solution")})
+                     "failure_solution": bundle.get("failure_solution"),
+                     # The run's own record — its trials, bracket and factor of
+                     # safety — which the displacement-vs-F curve is drawn from.
+                     # A live run and a reopened one carry it the same way.
+                     "ssrm_record": {**(bundle.get("meta") or {}),
+                                     "FS": bundle.get("FS")}})
             except Exception:
                 traceback.print_exc()
         self._update_fem_details_action()

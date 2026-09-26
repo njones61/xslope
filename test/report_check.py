@@ -12983,9 +12983,13 @@ def test_fem_section():
     """A report of a strength reduction run states its factor of safety, in bold,
     and a report of a single trial states no factor of safety at all."""
     fails = []
-    from xslope.report import FEM_PANELS
+    from xslope.plot_fem import ssrm_curve_unavailable
+    from xslope.report import FEM_FIELD_PANELS, ssrm_record
     _slope_data, bundle = _fem_bundle()
     report = _engine_report("fem")
+    # The displacement-vs-F figure is drawn where the run's trials carry their
+    # displacements; a corpus file saved before they did draws none.
+    curve = int(ssrm_curve_unavailable(ssrm_record(bundle)) is None)
 
     # The mesh comes LAST of the inputs, under a heading of its own: it is what
     # the model and everything on it were discretized onto, and a reader meets it
@@ -13033,18 +13037,18 @@ def test_fem_section():
     if planned != drawn:
         fails.append(f"the SSRM report planned {planned} figures and built {drawn}")
     sources = [f.source for f in report.figures()]
-    # The model, the mesh, one panel per field, and the search that reached the
-    # factor of safety — the corpus run records its trials, so the search is
-    # drawn and is part of what a full strength reduction report is.
+    # The model, the mesh, one panel per field, and — where the record carries
+    # the trials' displacements — the displacement-vs-F curve.
     for wanted in ("fem model", "fem mesh", "fem run1 deformation",
-                   "fem run1 shear_strain", "fem run1 displace_vector",
-                   "fem run1 search"):
+                   "fem run1 shear_strain", "fem run1 displace_vector") + (
+                       ("fem run1 ssrm_curve",) if curve else ()):
         if wanted not in sources:
             fails.append(f"the SSRM report has no {wanted!r} figure: {sources}")
-    if drawn != 3 + len(FEM_PANELS):
+    if drawn != 2 + len(FEM_FIELD_PANELS) + curve:
         fails.append(f"the SSRM report drew {drawn} figures, expected the model, "
-                     f"the mesh, the {len(FEM_PANELS)} result panels and the "
-                     f"search: {sources}")
+                     f"the mesh, the {len(FEM_FIELD_PANELS)} result panels"
+                     f"{' and the displacement curve' if curve else ''}: "
+                     f"{sources}")
 
     # The mesh figure is Studio's FEM data view, from the same function, with the
     # boundary conditions on it: a mesh drawn without them does not say what the
@@ -13079,7 +13083,7 @@ def test_fem_section():
 
     # Each figure carries its own option, and switching one off takes only it.
     for option, gone in (("fem_inputs_figure", 1), ("fem_mesh_figure", 1),
-                         ("fem_figure", len(FEM_PANELS))):
+                         ("fem_figure", len(FEM_FIELD_PANELS))):
         off = _engine_report("fem", options={option: False})
         planned, off_drawn = _planned_matches(off, "fem", options={option: False})
         if planned != off_drawn:
@@ -13960,9 +13964,9 @@ def test_fem_result_figures_carry_no_title():
     # Read off the rendered axes, not off the call: whatever reaches the page.
     import matplotlib.figure as mplfig
     from xslope.plot_fem import plot_fem_results
-    from xslope.report import FEM_PANELS
+    from xslope.report import FEM_FIELD_PANELS
     titled = []
-    for panel, _caption, _shows in FEM_PANELS:
+    for panel, _caption, _shows in FEM_FIELD_PANELS:
         fig = mplfig.Figure(figsize=(4.0, 2.5))
         with contextlib.redirect_stdout(io.StringIO()):
             plot_fem_results(bundle["fem_data"], bundle["solution"],
@@ -14043,7 +14047,7 @@ def test_the_field_state_toggles():
     together giving both sets of panels.
     """
     fails = []
-    from xslope.report import DEFAULT_OPTIONS, FEM_PANELS
+    from xslope.report import DEFAULT_OPTIONS, FEM_FIELD_PANELS
 
     xlsx = RS2_28A_XLSX
     slope_data, solutions = _restored(xlsx)
@@ -14074,7 +14078,7 @@ def test_the_field_state_toggles():
                                planned_figures as planned_figures_,
                                resolve_options as resolve_options_)
 
-    n = len(FEM_PANELS)
+    n = len(FEM_FIELD_PANELS)
     cases = [("the default", {}, ["fem run1 shear_strain"], n),
              ("last converged alone", {"fem_state_failure": False,
                                        "fem_state_converged": True},
@@ -14087,13 +14091,12 @@ def test_the_field_state_toggles():
         report, planned = built(extra)
         sources = [f.source for f in report.figures()]
         # The state panels are what the toggles select. The model, the mesh and
-        # the strength-reduction search are drawn once per run whatever state is
-        # asked for — the search figure appears for any run whose record carries
-        # its trials, which is every run cut since the record was persisted, and
-        # it is still there when both states are switched off.
+        # the displacement-vs-F curve are drawn once per run whatever state is
+        # asked for — the curve appears for any run whose trials carry their
+        # displacements, and it is still there when both states are switched off.
         panel_figures = [s for s in sources
                          if s not in ("fem model", "fem mesh")
-                         and not s.endswith(" search")]
+                         and not s.endswith(" ssrm_curve")]
         if len(panel_figures) != panels:
             fails.append(f"{label}: {len(panel_figures)} result panels, expected "
                          f"{panels}: {panel_figures}")
@@ -14137,7 +14140,7 @@ def test_the_field_state_toggles():
             # state's sentence, and the second state's sentence cites its
             # figures without re-describing them — the two sentences repeated
             # the three descriptions verbatim in one paragraph.
-            for _p, _c, shows in FEM_PANELS:
+            for _p, _c, shows in FEM_FIELD_PANELS:
                 if said.count(shows) != 1:
                     fails.append(f"both: {shows!r} is said "
                                  f"{said.count(shows)} times in one paragraph")
@@ -14190,7 +14193,8 @@ def test_the_field_state_toggles():
         # drawn once whatever state is asked for, and it is the panels that count
         # the states.
         panel_figures = [s for s in sources
-                         if s not in ("fem model", "fem mesh", "fem run1 search")]
+                         if s not in ("fem model", "fem mesh",
+                                      "fem run1 ssrm_curve")]
         if len(panel_figures) != n:
             fails.append(f"a run with no snapshot drew {len(panel_figures)} "
                          f"panels for {extra}, not the {n} of one state: "
@@ -14229,7 +14233,7 @@ def test_each_state_is_drawn_at_its_own_scale():
     import xslope.plot_fem as pf
     from xslope.fem_details import field_solution
     from xslope.plot_fem import deformation_scale, shear_strain_field
-    from xslope.report import FEM_PANELS, build_report
+    from xslope.report import FEM_FIELD_PANELS, build_report
 
     xlsx = FEM_XLSX          # griffiths1_load: the model the owner read
     slope_data, solutions = _restored(xlsx)
@@ -14258,9 +14262,9 @@ def test_each_state_is_drawn_at_its_own_scale():
         return list(calls), report
 
     both, report = draw({"fem_state_converged": True, "fem_figure": True})
-    if len(both) != 2 * len(FEM_PANELS):
+    if len(both) != 2 * len(FEM_FIELD_PANELS):
         fails.append(f"both states drew {len(both)} panels, not "
-                     f"{2 * len(FEM_PANELS)}")
+                     f"{2 * len(FEM_FIELD_PANELS)}")
     states = [kw.get("field_state") for kw in both]
     if set(states) != {"failure", "converged"}:
         fails.append(f"the panels were not drawn at the two states: {states}")
@@ -14415,87 +14419,78 @@ def test_the_member_forces_follow_the_state_the_panels_are_drawn_at():
     return fails
 
 
-def test_the_search_figure_draws_the_trials():
-    """The search that reached the factor of safety is drawn from the trials the
-    run recorded.
-
-    plot_ssrm_convergence read ``F_history`` and ``convergence_history``, which
-    solve_ssrm has never emitted under any criterion: it printed "No SSRM
-    convergence history found" and returned nothing, on every run there has ever
-    been. It reads the ``trials`` the solver does record.
+def test_the_displacement_curve_draws_the_trials():
+    """The fourth finite element plot — every trial's maximum displacement against
+    its strength reduction factor — is drawn from the trials the run recorded,
+    reaches the report under its own switch, and is left out, with no sentence
+    about it, where the record cannot draw it.
     """
     fails = []
     import inspect
     import matplotlib.figure as mplfig
     from xslope.fem import _ssrm_displacement_limit
-    from xslope.plot_fem import (plot_ssrm_convergence, ssrm_has_convergence_history,
-                                 ssrm_interval_history, ssrm_trials)
+    from xslope.plot_fem import (plot_ssrm_curve, ssrm_curve_points,
+                                 ssrm_curve_unavailable, ssrm_has_convergence_history,
+                                 ssrm_interval_history)
 
     # The keys it reads are the keys the solver writes.
     recorder = inspect.getsource(_ssrm_displacement_limit)
-    for key in ('"F"', '"role"', '"stable"'):
+    for key in ('"F"', '"stable"', '"max_displacement"', '"exit_reason"'):
         if key not in recorder:
             fails.append(f"the solver no longer records {key} on a trial, so the "
                          f"figure is reading something else")
-    # The keys the function itself uses, not the docstring — which says what it
-    # used to read, and why.
-    used = [c for c in plot_ssrm_convergence.__code__.co_consts
-            if isinstance(c, str) and c is not plot_ssrm_convergence.__doc__]
-    for gone in ("F_history", "convergence_history"):
-        if gone in used:
-            fails.append(f"the figure still reads {gone!r}, which the solver "
-                         f"does not emit")
-    if "trials" not in [c for c in ssrm_trials.__code__.co_consts
-                        if isinstance(c, str)]:
-        fails.append("the figure's trial reader no longer reads 'trials'")
 
-    record = {"FS": 1.36, "tolerance": 0.01,
-              "trials": [{"F": 1.0, "role": "lower", "stable": True},
-                         {"F": 1.8, "role": "upper", "stable": False},
-                         {"F": 1.4, "role": "bisect", "stable": False},
-                         {"F": 1.2, "role": "bisect", "stable": True},
-                         {"F": 1.3, "role": "bisect", "stable": True},
-                         {"F": 1.35, "role": "bisect", "stable": True}]}
+    record = {"FS": 1.375, "tolerance": 0.01, "final_interval": [1.35, 1.40],
+              "trials": [
+                  {"F": 1.0, "role": "lower", "stable": True, "converged": True,
+                   "exit_reason": "converged", "max_displacement": 0.05},
+                  {"F": 2.0, "role": "upper", "stable": False, "converged": False,
+                   "exit_reason": "diverging", "max_displacement": 1.9},
+                  {"F": 1.5, "role": "bisect", "stable": False, "converged": False,
+                   "exit_reason": "disp_limit", "max_displacement": 1.2},
+                  {"F": 1.25, "role": "bisect", "stable": True, "converged": True,
+                   "exit_reason": "converged", "max_displacement": 0.07},
+                  {"F": 1.40, "role": "bisect", "stable": False, "converged": False,
+                   "exit_reason": "iteration_cap", "growth": 0.4,
+                   "max_displacement": 0.6},
+                  {"F": 1.35, "role": "bisect", "stable": True, "converged": True,
+                   "exit_reason": "converged", "max_displacement": 0.1}]}
+    if ssrm_curve_unavailable(record) is not None:
+        fails.append("a run with six trials and their displacements is said to "
+                     "have no curve to draw")
+    # The search's own siblings still read the same record.
     if not ssrm_has_convergence_history(record):
-        fails.append("a run with six recorded trials has no history to draw")
-    for bare in ({}, {"trials": []}, {"trials": [{"F": 1.0}]},
-                 {"trials": [{"role": "lower"}, {"role": "upper"}]}):
-        if ssrm_has_convergence_history(bare):
-            fails.append(f"a run recording {bare!r} is said to have a search to "
-                         f"draw")
+        fails.append("a run with six recorded trials has no search history")
+    if ssrm_interval_history(record)[-1] != (1.35, 1.40):
+        fails.append(f"the interval replayed from the roles ends at "
+                     f"{ssrm_interval_history(record)[-1]}, not (1.35, 1.40)")
+    Fs = [p["F"] for p in ssrm_curve_points(record)]
+    if Fs != sorted(Fs):
+        fails.append(f"the curve's points are not in F order: {Fs}")
+    for bare in ({}, {"trials": []},
+                 {"trials": [{"F": 1.0, "stable": True},
+                             {"F": 1.5, "stable": False}]}):
+        if ssrm_curve_unavailable(bare) is None:
+            fails.append(f"a run recording {bare!r} is said to have a curve")
 
-    # The interval really narrows, and it is the solver's own rule that moves it.
-    history = ssrm_interval_history(record)
-    widths = [hi - lo for lo, hi in history if lo is not None and hi is not None]
-    if widths != sorted(widths, reverse=True):
-        fails.append(f"the interval drawn does not narrow: {history}")
-    if history[-1] != (1.35, 1.4):
-        fails.append(f"the interval after the last trial is {history[-1]}, not "
-                     f"the (1.35, 1.4) the recorded verdicts leave")
-
-    # It draws: one axes, every trial on it, and the factor of safety ruled.
     fig = mplfig.Figure(figsize=(6.0, 4.0))
-    plot_ssrm_convergence(record, fig=fig, show_title=False)
-    if len(fig.axes) != 1:
-        fails.append(f"the search figure draws {len(fig.axes)} axes, not the one "
-                     f"bounded figure it is meant to be")
-    else:
-        ax = fig.axes[0]
-        plotted = sum(len(line.get_xdata()) for line in ax.lines
-                      if line.get_linestyle() == "None")
-        if plotted != len(record["trials"]):
-            fails.append(f"{plotted} trials are marked, of "
-                         f"{len(record['trials'])} recorded")
-        labels = [t.get_text() for t in (ax.get_legend().get_texts()
-                                         if ax.get_legend() else [])]
-        for wanted in ("stood", "did not stand", "1.360"):
-            if not any(wanted in l for l in labels):
-                fails.append(f"the figure's legend does not name {wanted!r}: "
-                             f"{labels}")
-    # A run with nothing to draw refuses rather than drawing an empty axes.
+    ax = fig.add_subplot(111)
+    plot_ssrm_curve(ax, record, show_title=False)
+    marked = sum(len(line.get_xdata()) for line in ax.lines
+                 if line.get_linestyle() == "None")
+    if marked != len(record["trials"]):
+        fails.append(f"{marked} trials are marked, of {len(record['trials'])}")
+    labels = [t.get_text() for t in (ax.get_legend().get_texts()
+                                     if ax.get_legend() else [])]
+    for wanted in ("reached equilibrium",
+                   "stopped at the iteration limit, still moving",
+                   "displacements ran away", "past the displacement limit",
+                   "FS = 1.375"):
+        if not any(wanted in l for l in labels):
+            fails.append(f"the key does not name {wanted!r}: {labels}")
     try:
-        plot_ssrm_convergence({"trials": []}, fig=mplfig.Figure())
-        fails.append("a run recording no trials still produced a figure")
+        plot_ssrm_curve(mplfig.Figure().add_subplot(111), {"trials": []})
+        fails.append("a run recording no trials still produced a curve")
     except ValueError:
         pass
 
@@ -14504,29 +14499,33 @@ def test_the_search_figure_draws_the_trials():
     carried = dict(bundle, meta=dict(bundle.get("meta") or {}, **record))
     report = _engine_report("fem", bundle=carried)
     sources = [f.source for f in report.figures()]
-    if "fem run1 search" not in sources:
-        fails.append(f"the search figure does not reach the report: {sources}")
+    if "fem run1 ssrm_curve" not in sources:
+        fails.append(f"the displacement curve does not reach the report: "
+                     f"{sources}")
     said = " ".join(_prose(report))
-    if f"each of the {len(record['trials'])} trials at its own" not in said:
-        fails.append(f"the report does not say how many trials the search took: "
-                     f"{said!r}")
+    if f"for each of the {len(record['trials'])} trials" not in said:
+        fails.append(f"the report does not say how many trials the curve "
+                     f"draws: {said!r}")
+    if "depends on the iteration limit" not in said:
+        fails.append("a run whose top trial hit the iteration limit while the "
+                     "slope was still moving slowly is not said to depend on it")
     planned, drawn = _planned_matches(report, "fem", bundle=carried)
     if planned != drawn:
-        fails.append(f"a report carrying the search planned {planned} figures "
+        fails.append(f"a report carrying the curve planned {planned} figures "
                      f"and built {drawn}")
     off = _engine_report("fem", options={"fem_convergence_figure": False},
                          bundle=carried)
-    if "fem run1 search" in [f.source for f in off.figures()]:
-        fails.append("the search figure cannot be switched off")
+    if "fem run1 ssrm_curve" in [f.source for f in off.figures()]:
+        fails.append("the displacement curve cannot be switched off")
 
     # A run that kept no trials gets neither the figure nor a sentence about it.
     _sd, forgot = _fem_run_forgetting({"trials"})
     plain = _engine_report("fem", bundle=forgot)
-    if "fem run1 search" in [f.source for f in plain.figures()]:
-        fails.append("a run recording no trials drew a search figure anyway")
-    if "the search that reached it" in " ".join(_prose(plain)):
+    if "fem run1 ssrm_curve" in [f.source for f in plain.figures()]:
+        fails.append("a run recording no trials drew a curve anyway")
+    if "trials the search solved" in " ".join(_prose(plain)):
         fails.append("a run recording no trials is given a sentence about a "
-                     "search figure it has not got")
+                     "curve it has not got")
     return fails
 
 
@@ -14737,9 +14736,9 @@ def test_fem_panels_mirror_the_fem_view():
             fails.append(f"the {panel!r} panel has no sentence to introduce it, "
                          f"so its figure stands unexplained")
 
-    # They are drawn under one switch, on by default, under the finite element
-    # branch: the three are one reading of the solve, and the results view offers
-    # them together.
+    # The three field plots are drawn under one switch, on by default, under the
+    # finite element branch: they are one reading of the solve. The fourth, the
+    # displacement curve, is a reading of the trials and has a switch of its own.
     rows = {}
     for key, _label, _tip, children in CONTENT_TREE:
         for child_key, _l, _t in children:
@@ -14763,9 +14762,18 @@ def test_fem_panels_mirror_the_fem_view():
     row_title = labels.get("fem_figure") or ""
     words = {"shear_strain": "shear strain", "deformation": "deformed mesh",
              "displace_vector": "displacement"}
-    if set(words) != set(printed):
+    fields = [p for p in printed if p != "ssrm_curve"]
+    if set(words) != set(fields):
         fails.append(f"the row-title words cover {sorted(words)}, not the "
-                     f"panels printed: {printed}")
+                     f"field panels printed: {fields}")
+    curve_title = labels.get("fem_convergence_figure") or ""
+    curve_name = dict(FEM_PLOT_TYPES).get("ssrm_curve") or ""
+    if not curve_name or curve_name.lower() not in curve_title.lower():
+        fails.append(f"the displacement curve's row is titled {curve_title!r}, "
+                     f"which does not name the plot {curve_name!r}")
+    if rows.get("fem_convergence_figure") != "fem":
+        fails.append("the displacement curve's row is not under the finite "
+                     "element section that prints it")
     positions = [row_title.lower().find(words[p]) for p in printed
                  if p in words]
     if -1 in positions:
@@ -14781,12 +14789,19 @@ def test_fem_panels_mirror_the_fem_view():
     import matplotlib.figure as mplfig
     from xslope.plot_fem import plot_fem_results
     _slope_data, bundle = _fem_bundle()
+    # The curve is drawn from a run record, so it is handed one.
+    record = {"FS": 1.37, "final_interval": [1.35, 1.40],
+              "trials": [{"F": 1.0, "stable": True, "converged": True,
+                          "max_displacement": 0.05},
+                         {"F": 1.4, "stable": False, "converged": False,
+                          "exit_reason": "diverging", "max_displacement": 0.9}]}
     for panel in offered:
         fig = mplfig.Figure(figsize=(3.0, 2.0))
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 plot_fem_results(bundle["fem_data"], bundle["solution"],
-                                 plot_type=[panel], fig=fig, show_title=False)
+                                 plot_type=[panel], fig=fig, show_title=False,
+                                 ssrm_record=record)
         except Exception as exc:
             fails.append(f"the {panel!r} plot both lists offer cannot be drawn: "
                          f"{exc!r}")
@@ -16593,12 +16608,12 @@ def _member_overlay_words(bundle):
     """
     import matplotlib.figure as mplfig
     from xslope.plot_fem import plot_fem_results
-    from xslope.report import FEM_PANELS
+    from xslope.report import FEM_FIELD_PANELS
 
     fig = mplfig.Figure(figsize=(7.0, 8.0))
     with contextlib.redirect_stdout(io.StringIO()):
         plot_fem_results(bundle["fem_data"], bundle["solution"],
-                         plot_type=[p for p, _c, _s in FEM_PANELS], fig=fig,
+                         plot_type=[p for p, _c, _s in FEM_FIELD_PANELS], fig=fig,
                          failure_solution=bundle.get("failure_solution"),
                          show_title=False)
     legend = []
@@ -16715,13 +16730,13 @@ def _overlay_render(bundle, field_state, solution=None):
     """
     import matplotlib.figure as mplfig
     from xslope.plot_fem import plot_fem_results
-    from xslope.report import FEM_PANELS
+    from xslope.report import FEM_FIELD_PANELS
 
     fig = mplfig.Figure(figsize=(7.0, 8.0))
     with contextlib.redirect_stdout(io.StringIO()):
         plot_fem_results(bundle["fem_data"],
                          bundle["solution"] if solution is None else solution,
-                         plot_type=[p for p, _c, _s in FEM_PANELS], fig=fig,
+                         plot_type=[p for p, _c, _s in FEM_FIELD_PANELS], fig=fig,
                          failure_solution=bundle.get("failure_solution"),
                          field_state=field_state, show_title=False)
     return fig
@@ -17319,7 +17334,7 @@ def test_engine_sections_follow_their_solutions():
     """Neither section is built without its engine's solution, and each toggle
     removes what it names."""
     fails = []
-    from xslope.report import FEM_PANELS, SEEP_PANELS, build_report
+    from xslope.report import FEM_FIELD_PANELS, SEEP_PANELS, build_report
 
     # The LEM sample carries neither a seepage nor a finite element solution, and
     # the default report of it has neither section.
@@ -17370,7 +17385,7 @@ def test_engine_sections_follow_their_solutions():
         ("fem", {"fem_inputs_figure": False}, None, None, ("fem model",)),
         ("fem", {"fem_mesh_figure": False}, None, None, ("fem mesh",)),
         ("fem", {"fem_figure": False}, None, None,
-         tuple(f"fem run1 {panel}" for panel, _c, _s in FEM_PANELS)),
+         tuple(f"fem run1 {panel}" for panel, _c, _s in FEM_FIELD_PANELS)),
     ]
     heads = {"seep": "Seepage Analysis",
              "fem": "Deformation and Strength Reduction"}
@@ -20268,8 +20283,8 @@ CHECKS = [
      test_each_state_is_drawn_at_its_own_scale),
     ("the member forces follow the state drawn",
      test_the_member_forces_follow_the_state_the_panels_are_drawn_at),
-    ("the search figure draws the trials",
-     test_the_search_figure_draws_the_trials),
+    ("the displacement curve draws the trials",
+     test_the_displacement_curve_draws_the_trials),
     ("one name for the shear strain field",
      test_one_name_for_the_shear_strain_field),
     ("the panels mirror the finite element view",

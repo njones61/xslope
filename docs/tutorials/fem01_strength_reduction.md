@@ -14,14 +14,16 @@ the dialogs) turns that solver into a stability analysis: it weakens the soil,
 step by step, until the slope can no longer hold itself up. Where it fails, and
 on what shape, is something the run reports rather than something we supply.
 
-The example is a 50 ft embankment on a rigid base — one soil, no water, no
-loads — the simplest slope the method can be shown on. We solve it twice. First
+The example is a 50 ft embankment on a rigid base with a 2:1 face — one soil, no
+water, no loads — the simplest slope the method can be shown on. We solve it twice. First
 with **Spencer's method**, on its own search, and that answer is the reference
 everything after it is read against. Then we mesh the same model, run it by
 **strength reduction**, and put the two numbers side by side. In between come the
 three things a finite element stability run needs that a limit equilibrium run
 does not: two elastic properties, a mesh, and a set of convergence controls that
 decide whether the answer we are given is the answer the model has.
+
+![The embankment, its soil, and the elastic properties added later on this page](images/fem01_problem_sketch.png){width=1000}
 
 In [LEM-1](lem01_simple_embankment.md) we built a slope of this kind from
 nothing, covering the geometry, the material and the circular search, and mesh
@@ -101,8 +103,6 @@ iteration underneath all of it.
 ---
 
 ## The problem
-
-![The embankment, its soil, and the elastic properties added later on this page](images/fem01_problem_sketch.png){width=1000}
 
 The embankment stands **50 ft** high on a rigid base at elevation 0, with a
 60 ft crest platform and a **2:1** face running down to a toe at x = 160. It is

@@ -28,6 +28,9 @@ rather than copies.
 Run:  PYTHONPATH=. python3 tools/make_block_wall_figures.py             # everything
       PYTHONPATH=. python3 tools/make_block_wall_figures.py inputs      # one group
       PYTHONPATH=. python3 tools/make_block_wall_figures.py wall grid   # by name
+      PYTHONPATH=. python3 tools/make_block_wall_figures.py fem03_grid_long
+                                            # the 500,000-iteration run, only
+                                            # when named (about 40 minutes)
 """
 
 from __future__ import annotations
@@ -98,6 +101,13 @@ FEM03_TOLERANCE = 0.01
 #: is recorded undecided and read as not standing — which reports the budget
 #: rather than the wall.
 FEM03_MAX_ITERATIONS = 100000
+#: The geogrid wall once more at five times the limit — the run behind the page's
+#: sentence that raising Max iterations per trial moves the number.  No figures
+#: are drawn from it.
+FEM03_LONG_MAX_ITERATIONS = 500000
+#: The displacement-vs-F figure's size: the one ``docs/fem/images/
+#: fem01_ssrm_curve.png`` was drawn at (a 9 x 5 in axes figure, tight layout).
+FEM03_CURVE_FIGSIZE = (9.0, 5.0)
 #: The layer the page reads the 1D Details panel on: the middle of the three, the
 #: one the block column's own movement develops tension in from both ends.
 FEM03_DETAIL_LINE = "grid-02"
@@ -133,14 +143,16 @@ def _mesh(model, target_size):
             joint_lines=extract_joint_options(model))
 
 
-def _solve(model, mesh):
+def _solve(model, mesh, max_iterations=FEM03_MAX_ITERATIONS):
     """One strength reduction at the page's settings, on the reference kernel.
 
     ``fast_kernel=False`` is pinned the way every producer of a committed number
     pins it: the compiled Mohr-Coulomb kernel is built on some machines and not
     others, and on this wall the two paths do not agree — so the figure has to
     carry the answer the reference path gives.  Returns
-    ``(fem_data, result, seconds)``.
+    ``(fem_data, result, seconds)``.  ``max_iterations`` is the page's 100,000
+    for every figure; only the long run behind the page's iteration-limit
+    sentence passes another.
     """
     import time
 
@@ -155,7 +167,7 @@ def _solve(model, mesh):
             result = solve_ssrm(fem_data, F_min=FEM03_F_MIN, F_max=FEM03_F_MAX,
                                 tolerance=FEM03_TOLERANCE, debug_level=0,
                                 failure_criterion=FEM03_CRITERION,
-                                max_iterations=FEM03_MAX_ITERATIONS)
+                                max_iterations=max_iterations)
     return fem_data, result, time.time() - t0
 
 
@@ -239,21 +251,79 @@ def _counts(label, model, mesh, fem_data):
              declared_unit_labels(model)["length"]))
 
 
-def _report(label, result, seconds):
-    """The bracket walk: what each trial was asked, and what it answered."""
+def _report(label, result, seconds, units=""):
+    """The bracket walk: what each trial was asked, how it ended, and how far the
+    section had moved when it stopped; then the run's closing summary."""
     print("   %-11s FS %.4f from [%.6f, %.6f] (width %.6f) after %d bisection "
           "step(s) · %.0f s"
           % (label, result["FS"], result["final_interval"][0],
              result["final_interval"][1], result["interval_width"],
              result["iterations_ssrm"], seconds))
     for tr in result["trials"]:
-        print("        F %.4f  %-6s  %-13s  %s sweeps"
-              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+        u = tr.get("max_displacement")
+        print("        F %.4f  %-6s  %-13s  %-11s  %s sweeps  max disp %s"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("exit_reason"),
+                 tr.get("iterations"),
+                 "n/a" if u is None else "%.6f%s" % (u, (" " + units) if units else "")))
     last = result["last_solution"]
     print("        last standing trial F %.4f · %s · %s sweeps (%s)"
           % (last.get("F", float("nan")),
              "equilibrium" if last.get("converged") else "no equilibrium",
              last.get("iterations"), last.get("exit_reason")))
+    # The run's own closing summary, verbatim, so the page quotes the words a
+    # reader's run prints rather than a paraphrase of them.
+    print("closing summary:")
+    print(result["summary"])
+
+
+def _layer_loads(model, fem_data, result):
+    """Each geogrid sheet's peak bar tension against its capacity at the last
+    standing trial, as a percentage, read from the sheet's joint profile (which
+    carries ``bar_T`` and ``bar_cap`` at the bar's own element centroids)."""
+    import numpy as np
+
+    from xslope import fem_details
+
+    last = result["last_solution"]
+    force = declared_unit_labels(model)["force_per_len"]
+    print("layer loads:")
+    print("   at the last standing trial, F %.4f" % last.get("F", float("nan")))
+    # The capacity is the one at the station the peak sits at (a pullout-limited
+    # end carries less than the sheet's Tmax); the last column is the highest
+    # T/cap at any station, which differs from the first ratio only where it does.
+    print("   %-8s %12s %12s %8s %14s"
+          % ("sheet", "peak T", "capacity", "T/cap", "max T/cap"))
+    for row in fem_details.list_lines(fem_data, last, model):
+        if row["kind"] != "joint" or not str(row["label"]).startswith("grid-"):
+            continue
+        prof = fem_details.joint_profile(fem_data, last, row["index"],
+                                         slope_data=model, field_state="converged")
+        T = np.abs(np.asarray(prof["bar_T"], dtype=float))
+        cap = np.asarray(prof["bar_cap"], dtype=float)
+        if not len(T):
+            print("   %-8s no bar stations" % row["label"])
+            continue
+        k = int(np.argmax(T))
+        ratio = np.where(cap > 1e-12, T / np.where(cap > 1e-12, cap, 1.0), np.nan)
+        print("   %-8s %12.4f %12.4f %7.1f%% %13.1f%%   (%s)"
+              % (row["label"], T[k], cap[k],
+                 100.0 * T[k] / cap[k] if cap[k] > 1e-12 else float("nan"),
+                 100.0 * float(np.nanmax(ratio)), force))
+
+
+def _curve(name, fem_data, result):
+    """The displacement-vs-F figure: every trial's largest displacement against
+    its F, drawn by the standard plot call from the run's own result, at the
+    size the overview's FEM-1 figure was drawn at, saved through ``capture``."""
+    import matplotlib.pyplot as plt
+    from xslope.plot_fem import plot_ssrm_curve
+
+    def _draw():
+        fig, ax = plt.subplots(figsize=FEM03_CURVE_FIGSIZE)
+        plot_ssrm_curve(ax, result, fem_data=fem_data)
+        fig.tight_layout()
+
+    capture(name, _draw)
 
 
 def _joints(model, fem_data, result, dump=None):
@@ -393,11 +463,12 @@ def fem03_wall():
     mesh = _mesh(wall, FEM03_TARGET_SIZE)
     fem_data, result, seconds = _solve(wall, mesh)
     _counts("wall", wall, mesh, fem_data)
-    _report("wall", result, seconds)
+    _report("wall", result, seconds, declared_unit_labels(wall)["length"])
     _joints(wall, fem_data, result, dump="wall")
     _pair("fem03_fem_blocks.png", "fem03_fem_shear.png", fem_data, result,
           "displace_vector")
     _keep_solution("wall", fem_data, result)
+    _curve("fem03_ssrm_curve.png", fem_data, result)
 
     # The back face's 1D details: the panel the page's slip table is read from,
     # shown for the contact that carries the failure so the reader can see the
@@ -437,11 +508,13 @@ def fem03_grid():
     mesh = _mesh(grid, FEM03_TARGET_SIZE)
     fem_data, result, seconds = _solve(grid, mesh)
     _counts("wall + grid", grid, mesh, fem_data)
-    _report("wall + grid", result, seconds)
+    _report("wall + grid", result, seconds, declared_unit_labels(grid)["length"])
     _joints(grid, fem_data, result, dump="grid")
     _pair("fem03_fem_blocks_grid.png", "fem03_fem_shear_grid.png", fem_data,
           result, "displace_vector")
     _keep_solution("wall_grid", fem_data, result)
+    _curve("fem03_ssrm_curve_grid.png", fem_data, result)
+    _layer_loads(grid, fem_data, result)
 
     last = result["last_solution"]
     rows = fem_details.list_lines(fem_data, last, grid)
@@ -477,6 +550,23 @@ def fem03_grid():
              float(max(prof["tlim"])) if len(prof["tlim"]) else float("nan"),
              float(max(prof["slip"])) if len(prof["slip"]) else float("nan")))
     capture("fem03_1d_details.png", plot_detail, prof)
+
+
+def fem03_grid_long():
+    """The geogrid wall at the page's settings but 500,000 iterations a trial.
+
+    No figures and no kept solution: the run exists for its factor, its bracket
+    and its closing summary, which say whether raising the iteration limit moves
+    the number the 100,000-iteration run reports.
+    """
+    grid = load_slope_data(FEM03_GRID)
+    mesh = _mesh(grid, FEM03_TARGET_SIZE)
+    fem_data, result, seconds = _solve(grid, mesh,
+                                       max_iterations=FEM03_LONG_MAX_ITERATIONS)
+    _counts("wall + grid", grid, mesh, fem_data)
+    _report("grid 500k", result, seconds, declared_unit_labels(grid)["length"])
+    _layer_loads(grid, fem_data, result)
+    print("   wall time   %.0f s (%.1f min)" % (seconds, seconds / 60.0))
 
 
 # --------------------------------------------------------------------------- #
@@ -600,14 +690,24 @@ GROUPS = {
     "fem03_inputs": fem03_inputs,
     "fem03_wall": fem03_wall,
     "fem03_grid": fem03_grid,
+    "fem03_grid_long": fem03_grid_long,
     "fem03_sheets": fem03_sheets,
 }
+
+#: Groups the no-argument run leaves out.
+OPT_IN = {"fem03_grid_long"}
 
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)
-    names = [n for n in GROUPS if not argv or any(a in n for a in argv)]
+    # A group named in full is that group alone ("fem03_grid" must not also run
+    # "fem03_grid_long"); anything else is matched as a substring.
+    # The 500,000-iteration run is forty minutes and draws nothing, so it runs
+    # only when it is named.
+    names = [n for n in GROUPS
+             if (not argv and n not in OPT_IN)
+             or any(a == n or (a not in GROUPS and a in n) for a in argv)]
     if not names:
         print("no figure group matching %s; known groups: %s"
               % (argv, ", ".join(sorted(GROUPS))))

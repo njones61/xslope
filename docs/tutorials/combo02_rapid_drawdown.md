@@ -9,6 +9,8 @@ In [COMBO-1](combo01_seepage_stability.md) we ran the Johnson Reservoir dam unde
 a standing reservoir. Here we lower that reservoir 50 ft over 45 days, after five
 days at full pool, so the pool reaches its residual level at day 50.
 
+![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
+
 Lowering a pool removes the water pressing on the upstream face, which was
 holding the slope up. If the soil behind the face could shed its own pore water
 just as fast, nothing much would happen: the driving weight and the resisting
@@ -147,8 +149,6 @@ and the pore pressure inside the dam can never disagree about where it stood.
 ---
 
 ## The dam
-
-![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
 
 The section is 750 ft long: a 100 ft foundation on rock at elevation 0, and an
 80 ft embankment on it with a crest at elevation 180. A sand shell rises 2:1

@@ -236,6 +236,300 @@ def _jsonable(value):
     return value
 
 
+def _finite_or_none(value):
+    """``value`` as a float, or None where it is missing or not a finite number."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if np.isfinite(value) else None
+
+
+def _ssrm_duration(seconds):
+    """A wall time the way a person says it: "48 s", "11 min 4 s", "2 h 5 min"."""
+    seconds = max(0.0, float(seconds))
+    if seconds < 10:
+        return f"{seconds:.1f} s"
+    if seconds < 60:
+        return f"{seconds:.0f} s"
+    minutes, secs = divmod(int(round(seconds)), 60)
+    if minutes < 60:
+        return f"{minutes} min {secs} s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours} h {minutes} min"
+
+
+def _trial_stood(trial):
+    """Whether the search counted a recorded trial as standing. The bisection
+    records ``stable``; a record without it carries ``converged``, and the Newton
+    ramp records only its ``verdict``."""
+    if trial.get("stable") is not None:
+        return bool(trial["stable"])
+    if trial.get("converged") is not None:
+        return bool(trial["converged"])
+    return trial.get("verdict") == "CONVERGED"
+
+
+def _edge_trial(trials, F, stood):
+    """The last trial solved at ``F`` that the search counted as ``stood``."""
+    for trial in reversed(trials):
+        tF = _finite_or_none(trial.get("F"))
+        if (tF is not None and abs(tF - F) <= 1e-9 * max(1.0, abs(F))
+                and _trial_stood(trial) is stood):
+            return trial
+    return None
+
+
+def _ssrm_length_unit(fem_data):
+    """The declared length unit ("m", "ft"), or "" where the model declares none."""
+    try:
+        from .units import labels, normalize_unit_system
+        system = normalize_unit_system((fem_data or {}).get("unit_system"))
+        if system is None:
+            return ""
+        return labels(system, (fem_data or {}).get("time_unit")).get("length") or ""
+    except Exception:
+        return ""
+
+
+def _ssrm_pct(fraction):
+    """A fraction as a percentage: no decimals from 1% up, two significant
+    figures below it."""
+    v = 100.0 * float(fraction)
+    return f"{v:.0f}%" if abs(v) >= 1.0 else f"{v:.2g}%"
+
+
+def _stop_reading(trial, rule):
+    """The trial's recorded stop reading, if it is the given rule's; else None.
+    A trial saved before readings were recorded carries none."""
+    reading = trial.get("stop_reading")
+    if isinstance(reading, dict) and reading.get("rule") == rule:
+        return reading
+    return None
+
+
+def _standing_edge_sentence(F, trial, trials, count, unit=""):
+    """What happened at the bottom of the bracket, in one sentence."""
+    if trial is None:
+        below = [t for t in trials if _trial_stood(t)
+                 and (_finite_or_none(t.get("F")) or 0.0) < F]
+        if below:
+            best = max(below, key=lambda t: float(t["F"]))
+            return (f"F = {F:.4f} was not solved itself: it is a grid point below "
+                    f"F = {float(best['F']):.4f}, where the slope reached "
+                    f"equilibrium.")
+        return f"No trial at F = {F:.4f} is recorded as reaching equilibrium."
+    n = int(trial.get("iterations") or 0)
+    slowing = _stop_reading(trial, "slowing")
+    if slowing is not None:
+        return f"At F = {F:.4f} {_creep_slowing_clause(slowing, unit)}."
+    if trial.get("converged") or trial.get("verdict") == "CONVERGED":
+        how = (", finished by the Newton corrector"
+               if trial.get("corrector") else "")
+        return (f"At F = {F:.4f} the slope reached equilibrium in {n:,} "
+                f"{count}{how}.")
+    settled = _stop_reading(trial, "joint_settled")
+    if settled is not None:
+        return (f"At F = {F:.4f} the joint slip and the displacements had stopped "
+                f"(the slip grew {_ssrm_pct(settled['slip_frac'])} over the last "
+                f"{int(settled['window']):,} {count}) while the joint forces kept "
+                f"flickering, so it was counted as standing.")
+    stopped = ("its joints and displacements had stopped"
+               if trial.get("verdict") == "JOINT_SETTLED"
+               else "its displacements had stopped")
+    return (f"At F = {F:.4f} the slope did not meet the force tolerance within "
+            f"{n:,} {count}, but {stopped}, so it was counted as standing.")
+
+
+#: The closing sentence for a trial the iteration limit cut off while the slope
+#: was still moving slowly: the answer then belongs to the limit.
+_SSRM_SET_BY_LIMIT = ("The factor of safety depends on the iteration limit "
+                      "here. Raise Max iterations per trial and it may change.")
+
+
+def _failing_edge_sentences(F, trial, count, unit):
+    """What happened at the top of the bracket, in one to three sentences."""
+    if trial is None:
+        return f"No trial at F = {F:.4f} is recorded as failing."
+    n = int(trial.get("iterations") or 0)
+    why = trial.get("exit_reason")
+    one = count[:-1]
+    did_not = f"At F = {F:.4f} it did not:"
+    unit_txt = f" {unit}" if unit else ""
+    if why == "diverging":
+        rd = _stop_reading(trial, "diverging")
+        if rd is not None and rd.get("signal") == "runaway" and rd.get("u_ratio"):
+            return (f"{did_not} the largest displacement reached "
+                    f"{float(rd['u_ratio']):.1f} times the elastic value at {one} "
+                    f"{int(rd['iteration']):,}.")
+        if rd is not None and rd.get("gain") is not None:
+            return (f"{did_not} the out-of-balance force stopped falling while "
+                    f"the displacement grew {float(rd['gain']):.1f} times the "
+                    f"elastic value over the last {int(rd['window']):,} {count}, "
+                    f"at {one} {int(rd['iteration']):,}.")
+        return f"{did_not} the displacements ran away at {one} {n:,}."
+    if why in ("disp_limit", "displacement_limit"):
+        rd = _stop_reading(trial, why)
+        if rd is not None:
+            return (f"{did_not} the displacement reached "
+                    f"{float(rd['displacement']):.3g}{unit_txt} at {one} "
+                    f"{int(rd['iteration']):,}, past the limit of "
+                    f"{float(rd['limit']):.3g}{unit_txt}.")
+        return f"{did_not} it passed the displacement limit at {one} {n:,}."
+    if why == "steady_slip":
+        rd = _stop_reading(trial, "steady_slip")
+        if rd is not None:
+            ratio = float(rd.get("rate_ratio") or 1.0)
+            rate = ("its rate did not slow" if ratio >= 1.0 else
+                    f"its rate slowed by only {_ssrm_pct(1.0 - ratio)}")
+            return (f"{did_not} over the last {int(rd['window']):,} {count} the "
+                    f"joint slip grew {_ssrm_pct(rd['slip_frac'])} and {rate}, so "
+                    f"the run stopped waiting at {one} {int(rd['iteration']):,} "
+                    f"and counted the slope as sliding.")
+        return (f"{did_not} the slope was sliding steadily on its joints at "
+                f"{one} {n:,}.")
+    if why == "not_slowing":
+        rd = _stop_reading(trial, "not_slowing")
+        if rd is not None:
+            return f"{did_not} {_creep_sliding_clause(rd)}."
+        return (f"{did_not} the slope was still moving at the iteration limit "
+                f"without slowing, at {one} {n:,}.")
+    if why == "nonfinite":
+        return (f"{did_not} the calculation stopped producing finite numbers at "
+                f"{one} {n:,}.")
+    open_question = ("That is neither an equilibrium nor a failure, so the factor "
+                     "of safety carries it as an open question.")
+    if why == "yield_gate":
+        return (f"At F = {F:.4f} the trial settled in force outside the yield "
+                f"surface at {one} {n:,}, and the Newton corrector found no "
+                f"admissible state. {open_question}")
+    if why == "inconclusive":
+        rd = _stop_reading(trial, "inconclusive")
+        fell = (f" (from {float(rd['oob_from']):.2g} to {float(rd['oob_to']):.2g} "
+                f"over the last {int(rd['window']):,} {count})"
+                if rd is not None else "")
+        return (f"At F = {F:.4f} the trial hit the {n:,}-{one} limit with its "
+                f"out-of-balance force still falling{fell}. {open_question}")
+
+    # Everything else was stopped by the iteration limit, and the trial's own
+    # classification — recorded on every criterion — says what the slope was
+    # doing when it was stopped.
+    verdict = trial.get("verdict")
+    growth = _finite_or_none(trial.get("growth"))
+    moving = growth is not None and growth > _HYBRID_GROWTH_MIN
+    u = _finite_or_none(trial.get("max_displacement"))
+    ratio = _finite_or_none(trial.get("u_ratio"))
+    unit_txt = f" {unit}" if unit else ""
+    last = int(round(n * _HYBRID_WINDOW_FRAC))
+
+    def _numbers():
+        """"its largest displacement was X, R times the elastic value, and had
+        grown by G over the last N iterations", or "" without the numbers."""
+        if u is None or not ratio or growth is None:
+            return ""
+        grew = growth * u / ratio
+        return (f"its largest displacement was {u:.3g}{unit_txt}, {ratio:.1f} "
+                f"times the elastic value, and had grown by {grew:.3g}{unit_txt} "
+                f"over the last {last:,} {count}")
+
+    hit = f"{did_not} the trial hit the {n:,}-{one} limit"
+    if verdict == "FAILED":
+        ev = _numbers()
+        return (f"{hit} while still moving fast" + (f" — {ev}" if ev else "")
+                + ". The slope was failing; more iterations would only have let "
+                  "it move further.")
+    if verdict in ("STABLE_STUCK", "JOINT_SETTLED") or (growth is not None
+                                                         and not moving):
+        return (f"{hit} without meeting the force tolerance, with its "
+                f"displacements stopped. This run's failure criterion counts that "
+                f"as failed. {_SSRM_SET_BY_LIMIT}")
+    if moving:
+        ev = _numbers()
+        return (f"{hit} while still moving, but slowly"
+                + (f" — {ev}" if ev else "") + ". That is too much movement to "
+                "call the slope settled and too little to call it a failure, so "
+                f"the trial was counted as failed. {_SSRM_SET_BY_LIMIT}")
+    return f"{hit} without reaching equilibrium. {_SSRM_SET_BY_LIMIT}"
+
+
+def ssrm_run_summary(result, fem_data=None):
+    """The closing summary of a strength reduction run, as a short paragraph.
+
+    It states the factor of safety and the bracket it is the midpoint of, what
+    happened at each end of that bracket — at the bottom, the slope reached
+    equilibrium (or was counted as standing); at the top, how the trial ended —
+    and the wall time, in the words of the Run dialog ("iterations", "the
+    iteration limit", "Max iterations per trial").
+
+    A trial at the top that hit the iteration limit is read by the classification
+    the solver recorded for it. One still moving fast (FAILED) was failing, and
+    the summary says more iterations would only have let it move further. One
+    still moving, but slowly (AMBIGUOUS, or none recorded), was counted as failed
+    without being a failure, and the summary says the factor of safety depends
+    on the iteration limit there. Both quote the largest
+    displacement, its multiple of the elastic value and its growth over the last
+    quarter of the trial's iterations.
+
+    Every other stopping rule is quoted by the reading that fired it, recorded on
+    the trial as ``stop_reading``: the joint slip gained over the window and
+    whether its rate slowed (sliding on the joints), the displacement reached as
+    a multiple of the elastic value (running away), the displacement against the
+    limit, the out-of-balance force's fall (the iteration ceiling), the slip's
+    growth while the joints settled (counted as standing), and the trend of the
+    movement at the iteration limit: slowing, with the corrector's balanced state
+    that far on (counted as standing), or not slowing (counted as sliding). A trial saved
+    before readings were recorded gets the shorter sentence it always had.
+    :func:`solve_ssrm` prints the summary at the end of every run and returns it
+    as ``result['summary']``.
+    """
+    r = result or {}
+    trials = [t for t in (r.get("trials") or []) if isinstance(t, dict)]
+    count = "iterations"
+    elapsed = _finite_or_none(r.get("elapsed_time"))
+    took = f"The run took {_ssrm_duration(elapsed)}." if elapsed is not None else ""
+
+    def _join(*parts):
+        return " ".join(p for p in parts if p)
+
+    if r.get("probe"):
+        said = []
+        for t in trials:
+            F = float(t["F"])
+            n = int(t.get("iterations") or 0)
+            said.append(f"At F = {F:.4f} the slope "
+                        f"{'reached' if _trial_stood(t) else 'did not reach'} "
+                        f"equilibrium ({n:,} {count}).")
+        return _join("This run solved the named trials and computes no factor of "
+                     "safety from them.", *said, took)
+
+    FS = _finite_or_none(r.get("FS"))
+    interval = r.get("final_interval")
+    if not r.get("converged") or FS is None or not interval:
+        why = str(r.get("error") or "The search did not close on a bracket.")
+        if why.startswith("SSRM") and ": " in why:
+            why = why.split(": ", 1)[1]
+        why = why[:1].upper() + why[1:]
+        return _join("No factor of safety was found.", why, took)
+
+    lo, hi = float(interval[0]), float(interval[1])
+    head = (f"The factor of safety is {FS:.3f}, the midpoint of the bracket "
+            f"F = {lo:.4f} to {hi:.4f}.")
+    if r.get("sweep_F") is not None:
+        return _join(head, "The displacement catastrophe criterion placed the "
+                     "bracket where the plastic displacement jumped most "
+                     "sharply.", took)
+    if not trials:
+        return _join(head, "The run kept no record of its trials, so what "
+                     "happened at either end of the bracket is not known.", took)
+    unit = _ssrm_length_unit(fem_data)
+    return _join(head,
+                 _standing_edge_sentence(lo, _edge_trial(trials, lo, True),
+                                         trials, count, unit),
+                 _failing_edge_sentences(hi, _edge_trial(trials, hi, False),
+                                         count, unit),
+                 took)
+
+
 def ssrm_run_record(result, fem_data=None, options=None):
     """What a strength reduction run chose and what its trials found, as meta.
 
@@ -4472,7 +4766,7 @@ def _window_rate(series, lo, hi):
 def joint_verdict(slip_hist, soil_oob_hist, disp_hist, u_elastic_scale,
                   force_tol, joint_oob_hist=None, budget=None,
                   sample_every=_HYBRID_SAMPLE_EVERY,
-                  warmup=_JOINT_VERDICT_WARMUP):
+                  warmup=_JOINT_VERDICT_WARMUP, reading=None):
     """Read an undecided jointed trial off its interface trace.
 
     Returns ``'steady_slip'`` (the interface mechanism is running: FAILED),
@@ -4517,6 +4811,15 @@ def joint_verdict(slip_hist, soil_oob_hist, disp_hist, u_elastic_scale,
             slip over thousands of sweeps and a window inside that is a
             measurement of the transient, not of the state. The FAILED reading
             waits longer still (``_JOINT_MOVING_MIN_SWEEPS``).
+        reading (dict or None): when given and a verdict is returned, it is
+            filled with the numbers that decided it — the window length in
+            iterations (``window``), the slip gained over the window as a fraction
+            of the total (``slip_frac``), the displacement gained in elastic
+            values (``growth``), and for 'steady_slip' the slip rate of the last
+            half-window against the half before (``rate_ratio``), for
+            'joint_settled' the largest soil out-of-balance over the window
+            (``soil_oob``) and the tolerance it was held to (``force_tol``). It
+            changes nothing about when a verdict is returned.
     """
     n = len(slip_hist)
     if (n < 2 * max(4, int(warmup / max(1, sample_every)) // 2)
@@ -4546,6 +4849,12 @@ def joint_verdict(slip_hist, soil_oob_hist, disp_hist, u_elastic_scale,
         prev = sum(joint_oob_hist[h:q]) / max(1, q - h)
         last = sum(joint_oob_hist[q:n]) / max(1, n - q)
         if prev > 0.0 and last / prev >= _JOINT_SETTLED_OOB_FLAT:
+            if reading is not None:
+                reading.update(rule='joint_settled',
+                               window=int((n - h) * sample_every),
+                               slip_frac=float(slip_frac), growth=float(growth),
+                               soil_oob=float(max(soil_oob_hist[h:])),
+                               force_tol=float(force_tol))
             return 'joint_settled'
 
     if (budget is not None
@@ -4556,6 +4865,11 @@ def joint_verdict(slip_hist, soil_oob_hist, disp_hist, u_elastic_scale,
             and growth >= _JOINT_MOVING_GROWTH):
         _, rate_ratio = _slip_rate_reading(slip_hist, h, n)
         if rate_ratio >= _JOINT_MOVING_DECAY_MIN:
+            if reading is not None:
+                reading.update(rule='steady_slip',
+                               window=int((n - h) * sample_every),
+                               slip_frac=float(slip_frac), growth=float(growth),
+                               rate_ratio=float(rate_ratio))
             return 'steady_slip'
     return None
 
@@ -4616,6 +4930,15 @@ def _slip_rate_reading(slip_hist, h, n, rates=True):
 # displacements the hybrid classifier's growth line, the 1e-4 the joint verdict's
 # "the field has stopped". The reading is a ratio of movements, never a count of
 # iterations, so a plain and an accelerated sweep read the same trial the same way.
+#: The extrapolated seed carries the plastic strains and the joint slip forward by
+#: the same ratio as the field. False seeds the extrapolated field on the latest
+#: snapshot's strains and slip, which is the order's first reading; on the FEM-3
+#: geogrid wall at F = 1.25 that seed is refused at every block (the corrector
+#: diverges), which is why the strains go with the field.
+CREEP_EXTRAPOLATE_STATE = True
+#: The trend reading's extrapolation, on. False seeds the corrector on the latest
+#: snapshot itself (no extrapolation) — the comparison the seed test locks.
+CREEP_EXTRAPOLATE = True
 _CREEP_BLOCKS = 5
 _CREEP_BLOCK_FRAC = 0.1
 _CREEP_DYING_MAX = _JOINT_MOVING_DECAY_MIN
@@ -4690,40 +5013,49 @@ def creep_trend(marks, u_elastic_scale, block, slip_hist=None,
     return rd
 
 
-def _creep_pct(fraction):
-    v = 100.0 * float(fraction)
-    return f"{v:.0f}%" if abs(v) >= 1.0 else f"{v:.2g}%"
+def _creep_slowing_clause(rd, unit=""):
+    """'still moving at iteration N, but slowing (...); the corrector found ...,
+    so it was counted as standing at U' — the trend reading that stood a trial."""
+    u = f" {unit}" if unit else ""
+    inc = rd.get('increments') or [1.0, 1.0]
+    fell = 1.0 - (inc[-1] / inc[0]) if inc[0] > 0 else 0.0
+    hold = (rd.get('corrector') or {}).get('hold')
+    held = " and the hold test confirmed it" if (hold and hold.get('held')) else ""
+    return (f"the slope was still moving at iteration "
+            f"{int(rd.get('iteration', 0)):,}, but slowing (the movement per "
+            f"{int(rd.get('block', 0)):,} iterations fell by {_ssrm_pct(fell)} over "
+            f"the last {int(rd.get('window', 0)):,}); the corrector found the "
+            f"balanced state {float(rd.get('extrapolated') or 0.0):.3g}{u} further "
+            f"on{held}, so it was counted as standing at "
+            f"{float(rd.get('max_displacement') or 0.0):.3g}{u}")
 
 
-def creep_sentence(rd, F):
+def _creep_sliding_clause(rd):
+    """'over the last N iterations the movement per iteration did not slow
+    (ratio r), so the trial was counted as sliding' — the trend reading that
+    failed a trial."""
+    window = int(rd.get('window', 0))
+    r = rd.get('ratio')
+    if r is not None and np.isfinite(r) and r >= _CREEP_DYING_MAX:
+        what = ("the movement per iteration grew" if r >= 1.0 else
+                "the movement per iteration did not slow")
+        return (f"over the last {window:,} iterations {what} (ratio {r:.2f}), so "
+                f"the trial was counted as sliding")
+    sr = rd.get('slip_ratio')
+    sr_txt = (f" (ratio {float(sr):.2f})" if sr is not None and np.isfinite(sr)
+              else "")
+    return (f"over the last {window:,} iterations the joint slip grew "
+            f"{_ssrm_pct(rd.get('slip_frac') or 0.0)} and its rate did not "
+            f"slow{sr_txt}, so the trial was counted as sliding")
+
+
+def creep_sentence(rd, F, unit=""):
     """The trend reading that ended a trial, in the Run dialog's words."""
     rule = rd.get('rule')
-    window = int(rd.get('window', 0))
-    block = int(rd.get('block', 0))
     if rule == 'slowing':
-        inc = rd.get('increments') or [1.0, 1.0]
-        fell = 1.0 - (inc[-1] / inc[0]) if inc[0] > 0 else 0.0
-        hold = (rd.get('corrector') or {}).get('hold')
-        held = " and the hold test confirmed it" if (hold and hold.get('held')) else ""
-        return (f"At F = {F:.4f} the slope was still moving at iteration "
-                f"{int(rd.get('iteration', 0)):,}, but slowing (the movement per "
-                f"{block:,} iterations fell by {_creep_pct(fell)} over the last "
-                f"{window:,}); the corrector found the balanced state "
-                f"{float(rd.get('extrapolated') or 0.0):.3g} further on{held}, so "
-                f"it was counted as standing at "
-                f"{float(rd.get('max_displacement') or 0.0):.3g}.")
+        return f"At F = {F:.4f} {_creep_slowing_clause(rd, unit)}."
     if rule == 'not_slowing':
-        r = rd.get('ratio')
-        if r is not None and np.isfinite(r) and r >= _CREEP_DYING_MAX:
-            what = ("the movement per iteration grew" if r >= 1.0 else
-                    "the movement per iteration did not slow")
-            return (f"At F = {F:.4f}, over the last {window:,} iterations {what} "
-                    f"(ratio {r:.2f}), so the trial was counted as sliding.")
-        sr = rd.get('slip_ratio')
-        return (f"At F = {F:.4f}, over the last {window:,} iterations the joint "
-                f"slip grew {_creep_pct(rd.get('slip_frac') or 0.0)} and its rate "
-                f"did not slow (ratio {float(sr):.2f}), so the trial was counted "
-                f"as sliding.")
+        return f"At F = {F:.4f}, {_creep_sliding_clause(rd)}."
     return ""
 
 
@@ -6503,7 +6835,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             k0=k0, _nr_init_state=_init_state,
             debug_level=max(0, debug_level - 1))
 
-    def _try_corrector(u_now, groups_now, where, vp_iterations, softened_now=None):
+    def _try_corrector(u_now, groups_now, where, vp_iterations, softened_now=None,
+                       evp_seed=None, slip_seed=None):
         """One bounded Newton attempt at full gravity from the current state.
 
         Returns the corrector's own result dictionary when the state it reaches
@@ -6523,8 +6856,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         than lose its trial to a traceback.
         """
         _t0 = time.perf_counter()
+        # ``evp_seed`` / ``slip_seed`` replace the plastic strains and the joint
+        # slip the seed carries (the trend reading's extrapolated state; see
+        # `creep_extrapolate`); None takes them from the live state.
         _seed = {"u": np.asarray(u_now, dtype=float).copy(),
-                 "evp": [g['evp'].copy() for g in groups_now]}
+                 "evp": ([np.asarray(e, dtype=float).copy() for e in evp_seed]
+                         if evp_seed is not None
+                         else [g['evp'].copy() for g in groups_now])}
         _kw = dict(_corr_nr_kw)
         if softened_now is not None and np.any(softened_now):
             _kw['_softened_seed'] = softened_now
@@ -6533,7 +6871,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # them the corrector linearizes a slip-grown state about zero slip,
             # which is a different problem from the one the sweep is solving.
             _kw['_nr_joint_state'] = {
-                'slip_p': joint_slip.copy(), 'open_prev': joint_open.copy(),
+                'slip_p': (joint_slip.copy() if slip_seed is None
+                           else np.asarray(slip_seed, dtype=float).copy()),
+                'open_prev': joint_open.copy(),
                 'slipped': None if joint_slipped is None else joint_slipped.copy(),
                 'dil_p': None if joint_dil is None else joint_dil.copy()}
         try:
@@ -6696,21 +7036,33 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             _drift_rel <= float(_CORRECTOR_HOLD_DRIFT)
         return _out
 
+    def _creep_snapshot(u_free_now):
+        """One block-end snapshot for the extrapolation: the field on the free
+        dofs, every Gauss point's plastic strain and the joint slip."""
+        return {"u": np.array(u_free_now, dtype=float, copy=True),
+                "evp": [g_['evp'].copy() for g_ in gp_groups],
+                "slip": joint_slip.copy() if has_joints else None}
+
     def _creep_attempt(rd, snaps, u_now, groups_now, vp_iterations,
                        softened_now=None):
         """The trend reading's corrector attempt (see `creep_trend`): seed the
         corrector where a dying-away movement is heading, and certify as the
         corrector does. Fills ``rd`` with the extrapolation and the attempt's
         outcome; returns the certified solution (with ``stop_reading``) or None.
-        The plastic strains and the joint state are the latest snapshot's."""
+        The field, the plastic strains and the joint slip are carried forward
+        together (CREEP_EXTRAPOLATE_STATE); the joint open / latch state is the
+        latest snapshot's."""
         if len(snaps) < 3:
             rd['extrapolated'] = None
             return None
-        u_rest_free, r_f = creep_extrapolate(snaps, rd.get('ratio'))
+        u_rest_free, r_f = creep_extrapolate([x["u"] for x in snaps],
+                                             rd.get('ratio'))
         rd['field_ratio'] = float(r_f)
         if u_rest_free is None:
             rd['extrapolated'] = None
             return None
+        if not CREEP_EXTRAPOLATE:
+            u_rest_free = np.asarray(snaps[-1]["u"], dtype=float)
         u_seed = np.asarray(u_now, dtype=float).copy()
         u_seed[free_dofs] = u_rest_free
         ahead = float(np.max(np.abs(u_seed[_trans_dofs] - u_now[_trans_dofs])))
@@ -6718,9 +7070,24 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         rd['extrapolated_u_ratio'] = (
             float(np.max(np.abs(u_seed[_trans_dofs] - u_datum[_trans_dofs])))
             / u_elastic_scale_now[0] if u_elastic_scale_now[0] > 0 else None)
+        # The plastic strains and the joint slip go with the field, by the same
+        # ratio: a displacement carried forward over strains held back is a
+        # state no sweep passes through (see CREEP_EXTRAPOLATE_STATE).
+        _k = r_f / (1.0 - r_f)
+        evp_seed = slip_seed = None
+        if CREEP_EXTRAPOLATE_STATE and CREEP_EXTRAPOLATE:
+            evp_seed = [e2 + (e2 - e1) * _k for e1, e2 in
+                        zip(snaps[1]["evp"], snaps[2]["evp"])]
+            if snaps[2]["slip"] is not None and snaps[1]["slip"] is not None:
+                slip_seed = snaps[2]["slip"] + (snaps[2]["slip"]
+                                                - snaps[1]["slip"]) * _k
+        rd['extrapolated_state'] = bool(CREEP_EXTRAPOLATE_STATE
+                                        and CREEP_EXTRAPOLATE)
+        rd['extrapolated_field'] = bool(CREEP_EXTRAPOLATE)
         _n_before = len(_corr_attempts)
         _c = _try_corrector(u_seed, groups_now, f"trend:{int(vp_iterations)}",
-                            vp_iterations, softened_now)
+                            vp_iterations, softened_now,
+                            evp_seed=evp_seed, slip_seed=slip_seed)
         _att = _corr_attempts[-1] if len(_corr_attempts) > _n_before else {}
         rd['corrector'] = dict(
             certified=bool(_c is not None),
@@ -7355,6 +7722,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         plateau_ratio = None
         diverging_iter = None          # early-failure watch, reset per stage
         diverging_signal = None
+        # The numbers the rule that ends this trial read, when a rule ends it —
+        # quoted by the strength reduction run's closing summary.
+        stop_reading = None
         oob_hist = []                  # out-of-balance samples (budget-extension trend)
         budget = int(max_iterations)   # this stage's CURRENT budget; may be extended
         ceiling = max(int(max_iterations_ceiling or 0), budget)
@@ -7373,11 +7743,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         creep_marks = [float(np.max(np.abs(u[free_dofs] - u_datum_free)))
                        if u[free_dofs].size else 0.0]
         creep_snaps = collections.deque(maxlen=3)
-        creep_snaps.append(u[free_dofs].copy())
+        creep_snaps.append(_creep_snapshot(u[free_dofs]))
         creep_certify = bool(_creep_certify and _corrector_on and not guard_on)
         creep_last = None              # the last trend reading taken
         u_elastic_scale_now[0] = u_elastic_scale
-        stop_reading = None
 
         iteration = -1
         while True:
@@ -7445,6 +7814,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         # keeps the legacy verdict, so the bisection is only ever
                         # halted on positive evidence of an unfinished convergence.
                         exit_reason = 'inconclusive'
+                        _k = max(2, int(trend_window // _HYBRID_SAMPLE_EVERY))
+                        stop_reading = dict(
+                            rule='inconclusive',
+                            oob_from=float(sum(oob_hist[-2 * _k:-_k]) / _k),
+                            oob_to=float(sum(oob_hist[-_k:]) / _k),
+                            window=int(2 * _k * _HYBRID_SAMPLE_EVERY),
+                            force_tol=float(force_tol))
                         if debug_level >= 1:
                             print(f"  Iteration ceiling {ceiling} reached with the "
                                   f"solve still making progress "
@@ -8440,7 +8816,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # The trend reading's block-end marks (see `creep_trend`).
             if (iteration + 1) % creep_block == 0:
                 creep_marks.append(float(norm_u_new))
-                creep_snaps.append(u_free_new.copy())
+                creep_snaps.append(_creep_snapshot(u_free_new))
 
             # Force-equilibrium condition. The threshold is ABSOLUTE, which is what
             # makes the test immune to the size of the domain and to the size of the
@@ -8539,6 +8915,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 if max_vp_disp > vp_disp_limit:
                     converged = False
                     exit_reason = 'disp_limit'
+                    stop_reading = dict(rule='disp_limit',
+                                        displacement=float(max_vp_disp),
+                                        limit=float(vp_disp_limit),
+                                        iteration=int(total_iterations
+                                                      + iteration + 1))
                     u = u_new
                     if debug_level >= 1:
                         print(f"  Displacement limit exceeded at iteration {iteration+1}: "
@@ -8728,6 +9109,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     exit_reason = 'diverging'
                     diverging_iter = iteration
                     diverging_signal = _signal
+                    _kw = max(2, int(_EARLY_FAIL_WINDOW // _HYBRID_SAMPLE_EVERY))
+                    stop_reading = dict(
+                        rule='diverging', signal=_signal,
+                        iteration=int(total_iterations + iteration + 1),
+                        u_ratio=(float(norm_u_new / u_elastic_scale)
+                                 if u_elastic_scale > 0 else None),
+                        window=int(_EARLY_FAIL_WINDOW),
+                        gain=(float((disp_hist[-1] - disp_hist[-1 - _kw])
+                                    / u_elastic_scale)
+                              if u_elastic_scale > 0 and len(disp_hist) > _kw
+                              else None))
                     u = u_new
                     if debug_level >= 1:
                         print(f"  Failing at iteration {iteration}: max|u| = "
@@ -8762,16 +9154,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             if (has_joints and JOINT_VERDICT_ON and not joint_relief_on
                     and iteration % _JOINT_VERDICT_EVERY == 0
                     and iteration >= _JOINT_VERDICT_WARMUP):
+                _jv_reading = {}
                 _jv = joint_verdict(jslip_hist, soob_hist, disp_hist,
                                     u_elastic_scale, force_tol,
                                     joint_oob_hist=joob_hist,
                                     # The sliding reading is the trend
                                     # reading's (see `creep_trend`); only the
                                     # settled reading is asked here.
-                                    budget=None)
+                                    budget=None, reading=_jv_reading)
                 if _jv is not None:
                     converged = False
                     exit_reason = _jv
+                    stop_reading = dict(_jv_reading,
+                                        iteration=int(total_iterations
+                                                      + iteration + 1))
                     u = u_new
                     if debug_level >= 1:
                         if _jv == 'steady_slip':
@@ -9230,8 +9626,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         "u_growth": u_growth,
         "u_elastic_scale": u_elastic_scale,
         "exit_reason": exit_reason,
-        # The numbers the stopping rule that ended this trial read, where the
-        # trend reading ended it (see `creep_trend`); None otherwise.
+        # The numbers the stopping rule that ended this trial read (see
+        # `stop_reading` above and `creep_trend`); None where no rule ended it.
         "stop_reading": stop_reading,
         # The last trend reading taken, whatever it said (diagnostic).
         "creep_reading": creep_last,
@@ -12120,10 +12516,15 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # own travel is reported beside it rather than dropped.
     nr_disp_deep, nr_disp_skin = _nr_umax_split(u - u_datum, trans_dofs,
                                                deep_dof_mask)
+    nr_stop_reading = None
     if converged and nr_disp_limit is not None:
         if nr_disp_deep > nr_disp_limit:
             converged = False
             exit_reason = 'displacement_limit'
+            nr_stop_reading = dict(rule='displacement_limit',
+                                   displacement=float(nr_disp_deep),
+                                   limit=float(nr_disp_limit),
+                                   iteration=int(total_iterations))
 
     # ---- reporting ----------------------------------------------------------
     for grp in groups:
@@ -12385,6 +12786,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "u_growth": None,
         "u_elastic_scale": u_elastic_scale,
         "exit_reason": exit_reason,
+        "stop_reading": nr_stop_reading,
         "_k0_state": nr_k0_state,
         "_nr_state": nr_end_state,
         "plateau_iteration": None,
@@ -12597,12 +12999,15 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                          early_failure=early_failure, _init_state=init_state,
                          _nr_export=(None if export_only else ctx))
 
-    def _record(F, verdict, iters, fevals, oob, maxu, kind, why=None):
+    def _record(F, verdict, iters, fevals, oob, maxu, kind, why=None,
+                reading=None):
         trials.append({"F": float(F), "verdict": verdict, "iterations": int(iters),
                        "nr_force_evals": int(fevals),
                        "unbalanced_force_ratio": float(oob),
                        "max_displacement": float(maxu), "ramp_step": kind,
-                       "exit_reason": why})
+                       "exit_reason": why,
+                       # What the stopping rule that ended it read, when one did.
+                       "stop_reading": reading})
 
     # --- the foot of the ramp: one cold solve, walked down if it does not stand --
     F0 = float(F_min)
@@ -12610,7 +13015,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
     sol0 = _cold(F0)
     _record(F0, sol0['verdict'], sol0['iterations'], sol0.get('nr_force_evals', 0),
             sol0['unbalanced_force_ratio'], sol0['max_displacement'], 'cold',
-            sol0.get('exit_reason'))
+            sol0.get('exit_reason'), sol0.get('stop_reading'))
     while not sol0['converged']:
         if F0 <= f_min_floor + 1e-9 or n_expand >= max_expand:
             msg = (f"SSRM (ramp): the slope does not reach equilibrium even at "
@@ -12624,7 +13029,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
         sol0 = _cold(F0)
         _record(F0, sol0['verdict'], sol0['iterations'],
                 sol0.get('nr_force_evals', 0), sol0['unbalanced_force_ratio'],
-                sol0['max_displacement'], 'cold', sol0.get('exit_reason'))
+                sol0['max_displacement'], 'cold', sol0.get('exit_reason'), sol0.get('stop_reading'))
 
     groups, pattern, bars = ctx['groups'], ctx['pattern'], ctx.get('bars')
     joints = ctx.get('joints')
@@ -12845,7 +13250,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
     sol_end = _cold(F_stands, export_only=True)
     _record(F_stands, sol_end['verdict'], sol_end['iterations'],
             sol_end.get('nr_force_evals', 0), sol_end['unbalanced_force_ratio'],
-            sol_end['max_displacement'], 'final_export', sol_end.get('exit_reason'))
+            sol_end['max_displacement'], 'final_export', sol_end.get('exit_reason'), sol_end.get('stop_reading'))
     total_iters += int(sol_end['iterations'])
     total_fevals += int(sol_end.get('nr_force_evals', 0))
     pred_iters += int(sol_end.get('nr_predictor_iterations', 0) or 0)
@@ -14620,6 +15025,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     if debug_level >= 1:
         print(f"  SSRM completed in {elapsed:.1f} seconds")
 
+    # The closing summary: the answer, what happened at each end of its bracket,
+    # and the wall time, in words. Printed on every run, whatever the debug level,
+    # because it is where a reader learns that the answer depends on the
+    # iteration limit.
+    result["summary"] = ssrm_run_summary(result, fem_data)
+    print(f"\n{result['summary']}")
+
     return result
 
 
@@ -14696,17 +15108,18 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
 
     def _note_inconclusive(F, sol):
         if sol.get("exit_reason") == 'yield_gate':
-            why = ("force equilibrium settled outside the yield surface and the "
-                   "corrector refused an admissible replacement")
+            why = ("It settled in force outside the yield surface, and the "
+                   "Newton corrector found no admissible state to put in its "
+                   "place.")
+            then = ""
         else:
-            why = (f"the iteration ceiling stopped it after "
-                   f"{sol.get('iterations', 0)} iterations while the "
-                   "out-of-balance was still falling; raise "
-                   f"max_iterations_ceiling to decide it")
-        msg = (f"SSRM: trial F = {F:.4f} is inconclusive: {why}. It is NOT "
-               f"counted as a failure: the bracket's upper edge carries this trial "
-               f"as an uncertainty rather than a measured failure, and the factor of "
-               f"safety is reported as the bracket midpoint, as on any other run.")
+            why = (f"It hit the {int(sol.get('iterations', 0)):,}-iteration "
+                   f"limit with its out-of-balance force still falling.")
+            then = " Raise the iteration ceiling to decide it."
+        msg = (f"SSRM: the trial at F = {F:.4f} is inconclusive. {why} That is "
+               f"neither an equilibrium nor a failure, so it is not counted as a "
+               f"failure: the factor of safety carries it as an open question at "
+               f"the top of the bracket, and is still the bracket midpoint.{then}")
         inconclusive.append({"F": float(F), "iterations": int(sol.get("iterations", 0)),
                              "message": msg})
         print(f"\n{msg}")
@@ -14721,9 +15134,14 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "verdict": sol.get("verdict"),
             "u_ratio": sol.get("u_ratio"),
             "growth": sol.get("u_growth"),
+            # How far the section had moved when this trial stopped, by whatever
+            # route it stopped: the solve's own max_displacement, the quantity a
+            # saved field's meta records under the same name and the Newton ramp
+            # records on its trials. None where the arithmetic gave out.
+            "max_displacement": _finite_or_none(sol.get("max_displacement")),
             "exit_reason": sol.get("exit_reason"),
-            # What the trend reading read, where it ended the trial, and the last
-            # reading it took either way (see `creep_trend`).
+            # What the stopping rule that ended the trial read, when one did, and
+            # the last trend reading taken either way (see `creep_trend`).
             "stop_reading": sol.get("stop_reading"),
             "creep_reading": sol.get("creep_reading"),
             # The residual went flat before this trial stopped (None if it never did).
@@ -14956,10 +15374,11 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     n_expand = 0
     while _stable(solution_max):
         if F_right >= f_max_ceiling - 1e-9 or n_expand >= max_expand:
-            msg = (f"SSRM: the slope still reaches equilibrium at F = {F_right:.2f} "
-                   f"(raised to the ceiling while auto-bracketing), so the factor of safety "
-                   f"exceeds this. Raise F_max / f_max_ceiling, or the slope may deform "
-                   f"ductilely without a displacement catastrophe.")
+            msg = (f"SSRM: the slope still reaches equilibrium at F = {F_right:.2f}, "
+                   f"the top of the range the search may try, so the factor of "
+                   f"safety is above it. Raise F max, or the ceiling "
+                   f"(f_max_ceiling), to find it. A slope that keeps deforming "
+                   f"without ever running away also ends here.")
             print(f"\n{msg}")
             return {"converged": False, "FS": None, "last_solution": solution_max,
                     "error": msg, "trials": trials}

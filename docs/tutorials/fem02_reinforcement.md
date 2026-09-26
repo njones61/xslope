@@ -24,6 +24,8 @@ yield, which is what every mainstream finite element code assumes unless told
 otherwise, and once with a residual capacity that takes effect after the layer
 ruptures.
 
+![A 24 ft reinforced sand fill: six geogrid layers developing their tension over 4 ft at each end, a cohesive face band, and a crest surcharge](images/fem02_problem_sketch.png){width=1000}
+
 Work through [LEM-8](lem08_reinforced_slope.md) first if you have not: that is
 where we built this model, and it covers reinforcement lines, the capacity
 envelope and pullout lengths, all of which we lean on here. Strength reduction,
@@ -63,8 +65,6 @@ step below is done on either one
 ---
 
 ## The problem
-
-![A 24 ft reinforced sand fill: six geogrid layers developing their tension over 4 ft at each end, a cohesive face band, and a crest surcharge](images/fem02_problem_sketch.png){width=1000}
 
 The fill stands **24 ft** high at **1.25:1** on a foundation that runs 10 ft
 below the toe, with a **240 psf** surcharge over the 70 ft of crest behind it.

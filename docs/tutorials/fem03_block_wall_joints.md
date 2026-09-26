@@ -13,8 +13,11 @@ wall as far stronger than it is.
 
 This tutorial shows how to put each of those contacts into the model as a **slip
 joint** — a line the mesh is split along, with an interface element carrying the
-normal and shear stress between the two faces — and then runs the wall twice: standing on its
-own blocks, and with three layers of geogrid tied into the facing.
+normal and shear stress between the two faces — and then runs the wall, 3.6 m of
+six block courses with a 2:1 backfill slope behind it, twice: standing on its own
+blocks, and with three layers of geogrid tied into the facing.
+
+![A 3.6 m segmental block wall of six 0.6 m courses on a 3.2 m foundation, with three geogrid layers tied into the blocks and a 2:1 backfill slope behind it](images/fem03_problem_sketch.png){width=1000}
 
 Then it takes up a second question, which comes up on every model with a
 geosynthetic in it. A sheet can be modeled two ways: as a **bar bonded into the
@@ -42,11 +45,11 @@ is repeated here.
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how the contacts in a block wall are entered as slip
-joints, what a strength reduction does to them, how a geosynthetic layer behaves
-as a bonded bar against the same layer as a slip surface, and when each is the
-right model.
+joints, what a strength reduction does to them, how to tell a wall that fails
+from one that keeps moving, how a geosynthetic layer behaves as a bonded bar
+against the same layer as a slip surface, and when each is the right model.
 </div>
-<p><span class="tg-pill">four materials</span><span class="tg-pill">slip joints</span><span class="tg-pill">joints worksheet</span><span class="tg-pill">interface element</span><span class="tg-pill">block wall</span><span class="tg-pill">elastic blocks</span><span class="tg-pill">local element size</span><span class="tg-pill">geogrid</span><span class="tg-pill">end ties</span><span class="tg-pill">bonded bar</span><span class="tg-pill">jointed sheet</span><span class="tg-pill">hybrid criterion</span><span class="tg-pill">sweep budget</span><span class="tg-pill">joint slip</span><span class="tg-pill">deformed blocks</span><span class="tg-pill">1D details</span></p>
+<p><span class="tg-pill">four materials</span><span class="tg-pill">slip joints</span><span class="tg-pill">joints worksheet</span><span class="tg-pill">interface element</span><span class="tg-pill">block wall</span><span class="tg-pill">elastic blocks</span><span class="tg-pill">local element size</span><span class="tg-pill">geogrid</span><span class="tg-pill">end ties</span><span class="tg-pill">bonded bar</span><span class="tg-pill">jointed sheet</span><span class="tg-pill">hybrid criterion</span><span class="tg-pill">iteration limit</span><span class="tg-pill">joint slip</span><span class="tg-pill">deformed blocks</span><span class="tg-pill">1D details</span></p>
 <div class="tgm-model" markdown>
 **Starter file** — [xslope_block_wall_start.xlsx](files/xslope_block_wall_start.xlsx),
 the section, the four materials and the six block courses, with nothing on the
@@ -63,8 +66,6 @@ where it uses them
 ---
 
 ## The problem
-
-![A 3.6 m segmental block wall of six 0.6 m courses on a 3.2 m foundation, with three geogrid layers tied into the blocks and a 2:1 backfill slope behind it](images/fem03_problem_sketch.png){width=1000}
 
 The wall stands **3.6 m** high in **six 0.6 m courses** of modular block
 **1.2 m deep**, on a 3.2 m foundation, with a 6 m zone of reinforced granular
@@ -217,16 +218,17 @@ Open **Run → Run FEM…**. The analysis is **SSRM**, the bracket is *F* from
 Two rows further down there is one setting to change, and one below it to leave
 alone once you know what it does.
 
-![Run FEM on the meshed wall, with the sweep budget raised](images/fem03_studio_run_fem.png){width=860}
+![Run FEM on the meshed wall, with the iteration limit raised](images/fem03_studio_run_fem.png){width=860}
 
 **Max iterations per trial — change it to 100,000.** A joint reaches equilibrium
-by growing slip, a little on each pass of the solver, so a jointed model settles
-over tens of thousands of passes where a model without joints settles over
-hundreds. A trial that runs out of passes before it has settled is recorded as
-not standing, and the factor of safety then comes out low — a reading of the
-budget rather than of the wall. The model checks in the column beside the dialog
-say so while the budget is left lower. Raising it costs very little, because a
-trial that has settled stops there and does not use the rest.
+by growing slip, a little on each iteration of the solver, so a jointed model
+settles over tens of thousands of iterations where a model without joints settles
+over hundreds. A trial that hits the limit before it has settled is counted as
+not standing, and the factor of safety then comes out low, because the limit
+stopped the trial before the wall had finished moving. The model checks in the
+column beside the dialog say so while the limit is left lower. Raising it costs
+very little, because a trial that has settled stops there and does not use the
+rest.
 
 **Failure criterion — leave it on Hybrid.** The dialog opens on Hybrid for any
 model that carries a joint, and this is why. A near-critical trial on a jointed
@@ -293,6 +295,29 @@ had nothing to say about which of its seven surfaces was carrying the failure.
 The shear strain shows where the soil is working. The reinforced fill behind the
 blocks is straining along a surface that runs up from the heel of the wall, which
 is the mass the facing has to hold back.
+
+The fourth plot in the results view, **Displacement vs F**, shows the search
+itself: every strength it tried, with the largest displacement the wall reached
+there.
+
+![Displacement against strength reduction factor for the wall alone: the wall comes to rest at 1.0, 1.125 and 1.133, and slides steadily on its joints at every strength above](images/fem03_ssrm_curve.png){width=1000}
+
+A filled point is a strength at which the wall came to rest, and the line joins
+those. An open point is a trial the run stopped while the wall was still moving,
+drawn where it was when stopped. The wall rests at F = 1.0 and 1.125 with under
+6 cm of movement, and at 1.133 with 8 cm. At 1.141, and at every strength above
+it, the joints slide steadily and the wall never comes to rest. That is a wall
+with a strength limit, and the factor of safety is where the resting points end.
+The Log says the same in words at the end of every strength reduction run:
+
+> The factor of safety is 1.137, the midpoint of the bracket F = 1.1328 to
+> 1.1406. At F = 1.1328 the slope reached equilibrium in 363 iterations,
+> finished by the Newton corrector. At F = 1.1406 it did not: over the last
+> 45,010 iterations the joint slip grew 34% and its rate did not slow, so the run
+> stopped waiting at iteration 90,001 and counted the slope as sliding.
+
+Read this summary on every run. Part 2 is a run where it says something
+different.
 
 A factor of safety of 1.137 is not a design margin for a retaining wall. The
 blocks are doing what a gravity wall does — standing on their own weight — and on
@@ -395,12 +420,43 @@ two interfaces, one against each.
 
 Then open **Run → Run FEM…** and run it exactly as Part 1 did: SSRM, the bracket
 from 1.0 to 2.0, tolerance 0.01, **Max iterations per trial** at 100,000 and the
-failure criterion on Hybrid. Press **Run**. It takes about eleven minutes, and
+failure criterion on Hybrid. Press **Run**. It takes about as long as Part 1, and
 reports
 
 <!-- test: file=files/xslope_block_wall_grid.xlsx, type=fem_ssrm, expected_fs=1.246, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-grid-ssrm -->
 
 >>**FS = 1.246**
+
+Read the search before the panels this time. Here is the Displacement vs F plot:
+
+![Displacement against strength reduction factor with the geogrid in place: the wall comes to rest at every strength up to 1.242, and the trials above were stopped at the iteration limit while still moving](images/fem03_ssrm_curve_grid.png){width=1000}
+
+In Part 1 the resting points ended where the joints began to slide. Here they do
+not end. The wall comes to rest at every strength up to 1.242, its movement
+growing from 1.7 cm to 2.2 cm along the way, and the trial at 1.25 was stopped at
+the 100,000-iteration limit with the wall still moving, but slowly. The run
+counted that trial as failed, which is what put the factor of safety at 1.246.
+The trials at 1.5 and 2.0 ended the same way, with more movement. Nothing on this
+plot is a wall giving way. The closing summary says so:
+
+> The factor of safety is 1.246, the midpoint of the bracket F = 1.2422 to
+> 1.2500. At F = 1.2422 the slope reached equilibrium in 1,083 iterations,
+> finished by the Newton corrector. At F = 1.2500 it did not: the trial hit the
+> 100,000-iteration limit while still moving, but slowly — its largest
+> displacement was 0.0218 m, 1.3 times the elastic value, and had grown by
+> 0.000381 m over the last 25,000 iterations. That is too much movement to call
+> the slope settled and too little to call it a failure, so the trial was
+> counted as failed. The factor of safety depends on the iteration limit here.
+> Raise Max iterations per trial and it may change.
+
+It does change. With **Max iterations per trial** at 500,000 the same search
+runs for an hour and a half and reports **1.395**. The wall is standing at that
+strength too, having moved 4 cm, and the geogrid is carrying a fifth of its
+capacity. Given 2.4 million iterations it comes to rest at 1.86 as well. None of
+these is a strength the wall runs out of; each is the strength at which one
+iteration limit stopped waiting. What is going on, and what a factor of safety
+means for a wall like this, is taken up after the panels, which show what the
+wall is doing at the trial the search stopped on.
 
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=1000}
 
@@ -418,12 +474,12 @@ their deformed position. Along most of each sheet the soil faces lie on the bar
 and hide it; where the faces have slid along the bar, at the facing, the red
 shows through.
 
-Against 1.137 for the same wall without them, the three layers are worth 0.109 of
-factor of safety, and the joint slip says exactly where it came from. The back
-face's slip falls from **70 mm to 13 mm** and the base's from **13 mm to under
-1 mm**. The back face is still the contact with the most slip, so the wall still
-fails by sliding down its own back, but it slides a fifth as far before the
-model stops standing.
+The joint slip says what the layers have done to the wall's movement. At the
+trial the search stopped on, the back face has slid **13 mm** against the
+**70 mm** the wall alone had slid when its joints let go, and the base under
+**1 mm** against 13 mm. The back face is still the contact with the most slip,
+but the wall is not sliding down it: it is standing, with the layers holding the
+block column to the fill.
 
 ![Viscoplastic shear strain at the critical factor with the geogrid in place](images/fem03_fem_shear_grid_failure.png){width=1000}
 
@@ -431,9 +487,9 @@ The shear strain panel says the same thing about the soil. Part 1's band ran up
 from the heel of the wall through the reinforced fill with strains near 0.05;
 here the band is in the same place but faint, and the scale tops out near 0.04.
 The three layers have not moved the surface the fill wants to fail on. They have
-held the mass behind the facing together so that less of it is straining at
-failure. The bars themselves show dark on the reinforcement force scale: they
-carry little tension, which the next panel makes exact.
+held the mass behind the facing together so that less of it is straining. The
+bars themselves show dark on the reinforcement force scale: they carry little
+tension, which the next panel makes exact.
 
 **1D Details…** draws what one layer is doing along its length. Here is the
 middle one:
@@ -447,6 +503,9 @@ doing instead: the interface reaches its Mohr-Coulomb limit at one station,
 immediately behind the block column, and nowhere else. What the geogrid
 contributes on this wall, it contributes by tying the block column to a mass of
 fill that will not move — which is why **Tend1** is the number that matters.
+The other number on that panel is the 92% of capacity the layer still has in
+hand. That is the reason this wall does not fail, and the next section is about
+it.
 
 It also says how little the jointing of the sheets matters here. Nothing slides
 along them: the slip is zero beyond the first stretch, and over the rest of
@@ -456,6 +515,41 @@ bonded bar cannot stand on a split node; on this wall the interface elements
 act as a stiff bond and a bonded bar with the same tie would give much the
 same answer. Part 3 is where jointing changes the answer, and its models show
 why.
+
+### What the factor of safety means for this wall
+
+Part 1's wall failed the way strength reduction expects: at one strength the
+joints let go, and no amount of waiting brings the wall to rest. This wall never
+does that within the search's range. Every time the facing moves it stretches
+the three layers, and stretched geogrid pulls back: load moves off the sliding
+contacts and into the sheets, the wall slows, and it comes to rest again a
+little further out. With the soil at 80% of its strength the layers carry 8% of
+their capacity; at 1.39 they carry a fifth. The strength at which they would
+run out lies beyond the top of the search range: from 1.25 to 1.39 the load in
+them rose from 8% to 20% of capacity, with the rest still in hand. So in the
+range a strength reduction covers, this wall has no strength limit. It has a
+movement that grows with every step of strength taken from the soil, and the
+search reports whichever strength its iteration limit happened to stop it at:
+1.246 at the default limit, 1.395 at five times that.
+
+That makes the factor of safety of a reinforced wall a different kind of number
+from Part 1's. The question a strength reduction can answer for this wall is at
+what strength it has moved more than the design allows, and the movement the
+design allows is the engineer's input. The Displacement vs F plot is where it is
+read: draw the allowable movement across the plot, and the strength at which the
+resting points cross it is the wall's factor of safety on that criterion. On a
+3.6 m wall, 4 cm is about 1% of the height, the kind of movement a wall
+specification sets a limit on, so that factor lies between 1.25 and 1.39 for
+this wall, and where in that range is a design decision.
+
+Two things follow for practice. Report the movement with the number: "stands
+past F = 1.25 with 2 cm of movement and the geogrid at 8% of capacity" is what
+the analysis found. And read the closing summary on every reinforced wall: the sentence *the factor of safety depends on the
+iteration limit here* is the program telling you that you are looking at this
+kind of wall. A limit equilibrium analysis of the same wall, with the layers
+entered as reinforcement, asks the strength question directly and does not
+depend on movement at all; [FEM-2](fem02_reinforcement.md) runs a reinforced
+slope both ways.
 
 ---
 
@@ -651,8 +745,8 @@ This tutorial covered:
   contact's friction angle comes from.
 - A local element size on the block polygons, which resolves a 0.6 m course
   without refining the whole section.
-- The sweep budget a jointed run needs, and what leaving it at the default does
-  to the answer.
+- The iteration limit a jointed run needs, and how the displacement-vs-F plot
+  and the closing summary tell a wall that fails from one that keeps moving.
 - The wall standing on its own blocks against the same wall with three geogrid
   layers tied into the facing.
 - The question every geosynthetic model has to answer — does the surface cut

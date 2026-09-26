@@ -9,7 +9,7 @@ The section below is a 20 ft embankment on a rigid foundation, one soil througho
 with a 1:1 face and a level crest. Its strength is a cohesion of 500 psf and no
 friction angle — a **total-stress undrained** strength.
 
-![Simple embankment problem](../lem/sample_images/simple_embankment.png){width=700}
+![The embankment: 20 ft high on a rigid base with a 1:1 face, one soil](images/lem01_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -116,9 +116,9 @@ until you use **Save As**.
 Now we read what it built against the section it was given, and correct it in the
 same conversation — plain sentences work, and each correction is undoable.
 
-- **φ = 0.** Check this first: it is the judgment the drawing leaves to you, and the
-  likeliest miss, because the drawing never states it. If the assistant supplied a
-  friction angle, say: *"c = 500 psf is an undrained strength. Set phi to 0 and leave
+- **φ = 0.** Check this first: it is the likeliest miss. The drawing states it, but
+  a soil given a cohesion is easily given a friction angle as well. If the assistant
+  supplied one, say: *"c = 500 psf is an undrained strength. Set phi to 0 and leave
   the pore pressure option at none."*
 - **One material**, γ = `125` pcf, c = `500` psf, strength option `mc`.
 - **No water.** There should be no piezometric line. If one was added, have it

@@ -719,8 +719,15 @@ safety and the bracket are unaffected either way. The controls are gated to the
 SSRM analysis, since a single trial has no bracket to capture beyond.
 
 The run produces **FEM · Data** (mesh + boundary conditions + reinforcement) and
-**FEM · Results** (deformation, shear strain, displacement vectors). An SSRM run
-reports the factor of safety and can be **cancelled** mid-run. The solution is
+**FEM · Results** (deformation, shear strain, displacement vectors, and displacement
+vs F). An SSRM run reports the factor of safety and can be **cancelled** mid-run. It
+ends with a closing summary in the Log: the factor of safety and its bracket, what
+happened at each end of the bracket, and the wall time. When the trial at the top of
+the bracket hit the iteration limit while the slope was still moving slowly, the
+summary says the factor of safety depends on the iteration limit, and that raising
+**Max iterations per trial** may change it. A trial ended by any other rule is
+reported with the numbers that ended it, such as how much the joint slip grew over
+the last stretch of iterations. The solution is
 exported alongside the model so it can be restored on the next Open without
 re-solving — including the at-failure mechanism snapshot (a second CSV pair) and,
 for a model with reinforcement or piles, the per-element structural results
@@ -744,6 +751,17 @@ prints, whose **Auto** default picks whatever draws the largest displacement at
 the **Auto size** percent of the mesh height; entering an explicit Scale ×
 dims Auto size until the box returns to Auto. The displacement-vector plot can **color arrows by magnitude** (with
 a colorbar) instead of solid black.
+
+**Displacement vs F** plots the maximum displacement of every trial the strength
+reduction run solved against its factor. Filled markers are trials in which the
+slope reached equilibrium, joined by a line. Open markers are trials that were
+stopped before it did, drawn where they were when they were stopped, with no line
+through them. The factor of safety is a dashed line over the shaded final bracket. It is drawn from the run's own record of
+its trials, so the section controls (element edges, field state, the deformation
+and vector controls, the member and joint overlays) are dimmed for it. A single
+solve, or a solution saved before trials recorded their displacement, shows a
+one-line note in place of the plot. How to read the curve is set out in
+[Displacement vs F](../fem/overview.md#displacement-vs-f).
 
 On a jointed model the displacement-vector plot is the scaled deformed mesh instead, drawn as the blocks the joints
 cut the section into — each under a faint tint, its joint faces green, the deformed outside of the mesh a dark line

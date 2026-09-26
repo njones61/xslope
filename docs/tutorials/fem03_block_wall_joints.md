@@ -438,12 +438,11 @@ Read the search before the panels this time. Here is the Displacement vs F plot:
 
 ![Displacement against strength reduction factor with the geogrid in place: the wall comes to rest at 1.0, 1.5 and 1.5625, the trials just above were still slowing when the limit came, and only at 2.0 did the movement fail to slow](images/fem03_ssrm_curve_grid.png){width=1000}
 
-Nothing on this plot is a wall giving way. The filled points are the strengths
-at which the wall came to rest: 1.0, 1.5 and 1.56, with its movement growing
-from 2 cm to 8 cm. Above 1.56 the wall was still creeping when the run's
-iteration limit arrived, more slowly all the time, and the program cannot say
-whether it would have stopped. So it reports the last strength it is sure of,
-1.566, and says in the Log that the trial above was left unfinished:
+Nothing on this plot is a wall giving way. Every filled point is a strength at
+which the wall came to rest, and the movement grows with each one: 2 cm at 1.0,
+6 cm at 1.5, 8 cm at 1.56. Above 1.56 the wall was still creeping, more slowly
+all the time, when the run's iteration limit arrived, so the program could not
+confirm whether it would stop. The Log says so:
 
 > The factor of safety is 1.566, the midpoint of the bracket F = 1.5625 to
 > 1.5703. At F = 1.5625 the slope was still moving at iteration 100,000, but
@@ -456,16 +455,15 @@ whether it would have stopped. So it reports the last strength it is sure of,
 > trial is left undecided, neither a failure nor a confirmed rest. Convergence
 > acceleration was on.
 
-Two things to take from that. First, 1.566 is not the strength at which this
-wall fails. It is the last strength the run had time to confirm. Give it more
-iterations and the number rises. Run it without the accelerator (untick the box
-in the Run FEM dialog) and it falls to 1.246, because the plain solver needs far
-longer to bring the wall to rest, and the same summary tells you so. Given
-2.4 million iterations the plain solver confirms the wall at rest at 1.86.
-Second, the wall never fails anywhere in the range searched: even at 2.0, where
-the run gives up on it, it is sliding slowly, not collapsing. What that means for
-a factor of safety is taken up after the panels, which show what the wall is
-doing at the trial the search stopped on.
+So the number the dialog prints is not the strength at which this wall fails.
+It is the last strength at which the run confirmed the wall at rest before its
+iteration limit, and on a wall like this that depends on how far the run gets,
+nothing else: the plain solver needs many more iterations to bring the wall to
+rest, so at the same limit it prints 1.246, and given millions of iterations it
+confirms the wall at rest all the way to 1.86. The wall is not failing at any of
+those strengths. What a factor of safety should mean for a wall that does not
+fail is taken up after the panels, which show what the wall is doing at the
+last strength the search confirmed.
 
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=1000}
 

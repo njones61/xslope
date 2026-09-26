@@ -378,10 +378,8 @@ def _standing_edge_sentence(F, trial, trials, count, unit=""):
     if slowing is not None:
         return f"At F = {F:.4f} {_creep_slowing_clause(slowing, unit)}."
     if trial.get("converged") or trial.get("verdict") == "CONVERGED":
-        how = (", finished by the Newton corrector"
-               if trial.get("corrector") else "")
         return (f"At F = {F:.4f} the slope reached equilibrium in {n:,} "
-                f"{count}{how}.")
+                f"{count}.")
     settled = _stop_reading(trial, "joint_settled")
     if settled is not None:
         return (f"At F = {F:.4f} the joint slip and the displacements had stopped "
@@ -549,7 +547,8 @@ def ssrm_run_summary(result, fem_data=None):
     iteration limit", "Max iterations per trial").
 
     A run whose top trial ended undecided (``result['fs_is_lower_bound']``)
-    leads with that finding instead: no failure was found, the slope came to
+    leads with that finding instead: no failure was found up to the top of the
+    bracket (a failure counted above it is not denied), the slope came to
     rest at every strength tried up to the bracket's bottom (and whether it
     moved further each time, and how far it had moved there), what the top
     trial was doing when it stopped, and that the factor of safety is at least
@@ -622,7 +621,7 @@ def ssrm_run_summary(result, fem_data=None):
         bound = (f"The factor of safety is at least {ssrm_bound_text(FS)}."
                  + (" To go further, raise Max iterations per trial."
                     if top.get("exit_reason") == "inconclusive" else ""))
-        return _join("No failure was found.",
+        return _join(f"No failure was found up to F = {hi:.4f}.",
                      _came_to_rest_sentence(lo, trials, count, unit),
                      _undecided_sentence(hi, top, count), bound, accelerated,
                      took)

@@ -32,11 +32,11 @@ What this file locks:
 
   5. THE LOWER BOUND. A run whose top trial ended undecided reports the
      bracket's bottom as a lower bound: its summary leads with "No failure was
-     found." and says "The factor of safety is at least X" (cut down to two
-     decimals); the curve rules "FS ≥ X" at the confirmed strength; the result
-     panels read "FS ≥ X" and the undecided trial's panel "Last trial
-     (undecided)  FS ≥ X"; the run record carries the flag only where it is
-     true.
+     found up to F = X." (the top of the bracket) and says "The factor of
+     safety is at least X" (cut down to two decimals); the curve rules
+     "FS ≥ X" at the confirmed strength; the result panels read "FS ≥ X"
+     and the undecided trial's panel "Last trial (undecided)  FS ≥ X"; the
+     run record carries the flag only where it is true.
 
 Run directly:  PYTHONPATH=. python3 test/ssrm_curve_check.py
 Exits non-zero on any failure.
@@ -484,9 +484,9 @@ def check_summary():
     _SUMMARIES.append(result.get("summary") or "")
     import re
     jargon = [(w, s) for s in _SUMMARIES
-              for w in ("budget", "edge", "sweep", "verdict")
+              for w in ("budget", "edge", "sweep", "verdict", "corrector")
               if re.search(w, s, re.IGNORECASE)]
-    check("no summary says budget, edge, sweep or verdict", not jargon,
+    check("no summary says budget, edge, sweep, verdict or corrector", not jargon,
           f"{jargon[:1]}")
     contrast = [s for s in _SUMMARIES if re.search(r", not (by |the )", s)]
     check("no summary is built on an 'X, not Y' contrast", not contrast,
@@ -530,7 +530,8 @@ def check_lower_bound():
           (fem.ssrm_undecided_top(dict(rec, fs_is_lower_bound=False)) or {}).get("F")
           == 1.5703125)
     s = _said(fem.ssrm_run_summary(rec, {"unit_system": "SI"}))
-    want = ("No failure was found. The slope came to rest at every strength "
+    want = ("No failure was found up to F = 1.5703. The slope came to rest at "
+            "every strength "
             "tried up to F = 1.5625, moving further each time; at that strength "
             "it had moved 0.0767 m. At F = 1.5703 it was still creeping, more "
             "slowly all the time, when the 100,000-iteration limit came, so the "

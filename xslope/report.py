@@ -8970,8 +8970,10 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
             # down to the closing summary's two decimals.
             from .fem import ssrm_bound_text
             bound = ssrm_bound_text(fs)
+            top = (ssrm_record(bundle).get("final_interval") or (fs, fs))[1]
             sub.blocks.append(Prose(
-                f"The shear strength reduction search found no failure, so it "
+                f"The shear strength reduction search found no failure up to "
+                f"F = {float(top):.4f}, so it "
                 f"gives a lower bound on the factor of safety: at least {bound}."
                 + (f" {state}" if state else "") + drawn,
                 bold=[bound], links=links))
@@ -9105,7 +9107,7 @@ def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
                  f"safety, F = {float(interval[0]):.4f}, the highest strength at "
                  f"which the slope came to rest. The trial above it, at "
                  f"F = {float(interval[1]):.4f}, ended undecided, so the search "
-                 f"found no failure.")
+                 f"found no failure up to that strength.")
     limited = _failing_edge_on_budget(record)
     if limited is not None:
         F, iterations = limited

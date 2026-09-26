@@ -326,10 +326,10 @@ The Log says the same in words at the end of every strength reduction run:
 Read this summary on every run. Part 2 is a run where it says something
 different.
 
-A factor of safety of 1.137 is not a design margin for a retaining wall. The
-blocks are doing what a gravity wall does — standing on their own weight — and on
-a 3.6 m wall with a backslope that is not enough. That is what the reinforcement
-in the next section is for.
+A factor of safety of 1.137 is well below what a retaining wall needs. These
+blocks are holding the fill back by their own weight alone, and for a 3.6 m wall
+with sloping backfill behind it that is not enough. Part 2 adds the geogrid
+layers that make the wall work.
 
 ---
 

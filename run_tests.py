@@ -5009,6 +5009,7 @@ PREFLIGHT_BASE_PILES = _repo('docs/lem/files/xslope_piles.xlsx')
 PREFLIGHT_BASE_PILES_FEM = _repo('docs/fem/files/xslope_piles_fem.xlsx')
 PREFLIGHT_BASE_REINF = _repo('docs/inputs/slope/xslope_reinf.xlsx')
 PREFLIGHT_BASE_REINF_FEM = _repo('docs/fem/files/xslope_reinforce_fem.xlsx')
+PREFLIGHT_BASE_GRID_WALL = _repo('docs/tutorials/files/xslope_block_wall_grid.xlsx')
 PREFLIGHT_BASE_CRACK = _repo('docs/verification/files/rocscience/vp053.xlsx')
 #: A profile-line model, so its domain is built from Max Depth (profile sheet B2)
 #: and the writer can express the mutation that breaks it. This is also the file
@@ -5249,6 +5250,15 @@ def _pf_joint_pair(sd, both=True):
                        x1=5.0, y1=2.0, x2=25.0, y2=2.0)
         rows[1].update(joint='Yes' if both else 'No', adhesion=5.0, delta=25.0,
                        x1=15.0, y1=-2.0, x2=15.0, y2=6.0)
+    return sd
+
+
+def _pf_bonded_grid(sd, gap=0.0):
+    """The FEM-3 geogrid wall with its second sheet left bonded, its wall end
+    moved ``gap`` back from the back face (the face and a block course both
+    stand at that end)."""
+    r = sd['reinforcement_lines'][1]
+    r.update(joint='No', x1=float(r['x1']) + gap)
     return sd
 
 
@@ -6129,7 +6139,30 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_joint_pair(sd, both=False),
          control=lambda sd: _pf_joint_pair(sd, both=True),
-         expect='is a joint and touches'),
+         expect='crosses jointed line'),
+    # The FEM-3 geogrid wall with one sheet's Joint cleared: the bar ends on the
+    # back face and on a block course. A millionth of a meter off the face is
+    # still ON it for the mesher, so it is for the rule too; a millimeter short
+    # is clear of both. An exact touch is reported once for the bar, however
+    # many jointed lines it ends on.
+    dict(rule='joint.crosses_constraint_line', base=PREFLIGHT_BASE_GRID_WALL,
+         analysis='ssrm',
+         mutation=lambda sd: _pf_bonded_grid(sd, gap=1e-6),
+         control=lambda sd: sd,
+         expect="ends on jointed lines 'back face' and 'course-03'", count=1),
+    dict(rule='joint.crosses_constraint_line', base=PREFLIGHT_BASE_GRID_WALL,
+         analysis='ssrm',
+         mutation=lambda sd: _pf_bonded_grid(sd, gap=0.0),
+         control=lambda sd: _pf_bonded_grid(sd, gap=1e-3),
+         expect='set Joint = Yes on the reinforcement line, or end it short',
+         count=1),
+    # A pile has no Joint column: the message calls it a pile line and the fix
+    # is to move it.
+    dict(rule='joint.crosses_constraint_line', base=PREFLIGHT_BASE_PILES_FEM,
+         analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, x1=0.0, y1=0.0, x2=8.0, y2=0.0),
+         control=lambda sd: _pf_joint_sheet(sd, x1=20.0, y1=0.0, x2=28.0, y2=0.0),
+         expect="Pile line 1 ('pile') crosses jointed line 'seam'", count=1),
     # The joints sheet's own rows: a line with no reinforcement in it. What the
     # interface law cannot do without, and the two geometries the split cannot
     # represent.
@@ -6459,6 +6492,9 @@ def run_preflight_rules_test(test):
             elif not any(spec['expect'] in f.message for f in fired):
                 problems.append(f"{rid}: fired, but no message contained "
                                 f"{spec['expect']!r} (got {fired[0].message[:80]!r})")
+            elif 'count' in spec and len(fired) != spec['count']:
+                problems.append(f"{rid}: fired {len(fired)} time(s), expected "
+                                f"{spec['count']}")
 
             # 2. the negative control: the rule must be silent on a model that
             #    satisfies it.

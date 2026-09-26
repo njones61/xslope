@@ -265,6 +265,14 @@ interfaces act in series where a joints-sheet line carries one contact.
 [Ends, ties and the bar](reinforcement.md#ends-ties-and-the-bar) covers how such a sheet is
 anchored, and what the bar does and does not carry once the interfaces carry the grip.
 
+A reinforcement line that ends on a joint line, or crosses one, must be jointed itself or stop short
+of it; so must a pile, which cannot be jointed and has to stop short. The split gives every node on
+the joint one copy for each side, and a bonded bar shares the soil's own nodes, so a bar standing on
+one of those nodes has no single side to attach to. A geogrid running back from a block facing ends
+on the back-face joint, which is why each sheet in such a wall is set `Joint = Yes`. The model checks
+name the line and the joint before the mesh is built, and count an end that misses the joint by less
+than the mesher tells apart as on it.
+
 ## Running a Jointed Model
 
 ### The sweep budget

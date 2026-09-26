@@ -5582,35 +5582,102 @@ def _joint_lines_meet(ctx):
 
 
 @rule("joint.crosses_constraint_line", ERROR, ("fem",),
-      "A jointed line cannot cross another reinforcement or pile line.")
+      "A bonded reinforcement or pile line cannot end on or cross a jointed line.")
 def _joint_crosses(ctx):
-    from shapely.geometry import LineString
-    jointed = _all_joint_lines(ctx)
-    if not jointed:
-        return
-    jointed_labels = set(label for label, _r, _s in jointed)
-    others = []
+    from shapely.geometry import LineString, Point
+    from .mesh import _joint_line_tol, line_is_jointed
+
+    # The jointed lines, each with the name the message gives it.
+    jointed = []
     for i, r in enumerate(ctx.reinforcement):
         seg = _joint_seg(r)
-        if seg is not None:
-            others.append((ctx.reinf_label(i), seg, "reinforcement"))
+        if seg is None or not line_is_jointed(r):
+            continue
+        name = r.get("label")
+        jointed.append((f"'{name}'" if name else None,
+                        f"reinforcement line {i + 1}", seg))
+    for i, j in enumerate(ctx.joints):
+        seg = _joint_seg(j)
+        if seg is None:
+            continue
+        name = j.get("label")
+        jointed.append((f"'{name}'" if name else None,
+                        f"line {i + 1} on the joints sheet", seg))
+    if not jointed:
+        return
+
+    # The bonded members: reinforcement left bonded, and every pile.
+    bonded = []
+    for i, r in enumerate(ctx.reinforcement):
+        seg = _joint_seg(r)
+        if seg is not None and not line_is_jointed(r):
+            bonded.append((ctx.reinf_label(i), seg, "reinforcement"))
     for i, p in enumerate(ctx.piles):
         seg = _joint_seg(p)
         if seg is not None:
-            others.append((ctx.pile_label(i), seg, "pile"))
-    for lj, _rj, sj in jointed:
-        gj = LineString(list(sj))
-        for label, so, kind in others:
-            if label in jointed_labels:
-                continue          # two joints meeting is allowed; overlap has its own rule
-            if not gj.intersects(LineString(list(so))):
+            name = p.get("label") if isinstance(p, dict) else None
+            base = f"Pile line {i + 1}"
+            bonded.append((f"{base} ('{name}')" if name else base, seg, "pile"))
+    if not bonded:
+        return
+
+    # The mesher's own tolerance over the same geometry: a member it would
+    # refuse as touching a jointed line is one this rule reports.
+    lines = [list(s) for _n, _f, s in jointed] + [list(s) for _l, s, _k in bonded]
+    polys = []
+    for p in (ctx.sd.get("polygons") or []):
+        poly = p.get("polygon") if isinstance(p, dict) else None
+        if poly is not None and not poly.is_empty:
+            polys.append([tuple(c) for c in poly.exterior.coords])
+    tol = _joint_line_tol(lines, polys)
+
+    def _names(hits):
+        # "jointed line 'back face'", "jointed lines 'a' and 'b'", or, for a
+        # line with no label, "jointed line 3 on the joints sheet".
+        if all(n is not None for n, _f in hits):
+            head = "jointed line " if len(hits) == 1 else "jointed lines "
+            return head + _join_names([n for n, _f in hits])
+        return _join_names([f"jointed line {n}" if n is not None
+                            else f"jointed {f}" for n, f in hits])
+
+    for label, seg, kind in bonded:
+        g = LineString(list(seg))
+        ends, crosses = [], []
+        for name, fallback, sj in jointed:
+            gj = LineString(list(sj))
+            if g.distance(gj) > tol:
                 continue
-            yield (f"{lj} is a joint and touches {label}. The mesh splits along "
-                   f"a jointed line and every node on it is copied once per "
-                   f"wedge of material around it, so the {kind} line's own "
-                   f"element would keep one wedge's copy and lose the material "
-                   f"on the other side of the joint. Move the lines apart, or "
-                   f"make the {kind} line a joint too.")
+            if any(gj.distance(Point(q)) <= tol for q in seg):
+                ends.append((name, fallback))
+            else:
+                crosses.append((name, fallback))
+        if not ends and not crosses:
+            continue
+        what = "bar" if kind == "reinforcement" else "pile"
+        parts = []
+        if ends:
+            parts.append(f"ends on {_names(ends)}")
+        if crosses:
+            parts.append(f"crosses {_names(crosses)}")
+        verb = " or ".join(v for v, on in (("end on", ends), ("cross", crosses))
+                           if on)
+        if kind == "reinforcement":
+            fix = ("set Joint = Yes on the reinforcement line, or end it short "
+                   "of the joint." if not crosses else
+                   "set Joint = Yes on it or move it clear.")
+        else:
+            fix = ("end it short of the joint." if not crosses else
+                   "move it clear.")
+        yield (f"{label} {' and '.join(parts)}. A {what} bonded to the soil "
+               f"cannot {verb} a surface the soil is allowed to slide along; "
+               f"{fix}")
+
+
+def _join_names(names):
+    """``'a'``, ``'a' and 'b'``, ``'a', 'b' and 'c'``."""
+    if len(names) <= 1:
+        return "".join(names)
+    return ", ".join(names[:-1]) + " and " + names[-1]
 
 
 @rule("joint.line_load_on_line", ERROR, ("fem",),

@@ -1062,7 +1062,10 @@ MEET — at a T, a crossing, a corner, end to end — and the split copies the s
 wedge of material around it, which is what makes a facing column with a back-face joint, a base
 joint and a course joint at each mortar line into a stack rather than a notched solid. They may
 NOT lie on one another over a stretch, or run along the outside of the section, where there is
-material on one side only. A thin zone crossed by many joint lines needs a per-polygon `size`
+material on one side only. A reinforcement line that ends on or crosses a jointed line must be
+jointed too (`joint='Yes'`) or stop short of it, and a pile must stop short: the split copies the
+node, and a bonded member there has no side to attach to (preflight
+`joint.crosses_constraint_line` refuses it). A thin zone crossed by many joint lines needs a per-polygon `size`
 (the polygon sheet's Size column) — a 0.3 m facing column crossed every 0.6 m does not mesh at a
 1 m target size. LEM ignores the sheet entirely. See `docs/fem/reinforcement.md`, "Joints without
 reinforcement".

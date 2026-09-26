@@ -565,6 +565,12 @@ the foundation beneath. A sheet whose front end stops on the back face of a colu
 takes the material the line runs into past its end — the column — so the wrap's connection to the facing is what the
 tie represents.
 
+A sheet that ends on a joint line — the back face of a column, or a course joint between blocks — must itself be
+jointed, or stop short of the joint. The mesh is split along the joint, so the node at the sheet's end exists once
+for each side of it, and a bonded bar, which shares the soil's own nodes, has no single side to attach to. Preflight
+reports a bonded reinforcement or pile line that ends on or crosses a jointed line, naming both, before the mesh is
+built.
+
 ## Bonded Bar or Joint?
 
 The choice is about the mechanism, not about the material: does the slip surface **cut** the reinforcement, or run

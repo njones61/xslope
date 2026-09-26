@@ -27,10 +27,21 @@ What this file locks:
      90,000 and is counted as sliding.
 
   5. THE SENTENCES. The closing summary quotes a standing edge counted standing
-     by a slowing movement and a failing edge counted as sliding by a movement
-     that did not slow, in the Run dialog's words.
+     by a slowing movement (from where it was, or from the estimated resting
+     state), a failing edge counted as sliding by a movement that did not slow,
+     and one still slowing at the limit that the corrector could not finish, in
+     the Run dialog's words.
 
-Run directly:  PYTHONPATH=. python3 test/creep_trend_check.py
+  6. THE SEEDS (minutes; skipped with --quick). The FEM-3 geogrid wall at
+     F = 1.25, at its page settings: at 100,000 iterations the movement is dying
+     away and the corrector refuses both seeds, the block-end state and the
+     estimated resting state. At a 200,000 allowance each seed on its own
+     certifies at 140,000 and the hold test holds it, at about 1.30 elastic
+     displacements, where the plain sweep's own rest (465,581 iterations) is
+     1.297. It is the corrector attempt at every block end after the warm-up that
+     stands this trial; the extrapolation adds nothing measurable on it.
+
+Run directly:  PYTHONPATH=. python3 test/creep_trend_check.py [--quick]
 Exits non-zero on any failure.
 """
 import json
@@ -197,6 +208,7 @@ def check_sentences():
     slowing = dict(rule='slowing', window=50000, block=10000, iteration=100000,
                    increments=[0.02, 0.016, 0.0128, 0.0102, 0.0082], ratio=0.8,
                    extrapolated=0.0006, max_displacement=0.023,
+                   seed='extrapolated',
                    corrector={'certified': True, 'hold': {'held': True}})
     sliding = dict(rule='not_slowing', window=50000, block=10000,
                    iteration=90000, ratio=0.96,
@@ -214,10 +226,16 @@ def check_sentences():
     check("the standing edge is quoted by its slowing movement",
           "was still moving at iteration 100,000, but slowing" in summary
           and "fell by 59% over the last 50,000" in summary)
-    check("with the corrector's balanced state and the hold test",
-          "the corrector found the balanced state 0.0006" in summary
+    check("from the estimated resting state, with the hold test",
+          "the corrector found the balanced state from the estimated resting "
+          "state, 0.0006 m further on" in summary
           and "the hold test confirmed it" in summary
-          and "counted as standing at 0.023" in summary)
+          and "counted as standing at 0.023 m" in summary)
+    s_as_is = fem.creep_sentence(dict(slowing, seed='as_is'), 1.25, "m")
+    check("from where it was, when the block-end state itself certified",
+          "the corrector found the balanced state from where it was and the "
+          "hold test confirmed it, so it was counted as standing at 0.023 m."
+          in s_as_is, s_as_is)
     check("the failing edge is counted as sliding, with its ratio",
           "At F = 1.2578 it did not: over the last 50,000 iterations the "
           "movement per iteration did not slow (ratio 0.96), so the trial was "
@@ -264,12 +282,70 @@ def check_sentences():
           in note, note)
 
 
+def _grid_trial(budget, seeds):
+    """The FEM-3 geogrid wall's trial at F = 1.25 at its page settings (the
+    tutorial's lock tag), on the reference kernel, with Max iterations per trial
+    set to ``budget`` and the trend reading's seeds limited to ``seeds``."""
+    import contextlib
+    import io
+    import run_tests as rt
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    page = os.path.join(here, "docs", "tutorials", "fem03_block_wall_joints.md")
+    tag = next(dict(t) for t in rt.parse_test_tags(page)
+               if t.get("benchmark") == "FEM-3-grid-ssrm")
+    tag["file"] = os.path.normpath(os.path.join(os.path.dirname(page), tag["file"]))
+    with contextlib.redirect_stdout(io.StringIO()):
+        fem_data, kw, f_min, f_max, tol = rt.build_fem_ssrm_case(tag)
+    kw = dict(kw, capture_failure_state=False, max_iterations=int(budget),
+              max_iterations_ceiling=int(budget))
+    saved = fem.CREEP_SEEDS
+    fem.CREEP_SEEDS = tuple(seeds)
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            with rt._force_fast_kernel(fem, False):
+                res = fem.solve_ssrm(fem_data, F_min=f_min, F_max=f_max,
+                                     tolerance=tol, trial_factors=[1.25], **kw)
+    finally:
+        fem.CREEP_SEEDS = saved
+    return next(t for t in res["trials"] if abs(t["F"] - 1.25) < 1e-12)
+
+
+def check_seeds():
+    print("\n6. the corrector's seeds on the geogrid wall at F = 1.25 (minutes)")
+    ue = 0.017436613824979727          # the trial's elastic max|u|, m
+    t = _grid_trial(100000, ('as_is', 'extrapolated'))
+    rd = t.get("stop_reading") or {}
+    seeds = [(a["seed"], a["certified"]) for a in rd.get("attempts") or []]
+    check("at the page's 100,000 the trial is slowing and both seeds are refused",
+          not t["stable"] and rd.get("rule") == "slowing_refused"
+          and seeds == [("as_is", False), ("extrapolated", False)],
+          f"{t['exit_reason']}, {rd.get('rule')}, {seeds}")
+    for seeds_in, want in ((('as_is',), 'as_is'),
+                           (('extrapolated',), 'extrapolated')):
+        t = _grid_trial(200000, seeds_in)
+        rd = t.get("stop_reading") or {}
+        hold = (rd.get("corrector") or {}).get("hold") or {}
+        u = float(rd.get("max_displacement") or 0.0)
+        check(f"at a 200,000 allowance the {want} seed certifies at 140,000",
+              t["stable"] and rd.get("rule") == "slowing"
+              and rd.get("seed") == want and rd.get("iteration") == 140000,
+              f"{t['exit_reason']}, {rd.get('rule')}, seed {rd.get('seed')}, "
+              f"at {rd.get('iteration')}")
+        check(f"  and the hold test holds it, at about 1.30 elastic "
+              f"displacements", hold.get("held") is True
+              and 1.29 <= u / ue <= 1.32, f"held {hold.get('held')}, "
+              f"{u / ue:.3f} u_el")
+
+
 def main():
+    quick = "--quick" in sys.argv
     check_classes()
     check_ratio_not_count()
     check_extrapolation()
     check_recorded()
     check_sentences()
+    if not quick:
+        check_seeds()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"{len(FAILURES)} trend reading check(s) FAILED:")

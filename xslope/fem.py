@@ -487,7 +487,8 @@ def ssrm_run_summary(result, fem_data=None):
     limit, the out-of-balance force's fall (the iteration ceiling), the slip's
     growth while the joints settled (counted as standing), and the trend of the
     movement at the iteration limit: slowing, with the corrector's balanced state
-    that far on (counted as standing); slowing, with the corrector unable to find
+    found from where the trial was or from the estimated resting state (counted
+    as standing); slowing, with the corrector unable to find
     the balanced state from there (counted as failed, and the factor of safety
     depends on the limit); or not slowing (counted as sliding). A trial saved
     before readings were recorded gets the shorter sentence it always had.
@@ -4944,13 +4945,14 @@ def _slip_rate_reading(slip_hist, h, n, rates=True):
 # iterations, so a plain and an accelerated sweep read the same trial the same way.
 #: The extrapolated seed carries the plastic strains and the joint slip forward by
 #: the same ratio as the field. False seeds the extrapolated field on the latest
-#: snapshot's strains and slip, which is the order's first reading; on the FEM-3
-#: geogrid wall at F = 1.25 that seed is refused at every block (the corrector
-#: diverges), which is why the strains go with the field.
+#: snapshot's strains and slip. On the FEM-3 geogrid wall at F = 1.25 and 100,000
+#: iterations both forms, and Aitken's per-component form of each, were refused
+#: at every block (the corrector diverges).
 CREEP_EXTRAPOLATE_STATE = True
-#: The trend reading's extrapolation, on. False seeds the corrector on the latest
-#: snapshot itself (no extrapolation) — the comparison the seed test locks.
-CREEP_EXTRAPOLATE = True
+#: The trend reading's corrector seeds, in the order they are tried: the
+#: block-end state as it is ('as_is'), then, where that is refused, the estimated
+#: resting state ('extrapolated'). A study drops either to measure the other.
+CREEP_SEEDS = ('as_is', 'extrapolated')
 _CREEP_BLOCKS = 5
 _CREEP_BLOCK_FRAC = 0.1
 _CREEP_DYING_MAX = _JOINT_MOVING_DECAY_MIN
@@ -5033,12 +5035,17 @@ def _creep_slowing_clause(rd, unit=""):
     fell = 1.0 - (inc[-1] / inc[0]) if inc[0] > 0 else 0.0
     hold = (rd.get('corrector') or {}).get('hold')
     held = " and the hold test confirmed it" if (hold and hold.get('held')) else ""
+    if rd.get('seed') == 'extrapolated':
+        held = "," + held if held else held
+        where = (f"from the estimated resting state, "
+                 f"{float(rd.get('extrapolated') or 0.0):.3g}{u} further on")
+    else:
+        where = "from where it was"
     return (f"the slope was still moving at iteration "
             f"{int(rd.get('iteration', 0)):,}, but slowing (the movement per "
             f"{int(rd.get('block', 0)):,} iterations fell by {_ssrm_pct(fell)} over "
             f"the last {int(rd.get('window', 0)):,}); the corrector found the "
-            f"balanced state {float(rd.get('extrapolated') or 0.0):.3g}{u} further "
-            f"on{held}, so it was counted as standing at "
+            f"balanced state {where}{held}, so it was counted as standing at "
             f"{float(rd.get('max_displacement') or 0.0):.3g}{u}")
 
 
@@ -7091,62 +7098,84 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
 
     def _creep_attempt(rd, snaps, u_now, groups_now, vp_iterations,
                        softened_now=None):
-        """The trend reading's corrector attempt (see `creep_trend`): seed the
-        corrector where a dying-away movement is heading, and certify as the
-        corrector does. Fills ``rd`` with the extrapolation and the attempt's
-        outcome; returns the certified solution (with ``stop_reading``) or None.
-        The field, the plastic strains and the joint slip are carried forward
-        together (CREEP_EXTRAPOLATE_STATE); the joint open / latch state is the
-        latest snapshot's."""
-        if len(snaps) < 3:
-            rd['extrapolated'] = None
-            return None
-        u_rest_free, r_f = creep_extrapolate([x["u"] for x in snaps],
-                                             rd.get('ratio'))
-        rd['field_ratio'] = float(r_f)
-        if u_rest_free is None:
-            rd['extrapolated'] = None
-            return None
-        if not CREEP_EXTRAPOLATE:
-            u_rest_free = np.asarray(snaps[-1]["u"], dtype=float)
-        u_seed = np.asarray(u_now, dtype=float).copy()
-        u_seed[free_dofs] = u_rest_free
-        ahead = float(np.max(np.abs(u_seed[_trans_dofs] - u_now[_trans_dofs])))
-        rd['extrapolated'] = ahead
-        rd['extrapolated_u_ratio'] = (
-            float(np.max(np.abs(u_seed[_trans_dofs] - u_datum[_trans_dofs])))
-            / u_elastic_scale_now[0] if u_elastic_scale_now[0] > 0 else None)
-        # The plastic strains and the joint slip go with the field, by the same
-        # ratio: a displacement carried forward over strains held back is a
-        # state no sweep passes through (see CREEP_EXTRAPOLATE_STATE).
-        _pc = (CREEP_EXTRAPOLATION == 'aitken')
-        evp_seed = slip_seed = None
-        if CREEP_EXTRAPOLATE_STATE and CREEP_EXTRAPOLATE:
-            evp_seed = [_creep_carry(e0, e1, e2, r_f, _pc) for e0, e1, e2 in
-                        zip(snaps[0]["evp"], snaps[1]["evp"], snaps[2]["evp"])]
-            if all(x["slip"] is not None for x in snaps):
-                slip_seed = _creep_carry(snaps[0]["slip"], snaps[1]["slip"],
-                                         snaps[2]["slip"], r_f, _pc)
-        rd['extrapolated_state'] = bool(CREEP_EXTRAPOLATE_STATE
-                                        and CREEP_EXTRAPOLATE)
-        rd['extrapolated_field'] = bool(CREEP_EXTRAPOLATE)
-        rd['extrapolation'] = str(CREEP_EXTRAPOLATION)
-        _n_before = len(_corr_attempts)
-        _c = _try_corrector(u_seed, groups_now, f"trend:{int(vp_iterations)}",
-                            vp_iterations, softened_now,
-                            evp_seed=evp_seed, slip_seed=slip_seed)
-        _att = _corr_attempts[-1] if len(_corr_attempts) > _n_before else {}
-        rd['corrector'] = dict(
-            certified=bool(_c is not None),
-            nr_iterations=_att.get('nr_iterations'),
-            oob=_att.get('oob'), yield_violation=_att.get('yield_violation'),
-            exit_reason=_att.get('exit_reason'),
-            hold=(None if _att.get('hold') is None else {
-                k: _att['hold'].get(k) for k in (
-                    'held', 'verdict', 'exit_reason', 'sweeps', 'drift',
-                    'drift_u_el')}))
+        """The trend reading's corrector attempts (see `creep_trend`), in order:
+        the block-end state as it is, then, where that is refused and the
+        movement gives a ratio to carry it by, the estimated resting state (see
+        `creep_extrapolate`; the field, the plastic strains and the joint slip
+        carried forward together, the joint open / latch state the latest
+        snapshot's). A certification is taken as the corrector takes it (force,
+        yield and, on a jointed model, the hold test). Fills ``rd`` with every
+        attempt (``attempts``: the seed, the corrector's starting residual and
+        its outcome) and ``seed`` ('as_is' or 'extrapolated') for the one that
+        certified; returns the certified solution (with ``stop_reading``) or
+        None.
+
+        The order is measured. On the FEM-3 geogrid wall at F = 1.25 (plain,
+        200,000 allowance) both seeds certify at 140,000 and both hold; the
+        block-end state starts the corrector at a residual of 0.39 and lands at
+        1.299 elastic displacements, beside the plain sweep's own rest at
+        1.297, while the extrapolated seed starts at 22.1 and lands on a
+        neighboring held state 1.3% further out. At 100,000 both are refused."""
+        rd['attempts'] = []
+        rd['seed'] = None
+
+        def _one(seed, u_seed, evp_seed=None, slip_seed=None):
+            _n_before = len(_corr_attempts)
+            _c = _try_corrector(u_seed, groups_now,
+                                f"trend:{int(vp_iterations)}"
+                                + ("" if seed == 'as_is' else ":extrapolated"),
+                                vp_iterations, softened_now,
+                                evp_seed=evp_seed, slip_seed=slip_seed)
+            _att = _corr_attempts[-1] if len(_corr_attempts) > _n_before else {}
+            rec = dict(
+                seed=seed, certified=bool(_c is not None),
+                r_first=(_att.get('nr_diag') or {}).get('r_first'),
+                nr_iterations=_att.get('nr_iterations'),
+                oob=_att.get('oob'), yield_violation=_att.get('yield_violation'),
+                exit_reason=_att.get('exit_reason'),
+                hold=(None if _att.get('hold') is None else {
+                    k: _att['hold'].get(k) for k in (
+                        'held', 'verdict', 'exit_reason', 'sweeps', 'drift',
+                        'drift_u_el')}))
+            rd['attempts'].append(rec)
+            rd['corrector'] = rec
+            return _c
+
+        _c = None
+        if 'as_is' in CREEP_SEEDS:
+            _c = _one('as_is', np.asarray(u_now, dtype=float))
+        if _c is None and 'extrapolated' in CREEP_SEEDS and len(snaps) >= 3:
+            u_rest_free, r_f = creep_extrapolate([x["u"] for x in snaps],
+                                                 rd.get('ratio'))
+            rd['field_ratio'] = float(r_f)
+            if u_rest_free is not None:
+                u_seed = np.asarray(u_now, dtype=float).copy()
+                u_seed[free_dofs] = u_rest_free
+                rd['extrapolated'] = float(np.max(np.abs(
+                    u_seed[_trans_dofs] - u_now[_trans_dofs])))
+                rd['extrapolated_u_ratio'] = (
+                    float(np.max(np.abs(u_seed[_trans_dofs]
+                                        - u_datum[_trans_dofs])))
+                    / u_elastic_scale_now[0]
+                    if u_elastic_scale_now[0] > 0 else None)
+                # The plastic strains and the joint slip go with the field, by
+                # the same ratio (see CREEP_EXTRAPOLATE_STATE).
+                _pc = (CREEP_EXTRAPOLATION == 'aitken')
+                evp_seed = slip_seed = None
+                if CREEP_EXTRAPOLATE_STATE:
+                    evp_seed = [_creep_carry(e0, e1, e2, r_f, _pc)
+                                for e0, e1, e2 in zip(snaps[0]["evp"],
+                                                      snaps[1]["evp"],
+                                                      snaps[2]["evp"])]
+                    if all(x["slip"] is not None for x in snaps):
+                        slip_seed = _creep_carry(
+                            snaps[0]["slip"], snaps[1]["slip"],
+                            snaps[2]["slip"], r_f, _pc)
+                rd['extrapolation'] = str(CREEP_EXTRAPOLATION)
+                _c = _one('extrapolated', u_seed, evp_seed, slip_seed)
         if _c is None:
             return None
+        rd['seed'] = rd['attempts'][-1]['seed']
         rd['rule'] = 'slowing'
         rd['iteration'] = int(vp_iterations)
         rd['max_displacement'] = float(_c.get('max_displacement', np.nan))

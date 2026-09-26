@@ -589,6 +589,7 @@ class FemRunner(RunnerThread):
                                      max_iterations_ceiling=(
                                          opts.get("max_iterations_ceiling") or 50000),
                                      k0=opts.get("k0"),
+                                     accelerate=opts.get("accelerate"),
                                      progress_callback=fem_cb)
                 print(f"FEM solve: converged={solution.get('converged')}, "
                       f"iterations={solution.get('iterations')}")
@@ -616,6 +617,9 @@ class FemRunner(RunnerThread):
                     capture_failure_state=opts.get("capture_failure_state", True),
                     capture_margin=opts.get("capture_margin", 0.15),
                     capture_max_iterations=opts.get("capture_max_iterations"),
+                    # The Run FEM dialog's "Accelerate convergence" box; None
+                    # (a caller with no dialog) takes the module default.
+                    accelerate=opts.get("accelerate"),
                     cancel_check=self._cancel.is_set, progress_callback=cb)
                 if not result.get("converged", False):
                     self.failed.emit(f"SSRM did not converge: "

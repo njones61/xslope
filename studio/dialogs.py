@@ -605,6 +605,22 @@ class RunFemDialog(QDialog):
             "failure, and the Log says so.")
         form.addRow("Iteration ceiling", self.max_iterations_ceiling)
 
+        # The accelerated sweep (xslope.fem.ACCELERATE_DEFAULT): on by default for
+        # a model that carries a joint, where a trial settles over tens of
+        # thousands of sweeps and the multiplier reaches the same state in fewer.
+        self.accelerate = QCheckBox("Accelerate convergence")
+        _acc_default = defaults.get("accelerate")
+        self.accelerate.setChecked(bool(self._opening_criterion() == "hybrid")
+                                   if _acc_default is None else bool(_acc_default))
+        self.accelerate.setToolTip(
+            "Take longer steps where each iteration's movement shows the solution "
+            "is still heading the same way, so a slowly settling trial reaches "
+            "the same balanced state in fewer iterations. A step that would change "
+            "whether a joint is open or slipping is taken at the ordinary length. "
+            "Checked by default on a model with joints, where trials settle "
+            "slowly; the closing summary says when it was on.")
+        form.addRow("", self.accelerate)
+
         # Side boundary condition (v21 main!D22). Applies to both a single trial and
         # the SSRM — it is part of how the model is restrained, not part of the
         # reduction — so it is never gated by the analysis type.
@@ -946,6 +962,7 @@ class RunFemDialog(QDialog):
             "tolerance": self.tolerance.value(),
             "max_iterations": self.max_iterations.value(),
             "max_iterations_ceiling": self.max_iterations_ceiling.value(),
+            "accelerate": self.accelerate.isChecked(),
             "failure_criterion": self.failure_criterion.currentData(),
             "min_slip_depth": (self.min_slip_depth.value()
                                if self.min_slip_on.isChecked()

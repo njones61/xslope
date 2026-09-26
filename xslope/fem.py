@@ -490,7 +490,9 @@ def ssrm_run_summary(result, fem_data=None):
     found from where the trial was or from the estimated resting state (counted
     as standing); slowing, with the corrector unable to find
     the balanced state from there (counted as failed, and the factor of safety
-    depends on the limit); or not slowing (counted as sliding). A trial saved
+    depends on the limit); or not slowing (counted as sliding).
+    A run whose trials used the accelerated sweep says "Convergence acceleration
+    was on." before the wall time. A trial saved
     before readings were recorded gets the shorter sentence it always had.
     :func:`solve_ssrm` prints the summary at the end of every run and returns it
     as ``result['summary']``.
@@ -535,12 +537,15 @@ def ssrm_run_summary(result, fem_data=None):
         return _join(head, "The run kept no record of its trials, so what "
                      "happened at either end of the bracket is not known.", took)
     unit = _ssrm_length_unit(fem_data)
+    accelerated = ("Convergence acceleration was on."
+                   if any((t.get("acceleration") or {}).get("on")
+                          for t in trials) else "")
     return _join(head,
                  _standing_edge_sentence(lo, _edge_trial(trials, lo, True),
                                          trials, count, unit),
                  _failing_edge_sentences(hi, _edge_trial(trials, hi, False),
                                          count, unit),
-                 took)
+                 accelerated, took)
 
 
 def ssrm_run_record(result, fem_data=None, options=None):
@@ -4640,9 +4645,14 @@ _JOINT_RELIEF_STEP = 0.1
 #   * off in the K0 in-situ solve (every trial's datum), exclusive of the
 #     interface relief, the corrector and its hold test unchanged.
 #
-#: Module default for `solve_fem(accelerate=...)` / `solve_ssrm(accelerate=...)`.
-#: OFF: no locked factor of safety is defined with it on.
-ACCELERATE_DEFAULT = False
+#: Module default for `solve_fem(accelerate=...)` / `solve_ssrm(accelerate=...)`
+#: when the caller passes None: 'jointed' turns it on for a model that carries a
+#: joint (and has the interface relief off, which it is exclusive of) and leaves
+#: every other model on the plain sweep; True / False turn it on / off for every
+#: model. Measured over the 32 jointed locks (rL_creep_rule.md): the same locks,
+#: the FEM-3 geogrid wall moved toward the longer plain runs, and 19% less wall
+#: time over the set.
+ACCELERATE_DEFAULT = 'jointed'
 #: The multiplier's clamp. The floor is 1, the plain sweep's own pace: the review's
 #: [0.2, 50] let a sliding trial take mostly 0.2-steps (the formula has no target on
 #: a mechanism with no fixed point, so it reads noise; the safeguard refuses the
@@ -6294,8 +6304,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             ACCELERATE_DEFAULT for the whole rule). The fixed point is the plain
             sweep's; what changes is how many sweeps reach it. The multiplier
             waits until the trial's last corrector checkpoint has been read. None
-            takes the module default (`ACCELERATE_DEFAULT`, OFF). Exclusive of
-            the interface relief. The result carries what the multiplier did under
+            takes the module default (`ACCELERATE_DEFAULT`: on for a model that
+            carries a joint and has the interface relief off, off otherwise).
+            Exclusive of the interface relief when asked for explicitly. The result carries what the multiplier did under
             ``"accelerate"`` when it is on, and no such key when it is off.
         joint_tangent_factor (float or None): The residual stiffness a relieved
             pair keeps in the matrix, as a fraction of its elastic value. None
@@ -7450,7 +7461,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # ---- The accelerated sweep (see ACCELERATE_DEFAULT) ----
     # `_acc` is None with it off, and every line below that reads it is then
     # skipped, so the plain loop runs exactly the arithmetic it always did.
-    _acc_on = bool(ACCELERATE_DEFAULT if accelerate is None else accelerate)
+    if accelerate is not None:
+        _acc_on = bool(accelerate)
+    elif ACCELERATE_DEFAULT == 'jointed':
+        _acc_on = bool(has_joints and not joint_relief_on)
+    else:
+        _acc_on = bool(ACCELERATE_DEFAULT)
     _acc = None
     if _acc_on:
         if joint_relief_on:
@@ -14270,7 +14286,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         accelerate (bool or None): The accelerated sweep (see solve_fem's entry
             and ACCELERATE_DEFAULT), passed to every trial's solve_fem. The
             in-situ equilibration always runs the plain sweep: its state is every
-            trial's datum. None takes the module default (OFF).
+            trial's datum. None takes the module default (on for a model that
+            carries a joint; see ACCELERATE_DEFAULT).
         fem_solver (str or None): Which per-trial driver runs, passed to every
             solve_fem trial — 'auto' (the default: the viscoplastic loop with the
             Newton corrector and the yield gate), 'viscoplastic' (that loop alone,

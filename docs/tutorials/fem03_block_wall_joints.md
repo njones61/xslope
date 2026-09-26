@@ -516,11 +516,11 @@ the force in that tie at the facing is the **Tend1** column of the details
 table. The 70% of capacity the layer has in hand is what keeps this wall from
 failing.
 
-The sheets are entered as jointed sheets (`Joint = Yes`) because they end on
-the wall's back-face joint. The mesh is split along that joint, so every node
-on it exists twice, one copy on each side, and a bonded bar cannot be attached
-to a node like that; the program refuses it when the mesh is built. On this
-wall the jointing makes almost no difference to the answer. Sliding along a
+The sheets are entered as jointed sheets (`Joint = Yes`) because they are tied
+into a wall whose back face is itself a joint. A bar bonded to the soil cannot
+end on a surface the soil is allowed to slide along, so a sheet that meets a
+joint has to be a joint too, or stop short of it. On this wall the jointing
+makes almost no difference to the answer. Sliding along a
 sheet would show in the 1D details as the shear stress sitting on the
 Mohr-Coulomb limit over a length of the sheet, with the slip rising along that
 length, and in the blocks panel as the sheet's faces turning green along it.

@@ -566,7 +566,7 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
         handles, labels = [], []
         if len(bar_cap) == len(bar_s):
             cap, = ax_T.step(bar_s, bar_cap, where="mid", linestyle="--",
-                             linewidth=1.3, color=C_ENVELOPE)
+                             linewidth=1.3, color=C_ENVELOPE, zorder=3)
             handles.append(cap)
             labels.append("Bar capacity")
         mob, = ax_T.plot(bar_s, bar_T, "-o", color=C_FORCE, linewidth=1.7,
@@ -587,8 +587,10 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
     # --- shear traction against its limit ----------------------------------
     ts = np.abs(np.asarray(profile["ts"], dtype=float))
     tlim = np.asarray(profile["tlim"], dtype=float)
-    lim, = ax_s.plot(s, tlim, "--", color=C_ENVELOPE, linewidth=1.3)
-    mob, = ax_s.plot(s, ts, "-", color=C_FORCE, linewidth=1.6)
+    # The limit is drawn on top of the shear stress: where the interface slips
+    # the two coincide, and the dashed limit must stay visible there.
+    mob, = ax_s.plot(s, ts, "-", color=C_FORCE, linewidth=1.6, zorder=2)
+    lim, = ax_s.plot(s, tlim, "--", color=C_ENVELOPE, linewidth=1.3, zorder=3)
     h, l = [lim, mob], ["Mohr-Coulomb limit", "Shear stress"]
     slipping = np.asarray(profile["slipping"], dtype=bool)
     opened = np.asarray(profile["open"], dtype=bool)

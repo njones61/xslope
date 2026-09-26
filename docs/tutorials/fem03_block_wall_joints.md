@@ -535,8 +535,9 @@ contacts and into the sheets, the wall slows, and it comes to rest again a
 little further out. At 1.5, with a third of the soil's strength taken away, the
 wall has moved 6 cm and come to rest; at 1.5625 it has moved 7.7 cm, the layers
 carry a third of their capacity, and two-thirds is still in hand. The strength
-at which they would run out lies beyond the top of the search range. So in the
-range a strength reduction covers, this wall has no strength limit. It has a
+at which they run out lies at the very top of the search range, as the long run
+below shows. So in the range the default search covers, this wall has no
+strength limit. It has a
 movement that grows with every step of strength taken from the soil, and the
 search reports the strength at which its iteration limit stopped answering:
 at least 1.56 at the default settings, 1.246 with the accelerator off, higher
@@ -561,6 +562,47 @@ telling you that you are looking at this kind of wall. A limit equilibrium analy
 entered as reinforcement, asks the strength question directly and does not
 depend on movement at all; [FEM-2](fem02_reinforcement.md) runs a reinforced
 slope both ways.
+
+### The same search with a much larger limit
+
+The default limit is what stopped the search at 1.56. With **Max iterations per
+trial** raised to 1,000,000 (and the iteration ceiling raised to match) the
+search goes on until the wall gives way. This is not a run to repeat: it takes
+70 minutes on an ordinary desktop, and the results below are from it.
+
+![Displacement against strength reduction factor with a million-iteration limit: the wall comes to rest at every strength up to 1.9922, moving further each time, and runs away at 2.0](images/fem03_ssrm_curve_grid_long.png){width=1000}
+
+The wall comes to rest at every strength tried up to F = 1.9922, and its
+movement grows the whole way: 6 cm at 1.5, 13 cm at 1.75, 19 cm at 1.875 and
+30 cm at 1.9922, a twelfth of the wall's height. At 2.0 the movement runs away,
+and the search reports
+
+>>**FS = 1.996**
+
+> The factor of safety is 1.996, the midpoint of the bracket F = 1.9922 to
+> 2.0000. At F = 1.9922 the slope reached equilibrium in 229,503 iterations. At
+> F = 2.0000 it did not: the largest displacement reached 15.0 times the elastic
+> value at iteration 210,841. Convergence acceleration was on. The run took
+> 1 h 9 min.
+
+So this wall does have a strength limit, and it is the geogrid's. At 1.9922 the
+top layer is carrying 98.6% of its 40 kN/m capacity, the middle layer 72% and
+the bottom layer 57%; the back face has slid 80 mm and the base 25 mm. Here is
+the top layer:
+
+![The top layer's 1D details at F = 1.9922: the bar's tension at its capacity along most of its length](images/fem03_1d_details_grid_long.png){width=1000}
+
+One more step in strength and the top layer has nothing left to give, and the
+wall goes. This is the failed state at 2.0, drawn to scale, with no
+exaggeration:
+
+![The wall at 2.0, drawn at true scale: the block column pushed out and sunk into the foundation, the fill behind it collapsed, and the geogrid layers dragged out with it](images/fem03_fem_blocks_grid_long_failure.png){width=1000}
+
+That is the failure the strength reduction was looking for, and it is real. But
+it arrives with the soil at half its strength, after 30 cm of movement on a
+wall 3.6 m high, and no wall is allowed to move that far. The strength limit
+answers the strength question. For this wall the movement is the answer that
+matters, and it is read from the curve.
 
 ---
 

@@ -3217,7 +3217,7 @@ _SSRM_CURVE_ENDINGS = {
     "displacement_limit": ("past the displacement limit", "^"),
     "steady_slip": ("sliding steadily on its joints", "D"),
     "not_slowing": ("did not slow, counted as sliding", "D"),
-    "inconclusive": ("still slowing when the limit came, an open question", "p"),
+    "inconclusive": ("still slowing when the limit came, left undecided", "p"),
     "yield_gate": ("settled outside the yield surface", "D"),
     "nonfinite": ("calculation stopped producing numbers", "X"),
 }
@@ -3283,8 +3283,8 @@ def ssrm_curve_unavailable(record):
 def _ssrm_curve_legend(ax, handles, labels, title):
     """The key, in the joint-slip panel's styling, in the first corner of the axes
     the drawing leaves empty — tested against the drawn points, the lines joining
-    them and the factor-of-safety rule — or outside the axes on the right where no
-    corner is clear."""
+    them and the factor-of-safety rule — or, where no corner is clear, in reserved
+    space below the axes, in two columns, so the plot keeps its full width."""
     from matplotlib.legend_handler import HandlerTuple
     style = dict(fontsize=8, frameon=True, framealpha=0.92, edgecolor="#cccccc",
                  borderpad=0.6, handlelength=2.6, title=title, title_fontsize=8,
@@ -3320,8 +3320,8 @@ def _ssrm_curve_legend(ax, handles, labels, title):
         if not np.any(inside):
             return leg
         leg.remove()
-    return ax.legend(handles, labels, loc="upper left", bbox_to_anchor=(1.0, 1.0),
-                     **style)
+    return ax.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, -0.16),
+                     ncol=2, **style)
 
 
 def plot_ssrm_curve(ax, record, fs=None, final_interval=None, fem_data=None,

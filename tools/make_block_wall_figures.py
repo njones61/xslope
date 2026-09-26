@@ -643,12 +643,13 @@ def _pair(deform_name, strain_name, fem_data, result, deform_type):
     the page, in both field states, saved so that they MATCH: the same image
     size, the same section frame, the same font size.
 
-    The strain panel carries colorbars, which take their width from its axes;
-    saved on its own, a deformation panel with no colorbar comes out narrower
-    and the page then scales the two differently. So each deformation figure
-    takes the strain figure's size and axes position, and both are saved to
-    the strain figure's own tight box — the deformation panel simply has empty
-    paper where the colorbars would be."""
+    The strain panel carries two color scales and the deformation panel one, so
+    each deformation figure takes the strain figure's size and axes position
+    (the sections are drawn at the same scale) and each is saved to ITS OWN
+    tight box, with no blank paper. The two images then differ in width, and
+    the page sets the deformation figure's width in proportion so the sections
+    line up: the width to use at a strain-panel width of 1000 is printed beside
+    each file."""
     import matplotlib.pyplot as plt
     from xslope.plot_fem import plot_fem_results
 
@@ -667,14 +668,18 @@ def _pair(deform_name, strain_name, fem_data, result, deform_type):
                              plot_type=["shear_strain"], **kw)
             fig_s = plt.gcf()
         fig_s.canvas.draw()
-        box = fig_s.get_tightbbox(fig_s.canvas.get_renderer())
+        box_s = fig_s.get_tightbbox(fig_s.canvas.get_renderer())
         ax_s = fig_s.axes[0]
         fig_d.set_size_inches(fig_s.get_size_inches())
         fig_d.axes[0].set_position(ax_s.get_position())
-        for fig, name in ((fig_s, strain_name), (fig_d, deform_name)):
+        fig_d.canvas.draw()
+        box_d = fig_d.get_tightbbox(fig_d.canvas.get_renderer())
+        for fig, name, box in ((fig_s, strain_name, box_s), (fig_d, deform_name, box_d)):
             out = os.path.join(OUT_DIR, name.replace(".png", suffix + ".png"))
             fig.savefig(out, dpi=200, bbox_inches=box.padded(0.1))
-            print("-> %s" % os.path.basename(out))
+            width = round(1000 * (box.width + 0.2) / (box_s.width + 0.2))
+            print("-> %s  (page width %d at a strain-panel width of 1000)"
+                  % (os.path.basename(out), width))
         plt.close("all")
 
 

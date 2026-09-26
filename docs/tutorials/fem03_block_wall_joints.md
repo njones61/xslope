@@ -514,7 +514,7 @@ sheet, with the shear well below the limit and no slip. So the geogrid works as
 a tie: anchored in fill that does not move, it holds the block column back, and
 the force in that tie at the facing is the **Tend1** column of the details
 table. The 70% of capacity the layer has in hand is what keeps this wall from
-failing, as the next section explains.
+failing.
 
 The sheets are entered as jointed sheets (`Joint = Yes`) because they end on
 the wall's back-face joint. The mesh is split along that joint, so every node

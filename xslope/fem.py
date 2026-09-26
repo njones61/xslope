@@ -5059,7 +5059,37 @@ def creep_sentence(rd, F, unit=""):
     return ""
 
 
-def creep_extrapolate(snaps, ratio=None):
+#: How the extrapolation reads each component's decay: 'ratio' carries every
+#: component forward by the field's one ratio (the exponential fit the ratio
+#: implies); 'aitken' reads each component's own ratio d2/d1 (Aitken's delta-squared
+#: per degree of freedom), falling back to the field's ratio where a component's
+#: own is not in (0, _CREEP_AITKEN_R_MAX] or its movement is below
+#: _CREEP_AITKEN_FLOOR of the largest.
+CREEP_EXTRAPOLATION = 'ratio'
+_CREEP_AITKEN_R_MAX = 0.99
+_CREEP_AITKEN_FLOOR = 1e-6
+
+
+def _creep_carry(x0, x1, x2, r, per_component):
+    """x2 carried forward to where a movement shrinking by r per block is
+    heading: x2 + d2 r / (1 - r), with d2 = x2 - x1. ``per_component`` reads r
+    per component as d2 / d1 (Aitken), keeping the scalar ``r`` where that one
+    is not usable."""
+    x1 = np.asarray(x1, dtype=float)
+    x2 = np.asarray(x2, dtype=float)
+    d2 = x2 - x1
+    if not per_component:
+        return x2 + d2 * (r / (1.0 - r))
+    d1 = x1 - np.asarray(x0, dtype=float)
+    big = float(np.max(np.abs(d1))) if d1.size else 0.0
+    with np.errstate(divide='ignore', invalid='ignore'):
+        ri = np.where(np.abs(d1) > _CREEP_AITKEN_FLOOR * big, d2 / d1, np.nan)
+    ok = np.isfinite(ri) & (ri > 0.0) & (ri <= _CREEP_AITKEN_R_MAX)
+    rr = np.where(ok, ri, r)
+    return x2 + d2 * (rr / (1.0 - rr))
+
+
+def creep_extrapolate(snaps, ratio=None, per_component=None):
     """Where a dying-away movement is heading, from the last three field
     snapshots taken one block apart.
 
@@ -5067,10 +5097,14 @@ def creep_extrapolate(snaps, ratio=None):
     one block to the next is r = (d2 . d1) / (d1 . d1), and a movement shrinking by
     r a block has r / (1 - r) blocks' worth of d2 still to go:
     u_rest = s2 + d2 r / (1 - r). ``ratio`` (the displacement reading's own ratio)
-    stands in where the field's is not in (0, 1).
+    stands in where the field's is not in (0, 1). With ``per_component`` (default:
+    CREEP_EXTRAPOLATION == 'aitken') each degree of freedom is carried by its own
+    ratio (see `_creep_carry`).
 
     Returns ``(u_rest, r)``, or ``(None, r)`` where no ratio in (0, 1) is
     available and there is nothing to extrapolate."""
+    if per_component is None:
+        per_component = (CREEP_EXTRAPOLATION == 'aitken')
     s0, s1, s2 = (np.asarray(x, dtype=float) for x in snaps)
     d1 = s1 - s0
     d2 = s2 - s1
@@ -5081,7 +5115,7 @@ def creep_extrapolate(snaps, ratio=None):
                               and 0.0 < ratio < 1.0) else r)
     if not (np.isfinite(r) and 0.0 < r < 1.0):
         return None, r
-    return s2 + d2 * (r / (1.0 - r)), r
+    return _creep_carry(s0, s1, s2, r, per_component), r
 
 
 # Iterations without a >1% improvement on the best out-of-balance value seen after
@@ -7073,17 +7107,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # The plastic strains and the joint slip go with the field, by the same
         # ratio: a displacement carried forward over strains held back is a
         # state no sweep passes through (see CREEP_EXTRAPOLATE_STATE).
-        _k = r_f / (1.0 - r_f)
+        _pc = (CREEP_EXTRAPOLATION == 'aitken')
         evp_seed = slip_seed = None
         if CREEP_EXTRAPOLATE_STATE and CREEP_EXTRAPOLATE:
-            evp_seed = [e2 + (e2 - e1) * _k for e1, e2 in
-                        zip(snaps[1]["evp"], snaps[2]["evp"])]
-            if snaps[2]["slip"] is not None and snaps[1]["slip"] is not None:
-                slip_seed = snaps[2]["slip"] + (snaps[2]["slip"]
-                                                - snaps[1]["slip"]) * _k
+            evp_seed = [_creep_carry(e0, e1, e2, r_f, _pc) for e0, e1, e2 in
+                        zip(snaps[0]["evp"], snaps[1]["evp"], snaps[2]["evp"])]
+            if all(x["slip"] is not None for x in snaps):
+                slip_seed = _creep_carry(snaps[0]["slip"], snaps[1]["slip"],
+                                         snaps[2]["slip"], r_f, _pc)
         rd['extrapolated_state'] = bool(CREEP_EXTRAPOLATE_STATE
                                         and CREEP_EXTRAPOLATE)
         rd['extrapolated_field'] = bool(CREEP_EXTRAPOLATE)
+        rd['extrapolation'] = str(CREEP_EXTRAPOLATION)
         _n_before = len(_corr_attempts)
         _c = _try_corrector(u_seed, groups_now, f"trend:{int(vp_iterations)}",
                             vp_iterations, softened_now,

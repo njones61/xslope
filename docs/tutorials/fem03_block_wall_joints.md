@@ -437,16 +437,7 @@ because the search climbs higher, and reports
 
 >>**FS ≥ 1.56**
 
-Read the search before the panels this time. Here is the Displacement vs F plot:
-
-![Displacement against strength reduction factor with the geogrid in place: the wall comes to rest at 1.0, 1.5 and 1.5625, the trials just above were still slowing when the limit came, and only at 2.0 did the movement fail to slow](images/fem03_ssrm_curve_grid.png){width=1000}
-
-Nothing on this plot is a wall giving way. Every filled point is a strength at
-which the wall came to rest, and the movement grows with each one: 2 cm at 1.0,
-6 cm at 1.5, 8 cm at 1.56. Above 1.56 the wall was still creeping, more slowly
-all the time, when the run's iteration limit arrived, so the program could not
-tell whether it would stop. That is why the dialog reports a lower bound rather
-than a number, and the Log says so:
+Not a number this time but a bound, and the Log says why:
 
 > No failure was found up to F = 1.5703. The slope came to rest at every
 > strength tried up to F = 1.5625, moving further each time; at that strength
@@ -455,14 +446,24 @@ than a number, and the Log says so:
 > whether it would stop. The factor of safety is at least 1.56. To go further,
 > raise Max iterations per trial. Convergence acceleration was on.
 
-So the bound the dialog reports is the last strength at which the run confirmed
-the wall at rest before its iteration limit, and on a wall like this that
-depends on how far the run gets, nothing else. The plain solver needs many more
-iterations to bring the wall to rest, so at the same limit it reports 1.246,
-and given millions of iterations it confirms the wall at rest all the way to
-1.86. The wall is not failing at any of those strengths. What a factor of safety
-should mean for a wall that does not fail is taken up after the panels, which
-show what the wall is doing at the last trial, the undecided one at 1.5703.
+The wall came to rest at every strength the search confirmed, and at the next
+strength up it was still creeping when the iteration limit arrived. The run does
+not know whether that trial would have come to rest, so it reports the last
+strength it is sure of. That is not the end of this wall's story, and the
+section after next takes it further. But a reader who stops here has a complete
+set of results, and they are worth reading first.
+
+### If you stop here
+
+Here is the Displacement vs F plot from this run:
+
+![Displacement against strength reduction factor with the geogrid in place: the wall comes to rest at 1.0, 1.5 and 1.5625, the trials just above were still slowing when the limit came, and only at 2.0 did the movement fail to slow](images/fem03_ssrm_curve_grid.png){width=1000}
+
+Nothing on it is a wall giving way. Every filled point is a strength at which
+the wall came to rest, and the movement grows with each one: 2 cm at 1.0, 6 cm
+at 1.5, 8 cm at 1.56. The open points above 1.56 are trials that were still
+creeping, more slowly all the time, when the limit came. The panels show what
+the wall is doing at the last trial, the undecided one at 1.5703.
 
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=1000}
 
@@ -512,8 +513,8 @@ the interface has opened and slid 2 mm. Everywhere else the soil grips the
 sheet, with the shear well below the limit and no slip. So the geogrid works as
 a tie: anchored in fill that does not move, it holds the block column back, and
 the force in that tie at the facing is the **Tend1** column of the details
-table. The 70% of capacity the layer has in hand is what keeps this wall from
-failing.
+table. The 70% of capacity the layer has in hand is what keeps this wall
+standing.
 
 The sheets are entered as jointed sheets (`Joint = Yes`) because they are tied
 into a wall whose back face is itself a joint. A bar bonded to the soil cannot
@@ -528,48 +529,10 @@ interface acts as a stiff bond and a bonded bar would give much the same
 result. Part 3 is about the models where jointing the sheet itself does change
 the answer.
 
-### What the factor of safety means for this wall
+### If you let it run
 
-Part 1's wall failed the way strength reduction expects: at one strength the
-joints let go, and no amount of waiting brings the wall to rest. This wall never
-does that within the search's range. Every time the facing moves it stretches
-the three layers, and stretched geogrid pulls back: load moves off the sliding
-contacts and into the sheets, the wall slows, and it comes to rest again a
-little further out. At 1.5, with a third of the soil's strength taken away, the
-wall has moved 6 cm and come to rest; at 1.5625 it has moved 7.7 cm, the layers
-carry a third of their capacity, and two-thirds is still in hand. The strength
-at which they run out lies at the very top of the search range, as the long run
-below shows. So in the range the default search covers, this wall has no
-strength limit. It has a
-movement that grows with every step of strength taken from the soil, and the
-search reports the strength at which its iteration limit stopped answering:
-at least 1.56 at the default settings, 1.246 with the accelerator off, higher
-with a higher limit.
-
-That makes the factor of safety of a reinforced wall a different kind of number
-from Part 1's. The question a strength reduction can answer for this wall is at
-what strength it has moved more than the design allows, and the movement the
-design allows is the engineer's input. The Displacement vs F plot is where it is
-read: draw the allowable movement across the plot, and the strength at which the
-resting points cross it is the wall's factor of safety on that criterion. On a
-3.6 m wall, 3.6 cm is 1% of the height, the kind of movement a wall
-specification sets a limit on; the resting points cross it between 1.0 and 1.5,
-and a second search with the bracket set to 1.0–1.5 would fill the curve in
-there and pin where. Where in that range is a design decision.
-
-Two things follow for practice. Report the movement with the number: "stands
-at F = 1.56 with 7.7 cm of movement and the geogrid at a third of capacity" is
-what the analysis found. And read the closing summary on every reinforced wall:
-*No failure was found* and *the factor of safety is at least* are the program
-telling you that you are looking at this kind of wall. A limit equilibrium analysis of the same wall, with the layers
-entered as reinforcement, asks the strength question directly and does not
-depend on movement at all; [FEM-2](fem02_reinforcement.md) runs a reinforced
-slope both ways.
-
-### The same search with a much larger limit
-
-The default limit is what stopped the search at 1.56. With **Max iterations per
-trial** raised to 1,000,000 (and the iteration ceiling raised to match) the
+The iteration limit is what stopped the search at 1.56. With **Max iterations
+per trial** raised to 1,000,000 (and the iteration ceiling raised to match) the
 search goes on until the wall gives way. This is not a run to repeat: it takes
 70 minutes on an ordinary desktop, and the results below are from it.
 
@@ -601,19 +564,46 @@ exaggeration:
 
 ![The wall at 2.0, drawn at true scale: the block column pushed out and sunk into the foundation, the fill behind it collapsed, and the geogrid layers dragged out with it](images/fem03_fem_blocks_grid_long_failure.png){width=1000}
 
-That is the failure the strength reduction was looking for, and it is real. But
-it arrives with the soil at half its strength, after 30 cm of movement on a
-wall 3.6 m high, and no wall is allowed to move that far. The strength limit
-answers the strength question. For this wall the movement is the answer that
-matters, and it is read from the curve.
+### What the factor of safety means for this wall
 
-The other lesson of this run is patience. Nothing about the wall was ever
-undecided; the trials were only unfinished. A jointed model settles slowly,
-because every joint reaches equilibrium by slipping a little at a time, and a
-trial cut off before it has settled reads as a failure or as undecided when it
-would have come to rest. The closing summary tells you which happened. When it
-says the factor of safety depends on the iteration limit, or reports it as "at
-least", raise the limit and let the run take the time it needs.
+Part 1's wall failed the way strength reduction expects: at one strength the
+joints let go, and no amount of waiting brought the wall to rest. This wall
+fails in the end too, but only after the soil is down to half its strength and
+the wall has moved 30 cm, a twelfth of its height. Every time the facing moves
+it stretches the three layers, and stretched geogrid pulls back: load moves off
+the sliding contacts and into the sheets, the wall slows, and it comes to rest
+again a little further out, until the top layer reaches its capacity and there
+is nothing left to take the load.
+
+Between the working strength and that failure lies a great deal of deformation:
+2 cm at F = 1, 6 cm at 1.5, 8 cm at 1.56, 13 cm at 1.75, 30 cm at 1.99. No wall
+in service is allowed to move like that. How much movement is acceptable is a
+matter of judgment, set by what the wall carries and what stands on or behind
+it, and the Displacement vs F plot is where that judgment is applied: draw the
+allowable movement across the plot, and the strength at which the resting
+points cross it is the wall's factor of safety on that criterion. At 1% of the
+height, 3.6 cm, the crossing lies between 1.0 and 1.5, and a second search with
+the bracket set to 1.0–1.5 would fill the curve in there and pin it; at 2%,
+7 cm, it lies just under 1.56. The strength limit near 2.0 answers the strength
+question. For this wall the movement is the answer that matters.
+
+Two things follow for practice. Report the movement with the number: "stands
+at F = 1.56 with 7.7 cm of movement and the geogrid at a third of capacity" is
+what the default run found. And read the closing summary on every reinforced
+wall: *No failure was found* and *the factor of safety is at least* are the
+program telling you that you are looking at this kind of wall. A limit
+equilibrium analysis of the same wall, with the layers entered as
+reinforcement, asks the strength question directly and does not depend on
+movement at all; [FEM-2](fem02_reinforcement.md) runs a reinforced slope both
+ways.
+
+The last lesson of this wall is patience. Nothing about it was ever undecided;
+the trials were only unfinished. A jointed model settles slowly, because every
+joint reaches equilibrium by slipping a little at a time, and a trial cut off
+before it has settled reads as a failure or as undecided when it would have
+come to rest. The closing summary tells you which happened. When it says the
+factor of safety depends on the iteration limit, or reports it as "at least",
+raise the limit and let the run take the time it needs.
 
 ---
 

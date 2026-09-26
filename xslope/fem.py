@@ -4530,10 +4530,9 @@ def joint_verdict(slip_hist, soil_oob_hist, disp_hist, u_elastic_scale,
     h = int(n * (1.0 - _JOINT_WINDOW_FRAC))
     if n - h < 8:
         return None
-    total = float(slip_hist[-1])
-    if total <= 0.0:
+    if float(slip_hist[-1]) <= 0.0:
         return None
-    slip_frac = (total - float(slip_hist[h])) / total
+    slip_frac, _ = _slip_rate_reading(slip_hist, h, n, rates=False)
     growth = (float(disp_hist[-1]) - float(disp_hist[h])) / float(u_elastic_scale)
 
     # SETTLED first: it is the stricter of the two, and a state that satisfies it
@@ -4555,12 +4554,202 @@ def joint_verdict(slip_hist, soil_oob_hist, disp_hist, u_elastic_scale,
                 _JOINT_MOVING_BUDGET_FRAC * float(budget))
             and slip_frac >= _JOINT_MOVING_SLIP_FRAC
             and growth >= _JOINT_MOVING_GROWTH):
-        q = h + (n - h) // 2
-        r1, _ = _window_rate(slip_hist, h, q)
-        r2, _ = _window_rate(slip_hist, q, n)
-        if r1 > 0.0 and r2 / r1 >= _JOINT_MOVING_DECAY_MIN:
+        _, rate_ratio = _slip_rate_reading(slip_hist, h, n)
+        if rate_ratio >= _JOINT_MOVING_DECAY_MIN:
             return 'steady_slip'
     return None
+
+
+def _slip_rate_reading(slip_hist, h, n, rates=True):
+    """The joint slip over the window ``slip_hist[h:n]``: the slip gained as a
+    fraction of the total at the window's end, and the slip RATE of the window's
+    second half against its first (a least-squares line through each half; see
+    `_window_rate`). The rate ratio is NaN where it cannot be read (the first
+    half's rate is not positive, or ``rates`` is False). `joint_verdict` and the
+    trend reading (`creep_trend`) both read the slip through this."""
+    total = float(slip_hist[n - 1])
+    if total <= 0.0:
+        return 0.0, float('nan')
+    slip_frac = (total - float(slip_hist[h])) / total
+    if not rates:
+        return slip_frac, float('nan')
+    q = h + (n - h) // 2
+    r1, _ = _window_rate(slip_hist, h, q)
+    r2, _ = _window_rate(slip_hist, q, n)
+    ratio = (r2 / r1) if (np.isfinite(r1) and r1 > 0.0) else float('nan')
+    return slip_frac, float(ratio)
+
+
+# === The trend reading =========================================================
+# A trial still moving when its iteration limit arrives fits none of the yes/no
+# stopping rules: it has not converged, it is not running away, and a displacement
+# ratio read at the limit makes the factor of safety a function of that limit. On
+# the FEM-3 geogrid wall the search gave 1.246 at 100,000 iterations and 1.395 at
+# 500,000, and the plain sweep, given 918,000 iterations at F = 1.5 and 2.4
+# million at 1.86, brings the wall to rest at both (rI_acceleration.md §2.3).
+#
+# So such a trial is read by the TREND of its movement. The trailing window is
+# `_CREEP_BLOCKS` blocks of equal length; the block is `_CREEP_BLOCK_FRAC` of the
+# trial's Max iterations, so at the limit the window is the second half of the
+# trial. The reading is the movement of each block, max|u| at the block's end less
+# max|u| at its start, and the ratio of one block's movement to the one before:
+#
+#   * DYING AWAY — every block moved forward, no block moved more than the one
+#     before, and the movement shrinks at a steady ratio below
+#     `_CREEP_DYING_MAX` a block (the geometric mean of the four ratios). The
+#     field is extrapolated to where that movement is heading and the Newton
+#     corrector is seeded there (see `creep_extrapolate`); a certified state
+#     (force, yield and, on a jointed model, the hold test) is a stand.
+#   * HOLDING STEADY OR GROWING — the window moved at least `_CREEP_MOVING`
+#     elastic displacements and the ratio is at or above `_CREEP_DYING_MAX`: the
+#     slope is sliding. On a jointed model the slip reading of `joint_verdict`
+#     counts the same way (slip gained at least `_JOINT_MOVING_SLIP_FRAC` of itself
+#     at a rate not falling below `_JOINT_MOVING_DECAY_MIN` of the half before).
+#   * STILL — the window moved less than `_CREEP_STILL` elastic displacements (and
+#     the slip, on a jointed model, less than `_JOINT_SETTLED_SLIP_FRAC` of
+#     itself): there is no movement to read a trend from, and the displacement
+#     classifier rules as it always has.
+#   * UNCLEAR — anything else.
+#
+# Every level is one this file already defines and a locked row already depends on:
+# the 0.9 rate ratio is the joint verdict's "not decaying at all", the 0.02 elastic
+# displacements the hybrid classifier's growth line, the 1e-4 the joint verdict's
+# "the field has stopped". The reading is a ratio of movements, never a count of
+# iterations, so a plain and an accelerated sweep read the same trial the same way.
+_CREEP_BLOCKS = 5
+_CREEP_BLOCK_FRAC = 0.1
+_CREEP_DYING_MAX = _JOINT_MOVING_DECAY_MIN
+_CREEP_MOVING = _HYBRID_GROWTH_MIN
+_CREEP_STILL = _JOINT_SETTLED_GROWTH
+
+
+def creep_trend(marks, u_elastic_scale, block, slip_hist=None,
+                sample_every=_HYBRID_SAMPLE_EVERY):
+    """Read the trend of a still-moving trial's movement.
+
+    Parameters:
+        marks (list of float): max|u| (from the trial's datum) at the end of
+            every block of ``block`` iterations, the first at the block grid's
+            origin. The trailing ``_CREEP_BLOCKS + 1`` are read.
+        u_elastic_scale (float): the trial's elastic max|u|, the yardstick.
+        block (int): iterations per block.
+        slip_hist (list of float or None): total joint slip every
+            ``sample_every`` iterations (jointed models), read over the same
+            window through `_slip_rate_reading`.
+
+    Returns:
+        dict or None: None where there are too few blocks or no yardstick. The
+        dict carries ``trend`` ('dying', 'steady', 'growing', 'still' or
+        'unclear'), ``window`` and ``block`` in iterations, ``increments`` (each
+        block's movement in elastic displacements), ``ratios`` (block to block),
+        ``ratio`` (their geometric mean, NaN unless every block moved forward),
+        ``moved`` (elastic displacements over the window) and, on a jointed model,
+        ``slip_frac`` and ``slip_ratio``.
+    """
+    nb = int(_CREEP_BLOCKS)
+    if (len(marks) < nb + 1 or not u_elastic_scale or u_elastic_scale <= 0.0
+            or block <= 0):
+        return None
+    m = np.asarray(marks[-(nb + 1):], dtype=float)
+    d = np.diff(m) / float(u_elastic_scale)
+    moved = float(m[-1] - m[0]) / float(u_elastic_scale)
+    forward = bool(np.all(d > 0.0))
+    ratios = [float(d[k + 1] / d[k]) if d[k] != 0.0 else float('nan')
+              for k in range(nb - 1)]
+    ratio = (float((d[-1] / d[0]) ** (1.0 / (nb - 1))) if forward
+             else float('nan'))
+    rd = dict(window=int(nb * block), block=int(block),
+              increments=[float(x) for x in d], ratios=ratios, ratio=ratio,
+              moved=moved, u_elastic_scale=float(u_elastic_scale),
+              slip_frac=None, slip_ratio=None)
+    slip_moving = slip_steady = False
+    slip_still = True
+    if slip_hist:
+        n = len(slip_hist)
+        h = n - int(round(nb * block / max(1, sample_every)))
+        if h >= 0 and n - h >= 8:
+            sf, sr = _slip_rate_reading(slip_hist, h, n)
+            rd['slip_frac'], rd['slip_ratio'] = float(sf), float(sr)
+            slip_still = sf < _JOINT_SETTLED_SLIP_FRAC
+            slip_moving = sf >= _JOINT_SETTLED_SLIP_FRAC
+            slip_steady = (sf >= _JOINT_MOVING_SLIP_FRAC
+                           and np.isfinite(sr) and sr >= _JOINT_MOVING_DECAY_MIN)
+    if abs(moved) < _CREEP_STILL and slip_still:
+        rd['trend'] = 'still'
+    elif moved >= _CREEP_MOVING and (
+            (forward and ratio >= _CREEP_DYING_MAX) or slip_steady):
+        rd['trend'] = ('growing' if (forward and ratio >= 1.0 / _CREEP_DYING_MAX)
+                       else 'steady')
+    elif (forward and ratio < _CREEP_DYING_MAX
+          and all(r <= 1.0 for r in ratios)
+          and not (slip_moving and not (np.isfinite(rd['slip_ratio'])
+                                        and rd['slip_ratio'] < _JOINT_MOVING_DECAY_MIN))):
+        rd['trend'] = 'dying'
+    else:
+        rd['trend'] = 'unclear'
+    return rd
+
+
+def _creep_pct(fraction):
+    v = 100.0 * float(fraction)
+    return f"{v:.0f}%" if abs(v) >= 1.0 else f"{v:.2g}%"
+
+
+def creep_sentence(rd, F):
+    """The trend reading that ended a trial, in the Run dialog's words."""
+    rule = rd.get('rule')
+    window = int(rd.get('window', 0))
+    block = int(rd.get('block', 0))
+    if rule == 'slowing':
+        inc = rd.get('increments') or [1.0, 1.0]
+        fell = 1.0 - (inc[-1] / inc[0]) if inc[0] > 0 else 0.0
+        hold = (rd.get('corrector') or {}).get('hold')
+        held = " and the hold test confirmed it" if (hold and hold.get('held')) else ""
+        return (f"At F = {F:.4f} the slope was still moving at iteration "
+                f"{int(rd.get('iteration', 0)):,}, but slowing (the movement per "
+                f"{block:,} iterations fell by {_creep_pct(fell)} over the last "
+                f"{window:,}); the corrector found the balanced state "
+                f"{float(rd.get('extrapolated') or 0.0):.3g} further on{held}, so "
+                f"it was counted as standing at "
+                f"{float(rd.get('max_displacement') or 0.0):.3g}.")
+    if rule == 'not_slowing':
+        r = rd.get('ratio')
+        if r is not None and np.isfinite(r) and r >= _CREEP_DYING_MAX:
+            what = ("the movement per iteration grew" if r >= 1.0 else
+                    "the movement per iteration did not slow")
+            return (f"At F = {F:.4f}, over the last {window:,} iterations {what} "
+                    f"(ratio {r:.2f}), so the trial was counted as sliding.")
+        sr = rd.get('slip_ratio')
+        return (f"At F = {F:.4f}, over the last {window:,} iterations the joint "
+                f"slip grew {_creep_pct(rd.get('slip_frac') or 0.0)} and its rate "
+                f"did not slow (ratio {float(sr):.2f}), so the trial was counted "
+                f"as sliding.")
+    return ""
+
+
+def creep_extrapolate(snaps, ratio=None):
+    """Where a dying-away movement is heading, from the last three field
+    snapshots taken one block apart.
+
+    With d1 = s1 - s0 and d2 = s2 - s1 the ratio of the field's own movement from
+    one block to the next is r = (d2 . d1) / (d1 . d1), and a movement shrinking by
+    r a block has r / (1 - r) blocks' worth of d2 still to go:
+    u_rest = s2 + d2 r / (1 - r). ``ratio`` (the displacement reading's own ratio)
+    stands in where the field's is not in (0, 1).
+
+    Returns ``(u_rest, r)``, or ``(None, r)`` where no ratio in (0, 1) is
+    available and there is nothing to extrapolate."""
+    s0, s1, s2 = (np.asarray(x, dtype=float) for x in snaps)
+    d1 = s1 - s0
+    d2 = s2 - s1
+    den = float(d1 @ d1)
+    r = float(d2 @ d1) / den if den > 0.0 else float('nan')
+    if not (0.0 < r < 1.0):
+        r = (float(ratio) if (ratio is not None and np.isfinite(ratio)
+                              and 0.0 < ratio < 1.0) else r)
+    if not (np.isfinite(r) and 0.0 < r < 1.0):
+        return None, r
+    return s2 + d2 * (r / (1.0 - r)), r
 
 
 # Iterations without a >1% improvement on the best out-of-balance value seen after
@@ -4569,37 +4758,23 @@ def joint_verdict(slip_hist, soil_oob_hist, disp_hist, u_elastic_scale,
 # watch inside solve_fem for why it may not decide a verdict).
 _NO_PROGRESS_WINDOW = 1500
 
-# === Budget extension =========================================================
-# Reaching `max_iterations` is not a verdict either. A trial whose out-of-balance
-# is still TRENDING DOWN when the budget runs out has not failed; it has run out of
-# budget, and the number of iterations a viscoplastic solve needs grows with mesh
-# refinement and with proximity to the critical F. So the budget is EXTENDED, one
-# chunk at a time, for as long as the residual keeps falling, up to a hard ceiling
-# (`max_iterations_ceiling`).
+# === The ceiling's inconclusive reading =======================================
+# What happens at Max iterations is the trend reading's (see `creep_trend`): a
+# movement dying away is extrapolated and certified, one holding steady or growing
+# is sliding, and one still dying away or not yet clear is given another Max
+# iterations' worth up to `max_iterations_ceiling`. It replaced a grant read from
+# the leftover force (the out-of-balance still trending down, or a displacement
+# field the classifier could not rule on), which made the factor of safety depend
+# on where the limit fell and on how far each solver got per iteration
+# (rJ_adoption.md: RS2-24a-noskin's trial at F = 0.8164 was extended plain and not
+# accelerated, from the same state of the slope).
 #
-# The trend is read from the mean of the last window against the mean of the window
-# before it, rather than from a single iterate: the residual oscillates on the yield
-# surface (see oob_window) and creeps non-monotonically, so consecutive values say
-# nothing. Requiring the same 1% the no-progress watch uses keeps one definition of
-# "meaningful improvement" in the file.
+# At the ceiling itself the older reading still words the ending: a trial whose
+# out-of-balance is measurably still falling (the mean of the last window against
+# the mean of the window before, `_OOB_TREND_MIN`) is INCONCLUSIVE, neither
+# converged nor failed, and the bisection carries it as upper uncertainty.
 _OOB_TREND_WINDOW = 500        # iterations averaged in each of the two windows
 _OOB_TREND_MIN = 0.01          # the later window must be this much lower (1%)
-# A steady decay is not the only way a solve is worth more iterations. Measured on
-# the reinforced slope at F = 1.25 (tri6, 1 ft): the residual falls to 2e-3 by
-# iteration 9,000, sits there, then RISES eighty-fold through a burst of plastic
-# redistribution around iteration 14,000 before coming back down and reaching
-# equilibrium at 16,242 — while max|u| moves from 0.1101 to 0.1139 ft. The slope is
-# standing still the whole time; only the residual is thrashing. At iteration 12,000
-# that solve is mid-excursion, so a trend test alone reads RISING and stops it 4,000
-# iterations short of its answer.
-#
-# The second signal is therefore the DISPLACEMENT field, read through the same
-# classifier the failure criterion uses: a trial whose displacement is not growing
-# and whose evidence the classifier cannot rule on (AMBIGUOUS) has not shown itself
-# to be failing, and gets more budget. A trial that IS growing is failing and gets
-# none — which is also where the iterations are saved. A STABLE_STUCK trial is
-# excluded deliberately: the classifier can already rule on it, and under the hybrid
-# criterion it counts as standing, so spending the ceiling on it would buy nothing.
 
 
 # === Early failure ============================================================
@@ -4901,7 +5076,8 @@ _CORRECTOR_CHECKPOINTS = (300, 1000, 3000)
 # was standing in for. The three certified moves are worth more than 2% of a run, so
 # the ladder keeps every exit; SPIKE.md's "THE LADDER AND THE YIELD GATE" carries the
 # candidate ladders and their numbers.
-_CORRECTOR_RULE_EXITS = ('inconclusive', 'iteration_cap', 'runaway', 'disp_limit')
+_CORRECTOR_RULE_EXITS = ('inconclusive', 'iteration_cap', 'runaway', 'disp_limit',
+                         'not_slowing')
 # The same ladder, continued, for the K0 IN-SITU EQUILIBRATION of a jointed model
 # (see solve_ssrm's equilibration solve and K0_CORRECTOR_LADDER_ON).
 #
@@ -5373,7 +5549,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               _finite_guard=False, _finite_guard_u_max=None,
               joint_slip_stiffness_factor=None,
               joint_tangent=None, joint_tangent_factor=None,
-              joint_newton=None, accelerate=None):
+              joint_newton=None, accelerate=None, _creep_certify=True):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -5432,14 +5608,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         F (float): Shear strength reduction factor (c/F, tan(phi)/F)
         debug_level (int): 0=silent, 1=summary, 2=per-iteration
         max_iterations (int): Viscoplastic iteration budget per trial (default
-            12000). It is a budget, not a ceiling: a trial that reaches it with the
-            out-of-balance residual still trending down is EXTENDED by another
-            budget's worth, repeatedly, while the trend holds.
+            12000). A trial that reaches it still moving is read by the trend of
+            its movement (see `creep_trend`): dying away, the field is
+            extrapolated to where it is heading and the Newton corrector is
+            seeded there, and a certified state is a stand; holding steady or
+            growing, the trial ends 'not_slowing' (FAILED). A movement still
+            dying away or not yet clear is given another budget's worth, up to
+            the ceiling.
         max_iterations_ceiling (int): Hard stop on that extension (default 50000).
-            A trial that reaches the ceiling while still improving stops with
-            exit_reason 'inconclusive' - neither converged nor failed - and
-            solve_ssrm reports it as the bracket's upper uncertainty rather than
-            counting it as a failure.
+            A trial that reaches the ceiling with its out-of-balance still
+            falling stops with exit_reason 'inconclusive' - neither converged nor
+            failed - and solve_ssrm reports it as the bracket's upper uncertainty
+            rather than counting it as a failure.
         fem_solver (str or None): Which per-trial driver runs — 'auto' (the
             default: the viscoplastic loop with the Newton corrector called from
             inside it), 'viscoplastic' (that loop alone, with no corrector) or
@@ -5798,8 +5978,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             - exit_reason (str): why this solve stopped - 'converged' |
               'iteration_cap' | 'inconclusive' | 'disp_limit' | 'diverging' |
               'yield_gate' (it settled in force outside the yield surface and the
-              corrector refused, leaving the trial undecided) | 'steady_slip' /
-              'joint_settled' (the two jointed readings, `joint_verdict`)
+              corrector refused, leaving the trial undecided) | 'not_slowing'
+              (the trend reading: the movement did not slow, FAILED; see
+              `creep_trend`) | 'joint_settled' (`joint_verdict`) | 'steady_slip'
+              (a record made before the trend reading replaced it)
             - diverging_iteration (int or None): iteration at which the early-failure
               rule fired, and diverging_signal (str or None) which of its two tests
               fired ('runaway' or 'stalled_residual'); None on any other exit
@@ -6514,6 +6696,54 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             _drift_rel <= float(_CORRECTOR_HOLD_DRIFT)
         return _out
 
+    def _creep_attempt(rd, snaps, u_now, groups_now, vp_iterations,
+                       softened_now=None):
+        """The trend reading's corrector attempt (see `creep_trend`): seed the
+        corrector where a dying-away movement is heading, and certify as the
+        corrector does. Fills ``rd`` with the extrapolation and the attempt's
+        outcome; returns the certified solution (with ``stop_reading``) or None.
+        The plastic strains and the joint state are the latest snapshot's."""
+        if len(snaps) < 3:
+            rd['extrapolated'] = None
+            return None
+        u_rest_free, r_f = creep_extrapolate(snaps, rd.get('ratio'))
+        rd['field_ratio'] = float(r_f)
+        if u_rest_free is None:
+            rd['extrapolated'] = None
+            return None
+        u_seed = np.asarray(u_now, dtype=float).copy()
+        u_seed[free_dofs] = u_rest_free
+        ahead = float(np.max(np.abs(u_seed[_trans_dofs] - u_now[_trans_dofs])))
+        rd['extrapolated'] = ahead
+        rd['extrapolated_u_ratio'] = (
+            float(np.max(np.abs(u_seed[_trans_dofs] - u_datum[_trans_dofs])))
+            / u_elastic_scale_now[0] if u_elastic_scale_now[0] > 0 else None)
+        _n_before = len(_corr_attempts)
+        _c = _try_corrector(u_seed, groups_now, f"trend:{int(vp_iterations)}",
+                            vp_iterations, softened_now)
+        _att = _corr_attempts[-1] if len(_corr_attempts) > _n_before else {}
+        rd['corrector'] = dict(
+            certified=bool(_c is not None),
+            nr_iterations=_att.get('nr_iterations'),
+            oob=_att.get('oob'), yield_violation=_att.get('yield_violation'),
+            exit_reason=_att.get('exit_reason'),
+            hold=(None if _att.get('hold') is None else {
+                k: _att['hold'].get(k) for k in (
+                    'held', 'verdict', 'exit_reason', 'sweeps', 'drift',
+                    'drift_u_el')}))
+        if _c is None:
+            return None
+        rd['rule'] = 'slowing'
+        rd['iteration'] = int(vp_iterations)
+        rd['max_displacement'] = float(_c.get('max_displacement', np.nan))
+        _c['stop_reading'] = dict(rd)
+        if debug_level >= 1:
+            print("  " + creep_sentence(rd, _c.get('F', F)))
+        return _c
+
+    # The elastic scale the extrapolation's report is read in; set per stage.
+    u_elastic_scale_now = [0.0]
+
     if debug_level >= 1:
         print(f"  c: {c_by_elem[0]:.1f} -> {c_reduced[0]:.1f}")
         print(f"  phi: {phi_by_elem[0]:.1f} -> {np.degrees(phi_reduced[0]):.1f}")
@@ -6921,6 +7151,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     diverging_iter = None          # iteration at which the early-failure rule fired
     diverging_signal = None        # which of its two tests fired
     n_extensions = 0               # budget extensions granted (all stages)
+    stop_reading = None            # see `creep_trend`; set per stage
+    creep_last = None
     budget = int(max_iterations)
     sq3 = np.sqrt(3.0)   # loop-invariant constant (hoisted out of the VP iteration)
 
@@ -7132,23 +7364,74 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # width, capped at a quarter of the budget.
         trend_window = min(_OOB_TREND_WINDOW,
                            max(2 * _HYBRID_SAMPLE_EVERY, budget // 4))
+        # The trend reading (see `creep_trend`): max|u| at the end of every
+        # block, and the last three block-end fields for the extrapolation.
+        # Neither is kept on the in-situ solve's certifying side or read while the
+        # interface relief is running (its sweeps are read by no rule).
+        creep_block = max(2 * _HYBRID_SAMPLE_EVERY,
+                          int(round(chunk * _CREEP_BLOCK_FRAC)))
+        creep_marks = [float(np.max(np.abs(u[free_dofs] - u_datum_free)))
+                       if u[free_dofs].size else 0.0]
+        creep_snaps = collections.deque(maxlen=3)
+        creep_snaps.append(u[free_dofs].copy())
+        creep_certify = bool(_creep_certify and _corrector_on and not guard_on)
+        creep_last = None              # the last trend reading taken
+        u_elastic_scale_now[0] = u_elastic_scale
+        stop_reading = None
 
         iteration = -1
         while True:
             iteration += 1
             if iteration >= budget:
-                # Budget reached. Extend it while the solve is still progressing.
-                if budget < ceiling and _still_progressing(
-                        oob_hist, disp_hist, u_elastic_scale, mesh_height,
-                        trend_window):
+                # The iteration limit. A trial still moving here is read by the
+                # trend of its movement (see `creep_trend`): dying away, it is
+                # extrapolated to where it is heading and the corrector is seeded
+                # there; holding steady or growing, it is sliding; still or
+                # unclear, the rules below decide it as they always have. Below
+                # the ceiling a movement still dying away, or not yet clear, is
+                # given another Max iterations' worth.
+                _rd = None
+                if not joint_relief_on:
+                    _rd = creep_trend(creep_marks, u_elastic_scale, creep_block,
+                                      jslip_hist if has_joints else None)
+                    if _rd is not None:
+                        _rd['iteration'] = int(total_iterations + iteration)
+                        creep_last = _rd
+                _tr = None if _rd is None else _rd['trend']
+                if _tr == 'dying' and creep_certify:
+                    _c = _creep_attempt(
+                        _rd, creep_snaps, u, gp_groups,
+                        total_iterations + iteration,
+                        softened_1d if has_1d_elements else None)
+                    if _c is not None:
+                        return _c
+                if _tr in ('steady', 'growing') and not guard_on:
+                    converged = False
+                    exit_reason = 'not_slowing'
+                    stop_reading = dict(_rd, rule='not_slowing')
+                    if debug_level >= 1:
+                        print("  " + creep_sentence(stop_reading, F))
+                    if _corrector_on and exit_reason in _CORRECTOR_RULE_EXITS:
+                        _c = _try_corrector(
+                            u, gp_groups, f"rule:{exit_reason}",
+                            total_iterations + iteration,
+                            softened_1d if has_1d_elements else None)
+                        if _c is not None:
+                            return _c
+                    iteration -= 1          # the last iteration actually performed
+                    break
+                if _tr in ('dying', 'unclear') and budget < ceiling:
                     budget = min(ceiling, budget + chunk)
                     n_extensions += 1
                     if debug_level >= 1:
-                        print(f"  Budget extended at iteration {iteration}: "
-                              f"the solve is still making progress "
-                              f"({unbalanced_force_ratio:.2e} against tolerance "
-                              f"{force_tol:.1e}); budget now {budget} "
-                              f"(ceiling {ceiling})")
+                        print(f"  Max iterations per trial reached at iteration "
+                              f"{iteration} with the slope still moving "
+                              + ("and slowing" if _tr == 'dying' else
+                                 "and no clear trend")
+                              + f" (movement over the last {_rd['window']:,} "
+                              f"iterations {_rd['moved']:.3g} elastic "
+                              f"displacements); continuing to {budget:,} "
+                              f"(ceiling {ceiling:,})")
                 else:
                     if (budget >= ceiling
                             and _still_progressing(oob_hist, disp_hist,
@@ -7561,6 +7844,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     joob_hist = []
                     soob_hist = []
                     jchg_hist = []
+                    creep_marks = []
+                    creep_snaps.clear()
                     ufr_best = float('inf')
                     last_progress_iter = iteration
                     plateau_iter = None
@@ -8152,6 +8437,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     soob_hist.append(float(oob_node[_soil_node_free].max())
                                      if _soil_node_free.any() else 0.0)
                     jchg_hist.append(int(joint_n_changed))
+            # The trend reading's block-end marks (see `creep_trend`).
+            if (iteration + 1) % creep_block == 0:
+                creep_marks.append(float(norm_u_new))
+                creep_snaps.append(u_free_new.copy())
 
             # Force-equilibrium condition. The threshold is ABSOLUTE, which is what
             # makes the test immune to the size of the domain and to the size of the
@@ -8295,6 +8584,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     joob_hist = []
                     soob_hist = []
                     jchg_hist = []
+                    creep_marks = []
+                    creep_snaps.clear()
                     ufr_best = float('inf')
                     last_progress_iter = iteration
                     plateau_iter = None
@@ -8473,7 +8764,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     and iteration >= _JOINT_VERDICT_WARMUP):
                 _jv = joint_verdict(jslip_hist, soob_hist, disp_hist,
                                     u_elastic_scale, force_tol,
-                                    joint_oob_hist=joob_hist, budget=budget)
+                                    joint_oob_hist=joob_hist,
+                                    # The sliding reading is the trend
+                                    # reading's (see `creep_trend`); only the
+                                    # settled reading is asked here.
+                                    budget=None)
                 if _jv is not None:
                     converged = False
                     exit_reason = _jv
@@ -8511,6 +8806,51 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 if _c is not None:
                     return _c
 
+            # ---- the trend reading before the limit (see `creep_trend`) -------
+            # Read at every block end once the window is full and, on a jointed
+            # model, past the joint warm-up. A movement dying away is extrapolated
+            # and handed to the corrector whenever it is read, since a
+            # certification is a stand wherever it is found and a refusal decides
+            # nothing. A movement holding steady or growing is counted as sliding
+            # before the limit only on a jointed model and only in the last tenth
+            # of Max iterations, the timing the joint verdict's sliding reading
+            # was measured to need: RJ-2's standing bracket edge reads as an
+            # accelerating slide at 50,000 iterations and then converges (see
+            # `_JOINT_MOVING_BUDGET_FRAC`).
+            _sw = iteration + 1
+            if (not joint_relief_on and _sw % creep_block == 0 and _sw < budget
+                    and _sw >= max(_CREEP_BLOCKS * creep_block,
+                                   _JOINT_VERDICT_WARMUP if has_joints else 0)):
+                _rd = creep_trend(creep_marks, u_elastic_scale, creep_block,
+                                  jslip_hist if has_joints else None)
+                if _rd is not None:
+                    _rd['iteration'] = int(total_iterations + _sw)
+                    creep_last = _rd
+                    if _rd['trend'] == 'dying' and creep_certify:
+                        _c = _creep_attempt(
+                            _rd, creep_snaps, u, gp_groups,
+                            total_iterations + _sw,
+                            softened_1d if has_1d_elements else None)
+                        if _c is not None:
+                            return _c
+                    elif (_rd['trend'] in ('steady', 'growing') and has_joints
+                            and not guard_on
+                            and _sw >= max(_JOINT_MOVING_MIN_SWEEPS,
+                                           _JOINT_MOVING_BUDGET_FRAC * budget)):
+                        converged = False
+                        exit_reason = 'not_slowing'
+                        stop_reading = dict(_rd, rule='not_slowing')
+                        if debug_level >= 1:
+                            print("  " + creep_sentence(stop_reading, F))
+                        if _corrector_on and exit_reason in _CORRECTOR_RULE_EXITS:
+                            _c = _try_corrector(
+                                u, gp_groups, f"rule:{exit_reason}",
+                                total_iterations + _sw,
+                                softened_1d if has_1d_elements else None)
+                            if _c is not None:
+                                return _c
+                        break
+
 
         total_iterations += iteration + 1
         if not converged:
@@ -8533,6 +8873,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # reach equilibrium and must not claim it.
     if converged:
         verdict, u_ratio, u_growth = 'CONVERGED', None, None
+    elif exit_reason == 'not_slowing':
+        # The trend reading (see `creep_trend`): the movement did not slow, so the
+        # slope is sliding. The classifier's ratios are reported beside it.
+        _, u_ratio, u_growth = classify_nonconvergence(
+            disp_hist, u_elastic_scale, 'iteration_cap', model_height=mesh_height)
+        verdict = 'FAILED'
     elif exit_reason in ('steady_slip', 'joint_settled'):
         # The joint verdict is a reading of the INTERFACE, and the displacement
         # classifier is not re-asked: the two measure different things and the
@@ -8884,6 +9230,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         "u_growth": u_growth,
         "u_elastic_scale": u_elastic_scale,
         "exit_reason": exit_reason,
+        # The numbers the stopping rule that ended this trial read, where the
+        # trend reading ended it (see `creep_trend`); None otherwise.
+        "stop_reading": stop_reading,
+        # The last trend reading taken, whatever it said (diagnostic).
+        "creep_reading": creep_last,
         # Equilibrated initial-stress state (K0 runs only; None otherwise). Internal:
         # solve_ssrm's equilibration solve hands this to every trial as _init_state.
         "_k0_state": k0_state,
@@ -13095,6 +13446,12 @@ def _verdict_note(sol, hybrid=True):
     ur_txt = "" if ur is None else f", max|u| = {ur:.2f}x elastic"
     if sol.get("exit_reason") == 'steady_slip':
         return f"FAILED on a steady interface mechanism (joint slip){ur_txt}"
+    if sol.get("exit_reason") == 'not_slowing':
+        rd = sol.get("stop_reading") or {}
+        r = rd.get("ratio")
+        r_txt = "" if r is None or not np.isfinite(r) else f" (ratio {r:.2f})"
+        return (f"FAILED: over the last {int(rd.get('window', 0)):,} iterations "
+                f"the movement did not slow{r_txt}{ur_txt}")
     # What the bisection did with a verdict the criterion in force may not read.
     counted = ("counted STABLE" if hybrid else
                "counted FAILED (this run's criterion reads convergence alone)")
@@ -13912,6 +14269,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             # The in-situ state is every trial's datum and is path-dependent, so
             # it is always settled on the plain sweep (see ACCELERATE_DEFAULT).
             accelerate=False,
+            # Its state is every trial's datum, so it is settled by the sweep and
+            # the ladder alone, never by an extrapolated seed (see creep_trend).
+            _creep_certify=False,
             _corrector_rungs=(
                 _K0_CORRECTOR_CHECKPOINTS
                 if (K0_CORRECTOR_LADDER_ON
@@ -14362,9 +14722,14 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "u_ratio": sol.get("u_ratio"),
             "growth": sol.get("u_growth"),
             "exit_reason": sol.get("exit_reason"),
+            # What the trend reading read, where it ended the trial, and the last
+            # reading it took either way (see `creep_trend`).
+            "stop_reading": sol.get("stop_reading"),
+            "creep_reading": sol.get("creep_reading"),
             # The residual went flat before this trial stopped (None if it never did).
             "plateau_iteration": sol.get("plateau_iteration"),
-            # How many extra budgets this trial was granted for still improving.
+            # How many times Max iterations was extended because the movement was
+            # still dying away or not yet clear (see `creep_trend`).
             "budget_extensions": int(sol.get("budget_extensions", 0) or 0),
             # The iteration the early-failure rule fired at (None if it never did).
             "diverging_iteration": sol.get("diverging_iteration"),

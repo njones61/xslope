@@ -317,8 +317,8 @@ the resting points end.
 The Log says the same in words at the end of every strength reduction run:
 
 > The factor of safety is 1.137, the midpoint of the bracket F = 1.1328 to
-> 1.1406. At F = 1.1328 the slope reached equilibrium in 363 iterations,
-> finished by the Newton corrector. At F = 1.1406 it did not: over the last
+> 1.1406. At F = 1.1328 the slope reached equilibrium in 363 iterations. At
+> F = 1.1406 it did not: over the last
 > 50,000 iterations the movement did not slow (each block of 10,000 iterations
 > moved the slope 92% as far as the one before), so the trial was counted as
 > sliding. Convergence acceleration was on.
@@ -430,9 +430,9 @@ from 1.0 to 2.0, tolerance 0.01, **Max iterations per trial** at 100,000 and the
 failure criterion on Hybrid. Press **Run**. It takes about twice as long as Part 1,
 because the search climbs higher, and reports
 
-<!-- test: file=files/xslope_block_wall_grid.xlsx, type=fem_ssrm, expected_fs=1.566, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-grid-ssrm -->
+<!-- test: file=files/xslope_block_wall_grid.xlsx, type=fem_ssrm, expected_fs=1.5625, fs_bound=lower, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-grid-ssrm -->
 
->>**FS = 1.566**
+>>**FS ≥ 1.56**
 
 Read the search before the panels this time. Here is the Displacement vs F plot:
 
@@ -442,28 +442,24 @@ Nothing on this plot is a wall giving way. Every filled point is a strength at
 which the wall came to rest, and the movement grows with each one: 2 cm at 1.0,
 6 cm at 1.5, 8 cm at 1.56. Above 1.56 the wall was still creeping, more slowly
 all the time, when the run's iteration limit arrived, so the program could not
-confirm whether it would stop. The Log says so:
+tell whether it would stop. That is why the dialog reports a lower bound rather
+than a number, and the Log says so:
 
-> The factor of safety is 1.566, the midpoint of the bracket F = 1.5625 to
-> 1.5703. At F = 1.5625 the slope was still moving at iteration 100,000, but
-> slowing (the movement per 10,000 iterations had fallen 81% over the last
-> 50,000). The solver checked whether it comes to rest and found that it does,
-> 0.00445 m further on, and that it stays there, so it was counted as standing
-> at 0.0767 m. At F = 1.5703 the slope was still moving and still settling when
-> the 100,000-iteration limit came (the leftover force fell by 1% over the last
-> 1,000 iterations), and the solver could not confirm that it comes to rest. The
-> trial is left undecided, neither a failure nor a confirmed rest. Convergence
-> acceleration was on.
+> No failure was found up to F = 1.5703. The slope came to rest at every
+> strength tried up to F = 1.5625, moving further each time; at that strength
+> it had moved 0.0767 m. At F = 1.5703 it was still creeping, more slowly all
+> the time, when the 100,000-iteration limit came, so the run could not tell
+> whether it would stop. The factor of safety is at least 1.56. To go further,
+> raise Max iterations per trial. Convergence acceleration was on.
 
-So the number the dialog prints is not the strength at which this wall fails.
-It is the last strength at which the run confirmed the wall at rest before its
-iteration limit, and on a wall like this that depends on how far the run gets,
-nothing else: the plain solver needs many more iterations to bring the wall to
-rest, so at the same limit it prints 1.246, and given millions of iterations it
-confirms the wall at rest all the way to 1.86. The wall is not failing at any of
-those strengths. What a factor of safety should mean for a wall that does not
-fail is taken up after the panels, which show what the wall is doing at the
-last strength the search confirmed.
+So the bound the dialog reports is the last strength at which the run confirmed
+the wall at rest before its iteration limit, and on a wall like this that
+depends on how far the run gets, nothing else. The plain solver needs many more
+iterations to bring the wall to rest, so at the same limit it reports 1.246,
+and given millions of iterations it confirms the wall at rest all the way to
+1.86. The wall is not failing at any of those strengths. What a factor of safety
+should mean for a wall that does not fail is taken up after the panels, which
+show what the wall is doing at the last trial, the undecided one at 1.5703.
 
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=1000}
 
@@ -471,14 +467,14 @@ This panel has no element grid where Part 1's did. The blocks panel drops the
 grid once a model carries more than eight jointed lines (the wall alone had
 seven; the three sheets make ten), because the blocks are only a few elements
 each and the grid would bury their outlines. **Element edges** in the display
-panel puts it back. The rest is drawn as in Part 1: the block column, 6.9 times
+panel puts it back. The rest is drawn as in Part 1: the block column, 12 times
 deformed, with the undeformed outline dashed behind it, and every contact drawn
 as a line, gray where it is closed and not slipping, green where it is slipping,
 shaded by how far. The three geogrid sheets are the three near-horizontal lines
 running back from the facing into the reinforced fill. Each is drawn as the two
 faces of its interface: gray along most of its length, where the soil grips the
 sheet, and green over the short lengths where the soil has slid along it, at
-the facing on all three and near the far end of the middle and lower sheets.
+the facing on all three and near the far end of the top sheet.
 
 The joint slip puts numbers on what the layers do. With the soil at 64% of its
 strength (F = 1.5625), the back face has slid **40 mm** and the base **10 mm**,
@@ -543,8 +539,8 @@ at which they would run out lies beyond the top of the search range. So in the
 range a strength reduction covers, this wall has no strength limit. It has a
 movement that grows with every step of strength taken from the soil, and the
 search reports the strength at which its iteration limit stopped answering:
-1.566 at the default settings, 1.246 with the accelerator off, higher with a
-higher limit.
+at least 1.56 at the default settings, 1.246 with the accelerator off, higher
+with a higher limit.
 
 That makes the factor of safety of a reinforced wall a different kind of number
 from Part 1's. The question a strength reduction can answer for this wall is at
@@ -560,7 +556,7 @@ there and pin where. Where in that range is a design decision.
 Two things follow for practice. Report the movement with the number: "stands
 at F = 1.56 with 7.7 cm of movement and the geogrid at a third of capacity" is
 what the analysis found. And read the closing summary on every reinforced wall:
-*still moving at the limit, but slowing* and *left undecided* are the program
+*No failure was found* and *the factor of safety is at least* are the program
 telling you that you are looking at this kind of wall. A limit equilibrium analysis of the same wall, with the layers
 entered as reinforcement, asks the strength question directly and does not
 depend on movement at all; [FEM-2](fem02_reinforcement.md) runs a reinforced

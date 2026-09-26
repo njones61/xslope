@@ -415,9 +415,12 @@ def _failing_edge_sentences(F, trial, count, unit):
                 f"admissible state. {open_question}")
     if why == "inconclusive":
         rd = _stop_reading(trial, "inconclusive")
-        fell = (f" (from {float(rd['oob_from']):.2g} to {float(rd['oob_to']):.2g} "
-                f"over the last {int(rd['window']):,} {count})"
-                if rd is not None else "")
+        fell = ""
+        if rd is not None:
+            a, b = float(rd["oob_from"]), float(rd["oob_to"])
+            pct = (a - b) / a * 100.0 if a > 0 else 0.0
+            by = f"by {pct:.0f}%" if pct >= 0.5 else "by under 1%"
+            fell = f", {by} over the last {int(rd['window']):,} {count}"
         return (f"At F = {F:.4f} the trial hit the {n:,}-{one} limit with its "
                 f"out-of-balance force still falling{fell}. {open_question}")
 

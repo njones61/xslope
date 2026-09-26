@@ -421,7 +421,7 @@ def check_summary():
                                    "oob_to": 0.0024, "window": 1000,
                                    "force_tol": 0.001}})
     check("the iteration ceiling quotes the fall of the out-of-balance force",
-          "still falling (from 0.0031 to 0.0024 over the last 1,000 iterations). "
+          "still falling, by 23% over the last 1,000 iterations. "
           "That is neither an equilibrium nor a failure" in s, s)
     settled = {"F": 1.35, "stable": True, "converged": False,
                "verdict": "JOINT_SETTLED", "iterations": 60000,

@@ -3171,6 +3171,8 @@ _SSRM_CURVE_ENDINGS = {
     "disp_limit": ("past the displacement limit", "^"),
     "displacement_limit": ("past the displacement limit", "^"),
     "steady_slip": ("sliding steadily on its joints", "D"),
+    "not_slowing": ("did not slow, counted as sliding", "D"),
+    "inconclusive": ("still slowing when the limit came, an open question", "p"),
     "yield_gate": ("settled outside the yield surface", "D"),
     "nonfinite": ("calculation stopped producing numbers", "X"),
 }

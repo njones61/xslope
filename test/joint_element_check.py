@@ -1119,7 +1119,7 @@ def _leg_accelerated(failures, results):
     for label, row, F in (('row 2', ROW2, 1.56), ('row 4', ROW4, 1.5)):
         _d, fd, g = slab_model(**row)
         with contextlib.redirect_stdout(io.StringIO()):
-            off = solve_fem(fd, F=F, **kw)
+            off = solve_fem(fd, F=F, accelerate=False, **kw)
             on = solve_fem(fd, F=F, accelerate=True, **kw)
         acc = on.get('accelerate') or {}
         if 'accelerate' in off:

@@ -4482,6 +4482,12 @@ _HYBRID_U_SCALE_FLOOR_FRAC = 1e-6
 # re-measurement of them.
 JOINT_TRACE_SINK = None
 
+#: The accelerated sweep's per-sweep trace, for a study: set to a list and each
+#: accelerated solve appends one record (the multiplier proposed and taken, the
+#: outcome, why a step was refused, the resets, the increment's size and the
+#: out-of-balance, every sweep). None, the default, collects nothing.
+ACCEL_TRACE_SINK = None
+
 # === The joint verdict ========================================================
 # What an undecided jointed trial actually is, measured on the corpus that
 # produced them (r15_joint_convergence.md §1: five bracket-edge trials of RJ-6,
@@ -4647,7 +4653,16 @@ ACCELERATE_DEFAULT = False
 #: safeguard refuses is taken at plain pace, never shortened.
 _ACCEL_ALPHA_MIN = 1.0
 _ACCEL_ALPHA_MAX = 50.0
-#: Sweeps run plain before the multiplier may differ from 1.
+#: Sweeps run plain before the multiplier may differ from 1. On the default driver
+#: the multiplier waits longer, until the trial's last corrector checkpoint
+#: (`_CORRECTOR_CHECKPOINTS`, 3,000) has been read: every rung of that ladder then
+#: sees the state the plain sweep reaches, so a trial the corrector finishes on
+#: the ladder is finished on the same state, accelerated or not. Measured on
+#: RJ-19's standing bracket edge (F = 1.6133): with the multiplier on from 300 the
+#: sweep reached 0.98 elastic displacements by 1,000 where the plain one reaches
+#: 0.46, the 1,000 rung refused the accelerated state where it certifies the
+#: plain one, and the trial ran to a block-end certificate at 125,008 against
+#: 1,078 plain (rL_creep_rule.md, 2026-09-26).
 _ACCEL_START = 300
 #: AUTO-OFF. Over the trailing `_ACCEL_OFF_WINDOW` sweeps, if more than
 #: `_ACCEL_OFF_FRACTION` of the accelerated steps proposed were refused by the
@@ -6277,9 +6292,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             increment of the sweep scaled by the same factor and a safeguard that
             refuses any step that would change a joint pair's status (see
             ACCELERATE_DEFAULT for the whole rule). The fixed point is the plain
-            sweep's; what changes is how many sweeps reach it. None takes the
-            module default (`ACCELERATE_DEFAULT`, OFF). Exclusive of the
-            interface relief. The result carries what the multiplier did under
+            sweep's; what changes is how many sweeps reach it. The multiplier
+            waits until the trial's last corrector checkpoint has been read. None
+            takes the module default (`ACCELERATE_DEFAULT`, OFF). Exclusive of
+            the interface relief. The result carries what the multiplier did under
             ``"accelerate"`` when it is on, and no such key when it is off.
         joint_tangent_factor (float or None): The residual stiffness a relieved
             pair keeps in the matrix, as a fraction of its elastic value. None
@@ -7446,7 +7462,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # every Gauss point is elastic has no flicker to cancel.
         _acc_mean = any(not (g_.get('has_elastic') and bool(np.all(g_['elastic'])))
                         for g_ in gp_groups)
-        _acc = dict(on=True, start=int(_ACCEL_START),
+        _acc_start = int(_ACCEL_START)
+        if _corrector_on and _corrector_ladder:
+            _acc_start = max(_acc_start, int(max(_corrector_ladder)))
+        _acc = dict(on=True, start=int(_acc_start),
                     alpha_min=float(_ACCEL_ALPHA_MIN),
                     alpha_max=float(_ACCEL_ALPHA_MAX),
                     two_sweep_mean=bool(_acc_mean),
@@ -7779,6 +7798,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             _acc_gnorm = 0.0
             # The auto-off window: per sweep, 1 = step accepted, 2 = refused,
             # 0 = no accelerated step proposed.
+            _acc_trace = None
+            if ACCEL_TRACE_SINK is not None:
+                _acc_trace = dict(F=float(F), alpha=[], outcome=[], pair_chg=[],
+                                  gp_chg=[], gnorm=[], oob=[])
+                ACCEL_TRACE_SINK.append(_acc_trace)
             _acc_win = collections.deque(maxlen=int(_ACCEL_OFF_WINDOW))
             _acc_win_acc = 0
             _acc_win_rej = 0
@@ -8642,7 +8666,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                           else 0.5 * (_acc_g + _acc_g_prev))
                 _alpha = 1.0
                 _acc_outcome = 0
-                if (iteration >= _ACCEL_START
+                if (iteration >= _acc['start']
                         and _acc['switched_off_at'] is None):
                     if _acc_pair_chg or _acc_gp_chg:
                         _acc['resets'] += 1
@@ -8717,6 +8741,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     _acc['smallest_alpha'] = min(_acc['smallest_alpha'], _alpha)
                 else:
                     _acc_L = loads_oob
+                if _acc_trace is not None:
+                    _acc_trace['alpha'].append(float(_alpha))
+                    _acc_trace['outcome'].append(int(_acc_outcome))
+                    _acc_trace['pair_chg'].append(bool(_acc_pair_chg))
+                    _acc_trace['gp_chg'].append(bool(_acc_gp_chg))
+                    _acc_trace['gnorm'].append(float(_acc_gnorm))
+                    _acc_trace['oob'].append(float(unbalanced_force_ratio))
                 _acc_g_prev = _acc_g
                 _acc_h_prev = _acc_h
                 _acc_a_prev = _alpha
@@ -8726,7 +8757,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                                   'rejected_latch'):
                     _acc_outcome = 0
                 if (not _acc_win and _acc['switched_off_at'] is None
-                        and iteration >= _ACCEL_START and not _acc_win_open):
+                        and iteration >= _acc['start'] and not _acc_win_open):
                     _quiet = (_JOINT_CHURN_SAMPLES * _HYBRID_SAMPLE_EVERY)
                     if (iteration >= _JOINT_VERDICT_WARMUP
                             or iteration - _acc_last_pair_chg >= _quiet):

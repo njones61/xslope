@@ -575,15 +575,16 @@ class RunFemDialog(QDialog):
         self.max_iterations.setSingleStep(500)
         self.max_iterations.setValue(int(defaults.get("max_iterations") or 12000))
         self.max_iterations.setToolTip(
-            "Viscoplastic iteration budget for EACH trial F (and single-F runs). "
-            "It is a budget, not a hard stop: a trial that reaches it with the "
-            "out-of-balance force still falling is given another budget's worth, "
-            "again and again, up to the iteration ceiling below. A residual that "
-            "stops improving is reported but never ends a trial on its own; a "
-            "trial whose movement is clearly running away is declared failed "
-            "early and does not spend the rest of its budget. "
-            "Raise it if the reported FS keeps climbing when you do; it has "
-            "plateaued when raising it further changes nothing.")
+            "Viscoplastic iterations for EACH trial F (and single-F runs). A "
+            "trial that reaches this without converging is read by the trend of "
+            "its movement over its last half: movement dying away is handed to "
+            "the Newton corrector, and a balanced state it finds counts as "
+            "standing; movement that does not slow is counted as sliding; "
+            "movement still slowing that the corrector cannot finish, or with no "
+            "clear trend, is given another Max iterations' worth, up to the "
+            "iteration ceiling below. A trial whose movement is clearly running "
+            "away is declared failed early. Raise it when the closing summary "
+            "says the factor of safety depends on the iteration limit.")
         form.addRow("Max iterations per trial", self.max_iterations)
 
         # Hard stop on the automatic budget extension. A trial that reaches THIS
@@ -595,7 +596,7 @@ class RunFemDialog(QDialog):
         self.max_iterations_ceiling.setValue(
             int(defaults.get("max_iterations_ceiling") or 50000))
         self.max_iterations_ceiling.setToolTip(
-            "Hard stop on the automatic budget extension above. A trial that "
+            "Hard stop on the extension above. A trial that "
             "reaches this ceiling with its out-of-balance force still falling is "
             "reported INCONCLUSIVE - neither settled nor failed - and is not "
             "counted as a failure. The factor of safety is still the final "

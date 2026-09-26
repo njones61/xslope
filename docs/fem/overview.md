@@ -698,16 +698,40 @@ count climbs steeply as a trial approaches the critical factor and as the mesh i
 reinforced slope reaches equilibrium at $F = 1.25$ in 5,054 iterations at 2.5 ft element size and
 16,242 at 1 ft.
 
-**Running out of budget is not a verdict.** A trial that reaches `max_iterations` with its
-out-of-balance still **trending down** — the mean over the last 500 iterations at least 1% below the
-mean over the 500 before it — is given another `max_iterations` worth, and again, for as long as the
-trend holds, up to `max_iterations_ceiling` (default 50000). So the budget sets where the extension
-starts, not where the trial dies, and the answer stops depending on it: the FEM-1 embankment returns
-FS = 1.3711 from a 3000-iteration budget and from a 12000-iteration one. A trial whose residual is
-**not** falling at the budget stops there and is failed exactly as before.
+#### Trials that reach the iteration limit {#creep-trend}
 
-**Inconclusive trials.** A trial that reaches `max_iterations_ceiling` while still improving is
-neither settled nor failed, and it is reported as `exit_reason = 'inconclusive'`. This is where the
+**A trial still moving at the limit is read by its trend.** A trial that reaches `max_iterations`
+without converging is read by the trend of its movement over the second half of its iterations,
+split into five equal blocks: how far max&#124;u&#124; moved in each block, and the ratio of each
+block's movement to the one before. The ratio is a ratio of movements, not a count of iterations, so
+two runs that cover the same ground at different paces read the same way.
+
+| Trend over the window | What happens |
+|---|---|
+| **Dying away**: every block moved forward, none moved more than the one before, and the movement shrinks at a steady ratio below 0.9 a block | The [Newton corrector](#finishing-a-trial-with-the-newton-corrector) is asked for the balanced state from where the trial is and, if it refuses, from the estimated resting state: the field, the plastic strains and the joint slip carried forward by that ratio, $u_{rest} = u_2 + (u_2 - u_1)\,r/(1-r)$ from the last three block ends. A state the corrector certifies (force, yield and, on a jointed model, the hold test) stands, and the trial's `stop_reading` records the reading, the seed and the corrector's result. Where both are refused the trial is decided as below |
+| **Holding steady or growing**: the window moved at least 0.02 elastic displacements at a ratio of 0.9 or more a block; on a jointed model also the joint slip gaining 2% of itself or more at a rate not falling below 0.9 of the half-window before | `exit_reason = 'not_slowing'`, `FAILED`: the slope is sliding |
+| **Still** (under $10^{-4}$ elastic displacements over the window) or **unclear** | The [hybrid classifier](#2-hybrid-hybrid-default) decides, as for any trial stopped at the limit |
+
+Below `max_iterations_ceiling` (default 50000) a movement still dying away, or not yet clear, is given
+another `max_iterations` worth and read again at the new limit; a trial holding steady, growing or
+still stops at the limit. The dying-away reading, with its corrector attempts, is also taken at every
+block end once the window is full (and, on a jointed model, past 5,000 iterations), so a creeping
+trial can be certified before its limit. A jointed trial holding steady is counted as sliding from the
+last tenth of `max_iterations` on, and never earlier: see
+[the joint verdict](#the-joint-verdict) for the standing trial that looks like a slide at a third of
+its iterations. Every level is one the classifier or the joint verdict already uses: 0.9 is the joint
+verdict's "not decaying", 0.02 elastic displacements the classifier's "still moving", $10^{-4}$ the
+joint verdict's "stopped".
+
+Whether a trial dying away is certified depends on how close to rest it has come. On the FEM-3
+geogrid wall at $F = 1.25$ the corrector refuses both seeds at 100,000 iterations and certifies at
+140,000 (the ordinary sweep reaches the same rest on its own at 465,581), so at the tutorial's
+100,000 the plain search still counts that trial as failed and says the factor of safety depends on
+the limit.
+
+**Inconclusive trials.** A trial that reaches `max_iterations_ceiling` still dying away or with no
+clear trend, and with its out-of-balance still falling (the mean over the last 500 iterations at
+least 1% below the mean over the 500 before), is neither settled nor failed, and it is reported as `exit_reason = 'inconclusive'`. This is where the
 [Newton corrector](#finishing-a-trial-with-the-newton-corrector) does most of its work — a trial
 still improving at the ceiling is exactly the one a locally quadratic iteration can finish — so on
 the default driver an inconclusive trial is rare, and it survives only where the corrector also
@@ -784,17 +808,17 @@ there, and the displacement gained over the window in the trial's own elastic di
 
 | Evidence | `exit_reason` | Verdict | Effect on the bisection |
 |---|---|---|---|
-| In the last tenth of the budget: the slip gains ≥ 2% of itself over the window, its rate is **not decaying at all** (the last quarter's rate at least 0.9 of the quarter before), **and** max&#124;u&#124; gains ≥ 0.05 elastic displacements | `steady_slip` | `FAILED` | Failed — the slope is moving on its joints |
+| In the last tenth of the budget, or at the limit: the [trend reading](#creep-trend) finds the slip gaining ≥ 2% of itself over the window at a rate **not decaying at all** (the last half-window's rate at least 0.9 of the half before), or max&#124;u&#124; moving at a pace that does not slow, **and** max&#124;u&#124; gaining ≥ 0.02 elastic displacements | `not_slowing` | `FAILED` | Failed — the slope is moving on its joints |
 | The slip gains ≤ 0.01% of itself, max&#124;u&#124; gains ≤ 10⁻⁴ elastic displacements, the residual on the nodes carrying *no* joint is under `force_tol` across the window, **and** the joint residual has stopped falling (its window mean at least 0.85 of the previous window's) | `joint_settled` | `JOINT_SETTLED` | **Not** failed: the slope is standing, and the bracket moves up |
 | Anything else | unchanged | unchanged | The [hybrid classifier's](#2-hybrid-hybrid-default) verdict stands |
 
 Both readings are asked only of a trial that would otherwise spend its whole budget, and only on a
-jointed model — a trial that converges, a trial already failing, and every model without a joint
+jointed model (the sliding one through the trend reading, which every model has) — a trial that converges, a trial already failing, and every model without a joint
 reach neither.
 
 Each strict condition is there because the looser version was measured wrong.
 
-**The `FAILED` reading is taken only in the last tenth of the trial's budget, and it is not an early
+**The sliding reading is taken only in the last tenth of the trial's budget, and it is not an early
 exit.** There is no early reading that separates a jointed mechanism from a jointed trial that
 converges late. One bracket-edge trial that reaches force equilibrium at 185,381 sweeps has, at
 50,000 sweeps, gained 30% of its slip and 1.76 elastic displacements of movement with an
@@ -826,7 +850,8 @@ The viscoplastic iteration approaches equilibrium from outside the yield surface
 convergence rate is linear, so a trial near the critical strength can spend tens of thousands of
 iterations still improving and still undecided. XSLOPE runs a second, locally quadratic iteration on
 top of it. The viscoplastic loop drives the solve and builds the plastic history; at a short ladder
-of checkpoints — 300, 1,000 and 3,000 viscoplastic passes — and again wherever one of the stopping
+of checkpoints — 300, 1,000 and 3,000 viscoplastic passes — at every block end where the
+[trend reading](#creep-trend) finds the movement dying away, and again wherever one of the stopping
 rules above would end the trial, the current displacement field and plastic strains are handed to a
 single bounded Newton-Raphson solve at full gravity and this trial's reduced strengths. That solve
 uses the consistent tangent of the Mohr-Coulomb return map, and from a seed that has already walked
@@ -1078,8 +1103,10 @@ Its principal arguments:
 >  $\tan\phi_r = \tan\phi/F$.<br>
 >- **`max_iterations`** (default 12000) and **`tolerance`** (default $10^{-3}$): the iteration budget
 >  and the CHECON displacement tolerance.<br>
->- **`max_iterations_ceiling`** (default 50000): hard stop on the automatic extension of that
->  budget. Reaching it while still improving gives `exit_reason = 'inconclusive'`.<br>
+>- **`max_iterations_ceiling`** (default 50000): hard stop on the extension a trial still dying
+>  away, or with no clear trend, is given at `max_iterations` (see the
+>  [trend reading](#creep-trend)). Reaching it with the
+>  out-of-balance still falling gives `exit_reason = 'inconclusive'`.<br>
 >- **`force_tol`** (default $10^{-3}$): the per-node force-equilibrium tolerance; with `oob_window`
 >  (default 10) the averaging width that cancels the yield-surface limit cycle.<br>
 >- **`failure_criterion`** (default `"hybrid"`): how a non-converged trial is judged — see

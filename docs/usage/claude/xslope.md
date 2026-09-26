@@ -1988,11 +1988,15 @@ else:
     print(f"SSRM failed: {result.get('error', 'Unknown error')}")
 ```
 
-**The iteration budget extends itself.** `max_iterations` (default 12000) is the budget each
-trial *starts* with. A trial that uses it up with the out-of-balance force still falling is
-granted another budget's worth, repeatedly, up to `max_iterations_ceiling` (default 50000), so
-the factor of safety does not depend on the budget you pass. A trial that reaches the ceiling
-still improving is reported `inconclusive` and is NOT counted as a failure: `solve_ssrm` carries
+**A trial still moving at the iteration limit is read by its trend.** At `max_iterations`
+(default 12000) a trial that has not converged is read by how its movement changed over the
+second half of its iterations. Movement dying away at a steady rate is handed to the Newton
+corrector (from where the trial is, then from where the movement is heading), and a certified
+state counts as standing; movement that does not slow ends the trial as sliding
+(`exit_reason = 'not_slowing'`); movement still dying away that the corrector cannot finish, or
+with no clear trend, gets another `max_iterations` worth, up to `max_iterations_ceiling`
+(default 50000). A trial that reaches the ceiling with the out-of-balance force still falling is
+reported `inconclusive` and is NOT counted as a failure: `solve_ssrm` carries
 on below it and reports `result['FS']` as the midpoint of `final_interval`, exactly as on any
 other run. The difference is that the bracket's upper edge is an undecided trial rather than a
 measured failure, which `result['inconclusive']` lists and `result['note']` states in a sentence.
@@ -2011,8 +2015,9 @@ iteration limit, and raising Max iterations per trial may change it. The `'ssrm_
 shows the same thing: a flat run of displacements and a sharp knee is a strength limit; a steady
 climb with no knee means the slope never stopped moving. In that second case say so to the user
 rather than reporting the number bare. Any other ending is quoted with the reading that fired it
-(joint slip growth and rate, the elastic multiple reached, the displacement against its limit);
-pass those numbers on rather than paraphrasing them.
+(the trend of the movement at the limit, joint slip growth and rate, the elastic multiple
+reached, the displacement against its limit); pass those numbers on rather than paraphrasing
+them.
 
 **How a trial is decided.** The viscoplastic loop drives the solve and builds the plastic history.
 At 300, 1,000 and 3,000 iterations, and again wherever one of the stopping rules above would end

@@ -636,18 +636,21 @@ the failure criterion.
 
 ![Run FEM dialog](images/analysis_run_fem_dialog.png)
 
-**Max iterations per trial** (12000) is the viscoplastic budget each trial *starts*
-with, not a hard stop. A trial that uses it up with its out-of-balance force still
-falling is given another budget's worth, repeatedly, until either it settles or it
-reaches the **Iteration ceiling** (50000). That is what keeps the answer from
-depending on the budget: a model needing 16,000 iterations returns the same factor
-of safety whether the budget was typed as 3000 or 12000. A trial that reaches the
-ceiling while still improving is *inconclusive* — neither settled nor failed — and
-the run says so in the Log rather than counting it as a failure. The factor of safety
-is still the final bracket's midpoint, as on any other run; what changes is that the
-bracket's upper edge is an undecided trial rather than a measured failure, which the
-Log states beside the answer. Raise the ceiling, or loosen the SSRM tolerance, when
-that happens.
+**Max iterations per trial** (12000) is where a trial that has not converged is read
+by the trend of its movement. Movement dying away at a steady rate is handed to the
+Newton corrector, from where the trial is and then from where the movement is heading;
+a balanced state it finds (and, on a jointed model, the hold test confirms) counts as
+standing. Movement that does not slow is counted as sliding. Movement still dying away
+that the corrector cannot finish, or with no clear trend, is given another
+Max iterations' worth, up to the **Iteration ceiling** (50000); at the ceiling a trial
+whose out-of-balance force is still falling is *inconclusive* — neither settled nor
+failed — and the run says so in the Log rather than counting it as a failure. The
+factor of safety is still the final bracket's midpoint, as on any other run; what
+changes is that the bracket's upper edge is an undecided trial rather than a measured
+failure, which the Log states beside the answer. The closing summary quotes the
+reading that decided each end of the bracket. Raise the ceiling, or loosen the SSRM
+tolerance, when a trial is inconclusive, and raise Max iterations per trial when the
+summary says the factor of safety depends on the iteration limit.
 
 The [model checks](#model-checks-before-a-run) in the dialog's second column are the
 finite-element ones: a blank Poisson's ratio (which reads as 0.0 and moved the

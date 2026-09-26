@@ -740,11 +740,13 @@ summary says the factor of safety depends on the iteration limit, and that raisi
 reported with the numbers that ended it, such as how much the joint slip grew over
 the last stretch of iterations.
 
-When the answer reads "FS ≥", or the trial at the top of the bracket was stopped by
-the iteration limit while still slowing, the FEM · Results toolbar shows **Continue
-with a higher limit…**. It asks for a new **Max iterations per trial** (five times the
-limit the run stopped at, to start) and continues the run from where its trials
-stopped, so the iterations already run count toward the new limit. The continuation
+When the iteration limit is what stopped the trial at the top of the bracket (the
+answer reads "FS ≥" because that trial was still settling, or the trial was counted
+failed while still slowing), the FEM · Results toolbar shows **Continue with a
+higher limit…**. It asks for a new **Max iterations per trial** (five times the limit
+the run stopped at, to start) and continues the run from where its trials stopped:
+the search follows the path a fresh run at the new limit would, reusing the trials
+already decided and finishing the ones the limit cut short. The continuation
 runs like any other run, with the same Cancel, the progress bar and the Log carrying
 on, and its results replace the previous ones when it ends; the Run FEM dialog keeps
 the new value for the next run. The button is there only for a run made in this

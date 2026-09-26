@@ -317,17 +317,18 @@ def ssrm_undecided_top(result):
 def _trial_can_continue(trial):
     """Whether a higher iteration limit could still decide a recorded trial.
 
-    True where the trial ended undecided (:data:`SSRM_UNDECIDED_EXITS`), and
-    where the iteration limit stopped it and it was counted failed while still
-    moving slowly or still slowing -- the trials the closing summary says the
-    factor of safety depends on the iteration limit for. A trial that stood,
-    that failed on any other rule, or that the limit stopped while still moving
-    fast (FAILED) is decided, and a higher limit would not change it.
+    True where the iteration limit is what stopped it: undecided at the limit
+    ('inconclusive'), or counted failed while still moving slowly or still
+    slowing -- the trials the closing summary says the factor of safety depends
+    on the iteration limit for. A trial that stood, that failed on any other
+    rule, that the limit stopped while still moving fast (FAILED), or that ended
+    on the yield gate (a rule that does not read the limit) is decided as far as
+    a higher limit goes.
     """
     if not isinstance(trial, dict) or _trial_stood(trial):
         return False
     why = trial.get("exit_reason")
-    if why in SSRM_UNDECIDED_EXITS:
+    if why == "inconclusive":
         return True
     if why == "iteration_cap":
         if _stop_reading(trial, "slowing_refused") is not None:
@@ -341,9 +342,10 @@ class SsrmContinuation(dict):
     higher Max iterations per trial (``result['resumable']``; see
     :func:`solve_ssrm`'s ``resume``).
 
-    It holds the end state of every trial a higher limit could still decide, by
-    F, beside the prepared model, the in-situ state and the options the run was
-    made with. It lives in memory only, for the session the run was made in: it
+    It holds the end state of every trial a higher limit could still decide and
+    the solution of every trial, by F (a continuation reuses the trials the run
+    decided), beside the prepared model, the in-situ state and the options the
+    run was made with. It lives in memory only, for the session the run was made in: it
     pickles and copies as an EMPTY store, so a saved result, a meta sidecar or a
     pickled record never carries it, and a run read back from one cannot be
     continued (:func:`ssrm_can_continue` then says so).
@@ -366,8 +368,8 @@ def ssrm_can_continue(result):
     """The trial at the top of a run's final bracket, where the run can be
     continued with a higher Max iterations per trial; None otherwise.
 
-    A run can be continued where the trial at the top of its bracket is one a
-    higher limit could still decide (see :func:`_trial_can_continue`) and the
+    A run can be continued where the iteration limit is what stopped the trial
+    at the top of its bracket (see :func:`_trial_can_continue`) and the
     run kept that trial's end state in this session (``result['resumable']``).
     FEM-1 and the other runs whose top trial failed are never offered one.
     """
@@ -396,6 +398,11 @@ def ssrm_continue_refusal(result, max_iterations=None):
                 "continue.")
     top = _ssrm_top_trial(r)
     hi = float(r["final_interval"][1])
+    if top is not None and top.get("exit_reason") == "yield_gate":
+        return (f"At the top of the bracket, F = {hi:.4f}, the forces balanced "
+                f"with the stresses outside the yield surface. A higher Max "
+                f"iterations per trial would not change that, so this run cannot "
+                f"be continued.")
     if top is None or not _trial_can_continue(top):
         return (f"The trial at the top of the bracket, F = {hi:.4f}, failed. A "
                 f"higher Max iterations per trial would not change that, so this "
@@ -14951,22 +14958,25 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             moves rather than whether it failed, and cutting a trial short shortens
             the very displacement its curve is made of.
         resume (dict or None): An earlier result of this function, to CONTINUE
-            with a higher ``max_iterations`` rather than start over. Allowed where
-            the trial at the top of that run's bracket ended undecided, or was
-            stopped by the iteration limit and counted failed while still slowing
-            (:func:`ssrm_can_continue`), and only in the session the run was made
+            with a higher ``max_iterations``. Allowed where the iteration limit is
+            what stopped the trial at the top of that run's bracket (undecided at
+            the limit, or counted failed while still slowing;
+            :func:`ssrm_can_continue`), and only in the session the run was made
             in: the trials' end states are kept on ``result['resumable']`` in
             memory, and never in a saved file. Every other option is the earlier
             run's; ``max_iterations`` must be above the limit it used (the larger
             of its max_iterations and max_iterations_ceiling), and the ceiling is
             raised to it where it is lower, as the Run dialog raises its
-            Iteration ceiling. The trial at the top of the bracket
-            continues from where it stopped, its iterations counting toward the
-            new limit; the search then carries on as the bisection does (up if
-            that trial stands, down if it fails), and any later trial at an F
-            whose state was kept continues from it too. The result is the whole
-            run's: ``trials`` holds every trial once, a continued one carrying
-            ``resumed_from`` (the iteration it continued from); ``elapsed_time``
+            Iteration ceiling. The search walks the path a fresh search at the
+            new limit walks, from the original bracket: a trial on it the
+            earlier run decided is reused, one it left unfinished continues from
+            where it stopped (its iterations counting toward the new limit, and
+            ending as the same trial run straight through would), and any other
+            is solved afresh; a trial the path never reaches keeps its earlier
+            record. The result is the whole run's: ``trials`` holds every trial
+            once, a continued one carrying ``resumed_from`` (the iteration it
+            continued from), ``resumed`` lists the trials reused, continued and
+            solved afresh; ``elapsed_time``
             and the closing summary cover both parts, and a run that ends
             undecided again can be continued again. A run that cannot be
             continued raises ValueError with the reason in plain words
@@ -15436,6 +15446,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     # the result here and kept only where the run can in fact be continued.
     _kept_states = result.pop("_resume_states", None) or {}
     _kept_soft = result.pop("_resume_soft", None) or {}
+    _kept_solutions = result.pop("_resume_solutions", None) or {}
+    _how = result.pop("_resume_how", None) or {}
 
     # Record whether the optional interface-stiffness ceiling reached this model.
     # The key is absent with the switch off and on models without joints.
@@ -15634,13 +15646,19 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             "from_F": float(_resume_ctx["result"]["final_interval"][1]),
             "max_iterations": int(max(max_iterations,
                                       max_iterations_ceiling or 0)),
-            "previous_max_iterations": int(_resume_ctx["limit"])}
+            "previous_max_iterations": int(_resume_ctx["limit"]),
+            # The F of each trial on the path that was reused from the earlier
+            # run, continued from where it stopped, or solved afresh.
+            "reused": list(_how.get("reused") or []),
+            "continued": list(_how.get("continued") or []),
+            "fresh": list(_how.get("fresh") or [])}
     result["elapsed_time"] = elapsed
     if debug_level >= 1:
         print(f"  SSRM completed in {elapsed:.1f} seconds")
     if _kept_states:
         store = SsrmContinuation(
-            states=_kept_states, soft=_kept_soft, prep=prep,
+            states=_kept_states, soft=_kept_soft, solutions=_kept_solutions,
+            prep=prep,
             init_state=init_state, equilibration=equilibration,
             options=dict(_call_options), fem_data=fem_data,
             limit=int(max(max_iterations, max_iterations_ceiling or 0)))
@@ -15691,7 +15709,8 @@ def _ssrm_continue(fem_data, previous, max_iterations, max_iterations_ceiling,
     # earlier run as it was, still able to be continued, and one that ends
     # undecided again keeps its own.
     ctx = {"result": previous, "states": dict(store["states"]),
-           "soft": dict(store.get("soft") or {}), "prep": store["prep"],
+           "soft": dict(store.get("soft") or {}),
+           "solutions": dict(store.get("solutions") or {}), "prep": store["prep"],
            "init_state": store["init_state"],
            "equilibration": store["equilibration"],
            "limit": int(store["limit"])}
@@ -15734,9 +15753,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     ``_keep_resume`` keeps the end state of every trial a higher limit could
     decide (see :func:`_trial_can_continue`), and ``_resume`` (the context
     solve_ssrm builds from an earlier result, see its ``resume``) continues that
-    earlier search: the trial at the top of its bracket is continued first, and
-    the search then goes on from there as the bisection does (see the walk
-    below). Both are internal to solve_ssrm."""
+    earlier search along the path a fresh search at the new limit takes,
+    reusing the trials it decided and continuing the ones it left unfinished
+    (see ``_trial``). Both are internal to solve_ssrm."""
 
     trials = []                        # per-trial verdict metadata (both settings)
     inconclusive = []                  # trials that hit the iteration ceiling, still improving
@@ -15794,9 +15813,16 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             then = " Raise Max iterations per trial to decide it."
         msg = (f"SSRM: the trial at F = {F:.4f} is undecided. {why} The search "
                f"does not count it as a failure and carries on below it.{then}")
+        _last_undecided[0] = (float(F), sol)
+        if sol.get("_reused"):
+            # A trial the earlier run decided, reused by a continuation: its
+            # entry is already in the list, and the log said it then.
+            return msg
+        inconclusive[:] = [e for e in inconclusive
+                           if abs(float(e["F"]) - float(F))
+                           > 1e-12 * max(1.0, abs(float(F)))]
         inconclusive.append({"F": float(F), "iterations": int(sol.get("iterations", 0)),
                              "message": msg})
-        _last_undecided[0] = (float(F), sol)
         print(f"\n{msg}")
         return msg
 
@@ -15915,6 +15941,11 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     # where such a trial ends up the failing edge of a continued search).
     _kept = {}
     _soft = {}
+    # Every trial's solution by F, so that a continuation can reuse the trials
+    # this run decided (see ``_resume``), and the F of each trial a
+    # continuation reused, continued or solved afresh.
+    _solutions = {}
+    _how = {"reused": [], "continued": [], "fresh": []}
 
     def _at(store, F):
         """The key of ``store`` equal to F (to rounding), or None."""
@@ -15924,12 +15955,20 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         return None
 
     def _trial(F, step, prefix, role):
-        """Solve and record one trial at F. Where an earlier run of this search
-        kept the trial's end state (see ``_resume``), the trial is CONTINUED from
-        it with this run's limit, and its record replaces the earlier one in
-        place, carrying ``resumed_from`` (the iteration it continued from)."""
+        """Solve and record one trial at F. On a continuation (see ``_resume``) a
+        trial the earlier run decided is reused as it was; one whose end state
+        it kept is CONTINUED from it with this run's limit, its record
+        replacing the earlier one in place with ``resumed_from`` (the iteration
+        it continued from)."""
         k = _at(_kept, F)
         state = None if k is None else _kept.pop(k)
+        ks = _at(_solutions, F)
+        if state is None and ks is not None and _resume is not None:
+            # Decided by the earlier run: its verdict is reused, not solved again.
+            sol = _solutions[ks]
+            _how["reused"].append(float(F))
+            return sol
+        _how["continued" if state is not None else "fresh"].append(float(F))
         if state is None:
             sol = _record(F, _solve_at(F, step, prefix), role)
             rec = trials[-1]
@@ -15957,6 +15996,10 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         st = sol.pop("_resume_state", None)
         if st is not None and _trial_can_continue(rec):
             _kept[float(F)] = st
+        ko = _at(_solutions, F)
+        if ko is not None:
+            _solutions.pop(ko)
+        _solutions[float(F)] = sol
         ks = _at(_soft, F)
         if ks is not None:
             _soft.pop(ks)
@@ -16049,172 +16092,102 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         }
 
     from .search import _check_cancel
-    _walk = 0                              # trials the continuation walk solved
     if _resume is not None:
         # === Continuing an earlier search with a higher limit ===
-        # The earlier run's record and bracket are this run's to start from. The
-        # trial at the top of its bracket is the one the limit left undecided (or
-        # counted failed while still slowing), and it is continued first. If it
-        # stands, the search goes UP exactly as the bisection went down when that
-        # trial was undecided: the next trial is the nearest one above it that
-        # did not stand -- the upper edge of the bracket it was solved in -- and
-        # it is continued too where its state was kept, or is the failing edge
-        # where it was a failure. Above the highest trial of all, the top of the
-        # search is raised by f_adjust as a fresh search raises it. If the
-        # continued trial fails, or is undecided again, it is the new upper edge.
-        # The bisection below then carries on inside the bracket this leaves.
+        # The search walks the path a fresh search at the new limit walks, from
+        # the original bracket. A trial on that path the earlier run decided is
+        # reused (its record and its field); one it left unfinished is continued
+        # from its kept state; any other is solved afresh. A trial the path never
+        # reaches is left as the earlier run recorded it.
         prev = _resume["result"]
         trials.extend(dict(t) for t in (prev.get("trials") or []))
         inconclusive.extend(dict(e) for e in (prev.get("inconclusive") or []))
         _kept.update(_resume.get("states") or {})
         _soft.update(_resume.get("soft") or {})
-        for t in trials:
-            if _trial_stood(t) and _finite_or_none(t.get("F")) is not None:
-                _carried[0] = (float(t["F"]) if _carried[0] is None
-                               else max(_carried[0], float(t["F"])))
-        F_left, F_right = (float(x) for x in prev["final_interval"])
-        last_converged_solution = prev.get("last_solution")
-        failed_edge_solution = None
-        prog["n_bracket"], prog["n_steps"] = 1, 0
-        F_try = F_right
-        role = "bisect"
-        n_expand = 0
-        while True:
-            _check_cancel(cancel_check)
-            _ssrm_progress(progress_callback, bracket_step * SUBDIV,
-                           _total() * SUBDIV, f"F={F_try:.3f} continued")
-            if debug_level >= 1:
-                print(f"\n  SSRM continued: F = {F_try:.4f}  "
-                      f"[{F_left:.4f}, {F_right:.4f}]")
-            sol = _trial(F_try, bracket_step, f"F={F_try:.3f} continued", role)
-            _walk += 1
-            if debug_level >= 1:
-                print(f"    -> {_verdict_note(sol, hybrid)} ({sol['iterations']} iters)")
-            if _inconclusive(sol):
-                _note_inconclusive(F_try, sol)
-                F_right = F_try
-                break
-            if not _stable(sol):
-                F_right = F_try
-                failed_edge_solution = sol
-                break
-            F_left = F_try
-            last_converged_solution = sol
-            above = [float(t["F"]) for t in trials
-                     if _finite_or_none(t.get("F")) is not None
-                     and float(t["F"]) > F_try + 1e-12 * max(1.0, abs(F_try))
-                     and not _trial_stood(t)]
-            if above:
-                F_right = min(above)
-                if _at(_kept, F_right) is None:
-                    ks = _at(_soft, F_right)
-                    failed_edge_solution = {"softened_1d_elements": (
-                        [] if ks is None or _soft[ks] is None else _soft[ks])}
-                    break
-                F_try = F_right
-            else:
-                # Nothing above this trial failed: the top of the search is
-                # raised, as a fresh search raises it.
-                if F_try >= f_max_ceiling - 1e-9 or n_expand >= max_expand:
-                    msg = (f"SSRM: the slope still reaches equilibrium at F = "
-                           f"{F_try:.2f}, the top of the range the search may try, "
-                           f"so the factor of safety is above it. Raise F max, or "
-                           f"the ceiling (f_max_ceiling), to find it. A slope that "
-                           f"keeps deforming without ever running away also ends "
-                           f"here.")
-                    print(f"\n{msg}")
-                    return {"converged": False, "FS": None, "last_solution": sol,
-                            "error": msg, "trials": trials}
-                F_try = min(f_max_ceiling, F_try + f_adjust)
-                F_right = F_try
-                role = "upper"
-                n_expand += 1
-            _bump_bracket()
-        prog["n_steps"] = _ssrm_bisect_steps(F_right - F_left, tolerance)
-        iteration = 0
-    else:
-        # === Establish a valid bracket, auto-expanding a wrong guess ===
-        # The lower bound must converge and the upper must not. If the guess is off,
-        # step F_left DOWN / F_right UP by f_adjust until the bracket is valid, bounded
-        # by a positive floor (F stays > 0) and a ceiling (F can't grow forever). A
-        # good guess brackets on the first try and skips the expansion entirely.
+        for _F, _sol in (_resume.get("solutions") or {}).items():
+            _solutions[float(_F)] = {**_sol, "_reused": True}
+    # === Establish a valid bracket, auto-expanding a wrong guess ===
+    # The lower bound must converge and the upper must not. If the guess is off,
+    # step F_left DOWN / F_right UP by f_adjust until the bracket is valid, bounded
+    # by a positive floor (F stays > 0) and a ceiling (F can't grow forever). A
+    # good guess brackets on the first try and skips the expansion entirely.
 
-        # -- Lower bound: lower F_left until it converges --
-        _ssrm_progress(progress_callback, 0, _total() * SUBDIV, f"Checking lower bound F={F_left:.3f}")
+    # -- Lower bound: lower F_left until it converges --
+    _ssrm_progress(progress_callback, 0, _total() * SUBDIV, f"Checking lower bound F={F_left:.3f}")
+    if debug_level >= 1:
+        print(f"  Verifying lower bound F={F_left:.2f} converges...")
+    solution_min = _trial(F_left, bracket_step, f"Lower bound F={F_left:.3f}", "lower")
+    if _inconclusive(solution_min):
+        # An inconclusive lower bound has not been shown to stand, so the bracket
+        # walks down exactly as it would for a failure — but the trial is recorded
+        # as the uncertainty it is rather than silently counted as a failure.
+        _note_inconclusive(F_left, solution_min)
+    n_expand = 0
+    while not _stable(solution_min):
+        if F_left <= f_min_floor + 1e-9 or n_expand >= max_expand:
+            msg = (f"SSRM: the slope does not reach equilibrium even at F = {F_left:.2f} "
+                   f"(lowered to the floor while auto-bracketing) — it is unstable at or "
+                   f"below this strength-reduction factor (FS < {F_left:.2f}).")
+            print(f"\n{msg}")
+            return {"converged": False, "error": msg, "FS": None, "trials": trials}
+        F_new = max(f_min_floor, F_left - f_adjust)
         if debug_level >= 1:
-            print(f"  Verifying lower bound F={F_left:.2f} converges...")
+            print(f"    -> F={F_left:.2f} did not converge; lowering F_min to {F_new:.2f}")
+        F_left = F_new
+        n_expand += 1
+        _bump_bracket()
         solution_min = _trial(F_left, bracket_step, f"Lower bound F={F_left:.3f}", "lower")
         if _inconclusive(solution_min):
-            # An inconclusive lower bound has not been shown to stand, so the bracket
-            # walks down exactly as it would for a failure — but the trial is recorded
-            # as the uncertainty it is rather than silently counted as a failure.
             _note_inconclusive(F_left, solution_min)
-        n_expand = 0
-        while not _stable(solution_min):
-            if F_left <= f_min_floor + 1e-9 or n_expand >= max_expand:
-                msg = (f"SSRM: the slope does not reach equilibrium even at F = {F_left:.2f} "
-                       f"(lowered to the floor while auto-bracketing) — it is unstable at or "
-                       f"below this strength-reduction factor (FS < {F_left:.2f}).")
-                print(f"\n{msg}")
-                return {"converged": False, "error": msg, "FS": None, "trials": trials}
-            F_new = max(f_min_floor, F_left - f_adjust)
-            if debug_level >= 1:
-                print(f"    -> F={F_left:.2f} did not converge; lowering F_min to {F_new:.2f}")
-            F_left = F_new
-            n_expand += 1
-            _bump_bracket()
-            solution_min = _trial(F_left, bracket_step, f"Lower bound F={F_left:.3f}", "lower")
-            if _inconclusive(solution_min):
-                _note_inconclusive(F_left, solution_min)
-        F_min = F_left
-        if debug_level >= 1:
-            print(f"    -> Converged in {solution_min['iterations']} iters (F_min={F_min:.2f})")
+    F_min = F_left
+    if debug_level >= 1:
+        print(f"    -> Converged in {solution_min['iterations']} iters (F_min={F_min:.2f})")
 
-        # -- Upper bound: raise F_right until it does NOT converge --
-        _bump_bracket()
-        _ssrm_progress(progress_callback, bracket_step * SUBDIV, _total() * SUBDIV,
-                       f"Checking upper bound F={F_right:.3f}")
+    # -- Upper bound: raise F_right until it does NOT converge --
+    _bump_bracket()
+    _ssrm_progress(progress_callback, bracket_step * SUBDIV, _total() * SUBDIV,
+                   f"Checking upper bound F={F_right:.3f}")
+    if debug_level >= 1:
+        print(f"  Verifying upper bound F={F_right:.2f} does not converge...")
+    solution_max = _trial(F_right, bracket_step, f"Upper bound F={F_right:.3f}", "upper")
+    if _inconclusive(solution_max):
+        # The upper bound only has to NOT stand, and an inconclusive trial does not:
+        # it is accepted as the bracket's upper edge, carrying its uncertainty, and
+        # the bisection proceeds below it.
+        _note_inconclusive(F_right, solution_max)
+    n_expand = 0
+    while _stable(solution_max):
+        if F_right >= f_max_ceiling - 1e-9 or n_expand >= max_expand:
+            msg = (f"SSRM: the slope still reaches equilibrium at F = {F_right:.2f}, "
+                   f"the top of the range the search may try, so the factor of "
+                   f"safety is above it. Raise F max, or the ceiling "
+                   f"(f_max_ceiling), to find it. A slope that keeps deforming "
+                   f"without ever running away also ends here.")
+            print(f"\n{msg}")
+            return {"converged": False, "FS": None, "last_solution": solution_max,
+                    "error": msg, "trials": trials}
+        F_new = min(f_max_ceiling, F_right + f_adjust)
         if debug_level >= 1:
-            print(f"  Verifying upper bound F={F_right:.2f} does not converge...")
+            print(f"    -> F={F_right:.2f} converged; raising F_max to {F_new:.2f}")
+        F_right = F_new
+        n_expand += 1
+        _bump_bracket()
         solution_max = _trial(F_right, bracket_step, f"Upper bound F={F_right:.3f}", "upper")
         if _inconclusive(solution_max):
-            # The upper bound only has to NOT stand, and an inconclusive trial does not:
-            # it is accepted as the bracket's upper edge, carrying its uncertainty, and
-            # the bisection proceeds below it.
             _note_inconclusive(F_right, solution_max)
-        n_expand = 0
-        while _stable(solution_max):
-            if F_right >= f_max_ceiling - 1e-9 or n_expand >= max_expand:
-                msg = (f"SSRM: the slope still reaches equilibrium at F = {F_right:.2f}, "
-                       f"the top of the range the search may try, so the factor of "
-                       f"safety is above it. Raise F max, or the ceiling "
-                       f"(f_max_ceiling), to find it. A slope that keeps deforming "
-                       f"without ever running away also ends here.")
-                print(f"\n{msg}")
-                return {"converged": False, "FS": None, "last_solution": solution_max,
-                        "error": msg, "trials": trials}
-            F_new = min(f_max_ceiling, F_right + f_adjust)
-            if debug_level >= 1:
-                print(f"    -> F={F_right:.2f} converged; raising F_max to {F_new:.2f}")
-            F_right = F_new
-            n_expand += 1
-            _bump_bracket()
-            solution_max = _trial(F_right, bracket_step, f"Upper bound F={F_right:.3f}", "upper")
-            if _inconclusive(solution_max):
-                _note_inconclusive(F_right, solution_max)
-        F_max = F_right
-        if debug_level >= 1:
-            print(f"    -> Did NOT converge ({solution_max['iterations']} iters, F_max={F_max:.2f})")
+    F_max = F_right
+    if debug_level >= 1:
+        print(f"    -> Did NOT converge ({solution_max['iterations']} iters, F_max={F_max:.2f})")
 
-        # Recompute the bisection step budget for the (possibly widened) bracket.
-        prog["n_steps"] = _ssrm_bisect_steps(F_right - F_left, tolerance)
+    # Recompute the bisection step budget for the (possibly widened) bracket.
+    prog["n_steps"] = _ssrm_bisect_steps(F_right - F_left, tolerance)
 
-        last_converged_solution = solution_min
-        # The bracket's failed edge, kept for the at-failure capture: the post-peak
-        # set the trial at F_right shed to before it gave way (empty when nothing
-        # can soften). Updated whenever a trial moves F_right down.
-        failed_edge_solution = solution_max
-        iteration = 0
+    last_converged_solution = solution_min
+    # The bracket's failed edge, kept for the at-failure capture: the post-peak
+    # set the trial at F_right shed to before it gave way (empty when nothing
+    # can soften). Updated whenever a trial moves F_right down.
+    failed_edge_solution = solution_max
+    iteration = 0
 
     if grid is not None and grid > 0:
         # === Grid bisection (bracket-independent) ===
@@ -16334,9 +16307,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         # at-failure capture there is no failure to take.
         "undecided_solution": undecided[1] if lower_bound else None,
         "last_solution": last_converged_solution,
-        "iterations_ssrm": (iteration + _walk
-                            + (int((_resume["result"].get("iterations_ssrm")
-                                    or 0)) if _resume is not None else 0)),
+        "iterations_ssrm": iteration,
         "final_interval": (F_left, F_right),
         "interval_width": F_right - F_left,
         # The post-peak set the failed-edge trial shed to (None when nothing can
@@ -16348,6 +16319,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         # that did not stand.
         "_resume_states": _kept,
         "_resume_soft": _soft,
+        "_resume_solutions": _solutions,
+        "_resume_how": _how,
         # Per-trial record: F, role, converged/stable, hybrid verdict, u_ratio,
         # growth, exit_reason, iterations. Populated on every criterion so an A/B
         # between criteria costs no extra solves.

@@ -5,11 +5,12 @@ What this file locks:
   1. THE BOOKKEEPING, on a stand-in solver (no finite element solve). A run
      keeps the end state of exactly the trials a higher limit could still decide
      -- undecided at the limit, or counted failed while still slowing -- and no
-     other; a run whose top trial failed keeps nothing and offers nothing. A
-     continuation hands each kept state back to the trial at its F, continues
-     the top trial first and walks up through the trials above it that did not
-     stand, then bisects; every trial is recorded once, a continued one in
-     place with ``resumed_from``; the wall time is both parts; the closing
+     other; a run whose top trial failed, or ended on the yield gate, keeps
+     nothing and offers nothing. A continuation walks the path a fresh search
+     at the new limit walks: it reuses the trials the earlier run decided,
+     hands each kept state back to the unfinished trial at its F, solves the
+     rest afresh and never finishes a trial off the path; every trial is
+     recorded once, a continued one in place with ``resumed_from``; the wall time is both parts; the closing
      summary says where the run was continued from and to what limit, in the
      Run dialog's words; and the bracket is the one a fresh run at the new
      limit finds. A run that cannot be continued is refused in plain words: a
@@ -160,7 +161,7 @@ def check_bookkeeping():
           f"FS {r1.get('FS')} on {r1.get('final_interval')}")
     want = sorted(float(t["F"]) for t in r1["trials"]
                   if fem._trial_can_continue(t))
-    check("it keeps the end state of exactly the trials a higher limit could decide",
+    check("it keeps the end state of exactly the trials the limit stopped",
           _kept_Fs(r1) == want and want == [1.296875, 1.3125, 1.375, 1.5],
           f"kept {_kept_Fs(r1)}, continuable {want}")
     check("no kept state for a trial that stood or failed",
@@ -194,21 +195,26 @@ def check_bookkeeping():
           and r2.get("fs_is_lower_bound") == r3.get("fs_is_lower_bound"),
           f"continued {r2.get('final_interval')}, fresh {r3.get('final_interval')}")
     order = [c["F"] for c in c2]
-    check("the top trial is continued first, then the trials above it that "
-          "did not stand, lowest first",
-          order[:4] == [1.296875, 1.3125, 1.375, 1.5], f"order {order}")
-    check("each continued trial is handed its own kept state and starts at "
-          "6,000 iterations",
-          all(c["state"] is kept[c["F"]] and c["start"] == 6000 for c in c2[:4])
-          and all(c["state"] is None and c["start"] == 0 for c in c2[4:]))
-    check("the trials that stood or failed are not solved again",
-          not any(_same(c["F"], F) for c in c2 for F in (1.0, 2.0, 1.25, 1.28125,
-                                                          1.2890625)))
+    fresh_order = [c["F"] for c in c3]
+    check("the continuation walks the fresh run's path, solving only the trials "
+          "the earlier run did not decide",
+          order == [F for F in fresh_order if F not in (1.0, 2.0)]
+          and order == [1.5, 1.75, 1.625, 1.5625, 1.59375, 1.609375, 1.6171875],
+          f"continued {order}, fresh {fresh_order}")
+    check("the unfinished trial on the path is handed its own kept state and "
+          "starts at 6,000 iterations; the rest start from zero",
+          c2[0]["state"] is kept[1.5] and c2[0]["start"] == 6000
+          and all(c["state"] is None and c["start"] == 0 for c in c2[1:]))
+    how = r2.get("resumed") or {}
+    check("the result says which trials were reused, continued and fresh",
+          how.get("reused") == [1.0, 2.0] and how.get("continued") == [1.5]
+          and how.get("fresh") == [1.75, 1.625, 1.5625, 1.59375, 1.609375,
+                                   1.6171875], str(how))
     Fs = [round(float(t["F"]), 12) for t in r2["trials"]]
     check("every trial is recorded once", len(Fs) == len(set(Fs)), f"{Fs}")
     ok_place = True
     for i, t in enumerate(before):
-        if float(t["F"]) in (1.296875, 1.3125, 1.375, 1.5):
+        if float(t["F"]) == 1.5:
             n = r2["trials"][i]
             ok_place &= (_same(n["F"], t["F"]) and n.get("resumed_from") == 6000
                          and n["role"] == t["role"] and n["stable"]
@@ -216,7 +222,8 @@ def check_bookkeeping():
         else:
             ok_place &= (r2["trials"][i] == t)
     check("a continued trial's record replaces the earlier one in place, with "
-          "resumed_from = 6,000; the others are as they were", ok_place)
+          "resumed_from = 6,000; the others, those off the path included, are "
+          "as they were", ok_place)
     check("the wall time is both parts",
           r2["elapsed_time"] >= r1["elapsed_time"] > 0.0,
           f"{r1['elapsed_time']:.3f} s then {r2['elapsed_time']:.3f} s")
@@ -257,7 +264,7 @@ def check_bookkeeping():
         fem.solve_fem = real
     check("... and continued, it finds the fresh run's bracket",
           r5.get("final_interval") == r3.get("final_interval")
-          and [c["F"] for c in c5][:2] == [1.6015625, 1.609375],
+          and [c["F"] for c in c5] == [1.609375, 1.6171875],
           f"{r5.get('final_interval')} after {[c['F'] for c in c5]}")
 
     try:
@@ -277,7 +284,7 @@ def check_bookkeeping():
 
     reading = {"rule": "slowing_refused"}
     cases = [({"exit_reason": "inconclusive", "stable": False}, True),
-             ({"exit_reason": "yield_gate", "stable": False}, True),
+             ({"exit_reason": "yield_gate", "stable": False}, False),
              ({"exit_reason": "iteration_cap", "stable": False,
                "verdict": "AMBIGUOUS"}, True),
              ({"exit_reason": "iteration_cap", "stable": False, "verdict": "FAILED",
@@ -289,6 +296,14 @@ def check_bookkeeping():
              ({"exit_reason": "converged", "stable": True}, False),
              ({"exit_reason": "inconclusive", "stable": True,
                "verdict": "STABLE_STUCK"}, False)]
+    fake = {"converged": True, "final_interval": (1.5, 1.5078125),
+            "trials": [{"F": 1.5078125, "stable": False,
+                        "exit_reason": "yield_gate"}],
+            "resumable": {"states": {1.5078125: {}}, "limit": 100}}
+    why = fem.ssrm_continue_refusal(fake)
+    check("a top trial that ended on the yield gate is refused, in plain words",
+          fem.ssrm_can_continue(fake) is None and why is not None
+          and "yield surface" in why and "cannot be continued" in why, repr(why))
     check("which trials a higher limit could still decide",
           all(fem._trial_can_continue(t) is want for t, want in cases),
           str([fem._trial_can_continue(t) for t, _ in cases]))
@@ -524,6 +539,10 @@ def run_slow():
           r2["final_interval"] == (1.9921875, 2.0) and r2["FS"] == 1.99609375
           and not r2["fs_is_lower_bound"],
           f"{r2['FS']} {r2['final_interval']}; {s1:.0f} s + {s2:.0f} s")
+    # The fresh million-iteration run took 4182 s on the machine the lock was
+    # measured on; the continuation alone may not take longer.
+    check("... and the continuation alone takes no longer than the fresh "
+          "million-iteration run (4182 s)", s2 <= 4182.0, f"{s2:.0f} s")
     return list(FAILURES)
 
 

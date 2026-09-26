@@ -2006,11 +2006,13 @@ bracket's bottom and `result['fs_is_lower_bound']` is True — tell the user the
 "at least" that value, because no trial above it was shown to fail. Raise the ceiling or Max
 iterations per trial to go further. To go further without starting over, continue the run in
 the same Python session: `solve_ssrm(fem_data, resume=result, max_iterations=N)` with `N` above
-the limit it used. `xslope.fem.ssrm_can_continue(result)` says whether a run can be (its top
-trial ended undecided, or the limit stopped it while still slowing); the top trial goes on from
-the iteration it stopped at, the search carries on from there, and the result is the whole run's
-(`trials` once each, a continued one with `resumed_from`; the summary names the F and the new
-limit). The trials' end states live in memory only, so a result read back from a file cannot be
+the limit it used. `xslope.fem.ssrm_can_continue(result)` says whether a run can be (the
+iteration limit stopped its top trial: undecided at the limit, or counted failed while still
+slowing; a yield-gate top cannot). The search follows the path a fresh run at the new limit
+takes, reusing decided trials and finishing the unfinished ones from where they stopped; the
+result is the whole run's (`trials` once each, a continued one with `resumed_from`;
+`result['resumed']` lists reused, continued and fresh trials; the summary names the F and the
+new limit). The trials' end states live in memory only, so a result read back from a file cannot be
 continued. At the other end, a trial whose movement is
 clearly running away — past 8 times its own elastic displacement and still growing, or a flat
 residual over 2000 iterations while the field gains a whole elastic displacement — is declared

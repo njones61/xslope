@@ -564,6 +564,16 @@ exaggeration:
 
 ![The wall at 2.0, drawn at true scale: the block column pushed out and sunk into the foundation, the fill behind it collapsed, and the geogrid layers dragged out with it](images/fem03_fem_blocks_grid_long_failure.png){width=888}
 
+![Viscoplastic shear strain at the failed state: a band from under the toe of the block column, where the foundation is punched, up through the reinforced fill to the crest; the bottom layer at its capacity on the reinforcement force scale](images/fem03_fem_shear_grid_long_failure.png){width=1000}
+
+The shear strain is on a different scale from the default run's: it tops out
+near 2.6 where the default run's topped out near 0.04. The band runs from under
+the toe of the block column, where the wall is punching into the foundation, up
+through the reinforced fill and out to the crest. The bars are drawn on the
+reinforcement force scale, and at this state the bottom layer is at its
+capacity along most of its length, with the middle layer close to it at the
+facing.
+
 ### What the factor of safety means for this wall
 
 Part 1's wall failed the way strength reduction expects: at one strength the

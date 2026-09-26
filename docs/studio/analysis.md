@@ -738,7 +738,20 @@ the bracket hit the iteration limit while the slope was still moving slowly, the
 summary says the factor of safety depends on the iteration limit, and that raising
 **Max iterations per trial** may change it. A trial ended by any other rule is
 reported with the numbers that ended it, such as how much the joint slip grew over
-the last stretch of iterations. The solution is
+the last stretch of iterations.
+
+When the answer reads "FS ≥", or the trial at the top of the bracket was stopped by
+the iteration limit while still slowing, the FEM · Results toolbar shows **Continue
+with a higher limit…**. It asks for a new **Max iterations per trial** (five times the
+limit the run stopped at, to start) and continues the run from where its trials
+stopped, so the iterations already run count toward the new limit. The continuation
+runs like any other run, with the same Cancel, the progress bar and the Log carrying
+on, and its results replace the previous ones when it ends; the Run FEM dialog keeps
+the new value for the next run. The button is there only for a run made in this
+session: the trials' end states are held in memory and are not saved with the
+results.
+
+The solution is
 exported alongside the model so it can be restored on the next Open without
 re-solving — including the at-failure mechanism snapshot (a second CSV pair) and,
 for a model with reinforcement or piles, the per-element structural results

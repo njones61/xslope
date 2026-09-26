@@ -21,7 +21,7 @@ from PySide6.QtCore import Qt, QObject, QSettings, QStandardPaths, QThread, Sign
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QButtonGroup, QDialog, QDockWidget, QFileDialog, QHBoxLayout,
-    QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QProgressBar,
+    QInputDialog, QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QProgressBar,
     QPushButton, QStackedWidget, QTabWidget, QToolBar, QToolButton, QTreeWidget,
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )
@@ -34,6 +34,7 @@ from . import links, urlscheme
 from .canvas import MplCanvas
 from .dialogs import (
     BuildMeshDialog, DxfImportDialog, GszImportDialog, ReliabilityDialog,
+    MAX_ITERATIONS_LIMIT as _MAX_ITERATIONS_LIMIT,
     RunFemDialog, RunLemDialog, RunSeepDialog, SensitivityDialog, Slide2ImportDialog,
     UnpackPackageDialog,
 )
@@ -317,6 +318,9 @@ class MainWindow(QMainWindow):
         self.fem_data_canvas = None
         self.fem_results_canvas = None
         self.fem_details_btn = None       # "1D Details…" on the FEM results toolbar
+        # "Continue with a higher limit…" on the same toolbar, shown only while the
+        # displayed strength reduction run can be continued (see continue_fem).
+        self.fem_continue_btn = None
         self.fem_details_dlg = None       # the open (non-modal) details dialog
         self.view_tabs = QTabWidget()
         self.view_tabs.addTab(self.canvas, "Inputs")
@@ -1677,6 +1681,7 @@ class MainWindow(QMainWindow):
         self.act_report.setEnabled(open_ and solved and not busy)
         self.act_report.setToolTip(
             "" if solved else "Run an analysis first — a report documents results.")
+        self._update_fem_continue_action()
 
     def run_current(self):
         """Dispatch the Run action by the current mode."""
@@ -2489,8 +2494,11 @@ class MainWindow(QMainWindow):
         # SSRM supports cooperative cancel (a single-trial solve is quick).
         supports_cancel = opts["analysis"] == "ssrm"
         seep_time = opts.get("seep_time") or {}
-        if not self._apply_transient_analysis_frame(rapid=False,
-                                                    time=seep_time.get("time")):
+        # A continued run solves on the model its trials were made on, so the
+        # seepage frame that model was built with is already in it.
+        if (opts.get("continue_from") is None
+                and not self._apply_transient_analysis_frame(
+                    rapid=False, time=seep_time.get("time"))):
             return
         self.statusBar().showMessage("Running FEM …")
         self.progress_bar.setRange(0, 0)
@@ -2605,6 +2613,12 @@ class MainWindow(QMainWindow):
                 "1D Details…",
                 "Per-line profiles for reinforcement and piles.",
                 self.open_fem_details)
+            self.fem_continue_btn = self.fem_results_canvas.add_tool_button(
+                "Continue with a higher limit…",
+                "Continue this strength reduction run from where its trials "
+                "stopped, with a higher Max iterations per trial.",
+                self.continue_fem)
+            self.fem_continue_btn.setVisible(False)
         self._rerender_fem_results()
 
     def _rerender_fem_results(self):
@@ -2634,11 +2648,13 @@ class MainWindow(QMainWindow):
         self._update_fem_details_action()
 
     def _update_fem_details_action(self):
-        """Gate the FEM results view's "1D Details…" button.
+        """Gate the FEM results view's "1D Details…" button (and show or hide
+        "Continue with a higher limit…" beside it).
 
         The button stays on the toolbar and dims with its reason when there is
         nothing to detail — a model with no reinforcement lines and no piles has
         no 1D elements, and the dialog would open empty."""
+        self._update_fem_continue_action()
         if self.fem_details_btn is None:
             return
         from xslope.fem_details import has_1d_details
@@ -2650,6 +2666,71 @@ class MainWindow(QMainWindow):
             "Per-line profiles for reinforcement and piles."
             if ok else
             "This model has no reinforcement lines or piles to detail.")
+
+    def _fem_continuable(self):
+        """The displayed strength reduction run's result where it can be
+        continued with a higher limit, else None."""
+        bundle = self.doc.results.get("fem_solution") or {}
+        result = bundle.get("ssrm_result")
+        if result is None:
+            return None
+        from xslope.fem import ssrm_can_continue
+        return result if ssrm_can_continue(result) is not None else None
+
+    def _update_fem_continue_action(self):
+        """Show "Continue with a higher limit…" beside the results while the
+        displayed run can be continued: its top trial ended undecided, or was
+        counted failed while still slowing, and its trials' end states are held
+        in this session. Disabled while any run is going."""
+        btn = self.fem_continue_btn
+        if btn is None:
+            return
+        busy = (self._runner is not None or self._seep_runner is not None
+                or self._fem_runner is not None or self._sens_runner is not None
+                or self._rel_runner is not None
+                or self._report_runner is not None or self._mesh_busy)
+        btn.setVisible(self._fem_continuable() is not None)
+        btn.setEnabled(not busy)
+
+    def continue_fem(self):
+        """Continue the displayed strength reduction run with a higher Max
+        iterations per trial.
+
+        Asks for the new value (prefilled at five times the limit the run
+        stopped at), then runs the continuation in the worker exactly as an
+        ordinary run: the same Cancel, the same progress bar, the Log carrying
+        on, and the results replaced when it ends. The Run FEM dialog takes the
+        new value too, so a later fresh run uses it."""
+        if self._fem_runner is not None:
+            return
+        result = self._fem_continuable()
+        if result is None:
+            from xslope.fem import ssrm_continue_refusal
+            bundle = self.doc.results.get("fem_solution") or {}
+            QMessageBox.information(
+                self, "Continue with a higher limit",
+                ssrm_continue_refusal(bundle.get("ssrm_result"))
+                or "This run cannot be continued.")
+            return
+        limit = int((result.get("resumable") or {}).get("limit") or 0)
+        top = float(result["final_interval"][1])
+        value, ok = QInputDialog.getInt(
+            self, "Continue with a higher limit",
+            f"The run stopped at F = {top:.4f} with Max iterations per trial "
+            f"{limit:,}.\nContinue it from where its trials stopped with Max "
+            f"iterations per trial:",
+            max(limit + 1, 5 * limit), limit + 1, _MAX_ITERATIONS_LIMIT,
+            max(1000, limit // 10))
+        if not ok:
+            return
+        opts = dict(self._last_fem_opts or {})
+        opts["analysis"] = "ssrm"
+        opts["max_iterations"] = int(value)
+        opts["max_iterations_ceiling"] = max(
+            int(value), int(opts.get("max_iterations_ceiling") or 0))
+        # The Run FEM dialog opens on the new value, so a later fresh run uses it.
+        self._last_fem_opts = dict(opts)
+        self._start_fem({**opts, "continue_from": result})
 
     def open_fem_details(self):
         """Open the non-modal reinforcement/pile details dialog.

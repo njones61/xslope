@@ -90,6 +90,9 @@ ELEMENT_SIZE_1D_TIP = (
 
 
 FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)")]
+#: The largest Max iterations per trial (and Iteration ceiling) the Run FEM dialog
+#: and "Continue with a higher limit…" accept.
+MAX_ITERATIONS_LIMIT = 10_000_000
 # v21 main!D22. 'rollers' first — it is the template's shipped value, what every
 # file that declares nothing means, and the historical hardwired behaviour.
 FEM_SIDE_BC = [("rollers", "Rollers (vertical movement free)"),
@@ -571,7 +574,7 @@ class RunFemDialog(QDialog):
         # (solve_fem/solve_ssrm max_iterations); a Studio run was pinned at the
         # engine default with no way to reach the converged plateau.
         self.max_iterations = QSpinBox()
-        self.max_iterations.setRange(500, 100000)
+        self.max_iterations.setRange(500, MAX_ITERATIONS_LIMIT)
         self.max_iterations.setSingleStep(500)
         self.max_iterations.setValue(int(defaults.get("max_iterations") or 12000))
         self.max_iterations.setToolTip(
@@ -591,7 +594,7 @@ class RunFemDialog(QDialog):
         # while still improving is inconclusive - it did not fail, and it did not
         # settle - so the bisection does not count it as a failure and says so.
         self.max_iterations_ceiling = QSpinBox()
-        self.max_iterations_ceiling.setRange(500, 500000)
+        self.max_iterations_ceiling.setRange(500, MAX_ITERATIONS_LIMIT)
         self.max_iterations_ceiling.setSingleStep(1000)
         self.max_iterations_ceiling.setValue(
             int(defaults.get("max_iterations_ceiling") or 50000))

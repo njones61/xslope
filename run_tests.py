@@ -9100,6 +9100,22 @@ MODULE_CHECKS = {
         "displacement-vs-F plot draws them, and the closing summary says how "
         "each bracket edge was decided, including when the failing edge was "
         "only the sweep budget's verdict."),
+    'ssrm_resume': (
+        'ssrm_resume_check.py',
+        "Continuing a strength reduction run with a higher iteration limit: "
+        "the run keeps the end state of exactly the trials a higher limit "
+        "could still decide, a continued trial ends bit-identical to the same "
+        "trial run straight through, the continued run finds the bracket a "
+        "fresh run at the new limit finds, records every trial once with "
+        "resumed_from, says where it was continued from in its closing "
+        "summary, refuses in plain words a run that cannot be continued, and "
+        "Studio shows Continue with a higher limit… only while it can."),
+    'ssrm_resume_slow': (
+        'ssrm_resume_check.py',
+        "The slow half: FEM-1 and the FEM-3 wall keep nothing and offer "
+        "nothing, and the FEM-3 geogrid wall run at 100,000 iterations and "
+        "continued to 1,000,000 reports the fresh million-iteration bracket "
+        "(about 70 minutes; skipped with --quick)."),
     'joint_verdict': (
         'joint_verdict_check.py',
         "How an undecided jointed strength-reduction trial is read. Seven rows "
@@ -15072,6 +15088,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'joint_element': 5, 'joint_surfaces': 4, 'joint_network': 3,
               'joint_network_dialog': 2, 'joint_verdict': 1,
               'corrector_certified': 1, 'ssrm_curve': 2,
+              'ssrm_resume': 2, 'ssrm_resume_slow': 6,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'docs_index_sync': 3, 'assistant_docs_answers': 2,
@@ -16199,6 +16216,18 @@ def main():
         tests.append({'type': 'ssrm_curve',
                       'file': 'the displacement curve and the closing summary',
                       'method': '-', 'source': 'ssrm_curve'})
+        # Continuing a run with a higher limit: a stand-in solver for the
+        # bookkeeping, then the smallest shipped model and Studio (seconds).
+        tests.append({'type': 'ssrm_resume',
+                      'file': 'a run continued with a higher limit',
+                      'method': '-', 'source': 'ssrm_resume'})
+        # ... and the FEM-3 geogrid wall continued from 100,000 to 1,000,000,
+        # which takes as long as the fresh million-iteration run it matches.
+        if not args.quick:
+            tests.append({'type': 'ssrm_resume_slow',
+                          'file': 'the FEM-3 geogrid wall continued to 1,000,000',
+                          'method': '-', 'source': 'ssrm_resume',
+                          'entry': 'run_slow'})
         # The path a MODEL takes to the element: the column, the mesher, the
         # plots, the detail panel and the report, on one solve of the shipped
         # reinforcement sample with two of its lines made joints in memory.

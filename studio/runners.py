@@ -540,7 +540,13 @@ class FemRunner(RunnerThread):
     """Runs an FEM analysis (single trial or SSRM) off the GUI thread. SSRM
     supports cooperative cancellation via a cancel_check threaded into solve_ssrm.
     Emits ``succeeded`` with ``{fem_data, solution, FS, analysis}``, ``failed``,
-    or ``cancelled``."""
+    or ``cancelled``.
+
+    An SSRM bundle also carries the run's whole result (``ssrm_result``), which
+    is what a later "Continue with a higher limit…" continues from: options
+    carrying ``continue_from`` (that result) run
+    ``solve_ssrm(resume=continue_from, max_iterations=...)`` on the run's own
+    model instead of building a new one, and emit the same bundle."""
 
     succeeded = Signal(object)
     failed = Signal(str)
@@ -560,12 +566,34 @@ class FemRunner(RunnerThread):
         from xslope.fem import build_fem_data, solve_fem, solve_ssrm
         from xslope.search import AnalysisCancelled
         try:
+            opts = self._options
+            previous = opts.get("continue_from")
+            if previous is not None:
+                # A run continued with a higher limit solves on the model its
+                # trials were made on, which the earlier result keeps.
+                fem_data = (previous.get("resumable") or {}).get("fem_data")
+                n_new = int(opts.get("max_iterations") or 0)
+                top = (previous.get("final_interval") or (None, None))[1]
+                print("Continuing SSRM"
+                      + ("" if top is None else
+                         f" from the run that stopped at F = {float(top):.4f}")
+                      + f", with Max iterations per trial raised to {n_new:,}…")
+
+                def cb(done, total, label):
+                    self.progress.emit(int(done), int(total) if total else -1,
+                                       str(label))
+
+                result = solve_ssrm(fem_data, resume=previous,
+                                    max_iterations=n_new, debug_level=1,
+                                    cancel_check=self._cancel.is_set,
+                                    progress_callback=cb)
+                self._emit_ssrm(fem_data, result, opts)
+                return
             sd = self._sd
             mesh = sd.get("mesh")
             if mesh is None:
                 self.failed.emit("No mesh available — build a mesh first.")
                 return
-            opts = self._options
             # The side boundary condition (v21) is read off slope_data inside
             # build_fem_data rather than passed as a solver argument like k0 /
             # tension_srf, so the dialog's choice is layered onto a SHALLOW COPY here.
@@ -621,39 +649,7 @@ class FemRunner(RunnerThread):
                     # (a caller with no dialog) takes the module default.
                     accelerate=opts.get("accelerate"),
                     cancel_check=self._cancel.is_set, progress_callback=cb)
-                if not result.get("converged", False):
-                    self.failed.emit(f"SSRM did not converge: "
-                                     f"{result.get('error', 'unknown error')}")
-                    return
-                fs = result.get("FS")
-                # Nothing is printed here. solve_ssrm ends every run with its
-                # closing summary (result["summary"]) — the factor of safety, how
-                # each edge of the bracket was decided, including an undecided or
-                # budget-set failing edge, and the wall time — and prints it as the
-                # last lines of the Log, after its "SSRM result" line. A second
-                # copy here would say the same things twice.
-                # What the run chose and what its trials found. solve_ssrm returns
-                # these on the RESULT, and the bundle carried only
-                # result["last_solution"] — the field — so the criterion that
-                # decided every trial, the interval the search ended on, the
-                # trials themselves and the zones the reduction was confined to
-                # were dropped at this line and could never be saved or reported.
-                from xslope.fem import ssrm_run_record
-                self.succeeded.emit({"fem_data": fem_data,
-                                     "solution": result["last_solution"],
-                                     # The at-failure (unconverged) mechanism field the
-                                     # deformation/vector panels render (None if absent).
-                                     "failure_solution": result.get("failure_solution"),
-                                     "FS": fs, "analysis": "ssrm",
-                                     # True where the run found no failure and
-                                     # FS is the lower bound it confirmed: every
-                                     # place Studio shows the factor then reads
-                                     # "FS ≥ X". The run record carries it too,
-                                     # so a reopened run reads the same.
-                                     "fs_is_lower_bound": bool(
-                                         result.get("fs_is_lower_bound")),
-                                     "meta": ssrm_run_record(result, fem_data,
-                                                             opts)})
+                self._emit_ssrm(fem_data, result, opts)
         except AnalysisCancelled:
             print("Run cancelled.")
             self.cancelled.emit()
@@ -665,9 +661,59 @@ class FemRunner(RunnerThread):
             # gated it, and on the assistant's run_python path, which has no dialog.
             print(str(e))
             self.failed.emit(str(e))
+        except ValueError as e:
+            # solve_ssrm refuses a continuation it cannot make in plain words
+            # (ssrm_continue_refusal), and that sentence is the message.
+            if self._options.get("continue_from") is None:
+                traceback.print_exc()
+                self.failed.emit("FEM run failed — see the Log pane for details.")
+                return
+            print(str(e))
+            self.failed.emit(str(e))
         except Exception:
             traceback.print_exc()
             self.failed.emit("FEM run failed — see the Log pane for details.")
+
+    def _emit_ssrm(self, fem_data, result, opts):
+        """Emit a finished strength reduction run as the results bundle."""
+        if not result.get("converged", False):
+            self.failed.emit(f"SSRM did not converge: "
+                             f"{result.get('error', 'unknown error')}")
+            return
+        fs = result.get("FS")
+        # Nothing is printed here. solve_ssrm ends every run with its
+        # closing summary (result["summary"]) — the factor of safety, how
+        # each edge of the bracket was decided, including an undecided or
+        # budget-set failing edge, and the wall time — and prints it as the
+        # last lines of the Log, after its "SSRM result" line. A second
+        # copy here would say the same things twice.
+        # What the run chose and what its trials found. solve_ssrm returns
+        # these on the RESULT, and the bundle carried only
+        # result["last_solution"] — the field — so the criterion that
+        # decided every trial, the interval the search ended on, the
+        # trials themselves and the zones the reduction was confined to
+        # were dropped at this line and could never be saved or reported.
+        from xslope.fem import ssrm_run_record
+        self.succeeded.emit({"fem_data": fem_data,
+                             "solution": result["last_solution"],
+                             # The at-failure (unconverged) mechanism field the
+                             # deformation/vector panels render (None if absent).
+                             "failure_solution": result.get("failure_solution"),
+                             "FS": fs, "analysis": "ssrm",
+                             # True where the run found no failure and
+                             # FS is the lower bound it confirmed: every
+                             # place Studio shows the factor then reads
+                             # "FS ≥ X". The run record carries it too,
+                             # so a reopened run reads the same.
+                             "fs_is_lower_bound": bool(
+                                 result.get("fs_is_lower_bound")),
+                             "meta": ssrm_run_record(result, fem_data,
+                                                     opts),
+                             # The run's whole result, kept for this
+                             # session: where it can be continued
+                             # with a higher limit, the trials' end
+                             # states are on it (in memory only).
+                             "ssrm_result": result})
 
 
 class LemRunner(RunnerThread):

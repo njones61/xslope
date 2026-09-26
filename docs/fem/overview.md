@@ -755,6 +755,20 @@ the highest strength the slope was confirmed to stand at (`fs_is_lower_bound = T
 midpoint would stand on a failure no trial showed. Raise the ceiling or Max iterations per trial to
 go further.
 
+**Continuing a run with a higher limit.** Where the trial at the top of the final bracket ended
+undecided, or the iteration limit stopped it while it was still slowing, the run can be continued
+from where its trials stopped: `solve_ssrm(fem_data, resume=result, max_iterations=N)`, or
+**Continue with a higher limit…** in Studio. The top trial goes on from the iteration it stopped
+at, with its displacements, plastic strains, joint state and every history the stopping rules
+read, so its iterations so far count toward the new limit and it reaches the state a trial run
+straight through at that limit reaches. If it stands, the search continues each trial above it
+that did not stand in the same way, then bisects as usual; if it fails, the search closes below
+it. `trials` holds each trial once, a continued one with `resumed_from`, and the closing summary
+names the F the run was continued from and the new limit, with the wall time of both parts
+together. The trials' end states are held in memory for the session the run was made in
+(`result['resumable']`) and are never saved, so a run read back from its files cannot be
+continued.
+
 A **no-progress plateau** — 1500 iterations without improving on the lowest out-of-balance value
 seen by more than 1% — is recorded (`plateau_iteration`, `plateau_ratio`) and **does not stop the
 solve**: a trial runs to convergence, to its iteration ceiling, or to the displacement cap, and
@@ -1729,7 +1743,8 @@ search tried, and the trial at the top of the bracket was still moving slowly wh
 limit stopped it. The factor of safety then depends on the iteration limit, and raising Max
 iterations per trial may change it. A run whose top trial ended undecided found no failure, so the
 dashed line sits at the highest strength the slope came to rest at and the key reads "FS ≥": no
-trial above that strength was shown to fail.
+trial above that strength was shown to fail. Both kinds of run can be
+[continued with a higher limit](#creep-trend) from where their trials stopped.
 
 The run's closing summary says the same in words. It is printed as the last lines of every
 strength reduction run and returned as `result['summary']`. It says what happened at each end of

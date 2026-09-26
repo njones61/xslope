@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 import os
 import time
 import warnings
@@ -4310,7 +4311,7 @@ _JOINT_RELIEF_STEP = 0.1
 #     the formula reads the two-sweep mean (g_k + g_{k-1})/2 on a model whose soil
 #     can yield, which cancels the period-2 yield-surface flicker (see oob_window);
 #   * alpha_k = -alpha_{k-1} h_{k-1}.(h_k - h_{k-1}) / |h_k - h_{k-1}|^2, clamped
-#     to [_ACCEL_ALPHA_MIN, _ACCEL_ALPHA_MAX], alpha = 1 before sweep
+#     to [_ACCEL_ALPHA_MIN, _ACCEL_ALPHA_MAX] = [1, 50], alpha = 1 before sweep
 #     _ACCEL_START and on any sweep where a joint pair or a Gauss point changed
 #     status;
 #   * u_{k+1} = u_k + alpha_k g_k, and every internal variable's increment of the
@@ -4329,11 +4330,24 @@ _JOINT_RELIEF_STEP = 0.1
 #: Module default for `solve_fem(accelerate=...)` / `solve_ssrm(accelerate=...)`.
 #: OFF: no locked factor of safety is defined with it on.
 ACCELERATE_DEFAULT = False
-#: The multiplier's clamp. [0.2, 50] measured better than RS2's [0.2, 5] (review §1.3).
-_ACCEL_ALPHA_MIN = 0.2
+#: The multiplier's clamp. The floor is 1, the plain sweep's own pace: the review's
+#: [0.2, 50] let a sliding trial take mostly 0.2-steps (the formula has no target on
+#: a mechanism with no fixed point, so it reads noise; the safeguard refuses the
+#: large steps and the small ones win), which made RJ-2's failing edge three times
+#: slower and cost RS2-24a-noskin a converging trial at its allowance (rI §2.1,
+#: rJ). With the floor at 1 the accelerated sweep never goes slower than the plain
+#: one: a step the formula would shorten is taken at plain pace, and a step the
+#: safeguard refuses is taken at plain pace, never shortened.
+_ACCEL_ALPHA_MIN = 1.0
 _ACCEL_ALPHA_MAX = 50.0
 #: Sweeps run plain before the multiplier may differ from 1.
 _ACCEL_START = 300
+#: AUTO-OFF. Over the trailing `_ACCEL_OFF_WINDOW` sweeps, if more than
+#: `_ACCEL_OFF_FRACTION` of the accelerated steps proposed were refused by the
+#: safeguard, acceleration is switched off for the rest of the trial: the joints
+#: are changing state on nearly every step, which is where it cannot help.
+_ACCEL_OFF_WINDOW = 2000
+_ACCEL_OFF_FRACTION = 0.5
 
 _JOINT_VERDICT_WARMUP = 5000      # sweeps before either verdict may be read
 _JOINT_WINDOW_FRAC = 0.5          # trailing fraction of the history both read
@@ -5679,7 +5693,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             off on every model. Inert without a joint.
         accelerate (bool or None): THE ACCELERATED SWEEP — a step multiplier on
             each viscoplastic sweep's increment, taken from the last two
-            increments and clamped to [0.2, 50], with every internal variable's
+            increments and clamped to [1, 50] (never slower than the plain
+            sweep), switched off for the rest of a trial whose accelerated
+            steps are mostly being refused, with every internal variable's
             increment of the sweep scaled by the same factor and a safeguard that
             refuses any step that would change a joint pair's status (see
             ACCELERATE_DEFAULT for the whole rule). The fixed point is the plain
@@ -6404,6 +6420,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         _sol["gate_deferrals"] = int(gate_deferrals)
         if _acc is not None:
             _sol["accelerate"] = dict(_acc)
+            _sol["acceleration"] = {"on": True,
+                                    "switched_off_at": _acc['switched_off_at']}
         _sol["corrector"] = {
             "driver_of_record": "corrector",
             "checkpoint": where,
@@ -6753,7 +6771,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     # How the formula's raw value fell: below zero (clamped
                     # to the minimum), in [min, 1), above 1, and at the cap.
                     raw_negative=0, raw_below_one=0, raw_above_one=0,
-                    raw_at_max=0)
+                    raw_at_max=0, switched_off_at=None)
         _acc_ref_evp = [np.empty_like(g_['evp']) for g_ in gp_groups]
         _acc_ref_slip = np.empty_like(joint_slip) if has_joints else None
         _acc_ref_dil = (np.empty_like(joint_dil)
@@ -7067,6 +7085,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             _acc_a_prev = 1.0
             _acc_active_prev = None
             _acc_gnorm = 0.0
+            # The auto-off window: per sweep, 1 = step accepted, 2 = refused,
+            # 0 = no accelerated step proposed.
+            _acc_win = collections.deque(maxlen=int(_ACCEL_OFF_WINDOW))
+            _acc_win_acc = 0
+            _acc_win_rej = 0
         ufr_best = float('inf')        # lowest out-of-balance seen this stage
         last_progress_iter = 0         # iteration of last meaningful improvement
         gate_tried = False             # the yield gate has spent its one corrector
@@ -7855,7 +7878,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                      or _acc_g_prev is None)
                           else 0.5 * (_acc_g + _acc_g_prev))
                 _alpha = 1.0
-                if iteration >= _ACCEL_START:
+                _acc_outcome = 0
+                if (iteration >= _ACCEL_START
+                        and _acc['switched_off_at'] is None):
                     if _acc_pair_chg or _acc_gp_chg:
                         _acc['resets'] += 1
                         if _acc_pair_chg:
@@ -7907,6 +7932,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         _acc['rejected'] += 1
                         _acc[_why] += 1
                         _alpha = 1.0
+                        _acc_outcome = 2
                 if _alpha != 1.0:
                     for _grp, _buf in zip(gp_groups, _acc_ref_evp):
                         _e = _grp['evp']
@@ -7920,6 +7946,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     u_free_new = _acc_prev + _alpha * _acc_g
                     _acc_L = _acc_L + _alpha * _acc_d
                     _acc['accepted'] += 1
+                    _acc_outcome = 1
                     _acc['sum_alpha_accepted'] += _alpha
                     _acc['largest_alpha'] = max(_acc['largest_alpha'], _alpha)
                     _acc['smallest_alpha'] = min(_acc['smallest_alpha'], _alpha)
@@ -7928,6 +7955,23 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 _acc_g_prev = _acc_g
                 _acc_h_prev = _acc_h
                 _acc_a_prev = _alpha
+                # Auto-off (see _ACCEL_OFF_WINDOW).
+                if _acc['switched_off_at'] is None:
+                    if len(_acc_win) == _acc_win.maxlen:
+                        _old = _acc_win[0]
+                        _acc_win_acc -= (_old == 1)
+                        _acc_win_rej -= (_old == 2)
+                    _acc_win.append(_acc_outcome)
+                    _acc_win_acc += (_acc_outcome == 1)
+                    _acc_win_rej += (_acc_outcome == 2)
+                    if (len(_acc_win) == _acc_win.maxlen
+                            and _acc_win_rej > _ACCEL_OFF_FRACTION
+                            * (_acc_win_acc + _acc_win_rej)):
+                        _acc['switched_off_at'] = int(iteration)
+                        if debug_level >= 1:
+                            print(f"  Acceleration switched off at iteration "
+                                  f"{iteration}: most of its steps were being "
+                                  f"rejected")
 
             u_new = np.zeros(n_dof)
             u_new[free_dofs] = u_free_new
@@ -8783,7 +8827,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         "gate_deferrals": int(gate_deferrals),
         # What the accelerated sweep's multiplier did (see ACCELERATE_DEFAULT);
         # the key is absent with it off.
-        **({} if _acc is None else {"accelerate": dict(_acc)}),
+        **({} if _acc is None else {
+            "accelerate": dict(_acc),
+            "acceleration": {"on": True,
+                             "switched_off_at": _acc['switched_off_at']}}),
         # Every corrector attempt this trial made and what it read, including the
         # ones that refused — a refusal decides nothing, but it is the measurement
         # that says whether the corrector is earning its cost. Empty on the plain
@@ -14314,7 +14361,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "gate_deferrals": int(sol.get("gate_deferrals", 0) or 0),
             # What the accelerated sweep did on this trial; absent with it off.
             **({} if sol.get("accelerate") is None
-               else {"accelerate": sol["accelerate"]}),
+               else {"accelerate": sol["accelerate"],
+                     "acceleration": sol.get("acceleration")}),
         })
         if _stable(sol):
             _carried[0] = (float(F) if _carried[0] is None

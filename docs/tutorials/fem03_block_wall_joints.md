@@ -468,18 +468,17 @@ last strength the search confirmed.
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=1000}
 
 This panel has no element grid where Part 1's did. The blocks panel drops the
-grid once a model carries more than eight jointed lines, because on a jointed
-network the blocks are a few elements each and the grid would bury their
-outlines. The wall alone had seven jointed lines; the three sheets make ten.
-That only sets the default: **Element edges** in the display panel puts the
-grid back, or takes it off the Part 1 panel. Everything else is drawn as
-before. The three sheets show as green lines, the
-two faces of each sheet's interface colored by their slip, with the sheet's
-original position in gray behind. The
-short red lengths just behind the facing are the bars themselves, drawn red in
-their deformed position. Along most of each sheet the soil faces lie on the bar
-and hide it; where the faces have slid along the bar, at the facing, the red
-shows through.
+grid once a model carries more than eight jointed lines (the wall alone had
+seven; the three sheets make ten), because the blocks are only a few elements
+each and the grid would bury their outlines. **Element edges** in the display
+panel puts it back. The rest is drawn as in Part 1: the block column, 6.9 times
+deformed, with the undeformed outline dashed behind it, and every contact drawn
+as a line, gray where it is closed and not slipping, green where it is slipping,
+shaded by how far. The three geogrid sheets are the three near-horizontal lines
+running back from the facing into the reinforced fill. Each is drawn as the two
+faces of its interface: gray along most of its length, where the soil grips the
+sheet, and green over the short lengths where the soil has slid along it, at
+the facing on all three and near the far end of the middle and lower sheets.
 
 The joint slip says what the layers have done to the wall's movement. At the
 last strength the wall stands at, 1.5625, the back face has slid **40 mm** and

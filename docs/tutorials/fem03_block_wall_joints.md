@@ -516,14 +516,14 @@ the force in that tie at the facing is the **Tend1** column of the details
 table. The 70% of capacity the layer has in hand is what keeps this wall from
 failing, as the next section explains.
 
-It also says how little the jointing of the sheets matters here. Nothing slides
-along them: the slip is zero beyond the first stretch, and over the rest of
-the length the two faces carry their shear below the limit, which is grip, not
-sliding. The sheets are jointed because they end on the back-face joint and a
-bonded bar cannot stand on a split node; on this wall the interface elements
-act as a stiff bond and a bonded bar with the same tie would give much the
-same answer. Part 3 is where jointing changes the answer, and its models show
-why.
+The sheets are entered as jointed sheets (`Joint = Yes`) because they end on
+the wall's back-face joint. The mesh is split along that joint, so every node
+on it exists twice, one copy on each side, and a bonded bar cannot be attached
+to a node like that; the program refuses it when the mesh is built. On this
+wall the jointing makes almost no difference to the answer: nothing slides
+along the sheets beyond the first few centimeters at the facing, so the
+interface acts as a stiff bond and a bonded bar would give much the same
+result. Part 3 is about the models where jointing does change the answer.
 
 ### What the factor of safety means for this wall
 

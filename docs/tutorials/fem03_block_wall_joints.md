@@ -308,7 +308,7 @@ The fourth plot in the results view, **Displacement vs F**, shows the search
 itself: every strength it tried, with the largest displacement the wall reached
 there.
 
-![Displacement against strength reduction factor for the wall alone: the wall comes to rest at 1.0, 1.125 and 1.133, and at every strength above the movement does not slow or runs away](images/fem03_ssrm_curve.png){width=1000}
+![Displacement against strength reduction factor for the wall alone: the wall comes to rest at 1.0, 1.125 and 1.133, and at every strength above the movement does not slow or runs away](images/fem03_ssrm_curve.png){width=800}
 
 A filled point is a strength at which the wall came to rest, and the line joins
 those. An open point is a trial the run stopped while the wall was still moving,
@@ -457,7 +457,7 @@ set of results, and they are worth reading first.
 
 Here is the Displacement vs F plot from this run:
 
-![Displacement against strength reduction factor with the geogrid in place: the wall comes to rest at 1.0, 1.5 and 1.5625, the trials just above were still slowing when the limit came, and only at 2.0 did the movement fail to slow](images/fem03_ssrm_curve_grid.png){width=1000}
+![Displacement against strength reduction factor with the geogrid in place: the wall comes to rest at 1.0, 1.5 and 1.5625, the trials just above were still slowing when the limit came, and only at 2.0 did the movement fail to slow](images/fem03_ssrm_curve_grid.png){width=800}
 
 Nothing on it is a wall giving way. Every filled point is a strength at which
 the wall came to rest, and the movement grows with each one: 2 cm at 1.0, 6 cm
@@ -536,7 +536,7 @@ per trial** raised to 1,000,000 (and the iteration ceiling raised to match) the
 search goes on until the wall gives way. This is not a run to repeat: it takes
 70 minutes on an ordinary desktop, and the results below are from it.
 
-![Displacement against strength reduction factor with a million-iteration limit: the wall comes to rest at every strength up to 1.9922, moving further each time, and runs away at 2.0](images/fem03_ssrm_curve_grid_long.png){width=1000}
+![Displacement against strength reduction factor with a million-iteration limit: the wall comes to rest at every strength up to 1.9922, moving further each time, and runs away at 2.0](images/fem03_ssrm_curve_grid_long.png){width=800}
 
 The wall comes to rest at every strength tried up to F = 1.9922, and its
 movement grows the whole way: 6 cm at 1.5, 13 cm at 1.75, 19 cm at 1.875 and

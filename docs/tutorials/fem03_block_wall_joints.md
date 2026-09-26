@@ -228,7 +228,10 @@ not standing, and the factor of safety then comes out low, because the limit
 stopped the trial before the wall had finished moving. The model checks in the
 column beside the dialog say so while the limit is left lower. Raising it costs
 very little, because a trial that has settled stops there and does not use the
-rest.
+rest. This is the one habit a jointed model asks of you: a trial cut off early
+is not a failed trial, and when the closing summary says the factor of safety
+depends on the iteration limit, or reports it as "at least", the answer is a
+higher limit and the patience to let the run finish.
 
 **Accelerate convergence — leave it ticked.** It is on for any model that
 carries a joint. Once the joints have settled into their states the solver
@@ -604,6 +607,14 @@ wall 3.6 m high, and no wall is allowed to move that far. The strength limit
 answers the strength question. For this wall the movement is the answer that
 matters, and it is read from the curve.
 
+The other lesson of this run is patience. Nothing about the wall was ever
+undecided; the trials were only unfinished. A jointed model settles slowly,
+because every joint reaches equilibrium by slipping a little at a time, and a
+trial cut off before it has settled reads as a failure or as undecided when it
+would have come to rest. The closing summary tells you which happened. When it
+says the factor of safety depends on the iteration limit, or reports it as "at
+least", raise the limit and let the run take the time it needs.
+
 ---
 
 ## Part 3 — When a sheet is a slip surface, and when it is bonded
@@ -800,6 +811,9 @@ This tutorial covered:
   without refining the whole section.
 - The iteration limit a jointed run needs, and how the displacement-vs-F plot
   and the closing summary tell a wall that fails from one that keeps moving.
+- That a trial cut off early is not a failed trial: a jointed model settles
+  slowly, and when the summary says the factor of safety depends on the limit
+  or reports it as "at least", the answer is a higher limit and patience.
 - The wall standing on its own blocks against the same wall with three geogrid
   layers tied into the facing.
 - The question every geosynthetic model has to answer — does the surface cut

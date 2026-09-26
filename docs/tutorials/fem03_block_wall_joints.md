@@ -487,8 +487,9 @@ The shear strain panel says the same thing about the soil. Part 1's band ran up
 from the heel of the wall through the reinforced fill with strains near 0.05;
 here the band is in the same place but faint, and the scale tops out near 0.04.
 The three layers have not moved the surface the fill wants to fail on. They have
-held the mass behind the facing together so that less of it is straining. The bars themselves show dark on the reinforcement force scale: they
-carry little tension, which the next panel makes exact.
+held the mass behind the facing together so that less of it is straining. The
+bars themselves show dark on the reinforcement force scale: they carry little
+tension, which the next panel makes exact.
 
 **1D Details…** draws what one layer is doing along its length. Here is the
 middle one:
@@ -532,19 +533,18 @@ search reports whichever strength its iteration limit happened to stop it at:
 1.246 at the default limit, 1.395 at five times that.
 
 That makes the factor of safety of a reinforced wall a different kind of number
-from Part 1's. The question the strength reduction can answer is not at what
-strength the wall fails but at what strength it has moved more than the design
-allows, and the movement the design allows is the engineer's input. The
-Displacement vs F plot is where it is read: draw the allowable movement across
-the plot, and the strength at which the resting points cross it is the wall's
-factor of safety on that criterion. On a 3.6 m wall, 4 cm is about 1% of the height, the kind of movement a wall
+from Part 1's. The question a strength reduction can answer for this wall is at
+what strength it has moved more than the design allows, and the movement the
+design allows is the engineer's input. The Displacement vs F plot is where it is
+read: draw the allowable movement across the plot, and the strength at which the
+resting points cross it is the wall's factor of safety on that criterion. On a
+3.6 m wall, 4 cm is about 1% of the height, the kind of movement a wall
 specification sets a limit on, so that factor lies between 1.25 and 1.39 for
 this wall, and where in that range is a design decision.
 
 Two things follow for practice. Report the movement with the number: "stands
-past F = 1.25 with 2 cm of movement and the geogrid at 8% of capacity" says what
-the analysis found, and "FS = 1.246" does not. And read the closing summary on
-every reinforced wall: the sentence *the factor of safety depends on the
+past F = 1.25 with 2 cm of movement and the geogrid at 8% of capacity" is what
+the analysis found. And read the closing summary on every reinforced wall: the sentence *the factor of safety depends on the
 iteration limit here* is the program telling you that you are looking at this
 kind of wall. A limit equilibrium analysis of the same wall, with the layers
 entered as reinforcement, asks the strength question directly and does not

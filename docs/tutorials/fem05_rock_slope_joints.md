@@ -41,7 +41,7 @@ joint lines, how to check a jointed answer against a closed-form solution, how t
 generate a joint network instead of typing one, and which rock slope problems
 this method can solve.
 </div>
-<p><span class="tg-pill">one material</span><span class="tg-pill">elastic rock</span><span class="tg-pill">joints worksheet</span><span class="tg-pill">bedding plane</span><span class="tg-pill">release joint</span><span class="tg-pill">plane failure</span><span class="tg-pill">closed-form check</span><span class="tg-pill">strength reduction</span><span class="tg-pill">hybrid criterion</span><span class="tg-pill">sweep budget</span><span class="tg-pill">joint region</span><span class="tg-pill">generated network</span><span class="tg-pill">parallel set</span><span class="tg-pill">block toppling</span><span class="tg-pill">joint slip</span><span class="tg-pill">deformed blocks</span></p>
+<p><span class="tg-pill">one material</span><span class="tg-pill">elastic rock</span><span class="tg-pill">joints worksheet</span><span class="tg-pill">bedding plane</span><span class="tg-pill">release joint</span><span class="tg-pill">plane failure</span><span class="tg-pill">closed-form check</span><span class="tg-pill">strength reduction</span><span class="tg-pill">hybrid criterion</span><span class="tg-pill">iteration limit</span><span class="tg-pill">joint region</span><span class="tg-pill">generated network</span><span class="tg-pill">parallel set</span><span class="tg-pill">block toppling</span><span class="tg-pill">joint slip</span><span class="tg-pill">deformed blocks</span></p>
 <div class="tgm-model" markdown>
 **Starter file** — [xslope_rock_joints_start.xlsx](files/xslope_rock_joints_start.xlsx),
 the section and the rock with nothing on the joints worksheet; this is the file
@@ -188,18 +188,20 @@ mesh in their own style instead, which is how to tell that the split happened.
 
 Open **Run → Run FEM…**. The analysis is **SSRM**, the bracket is *F* from
 **1.0** to **2.0** and the tolerance is **0.01**, all of which are the defaults.
-Two settings further down the dialog matter for a jointed model: **Max iterations
-per trial**, which has to be raised, and **Failure criterion**, which the dialog
-has already set to Hybrid;
-[FEM-3](fem03_block_wall_joints.md#running-the-wall-alone) explains both.
+Three settings further down the dialog matter for a jointed model: **Max
+iterations per trial**, which has to be raised, **Failure criterion**, which the
+dialog has already set to Hybrid, and **Accelerate convergence**, which it has
+already ticked;
+[FEM-3](fem03_block_wall_joints.md#running-the-wall-alone) explains all three.
 
-![Run FEM on the meshed slab: SSRM, the default bracket, a raised sweep budget and the Hybrid criterion](images/fem05_studio_run_fem.png){width=818}
+![Run FEM on the meshed slab: SSRM, the default bracket, a raised iteration limit, the Hybrid criterion and the accelerated solver](images/fem05_studio_run_fem.png){width=818}
 
 Set **Max iterations per trial** to **100,000**: a joint reaches equilibrium by
-growing slip, a little on each pass, so a jointed model needs tens of thousands
-of passes where a slope without joints needs hundreds, and a trial that runs out
-of them is recorded as not standing. Leave **Failure criterion** on **Hybrid**,
-which is what the dialog opens on for a model that carries joints.
+growing slip, a little on each iteration, so a jointed model needs tens of
+thousands of iterations where a slope without joints needs hundreds, and a trial
+that runs out of them is recorded as not standing. Leave **Failure criterion**
+on **Hybrid** and **Accelerate convergence** ticked, which is how the dialog
+opens for a model that carries joints.
 
 Press **Run**. The search takes about **two minutes** on an ordinary desktop —
 nearer three on an install that does not carry the
@@ -444,10 +446,10 @@ region at three spacings, meshed at the same 1.5 m target size:
 The node count barely moves, because the region is a small part of a 26 m
 section. The interface count is what grows, and it is the interfaces that set
 the cost: a joint reaches equilibrium by growing slip a little at a time, so the
-sweeps a trial needs go up with them. On the shipped model at 1.5 m the trials
-that stand settle in a few hundred sweeps, while the two that fail nearest the
-answer run 72,561 sweeps and the whole 100,000 allowed — and there are twice as
-many interfaces to carry at 0.75 m.
+iterations a trial needs go up with them. On the shipped model at 1.5 m the
+trials that stand settle in a few hundred iterations, while the two that fail
+nearest the answer run 19,081 and 33,401 before their movement runs away — and
+there are twice as many interfaces to carry at 0.75 m.
 
 So start coarse. Describe the set at a spacing two or three times what the rock
 really has, get the mechanism and the factor of safety, and only then refine —
@@ -466,16 +468,17 @@ before. The completed model is
 
 Meshed at the same 1.5 m it comes to **1,303 nodes, 531 elements and 82 joint
 elements**, twice the interfaces of the column set, and run at the same settings
-it takes about **nine minutes** on the reference solver. The search reports
+it takes about **five minutes** on the reference solver. The search reports
 
->>**FS = 1.113**
+<!-- test: file=files/xslope_rock_voronoi.xlsx, type=fem_ssrm, expected_fs=1.090, element_type=tri6, target_size=1.5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-5-voronoi-ssrm -->
 
-but read that with the trials beside it. The mass stands at 1.0625, where it
-settles in 309 sweeps, and fails at 1.117; the two trials in between, at 1.094
-and 1.109, used their whole 100,000 sweeps without settling and were read as
-standing because they had stopped moving. So the factor lies between 1.06 and
-1.12, close to the column set's 1.105, and the figures show why the two agree
-in number and differ in kind:
+>>**FS = 1.090**
+
+and every trial beside it is decided: the mass comes to rest at 1.0625, 1.0781
+and 1.0859, each in about 310 iterations, and at 1.0938 its movement does not
+slow, so the run counts it as sliding. The factor is a little under the column
+set's 1.105, and the figures show why the two are close in number and differ in
+kind:
 
 ![Joint slip on the Voronoi mass: the base plane slipping end to end, a chain of block walls slipping from its upper tip up to the crest, and the walls nearest the face opened](images/fem05_joint_slip_voronoi.png){width=900}
 
@@ -543,8 +546,9 @@ This tutorial covered:
   endpoints set by the geometry of the mechanism rather than chosen.
 - Elastic rock, which leaves the strength reduction nothing but the joints to
   weaken, and what giving the rock a strength instead would buy and cost.
-- The two settings a jointed run needs: the Hybrid failure criterion, and a
-  sweep budget large enough for the joints to reach equilibrium.
+- The settings a jointed run needs: the Hybrid failure criterion, an iteration
+  limit large enough for the joints to reach equilibrium, and the accelerated
+  solver the dialog turns on for them.
 - A factor of safety checked against tan φ / tan β by hand, and what that check
   does and does not depend on.
 - A joint set generated from a dip and a spacing over a joint region, and the

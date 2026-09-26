@@ -674,10 +674,19 @@ def _pair(deform_name, strain_name, fem_data, result, deform_type):
         fig_d.axes[0].set_position(ax_s.get_position())
         fig_d.canvas.draw()
         box_d = fig_d.get_tightbbox(fig_d.canvas.get_renderer())
+        # Each axes keeps an equal aspect by shrinking its own box at draw time,
+        # so the two frames are not the same width even at the same position.
+        # The page width that lines the frames up is set from the frames AS
+        # DRAWN: the fraction of each image the frame occupies.
+        def _frame_frac(fig, box):
+            ax = fig.axes[0]
+            ext = ax.get_window_extent(fig.canvas.get_renderer())
+            return (ext.width / fig.dpi) / (box.width + 0.2)
+        frac_s = _frame_frac(fig_s, box_s)
         for fig, name, box in ((fig_s, strain_name, box_s), (fig_d, deform_name, box_d)):
             out = os.path.join(OUT_DIR, name.replace(".png", suffix + ".png"))
             fig.savefig(out, dpi=200, bbox_inches=box.padded(0.1))
-            width = round(1000 * (box.width + 0.2) / (box_s.width + 0.2))
+            width = round(1000 * frac_s / _frame_frac(fig, box))
             print("-> %s  (page width %d at a strain-panel width of 1000)"
                   % (os.path.basename(out), width))
         plt.close("all")

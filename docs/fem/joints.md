@@ -223,6 +223,23 @@ it as "at least", raise **Max iterations per trial** and let the run finish.
 factor climbs from 1.25 to a real strength limit near 2.0 as the limit is raised, while the wall
 itself does the same thing throughout.
 
+**Why the shear traction can zigzag where an interface grips.** Along a stretch of interface
+that is not slipping, the shear traction plotted station by station can alternate high and low:
+the end stations of each interface element read low and the middle station reads high. The
+stations are the element's three node pairs, and each pair's traction is the force passed
+through that node divided by the length of interface the node stands for, one sixth of the
+element at each end and two thirds in the middle. Where the interface grips, its relative
+displacement is tiny, so the traction at a pair is set by the force the neighboring soil
+elements pass through that node. Quadratic soil elements hand the forces carried through their
+bodies to their mid-side nodes (the weight of a six-node triangle, for instance, is carried
+entirely at its three mid-side nodes), and that is what the middle stations show. The zigzag is
+that sharing, not a variation of the stress along the sheet: the element average, one sixth of
+each end station plus two thirds of the middle one, is the force the element actually
+transfers, it runs smoothly, and a ten times stiffer interface does not change it. It
+disappears where the interface slips, because every slipping station is held at its own
+Mohr-Coulomb limit, which follows the normal stress. Read a gripping stretch by its element
+averages, not station by station.
+
 The element's own law — the peak limit, the residual drop and the opening a dilating joint produces
 per unit of slip — is checked against its closed forms by `test/joint_element_check.py`.
 

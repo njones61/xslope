@@ -561,6 +561,16 @@ the top layer:
 
 ![The top layer's 1D details at F = 1.9922: the bar's tension at its capacity along most of its length](images/fem03_1d_details_grid_long.png){width=1000}
 
+The bar's tension sits on its capacity line over the middle of the sheet, and
+the interface beyond 2.3 m is slipping at its limit. Over the first 2.3 m,
+where the sheet grips, the shear stress zigzags from station to station
+between about 12 and 26 kPa. That is how a gripping interface reads out, not a
+change in the stress along the sheet: each station reports the force passed
+through its node over the short length it stands for, and the average over
+each element, the force the sheet actually picks up, runs smoothly at about
+17 to 20 kPa. The joints page explains it under *Why the shear traction can
+zigzag where an interface grips*.
+
 One more step in strength and the top layer has nothing left to give, and the
 wall goes. This is the failed state at 2.0, drawn to scale, with no
 exaggeration:

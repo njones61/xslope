@@ -652,6 +652,14 @@ reading that decided each end of the bracket. Raise the ceiling, or loosen the S
 tolerance, when a trial is inconclusive, and raise Max iterations per trial when the
 summary says the factor of safety depends on the iteration limit.
 
+**Accelerate convergence** is checked by default when the model has a joint. Each
+iteration's step is lengthened where the last two iterations show the solution still
+heading the same way, so a slowly settling jointed trial reaches the same balanced state
+in fewer iterations; a step that would change whether a joint is open or slipping is taken
+at the ordinary length, and the longer steps wait until the trial's corrector checkpoints
+(300, 1,000 and 3,000 iterations) have been read. The closing summary says
+"Convergence acceleration was on." when it was. Uncheck it to run the ordinary iteration.
+
 The [model checks](#model-checks-before-a-run) in the dialog's second column are the
 finite-element ones: a blank Poisson's ratio (which reads as 0.0 and moved the
 strength-reduction factor of safety by a third on the reference model), a modulus of

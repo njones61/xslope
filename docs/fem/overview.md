@@ -723,6 +723,17 @@ its iterations. Every level is one the classifier or the joint verdict already u
 verdict's "not decaying", 0.02 elastic displacements the classifier's "still moving", $10^{-4}$ the
 joint verdict's "stopped".
 
+**On a model with joints the iteration is accelerated by default** (`accelerate=None`; pass
+`accelerate=False` for the ordinary iteration, `True` to accelerate a model without joints).
+From the trial's last corrector checkpoint on, each iteration's step is multiplied by a factor
+between 1 and 50 read from the last two steps (Irons and Tuck), with the plastic strains and
+the joint slip scaled with it; a step that would change a joint pair's open or slipping state,
+trip its residual latch or add dilation is taken at the ordinary length. The balanced state is
+the ordinary iteration's; what changes is how many iterations reach it. Over the 32 jointed
+verification rows the answers are the same, and the whole set runs about a fifth faster. The
+K0 in-situ solve and the hold test always run the ordinary iteration, and the closing summary
+says "Convergence acceleration was on." when it was.
+
 Whether a trial dying away is certified depends on how close to rest it has come. On the FEM-3
 geogrid wall at $F = 1.25$ the corrector refuses both seeds at 100,000 iterations and certifies at
 140,000 (the ordinary sweep reaches the same rest on its own at 465,581), so at the tutorial's

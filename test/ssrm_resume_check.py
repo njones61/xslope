@@ -540,9 +540,10 @@ def run_slow():
           and not r2["fs_is_lower_bound"],
           f"{r2['FS']} {r2['final_interval']}; {s1:.0f} s + {s2:.0f} s")
     # The fresh million-iteration run took 4182 s on the machine the lock was
-    # measured on; the continuation alone may not take longer.
-    check("... and the continuation alone takes no longer than the fresh "
-          "million-iteration run (4182 s)", s2 <= 4182.0, f"{s2:.0f} s")
+    # measured on. The continuation's own time is reported, not asserted: a
+    # wall-time bound would fail on a slower machine for no fault of the code.
+    print(f"  [note] the continuation alone took {s2:.0f} s "
+          f"(the fresh million-iteration run took 4182 s on the reference machine)")
     return list(FAILURES)
 
 

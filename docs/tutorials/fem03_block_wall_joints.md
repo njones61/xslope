@@ -534,7 +534,10 @@ the answer.
 The iteration limit is what stopped the search at 1.56. With **Max iterations
 per trial** raised to 1,000,000 (and the iteration ceiling raised to match) the
 search goes on until the wall gives way. This is not a run to repeat: it takes
-70 minutes on an ordinary desktop, and the results below are from it.
+70 minutes on an ordinary desktop, and the results below are from it. When a
+run ends this way, Studio offers **Continue with a higher limit…** on the
+results toolbar, which carries the search on from where its trials stopped
+instead of starting over; on this wall that saves about ten of those minutes.
 
 ![Displacement against strength reduction factor with a million-iteration limit: the wall comes to rest at every strength up to 1.9922, moving further each time, and runs away at 2.0](images/fem03_ssrm_curve_grid_long.png){width=800}
 

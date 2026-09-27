@@ -256,19 +256,22 @@ enter its numbers and pick the region; the canvas previews the joints before any
 
 ![The Build network dialog: the kind of network, its parameters, and the region it is clipped to](../studio/images/editing_joint_network_dialog.png){width=1180}
 
-The three patterns:
+A joint network is built from one of three kinds of pattern, chosen in the dialog's **Kind**
+selector:
 
 - **Parallel set.** One family of joints at a given dip and spacing, such as bedding planes every
   2 m dipping 35° out of the face.
-- **Cross-jointed.** Two such families crossing, such as bedding plus a steeper joint set, which
-  cuts the rock into blocks.
-- **Voronoi.** A random pattern of blocks of a given size, for a rock mass with no preferred joint
-  direction.
+- **Cross-jointed (two sets).** Two such families crossing, such as bedding plus a steeper joint
+  set, which cuts the rock into blocks.
+- **Voronoi (blocky mass).** A random pattern of blocks of a given size, for a rock mass with no
+  preferred joint direction.
 
-The pattern is applied to the whole section, to one material, or to a region you draw. A drawn
-region is a polygon on the polygon sheet with its **Type** set to `joints` (see
-[joint regions](../usage/input_template.md#joint-regions) on the template page), and it can be
-limited to a band of elevations. No joints are written outside the region.
+Each kind has its own numbers, which appear below the selector. **Within** says where the set
+exists: the whole section, one material, or a region you draw. A drawn region is a polygon on
+the polygon sheet with its **Type** set to `joints` (see
+[joint regions](../usage/input_template.md#joint-regions) on the template page), and
+**Elevation band** limits the set to a range of elevations. No joints are written outside the
+region.
 
 The generator writes ordinary rows on the joints worksheet, labeled `set-01`, `set-02` and so
 on. The pattern itself is not stored, only the lines it produced, so to change a network you

@@ -250,8 +250,8 @@ edited in the joints editor, as a table or one line at a time with the section d
 
 ### Generating a network of joints
 
-A jointed rock mass has hundreds of joints, and nobody enters them one line at a time. Instead you
-describe the pattern and the program writes the lines for you:
+A jointed rock mass has hundreds of joints, and nobody enters them one line at a time. The
+program can write them from a description of the pattern:
 
 - **Parallel set.** One family of joints at a given dip and spacing, such as bedding planes every
   2 m dipping 35° out of the face.
@@ -260,10 +260,10 @@ describe the pattern and the program writes the lines for you:
 - **Voronoi.** A random pattern of blocks of a given size, for a rock mass with no preferred joint
   direction.
 
-You also say where the pattern applies: the whole section, one material, or a region you draw
-yourself. A drawn region is a polygon on the polygon sheet with its **Type** set to `joints` (see
+The pattern is applied to the whole section, to one material, or to a region you draw. A drawn
+region is a polygon on the polygon sheet with its **Type** set to `joints` (see
 [joint regions](../usage/input_template.md#joint-regions) on the template page), and it can be
-limited to a band of elevations. Outside the region no joints are written.
+limited to a band of elevations. No joints are written outside the region.
 
 In Studio, press [Build network](../studio/editing.md#build-network) on the joints editor,
 choose the pattern, enter its numbers and pick the region; the canvas previews the joints before

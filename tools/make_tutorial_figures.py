@@ -7197,8 +7197,9 @@ def combo03_rapid():
 def fem05_blocks_grid_pair():
     """The toppling stack's block drawing twice for the joints page: with the
     element grid under the blocks (the default for a model with eight or fewer
-    jointed lines) and without it, both at the same at-failure state and factor
-    as the tutorial's own block figure, which this group also rewrites."""
+    jointed lines) and without it, and once more with Color by block on, all at
+    the same at-failure state and factor as the tutorial's own block figure,
+    which this group also rewrites."""
     from xslope.plot_fem import plot_fem_results
     model = load_slope_data(FEM05_TOPPLE)
     mesh_t = _fem05_mesh(model)
@@ -7210,6 +7211,9 @@ def fem05_blocks_grid_pair():
     capture("fem05_fem_blocks_topple_nogrid.png", plot_fem_results, fem_t,
             result_t["last_solution"], plot_type="deformation",
             fs=result_t["FS"], block_grid=False)
+    capture("fem05_fem_blocks_topple_colored.png", plot_fem_results, fem_t,
+            result_t["last_solution"], plot_type="deformation",
+            fs=result_t["FS"], color_blocks=True)
 
 
 GROUPS = {

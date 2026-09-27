@@ -213,15 +213,16 @@ at failure shows the mechanism that starts, not the run-out. Those questions nee
 element program such as UDEC, in which blocks separate, rotate through large angles and make new
 contacts as they go, or a rockfall program that follows each block down the slope.
 
-The one habit a jointed run asks of you is patience. A joint reaches equilibrium by slipping a
-little at a time, so a jointed model settles over tens or hundreds of thousands of iterations
-where a model without joints settles in hundreds, and a trial cut off before it has settled reads
-as a failure or as undecided when it would have come to rest. The closing summary says which
-happened: when it reports that the factor of safety depends on the iteration limit, or reports
-it as "at least", raise **Max iterations per trial** and let the run finish.
-[Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) shows a geogrid wall whose reported
-factor climbs from 1.25 to a real strength limit near 2.0 as the limit is raised, while the wall
-itself does the same thing throughout.
+A jointed model needs far more iterations than one without joints. A joint reaches equilibrium
+by slipping a little at a time, so a jointed model settles over tens or hundreds of thousands of
+iterations where a model without joints settles in hundreds, and a trial cut off before it has
+settled reads as a failure or as undecided when it would have come to rest. The closing summary
+in the Log says when that has happened: if it gives the factor of safety as "at least" some
+value, or says the answer depends on the iteration limit, raise **Max iterations per trial** and
+let the run finish. [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) shows the effect
+on a geogrid wall: at the default limit of 100,000 the search reports a factor of safety of at
+least 1.56, and with the limit raised to a million the wall gives way at 2.0, after 30 cm of
+movement.
 
 **Why the shear traction can zigzag where an interface grips.** Along a stretch of interface
 that is not slipping, the shear traction plotted station by station can alternate high and low:

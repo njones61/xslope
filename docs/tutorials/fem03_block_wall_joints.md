@@ -522,15 +522,16 @@ standing.
 The sheets are entered as jointed sheets (`Joint = Yes`) because they are tied
 into a wall whose back face is itself a joint. A bar bonded to the soil cannot
 end on a surface the soil is allowed to slide along, so a sheet that meets a
-joint has to be a joint too, or stop short of it. On this wall the jointing
-makes almost no difference to the answer. Sliding along a
-sheet would show in the 1D details as the shear stress sitting on the
-Mohr-Coulomb limit over a length of the sheet, with the slip rising along that
-length, and in the blocks panel as the sheet's faces turning green along it.
-Here that happens only in the first few centimeters at the facing, so the
-interface acts as a stiff bond and a bonded bar would give much the same
-result. Part 3 is about the models where jointing the sheet itself does change
-the answer.
+joint has to be a joint too, or stop short of it. At the strength this run
+stopped at, the jointing has made little difference yet. Sliding along a sheet
+shows in the 1D details as the shear stress sitting on the Mohr-Coulomb limit
+over a length of the sheet, with the slip rising along that length, and in the
+blocks panel as the sheet's faces turning green along it; here that happens
+only in the first few centimeters at the facing. It does not stay that way.
+Further up the search, as the next section shows, the outer half of every
+sheet slides through the soil, and by the time the wall gives way the sheets
+are being dragged out of it, which is something a bonded bar cannot do. Part 3
+is about models where jointing the sheet changes the answer from the start.
 
 ### If you let it run
 

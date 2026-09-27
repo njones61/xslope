@@ -11960,14 +11960,20 @@ def _nr_factorize_tangent(K, cache):
     if not _NR_FACTOR_CACHED_ORDER:
         return splu(K)                  # the pre-cache call, for measuring against
     ipc = cache.get("ipc")
-    if ipc is not None and cache["sig"] != (K.shape, K.nnz):
-        # The pattern this cache was built on is not the pattern in hand. Nothing
-        # in the driver rebuilds a pattern under a live solve, so this cannot
-        # happen today; it is here because a wrong gather index would be silent.
+    if ipc is not None and not (cache["shape"] == K.shape and _nr_same_pattern(
+            cache["indptr"], cache["indices"], K)):
+        # The gather index is valid only for the exact pattern it was built on,
+        # so the cache checks the pattern itself (shape, indptr and indices), not
+        # a nonzero count: two patterns with the same count would otherwise reuse
+        # a wrong gather index and SuperLU would factorize a wrongly gathered
+        # matrix without complaint. The comparison is two array_equal calls on
+        # the index arrays, about 10 microseconds at 38,000 nonzeros.
         ipc = None
     if ipc is None:
         lu = splu(K)
-        cache["sig"] = (K.shape, K.nnz)
+        cache["shape"] = K.shape
+        cache["indptr"] = K.indptr
+        cache["indices"] = K.indices
         pc = lu.perm_c
         cache["pc"] = pc
         cache["ipc"] = ipc = np.argsort(pc)
@@ -11984,6 +11990,37 @@ def _nr_factorize_tangent(K, cache):
     Kp = csc_matrix((K.data[take], cache["newind"], cache["newptr"]),
                     shape=K.shape)
     return _NrPermutedLU(splu(Kp, permc_spec="NATURAL"), cache["pc"])
+
+
+def _nr_same_pattern(indptr, indices, K):
+    """Does ``K`` carry exactly this CSC pattern? An identity test when the
+    arrays are the same objects, an element-by-element comparison otherwise
+    (``csc_matrix`` may hand back its own copies of the pattern's arrays)."""
+    if indptr is K.indptr and indices is K.indices:
+        return True
+    return (np.array_equal(indptr, K.indptr)
+            and np.array_equal(indices, K.indices))
+
+
+def _nr_diag_positions(K, pattern):
+    """Positions of the diagonal entries in a CSC tangent's ``data`` array.
+
+    Computed once per pattern and kept on the pattern dict; recomputed when the
+    matrix in hand does not carry that pattern's index arrays. Returns ``None``
+    when some diagonal entry is not stored.
+    """
+    hit = pattern.get("_diag_pos")
+    if hit is not None and _nr_same_pattern(hit[0], hit[1], K):
+        return hit[2]
+    n = K.shape[0]
+    indptr, indices = K.indptr, K.indices
+    col = np.repeat(np.arange(K.shape[1]), np.diff(indptr))
+    on = np.flatnonzero(indices == col)
+    pos = None
+    if on.size == n and np.array_equal(col[on], np.arange(n)):
+        pos = on.astype(np.intp)
+    pattern["_diag_pos"] = (indptr, indices, pos)
+    return pos
 
 
 def _nr_tangent_factorable(K):
@@ -12503,7 +12540,20 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
             # tangent the shift is below the arithmetic's own noise.
             _shift = _NR_TANGENT_SHIFT * float(np.max(np.abs(K.diagonal())))
             if _shift > 0.0:
-                K = K + _sp_identity(K.shape[0], format="csc") * _shift
+                # The shift goes onto the stored diagonal entries in place, so
+                # the tangent keeps the pattern the assembly gave it. A sparse
+                # addition (K + shift*I) would drop the tangent's explicit zeros
+                # and hand the factorization a different pattern on each re-form.
+                _dpos = _nr_diag_positions(K, pattern)
+                if _dpos is not None:
+                    K.data[_dpos] += _shift
+                else:
+                    # A diagonal entry is not stored. A stiffness matrix always
+                    # carries its diagonal, so this does not arise from the
+                    # assembly; if it ever does, the structural addition is the
+                    # only way to place the shift, and the factorization's
+                    # pattern check then orders the new pattern afresh.
+                    K = K + _sp_identity(K.shape[0], format="csc") * _shift
             _tp = time.perf_counter() if _PROF_ON else None
             try:
                 lu = _nr_factorize_tangent(K, _order_cache)

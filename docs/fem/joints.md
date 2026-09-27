@@ -377,8 +377,9 @@ thin because a generated network puts hundreds of them over the field.
 
 ![Joint slip on a toppling stack at its critical factor: each joint colored by how far its faces have slid, gray where it has not slipped, drawn as two lines with a gap between them where it has opened](../tutorials/images/fem05_joint_slip_topple.png){width=900}
 
-On a jointed model the displacement panel is the scaled deformed mesh rather than an arrow field,
-drawn as the **blocks** the joints cut the section into — each block under a faint tint of its own,
+The deformation panel is the same on a jointed model as on any other. The third panel changes:
+in place of **Displacement vectors**, a jointed model shows the scaled deformed mesh drawn as the
+**blocks** the joints cut the section into — each block under a faint tint of its own,
 its joint faces in the same green, the outside of the deformed mesh as a dark line against the
 dashed undeformed outline. A block is a piece of the mesh that moves as one body, found by following
 element adjacency: the split gives the two sides of a joint their own nodes, so they are no longer

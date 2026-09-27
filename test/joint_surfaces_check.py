@@ -485,29 +485,42 @@ def _leg_plots(failures, cache):
                         "where the field it would scale is zero by construction")
     plt.close(fig)
 
-    # The opened tick is the one mark on that panel with no colorbar to explain
-    # it, and the results plots carry no legend, so the panel's own subtitle
-    # carries the key — on a figure that draws a tick and on no other.
+    # An opened stretch is the one joint state with no colorbar to explain it.
+    # It is drawn as its two faces apart, and the joint overlay's own key
+    # (closed / slipping / opened, drawn by plot_joint_states in the panel's
+    # corner) names it — on a figure that draws an opened stretch and on no
+    # other. (Commit 9a22615d replaced the old tick and its subtitle,
+    # `_joint_open_note`, with this key.) The overlay is drawn on the strain
+    # panel only where that panel is the joints' own (the all-elastic slip
+    # panel, fd_el above), so the key is asserted there, as the results figure
+    # draws it (bars included), and on the overlay by itself.
     opened = dict(sol)
     opened["joint_open"] = np.ones_like(np.asarray(sol["joint_open"]))
     shut = dict(sol)
     shut["joint_open"] = np.zeros_like(np.asarray(sol["joint_open"]))
-    if not _PF._joint_open_note(fem_data, opened):
-        failures.append("a model with an opened joint offers no key for the tick")
-    if _PF._joint_open_note(fem_data, shut):
-        failures.append("a model with nothing opened still keys the tick")
-    fig, ax = plt.subplots()
-    plot_shear_strain_contours(ax, fem_data, opened, single_panel=True)
-    if "opened" not in ax.get_title():
-        failures.append(f"the opened tick is drawn with nothing saying what it "
-                        f"is: {ax.get_title()!r}")
-    plt.close(fig)
-    fig, ax = plt.subplots()
-    plot_shear_strain_contours(ax, fem_data, shut, single_panel=True)
-    if "opened" in ax.get_title():
-        failures.append(f"a panel with no tick on it carries the tick's key: "
-                        f"{ax.get_title()!r}")
-    plt.close(fig)
+
+    def _key(ax):
+        leg = ax.get_legend()
+        return [] if leg is None else [t.get_text() for t in leg.get_texts()]
+
+    for where, draw in (
+            ("the joint overlay",
+             lambda ax, s_: plot_joint_states(ax, fem_data, s_)),
+            ("the slip panel",
+             lambda ax, s_: plot_shear_strain_contours(ax, fd_el, s_,
+                                                       single_panel=True))):
+        fig, ax = plt.subplots()
+        draw(ax, opened)
+        if "opened" not in _key(ax):
+            failures.append(f"{where}: the opened stretch is drawn with nothing "
+                            f"saying what it is: key {_key(ax)!r}")
+        plt.close(fig)
+        fig, ax = plt.subplots()
+        draw(ax, shut)
+        if "opened" in _key(ax):
+            failures.append(f"{where}: nothing opened, yet the key names the "
+                            f"opened state: key {_key(ax)!r}")
+        plt.close(fig)
 
     # And nothing at all where there is no joint.
     from xslope.fem import build_fem_data, solve_fem
@@ -793,7 +806,7 @@ def _leg_details(failures, cache):
         failures.append(f"the joint detail figure has {len(fig.axes)} panels, "
                         f"not the four the panel documents")
     ylabels = [a.get_ylabel() for a in fig.axes]
-    for want in ("Bar tension", "Normal traction", "Shear traction", "Slip"):
+    for want in ("Bar tension", "Normal stress", "Shear stress", "Slip"):
         if not any(want in y for y in ylabels):
             failures.append(f"the detail figure has no {want} panel: {ylabels}")
     plt.close(fig)

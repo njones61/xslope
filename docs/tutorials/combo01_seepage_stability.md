@@ -14,7 +14,7 @@ its answer is what the other two need.
 A seepage analysis produces a pore pressure at every node of a mesh. Both
 stability engines want exactly that, and neither one re-enters it: the limit
 equilibrium search reads the field at every slice base, the strength reduction
-reads it at every Gauss point, and both read it off the same mesh the seepage
+reads it inside every element, and both read it off the same mesh the seepage
 run was solved on. No file is exported, no value is retyped, and nothing about
 the water is stated twice.
 
@@ -188,7 +188,7 @@ model, so a section can mix them:
 | `ru` | A pore-pressure ratio applied to the vertical total stress |
 
 **All three of this dam's materials read `seep`**, which is what sends the field
-solved above to every slice base and every Gauss point. It is a stability input,
+solved above to every slice base and into every element. It is a stability input,
 not a seepage one: it says what the two stability engines do with a field the
 seepage run produced, and it has no effect on the seepage run itself.
 
@@ -301,8 +301,7 @@ prescribed.
 <!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.246, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=COMBO-1-ssrm, f_stand=1.2421875, f_fail=1.25, check=edges -->
 
 The pore pressures reached this run the same way they reached the search: off the
-materials' `u` column, interpolated from the same mesh nodes to each Gauss point,
-where they reduce the effective mean stress and with it the strength available.
+materials' `u` column, interpolated from the same mesh nodes into each element, where they reduce the effective mean stress and with it the strength available.
 The Run FEM dialog has no water control of its own, and the mesh underneath it
 was never rebuilt — the run read the seepage answer because the materials say
 to, not because anything was pointed at it.

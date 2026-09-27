@@ -91,11 +91,11 @@ displacements simply keep growing. **The factor of safety is the largest *F* the
 slope still stands at**, and finding it is a search over *F* rather than a
 search over surfaces.
 
-Two consequences follow, and both matter on the first run. Failure here is
-**the solver failing to find equilibrium**, not a surface reaching a limit
-state, so how long each trial is allowed to iterate is part of the answer. And
-because nothing about a surface was assumed, the mechanism comes out of the
-solution: the band of soil that is straining is wherever the model put it.
+Failure here is **the solver failing to find equilibrium**, not a surface
+reaching a limit state, so how long each trial is allowed to iterate is part
+of the answer. Because nothing about a surface was assumed, the mechanism comes
+out of the solution: the band of soil that is straining is wherever the model
+put it.
 [Shear strength reduction](../fem/overview.md#shear-strength-reduction-method-ssrm)
 carries the formulation, the four failure criteria and the viscoplastic
 iteration underneath all of it.
@@ -341,7 +341,7 @@ per trial** is 12000 and **Iteration ceiling** is 50000, all three of which the
 next section is about. **Failure criterion** is
 **Non-convergence** — the plain reading, that a trial which cannot reach
 equilibrium has failed. The list offers three others, among them **Hybrid**,
-which weighs displacement evidence alongside the convergence verdict; on this
+which weighs the displacements alongside the convergence test; on this
 model the two agree on every trial, including the marginal one, and return the
 same factor of safety.
 [SSRM failure criteria](../fem/overview.md#ssrm-failure-criteria) compares all
@@ -358,13 +358,12 @@ has to know that the bracket it was given actually contains the transition, so
 it solves at both ends: *F* min has to converge, and *F* max has to fail. (If
 either check comes back the wrong way the search widens that end and tries
 again, so a bracket that misses is repaired rather than fatal.) With the bracket
-validated, every step after that solves the midpoint, and the verdict moves one
-end in: a converged trial raises the lower end, a failed trial lowers the upper
+validated, every step after that solves the midpoint, and the result moves one end in: a converged trial raises the lower end, a failed trial lowers the upper
 one.
 
 That is what the Log reports, trial by trial:
 
-| Trial | *F* | Verdict | Iterations | Bracket after it |
+| Trial | *F* | Result | Iterations | Bracket after it |
 | --- | :---: | --- | :---: | :---: |
 | lower bound | 1.0000 | converged | 56 | — |
 | upper bound | 2.0000 | failed | 181 | [1.0000, 2.0000] |
@@ -429,8 +428,7 @@ moves the answer 0.002.
 
 **Max iterations per trial** is the viscoplastic iteration budget for each trial
 *F*, and it opens at **12,000**. It is a budget rather than a ceiling. A trial
-that spends it and is still making progress — its out-of-balance force still
-trending down, or its displacement field standing still — is given another
+that spends it and is still making progress — its leftover force still falling, or its displacement field standing still — is given another
 budget's worth, and another, up to the
 **Iteration ceiling** on the same dialog, which opens at 50,000. Only a trial
 whose displacements are growing stops at its budget and is recorded as failed.
@@ -447,8 +445,8 @@ inside one budget, and it stops at the same 12,000 iterations either way.
 The budget sets how coarsely the work is granted, not whether a slow trial is
 allowed to finish.
 
-The one verdict the ceiling can leave open is **inconclusive**: a trial that
-reaches 50,000 with its out-of-balance still falling has neither settled nor run
+The one result the ceiling can leave open is **inconclusive**: a trial that
+reaches 50,000 with its leftover force still falling has neither settled nor run
 away. The search does not count it as a failure: the inconclusive trial becomes the
 bracket's undecided upper edge, the factor of safety is the bracket's midpoint
 as usual, and the log says so, with the advice to raise the ceiling if that

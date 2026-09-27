@@ -8633,6 +8633,28 @@ def run_cwd_invariant_test(test):
     return 0.0, None
 
 
+def run_docs_prose_test(test):
+    """Guard: the docs and the program's user-facing strings carry none of the
+    phrases and sentence shapes the documentation does not use — list-announcing
+    openers ("Two things follow."), "worth noting" and its cousins, imagined
+    readers, coined phrases ("the march"), solver internals in a tutorial, the
+    comma contrast in a program sentence, British spellings. The rules and their
+    scopes live in test/docs_prose_check.py; a hit is fixed by rewriting the
+    sentence, never by widening a rule.
+    """
+    import importlib.util
+    path = Path(__file__).parent / 'test' / 'docs_prose_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('docs_prose_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, f"{len(failures)} prose hit(s): " + "; ".join(failures[:5])
+    return 0.0, None
+
+
 def run_docs_heading_trap_test(test):
     """Guard: no docs .md line may start with '#' followed immediately by a
     non-space, non-'#' character. Python-Markdown treats '#word' as a heading,
@@ -14938,6 +14960,8 @@ def _dispatch_test(test):
         return run_cwd_invariant_test(test)
     if test_type == 'docs_heading_trap':
         return run_docs_heading_trap_test(test)
+    if test_type == 'docs_prose':
+        return run_docs_prose_test(test)
     if test_type == 'verification_pages':
         return run_verification_pages_test(test)
     if test_type == 'tutorial_restatements':
@@ -15033,7 +15057,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -15979,6 +16003,11 @@ def main():
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.
         tests.append({'type': 'docs_heading_trap', 'file': 'docs line-initial # heading trap',
                       'method': '-', 'source': 'docs_heading_trap'})
+        # The docs and the program's user-facing strings read like a colleague
+        # wrote them: no list-announcing openers, no "worth noting", no coined
+        # phrases, no British spellings. See test/docs_prose_check.py.
+        tests.append({'type': 'docs_prose', 'file': 'docs and program prose',
+                      'method': '-', 'source': 'docs_prose'})
         # The suite must discover the same tests from any working directory. A
         # CWD-relative fixture path does not error when it misses — the .exists()
         # guards around the docs scan just collect fewer rows — so a shrunken run

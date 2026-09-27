@@ -474,7 +474,7 @@ an assumed distribution shape — free, but only as good as the assumption.
 
 ---
 
-## Which uncertainty is worth reducing
+## Which uncertainty to reduce
 
 The Taylor series put the spread of the factor of safety at
 σ<sub>F</sub> = 0.389. That spread comes from two sources — the uncertainty
@@ -513,7 +513,7 @@ the question: the same **Plot type** list offers
 `Monte Carlo rank correlation (σ)`,
 which runs a Monte Carlo campaign and ranks the parameters by how strongly
 each sampled input tracks the factor of safety across all the realizations.
-Run it and the same verdict comes back:
+Run it and the same ranking comes back:
 
 ![The Monte Carlo rank-correlation bars](images/lem11_rank.png){width=800}
 

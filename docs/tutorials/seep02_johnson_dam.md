@@ -561,10 +561,9 @@ the exit-face active set. Averaging *k<sub>r</sub>* over an element's integratio
 points rather than switching it node by node smears the wet-to-dry transition over
 one element instead of snapping it across a node.
 
-Two consequences follow for reading the result. The phreatic surface is resolved to
+The phreatic surface is resolved to
 about one element — 6.25 ft here — so a phreatic elevation quoted to better than
-that is quoting the interpolation rather than the physics. And the surface is a
-consequence of the head field, so it moves only when the head field moves: in the
+that is quoting the interpolation rather than the physics. The surface is a consequence of the head field, so it moves only when the head field moves: in the
 next section we run three different unsaturated models and find the surface
 moving by less than half a foot between them.
 
@@ -876,9 +875,9 @@ conductivities, and the steeper the curve, the harder the two chase each other.
 Set **Max iterations** on the **Run Seepage** dialog to `1000` and the same run
 converges, in **900 iterations**, at *q* = **1.9755**.
 
-Two habits come out of that. Check `converged` before quoting a flowrate: a run
+Check `converged` before quoting a flowrate: a run
 that hits the ceiling still returns one — 1.9733 here, only 0.11% from the
-converged answer, with nothing about the number to say so. And prefer a gentler
+converged answer, with nothing about the number to say so. Prefer a gentler
 relative-conductivity curve when nothing about the result depends on its shape,
 which on a stability model is the usual case.
 
@@ -931,8 +930,7 @@ that carries one.
 
 A pore pressure at every node of the mesh is what a stability analysis needs, and
 the completed file is set up to hand it over: all three materials carry `seep` in the **u** column
-of the material table's LEM band — three cells a builder adds the same way — so every
-slice base and every Gauss point reads the solved field rather than a piezometric
+of the material table's LEM band — three cells a builder adds the same way — so every slice base and every element reads the solved field rather than a piezometric
 line.
 
 The handover is by file. A solved run writes `xslope_johnson_res_mesh.json` and

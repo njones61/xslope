@@ -421,7 +421,7 @@ find equilibrium.
 The color layers on the shear strain plot give a first reading of each
 geogrid layer's state. The **1D Details** panel gives a much more detailed
 one: for every layer, its utilization, the force it carries along its whole
-length against its capacity envelope, and a verdict naming how it is working.
+length against its capacity envelope, and a line saying how it is working.
 Click **1D Details…** on the results toolbar. It opens on the **At failure**
 field, where all six layers stand at 100% and read alike; set **Field state**
 to **Last converged** — here the trial at *F* = 1.5625 — because that is the
@@ -782,11 +782,11 @@ the peak means nothing ever drops below what it was already carrying, so the
 post-peak branch is never entered. Below that the answer keeps falling, in uneven steps: 600 costs
 0.031, 400 another 0.016, and a brittle zero a further 0.063.
 
-Two things follow for a real design. The first is that the size of the residual
-matters as much as its presence: the step from holding capacity to shedding to
-three quarters of it is 2.0% of factor of safety, and the whole way down to a
-brittle zero costs two and a half times that again. The second is that the
-whole range, from a blank cell to a brittle zero, spans 0.109, about 7%. Leaving `Tres` blank claims the geogrid
+For a real design, the size of the residual matters as much as its presence:
+the step from holding capacity to shedding to three quarters of it is 2.0% of
+factor of safety, and the whole way down to a brittle zero costs two and a half
+times that again. The whole range, from a blank cell to a brittle zero, spans
+0.109, about 7%. Leaving `Tres` blank claims the geogrid
 holds its capacity once it yields, which is what the mainstream codes assume and
 what most published capacities describe; entering zero claims it snaps. Neither
 claim is one a catalog value settles, and the meshing step showed that the answer
@@ -812,7 +812,7 @@ This tutorial covered:
   decides the answer on this model — only how far the captured failure state
   develops.
 - Reading a reinforced result: the mechanism out of shear strain, and each
-  layer's force profile, bond transfer and verdict out of the 1D details panel at
+  layer's force profile, bond transfer and how it is working, out of the 1D details panel at
   the last converged trial.
 - How the two engines' answers stand against each other, a residual capacity that
   lands on steps rather than a curve, and what changes when the bond is read from

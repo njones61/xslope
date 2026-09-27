@@ -432,7 +432,7 @@ Bishop or Morgenstern-Price on the cracked model and they land on the *same* cir
 and the *same* factor of safety — once the model stops asking the soil to carry
 tension, the methods stop disagreeing.
 
-Two things to carry out of this:
+What the cracked run showed:
 
 - **The cracked answer is lower.** 1.276 → 1.084 is a 15% drop: the uncracked model
   was counting cohesion along a stretch of surface that the soil would in reality

@@ -675,9 +675,9 @@ With the schedule and the stage times on the file, we run the transient seepage
 analysis from the same seepage dialog. Click **Run → Run Seep…**. The dialog has grown
 a **Run type** selector, which appears only on a file carrying a schedule; set it
 to **Transient (time-dependent)**. **Convergence tol** grays out — it belongs to
-the steady solve, and the march sets its own step size from how fast the field is
+the steady solve, and the transient run sets its own step size from how fast the field is
 moving. **Max iterations** stays live and moves from `400` to `2000`, the budget
-for the one steady solve the march still makes: its initial condition. Leave it
+for the one steady solve the transient run still makes: its initial condition. Leave it
 there and click **Run**.
 
 The run solves its initial condition first — the same unconfined iteration as

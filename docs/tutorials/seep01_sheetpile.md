@@ -764,17 +764,15 @@ geometry** and type each size into **Target element size** — and run each one:
 | 0.25 | 9,607 | 18,708 | 39.786 |
 | 0.125 | 37,656 | 74,300 | 39.618 |
 
-The discharge falls at every refinement and never turns around. Two things follow
-from that.
-
-The first is that the coarse answers are **wrong in a known direction**. Between
+The discharge falls at every refinement and never turns around, so the coarse
+answers are **wrong in a known direction**. Between
 the coarsest mesh and the finest the discharge drops 5.6%, and the 0.5 m mesh the
 run above used is 1.2% above the 0.125 m one. A coarse mesh cannot resolve the
 crowding of the equipotentials at the two singular points, so it under-states how
 much the flow has to squeeze around the wall, and over-states how much gets
 through.
 
-The second is that the sequence does not settle on a value, and it will not. The
+The sequence also does not settle on a value, and it will not. The
 gradient at each of those two points is genuinely infinite in the exact solution,
 so each halving of the element size resolves a bit more of a peak that has no top,
 and the discharge keeps creeping down. In practice the refinement stops where the
@@ -974,10 +972,10 @@ drop across the section, and otherwise a matter of geometry. The head drop behav
 the same way and for the same reason — moving the upstream head from 11 m to 15 m,
 a drop of 1 m to 5 m, gives q/Δh = 13.370461 at every one of them.
 
-Two consequences follow for practice. Uncertainty in the conductivity passes straight through
+In practice, uncertainty in the conductivity passes straight through
 to the discharge, one for one, and no amount of solving improves on that — a *k*
 known to within a factor of three gives a *q* known to within a factor of three.
-And the head field, and everything read off it — the flow net, the pore pressures
+The head field, and everything read off it — the flow net, the pore pressures
 that a stability analysis would take from this solution, the gradient at the
 sheetpile toe — is **independent of the conductivity** on a problem like this one.
 The moment a second material appears, that stops being true and only the ratio of

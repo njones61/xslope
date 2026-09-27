@@ -261,8 +261,7 @@ The two engines agree to 0.1% on a slope whose strength is nonlinear everywhere,
 and each lands within 0.3% of the value the paper published for it. They get there
 from completely different discretizations of the same curve: the limit equilibrium
 run linearizes the envelope at the base normal stress on each of 40 slices, and the
-finite element run linearizes it at every Gauss point on every viscoplastic
-iteration.
+finite element run linearizes it inside every element on every viscoplastic iteration.
 
 ---
 
@@ -436,8 +435,7 @@ This tutorial covered:
   reduction from the same file, the two engines agreeing to 0.1% and both landing
   within 0.3% of the published values.
 - A Design sweep in the Parametric study: which of the four field inputs the
-  factor of safety turns on, and why the Geological Strength Index has the leverage
-  it does — *s* collapses about three times as fast as m<sub>b</sub>, and a slope
+  factor of safety turns on, and why the Geological Strength Index has the influence it does — *s* collapses about three times as fast as m<sub>b</sub>, and a slope
   this size lives at the low confinement where *s* decides the answer.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.

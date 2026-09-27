@@ -27,12 +27,12 @@ width of section. Nothing is prescribed. The beam carries whatever the deforming
 soil pushes onto it, over its whole length rather than at one point, and the run
 reports the moment, shear, deflection and soil reaction down the member.
 
-Two things follow from that difference, and we measure both below. A
-two-dimensional analysis is **plane strain**: every member in it is continuous
-out of plane, so a discrete row put into the finite element engine is a wall
-with no gaps for soil to squeeze through. And a beam model computes what the
-limit equilibrium force assumes — whether the shaft can develop the moment its
-capacity allows — which turns out to depend on what holds the pile at its ends.
+A two-dimensional analysis is **plane strain**: every member in it is
+continuous out of plane, so a discrete row put into the finite element engine
+is a wall with no gaps for soil to squeeze through. A beam model computes what
+the limit equilibrium force assumes — whether the shaft can develop the moment
+its capacity allows — which turns out to depend on what holds the pile at its
+ends. We measure both below.
 
 Work through [LEM-12](lem12_piles.md) first: that is where we build the pile
 model used in the first half, and it covers the Ito & Matsui force, the

@@ -384,10 +384,10 @@ through both soils. Deeper is now lower: a circle tangent to the contact lies
 wholly in the fill, where nothing has changed, so held still it returns the same
 1.247 it did before — against the 0.792 at the rock.
 
-Two things follow. **A layered model has one candidate mechanism per layer**, and
+**A layered model has one candidate mechanism per layer**, and
 a set of starting circles that names them all is how the model states that — the
 circle that looked redundant here is the whole answer under a different soil.
-And **a search cannot be audited by its own number**: 1.244 and 0.792 come from
+**A search cannot be audited by its own number**: 1.244 and 0.792 come from
 the same geometry, the same three build paths and the same run settings, and the
 only thing that tells them apart is reading how deep the reported surface went
 and what it ran through.

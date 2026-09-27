@@ -356,7 +356,7 @@ In Studio, click **Run → Parametric…**:
 **c = 817 psf.** The soil would have to be 63% stronger than the 500 psf it has
 to carry this stockpile at a factor of safety of 1.5.
 
-Two things stand out on the curve:
+Reading the curve:
 
 - **It is a straight line.** With φ = 0 the strength along the surface is c ×
   length and the driving side does not involve c at all; the search returns the

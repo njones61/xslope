@@ -527,7 +527,7 @@ schedule. Set it to **Transient (time-dependent)**.
 the steady solve — the nonlinear iteration we measured on the unconfined problem
 in SEEP-2 — while the transient march carries its own step-size controls and sets
 them from how fast the field is moving. **Max iterations** stays live and jumps
-from `400` to `2000`, because the march still has one steady solve to make: the
+from `400` to `2000`, because the transient run still has one steady solve to make: the
 initial condition, which is that same nonlinear iteration at full pool. Leave it
 at 2000.
 
@@ -767,8 +767,7 @@ This tutorial covered:
 - A boundary set for a dam with water on both sides, including an exit face
   whose wet extent the solution decides.
 - The initial condition: a steady solve at the schedule's t = 0 values.
-- A schedule — a pool-level time series, a run duration, and the save times
-  worth keeping.
+- A schedule — a pool-level time series, a run duration, and the times at which frames are saved.
 - Making a boundary time-varying by naming its series in the value cell, with
   the reservoir type freeing the nodes the water leaves.
 - Three readings of the result: the frames, the head history, and the water

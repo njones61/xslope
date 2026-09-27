@@ -676,7 +676,7 @@ stability analysis reads, and this page stops at the seepage field. Click **OK**
 they read 0, 30, 60, 200 and 230, and the run lasts 600 days with a frame saved
 every 25:
 
-- **Thirty dry days first.** The march begins from the dry-weather field, and a
+- **Thirty dry days first.** The transient run begins from the dry-weather field, and a
   model already at its answer must sit still while nothing drives it. Frames over
   these days are the check that it does.
 - **A thirty-day ramp to the full rate**, then a **140-day hold** at
@@ -712,7 +712,7 @@ the number 10 — a model can mix constant and time-varying boundaries freely.
 Click **OK**, and save the model under a name of your own; the file linked at the
 top of this section calls it `xslope_dam_infiltration_storm.xlsx`.
 
-### Running the march
+### Running the transient analysis
 
 Click **Run → Run Seep…** The dialog now carries a **Run type** row it did not have
 before, because the file has a `tseep` sheet. Set it to **Transient
@@ -806,7 +806,7 @@ This tutorial covered:
 carries the flux formulation, the nodal loads it assembles into, and the rest of
 the boundary condition types, and
 [Transient Seepage](../seep/transient.md) carries the storage laws, the series
-semantics and the time stepper behind the march;
+semantics and the time stepping behind a transient run;
 [GW6](../verification/rocscience_groundwater.md#gw6) carries five published cases
 for this dam, among them the dry dam solved here, the same dam under rain, and
 the same dam again with its drain replaced by a seepage face.

@@ -130,8 +130,7 @@ The same eight sessions were then played, unchanged, on four other models.
 **Everything in this table is a snapshot: the models as they behaved and the list
 prices as they stood in late August 2026, when this tutorial was written.**
 Models are replaced and retrained and prices are restructured every few months,
-so treat the numbers as an example of how to compare models, not as a standing
-verdict on any of them.
+so treat the numbers as an example of how to compare models, not as a rating of any of them.
 
 Each session is scored twice. **Model and numbers** asks whether the work was
 done: the model built or edited is the one the request describes, and every

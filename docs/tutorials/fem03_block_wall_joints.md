@@ -454,8 +454,8 @@ You can tell in Studio that a run ended this way. The results view is titled
 with the bound, **FS ≥ 1.56**, instead of a number, the Log carries the
 paragraph above, and the results toolbar shows a button that is not there after
 an ordinary run, **Continue with a higher limit…**, beside **1D Details…**.
-Leave it alone for now. A reader who stops here has a complete set of results,
-they are worth reading first, and the section after next presses the button.
+Leave it alone for now. If you stop here you have a complete set of results,
+and the next section reads them. The section after that presses the button.
 
 ### If you stop here
 

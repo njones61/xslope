@@ -325,9 +325,9 @@ model, in place of the 12,000 it opens with (`max_iterations` on `solve_fem()` a
 `solve_ssrm()` in Python). Allowing more costs almost nothing, because a trial that settles stops
 as soon as it has.
 
-When a run has already stopped short, the closing summary in the Log says so: it gives the
-factor of safety as "at least" some value, or says the answer depends on the iteration limit.
-There are two ways to give the run more iterations. On the FEM · Results toolbar, press
+When a run stops short, the closing summary in the Log says so: it gives the factor of safety
+as "at least" some value, or says the answer depends on the iteration limit. There are two ways
+to give the run more iterations. On the FEM · Results toolbar, press
 **Continue with a higher limit…**, enter a new **Max iterations per trial** (the dialog offers
 five times the limit the run stopped at), and the search picks up where its trials stopped,
 keeping every trial it has already decided. Or open **Run → Run FEM…**, raise **Max iterations

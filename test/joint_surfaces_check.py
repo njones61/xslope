@@ -20,9 +20,11 @@ six lines made joints in memory:
   c. the plots. The inputs plot draws a jointed line in its own style with its
      own legend entry and a bonded one in the ordinary one; the mesh plot draws
      the jointed lines over the mesh; the results panel draws every joint as a
-     hairline colored by slip, with the slip colorbar as its only legend and no
-     colorbar where nothing slipped, and draws nothing at all on a model with
-     no joint. The displacement panel is the scaled deformed mesh, with the
+     hairline colored by slip, with the slip colorbar and a key naming the
+     three states and no colorbar where nothing slipped, and draws nothing at
+     all on a model with no joint. With Show joints on the strain panel of a
+     jointed model draws that overlay whether its soil can yield (over the
+     strain field, strain title kept) or not (the Joint slip panel). The displacement panel is the scaled deformed mesh, with the
      joint faces over its grid, on a jointed model and the arrow field on every
      other one — asserted in both layouts a results figure is drawn in, the
      stacked multi-panel one and the single panel Studio and the report render,
@@ -488,15 +490,54 @@ def _leg_plots(failures, cache):
                         "where the field it would scale is zero by construction")
     plt.close(fig)
 
+    # A jointed model whose soil can yield keeps its strain panel AND draws its
+    # joints over the field (owner's ruling, 2026-09-27): with Show joints on,
+    # the joint key, the slip colorbar beside the strain one, and the strain
+    # title; with it off, the strain field alone. The fixture's materials yield
+    # (asserted above: it is not read as a slip panel), and it carries bars, so
+    # the key is the one merged with the bars' legend where they draw one.
+    _states = ("closed, no slip", "slipping (color = slip)", "opened")
+    for show in (True, False):
+        fig, ax = plt.subplots()
+        _m, specs_y = plot_shear_strain_contours(ax, fem_data, sol,
+                                                 single_panel=True,
+                                                 show_joints=show)
+        leg = ax.get_legend()
+        key = [] if leg is None else [t.get_text() for t in leg.get_texts()]
+        joint_key = [k for k in key if k in _states]
+        slip_bar = [lab for _sm, lab in specs_y if "Joint slip" in lab]
+        on = "on" if show else "off"
+        if SHEAR_STRAIN_LABEL not in ax.get_title():
+            failures.append(f"a yielding jointed model with Show joints {on} "
+                            f"lost the strain title: {ax.get_title()!r}")
+        if _m is None:
+            failures.append(f"a yielding jointed model with Show joints {on} "
+                            f"offered no strain colorbar")
+        if show and not joint_key:
+            failures.append(f"a yielding jointed model's strain panel draws no "
+                            f"joint key with Show joints on: key {key!r}")
+        if show and not slip_bar:
+            failures.append(f"a yielding jointed model's strain panel offers no "
+                            f"Joint slip colorbar with Show joints on: "
+                            f"{[lab for _sm, lab in specs_y]!r}")
+        if not show and joint_key:
+            failures.append(f"with Show joints off the strain panel still draws "
+                            f"the joint key: {key!r}")
+        if not show and slip_bar:
+            failures.append(f"with Show joints off the strain panel still offers "
+                            f"a slip colorbar: {slip_bar!r}")
+        plt.close(fig)
+
     # An opened stretch is the one joint state with no colorbar to explain it.
     # It is drawn as its two faces apart, and the joint overlay's own key
     # (closed / slipping / opened, drawn by plot_joint_states in the panel's
     # corner) names it — on a figure that draws an opened stretch and on no
     # other. (Commit 9a22615d replaced the old tick and its subtitle,
     # `_joint_open_note`, with this key.) The overlay is drawn on the strain
-    # panel only where that panel is the joints' own (the all-elastic slip
-    # panel, fd_el above), so the key is asserted there, as the results figure
-    # draws it (bars included), and on the overlay by itself.
+    # panel of every jointed model with Show joints on, so the key is asserted
+    # on the all-elastic slip panel (fd_el above) and on the yielding strain
+    # panel, as the results figure draws them (bars included), and on the
+    # overlay by itself.
     opened = dict(sol)
     opened["joint_open"] = np.ones_like(np.asarray(sol["joint_open"]))
     shut = dict(sol)
@@ -511,6 +552,9 @@ def _leg_plots(failures, cache):
              lambda ax, s_: plot_joint_states(ax, fem_data, s_)),
             ("the slip panel",
              lambda ax, s_: plot_shear_strain_contours(ax, fd_el, s_,
+                                                       single_panel=True)),
+            ("the strain panel",
+             lambda ax, s_: plot_shear_strain_contours(ax, fem_data, s_,
                                                        single_panel=True))):
         fig, ax = plt.subplots()
         draw(ax, opened)

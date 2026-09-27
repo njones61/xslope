@@ -9700,6 +9700,11 @@ VG_SEEP_XLSX = os.path.join(_REPO, "docs", "seep", "files",
 FEM_XLSX = os.path.join(_REPO, "docs", "fem", "files",
                         "xslope_griffiths1_load.xlsx")
 
+#: A jointed model with a solved run beside it: FEM-5's toppling rock slope,
+#: every material elastic, its mechanism slip and opening on the joints.
+TOPPLING_XLSX = os.path.join(_REPO, "docs", "tutorials", "files",
+                             "xslope_rock_toppling.xlsx")
+
 #: The two finite element models that carry one-dimensional members: six
 #: reinforcement lines, and two piles. Both ship a solved strength reduction run
 #: with member forces, and both are ALSO solved here for one gravity trial — a
@@ -14531,7 +14536,9 @@ def test_the_displacement_curve_draws_the_trials():
 
 def test_which_result_panels_draw_a_legend():
     """The deformation panel draws a legend only with Show joints off; the
-    strain and vector panels draw none either way.
+    strain panel of a jointed model draws the joint key with Show joints on and
+    none with it off, whether its soil can yield or not; an unjointed model's
+    strain panel and the vector panel draw none either way.
 
     The plots stay as they are (Norm's ruling). What is checked here is that the
     Studio panel beside them tells the truth about them. The note where the
@@ -14580,6 +14587,34 @@ def test_which_result_panels_draw_a_legend():
                              f"{'on' if show_joints else 'off'}, which the note "
                              f"says it does not")
 
+    # A jointed model's strain panel carries the joint key with Show joints on
+    # (owner's ruling, 2026-09-27), and none with it off. Read on the shipped
+    # toppling model from its stored solution as it is (all elastic: the Joint
+    # slip panel) and with its rock made able to yield in memory (the strain
+    # panel with the joints over it), since the rule reads the materials.
+    _states = ("closed, no slip", "slipping (color = slip)", "opened")
+    _sd_j, jbundle = _fem_bundle(TOPPLING_XLSX)
+    fd_as_built = jbundle["fem_data"]
+    fd_yields = dict(fd_as_built, elastic_materials=[])
+    for kind, fd in (("all-elastic", fd_as_built), ("yielding", fd_yields)):
+        for show_joints in (True, False):
+            fig = mplfig.Figure(figsize=(4.0, 3.0))
+            with contextlib.redirect_stdout(io.StringIO()):
+                plot_fem_results(fd, jbundle["solution"],
+                                 plot_type=["shear_strain"], fig=fig,
+                                 show_title=False, show_joints=show_joints)
+            key = [text.get_text()
+                   for ax in fig.axes if ax.get_legend() is not None
+                   for text in ax.get_legend().get_texts()]
+            joint_key = [k for k in key if k in _states]
+            if show_joints and not joint_key:
+                fails.append(f"a {kind} jointed model's strain panel draws no "
+                             f"joint key with Show joints on: {key}")
+            if not show_joints and key:
+                fails.append(f"a {kind} jointed model's strain panel draws a "
+                             f"legend {key} with Show joints off, which the "
+                             f"note says it does not")
+
     # The note itself: the comment block that opens "No legend controls." It
     # must name the control that decides the deformation legend, give both of
     # its states, and make neither of the two blanket claims the panels
@@ -14604,8 +14639,13 @@ def test_which_result_panels_draw_a_legend():
         if "Show joints on" not in note or "Show joints off" not in note:
             fails.append(f"the note does not say what the deformation panel "
                          f"draws with Show joints on and off: {note!r}")
+        if "strain panel carries the joint key" not in note:
+            fails.append(f"the note does not say the strain panel of a jointed "
+                         f"model carries the joint key with Show joints on: "
+                         f"{note!r}")
         for claim in ("result plots draw no legend", "DOES draw a legend",
-                      "always draws a legend"):
+                      "always draws a legend",
+                      "strain and vector panels carry none"):
             if claim.lower() in note.lower():
                 fails.append(f"the note still makes the blanket claim "
                              f"{claim!r}: {note!r}")

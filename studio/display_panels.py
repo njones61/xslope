@@ -634,8 +634,10 @@ class FemResultsDisplayPanel(QWidget):
         self.show_joints.setToolTip(
             "On the deformation plot of a jointed model, draw the two faces of "
             "every joint over the blocks, colored by how far they have slid. "
-            "Off, the blocks are drawn without their faces. On a model whose only "
-            "strength is its joints the strain plot carries the same reading.")
+            "Off, the blocks are drawn without their faces. On the strain plot "
+            "of a jointed model, draw every joint colored by its slip, with the "
+            "slip colorbar and a key; on a model whose only strength is its "
+            "joints that plot is titled Joint slip.")
         # How the blocks are filled on a jointed model's deformation plot: off
         # (the default), one faint tint per material zone; on, each block (a
         # connected piece of the mesh after the joint split) under its own tint.
@@ -690,9 +692,14 @@ class FemResultsDisplayPanel(QWidget):
         # panel carries no legend, because the block look carries its meaning in
         # the drawing, with Color by block on or off. With Show joints off it
         # names the original and deformed grids, and the reinforcement in both
-        # configurations, in a legend placed by _place_deform_legend. The strain
-        # and vector panels carry none either way. The panels keep the legend they were designed with, so there is
-        # nothing here to set.
+        # configurations, in a legend placed by _place_deform_legend. On a
+        # jointed model with Show joints on, the strain panel carries the joint
+        # key (closed, slipping, opened) beside the slip colorbar, over the
+        # strain field where the soil can yield and on the Joint slip panel of
+        # an all-elastic model; with Show joints off it carries none, and
+        # neither does an unjointed model's. The vector panel carries none
+        # either way. The panels keep the legend they were designed with, so
+        # there is nothing here to set.
 
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)
         self.cmap.currentIndexChanged.connect(self._emit)

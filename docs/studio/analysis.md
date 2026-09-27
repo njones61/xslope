@@ -799,8 +799,10 @@ mesh is shown undeformed and the title says so. A **Show joints** switch draws t
 that deformed mesh, each where the deformation has put it and colored by how far the faces have slid on a green
 ramp, gray where the joint is not slipping, with a slip colorbar; **Joint width** sets the weight of those faces
 in points, since a thin face disappears on a wide section. **Color by block** sets the fill of the blocks: off
-(the default), one tint per material; on, each block under its own tint so the bodies can be told apart. On a model whose only strength is its joints the
-strain plot carries the same reading, ticked across where a joint has opened.
+(the default), one tint per material; on, each block under its own tint so the bodies can be told apart. With
+**Show joints** on, the shear strain plot of a jointed model draws every joint colored by its slip, with the slip
+colorbar and a key naming the closed, slipping and opened states: over the strain field on a model whose soil can
+yield, and on its own panel, titled *Joint slip*, on a model whose only strength is its joints.
 
 The FEM · Results toolbar also carries **1D Details…**, which opens a non-modal panel
 listing every reinforcement line and pile in the model with a utilization badge, and

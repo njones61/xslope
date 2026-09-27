@@ -3604,18 +3604,21 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     # defer the force colorbar the same way and hand its spec back, so the two bars
     # get separate full-height slots instead of colliding in one.
     # A joint carries no strain of its own, so the contour field says nothing
-    # about it. Its state goes on the line as a hairline colored by slip, under
-    # the bar it stands beside, with no legend entry of its own — the slip
-    # colorbar is the legend.
-    # On a model with soil that can strain, the joints' reading belongs on the
-    # deformation panel, where the faces are drawn; put here as well, on top
-    # of the bars' force overlay, it was one thing too many on one line. The
-    # overlay stays only where this panel is the joints' own (slip_panel).
-    joint_cbar_specs = (plot_joint_states(ax, fem_data, solution,
-                                          draw_cbar=not single_panel,
-                                          linewidth=(joint_linewidth
-                                                     or JOINT_FACE_LINEWIDTH))
-                        if (show_joints and slip_panel) else [])
+    # about it. With Show joints on, every jointed model draws its joints on
+    # this panel, colored by slip, with the slip colorbar beside the field's
+    # and the key naming closed / slipping / opened (plot_joint_states). On a
+    # model whose soil or rock can yield they are drawn over the strain field,
+    # at the thin over-field width, and the panel keeps its strain title and
+    # colorbar; on an all-elastic model the panel is the joints' own
+    # (slip_panel), titled Joint slip, and the slipped lengths draw at the
+    # joint-face width.
+    jointed = bool((fem_data.get("joint_data") or {}).get("n"))
+    joint_cbar_specs = (plot_joint_states(
+                            ax, fem_data, solution,
+                            draw_cbar=not single_panel,
+                            linewidth=((joint_linewidth or JOINT_FACE_LINEWIDTH)
+                                       if slip_panel else None))
+                        if (show_joints and jointed) else [])
     reinf_cbar_specs = []
     if show_reinforcement and 'elements_1d' in fem_data:
         reinf_cbar_specs = plot_reinforcement_forces(

@@ -372,8 +372,11 @@ On the shear strain panel each joint is a thin line along its trace, colored on 
 titled *Joint slip* by how far its two faces have slid. A joint that has not slipped is a gray
 hairline. A stretch that has **opened** is drawn as two lines with a white gap between them,
 since opening is a condition rather than an amount. A key in the corner of the panel names the
-three states, and a model where no joint slipped carries no slip colorbar. The lines are kept
-thin because a generated network puts hundreds of them over the field.
+three states, and a model where no joint slipped carries no slip colorbar. On a model whose soil
+or rock can yield, the joints are drawn over the strain field and the panel keeps its strain title
+and colorbar, with the slip colorbar beside it; on a model whose every material is elastic there is
+no strain to draw, and the panel is the joints' own, titled *Joint slip*. The lines are kept thin
+because a generated network puts hundreds of them over the field.
 
 ![Joint slip on a toppling stack at its critical factor: each joint colored by how far its faces have slid, gray where it has not slipped, drawn as two lines with a gap between them where it has opened](../tutorials/images/fem05_joint_slip_topple.png){width=900}
 

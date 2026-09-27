@@ -218,12 +218,9 @@ by slipping a little at a time, so a jointed model settles over tens or hundreds
 iterations where a model without joints settles in hundreds, and a trial cut off before it has
 settled reads as a failure or as undecided when it would have come to rest. The closing summary
 in the Log says when that has happened: it gives the factor of safety as "at least" some value,
-or says the answer depends on the iteration limit. Either way the run needs more iterations,
-and there are two ways to give it more. On the FEM · Results toolbar, press **Continue with a
-higher limit…**, enter a new **Max iterations per trial** (the dialog offers five times the
-limit the run stopped at), and the search picks up where its trials stopped, keeping every
-trial it has already decided. Or open **Run → Run FEM…**, raise **Max iterations per trial** and
-the **Iteration ceiling** with it, and run again from the start; the answer is the same.
+or says the answer depends on the iteration limit. Either way the run needs more iterations;
+[Running a Jointed Model](#how-many-iterations-a-jointed-model-needs) says how to set the limit
+and how to continue a run that stopped short.
 [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) shows the effect on a geogrid wall:
 at a limit of 100,000 the search reports a factor of safety of at least 1.56, and with the
 limit raised to a million the wall gives way at 2.0, after 30 cm of movement.
@@ -320,11 +317,18 @@ above it was shown to fail.
 Set **Max iterations per trial** in Studio's Run FEM dialog to at least **100,000** for a jointed
 model, in place of the 12,000 it opens with (`max_iterations` on `solve_fem()` and
 `solve_ssrm()` in Python). Allowing more costs almost nothing, because a trial that settles stops
-as soon as it has. When a run has already stopped short, **Continue with a higher limit…** on the
-FEM · Results toolbar carries it on from where its trials stopped. The geogrid wall of
-[Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) reports a factor of safety of at least
-1.56 at 100,000 iterations and gives way at 2.0 with the limit at a million; the tutorial shows
-both runs.
+as soon as it has.
+
+When a run has already stopped short, the closing summary in the Log says so: it gives the
+factor of safety as "at least" some value, or says the answer depends on the iteration limit.
+There are two ways to give the run more iterations. On the FEM · Results toolbar, press
+**Continue with a higher limit…**, enter a new **Max iterations per trial** (the dialog offers
+five times the limit the run stopped at), and the search picks up where its trials stopped,
+keeping every trial it has already decided. Or open **Run → Run FEM…**, raise **Max iterations
+per trial** and the **Iteration ceiling** with it, and run again from the start; the answer is
+the same. The geogrid wall of [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) reports
+a factor of safety of at least 1.56 at 100,000 iterations and gives way at 2.0 with the limit at
+a million; the tutorial shows both runs.
 
 ### How a trial is decided
 

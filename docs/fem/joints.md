@@ -264,10 +264,10 @@ region is a polygon on the polygon sheet with its **Type** set to `joints` (see
 [joint regions](../usage/input_template.md#joint-regions) on the template page), and it can be
 limited to a band of elevations. No joints are written outside the region.
 
-In Studio, press [Build network](../studio/editing.md#build-network) on the joints editor,
-choose the pattern, enter its numbers and pick the region; the canvas previews the joints before
-anything is written. In a script, call `parallel_set`, `cross_jointed` or `voronoi` from
-`xslope.joints`.
+To create a network of joints in Studio, press [Build network](../studio/editing.md#build-network)
+on the joints editor, choose the pattern, enter its numbers and pick the region; the canvas
+previews the joints before anything is written. In a script, call `parallel_set`,
+`cross_jointed` or `voronoi` from `xslope.joints`.
 
 The generator writes ordinary rows on the joints worksheet, labeled `set-01`, `set-02` and so
 on. The pattern itself is not stored, only the lines it produced, so to change a network you

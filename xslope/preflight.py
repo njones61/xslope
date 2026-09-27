@@ -4602,7 +4602,7 @@ def _crack_deeper_than_slope(ctx):
 
 
 @rule("crack.exceeds_theoretical_depth", INFO, ("lem",),
-      "A crack far deeper than 2c/gamma is a geometric feature, not a Rankine estimate.",
+      "A crack far deeper than 2c/gamma is a geometric feature. It is not a Rankine estimate.",
       fields=("tcrack_depth", "c", "phi", "gamma"))
 def _crack_theoretical(ctx):
     d = _num(ctx.sd.get("tcrack_depth"))
@@ -5725,7 +5725,7 @@ def _joint_signal_boundary(ctx):
 
 
 @rule("joint.likely_flat_sheet", WARNING, ("fem",),
-      "A long, flat sheet under the mass is a sliding plane, not a tie.")
+      "A long, flat sheet under the mass is a sliding plane.")
 def _joint_signal_flat(ctx):
     for i, _r, seg in _joint_candidate_lines(ctx):
         if _joint_inclination(seg) > _JOINT_FLAT_DEG:
@@ -5753,7 +5753,7 @@ def _joint_signal_flat(ctx):
 
 
 @rule("joint.likely_smooth_interface", WARNING, ("fem",),
-      "Delta well below the soil's phi is a liner, not a soil contact.",
+      "Delta well below the soil's phi is a liner.",
       fields=("delta",))
 def _joint_signal_smooth(ctx):
     for i, r, seg in _joint_candidate_lines(ctx):
@@ -5780,7 +5780,7 @@ def _joint_signal_smooth(ctx):
 
 
 @rule("joint.likely_wall", WARNING, ("fem",),
-      "Closely spaced sheets behind a steep face are a wall, not a slope.")
+      "Closely spaced sheets behind a steep face are a wall.")
 def _joint_signal_wall(ctx):
     cands = [(i, r, seg) for i, r, seg in _joint_candidate_lines(ctx)
              if _joint_inclination(seg) <= _JOINT_NEAR_HORIZONTAL_DEG]
@@ -5840,7 +5840,7 @@ def _joint_signal_wall(ctx):
 # ---- the info: what a jointed line stops reading ---------------------------
 
 @rule("joint.bond_inputs_ignored", INFO, ("fem",),
-      "A jointed line's pullout comes from the interface, not from Lp or Tres.",
+      "A jointed line's pullout comes from the interface. Lp and Tres are not read.",
       fields=("lp1", "lp2", "t_res"))
 def _joint_bond_inputs(ctx):
     rows = []
@@ -6007,7 +6007,7 @@ def _mat_nu_band(ctx):
                    f"limit of 0.5. The plane-strain stiffness scales with "
                    f"1 / (1 - 2 nu), so the element matrices are poorly conditioned "
                    f"and the strength reduction converges slowly or not at all. Use "
-                   f"0.45 or less; an undrained clay is modeled at 0.45, not 0.49 "
+                   f"0.45 or less; an undrained clay is modeled at 0.45 "
                    f"{_AT_MAT}.")
             continue
         if nu >= 0.1:

@@ -3696,7 +3696,7 @@ class _MaterialListView(QWidget):
         lab = QLabel("Display color")
         lab.setMinimumWidth(80)
         lab.setToolTip("Color of this material's zone on the Inputs plot. Stored as a "
-                       "style override, not a 'mat' property.")
+                       "style override. It is not a 'mat' property.")
         h.addWidget(lab)
         self._color_btn = ColorButton("#000000", palette=MATERIAL_PALETTE)
         self._edit_keys[self._color_btn] = "_swatch"    # help-strip resolver
@@ -4197,7 +4197,7 @@ MATERIALS_HELP = {
     "Sy": "Specific yield — the drainable porosity: the volume fraction released "
           "as the water table falls (dimensionless). Read by a transient seepage "
           "run only; required on every material then, blank otherwise.",
-    "_swatch": "Display color on the Inputs plot — a style override, not a 'mat' property.",
+    "_swatch": "Display color on the Inputs plot — a style override. It is not a 'mat' property.",
 }
 
 
@@ -6490,7 +6490,7 @@ PILES_HELP = {
             "both engines: the LEM checks the per-pile moment against it; the FEM "
             "releases a plastic hinge where the beam moment reaches Mcap ÷ S per "
             "unit width.",
-    "appl": "Force application — Active: H is an allowable force, not divided by "
+    "appl": "Force application — Active: H is an allowable force and is not divided by "
            "FS (default). Passive: H is an ultimate capacity divided by FS. LEM only.",
     "head_fixity": "Restraint at the top of the pile: free (default; no connection "
                    "at the head), pinned (translation held, rotation free — tie-rods "
@@ -7534,8 +7534,8 @@ REINFORCE_HELP = {
     "dir": "Force direction at the slip surface — Tangent (flexible, e.g. "
           "geosynthetics; the default) or Axial (rigid, e.g. nails/tiebacks — the "
           "UTEXAS/UTEXASED convention). LEM only.",
-    "appl": "Force application — Active: allowable force on the driving side, not "
-           "divided by FS (default). Passive: ultimate capacity on the resisting "
+    "appl": "Force application — Active: allowable force on the driving side and "
+           "not divided by FS (default). Passive: ultimate capacity on the resisting "
            "side, divided by FS. LEM only.",
     "t_max": "Maximum tensile force the line can mobilize, per unit width (discrete "
             "supports: enter the per-element capacity with Spacing). Caps both the "

@@ -3714,7 +3714,7 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
             # is starting from a field that is not a steady state, so every frame
             # downstream of it inherits that, and the flag says so.
             print("WARNING: the transient initial condition did not converge — the "
-                  "march starts from a field that is not a steady state "
+                  "transient run starts from a field that is not a steady state "
                   "(solution['converged'] is False).")
 
     # characteristic head scale for the Picard tolerance and the dh limiter
@@ -4288,7 +4288,7 @@ def export_seep_u(nodes, u, filename, gamma_water):
         # A total-flowrate footer, matching export_seep_solution's format so the same
         # readers (which skip "#" comment lines) treat both files identically. There is
         # no solved flowrate here -- the field was imported, not computed.
-        f.write("# Total Flowrate: not computed (field imported, not solved)\n")
+        f.write("# Total Flowrate: not computed (field imported)\n")
 
 
 def import_seep_solution(seep_data, filename):

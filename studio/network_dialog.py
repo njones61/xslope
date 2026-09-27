@@ -80,7 +80,7 @@ KIND_FIELDS = {
          "is described by how big its blocks are rather than by a dip and a "
          "spacing. Every cell wall becomes a joint."),
         ("seed", "Seed",
-         "The random seed. Required, not optional: the same block size and "
+         "The random seed. Required. The same block size and "
          "seed reproduce the same network exactly, and a tessellation nobody "
          "can reproduce is not an input."),
     ],

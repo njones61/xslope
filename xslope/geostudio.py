@@ -1031,7 +1031,7 @@ def _import_seep(gsz, analysis, step, caveats, polygons):
         f"pore pressure came from the parent SEEP/W analysis as a finite element field "
         f"({len(mesh['nodes'])} nodes, step {chosen}) — imported onto the mesh SEEP/W "
         f"solved on, with every material set to the 'seep' option. It is SLOPE/W's own "
-        f"pore pressure, not a re-solve: xslope did not run the seepage analysis")
+        f"pore pressure. xslope did not run the seepage analysis")
     return mesh, u, chosen
 
 
@@ -1260,8 +1260,8 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
         caveats.append(
             "GeoStudio limits the negative pore-pressure (suction) "
             + (f"to a maximum of {mx:g}" if mx else "with CapSuction on")
-            + " for shear strength. That is SLOPE/W's threshold model, not xslope's "
-            "phi_b/s_cap apparent-cohesion pair — it was NOT converted; set phi_b (and "
+            + " for shear strength. That is SLOPE/W's threshold model. It is not xslope's "
+            "phi_b/s_cap apparent-cohesion pair and was NOT converted; set phi_b (and "
             "s_cap) by hand if you want unsaturated strength credited")
 
     ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
@@ -2106,7 +2106,7 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
                 f"no SEEP/W analysis in this file, so the field cannot be re-solved or "
                 f"its boundary conditions changed on the GeoStudio side; re-create the "
                 f"seepage problem in SEEP/W if you need that. GeoStudio applies a spatial "
-                f"function to every material in the analysis, not to a chosen subset")
+                f"function to every material in the analysis")
             if n_suction:
                 caveats.append(
                     f"{n_suction} of those {len(seep_pts)} points are NEGATIVE (suction "
@@ -2174,8 +2174,8 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     if any(m.get("phi_b") is not None or m.get("s_cap") is not None for m in materials):
         caveats.append(
             "matric-suction shear strength (phi_b / s_cap) is set on one or more "
-            "materials — it was NOT written: SLOPE/W parameterises unsaturated strength "
-            "as a suction ceiling on the piezometric surface, not a per-material phi_b, "
+            "materials — it was NOT written: SLOPE/W parameterizes unsaturated strength "
+            "as a suction ceiling on the piezometric surface. It has no per-material phi_b, "
             "so re-create it in GeoStudio if you need it")
 
     for key, label in [("circles", "failure circles"), ("non_circ", "non-circular surface"),

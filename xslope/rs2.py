@@ -1267,7 +1267,7 @@ def fez_to_slope_data(d):
         caveats.append(
             f"{len(e_fallback)} material(s) state no elastic constants in the RS2 file, "
             f"so E and nu were filled from the soil-type table in docs/fem/overview.md "
-            f"by strength: {_named}. These are ASSUMPTIONS, not the file's numbers — the "
+            f"by strength: {_named}. These are ASSUMPTIONS. The "
             f"LEM never reads them, but every FEM displacement does; set them before "
             f"running the FEM")
 
@@ -1425,7 +1425,7 @@ def fez_to_slope_data(d):
             f"{dl_report['water']} RS2 ponded-water load(s) were imported as distributed "
             f"loads (the water pressure gamma_w*depth on the submerged boundary, up to "
             f"{dl_report['peak']:.1f} at the deepest point) — RS2 stores these explicitly, "
-            f"so they are now carried, not dropped")
+            f"so they are carried")
     if dl_report["plain"]:
         caveats.append(
             f"{dl_report['plain']} distributed load(s) were imported directly from RS2 "
@@ -1434,9 +1434,9 @@ def fez_to_slope_data(d):
         caveats.append(
             f"{dl_report['vertical'] + dl_report['global_vertical']} RS2 vertical "
             f"distributed load(s) were imported as distributed loads with "
-            f"Direction='vertical' — dead weight applied straight down, not "
-            f"perpendicular to the loaded surface. On an inclined surface the two "
-            f"differ by a horizontal thrust of tan(slope) times the load")
+            f"Direction='vertical' — dead weight applied straight down. On an "
+            f"inclined surface it differs from a load normal to the surface "
+            f"by a horizontal thrust of tan(slope) times the load")
     if dl_report["global_vertical"]:
         caveats.append(
             f"{dl_report['global_vertical']} of them are RS2 'global angle' loads aimed "

@@ -563,7 +563,7 @@ class RunFemDialog(QDialog):
         self.tolerance.setValue(float(defaults.get("tolerance", 0.01)))
         self.tolerance.setToolTip(
             "How narrow the F bracket must get before the search stops — the "
-            "width of [F min, F max] after bisection, not a solver convergence "
+            "width of [F min, F max] after bisection. It is not a solver convergence "
             "tolerance.")
         form.addRow("Tolerance (SSRM)", self.tolerance)
 
@@ -638,7 +638,7 @@ class RunFemDialog(QDialog):
             "horizontal component and leaves the vertical free, so the truncated "
             "ground can still settle under its own weight.\n\n"
             "Fixed clamps both components, which is what RS2 does on its side "
-            "boundaries. It is a vendor-parity option, not a better model: fixing the "
+            "boundaries. It matches the vendor's setting. Fixing the "
             "sides adds shear restraint the real ground does not have, and stiffens a "
             "domain truncated close to the slope.")
         form.addRow("Side BC", self.side_bc)
@@ -651,7 +651,7 @@ class RunFemDialog(QDialog):
         self.k0_on.setToolTip(
             "Start from an at-rest in-situ stress state instead of switching gravity "
             "on in one step.\n\n"
-            "Off, the initial lateral stress is set by the STIFFNESS, not the soil: "
+            "Off, the initial lateral stress is set by the STIFFNESS: "
             "sigma_h = nu/(1-nu)·sigma_v, about 0.43·sigma_v at nu = 0.3. Real "
             "compacted fill and overconsolidated clay sit at K0 = 1 and above, and "
             "under-confining a thin structural column (a reinforced-soil block) "
@@ -1151,7 +1151,7 @@ class RunSeepDialog(QDialog):
             "can need more than the default."
             if steady else
             "Sweep ceiling for the steady solve that builds the t = 0 initial "
-            "condition. It is spent once, before the march, and has no bearing on "
+            "condition. It is spent once, before the first time step, and has no bearing on "
             "the time steps; an initial condition that does not close within it "
             "leaves converged = False on the result.")
 
@@ -2100,8 +2100,8 @@ class SensitivityDialog(QDialog):
         """
         if self.app_mode == "seep":
             return ("A factor-of-safety curve needs a stability engine. Switch the "
-                    "mode strip to LEM or FEM — the seepage solution is this run's "
-                    "input, not its output.")
+                    "mode strip to LEM or FEM — the seepage solution is an input "
+                    "to this run.")
         if not self._times:
             return "Run a transient seepage analysis first."
         uses_seep = any(str(m.get("u", "")).strip().lower() == "seep"
@@ -2261,7 +2261,7 @@ class SensitivityDialog(QDialog):
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
                 item.setToolTip(f"Stage 1 of every drawdown is read at "
                                 f"t = {_fmt_time(stage_1)}{unit}; this frame is "
-                                f"the state the others fall from, not a "
+                                f"the state the others fall from. It is not a "
                                 f"drawdown of its own.")
             else:
                 item.setFlags(item.flags() | Qt.ItemIsEnabled)

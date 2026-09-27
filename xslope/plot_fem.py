@@ -3012,7 +3012,7 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None):
     handles, labels = [], []
     if intact:
         handles.append(Line2D([0], [0], color=_JOINT_INTACT_COLOR, lw=lw_intact))
-        labels.append("closed, not slipping")
+        labels.append("closed, no slip")
     if slid:
         handles.append(Line2D([0], [0], color=cmap(0.7), lw=lw_slip))
         labels.append("slipping (color = slip)")

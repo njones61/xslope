@@ -158,7 +158,7 @@ on run argv
         end if
         set fieldCount to my updateFieldsOf(theDoc)
         -- A section need not have a header or a footer of every kind, and asking
-        -- for one it has not got is an error, not an empty answer.
+        -- for one it has not got raises an error.
         try
             repeat with aSection in (get sections of theDoc)
                 repeat with anIndex in {header footer primary, header footer first page, header footer even pages}

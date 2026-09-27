@@ -7129,7 +7129,7 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     # than one: a model documented on the steady states alone has no other basis
     # for the sentence to distinguish it from.
     basis = ("This is a steady state: the field was solved with the boundary "
-             "conditions held where this set puts them, not stepped through time. "
+             "conditions held where this set puts them. "
              if basis_named else "")
     if unconfined is None:
         text = basis + SEEP_BC_UNRECORDED
@@ -9200,8 +9200,8 @@ SSRM_CATASTROPHE = (
     "that displacement jumps hardest, and that interval is halved until it is "
     "{narrower}. The factor of safety is the midpoint of that final "
     "interval{bracket}. What locates it is the jump in displacement across the "
-    "interval, not a trial that failed to reach equilibrium: both ends of the "
-    "interval may have reached one.")
+    "interval. It is not located by a trial that failed to reach equilibrium: both "
+    "ends of the interval may have reached one.")
 
 #: The opening of the procedure paragraph: the method named in full and defined,
 #: which is true of every criterion. A reader who has not met the method before

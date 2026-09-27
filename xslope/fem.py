@@ -9846,7 +9846,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         _gr = 'n/a' if u_growth is None else f"{u_growth:+.3f}"
         print(f"  Displacement evidence: {_ur}, trailing growth {_gr} "
               f"-> verdict {verdict}"
-              + ("  [HYBRID: treated as STABLE, not a failure]"
+              + ("  [HYBRID: treated as STABLE]"
                  if stable else ""))
 
     # Copy grouped viscoplastic strains back into the per-element list used by

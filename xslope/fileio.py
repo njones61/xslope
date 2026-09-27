@@ -1967,8 +1967,8 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     if polygons_from_sheet:
         if profile_lines:
             raise ValueError(
-                "Both the 'profile' and 'polygon' sheets contain data. Use one "
-                "geometry method, not both.")
+                "Both the 'profile' and 'polygon' sheets contain data. Use only one "
+                "geometry method.")
         _validate_polygons_no_overlap(polygons_from_sheet)
         polygons = polygons_from_sheet
         # max_depth shapes nothing here — the polygons define the domain floor, and

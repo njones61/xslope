@@ -1875,7 +1875,7 @@ def _force_closure_root(residual, Z, N, det, poles, slice_df):
         max_Z = float(np.abs(Z).max())
         frac_neg = float(np.mean(N < 0)) if len(N) else 0.0
         if not np.isfinite(res_r):
-            rejected.append((r, "the march does not close here"))
+            rejected.append((r, "the slice-by-slice solution does not close here"))
         elif min_det < FE_MIN_BASE_FACTOR:
             rejected.append((r, f"base factor {min_det:.3f}"))
         elif max_Z > FE_MAX_Z_OVER_W * load_sum:

@@ -51,7 +51,7 @@ transfer.
 
 ![Seepage, limit equilibrium and finite element strength reduction of one earth dam, all from one XSLOPE input file](images/landing_three_modes.png){width="1200"}
 
-The Johnson Reservoir dam, analysed three ways from one input file. Every panel
+The Johnson Reservoir dam, analyzed three ways from one input file. Every panel
 is drawn by the same plotting functions the package ships, and every number on it
 is computed by the run that produced the figure —
 [see the worked example](seep/seep_slope.md).

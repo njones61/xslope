@@ -375,7 +375,7 @@ its factor of safety is reported.
 
 **A remedy declines rather than half-applying.** Every proposal carries
 `available` together with a `reason`, so an interface dims the button and explains
-why instead of failing when it is pressed — the same behaviour as `capabilities()`,
+why instead of failing when it is pressed — the same behavior as `capabilities()`,
 and `remedy_capabilities()` returns the same shape. The declines are as informative
 as the offers: a piezometric line whose x values rise and then fall is not a
 reversed line, so the reversal remedy refuses it rather than sorting it into a
@@ -584,7 +584,7 @@ else:
 ```
 
 **Which layer is the weak one** is decided by ranking every material zone on the
-shear strength it can mobilise *at the stress it actually carries*:
+shear strength it can mobilize *at the stress it actually carries*:
 
 ```
 tau = c + sigma'_n · tan(phi)
@@ -595,13 +595,13 @@ is the only quantity comparable between materials. Neither cohesion nor friction
 angle is: a `c = 0, φ = 35°` sand outranks a `c = 50 kPa, φ = 0` clay on cohesion and
 loses on friction, and neither answer means anything. It also spans every strength
 option on the `mat` sheet, because each reduces to a strength at a normal stress —
-undrained `cp` is already one, a Hoek-Brown rock mass is linearised at that stress by
+undrained `cp` is already one, a Hoek-Brown rock mass is linearized at that stress by
 `hoekbrown.hb_tangent`, and a power envelope is evaluated on it. An `elastic`
 material cannot fail, so it is not a candidate.
 
 **When one zone is clearly the weakest** — its strength at or below 0.60 of the next
 weakest — the generator seeds on it and states the choice and the reason:
-*"seeding on 'Weak Layer' — mobilisable strength 22.3 against 67.1 for the next
+*"seeding on 'Weak Layer' — mobilizable strength 22.3 against 67.1 for the next
 weakest ('Soil 1')"*. **When two are comparable it returns the ranked candidates
 instead of guessing**, and the caller asks. That is not a shortfall of the ranking;
 it is a property of the sections. Guo & Griffiths' embankment-over-foundation pair

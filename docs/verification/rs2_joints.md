@@ -129,7 +129,7 @@ joint model whose output is a stress-displacement curve.
 ### 🟢 RJ-1a: Goodman & Bray block toppling, case a (rj001a) {#rj-1a}
 
 Goodman & Bray's own toppling example, and the section all four of problem 1's cases share: sixteen
-rock columns 10 m wide and 4 to 40 m tall standing on a base that steps up one metre per column at
+rock columns 10 m wide and 4 to 40 m tall standing on a base that steps up one meter per column at
 30°, their sides at 120° — normal to that base — and their tops cut off by a 56.6° face above column
 ten. The toe is at (−0.5, 0.866) and the crest at (130.564, 93.856), inside the 261 × 140 m
 rectangle the vendor cuts, with everything above the columns deleted. The rock is elastic
@@ -138,7 +138,7 @@ every mechanism the model has is a joint one — which is the idealization the c
 
 The joints are not a list. They are the **shared edges** of the seventeen polygons the vendor's
 sixteen column outlines and the rock beneath them make: 31 contacts over 460.0 m, merged into 31
-straight lines, so a pair of columns that touches over three metres gets a three-metre joint rather
+straight lines, so a pair of columns that touches over three meters gets a three-meter joint rather
 than a full-height one. Fifteen of those contacts **end on** another, because a stepped base begins
 each column's basal contact partway along its downslope neighbour's side joint; see
 [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint). They carry no cohesion, φ = 38.15° — the angle
@@ -215,7 +215,7 @@ The mesh does not move this row. At the block width of 10 m and at the 5.0 m of 
 returns the same factor, and at 5.0 m every trial settles within the budget, the longest of them in
 177,381 sweeps of the 250,000 allowed. Case a's one-step move with refinement is not
 available here, for the reason the toe force gives: on this case the factor sits where a few hundred
-kilonewtons per metre of extra capacity is worth under two points of factor of safety, and the
+kilonewtons per meter of extra capacity is worth under two points of factor of safety, and the
 interface change refinement makes is smaller than that.
 
 Every input class matches the vendor model: the rock's
@@ -547,7 +547,7 @@ limit equilibrium here is. The distinct-element run is what the manual verifies 
 
 ### 🟢 RJ-10: Alejano et al. bilinear slab failure, example 1b (rj010) {#rj-10}
 
-Example 1a with the release joint moved five metres up the face, which the manual says is the whole
+Example 1a with the release joint moved five meters up the face, which the manual says is the whole
 difference between the two problems. The section, the bedding and both friction angles are
 [problem 9](#rj-9)'s: a 50 m slope at 50° cut by bedding dipping out of the face at −50° at 3 m
 spacing at φ = 30°, release at φ = 40°, and the same elastic rigid-block stand-in for the rock at
@@ -555,7 +555,7 @@ E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3.
 
 Moving the release upslope leaves the toe undercut where it was and cuts a second block out of the
 face above it: the trace that ran from the face to the toe in example 1a stays, and a new one leaves
-the face at (−9.977, 11.890) five metres higher. Both end on the bedding plane they are released by;
+the face at (−9.977, 11.890) five meters higher. Both end on the bedding plane they are released by;
 see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | LE (Alejano) | RS2 without / with improvement |
@@ -615,7 +615,7 @@ both directions.
 
 **Input file:** [rj011.xlsx](files/rocscience/joints/rj011.xlsx).
 
-![RJ-11: Alejano et al. plowing sliding slab failure (rj011) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. One bedding plane from the crest to the toe carries almost all of the slip, and at its foot the two release traces cut out a small wedge: the deformed section shows that wedge lifted and rotated out over the bench while the slab above it slides down the plane, which is the plowing mechanism the paper names. The wedge is driven out and up by the slab above it, and at the panel's exaggeration a movement of centimetres draws as metres, so the block appears to leave the slope](images/RJ-11.png)
+![RJ-11: Alejano et al. plowing sliding slab failure (rj011) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. One bedding plane from the crest to the toe carries almost all of the slip, and at its foot the two release traces cut out a small wedge: the deformed section shows that wedge lifted and rotated out over the bench while the slab above it slides down the plane, which is the plowing mechanism the paper names. The wedge is driven out and up by the slab above it, and at the panel's exaggeration a movement of centimetres draws as meters, so the block appears to leave the slope](images/RJ-11.png)
 
 ### 🟡 RJ-12: Alejano et al. plowing toppling slab failure (rj012) {#rj-12}
 

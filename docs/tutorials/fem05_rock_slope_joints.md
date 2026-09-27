@@ -92,7 +92,7 @@ worked out on paper and compared against the run's, which
 
 Download
 [xslope_rock_joints_start.xlsx](files/xslope_rock_joints_start.xlsx) and open it
-with **File → Open…**. Its units are metric, so lengths read in metres, unit
+with **File → Open…**. Its units are metric, so lengths read in meters, unit
 weights in kN/m³, and strengths and stiffnesses in kPa.
 
 ![The starter file: the section as one polygon of rock, with nothing on the joints worksheet](images/fem05_inputs_start.png){width=900}
@@ -217,7 +217,7 @@ the same three every finite element tutorial reads. On this model they come down
 to two pictures. The rock is elastic, so no part of it can strain plastically
 and there is no strain field to draw; everything that happened, happened on the
 two lines, and **Shear strain** draws as **Joint slip** instead: the section a
-flat gray, and the only colorbar the slip on the joints, in metres.
+flat gray, and the only colorbar the slip on the joints, in meters.
 
 ![The joint slip at the critical factor: the bedding plane bright along nearly its whole length, the release joint drawn as two parted lines where it has opened](images/fem05_joint_slip.png){width=900}
 

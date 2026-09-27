@@ -211,7 +211,7 @@ One background size field decides the element size everywhere, for both element
 families and whether or not anything is being refined: the requested size in the far
 field, and a graded band around each refined feature. Nothing else sets a size — the
 geometry's own vertices and edges carry no element count, so no polygon edge can be
-discretised coarser than what was asked for. Delivered node spacing along the geometry
+discretized coarser than what was asked for. Delivered node spacing along the geometry
 runs 0.75 to 1.00 times the requested size across the sample and verification sections;
 the shortfall is gmsh rounding a curve up to a whole number of divisions, which can only
 make an edge finer.
@@ -277,7 +277,7 @@ The classes are:
 - **Reinforcement and pile lines** — the embedded 1D lines get a distance-based band,
   finest along the polyline and coarsening away from it.
 - **Crack and notch tips** — the deepest vertex of a slit, where the material wraps
-  almost all the way around the point, such as the notch a sheet-pile wall is modelled
+  almost all the way around the point, such as the notch a sheet-pile wall is modeled
   with. Tips are refined twice as strongly, to resolve the singularity that governs
   convergence there. A sharp *convex* corner is not a tip and is not refined: a layer
   tapering to a point across the section, or an embankment toe, has the same edge

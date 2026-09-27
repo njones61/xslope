@@ -398,7 +398,7 @@ A piezometric line assigns pore pressure only over its own horizontal extent, ex
 [LEM](../lem/overview.md#pore-pressures); nothing is extrapolated past either end. Because the FEM
 samples the line at every node and Gauss point, the whole mesh must lie within that extent — a point
 outside stops the build with an error naming the point, its x-coordinate and the line's extent. A
-line that deliberately stops short (a reservoir on one side of a dam only) is modelled by carrying
+line that deliberately stops short (a reservoir on one side of a dam only) is modeled by carrying
 it on at an elevation below the mesh, which states that the ground beyond is dry. Selecting
 `u = piezo` when the file defines no piezometric line is refused on the same grounds: a model with
 no water is `u = none`.

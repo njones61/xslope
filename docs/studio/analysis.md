@@ -42,7 +42,7 @@ Findings come in three severities, and they behave differently:
   are collapsed behind a *n notes* line, available without being in the way.
 
 Here the circles sheet is empty, so there is no surface to analyse — an error, and
-**Run** is greyed out until it is resolved:
+**Run** is grayed out until it is resolved:
 
 ![Run LEM with an error and a remedy button](images/analysis_run_lem_preflight.png)
 
@@ -242,9 +242,9 @@ t = 0 at full pool), stage 2 is that instant's drawn-down state, and stage 3 re-
 same section with drained strengths. The reported value is the drawdown's own — the lower of
 stages 2 and 3 — so the curve answers *how safe is this slope if the pool falls to where it
 stands at t*, instant by instant. The box is available only on a model whose materials carry
-the drawdown strengths `d` and ψ; without them it is greyed and says so, because all three
+the drawdown strengths `d` and ψ; without them it is grayed and says so, because all three
 stages would read the same strengths. A drawdown point is always searched from the starting
-circle, so **Re-search** is held on and greyed while the box is ticked.
+circle, so **Re-search** is held on and grayed while the box is ticked.
 
 The mode is available in **LEM** and **FEM** mode on a model that carries a transient
 seepage solution and at least one material reading `u = seep`. Without one of those it is
@@ -267,7 +267,7 @@ sweep stops and the app is left consistent, with no partial result stored.
 
 **Sensitivity** opens a **Sensitivity** tab with the selected plot. For the default
 **tornado** — one horizontal bar per parameter, widest on top, with the base-case FS drawn as
-a labelled vertical reference line:
+a labeled vertical reference line:
 
 ![Sensitivity tornado](images/analysis_sensitivity_tornado.png)
 
@@ -680,10 +680,10 @@ trial, which has no bracket to reduce anything over.
 When the seismic coefficient is nonzero the checks also carry a note about what its
 **sign** means here, because it does not mean the same thing in both engines. The
 finite-element engine reads `main!D13` as a vector: `+k` pushes in `+x` and `−k` in
-`−x`, and since both faces of an embankment are analysed at once, choosing the
-direction is a modelling decision the engine will not make for you — a pseudo-static
+`−x`, and since both faces of an embankment are analyzed at once, choosing the
+direction is a modeling decision the engine will not make for you — a pseudo-static
 factor of safety can legitimately come out *above* the static one for the face the
-shaking stabilises. The limit-equilibrium engine reads the same cell as a magnitude
+shaking stabilizes. The limit-equilibrium engine reads the same cell as a magnitude
 and orients it itself, and its own dialog says so.
 
 **Side BC** chooses what holds the left and right edges of the model. **Rollers** —

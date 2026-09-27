@@ -137,7 +137,7 @@ default — is a soil zone. The three `ssr` types are
 strength-reduction run and are never meshed or sliced. `refine` is neither: it is a
 pure meshing region that carries no material and no analysis meaning, so a `refine`
 polygon must have a Size, and the dialog will not close until it does. Choosing any
-Type other than `material` greys out **Mat ID** and the material name, because an
+Type other than `material` grays out **Mat ID** and the material name, because an
 overlay is not a soil zone and has no material:
 
 ![Polygons editor on a refine region](images/editing_polygon_dialog_refine.png)
@@ -187,7 +187,7 @@ slopes fail along a weak layer rather than along their own geometry, and no circ
 passes through that mechanism — the surface runs flat inside the seam and turns up
 sharply at each end — so a model with a weak seam needs a surface a circular search
 cannot produce. The button builds one: it ranks the material zones by the shear
-strength each can mobilise at the stress it actually carries, lays a track just above
+strength each can mobilize at the stress it actually carries, lays a track just above
 the base of the weakest, and ramps up to the ground surface at both ends. It puts a
 vertex only where one earns its place — where the track bends, or where the search
 could move it — so a flat seam comes out as the two ends of its track rather than a
@@ -198,7 +198,7 @@ there are points already, it asks first. Either way the generated points land in
 table, so you can edit them and Cancel still discards them.
 
 When no zone is clearly the weakest, a **Choose the weak zone** dialog lists every
-zone with its material colour, its strength model and its computed strength, and the
+zone with its material color, its strength model and its computed strength, and the
 surface is built for the one you pick. The same list is how you override a choice you
 disagree with, so there is one thing to learn either way. On a model that has nothing
 to track — a single material zone, or no zones at all — the button is dimmed and its

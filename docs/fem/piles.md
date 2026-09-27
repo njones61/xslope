@@ -20,7 +20,7 @@ For background on the general finite element slope stability methodology in XSLO
 ## Applicability: Continuous Walls and Discrete Pile Rows
 
 A two-dimensional beam element is a plane-strain member. It is continuous out of plane, and its $EA$ and
-$EI$ are stiffnesses per metre of wall. That is an exact description of one kind of structure and an
+$EI$ are stiffnesses per meter of wall. That is an exact description of one kind of structure and an
 idealization of another, and the difference decides which of XSLOPE's two paths a problem belongs on.
 
 **Continuous walls** — sheet pile walls, diaphragm walls, secant pile walls — *are* continuous out of
@@ -44,12 +44,12 @@ finite element path is verified on, at both levels:
 
 **Discrete pile rows** are not continuous out of plane. Soil arches onto the piles and, at wide enough
 spacing, moves between them, so the load a pile attracts is set by a three-dimensional mechanism. Dividing
-$EA$ and $EI$ by the spacing (see [Assembly](#assembly)) smears one pile's stiffness over a metre of wall.
+$EA$ and $EI$ by the spacing (see [Assembly](#assembly)) smears one pile's stiffness over a meter of wall.
 That reproduces the row's average stiffness; it does not reproduce the arching, and shared-node coupling
 does not reproduce the slip that develops on each pile's surface (see
 [Pile-Soil Interface and Load Transfer](#pile-soil-interface-and-load-transfer)).
 
-The size of that idealization is measured rather than asserted. Cai & Ugai (2000) analysed one
+The size of that idealization is measured rather than asserted. Cai & Ugai (2000) analyzed one
 pile-stabilized slope with a three-dimensional strength reduction finite element model that meshes the
 individual piles with slip interfaces, and XSLOPE's SSRM is run on the same slope at a spacing of three
 diameters in [the VP106 diagnostic](../verification/rocscience.md#vp106-fem). With no pile the two agree to

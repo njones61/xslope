@@ -1691,7 +1691,7 @@ def _seep02_editor_labels():
     if SEEP02_MESH_QUAD_GROUP not in {g.title()
                                       for g in mesh2.findChildren(QGroupBox)}:
         fails.append(f"Build Mesh has no {SEEP02_MESH_QUAD_GROUP!r} group; "
-                     f"Tutorial SEEP-2 tells the reader why it is greyed out at a "
+                     f"Tutorial SEEP-2 tells the reader why it is grayed out at a "
                      f"triangular element type")
     mesh2.deleteLater()
 

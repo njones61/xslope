@@ -81,7 +81,7 @@ at a few of its saved states — four by default. The first and the last are two
 of them; the rest are weighted onto the interval the reservoir level falls over,
 so a drawdown report shows the drawdown happening rather than its two ends, and
 a run no level falls in is spaced evenly through the states it saved. Each
-state is drawn for the same four fields, on one colour scale across every state
+state is drawn for the same four fields, on one color scale across every state
 so the run can be read down the page. A history figure closes the
 section: the level the reservoir boundary is held at, the phreatic elevation and
 the top of the seepage face above it, and the boundary inflow and outflow below.
@@ -298,7 +298,7 @@ from a bundle the caller solved.
 The contents page is a real Word `TOC` field, and page numbers only exist once a
 page layout engine has laid the document out. Rather than guess them, the
 written document is handed to a program that lays pages out. Either way it is a
-labelled stretch of the progress bar, and either way the field stays live: F9 in
+labeled stretch of the progress bar, and either way the field stays live: F9 in
 Word still rebuilds the whole table.
 
 **Word**, where the machine has it, does its own job. On macOS it is driven over

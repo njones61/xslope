@@ -350,7 +350,7 @@ distributed load like any other, but it is not one you need to enter. The main s
 the engine derives the ponded-water load at solve time from the model's own statement of
 where the water stands: the seepage boundary conditions wherever a seepage analysis is
 defined, otherwise the piezometric line. The dloads sheets then carry non-water loads
-only, and the derived load is drawn on every plot in its own colour so a load nobody
+only, and the derived load is drawn on every plot in its own color so a load nobody
 typed is more visible rather than less. On `manual` — what every file written before
 template version 22 means, so that no existing model changes — the water load is whatever
 is on the dloads sheets, exactly as before. See
@@ -358,7 +358,7 @@ is on the dloads sheets, exactly as before. See
 
 The derivation is unconditional in the water it applies: a piezometric line above the
 ground surface loads the slope whatever the materials' pore-pressure option says. `mat!u`
-decides only who *samples* that water as pore pressure. A submerged slope analysed in
+decides only who *samples* that water as pore pressure. A submerged slope analyzed in
 total stress — every material undrained, `u = none` — therefore carries the reservoir's
 weight with zero pore pressure, which is what a total-stress analysis means.
 

@@ -2021,7 +2021,7 @@ which sets that row's dot — one count in the last place is worth 3.0%.
 The Budapest (Rózsadomb) landslide, after
 
 > [Görög, P. & Török, Á. (2007)](https://doi.org/10.5194/nhess-7-417-2007). *Slope stability assessment of weathered clay by using
-> field data and computer modelling: a case study from Budapest.* Natural Hazards 45
+> field data and computer modeling: a case study from Budapest.* Natural Hazards 45
 > (as presented in the RS2 Slope Stability Verification Manual, Part III, Problem 59,
 > "Stability of a Three-Layered Soil Slope", pp. 200–201).
 

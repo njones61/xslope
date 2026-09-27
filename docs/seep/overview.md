@@ -144,7 +144,7 @@ reference dataset, the same source HYDRUS and most unsaturated-flow codes use:
 
 !!! note "Units of α"
     These α values are in **1/cm**, the units Carsel & Parrish tabulate. XSLOPE is
-    unit-agnostic, so convert to the model's length unit: for **metres** multiply by 100, for
+    unit-agnostic, so convert to the model's length unit: for **meters** multiply by 100, for
     **feet** by 30.48. $n$ is dimensionless. Larger α and $n$ mean a coarser, more freely
     draining soil; small α with $n \to 1$ means a fine, slowly draining one.
 
@@ -223,7 +223,7 @@ the exit face; the crest flux is added here so all three appear together.*
 A specified-head boundary prescribes $h = h_0$ along a polyline. Its nodes are eliminated from
 the system rather than solved for. Two **types** are available per block:
 
-| Type | Behaviour |
+| Type | Behavior |
 |------|-----------|
 | `head` | A plain Dirichlet: every node of the polyline is held at the value at all times. It can hold a negative-pressure (suction) head and never converts to an exit face |
 | `reservoir` | A **submerged-only** Dirichlet: a node is held at the level only while it is submerged (elevation at or below the level). A node the water line leaves above it becomes an **exit face** node, free to seep |

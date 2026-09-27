@@ -62,7 +62,7 @@ unmodified model included as a flagged `is_base` row:
 | `Xo`, `Yo`, `R` | the critical circle per point (searched sweeps), so a jump of the critical surface is visible in the data — `plot_sensitivity` draws jumped points open |
 
 `plot_sensitivity` draws one line per method with FS = 1 (and an optional `target_fs`) as
-guide lines, marks the unmodified model as a labelled **base case** entry in the legend — so
+guide lines, marks the unmodified model as a labeled **base case** entry in the legend — so
 the black square in the plot reads as `base case (value, FS = …)` rather than an unexplained
 point — and draws any point where the critical surface jumped as an open circle.
 
@@ -122,7 +122,7 @@ A sweep validates in two stages.
 
 **Once, before the first point,** the base model goes through the full
 [preflight input check](../usage/preflight.md) for whichever engine the sweep will run.
-A model that cannot be analysed at all is refused there, with the field named — rather
+A model that cannot be analyzed at all is refused there, with the field named — rather
 than failing identically at every one of nine points.
 
 **Then, per point,** the substituted value is re-checked against only the rules that read
@@ -306,7 +306,7 @@ plot_tornado(result)
 For the shipped ACADS sample (a weak c–φ soil), the tornado ranks φ far ahead of c and
 γ — the ±25% φ band alone swings FS from 0.77 to 1.21 across FS = 1.
 
-`plot_tornado` draws the base-case FS as a labelled vertical reference line and stacks the
+`plot_tornado` draws the base-case FS as a labeled vertical reference line and stacks the
 bars widest-on-top by default — the classic Duncan ordering that gives the diagram its name.
 Pass `widest_on_top=False` to invert the stack (widest at the bottom); the parameter is kept
 for programmatic callers, and Studio deliberately exposes no toggle for it.

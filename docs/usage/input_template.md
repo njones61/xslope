@@ -204,7 +204,7 @@ $S_u/\sigma'_v$ (c/p) ratio but is referenced to elevation rather than depth, gi
 slope-stability problems. The rate is normally **positive** — undrained strength increasing with depth, the
 familiar c/p behavior. A negative rate is accepted for one special case: a stronger consolidated crust over
 softer clay, as in the Borges & Cardoso embankment ([VP30](../verification/rocscience.md#vp30)), where the top
-metre of the foundation gained strength under construction loading and the profile decreases into the layer
+meter of the foundation gained strength under construction loading and the profile decreases into the layer
 beneath.
 
 For the **pow** strength option, the shear strength is a curved envelope in terms of the effective normal stress
@@ -1124,7 +1124,7 @@ to the ground surface, where the water table position is a result of the analysi
 cannot be entered as a head. Two points to be careful about:
 
 - The flux is a flow per unit *area* of boundary, not a total discharge spread over the
-  boundary — a rate of 1×10⁻⁶ m/s applied along a 40 m surface admits 4×10⁻⁵ m³/s per metre of
+  boundary — a rate of 1×10⁻⁶ m/s applied along a 40 m surface admits 4×10⁻⁵ m³/s per meter of
   slope, not 1×10⁻⁶.
 - The sign matters and is easy to get backwards. **Positive is inflow** (infiltration,
   recharge). A negative value withdraws water.

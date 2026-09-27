@@ -5695,7 +5695,7 @@ class WeakZoneDialog(QDialog):
     clearly the weakest the generator has nothing to pre-select and this is how the
     question gets asked; when one *is*, this is how the user overrides it. The list
     is identical either way — every zone with its material colour, its computed
-    mobilisable strength and its extent — so there is one thing to learn and one
+    mobilizable strength and its extent — so there is one thing to learn and one
     thing to build. Only the pre-selection and the wording above the list differ.
     """
 
@@ -5712,7 +5712,7 @@ class WeakZoneDialog(QDialog):
 
         self.table = QTableWidget(len(zones), 4, self)
         self.table.setHorizontalHeaderLabels(
-            ["Zone", "Strength model", "Mobilisable strength", "Extent"])
+            ["Zone", "Strength model", "Mobilizable strength", "Extent"])
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)

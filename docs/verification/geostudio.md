@@ -670,7 +670,7 @@ SLOPE/W's own solved endpoint (25.98, 15.0) exactly.
 | Morgenstern-Price | 1.049 | 1.049 (0.0%) | — |
 
 All XSLOPE methods agree to four decimals on this surface and Janbu's f₀ correction is
-exactly 1.00, as they must for a single straight plane — the same behaviour the manual's
+exactly 1.00, as they must for a single straight plane — the same behavior the manual's
 FS-vs-λ figure shows for SLOPE/W. Total sliding weight matches SLOPE/W's to 0.004%.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.33; Priest (1993).
@@ -905,7 +905,7 @@ Eurocode 7*.
 ### 🟢 2.46 — Eurocode 7: Earth Dam {#gs-2-46}
 
 A homogeneous clay dam (characteristic c′ = 12, φ′ = 20°, γ = 19.2) with an upstream
-reservoir at 5.1 m total head, analysed as coupled steady-state seepage + slope
+reservoir at 5.1 m total head, analyzed as coupled steady-state seepage + slope
 stability under Eurocode 7 Design Approach 1, Combination 2 (after *Smith's Elements of
 Soil Mechanics*, ex. 5.12). Pore pressures come from an XSLOPE finite-element seepage
 solve (u = 'seep' with mesh/solution sidecars); the DA1-C2 material factors (set
@@ -1319,7 +1319,7 @@ rather than a per-station source value. Both unit-gradient plateaus land on SEEP
 low-rate initial profile agrees to 0.003 m of head at every station and the high-rate end
 state's deep column to 0.001 m. What stands off is the descending wetting front and the
 boundary layer above the drained base, where the column reads up to 0.12 m drier across the
-front at the middle frame and 0.18 m in the bottom metre at the end frame — the storage
+front at the middle frame and 0.18 m in the bottom meter at the end frame — the storage
 side of the same (α, n), which the conductivity fit does not reach. The figure shows the
 XSLOPE markers on the SEEP/W profiles away from the front. The locks are XSLOPE's own
 solved total heads at interior elevations at the two frames, at a 0.03 m regression
@@ -1449,7 +1449,7 @@ pinned, both sides on rollers. Three zones, all γ = 20 kN/m³ and ν′ = 0.4:
 | OC Soil | −4 → 5 | 500,000 | — | — | isotropic elastic — it carries no strength because it cannot fail |
 
 The wall runs from (38, 10) to (38, 1): E = 200 GPa, A = 0.02 m²/m, I = 0.0005 m⁴/m. It is **continuous**
-out of plane — a plane-strain beam's EA and EI are already per metre of wall — so XSLOPE's spacing column is
+out of plane — a plane-strain beam's EA and EI are already per meter of wall — so XSLOPE's spacing column is
 1 and the section constants transcribe unchanged. The tensile strength of 0 kPa on both Mohr-Coulomb zones is
 the example's own printed material property, and it is load-bearing: without it a c′–φ′ soil carries tension
 to the Mohr-Coulomb apex, 34.6 kPa in the sandy clay.

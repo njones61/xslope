@@ -34,7 +34,7 @@ taken at non-convergence of a displacement test, and they are printed to limited
 Examples 1 and 2 on a 0.05 trial grid, the Fig. 7 sweep "to the nearest 0.05" (p. 394),
 Example 6 to 0.1. Deltas are stated against the printed value as printed; where a classical
 chart solution is also quoted (Taylor, Morgenstern, Bishop & Morgenstern, Cousins) it is
-labelled as such and kept as context, never as the basis of the dot. A source's single
+labeled as such and kept as context, never as the basis of the dot. A source's single
 headline factor of safety is its published answer and takes a delta whatever engine
 produced it — carrying a delta is a separate question from governing the dot; where the
 same source prints a per-method table, each value is read like any
@@ -191,7 +191,7 @@ $\nu' = 0.3$. As everywhere in the SSRM the factor of safety is independent of t
 The dimensionless strength is again $c'/\gamma H = 0.05$ with $\phi' = 20°$. The domain uses
 the printed dimensions of Fig. 1 — a $1.2\,H$ (60 ft) crest platform, the 2:1 face, and a
 $2\,H$ (100 ft) runout past the toe — with the $H/2$ foundation from the Example 2 text
-($D = 1.5$). (Example 1 as modelled here omits the runout because with the base at toe
+($D = 1.5$). (Example 1 as modeled here omits the runout because with the base at toe
 level a mechanism cannot reach it; with a foundation beneath the toe the runout gives any
 deeper surface room to form.)
 
@@ -273,7 +273,7 @@ This is Example 3 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999
 (their Fig. 6): an **undrained** ($\phi_u = 0$) clay slope on a foundation layer
 ($D = 2$) that contains a **thin layer of weaker clay**. The surrounding clay is held
 at $c_{u1}/\gamma H = 0.25$; the thin-layer strength $c_{u2}$ is varied, and the
-behaviour is governed by the ratio $c_{u2}/c_{u1}$. The weak layer runs parallel to the
+behavior is governed by the ratio $c_{u2}/c_{u1}$. The weak layer runs parallel to the
 slope face through the slope body, turns horizontal through the foundation, and outcrops
 at 45 degrees beyond the toe — Griffiths & Lane liken it to a thin weak liner in a
 landfill. The lesson of the example is that lowering $c_{u2}$ eventually switches the
@@ -491,7 +491,7 @@ This is Example 4 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999
 (their Fig. 9): an **undrained** ($\phi_u = 0$) clay slope resting on a foundation layer,
 with the two layers assigned different undrained strengths. The slope body carries a
 constant $c_{u1}/\gamma H = 0.25$; the foundation strength $c_{u2}$ is varied, and the
-behaviour is governed by the strength ratio $c_{u2}/c_{u1}$. The firm base sits at depth
+behavior is governed by the strength ratio $c_{u2}/c_{u1}$. The firm base sits at depth
 $D = 2$ (a full $2H$ below the crest); the foundation layer is $H$ thick, and the material
 boundary is the toe elevation, which is also the ground surface of the runout.
 
@@ -603,7 +603,7 @@ land on both.*
 
 This is Example 5 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
 (their Figs 12-15): the Example 1 homogeneous 2:1 slope with a **horizontal free
-surface** at a depth $L$ below the crest, analysed across a range of drawdown ratios
+surface** at a depth $L$ below the crest, analyzed across a range of drawdown ratios
 $L/H$. The problem is a **"slow" drawdown** — a reservoir standing against the slope
 face is lowered from above the crest ($L/H < 0$, slope fully submerged) to the toe
 ($L/H = 1$, drained), with the free surface inside the slope tracking the reservoir
@@ -612,7 +612,7 @@ benchmark exercises the pore-pressure and reservoir-load treatment across the wh
 drawdown range rather than at a single point.
 
 Every comparison value above is read from the paper's Fig. 15 — the plotted FE points
-station by station, plus the two labelled chart anchors — and corroborated by the paper's
+station by station, plus the two labeled chart anchors — and corroborated by the paper's
 stated minimum in the text. Every XSLOPE number is computed.
 
 | Property | Value |
@@ -722,7 +722,7 @@ slide over the loaded face:
 
 ### 🟢 Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam {#verification-griffiths6}
 
-An actual earth dam cross-section, analysed with the reservoir full and before filling.
+An actual earth dam cross-section, analyzed with the reservoir full and before filling.
 
 | Case | XSLOPE | Griffiths & Lane FE | Note |
 |---|---|---|---|
@@ -854,7 +854,7 @@ spacing — because XSLOPE smears a pile row as $EA/S$ and $EI/S$, so those four
 numbers reproduce his $EA$ and $EI$ exactly. A 1.0 m spacing is a continuous wall,
 which is what a 2D plate element is. Fig. 17 dimensions the plate 8.66 m from the
 crest and 8.66 m from the toe, so its head sits at mid-slope where the ground is
-at elevation 25.0. The plate's own weight — Table 4 gives $w$ = 0.6 kN/m per metre
+at elevation 25.0. The plate's own weight — Table 4 gives $w$ = 0.6 kN/m per meter
 of wall, so 4.5 kN/m over the 7.5 m plate — is not carried, because XSLOPE's beam
 elements are weightless.
 
@@ -914,7 +914,7 @@ Same-method limit-equilibrium pairing on his own published failure line:
 The limit-equilibrium pair is read on the Table 18 polyline itself — a fixed
 surface — while SLIDE's figures come from a search, and the critical surface in a
 1 m band of $c = 0.01$ kPa soil lies on the band's lower face rather than its
-centre. The two rows therefore differ by where the surface sits in the band as well
+center. The two rows therefore differ by where the surface sits in the band as well
 as by method.
 
 This is the benchmark problem from [Torggler (2016)](https://diglib.tugraz.at/download.php?id=5891c94c5ba8d&location=browse), §4.
@@ -949,7 +949,7 @@ is resolved independently of the global size; both locks are taken at a 1.0 m gl
 target.
 
 **The plate is heavily engaged, and the band still shears.** In PLAXIS the
-plate changes which mechanism controls: "Because the plate is modelled as elastic
+plate changes which mechanism controls: "Because the plate is modeled as elastic
 material a different failure mechanism as compared to the unsupported case is
 developed (failure in the weak layer is prevented by the plate)" (§4.2), and §4.3.1
 places the supported mechanisms "outside the weakness zone." In XSLOPE the weak

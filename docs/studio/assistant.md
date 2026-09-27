@@ -223,7 +223,7 @@ a dialog to pick the provider and model and store credentials:
 **Every model on offer can read an image.** Building a model from a photograph or a
 sketch of a cross section is one of the things the assistant is for, and a text-only
 model turns that request into a conversation about what the picture shows. So a
-provider whose API takes no images is not listed, and where a provider's catalogue is
+provider whose API takes no images is not listed, and where a provider's catalog is
 mixed — Z.ai's text GLMs beside its V models, a local library that is mostly text —
 the list is filtered to the part of it that can see, and the caption under the box
 says so. The model box still accepts free text, so a text-only id can be typed in if

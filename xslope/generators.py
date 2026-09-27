@@ -904,7 +904,7 @@ def _pore_pressure(slope_data, material, x, y, sigma_v):
 
 
 def _comparable_strength(slope_data, ground, material, x, y):
-    """Mobilisable shear strength of a material at a point, across every model.
+    """Mobilizable shear strength of a material at a point, across every model.
 
     This is the one quantity that makes zones rankable. Every strength option in
     the ``mat`` sheet reduces to a shear strength at the normal stress the zone

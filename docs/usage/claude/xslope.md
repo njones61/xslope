@@ -280,7 +280,7 @@ derivation so the user can go deeper than a chat reply. Real pages, all under
 | Studio, the desktop app | `studio/`, `studio/editing/`, `studio/analysis/` |
 
 **Implementation questions — "what does xslope's Janbu actually do?"** Where this skill states
-the behaviour, that is the answer (the method table and its notes, the preflight rules, the
+the behavior, that is the answer (the method table and its notes, the preflight rules, the
 water/reinforcement/pore-pressure conventions). Where it does not, do **not** reconstruct the
 formulation from a textbook and present it as xslope's — programs differ on exactly these
 details. Answer the general theory, name the docs page, and say the solver source is public
@@ -877,7 +877,7 @@ pass the limits as its `entry_range` / `exit_range` / `center_box` / `tangent_de
 `slope_data` dict, call `generate_noncircular_surface(slope_data)`, imported as
 `from xslope.search import generate_noncircular_surface` (`xslope.generators` holds
 it too; import the name, not the package attribute). It ranks the material zones by the shear
-strength each can mobilise *at the stress it actually carries* — the only quantity
+strength each can mobilize *at the stress it actually carries* — the only quantity
 comparable across `mc`, `cp`, `hb` and `pow` materials — tracks the base of the
 weakest, and ramps to the ground at both ends, with explicit Y and Movement on every
 point. It is validated against the corpus's weak-seam problems. Fall back to
@@ -1100,7 +1100,7 @@ slope_data['joint_lines'] = voronoi(slope_data, block_size=1.5, seed=7,
                                     props={'phi': 20.0, 'c': 500.0})
 ```
 
-Rows come out labelled `bed-01`, `bed-02`, … so a network keeps one name per set. A trace that
+Rows come out labeled `bed-01`, `bed-02`, … so a network keeps one name per set. A trace that
 would lie ALONG the region's boundary is DROPPED rather than emitted — the mesh split needs
 material on both sides of a joint and there is none outside the section — while a trace ENDING
 on the boundary is ordinary and is kept. An elevation BAND is the exception: its edges are lines
@@ -1260,7 +1260,7 @@ for c in caveats:
   moving its water between the two — that is how a reservoir gets counted twice or lost.
 - The GeoStudio path also goes outward: `export_gsz(slope_data, "out.gsz")`.
 
-Import, then load, plot, and run the input checks (next section) before analysing.
+Import, then load, plot, and run the input checks (next section) before analyzing.
 
 ---
 

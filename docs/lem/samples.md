@@ -677,10 +677,10 @@ Solution (governing rapid-drawdown surface and factor of safety):
 A published pile-stabilization benchmark, and the check that XSLOPE's built-in
 Ito & Matsui force reproduces the force the source designed with. The slope is
 homogeneous, 13.7 m high at 30°, with $c = 23.94$ kPa, $\phi = 10°$ and
-$\gamma = 19.63$ kN/m³, and is dry. One row of 1.0 m piles at 2.5 m centres is
+$\gamma = 19.63$ kN/m³, and is dry. One row of 1.0 m piles at 2.5 m centers is
 placed 13.7 m horizontally from the toe, and in a second case 23.1 m from the toe.
-The published clear-to-centre spacing ratio $D_2/D_1 = 0.6$ is reproduced exactly:
-a 1.0 m pile at 2.5 m centres leaves a 1.5 m clear opening, and $1.5/2.5 = 0.6$.
+The published clear-to-center spacing ratio $D_2/D_1 = 0.6$ is reproduced exactly:
+a 1.0 m pile at 2.5 m centers leaves a 1.5 m clear opening, and $1.5/2.5 = 0.6$.
 
 Inputs, with both pile stations drawn together:
 
@@ -731,7 +731,7 @@ The row raises the factor of safety by 68%.
 
 Bishop's method gives 1.289 against 1.64 (Hassiotis et al., −21%). The row sits
 0.6 m short of the crest, so every surface that reaches it crosses it within a few
-metres of the pile head, where the soil column above the surface — and with it the
+meters of the pile head, where the soil column above the surface — and with it the
 Ito & Matsui force — is small. Moving the entry limit 2 m further behind the crest
 moves this factor of safety to 1.48, so the number is a reading of where the search
 is allowed to start rather than a converged property of the slope.
@@ -739,7 +739,7 @@ is allowed to start rather than a converged property of the slope.
 #### Search limits
 
 Both pile files declare a search window on their circles sheet: the surface
-daylights within a few metres of the toe (exit 25–32 m), enters behind the crest
+daylights within a few meters of the toe (exit 25–32 m), enters behind the crest
 (entry 54–75 m) and keeps its lowest point above the pile tip. Without it the
 search returns a deep surface that passes *below* the pile tip and collects no pile
 force at all — 1.327 for the 13.7 m row, which is the unreinforced slope's

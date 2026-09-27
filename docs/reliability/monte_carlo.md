@@ -29,7 +29,7 @@ and whose **standard deviation is the matching σ(·) column** — σ(γ) for $\
 **normal**, the same interpretation the Taylor series places on those columns; a
 `distribution='lognormal'` option draws lognormal samples matched to the same mean
 and standard deviation. Every draw is truncated at its physical floor — a strength
-or unit weight cannot go negative — which is the one modelling assumption beyond the
+or unit weight cannot go negative — which is the one modeling assumption beyond the
 raw mean and sigma. That truncation is exactly the $\phi \ge 0$ bound that governs
 high-COV problems (see the VP34 worked example under
 [When to use Monte Carlo versus the Taylor series](index.md#when-to-use-monte-carlo-versus-the-taylor-series));
@@ -160,7 +160,7 @@ their realizations through one routine, so the distributions, the physical floor
 and the $\phi \le 89°$ cap are identical by construction.
 
 **The design.** A central composite design about the most-likely values — the $2^d$
-factorial corners at ±1σ, $2d$ axial points at ±2σ, and the centre, where $d$ is the
+factorial corners at ±1σ, $2d$ axial points at ±2σ, and the center, where $d$ is the
 number of parameters carrying a standard deviation. That is 9 real solves for two
 uncertain parameters, 15 for three, 25 for four. Each is solved with the full
 pipeline on the fixed surface. A design point that lands below a parameter's

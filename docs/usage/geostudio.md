@@ -57,7 +57,7 @@ choice is not cosmetic, which is why XSLOPE makes you make it rather than guessi
 | Mohr-Coulomb materials (c′, φ′) | `option='mc'` with c′, φ′ |
 | **Undrained materials** (φ = 0, strength entered as cohesion) | `option='mc'` with c = Su, φ = 0 |
 | **Bedrock** (impenetrable) | `option='elastic'` — an impenetrable material, see below |
-| Material colour | The zone colour in Studio |
+| Material color | The zone color in Studio |
 | Piezometric surface, and the materials assigned to use it | Piezo line, on the materials that use it |
 | **Water above the ground surface** | **A distributed load** — see below |
 | **A parent SEEP/W analysis's pore-pressure field** | The `seep` option, on SEEP/W's own mesh — see below |
@@ -98,7 +98,7 @@ strength credited.
 A piezometric surface's points belong to the **analysis that owns it**, not to the
 shared geometry table, and the import resolves them that way (export writes them back
 under the same convention). The distinction is silent but not small: resolved against
-the wrong list, a water table can double back on itself or land metres off and the model
+the wrong list, a water table can double back on itself or land meters off and the model
 still solves — at pore pressures several percent wrong in factor of safety.
 
 Ponded water needs no conversion at all, and that is the point. GeoStudio stores no
@@ -280,7 +280,7 @@ is rejected rather than approximated.
     This is the mirror image of the import, and of XSLOPE's own automatic mode. A model
     with **Water loads** on `auto` has no water block to leave out in the first place:
     its piezometric line goes across, and GeoStudio derives the reservoir from it just
-    as XSLOPE's engine does. A `manual` model's water block is recognised and skipped.
+    as XSLOPE's engine does. A `manual` model's water block is recognized and skipped.
 
 A `.gsz` still cannot carry everything XSLOPE models. An **elastic** material *is* written
 — as GeoStudio's impenetrable **Bedrock** — but failure surfaces, piles, other
@@ -347,7 +347,7 @@ both directions:
   matters, and the one that is easy to forget: the first check cannot catch an
   **omission**, and an omission is worse, because the file still opens and still looks
   right. A file missing its `ComputedPhysics` block, for instance, draws perfectly and
-  names and colours its materials correctly while leaving their strengths unreachable,
+  names and colors its materials correctly while leaving their strengths unreachable,
   saying nothing.
 
 Both directions are locked in the test suite, so a regression fails locally rather than in

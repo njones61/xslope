@@ -87,7 +87,7 @@ used across this section (**built**, *covered*, *partial*, *planned*, *blocked*,
 | [2](#gw2) | 🟢 | Flow around cylinder | Solved heads within 0.0013 m of Slide2 at every printed point · closed form matched within its own idealization error | |
 | [3](#gw3) | 🟢 | Confined flow under dam foundation | Head profiles under and beyond the dam within 0.08 m of the published Rushton & Redshaw / Slide2 chart everywhere | |
 | [4](#gw4) | 🔴 | Steady unconfined flow through earth dam | Phreatic surface within 0.02–0.06 m of the Kozeny basic parabola over the dam body · y₁ above the drain toe 0.401 vs RS2's own solve of this model 0.395 (+1.5%) · drain-face entry offset x₁ 0.272 vs 0.226 (**+20.4%**, and it sets the dot) | RS2's Table 4.1 publishes both quantities and governs; x₁ turns on an unsaturated curve the vendor file does not store |
-| [5](#gw5) | 🟢 | Unsaturated flow behind an embankment | Q = 8.165×10⁻¹¹ vs the one-dimensional closed form *k·b·i* = 8.0×10⁻¹¹ (+2.1%) · solved pressure head inside Fig 5-4's own 1 m colour bands at 46 of 49 grid points | **built**; chart-keyed target, locked on XSLOPE's own field |
+| [5](#gw5) | 🟢 | Unsaturated flow behind an embankment | Q = 8.165×10⁻¹¹ vs the one-dimensional closed form *k·b·i* = 8.0×10⁻¹¹ (+2.1%) · solved pressure head inside Fig 5-4's own 1 m color bands at 46 of 49 grid points | **built**; chart-keyed target, locked on XSLOPE's own field |
 | [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1, against Slide2: cases 2 and 5 within 0.10 m, cases 1 and 4 within 0.37 m, case 3 the outlier at 0.98 m near the crest, where Slide2 and Ref[1] themselves differ by 0.9 m | **built** (5 of 5 cases); chart-only target, locked on XSLOPE's own field; one conductivity curve serves all five |
 | [7](#gw7) | 🟢 | Seepage within layered slope | Total head along the manual's own query line within 0.005 m rms of RS2's Fig 22.7 steady markers over 21 stations (≈1% of the profile's head range) · water table at the toe el 0.30 vs the stated Slide2 / Rulon & Freeze 0.3 m · perched zone and slope-face spring reproduced | **built**; problem 7's own figures are chart-only, so the numeric target comes from the RS2 manual's Fig 22.7 steady frame |
 | [8](#gw8) | 🟢 | Flow through ditch-drained soils | Flux boundary exact — total inflow = *q*·*L*, the confined response matching the closed form to six figures · water table within 0.004–0.006 m of the Fig 8.3/8.4 line over the whole span · Fig 8.3's labeled pressure-head contours within 0.010 m rms over 14 stations | **built**; flux rate and Soil B's Gardner *a* taken from the vendor model where it disagrees with the printed tables |
@@ -311,7 +311,7 @@ boundary data are read from the vendor RS2 models (`groundwater #006_01…05.slw
 
 **The conductivity function.** Every case shares one unsaturated curve, published in the
 vendor models as a table: k_s = 10⁻⁷ m/s, air entry 1 m, then log-linear in suction at ⅓ decade
-per metre to ψ = 10 m and ⅕ decade per metre beyond. XSLOPE carries van Genuchten, Gardner and
+per meter to ψ = 10 m and ⅕ decade per meter beyond. XSLOPE carries van Genuchten, Gardner and
 linear-front laws rather than a table, so the curve is fit; a least-squares Mualem–van Genuchten
 fit over the 0–8 m of suction the five solved fields occupy holds the vendor table to
 **0.030 decades rms**.
@@ -382,7 +382,7 @@ takes, so the surface goes in as three blocks: q_n = 10⁻⁸ cos(arctan ½) = 8
 2:1 faces and the full 10⁻⁸ across the horizontal crest.
 
 Figure 6.18 is the one target on this problem printed as **markers rather than a curve** —
-Slide2 and Ref[1] at every metre of elevation — so it can be read to about 0.05 m, and all
+Slide2 and Ref[1] at every meter of elevation — so it can be read to about 0.05 m, and all
 thirteen stations are compared:
 
 | Elevation on line 1-1 | XSLOPE pressure head | Slide2 (Fig 6.18) | Ref[1] |
@@ -651,7 +651,7 @@ them carries the gap:
 | exit-face extent | adding the dry upstream face and the crest, and pinning the vendor's total head 0 at the toe (183, 0) | 17.90 m |
 
 There is no trend with refinement, and at the finest mesh even the next face node above the
-release point stays more than a metre below Slide2's, so the gap is not a nodal-resolution
+release point stays more than a meter below Slide2's, so the gap is not a nodal-resolution
 artifact. Two notes on reading the manual: its text gives the downstream slope as 1:1.171
 where the printed dimensions on Fig. 11.1 give 76.9/45 = 1.709, a digit transposition, and the
 figure's dimensions are used here; and $k_s$ is not printed for this case, which is why the
@@ -724,7 +724,7 @@ curve "Analytical". The Slide2 manual carries the same seven problems as its cha
 with its own markers on the same reference curves; where the two programs' markers differ the
 section says so.
 
-Those three are modelled as **saturated** columns and strips, with the excess pore pressure
+Those three are modeled as **saturated** columns and strips, with the excess pore pressure
 carried on an arbitrary datum offset — a constant baseline head $h_\text{ref}$ added to every
 node — so the pressure head stays positive everywhere and the storage is $S_s$ throughout. The
 offset cancels out of the excess head $h-h_\text{ref}$ and selects the solver's saturated
@@ -851,10 +851,10 @@ there against a steady 7.06 / 7.25 / 5.77 / 4.21, settling to within 0.01 m of s
 $\approx5\times10^{4}$ h; the two stations furthest from steady sit between the crest and the
 drain, where the drain paces the last of the drawdown. At 238 nodes this is one of the coarsest
 transient meshes in the corpus, and a triangulation change moves those station heads by a few
-tenths of a metre while leaving the shape of the field unchanged, which is why the locks are
+tenths of a meter while leaving the shape of the field unchanged, which is why the locks are
 XSLOPE's own values.
 
-*Reading Fig 19-4: its colour ramp runs the opposite way to Fig 19-5's on the same page, so
+*Reading Fig 19-4: its color ramp runs the opposite way to Fig 19-5's on the same page, so
 read with Fig 19-5's key it places the 15 h front at the wrong end of the dam.*
 
 ![gw017: steady total-head field vs Fig 19-5](images/gw017.png)
@@ -934,7 +934,7 @@ acts above the water table governs the drainage time-scale outright.
 
 **Input files:** [gw019.xlsx](files/rocscience_gw/gw019.xlsx)
 
-A lined lagoon leaking into a two-layer aquifer, modelled as a **half-model** about the lagoon
+A lined lagoon leaking into a two-layer aquifer, modeled as a **half-model** about the lagoon
 centerline: 19 m wide × 10 m deep, a 1 m **soil liner** across the top over 9 m of **soil**.
 A 2 m-wide lagoon is filled with 1 m of water at $t=0$ and leaks down through the liner.
 
@@ -1004,7 +1004,7 @@ $S_s=\gamma_w m_v$ below the phreatic surface, so one constant capacity carries 
 it does in the vendor model. The conductivity table is fitted beside it by the Gardner power
 law, and where that fit is placed decides which part of the curve is right: the table holds
 $k_r=1$ out to $\psi=0.30581$ m — an air-entry value — then drops three decades over the next
-metre, and a Gardner law has no air-entry parameter, so one pair cannot carry both the plateau
+meter, and a Gardner law has no air-entry parameter, so one pair cannot carry both the plateau
 and the drop. It is fitted over the suctions this model reaches. The initial field puts the
 pressure head at $0.3-y$ everywhere, so the largest suction in the mesh is 0.700 m, at the
 crest, and infiltration only wets it from there; $\psi=1.3252$ and 3.0581 m, two of the

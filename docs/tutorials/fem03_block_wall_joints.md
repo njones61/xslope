@@ -612,44 +612,37 @@ facing.
 
 ### What the factor of safety means for this wall
 
-Part 1's wall failed the way strength reduction expects: at one strength the
-joints let go, and no amount of waiting brought the wall to rest. This wall
-fails in the end too, but only after the soil is down to half its strength and
-the wall has moved 30 cm, a twelfth of its height. Every time the facing moves
-it stretches the three layers, and stretched geogrid pulls back: load moves off
-the sliding contacts and into the sheets, the wall slows, and it comes to rest
-again a little further out, until the top layer reaches its capacity and there
-is nothing left to take the load.
+Part 1's wall failed at one strength: the joints let go, and no amount of
+waiting brought it to rest. This wall gives way too, but only after the soil is
+down to half its strength and the facing has moved 30 cm, a twelfth of its
+height. Each time the facing moves it stretches the geogrid, the sheets take
+more of the load, and the wall comes to rest a little further out, until the
+top layer reaches its capacity.
 
-Between the working strength and that failure lies a great deal of deformation:
-2 cm at F = 1, 6 cm at 1.5, 8 cm at 1.56, 13 cm at 1.75, 30 cm at 1.99. No wall
-in service is allowed to move like that. How much movement is acceptable is a
-matter of judgment, set by what the wall carries and what stands on or behind
-it, and the Displacement vs F plot is where that judgment is applied: draw the
-allowable movement across the plot, and the strength at which the resting
-points cross it is the wall's factor of safety on that criterion. At 1% of the
-height, 3.6 cm, the crossing lies between 1.0 and 1.5, and a second search with
-the bracket set to 1.0–1.5 would fill the curve in there and pin it; at 2%,
-7 cm, it lies just under 1.56. The strength limit near 2.0 answers the strength
-question. For this wall the movement is the answer that matters.
+Long before that limit the wall has moved more than any wall in service is
+allowed to: 2 cm at F = 1, 6 cm at 1.5, 13 cm at 1.75, 30 cm at 1.99. How much
+movement is acceptable depends on what the wall carries and what stands behind
+it, and that is the engineer's call. The Displacement vs F plot is where it is
+made: draw the allowable movement across the plot, and the strength where the
+resting points cross it is the factor of safety on that criterion. At 1% of
+the height, 3.6 cm, the crossing lies between 1.0 and 1.5 (a search over
+1.0–1.5 would pin it); at 2%, 7 cm, it lies just under 1.56. For this wall the
+movement decides the answer.
 
-Two things follow for practice. Report the movement with the number: "stands
-at F = 1.56 with 7.7 cm of movement and the geogrid at a third of capacity" is
-what the default run found. And read the closing summary on every reinforced
-wall: *No failure was found* and *the factor of safety is at least* are the
-program telling you that you are looking at this kind of wall. A limit
-equilibrium analysis of the same wall, with the layers entered as
-reinforcement, asks the strength question directly and does not depend on
-movement at all; [FEM-2](fem02_reinforcement.md) runs a reinforced slope both
-ways.
+Two habits follow. Report the movement with the number: the default run found
+a wall standing at F = 1.56 with 7.7 cm of movement and the geogrid at a third
+of capacity. And read the closing summary on every reinforced wall: *No
+failure was found* and *at least* mean you are looking at this kind of wall. A
+limit equilibrium analysis of the same wall, with the layers entered as
+reinforcement, asks only the strength question;
+[FEM-2](fem02_reinforcement.md) runs a reinforced slope both ways.
 
-The last lesson of this wall is patience. Nothing about it was ever undecided;
-the trials were only unfinished. A jointed model settles slowly, because every
+The last lesson is patience. A jointed model settles slowly, because each
 joint reaches equilibrium by slipping a little at a time, and a trial cut off
-before it has settled reads as a failure or as undecided when it would have
-come to rest. The closing summary tells you which happened. When it says the
-factor of safety depends on the iteration limit, or reports it as "at least",
-raise the limit and let the run take the time it needs.
+early reads as failed or undecided when it would have come to rest. When the
+closing summary says the factor of safety depends on the iteration limit, or
+reports it as "at least", raise the limit and let the run take the time it
+needs.
 
 ---
 

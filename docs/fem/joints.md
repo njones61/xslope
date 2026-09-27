@@ -233,7 +233,7 @@ limit raised to a million the wall gives way at 2.0, after 30 cm of movement.
 A joint enters a model as a row on the **joints** worksheet of the
 [input template](../usage/input_template.md#worksheet-joints), one line per row with its
 endpoints and properties. You can type those rows into the workbook in Excel, edit them in
-Studio's joints editor, or have the program generate a whole network of them from a pattern you
+Studio's joints editor, or have XSLOPE generate a whole network of them from a pattern you
 describe. A reinforcement line can also be declared a joint on the reinforce worksheet, so that
 the soil slides on the sheet instead of bonding to it.
 

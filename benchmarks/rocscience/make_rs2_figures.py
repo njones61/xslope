@@ -1185,13 +1185,14 @@ def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi, 
     # blocks moving as bodies on their joints, and arrows sampled at nodes miss
     # the parting and sliding that is the mechanism. Same rule plot_fem_results
     # applies to the standard figure; a row with no joint is unchanged.
+    deform_specs = []
     if solution_has_joint_state(fem_data, afield):
-        plot_deformed_mesh(
+        deform_specs = plot_deformed_mesh(
             ax_lr, fem_data, afield, _composite_deformation_scale(
                 fem_data, afield, domain),
             show_reinforcement=True, single_panel=True, joint_faces=True,
             color_blocks=COLOR_BLOCKS,
-            at_failure=afield.get('_at_failure', False))
+            at_failure=afield.get('_at_failure', False)) or []
     else:
         plot_displacement_vectors(
             ax_lr, fem_data, afield, show_mesh=False, show_reinforcement=True,
@@ -1230,11 +1231,23 @@ def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi, 
     field_specs = ([(strain_mappable, 'VP Max Shear Strain')]
                    + [(m, l) for (m, l) in reinf_specs])
     cbars = []
-    for j, (mp, lbl) in enumerate(field_specs):
-        if mp is None:
-            continue
+    # Slots are filled in order by the bars actually drawn, so on an all-elastic
+    # jointed row (the strain panel is the joints' own, with no field bar) the
+    # slip bar takes the first slot, level with the deformation panel's below.
+    for j, (mp, lbl) in enumerate([sp for sp in field_specs if sp[0] is not None]):
         cx = x_c1 + _WD_IN + _CAX_GAP + j * _CAX_PITCH
         cax = fig.add_axes(rect(cx, y_r0, _CAX_W, Hd, W, H))
+        cb = fig.colorbar(mp, cax=cax)
+        cb.set_label(lbl, rotation=270, labelpad=14)
+        cbars.append(cb)
+    # The jointed deformation panel's own slip colorbar, in the first slot to
+    # the right of the lower-right panel: its green is read against its own
+    # bar, as the strain panel's is against the one above. The right column's
+    # slot budget (Cb) is already sized to the strain panel's slot count,
+    # which counts the slip bar whenever the deformation panel draws one.
+    for j, (mp, lbl) in enumerate([sp for sp in deform_specs if sp[0] is not None]):
+        cx = x_c1 + _WD_IN + _CAX_GAP + j * _CAX_PITCH
+        cax = fig.add_axes(rect(cx, y_r1, _CAX_W, Hd, W, H))
         cb = fig.colorbar(mp, cax=cax)
         cb.set_label(lbl, rotation=270, labelpad=14)
         cbars.append(cb)
@@ -1325,8 +1338,15 @@ def render_figure(bench, sd, fem_data, field, failure=None, fs=None,
         # Pass 1: provisional bands → measure the real legend heights.
         fig, _axes, (ax_ul, ax_ll), _fs, _cb = _build_composite(
             bench, sd, fem_data, afield, style, 1.0, 1.0, dpi, domain)
-        leg0 = _measure_legend_band(ax_ul, dpi)
-        leg1 = _measure_legend_band(ax_ll, dpi)
+        # Each row's band holds the taller of its two panels' hung legends: the
+        # left panel's legend, and on a jointed row the joint key of the right
+        # panel when no corner of that panel is clear of the section and the
+        # key drops below the axes (plot_fem._place_joint_key). A key that sits
+        # in a corner measures inside the axes and asks for nothing.
+        leg0 = max(_measure_legend_band(ax_ul, dpi),
+                   _measure_legend_band(_axes[1], dpi))
+        leg1 = max(_measure_legend_band(ax_ll, dpi),
+                   _measure_legend_band(_axes[3], dpi))
         # …and the content the panels drew, which on a jointed row includes the
         # deformed section (see _fit_domain). Measured on the same pass, so the
         # second one lays out on a domain that holds everything.

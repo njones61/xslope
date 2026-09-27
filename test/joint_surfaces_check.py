@@ -20,15 +20,15 @@ six lines made joints in memory:
   c. the plots. The inputs plot draws a jointed line in its own style with its
      own legend entry and a bonded one in the ordinary one; the mesh plot draws
      the jointed lines over the mesh; the results panel draws every joint as a
-     hairline colored by slip, with the slip colorbar and a key naming the
-     three states and no colorbar where nothing slipped, and draws nothing at
-     all on a model with no joint. With Show joints on the strain panel of a
-     jointed model draws that overlay for its BAR-LESS joints whether its soil
-     can yield (over the strain field, strain title kept) or not (the Joint
-     slip panel); a jointed reinforcement sheet is drawn there as its bar only,
-     so a model whose only joints are sheets gets no overlay, no key and no
-     slip colorbar on that panel, while the deformation panel keeps the
-     sheet's faces. The displacement panel is the scaled deformed mesh, with the
+     thin line colored by slip with no white backing, with the slip colorbar
+     and a key naming the three states placed off the section, no colorbar
+     where nothing slipped, and nothing at all on a model with no joint. With
+     Show joints on the strain panel of a jointed model draws EVERY joint,
+     a jointed reinforcement sheet as its two faces either side of the bar,
+     whether its soil can yield (over the strain field, strain title kept) or
+     not (the Joint slip panel). The deformation panel draws the joints the
+     same way except that a closed joint keeps the joint-face weight, and it
+     returns the slip colorbar too. The displacement panel is the scaled deformed mesh, with the
      joint faces over its grid, on a jointed model and the arrow field on every
      other one — asserted in both layouts a results figure is drawn in, the
      stacked multi-panel one and the single panel Studio and the report render,
@@ -99,16 +99,15 @@ ADHESION, DELTA = 5.0, 25.0
 TARGET_SIZE = 3.0
 SIZE_1D = 2.0
 
-#: The heaviest a joint span may be drawn (points), and the heaviest its white
-#: under-stroke may be. The overlay was three-point bars over a four-and-a-half
-#: point black under-stroke, which a model with hundreds of joints turns into a
-#: solid mat over the field. It is thin lines now: a slipping span carries the
-#: reading and takes the weight, an intact one stays out of the way, and only
-#: the slipping one is backed by white so a dark green line still reads over a
-#: dark blue or red patch of field. These are the bounds that keep it that way.
+#: The heaviest a joint span may be drawn over a strain field (points). The
+#: overlay was three-point bars over a four-and-a-half point black under-stroke,
+#: which a model with hundreds of joints turns into a solid mat over the field.
+#: It is thin lines now, with no white backing: a slipping span carries the
+#: reading and takes the weight, a closed one stays out of the way. These are
+#: the bounds that keep it that way on the strain panel; the block drawing's
+#: closed joints are the joint-face weight instead (asserted below).
 _SPAN_MAX = 1.6
 _INTACT_MAX = 1.0
-_HALO_MAX = _SPAN_MAX + 1.3
 
 
 def _same_color(collection, color):
@@ -374,50 +373,112 @@ def _leg_plots(failures, cache):
                         f"panels no longer agree")
     plt.close(fig)
 
-    # The results overlay: hairlines, no state legend, a colorbar only where
-    # something slipped. A network of hundreds of traces is the case this is
-    # drawn for, so weight and legend entries are both part of the contract.
+    # The results overlay: thin lines, no per-state legend entries on the
+    # axes, a colorbar only where something slipped. A network of hundreds of
+    # traces is the case this is drawn for, so weight and legend entries are
+    # both part of the contract. Read on the fixture with nothing opened, so
+    # every white collection would be a backing: white is kept for the gap
+    # down an OPENED stretch, and nothing else carries it.
     from matplotlib.collections import LineCollection
+    import matplotlib.colors as mcolors
+    _white = mcolors.to_rgba("white")
+    _gray = mcolors.to_rgba(_PF._JOINT_INTACT_COLOR)
+    no_open = dict(sol)
+    no_open["joint_open"] = np.zeros_like(np.asarray(sol["joint_open"]))
+
+    def _by_color(ax):
+        cols_ = [c for c in ax.collections if isinstance(c, LineCollection)
+                 and 6.44 < c.get_zorder() < 6.61]
+        white_ = [c for c in cols_ if len(c.get_colors())
+                  and tuple(c.get_colors()[0]) == _white]
+        gray_ = [c for c in cols_ if len(c.get_colors())
+                 and tuple(c.get_colors()[0]) == _gray]
+        return cols_, white_, gray_, [c for c in cols_
+                                      if c not in white_ and c not in gray_]
+
     fig, ax = plt.subplots()
-    specs = plot_joint_states(ax, fem_data, sol)
-    cols = [c for c in ax.collections if isinstance(c, LineCollection)]
+    specs = plot_joint_states(ax, fem_data, no_open)
+    cols, white, faint, slid = _by_color(ax)
     if not cols:
         failures.append("the results overlay draws no joint")
-    widths = [w for c in cols for w in c.get_linewidths()]
-    if widths and max(widths) > _HALO_MAX:
-        failures.append(f"a joint is drawn heavier than a thin line and its "
-                        f"under-stroke: {widths}")
-    # The slipping spans carry the reading, so they take the weight and the
-    # white backing; the intact ones stay lighter and carry none. The three
-    # collections are told apart by color: white is the under-stroke, the
-    # neutral gray is the intact hairline, whatever is left is the slip.
-    import matplotlib.colors as mcolors
-    _white = mcolors.to_rgba(_PF._JOINT_HALO_COLOR)
-    _gray = mcolors.to_rgba(_PF._JOINT_INTACT_COLOR)
-    halo = [c for c in cols if tuple(c.get_colors()[0]) == _white]
-    faint = [c for c in cols if tuple(c.get_colors()[0]) == _gray]
-    slid = [c for c in cols if c not in halo and c not in faint]
-    if not halo:
-        failures.append("the slipping spans carry no white under-stroke, so a "
-                        "dark one over a dark patch of field has nothing to "
-                        "stand off")
+    if white:
+        failures.append(f"the strain overlay draws {len(white)} white "
+                        f"collection(s) with nothing opened: a white backing "
+                        f"under the slipping spans")
+    if not slid:
+        failures.append("the fixture's slipping spans are not drawn")
     if not faint:
-        failures.append("the fixture's intact spans are not drawn in the "
+        failures.append("the fixture's closed spans are not drawn in the "
                         "neutral gray")
     for c in faint:
         if max(c.get_linewidths()) > _INTACT_MAX:
-            failures.append(f"an intact span is drawn as heavily as a slipping "
-                            f"one: {c.get_linewidths()}")
+            failures.append(f"a closed span on the strain panel is not the "
+                            f"hairline: {c.get_linewidths()}")
     for c in slid:
         if max(c.get_linewidths()) > _SPAN_MAX:
             failures.append(f"a slipping span is heavier than the contract: "
                             f"{c.get_linewidths()}")
-    for c in halo:
-        if max(c.get_linewidths()) <= _SPAN_MAX:
-            failures.append("the under-stroke is no wider than the line it is "
-                            "meant to back")
-        if slid and c.get_zorder() >= min(x.get_zorder() for x in slid):
-            failures.append("the white under-stroke is drawn over its line")
+    plt.close(fig)
+
+    # The block drawing: the same styling (no white backing under a slipping
+    # span), except that a closed joint keeps the joint-face weight, because
+    # the thick gray closed joints are what make the blocks read as blocks;
+    # and it hands back the slip colorbar's spec for its caller to place.
+    from xslope.plot_fem import JOINT_FACE_LINEWIDTH, plot_deformed_mesh as _pdm0
+    fig, ax = plt.subplots()
+    d_specs = _quiet(_pdm0, ax, fem_data, no_open, 1000.0, joint_faces=True,
+                     single_panel=True) or []
+    _cols, d_white, d_gray, d_slid = _by_color(ax)
+    if not any("Joint slip" in lab for _sm, lab in d_specs):
+        failures.append(f"the deformation panel returns no slip colorbar "
+                        f"spec: {d_specs!r}")
+    if d_white:
+        failures.append(f"the block drawing draws {len(d_white)} white "
+                        f"collection(s) with nothing opened: a white backing "
+                        f"under the slipping spans")
+    if not d_gray:
+        failures.append("the block drawing draws no closed joint in gray")
+    for c in d_gray:
+        if abs(min(c.get_linewidths()) - JOINT_FACE_LINEWIDTH) > 1e-9:
+            failures.append(f"a closed joint on the block drawing is not the "
+                            f"joint-face weight {JOINT_FACE_LINEWIDTH}: "
+                            f"{c.get_linewidths()}")
+    for c in faint:
+        if max(c.get_linewidths()) >= JOINT_FACE_LINEWIDTH:
+            failures.append(f"a closed span on the strain panel is not "
+                            f"thinner than on the block drawing: "
+                            f"{c.get_linewidths()}")
+    plt.close(fig)
+
+    # The key is placed off the section: on each panel of the results figure
+    # its box in data coordinates does not touch the ground the panel draws
+    # (the shape the placer tests; a corner clear of the ground, or below the
+    # axes when no corner is).
+    from shapely.geometry import box as _sbox
+    from xslope.plot_fem import plot_fem_results as _pfr
+    fig, axes_k = _quiet(_pfr, fem_data, no_open,
+                         plot_type=["deformation", "shear_strain"],
+                         figsize=(9, 7))
+    fig.canvas.draw()
+    rr = fig.canvas.get_renderer()
+    for ax_k in axes_k:
+        leg = ax_k.get_legend()
+        texts = [] if leg is None else [t.get_text() for t in leg.get_texts()]
+        if "closed, no slip" not in texts:
+            failures.append(f"the {ax_k.get_title()[:30]!r} panel draws no "
+                            f"joint key: {texts!r}")
+            continue
+        shape = _PF._section_shape(ax_k)
+        bb = leg.get_window_extent(rr)
+        inv = ax_k.transData.inverted()
+        (x0, y0), (x1, y1) = inv.transform([[bb.x0, bb.y0], [bb.x1, bb.y1]])
+        if shape is None or shape.intersects(
+                _sbox(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))):
+            failures.append(f"the joint key on the {ax_k.get_title()[:30]!r} "
+                            f"panel lies over the section")
+    plt.close(fig)
+    fig, ax = plt.subplots()
+    specs = plot_joint_states(ax, fem_data, sol)
 
     # The ramp shares no color with the field it is drawn over. The field is
     # coolwarm — blue through white to red — and the slip ramp is green: every
@@ -494,11 +555,10 @@ def _leg_plots(failures, cache):
                         "where the field it would scale is zero by construction")
     plt.close(fig)
 
-    # A jointed reinforcement SHEET is drawn on the strain panel as its bar
-    # only (owner's ruling, 2026-09-27): the bar already carries the sheet
-    # there, and the faces' slip is the 1D Details panel's. Bar-less joints
-    # (wall contacts, rock joints) keep the overlay, the slip colorbar and the
-    # key. The fixture's joints are all sheets, so a MIXED copy is made by
+    # Every joint draws on the strain panel with Show joints on: a jointed
+    # reinforcement SHEET as its two faces either side of the bar, a bar-less
+    # joint (wall contact, rock joint) as its line, each with the slip
+    # colorbar and the key. The fixture's joints are all sheets, so a MIXED copy is made by
     # declaring one jointed line bar-less (``barless_1d_mask`` over its 1D
     # elements, which is what a joints-sheet line produces); the line chosen
     # is one with slipping spans, so its slip colorbar has something to scale.
@@ -541,31 +601,34 @@ def _leg_plots(failures, cache):
         plt.close(fig)
         return out
 
-    # Sheets only: the bar, and nothing of the faces.
+    # Sheets only: the bar AND the sheet faces, with the key and the slip
+    # colorbar; with Show joints off, the bar alone.
     for fd, tag in ((fem_data, "yielding"), (fd_el, "all-elastic")):
         with_bar = _strain(fd, show_joints=True)
         no_bar = _strain(fd, show_joints=True, show_reinforcement=False)
-        if no_bar["overlay"]:
-            failures.append(f"the {tag} sheet-only strain panel draws "
-                            f"{no_bar['overlay']} face collection(s) on the "
-                            f"sheets, which are drawn there as their bars only")
+        off = _strain(fd, show_joints=False, show_reinforcement=False)
+        if not no_bar["overlay"]:
+            failures.append(f"the {tag} sheet-only strain panel draws no sheet "
+                            f"faces")
+        if off["overlay"]:
+            failures.append(f"with Show joints off the {tag} sheet-only strain "
+                            f"panel still draws the sheet faces")
         if with_bar["artists"] <= no_bar["artists"]:
             failures.append(f"the {tag} sheet-only strain panel does not draw "
                             f"the sheets' bars")
-        if with_bar["key"]:
-            failures.append(f"the {tag} sheet-only strain panel draws a joint "
-                            f"key: {with_bar['key']!r}")
-        if with_bar["slip_bar"]:
-            failures.append(f"the {tag} sheet-only strain panel offers a slip "
-                            f"colorbar: {with_bar['slip_bar']!r}")
+        if not with_bar["key"]:
+            failures.append(f"the {tag} sheet-only strain panel draws no joint "
+                            f"key")
+        if not with_bar["slip_bar"]:
+            failures.append(f"the {tag} sheet-only strain panel offers no slip "
+                            f"colorbar")
     yld = _strain(fem_data, show_joints=True)
     if SHEAR_STRAIN_LABEL not in yld["title"] or yld["mappable"] is None:
         failures.append(f"a yielding sheet-only model lost its strain title or "
                         f"colorbar: {yld['title']!r}")
 
-    # Both kinds: the bar-less joint keeps the overlay, the key and the slip
-    # colorbar; the sheet still draws no faces (the overlay shrinks to the
-    # bar-less line's spans alone). With Show joints off, none of it.
+    # Both kinds: the bar-less joint and the sheet both draw, with the key and
+    # the slip colorbar. With Show joints off, none of it.
     if fd_mix is not None:
         from xslope.plot_fem import plot_joint_states as _pjs
         for show in (True, False):
@@ -584,30 +647,23 @@ def _leg_plots(failures, cache):
             if not show and (m["key"] or m["slip_bar"] or nb["overlay"]):
                 failures.append(f"with Show joints off the mixed strain panel "
                                 f"still draws joints: {m!r}")
-        # The sheet's faces are offset pairs, so drawing every span doubles the
-        # sheet's segments; the strain panel's overlay must hold only the
-        # bar-less line's. Counted as segments across the overlay collections.
-        def _segs(fd, skip):
-            fig, ax = plt.subplots()
-            _pjs(ax, fd, sol, skip_bar_spans=skip)
-            n = sum(len(c.get_segments()) for c in ax.collections
-                    if isinstance(c, LineCollection))
-            plt.close(fig)
-            return n
-        all_segs, strain_segs = _segs(fd_mix, False), _segs(fd_mix, True)
+        # The sheet's faces are offset pairs either side of its bar, so the
+        # strain overlay holds more segments than the bar-less line has spans:
+        # every joint is drawn, the sheet's included.
+        fig, ax = plt.subplots()
+        _pjs(ax, fd_mix, sol)
+        strain_segs = sum(len(c.get_segments()) for c in _overlay(ax))
+        plt.close(fig)
         barless_spans = sum(1 for r, ob in zip(
             spans_all, _PF._spans_on_bars(fd_mix, spans_all)) if not ob)
-        if not (0 < strain_segs < all_segs):
-            failures.append(f"skip_bar_spans does not leave only the bar-less "
-                            f"joint: {strain_segs} of {all_segs} segments")
-        # A bar-less span is one segment, or two where it slips (its line and
-        # the white under-stroke).
-        if strain_segs > 2 * barless_spans:
-            failures.append(f"the strain overlay holds more segments than the "
-                            f"bar-less line has spans: {strain_segs} for "
-                            f"{barless_spans}")
+        sheet_spans = len(spans_all) - barless_spans
+        if strain_segs < barless_spans + 2 * sheet_spans:
+            failures.append(f"the strain overlay leaves joints out: "
+                            f"{strain_segs} segments for {barless_spans} "
+                            f"bar-less spans and {sheet_spans} sheet spans "
+                            f"(two faces each)")
 
-    # The deformation panel is unchanged: it keeps the sheet's faces.
+    # The deformation panel draws the sheet's faces too.
     from xslope.plot_fem import plot_deformed_mesh as _pdm
     counts = []
     for faces_on in (True, False):
@@ -623,10 +679,10 @@ def _leg_plots(failures, cache):
 
     # An opened stretch is the one joint state with no colorbar to explain it.
     # It is drawn as its two faces apart, and the joint overlay's own key
-    # (closed / slipping / opened, drawn by plot_joint_states in the panel's
-    # corner) names it — on a figure that draws an opened stretch and on no
-    # other. The overlay is drawn on the strain panel for the bar-less joints
-    # of a jointed model with Show joints on, so the key is asserted on the
+    # (closed / slipping / opened, drawn by plot_joint_states off the section)
+    # names it — on a figure that draws an opened stretch and on no other. The
+    # overlay is drawn on the strain panel for every joint of a jointed model
+    # with Show joints on, so the key is asserted on the
     # MIXED model's all-elastic slip panel and yielding strain panel, as the
     # results figure draws them (bars included), and on the overlay by itself.
     opened = dict(sol)

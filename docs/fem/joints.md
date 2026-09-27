@@ -368,24 +368,27 @@ the shear strain panel every joint is drawn and colored by how far it has slippe
 section is drawn as the blocks the joints cut it into, and **1D Details…** lists every jointed
 line with the stresses along it.
 
-On the shear strain panel each joint is a thin line along its trace, colored on a green scale
-titled *Joint slip* by how far its two faces have slid. A joint that has not slipped is a gray
-hairline. A stretch that has **opened** is drawn as two lines with a white gap between them,
-since opening is a condition rather than an amount. A key in the corner of the panel names the
-three states, and a model where no joint slipped carries no slip colorbar. On a model whose soil
-or rock can yield, the joints are drawn over the strain field and the panel keeps its strain title
-and colorbar, with the slip colorbar beside it; on a model whose every material is elastic there is
-no strain to draw, and the panel is the joints' own, titled *Joint slip*. A jointed reinforcement
-sheet is drawn on this panel as its bar only; the slip of its two faces is read in **1D Details…**.
-The lines are kept thin because a generated network puts hundreds of them over the field.
+On the shear strain panel every joint is a thin line along its trace, colored on a green scale
+titled *Joint slip* by how far its two faces have slid. A closed joint, one that has not slipped,
+is a gray hairline. A stretch that has **opened** is drawn as two thin gray lines with a white gap
+between them, since opening is a condition rather than an amount; no other line carries white. A
+jointed reinforcement sheet is drawn as its two faces, one on each side of the bar. A key names the
+three states in a corner of the panel that the section does not reach, or below the panel when the
+section reaches every corner, and a model where no joint slipped carries no slip colorbar. On a
+model whose soil or rock can yield, the joints are drawn over the strain field and the panel keeps
+its strain title and colorbar, with the slip colorbar beside it; on a model whose every material is
+elastic there is no strain to draw, and the panel is the joints' own, titled *Joint slip*. The
+lines are kept thin because a generated network puts hundreds of them over the field.
 
 ![Joint slip on a toppling stack at its critical factor: each joint colored by how far its faces have slid, gray where it has not slipped, drawn as two lines with a gap between them where it has opened](../tutorials/images/fem05_joint_slip_topple.png){width=900}
 
 **Show joints** is set separately for the shear strain panel and the deformed mesh panel, and
 is on for both by default on a jointed model. On the **Deformed mesh** panel, with it on, the
 deformed section is drawn as the **blocks** the joints cut it into: the section under a faint
-tint, one per material, the joint faces in green, and the deformed outline as a dark line against
-the dashed undeformed outline. A block is a piece of the mesh that moves as one body; the mesh split gives
+tint, one per material, the joints drawn as on the shear strain panel, and the deformed outline as a
+dark line against the dashed undeformed outline. Two things differ from the shear strain panel: a
+closed joint keeps the full joint-face weight, so the thick gray joints outline the blocks, and the
+slipping joints are drawn at that same weight. The panel carries its own slip colorbar and key. A block is a piece of the mesh that moves as one body; the mesh split gives
 the two sides of a joint their own nodes, so the pieces between joints are found by following
 which elements still share nodes. A jointed failure looks like this, blocks moving as bodies with
 all of the movement taken up at the joints, and a joint that has slipped or opened shows as two

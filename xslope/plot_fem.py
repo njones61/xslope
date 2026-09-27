@@ -23,9 +23,7 @@ from matplotlib.patches import Patch, Polygon
 
 from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by name)
 from .plot import (adaptive_colorbar_ticks, declared_unit_labels,
-                   JOINT_COLOR, JOINT_LINEWIDTH, JOINT_TICK_MAX_LINES,
-                   JOINT_HALO_COLOR as _JOINT_HALO_COLOR,
-                   JOINT_HALO_LINEWIDTH as _JOINT_HALO_PT)
+                   JOINT_COLOR, JOINT_LINEWIDTH, JOINT_TICK_MAX_LINES)
 
 
 def _fem_cbar_label(fem_data, base, unit_key):
@@ -1234,6 +1232,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     # (populated only when reinforcement forces are present) so they can be placed
     # beside the field colorbar without collision.
     reinf_cbar_specs = []
+    deform_cbar_specs = []
     # displace_vector's OWN deferred mappable (only set when color_by_magnitude is
     # on) — placed on its own panel below, the same mappable/label-return
     # convention as the shear-strain field above.
@@ -1290,7 +1289,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                                     vector_max=vector_max,
                                     single_panel=defer_panel_cbar)
         elif pt == 'deformation':
-            reinf_cbar_specs = plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
+            deform_cbar_specs = plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
                              show_original=show_original, deformed_color=deformed_color,
                              show_reinforcement=show_reinforcement,
                              cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
@@ -1299,6 +1298,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                              joint_faces=show_joints, block_grid=block_grid,
                              joint_linewidth=joint_linewidth,
                              color_blocks=color_blocks) or []
+            if single:
+                reinf_cbar_specs = deform_cbar_specs
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
@@ -1371,7 +1372,11 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                        else []) + list(reinf_cbar_specs)
         vector_idx = plot_types.index('displace_vector') if 'displace_vector' in plot_types else None
         vector_specs = [(vector_mappable, vector_cbar_label)] if vector_mappable is not None else []
-        n_slots = max(len(field_specs), len(vector_specs))
+        # The deformation panel's own slip colorbar, when its joints are
+        # colored by slip.
+        deform_idx = plot_types.index('deformation') if 'deformation' in plot_types else None
+        deform_specs = list(deform_cbar_specs)
+        n_slots = max(len(field_specs), len(vector_specs), len(deform_specs))
         field_cbars = []
         vector_cbars = []
         for j, ax_j in enumerate(axes):
@@ -1381,6 +1386,9 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             elif j == vector_idx and vector_specs:
                 padded = vector_specs + [(None, "")] * (n_slots - len(vector_specs))
                 vector_cbars = _place_stacked_cbars(fig, ax_j, padded)
+            elif j == deform_idx and deform_specs:
+                padded = deform_specs + [(None, "")] * (n_slots - len(deform_specs))
+                vector_cbars += _place_stacked_cbars(fig, ax_j, padded)
             elif n_slots:
                 # Match the widest panel's reserved width with invisible slots.
                 _place_stacked_cbars(fig, ax_j, [(None, "")] * n_slots)
@@ -1882,9 +1890,9 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
     if show_mesh:
         plot_mesh_lines(ax, fem_data, color='gray', alpha=0.3, linewidth=0.3)
     
-    # Plot reinforcement with force visualization. The joint hairlines go on
-    # first, under the bars they stand beside; they carry no legend entry of
-    # their own — their colorbar is their legend.
+    # Plot reinforcement with force visualization. The joint lines go on
+    # first, under the bars they stand beside; their colorbar carries the
+    # slip and their key names the three states (plot_joint_states).
     plot_joint_states(ax, fem_data, solution)
     if show_reinforcement and 'elements_1d' in fem_data:
         plot_reinforcement_forces(ax, fem_data, solution)
@@ -1943,6 +1951,11 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
             opened shows as two lines that no longer lie on each other — which is
             the whole picture on a jointed model: the blocks move as bodies and
             the motion is AT the joints, not spread through the elements.
+            Where the field measured the joints' state, a closed face is gray
+            at ``joint_linewidth``, a slipping one is on the green slip ramp
+            at the same width, an opened stretch is two thin gray lines with a
+            white gap, the key goes off the section, and the slip colorbar's
+            spec is returned for the caller to place.
     """
     # Legacy alias: an explicit show_mesh bool maps onto the tri-state so older
     # callers keep working (True == the former full-grid-or-outline behavior).
@@ -2063,7 +2076,13 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     # x-axis alignment stays consistent across stacked subplots. Skipped for a
     # single-panel plot (the Studio case), where there's nothing to align to and
     # the invisible colorbar would just steal the right margin.
-    if not single_panel:
+    if not single_panel and face_cbar_specs:
+        # Joints colored by slip carry the slip colorbar, here as on the strain
+        # panel, in the slot the invisible spacer would have taken.
+        for sm, lbl in face_cbar_specs:
+            cbar = ax.figure.colorbar(sm, ax=ax, shrink=cbar_shrink)
+            cbar.set_label(lbl, rotation=270, labelpad=cbar_labelpad)
+    elif not single_panel:
         dummy_data = np.array([[0, 1]])
         dummy_im = ax.imshow(dummy_data, cmap='viridis', alpha=0)
         cbar = ax.figure.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
@@ -2628,13 +2647,90 @@ def _merge_joint_bar_legend(ax, role, handles, labels):
         h, l = list(handles) + prev[1], list(labels) + prev[2]
     else:
         h, l = prev[1] + list(handles), prev[2] + list(labels)
+    leg = _place_joint_key(ax, h, l)
+    leg._xslope_role = ('both', h, l)
+    return True
+
+
+def _section_shape(ax):
+    """The ground the panel draws, as one shapely geometry in data coordinates:
+    the union of every element's corner polygon at each node set the drawer
+    registered on ``ax`` (the model's own nodes, plus the deformed ones on the
+    deformation panel). Cached on the axes. None when nothing registered."""
+    reg = getattr(ax, '_xslope_section', None)
+    if reg is None:
+        return None
+    cached = getattr(ax, '_xslope_section_shape', None)
+    if cached is not None:
+        return cached
+    import shapely
+    from .mesh import element_corner_polygons
+    fem_data, node_sets = reg
+    polys = []
+    for nodes_xy in node_sets:
+        for poly in element_corner_polygons(fem_data, nodes_xy):
+            if poly is not None and len(poly) >= 3:
+                polys.append(shapely.Polygon(np.asarray(poly, dtype=float)[:, :2]))
+    shape = shapely.union_all(polys) if polys else None
+    ax._xslope_section_shape = shape
+    return shape
+
+
+def _register_section(ax, fem_data, *node_sets):
+    """Tell the key placer which ground this panel draws (see _section_shape)."""
+    prev = getattr(ax, '_xslope_section', None)
+    sets = list(prev[1]) if prev is not None else []
+    sets += [np.asarray(n, dtype=float) for n in node_sets]
+    ax._xslope_section = (fem_data, sets)
+    ax._xslope_section_shape = None
+
+
+def _place_joint_key(ax, handles, labels):
+    """The joint key, off the section: in the first corner of the axes whose box
+    the drawn ground (``_section_shape``) does not reach, or, where no corner is
+    clear, below the axes under the tick labels — the rule ``_ssrm_curve_legend``
+    applies to the curve. The corner is chosen when the legend is drawn or
+    measured, so it is tested against the panel's final limits, which the
+    callers set after the drawers return."""
+    from matplotlib.legend import Legend
     from matplotlib.legend_handler import HandlerTuple
-    leg = ax.legend(h, l, loc="lower right", fontsize=8, frameon=True,
+    from shapely.geometry import box as _box
+    leg = ax.legend(handles, labels, loc="upper left", fontsize=8, frameon=True,
                     framealpha=0.92, edgecolor="#cccccc", borderpad=0.6,
                     handlelength=2.6,
                     handler_map={tuple: HandlerTuple(ndivide=1, pad=0.0)})
-    leg._xslope_role = ('both', h, l)
-    return True
+    draw0, ext0 = leg.draw, leg.get_window_extent
+
+    def _choose(renderer):
+        shape = _section_shape(ax)
+        inv = ax.transData.inverted()
+        for loc in ("upper left", "upper right", "lower right", "lower left"):
+            leg._loc = Legend.codes[loc]
+            leg.set_bbox_to_anchor(None)
+            bb = Legend.get_window_extent(leg, renderer).padded(4)
+            (x0, y0), (x1, y1) = inv.transform([[bb.x0, bb.y0], [bb.x1, bb.y1]])
+            if shape is None or not shape.intersects(
+                    _box(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))):
+                return
+        # No corner is clear: below the axes, under the x tick labels.
+        tb = ax.xaxis.get_tightbbox(renderer)
+        ybot = (tb.y0 if tb is not None else ax.bbox.y0) - 4
+        yfrac = ax.transAxes.inverted().transform((0.0, ybot))[1]
+        leg._loc = Legend.codes["upper center"]
+        leg.set_bbox_to_anchor((0.5, yfrac), transform=ax.transAxes)
+
+    def _draw(renderer):
+        _choose(renderer)
+        return draw0(renderer)
+
+    def _extent(renderer=None):
+        r = renderer if renderer is not None else ax.figure._get_renderer()
+        _choose(r)
+        return ext0(r)
+
+    leg.draw = _draw
+    leg.get_window_extent = _extent
+    return leg
 
 
 #: How a joint reads on a results panel. Slip is the only quantity a joint has,
@@ -2656,8 +2752,7 @@ _JOINT_SLIP_CMAP = 'joint_slip'
 #: runs from the smallest reading to the largest across a field that goes from
 #: dark blue to red through white. A standard ``YlGn`` truncated at its pale end
 #: was the other candidate and lost on its low end: its light yellow-green spans
-#: went soft exactly where the field is at its white middle, and against their
-#: own white under-stroke. A saturated lime does not — it is far from white at
+#: went soft exactly where the field is at its white middle. A saturated lime does not — it is far from white at
 #: any value, and far from both of the field's ends.
 #:
 #: Dark at zero and bright at the top: the brightest color marks the largest
@@ -2679,10 +2774,10 @@ _JOINT_SLIP_PT = 1.6
 #: drawn as: the faces drawn apart, along the whole stretch that parted.
 _JOINT_OPEN_GAP_PT = 1.4
 
-#: The white under-stroke is the section drawing's (``plot.JOINT_HALO_*``): half
-#: a point of white on each side keeps a dark green span readable where the field
-#: beneath it goes dark blue or dark red. The intact gray hairlines carry no
-#: halo, so nothing is spent saying that nothing happened.
+#: No span carries a white under-stroke on a results panel: a slipping span is
+#: its green alone, a closed one plain gray (the hairline on the strain panel,
+#: the joint-face width on the block drawing), and white is kept for the one
+#: place it means something, the gap down an OPENED stretch.
 
 
 
@@ -2705,21 +2800,19 @@ def solution_has_joint_state(fem_data, solution):
 
 
 def _draw_joint_faces(ax, fem_data, solution, nodes_deformed, blocks, lw):
-    """Draw the two faces of every joint element on the deformed mesh, each face
-    at its own deformed position and colored by the element's slip.
+    """Draw the joints on the deformation panel.
 
-    This is the joints' reading on the deformation panel: where the faces have
-    parted or slid they are drawn apart, and the green ramp says how far. A face
-    that is not slipping is the neutral gray hairline. Returns the colorbar
-    spec for the ramp, or nothing when no joint slipped or the solution carries
-    no joint state (then the faces are drawn plain, in the joint's own green).
+    Where this field measured the joints' state they are drawn by
+    :func:`plot_joint_states` at the deformed node positions, with the strain
+    panel's styling except for one weight: a closed span is gray at ``lw`` (the
+    joint-face width), not the hairline, because the thick gray closed joints
+    are what make the blocks read as blocks. A slipping span is on the green
+    ramp at ``lw`` with no white under-stroke, an opened one is two thin gray
+    lines with a white gap, the key goes off the section and the slip
+    colorbar's spec is returned for the caller to place. A field that measured no
+    joint state draws the faces plain, in the joint's own green, and returns
+    nothing.
     """
-    import matplotlib.cm as cm
-    from matplotlib.colors import Normalize
-
-    jd = fem_data["joint_data"]
-    conn = np.asarray(jd["conn"], dtype=int)
-    n = int(jd["n"])
     if not solution_has_joint_state(fem_data, solution):
         faces = [e for edges in blocks.values() for e in edges]
         if faces:
@@ -2727,34 +2820,9 @@ def _draw_joint_faces(ax, fem_data, solution, nodes_deformed, blocks, lw):
                 [nodes_deformed[e, :2] for e in faces], colors=JOINT_COLOR,
                 linewidths=lw, alpha=1.0, zorder=6.5))
         return []
-    slip = np.abs(np.asarray(solution.get("joint_slip", np.zeros((n, 3))),
-                             dtype=float)).reshape(n, -1)
-    slipping = np.asarray(solution.get("joint_slipping",
-                                       np.zeros((n, 3), dtype=bool))).reshape(n, -1)
-    w = np.asarray(jd["w"], dtype=float).reshape(n, -1) > 0.0
-    s_el = np.where(w, slip, 0.0).max(axis=1)
-    sl_el = np.any(slipping & w, axis=1)
-    segs_a = [nodes_deformed[conn[i, 0:2], :2] for i in range(n)]
-    segs_b = [nodes_deformed[conn[i, 3:5], :2] for i in range(n)]
-    smax = float(s_el[sl_el].max()) if sl_el.any() else 0.0
-    specs = []
-    if smax > 0.0:
-        cmap = _joint_slip_cmap()
-        norm = Normalize(vmin=0.0, vmax=smax)
-        sm = cm.ScalarMappable(cmap=cmap, norm=norm)
-        sm.set_array([])
-        specs.append((sm, _fem_cbar_label(fem_data, 'Joint slip', 'length')))
-        colors = [cmap(norm(v)) if ok else _JOINT_INTACT_COLOR
-                  for v, ok in zip(s_el, sl_el)]
-    else:
-        colors = [_JOINT_INTACT_COLOR] * n
-    for segs in (segs_a, segs_b):
-        ax.add_collection(LineCollection(
-            segs, colors=_JOINT_HALO_COLOR, linewidths=lw + 2 * _JOINT_HALO_PT,
-            alpha=1.0, zorder=6.45))
-        ax.add_collection(LineCollection(
-            segs, colors=colors, linewidths=lw, alpha=1.0, zorder=6.5))
-    return specs
+    return plot_joint_states(ax, fem_data, solution, draw_cbar=False,
+                             linewidth=lw, closed_linewidth=lw,
+                             nodes=nodes_deformed)
 
 
 def _draw_block_tints(ax, fem_data, nodes_xy, comp, per_block=False):
@@ -2905,7 +2973,7 @@ def _offset_sheet_spans(ax, coords, slipping, slips, on_bar, opened=None):
             np.asarray(out_o, dtype=bool))
 
 
-def _joint_spans(fem_data, solution):
+def _joint_spans(fem_data, solution, nodes=None):
     """One record per station span of every jointed line: where it is, what state
     it is in, and how far the two faces have slid.
 
@@ -2914,13 +2982,18 @@ def _joint_spans(fem_data, solution):
     read together: the span's state is the worse of the two and its slip is the
     larger. Drawing them separately would put one line exactly on top of the
     other and report whichever happened to be drawn last.
+
+    ``nodes`` (default the model's own) are the positions the spans are drawn
+    at; the deformation panel passes the deformed ones. Each record also
+    carries ``faces``: every distinct face of the span's elements at those
+    positions, so a panel that shows the faces apart can draw each.
     """
     if not solution_has_joint_state(fem_data, solution):
         return []      # no joint, or a saved field that measured none of them
     jd = fem_data["joint_data"]
     conn = np.asarray(jd["conn"], dtype=int)
     side = np.asarray(jd["side"], dtype=int)
-    nodes = np.asarray(fem_data["nodes"], dtype=float)
+    nodes = np.asarray(fem_data["nodes"] if nodes is None else nodes, dtype=float)
     n = int(jd["n"])
     slip = np.asarray(solution.get("joint_slip", np.zeros((n, 3))), dtype=float)
     opened = np.asarray(solution.get("joint_open", np.zeros((n, 3), dtype=bool)))
@@ -2941,7 +3014,11 @@ def _joint_spans(fem_data, solution):
                 "xy": nodes[conn[i, 0:3], :2],
                 "open_st": np.zeros(3, dtype=bool),
                 "slip_st": np.zeros(3, dtype=bool),
-                "slip_v": np.zeros(3, dtype=float)}
+                "slip_v": np.zeros(3, dtype=float),
+                "faces": {}}
+        for f in (conn[i, 0:3], conn[i, 3:6]):
+            rec["faces"].setdefault(tuple(sorted(int(v) for v in f)),
+                                    [int(v) for v in f])
         active = w[i]
         rec["open_st"] |= (opened[i] & active)
         rec["slip_st"] |= (slipping[i] & active)
@@ -2958,8 +3035,11 @@ def _joint_spans(fem_data, solution):
         xy, op, sl, sv = rec["xy"], rec["open_st"], rec["slip_st"], rec["slip_v"]
         for (p, q) in ((0, 2), (2, 1)):
             is_open = bool(op[p] and op[q])
+            faces = [np.array([nodes[f[p], :2], nodes[f[q], :2]])
+                     for f in rec["faces"].values()]
             out.append({"line": rec["line"],
                         "coords": np.array([xy[p], xy[q]]),
+                        "faces": faces,
                         "open": is_open,
                         "slipping": bool((sl[p] or sl[q]) and not is_open),
                         "slip": float(max(sv[p], sv[q]))})
@@ -2996,39 +3076,42 @@ def _joint_slip_panel(fem_data):
 
 
 def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None,
-                      skip_bar_spans=False):
-    """Draw the joint (interface) elements as hairlines colored by their slip.
+                      nodes=None, closed_linewidth=None):
+    """Draw the joint (interface) elements colored by their slip.
 
     A joint has no strain, so it appears in a shear-strain field only through
     what it does to the soil beside it. This is the joint's own reading, and it
-    is drawn so that a network of hundreds of traces still leaves the field
-    underneath legible:
+    is drawn the same way on the strain panel and on the deformation panel, so
+    that a network of hundreds of traces still leaves the panel legible:
 
-    * every station span is a thin line, floored at one device pixel so it
-      stays crisp;
+    * a span that is closed (not slipping) is neutral gray — nothing happened
+      there, and it says so quietly. Its weight is ``closed_linewidth``: None
+      (the strain panel and the joints' own panel) is the hairline,
+      :data:`_JOINT_HAIRLINE_PT`; the block drawing passes the joint-face
+      width, because there the thick gray closed joints are what make the
+      blocks read as blocks. Either is floored at one device pixel so it stays
+      crisp;
     * a span that is slipping is colored by how far its faces have slid, on a
-      green ramp the ``coolwarm`` field underneath cannot produce at any of its
-      values (see :data:`_JOINT_SLIP_COLORS`), at :data:`_JOINT_SLIP_PT` over a thin
-      white under-stroke so a dark green line still reads where the field goes
-      dark blue or dark red; the colorbar IS the legend, and no per-state
-      legend entries go on the axes;
-    * a span that is not slipping is a lighter neutral gray hairline with no
-      under-stroke — nothing happened there, and it says so quietly;
+      green ramp the ``coolwarm`` field cannot produce at any of its values (see
+      :data:`_JOINT_SLIP_COLORS`), with no white under-stroke; its weight is
+      ``linewidth`` — :data:`_JOINT_SLIP_PT` over a strain field (None), the
+      joint-face width on the block drawing and on the joints' own panel;
     * an OPENED stretch is drawn as its two faces apart — two gray hairlines
-      with a white gap of :data:`_JOINT_OPEN_GAP_PT` between them, along the
-      whole stretch that parted — rather than colored, because opening is a
-      condition and not a quantity; a key in the panel's corner names the
-      three states;
-    * when nothing on the model is slipping there is no colorbar at all and
-      every joint draws gray.
+      with a white gap of :data:`_JOINT_OPEN_GAP_PT` between them, on every
+      panel — rather than colored, because opening is a condition and not a
+      quantity;
+    * a jointed reinforcement SHEET is drawn as its two faces, one each side of
+      the bar, so the bar keeps the middle;
+    * a key names the three states, placed off the section
+      (:func:`_place_joint_key`); the colorbar carries the slip, and when
+      nothing on the model is slipping there is no colorbar and every joint
+      draws gray.
 
-    With ``skip_bar_spans`` the spans of a jointed reinforcement SHEET (a joint
-    line that carries a bar) are left out entirely: not drawn, not counted in
-    the slip colorbar's range, not named in the key. The shear strain panel
-    asks for this, because there the bar already carries the sheet and the
-    faces' slip is the 1D Details panel's reading; only the bar-less joints
-    (wall contacts, rock joints) are drawn. When every joint on the model lies
-    on a bar, nothing is drawn and no colorbar or key is made.
+    ``nodes`` are the positions to draw at (the deformation panel passes the
+    deformed ones; default the model's own). There, a span that is closed or
+    slipping draws each of its faces at its own deformed position, so faces
+    that slid apart show apart; an opened span and a sheet's span are drawn
+    about the faces' mean line.
 
     Returns the ``(mappable, label)`` specs, empty on a model with no joint and
     on one where no joint slipped, so a caller that stacks colorbars can place
@@ -3037,24 +3120,27 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None,
     import matplotlib.cm as cm
     from matplotlib.colors import Normalize
 
-    spans = _joint_spans(fem_data, solution)
-    if spans and skip_bar_spans:
-        spans = [r for r, ob in zip(spans, _spans_on_bars(fem_data, spans))
-                 if not ob]
+    spans = _joint_spans(fem_data, solution, nodes)
     if not spans:
         return []
+    _register_section(ax, fem_data, fem_data["nodes"],
+                      *([nodes] if nodes is not None else []))
 
     floor = _mesh_pixel_floor_pt(ax)
     lw_intact = max(_JOINT_HAIRLINE_PT, floor)
-    # On the joints' own panel (no field under it) the slipped lengths draw at
-    # the joint-face width the deformed-blocks panel uses, and the same
-    # `joint_linewidth` option (Studio's Joint width) sets both; over a strain
-    # field they stay at _JOINT_SLIP_PT so the field is not buried.
+    # A closed span is the hairline, except on the block drawing, which passes
+    # the joint-face width: there the thick gray joints outline the blocks.
+    lw_closed = max(float(closed_linewidth) if closed_linewidth is not None
+                    else _JOINT_HAIRLINE_PT, floor)
+    # Over a strain field the slipped lengths stay at _JOINT_SLIP_PT so the
+    # field is not buried; the block drawing and the joints' own panel pass the
+    # joint-face width (Studio's Joint width sets it).
     lw_slip = max(float(linewidth) if linewidth is not None else _JOINT_SLIP_PT,
                   floor)
-    coords = [r["coords"] for r in spans]
+    on_bar = _spans_on_bars(fem_data, spans)
     slipping = np.array([bool(r["slipping"]) for r in spans])
     slips = np.array([float(r["slip"]) for r in spans])
+    opened = np.array([bool(r["open"]) for r in spans])
 
     cbar_specs = []
     smax = float(slips[slipping].max()) if slipping.any() else 0.0
@@ -3070,40 +3156,47 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None,
             cbar.set_label(label, rotation=270, labelpad=15, fontsize=10)
     else:
         slipping = np.zeros(len(spans), dtype=bool)   # nothing to color
-    # Opaque throughout: a thin line has no contrast to spare, and blending it
-    # into the field underneath takes the little it has. The two states are two
-    # collections, because they carry different weight and only the slipping one
-    # is given the white under-stroke that keeps it off a dark patch of field.
-    # A span on a jointed SHEET shares its chord with the bar's own force
-    # overlay, which is three points wide with a black outline: a hairline
-    # drawn down its middle is invisible, and its green is read as the bar's
-    # "inactive" green. So on a bar-carrying line each span is drawn twice,
-    # a few points either side of the bar — where the two faces are — and
-    # the bar keeps the middle. A bar-less joint line keeps the single line.
-    on_bar = _spans_on_bars(fem_data, spans)
-    opened = np.array([bool(r["open"]) for r in spans])
+
+    # What each span draws as. At the model's own nodes a span is its chord.
+    # At deformed nodes a closed or slipping bar-less span is each of its faces
+    # where it went; an opened span and a sheet's span are the faces' mean line
+    # (the sheet's two faces are drawn either side of the bar below, and the
+    # opened symbol is itself the two faces apart).
+    coords, sl_l, sv_l, op_l, ob_l = [], [], [], [], []
+    for r, sl, sv, op, ob in zip(spans, slipping, slips, opened, on_bar):
+        if nodes is None:
+            lines = [r["coords"]]
+        elif ob or op:
+            lines = [np.mean(np.asarray(r["faces"]), axis=0)]
+        else:
+            lines = r["faces"]
+        for c in lines:
+            coords.append(c); sl_l.append(sl); sv_l.append(sv)
+            op_l.append(op); ob_l.append(ob)
+    # A span on a jointed SHEET shares its chord with the bar's own overlay,
+    # which is three points wide with a black outline: a line drawn down its
+    # middle is invisible. So on a bar-carrying line each span is drawn twice,
+    # a few points either side of the bar — where the two faces are — and the
+    # bar keeps the middle.
     coords, slipping, slips, opened = _offset_sheet_spans(
-        ax, coords, slipping, slips, on_bar, opened)
+        ax, coords, np.asarray(sl_l, dtype=bool), np.asarray(sv_l, dtype=float),
+        ob_l, np.asarray(op_l, dtype=bool))
     intact = [c for c, sl, op in zip(coords, slipping, opened) if not sl and not op]
     slid = [c for c, sl, op in zip(coords, slipping, opened) if sl and not op]
     parted = [c for c, op in zip(coords, opened) if op]
+    # Opaque throughout: a thin line has no contrast to spare.
     if intact:
         ax.add_collection(LineCollection(
-            intact, colors=_JOINT_INTACT_COLOR, linewidths=lw_intact,
+            intact, colors=_JOINT_INTACT_COLOR, linewidths=lw_closed,
             alpha=1.0, zorder=6.5))
     if slid:
-        ax.add_collection(LineCollection(
-            slid, colors=_JOINT_HALO_COLOR,
-            linewidths=lw_slip + 2 * _JOINT_HALO_PT,
-            alpha=1.0, zorder=6.45))
         ax.add_collection(LineCollection(
             slid, colors=[cmap(norm(s)) for s, sl, op in zip(slips, slipping, opened)
                           if sl and not op],
             linewidths=lw_slip, alpha=1.0, zorder=6.5))
     # An OPENED stretch is drawn as its two faces apart: a gray line the width
     # of two hairlines and the gap, with a white line the width of the gap down
-    # its middle, along the whole stretch that parted. Opening is a condition,
-    # not a quantity, so it gets a symbol rather than a color.
+    # its middle, along the whole stretch that parted.
     gap = max(_JOINT_OPEN_GAP_PT, floor)
     if parted:
         ax.add_collection(LineCollection(
@@ -3112,13 +3205,11 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None,
         ax.add_collection(LineCollection(
             parted, colors='white', linewidths=gap, alpha=1.0, zorder=6.6))
 
-    # The key: the three states a joint can be in on this panel. The colorbar
-    # carries the slip; the key names what the line styles mean.
+    # The key: the three states a joint can be in on this panel.
     from matplotlib.lines import Line2D
-    from matplotlib.legend_handler import HandlerTuple
     handles, labels = [], []
     if intact:
-        handles.append(Line2D([0], [0], color=_JOINT_INTACT_COLOR, lw=lw_intact))
+        handles.append(Line2D([0], [0], color=_JOINT_INTACT_COLOR, lw=lw_closed))
         labels.append("closed, no slip")
     if slid:
         handles.append(Line2D([0], [0], color=cmap(0.7), lw=lw_slip))
@@ -3129,11 +3220,7 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None,
                         Line2D([0], [0], color='white', lw=gap)))
         labels.append("opened")
     if handles and not _merge_joint_bar_legend(ax, 'joints', handles, labels):
-        _tag_legend(ax.legend(handles, labels, loc="lower right", fontsize=8,
-                              frameon=True, framealpha=0.92,
-                              edgecolor="#cccccc", borderpad=0.6,
-                              handlelength=2.6,
-                              handler_map={tuple: HandlerTuple(ndivide=1, pad=0.0)}),
+        _tag_legend(_place_joint_key(ax, handles, labels),
                     'joints', handles, labels)
     return cbar_specs
 
@@ -3616,25 +3703,20 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     # defer the force colorbar the same way and hand its spec back, so the two bars
     # get separate full-height slots instead of colliding in one.
     # A joint carries no strain of its own, so the contour field says nothing
-    # about it. With Show joints on, every jointed model draws its BAR-LESS
-    # joints (wall contacts, rock joints) on this panel, colored by slip, with
-    # the slip colorbar beside the field's and the key naming closed /
-    # slipping / opened (plot_joint_states). A jointed reinforcement sheet is
-    # drawn here as its bar only: the bar already carries the sheet on this
-    # panel, and its two faces' slip is the 1D Details panel's reading, so
-    # skip_bar_spans leaves them out of the drawing, the slip colorbar and the
-    # key. A model whose every joint is a sheet therefore draws no joint
-    # overlay, no slip colorbar and no key here. (The deformation panel still
-    # draws the sheet's faces.) On a model whose soil or rock can yield the
-    # joints are drawn over the strain field, at the thin over-field width,
-    # and the panel keeps its strain title and colorbar; on an all-elastic
-    # model the panel is the joints' own (slip_panel), titled Joint slip, and
-    # the slipped lengths draw at the joint-face width.
+    # about it. With Show joints on, every jointed model draws every joint on
+    # this panel — wall contacts, rock joints and a jointed sheet's two faces
+    # either side of its bar — colored by slip, with the slip colorbar beside
+    # the field's and the key naming closed / slipping / opened, off the
+    # section (plot_joint_states). The deformation panel draws them the same
+    # way. On a model whose soil or rock can yield the joints are drawn over
+    # the strain field, at the thin over-field width, and the panel keeps its
+    # strain title and colorbar; on an all-elastic model the panel is the
+    # joints' own (slip_panel), titled Joint slip, and the slipped lengths draw
+    # at the joint-face width.
     jointed = bool((fem_data.get("joint_data") or {}).get("n"))
     joint_cbar_specs = (plot_joint_states(
                             ax, fem_data, solution,
                             draw_cbar=not single_panel,
-                            skip_bar_spans=True,
                             linewidth=((joint_linewidth or JOINT_FACE_LINEWIDTH)
                                        if slip_panel else None))
                         if (show_joints and jointed) else [])

@@ -623,10 +623,10 @@ class FemResultsDisplayPanel(QWidget):
         # split along a line. A joint carries no strain, so it does not appear in
         # the strain field at all; this draws its state on the line itself.
         # Like Element edges, the box keeps one state per plot: the deformation
-        # plot (the joint faces over the blocks) and the shear strain plot (the
-        # bar-less joints colored by slip; a jointed sheet is drawn there as its
-        # bar only) are set independently, both on by default on every jointed
-        # model. The box shows and edits the current plot's state.
+        # plot (the joints over the blocks) and the shear strain plot (every
+        # joint colored by slip, a jointed sheet as its two faces either side
+        # of the bar) are set independently, both on by default on every
+        # jointed model. The box shows and edits the current plot's state.
         self._joints_state = {"deformation": True, "shear_strain": True}
         self.show_joints = QCheckBox("Show joints")
         # The faces' weight on the deformation plot, in points: a thin trace
@@ -640,14 +640,15 @@ class FemResultsDisplayPanel(QWidget):
         self.show_joints.setToolTip(
             "Set separately for the deformation plot and the shear strain plot; "
             "on by default for both on every jointed model.\n"
-            "Deformation plot: draw the two faces of every joint over the "
-            "blocks, colored by how far they have slid. Off, the blocks are "
-            "drawn without their faces.\n"
-            "Shear strain plot: draw every joint that is not on a reinforcement "
-            "line colored by its slip, with the slip colorbar and a key; a "
-            "jointed reinforcement sheet is drawn as its bar only, its faces' "
-            "slip being in the 1D Details panel. On a model whose only strength "
-            "is its joints that plot is titled Joint slip.")
+            "Deformation plot: draw every joint over the blocks, gray where "
+            "closed and colored by how far it has slid, with the slip "
+            "colorbar and a key. Off, the blocks are drawn without their "
+            "joints.\n"
+            "Shear strain plot: draw every joint as a thin line colored by its "
+            "slip, with the slip colorbar and a key; a jointed reinforcement "
+            "sheet is drawn as its two faces either side of the bar. On a "
+            "model whose only strength is its joints that plot is titled "
+            "Joint slip.")
         # How the blocks are filled on a jointed model's deformation plot: off
         # (the default), one faint tint per material zone; on, each block (a
         # connected piece of the mesh after the joint split) under its own tint.
@@ -701,18 +702,21 @@ class FemResultsDisplayPanel(QWidget):
         # Show joints is set per plot (deformation and shear strain each keep
         # their own state, both on by default on a jointed model).
         # No legend controls. With Show joints on (the default) the deformation
-        # panel carries no legend, because the block look carries its meaning in
-        # the drawing, with Color by block on or off. With Show joints off it
-        # names the original and deformed grids, and the reinforcement in both
-        # configurations, in a legend placed by _place_deform_legend. On a
-        # jointed model with Show joints on, the strain panel carries the joint
-        # key (closed, slipping, opened) beside the slip colorbar, over the
+        # panel carries no grid legend, because the block look carries its
+        # meaning in the drawing, with Color by block on or off; where the
+        # field measured the joints' state it carries the joint key (closed,
+        # slipping, opened) off the section, beside the slip colorbar. With
+        # Show joints off it names the original and deformed grids, and the
+        # reinforcement in both configurations, in a legend placed by
+        # _place_deform_legend. On a jointed model with Show joints on, the
+        # strain panel carries the joint key beside the slip colorbar, over the
         # strain field where the soil can yield and on the Joint slip panel of
-        # an all-elastic model; with Show joints off it carries none, and
-        # neither does an unjointed model's, nor one whose only joints are
-        # jointed reinforcement sheets (drawn there as their bars only). The vector panel carries none
-        # either way. The panels keep the legend they were designed with, so
-        # there is nothing here to set.
+        # an all-elastic model. Every joint is drawn there, a jointed
+        # reinforcement sheet as its two faces either side of the bar, so a
+        # model whose only joints are sheets carries the key too. With Show
+        # joints off it carries none, and neither does an unjointed model's.
+        # The vector panel carries none either way. The panels keep the legend
+        # they were designed with, so there is nothing here to set.
 
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)
         self.cmap.currentIndexChanged.connect(self._emit)

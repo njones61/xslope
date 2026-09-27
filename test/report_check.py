@@ -14537,10 +14537,10 @@ def test_the_displacement_curve_draws_the_trials():
 def test_which_result_panels_draw_a_legend():
     """The deformation panel draws a legend only with Show joints off; the
     strain panel of a jointed model draws the joint key with Show joints on and
-    none with it off, whether its soil can yield or not; a model whose only
-    joints are jointed reinforcement sheets draws no joint key on its strain
-    panel (a sheet is drawn there as its bar only); an unjointed model's
-    strain panel and the vector panel draw none either way.
+    none with it off, whether its soil can yield or not, and a model whose
+    only joints are jointed reinforcement sheets is no exception (a sheet is
+    drawn there as its two faces); an unjointed model's strain panel and the
+    vector panel draw none either way.
 
     The plots stay as they are (Norm's ruling). What is checked here is that the
     Studio panel beside them tells the truth about them. The note where the
@@ -14618,11 +14618,12 @@ def test_which_result_panels_draw_a_legend():
                              f"legend {key} with Show joints off, which the "
                              f"note says it does not")
 
-    # A model whose only joints are jointed reinforcement SHEETS draws no joint
-    # key on its strain panel, Show joints on or off (owner's ruling,
-    # 2026-09-27): the sheet is drawn there as its bar only. Read on the same
-    # toppling field with its joint lines declared to carry bars (the bar-less
-    # mask cleared), which is what a jointed sheet looks like to the drawing.
+    # A model whose only joints are jointed reinforcement SHEETS draws the
+    # joint key on its strain panel with Show joints on, and none with it off:
+    # every joint draws when joints are on, a sheet as its two faces either
+    # side of the bar. Read on the same toppling field with its joint lines
+    # declared to carry bars (the bar-less mask cleared), which is what a
+    # jointed sheet looks like to the drawing.
     fd_sheets = dict(fd_as_built, elastic_materials=[],
                      barless_1d_mask=np.zeros(
                          len(fd_as_built.get("elements_1d", [])), dtype=bool))
@@ -14635,10 +14636,13 @@ def test_which_result_panels_draw_a_legend():
         key = [text.get_text()
                for ax in fig.axes if ax.get_legend() is not None
                for text in ax.get_legend().get_texts()]
-        if [k for k in key if k in _states]:
+        joint_key = [k for k in key if k in _states]
+        if show_joints and not joint_key:
+            fails.append(f"a model whose only joints are sheets draws no joint "
+                         f"key on its strain panel with Show joints on: {key}")
+        if not show_joints and joint_key:
             fails.append(f"a model whose only joints are sheets draws the joint "
-                         f"key on its strain panel with Show joints "
-                         f"{'on' if show_joints else 'off'}: {key}")
+                         f"key on its strain panel with Show joints off: {key}")
 
     # The note itself: the comment block that opens "No legend controls." It
     # must name the control that decides the deformation legend, give both of
@@ -14666,8 +14670,11 @@ def test_which_result_panels_draw_a_legend():
                          f"draws with Show joints on and off: {note!r}")
         if "only joints are" not in note:
             fails.append(f"the note does not say a model whose only joints are "
-                         f"sheets carries no joint key on the strain panel: "
+                         f"sheets carries the joint key on the strain panel: "
                          f"{note!r}")
+        if "bars only" in note or "bar only" in note:
+            fails.append(f"the note still says a sheet is drawn as its bar "
+                         f"only: {note!r}")
         if "strain panel carries the joint key" not in note:
             fails.append(f"the note does not say the strain panel of a jointed "
                          f"model carries the joint key with Show joints on: "

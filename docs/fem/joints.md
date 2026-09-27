@@ -225,24 +225,6 @@ and how to continue a run that stopped short.
 at a limit of 100,000 the search reports a factor of safety of at least 1.56, and with the
 limit raised to a million the wall gives way at 2.0, after 30 cm of movement.
 
-**Why the shear traction can zigzag where an interface grips.** Along a stretch of interface
-that is not slipping, the shear traction plotted station by station can alternate high and low:
-the end stations of each interface element read low and the middle station reads high. The
-stations are the element's three node pairs, and each pair's traction is the force passed
-through that node divided by the length of interface the node stands for, one sixth of the
-element at each end and two thirds in the middle. Where the interface grips, its relative
-displacement is tiny, so the traction at a pair is set by the force the neighboring soil
-elements pass through that node. Quadratic soil elements hand the forces carried through their
-bodies to their mid-side nodes (the weight of a six-node triangle, for instance, is carried
-entirely at its three mid-side nodes), and that is what the middle stations show. The zigzag is
-that sharing, not a variation of the stress along the sheet: the element average, one sixth of
-each end station plus two thirds of the middle one, is the force the element actually
-transfers, it runs smoothly, and a ten times stiffer interface does not change it. It
-disappears where the interface slips, because every slipping station is held at its own
-Mohr-Coulomb limit, which follows the normal stress. Read a gripping stretch by its element
-averages, not station by station.
-{ #shear-zigzag }
-
 The element's own law — the peak limit, the residual drop and the opening a dilating joint produces
 per unit of slip — is checked against its closed forms by `test/joint_element_check.py`.
 
@@ -392,6 +374,24 @@ its limit, and the largest offset the two faces reached.
 
 ![1D Details for a reinforcement line built as a slip surface, a geogrid layer in a block wall. Because this line carries a bar, it has the four panels: the bar's tension against its capacity, then the normal stress on the interface, the shear stress against its Mohr-Coulomb limit, and the slip along the line. A joints-sheet line has no bar and shows the last three only](../tutorials/images/fem03_1d_details.png){width=900}
 
+
+**Why the shear traction can zigzag where an interface grips.** Along a stretch of interface
+that is not slipping, the shear traction plotted station by station can alternate high and low:
+the end stations of each interface element read low and the middle station reads high. The
+stations are the element's three node pairs, and each pair's traction is the force passed
+through that node divided by the length of interface the node stands for, one sixth of the
+element at each end and two thirds in the middle. Where the interface grips, its relative
+displacement is tiny, so the traction at a pair is set by the force the neighboring soil
+elements pass through that node. Quadratic soil elements hand the forces carried through their
+bodies to their mid-side nodes (the weight of a six-node triangle, for instance, is carried
+entirely at its three mid-side nodes), and that is what the middle stations show. The zigzag is
+that sharing, not a variation of the stress along the sheet: the element average, one sixth of
+each end station plus two thirds of the middle one, is the force the element actually
+transfers, it runs smoothly, and a ten times stiffer interface does not change it. It
+disappears where the interface slips, because every slipping station is held at its own
+Mohr-Coulomb limit, which follows the normal stress. Read a gripping stretch by its element
+averages, not station by station.
+{ #shear-zigzag }
 ## References
 
 Goodman, R.E., Taylor, R.L., & Brekke, T.L. (1968). A model for the mechanics of jointed rock.

@@ -227,7 +227,13 @@ def wall_sheets():
             for n, y in enumerate(SHEET_Y)]
 
 
-WALL_CIRCLE = {"Xo": 10.6, "Yo": 11.2, "Depth": 0.0, "R": 11.2}
+# The starting circle is the generator's first on this section
+# (xslope.generators.generate_starting_circles), taken at full precision: it
+# bottoms out 0.3 m below the wall's base and so passes under the blocks. A circle
+# tangent at the base (Depth 0) cuts the blocks, which are elastic, and the slicer
+# refuses any surface that crosses an elastic zone.
+WALL_CIRCLE = {"Xo": 10.6, "Yo": 11.2, "Depth": -0.29782588144384725,
+               "R": 11.497825881443847}
 
 
 def _wall(joint_lines=(), sheets=()):

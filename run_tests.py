@@ -7852,7 +7852,22 @@ def run_corpus_circles_test(test):
         return all(not any(_val(m.get(k)) for k in ('c', 'phi', 'gamma'))
                    for m in mats)
 
+    def _all_elastic(sd):
+        """True when every material is elastic.
+
+        The slicer refuses any surface that crosses an elastic zone (slice.py,
+        ``option == 'elastic'``), so on a model with no other material no limit
+        equilibrium surface exists and preflight refuses Run LEM before it
+        starts. Its circle is not judged here for the same reason as a blank
+        materials table: the model cannot be sliced whatever circle it carries.
+        Detected from the loaded model, the slicer's own test, not by file name.
+        """
+        mats = [m for m in (sd.get('materials') or []) if isinstance(m, dict)]
+        return bool(mats) and all(
+            str(m.get('option', '')).strip().lower() == 'elastic' for m in mats)
+
     problems, checked, skipped = [], 0, 0
+    elastic_only = []
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
         for path in _corpus_circle_files():
@@ -7870,6 +7885,10 @@ def run_corpus_circles_test(test):
                 continue
             if _blank_strength(sd):
                 skipped += 1
+                continue
+            if _all_elastic(sd):
+                skipped += 1
+                elastic_only.append(name)
                 continue
             # Pore pressure neutralized, and both consumption paths tried, exactly
             # as preflight's own probe does it -- see _Ctx.circle_slice_failure for
@@ -7920,6 +7939,9 @@ def run_corpus_circles_test(test):
                     f"{name}: circle 1 (Xo={c.get('Xo')}, Yo={c.get('Yo')}, "
                     f"R={c.get('R')}) produces no slices -- {reason[:110]}")
 
+    print(f"    {checked} workbook(s) checked; {len(elastic_only)} skipped as "
+          f"all-elastic (no limit equilibrium surface can be sliced)"
+          + (f": {', '.join(elastic_only)}" if elastic_only else ""))
     if problems:
         return None, (f"{len(problems)} of {checked} shipped workbook(s) carry a "
                       f"first circle that cannot be sliced (fix the BUILDER, never "

@@ -265,10 +265,10 @@ yourself. A drawn region is a polygon on the polygon sheet with its **Type** set
 [joint regions](../usage/input_template.md#joint-regions) on the template page), and it can be
 limited to a band of elevations. Outside the region no joints are written.
 
-In Studio this is the [Build network](../studio/editing.md#build-network) button on the joints
-editor: choose the pattern, enter its numbers, pick the region, and the canvas previews the joints
-before anything is written. In a script the same three patterns are the functions `parallel_set`,
-`cross_jointed` and `voronoi` in `xslope.joints`.
+In Studio, press [Build network](../studio/editing.md#build-network) on the joints editor,
+choose the pattern, enter its numbers and pick the region; the canvas previews the joints before
+anything is written. In a script, call `parallel_set`, `cross_jointed` or `voronoi` from
+`xslope.joints`.
 
 What gets written is ordinary rows on the joints worksheet, labeled `set-01`, `set-02` and so on.
 The lines are the model; the pattern that made them is not remembered. To change a network, remove

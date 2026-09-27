@@ -180,6 +180,9 @@ interface friction; a natural joint whose strength is uncertain is part of the m
 looking for, and should be reduced with the rock. The stiffnesses `kn` and `ks` are not
 strengths, so they are not reduced, any more than the bar's are.
 
+The element's own law — the peak limit, the residual drop and the opening a dilating joint produces
+per unit of slip — is checked against its closed forms by `test/joint_element_check.py`.
+
 ## What the Method Can and Cannot Model
 
 The element is a small-strain interface between **fixed node pairs**. A pair carries compression
@@ -224,9 +227,6 @@ and how to continue a run that stopped short.
 [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) shows the effect on a geogrid wall:
 at a limit of 100,000 the search reports a factor of safety of at least 1.56, and with the
 limit raised to a million the wall gives way at 2.0, after 30 cm of movement.
-
-The element's own law — the peak limit, the residual drop and the opening a dilating joint produces
-per unit of slip — is checked against its closed forms by `test/joint_element_check.py`.
 
 ## Inputs
 
@@ -373,7 +373,6 @@ generated report carries the same reading as a table: the share of each line's l
 its limit, and the largest offset the two faces reached.
 
 ![1D Details for a reinforcement line built as a slip surface, a geogrid layer in a block wall. Because this line carries a bar, it has the four panels: the bar's tension against its capacity, then the normal stress on the interface, the shear stress against its Mohr-Coulomb limit, and the slip along the line. A joints-sheet line has no bar and shows the last three only](../tutorials/images/fem03_1d_details.png){width=900}
-
 
 **Why the shear traction can zigzag where an interface grips.** Along a stretch of interface
 that is not slipping, the shear traction plotted station by station can alternate high and low:

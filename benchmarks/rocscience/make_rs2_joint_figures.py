@@ -25,6 +25,10 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import make_rs2_figures as F                                        # noqa: E402
 
+# Every row on this page is jointed: its deformed-section panel draws each block
+# under its own tint, so the bodies can be told apart.
+F.COLOR_BLOCKS = True
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PAGE = os.path.join(ROOT, 'docs', 'verification', 'rs2_joints.md')
 

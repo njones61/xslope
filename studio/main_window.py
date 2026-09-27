@@ -2631,6 +2631,8 @@ class MainWindow(QMainWindow):
             if getattr(panel, "_grid_default_for", None) is not id(bundle):
                 from xslope.plot_fem import block_grid_default
                 panel.set_block_grid_default(block_grid_default(bundle["fem_data"]))
+                panel.set_jointed(bool(
+                    (bundle["fem_data"].get("joint_data") or {}).get("n")))
                 panel._grid_default_for = id(bundle)
             try:
                 self.fem_results_canvas.render_fem_results(

@@ -453,7 +453,7 @@ def fem03_wall():
     """The strength reduction on the wall as built, and the two panels the page
     reads it from: the blocks, and the shear strain in the soil around them.
 
-    On a jointed model the deformation panel, with Joint state on, is the block
+    On a jointed model the deformation panel, with Show joints on, is the block
     picture: the scaled deformed mesh with both faces of every joint drawn, because
     a jointed model's mechanism is wedges moving as bodies on their contacts.
     """

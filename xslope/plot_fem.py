@@ -55,14 +55,19 @@ _DEFORMED_GRID_UNDER_JOINTS = '0.62'
 _DEFORMED_BOUNDARY_COLOR = '#22262b'
 _DEFORMED_BOUNDARY_PT = 1.4
 
-#: The deformed mesh of a jointed model is filled with a faint tint per MATERIAL
-#: zone, in the colors the inputs and mesh plots give the zones
+#: The deformed mesh of a jointed model is filled with a faint tint
 #: (:func:`_draw_block_tints`), at ``_BLOCK_TINT_ALPHA`` so the element edges and
-#: the field stay readable through the fill. The tint does not change from block
-#: to block; the blocks are read from the joint faces drawn between them.
-#: ``_BLOCK_TINTS`` is not read by the drawing.
-_BLOCK_TINTS = ('#c8d8ea', '#ecd9c0', '#cfe3c6')
+#: the field stay readable through the fill. By default (``color_blocks=False``)
+#: the tint is one per MATERIAL zone, in the colors the inputs and mesh plots
+#: give the zones, and the blocks are read from the joint faces drawn between
+#: them. With ``color_blocks=True`` each block takes its own tint from
+#: ``_BLOCK_TINTS`` at ``_BLOCK_TINT_ALPHA_BY_BLOCK``, assigned so that two
+#: blocks sharing a joint face never take the same one
+#: (:func:`_block_tint_indices`); the fourth tint is used only where a block's
+#: neighbors already hold the first three.
+_BLOCK_TINTS = ('#c8d8ea', '#ecd9c0', '#cfe3c6', '#e3d3e6')
 _BLOCK_TINT_ALPHA = 0.22
+_BLOCK_TINT_ALPHA_BY_BLOCK = 0.45
 
 # Median rendered element edge (device px) below which two full interleaved grids
 # (original + deformed) tangle; below it the original mesh collapses to its domain
@@ -908,7 +913,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
-                    block_grid=None, joint_linewidth=None,
+                    block_grid=None, joint_linewidth=None, color_blocks=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
                     scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None,
                     mesh_on_fields=False, fs=None, failure_solution=None,
@@ -945,6 +950,9 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             grid is drawn under the blocks; None follows :func:`block_grid_default`.
         joint_linewidth: Width in points of the joint faces on that panel; None
             takes :data:`JOINT_FACE_LINEWIDTH`.
+        color_blocks: On a jointed model's deformation panel, fill each block
+            with its own tint (cycling :data:`_BLOCK_TINTS`) instead of one tint
+            per material zone (the default, False).
         show_mesh: Show mesh lines where the mesh IS the content — the deformation
             panel's original-vs-deformed grid (and the displace_vector panel's edge
             context). It does NOT overlay edges on the filled-field contour panels
@@ -1289,7 +1297,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                              label_elements=label_elements, single_panel=defer_panel_cbar,
                              at_failure=deform_field.get("_at_failure", False),
                              joint_faces=show_joints, block_grid=block_grid,
-                             joint_linewidth=joint_linewidth) or []
+                             joint_linewidth=joint_linewidth,
+                             color_blocks=color_blocks) or []
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
@@ -1894,7 +1903,8 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
                        show_original='outline', deformed_color='k', show_reinforcement=True,
                        cbar_shrink=0.8, cbar_labelpad=20, label_elements=False,
                        single_panel=False, at_failure=False, show_mesh=None,
-                       joint_faces=False, block_grid=None, joint_linewidth=None):
+                       joint_faces=False, block_grid=None, joint_linewidth=None,
+                       color_blocks=False):
     """
     Plot deformed mesh overlay on original mesh.
 
@@ -1923,6 +1933,10 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
             :func:`block_grid_default`; True or False is the user's own choice.
         joint_linewidth: Width of the joint faces in points; None takes
             :data:`JOINT_FACE_LINEWIDTH`.
+        color_blocks: With ``joint_faces``, fill each block (a connected piece
+            of the mesh after the joint split, :func:`xslope.mesh.block_components`)
+            with its own tint, cycling :data:`_BLOCK_TINTS`. False (default)
+            fills one tint per material zone.
         joint_faces: Draw the two faces of every joint element over the deformed
             grid, and drop the grid itself to a light gray so they read over it.
             Both copies of each face are drawn, so a joint that has slipped or
@@ -2006,7 +2020,8 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
         # block_grid_default); an explicit block_grid is the user's override.
         show_edges = (block_grid_default(fem_data) if block_grid is None
                       else bool(block_grid))
-        _draw_block_tints(ax, fem_data, nodes_deformed, comp)
+        _draw_block_tints(ax, fem_data, nodes_deformed, comp,
+                          per_block=color_blocks)
     if show_edges:
         plot_mesh_lines(ax, fem_data_deformed,
                         color=_DEFORMED_GRID_UNDER_JOINTS if block_look
@@ -2742,36 +2757,101 @@ def _draw_joint_faces(ax, fem_data, solution, nodes_deformed, blocks, lw):
     return specs
 
 
-def _draw_block_tints(ax, fem_data, nodes_xy, comp):
-    """Fill the deformed mesh with a faint tint per MATERIAL zone, the same
-    colors the inputs and mesh plots give the zones.
+def _draw_block_tints(ax, fem_data, nodes_xy, comp, per_block=False):
+    """Fill the deformed mesh with a faint tint, per material zone or per block.
 
-    The tint used to cycle by block, so a bonded and a jointed run of one
-    section drew differently — one tint over the whole mesh against a tint per
-    block. By material the two draw alike, and the blocks are still read from
-    the faces drawn between them. ``comp`` is accepted for the callers that
-    computed it and is not used for color.
+    ``per_block=False`` (default): one tint per MATERIAL zone, the same colors
+    the inputs and mesh plots give the zones, so a bonded and a jointed run of
+    one section draw alike and the blocks are read from the faces drawn between
+    them.
+
+    ``per_block=True``: each block (``comp``, the block index per element from
+    :func:`xslope.mesh.block_components`) takes a tint from ``_BLOCK_TINTS`` at
+    ``_BLOCK_TINT_ALPHA_BY_BLOCK``, chosen by :func:`_block_tint_indices` so no
+    two blocks that share a joint face take the same tint: on a toppling set the
+    columns alternate, while a section whose joints stop inside the mass comes
+    back as one block under one tint.
     """
     from matplotlib.collections import PolyCollection
     from .mesh import element_corner_polygons
-    from .style import material_style, resolve_style
-    mats = np.asarray(fem_data.get("element_materials",
-                                   np.ones(len(fem_data["elements"]))), dtype=int)
-    # Mesh material ids are 1-based (gmsh); the style sheet keys by the 0-based
-    # mat_id, as the mesh plot does, so the zones take the Inputs view's colors.
-    st = resolve_style(None)
-    color_of = {int(m): material_style(st, int(m) - 1)["color"]
-                for m in np.unique(mats)}
+    alpha = _BLOCK_TINT_ALPHA
+    if per_block:
+        keys = np.asarray(comp, dtype=int)
+        tint = _block_tint_indices(fem_data, keys)
+        color_of = {c: _BLOCK_TINTS[t] for c, t in tint.items()}
+        alpha = _BLOCK_TINT_ALPHA_BY_BLOCK
+    else:
+        from .style import material_style, resolve_style
+        keys = np.asarray(fem_data.get("element_materials",
+                                       np.ones(len(fem_data["elements"]))), dtype=int)
+        # Mesh material ids are 1-based (gmsh); the style sheet keys by the
+        # 0-based mat_id, as the mesh plot does, so the zones take the Inputs
+        # view's colors.
+        st = resolve_style(None)
+        color_of = {int(m): material_style(st, int(m) - 1)["color"]
+                    for m in np.unique(keys)}
     polys, colors = [], []
-    for poly, m in zip(element_corner_polygons(fem_data, nodes_xy), mats):
+    for poly, k in zip(element_corner_polygons(fem_data, nodes_xy), keys):
         if poly is None:
             continue
         polys.append(poly)
-        colors.append(color_of[int(m)])
+        colors.append(color_of[int(k)])
     if polys:
         ax.add_collection(PolyCollection(
             polys, facecolors=colors, edgecolors='none',
-            alpha=_BLOCK_TINT_ALPHA, zorder=0.5))
+            alpha=alpha, zorder=0.5))
+
+
+def _block_tint_indices(fem_data, comp):
+    """Which of ``_BLOCK_TINTS`` each block takes, as ``{block: tint index}``.
+
+    Two blocks are neighbors when they share a joint face: a node pair of an
+    interface element has one node in each. The blocks are visited in order of
+    their centroid x starting from the toe side (the end of the section whose
+    top is lower), and each takes the first of the first three tints no
+    already-colored neighbor holds; the fourth only when all three are taken.
+    Visiting from the toe keeps the assignment stable and makes a column set
+    alternate.
+    """
+    comp = np.asarray(comp, dtype=int)
+    blocks = [int(b) for b in np.unique(comp)]
+    elements = np.asarray(fem_data["elements"], dtype=int)
+    nodes = np.asarray(fem_data["nodes"], dtype=float)[:, :2]
+    # Every node's block(s), through the elements it belongs to.
+    blocks_of = {}
+    for e, b in zip(elements, comp):
+        for n in e:
+            if n >= 0:
+                blocks_of.setdefault(int(n), set()).add(int(b))
+    nbrs = {b: set() for b in blocks}
+    jd = fem_data.get("joint_data") or {}
+    if jd.get("n"):
+        conn = np.asarray(jd["conn"], dtype=int)
+        n_pairs = np.asarray(jd.get("n_pairs", [conn.shape[1] // 2] * len(conn)),
+                             dtype=int)
+        for row, npr in zip(conn, n_pairs):
+            for a, c in zip(row[:npr], row[npr:2 * npr]):
+                for ba in blocks_of.get(int(a), ()):
+                    for bc in blocks_of.get(int(c), ()):
+                        if ba != bc:
+                            nbrs[ba].add(bc)
+                            nbrs[bc].add(ba)
+    # Centroid x of each block (undeformed), and which end is the toe.
+    cx = {}
+    for b in blocks:
+        cx[b] = float(nodes[np.unique(elements[comp == b][elements[comp == b] >= 0]),
+                            0].mean())
+    x0, x1 = nodes[:, 0].min(), nodes[:, 0].max()
+    band = 0.01 * max(x1 - x0, 1e-12)
+    top_left = nodes[nodes[:, 0] <= x0 + band, 1].max()
+    top_right = nodes[nodes[:, 0] >= x1 - band, 1].max()
+    toe_right = top_right < top_left
+    order = sorted(blocks, key=lambda b: (-cx[b] if toe_right else cx[b], b))
+    tint = {}
+    for b in order:
+        taken = {tint[n] for n in nbrs[b] if n in tint}
+        tint[b] = next((t for t in range(3) if t not in taken), 3)
+    return tint
 
 
 #: Width, in points, of a joint face on the deformation panel. Studio's display

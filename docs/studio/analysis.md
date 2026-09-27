@@ -789,16 +789,17 @@ solve, or a solution saved before trials recorded their displacement, shows a
 one-line note in place of the plot. How to read the curve is set out in
 [Displacement vs F](../fem/overview.md#displacement-vs-f).
 
-On a jointed model the displacement-vector plot is the scaled deformed mesh instead, drawn as the blocks the joints
-cut the section into — each under a faint tint, its joint faces green, the deformed outside of the mesh a dark line
+The displacement-vector plot draws the arrow field on every model, jointed or not. On a jointed model the deformation
+plot draws the scaled deformed mesh as the blocks the joints cut the section into — each under a faint tint, its joint faces green, the deformed outside of the mesh a dark line
 against the dashed undeformed outline: a jointed slope fails by blocks moving as bodies on their joints, and an arrow
 field sampled at nodes misses the parting and sliding that is the whole mechanism. On a network of more than eight
 jointed lines the element edges come off so the blocks can be seen; that sets the **Element edges** box for the
 result, and the box overrides it either way. Where the displacements are too small to draw the
-mesh is shown undeformed and the title says so. A **Joint state** switch draws the two faces of every joint on
+mesh is shown undeformed and the title says so. A **Show joints** switch draws the two faces of every joint on
 that deformed mesh, each where the deformation has put it and colored by how far the faces have slid on a green
 ramp, gray where the joint is not slipping, with a slip colorbar; **Joint width** sets the weight of those faces
-in points, since a thin face disappears on a wide section. On a model whose only strength is its joints the
+in points, since a thin face disappears on a wide section. **Color by block** sets the fill of the blocks: off
+(the default), one tint per material; on, each block under its own tint so the bodies can be told apart. On a model whose only strength is its joints the
 strain plot carries the same reading, ticked across where a joint has opened.
 
 The FEM · Results toolbar also carries **1D Details…**, which opens a non-modal panel

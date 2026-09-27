@@ -622,7 +622,7 @@ class FemResultsDisplayPanel(QWidget):
         # The interface (joint) elements' own reading, on a model whose mesh was
         # split along a line. A joint carries no strain, so it does not appear in
         # the strain field at all; this draws its state on the line itself.
-        self.show_joints = QCheckBox("Joint state")
+        self.show_joints = QCheckBox("Show joints")
         # The faces' weight on the deformation plot, in points: a thin trace
         # disappears on a wide section, a heavy one hides the blocks.
         from xslope.plot_fem import JOINT_FACE_LINEWIDTH
@@ -636,6 +636,18 @@ class FemResultsDisplayPanel(QWidget):
             "every joint over the blocks, colored by how far they have slid. "
             "Off, the blocks are drawn without their faces. On a model whose only "
             "strength is its joints the strain plot carries the same reading.")
+        # How the blocks are filled on a jointed model's deformation plot: off
+        # (the default), one faint tint per material zone; on, each block (a
+        # connected piece of the mesh after the joint split) under its own tint.
+        # Enabled only on that plot of a jointed model, with Show joints on,
+        # since the fill is part of the block drawing.
+        self._jointed = False
+        self.color_blocks = QCheckBox("Color by block")
+        self.color_blocks.setChecked(False)
+        self.color_blocks.setToolTip(
+            "On the deformation plot of a jointed model, fill each block with "
+            "its own tint so the bodies can be told apart. Off, the fill is one "
+            "tint per material.")
         self.label_elements = QCheckBox("Element numbers")
 
         # Displacement-vector-only controls.
@@ -666,6 +678,7 @@ class FemResultsDisplayPanel(QWidget):
         form.addRow("", self.element_edges)
         form.addRow("", self.show_reinforcement)
         form.addRow("", self.show_joints)
+        form.addRow("", self.color_blocks)
         form.addRow("Joint width (pt)", self.joint_width)
         form.addRow("", self.label_elements)
         form.addRow("", self.plot_boundary)
@@ -673,12 +686,12 @@ class FemResultsDisplayPanel(QWidget):
         form.addRow("", self.scale_vectors)
         form.addRow("Vector cutoff", self.displacement_tolerance)
         form.addRow("", self.color_by_magnitude)
-        # No legend controls. With Joint state on (the default) the deformation
+        # No legend controls. With Show joints on (the default) the deformation
         # panel carries no legend, because the block look carries its meaning in
-        # the drawing. With Joint state off it names the original and deformed
-        # grids, and the reinforcement in both configurations, in a legend placed
-        # by _place_deform_legend. The strain and vector panels carry none either
-        # way. The panels keep the legend they were designed with, so there is
+        # the drawing, with Color by block on or off. With Show joints off it
+        # names the original and deformed grids, and the reinforcement in both
+        # configurations, in a legend placed by _place_deform_legend. The strain
+        # and vector panels carry none either way. The panels keep the legend they were designed with, so there is
         # nothing here to set.
 
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)
@@ -692,8 +705,10 @@ class FemResultsDisplayPanel(QWidget):
         for c in (self.element_edges, self.show_reinforcement, self.show_joints,
                   self.label_elements,
                   self.plot_boundary, self.plot_nodes, self.scale_vectors,
-                  self.color_by_magnitude):
+                  self.color_by_magnitude, self.color_blocks):
             c.toggled.connect(self._emit)
+        # Color by block follows Show joints: the fill belongs to the block look.
+        self.show_joints.toggled.connect(lambda *_: self._sync_enabled())
         self._sync_enabled()
 
     @property
@@ -715,6 +730,12 @@ class FemResultsDisplayPanel(QWidget):
             self.element_edges.setChecked(flag)
             self.element_edges.blockSignals(False)
             self._sync_enabled()
+
+    def set_jointed(self, flag):
+        """Tell the panel whether the result on screen is a jointed model, which
+        is the only model the Color by block box applies to."""
+        self._jointed = bool(flag)
+        self._sync_enabled()
 
     def _on_plot_type(self, *_):
         # "Element edges" carries a per-type default and remembers the user's
@@ -760,6 +781,8 @@ class FemResultsDisplayPanel(QWidget):
         for w in (self.deform_percent, self.deform_scale,
                   self.show_original, self.deformed_color):
             w.setEnabled(pt == "deformation")
+        self.color_blocks.setEnabled(pt == "deformation" and self._jointed
+                                     and self.show_joints.isChecked())
         # Auto size is Auto's target: dead while Scale x pins the multiplier.
         if pt == "deformation":
             self.deform_percent.setEnabled(self.deform_scale.value() == 0.0)
@@ -791,6 +814,9 @@ class FemResultsDisplayPanel(QWidget):
             "block_grid": edges,
             "show_reinforcement": self.show_reinforcement.isChecked(),
             "show_joints": self.show_joints.isChecked(),
+            # Per-block fill on a jointed model only; an unjointed model keeps
+            # its material tint whatever the box says.
+            "color_blocks": self.color_blocks.isChecked() and self._jointed,
             "joint_linewidth": float(self.joint_width.value()),
             "label_elements": self.label_elements.isChecked(),
             "plot_boundary": self.plot_boundary.isChecked(),

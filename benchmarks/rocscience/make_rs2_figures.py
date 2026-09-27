@@ -108,6 +108,12 @@ OUT = os.path.join(ROOT, 'docs', 'verification', 'images')
 
 TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 
+#: Whether a jointed row's deformed-section panel fills each block with its own
+#: tint (``plot_deformed_mesh(color_blocks=True)``) rather than one tint per
+#: material. Off here, so this page's figures draw as they always have; the joint
+#: corpus producer (make_rs2_joint_figures.py) turns it on for its rows.
+COLOR_BLOCKS = False
+
 
 # Rows the page documents but does NOT regression-lock, so they carry no fem_ssrm
 # test tag for parse_tags to find. Registered here — in the same tag shape — so a
@@ -1184,6 +1190,7 @@ def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi, 
             ax_lr, fem_data, afield, _composite_deformation_scale(
                 fem_data, afield, domain),
             show_reinforcement=True, single_panel=True, joint_faces=True,
+            color_blocks=COLOR_BLOCKS,
             at_failure=afield.get('_at_failure', False))
     else:
         plot_displacement_vectors(

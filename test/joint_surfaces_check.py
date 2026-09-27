@@ -43,7 +43,10 @@ six lines made joints in memory:
      — leaves the bodies the joints cut the section into. Read on two grids
      whose answer is known by inspection: a rectangle cut through is two blocks,
      and one whose joint stops inside is one, because the material wraps around
-     the tip. That is what the deformed panel tints and outlines.
+     the tip. That is what the deformed panel tints and outlines. With Color
+     by block on (``color_blocks=True``) the shipped toppling model's panel,
+     drawn from its stored solution, fills more than one tint, neighboring
+     blocks differing; off, it fills exactly one, its single material's.
   g. the saved field keeps its joints. Slip and the opened record are the
      solve's own history and cannot be recovered from the displacements, so a
      field exported without them reloads as a model whose interfaces went
@@ -537,7 +540,7 @@ def _leg_plots(failures, cache):
     cache["plain"] = (plain, mesh0, fd0, sol0)
 
     # The block picture. A jointed model's mechanism is blocks moving as bodies
-    # on their joints, so with Joint state on (the default) its deformation panel
+    # on their joints, so with Show joints on (the default) its deformation panel
     # draws the scaled deformed mesh as blocks with the joint faces over them. The
     # displacement-vector panel is the arrow field on every model, jointed or not.
     #
@@ -991,6 +994,41 @@ def _leg_blocks(failures, cache):
     if sum(len(v) for v in blocks2.values()) != 2:
         failures.append(f"the joint that stops inside lost its faces: "
                         f"{ {k: len(v) for k, v in blocks2.items()} }")
+
+
+    # Color by block, on the shipped toppling model's stored solution (no
+    # solve): on, a tint per block with neighbors differing, so more than one;
+    # off, one tint per material, and the model has one material.
+    import matplotlib.figure as mplfig
+    import matplotlib.colors as mcolors
+    from matplotlib.collections import PolyCollection
+    from xslope.fileio import load_slope_data
+    from xslope.fem import build_fem_data, import_fem_solution
+    from xslope.mesh import import_mesh_from_json
+    from xslope.plot_fem import plot_fem_results
+    stem = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "docs", "tutorials", "files", "xslope_rock_toppling")
+    sd = _quiet(load_slope_data, stem + ".xlsx")
+    fd = _quiet(build_fem_data, sd, _quiet(import_mesh_from_json,
+                                          stem + "_mesh.json"))
+    sol = _quiet(import_fem_solution, fd, stem)
+    n_mats = len(np.unique(np.asarray(fd["element_materials"], dtype=int)))
+    if n_mats != 1:
+        failures.append(f"the toppling model carries {n_mats} materials; the "
+                        f"Color by block assertion expects one")
+    for on, want in ((True, "more than one"), (False, "exactly one")):
+        fig = mplfig.Figure(figsize=(6.0, 4.0))
+        _quiet(plot_fem_results, fd, sol, plot_type=["deformation"], fig=fig,
+               show_joints=True, color_blocks=on)
+        tints = {tuple(np.round(c[:3], 6))
+                 for ax in fig.axes for coll in ax.collections
+                 if isinstance(coll, PolyCollection) and coll.get_zorder() == 0.5
+                 for c in coll.get_facecolors()}
+        ok = len(tints) > 1 if on else len(tints) == 1
+        if not ok:
+            failures.append(f"with Color by block {'on' if on else 'off'} the "
+                            f"toppling model's deformation panel fills "
+                            f"{len(tints)} tint(s), not {want}")
 
 
 # --------------------------------------------------------------------------

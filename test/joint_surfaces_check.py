@@ -536,25 +536,28 @@ def _leg_plots(failures, cache):
     plt.close(fig)
     cache["plain"] = (plain, mesh0, fd0, sol0)
 
-    # The displacement panel. A jointed model's mechanism is blocks moving as
-    # bodies on their joints, which an arrow field sampled at nodes does not
-    # show, so that panel becomes the scaled deformed mesh with the joint faces
-    # drawn. An unjointed model keeps the arrows.
+    # The block picture. A jointed model's mechanism is blocks moving as bodies
+    # on their joints, so with Joint state on (the default) its deformation panel
+    # draws the scaled deformed mesh as blocks with the joint faces over them. The
+    # displacement-vector panel is the arrow field on every model, jointed or not.
     #
-    # The rule belongs to the PANEL, not to a figure, so it is asserted on every
+    # Each rule belongs to a PANEL, not to a figure, so it is asserted on every
     # layout a results figure is drawn in: the stacked multi-panel figure the
     # driver scripts and the docs render, AND the one-panel-at-a-time figure
     # Studio's results view and the report render. Those take different layout
     # branches through plot_fem_results (deferred stacked colorbars vs. the
     # single-panel make_axes_locatable path), so one passing does not prove the
     # other.
+    from matplotlib.collections import PolyCollection
     from matplotlib.quiver import Quiver
     from xslope.plot_fem import plot_fem_results
-    layouts = (["shear_strain", "displace_vector"],   # stacked figure
-               ["displace_vector"])                   # Studio / report: one panel
-    for fd, sol, jointed in ((fem_data, sol, True), (fd0, sol0, False)):
-        for panels in layouts:
-            where = f"{len(panels)}-panel"
+    cases = ((fem_data, sol, True, "deformation"),
+             (fem_data, sol, True, "displace_vector"),
+             (fd0, sol0, False, "displace_vector"))
+    for fd, sol, jointed, pt in cases:
+        for panels in (["shear_strain", pt],   # stacked figure
+                       [pt]):                  # Studio / report: one panel
+            where = f"{len(panels)}-panel {pt}"
             fig, axes = _quiet(plot_fem_results, fd, sol, plot_type=list(panels),
                                figsize=(9, 7))
             # One panel returns the Axes itself, not a list of them.
@@ -562,31 +565,6 @@ def _leg_plots(failures, cache):
             title = ax_d.get_title()
             arrows = [a for a in ax_d.collections if isinstance(a, Quiver)]
             faces = [c for c in ax_d.collections if isinstance(c, LineCollection)]
-            if jointed and arrows:
-                failures.append(f"a jointed model's {where} displacement panel "
-                                f"still draws an arrow field")
-            if jointed and "Deformation" not in title:
-                failures.append(f"a jointed model's {where} displacement panel "
-                                f"is not the deformed mesh: {title!r}")
-            if jointed and "Scale" not in title:
-                failures.append(f"the {where} deformed-mesh panel does not print "
-                                f"its exaggeration: {title!r}")
-            # The joint faces are the point of the substitution: a deformed grid
-            # with no faces on it says nothing the arrows didn't.
-            if jointed and len(faces) < 2:
-                failures.append(f"the {where} deformed-mesh panel drew no joint "
-                                f"faces over its grid: {len(faces)} collections")
-            if not jointed and not arrows:
-                failures.append(f"an unjointed model lost its {where} "
-                                f"displacement vectors")
-            if not jointed and "Displacement Vectors" not in title:
-                failures.append(f"an unjointed model's {where} displacement "
-                                f"panel changed: {title!r}")
-            # The blocks: a faint tint per body, and the outside of the deformed
-            # mesh as a line of its own. Without the tint two blocks that touch
-            # are one gray field; without the boundary the only thing carrying
-            # the deformed ground surface is the light element grid.
-            from matplotlib.collections import PolyCollection
             # A Quiver is itself a PolyCollection, so the arrow field is not a
             # block tint however much it looks like one to isinstance.
             tints = [c for c in ax_d.collections
@@ -594,16 +572,48 @@ def _leg_plots(failures, cache):
                      and not isinstance(c, Quiver)]
             edges = [c for c in ax_d.collections if isinstance(c, LineCollection)
                      and _same_color(c, _PF._DEFORMED_BOUNDARY_COLOR)]
-            if jointed and not tints:
-                failures.append(f"the {where} deformed panel tints no blocks, "
-                                f"so two bodies that touch read as one")
-            if jointed and not edges:
-                failures.append(f"the {where} deformed panel draws no exterior "
-                                f"boundary, so the moved ground surface is "
-                                f"carried only by the element grid")
-            if not jointed and tints:
-                failures.append(f"an unjointed model's {where} panel was "
-                                f"tinted by block")
+            if pt == "displace_vector":
+                # The arrow field on every model: a jointed model's third panel
+                # is not the block picture a second time.
+                if not arrows:
+                    failures.append(f"{'a jointed' if jointed else 'an unjointed'}"
+                                    f" model's {where} panel draws no "
+                                    f"displacement vectors")
+                if "Displacement Vectors" not in title:
+                    failures.append(f"{'a jointed' if jointed else 'an unjointed'}"
+                                    f" model's {where} panel is not the "
+                                    f"vectors panel: {title!r}")
+                if tints:
+                    failures.append(f"{'a jointed' if jointed else 'an unjointed'}"
+                                    f" model's {where} panel was tinted by "
+                                    f"block")
+            else:
+                if arrows:
+                    failures.append(f"a jointed model's {where} panel draws an "
+                                    f"arrow field")
+                if "Deformation" not in title:
+                    failures.append(f"a jointed model's {where} panel is not "
+                                    f"the deformed mesh: {title!r}")
+                if "Scale" not in title:
+                    failures.append(f"the {where} panel does not print its "
+                                    f"exaggeration: {title!r}")
+                # The joint faces are the point of the block picture: a deformed
+                # grid with no faces on it says nothing about the joints.
+                if len(faces) < 2:
+                    failures.append(f"the {where} panel drew no joint faces "
+                                    f"over its grid: {len(faces)} collections")
+                # The blocks: a faint tint per body, and the outside of the
+                # deformed mesh as a line of its own. Without the tint two blocks
+                # that touch are one gray field; without the boundary the only
+                # thing carrying the deformed ground surface is the light
+                # element grid.
+                if not tints:
+                    failures.append(f"the {where} panel tints no blocks, so two "
+                                    f"bodies that touch read as one")
+                if not edges:
+                    failures.append(f"the {where} panel draws no exterior "
+                                    f"boundary, so the moved ground surface is "
+                                    f"carried only by the element grid")
             plt.close(fig)
 
 

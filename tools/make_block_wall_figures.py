@@ -453,10 +453,9 @@ def fem03_wall():
     """The strength reduction on the wall as built, and the two panels the page
     reads it from: the blocks, and the shear strain in the soil around them.
 
-    On a jointed model the displacement panel IS the block picture — the scaled
-    deformed mesh with both faces of every joint drawn, because a jointed model's
-    mechanism is wedges moving as bodies on their contacts and an arrow field
-    sampled at nodes says nothing about the contacts.
+    On a jointed model the deformation panel, with Joint state on, is the block
+    picture: the scaled deformed mesh with both faces of every joint drawn, because
+    a jointed model's mechanism is wedges moving as bodies on their contacts.
     """
     from xslope.plot_fem import plot_fem_results
 
@@ -467,7 +466,7 @@ def fem03_wall():
     _report("wall", result, seconds, declared_unit_labels(wall)["length"])
     _joints(wall, fem_data, result, dump="wall")
     _pair("fem03_fem_blocks.png", "fem03_fem_shear.png", fem_data, result,
-          "displace_vector")
+          "deformation")
     _keep_solution("wall", fem_data, result)
     _curve("fem03_ssrm_curve.png", fem_data, result)
 
@@ -512,7 +511,7 @@ def fem03_grid():
     _report("wall + grid", result, seconds, declared_unit_labels(grid)["length"])
     _joints(grid, fem_data, result, dump="grid")
     _pair("fem03_fem_blocks_grid.png", "fem03_fem_shear_grid.png", fem_data,
-          result, "displace_vector")
+          result, "deformation")
     _keep_solution("wall_grid", fem_data, result)
     _curve("fem03_ssrm_curve_grid.png", fem_data, result)
     _layer_loads(grid, fem_data, result)
@@ -610,15 +609,8 @@ def fem03_sheets():
         # model, the deformed mesh on a bonded one), then the strain panel,
         # each in both field states.
         _pair(name.replace("fem03_shear_", "fem03_deform_"), name, fem_data,
-              result, _deform_panel(fem_data))
+              result, "deformation")
         _keep_solution(label, fem_data, result)
-
-
-def _deform_panel(fem_data):
-    """The deformation panel a model gets: the blocks (displace_vector routes
-    there on a jointed model) or the deformed mesh on a model with no joint."""
-    return ("displace_vector" if (fem_data.get("joint_data") or {}).get("n")
-            else "deformation")
 
 
 def _both_states(name, fem_data, result, plot_type):

@@ -55,10 +55,12 @@ _DEFORMED_GRID_UNDER_JOINTS = '0.62'
 _DEFORMED_BOUNDARY_COLOR = '#22262b'
 _DEFORMED_BOUNDARY_PT = 1.4
 
-#: The tints the blocks of a jointed mesh are filled with, cycling by block. Very
-#: light and few: the tint says "this much material moves as one body", and three
-#: of them are enough for neighbors to differ while the element edges and the
-#: field stay readable through the fill.
+#: The deformed mesh of a jointed model is filled with a faint tint per MATERIAL
+#: zone, in the colors the inputs and mesh plots give the zones
+#: (:func:`_draw_block_tints`), at ``_BLOCK_TINT_ALPHA`` so the element edges and
+#: the field stay readable through the fill. The tint does not change from block
+#: to block; the blocks are read from the joint faces drawn between them.
+#: ``_BLOCK_TINTS`` is not read by the drawing.
 _BLOCK_TINTS = ('#c8d8ea', '#ecd9c0', '#cfe3c6')
 _BLOCK_TINT_ALPHA = 0.22
 
@@ -923,11 +925,9 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         plot_type: Comma-separated plot types. Valid types:
             'deformation' - deformed mesh overlay
             'displace_mag' - displacement magnitude contours
-            'displace_vector' - displacement vectors at corner nodes; on a model
-                whose field carries joint state this panel becomes the scaled
-                deformed mesh with the joint faces drawn, because a jointed
-                model's mechanism is blocks moving as bodies on their joints and
-                an arrow field sampled at nodes does not show that
+            'displace_vector' - displacement vectors at corner nodes, on a
+                jointed model as on any other; a jointed model's blocks are
+                drawn on the 'deformation' panel (``show_joints``)
             'stress' - von Mises stress contours
             'strain' - equivalent strain contours
             'shear_strain' - viscoplastic max shear strain contours
@@ -1273,21 +1273,6 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         if pt == 'displace_mag':
             plot_displacement_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                      cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
-        elif pt == 'displace_vector' and solution_has_joint_state(fem_data, deform_field):
-            # A jointed model's mechanism is block motion: wedges that translate
-            # and rotate as bodies, with every bit of the movement taken up AT
-            # the joints. An arrow field samples that at nodes and says nothing
-            # about the joints themselves, so this panel becomes the scaled
-            # deformed mesh with the faces drawn — where a slipped joint is two
-            # lines that have parted, and a toppling column leans.
-            reinf_cbar_specs = plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
-                             show_original=show_original, deformed_color=deformed_color,
-                             show_reinforcement=show_reinforcement,
-                             cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
-                             label_elements=label_elements, single_panel=defer_panel_cbar,
-                             at_failure=deform_field.get("_at_failure", False),
-                             joint_faces=show_joints, block_grid=block_grid,
-                             joint_linewidth=joint_linewidth) or []
         elif pt == 'displace_vector':
             vector_mappable = plot_displacement_vectors(ax, fem_data, deform_field, show_mesh, show_reinforcement,
                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,

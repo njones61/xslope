@@ -5832,7 +5832,7 @@ def fem05_plots():
     capture("fem05_joint_slip.png", plot_fem_results, fem_data,
             result["last_solution"], plot_type="shear_strain", fs=result["FS"])
     capture("fem05_fem_blocks.png", plot_fem_results, fem_data,
-            result["last_solution"], plot_type="displace_vector",
+            result["last_solution"], plot_type="deformation",
             fs=result["FS"])
 
     # ---- part 2: the generated column set ----------------------------------- #
@@ -5853,7 +5853,7 @@ def fem05_plots():
             result_t["last_solution"], plot_type="shear_strain",
             fs=result_t["FS"])
     capture("fem05_fem_blocks_topple.png", plot_fem_results, fem_t,
-            result_t["last_solution"], plot_type="displace_vector",
+            result_t["last_solution"], plot_type="deformation",
             fs=result_t["FS"])
 
     # ---- the third generator: the Voronoi model ---------------------------- #
@@ -5890,7 +5890,7 @@ def fem05_plots():
                 result_v["last_solution"], plot_type="shear_strain",
                 fs=result_v["FS"])
         capture("fem05_fem_blocks_voronoi.png", plot_fem_results, fem_v,
-                result_v["last_solution"], plot_type="displace_vector",
+                result_v["last_solution"], plot_type="deformation",
                 fs=result_v["FS"])
     else:
         print("   voronoi   no standing trial — no result panels drawn")

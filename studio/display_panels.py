@@ -709,8 +709,8 @@ class FemResultsDisplayPanel(QWidget):
         own setting survives view switches and re-renders and yields only to
         the next solve."""
         flag = bool(flag)
-        self._edges_state["displace_vector"] = flag
-        if self._current_pt == "displace_vector":
+        self._edges_state["deformation"] = flag
+        if self._current_pt == "deformation":
             self.element_edges.blockSignals(True)
             self.element_edges.setChecked(flag)
             self.element_edges.blockSignals(False)

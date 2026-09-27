@@ -384,8 +384,11 @@ the dashed undeformed outline. A block is a piece of the mesh that moves as one 
 the two sides of a joint their own nodes, so the pieces between joints are found by following
 which elements still share nodes. A jointed failure looks like this, blocks moving as bodies with
 all of the movement taken up at the joints, and a joint that has slipped or opened shows as two
-lines that no longer lie on each other. With Joint state off the panel draws the ordinary deformed
-mesh. The **Displacement vectors** panel is the same as on any other model.
+lines that no longer lie on each other. The element grid is drawn under the blocks, in light
+gray, when the model has eight or fewer jointed lines and left out when it has more, so a
+generated network stays readable; **Element edges** in the display panel turns it on or off
+either way. With Joint state off the panel draws the ordinary deformed mesh. The **Displacement
+vectors** panel is the same as on any other model.
 
 ![The deformed mesh of the same stack, drawn as blocks: each block moves as one body, the joints between them shown in green, and the dashed outline is the undeformed section](../tutorials/images/fem05_fem_blocks_topple.png){width=900}
 

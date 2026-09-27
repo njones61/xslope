@@ -255,7 +255,7 @@ nearer twelve on an install that does not carry the
 
 >>**FS = 1.137**
 
-![The deformed blocks at the critical factor: the block column has leaned out away from the fill behind it](images/fem03_fem_blocks_failure.png){width=1005}
+![The deformed blocks at the critical factor: the block column has leaned out away from the fill behind it](images/fem03_fem_blocks_failure.png){width=918}
 
 On a jointed model the displacement panel is the deformed section drawn as the
 **blocks** the joints cut it into — each block under a faint tint of its own,
@@ -469,7 +469,7 @@ at 1.5, 8 cm at 1.56. The open points above 1.56 are trials that were still
 creeping, more slowly all the time, when the limit came. The panels show what
 the wall is doing at the last trial, the undecided one at 1.5703.
 
-![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=937}
+![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=855}
 
 This panel has no element grid: the blocks panel drops it once a model carries
 more than eight jointed lines (the wall alone had seven; the sheets make ten),
@@ -587,7 +587,7 @@ One more step in strength and the top layer has nothing left to give, and the
 wall goes. This is the failed state at 2.0, drawn to scale, with no
 exaggeration:
 
-![The wall at 2.0, drawn at true scale: the block column pushed out and sunk into the foundation, the fill behind it collapsed, and the geogrid layers dragged out with it](images/fem03_fem_blocks_grid_long_failure.png){width=929}
+![The wall at 2.0, drawn at true scale: the block column pushed out and sunk into the foundation, the fill behind it collapsed, and the geogrid layers dragged out with it](images/fem03_fem_blocks_grid_long_failure.png){width=848}
 
 The block column has been pushed out more than 2 m and has sunk almost a meter
 into the foundation, which has heaved up in front of the toe. The fill behind

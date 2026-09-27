@@ -2995,7 +2995,8 @@ def _joint_slip_panel(fem_data):
     return bool(names) and all(n in elastic for n in names)
 
 
-def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None):
+def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None,
+                      skip_bar_spans=False):
     """Draw the joint (interface) elements as hairlines colored by their slip.
 
     A joint has no strain, so it appears in a shear-strain field only through
@@ -3021,6 +3022,14 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None):
     * when nothing on the model is slipping there is no colorbar at all and
       every joint draws gray.
 
+    With ``skip_bar_spans`` the spans of a jointed reinforcement SHEET (a joint
+    line that carries a bar) are left out entirely: not drawn, not counted in
+    the slip colorbar's range, not named in the key. The shear strain panel
+    asks for this, because there the bar already carries the sheet and the
+    faces' slip is the 1D Details panel's reading; only the bar-less joints
+    (wall contacts, rock joints) are drawn. When every joint on the model lies
+    on a bar, nothing is drawn and no colorbar or key is made.
+
     Returns the ``(mappable, label)`` specs, empty on a model with no joint and
     on one where no joint slipped, so a caller that stacks colorbars can place
     this one beside the field bar.
@@ -3029,6 +3038,9 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None):
     from matplotlib.colors import Normalize
 
     spans = _joint_spans(fem_data, solution)
+    if spans and skip_bar_spans:
+        spans = [r for r, ob in zip(spans, _spans_on_bars(fem_data, spans))
+                 if not ob]
     if not spans:
         return []
 
@@ -3604,18 +3616,25 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     # defer the force colorbar the same way and hand its spec back, so the two bars
     # get separate full-height slots instead of colliding in one.
     # A joint carries no strain of its own, so the contour field says nothing
-    # about it. With Show joints on, every jointed model draws its joints on
-    # this panel, colored by slip, with the slip colorbar beside the field's
-    # and the key naming closed / slipping / opened (plot_joint_states). On a
-    # model whose soil or rock can yield they are drawn over the strain field,
-    # at the thin over-field width, and the panel keeps its strain title and
-    # colorbar; on an all-elastic model the panel is the joints' own
-    # (slip_panel), titled Joint slip, and the slipped lengths draw at the
-    # joint-face width.
+    # about it. With Show joints on, every jointed model draws its BAR-LESS
+    # joints (wall contacts, rock joints) on this panel, colored by slip, with
+    # the slip colorbar beside the field's and the key naming closed /
+    # slipping / opened (plot_joint_states). A jointed reinforcement sheet is
+    # drawn here as its bar only: the bar already carries the sheet on this
+    # panel, and its two faces' slip is the 1D Details panel's reading, so
+    # skip_bar_spans leaves them out of the drawing, the slip colorbar and the
+    # key. A model whose every joint is a sheet therefore draws no joint
+    # overlay, no slip colorbar and no key here. (The deformation panel still
+    # draws the sheet's faces.) On a model whose soil or rock can yield the
+    # joints are drawn over the strain field, at the thin over-field width,
+    # and the panel keeps its strain title and colorbar; on an all-elastic
+    # model the panel is the joints' own (slip_panel), titled Joint slip, and
+    # the slipped lengths draw at the joint-face width.
     jointed = bool((fem_data.get("joint_data") or {}).get("n"))
     joint_cbar_specs = (plot_joint_states(
                             ax, fem_data, solution,
                             draw_cbar=not single_panel,
+                            skip_bar_spans=True,
                             linewidth=((joint_linewidth or JOINT_FACE_LINEWIDTH)
                                        if slip_panel else None))
                         if (show_joints and jointed) else [])

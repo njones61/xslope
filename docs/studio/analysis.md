@@ -795,14 +795,17 @@ against the dashed undeformed outline: a jointed slope fails by blocks moving as
 field sampled at nodes misses the parting and sliding that is the whole mechanism. On a network of more than eight
 jointed lines the element edges come off so the blocks can be seen; that sets the **Element edges** box for the
 result, and the box overrides it either way. Where the displacements are too small to draw the
-mesh is shown undeformed and the title says so. A **Show joints** switch draws the two faces of every joint on
+mesh is shown undeformed and the title says so. A **Show joints** switch, set separately for the deformation plot
+and the shear strain plot and on for both by default on a jointed model, draws the two faces of every joint on
 that deformed mesh, each where the deformation has put it and colored by how far the faces have slid on a green
 ramp, gray where the joint is not slipping, with a slip colorbar; **Joint width** sets the weight of those faces
 in points, since a thin face disappears on a wide section. **Color by block** sets the fill of the blocks: off
 (the default), one tint per material; on, each block under its own tint so the bodies can be told apart. With
 **Show joints** on, the shear strain plot of a jointed model draws every joint colored by its slip, with the slip
 colorbar and a key naming the closed, slipping and opened states: over the strain field on a model whose soil can
-yield, and on its own panel, titled *Joint slip*, on a model whose only strength is its joints.
+yield, and on its own panel, titled *Joint slip*, on a model whose only strength is its joints. A jointed
+reinforcement sheet is drawn on the shear strain plot as its bar only; the slip of its two faces is read in
+**1D Details…**.
 
 The FEM · Results toolbar also carries **1D Details…**, which opens a non-modal panel
 listing every reinforcement line and pile in the model with a utilization badge, and

@@ -31,6 +31,18 @@ Run:  PYTHONPATH=. python3 tools/make_block_wall_figures.py             # everyt
       PYTHONPATH=. python3 tools/make_block_wall_figures.py fem03_grid_long
                                             # the 500,000-iteration run, only
                                             # when named (about 40 minutes)
+      PYTHONPATH=. python3 tools/make_block_wall_figures.py --from wall grid_1M
+                                            # redraw a panel pair from a STORED
+                                            # solve (FEM03_STORED), no solving
+      PYTHONPATH=. python3 tools/make_block_wall_figures.py --from wall \
+                  --only fem03_fem_shear_failure.png
+                                            # ... writing only the named files
+
+``--from`` draws each named stored result through the same ``_pair`` call its
+live group makes, at the same size, dpi and box, so a change to the plot code
+reaches the committed figures without a strength reduction.  ``--only`` limits
+which of the pair's files are written (every panel and state is still drawn,
+because the deformation figure takes the strain figure's size).
 """
 
 from __future__ import annotations
@@ -630,7 +642,7 @@ def _both_states(name, fem_data, result, plot_type):
                 fs_is_lower_bound=lower)
 
 
-def _pair(deform_name, strain_name, fem_data, result, deform_type):
+def _pair(deform_name, strain_name, fem_data, result, deform_type, only=None):
     """A deformation panel and a strain panel that sit one above the other on
     the page, in both field states, saved so that they MATCH: the same image
     size, the same section frame, the same font size.
@@ -641,7 +653,9 @@ def _pair(deform_name, strain_name, fem_data, result, deform_type):
     tight box, with no blank paper. The two images then differ in width, and
     the page sets the deformation figure's width in proportion so the sections
     line up: the width to use at a strain-panel width of 1000 is printed beside
-    each file."""
+    each file. ``only`` is the set of file names to write (None: all of them);
+    every panel is still drawn, since the deformation figure is sized from the
+    strain one."""
     import matplotlib.pyplot as plt
     from xslope.plot_fem import plot_fem_results
 
@@ -677,6 +691,8 @@ def _pair(deform_name, strain_name, fem_data, result, deform_type):
         frac_s = _frame_frac(fig_s, box_s)
         for fig, name, box in ((fig_s, strain_name, box_s), (fig_d, deform_name, box_d)):
             out = os.path.join(OUT_DIR, name.replace(".png", suffix + ".png"))
+            if only is not None and os.path.basename(out) not in only:
+                continue
             fig.savefig(out, dpi=200, bbox_inches=box.padded(0.1))
             width = round(1000 * frac_s / _frame_frac(fig, box))
             print("-> %s  (page width %d at a strain-panel width of 1000)"
@@ -684,13 +700,56 @@ def _pair(deform_name, strain_name, fem_data, result, deform_type):
         plt.close("all")
 
 
+#: Where the kept solves live: ``_keep_solution`` writes the part 1-3 runs here.
+SOLUTIONS_DIR = os.path.join(os.path.expanduser("~"), "python_projects",
+                             "xslope_private", "reports", "campaign_joints_2026-09",
+                             "fem03_part3_solutions")
+#: The stored solves the figures can be redrawn from, by name: the pickle (a
+#: ``{"fem_data", "result"}`` dict, ``solve_ssrm``'s own result) and the pair of
+#: files its live group draws from it.  ``grid_1M`` is the geogrid wall at
+#: 1,000,000 iterations a trial, the run behind the page's long-run section.
+FEM03_STORED = {
+    "wall": (os.path.join(SOLUTIONS_DIR, "wall.pkl"),
+             "fem03_fem_blocks.png", "fem03_fem_shear.png"),
+    "wall_grid": (os.path.join(SOLUTIONS_DIR, "wall_grid.pkl"),
+                  "fem03_fem_blocks_grid.png", "fem03_fem_shear_grid.png"),
+    "grid_1M": (os.path.join(os.path.expanduser("~"), "python_projects",
+                             "xslope_private", "handoffs", "fem03_long_2026-09-26",
+                             "grid_1M.pkl"),
+                "fem03_fem_blocks_grid_long.png", "fem03_fem_shear_grid_long.png"),
+}
+for _label, _path, _name in FEM03_PAIRS:
+    FEM03_STORED[_label.replace(" ", "_")] = (
+        os.path.join(SOLUTIONS_DIR, "%s.pkl" % _label.replace(" ", "_")),
+        _name.replace("fem03_shear_", "fem03_deform_"), _name)
+
+
+def fem03_from(names, only=None):
+    """Redraw the panel pairs of the named stored solves (``FEM03_STORED``)
+    through ``_pair``, the call the live groups make, without solving.
+    ``only`` is the set of file names to write; None writes them all."""
+    import pickle
+
+    for name in names:
+        if name not in FEM03_STORED:
+            raise SystemExit("no stored result %r; known: %s"
+                             % (name, ", ".join(sorted(FEM03_STORED))))
+        path, deform_name, strain_name = FEM03_STORED[name]
+        if not os.path.exists(path):
+            raise SystemExit("stored result %r is missing: %s" % (name, path))
+        with open(path, "rb") as fh:
+            kept = pickle.load(fh)
+        print("== %s  (from %s, FS %s)" % (name, path, kept["result"].get("FS")))
+        _pair(deform_name, strain_name, kept["fem_data"], kept["result"],
+              "deformation", only=only)
+
+
 def _keep_solution(label, fem_data, result):
     """Pickle a part 3 solve under the private campaign directory so both field
     states can be redrawn and compared without the solve."""
     import pickle
 
-    d = os.path.join(os.path.expanduser("~"), "python_projects", "xslope_private",
-                     "reports", "campaign_joints_2026-09", "fem03_part3_solutions")
+    d = SOLUTIONS_DIR
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "%s.pkl" % label.replace(" ", "_")), "wb") as fh:
         pickle.dump({"fem_data": fem_data, "result": result}, fh)
@@ -711,6 +770,27 @@ OPT_IN = {"fem03_grid_long"}
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)
+    # --from NAME ... [--only FILE ...]: redraw from stored solves, no solving.
+    if "--from" in argv:
+        def _after(flag):
+            if flag not in argv:
+                return None
+            out = []
+            for a in argv[argv.index(flag) + 1:]:
+                if a.startswith("--"):
+                    break
+                out.append(a)
+            return out
+        stored = _after("--from")
+        only = _after("--only")
+        if not stored:
+            print("--from needs one or more of: %s"
+                  % ", ".join(sorted(FEM03_STORED)))
+            return 1
+        fem03_from(stored, only=None if only is None else set(only))
+        print("\nredrew %d stored result(s) into docs/tutorials/images/"
+              % len(stored))
+        return 0
     # A group named in full is that group alone ("fem03_grid" must not also run
     # "fem03_grid_long"); anything else is matched as a substring.
     # The 500,000-iteration run is forty minutes and draws nothing, so it runs

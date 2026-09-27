@@ -375,12 +375,14 @@ since opening is a condition rather than an amount. A key in the corner of the p
 three states, and a model where no joint slipped carries no slip colorbar. On a model whose soil
 or rock can yield, the joints are drawn over the strain field and the panel keeps its strain title
 and colorbar, with the slip colorbar beside it; on a model whose every material is elastic there is
-no strain to draw, and the panel is the joints' own, titled *Joint slip*. The lines are kept thin
-because a generated network puts hundreds of them over the field.
+no strain to draw, and the panel is the joints' own, titled *Joint slip*. A jointed reinforcement
+sheet is drawn on this panel as its bar only; the slip of its two faces is read in **1D Details…**.
+The lines are kept thin because a generated network puts hundreds of them over the field.
 
 ![Joint slip on a toppling stack at its critical factor: each joint colored by how far its faces have slid, gray where it has not slipped, drawn as two lines with a gap between them where it has opened](../tutorials/images/fem05_joint_slip_topple.png){width=900}
 
-On the **Deformed mesh** panel, with **Show joints** on (the default for a jointed model), the
+**Show joints** is set separately for the shear strain panel and the deformed mesh panel, and
+is on for both by default on a jointed model. On the **Deformed mesh** panel, with it on, the
 deformed section is drawn as the **blocks** the joints cut it into: the section under a faint
 tint, one per material, the joint faces in green, and the deformed outline as a dark line against
 the dashed undeformed outline. A block is a piece of the mesh that moves as one body; the mesh split gives

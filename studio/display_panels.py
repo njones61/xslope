@@ -622,6 +622,12 @@ class FemResultsDisplayPanel(QWidget):
         # The interface (joint) elements' own reading, on a model whose mesh was
         # split along a line. A joint carries no strain, so it does not appear in
         # the strain field at all; this draws its state on the line itself.
+        # Like Element edges, the box keeps one state per plot: the deformation
+        # plot (the joint faces over the blocks) and the shear strain plot (the
+        # bar-less joints colored by slip; a jointed sheet is drawn there as its
+        # bar only) are set independently, both on by default on every jointed
+        # model. The box shows and edits the current plot's state.
+        self._joints_state = {"deformation": True, "shear_strain": True}
         self.show_joints = QCheckBox("Show joints")
         # The faces' weight on the deformation plot, in points: a thin trace
         # disappears on a wide section, a heavy one hides the blocks.
@@ -630,19 +636,23 @@ class FemResultsDisplayPanel(QWidget):
         self.joint_width.setToolTip(
             "Width of the joint faces drawn on the deformation plot, in points.")
         self.joint_width.valueChanged.connect(lambda *_: self.changed.emit())
-        self.show_joints.setChecked(True)
+        self.show_joints.setChecked(self._joints_state.get(self._current_pt, True))
         self.show_joints.setToolTip(
-            "On the deformation plot of a jointed model, draw the two faces of "
-            "every joint over the blocks, colored by how far they have slid. "
-            "Off, the blocks are drawn without their faces. On the strain plot "
-            "of a jointed model, draw every joint colored by its slip, with the "
-            "slip colorbar and a key; on a model whose only strength is its "
-            "joints that plot is titled Joint slip.")
+            "Set separately for the deformation plot and the shear strain plot; "
+            "on by default for both on every jointed model.\n"
+            "Deformation plot: draw the two faces of every joint over the "
+            "blocks, colored by how far they have slid. Off, the blocks are "
+            "drawn without their faces.\n"
+            "Shear strain plot: draw every joint that is not on a reinforcement "
+            "line colored by its slip, with the slip colorbar and a key; a "
+            "jointed reinforcement sheet is drawn as its bar only, its faces' "
+            "slip being in the 1D Details panel. On a model whose only strength "
+            "is its joints that plot is titled Joint slip.")
         # How the blocks are filled on a jointed model's deformation plot: off
         # (the default), one faint tint per material zone; on, each block (a
         # connected piece of the mesh after the joint split) under its own tint.
-        # Enabled only on that plot of a jointed model, with Show joints on,
-        # since the fill is part of the block drawing.
+        # Enabled only on that plot of a jointed model, with that plot's Show
+        # joints on, since the fill is part of the block drawing.
         self._jointed = False
         self.color_blocks = QCheckBox("Color by block")
         self.color_blocks.setChecked(False)
@@ -688,6 +698,8 @@ class FemResultsDisplayPanel(QWidget):
         form.addRow("", self.scale_vectors)
         form.addRow("Vector cutoff", self.displacement_tolerance)
         form.addRow("", self.color_by_magnitude)
+        # Show joints is set per plot (deformation and shear strain each keep
+        # their own state, both on by default on a jointed model).
         # No legend controls. With Show joints on (the default) the deformation
         # panel carries no legend, because the block look carries its meaning in
         # the drawing, with Color by block on or off. With Show joints off it
@@ -697,7 +709,8 @@ class FemResultsDisplayPanel(QWidget):
         # key (closed, slipping, opened) beside the slip colorbar, over the
         # strain field where the soil can yield and on the Joint slip panel of
         # an all-elastic model; with Show joints off it carries none, and
-        # neither does an unjointed model's. The vector panel carries none
+        # neither does an unjointed model's, nor one whose only joints are
+        # jointed reinforcement sheets (drawn there as their bars only). The vector panel carries none
         # either way. The panels keep the legend they were designed with, so
         # there is nothing here to set.
 
@@ -715,7 +728,13 @@ class FemResultsDisplayPanel(QWidget):
                   self.color_by_magnitude, self.color_blocks):
             c.toggled.connect(self._emit)
         # Color by block follows Show joints: the fill belongs to the block look.
-        self.show_joints.toggled.connect(lambda *_: self._sync_enabled())
+        self.show_joints.toggled.connect(self._on_show_joints)
+        self._sync_enabled()
+
+    def _on_show_joints(self, checked):
+        # The box edits the current plot's own Show joints state.
+        if self._current_pt in self._joints_state:
+            self._joints_state[self._current_pt] = bool(checked)
         self._sync_enabled()
 
     @property
@@ -740,8 +759,16 @@ class FemResultsDisplayPanel(QWidget):
 
     def set_jointed(self, flag):
         """Tell the panel whether the result on screen is a jointed model, which
-        is the only model the Color by block box applies to."""
+        is the only model the Color by block box applies to. Called once per
+        new result, which also puts Show joints back on for both plots (its
+        default on every jointed model); a user's per-plot setting survives
+        view switches and re-renders and yields only to the next solve."""
         self._jointed = bool(flag)
+        for k in self._joints_state:
+            self._joints_state[k] = True
+        self.show_joints.blockSignals(True)
+        self.show_joints.setChecked(self._joints_state.get(self._current_pt, True))
+        self.show_joints.blockSignals(False)
         self._sync_enabled()
 
     def _on_plot_type(self, *_):
@@ -754,6 +781,12 @@ class FemResultsDisplayPanel(QWidget):
             self.element_edges.blockSignals(True)
             self.element_edges.setChecked(self._edges_state.get(new_pt, False))
             self.element_edges.blockSignals(False)
+            # Show joints keeps its own state per plot the same way.
+            if self._current_pt in self._joints_state:
+                self._joints_state[self._current_pt] = self.show_joints.isChecked()
+            self.show_joints.blockSignals(True)
+            self.show_joints.setChecked(self._joints_state.get(new_pt, True))
+            self.show_joints.blockSignals(False)
             self._current_pt = new_pt
         self._sync_enabled()
         self.changed.emit()
@@ -788,8 +821,10 @@ class FemResultsDisplayPanel(QWidget):
         for w in (self.deform_percent, self.deform_scale,
                   self.show_original, self.deformed_color):
             w.setEnabled(pt == "deformation")
-        self.color_blocks.setEnabled(pt == "deformation" and self._jointed
-                                     and self.show_joints.isChecked())
+        self.color_blocks.setEnabled(
+            pt == "deformation" and self._jointed
+            and self._joints_state.get("deformation", True)
+            and self.show_joints.isChecked())
         # Auto size is Auto's target: dead while Scale x pins the multiplier.
         if pt == "deformation":
             self.deform_percent.setEnabled(self.deform_scale.value() == 0.0)
@@ -820,6 +855,7 @@ class FemResultsDisplayPanel(QWidget):
             # grid under its blocks; the plotter ignores it everywhere else.
             "block_grid": edges,
             "show_reinforcement": self.show_reinforcement.isChecked(),
+            # The current plot's own Show joints state (the box shows it).
             "show_joints": self.show_joints.isChecked(),
             # Per-block fill on a jointed model only; an unjointed model keeps
             # its material tint whatever the box says.

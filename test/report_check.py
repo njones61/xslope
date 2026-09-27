@@ -14537,7 +14537,9 @@ def test_the_displacement_curve_draws_the_trials():
 def test_which_result_panels_draw_a_legend():
     """The deformation panel draws a legend only with Show joints off; the
     strain panel of a jointed model draws the joint key with Show joints on and
-    none with it off, whether its soil can yield or not; an unjointed model's
+    none with it off, whether its soil can yield or not; a model whose only
+    joints are jointed reinforcement sheets draws no joint key on its strain
+    panel (a sheet is drawn there as its bar only); an unjointed model's
     strain panel and the vector panel draw none either way.
 
     The plots stay as they are (Norm's ruling). What is checked here is that the
@@ -14552,6 +14554,7 @@ def test_which_result_panels_draw_a_legend():
     """
     fails = []
     import inspect
+    import numpy as np
     import matplotlib.figure as mplfig
     from xslope.plot_fem import plot_fem_results
     from studio import display_panels
@@ -14615,6 +14618,28 @@ def test_which_result_panels_draw_a_legend():
                              f"legend {key} with Show joints off, which the "
                              f"note says it does not")
 
+    # A model whose only joints are jointed reinforcement SHEETS draws no joint
+    # key on its strain panel, Show joints on or off (owner's ruling,
+    # 2026-09-27): the sheet is drawn there as its bar only. Read on the same
+    # toppling field with its joint lines declared to carry bars (the bar-less
+    # mask cleared), which is what a jointed sheet looks like to the drawing.
+    fd_sheets = dict(fd_as_built, elastic_materials=[],
+                     barless_1d_mask=np.zeros(
+                         len(fd_as_built.get("elements_1d", [])), dtype=bool))
+    for show_joints in (True, False):
+        fig = mplfig.Figure(figsize=(4.0, 3.0))
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_fem_results(fd_sheets, jbundle["solution"],
+                             plot_type=["shear_strain"], fig=fig,
+                             show_title=False, show_joints=show_joints)
+        key = [text.get_text()
+               for ax in fig.axes if ax.get_legend() is not None
+               for text in ax.get_legend().get_texts()]
+        if [k for k in key if k in _states]:
+            fails.append(f"a model whose only joints are sheets draws the joint "
+                         f"key on its strain panel with Show joints "
+                         f"{'on' if show_joints else 'off'}: {key}")
+
     # The note itself: the comment block that opens "No legend controls." It
     # must name the control that decides the deformation legend, give both of
     # its states, and make neither of the two blanket claims the panels
@@ -14639,6 +14664,10 @@ def test_which_result_panels_draw_a_legend():
         if "Show joints on" not in note or "Show joints off" not in note:
             fails.append(f"the note does not say what the deformation panel "
                          f"draws with Show joints on and off: {note!r}")
+        if "only joints are" not in note:
+            fails.append(f"the note does not say a model whose only joints are "
+                         f"sheets carries no joint key on the strain panel: "
+                         f"{note!r}")
         if "strain panel carries the joint key" not in note:
             fails.append(f"the note does not say the strain panel of a jointed "
                          f"model carries the joint key with Show joints on: "

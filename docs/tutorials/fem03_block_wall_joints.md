@@ -104,8 +104,7 @@ Coulomb shear along it. When the shear reaches its limit the two faces **slip**
 past each other; when the normal stress goes into tension the joint **opens**
 and carries nothing, until the faces meet again and it closes.
 
-That is what makes a stack of blocks behave like a stack of blocks. Without the
-joints the six courses are one concrete column that can only bend. With them,
+Without the joints the six courses are one concrete column that can only bend. With them,
 each course can slide on the one below it, the column can slide on the
 foundation, and the back face can part from the fill.
 
@@ -239,8 +238,8 @@ takes longer steps, which brings a jointed trial to rest in a fraction of the
 iterations, and the closing summary says when it was on.
 
 **Failure criterion — leave it on Hybrid.** The dialog opens on Hybrid for any
-model that carries a joint, and this is why. A near-critical trial on a jointed
-model often neither settles nor runs away: the joints go on slipping by a fixed
+model that carries a joint, because a near-critical trial on a jointed model
+often neither settles nor runs away: the joints go on slipping by a fixed
 amount each pass while the wall itself stops moving, which is a wall standing
 still behind contacts that never quite balance. Hybrid reads the slip and the
 movement together and reports that as standing. The other criteria read only
@@ -315,8 +314,8 @@ those. An open point is a trial the run stopped while the wall was still moving,
 drawn where it was when stopped. The wall rests at F = 1.0 and 1.125 with under
 6 cm of movement, and at 1.133 with 8 cm. At 1.141 and every strength above it
 the movement does not slow, or runs away outright, and the wall never comes to
-rest. That is a wall with a strength limit, and the factor of safety is where
-the resting points end.
+rest. This wall has a strength limit, and the factor of safety sits where the
+resting points end.
 The Log says the same in words at the end of every strength reduction run:
 
 > The factor of safety is 1.137, the midpoint of the bracket F = 1.1328 to
@@ -392,12 +391,12 @@ it ruptures.
 **Adhesion** and **Delta** are the strength of the interface between the sheet
 and the soil around it: 1 kPa and 30°. On a bonded bar they set how much grip a
 length of sheet develops. On a jointed sheet they are also the strength of the
-slip surface the soil moves along, which is what makes them the most important
-two numbers in this section.
+slip surface the soil moves along, which makes them the two most important
+numbers in this section.
 
 **E** and **Area** give the sheet its axial stiffness, 1,000,000 kPa × 0.001 m²,
-so EA = 1,000 kN/m. A sheet has to stretch before it can carry tension, and this
-is what sets how much.
+so EA = 1,000 kN/m. A sheet has to stretch before it can carry tension, and EA
+sets how much.
 
 **Tend1** and **Tend2** are the capacities of the two ends. A blank end is free:
 it can pull out of the soil, and the only thing holding it is the grip along its
@@ -451,9 +450,9 @@ strength up it was still creeping when the iteration limit arrived. The run does
 not know whether that trial would have come to rest, so it reports the last
 strength it is sure of.
 
-Three things in Studio tell you a run has ended this way. The results view is
-titled with the bound, **FS ≥ 1.56**, instead of a number. The Log carries the
-paragraph above. And the results toolbar shows a button that is not there after
+You can tell in Studio that a run ended this way. The results view is titled
+with the bound, **FS ≥ 1.56**, instead of a number, the Log carries the
+paragraph above, and the results toolbar shows a button that is not there after
 an ordinary run, **Continue with a higher limit…**, beside **1D Details…**.
 Leave it alone for now. A reader who stops here has a complete set of results,
 they are worth reading first, and the section after next presses the button.
@@ -516,8 +515,7 @@ the interface has opened and slid 2 mm. Everywhere else the soil grips the
 sheet, with the shear well below the limit and no slip. So the geogrid works as
 a tie: anchored in fill that does not move, it holds the block column back, and
 the force in that tie at the facing is the **Tend1** column of the details
-table. The 70% of capacity the layer has in hand is what keeps this wall
-standing.
+table. The 70% of capacity the layer has in hand keeps this wall standing.
 
 The sheets are entered as jointed sheets (`Joint = Yes`) because they are tied
 into a wall whose back face is itself a joint. A bar bonded to the soil cannot
@@ -575,16 +573,15 @@ face and 25 mm along its base. Here is the 1D details plot for the top layer:
 The bar's tension sits on its capacity line over the middle of the sheet, and
 the interface beyond 2.3 m is slipping at its limit. Over the first 2.3 m,
 where the sheet grips, the shear stress zigzags from station to station
-between about 12 and 26 kPa. That is how a gripping interface reads out, not a
-change in the stress along the sheet: each station reports the force passed
-through its node over the short length it stands for, and the average over
-each element, the force the sheet actually picks up, runs smoothly at about
-17 to 20 kPa. The joints page [explains why](../fem/joints.md#shear-zigzag).
-One more thing to know when reading these
-panels: at the sheet's tip, the last station, the normal stress plots as zero
-while the Mohr-Coulomb limit does not, because the two faces of the interface
-meet at one node there and the limit is taken from the soil's pressure on the
-sheet instead. Everywhere else the two panels use the same stress.
+between about 12 and 26 kPa. The stress along the sheet does not swing like
+that. Each station reports the force passed through its node over the short
+length it stands for, and the average over each element, the force the sheet
+actually picks up, runs smoothly at about 17 to 20 kPa. The joints page
+[explains why](../fem/joints.md#shear-zigzag). At the sheet's tip, the last
+station, the normal stress plots as zero while the Mohr-Coulomb limit does not,
+because the two faces of the interface meet at one node there and the limit is
+taken from the soil's pressure on the sheet instead. Everywhere else the two
+panels use the same stress.
 
 One more step in strength and the top layer has nothing left to give, and the
 wall goes. This is the failed state at 2.0, drawn to scale, with no
@@ -622,9 +619,9 @@ reaches its capacity.
 Long before that, the wall has moved more than any wall in service is allowed
 to: 2 cm at F = 1, 6 cm at 1.5, 13 cm at 1.75, 30 cm at 1.99. How much
 movement is acceptable depends on what the wall carries and what stands behind
-it. The Displacement vs F plot is where that judgment is applied: draw the
-allowable movement across it, and the strength where the resting points cross
-that line is the factor of safety on that criterion. At 1% of the height,
+it. Once you have that number, draw it across the Displacement vs F plot; the
+strength where the resting points cross that line is the factor of safety on
+that criterion. At 1% of the height,
 3.6 cm, the crossing lies between 1.0 and 1.5; at 2%, 7 cm, just under 1.56.
 For this wall the movement decides the answer.
 
@@ -658,7 +655,7 @@ A sheet is entered one of two ways:
 
 - **Bonded**, `Joint` blank or `No`. The soil above the sheet and the soil below
   it move together, and the sheet carries tension across whatever failure
-  surface cuts through it. This is what [FEM-2](fem02_reinforcement.md) uses
+  surface cuts through it. [FEM-2](fem02_reinforcement.md) uses this setting
   throughout: geogrid interlocked in granular fill, a nail wall, a circular
   surface through a reinforced slope.
 - **A slip surface**, `Joint = Yes`. The mesh splits along the sheet, and the
@@ -774,9 +771,9 @@ slide outward on it: 30 of its 55 spans slip, and the strain in the fill
 collects where each wedge meets the sheet. The liner itself carries almost no
 tension, dark blue along its whole length on the force scale. The fill slides
 over it rather than gripping it, so the membrane's own strength never comes
-into play and a stronger one would not help. That is what a fill on a smooth
-membrane does, and it is far weaker than the slope faces: 1.285 against 2.167,
-forty percent less. The bonded model never saw it, and reported the slope far
+into play and a stronger one would not help. A fill on a smooth membrane
+behaves this way, and it gives way at a far lower strength than the slope
+faces do: 1.285 against 2.167, forty percent less. The bonded model never saw it, and reported the slope far
 safer than it is.
 
 ### The rule

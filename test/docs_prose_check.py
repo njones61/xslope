@@ -20,9 +20,6 @@ Each rule is a name, a scope and a pattern. The groups:
 ``signpost``   a paragraph that announces itself instead of saying its point:
                "Two things follow.", "One more thing to know:", "The last
                lesson is patience.", "and this is why."
-``identify``   the rhetorical identification in place of a plain sentence:
-               "That is what makes...", "X is where the judgment is applied",
-               "the movement is the answer", "The point of the page is..."
 ``reader``     imagined readers: "a reader who tries it will meet the refusal".
 ``contrast``   "not a limitation but a feature" in prose; in program strings
                also the comma contrast, "a failure, not a budget effect".
@@ -36,7 +33,9 @@ Each rule is a name, a scope and a pattern. The groups:
 
 A hit is a failure. The fix is to rewrite the sentence, never to widen a rule
 or add an exemption; a rule that fires on a sentence a colleague would write
-is narrowed, and the narrowing is the commit.
+is narrowed, and the narrowing is the commit. (A rule for "X is what makes Y"
+was tried and dropped: on pages Norm had reviewed it fired on sentences he had
+let stand.)
 
 Run it alone::
 
@@ -86,30 +85,22 @@ RULES: list[tuple[str, tuple[str, ...], re.Pattern]] = [
         r"the (?:last|first|final|real|main|big|one) lesson|"
         r"lesson (?:here|of this|for practice))\b", I)),
     # ---- signpost -------------------------------------------------------
+    # A count noun that announces a list ("Two things follow.") rather than
+    # counting something ("Two points, both at y = 20"; "Four notes come back").
     ("signpost", ALL, re.compile(
         r"(?:^|(?<=[.!?:] ))(?:One|Two|Three|Four|Five|Several|A few|A couple of) "
-        r"(?:more )?(?:things?|habits|points|notes|rules|lessons|observations|"
-        r"caveats|remarks)\b")),
+        r"(?:more )?(?:things?|habits|points|notes|rules|lessons|consequences|"
+        r"observations|caveats|remarks|takeaways)\b[^.:;]{0,40}?"
+        r"\b(?:follow|stand out|come out of|to carry|to note|to know|to watch|"
+        r"to take away|to remember|to keep in mind|are worth|for practice)\b")),
     ("signpost", ALL, re.compile(
-        r"\bthings? (?:follow|to note|stand out|to take away|to know|to watch)\b", I)),
+        r"\b(?:things?|habits|lessons|consequences) "
+        r"(?:follow|to note|stand out|to take away|to know|to watch|to carry)\b", I)),
     ("signpost", ALL, re.compile(r"(?:^|(?<=[.!?:] ))One more (?:thing|point|note)\b")),
     ("signpost", ALL, re.compile(r"\b(?:for practice|this is why)\b", I)),
     ("signpost", ALL, re.compile(
         r"(?:^|(?<=[.!?] ))(?:Put|Said|Stated) (?:simply|another way|differently|plainly)\b")),
     ("signpost", ALL, re.compile(r"(?:^|(?<=[.!?] ))In short\b")),
-    # ---- identify -------------------------------------------------------
-    ("identify", ALL, re.compile(r"\b[Tt]h(?:at|is|ese|ose) (?:is|are) (?:what|how|where)\b")),
-    ("identify", ALL, re.compile(
-        r"\bis what (?:makes|sets|keeps|gives|lets|tells|has|does|puts|turns|"
-        r"holds|drives|decides|matters|counts)\b")),
-    ("identify", ALL, re.compile(
-        r"\b[Tt]he (?:whole )?point (?:of (?:this|the|that|a|an) \w+(?: \w+)? is|"
-        r"here is|is (?:that|the|to|not))\b")),
-    ("identify", ALL, re.compile(
-        r"\b[Tt]he (?:real|whole|big) "
-        r"(?:question|answer|story|lesson|trick|catch|problem|issue|work|test)\b")),
-    ("identify", ALL, re.compile(
-        r"\bis the (?:story|lesson|point|whole story|whole point)\b")),
     # ---- reader ---------------------------------------------------------
     ("reader", ALL, re.compile(r"\ba reader who\b", I)),
     ("reader", ALL, re.compile(

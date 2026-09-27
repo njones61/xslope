@@ -354,13 +354,12 @@ trial that has not converged by the iteration limit counts as failed; it is kept
 reproducing published results obtained that way. On a jointed model it counts a standing slope
 as failed, so leave it alone.
 
-The run also tries to finish a slowing trial directly, at set checkpoints and whenever the
-movement is dying away. Starting from the slip, the opening and the strength each joint has
-reached, the [Newton corrector](overview.md#finishing-a-trial-with-the-newton-corrector) solves
-for a balanced state at that strength. If it finds one, the iteration resumes from that state to
-check that the slope stays there, and if it does the trial stands, usually within a few hundred
-more iterations. If no balanced state is found, the trial is judged by its movement as above;
-not finding one this way does not mean none exists.
+While a trial is slowing down, the run periodically takes a shortcut: from the state the trial
+has reached, it solves directly for a state in which the forces balance (the
+[Newton corrector](overview.md#finishing-a-trial-with-the-newton-corrector)). If it finds one,
+the ordinary iteration continues from there for a few hundred iterations to confirm that the
+slope stays put, and if it does, the trial ends as standing. If the shortcut finds nothing, the
+ordinary iteration carries on and the trial is judged by its movement as above.
 
 ### What the results show
 

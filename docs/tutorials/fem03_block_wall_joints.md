@@ -564,10 +564,11 @@ The wall comes to rest at every strength tried up to F = 1.9922, and its
 movement grows the whole way: 6 cm at 1.5, 13 cm at 1.75, 19 cm at 1.875 and
 30 cm at 1.9922, a twelfth of the wall's height. At 2.0 the movement runs away.
 
-So this wall does have a strength limit, and it is the geogrid's. At 1.9922 the
-top layer is carrying 98.6% of its 40 kN/m capacity, the middle layer 72% and
-the bottom layer 57%; the back face has slid 80 mm and the base 25 mm. Here is
-the top layer:
+So the wall does fail in the end, and what gives out is the geogrid. At
+F = 1.9922, the last strength at which the wall came to rest, the top layer is
+carrying 98.6% of its 40 kN/m capacity. The middle layer is at 72% and the
+bottom layer at 57%. By then the block column has slid 80 mm down its back
+face and 25 mm along its base. Here is the 1D details plot for the top layer:
 
 ![The top layer's 1D details at F = 1.9922: the bar's tension at its capacity along most of its length](images/fem03_1d_details_grid_long.png){width=1000}
 

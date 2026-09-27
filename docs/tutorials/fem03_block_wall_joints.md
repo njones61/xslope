@@ -631,8 +631,7 @@ the factor of safety. The default run found a wall standing at F = 1.56 with
 than the factor of safety alone.
 Read the closing summary on every reinforced wall: when it says *No failure
 was found* or gives the factor of safety as *at least*, you have this kind of
-wall. A limit equilibrium analysis of the same wall asks only the strength
-question; [FEM-2](fem02_reinforcement.md) runs a reinforced slope both ways.
+wall.
 
 Furthermore, a jointed model can require a long time to solve. It settles
 slowly, because each joint reaches equilibrium by slipping a little at a time,

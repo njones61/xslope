@@ -634,11 +634,11 @@ was found* or gives the factor of safety as *at least*, you have this kind of
 wall. A limit equilibrium analysis of the same wall asks only the strength
 question; [FEM-2](fem02_reinforcement.md) runs a reinforced slope both ways.
 
-Give a jointed model time. It settles slowly, because each joint reaches
-equilibrium by slipping a little at a time, and a trial cut off early reads as
-failed or undecided when it would have come to rest. When the closing summary
-gives the factor of safety as "at least", or says it depends on the iteration
-limit, raise the limit and let the run finish.
+Furthermore, a jointed model can require a long time to solve. It settles
+slowly, because each joint reaches equilibrium by slipping a little at a time,
+and a trial cut off early reads as failed or undecided when it would have come
+to rest. When the closing summary gives the factor of safety as "at least", or
+says it depends on the iteration limit, raise the limit and let the run finish.
 
 ---
 

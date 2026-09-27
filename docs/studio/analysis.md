@@ -22,8 +22,8 @@ number is wrong. The checks say so before the solve rather than after the report
 
 The column is a **list**: one line per finding, marked with its severity, with the
 full text of the selected line underneath it. The dialog opens on the first error,
-or on the first line when there is none, so what is on screen is always the thing
-most worth reading. A check that fires once per material — four materials with no
+or on the first line when there is none, so the most serious finding is always the one
+on screen. A check that fires once per material — four materials with no
 tensile cap, say — takes **one line, not four**: the line says how many and which
 (*"… — 4 materials: 1 ('Shell'), 2 ('Core'), 3 ('Clay'), 4 ('Sand')"*), and the
 detail states the explanation they share once, with each material's own numbers
@@ -317,7 +317,7 @@ of the engine's
 Every result view above carries two sub-tabs: **Plot**, which it opens on, and **Table** — the
 numbers the plot is drawn from, as a grid. Each mode shows its own: the low and high bound of
 each tornado bar, the swept values and factors of safety of a design or back-analysis curve,
-and, for a march, one row per instant with its factor of safety, the critical circle and the
+and, for a transient run, one row per instant with its factor of safety, the critical circle and the
 face that circle sits on (plus the three stage values and the governing stage on a drawdown).
 An instant that produced no result carries its reason in the row rather than leaving a gap.
 **Save CSV…** writes the grid to a comma-separated file, offered as `<model>_<mode>.csv`

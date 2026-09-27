@@ -113,7 +113,7 @@ the answer you will get.*
 > recovers the pre-drawdown effective stresses on the slip surface, stage 2 computes FS
 > after drawdown with undrained strengths derived from those stresses, and stage 3
 > re-checks with drained strengths; the reported FS is the lower of stages 2 and 3. So a
-> drop is the expected behavior, not a defect — what is worth checking is whether rapid
+> drop is the expected behavior. The question to check is whether rapid
 > drawdown applies at all, via the time factor T = c_v·t/D².
 >
 > Procedure and the T rubric:
@@ -151,7 +151,7 @@ one rather than reassembling the engine by hand:
 | --- | --- |
 | `run_lem(search=True)` | One limit-equilibrium solve. `search=True` searches for the critical surface for that method, exactly as [Run LEM](analysis.md) does; `search=False` solves the surface already on the project. The method defaults to the one the **model** declares (the `main` sheet's LEM method, which is what the Run LEM dialog opens on), so the assistant and the dialog run the same method unless you name another. The result carries the surface it was solved on — `Xo`, `Yo`, `R`, `Depth`, and the `x_entry`/`x_exit` ends of the trace — and the run is stored where a dialog run is stored, so the results tabs show it and the report documents it. |
 | `run_seep(bc=1)` | One steady seepage solve. The solved pore pressures are attached to the model, so a later stability run with `u = seep` reads them. |
-| `run_tseep()` | The transient march, on the project's own transient sheet — the same run as [Run Seep](analysis.md) with **Transient** ticked. Its frames are stored where Studio stores them, so the **Seep · Transient** tab plays them and a stability run can read one. It hands back a march already loaded (a project opened with its `_tseep.csv` sidecar has one) rather than repeating it. |
+| `run_tseep()` | The transient run, on the project's own transient sheet — the same run as [Run Seep](analysis.md) with **Transient** ticked. Its frames are stored where Studio stores them, so the **Seep · Transient** tab plays them and a stability run can read one. It hands back a transient run that is already loaded (a project opened with its `_tseep.csv` sidecar has one) rather than repeating it. |
 | `run_lem(seep_time=t)` | One instant of that march as the run's pore pressure; with `rapid=True`, the transient sheet's two drawdown stages. Which instant was used is stated in the log. |
 | `fs_vs_time()` | The factor of safety at every saved instant — the curve the **FS vs Time** tab shows, with its lowest point and the time it falls at. |
 | `run_fem(analysis='ssrm')` | One finite element run — the SSRM factor of safety, or a single trial. Minutes, not seconds. |

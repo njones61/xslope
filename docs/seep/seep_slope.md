@@ -182,8 +182,8 @@ The Johnson Reservoir dam, built and run step by step in
 
 [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx)
 
-The two factors of safety below are read on the mesh and nodal solution that ship
-beside the workbook — [xslope_johnson_res_mesh.json](files/xslope_johnson_res_mesh.json)
+The two factors of safety below are read on the mesh and nodal solution in the same
+folder as the workbook — [xslope_johnson_res_mesh.json](files/xslope_johnson_res_mesh.json)
 and [xslope_johnson_res_seep.csv](files/xslope_johnson_res_seep.csv) — which
 `load_slope_data()` picks up by name.
 

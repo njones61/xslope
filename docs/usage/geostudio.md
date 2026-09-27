@@ -317,7 +317,7 @@ pressure beneath it, which is the very assumption a seepage analysis is run to a
 XSLOPE will not quietly swap one for the other. Where a model defines both, the seepage
 field wins and the export says so.
 
-Two things to know about the result. GeoStudio applies a spatial function to **every
+GeoStudio applies a spatial function to **every
 material in the analysis**, not to a chosen subset, so a model where only some materials
 draw from the seepage field arrives with all of them doing so. And ponded water — written
 as a surcharge here, as everywhere — **must be kept**, which is the opposite of the

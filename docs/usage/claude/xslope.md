@@ -252,7 +252,7 @@ Input Checks) when a model is loaded — it returns availability *and the reason
 analysis and every LEM method — and this skill's own coverage otherwise, which is a map of the
 inputs and solvers xslope accepts. If neither settles it, grep the package, or say plainly what
 you checked and what you did not: *"I found no input for that in the material schema or the
-solver API, so I don't believe it exists — worth confirming against the docs."* A wrong "no,
+solver API, so I don't believe it exists, but please confirm it against the docs."* A wrong "no,
 xslope can't" costs the user a workaround they never needed; a wrong "yes it can" costs them an
 afternoon. Both are failures. Being uncertain out loud is not.
 
@@ -1138,7 +1138,7 @@ Parameter keys per kind: parallel `dip`, `spacing`, `offset`, `trace_len`, `gap`
 name and its place in the set, `bed-03`, and nothing else — `set_name` reads the set back off it,
 which is what groups the rows of one network. A label of any other shape belongs to no set.
 
-**Layout convention** (when the sketch gives spacing but not explicit elevations): the bottom
+**Layout convention** (when the sketch gives spacing but not explicit elevations): the lowest
 line sits **AT the toe/base elevation** (e.g. y=0), then y = s, 2s, … upward; each line starts
 **on the slope face** at its elevation; **length = the labeled dimension measured from the
 face** (do not add the face offset — if the sketch shows "20 ft" of geogrid, the line is 20 ft
@@ -1720,7 +1720,7 @@ For a straight low/high tornado without full curves, call
 
 #### Sensitivity plots beyond the tornado
 
-Four more views ship alongside the tornado; all take `(success, result)` and pair with a
+Four more views accompany the tornado; all take `(success, result)` and pair with a
 `plot_*`. The first three are LOCAL/deterministic; the last two need reliability sigmas.
 
 ```python
@@ -2049,8 +2049,8 @@ solution therefore carries a yield reading (`max_yield_violation`, `n_yield_abov
 `max_yield_at`), and a trial the corrector decided carries a `corrector` record naming the
 checkpoint and the three readings.
 
-Two things follow for a user. First, an inconclusive trial is now rare, because a trial still
-improving at the ceiling is exactly the one the corrector can finish. Second, when a run reports a
+An inconclusive trial is rare, because a trial still
+improving at the ceiling is exactly the one the corrector can finish. When a run reports a
 large `max_yield_violation` on the state it stands on, look at the material at `max_yield_at` — the
 violation is a fraction of the strength available there, floored at 1e-4 of the model's overburden
 scale so a near-free-surface point cannot report round-off as a gross violation. A material with

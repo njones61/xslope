@@ -459,8 +459,8 @@ makes that result stale. Studio handles this automatically:
 - Undo/redo apply the same rule — stale solution tabs are dropped, and the mesh
   follows the restored geometry.
 
-This is why an edit visibly refreshes the Inputs view: Studio always leaves you on
-a valid picture.
+Studio always leaves you on a valid picture, so an edit visibly refreshes the
+Inputs view.
 
 ---
 

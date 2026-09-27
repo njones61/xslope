@@ -292,8 +292,6 @@ $qL/6,\ qL/6,\ 2qL/3$ at the corners and midside of a quadratic edge. Each set s
 so the water entering through an edge is exactly $qL$ at any element order. Flux nodes remain
 unknowns in the solve, since a flux is a natural boundary condition.
 
-Four consequences follow:
-
 **A model with only flux boundaries is singular.** A flux constrains the gradient of the head,
 not the head, so the solution is determined only up to an additive constant. At least one
 specified-head boundary or exit face must be present, and XSLOPE refuses the model if none is.

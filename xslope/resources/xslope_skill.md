@@ -252,7 +252,7 @@ Input Checks) when a model is loaded — it returns availability *and the reason
 analysis and every LEM method — and this skill's own coverage otherwise, which is a map of the
 inputs and solvers xslope accepts. If neither settles it, grep the package, or say plainly what
 you checked and what you did not: *"I found no input for that in the material schema or the
-solver API, so I don't believe it exists — worth confirming against the docs."* A wrong "no,
+solver API, so I don't believe it exists, but please confirm it against the docs."* A wrong "no,
 xslope can't" costs the user a workaround they never needed; a wrong "yes it can" costs them an
 afternoon. Both are failures. Being uncertain out loud is not.
 
@@ -280,7 +280,7 @@ derivation so the user can go deeper than a chat reply. Real pages, all under
 | Studio, the desktop app | `studio/`, `studio/editing/`, `studio/analysis/` |
 
 **Implementation questions — "what does xslope's Janbu actually do?"** Where this skill states
-the behaviour, that is the answer (the method table and its notes, the preflight rules, the
+the behavior, that is the answer (the method table and its notes, the preflight rules, the
 water/reinforcement/pore-pressure conventions). Where it does not, do **not** reconstruct the
 formulation from a textbook and present it as xslope's — programs differ on exactly these
 details. Answer the general theory, name the docs page, and say the solver source is public
@@ -877,7 +877,7 @@ pass the limits as its `entry_range` / `exit_range` / `center_box` / `tangent_de
 `slope_data` dict, call `generate_noncircular_surface(slope_data)`, imported as
 `from xslope.search import generate_noncircular_surface` (`xslope.generators` holds
 it too; import the name, not the package attribute). It ranks the material zones by the shear
-strength each can mobilise *at the stress it actually carries* — the only quantity
+strength each can mobilize *at the stress it actually carries* — the only quantity
 comparable across `mc`, `cp`, `hb` and `pow` materials — tracks the base of the
 weakest, and ramps to the ground at both ends, with explicit Y and Movement on every
 point. It is validated against the corpus's weak-seam problems. Fall back to
@@ -1100,7 +1100,7 @@ slope_data['joint_lines'] = voronoi(slope_data, block_size=1.5, seed=7,
                                     props={'phi': 20.0, 'c': 500.0})
 ```
 
-Rows come out labelled `bed-01`, `bed-02`, … so a network keeps one name per set. A trace that
+Rows come out labeled `bed-01`, `bed-02`, … so a network keeps one name per set. A trace that
 would lie ALONG the region's boundary is DROPPED rather than emitted — the mesh split needs
 material on both sides of a joint and there is none outside the section — while a trace ENDING
 on the boundary is ordinary and is kept. An elevation BAND is the exception: its edges are lines
@@ -1138,7 +1138,7 @@ Parameter keys per kind: parallel `dip`, `spacing`, `offset`, `trace_len`, `gap`
 name and its place in the set, `bed-03`, and nothing else — `set_name` reads the set back off it,
 which is what groups the rows of one network. A label of any other shape belongs to no set.
 
-**Layout convention** (when the sketch gives spacing but not explicit elevations): the bottom
+**Layout convention** (when the sketch gives spacing but not explicit elevations): the lowest
 line sits **AT the toe/base elevation** (e.g. y=0), then y = s, 2s, … upward; each line starts
 **on the slope face** at its elevation; **length = the labeled dimension measured from the
 face** (do not add the face offset — if the sketch shows "20 ft" of geogrid, the line is 20 ft
@@ -1260,7 +1260,7 @@ for c in caveats:
   moving its water between the two — that is how a reservoir gets counted twice or lost.
 - The GeoStudio path also goes outward: `export_gsz(slope_data, "out.gsz")`.
 
-Import, then load, plot, and run the input checks (next section) before analysing.
+Import, then load, plot, and run the input checks (next section) before analyzing.
 
 ---
 
@@ -1720,7 +1720,7 @@ For a straight low/high tornado without full curves, call
 
 #### Sensitivity plots beyond the tornado
 
-Four more views ship alongside the tornado; all take `(success, result)` and pair with a
+Four more views accompany the tornado; all take `(success, result)` and pair with a
 `plot_*`. The first three are LOCAL/deterministic; the last two need reliability sigmas.
 
 ```python
@@ -2049,8 +2049,8 @@ solution therefore carries a yield reading (`max_yield_violation`, `n_yield_abov
 `max_yield_at`), and a trial the corrector decided carries a `corrector` record naming the
 checkpoint and the three readings.
 
-Two things follow for a user. First, an inconclusive trial is now rare, because a trial still
-improving at the ceiling is exactly the one the corrector can finish. Second, when a run reports a
+An inconclusive trial is rare, because a trial still
+improving at the ceiling is exactly the one the corrector can finish. When a run reports a
 large `max_yield_violation` on the state it stands on, look at the material at `max_yield_at` — the
 violation is a fraction of the strength available there, floored at 1e-4 of the model's overburden
 scale so a near-free-surface point cannot report round-off as a gross violation. A material with

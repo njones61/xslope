@@ -208,12 +208,10 @@ rows carry `stage1_FS`, `stage2_FS`, `stage3_FS`, `stage3_run` and `governs` bes
 `plot_fs_vs_time` draws the reported curve alone; the stage values are in the run's printed
 table and in `result['df']`.
 
-Two consequences follow from the construction:
-
-* every point is an **auto search from the model's starting circle**, never the stored
+* Every point is an **auto search from the model's starting circle**, never the stored
   circle, so `search` is not consulted on this branch — a drawdown's critical surface is not
   the drained one, and it moves with the drawn-down field.
-* the stage values on a row are read **on that row's critical surface**, which is the
+* The stage values on a row are read **on that row's critical surface**, which is the
   drawdown's, so `stage1_FS` varies slightly along the curve. It is the full-pool factor of
   safety of the surface the drawdown settled on, not of the surface a full-pool search would
   have found.

@@ -320,7 +320,7 @@ rather than a guess. An explicit initial head field may be supplied instead when
 
 The unconfined branch is an iteration and carries a sweep budget, `max_iter`, which defaults to
 2000 — the one convergence parameter of the initial condition a caller sets, and the same key the
-steady runners take for the same solve. It is spent once, before the march, and has nothing to do
+steady runners take for the same solve. It is spent once, before the transient run starts, and has nothing to do
 with the time steps. Raising it is the remedy for a model whose steady state is slow to reach; a
 tall unsaturated column draining at unit gradient is the usual such model, and it converges
 monotonically, just slowly. What that solve spends its sweeps on is the ordinary
@@ -328,7 +328,7 @@ monotonically, just slowly. What that solve spends its sweeps on is the ordinary
 at the tighter head tolerance the initial condition uses — 1e-6 of the model's head scale, against
 the 1e-4 a steady run takes. The outcome of that solve belongs to the run: an initial condition that
 does not close within the budget leaves `converged` False on the returned dictionary, the same flag
-a force-accepted time step clears, so a march begun from a field that is not a steady state says so
+a force-accepted time step clears, so a transient run begun from a field that is not a steady state says so
 in its result.
 
 Because of that rule, the way to start from a particular steady state — a full reservoir before

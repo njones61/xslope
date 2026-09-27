@@ -3,7 +3,7 @@
 ## A project is a set of files
 
 An XSLOPE project starts as one Excel workbook, but it does not stay that way. Every
-analysis that produces something worth keeping writes it to a **sidecar** file beside
+analysis that produces a stored result writes it to a **sidecar** file beside
 the workbook, named after it:
 
 | File | Written by | Holds |

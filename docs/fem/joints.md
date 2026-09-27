@@ -354,14 +354,13 @@ trial that has not converged by the iteration limit counts as failed; it is kept
 reproducing published results obtained that way. On a jointed model it counts a standing slope
 as failed, so leave it alone.
 
-The [Newton corrector](overview.md#finishing-a-trial-with-the-newton-corrector) works the same
-way on any model, jointed or not: while a trial is slowing down, the run periodically takes a
-shortcut and solves directly, from the state the trial has reached, for a state in which the
-forces balance. On a jointed model that state gets one extra check before it counts, because a
-jointed slope can sit at a balanced state its contacts will not hold: the ordinary iteration
-continues from it for a few hundred iterations to confirm that the slope stays put. If it does,
-the trial ends as standing. If the shortcut finds nothing, or the slope moves off the state, the
-ordinary iteration carries on and the trial is judged by its movement as above.
+While a trial is slowing down, the run periodically takes a shortcut: from the state the trial
+has reached, it solves directly for a state in which the forces balance (the
+[Newton corrector](overview.md#finishing-a-trial-with-the-newton-corrector)). If it finds one,
+the ordinary iteration continues from there for a few hundred iterations to confirm that the
+slope stays put, and if it does, the trial ends as standing. If the shortcut finds nothing, the
+ordinary iteration carries on and the trial is judged by its movement as above. The shortcut is
+used on every model; the confirming run afterward is added for jointed models.
 
 ### What the results show
 

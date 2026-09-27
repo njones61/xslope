@@ -391,13 +391,9 @@ either way. **Color by block** sets the fill: off (the default), one tint per ma
 block under its own tint so the bodies can be told apart. The toppling stack of Tutorial FEM-5
 with the grid on and off:
 
-![The Deformed mesh panel of the toppling stack at its critical factor, with the element grid under the blocks, the default for a model with eight or fewer jointed lines](../tutorials/images/fem05_fem_blocks_topple.png){width=900}
+![The Deformed mesh panel of the toppling stack at its critical factor with Element edges on and Color by block off: the grid under the blocks, one tint for the one material](../tutorials/images/fem05_fem_blocks_topple.png){width=900}
 
-![The same panel with the element grid off, the default above eight jointed lines: the joint faces, the deformed outline and the dashed undeformed outline remain](../tutorials/images/fem05_fem_blocks_topple_nogrid.png){width=900}
-
-And with **Color by block** on:
-
-![The same panel with Color by block on: the four columns alternating two tints and the mass a third, so each body can be told from its neighbors](../tutorials/images/fem05_fem_blocks_topple_colored.png){width=900}
+![The same panel with Element edges off and Color by block on: the four columns alternating two tints and the mass a third](../tutorials/images/fem05_fem_blocks_topple_colored.png){width=900}
 
 With Show joints off the panel draws the ordinary deformed mesh. The **Displacement vectors**
 panel is the same as on any other model.

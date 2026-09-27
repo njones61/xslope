@@ -625,9 +625,10 @@ that criterion. At 1% of the height,
 3.6 cm, the crossing lies between 1.0 and 1.5; at 2%, 7 cm, just under 1.56.
 For this wall the movement decides the answer.
 
-When you report a wall like this, give the movement along with the number.
-The default run found a wall standing at F = 1.56 with 7.7 cm of movement and
-the geogrid at a third of capacity, and that says more than the number alone.
+When modeling a wall like this, you may wish to give the movement along with
+the number. The default run found a wall standing at F = 1.56 with 7.7 cm of
+movement and the geogrid at a third of capacity, and that says more than the
+number alone.
 Read the closing summary on every reinforced wall: when it says *No failure
 was found* or gives the factor of safety as *at least*, you have this kind of
 wall. A limit equilibrium analysis of the same wall asks only the strength

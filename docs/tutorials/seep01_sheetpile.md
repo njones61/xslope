@@ -905,7 +905,7 @@ dialog in one control at a time:
   `Back-Analysis (target q)`, the same single-parameter sweep run backwards from a
   discharge you have measured. A fourth, `Factor of safety vs time`, is listed but
   grayed out, since a factor-of-safety curve needs a stability engine and the
-  seepage solution is this run's input rather than its output;
+  seepage solution is an input to this run;
   [COMBO-3](combo03_fs_vs_time.md) is the tutorial that runs it.
 - **Convergence tol** = `0.0001`, the same solver control the Run Seepage dialog
   carries and with the same meaning: every step of the sweep is one of those

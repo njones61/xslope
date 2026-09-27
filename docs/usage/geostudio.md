@@ -85,7 +85,7 @@ fail. That reproduces SLOPE/W exactly, and the material round-trips back to Bedr
 export. Importing bedrock as ordinary soil would let trial surfaces cut straight
 through it.
 
-Matric suction is reported rather than converted. SLOPE/W parameterises unsaturated
+Matric suction is reported rather than converted. SLOPE/W parameterizes unsaturated
 (negative pore-pressure) shear strength as a **suction ceiling on the piezometric
 surface** — a maximum suction, and a cap on how much of it counts — not as a
 per-material φᵇ. That is a threshold on the pore pressure, semantically different from
@@ -318,7 +318,7 @@ XSLOPE will not quietly swap one for the other. Where a model defines both, the 
 field wins and the export says so.
 
 GeoStudio applies a spatial function to **every
-material in the analysis**, not to a chosen subset, so a model where only some materials
+material in the analysis**, so a model where only some materials
 draw from the seepage field arrives with all of them doing so. And ponded water — written
 as a surcharge here, as everywhere — **must be kept**, which is the opposite of the
 piezometric-surface case above: a spatial function gives GeoStudio no water surface, so it

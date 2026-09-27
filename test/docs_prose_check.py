@@ -126,7 +126,7 @@ RULES: list[tuple[str, tuple[str, ...], re.Pattern]] = [
         r"labell(?:ed|ing)|behaviours?|mobilis(?:e|es|ed|ing|ation|able)|"
         r"analys(?:ed|ing)|normalis(?:e|es|ed|ing|ation)|modell(?:ed|ing)|"
         r"(?:optim|minim|maxim|initial|stabil|linear|discret|ideal|penal|"
-        r"recogn|visual|summar|emphas|character|parametr|organ|util)is"
+        r"recogn|visual|summar|emphas|character|parametr|parameter|organ|util)is"
         r"(?:e|es|ed|ing|ation)|favour(?:s|ed|ing|able|ite)?|programme|catalogue|"
         r"defence|licence|artefacts?|aluminium|whilst|amongst)\b", I)),
 ]

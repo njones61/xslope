@@ -250,7 +250,7 @@ The mode is available in **LEM** and **FEM** mode on a model that carries a tran
 seepage solution and at least one material reading `u = seep`. Without one of those it is
 disabled and names the reason — *Run a transient seepage analysis first*, *No material takes
 its pore pressure from the seepage solution*, or, in Seepage mode, that the seepage solution
-is this run's input rather than its output. The drawdown option is LEM only: the three-stage
+is an input to this run. The drawdown option is LEM only: the three-stage
 procedure is a limit-equilibrium construction with no SSRM equivalent. The engine page
 [Factor of safety versus time](../parametric/sensitivity.md#factor-of-safety-versus-time)
 carries the sweep itself.
@@ -690,7 +690,7 @@ and orients it itself, and its own dialog says so.
 the default, and what every model that does not say otherwise means — fixes the
 horizontal component and leaves the vertical free, so the truncated ground can still
 settle under its own weight. **Fixed** clamps both components, which is what RS2 does
-on its side boundaries. Fixed is a vendor-parity option rather than a better model: it
+on its side boundaries. Fixed matches the vendor's setting rather than improving the model: it
 adds shear restraint the real ground does not have, and stiffens a domain truncated
 close to the slope. The setting is part of how the model is restrained rather than
 part of the strength reduction, so it applies to a single trial and an SSRM alike. Like

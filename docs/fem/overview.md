@@ -357,7 +357,7 @@ specified by hand:
    cell chooses what the restraint is: `rollers` (the default, and every file that does not declare
    it) gives $u = 0$ with $v$ free, so truncated ground can still settle under its own weight;
    `fixed` clamps both components, which is what RS2 does on its side boundaries. Fixing the sides
-   is a vendor-parity option rather than a better model — it adds shear restraint the real ground
+   matches the vendor's setting rather than improving the model — it adds shear restraint the real ground
    does not have and stiffens a domain truncated close to the slope. Corner nodes where a side meets
    the base keep the fixed condition either way.
 

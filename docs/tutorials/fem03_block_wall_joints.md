@@ -541,8 +541,8 @@ press **Continue with a higher limit…** on the results toolbar and enter
 has already decided, and runs until the wall gives way. You can also start
 over from the Run FEM dialog with **Max iterations per trial** at 1,000,000 and
 the iteration ceiling raised to match; that gives the same answer. Either way
-it takes a long time, about an hour to continue and ten minutes longer to start
-over, so we have not asked you to do it. The results below come from that run.
+takes about an hour on an ordinary desktop. Run it if you have the time, or
+just read the results below, which come from that run.
 
 ![Displacement against strength reduction factor with a million-iteration limit: the wall comes to rest at every strength up to 1.9922, moving further each time, and runs away at 2.0](images/fem03_ssrm_curve_grid_long.png){width=800}
 

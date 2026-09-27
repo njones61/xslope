@@ -592,6 +592,14 @@ exaggeration:
 
 ![The wall at 2.0, drawn at true scale: the block column pushed out and sunk into the foundation, the fill behind it collapsed, and the geogrid layers dragged out with it](images/fem03_fem_blocks_grid_long_failure.png){width=929}
 
+The block column has been pushed out more than 2 m and has sunk almost a meter
+into the foundation, which has heaved up in front of the toe. The fill behind
+the facing has dropped with it, and the ground surface now sits about a meter
+and a half below the dashed line that marks where it started. The three geogrid
+sheets have gone out with the blocks, their front ends carried along by the
+facing and their back ends dragged through the fill, the bottom sheet slipping
+the farthest.
+
 ![Viscoplastic shear strain at the failed state: a band from under the toe of the block column, where the foundation is punched, up through the reinforced fill to the crest; the bottom layer at its capacity on the reinforcement force scale](images/fem03_fem_shear_grid_long_failure.png){width=1000}
 
 The shear strain is on a different scale from the default run's: it tops out

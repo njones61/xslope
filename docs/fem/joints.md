@@ -250,8 +250,7 @@ edited in the joints editor, as a table or one line at a time with the section d
 
 ### Generating a network of joints
 
-A jointed rock mass has hundreds of joints, and nobody enters them one line at a time. The
-program can write them from a description of the pattern:
+A jointed rock mass may have hundreds of joints. The program can generate them from a pattern:
 
 - **Parallel set.** One family of joints at a given dip and spacing, such as bedding planes every
   2 m dipping 35° out of the face.

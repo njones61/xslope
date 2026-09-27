@@ -673,11 +673,12 @@ class FemResultsDisplayPanel(QWidget):
         form.addRow("", self.scale_vectors)
         form.addRow("Vector cutoff", self.displacement_tolerance)
         form.addRow("", self.color_by_magnitude)
-        # No legend controls. The deformation panel DOES draw a legend — the
-        # original and deformed grids, and the reinforcement in both
-        # configurations, named by plot_deformed_mesh via _place_deform_legend —
-        # and the strain and vector panels draw none. What is absent is the
-        # choice: the panels keep the legend they were designed with, so there is
+        # No legend controls. With Joint state on (the default) the deformation
+        # panel carries no legend, because the block look carries its meaning in
+        # the drawing. With Joint state off it names the original and deformed
+        # grids, and the reinforcement in both configurations, in a legend placed
+        # by _place_deform_legend. The strain and vector panels carry none either
+        # way. The panels keep the legend they were designed with, so there is
         # nothing here to set.
 
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)

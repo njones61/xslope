@@ -14530,14 +14530,18 @@ def test_the_displacement_curve_draws_the_trials():
 
 
 def test_which_result_panels_draw_a_legend():
-    """The deformation panel names its two grids in a legend; the strain and
-    vector panels draw none.
+    """The deformation panel draws a legend only with Joint state off; the
+    strain and vector panels draw none either way.
 
     The plots stay as they are (Norm's ruling). What is checked here is that the
-    Studio panel beside them tells the truth about them: the note where the legend
-    controls would go said "the single-panel FEM result plots draw no legend",
-    and the deformation panel has always drawn one — original grid, deformed grid,
-    and the reinforcement in both configurations where the model carries any.
+    Studio panel beside them tells the truth about them. The note where the
+    legend controls would go once said the deformation panel always draws a
+    legend. Since the block look became the default, it draws one only when the
+    Joint state box is cleared: original grid, deformed grid, and the
+    reinforcement in both configurations where the model carries any. Before
+    that, the note said the result plots draw no legend at all. Both claims were
+    wrong for one of the two settings, so both settings are rendered here and
+    the note must name the control that decides it.
     """
     fails = []
     import inspect
@@ -14547,33 +14551,64 @@ def test_which_result_panels_draw_a_legend():
 
     _slope_data, bundle = _fem_bundle()
     drawn = {}
-    for panel in ("deformation", "shear_strain", "displace_vector"):
-        fig = mplfig.Figure(figsize=(4.0, 3.0))
-        with contextlib.redirect_stdout(io.StringIO()):
-            plot_fem_results(bundle["fem_data"], bundle["solution"],
-                             plot_type=[panel], fig=fig, show_title=False)
-        legends = [text.get_text()
-                   for ax in fig.axes if ax.get_legend() is not None
-                   for text in ax.get_legend().get_texts()]
-        drawn[panel] = legends
-    if not drawn["deformation"]:
-        fails.append("the deformation panel draws no legend, so the note beside "
-                     "the controls is describing a plot that no longer exists")
+    for show_joints in (True, False):
+        for panel in ("deformation", "shear_strain", "displace_vector"):
+            fig = mplfig.Figure(figsize=(4.0, 3.0))
+            with contextlib.redirect_stdout(io.StringIO()):
+                plot_fem_results(bundle["fem_data"], bundle["solution"],
+                                 plot_type=[panel], fig=fig, show_title=False,
+                                 show_joints=show_joints)
+            legends = [text.get_text()
+                       for ax in fig.axes if ax.get_legend() is not None
+                       for text in ax.get_legend().get_texts()]
+            drawn[(panel, show_joints)] = legends
+    if drawn[("deformation", True)]:
+        fails.append(f"with Joint state on the deformation panel draws a legend "
+                     f"{drawn[('deformation', True)]}, which the note says it "
+                     f"does not")
+    off = drawn[("deformation", False)]
+    if not (any(t.startswith("Original") for t in off)
+            and any(t.startswith("Deformed") for t in off)):
+        fails.append(f"with Joint state off the deformation panel's legend is "
+                     f"{off}, and the note says it names the original and "
+                     f"deformed grids")
     for panel in ("shear_strain", "displace_vector"):
-        if drawn[panel]:
-            fails.append(f"the {panel!r} panel draws a legend {drawn[panel]}, "
-                         f"which the note beside the controls says it does not")
+        for show_joints in (True, False):
+            if drawn[(panel, show_joints)]:
+                fails.append(f"the {panel!r} panel draws a legend "
+                             f"{drawn[(panel, show_joints)]} with Joint state "
+                             f"{'on' if show_joints else 'off'}, which the note "
+                             f"says it does not")
 
-    # The note itself: it must not assert the absence the panels contradict.
+    # The note itself: the comment block that opens "No legend controls." It
+    # must name the control that decides the deformation legend, give both of
+    # its states, and make neither of the two blanket claims the panels
+    # contradict.
     source = inspect.getsource(display_panels.FemResultsDisplayPanel)
-    notes = [line.strip() for line in source.splitlines()
-             if line.strip().startswith("#") and "legend" in line.lower()]
-    if not notes:
+    lines = [line.strip() for line in source.splitlines()]
+    try:
+        first = next(i for i, l in enumerate(lines)
+                     if l.startswith("#") and "No legend controls" in l)
+    except StopIteration:
+        first = None
         fails.append("the results panel carries no note about the legends at all")
-    for note in notes:
-        if "draw no legend" in note or "draws no legend" in note:
-            fails.append(f"the note still says the result plots draw no legend: "
-                         f"{note!r}")
+    if first is not None:
+        block = []
+        for l in lines[first:]:
+            if not l.startswith("#"):
+                break
+            block.append(l.lstrip("#").strip())
+        note = " ".join(block)
+        if 'QCheckBox("Joint state")' not in source:
+            fails.append("the panel has no 'Joint state' box for the note to name")
+        if "Joint state on" not in note or "Joint state off" not in note:
+            fails.append(f"the note does not say what the deformation panel "
+                         f"draws with Joint state on and off: {note!r}")
+        for claim in ("result plots draw no legend", "DOES draw a legend",
+                      "always draws a legend"):
+            if claim.lower() in note.lower():
+                fails.append(f"the note still makes the blanket claim "
+                             f"{claim!r}: {note!r}")
     return fails
 
 

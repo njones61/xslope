@@ -308,12 +308,8 @@ an end that misses the joint by less than the mesher tells apart as being on it.
 ## Running a Jointed Model
 
 A jointed model is run the way any other finite element model is: build the mesh, open
-**Run → Run FEM…**, choose the strength reduction, and press **Run**. Three things change once
-joints are in the model. The model needs far more iterations to settle, so the iteration limit
-has to be raised. A trial is decided from the joints and from the trend of the movement, because
-the back-and-forth on a slipping contact never dies down to a force tolerance. And the results
-carry the joints: each one drawn by how far it has slipped, the deformed section drawn as
-blocks, and a 1D Details panel for every jointed line.
+**Run → Run FEM…**, choose the strength reduction, and press **Run**. The differences are in
+how many iterations the run needs, how each trial is judged, and what the results show.
 
 ### How many iterations a jointed model needs
 

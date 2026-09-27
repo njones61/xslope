@@ -285,19 +285,25 @@ To generate a joint network from a Python script, call `parallel_set`, `cross_jo
 
 ### A reinforcement line as a joint
 
-Setting `Joint = Yes` on a reinforcement line splits the mesh along it and puts the sheet between
-two interfaces, one against the soil above and one against the soil below, so the sheet's two
-interfaces act in series where a joints-sheet line carries one contact.
-[Ends, ties and the bar](reinforcement.md#ends-ties-and-the-bar) covers how such a sheet is
-anchored, and what the bar does and does not carry once the interfaces carry the grip.
+A geosynthetic sheet or a liner can be modeled as a bar bonded to the soil or as a surface the
+soil slides on, and which is right depends on the problem;
+[Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) works through both on the same
+embankment. To make a reinforcement line a slip surface, set its **Joint** column to `Yes` on
+the reinforce worksheet, or the Joint field in Studio's reinforcement editor. The mesh then
+splits along the line and the sheet sits between two interfaces, one against the soil above and
+one against the soil below, whose strength comes from the line's own **Adhesion** and **Delta**.
+The sheet's two interfaces act in series where a line on the joints worksheet has a single
+contact. How such a sheet is anchored, and what the bar carries once the interfaces carry the
+grip, is on the reinforcement page under
+[Ends, ties and the bar](reinforcement.md#ends-ties-and-the-bar).
 
-A reinforcement line that ends on a joint line, or crosses one, must be jointed itself or stop short
-of it; so must a pile, which cannot be jointed and has to stop short. The split gives every node on
-the joint one copy for each side, and a bonded bar shares the soil's own nodes, so a bar standing on
-one of those nodes has no single side to attach to. A geogrid running back from a block facing ends
-on the back-face joint, which is why each sheet in such a wall is set `Joint = Yes`. The model checks
-name the line and the joint before the mesh is built, and count an end that misses the joint by less
-than the mesher tells apart as on it.
+A reinforcement line that ends on a joint line, or crosses one, must be a joint itself or stop
+short of the joint, and a pile, which cannot be a joint, has to stop short. The split gives every
+node on the joint one copy for each side, and a bonded bar attaches to the soil's own nodes, so a
+bar standing on one of those nodes has no single side to attach to. A geogrid running back from a
+block facing ends on the back-face joint, which is why each sheet in such a wall is set to
+`Joint = Yes`. The model checks name the line and the joint before the mesh is built, and count
+an end that misses the joint by less than the mesher tells apart as being on it.
 
 ## Running a Jointed Model
 

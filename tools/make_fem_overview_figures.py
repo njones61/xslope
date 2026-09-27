@@ -342,8 +342,38 @@ def fig_ssrm_sweep():
     _finish(fig, "fem_ov_ssrm_sweep.png")
 
 
+# ===========================================================================
+# Figure 5 — the block drawing with and without the element grid
+# ===========================================================================
+
+TOPPLING = os.path.join(HERE, "..", "docs", "tutorials", "files", "xslope_rock_toppling")
+
+
+def fig_joint_block_grid():
+    """The Deformed mesh panel of a jointed model (FEM-5's toppling stack, its
+    shipped solution) drawn twice: with the element grid under the blocks, the
+    default for a model with eight or fewer jointed lines, and without it, the
+    default above that count. Element edges in Studio's display panel switches
+    between the two either way. Standard plot call, as Studio draws it."""
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import import_mesh_from_json
+    from xslope import fem, plot_fem
+    sd = load_slope_data(TOPPLING + ".xlsx")
+    mesh = import_mesh_from_json(TOPPLING + "_mesh.json")
+    fd = fem.build_fem_data(sd, mesh)
+    sol = fem.import_fem_solution(fd, TOPPLING)
+    for grid, name in ((True, "joints_blocks_grid_on.png"),
+                       (False, "joints_blocks_grid_off.png")):
+        out = plot_fem.plot_fem_results(fd, sol, plot_type=["deformation"],
+                                        show_joints=True, block_grid=grid,
+                                        save_png=False)
+        fig = out if hasattr(out, "get_axes") else out[0]
+        _finish(fig, name)
+
+
 if __name__ == "__main__":
     fig_viscoplastic_loop()
     fig_tension_cutoff()
     fig_k0_initial()
     fig_ssrm_sweep()
+    fig_joint_block_grid()

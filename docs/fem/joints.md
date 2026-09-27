@@ -246,14 +246,17 @@ documented with the rest of the template under
 [Worksheet: joints](../usage/input_template.md#worksheet-joints). In Studio the same rows are
 edited in the joints editor, as a table or one line at a time with the section drawn beside it.
 
-![The joints editor in Studio: the lines of a model, one selected, with its properties and the section beside it](../studio/images/editing_joints_editor.png){width=900}
+![The joints editor in Studio: the lines of a model, one selected, with its properties and the section beside it](../studio/images/editing_joints_editor.png){width=1240}
 
 ### Generating a network of joints
 
-A jointed rock mass may have hundreds of joints. XSLOPE generates them from a pattern: in
-Studio, press [Build network](../studio/editing.md#build-network) on the joints editor; in a
-script, call `parallel_set`, `cross_jointed` or `voronoi` from `xslope.joints`. The three
-patterns:
+A jointed rock mass may have hundreds of joints. To create a network of joints in Studio, press
+[Build network](../studio/editing.md#build-network) on the joints editor, choose the pattern,
+enter its numbers and pick the region; the canvas previews the joints before anything is written.
+
+![The Build network dialog: the kind of network, its parameters, and the region it is clipped to](../studio/images/editing_joint_network_dialog.png){width=1180}
+
+The three patterns:
 
 - **Parallel set.** One family of joints at a given dip and spacing, such as bedding planes every
   2 m dipping 35° out of the face.
@@ -267,14 +270,12 @@ region is a polygon on the polygon sheet with its **Type** set to `joints` (see
 [joint regions](../usage/input_template.md#joint-regions) on the template page), and it can be
 limited to a band of elevations. No joints are written outside the region.
 
-In the Build network dialog, choose the pattern, enter its numbers and pick the region; the
-canvas previews the joints before anything is written.
-
 The generator writes ordinary rows on the joints worksheet, labeled `set-01`, `set-02` and so
 on. The pattern itself is not stored, only the lines it produced, so to change a network you
 remove the set and build another.
 
-![The Build network dialog: the kind of network, its parameters, and the region it is clipped to](../studio/images/editing_joint_network_dialog.png){width=760}
+In a script, call `parallel_set`, `cross_jointed` or `voronoi` from `xslope.joints`; they write
+the same rows.
 
 ### A reinforcement line as a joint
 

@@ -571,9 +571,9 @@ each element, the force the sheet actually picks up, runs smoothly at about
 17 to 20 kPa. The joints page explains it under *Why the shear traction can
 zigzag where an interface grips*. One more thing to know when reading these
 panels: at the sheet's tip, the last station, the normal stress plots as zero
-while the limit does not, because the two faces of the interface meet at one
-node there and the limit is taken from the soil's pressure on the sheet
-instead. Everywhere else the two panels use the same stress.
+while the Mohr-Coulomb limit does not, because the two faces of the interface
+meet at one node there and the limit is taken from the soil's pressure on the
+sheet instead. Everywhere else the two panels use the same stress.
 
 One more step in strength and the top layer has nothing left to give, and the
 wall goes. This is the failed state at 2.0, drawn to scale, with no

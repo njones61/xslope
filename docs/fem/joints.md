@@ -377,15 +377,15 @@ thin because a generated network puts hundreds of them over the field.
 
 ![Joint slip on a toppling stack at its critical factor: each joint colored by how far its faces have slid, gray where it has not slipped, drawn as two lines with a gap between them where it has opened](../tutorials/images/fem05_joint_slip_topple.png){width=900}
 
-The deformation panel is the same on a jointed model as on any other. The third panel changes:
-in place of **Displacement vectors**, a jointed model shows the scaled deformed mesh drawn as the
-**blocks** the joints cut the section into — each block under a faint tint of its own,
-its joint faces in the same green, the outside of the deformed mesh as a dark line against the
-dashed undeformed outline. A block is a piece of the mesh that moves as one body, found by following
-element adjacency: the split gives the two sides of a joint their own nodes, so they are no longer
-neighbors. That is what a jointed failure looks like — blocks moving as bodies, with all of the
-movement taken up at the joints, where a slipped or opened joint shows as two lines that no longer
-lie on each other. An arrow field samples that at nodes and misses exactly the thing that happened.
+On the **Deformed mesh** panel, with **Joint state** on (the default for a jointed model), the
+deformed section is drawn as the **blocks** the joints cut it into: each block under a faint tint
+of its own, the joint faces in green, and the deformed outline as a dark line against the dashed
+undeformed outline. A block is a piece of the mesh that moves as one body; the mesh split gives
+the two sides of a joint their own nodes, so the pieces between joints are found by following
+which elements still share nodes. A jointed failure looks like this, blocks moving as bodies with
+all of the movement taken up at the joints, and a joint that has slipped or opened shows as two
+lines that no longer lie on each other. With Joint state off the panel draws the ordinary deformed
+mesh. The **Displacement vectors** panel is the same as on any other model.
 
 ![The deformed mesh of the same stack, drawn as blocks: each block moves as one body, the joints between them shown in green, and the dashed outline is the undeformed section](../tutorials/images/fem05_fem_blocks_topple.png){width=900}
 

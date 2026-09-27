@@ -160,7 +160,7 @@ def model(materials, polygons, circle, target_size, joint_lines=(),
                 "non_circ", "dloads", "dloads2", "dload_dirs", "dload2_dirs",
                 "pile_lines", "line_loads", "piezo_line", "piezo_line2"):
         sd[key] = []
-    sd["circles"] = [dict(circle)]
+    sd["circles"] = [dict(circle)] if circle is not None else []
     sd["element_type"] = "tri6"
     sd["target_size"] = target_size
     sd["element_size_1d"] = None
@@ -227,19 +227,12 @@ def wall_sheets():
             for n, y in enumerate(SHEET_Y)]
 
 
-# The starting circle is the generator's first on this section
-# (xslope.generators.generate_starting_circles), taken at full precision: it
-# bottoms out 0.3 m below the wall's base and so passes under the blocks. A circle
-# tangent at the base (Depth 0) cuts the blocks, which are elastic, and the slicer
-# refuses any surface that crosses an elastic zone.
-WALL_CIRCLE = {"Xo": 10.6, "Yo": 11.2, "Depth": -0.29782588144384725,
-               "R": 11.497825881443847}
-
-
 def _wall(joint_lines=(), sheets=()):
     sd = _base()
+    # The wall files carry no failure surface: nothing on the page runs one, and
+    # the strength reduction never reads the circles sheet.
     return model(wall_materials(sd["materials"][0]), wall_polygons(),
-                 WALL_CIRCLE, WALL_TARGET_SIZE, joint_lines=joint_lines,
+                 None, WALL_TARGET_SIZE, joint_lines=joint_lines,
                  reinforcement_lines=sheets, max_depth=FOUND_Y0)
 
 

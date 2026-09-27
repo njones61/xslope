@@ -143,12 +143,9 @@ def model(joint_lines=(), joint_zones=()):
                 "dload_dirs", "dload2_dirs", "pile_lines", "line_loads",
                 "piezo_line", "piezo_line2"):
         sd[key] = []
-    # The loader will not open a model that carries no surface, no mesh and no
-    # seepage boundary, so every file here carries one starting circle, placed
-    # the standard way: center above the middle of the face at twice its height,
-    # tangent to the base of the section.  Nothing on FEM-5 runs it.
-    sd["circles"] = [{"Xo": round((CREST_X + TOE_X) / 2.0, 2), "Yo": 2.0 * H,
-                      "Depth": 0.0, "R": 2.0 * H}]
+    # No failure surface: nothing on FEM-5 runs one, and the strength reduction
+    # never reads the circles sheet.
+    sd["circles"] = []
     sd["element_type"] = "tri6"
     sd["target_size"] = TARGET_SIZE
     sd["element_size_1d"] = None

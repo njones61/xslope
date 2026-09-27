@@ -684,7 +684,7 @@ The **circles** worksheet defines circular failure surfaces for limit equilibriu
 the most common assumption in slope stability analysis and are required for methods like Bishop's Simplified Method 
 and Spencer's Method. XSLOPE supports up to 10 circular failure surfaces, each of which can be analyzed 
 individually or used as starting points when searching for a critical failure surface with a minimum factor of 
-safety using an automated search algorithm.
+safety using an automated search algorithm. A seepage or finite element model can leave this sheet empty: only a limit equilibrium run needs a surface, here or on the **non-circ** sheet.
 
 ![circles.png](images/circles.png){width=1000px}
 

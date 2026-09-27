@@ -854,8 +854,8 @@ Whether such a surficial "skin" failure is the answer you *want* is an engineeri
 it is often surface ravelling rather than a stability concern — but the search should find it
 and you should decide consciously, not miss it by accident.
 
-Even a **FEM-only** run needs at least one nominal circle here so `load_slope_data` validates;
-the FEM solver does not use it, but the loader requires a failure surface to exist.
+A **FEM-only** or seepage-only model needs no circle: leave the sheet empty. Only a
+limit-equilibrium run needs a surface, and preflight refuses that run when there is none.
 
 **A file that defines both families.** `slope_data['surface_family']` (main!D25) — `'circular'`
 or `'non-circular'` — decides which one runs, and the loader uses it to set
@@ -2064,10 +2064,9 @@ factor of safety was produced on before the corrector. `XSLOPE_FEM_SOLVER` sets 
 process and prints a warning when it does. Use it to reproduce an older number; leave it alone
 otherwise.
 
-**FEM-only models still need one starting circle.** `load_slope_data()` requires a failure
-surface definition unless the file has seepage BCs or a pre-built mesh; a pure FEM input with
-neither will raise "Input must include either circular or non-circular surface data". Add one
-nominal circle (any reasonable toe circle) — the SSRM never uses it.
+**FEM-only models need no starting circle.** `load_slope_data()` loads a model with no
+surface, mesh or seepage boundary conditions; the SSRM never reads the circles sheet, and
+`preflight(sd, 'fem')` passes with it empty. Do not add a placeholder circle.
 
 **FEM domain extents matter as much as in LEM.** The extent rule (flat ground ≥ ~2× slope
 height beyond toe and crest) and a foundation depth below the toe apply to SSRM too: a domain

@@ -1209,12 +1209,10 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     It handles circular and non-circular failure surface data, reinforcement, piezometric
     lines, and distributed loads.
 
-    ``require_analysis_data=False`` loads a model that is not yet runnable — no
-    failure surfaces, no mesh, and no seepage boundary conditions (e.g. a partially
-    built model saved from an editor, or a tutorial starter file). Such a model is
-    validated on the seepage-only path (unit weights may be blank); everything else
-    is checked as usual. The default (True) keeps the analysis-entry behavior: a
-    file with none of the four is rejected.
+    A workbook with no failure surface, no mesh and no seepage boundary conditions
+    loads: the loader checks structure only, and whether a model can run a given
+    engine is decided by :func:`xslope.preflight.preflight`. ``require_analysis_data``
+    is accepted for compatibility and no longer changes what loads.
 
     ``filepath`` is a workbook (.xlsx) or a project package (.xslz). A package is
     unpacked first and the extracted workbook loaded, because the sidecars this
@@ -1225,8 +1223,7 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     beside it, and raises rather than write over a folder that is already there.
 
     Validation is enforced to ensure required geometry and material information is present:
-    - Circular failure surface: must contain at least one valid row with Xo and Yo
-    - Non-circular failure surface: required if no circular data is provided
+    - Circular failure surface: each row must carry Xo and Yo
     - Profile lines: must contain at least one valid set, and each line must have ≥ 2 points
     - Materials: must match the number of profile lines
     - Piezometric line: only included if it contains ≥ 2 valid rows
@@ -2772,25 +2769,11 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     # define.
     if surface_family is not None and circular and len(non_circ) > 0:
         circular = surface_family == 'circular'
-    # Check if this is a seep-only analysis (has seep BCs but no slope stability surfaces)
-    has_seepage_bc = (len(seepage_bc.get("specified_heads", [])) > 0 or
-                     len(seepage_bc.get("specified_fluxes", [])) > 0 or
-                     len(seepage_bc.get("exit_face", [])) > 0)
-    # An editor load (require_analysis_data=False) of a model with no surfaces takes
-    # the same validation path: it is a seepage model in progress, so unit weights
-    # may still be blank and no failure surfaces are demanded.
-    is_seepage_only = ((has_seepage_bc or not require_analysis_data)
-                       and not circular and len(non_circ) == 0)
-    # A mesh-based run with no LEM surfaces is a seepage or FEM (SSRM) analysis;
-    # neither needs circular/non-circular failure surfaces.
-    is_mesh_analysis = mesh is not None and not circular and len(non_circ) == 0
-
-    # Only require circular/non-circular data for a pure LEM run (no seep BCs, no mesh)
-    if not is_seepage_only and not is_mesh_analysis and not circular and len(non_circ) == 0:
-        raise ValueError(
-            "Input must include circular or non-circular surface data (for a "
-            "slope-stability run), a mesh, or seepage boundary conditions (for a "
-            "seepage run).")
+    # No failure surface, mesh or seepage boundary condition is demanded here. The
+    # loader answers only "is this workbook structurally readable"; whether the model
+    # carries what a given engine needs (a surface for LEM, boundary conditions for
+    # seepage) is a preflight question, asked per engine at run time. An FEM model
+    # needs none of them.
     if not polygons:
         raise ValueError("Geometry is missing: provide either the 'profile' sheet or the 'polygon' sheet.")
     if not materials:

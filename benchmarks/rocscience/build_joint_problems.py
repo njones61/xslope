@@ -71,6 +71,9 @@ def _base():
     # and none of them has water, so the value is inert but it must not be wrong.
     sd['gamma_water'] = 9.81
     sd['profile_lines'] = []
+    # No failure surface: every file here is run by the strength reduction only,
+    # which never reads the circles or non-circ sheets, and nothing runs a
+    # limit-equilibrium surface on them.
     sd['circles'] = []
     sd['non_circ'] = []
     sd['piezo_line'] = []
@@ -124,53 +127,6 @@ def _offset_through(dip_deg, x, y):
     return float(x) * nx + float(y) * ny
 
 
-def _circle_through_at(p1, p2, yo):
-    """The circle through ground points ``p1`` and ``p2`` whose center sits at
-    elevation ``yo``, in the circles sheet's form."""
-    (x1, y1), (x2, y2) = p1, p2
-    xo = ((x2 * x2 + (y2 - yo) ** 2) - (x1 * x1 + (y1 - yo) ** 2)) \
-        / (2.0 * (x2 - x1))
-    r = ((xo - x1) ** 2 + (y1 - yo) ** 2) ** 0.5
-    return [{'Xo': float(xo), 'Yo': float(yo), 'Depth': float(yo - r),
-             'R': float(r)}]
-
-
-def _toe_chord(toe, crest):
-    """The seed surface for an ELASTIC section whose mechanism is not one plane.
-
-    A limit-equilibrium surface cannot be sliced on a model whose rock is
-    elastic: an elastic zone cannot fail, so the slicer refuses any surface that
-    crosses one, and the starting circle the house rule draws is refused with it.
-    What the file needs is a surface at all — the loader will not read a model
-    with no failure surface, no mesh and no seepage boundary condition — and a
-    strength reduction never reads it. So an elastic row carries the chord
-    between the two points the house rule draws its circle through, toe to
-    crest, as a non-circular surface.
-    """
-    return _surface([toe, crest])
-
-
-def _toe_circle(toe, crest):
-    """A starting circle for a section whose mechanism is not a single plane.
-
-    Centred above mid-slope at the toe elevation plus twice the slope height and
-    passing through the toe, which is the starting circle a user would draw on
-    this section. It is what makes the file a complete slope-stability model;
-    a strength reduction never reads it. A section whose rock is ELASTIC takes
-    :func:`_toe_chord` instead — a circle cannot be sliced through a zone that
-    cannot fail.
-    """
-    (tx, ty), (cx, cy) = toe, crest
-    xo = 0.5 * (tx + cx)
-    yo = ty + 2.0 * (cy - ty)
-    r = ((xo - tx) ** 2 + (yo - ty) ** 2) ** 0.5
-    # Depth is the elevation of the circle's lowest point, and the loader reads
-    # it in preference to R, so the two have to agree or the stated radius is
-    # replaced by one that reaches elevation zero.
-    return [{'Xo': float(xo), 'Yo': float(yo), 'Depth': float(yo - r),
-             'R': float(r)}]
-
-
 def _joint(label, p1, p2, c, phi, kn=KN_STD, ks=KS_STD, t_cut=0.0,
            c_res=None, phi_res=None, dil=None, jred=''):
     """One row of the joints sheet, in kPa."""
@@ -183,19 +139,6 @@ def _joint(label, p1, p2, c, phi, kn=KN_STD, ks=KS_STD, t_cut=0.0,
             'phi_res': nan if phi_res is None else phi_res,
             'dil': nan if dil is None else dil,
             't_cut': t_cut, 'kn': kn, 'ks': ks, 'jred': jred}
-
-
-def _surface(points):
-    """A non-circular failure surface through the stated points.
-
-    The two ends are Free — they are on the ground surface and the slicer finds
-    where — and every point between them is Fixed. Each carries an explicit Y,
-    which is what a Free end needs.
-    """
-    n = len(points)
-    return [{'X': float(x), 'Y': float(y),
-             'Movement': 'Free' if i in (0, n - 1) else 'Fixed'}
-            for i, (x, y) in enumerate(points)]
 
 
 def _finish(sd, rings_and_ids, materials):
@@ -421,9 +364,6 @@ def _gb_case(name, phi_joint, toe_force=0.0):
         sd['line_loads'] = [{'label': 'toe force',
                              'x': GB_FORCE_CORNER[0], 'y': GB_FORCE_CORNER[1],
                              'P': float(toe_force), 'angle': 0.0}]
-    # The seed surface is the basal plane the stack stands on, toe to crest.
-    sd['non_circ'] = _surface([(-0.5, 0.866025403784439),
-                               (130.56406460551, 93.856406460551)])
     return _write(sd, name)
 
 
@@ -516,9 +456,6 @@ def rj002():
     sd['joint_lines'] = [
         _joint('basal', (20.0, 10.0), (2.9393, 19.85), 0.0, 31.0),
     ] + columns
-    # The seed surface is the basal joint: the plane the toppling column stack
-    # stands on. Inert for a strength reduction, and it makes the file complete.
-    sd['non_circ'] = _surface([(20.0, 10.0), (2.9393, 19.85)])
     return _write(sd, 'rj002.xlsx')
 
 
@@ -544,7 +481,6 @@ def rj003():
     sd['joint_lines'] = cross_jointed(
         parallel_set(sd, 70.0, 20.0, label='col', props=LV_JOINT),
         parallel_set(sd, -20.0, 30.0, label='cross', props=LV_JOINT))
-    sd['non_circ'] = _toe_chord((560.0, 140.0), (377.785587105239, 400.0))
     return _write(sd, 'rj003.xlsx')
 
 
@@ -568,7 +504,6 @@ def rj004():
     mats = [_rock('Rock', 26.1, 9.072e6, 0.26, 675.0, 43.0, t_cut=0.0)]
     _finish(sd, [(LV_RING, 0)], mats)
     sd['joint_lines'] = parallel_set(sd, 70.0, 20.0, label='col', props=LV_JOINT)
-    sd['circles'] = _toe_circle((560.0, 140.0), (377.785587105239, 400.0))
     return _write(sd, 'rj004.xlsx')
 
 
@@ -595,7 +530,6 @@ def rj005():
                      label='dip', props=LV_JOINT),
         parallel_set(sd, 0.0, 40.0, offset=_offset_through(0.0, 0.0, 400.0),
                      label='bed', props=LV_JOINT))
-    sd['non_circ'] = _toe_chord((560.0, 140.0), (377.785587105239, 400.0))
     return _write(sd, 'rj005.xlsx')
 
 
@@ -619,10 +553,6 @@ def rj006():
     mats = [_rock('Rock', 26.1, 9.072e6, 0.26, 675.0, 43.0, t_cut=0.0)]
     _finish(sd, [(LV_RING, 0)], mats)
     sd['joint_lines'] = parallel_set(sd, -35.0, 10.0, label='jnt', props=LV_JOINT)
-    # The seed surface is the daylighting plane itself: the 35 degree joint
-    # through the toe of the face, back to where it reaches the crest plateau.
-    # Inert for a strength reduction, and it makes the file a complete model.
-    sd['non_circ'] = _surface([(188.6478, 400.0), (560.0, 140.0)])
     return _write(sd, 'rj006.xlsx')
 
 
@@ -647,7 +577,6 @@ def rj007():
     mats = [_rock('Rock', 26.1, 9.072e6, 0.26, 675.0, 43.0, t_cut=0.0)]
     _finish(sd, [(LV_RING, 0)], mats)
     sd['joint_lines'] = parallel_set(sd, -70.0, 20.0, label='jnt', props=LV_JOINT)
-    sd['circles'] = _toe_circle((560.0, 140.0), (377.785587105239, 400.0))
     return _write(sd, 'rj007.xlsx')
 
 
@@ -697,8 +626,6 @@ def rj008():
         _joint('base-2', (68.4, 6.0), (72.407, 6.0), 0.0, 39.0, kn=kn, ks=ks),
         _joint('back', (68.4, 36.5), (68.4, 6.0), 0.0, 39.0, kn=kn, ks=ks),
     ] + columns
-    # The seed surface is the basal joint the column stack stands on.
-    sd['non_circ'] = _surface([(15.0, 6.0), (72.407, 6.0)])
     return _write(sd, 'rj008.xlsx')
 
 
@@ -795,7 +722,6 @@ def _alejano(name, round6=False):
         for j in sd['joint_lines']:
             for k in ('x1', 'y1', 'x2', 'y2'):
                 j[k] = round(float(j[k]), 6)
-    sd['non_circ'] = _toe_chord((0.0, 0.0), (ring[-3][0], ring[-3][1]))
     return _write(sd, name + '.xlsx')
 
 
@@ -893,7 +819,6 @@ def rj015():
     _finish(sd, [(ring, 0)], mats)
     props = {'c': 0.0, 'phi': 25.0, 't_cut': 0.0, 'kn': 5.0e6, 'ks': 5.0e5}
     sd['joint_lines'] = parallel_set(sd, -40.0, 2.0, label='bed', props=props)
-    sd['circles'] = _toe_circle((0.0, 0.0), (-47.6701, 40.0))
     return _write(sd, 'rj015.xlsx')
 
 # ---------------------------------------------------------------------------
@@ -977,9 +902,6 @@ def rj016():
                        props['c'], props['phi'],
                        kn=props['kn'], ks=props['ks']))
     sd['joint_lines'] = rows
-    # The seed surface: the staircase face itself, toe to crest. A strength
-    # reduction never reads it, and an elastic section cannot be sliced.
-    sd['non_circ'] = _toe_chord((0.09, 0.09), (0.45, 0.9))
     return _write(sd, 'rj016.xlsx')
 
 
@@ -1072,7 +994,6 @@ def _rj017(name, elastic_ring):
     # the search area, because that is the region the vendor holds.
     sd['ssr_zones'] = [{'kind': 'hold_elastic',
                         'polygon': [(float(x), float(y)) for x, y in elastic_ring]}]
-    sd['circles'] = _toe_circle((17.0, 8.2), (26.9, 20.0))
     return _write(sd, name)
 
 
@@ -1140,11 +1061,6 @@ def rj018():
         _joint('joint-2', (19.3571, 11.0095), (31.7, 20.0), 1.0, 35.0),
         _joint('joint-3', (21.7143, 13.819), (30.2, 20.0), 1.0, 35.0),
     ]
-    # The seed failure surface. A rock slope cut by through-going joints does not
-    # fail on a circle, and the surface worth shipping with the file is the one
-    # the joints draw: the lowest joint, from the toe of the face to the crest.
-    # Inert for a strength reduction, and it makes the file a complete model.
-    sd['non_circ'] = _surface([(17.0, 8.2), (33.2, 20.0)])
     return _write(sd, 'rj018.xlsx')
 
 
@@ -1177,10 +1093,6 @@ def rj019():
         _joint('basal', (39.0149, 35.0248), (63.0, 48.0), 0.0, 40.0),
         _joint('upper', (62.0, 49.0), (76.0, 70.0), 0.0, 40.0),
     ]
-    # The seed surface is the bi-planar path itself: up the basal joint, across
-    # the rock bridge, and out along the upper one.
-    sd['non_circ'] = _surface([(39.0149, 35.0248), (63.0, 48.0),
-                               (76.0, 70.0)])
     return _write(sd, 'rj019.xlsx')
 
 
@@ -1224,15 +1136,6 @@ def _rj020(name, joint_lines):
     mats = [_rock('Rock', 27.0, 2.0e7, 0.3, 1000.0, 35.0, t_cut=0.0)]
     _finish(sd, [(RJ20_RING, 0)], mats)
     sd['joint_lines'] = joint_lines(sd)
-    # The seed surface. A blocky mass has no one plane to fail on, so the file
-    # carries a starting circle; a strength reduction never reads it. The
-    # house-rule circle through the toe (R = 120 m) crosses the crest elevation
-    # at x = 124, past the section's end at x = 80, and no circle through the toe
-    # with its center above the crest (which the slicer needs) comes back to the
-    # ground inside it. So this one leaves the face a quarter of the way up, at
-    # (15, 25), and enters the crest halfway back, at (55, 70), with its center
-    # 10 m above the crest.
-    sd['circles'] = _circle_through_at((15.0, 25.0), (55.0, 70.0), 80.0)
     return _write(sd, name)
 
 
@@ -1264,7 +1167,7 @@ def rj020():
 #: Every builder in this module, in problem-number order. ``verify_rebuild.py``'s
 #: ``joints`` group is this list, so a builder missing here is a corpus file
 #: nothing guards.
-BUILDERS = [rj001a, rj001b, rj001c, rj001d, rj002, rj015, rj003, rj004, rj005,
+BUILDERS = [rj001a, rj001b, rj001c, rj001d, rj002, rj015, rj016, rj003, rj004, rj005,
             rj006, rj007, rj008, rj009, rj010, rj011, rj012, rj013, rj014,
             rj017, rj017_staircase, rj018, rj019, rj020]
 

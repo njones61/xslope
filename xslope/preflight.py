@@ -2500,10 +2500,8 @@ def _surface_none(ctx):
         # from -- and refusing here would block the caller that needs the sheet
         # least.
         return None
-    return ("This model defines no failure surface: it carries neither a circle "
-            "nor a non-circular surface. A limit-equilibrium run needs at least one "
-            "starting surface (Circles, circles sheet; Non-circular surface, "
-            "non-circ sheet).")
+    return ("This model has no failure surface. Enter a circle on the circles "
+            "sheet or a surface on the non-circ sheet.")
 
 
 @rule("surface.method_requires_circle", ERROR, ("lem",), capability="lem_method",

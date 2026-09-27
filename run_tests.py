@@ -5477,7 +5477,7 @@ PREFLIGHT_RULE_SPECS = [
     # --- surface family and method compatibility ---------------------------
     dict(rule='surface.none_defined', base=PREFLIGHT_BASE_LEM, mode='dict',
          mutation=lambda sd: _pf_set(sd, circles=[], non_circ=[], circular=False),
-         expect='defines no failure surface'),
+         expect='has no failure surface'),
     # Selection-awareness: the SAME empty-sheet model, and the only difference is
     # that the control's run brought its own surface (generate_slices(circle=...),
     # a search's trial circle, a sweep step). The sheet is then not the source, so
@@ -5488,7 +5488,7 @@ PREFLIGHT_RULE_SPECS = [
          control_selection={'surface': 'circular', 'surface_supplied': True},
          mutation=lambda sd: _pf_set(sd, circles=[], non_circ=[], circular=False),
          control=lambda sd: _pf_set(sd, circles=[], non_circ=[], circular=False),
-         expect='defines no failure surface'),
+         expect='has no failure surface'),
     dict(rule='surface.method_requires_circle', base=PREFLIGHT_BASE_NONCIRC,
          mode='dict', selection={'surface': 'noncircular', 'method': 'oms'},
          control_selection={'surface': 'noncircular', 'method': 'spencer'},
@@ -7852,22 +7852,7 @@ def run_corpus_circles_test(test):
         return all(not any(_val(m.get(k)) for k in ('c', 'phi', 'gamma'))
                    for m in mats)
 
-    def _all_elastic(sd):
-        """True when every material is elastic.
-
-        The slicer refuses any surface that crosses an elastic zone (slice.py,
-        ``option == 'elastic'``), so on a model with no other material no limit
-        equilibrium surface exists and preflight refuses Run LEM before it
-        starts. Its circle is not judged here for the same reason as a blank
-        materials table: the model cannot be sliced whatever circle it carries.
-        Detected from the loaded model, the slicer's own test, not by file name.
-        """
-        mats = [m for m in (sd.get('materials') or []) if isinstance(m, dict)]
-        return bool(mats) and all(
-            str(m.get('option', '')).strip().lower() == 'elastic' for m in mats)
-
-    problems, checked, skipped = [], 0, 0
-    elastic_only = []
+    problems, checked, skipped, no_circle = [], 0, 0, []
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
         for path in _corpus_circle_files():
@@ -7882,13 +7867,10 @@ def run_corpus_circles_test(test):
             circles = sd.get('circles') or []
             if not circles or not isinstance(circles[0], dict):
                 skipped += 1
+                no_circle.append(name)
                 continue
             if _blank_strength(sd):
                 skipped += 1
-                continue
-            if _all_elastic(sd):
-                skipped += 1
-                elastic_only.append(name)
                 continue
             # Pore pressure neutralized, and both consumption paths tried, exactly
             # as preflight's own probe does it -- see _Ctx.circle_slice_failure for
@@ -7939,9 +7921,8 @@ def run_corpus_circles_test(test):
                     f"{name}: circle 1 (Xo={c.get('Xo')}, Yo={c.get('Yo')}, "
                     f"R={c.get('R')}) produces no slices -- {reason[:110]}")
 
-    print(f"    {checked} workbook(s) checked; {len(elastic_only)} skipped as "
-          f"all-elastic (no limit equilibrium surface can be sliced)"
-          + (f": {', '.join(elastic_only)}" if elastic_only else ""))
+    print(f"    {checked} workbook(s) checked; {skipped} skipped, {len(no_circle)} "
+          f"of them carrying no circle")
     if problems:
         return None, (f"{len(problems)} of {checked} shipped workbook(s) carry a "
                       f"first circle that cannot be sliced (fix the BUILDER, never "
@@ -13708,10 +13689,8 @@ def run_rs2_import_test(test):
         # vendor's own archive, in run_rs2_water_mode_test.
 
         # Round-trip: the geometry must survive the .xlsx writer AND reload. An RS2
-        # import carries no surface, so give it one (as a user must) before saving —
-        # load_slope_data rejects a surface-less file, which is the real consumer.
-        sd["circular"] = True
-        sd["circles"] = [{"Xo": 20.0, "Yo": 30.0, "R": 26.0, "Depth": 4.0}]
+        # import carries no surface, and the file loads without one: whether a model
+        # can run limit equilibrium is preflight's question, not the loader's.
         xlsx = os.path.join(td, "synthetic.xlsx")
         save_slope_data_to_xlsx(sd, xlsx, template=default_template_path())
         reloaded = load_slope_data(xlsx)

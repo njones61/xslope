@@ -338,30 +338,26 @@ a million; the tutorial shows both runs.
 
 ### How a trial is decided
 
-On a jointed model almost all of the out-of-balance force sits on the joints, and a pair of faces
-at its slip limit alternates between slipping and sticking as the material around it breathes. What
-that leaves is a steady back-and-forth the sweeps never damp out, so its average never falls under
-a force tolerance no matter how many sweeps are allowed. A jointed trial that neither converges nor
-runs away is therefore read from the **joints** and from the **trend** of its movement: slip still
-growing at an undiminishing rate while the slope keeps moving is a slope failing on its joints, and
-slip and movement both stopped with the soil in equilibrium is a slope standing behind that
-back-and-forth.
-[The joint verdict](overview.md#the-joint-verdict) and
-[the trend reading](overview.md#creep-trend) give the readings and their thresholds.
+On a model without joints, a trial converges when the forces come into balance everywhere. On a
+jointed model they never quite do: a contact at its slip limit keeps flickering between slipping
+and holding as the ground around it settles, so a small imbalance remains however long the run
+goes on. A jointed trial that neither converges nor runs away is therefore judged by what the
+slope is doing. If the joints are still slipping at a steady rate and the slope keeps moving, the
+slope is failing on its joints. If the slip has stopped growing and the movement has stopped,
+the slope is standing. [The joint verdict](overview.md#the-joint-verdict) and
+[the trend reading](overview.md#creep-trend) on the overview page give the thresholds.
 
-The standing reading counts only under the default `hybrid`
-[failure criterion](overview.md#ssrm-failure-criteria); under `non_convergence` a trial that has
-stopped moving but never converged is still a non-converged trial, and the search reads it as
-failed.
+That standing reading counts only under the default `hybrid`
+[failure criterion](overview.md#ssrm-failure-criteria). Under `non_convergence`, a trial that
+has stopped moving but never converged is still counted as failed.
 
-A jointed trial is also handed to the [Newton
-corrector](overview.md#finishing-a-trial-with-the-newton-corrector), at its checkpoints and at every
-block end where its movement is dying away. The corrector starts from the state the sweeps have
-reached — the slip, the opening and the residual strength each joint has arrived at — and looks
-for equilibrium at that strength directly. Where it finds one, the sweeps are restarted from it to
-confirm that the slope stays there (the [hold test](overview.md#finishing-a-trial-with-the-newton-corrector)), and the trial stands,
-usually within a few hundred more sweeps. Where it does not, the trial is left as the sweeps read
-it: not finding an equilibrium this way is not evidence that none exists.
+The run also tries to finish a slowing trial directly, at set checkpoints and whenever the
+movement is dying away. Starting from the slip, the opening and the strength each joint has
+reached, the [Newton corrector](overview.md#finishing-a-trial-with-the-newton-corrector) solves
+for a balanced state at that strength. If it finds one, the iteration resumes from that state to
+check that the slope stays there, and if it does the trial stands, usually within a few hundred
+more iterations. If no balanced state is found, the trial is judged by its movement as above;
+not finding one this way does not mean none exists.
 
 ### What the results show
 

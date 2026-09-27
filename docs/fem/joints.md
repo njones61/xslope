@@ -280,8 +280,8 @@ remove the network later, select any of its rows in the joints editor and press 
 XSLOPE keeps the lines, not the pattern that made them, so to change a network you remove the
 set and build a new one.
 
-In a script, call `parallel_set`, `cross_jointed` or `voronoi` from `xslope.joints`; they write
-the same rows.
+To generate a joint network from a Python script, call `parallel_set`, `cross_jointed` or
+`voronoi` from `xslope.joints`; they write the same rows.
 
 ### A reinforcement line as a joint
 

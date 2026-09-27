@@ -357,10 +357,9 @@ as failed, so leave it alone.
 While a trial is slowing down, the run periodically takes a shortcut: from the state the trial
 has reached, it solves directly for a state in which the forces balance (the
 [Newton corrector](overview.md#finishing-a-trial-with-the-newton-corrector)). If it finds one,
-the ordinary iteration continues from there for a few hundred iterations to confirm that the
-slope stays put, and if it does, the trial ends as standing. If the shortcut finds nothing, the
-ordinary iteration carries on and the trial is judged by its movement as above. The shortcut is
-used on every model; the confirming run afterward is added for jointed models.
+the trial ends as standing; for jointed models, the ordinary iteration first continues from that
+state for a few hundred iterations to confirm that the slope stays put. If the shortcut finds
+nothing, the ordinary iteration carries on and the trial is judged by its movement as above.
 
 ### What the results show
 

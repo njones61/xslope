@@ -535,14 +535,14 @@ is about models where jointing the sheet changes the answer from the start.
 
 ### If you let it run
 
-The iteration limit is what stopped the search at 1.56. Press **Continue with
-a higher limit…** on the results toolbar and give it 1,000,000: the search
-carries on from where its trials stopped, reusing every trial it has already
-decided, and goes on until the wall gives way. Starting over from the Run FEM
-dialog with **Max iterations per trial** at 1,000,000 (and the iteration
-ceiling raised to match) reaches the same answer. Neither is a run to repeat:
-continuing takes about an hour on an ordinary desktop and starting over about
-ten minutes longer, and the results below are from it.
+The search stopped at 1.56 because it ran out of iterations. To go further,
+press **Continue with a higher limit…** on the results toolbar and enter
+1,000,000. The search picks up where its trials stopped, keeps every trial it
+has already decided, and runs until the wall gives way. You can also start
+over from the Run FEM dialog with **Max iterations per trial** at 1,000,000 and
+the iteration ceiling raised to match; that gives the same answer. Either way
+it takes a long time, about an hour to continue and ten minutes longer to start
+over, so we have not asked you to do it. The results below come from that run.
 
 ![Displacement against strength reduction factor with a million-iteration limit: the wall comes to rest at every strength up to 1.9922, moving further each time, and runs away at 2.0](images/fem03_ssrm_curve_grid_long.png){width=800}
 

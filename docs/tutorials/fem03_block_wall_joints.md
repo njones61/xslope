@@ -628,18 +628,19 @@ that line is the factor of safety on that criterion. At 1% of the height,
 3.6 cm, the crossing lies between 1.0 and 1.5; at 2%, 7 cm, just under 1.56.
 For this wall the movement decides the answer.
 
-Two habits follow. Report the movement with the number: the default run found
-a wall standing at F = 1.56 with 7.7 cm of movement and the geogrid at a third
-of capacity. And read the closing summary on every reinforced wall: *No
-failure was found* and *at least* mean you are looking at this kind of wall. A
-limit equilibrium analysis of the same wall asks only the strength question;
-[FEM-2](fem02_reinforcement.md) runs a reinforced slope both ways.
+When you report a wall like this, give the movement along with the number.
+The default run found a wall standing at F = 1.56 with 7.7 cm of movement and
+the geogrid at a third of capacity, and that says more than the number alone.
+Read the closing summary on every reinforced wall: when it says *No failure
+was found* or gives the factor of safety as *at least*, you have this kind of
+wall. A limit equilibrium analysis of the same wall asks only the strength
+question; [FEM-2](fem02_reinforcement.md) runs a reinforced slope both ways.
 
-The last lesson is patience. A jointed model settles slowly, because each
-joint reaches equilibrium by slipping a little at a time, and a trial cut off
-early reads as failed or undecided when it would have come to rest. When the
-closing summary reports the factor of safety as "at least", or says it depends
-on the iteration limit, raise the limit and let the run finish.
+Give a jointed model time. It settles slowly, because each joint reaches
+equilibrium by slipping a little at a time, and a trial cut off early reads as
+failed or undecided when it would have come to rest. When the closing summary
+gives the factor of safety as "at least", or says it depends on the iteration
+limit, raise the limit and let the run finish.
 
 ---
 

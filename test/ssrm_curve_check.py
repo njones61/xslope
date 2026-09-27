@@ -537,7 +537,7 @@ def check_lower_bound():
             "slowly all the time, when the 100,000-iteration limit came, so the "
             "run could not tell whether it would stop. The factor of safety is at "
             "least 1.56. To go further, raise Max iterations per trial. "
-            "Convergence acceleration was on. The run took 22 min 56 s.")
+            "The run took 22 min 56 s.")
     check("the lower-bound summary reads as ruled", s == want, s)
     s = _said(fem.ssrm_run_summary(_grid_like(top_exit="yield_gate"),
                                    {"unit_system": "SI"}))
@@ -546,7 +546,7 @@ def check_lower_bound():
           "At F = 1.5703 the forces balanced at iteration 100,000 with the "
           "stresses outside the yield surface, and no admissible state was found, "
           "so the run could not tell whether the slope would stand. The factor of "
-          "safety is at least 1.56. Convergence" in s, s)
+          "safety is at least 1.56. The run took" in s, s)
     s = _said(fem.ssrm_run_summary(
         _grid_like(stood=[(1.0, 0.03), (1.5, 0.02), (1.5625, 0.0767)]),
         {"unit_system": "SI"}))

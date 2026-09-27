@@ -324,7 +324,7 @@ The Log says the same in words at the end of every strength reduction run:
 > F = 1.1406 it did not: over the last
 > 50,000 iterations the movement did not slow (each block of 10,000 iterations
 > moved the slope 92% as far as the one before), so the trial was counted as
-> sliding. Convergence acceleration was on.
+> sliding.
 
 Read this summary on every run. Part 2 is a run where it says something
 different.
@@ -444,7 +444,7 @@ Not a number this time but a bound, and the Log says why:
 > it had moved 0.0767 m. At F = 1.5703 it was still creeping, more slowly all
 > the time, when the 100,000-iteration limit came, so the run could not tell
 > whether it would stop. The factor of safety is at least 1.56. To go further,
-> raise Max iterations per trial. Convergence acceleration was on.
+> raise Max iterations per trial.
 
 The wall came to rest at every strength the search confirmed, and at the next
 strength up it was still creeping when the iteration limit arrived. The run does
@@ -472,18 +472,16 @@ the wall is doing at the last trial, the undecided one at 1.5703.
 
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=937}
 
-This panel has no element grid where Part 1's did. The blocks panel drops the
-grid once a model carries more than eight jointed lines (the wall alone had
-seven; the three sheets make ten), because the blocks are only a few elements
-each and the grid would bury their outlines. **Element edges** in the display
-panel puts it back. The rest is drawn as in Part 1: the block column, 12 times
-deformed, with the undeformed outline dashed behind it, and every contact drawn
-as a line, gray where it is closed and not slipping, green where it is slipping,
-shaded by how far. The three geogrid sheets are the three near-horizontal lines
-running back from the facing into the reinforced fill. Each is drawn as the two
-faces of its interface: gray along most of its length, where the soil grips the
-sheet, and green over the short lengths where the soil has slid along it, at
-the facing on all three and near the far end of the top sheet.
+This panel has no element grid: the blocks panel drops it once a model carries
+more than eight jointed lines (the wall alone had seven; the sheets make ten),
+and **Element edges** in the display panel puts it back. Otherwise it is drawn
+as in Part 1: the block column 12 times deformed, the undeformed outline dashed
+behind it, and every contact a line, gray where closed and not slipping, green
+where slipping, shaded by how far. The three geogrid sheets are the
+near-horizontal lines running back from the facing, each drawn as the two faces
+of its interface: gray where the soil grips the sheet, green over the short
+lengths where it has slid, at the facing on all three and near the far end of
+the top sheet.
 
 The joint slip puts numbers on what the layers do. With the soil at 64% of its
 strength (F = 1.5625), the back face has slid **40 mm** and the base **10 mm**,
@@ -557,8 +555,7 @@ and the search reports
 > The factor of safety is 1.996, the midpoint of the bracket F = 1.9922 to
 > 2.0000. At F = 1.9922 the slope reached equilibrium in 229,503 iterations. At
 > F = 2.0000 it did not: the largest displacement reached 15.0 times the elastic
-> value at iteration 210,841. Convergence acceleration was on. The run took
-> 1 h 9 min.
+> value at iteration 210,841. The run took 1 h 9 min.
 
 So this wall does have a strength limit, and it is the geogrid's. At 1.9922 the
 top layer is carrying 98.6% of its 40 kN/m capacity, the middle layer 72% and

@@ -731,8 +731,8 @@ the joint slip scaled with it; a step that would change a joint pair's open or s
 trip its residual latch or add dilation is taken at the ordinary length. The balanced state is
 the ordinary iteration's; what changes is how many iterations reach it. Over the 32 jointed
 verification rows the answers are the same, and the whole set runs about a fifth faster. The
-K0 in-situ solve and the hold test always run the ordinary iteration, and the closing summary
-says "Convergence acceleration was on." when it was.
+K0 in-situ solve and the hold test always run the ordinary iteration, and the Log's opening
+lines for a run say whether acceleration was on.
 
 Whether a trial dying away is certified depends on how close to rest it has come. On the FEM-3
 geogrid wall at $F = 1.25$ the corrector refuses both seeds at 100,000 iterations and certifies at

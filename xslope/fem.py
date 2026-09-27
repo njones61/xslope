@@ -729,9 +729,6 @@ def ssrm_run_summary(result, fem_data=None):
 
     lo, hi = float(interval[0]), float(interval[1])
     unit = _ssrm_length_unit(fem_data)
-    accelerated = ("Convergence acceleration was on."
-                   if any((t.get("acceleration") or {}).get("on")
-                          for t in trials) else "")
     top = _edge_trial(trials, hi, False) if r.get("fs_is_lower_bound") else None
     if top is not None:
         bound = (f"The factor of safety is at least {ssrm_bound_text(FS)}."
@@ -739,7 +736,7 @@ def ssrm_run_summary(result, fem_data=None):
                     if top.get("exit_reason") == "inconclusive" else ""))
         return _join(f"No failure was found up to F = {hi:.4f}.",
                      _came_to_rest_sentence(lo, trials, count, unit),
-                     _undecided_sentence(hi, top, count), bound, accelerated,
+                     _undecided_sentence(hi, top, count), bound,
                      took)
     head = (f"The factor of safety is {FS:.3f}, the midpoint of the bracket "
             f"F = {lo:.4f} to {hi:.4f}.")
@@ -755,7 +752,7 @@ def ssrm_run_summary(result, fem_data=None):
                                          trials, count, unit),
                  _failing_edge_sentences(hi, _edge_trial(trials, hi, False),
                                          count, unit),
-                 accelerated, took)
+                 took)
 
 
 def ssrm_run_record(result, fem_data=None, options=None):
@@ -15904,6 +15901,15 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         print(f"  Bisection range: [{F_min:.2f}, {F_max:.2f}], tolerance: {tolerance}")
         if max_disp_factor is not None:
             print(f"  Displacement limit: {max_disp_factor:.0%} of mesh height")
+        # The acceleration setting is recorded here, with the other settings,
+        # rather than in the closing summary about what the slope did.
+        if accelerate is None:
+            _acc_hdr = (bool((fem_data.get("joint_data") or {}).get("n"))
+                        if ACCELERATE_DEFAULT == 'jointed' else bool(ACCELERATE_DEFAULT))
+        else:
+            _acc_hdr = bool(accelerate)
+        print(f"  Max iterations per trial: {max_iterations:,}; "
+              f"convergence acceleration {'on' if _acc_hdr else 'off'}")
 
     # Progress reported as: the bracket-establishment solves (>=2) + the
     # (deterministic) bisection steps. Each solve_fem is subdivided (SUBDIV) and its

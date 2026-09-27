@@ -275,9 +275,8 @@ def check_sentences():
     acc_trials = [dict(t, acceleration={"on": True, "switched_off_at": None})
                   for t in trials]
     s_acc = fem.ssrm_run_summary(_run(acc_trials, 1.2421875, 1.25))
-    check("an accelerated run says so, before the run time",
-          "Convergence acceleration was on. The run took" in s_acc, s_acc[-90:])
-    check("a plain run does not", "acceleration" not in summary)
+    check("the closing summary does not name the acceleration setting",
+          "acceleration" not in s_acc and "acceleration" not in summary, s_acc[-90:])
     growing = dict(sliding, ratio=1.2)
     s = fem.creep_sentence(growing, 1.3)
     check("a growing movement says it grew", "the movement grew (each block of "

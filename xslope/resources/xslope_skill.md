@@ -2022,8 +2022,8 @@ failed at that point rather than spending the rest of its budget (`exit_reason =
 **Jointed models are accelerated by default.** On a model with a joint, `solve_fem` and
 `solve_ssrm` lengthen each iteration's step where the last two show the solution still heading
 the same way (`accelerate=None`, the default; `accelerate=False` for the ordinary iteration).
-It reaches the same balanced state in fewer iterations; the closing summary says
-"Convergence acceleration was on." when it was.
+It reaches the same balanced state in fewer iterations; the Log's opening lines for a run
+say whether acceleration was on.
 
 **Read the closing summary and the curve before quoting the number.** Every run ends with
 `result['summary']`, printed as its last lines. When the trial at the top of the bracket hit the

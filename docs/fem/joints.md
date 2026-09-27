@@ -273,9 +273,11 @@ the polygon sheet with its **Type** set to `joints` (see
 **Elevation band** limits the set to a range of elevations. No joints are written outside the
 region.
 
-The generator writes ordinary rows on the joints worksheet, labeled `set-01`, `set-02` and so
-on. The pattern itself is not stored, only the lines it produced, so to change a network you
-remove the set and build another.
+**Name** is the set's name, and every row the generator writes on the joints worksheet is
+named for it: a set called `bed` produces `bed-01`, `bed-02` and so on (the dialog offers
+`set1`, `set2`, … if you leave it). That is how the network is found later: to remove it, select
+any of its rows in the joints editor and press **Remove set**. The pattern itself is not stored,
+only the lines it produced, so to change a network you remove the set and build another.
 
 In a script, call `parallel_set`, `cross_jointed` or `voronoi` from `xslope.joints`; they write
 the same rows.

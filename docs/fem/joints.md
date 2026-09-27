@@ -250,7 +250,10 @@ edited in the joints editor, as a table or one line at a time with the section d
 
 ### Generating a network of joints
 
-A jointed rock mass may have hundreds of joints. XSLOPE can generate them from a pattern:
+A jointed rock mass may have hundreds of joints. XSLOPE generates them from a pattern: in
+Studio, press [Build network](../studio/editing.md#build-network) on the joints editor; in a
+script, call `parallel_set`, `cross_jointed` or `voronoi` from `xslope.joints`. The three
+patterns:
 
 - **Parallel set.** One family of joints at a given dip and spacing, such as bedding planes every
   2 m dipping 35° out of the face.
@@ -264,10 +267,8 @@ region is a polygon on the polygon sheet with its **Type** set to `joints` (see
 [joint regions](../usage/input_template.md#joint-regions) on the template page), and it can be
 limited to a band of elevations. No joints are written outside the region.
 
-To create a network of joints in Studio, press [Build network](../studio/editing.md#build-network)
-on the joints editor, choose the pattern, enter its numbers and pick the region; the canvas
-previews the joints before anything is written. In a script, call `parallel_set`,
-`cross_jointed` or `voronoi` from `xslope.joints`.
+In the Build network dialog, choose the pattern, enter its numbers and pick the region; the
+canvas previews the joints before anything is written.
 
 The generator writes ordinary rows on the joints worksheet, labeled `set-01`, `set-02` and so
 on. The pattern itself is not stored, only the lines it produced, so to change a network you

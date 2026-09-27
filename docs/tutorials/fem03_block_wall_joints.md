@@ -544,19 +544,25 @@ the iteration ceiling raised to match; that gives the same answer. Either way
 takes about an hour on an ordinary desktop. Run it if you have the time, or
 just read the results below, which come from that run.
 
-![Displacement against strength reduction factor with a million-iteration limit: the wall comes to rest at every strength up to 1.9922, moving further each time, and runs away at 2.0](images/fem03_ssrm_curve_grid_long.png){width=800}
-
-The wall comes to rest at every strength tried up to F = 1.9922, and its
-movement grows the whole way: 6 cm at 1.5, 13 cm at 1.75, 19 cm at 1.875 and
-30 cm at 1.9922, a twelfth of the wall's height. At 2.0 the movement runs away,
-and the search reports
+With a million iterations to work with, the search climbs all the way to 2.0
+and reports
 
 >>**FS = 1.996**
+
+The Log's closing summary reads:
 
 > The factor of safety is 1.996, the midpoint of the bracket F = 1.9922 to
 > 2.0000. At F = 1.9922 the slope reached equilibrium in 229,503 iterations. At
 > F = 2.0000 it did not: the largest displacement reached 15.0 times the elastic
 > value at iteration 210,841. The run took 1 h 9 min.
+
+The Displacement vs F plot shows how the wall got there:
+
+![Displacement against strength reduction factor with a million-iteration limit: the wall comes to rest at every strength up to 1.9922, moving further each time, and runs away at 2.0](images/fem03_ssrm_curve_grid_long.png){width=800}
+
+The wall comes to rest at every strength tried up to F = 1.9922, and its
+movement grows the whole way: 6 cm at 1.5, 13 cm at 1.75, 19 cm at 1.875 and
+30 cm at 1.9922, a twelfth of the wall's height. At 2.0 the movement runs away.
 
 So this wall does have a strength limit, and it is the geogrid's. At 1.9922 the
 top layer is carrying 98.6% of its 40 kN/m capacity, the middle layer 72% and

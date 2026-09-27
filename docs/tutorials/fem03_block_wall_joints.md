@@ -645,13 +645,13 @@ on the iteration limit, raise the limit and let the run finish.
 
 ## Part 3 — When a sheet is a slip surface, and when it is bonded
 
-Part 3 leaves the wall. The question it takes up came out of Part 2, where the
-geogrid layers were entered with `Joint = Yes`, and it applies to every model
-with a geosynthetic in it: should a sheet be a **bonded bar** or a **slip
-surface**? The two are one cell apart on the reinforce worksheet and can give
-very different answers. To show when each is right, this part builds a simpler
-problem than the wall: an embankment on a foundation with a single sheet at its
-base, and nothing else in the section that could slide.
+In Part 2 the geogrid layers were entered with `Joint = Yes`. That raises a
+question for any model with a geosynthetic in it: should the sheet be a
+**bonded bar** or a **slip surface**? The choice is a single cell on the
+reinforce worksheet, and the two settings can give very different answers.
+Part 3 uses a simpler problem to show when each one is right: an embankment on
+a foundation with one sheet at its base, and nothing else in the section that
+could slide.
 
 A sheet is entered one of two ways:
 

@@ -3019,7 +3019,7 @@ the piezometric line and saturated below it in both engines, not the steeper sin
 Slide2-Import conversion of the same problem.
 
 **The vendor zone here is a mechanism-selection corridor, and it is documented rather than
-carried.** `#064.fez` holds a 65-vertex SSR *search area* that is not a region but a ~6 ft ribbon
+carried.** `#064.fez` holds a 65-vertex SSR *search area* drawn as a ~6 ft ribbon
 traced along Slide2's Spencer critical circle, from the crest down to the downstream toe — 96.2% of
 the domain is outside it and held at full strength. It is RS2's way of reproducing a specified
 Slide2 slip surface by strength reduction, the idiom the manual states in prose on VP6, VP19 and

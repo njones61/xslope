@@ -77,7 +77,7 @@ The best circle from each surviving tangent family — every family within 25% o
 
 Because the seeds come from the geometry, grid seeding also works with an **empty circles sheet** — the search needs no starting guess at all.
 
-Two behaviors of a global search are worth understanding before turning it on:
+Before turning on a global search, know how it behaves:
 
 - **It reports the most critical surface anywhere in the model.** If the model contains a genuinely marginal minor feature — say a steep fill face standing near its limit — the global minimum is there, not on the main slope, and that is what the search returns. This is correct behavior, but it differs from a benchmark or a design check that targets one specific mechanism. To interrogate a particular mechanism, use the default seeded mode with circles placed in that mechanism's family.
 - **Surficial skin slides are filtered — in grid mode only.** On a steep face with little cohesion, a vanishingly thin surface hugging the face can undercut every real mechanism (a raveling mode, not a slope failure), so grid mode rejects trial surfaces whose maximum thickness is under 5% of the slope height. The filter deliberately does **not** apply to the default seeded search, because a thin surface can also be the correct answer — a submerged cohesionless slope fails as an infinite-slope skin at essentially zero depth, and a seeded search must be able to follow your circles there. If your problem's true critical is that kind of skin, use seeded mode.
@@ -168,7 +168,7 @@ A disclosure whose unsolved trials rank below the reported minimum means the rep
 
 ## Visualization of Search Results
 
-The xslope package provides specialized plotting functions that transform the numerical search results into intuitive visual representations of the failure surface exploration process. These functions leverage matplotlib to create publication-quality figures that overlay the discovered failure surfaces onto the slope geometry.
+The xslope package provides specialized plotting functions that transform the numerical search results into intuitive visual representations of the failure surface exploration process. These functions use matplotlib to create publication-quality figures that overlay the discovered failure surfaces onto the slope geometry.
 
 The `plot_circular_search_results()` function (in xslope/plot.py) creates a comprehensive visualization that begins by plotting all the fundamental slope features—the ground surface profile, subsurface stratigraphy boundaries, maximum depth line, piezometric surface, distributed loads, and tension crack geometry. This establishes the physical context within which the failure surfaces were searched. A piezometric line is drawn only where the analysis reads it — as a material's pore-pressure source (`u = piezo`), as the water table a `gamma_sat` weight split is measured from, or as the sheet that states the pool loading the slope — so a line the run never consults does not appear on the figure. The function then overlays every circular failure surface stored in the `fs_cache`, plotting them as curved lines. The critical surface (with the minimum factor of safety) is rendered in a bold red line with width 2, while all other explored surfaces are shown as semi-transparent gray lines with reduced width. This visual hierarchy immediately draws attention to the most dangerous surface while still revealing the breadth of the search space that was explored.
 
@@ -265,4 +265,4 @@ for i, (x, y) in enumerate(critical_points):
 plot_noncircular_search_results(slope_data, fs_cache, search_path)
 ```
 
-Both search algorithms can also be combined with rapid drawdown analysis by setting the `rapid=True` parameter, which modifies the solution method to account for transient pore pressure conditions during reservoir drawdown scenarios. The search algorithms automatically handle this by passing the appropriate parameters to the underlying limit equilibrium solvers, making it seamless to find critical surfaces under various loading conditions.
+Both search algorithms can also be combined with rapid drawdown analysis by setting the `rapid=True` parameter, which modifies the solution method to account for transient pore pressure conditions during reservoir drawdown scenarios. The search algorithms pass the appropriate parameters to the underlying limit equilibrium solvers automatically, so the search itself needs no other change.

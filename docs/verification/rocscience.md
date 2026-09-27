@@ -899,9 +899,9 @@ clay unit weights to reproduce the published deterministic factor of safety. The
 for this problem (SLOPE/W [§2.17](geostudio.md)) carries the values SLOPE/W actually used — sand
 cap γ = 21, all three Congress-St. clays γ = 22, and, below clay-3 where the Slide manual is
 silent, a `bed` unit at c′ = 200 / φ′ = 35° — and enters every cohesion σ as C&X's own published
-per-material statistic. Two things follow: the embankment (Example 5) is fully specified there
+per-material statistic. The embankment (Example 5) is fully specified there
 (fill c′ = 10 / φ′ = 12° / γ = 20, foundation clay c′ = 40 / φ′ = 0 / γ = 18 over bedrock), which
-is what vp028b/c carry; and the deep circle is tangent to the clay-3 base at el. −12.19, so it
+is what vp028b/c carry. The deep circle is tangent to the clay-3 base at el. −12.19, so it
 rides that contact with the strong `bed` untouched.
 
 The `.gsz` also holds SLOPE/W's own solved factors of safety and probabilities of failure for all
@@ -1961,7 +1961,7 @@ Slide #75 / Duncan & Wright (2005) Fig. 7.16: one of the planned James Bay dykes
 | Bishop | 1.424 | 1.45 (−1.8%) | 1.468 |
 | Spencer | 1.420 | — | 1.464 |
 
-*The critical surface is a deep circle tangent to the base of the lacustrine clay, cutting all three foundation units. This problem is the corpus's local-minimum showcase: from a single mid-depth seed the 9-point descent settles onto a base-tangent local minimum that exits through the berm — converged, plausible-looking, and well above the true minimum with no warning — so the input file carries three seeds spanning shallow to deep. [Grid seeding](../lem/search.md#grid-seeding-global-search) (`seed='grid'`) removes the trap entirely: with the circles sheet ignored it finds Spencer 1.420 on its own, and that is regression-locked alongside the seeded search.*
+*The critical surface is a deep circle tangent to the base of the lacustrine clay, cutting all three foundation units. This problem has a strong local minimum: from a single mid-depth seed the 9-point descent settles onto a base-tangent local minimum that exits through the berm — converged, plausible-looking, and well above the true minimum with no warning — so the input file carries three seeds spanning shallow to deep. [Grid seeding](../lem/search.md#grid-seeding-global-search) (`seed='grid'`) removes the trap entirely: with the circles sheet ignored it finds Spencer 1.420 on its own, and that is regression-locked alongside the seeded search.*
 
 ![vp075: inputs and representative solution](images/vp075.png)
 

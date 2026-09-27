@@ -1,6 +1,6 @@
 # Rapid Drawdown Analysis
 
-When designing a dam or levee, it is crucial to consider the potential for rapid drawdown of the water level. This can occur due to various factors such as dam failure, sluice gate operation, or other emergency situations. When the water level drops rapidly, it can lead to significant changes in the forces acting on the structure, potentially causing instability or failure. Specifically, the rapid drawdown eliminates the hydrostatic pressure on the upstream side of the structure, removing the buoyancy effect of the water, which can lead to a sudden increase in effective stress and shearing under undrained conditions.
+The design of a dam or levee must consider the potential for rapid drawdown of the water level. This can occur due to various factors such as dam failure, sluice gate operation, or other emergency situations. When the water level drops rapidly, it can lead to significant changes in the forces acting on the structure, potentially causing instability or failure. Specifically, the rapid drawdown eliminates the hydrostatic pressure on the upstream side of the structure, removing the buoyancy effect of the water, which can lead to a sudden increase in effective stress and shearing under undrained conditions.
 
 ![pool_normal.png](rapid_images/pool_normal.png)
 

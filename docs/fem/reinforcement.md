@@ -453,7 +453,7 @@ report.
 | ruptured | has softened with no residual capacity left and now carries nothing |
 | inactive | carries no tension anywhere and is not engaged |
 
-The two middle states are the ones worth separating, and they read alike on a badge: both are a line standing at
+Pullout and yielded read alike on a badge: both are a line standing at
 100% of what is available to it. **Pullout** is an end element at the reduced capacity its embedment can develop —
 the friction ramp doing what a friction ramp does, with the interior of the line still below capacity. **Yielded**
 is an element out on the $T_{max}$ plateau, where the whole tensile strength of the geosynthetic is mobilized. A
@@ -536,7 +536,7 @@ and can slide along, with no member between them. Those go on the **joints** wor
 are the subject of [Joints and interface elements](joints.md) — the mesh split, the element, the strength, the
 residual branch and the dilation a rock joint states, and what the results show.
 
-The mesh split is the one difference worth drawing here. A joints-sheet line has nothing between its faces, so a
+The two kinds of line differ in the mesh split. A joints-sheet line has nothing between its faces, so a
 station carries two coincident nodes and **one** interface element spans them, where a jointed reinforcement line
 carries three nodes and two:
 

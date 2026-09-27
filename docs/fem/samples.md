@@ -160,9 +160,9 @@ now reproduces **all six** of the paper's worked examples:
 
 - [Example 1 — homogeneous slope](../verification/ssrm.md#verification-griffiths1)
 - [Example 2 — foundation layer, the false base circle](../verification/ssrm.md#verification-griffiths2)
-- [Example 3 — undrained clay with a thin weak layer](../verification/ssrm.md#verification-griffiths3) — figure-read Fig. 7 sweep and the two-mechanism showcase
+- [Example 3 — undrained clay with a thin weak layer](../verification/ssrm.md#verification-griffiths3) — figure-read Fig. 7 sweep and the two competing mechanisms
 - [Example 4 — undrained clay over a weak foundation](../verification/ssrm.md#verification-griffiths4) — the base→toe mechanism flip
-- [Example 5 — "slow" drawdown sweep](../verification/ssrm.md#verification-griffiths5) — a pore-pressure and reservoir-load showcase
+- [Example 5 — "slow" drawdown sweep](../verification/ssrm.md#verification-griffiths5) — pore pressure and reservoir load
 - [Example 6 — two-sided earth dam](../verification/ssrm.md#verification-griffiths6)
 
 Each is documented in full — geometry, mesh, factor of safety, and the locked

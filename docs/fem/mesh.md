@@ -160,7 +160,7 @@ The row and column counts come from the requested element size, and a boundary s
 two zones gets exactly one count, so a swept zone and its free-meshed neighbor meet at the
 same node spacing with no hanging nodes. Choose it when the section is built of block-like
 zones — a layered foundation, a cutoff or grout curtain, a rectangular core — where rows
-of aligned elements are worth having.
+of aligned elements are useful.
 
 A zone the check declines is simply meshed by the free mesher, and the rest of the model
 is unaffected. The sweep is a per-zone improvement, never a whole-mesh commitment, so this

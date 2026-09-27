@@ -1492,7 +1492,7 @@ center, so a Gauss point pulled to mean tension is inadmissible with no directio
 returns it, and the iteration cannot settle. The Rankine flow is volumetric at the biaxial apex and
 supplies exactly that return.
 
-Two consequences follow. A **cohesionless** material carries no tension whether its cell is blank or
+A **cohesionless** material carries no tension whether its cell is blank or
 `0`: its apex sits at the origin, so the two entries describe the same admissible set and now give
 the same answer. And at $\phi = 0$ — a `cp` material, or `mc` entered with $\phi = 0$ — the apex is
 at infinity, so only a stated $T$ bounds the tension there. Power-curve and Hoek-Brown elements are

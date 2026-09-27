@@ -201,7 +201,7 @@ That covers the mechanisms a jointed slope usually fails by — block toppling, 
 plane failure, step-path failure through rock bridges, plowing slabs, a mass cut into many small
 blocks, a block wall sliding and tipping on its courses, an embankment sliding on its base sheet.
 
-**The short version for practice.** The factor of safety a jointed strength reduction reports is
+The factor of safety a jointed strength reduction reports is
 valid: it is the factor by which the joint strengths can be reduced before the mass starts to move,
 which is the same quantity the closed forms and a distinct element strength reduction report. On
 the problems that have a closed form the method reproduces them — a slab on a daylighting bedding

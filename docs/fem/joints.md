@@ -363,14 +363,17 @@ nothing, the ordinary iteration carries on and the trial is judged by its moveme
 
 ### What the results show
 
-Each interface is drawn as a thin line on the line it runs along, colored by how far its two faces
-have slid, on a colorbar titled *Joint slip*: a green ramp, because the strain field under it runs
-blue through white to red. A slipping span is backed by a thin white stroke so it reads over a dark
-field; a joint that is not slipping is a neutral gray hairline; a stretch that has **opened** is
-drawn as its two faces apart — two thin lines with a white gap between them, along the whole
-stretch that parted — rather than given a color, because opening is a condition and not a quantity.
-A key in the corner of the panel names the three states. A model where no joint slipped carries no
-colorbar. The weight is deliberate: a generated network puts hundreds of traces over the field.
+For jointed models, the results panels include features that show what the joints are doing: on
+the shear strain panel every joint is drawn and colored by how far it has slipped, the deformed
+section is drawn as the blocks the joints cut it into, and **1D Details…** lists every jointed
+line with the stresses along it.
+
+On the shear strain panel each joint is a thin line along its trace, colored on a green scale
+titled *Joint slip* by how far its two faces have slid. A joint that has not slipped is a gray
+hairline. A stretch that has **opened** is drawn as two lines with a white gap between them,
+since opening is a condition rather than an amount. A key in the corner of the panel names the
+three states, and a model where no joint slipped carries no slip colorbar. The lines are kept
+thin because a generated network puts hundreds of them over the field.
 
 ![Joint slip on a toppling stack at its critical factor: each joint colored by how far its faces have slid, gray where it has not slipped, drawn as two lines with a gap between them where it has opened](../tutorials/images/fem05_joint_slip_topple.png){width=900}
 

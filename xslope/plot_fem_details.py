@@ -575,6 +575,7 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
         labels.append("Bar tension")
         ax_T.legend(handles, labels, loc="best", fontsize=8, frameon=False)
         ax_T.set_ylabel(_axis_label("Bar tension", u.get("force")), fontsize=9)
+        ax_T.set_ylim(bottom=0.0)
         ax_T.grid(True, **GRID)
 
     # --- normal traction ---------------------------------------------------
@@ -606,6 +607,9 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
         l.append("Open")
     ax_s.legend(h, l, loc="best", fontsize=8, frameon=False)
     ax_s.set_ylabel(_axis_label("Shear stress", u.get("stress")), fontsize=9)
+    # From zero, like the normal-stress panel above it, so the limit keeps the
+    # normal stress's proportions instead of being stretched over a narrow range.
+    ax_s.set_ylim(bottom=0.0)
     ax_s.grid(True, **GRID)
 
     # --- slip --------------------------------------------------------------

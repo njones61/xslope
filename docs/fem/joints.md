@@ -285,17 +285,17 @@ To generate a joint network from a Python script, call `parallel_set`, `cross_jo
 
 ### A reinforcement line as a joint
 
-A geosynthetic sheet or a liner can be modeled as a bar bonded to the soil or as a surface the
-soil slides on, and which is right depends on the problem;
-[Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md#part-3-when-a-sheet-is-a-slip-surface-and-when-it-is-bonded)
-works through both on the same embankment. To make a reinforcement line a slip surface, set its **Joint** column to `Yes` on
-the reinforce worksheet, or the Joint field in Studio's reinforcement editor. The mesh then
+Joints are also used with reinforcement lines. To make a reinforcement line a slip surface,
+set its **Joint** column to `Yes` on the reinforce worksheet, or the Joint field in Studio's
+reinforcement editor. The mesh then
 splits along the line and the sheet sits between two interfaces, one against the soil above and
 one against the soil below, whose strength comes from the line's own **Adhesion** and **Delta**.
 The sheet's two interfaces act in series where a line on the joints worksheet has a single
 contact. How such a sheet is anchored, and what the bar carries once the interfaces carry the
 grip, is on the reinforcement page under
-[Ends, ties and the bar](reinforcement.md#ends-ties-and-the-bar).
+[Ends, ties and the bar](reinforcement.md#ends-ties-and-the-bar); when a sheet should be a
+joint and when it should be a bonded bar is worked through in
+[Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md#part-3-when-a-sheet-is-a-slip-surface-and-when-it-is-bonded).
 
 A reinforcement line that ends on a joint line, or crosses one, must be a joint itself or stop
 short of the joint, and a pile, which cannot be a joint, has to stop short. The split gives every

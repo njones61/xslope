@@ -2602,9 +2602,39 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
     # Add legend if any special states exist
     handles, labels = ax.get_legend_handles_labels()
     if handles:
-        ax.legend(loc='lower right', fontsize=9, framealpha=0.9)
+        if not _merge_joint_bar_legend(ax, 'bars', handles, labels):
+            _tag_legend(ax.legend(loc='lower right', fontsize=9, framealpha=0.9),
+                        'bars', handles, labels)
 
     return cbar_specs
+
+
+def _tag_legend(leg, role, handles, labels):
+    """Mark a legend as the joint key ('joints') or the bars' ('bars')."""
+    leg._xslope_role = (role, list(handles), list(labels))
+    return leg
+
+
+def _merge_joint_bar_legend(ax, role, handles, labels):
+    """Fold this key into the other's when the joint key and the bars' legend
+    share a panel: one legend, joint entries first, in the joint key's corner
+    and style. Returns False (draw nothing) when the axes carries no legend
+    from the other of the two."""
+    prev = getattr(ax.get_legend(), '_xslope_role', None)
+    other = 'bars' if role == 'joints' else 'joints'
+    if prev is None or prev[0] != other:
+        return False
+    if role == 'joints':
+        h, l = list(handles) + prev[1], list(labels) + prev[2]
+    else:
+        h, l = prev[1] + list(handles), prev[2] + list(labels)
+    from matplotlib.legend_handler import HandlerTuple
+    leg = ax.legend(h, l, loc="lower right", fontsize=8, frameon=True,
+                    framealpha=0.92, edgecolor="#cccccc", borderpad=0.6,
+                    handlelength=2.6,
+                    handler_map={tuple: HandlerTuple(ndivide=1, pad=0.0)})
+    leg._xslope_role = ('both', h, l)
+    return True
 
 
 #: How a joint reads on a results panel. Slip is the only quantity a joint has,
@@ -3021,11 +3051,13 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None):
                                lw=2 * lw_intact + gap),
                         Line2D([0], [0], color='white', lw=gap)))
         labels.append("opened")
-    if handles:
-        ax.legend(handles, labels, loc="lower right", fontsize=8, frameon=True,
-                  framealpha=0.92, edgecolor="#cccccc", borderpad=0.6,
-                  handlelength=2.6,
-                  handler_map={tuple: HandlerTuple(ndivide=1, pad=0.0)})
+    if handles and not _merge_joint_bar_legend(ax, 'joints', handles, labels):
+        _tag_legend(ax.legend(handles, labels, loc="lower right", fontsize=8,
+                              frameon=True, framealpha=0.92,
+                              edgecolor="#cccccc", borderpad=0.6,
+                              handlelength=2.6,
+                              handler_map={tuple: HandlerTuple(ndivide=1, pad=0.0)}),
+                    'joints', handles, labels)
     return cbar_specs
 
 

@@ -613,36 +613,33 @@ facing.
 ### What the factor of safety means for this wall
 
 Part 1's wall failed at one strength: the joints let go, and no amount of
-waiting brought it to rest. This wall gives way too, but only after the soil is
-down to half its strength and the facing has moved 30 cm, a twelfth of its
-height. Each time the facing moves it stretches the geogrid, the sheets take
-more of the load, and the wall comes to rest a little further out, until the
-top layer reaches its capacity.
+waiting brought it to rest. This wall gives way only after the soil is down to
+half its strength and the facing has moved 30 cm, a twelfth of its height. Each
+time the facing moves it stretches the geogrid, the sheets take more of the
+load, and the wall comes to rest a little further out, until the top layer
+reaches its capacity.
 
-Long before that limit the wall has moved more than any wall in service is
-allowed to: 2 cm at F = 1, 6 cm at 1.5, 13 cm at 1.75, 30 cm at 1.99. How much
+Long before that, the wall has moved more than any wall in service is allowed
+to: 2 cm at F = 1, 6 cm at 1.5, 13 cm at 1.75, 30 cm at 1.99. How much
 movement is acceptable depends on what the wall carries and what stands behind
-it, and that is the engineer's call. The Displacement vs F plot is where it is
-made: draw the allowable movement across the plot, and the strength where the
-resting points cross it is the factor of safety on that criterion. At 1% of
-the height, 3.6 cm, the crossing lies between 1.0 and 1.5 (a search over
-1.0–1.5 would pin it); at 2%, 7 cm, it lies just under 1.56. For this wall the
-movement decides the answer.
+it. The Displacement vs F plot is where that judgment is applied: draw the
+allowable movement across it, and the strength where the resting points cross
+that line is the factor of safety on that criterion. At 1% of the height,
+3.6 cm, the crossing lies between 1.0 and 1.5; at 2%, 7 cm, just under 1.56.
+For this wall the movement decides the answer.
 
 Two habits follow. Report the movement with the number: the default run found
 a wall standing at F = 1.56 with 7.7 cm of movement and the geogrid at a third
 of capacity. And read the closing summary on every reinforced wall: *No
 failure was found* and *at least* mean you are looking at this kind of wall. A
-limit equilibrium analysis of the same wall, with the layers entered as
-reinforcement, asks only the strength question;
+limit equilibrium analysis of the same wall asks only the strength question;
 [FEM-2](fem02_reinforcement.md) runs a reinforced slope both ways.
 
 The last lesson is patience. A jointed model settles slowly, because each
 joint reaches equilibrium by slipping a little at a time, and a trial cut off
 early reads as failed or undecided when it would have come to rest. When the
-closing summary says the factor of safety depends on the iteration limit, or
-reports it as "at least", raise the limit and let the run take the time it
-needs.
+closing summary reports the factor of safety as "at least", or says it depends
+on the iteration limit, raise the limit and let the run finish.
 
 ---
 

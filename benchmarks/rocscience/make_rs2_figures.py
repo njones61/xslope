@@ -239,6 +239,10 @@ SIDECAR_STEM = {
     # solves the seepage again on its own tri6 mesh, so its sidecars — the mesh json
     # included — go under a stem of their own rather than over the committed ones.
     'RS2-40-seep': 'vp077a_ssrm',
+    # The d30 variant is a second SSRM run on the same workbook and the same tri6
+    # mesh; under the workbook's own stem its mesh json overwrote the tri3 seepage
+    # mesh that vp077a_seep.csv is indexed on.
+    'RS2-40-seep-d30': 'vp077a_ssrm_d30',
     'RS2-66a-deep': 'rs2_66a_deep',
     'RS2-P4-VP68-zone': 'vp068_zone',
     'RS2-P4-VP102-t-300-c2': 'vp102t_300_c2',
@@ -296,6 +300,29 @@ def _shared_stems():
             os.path.join(ROOT, 'docs', 'verification', tag['file'])))
         counts[stem] = counts.get(stem, 0) + 1
     return {stem: n for stem, n in counts.items() if n > 1}
+
+
+def _refuse_seep_mesh_overwrite(stem, mesh):
+    """Refuse to replace a ``{stem}_mesh.json`` that a shipped seepage field is
+    indexed on with a different mesh.
+
+    ``{stem}_seep.csv`` / ``_seep2.csv`` are read node-for-node against the mesh
+    beside them, so writing this run's mesh there silently breaks every ``u='seep'``
+    reader of the workbook. A row whose FEM mesh is not the seepage mesh needs its
+    own stem in ``SIDECAR_STEM``."""
+    path = f'{stem}_mesh.json'
+    seep = [f'{stem}{s}' for s in ('_seep.csv', '_seep2.csv')
+            if os.path.exists(f'{stem}{s}')]
+    if not seep or not os.path.exists(path):
+        return
+    with open(path) as fh:
+        old = np.asarray(json.load(fh).get('nodes', []), dtype=float)
+    new = np.asarray(mesh['nodes'], dtype=float)
+    if old.shape != new.shape or not np.allclose(old, new):
+        raise RuntimeError(
+            f'{os.path.basename(path)} is the mesh {os.path.basename(seep[0])} is '
+            f'indexed on ({len(old)} nodes); this run solved on a different one '
+            f'({len(new)} nodes). Give the row its own stem in SIDECAR_STEM.')
 
 
 def _write_row_meta(tag, stem, meta):
@@ -1456,6 +1483,7 @@ def make_figure(tag, dpi=150):
         # rows that ship none, rebuilds from the tag and hopes the discretization
         # comes out node-for-node the same, so everything downstream reads a
         # section that was never solved.
+        _refuse_seep_mesh_overwrite(stem, mesh)
         export_mesh_to_json(mesh, f'{stem}_mesh.json')
     _write_row_meta(tag, stem, meta)
 

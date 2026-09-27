@@ -124,6 +124,17 @@ def _offset_through(dip_deg, x, y):
     return float(x) * nx + float(y) * ny
 
 
+def _circle_through_at(p1, p2, yo):
+    """The circle through ground points ``p1`` and ``p2`` whose center sits at
+    elevation ``yo``, in the circles sheet's form."""
+    (x1, y1), (x2, y2) = p1, p2
+    xo = ((x2 * x2 + (y2 - yo) ** 2) - (x1 * x1 + (y1 - yo) ** 2)) \
+        / (2.0 * (x2 - x1))
+    r = ((xo - x1) ** 2 + (y1 - yo) ** 2) ** 0.5
+    return [{'Xo': float(xo), 'Yo': float(yo), 'Depth': float(yo - r),
+             'R': float(r)}]
+
+
 def _toe_chord(toe, crest):
     """The seed surface for an ELASTIC section whose mechanism is not one plane.
 
@@ -1214,9 +1225,14 @@ def _rj020(name, joint_lines):
     _finish(sd, [(RJ20_RING, 0)], mats)
     sd['joint_lines'] = joint_lines(sd)
     # The seed surface. A blocky mass has no one plane to fail on, so the file
-    # carries the starting circle a user would draw through the toe at (10, 10)
-    # and the crest at (30, 70). A strength reduction never reads it.
-    sd['circles'] = _toe_circle((10.0, 10.0), (30.0, 70.0))
+    # carries a starting circle; a strength reduction never reads it. The
+    # house-rule circle through the toe (R = 120 m) crosses the crest elevation
+    # at x = 124, past the section's end at x = 80, and no circle through the toe
+    # with its center above the crest (which the slicer needs) comes back to the
+    # ground inside it. So this one leaves the face a quarter of the way up, at
+    # (15, 25), and enters the crest halfway back, at (55, 70), with its center
+    # 10 m above the crest.
+    sd['circles'] = _circle_through_at((15.0, 25.0), (55.0, 70.0), 80.0)
     return _write(sd, name)
 
 

@@ -378,9 +378,9 @@ thin because a generated network puts hundreds of them over the field.
 ![Joint slip on a toppling stack at its critical factor: each joint colored by how far its faces have slid, gray where it has not slipped, drawn as two lines with a gap between them where it has opened](../tutorials/images/fem05_joint_slip_topple.png){width=900}
 
 On the **Deformed mesh** panel, with **Joint state** on (the default for a jointed model), the
-deformed section is drawn as the **blocks** the joints cut it into: each block under a faint tint
-of its own, the joint faces in green, and the deformed outline as a dark line against the dashed
-undeformed outline. A block is a piece of the mesh that moves as one body; the mesh split gives
+deformed section is drawn as the **blocks** the joints cut it into: the section under a faint
+tint, one per material, the joint faces in green, and the deformed outline as a dark line against
+the dashed undeformed outline. A block is a piece of the mesh that moves as one body; the mesh split gives
 the two sides of a joint their own nodes, so the pieces between joints are found by following
 which elements still share nodes. A jointed failure looks like this, blocks moving as bodies with
 all of the movement taken up at the joints, and a joint that has slipped or opened shows as two

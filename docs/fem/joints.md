@@ -348,8 +348,11 @@ the slope is standing. [The joint verdict](overview.md#the-joint-verdict) and
 [the trend reading](overview.md#creep-trend) on the overview page give the thresholds.
 
 That standing reading counts only under the default `hybrid`
-[failure criterion](overview.md#ssrm-failure-criteria). Under `non_convergence`, a trial that
-has stopped moving but never converged is still counted as failed.
+[failure criterion](overview.md#ssrm-failure-criteria), which is the right choice for a jointed
+model. The `non_convergence` criterion is the classical rule of Griffiths and Lane, where any
+trial that has not converged by the iteration limit counts as failed; it is kept for
+reproducing published results obtained that way. On a jointed model it counts a standing slope
+as failed, so leave it alone.
 
 The run also tries to finish a slowing trial directly, at set checkpoints and whenever the
 movement is dying away. Starting from the slip, the opening and the strength each joint has

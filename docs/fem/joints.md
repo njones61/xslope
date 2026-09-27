@@ -377,7 +377,7 @@ thin because a generated network puts hundreds of them over the field.
 
 ![Joint slip on a toppling stack at its critical factor: each joint colored by how far its faces have slid, gray where it has not slipped, drawn as two lines with a gap between them where it has opened](../tutorials/images/fem05_joint_slip_topple.png){width=900}
 
-On the **Deformed mesh** panel, with **Joint state** on (the default for a jointed model), the
+On the **Deformed mesh** panel, with **Show joints** on (the default for a jointed model), the
 deformed section is drawn as the **blocks** the joints cut it into: the section under a faint
 tint, one per material, the joint faces in green, and the deformed outline as a dark line against
 the dashed undeformed outline. A block is a piece of the mesh that moves as one body; the mesh split gives
@@ -387,16 +387,16 @@ all of the movement taken up at the joints, and a joint that has slipped or open
 lines that no longer lie on each other. The element grid is drawn under the blocks, in light
 gray, when the model has eight or fewer jointed lines and left out when it has more, so a
 generated network stays readable; **Element edges** in the display panel turns it on or off
-either way. The toppling stack of Tutorial FEM-5 both ways:
+either way. **Color by block** sets the fill: off (the default), one tint per material; on, each
+block under its own tint so the bodies can be told apart. The toppling stack of Tutorial FEM-5
+with the grid on and off:
 
-![The Deformed mesh panel of the toppling stack with the element grid under the blocks, the default for a model with eight or fewer jointed lines](images/joints_blocks_grid_on.png){width=1000}
+![The Deformed mesh panel of the toppling stack at its critical factor, with the element grid under the blocks, the default for a model with eight or fewer jointed lines](../tutorials/images/fem05_fem_blocks_topple.png){width=900}
 
-![The same panel with the element grid off, the default above eight jointed lines: only the joint faces, the deformed outline and the dashed undeformed outline remain](images/joints_blocks_grid_off.png){width=1000}
+![The same panel with the element grid off, the default above eight jointed lines: the joint faces, the deformed outline and the dashed undeformed outline remain](../tutorials/images/fem05_fem_blocks_topple_nogrid.png){width=900}
 
-With Joint state off the panel draws the ordinary deformed mesh. The **Displacement vectors**
+With Show joints off the panel draws the ordinary deformed mesh. The **Displacement vectors**
 panel is the same as on any other model.
-
-![The deformed mesh of the same stack, drawn as blocks: each block moves as one body, the joints between them shown in green, and the dashed outline is the undeformed section](../tutorials/images/fem05_fem_blocks_topple.png){width=900}
 
 **1D Details…** lists every jointed line, from the joints sheet and from the reinforce sheet
 alike, under a *Joints* heading, and draws panels along each line: the normal stress on the

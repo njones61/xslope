@@ -449,9 +449,14 @@ Not a number this time but a bound, and the Log says why:
 The wall came to rest at every strength the search confirmed, and at the next
 strength up it was still creeping when the iteration limit arrived. The run does
 not know whether that trial would have come to rest, so it reports the last
-strength it is sure of. That is not the end of this wall's story, and the
-section after next takes it further. But a reader who stops here has a complete
-set of results, and they are worth reading first.
+strength it is sure of.
+
+Three things in Studio tell you a run has ended this way. The results view is
+titled with the bound, **FS ≥ 1.56**, instead of a number. The Log carries the
+paragraph above. And the results toolbar shows a button that is not there after
+an ordinary run, **Continue with a higher limit…**, beside **1D Details…**.
+Leave it alone for now. A reader who stops here has a complete set of results,
+they are worth reading first, and the section after next presses the button.
 
 ### If you stop here
 
@@ -531,13 +536,14 @@ the answer.
 
 ### If you let it run
 
-The iteration limit is what stopped the search at 1.56. With **Max iterations
-per trial** raised to 1,000,000 (and the iteration ceiling raised to match) the
-search goes on until the wall gives way. This is not a run to repeat: it takes
-70 minutes on an ordinary desktop, and the results below are from it. When a
-run ends this way, Studio offers **Continue with a higher limit…** on the
-results toolbar, which carries the search on from where its trials stopped
-instead of starting over; on this wall that saves about ten of those minutes.
+The iteration limit is what stopped the search at 1.56. Press **Continue with
+a higher limit…** on the results toolbar and give it 1,000,000: the search
+carries on from where its trials stopped, reusing every trial it has already
+decided, and goes on until the wall gives way. Starting over from the Run FEM
+dialog with **Max iterations per trial** at 1,000,000 (and the iteration
+ceiling raised to match) reaches the same answer. Neither is a run to repeat:
+continuing takes about an hour on an ordinary desktop and starting over about
+ten minutes longer, and the results below are from it.
 
 ![Displacement against strength reduction factor with a million-iteration limit: the wall comes to rest at every strength up to 1.9922, moving further each time, and runs away at 2.0](images/fem03_ssrm_curve_grid_long.png){width=800}
 

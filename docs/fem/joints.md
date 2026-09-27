@@ -270,9 +270,9 @@ choose the pattern, enter its numbers and pick the region; the canvas previews t
 anything is written. In a script, call `parallel_set`, `cross_jointed` or `voronoi` from
 `xslope.joints`.
 
-What gets written is ordinary rows on the joints worksheet, labeled `set-01`, `set-02` and so on.
-The lines are the model; the pattern that made them is not remembered. To change a network, remove
-the set and build another.
+The generator writes ordinary rows on the joints worksheet, labeled `set-01`, `set-02` and so
+on. The pattern itself is not stored, only the lines it produced, so to change a network you
+remove the set and build another.
 
 ![The Build network dialog: the kind of network, its parameters, and the region it is clipped to](../studio/images/editing_joint_network_dialog.png){width=760}
 

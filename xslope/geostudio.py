@@ -1473,7 +1473,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
         tc = None
     elif tc and opt not in _TCRACK_OPTIONS:
         caveats.append(f"GeoStudio defines the tension crack by '{opt}', which xslope "
-                       f"does not recognise — the crack was NOT imported, so the factor "
+                       f"does not recognize — the crack was NOT imported, so the factor "
                        f"of safety will be too high")
         tc = None
 
@@ -1579,7 +1579,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     for tag in stab.get("elements", []):
         if tag not in _ENTRY_ELEMENTS:
             caveats.append(
-                f"this analysis has a GeoStudio '{tag}' that xslope does not recognise "
+                f"this analysis has a GeoStudio '{tag}' that xslope does not recognize "
                 f"and did NOT import — if it affects the model, the imported factor of "
                 f"safety will be wrong")
         elif _ENTRY_ELEMENTS[tag]:
@@ -1612,7 +1612,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
 def gsz_style(gsz, analysis_id=None):
     """The material colors from a .gsz, as an xslope style sidecar.
 
-    GeoStudio gives every material a colour, and it is how people recognise their own
+    GeoStudio gives every material a colour, and it is how people recognize their own
     model at a glance -- so a model that comes back in xslope's default palette looks
     like someone else's. Returns ``{'materials': {'<mat_id>': {'color': '#rrggbb'}}}``,
     keyed the way :mod:`xslope.style` expects, or ``{}`` if the file names no colours.
@@ -2155,7 +2155,7 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         caveats.append(
             f"elastic material(s) {', '.join(repr(n) for n in elastic_names)} were "
             f"written as GeoStudio's impenetrable Bedrock — a slip surface cannot enter "
-            f"them, which is xslope's elastic behaviour")
+            f"them, which is xslope's elastic behavior")
     non_mc = sorted({(m.get("option") or "") for m in materials} - {"mc", "elastic", ""})
     if non_mc:
         caveats.append(

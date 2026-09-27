@@ -5706,7 +5706,7 @@ class WeakZoneDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(_help_label(
             headline or "Choose the material zone the starting surface should track. "
-                        "Strength is the shear strength each zone can mobilise at the "
+                        "Strength is the shear strength each zone can mobilize at the "
                         "stress it actually carries, which is what makes zones of "
                         "different material models comparable."))
 
@@ -7370,7 +7370,7 @@ POLYGON_HELP = {
     # Each entry is <= the t_cut budget (393 chars — MEASURED to wrap in exactly two
     # lines at the dialog's natural width; the strip is fixed at two lines and clips
     # beyond).
-    "mat_id": ("Material assigned to this closed zone. Greyed out for any Type other than 'material': an overlay is not a soil zone, so it has no material — the same rule the polygon sheet applies when it blanks the material-name echo."),
+    "mat_id": ("Material assigned to this closed zone. Grayed out for any Type other than 'material': an overlay is not a soil zone, so it has no material — the same rule the polygon sheet applies when it blanks the material-name echo."),
     "type": ("What kind of region this polygon is. 'material' (the default) is a soil zone. The three SSR types are FEM analysis OVERLAYS — never meshed, never sliced: 'ssr reduce' reduces only inside, 'ssr hold' holds full strength inside, 'ssr elastic' cannot yield inside. 'refine' is a pure meshing region and needs a Size. 'joints' marks where a joint network is built."),
     "size": ("Optional target finite-element size inside this polygon, used only when a mesh is generated. Blank = the global target size. Independent of Type: a material zone or an SSR overlay may carry one, and a 'refine' polygon is nothing but one. A Size only ever refines — a value at or above the global size cannot coarsen the mesh."),
 }

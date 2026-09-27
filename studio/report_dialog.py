@@ -149,7 +149,7 @@ CONTENT_TREE = [
          ("seep_transient_figures", "Transient frame plots",
           "The section at selected states of a transient seepage run — the first, the "
           "last, and the rest spaced evenly through the ones between — each "
-          "drawn for the same fields a steady solution is, on one colour scale "
+          "drawn for the same fields a steady solution is, on one color scale "
           "across every state. Only where a transient analysis was run."),
          ("seep_transient_history", "Transient history plot",
           "The transient run on one time axis: the level the reservoir boundary is held "

@@ -555,7 +555,7 @@ def rules(analysis=None, fields=None):
 #: seepage solve read onto this mesh -- so telling a user (or an assistant) to
 #: "fix" one of these invites the wrong repair: silence it by changing the
 #: pore-pressure option, which does not supply the missing physics, it removes
-#: the requirement and quietly changes what is being analysed. An interface that
+#: the requirement and quietly changes what is being analyzed. An interface that
 #: reports findings while a model is being BUILT needs to tell the two apart, so
 #: the distinction is declared here rather than inferred from wording.
 #:
@@ -820,7 +820,7 @@ class _Ctx:
 
     @property
     def effective_surface_family(self):
-        """The family that would actually be analysed, applying today's precedence.
+        """The family that would actually be analyzed, applying today's precedence.
 
         With no explicit selection the circular family wins whenever circles are
         present -- ``generate_slices`` takes the circle branch first -- which is
@@ -4339,7 +4339,7 @@ def _rapid_dloads2(ctx):
         return None            # in auto mode the engine derives the stage-2 load
     return ("The stage-2 distributed loads are empty, so the post-drawdown water "
             "load is zero. A rapid-drawdown run needs the stage-2 load: with the "
-            "reservoir load simply absent the slope is analysed as though the water "
+            "reservoir load simply absent the slope is analyzed as though the water "
             "vanished without ever having pressed on it. Enter zero loads "
             "deliberately if the pool drains completely (Distributed loads, Set 2; "
             "dloads (2) sheet).")
@@ -4553,11 +4553,11 @@ def _seismic_direction_fem(ctx):
         return None
     pushes = "+x" if k > 0 else "-x"
     return (f"Seismic coefficient k = {k:g} pushes in {pushes}. In the finite "
-            f"element engine the sign IS the direction: both faces are analysed at "
+            f"element engine the sign IS the direction: both faces are analyzed at "
             f"once, so choose the direction that drives the face you are checking -- "
             f"the engine will not choose for you, and a pseudo-static factor of "
             f"safety can legitimately come out above the static one for the face the "
-            f"shaking stabilises. The limit-equilibrium engine reads the same value "
+            f"shaking stabilizes. The limit-equilibrium engine reads the same value "
             f"as a magnitude and orients it itself {_at_global('D13')}.")
 
 
@@ -6007,7 +6007,7 @@ def _mat_nu_band(ctx):
                    f"limit of 0.5. The plane-strain stiffness scales with "
                    f"1 / (1 - 2 nu), so the element matrices are poorly conditioned "
                    f"and the strength reduction converges slowly or not at all. Use "
-                   f"0.45 or less; an undrained clay is modelled at 0.45, not 0.49 "
+                   f"0.45 or less; an undrained clay is modeled at 0.45, not 0.49 "
                    f"{_AT_MAT}.")
             continue
         if nu >= 0.1:

@@ -778,7 +778,7 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
     if analysis is not None:                           # deprecated alias for mode=
         mode = analysis
     if mode not in _OUTPUT_BY_MODE:
-        return False, (f"mode='{mode}' is not recognised "
+        return False, (f"mode='{mode}' is not recognized "
                        f"(choose 'lem', 'fem', or 'seep').")
     output, output_label = _OUTPUT_BY_MODE[mode]
     if mode in ('fem', 'seep') and slope_data.get('mesh') is None:

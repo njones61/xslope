@@ -1368,7 +1368,7 @@ def fez_to_slope_data(d):
         caveats.append(
             "THE FACTOR OF SAFETY WILL BE WRONG: material(s) "
             + ", ".join(f"{n!r} (iStaticWaterMode = {v})" for n, v in unknown)
-            + " use an RS2 pore-pressure source this importer does not recognise — "
+            + " use an RS2 pore-pressure source this importer does not recognize — "
               "imported as ZERO, which is NOT the same as dry unless you check it. Set "
               "the water source before solving")
     if no_piezo:

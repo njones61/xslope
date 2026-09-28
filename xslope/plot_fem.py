@@ -2671,9 +2671,29 @@ def _section_shape(ax):
         for poly in element_corner_polygons(fem_data, nodes_xy):
             if poly is not None and len(poly) >= 3:
                 polys.append(shapely.Polygon(np.asarray(poly, dtype=float)[:, :2]))
-    shape = shapely.union_all(polys) if polys else None
+    shape = None
+    if polys:
+        try:
+            shape = shapely.union_all(polys)
+        except Exception:
+            # GEOS can refuse the overlay on a deformed mesh whose element
+            # polygons overlap or fold (RJ-14: "found two shells in EdgeRing
+            # list"). The key placer only asks whether a corner box touches the
+            # ground, so the unmerged polygons answer that just as well.
+            shape = _PolygonList(polys)
     ax._xslope_section_shape = shape
     return shape
+
+
+class _PolygonList:
+    """A stand-in for a shapely geometry when the union cannot be built: the
+    element polygons kept apart, answering ``intersects`` as any of them."""
+
+    def __init__(self, polys):
+        self._polys = polys
+
+    def intersects(self, other):
+        return any(p.intersects(other) for p in self._polys)
 
 
 def _register_section(ax, fem_data, *node_sets):

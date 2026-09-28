@@ -1,5 +1,5 @@
 """Checks for the TREND READING — how a trial still moving at its iteration limit
-is read (`xslope.fem.creep_trend`, `creep_extrapolate`, the 'not_slowing' and
+is read (`xslope.fem.creep_trend`, the 'not_slowing' and
 'slowing' endings and their sentences in the closing summary).
 
 What this file locks:
@@ -17,29 +17,23 @@ What this file locks:
      (a plain sweep and an accelerated one covering it in fewer iterations) is
      read the same way.
 
-  3. THE EXTRAPOLATION. A field decaying geometrically is carried to its limit,
-     by the field's one ratio and per degree of freedom (Aitken), and a movement
-     that is not shrinking gives nothing to extrapolate.
-
-  4. THE RECORDED TRACES (test/fixtures/creep_traces.json). The FEM-3 geogrid
+  3. THE RECORDED TRACES (test/fixtures/creep_traces.json). The FEM-3 geogrid
      wall's trial at F = 1.25, at its page settings, is dying away at 100,000
      iterations; the FEM-3 wall alone at F = 1.140625 is holding steady at
      90,000 and is counted as sliding.
 
-  5. THE SENTENCES. The closing summary quotes a standing edge counted standing
-     by a slowing movement (from where it was, or from the estimated resting
-     state), a failing edge counted as sliding by a movement that did not slow,
+  4. THE SENTENCES. The closing summary quotes a standing edge counted standing
+     by a slowing movement, a failing edge counted as sliding by a movement that did not slow,
      and one still slowing at the limit that the corrector could not finish, in
      the Run dialog's words.
 
-  6. THE SEEDS (minutes; skipped with --quick). The FEM-3 geogrid wall at
-     F = 1.25, at its page settings: at 100,000 iterations the movement is dying
-     away and the corrector refuses both seeds, the block-end state and the
-     estimated resting state. At a 200,000 allowance each seed on its own
-     certifies at 140,000 and the hold test holds it, at about 1.30 elastic
-     displacements, where the plain sweep's own rest (465,581 iterations) is
-     1.297. It is the corrector attempt at every block end after the warm-up that
-     stands this trial; the extrapolation adds nothing measurable on it.
+  5. THE CORRECTOR ATTEMPT (about a minute; skipped with --quick). The Griffiths
+     & Lane Example 2 slope (SSRM-G2) at F = 1.34375, built the way its figure
+     producer builds it: the corrector refuses the state at every checkpoint and
+     every block end before 11,200 iterations and certifies the block-end state
+     as it stands at 11,200. The reading's record carries that one attempt and
+     no extrapolated state, and the trial matches the one the row's stored
+     result carries (docs/fem/files/xslope_griffiths2_fem_meta.json).
 
 Run directly:  PYTHONPATH=. python3 test/creep_trend_check.py [--quick]
 Exits non-zero on any failure.
@@ -53,7 +47,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np                                          # noqa: E402
 
 import xslope.fem as fem                                    # noqa: E402
-from xslope.fem import creep_trend, creep_extrapolate      # noqa: E402
+from xslope.fem import creep_trend                         # noqa: E402
 
 FAILURES = []
 TRACES = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -150,33 +144,8 @@ def check_ratio_not_count():
           f"{a['trend']} {a['ratio']:.4f} / {b['trend']} {b['ratio']:.4f}")
 
 
-def check_extrapolation():
-    print("\n3. the extrapolation")
-    rng = np.random.default_rng(3)
-    lim = rng.normal(size=200)
-    a = rng.normal(size=200)
-    snaps = [lim - a * 0.8 ** k for k in (4, 5, 6)]
-    u, r = creep_extrapolate(snaps, per_component=False)
-    check("one ratio: a geometric decay is carried to its limit",
-          u is not None and np.abs(u - lim).max() < 1e-10 and abs(r - 0.8) < 1e-12,
-          f"error {np.abs(u - lim).max():.1e}, r {r:.4f}")
-    # two modes decaying at different rates: Aitken per component reads each
-    b = rng.normal(size=200)
-    mask = np.arange(200) < 100
-    snaps = [lim - np.where(mask, a * 0.6 ** k, b * 0.9 ** k) for k in (4, 5, 6)]
-    u1, _ = creep_extrapolate(snaps, per_component=False)
-    u2, _ = creep_extrapolate(snaps, per_component=True)
-    check("per component, two modes at two rates are each carried to their limit",
-          np.abs(u2 - lim).max() < 1e-9 < np.abs(u1 - lim).max(),
-          f"Aitken {np.abs(u2 - lim).max():.1e}, one ratio {np.abs(u1 - lim).max():.1e}")
-    snaps = [lim + a * k for k in (0, 1, 2)]
-    u, r = creep_extrapolate(snaps)
-    check("a movement that is not shrinking has nowhere to be carried",
-          u is None, f"r {r}")
-
-
 def check_recorded():
-    print("\n4. the recorded traces")
+    print("\n3. the recorded traces")
     with open(TRACES) as f:
         rec = json.load(f)
     for name, want, sweeps in (("grid_F1.25", ("dying",), 100000),
@@ -204,11 +173,10 @@ def _run(trials, lo, hi):
 
 
 def check_sentences():
-    print("\n5. the sentences")
+    print("\n4. the sentences")
     slowing = dict(rule='slowing', window=50000, block=10000, iteration=100000,
                    increments=[0.02, 0.016, 0.0128, 0.0102, 0.0082], ratio=0.8,
-                   extrapolated=0.0006, max_displacement=0.023,
-                   seed='extrapolated',
+                   max_displacement=0.023,
                    corrector={'certified': True, 'hold': {'held': True}})
     sliding = dict(rule='not_slowing', window=50000, block=10000,
                    iteration=90000, ratio=0.96,
@@ -231,11 +199,6 @@ def check_sentences():
     check("with no percentage, no distance further on, no 'stays there'",
           not any(w in standing for w in ("%", "further on", "stays there",
                                           "fallen")), standing)
-    s_as_is = fem.creep_sentence(dict(slowing, seed='as_is'), 1.25, "m")
-    check("the same sentence whichever state the rest was confirmed from",
-          s_as_is == "At F = 1.2500 the slope was still creeping at iteration "
-          "100,000 but slowing; the solver confirmed that it comes to rest, at "
-          "0.023 m, and counted it as standing.", s_as_is)
     check("the failing edge is counted as sliding, with its ratio",
           "At F = 1.2578 it did not: over the last 50,000 iterations the "
           "movement did not slow (each block of 10,000 iterations moved the "
@@ -296,70 +259,100 @@ def check_sentences():
           in note, note)
 
 
-def _grid_trial(budget, seeds):
-    """The FEM-3 geogrid wall's trial at F = 1.25 at its page settings (the
-    tutorial's lock tag), on the reference kernel, with Max iterations per trial
-    set to ``budget`` and the trend reading's seeds limited to ``seeds``."""
+#: The trial section 5 reads: the SSRM-G2 row's standing edge.
+_G2_STEM = "xslope_griffiths2"
+_G2_F = 1.34375
+_G2_META = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "docs", "fem", "files", "xslope_griffiths2_fem_meta.json")
+
+
+def _g2_trial():
+    """The SSRM-G2 row's trial at F = 1.34375, on the model its figure producer
+    (benchmarks/make_griffiths_figures.py) builds from the row's tag, solved on
+    the reference kernel at the tag's settings."""
     import contextlib
     import io
-    import run_tests as rt
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    page = os.path.join(here, "docs", "tutorials", "fem03_block_wall_joints.md")
-    tag = next(dict(t) for t in rt.parse_test_tags(page)
-               if t.get("benchmark") == "FEM-3-grid-ssrm")
-    tag["file"] = os.path.normpath(os.path.join(os.path.dirname(page), tag["file"]))
+    sys.path.insert(0, os.path.join(here, "benchmarks"))
+    import make_griffiths_figures as G
+    tag = next(t for t in G.figure_tags() if G.stem(t) == _G2_STEM)
     with contextlib.redirect_stdout(io.StringIO()):
-        fem_data, kw, f_min, f_max, tol = rt.build_fem_ssrm_case(tag)
-    kw = dict(kw, capture_failure_state=False, max_iterations=int(budget),
-              max_iterations_ceiling=int(budget))
-    saved = fem.CREEP_SEEDS
-    fem.CREEP_SEEDS = tuple(seeds)
-    try:
-        with contextlib.redirect_stdout(io.StringIO()):
-            with rt._force_fast_kernel(fem, False):
-                res = fem.solve_ssrm(fem_data, F_min=f_min, F_max=f_max,
-                                     tolerance=tol, trial_factors=[1.25], **kw)
-    finally:
-        fem.CREEP_SEEDS = saved
-    return next(t for t in res["trials"] if abs(t["F"] - 1.25) < 1e-12)
+        sd = G.load_slope_data(tag["file"])
+        lines, _n_reinf, _n_pile = G.extract_constraint_line_geometry(sd)
+        polys = G.get_material_polygons(sd, reinf_lines=lines)
+        mesh = G.build_mesh_from_polygons(
+            polys, target_size=tag.get("target_size"),
+            element_type=tag["element_type"], lines=lines,
+            element_size_1d=sd.get("element_size_1d"),
+            point_constraints=G.extract_point_constraints(sd),
+            size_regions=G.extract_size_regions(sd), **G.RT._refine_kwargs(tag))
+        fem_data = G.build_fem_data(sd, mesh)
+        with G.RT._force_fast_kernel(fem, False):
+            res = fem.solve_ssrm(fem_data, F_min=tag.get("f_min", 0.5),
+                                 F_max=tag.get("f_max", 3.0),
+                                 tolerance=tag.get("tolerance", 0.05),
+                                 max_iterations=int(tag["max_iter"]),
+                                 capture_failure_state=False,
+                                 trial_factors=[_G2_F])
+    return next(t for t in res["trials"] if abs(t["F"] - _G2_F) < 1e-12)
 
 
-def check_seeds():
-    print("\n6. the corrector's seeds on the geogrid wall at F = 1.25 (minutes)")
-    ue = 0.017436613824979727          # the trial's elastic max|u|, m
-    t = _grid_trial(100000, ('as_is', 'extrapolated'))
+#: Fields a record of the trend reading's corrector attempt does not carry: the
+#: attempt is made from the block-end state as it stands, and nothing else.
+_NOT_RECORDED = ("seed", "extrapolated", "extrapolated_u_ratio", "field_ratio",
+                 "extrapolation")
+
+
+def check_corrector_attempt():
+    print("\n5. the corrector attempt on SSRM-G2 at F = 1.34375 (about a minute)")
+    t = _g2_trial()
     rd = t.get("stop_reading") or {}
-    seeds = [(a["seed"], a["certified"]) for a in rd.get("attempts") or []]
-    check("at the page's 100,000 the trial is slowing and both seeds are refused",
-          not t["stable"] and rd.get("rule") == "slowing_refused"
-          and seeds == [("as_is", False), ("extrapolated", False)],
-          f"{t['exit_reason']}, {rd.get('rule')}, {seeds}")
-    for seeds_in, want in ((('as_is',), 'as_is'),
-                           (('extrapolated',), 'extrapolated')):
-        t = _grid_trial(200000, seeds_in)
-        rd = t.get("stop_reading") or {}
-        hold = (rd.get("corrector") or {}).get("hold") or {}
-        u = float(rd.get("max_displacement") or 0.0)
-        check(f"at a 200,000 allowance the {want} seed certifies at 140,000",
-              t["stable"] and rd.get("rule") == "slowing"
-              and rd.get("seed") == want and rd.get("iteration") == 140000,
-              f"{t['exit_reason']}, {rd.get('rule')}, seed {rd.get('seed')}, "
-              f"at {rd.get('iteration')}")
-        check(f"  and the hold test holds it, at about 1.30 elastic "
-              f"displacements", hold.get("held") is True
-              and 1.29 <= u / ue <= 1.32, f"held {hold.get('held')}, "
-              f"{u / ue:.3f} u_el")
+    atts = t.get("corrector_attempts") or []
+    labels = [str(a.get("at")) for a in atts]
+    cert = [str(a.get("at")) for a in atts if a.get("certified")]
+    check("the trial stands on the trend reading at 11,200 iterations",
+          t["stable"] and rd.get("rule") == "slowing"
+          and rd.get("iteration") == 11200
+          and (t.get("corrector") or {}).get("checkpoint") == "trend:11200",
+          f"{t['exit_reason']}, {rd.get('rule')}, at {rd.get('iteration')}, "
+          f"checkpoint {(t.get('corrector') or {}).get('checkpoint')}")
+    check("  every earlier checkpoint and block end was refused, and only "
+          "trend:11200 certified",
+          cert == ["trend:11200"] and labels[-1] == "trend:11200"
+          and all(not a.get("certified") for a in atts[:-1])
+          and {"vp300", "vp1000", "vp3000"} <= set(labels), f"{labels}")
+    check("  every attempt was made from the state as it stood",
+          not any(":" in lab.split("trend:", 1)[1] for lab in labels
+                  if lab.startswith("trend:")), f"{labels}")
+    ra = rd.get("attempts") or []
+    check("  the reading's record carries one certified attempt and no "
+          "extrapolation field",
+          len(ra) == 1 and ra[0].get("certified") is True
+          and not any(k in rd for k in _NOT_RECORDED)
+          and not any(k in ra[0] for k in _NOT_RECORDED),
+          f"{len(ra)} attempt(s), keys {sorted(rd)}")
+    with open(_G2_META) as f:
+        stored = next(x for x in json.load(f)["trials"]
+                      if abs(x["F"] - _G2_F) < 1e-12)
+    same = (t["iterations"] == stored["iterations"]
+            and t["verdict"] == stored["verdict"]
+            and t["exit_reason"] == stored["exit_reason"]
+            and abs(t["u_ratio"] - stored["u_ratio"]) <= 1e-9 * stored["u_ratio"]
+            and (t.get("corrector") or {}).get("checkpoint")
+            == (stored.get("corrector") or {}).get("checkpoint"))
+    check("  the trial is the one the row's stored result carries", same,
+          f"{t['iterations']} / {stored['iterations']} iterations, u_ratio "
+          f"{t['u_ratio']:.6f} / {stored['u_ratio']:.6f}")
 
 
 def main():
     quick = "--quick" in sys.argv
     check_classes()
     check_ratio_not_count()
-    check_extrapolation()
     check_recorded()
     check_sentences()
     if not quick:
-        check_seeds()
+        check_corrector_attempt()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"{len(FAILURES)} trend reading check(s) FAILED:")

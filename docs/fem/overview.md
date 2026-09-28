@@ -708,13 +708,13 @@ two runs that cover the same ground at different paces read the same way.
 
 | Trend over the window | What happens |
 |---|---|
-| **Dying away**: every block moved forward, none moved more than the one before, and the movement shrinks at a steady ratio below 0.9 a block | The [Newton corrector](#finishing-a-trial-with-the-newton-corrector) is asked for the balanced state from where the trial is and, if it refuses, from the estimated resting state: the field, the plastic strains and the joint slip carried forward by that ratio, $u_{rest} = u_2 + (u_2 - u_1)\,r/(1-r)$ from the last three block ends. A state the corrector certifies (force, yield and, on a jointed model, the hold test) stands, and the trial's `stop_reading` records the reading, the seed and the corrector's result. Where both are refused the trial is decided as below |
+| **Dying away**: every block moved forward, none moved more than the one before, and the movement shrinks at a steady ratio below 0.9 a block | The [Newton corrector](#finishing-a-trial-with-the-newton-corrector) is asked for the balanced state from where the trial is. A state the corrector certifies (force, yield and, on a jointed model, the hold test) stands, and the trial's `stop_reading` records the reading and the corrector's result. Where the corrector refuses, the trial is decided as below |
 | **Holding steady or growing**: the window moved at least 0.02 elastic displacements at a ratio of 0.9 or more a block; on a jointed model also the joint slip gaining 2% of itself or more at a rate not falling below 0.9 of the half-window before | `exit_reason = 'not_slowing'`, `FAILED`: the slope is sliding |
 | **Still** (under $10^{-4}$ elastic displacements over the window) or **unclear** | The [hybrid classifier](#2-hybrid-hybrid-default) decides, as for any trial stopped at the limit |
 
 Below `max_iterations_ceiling` (default 50000) a movement still dying away, or not yet clear, is given
 another `max_iterations` worth and read again at the new limit; a trial holding steady, growing or
-still stops at the limit. The dying-away reading, with its corrector attempts, is also taken at every
+still stops at the limit. The dying-away reading, with its corrector attempt, is also taken at every
 block end once the window is full (and, on a jointed model, past 5,000 iterations), so a creeping
 trial can be certified before its limit. A jointed trial holding steady is counted as sliding from the
 last tenth of `max_iterations` on, and never earlier: see
@@ -734,11 +734,15 @@ verification rows the answers are the same, and the whole set runs about a fifth
 K0 in-situ solve and the hold test always run the ordinary iteration, and the Log's opening
 lines for a run say whether acceleration was on.
 
-Whether a trial dying away is certified depends on how close to rest it has come. On the FEM-3
-geogrid wall at $F = 1.25$ the corrector refuses both seeds at 100,000 iterations and certifies at
-140,000 (the ordinary sweep reaches the same rest on its own at 465,581), so at the tutorial's
-100,000 the plain search still counts that trial as failed and says the factor of safety depends on
-the limit.
+Whether a trial dying away is certified depends on how close to rest it has come. On the
+[Griffiths and Lane Example 2 slope](../verification/ssrm.md#verification-griffiths2) at
+$F = 1.34375$ no state is certified at the 300, 1,000 or 3,000 checkpoints or at the block ends
+before 11,200 iterations; at 11,200, with each block of 1,600 iterations moving the slope about 0.71
+times as far as the one before, the corrector certifies the state at 1.85 times the elastic
+displacement and the trial stands. On [RS2-28a](../verification/rs2.md#rs2-28) at $F = 1.7$ the
+movement does not die away: at the 16,000-iteration limit the slope has moved 13 times the elastic
+displacement, each block still moving it 96% as far as the one before, no state along the way is
+certified, and the trial is counted as sliding.
 
 **Inconclusive trials.** A trial that reaches `max_iterations_ceiling` still dying away or with no
 clear trend, and with its out-of-balance still falling (the mean over the last 500 iterations at

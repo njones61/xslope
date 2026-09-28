@@ -138,7 +138,10 @@ acts.** Goodman & Bray hand each column-to-column thrust to the top corner of it
 cannot do that: the two columns lean together, the face stays closed only over its upper quarter to
 half, so the resultant stands a tenth to a sixth of the face
 below the corner. Given those heights read off the solved state, and nothing else changed, the same
-recursion returns **1.0279**, the bottom of this row's own bracket.
+recursion returns **1.0279**, the bottom of this row's own bracket. The closed form's other three
+assumptions the solution obeys exactly: every block balances in force and in moment on the
+interface stresses alone, every closed side pair is at its friction limit, and the base reaction of
+every toppling block sits on its downslope corner.
 
 At the block width of 10 m the bracket reads 1.037; at 2D sizes of 7.0 m, 5.0 m and 3.5 m it reads
 1.018, one step of the search lower, and at the 5.0 m of the lock all nine trials settle.
@@ -531,7 +534,7 @@ restraint the vendor clamps in both directions.
 
 **Input file:** [rj011.xlsx](files/rocscience/joints/rj011.xlsx).
 
-![RJ-11: Alejano et al. plowing sliding slab failure (rj011) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. One bedding plane from the crest to the toe carries almost all of the slip, and at its foot the two release traces cut out a small wedge: the deformed section shows that wedge lifted and rotated out over the bench while the slab above it slides down the plane, which is the plowing mechanism the paper names. The wedge is driven out and up by the slab above it, and at the panel's exaggeration a movement of centimetres draws as meters, so the block appears to leave the slope](images/RJ-11.png)
+![RJ-11: Alejano et al. plowing sliding slab failure (rj011) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. One bedding plane from the crest to the toe carries almost all of the slip, and at its foot the two release traces cut out a small wedge: the deformed section shows that wedge lifted and rotated out over the bench while the slab above it slides down the plane, which is the plowing mechanism the paper names. The wedge is driven out and up by the slab above it, and at the panel's exaggeration a movement of centimeters draws as meters, so the block appears to leave the slope](images/RJ-11.png)
 
 ### 🟡 RJ-12: Alejano et al. plowing toppling slab failure (rj012) {#rj-12}
 
@@ -691,7 +694,9 @@ standing, on the corpus mesh of 0.09 m, the block size.
 
 The stack stands at k = 0.1798, which is 10.20°, and goes at k = 0.1814, which is 10.28°. It stands
 at every coefficient tried below that and fails at every one above, through 0.25, and the row's
-check re-solves both coefficients at full strength.
+check re-solves both coefficients at full strength. Run on with no stopping rule at all, the plain
+iteration agrees: the stack settles at every tilt through 9.9° and moves at a steady rate from
+10.2°.
 
 **A coefficient is not a rotation, and here the difference is measurable and measures zero.**
 Tilting the model by θ turns the body force through θ and leaves its magnitude at γ; a coefficient

@@ -5180,9 +5180,9 @@ def _slip_rate_reading(slip_hist, h, n, rates=True):
 #   * DYING AWAY — every block moved forward, no block moved more than the one
 #     before, and the movement shrinks at a steady ratio below
 #     `_CREEP_DYING_MAX` a block (the geometric mean of the four ratios). The
-#     field is extrapolated to where that movement is heading and the Newton
-#     corrector is seeded there (see `creep_extrapolate`); a certified state
-#     (force, yield and, on a jointed model, the hold test) is a stand.
+#     Newton corrector is asked for a balanced state from the state the trial
+#     has reached; a certified state (force, yield and, on a jointed model, the
+#     hold test) is a stand.
 #   * HOLDING STEADY OR GROWING — the window moved at least `_CREEP_MOVING`
 #     elastic displacements and the ratio is at or above `_CREEP_DYING_MAX`: the
 #     slope is sliding. On a jointed model the slip reading of `joint_verdict`
@@ -5199,22 +5199,8 @@ def _slip_rate_reading(slip_hist, h, n, rates=True):
 # displacements the hybrid classifier's growth line, the 1e-4 the joint verdict's
 # "the field has stopped". The reading is a ratio of movements, never a count of
 # iterations, so a plain and an accelerated sweep read the same trial the same way.
-#: The extrapolated seed carries the plastic strains and the joint slip forward by
-#: the same ratio as the field. False seeds the extrapolated field on the latest
-#: snapshot's strains and slip. On the FEM-3 geogrid wall at F = 1.25 and 100,000
-#: iterations both forms, and Aitken's per-component form of each, were refused
-#: at every block (the corrector diverges).
-CREEP_EXTRAPOLATE_STATE = True
-#: The trend reading's corrector seeds, in the order they are tried: the
-#: block-end state as it is ('as_is'), then, where that is refused, the estimated
-#: resting state ('extrapolated'). A study drops either to measure the other.
-CREEP_SEEDS = ('as_is', 'extrapolated')
 _CREEP_BLOCKS = 5
 _CREEP_BLOCK_FRAC = 0.1
-#: How many block-end snapshots a trial keeps beside the trend reading's three,
-#: so that a trial continued with a higher limit (see ``solve_fem``'s
-#: ``_resume_state``) can take the three its coarser block would have kept.
-_RESUME_SNAP_KEEP = 7
 _CREEP_DYING_MAX = _JOINT_MOVING_DECAY_MIN
 _CREEP_MOVING = _HYBRID_GROWTH_MIN
 _CREEP_STILL = _JOINT_SETTLED_GROWTH
@@ -5333,65 +5319,6 @@ def creep_sentence(rd, F, unit=""):
     return ""
 
 
-#: How the extrapolation reads each component's decay: 'ratio' carries every
-#: component forward by the field's one ratio (the exponential fit the ratio
-#: implies); 'aitken' reads each component's own ratio d2/d1 (Aitken's delta-squared
-#: per degree of freedom), falling back to the field's ratio where a component's
-#: own is not in (0, _CREEP_AITKEN_R_MAX] or its movement is below
-#: _CREEP_AITKEN_FLOOR of the largest.
-CREEP_EXTRAPOLATION = 'ratio'
-_CREEP_AITKEN_R_MAX = 0.99
-_CREEP_AITKEN_FLOOR = 1e-6
-
-
-def _creep_carry(x0, x1, x2, r, per_component):
-    """x2 carried forward to where a movement shrinking by r per block is
-    heading: x2 + d2 r / (1 - r), with d2 = x2 - x1. ``per_component`` reads r
-    per component as d2 / d1 (Aitken), keeping the scalar ``r`` where that one
-    is not usable."""
-    x1 = np.asarray(x1, dtype=float)
-    x2 = np.asarray(x2, dtype=float)
-    d2 = x2 - x1
-    if not per_component:
-        return x2 + d2 * (r / (1.0 - r))
-    d1 = x1 - np.asarray(x0, dtype=float)
-    big = float(np.max(np.abs(d1))) if d1.size else 0.0
-    with np.errstate(divide='ignore', invalid='ignore'):
-        ri = np.where(np.abs(d1) > _CREEP_AITKEN_FLOOR * big, d2 / d1, np.nan)
-    ok = np.isfinite(ri) & (ri > 0.0) & (ri <= _CREEP_AITKEN_R_MAX)
-    rr = np.where(ok, ri, r)
-    return x2 + d2 * (rr / (1.0 - rr))
-
-
-def creep_extrapolate(snaps, ratio=None, per_component=None):
-    """Where a dying-away movement is heading, from the last three field
-    snapshots taken one block apart.
-
-    With d1 = s1 - s0 and d2 = s2 - s1 the ratio of the field's own movement from
-    one block to the next is r = (d2 . d1) / (d1 . d1), and a movement shrinking by
-    r a block has r / (1 - r) blocks' worth of d2 still to go:
-    u_rest = s2 + d2 r / (1 - r). ``ratio`` (the displacement reading's own ratio)
-    stands in where the field's is not in (0, 1). With ``per_component`` (default:
-    CREEP_EXTRAPOLATION == 'aitken') each degree of freedom is carried by its own
-    ratio (see `_creep_carry`).
-
-    Returns ``(u_rest, r)``, or ``(None, r)`` where no ratio in (0, 1) is
-    available and there is nothing to extrapolate."""
-    if per_component is None:
-        per_component = (CREEP_EXTRAPOLATION == 'aitken')
-    s0, s1, s2 = (np.asarray(x, dtype=float) for x in snaps)
-    d1 = s1 - s0
-    d2 = s2 - s1
-    den = float(d1 @ d1)
-    r = float(d2 @ d1) / den if den > 0.0 else float('nan')
-    if not (0.0 < r < 1.0):
-        r = (float(ratio) if (ratio is not None and np.isfinite(ratio)
-                              and 0.0 < ratio < 1.0) else r)
-    if not (np.isfinite(r) and 0.0 < r < 1.0):
-        return None, r
-    return _creep_carry(s0, s1, s2, r, per_component), r
-
-
 # Iterations without a >1% improvement on the best out-of-balance value seen after
 # which the residual is called PLATEAUED. This is a reporting threshold only: a
 # plateau is recorded in the result and the solve keeps running (see the no-progress
@@ -5400,7 +5327,7 @@ _NO_PROGRESS_WINDOW = 1500
 
 # === The ceiling's inconclusive reading =======================================
 # What happens at Max iterations is the trend reading's (see `creep_trend`): a
-# movement dying away is extrapolated and certified, one holding steady or growing
+# movement dying away is handed to the corrector, one holding steady or growing
 # is sliding, and one still dying away or not yet clear is given another Max
 # iterations' worth up to `max_iterations_ceiling`. It replaced a grant read from
 # the leftover force (the out-of-balance still trending down, or a displacement
@@ -6316,9 +6243,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         debug_level (int): 0=silent, 1=summary, 2=per-iteration
         max_iterations (int): Viscoplastic iteration budget per trial (default
             12000). A trial that reaches it still moving is read by the trend of
-            its movement (see `creep_trend`): dying away, the field is
-            extrapolated to where it is heading and the Newton corrector is
-            seeded there, and a certified state is a stand; holding steady or
+            its movement (see `creep_trend`): dying away, the Newton corrector
+            is asked for a balanced state from the state the trial has reached,
+            and a certified state is a stand; holding steady or
             growing, the trial ends 'not_slowing' (FAILED). A movement still
             dying away or not yet clear is given another budget's worth, up to
             the ceiling.
@@ -7234,8 +7161,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             k0=k0, _nr_init_state=_init_state,
             debug_level=max(0, debug_level - 1))
 
-    def _try_corrector(u_now, groups_now, where, vp_iterations, softened_now=None,
-                       evp_seed=None, slip_seed=None):
+    def _try_corrector(u_now, groups_now, where, vp_iterations, softened_now=None):
         """One bounded Newton attempt at full gravity from the current state.
 
         Returns the corrector's own result dictionary when the state it reaches
@@ -7255,13 +7181,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         than lose its trial to a traceback.
         """
         _t0 = time.perf_counter()
-        # ``evp_seed`` / ``slip_seed`` replace the plastic strains and the joint
-        # slip the seed carries (the trend reading's extrapolated state; see
-        # `creep_extrapolate`); None takes them from the live state.
         _seed = {"u": np.asarray(u_now, dtype=float).copy(),
-                 "evp": ([np.asarray(e, dtype=float).copy() for e in evp_seed]
-                         if evp_seed is not None
-                         else [g['evp'].copy() for g in groups_now])}
+                 "evp": [g['evp'].copy() for g in groups_now]}
         _kw = dict(_corr_nr_kw)
         if softened_now is not None and np.any(softened_now):
             _kw['_softened_seed'] = softened_now
@@ -7270,8 +7191,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # them the corrector linearizes a slip-grown state about zero slip,
             # which is a different problem from the one the sweep is solving.
             _kw['_nr_joint_state'] = {
-                'slip_p': (joint_slip.copy() if slip_seed is None
-                           else np.asarray(slip_seed, dtype=float).copy()),
+                'slip_p': joint_slip.copy(),
                 'open_prev': joint_open.copy(),
                 'slipped': None if joint_slipped is None else joint_slipped.copy(),
                 'dil_p': None if joint_dil is None else joint_dil.copy()}
@@ -7435,93 +7355,33 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             _drift_rel <= float(_CORRECTOR_HOLD_DRIFT)
         return _out
 
-    def _creep_snapshot(u_free_now):
-        """One block-end snapshot for the extrapolation: the field on the free
-        dofs, every Gauss point's plastic strain and the joint slip."""
-        return {"u": np.array(u_free_now, dtype=float, copy=True),
-                "evp": [g_['evp'].copy() for g_ in gp_groups],
-                "slip": joint_slip.copy() if has_joints else None}
-
-    def _creep_attempt(rd, snaps, u_now, groups_now, vp_iterations,
-                       softened_now=None):
-        """The trend reading's corrector attempts (see `creep_trend`), in order:
-        the block-end state as it is, then, where that is refused and the
-        movement gives a ratio to carry it by, the estimated resting state (see
-        `creep_extrapolate`; the field, the plastic strains and the joint slip
-        carried forward together, the joint open / latch state the latest
-        snapshot's). A certification is taken as the corrector takes it (force,
-        yield and, on a jointed model, the hold test). Fills ``rd`` with every
-        attempt (``attempts``: the seed, the corrector's starting residual and
-        its outcome) and ``seed`` ('as_is' or 'extrapolated') for the one that
-        certified; returns the certified solution (with ``stop_reading``) or
-        None.
-
-        The order is measured. On the FEM-3 geogrid wall at F = 1.25 (plain,
-        200,000 allowance) both seeds certify at 140,000 and both hold; the
-        block-end state starts the corrector at a residual of 0.39 and lands at
-        1.299 elastic displacements, beside the plain sweep's own rest at
-        1.297, while the extrapolated seed starts at 22.1 and lands on a
-        neighboring held state 1.3% further out. At 100,000 both are refused."""
+    def _creep_attempt(rd, u_now, groups_now, vp_iterations, softened_now=None):
+        """The trend reading's corrector attempt (see `creep_trend`): one bounded
+        Newton attempt from the state the trial has reached at the block end. A
+        certification is taken as the corrector takes it (force, yield and, on a
+        jointed model, the hold test). Fills ``rd`` with the attempt
+        (``attempts``: the corrector's starting residual and its outcome, a list
+        of one); returns the certified solution (with ``stop_reading``) or None."""
         rd['attempts'] = []
-        rd['seed'] = None
-
-        def _one(seed, u_seed, evp_seed=None, slip_seed=None):
-            _n_before = len(_corr_attempts)
-            _c = _try_corrector(u_seed, groups_now,
-                                f"trend:{int(vp_iterations)}"
-                                + ("" if seed == 'as_is' else ":extrapolated"),
-                                vp_iterations, softened_now,
-                                evp_seed=evp_seed, slip_seed=slip_seed)
-            _att = _corr_attempts[-1] if len(_corr_attempts) > _n_before else {}
-            rec = dict(
-                seed=seed, certified=bool(_c is not None),
-                r_first=(_att.get('nr_diag') or {}).get('r_first'),
-                nr_iterations=_att.get('nr_iterations'),
-                oob=_att.get('oob'), yield_violation=_att.get('yield_violation'),
-                exit_reason=_att.get('exit_reason'),
-                hold=(None if _att.get('hold') is None else {
-                    k: _att['hold'].get(k) for k in (
-                        'held', 'verdict', 'exit_reason', 'sweeps', 'drift',
-                        'drift_u_el')}))
-            rd['attempts'].append(rec)
-            rd['corrector'] = rec
-            return _c
-
-        _c = None
-        if 'as_is' in CREEP_SEEDS:
-            _c = _one('as_is', np.asarray(u_now, dtype=float))
-        if _c is None and 'extrapolated' in CREEP_SEEDS and len(snaps) >= 3:
-            u_rest_free, r_f = creep_extrapolate([x["u"] for x in snaps],
-                                                 rd.get('ratio'))
-            rd['field_ratio'] = float(r_f)
-            if u_rest_free is not None:
-                u_seed = np.asarray(u_now, dtype=float).copy()
-                u_seed[free_dofs] = u_rest_free
-                rd['extrapolated'] = float(np.max(np.abs(
-                    u_seed[_trans_dofs] - u_now[_trans_dofs])))
-                rd['extrapolated_u_ratio'] = (
-                    float(np.max(np.abs(u_seed[_trans_dofs]
-                                        - u_datum[_trans_dofs])))
-                    / u_elastic_scale_now[0]
-                    if u_elastic_scale_now[0] > 0 else None)
-                # The plastic strains and the joint slip go with the field, by
-                # the same ratio (see CREEP_EXTRAPOLATE_STATE).
-                _pc = (CREEP_EXTRAPOLATION == 'aitken')
-                evp_seed = slip_seed = None
-                if CREEP_EXTRAPOLATE_STATE:
-                    evp_seed = [_creep_carry(e0, e1, e2, r_f, _pc)
-                                for e0, e1, e2 in zip(snaps[0]["evp"],
-                                                      snaps[1]["evp"],
-                                                      snaps[2]["evp"])]
-                    if all(x["slip"] is not None for x in snaps):
-                        slip_seed = _creep_carry(
-                            snaps[0]["slip"], snaps[1]["slip"],
-                            snaps[2]["slip"], r_f, _pc)
-                rd['extrapolation'] = str(CREEP_EXTRAPOLATION)
-                _c = _one('extrapolated', u_seed, evp_seed, slip_seed)
+        _n_before = len(_corr_attempts)
+        _c = _try_corrector(np.asarray(u_now, dtype=float), groups_now,
+                            f"trend:{int(vp_iterations)}", vp_iterations,
+                            softened_now)
+        _att = _corr_attempts[-1] if len(_corr_attempts) > _n_before else {}
+        rec = dict(
+            certified=bool(_c is not None),
+            r_first=(_att.get('nr_diag') or {}).get('r_first'),
+            nr_iterations=_att.get('nr_iterations'),
+            oob=_att.get('oob'), yield_violation=_att.get('yield_violation'),
+            exit_reason=_att.get('exit_reason'),
+            hold=(None if _att.get('hold') is None else {
+                k: _att['hold'].get(k) for k in (
+                    'held', 'verdict', 'exit_reason', 'sweeps', 'drift',
+                    'drift_u_el')}))
+        rd['attempts'].append(rec)
+        rd['corrector'] = rec
         if _c is None:
             return None
-        rd['seed'] = rd['attempts'][-1]['seed']
         rd['rule'] = 'slowing'
         rd['iteration'] = int(vp_iterations)
         rd['max_displacement'] = float(_c.get('max_displacement', np.nan))
@@ -7529,9 +7389,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         if debug_level >= 1:
             print("  " + creep_sentence(rd, _c.get('F', F)))
         return _c
-
-    # The elastic scale the extrapolation's report is read in; set per stage.
-    u_elastic_scale_now = [0.0]
 
     if debug_level >= 1:
         print(f"  c: {c_by_elem[0]:.1f} -> {c_reduced[0]:.1f}")
@@ -8175,24 +8032,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         trend_window = min(_OOB_TREND_WINDOW,
                            max(2 * _HYBRID_SAMPLE_EVERY, budget // 4))
         # The trend reading (see `creep_trend`): max|u| at the end of every
-        # block, and the last three block-end fields for the extrapolation.
-        # Neither is kept on the in-situ solve's certifying side or read while the
-        # interface relief is running (its sweeps are read by no rule).
+        # block. It is not kept on the in-situ solve's certifying side or read
+        # while the interface relief is running (its sweeps are read by no rule).
         creep_block = max(2 * _HYBRID_SAMPLE_EVERY,
                           int(round(chunk * _CREEP_BLOCK_FRAC)))
         creep_marks = [float(np.max(np.abs(u[free_dofs] - u_datum_free)))
                        if u[free_dofs].size else 0.0]
-        creep_snaps = collections.deque(maxlen=3)
-        creep_snaps.append(_creep_snapshot(u[free_dofs]))
-        # The last few block-end snapshots with their block numbers, kept only so
-        # that a trial continued with a higher limit (see _resume_state) can take
-        # the three its own, coarser, block would have kept. The snapshots are the
-        # same objects creep_snaps holds; nothing reads this list in the loop.
-        creep_snap_hist = collections.deque(maxlen=_RESUME_SNAP_KEEP)
-        creep_snap_hist.append((0, creep_snaps[-1]))
         creep_certify = bool(_creep_certify and _corrector_on and not guard_on)
         creep_last = None              # the last trend reading taken
-        u_elastic_scale_now[0] = u_elastic_scale
 
         iteration = -1
         if _resume_state is not None and stage_idx == 0:
@@ -8258,19 +8105,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             creep_last = _sc["creep_last"]
             _corr_attempts.extend(_rs.get("corrector_attempts") or [])
             # The trend reading's block: the new limit's, where that is a whole
-            # multiple of the block the trial ran with, so the marks and the
-            # snapshots are exactly the ones a trial run straight through at the
-            # new limit would hold.
+            # multiple of the block the trial ran with, so the marks are exactly
+            # the ones a trial run straight through at the new limit would hold.
             _ob = max(1, int(_rs["creep_block"]))
             _m = max(1, creep_block // _ob)
             creep_block = _ob * _m
             creep_marks = list(_rs["creep_marks"][::_m])
-            creep_snaps = collections.deque(maxlen=3)
-            creep_snap_hist = collections.deque(maxlen=_RESUME_SNAP_KEEP)
-            for _bi, _snap in _rs["snap_hist"]:
-                if _bi % _m == 0:
-                    creep_snaps.append(_snap)
-                    creep_snap_hist.append((_bi // _m, _snap))
             if _acc is not None:
                 _ar = _rs["acc"]
                 _acc.clear()
@@ -8299,9 +8139,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             iteration += 1
             if iteration >= budget:
                 # The iteration limit. A trial still moving here is read by the
-                # trend of its movement (see `creep_trend`): dying away, it is
-                # extrapolated to where it is heading and the corrector is seeded
-                # there; holding steady or growing, it is sliding; still or
+                # trend of its movement (see `creep_trend`): dying away, the
+                # corrector is asked for a balanced state from where the trial
+                # stands; holding steady or growing, it is sliding; still or
                 # unclear, the rules below decide it as they always have. Below
                 # the ceiling a movement still dying away, or not yet clear, is
                 # given another Max iterations' worth.
@@ -8315,7 +8155,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 _tr = None if _rd is None else _rd['trend']
                 if _tr == 'dying' and creep_certify:
                     _c = _creep_attempt(
-                        _rd, creep_snaps, u, gp_groups,
+                        _rd, u, gp_groups,
                         total_iterations + iteration,
                         softened_1d if has_1d_elements else None)
                     if _c is not None:
@@ -8374,9 +8214,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                   f"{force_tol:.1e}) - INCONCLUSIVE, neither "
                                   f"converged nor failed")
                     if exit_reason == 'iteration_cap' and _tr == 'dying':
-                        # Slowing, but the corrector could not finish it from
-                        # the extrapolated seed: the reading is kept for the
-                        # closing summary, and the classifier rules below.
+                        # Slowing, but the corrector could not finish it: the
+                        # reading is kept for the closing summary, and the
+                        # classifier rules below.
                         stop_reading = dict(_rd, rule='slowing_refused')
                     # The loop is about to end this trial on a RULE — the ceiling or
                     # the budget-extension heuristic declining — rather than on the
@@ -8772,7 +8612,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     soob_hist = []
                     jchg_hist = []
                     creep_marks = []
-                    creep_snaps.clear()
                     ufr_best = float('inf')
                     last_progress_iter = iteration
                     plateau_iter = None
@@ -9374,9 +9213,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # The trend reading's block-end marks (see `creep_trend`).
             if (iteration + 1) % creep_block == 0:
                 creep_marks.append(float(norm_u_new))
-                creep_snaps.append(_creep_snapshot(u_free_new))
-                creep_snap_hist.append(((iteration + 1) // creep_block,
-                                        creep_snaps[-1]))
 
             # Force-equilibrium condition. The threshold is ABSOLUTE, which is what
             # makes the test immune to the size of the domain and to the size of the
@@ -9526,7 +9362,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     soob_hist = []
                     jchg_hist = []
                     creep_marks = []
-                    creep_snaps.clear()
                     ufr_best = float('inf')
                     last_progress_iter = iteration
                     plateau_iter = None
@@ -9779,8 +9614,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
 
             # ---- the trend reading before the limit (see `creep_trend`) -------
             # Read at every block end once the window is full and, on a jointed
-            # model, past the joint warm-up. A movement dying away is extrapolated
-            # and handed to the corrector whenever it is read, since a
+            # model, past the joint warm-up. A movement dying away is handed to
+            # the corrector, from the state it has reached, whenever it is read,
+            # since a
             # certification is a stand wherever it is found and a refusal decides
             # nothing. A movement holding steady or growing is counted as sliding
             # before the limit only on a jointed model and only in the last tenth
@@ -9799,7 +9635,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     creep_last = _rd
                     if _rd['trend'] == 'dying' and creep_certify:
                         _c = _creep_attempt(
-                            _rd, creep_snaps, u, gp_groups,
+                            _rd, u, gp_groups,
                             total_iterations + _sw,
                             softened_1d if has_1d_elements else None)
                         if _c is not None:
@@ -9871,7 +9707,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         "creep_last": creep_last},
             "creep_block": int(creep_block),
             "creep_marks": list(creep_marks),
-            "snap_hist": list(creep_snap_hist),
             "corrector_attempts": list(_corr_attempts),
             "acc": (None if _acc is None else {
                 "record": copy.deepcopy(_acc),
@@ -15465,7 +15300,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             # it is always settled on the plain sweep (see ACCELERATE_DEFAULT).
             accelerate=False,
             # Its state is every trial's datum, so it is settled by the sweep and
-            # the ladder alone, never by an extrapolated seed (see creep_trend).
+            # the ladder alone, never by the trend reading (see creep_trend).
             _creep_certify=False,
             _corrector_rungs=(
                 _K0_CORRECTOR_CHECKPOINTS

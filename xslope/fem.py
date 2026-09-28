@@ -12343,6 +12343,7 @@ def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
     n_bars = sum(len(bg['idx']) for bg in bars)
     it_total = fe_total = rounds = cuts = 0
     oob_last = 0.0
+    rel_last = None      # the last equilibrate's relative step, for the caller's report
     while rounds < n_bars:
         newly = _nr_soften_newly(bars)
         if not any(nw.any() for nw in newly):
@@ -12359,6 +12360,7 @@ def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
                 joints=joints, trans_dofs=trans_dofs, deep_free=deep_free)
             it_total += it
             fe_total += fe
+            rel_last = _rel
             if ok:
                 u = u_try
                 for grp in groups:
@@ -12372,7 +12374,7 @@ def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
                 cuts += 1
                 deta = (eta_try - eta) * 0.5
                 if deta < _NR_SOFTEN_MIN_STEP:
-                    return False, u_try, it_total, fe_total, oob_here, rounds, cuts
+                    return False, u_try, it_total, fe_total, oob_here, rounds, cuts, _rel
         # The walk finished: those bars now hold the residual, permanently for this
         # solve. The latch is one-way; the FORCE is not, since a softened bar that
         # unloads carries less than its residual.
@@ -12385,7 +12387,7 @@ def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
             _t = sum(int(bg['softened'].sum()) for bg in bars)
             print(f"  Softening round {rounds}: {_n} bar element(s) dropped to "
                   f"t_res ({_t} total); re-solved")
-    return True, u, it_total, fe_total, oob_last, rounds, cuts
+    return True, u, it_total, fe_total, oob_last, rounds, cuts, rel_last
 
 
 def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
@@ -13060,7 +13062,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # cannot shed that force. The end state at eta = 1 is the same law either way.
     n_soften_rounds = 0
     if converged and bars is not None and any(bg['can_soften'].any() for bg in bars):
-        _ok, u, _it, _fe, _oobs, n_soften_rounds, _cuts = _nr_soften_latch(
+        _ok, u, _it, _fe, _oobs, n_soften_rounds, _cuts, _rels = _nr_soften_latch(
             bars, groups, pattern, u, base_loads, free_dofs, n_dof, h_eps,
             force_tol, _oob, nr_max_iter, u_elastic_scale, piles=piles,
             joints=joints, trans_dofs=trans_dofs, debug_level=debug_level,
@@ -13071,7 +13073,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         # As above, a refused softening step must report its own residual rather
         # than the equilibrium value from before the capacity drop.
         last_oob = _oobs
-        last_rel_du = _rels
+        if _rels is not None:
+            last_rel_du = _rels
         if not _ok:
             converged = False
             exit_reason = 'diverging'
@@ -13755,7 +13758,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
         # means. A drop that reaches the step floor refuses the step.
         if ok and oob < force_tol and bars is not None and any(
                 bg['can_soften'].any() for bg in bars):
-            ok, u_try, it_s, fe_s, oob_s, _r, _c = _nr_soften_latch(
+            ok, u_try, it_s, fe_s, oob_s, _r, _c, _ = _nr_soften_latch(
                 bars, groups, pattern, u_try, base_loads, free_dofs, n_dof, h_eps,
                 force_tol, oob_fn, _NR_MAX_ITER, u_el, piles=piles,
                 joints=joints, trans_dofs=trans_dofs, debug_level=debug_level,

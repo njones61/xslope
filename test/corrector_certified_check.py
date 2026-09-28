@@ -49,6 +49,11 @@ What this file locks:
   5. A REFUSAL'S RESIDUAL. A failed one-shot corrector publishes the residual of
      the state it actually returned. It must agree with `nr_diag['oob']`, not the
      zero that `last_oob` was initialized to before the attempt.
+
+  6. A CERTIFICATION THROUGH THE SOFTENING LATCH. On a model whose bars can
+     soften, every converged Newton state passes through `_nr_soften_latch`
+     before it is judged, so a certification there is the path a refusal never
+     reaches. The corrector must certify, and no attempt may have raised.
 """
 import os
 import sys
@@ -360,6 +365,94 @@ def check_refusal_residual():
           public == diagnostic, f"{public} / {diagnostic}")
 
 
+def check_soften_certified():
+    """A corrector that CERTIFIES on a model whose bars can soften.
+
+    Section 5 reaches only a refused corrector, which leaves `_solve_fem_newton`
+    before the post-peak softening latch. A certification does not: on any model
+    with a bar whose residual strength is below its capacity, the converged state
+    goes through `_nr_soften_latch` first, and whatever the caller does with what
+    the latch returns runs on every certification. An exception there is caught
+    by `_try_corrector` and recorded as a refusal, so the trial still gets a
+    verdict — from the sweep — and nothing downstream sees an error. What shows it
+    is that the corrector did not certify, and the refusal names the exception.
+
+    The fixture is tutorial FEM-2's reinforced slope, built exactly as the suite
+    builds its `fem_ssrm` row, at that row's standing edge F = 1.53125 on the
+    reference kernel: the corrector certifies it at the `vp300` checkpoint.
+    """
+    print("\n6. A certification through the softening latch")
+    import contextlib
+    import io
+
+    import numpy as np
+
+    import run_tests as rt
+    from xslope import fem
+
+    page = os.path.join(_ROOT, "docs", "tutorials", "fem02_reinforcement.md")
+    tag = next(t for t in rt.parse_test_tags(page)
+               if t.get("benchmark") == "FEM-2-ssrm")
+    tag = dict(tag)
+    tag["file"] = os.path.normpath(
+        os.path.join(os.path.dirname(page), tag["file"]))
+    with contextlib.redirect_stdout(io.StringIO()):
+        fem_data, kwargs, f_min, f_max, tol = rt.build_fem_ssrm_case(tag)
+    kwargs = dict(kwargs)
+    kwargs.update(max_iterations=12000, failure_criterion="hybrid",
+                  capture_failure_state=False)
+
+    t_res = np.asarray(fem_data.get("t_res_by_1d_elem", []), dtype=float)
+    t_cap = np.asarray(fem_data.get("t_allow_by_1d_elem", []), dtype=float)
+    check("the fixture has bars that can soften",
+          t_res.size > 0 and bool(np.any(t_res < t_cap)),
+          f"{int(np.sum(t_res < t_cap))} of {t_res.size} bar elements")
+
+    # The latch's own return is the only place its use is visible: the Newton
+    # result does not publish it. Count the calls and what each returned.
+    latch = []
+    orig = fem._nr_soften_latch
+
+    def counted(*a, **k):
+        out = orig(*a, **k)
+        latch.append({"ok": bool(out[0]), "rounds": int(out[5])})
+        return out
+
+    fem._nr_soften_latch = counted
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            with rt._force_fast_kernel(fem, False):
+                result = fem.solve_ssrm(
+                    fem_data, F_min=f_min, F_max=f_max, tolerance=tol,
+                    debug_level=0, trial_factors=[1.53125], **kwargs)
+    finally:
+        fem._nr_soften_latch = orig
+
+    t = result["trials"][0]
+    cert = t.get("corrector") or {}
+    attempts = list(t.get("corrector_attempts") or [])
+    check("the trial stands", t.get("verdict") == "CONVERGED",
+          f"{t.get('verdict')} in {t.get('iterations')} sweep(s)")
+    check("the corrector certified it at vp300",
+          cert.get("checkpoint") == "vp300"
+          and cert.get("driver_of_record") == "corrector",
+          f"at {cert.get('checkpoint')}, out-of-balance {cert.get('oob')}")
+    check("its out-of-balance is inside the force tolerance",
+          cert.get("oob") is not None
+          and cert.get("oob") < cert.get("force_tol", 0.0),
+          f"{cert.get('oob')} < {cert.get('force_tol')}")
+    check("the certifying attempt went through the softening latch",
+          len(latch) >= 1 and all(c["ok"] for c in latch),
+          f"{len(latch)} call(s), rounds {[c['rounds'] for c in latch]}")
+    raised = [a for a in attempts
+              if "error" in str(a.get("refusal") or "").lower()
+              or "error" in str(a.get("exit_reason") or "").lower()]
+    check("no corrector attempt raised",
+          bool(attempts) and not raised,
+          "; ".join(f"{a.get('at')}: {a.get('refusal') or a.get('exit_reason')}"
+                    for a in raised) or f"{len(attempts)} attempt(s)")
+
+
 def main():
     print("=" * 72)
     print("Corrector certification checks")
@@ -370,6 +463,7 @@ def main():
     check_record()
     check_k0_step()
     check_refusal_residual()
+    check_soften_certified()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"FAILED ({len(FAILURES)}): " + ", ".join(FAILURES))

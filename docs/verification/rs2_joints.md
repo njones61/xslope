@@ -27,8 +27,7 @@ shared [References](references.md) page.
   problems 1 and 2, Alejano's plowing equation on problems 11 to 14, the sliding block with its tensile bridge on
   problem 19, and, on problem 15, the vendor's Slide2 limit-equilibrium search, since Alejano's
   footwall equations price a mechanism the slope does not take. Where none exists the referee is the one the manual names, UDEC in every such case.
-  Each row shows the recomputed value beside the one its source prints. Problem 16, a tilt table,
-  is scored against its experiment.
+  Each row shows the recomputed value beside the one its source prints.
 - **Rigid-block bound.** Each plowing problem is two rigid blocks. The highest reduction factor at
   which some set of joint forces, each inside its friction cone, can still hold both blocks in
   place is a ceiling on any rigid-block answer: above it the blocks must move. Alejano's Eq. (7)
@@ -97,7 +96,7 @@ joint model whose output is a stress-displacement curve.
 | [13](#rj-13) | 🟢 | Plowing sliding slab, example 4 | SSRM 0.998 vs Alejano Eq. (7) 1.0002 (−0.2%) | 1.0 vs 1.0002 (0.0%) | UDEC 1.0 (−0.2%) · Alejano prints 1.0 | 1.0 / 1.05 | |
 | [14](#rj-14) | 🟢 | Plowing sliding slab, example 5 | SSRM 1.232 vs Alejano Eq. (7) 1.2034 (+2.4%) | 0.89 vs 1.2034 (−26.0%) | UDEC 0.9 (+36.9%) · Alejano prints 1.00 | 0.89 / 1.09 | The 1.00 the paper prints for this example does not follow from the inputs it prints; Eq. (7) on them gives 1.2034. |
 | [15](#rj-15) | 🟢 | Partially joint-controlled footwall | SSRM 1.271 vs Slide2 LE search 1.25 (+1.7%) | 1.28 vs 1.25 (+2.4%) | Alejano Eqs. (9)–(10) 1.7985 (single-bed formula; the paper prints 1.72) · UDEC 1.6 (−20.6%) | 1.28 / 1.42 | Alejano's closed form drives a wedge out through a single 2 m bed and its factor rises with bed thickness; the three programs free to search for a surface agree at 1.25–1.28, so the limit-equilibrium search is the referee, as the rigid-block bound is on problem 11. |
-| [16](#rj-16) | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | Tilt 8.5° vs experiment 9° (−5.6%) | 9° vs 9° (0.0%) | UDEC 11° (−22.7%) | 9° / 7° | *reported, no lock* — a tilt angle rather than a factor of safety: pushed with a seismic coefficient at full strength, the stack stands at 8.40° and topples at 8.55°. |
+| [16](#rj-16) | 🔴 | Barla et al. tilt-table block toppling | Tilt 10.24° vs UDEC 11° (−6.9%) | 9° vs 11° (−18.2%) | Experiment 9° · Goodman & Bray, plate tilted, 7.6° | 9° / 7° | A tilt angle rather than a factor of safety: pushed with a seismic coefficient at full strength, the stack stands at 10.20° and topples at 10.28°, above the rigid-column bound and the physical stack and below the distinct-element code. |
 | [17](#rj-17) | 🟡 | Step-path, en-echelon joints | SSRM 1.213 vs UDEC 1.29 (−6.0%) | 1.24 vs 1.29 (−3.9%) | — | 1.24 / 1.2 | No closed form: three rock bridges decide the factor, and both finite element codes read them below the distinct-element run, 2.1 points apart. |
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | 1.01 vs 1.01 (0.0%) | — | 1.01 / 1.0 | |
 | [19](#rj-19) | 🟢 | Bi-planar step-path failure | SSRM 1.623 vs rigid-block limit equilibrium 1.5914 (+2.0%) | 1.5 vs 1.5914 (−5.7%) | UDEC 1.46 (+11.2%) | 1.5 / 1.41 | One block sliding on the basal joint, held by friction and by the rock bridge in tension; its statics, with the tensile cap reduced with the trial factor as the vendor reduces it, is the referee, and both vendor numbers sit below it. |
@@ -758,7 +757,7 @@ above the Mohr-Coulomb apex its own c and φ imply (c/tan φ = 285.6 kPa), so it
 
 ![RJ-15: partially joint-controlled footwall slope (rj015) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. The bedding slips over a long stretch behind the face, and the rock's only strain is a small patch at the toe where the slab has to break through to get out — the coupled mechanism the source paper describes](images/RJ-15.png)
 
-### <span class="nodata">⊘</span> RJ-16: Barla et al. tilt-table block toppling (rj016) {#rj-16}
+### 🔴 RJ-16: Barla et al. tilt-table block toppling (rj016) {#rj-16}
 
 A laboratory test rather than a slope. Fourteen columns of 9 cm blocks are stacked into a 63.4°
 staircase on a plate, and the plate is tilted until the stack topples; what the problem reports is
@@ -776,26 +775,35 @@ sign is its direction, so a tilt of θ is k = tan θ toward the face, and the ro
 sweeping k at full strength — F = 1, no reduction — until the stack stops standing. Every point is
 one solve on the corpus mesh, 0.09 m, which is the block size.
 
-| XSLOPE tilt | Experiment referee | RS2 vs referee | UDEC (manual) | RS2 without / with improvement |
-|---|---|---|---|---|
-| **8.5°** | 9° (−5.6%) | 9° vs 9° (0.0%) | 11° (−22.7%) | 9° / 7° |
+| XSLOPE tilt | UDEC referee | RS2 vs referee | Experiment | Goodman & Bray, plate tilted | RS2 without / with improvement |
+|---|---|---|---|---|---|
+| **10.24°** | 11° (−6.9%) | 9° vs 11° (−18.2%) | 9° | 7.6° | 9° / 7° |
 
-The stack stands at k = 0.1477, which is 8.40°, and goes at k = 0.1504, which is 8.55°. It stands
-at every coefficient tried below that and fails at every one above, through 0.35, the largest
-tried.
+<!-- test: file=files/rocscience/joints/rj016.xlsx, type=fem_tilt, k_stand=0.179846, k_fail=0.181396, expected_tilt=10.24, tolerance=0.1, element_type=tri6, target_size=0.09, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-16 -->
+
+The stack stands at k = 0.1798, which is 10.20°, and goes at k = 0.1814, which is 10.28°. It stands
+at every coefficient tried below that and fails at every one above, through 0.25, the largest
+tried. Run on with no stopping rule at all, the plain iteration agrees: the stack settles at every
+tilt through 9.9° and moves at a steady rate from 10.2°.
 
 **A coefficient is not a rotation, and here the difference is measurable and measures zero.**
 Tilting the model by θ turns the body force through θ and leaves its magnitude at γ; a coefficient
-k = tan θ turns it through the same angle and multiplies its magnitude by 1/cos θ, which is 1.1% at
-8.5°. On this model that cannot move the answer, because every joint carries zero cohesion and no
+k = tan θ turns it through the same angle and multiplies its magnitude by 1/cos θ, which is 1.6% at
+10.2°. On this model that cannot move the answer, because every joint carries zero cohesion and no
 block can yield, so what the state depends on is the direction of the body force and not its size.
-Re-solving the two bracketing coefficients with every unit weight scaled by 1.011 and then by 0.5
+Re-solving the two bracketing coefficients with every unit weight scaled by 1.016 and then by 0.5
 leaves both unchanged: the stack still stands at the lower coefficient and goes at the higher.
 
-**The row is reported rather than locked**: what it measures is a tilt rather than a factor of
-safety, and its two bracketing coefficients are re-solved by a check of their own before a lock is
-recorded. Its figure is drawn the same way, two solves at the two coefficients, titled by the angle
-rather than by a factor.
+**Where the five numbers sit.** Goodman & Bray's column analysis, with the plate tilted instead of
+the strength reduced, puts the toppling tilt of these fourteen rigid columns at 7.6°: every column
+tipping at once about its base corner, each thrust between columns at the top corner of the
+contact, friction fully mobilized everywhere. That construction allows no contact pressure below a
+corner, so it is a lower bound, and everything else sits above it: the physical stack and RS2 at
+9°, XSLOPE at 10.2°, and the distinct-element code, whose contacts roll and re-form as the columns
+lean, at 11°. The row is locked on its two coefficients: its check re-solves the stack at both, at
+full strength, and confirms that it stands at the first and topples at the second. Its figure is
+drawn the same way, two solves at the two coefficients, titled by the angle rather than by a
+factor.
 
 The plate is weightless in the vendor model (`BodyForceSolid: 0` — it is the apparatus, not rock),
 and `build_fem_data` requires a positive unit weight, so it is built at the 27 kN/m³ its own
@@ -804,7 +812,7 @@ base of the stack is the weight of the blocks above it.
 
 **Input file:** [rj016.xlsx](files/rocscience/joints/rj016.xlsx).
 
-![RJ-16: Barla et al. tilt-table block toppling (rj016) — FEM inputs with the seismic coefficient that stands for the tilt, mesh with the vendor's rollers, joint slip at the first coefficient the stack goes at, and the deformed section. The slip is on the vertical joints between the columns and on the bedding under the crest of the stack, and the deformed section at 156x shows what that adds up to: every column leaning downslope about its own base, the tall ones at the back furthest over, which is toppling rather than the stack sliding along the plate](images/RJ-16.png)
+![RJ-16: Barla et al. tilt-table block toppling (rj016) — FEM inputs with the seismic coefficient that stands for the tilt, mesh with the vendor's rollers, joint slip at the first coefficient the stack goes at, and the deformed section. The slip is on the vertical joints between the lower columns and along the bedding one block above the plate, and the deformed section at 81x shows what that adds up to: every column leaning downslope about its own base, the tall ones at the back furthest over, which is toppling rather than the stack sliding along the plate](images/RJ-16.png)
 
 ### 🟡 RJ-17: Step-path failure, en-echelon joints (rj017) {#rj-17}
 

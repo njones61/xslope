@@ -74,7 +74,9 @@ in length units; a `support_force` tag locks `expected_force`, the horizontal
 support force per meter that holds a slope at a target factor of safety. Both
 keys are read exactly like `expected_fs`: the value must be printed in the
 section carrying the tag, at a precision `tag_round_dp` allows, and the untagged
-sweep treats a number printed under one of them as guarded. Neither is read by
+sweep treats a number printed under one of them as guarded. A `fem_tilt` tag
+locks a third, `expected_tilt`, the tilt angle in degrees at which a tilt-table
+model fails, and it is read the same way. None of the three is read by
 the restatement pass, which is about factors of safety; a depth or a force
 printed in an XSLOPE column belongs to the forward pass and to the delta check.
 The delta check reads no tag keys at all, so the two need nothing from it — a

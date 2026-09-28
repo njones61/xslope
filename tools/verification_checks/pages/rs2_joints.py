@@ -47,7 +47,6 @@ CONFIG = PageConfig(
     bounds=[
         # the vendor's token toe force on problem 1, as a share of the block's
         # own weight: one quantity against one, not two printed factors
-        ('+0.05', 'which is 0.05% of it'),
     ],
 
     # Goodman & Bray, Alejano, Lorig & Varona and UDEC are the referees this

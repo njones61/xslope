@@ -16,7 +16,6 @@ Usage, the same as its sibling's:
     python benchmarks/rocscience/make_rs2_joint_figures.py --audit
 """
 
-import math
 import os
 import sys
 import time
@@ -66,6 +65,10 @@ EXTRA_CASES = [
 #: with. Each entry names the two coefficients the sweep closed on — the last one
 #: the stack stands at and the first one it goes at — and the figure draws the
 #: second with both angles in its title. See :func:`make_sweep_figure`.
+#:
+#: A row the page LOCKS carries a ``type=fem_tilt`` tag with the same keys, and
+#: the tag wins over the entry here (see :func:`sweep_cases`), exactly as a
+#: ``fem_ssrm`` tag wins over an ``EXTRA_CASES`` entry.
 SWEEP_CASES = [
     {'file': 'files/rocscience/joints/rj016.xlsx', 'benchmark': 'RJ-16',
      'target_size': '0.09', 'max_iter': '250000', 'element_type': 'tri6',
@@ -74,15 +77,42 @@ SWEEP_CASES = [
 ]
 
 
+def parse_sweep_tags(path=PAGE):
+    """Every ``fem_tilt`` tag on the joint page, as string key->value dicts."""
+    cases = []
+    with open(path) as fh:
+        for line in fh:
+            m = F.TAG_RE.search(line)
+            if not m:
+                continue
+            kv = {}
+            for part in m.group(1).split(','):
+                if '=' in part:
+                    k, v = part.split('=', 1)
+                    kv[k.strip()] = v.strip()
+            if kv.get('type') == 'fem_tilt':
+                cases.append(kv)
+    return cases
+
+
+def sweep_cases():
+    """Every sweep row, each ONCE: the page's fem_tilt tags, then any
+    SWEEP_CASES entry whose row carries no tag yet."""
+    tagged = parse_sweep_tags()
+    have = {t.get('benchmark') for t in tagged}
+    return tagged + [t for t in SWEEP_CASES if t.get('benchmark') not in have]
+
+
 def sweep_registered():
     """Every sweep row, by benchmark."""
-    return {t['benchmark']: t for t in SWEEP_CASES}
+    return {t['benchmark']: t for t in sweep_cases()}
 
 
 def _tilt(k):
-    """The tilt a coefficient stands for: a body force of k*gamma toward the face
-    points where gravity points on a slope tilted by atan(k)."""
-    return math.degrees(math.atan(abs(float(k))))
+    """The tilt a coefficient stands for (run_tests.tilt_of, the one rule)."""
+    sys.path.insert(0, F.ROOT)
+    import run_tests as RT
+    return RT.tilt_of(k)
 
 
 def _solve_at(sd, mesh, k, tag):
@@ -90,26 +120,14 @@ def _solve_at(sd, mesh, k, tag):
 
     F = 1 and no reduction: what the sweep asks of each coefficient is whether the
     model stands under it, which is the question the manual's tilt table asks and
-    not the one a strength reduction answers. The reference kernel is forced for
-    the same reason the bracket rows force it — a figure and a page number must
-    not depend on whether a machine has the compiled kernel built.
+    not the one a strength reduction answers. The solve itself is
+    ``run_tests.solve_fem_tilt`` — the same call the suite's ``fem_tilt`` check
+    makes — so the figure and the lock are one computation, reference kernel
+    forced in both.
     """
-    import xslope.fem as _fem
-    from xslope.fem import build_fem_data, solve_fem
-
     sys.path.insert(0, F.ROOT)
     import run_tests as RT
-
-    sd = {**sd, 'k_seismic': -abs(float(k))}
-    fem_data = build_fem_data(sd, mesh)
-    with RT._force_fast_kernel(_fem, False):
-        sol = solve_fem(fem_data, F=1.0, debug_level=0,
-                        max_iterations=int(tag.get('max_iter', 250000)),
-                        tension_srf=str(tag.get('tension_srf', '')).lower()
-                        in ('true', '1', 'yes'),
-                        k0=float(tag['k0']) if tag.get('k0') else None,
-                        fast_kernel=False)
-    return sd, fem_data, sol
+    return RT.solve_fem_tilt(sd, mesh, k, tag)
 
 
 def make_sweep_figure(tag, dpi=150):
@@ -175,7 +193,7 @@ def audit(out_dir=None, verbose=True):
     """Registered rows with no rendered PNG, and NO_FIGURE entries that are dead."""
     out_dir = out_dir or F.OUT
     missing, dead = [], []
-    for tag in list(registered()) + list(SWEEP_CASES):
+    for tag in list(registered()) + list(sweep_cases()):
         bench = tag.get('benchmark', '?')
         png = os.path.join(out_dir, f'{bench}.png')
         if not os.path.exists(png):
@@ -213,9 +231,10 @@ if __name__ == '__main__':
         sys.exit(1 if (missing or dead or bad) else 0)
     from_sidecar = '--from-sidecar' in args
     only = set(a for a in args if not a.startswith('--'))
-    cases = list(registered()) + list(SWEEP_CASES)
+    sweeps = sweep_cases()
+    cases = list(registered()) + list(sweeps)
     print(f'{len(cases)} registered rows (fem_ssrm tags + EXTRA_CASES + '
-          f'{len(SWEEP_CASES)} sweep row(s))'
+          f'{len(sweeps)} sweep row(s))'
           f"{'  (solve-free re-render from sidecars)' if from_sidecar else ''}")
     for tag in cases:
         bench = tag.get('benchmark', '?')

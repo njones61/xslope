@@ -296,6 +296,13 @@ def main(argv=None):
         ready.append((name, page, line_no, pair, kv))
 
     print(f"{len(rows)} fem_ssrm lock(s) on {len(set(p for p, _, _ in rows))} page(s)")
+    tilts = audit.tilt_tags(pages)
+    if tilts:
+        names = ", ".join(kv.get("benchmark") or os.path.basename(kv["file"])
+                          for _, kv in tilts)
+        print(f"{len(tilts)} fem_tilt lock(s) carry their pair on the tag already "
+              f"(k_stand/k_fail, from the sweep); nothing to write, and run_tests' "
+              f"lock_edges row checks them: {names}")
     if args.missing:
         print(f"\n{len(blocked)} lock(s) cannot be converted from what is on disk. "
               f"Each stays in bracket mode until its next re-cut, when the run that "

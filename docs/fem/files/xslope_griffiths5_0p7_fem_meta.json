@@ -2,10 +2,10 @@
   "failure_criterion": "hybrid",
   "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
   "final_interval": [
-    1.2937500000000002,
-    1.3
+    1.2875,
+    1.2937500000000002
   ],
-  "interval_width": 0.006249999999999867,
+  "interval_width": 0.006250000000000089,
   "iterations_ssrm": 7,
   "trials": [
     {
@@ -267,113 +267,84 @@
     {
       "F": 1.2937500000000002,
       "role": "bisect",
-      "converged": true,
-      "stable": true,
-      "verdict": "CONVERGED",
-      "u_ratio": 14.223442766792028,
-      "growth": null,
-      "max_displacement": 0.771138216933857,
-      "exit_reason": "converged",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 6.592391132155587,
+      "growth": 1.2455200420035109,
+      "max_displacement": 0.3575594340182517,
+      "exit_reason": "not_slowing",
       "stop_reading": {
         "window": 8000,
         "block": 1600,
         "increments": [
-          1.065502631085461,
-          0.5615976845308475,
-          0.5040438254169995,
-          0.47534433005140586,
-          0.4486397880753607
+          0.490148633602064,
+          0.5383853217408957,
+          0.5214430521257033,
+          0.5035615519600662,
+          0.4864234438373575
         ],
         "ratios": [
-          0.5270730152573441,
-          0.8975176346000647,
-          0.9430615079118361,
-          0.9438206363518479
+          1.0984123688856258,
+          0.968531330756922,
+          0.9657076643504181,
+          0.9659662099777073
         ],
-        "ratio": 0.8055375969084724,
-        "moved": 3.0551282591600746,
+        "ratio": 0.9980945300121752,
+        "moved": 2.539962003266087,
         "u_elastic_scale": 0.05421600308571287,
         "slip_frac": null,
         "slip_ratio": null,
-        "trend": "dying",
-        "iteration": 8000,
-        "attempts": [
-          {
-            "seed": "as_is",
-            "certified": false,
-            "r_first": 102.50470706994066,
-            "nr_iterations": 150,
-            "oob": 0.08376486097925381,
-            "yield_violation": 1.4443795912820591e-08,
-            "exit_reason": "diverging",
-            "hold": null
-          },
-          {
-            "seed": "extrapolated",
-            "certified": true,
-            "r_first": 4293.828680454919,
-            "nr_iterations": 11,
-            "oob": 5.381738735898611e-09,
-            "yield_violation": 6.938575302876446e-09,
-            "exit_reason": "converged",
-            "hold": null
-          }
-        ],
-        "seed": "extrapolated",
-        "corrector": {
-          "seed": "extrapolated",
-          "certified": true,
-          "r_first": 4293.828680454919,
-          "nr_iterations": 11,
-          "oob": 5.381738735898611e-09,
-          "yield_violation": 6.938575302876446e-09,
-          "exit_reason": "converged",
-          "hold": null
-        },
-        "field_ratio": 0.9452651297324337,
-        "extrapolated": 0.5513012425803131,
-        "extrapolated_u_ratio": 14.131338362246733,
-        "extrapolation": "ratio",
-        "rule": "slowing",
-        "max_displacement": 0.771138216933857
+        "trend": "steady",
+        "iteration": 16000,
+        "rule": "not_slowing"
       },
-      "creep_reading": null,
+      "creep_reading": {
+        "window": 8000,
+        "block": 1600,
+        "increments": [
+          0.490148633602064,
+          0.5383853217408957,
+          0.5214430521257033,
+          0.5035615519600662,
+          0.4864234438373575
+        ],
+        "ratios": [
+          1.0984123688856258,
+          0.968531330756922,
+          0.9657076643504181,
+          0.9659662099777073
+        ],
+        "ratio": 0.9980945300121752,
+        "moved": 2.539962003266087,
+        "u_elastic_scale": 0.05421600308571287,
+        "slip_frac": null,
+        "slip_ratio": null,
+        "trend": "steady",
+        "iteration": 16000
+      },
       "plateau_iteration": null,
       "budget_extensions": 0,
       "diverging_iteration": null,
       "ee_suppressed": false,
-      "iterations": 8011,
-      "nr_force_evals": 25,
-      "nr_predictor_iterations": 0,
-      "corrector": {
-        "driver_of_record": "corrector",
-        "checkpoint": "trend:8000:extrapolated",
-        "vp_iterations": 8000,
-        "nr_iterations": 11,
-        "nr_force_evals": 25,
-        "oob": 5.381738735898611e-09,
-        "force_tol": 0.001,
-        "yield_violation": 6.938575302876446e-09,
-        "yield_tol": 1e-06,
-        "max_disp_deep": 0.771138216933857,
-        "disp_limit": 5.0,
-        "disp_frac_height": 0.01542276433867714
-      }
+      "iterations": 16000,
+      "nr_force_evals": 0,
+      "nr_predictor_iterations": 0
     }
   ],
   "tolerance": 0.01,
   "F_min": 0.9,
   "F_max": 1.7,
   "analysis_type": "ssrm",
-  "FS": 1.296875,
-  "F": 1.2937500000000002,
+  "FS": 1.2906250000000001,
+  "F": 1.2875,
   "element_type": "quad8",
   "target_size": 3.5,
   "max_iter": 16000,
   "benchmark": "SSRM-G5",
   "unit_system": "imperial",
   "converged": true,
-  "iterations": 8011,
-  "residual": 1.0544342520463352e-07,
-  "max_displacement": 0.771138216933857
+  "iterations": 360,
+  "residual": 0.0006023080942909554,
+  "max_displacement": 0.9441834458278708
 }

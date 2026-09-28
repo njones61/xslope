@@ -300,94 +300,77 @@
       "converged": true,
       "stable": true,
       "verdict": "CONVERGED",
-      "u_ratio": 1.8489510788570667,
+      "u_ratio": 1.8463497990768407,
       "growth": null,
-      "max_displacement": 0.2381057037612032,
+      "max_displacement": 0.23777071406902955,
       "exit_reason": "converged",
       "stop_reading": {
         "window": 8000,
         "block": 1600,
         "increments": [
-          0.5520320646570804,
-          0.11528883502243115,
           0.05927221275071089,
           0.04415046131366795,
-          0.02684604513334336
+          0.02684604513334336,
+          0.01946143536387808,
+          0.015482753457508915
         ],
         "ratios": [
-          0.20884445379825536,
-          0.5141192791060696,
           0.7448762120516317,
-          0.6080580889657081
+          0.6080580889657081,
+          0.7249274620233191,
+          0.7955607162586833
         ],
-        "ratio": 0.4696009890249496,
-        "moved": 0.7975896188772338,
+        "ratio": 0.714906530750214,
+        "moved": 0.16521290801910918,
         "u_elastic_scale": 0.12877880138850878,
         "slip_frac": null,
         "slip_ratio": null,
         "trend": "dying",
-        "iteration": 8000,
+        "iteration": 11200,
         "attempts": [
           {
-            "seed": "as_is",
-            "certified": false,
-            "r_first": 20.70639673850769,
-            "nr_iterations": 58,
-            "oob": 0.0657233911197422,
-            "yield_violation": 9.706885053770016e-09,
-            "exit_reason": "diverging",
-            "hold": null
-          },
-          {
-            "seed": "extrapolated",
             "certified": true,
-            "r_first": 143.77955581451832,
-            "nr_iterations": 24,
-            "oob": 8.936488895394945e-07,
-            "yield_violation": 3.775114325802568e-14,
+            "r_first": 12.268542573855582,
+            "nr_iterations": 21,
+            "oob": 6.881083152093278e-05,
+            "yield_violation": 1.0231524977142662e-13,
             "exit_reason": "converged",
             "hold": null
           }
         ],
-        "seed": "extrapolated",
         "corrector": {
-          "seed": "extrapolated",
           "certified": true,
-          "r_first": 143.77955581451832,
-          "nr_iterations": 24,
-          "oob": 8.936488895394945e-07,
-          "yield_violation": 3.775114325802568e-14,
+          "r_first": 12.268542573855582,
+          "nr_iterations": 21,
+          "oob": 6.881083152093278e-05,
+          "yield_violation": 1.0231524977142662e-13,
           "exit_reason": "converged",
           "hold": null
         },
-        "field_ratio": 0.6111888042789096,
-        "extrapolated": 0.0070444101721852115,
-        "extrapolated_u_ratio": 1.8397900555036417,
-        "extrapolation": "ratio",
         "rule": "slowing",
-        "max_displacement": 0.2381057037612032
+        "max_displacement": 0.23777071406902955
       },
       "creep_reading": null,
       "plateau_iteration": null,
       "budget_extensions": 0,
       "diverging_iteration": null,
       "ee_suppressed": false,
-      "iterations": 8024,
-      "nr_force_evals": 128,
+      "iterations": 11221,
+      "nr_force_evals": 108,
       "nr_predictor_iterations": 0,
       "corrector": {
         "driver_of_record": "corrector",
-        "checkpoint": "trend:8000:extrapolated",
-        "vp_iterations": 8000,
-        "nr_iterations": 24,
-        "nr_force_evals": 128,
-        "oob": 8.936488895394945e-07,
+        "checkpoint": "trend:11200",
+        "vp_iterations": 11200,
+        "nr_iterations": 21,
+        "nr_force_evals": 108,
+        "oob": 6.881083152093278e-05,
         "force_tol": 0.001,
-        "yield_violation": 3.775114325802568e-14,
+        "yield_violation": 1.0231524977142662e-13,
         "yield_tol": 1e-06,
-        "max_disp_deep": 0.2381057037612032,
+        "max_disp_deep": 0.23777071406902955,
         "disp_limit": 7.5,
-        "disp_frac_height": 0.0031747427168160426
+        "disp_frac_height": 0.0031702761875870606
       }
     }
   ],
@@ -403,7 +386,7 @@
   "benchmark": "SSRM-G2",
   "unit_system": "imperial",
   "converged": true,
-  "iterations": 8024,
-  "residual": 2.8463286352574705e-06,
-  "max_displacement": 0.2381057037612032
+  "iterations": 11221,
+  "residual": 1.7483319009630535e-06,
+  "max_displacement": 0.23777071406902955
 }

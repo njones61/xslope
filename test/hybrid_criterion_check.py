@@ -647,6 +647,147 @@ def check_log_wording():
               got[0] if got else "no STABLE_STUCK trial was logged")
 
 
+# ===================== 9. the yield gate leaves the fixed boundary out ============
+
+def _gp_group(sig_rows, on_bnd, t_cap=None, pairs=None):
+    """Gauss points carrying exactly the stresses asked for, as a `_yield_reading`
+    group (B = 0, the whole stress is the in-situ term), c = 10, phi = 30."""
+    import numpy as np
+    n = len(sig_rows)
+    ph = np.radians(30.0)
+    g = {'B': np.zeros((n, 3, 2)), 'D4': np.zeros((n, 4, 4)),
+         'dof': np.zeros((n, 2), dtype=int), 'evp': np.zeros((n, 4)),
+         'w': np.ones(n), 'u_gp': np.zeros(n),
+         'pairs': pairs or [(i, 0) for i in range(n)],
+         'c_r': np.full(n, 10.0), 'snph': np.full(n, np.sin(ph)),
+         'csph': np.full(n, np.cos(ph)),
+         'sig0': np.array(sig_rows, dtype=float),
+         'on_bnd': np.array(on_bnd, dtype=bool)}
+    if t_cap is not None:
+        g['t_cap'] = np.array(t_cap, dtype=float)
+    return g
+
+
+def _inject(target_elem, add):
+    """A `_yield_reading` that, on the GATE's reading only, reads the Gauss points of
+    `target_elem` with `add` (sx, sy, txy, sz) added to their stress — the solve
+    itself never sees it — so the gate's response to an overstress at a chosen
+    place is measured on a real solve."""
+    import numpy as np
+    real = fem._yield_reading
+
+    def reading(gp_groups, u, sq3=None, floor=0.0, split_boundary=False):
+        if not split_boundary:
+            return real(gp_groups, u, sq3, floor)
+        saved = []
+        for grp in gp_groups:
+            rows = [i for i, (e, _) in enumerate(grp['pairs']) if e == target_elem]
+            if not rows:
+                continue
+            old = grp.get('sig0')
+            new = (np.zeros((len(grp['pairs']), 4)) if old is None
+                   else np.array(old, dtype=float, copy=True))
+            new[rows] += np.asarray(add, dtype=float)
+            saved.append((grp, old))
+            grp['sig0'] = new
+        try:
+            return real(gp_groups, u, sq3, floor, split_boundary=True)
+        finally:
+            for grp, old in saved:
+                if old is None:
+                    grp.pop('sig0', None)
+                else:
+                    grp['sig0'] = old
+    return reading
+
+
+def check_gate_boundary():
+    print("\n9. the yield gate leaves elements on the fixed boundary out of its reading")
+    import numpy as np
+
+    # --- the reading itself, on states chosen by hand -------------------------
+    over = [0.0, 0.0, 40.0, 0.0]        # pure shear 40 against c = 10: far outside
+    fine = [-50.0, -50.0, 0.0, -50.0]   # isotropic compression: inside
+    grp = _gp_group([over, fine], on_bnd=[True, False])
+    v, n, _, w, b = fem._yield_reading([grp], np.zeros(2), split_boundary=True)
+    v0, n0, _, w0 = fem._yield_reading([grp], np.zeros(2))
+    check("a boundary-only overstress is left out of the gate's reading",
+          v <= fem._VP_YIELD_GATE and n == 0 and w is None,
+          f"reading {v:.3e} on {n} point(s)")
+    check("... and reported apart: count, worst and where",
+          b['n'] == 1 and b['max'] > fem._VP_YIELD_GATE and b['at'] == (0, 0),
+          f"{b}")
+    check("the reading off the gate is unchanged (boundary point counted)",
+          v0 == b['max'] and n0 == 1 and w0 == (0, 0))
+    grp = _gp_group([over, over], on_bnd=[True, False])
+    v, n, _, w, b = fem._yield_reading([grp], np.zeros(2), split_boundary=True)
+    check("an interior overstress still reads over the gate",
+          v > fem._VP_YIELD_GATE and n == 1 and w == (1, 0) and b['n'] == 1,
+          f"reading {v:.3e} on {n} point(s) at {w}")
+    # The count and the worst are one quantity: a point over only its tension cap
+    # is counted, not reported as the worst beside a count of zero.
+    grp = _gp_group([[5.0, 5.0, 0.0, 5.0]], on_bnd=[False], t_cap=[0.0])
+    v, n, t, w = fem._yield_reading([grp], np.zeros(2))
+    check("a tension-cap-only violation is counted with the worst it sets",
+          v > fem._YIELD_FLAG_FRAC and n == 1 and t is not None and w == (0, 0),
+          f"worst {v:.3e}, count {n}, tension {t}")
+
+    # --- the gate on a real solve ---------------------------------------------
+    fem_data = _real_model()
+    if fem_data is None:
+        check("griffiths1 input present", False)
+        return
+    bnd = fem._boundary_element_mask(fem_data)
+    nodes = np.asarray(fem_data['nodes'], float)
+    els = np.asarray(fem_data['elements'], int)
+    et = np.asarray(fem_data['element_types'], int)
+    bc = np.asarray(fem_data['bc_type'])
+    on_node = np.isin(bc, (1, 2, 3))
+    # the mask is exactly "some node of the element is constrained"
+    want = np.array([bool(on_node[els[e, :et[e]]].any()) for e in range(len(els))])
+    check("the boundary mask marks exactly the elements with a constrained node",
+          bool(np.array_equal(bnd, want)) and bnd.any() and not bnd.all(),
+          f"{int(bnd.sum())} of {len(bnd)} elements")
+    cen = np.array([nodes[els[e, :et[e]]].mean(axis=0) for e in range(len(els))])
+    e_bnd = int(np.flatnonzero(bnd)[0])
+    interior = np.flatnonzero(~bnd)
+    # the interior element farthest from every boundary element's centroid
+    d = np.min(np.linalg.norm(cen[interior][:, None, :] - cen[bnd][None, :, :],
+                              axis=2), axis=1)
+    e_int = int(interior[int(np.argmax(d))])
+    add = [0.0, 0.0, 1e4, 0.0]
+    saved = (fem._yield_reading, fem._CORRECTOR_YIELD_TOL, fem._vp_gate_armed)
+    try:
+        # The corrector refuses everything and the gate is armed from the first
+        # settled state, so the gate's reading alone decides how the trial ends.
+        fem._CORRECTOR_YIELD_TOL = -1.0
+        fem._vp_gate_armed = lambda *a, **k: True
+        fem._yield_reading = _inject(e_bnd, add)
+        sa = fem.solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=4000,
+                           max_disp_factor=None)
+        fem._yield_reading = _inject(e_int, add)
+        sb = fem.solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=4000,
+                           max_disp_factor=None)
+    finally:
+        fem._yield_reading, fem._CORRECTOR_YIELD_TOL, fem._vp_gate_armed = saved
+    gb = sa.get('gate_boundary') or {}
+    check("force-settled, overstress only in a fixed-boundary element: NOT ended "
+          "by the gate",
+          sa['converged'] and sa['exit_reason'] == 'converged'
+          and not sa.get('gate_failed'),
+          f"exit {sa['exit_reason']!r}, {sa['iterations']} iterations")
+    check("... and the trial records the left-out points and where",
+          int(gb.get('n', 0)) > 0 and gb.get('at') is not None
+          and gb['at'][0] == e_bnd and gb.get('remaining_max', 1.0)
+          <= fem._VP_YIELD_GATE, f"{gb}")
+    check("... and its log line names them",
+          "left out of the yield reading" in fem._verdict_note(sa))
+    check("force-settled, overstress in an interior element: ended by the gate",
+          (not sb['converged']) and sb['exit_reason'] == 'yield_gate'
+          and sb.get('gate_failed'),
+          f"exit {sb['exit_reason']!r}, {sb['iterations']} iterations")
+
+
 def main():
     print("=" * 72)
     print("Hybrid failure-criterion checks")
@@ -659,6 +800,7 @@ def main():
     check_early_failure()
     check_early_failure_wiring()
     check_log_wording()
+    check_gate_boundary()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"FAILED ({len(FAILURES)}): " + ", ".join(FAILURES))

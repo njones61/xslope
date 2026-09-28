@@ -24,9 +24,11 @@ shared [References](references.md) page.
   MN/m³; these files use kPa and kN/m³.
 - **Referee.** Where a closed-form rigid-block limit equilibrium exists for a problem it is the
   referee, recomputed from the inputs the model carries: Goodman & Bray's column analysis on
-  problems 1 and 2, Alejano's plowing equation on problems 11 to 14 and footwall equations on
-  problem 15. Where none exists the referee is the one the manual names, UDEC in every such case.
-  Each row shows the recomputed value beside the one its source prints.
+  problems 1 and 2, Alejano's plowing equation on problems 11 to 14, the sliding block with its tensile bridge on
+  problem 19, and, on problem 15, the vendor's Slide2 limit-equilibrium search, since Alejano's
+  footwall equations price a mechanism the slope does not take. Where none exists the referee is the one the manual names, UDEC in every such case.
+  Each row shows the recomputed value beside the one its source prints. Problem 16, a tilt table,
+  is scored against its experiment.
 - **Rigid-block bound.** Each plowing problem is two rigid blocks. The highest reduction factor at
   which some set of joint forces, each inside its friction cone, can still hold both blocks in
   place is a ceiling on any rigid-block answer: above it the blocks must move. Alejano's Eq. (7)
@@ -94,11 +96,11 @@ joint model whose output is a stress-displacement curve.
 | [12](#rj-12) | 🟡 | Plowing toppling slab failure | SSRM 2.033 vs Alejano Eq. (7) 1.9659 (+3.4%) | 1.39 vs 1.9659 (−29.3%) | UDEC 1.78 (+14.2%) · Alejano prints 2.00 | 1.39 / 1.75 | |
 | [13](#rj-13) | 🟢 | Plowing sliding slab, example 4 | SSRM 0.998 vs Alejano Eq. (7) 1.0002 (−0.2%) | 1.0 vs 1.0002 (0.0%) | UDEC 1.0 (−0.2%) · Alejano prints 1.0 | 1.0 / 1.05 | |
 | [14](#rj-14) | 🟢 | Plowing sliding slab, example 5 | SSRM 1.232 vs Alejano Eq. (7) 1.2034 (+2.4%) | 0.89 vs 1.2034 (−26.0%) | UDEC 0.9 (+36.9%) · Alejano prints 1.00 | 0.89 / 1.09 | The 1.00 the paper prints for this example does not follow from the inputs it prints; Eq. (7) on them gives 1.2034. |
-| [15](#rj-15) | 🔴 | Partially joint-controlled footwall | SSRM 1.271 vs Alejano Eqs. (9)–(10) 1.7985 (−29.3%) | 1.28 vs 1.7985 (−28.8%) | UDEC 1.6 (−20.6%) · Alejano prints 1.72 · Slide2 (vendor) 1.25 | 1.28 / 1.42 | The closed form drives a wedge out through a single 2 m bed and its factor rises with bed thickness; the three programs free to search for a surface agree at 1.25–1.28. |
-| [16](#rj-16) | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | UDEC 11° | 9° vs 11° (−18.2%) | Experiment 9° | 9° / 7° | *reported, no lock* — the problem scores a tilt angle rather than a factor of safety. Swept as a seismic coefficient at full strength, the stack stands at 8.40° and topples at 8.55°. |
+| [15](#rj-15) | 🟢 | Partially joint-controlled footwall | SSRM 1.271 vs Slide2 LE search 1.25 (+1.7%) | 1.28 vs 1.25 (+2.4%) | Alejano Eqs. (9)–(10) 1.7985 (single-bed formula; the paper prints 1.72) · UDEC 1.6 (−20.6%) | 1.28 / 1.42 | Alejano's closed form drives a wedge out through a single 2 m bed and its factor rises with bed thickness; the three programs free to search for a surface agree at 1.25–1.28, so the limit-equilibrium search is the referee, as the rigid-block bound is on problem 11. |
+| [16](#rj-16) | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | Tilt 8.5° vs experiment 9° (−5.6%) | 9° vs 9° (0.0%) | UDEC 11° (−22.7%) | 9° / 7° | *reported, no lock* — a tilt angle rather than a factor of safety: pushed with a seismic coefficient at full strength, the stack stands at 8.40° and topples at 8.55°. |
 | [17](#rj-17) | 🟡 | Step-path, en-echelon joints | SSRM 1.213 vs UDEC 1.29 (−6.0%) | 1.24 vs 1.29 (−3.9%) | — | 1.24 / 1.2 | No closed form: three rock bridges decide the factor, and both finite element codes read them below the distinct-element run, 2.1 points apart. |
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | 1.01 vs 1.01 (0.0%) | — | 1.01 / 1.0 | |
-| [19](#rj-19) | 🔴 | Bi-planar step-path failure | SSRM 1.623 vs UDEC 1.46 (+11.2%) | 1.5 vs 1.46 (+2.7%) | — | 1.5 / 1.41 | The factor is set by the tensile cap on the rock bridge rather than by its cohesion, and the cap is reduced with the trial factor here as the vendor reduces it. |
+| [19](#rj-19) | 🟢 | Bi-planar step-path failure | SSRM 1.623 vs rigid-block limit equilibrium 1.5914 (+2.0%) | 1.5 vs 1.5914 (−5.7%) | UDEC 1.46 (+11.2%) | 1.5 / 1.41 | One block sliding on the basal joint, held by friction and by the rock bridge in tension; its statics, with the tensile cap reduced with the trial factor as the vendor reduces it, is the referee, and both vendor numbers sit below it. |
 | [20](#rj-20) | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | 2.21 vs 2.46 (−10.2%) | — | 2.21 / 2.37 | *reported, no lock* — four of the nine trials do not settle within the 250,000-iteration limit, including both of the trials the search closes on. |
 | 21 | <span class="nodata">⊘</span> | Shallow excavation, jointed tunnel | UDEC 8.16 | 8.27 vs 8.16 (+1.3%) | — | 8.27 / 8.5 | *blocked* — the second stage of the vendor model excavates a 2 m opening and the strength reduction runs on the excavated state, which carries the stress the first stage left behind; XSLOPE has no staged construction. |
 | 22 | <span class="nodata">⊘</span> | Joint model: hyperbolic softening | — | — | — | — | *not supported* — the problem exercises RS2's hyperbolic displacement- and work-softening joint law, which XSLOPE's interface element does not have; it reports no factor of safety. |
@@ -705,7 +707,7 @@ clamps in both directions.
 
 ![RJ-14: Alejano et al. plowing sliding slab, example 5 (rj014) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it moves: one bedding plane from the crest to the toe carries the slip, with the release trace at the toe opening as the slab above it slides out over the bench](images/RJ-14.png)
 
-### 🔴 RJ-15: Partially joint-controlled footwall slope (rj015) {#rj-15}
+### 🟢 RJ-15: Partially joint-controlled footwall slope (rj015) {#rj-15}
 
 A 40 m footwall at 40° whose bedding dips in the same direction at the same angle, 2 m apart, so
 the slabs lie parallel to the face and a failure has to break rock at the toe to get out. This is
@@ -714,15 +716,17 @@ the one problem in the Alejano family whose rock can yield: Mohr-Coulomb, c = 20
 kPa/m and k<sub>s</sub> = 5 × 10<sup>5</sup> kPa/m, twenty times below the set's standard pair — with
 no cohesion and φ = 25°.
 
-The referee is Alejano's footwall limit equilibrium, Eqs. (9)–(10) of the source paper, recomputed
-on the inputs the vendor file states. It resolves one block along and normal to its own break-out
+Alejano's footwall limit equilibrium, Eqs. (9)–(10) of the source paper, is recomputed on the
+inputs the vendor file states. It resolves one block along and normal to its own break-out
 plane, and at the optimum the paper states — a break-out inclined 14° to the bedding and emerging at
 55°, with the failure taken at the face — it gives **1.7985** against the value the paper prints.
-Minimized over its own two angles it settles within half a degree of that same optimum.
+Minimized over its own two angles it settles within half a degree of that same optimum. The referee
+is Rocscience's own Slide2 limit-equilibrium search at 1.25, for the reason given below the table:
+the formula prices a mechanism the slope does not take.
 
-| XSLOPE SSRM | Alejano Eqs. (9)–(10) referee | RS2 vs referee | UDEC-SSRT (Alejano) | Slide2 LEM (vendor) | RS2 without / with improvement |
+| XSLOPE SSRM | Slide2 LE search referee | RS2 vs referee | Alejano Eqs. (9)–(10) | UDEC-SSRT (Alejano) | RS2 without / with improvement |
 |---|---|---|---|---|---|
-| **1.271** | 1.7985 (−29.3%) | 1.28 vs 1.7985 (−28.8%) | 1.6 (−20.6%) | 1.25 | 1.28 / 1.42 |
+| **1.271** | 1.25 (+1.7%) | 1.28 vs 1.25 (+2.4%) | 1.7985 (single-bed formula; the paper prints 1.72) | 1.6 (−20.6%) | 1.28 / 1.42 |
 
 <!-- test: file=files/rocscience/joints/rj015.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-15, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate -->
 
@@ -733,9 +737,10 @@ factor they return rises with that thickness, so the shallowest case the formula
 lowest it can report. Three programs of three different kinds are under no such restriction: this
 SSRM at 1.271, RS2's SSR at 1.28 and Rocscience's own Slide2 limit-equilibrium search at 1.25, the
 three inside 2.4% of one another and all three far below the closed form, with the paper's
-distinct-element run at 1.6 between. **Both finite element codes miss the referee by the same
-amount and in the same direction**, which makes the gap a property of what the closed form is
-allowed to consider rather than of either program.
+distinct-element run at 1.6 between. **Both finite element codes miss the closed form by the same
+amount and in the same direction**, which makes the gap a property of what the formula is allowed
+to consider rather than of either program, and is why the searched limit-equilibrium answer is the
+referee here, as the rigid-block bound is on [problem 11](#rj-11).
 
 Every trial settles. A step of refinement — a
 2D size of 1.4 m, which takes the mesh from 14,964 nodes and 2,179 interface elements to 32,131 and
@@ -771,9 +776,9 @@ sign is its direction, so a tilt of θ is k = tan θ toward the face, and the ro
 sweeping k at full strength — F = 1, no reduction — until the stack stops standing. Every point is
 one solve on the corpus mesh, 0.09 m, which is the block size.
 
-| XSLOPE tilt | UDEC referee | RS2 vs referee | Experiment | RS2 without / with improvement |
+| XSLOPE tilt | Experiment referee | RS2 vs referee | UDEC (manual) | RS2 without / with improvement |
 |---|---|---|---|---|
-| **8.5°** | 11° | 9° vs 11° (−18.2%) | 9° | 9° / 7° |
+| **8.5°** | 9° (−5.6%) | 9° vs 9° (0.0%) | 11° (−22.7%) | 9° / 7° |
 
 The stack stands at k = 0.1477, which is 8.40°, and goes at k = 0.1504, which is 8.55°. It stands
 at every coefficient tried below that and fails at every one above, through 0.35, the largest
@@ -787,10 +792,10 @@ block can yield, so what the state depends on is the direction of the body force
 Re-solving the two bracketing coefficients with every unit weight scaled by 1.011 and then by 0.5
 leaves both unchanged: the stack still stands at the lower coefficient and goes at the higher.
 
-**The row is reported rather than locked**, because what it measures is not a factor of safety: it
-asks at what tilt the stack goes, where every other row here asks by how much the strength has to
-be reduced before the slope fails. Its figure is drawn the same way — two solves at the two
-coefficients that bracket the tilt, titled by the angle rather than by a factor.
+**The row is reported rather than locked**: what it measures is a tilt rather than a factor of
+safety, and its two bracketing coefficients are re-solved by a check of their own before a lock is
+recorded. Its figure is drawn the same way, two solves at the two coefficients, titled by the angle
+rather than by a factor.
 
 The plate is weightless in the vendor model (`BodyForceSolid: 0` — it is the apparatus, not rock),
 and `build_fem_data` requires a positive unit weight, so it is built at the 27 kN/m³ its own
@@ -875,7 +880,7 @@ settles.
 
 ![RJ-18: step-path failure through three continuous joints (rj018) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. Every joint is slipping along its lower half and open along its upper, and the three slabs between them slide out together down the 36.1° path; the rock itself carries almost no plastic strain](images/RJ-18.png)
 
-### 🔴 RJ-19: Bi-planar step-path failure (rj019) {#rj-19}
+### 🟢 RJ-19: Bi-planar step-path failure (rj019) {#rj-19}
 
 A 120 × 70 m section of one Mohr-Coulomb rock (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 10,500 kPa,
 φ = 35°, tensile capacity 200 kPa) with a slope face from (30, 20) to (60, 70), cut by two
@@ -891,9 +896,16 @@ same rock's 200 kPa tensile capacity, worth 283 kN/m across the bridge. Every mo
 reduces that capacity with the trial factor, and this row is run the same way — see the departures
 table. It is the one problem in the corpus where that setting reaches the answer.
 
-| XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
-|---|---|---|---|
-| **1.623** | 1.46 (+11.2%) | 1.5 vs 1.46 (+2.7%) | 1.5 / 1.41 |
+The referee is the rigid-block limit equilibrium of that mechanism, recomputed from the inputs the
+workbook carries: the block slides on the basal joint, opens the upper joint behind it, and pulls
+the bridge apart in tension, with the joint's friction and the rock's tensile capacity both reduced
+by the trial factor. It holds up to 1.5914; friction alone holds it to 1.551. XSLOPE's 1.623 sits
+2.0% above 1.5914, and both vendor numbers sit below what the statics of the block admits, so the
+distinct-element run and RS2 fail this block by some route those statics do not contain.
+
+| XSLOPE SSRM | Rigid-block limit equilibrium referee | RS2 vs referee | UDEC (manual) | RS2 without / with improvement |
+|---|---|---|---|---|
+| **1.623** | 1.5914 (+2.0%) | 1.5 vs 1.5914 (−5.7%) | 1.46 (+11.2%) | 1.5 / 1.41 |
 
 <!-- test: file=files/rocscience/joints/rj019.xlsx, type=fem_ssrm, expected_fs=1.623, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=true, k0=1, benchmark=RJ-19, f_stand=1.61328125, f_fail=1.6328125, check=edges, tier=gate -->
 

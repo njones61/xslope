@@ -644,6 +644,25 @@ def _came_to_rest_sentence(lo, trials, count, unit):
     return said + "."
 
 
+def _gate_boundary_summary(trials, lo, hi):
+    """One sentence per bracket edge whose trial the yield gate read with Gauss
+    points over the limit left out on the fixed boundary; empty where none."""
+    said = []
+    for F in sorted({lo, hi}):
+        t = next((t for t in reversed(trials)
+                  if _finite_or_none(t.get("F")) is not None
+                  and abs(float(t["F"]) - F) <= 1e-9 * max(1.0, abs(F))
+                  and t.get("gate_boundary")), None)
+        if t is None:
+            continue
+        gb = t["gate_boundary"]
+        said.append(f"At F = {F:.4f}, {int(gb['n'])} Gauss point(s) in elements "
+                    f"on the fixed boundary were over the yield limit (worst "
+                    f"{100.0 * float(gb['max']):.1f}% of local strength) and were "
+                    f"left out of the yield reading.")
+    return " ".join(said)
+
+
 def ssrm_run_summary(result, fem_data=None):
     """The closing summary of a strength reduction run, as a short paragraph.
 
@@ -729,6 +748,7 @@ def ssrm_run_summary(result, fem_data=None):
 
     lo, hi = float(interval[0]), float(interval[1])
     unit = _ssrm_length_unit(fem_data)
+    took = _join(_gate_boundary_summary(trials, lo, hi), took)
     top = _edge_trial(trials, hi, False) if r.get("fs_is_lower_bound") else None
     if top is not None:
         bound = (f"The factor of safety is at least {ssrm_bound_text(FS)}."
@@ -5936,16 +5956,61 @@ _YIELD_FLAG_FRAC = 0.01
 _YIELD_ABS_FLOOR_FRAC = 1e-4
 
 
-def _yield_reading(gp_groups, u, sq3=None, floor=0.0):
+def _boundary_element_mask(fem_data):
+    """Per continuum element: True where at least one of its nodes carries a
+    constrained degree of freedom on the model boundary — fixed (``bc_type`` 1) or
+    a roller in either direction (2, 3) — i.e. the elements against the fixed side
+    and base boundaries.
+
+    THE RULE. The yield gate (see `_VP_YIELD_GATE`) reads admissibility on every
+    Gauss point EXCEPT those of these elements. A boundary element's stress is set
+    by the constraint as much as by the slope: where a joint or a material contact
+    ends on a fixed side boundary the corner is singular, and the viscoplastic
+    relaxation leaves a few percent of overstress there that no amount of iterating
+    removes. Measured on RJ-4 (rj004) and RJ-6 (rj006): the ONLY overstress on
+    their force-settled trials, 2-7% of local strength at 2-5 Gauss points, sits in
+    elements against the fixed left boundary under the crest, where a joint ends on
+    the wall, hundreds of meters from the slope face that fails. The gate ended
+    those trials undecided on that corner. The points are not dropped silently:
+    the gate reports them apart (see `_yield_reading`'s ``split_boundary``).
+    """
+    elements = np.asarray(fem_data["elements"])
+    n_el = len(elements)
+    bc_type = np.asarray(fem_data["bc_type"])
+    n_nodes = len(bc_type)
+    node_on = np.isin(bc_type, (1, 2, 3))
+    for key in ("fixed_nodes", "roller_x_nodes", "roller_y_nodes"):
+        for i in (fem_data.get(key) or ()):
+            if 0 <= int(i) < n_nodes:
+                node_on[int(i)] = True
+    if n_el == 0:
+        return np.zeros(0, dtype=bool)
+    et = np.asarray(fem_data.get("element_types",
+                                 np.full(n_el, elements.shape[1])), dtype=int)
+    idx = elements.astype(int)
+    used = np.arange(idx.shape[1])[None, :] < et[:, None]
+    safe = np.clip(idx, 0, n_nodes - 1)
+    return np.any(node_on[safe] & used, axis=1)
+
+
+def _yield_reading(gp_groups, u, sq3=None, floor=0.0, split_boundary=False):
     """The invariant-form admissibility reading on a viscoplastic state.
 
     Returns ``(max_violation, n_above_flag, max_tension_violation, worst)``: the
-    largest Mohr-Coulomb yield-function value over every Gauss point divided by that
-    point's own strength scale, how many points exceed ``_YIELD_FLAG_FRAC`` of it,
-    the same reading for the Rankine cap where one is finite (None where no point
-    carries a cap), and ``worst`` — the ``(element, gauss point)`` the largest
-    violation sits at, or None where nothing violates. A reading that condemns a
-    state has to say WHERE, or a reader cannot check it.
+    largest yield-function value over every Gauss point divided by that point's own
+    strength scale — Mohr-Coulomb, and the Rankine cap where one is finite — how
+    many points exceed ``_YIELD_FLAG_FRAC`` of it ON THAT SAME QUANTITY (a point
+    counts if either its Mohr-Coulomb or its cap reading is above the flag, so the
+    count and the worst never disagree), the Rankine half of the reading alone
+    (None where no point carries a cap), and ``worst`` — the ``(element, gauss
+    point)`` the largest violation sits at, or None where nothing violates. A
+    reading that condemns a state has to say WHERE, or a reader cannot check it.
+
+    ``split_boundary`` (the yield gate's reading, and only the gate's): Gauss points
+    of elements on a constrained boundary (``grp['on_bnd']``, see
+    `_boundary_element_mask`) are left out of all four numbers above, and a fifth
+    item is returned — ``{'n', 'max', 'at'}``: how many of those left-out points
+    are above the flag, their worst violation and where it sits.
 
     ``floor`` is the absolute floor under that strength scale, in the model's own
     stress units — ``prep['yield_floor']``, which is ``_YIELD_ABS_FLOOR_FRAC``
@@ -5958,7 +6023,7 @@ def _yield_reading(gp_groups, u, sq3=None, floor=0.0):
     sigma = D (B u - eps^p) + sigma_0, with the pore pressure added back the way the
     loop's own yield check adds it — so the two drivers' evidence is comparable
     number for number. One pass over the Gauss points, no solve, and nothing here is
-    ever read for a verdict.
+    ever read for a verdict except by the gate.
     """
     if sq3 is None:
         sq3 = np.sqrt(3.0)
@@ -5966,6 +6031,7 @@ def _yield_reading(gp_groups, u, sq3=None, floor=0.0):
     n_above = 0
     max_tens = None
     worst = None
+    bnd_n, bnd_max, bnd_at = 0, 0.0, None
     for grp in gp_groups:
         Bg, D4g, dofg, evpg = grp['B'], grp['D4'], grp['dof'], grp['evp']
         eps = np.einsum('gij,gj->gi', Bg, u[dofg])
@@ -6000,14 +6066,11 @@ def _yield_reading(gp_groups, u, sq3=None, floor=0.0):
         if grp.get('has_elastic'):
             # A material held linear elastic has no yield surface to violate.
             ok = ok & ~grp['elastic']
-        if np.any(ok):
-            idx = np.flatnonzero(ok)
-            ratio = fv[ok] / den[ok]
-            _k = int(np.argmax(ratio))
-            if float(ratio[_k]) > max_viol:
-                max_viol = float(ratio[_k])
-                worst = tuple(int(x) for x in grp['pairs'][int(idx[_k])])
-            n_above += int(np.count_nonzero(ratio > _YIELD_FLAG_FRAC))
+        # Per point: the Mohr-Coulomb reading, then the cap reading where larger.
+        # -inf marks a point with nothing to read.
+        r_all = np.full(len(ok), -np.inf)
+        r_all[ok] = fv[ok] / den[ok]
+        t_all = None
         _tc = grp.get('t_cap')
         if _tc is not None:
             m = np.isfinite(_tc) & ok
@@ -6015,15 +6078,38 @@ def _yield_reading(gp_groups, u, sq3=None, floor=0.0):
                 ctr = 0.5 * (sx + sy)
                 rad = np.sqrt((0.5 * (sx - sy)) ** 2 + txy ** 2)
                 s1 = np.maximum(ctr + rad, sz)
-                _tr = (s1[m] - _tc[m]) / den[m]
-                _j = int(np.argmax(_tr))
-                tv = float(_tr[_j])
-                if tv > max_viol:
-                    worst = tuple(int(x) for x in
-                                  grp['pairs'][int(np.flatnonzero(m)[_j])])
-                max_tens = tv if max_tens is None else max(max_tens, tv)
-    if max_tens is not None:
-        max_viol = max(max_viol, max_tens)
+                t_all = np.full(len(ok), -np.inf)
+                t_all[m] = (s1[m] - _tc[m]) / den[m]
+                r_all = np.maximum(r_all, t_all)
+        keep = ok
+        if split_boundary:
+            _ob = grp.get('on_bnd')
+            if _ob is not None and np.any(_ob & ok):
+                out = _ob & ok
+                ro = r_all[out]
+                bnd_n += int(np.count_nonzero(ro > _YIELD_FLAG_FRAC))
+                _j = int(np.argmax(ro))
+                if float(ro[_j]) > bnd_max:
+                    bnd_max = float(ro[_j])
+                    bnd_at = tuple(int(x) for x in
+                                   grp['pairs'][int(np.flatnonzero(out)[_j])])
+                keep = ok & ~_ob
+        if np.any(keep):
+            idx = np.flatnonzero(keep)
+            ratio = r_all[keep]
+            _k = int(np.argmax(ratio))
+            if float(ratio[_k]) > max_viol:
+                max_viol = float(ratio[_k])
+                worst = tuple(int(x) for x in grp['pairs'][int(idx[_k])])
+            n_above += int(np.count_nonzero(ratio > _YIELD_FLAG_FRAC))
+            if t_all is not None:
+                tk = t_all[keep]
+                if np.any(np.isfinite(tk)):
+                    tv = float(np.max(tk))
+                    max_tens = tv if max_tens is None else max(max_tens, tv)
+    if split_boundary:
+        return (max_viol, n_above, max_tens, worst,
+                {'n': int(bnd_n), 'max': float(bnd_max), 'at': bnd_at})
     return max_viol, n_above, max_tens, worst
 
 
@@ -7649,6 +7735,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # dt_r, and the suction/elastic/pow/hb parameters) are shared by reference; the
     # viscoplastic loop only ever reads them and mutates the fresh per-solve arrays
     # (evp, and — for power-curve / Hoek-Brown Gauss points — c_r, snph, csph).
+    _bnd_elem = _boundary_element_mask(fem_data)
     gp_groups = []
     for _gi, _sg in enumerate(prep["gp_groups_static"]):
         _e_idx = _sg['e_idx']
@@ -7686,6 +7773,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             grp['hb_m'] = _sg['hb_m']
             for _k in ('hb_sci', 'hb_mb', 'hb_s', 'hb_a'):
                 grp[_k] = _sg[_k]
+        # Gauss points of an element with a node on a constrained boundary (see
+        # `_boundary_element_mask`): the yield gate leaves them out of its reading.
+        grp['on_bnd'] = _bnd_elem[_e_idx]
         gp_groups.append(grp)
 
     # ---- The accelerated sweep (see ACCELERATE_DEFAULT) ----
@@ -7854,6 +7944,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     u_elastic_scale = 0.0
     exit_reason = 'iteration_cap'
     gate_failed = False            # a force-settled state the yield gate refused
+    gate_boundary = None           # the gate's last left-out boundary reading
     gate_deferrals = 0             # force-settled but inadmissible states the loop
                                    # carried past because it was still improving
                                    # (see _vp_gate_armed)
@@ -9500,8 +9591,23 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 # trial — and the gate is read again on whatever state it reaches next.
                 _gate_defer = False
                 if _corrector_on:
-                    _gv, _gn, _, _gw = _yield_reading(gp_groups, u_new, sq3,
-                                                      _yield_floor)
+                    # Elements on a constrained boundary are left out of this
+                    # reading and reported apart (see `_boundary_element_mask`).
+                    _gv, _gn, _, _gw, _gb = _yield_reading(
+                        gp_groups, u_new, sq3, _yield_floor, split_boundary=True)
+                    gate_boundary = (
+                        {"n": _gb['n'], "max": _gb['max'], "at": _gb['at'],
+                         "iteration": total_iterations + iteration + 1,
+                         "remaining_max": float(_gv), "remaining_n": int(_gn),
+                         "remaining_at": _gw}
+                        if _gb['n'] > 0 else None)
+                    if gate_boundary is not None and debug_level >= 1:
+                        print(f"  Yield gate at iteration {iteration+1}: "
+                              f"{_gb['n']} Gauss point(s) over the limit on the "
+                              f"fixed boundary, left out of the reading (worst "
+                              f"{_gb['max']:.3e} of local strength at element/Gauss "
+                              f"point {_gb['at']}); the rest of the section reads "
+                              f"{_gv:.3e} on {_gn} point(s) above 1%")
                     _armed = _vp_gate_armed(iteration, last_progress_iter,
                                             disp_hist, u_elastic_scale)
                     if _gv > _VP_YIELD_GATE and (_armed or not gate_tried):
@@ -9509,7 +9615,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         if debug_level >= 1:
                             print(f"  Force-settled at iteration {iteration+1} but "
                                   f"NOT admissible: worst yield violation "
-                                  f"{_gv:.3e} of local strength on {_gn} Gauss "
+                                  f"{_gv:.3e} of local strength, {_gn} Gauss "
                                   f"point(s) above 1% (worst at element/Gauss point "
                                   f"{_gw}) - handing to the corrector")
                         gate_tried = True
@@ -10141,6 +10247,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # the loop was still improving, and carried on rather than ending on the gate
         # (see _vp_gate_armed). Zero on a trial the gate never read.
         "gate_deferrals": int(gate_deferrals),
+        # The yield gate's last reading of the Gauss points it LEFT OUT, those of
+        # elements on a constrained boundary (see `_boundary_element_mask`): how
+        # many were over the limit, the worst and where, and what the rest of the
+        # section read beside it. None where none of them was over the limit.
+        "gate_boundary": gate_boundary,
         # What the accelerated sweep's multiplier did (see ACCELERATE_DEFAULT);
         # the key is absent with it off.
         **({} if _acc is None else {
@@ -14422,7 +14533,38 @@ def _ssrm_progress(callback, done, total, label):
             pass
 
 
+def _jsonable_gate_boundary(gb):
+    """The gate's left-out boundary reading (``sol['gate_boundary']``) as plain
+    JSON: ints, floats and ``[element, gauss point]`` lists."""
+    def _at(v):
+        return None if v is None else [int(x) for x in v]
+    return {"n": int(gb.get("n", 0)), "max": float(gb.get("max", 0.0)),
+            "at": _at(gb.get("at")),
+            "iteration": int(gb.get("iteration", 0) or 0),
+            "remaining_max": float(gb.get("remaining_max", 0.0)),
+            "remaining_n": int(gb.get("remaining_n", 0) or 0),
+            "remaining_at": _at(gb.get("remaining_at"))}
+
+
+def _gate_boundary_clause(gb):
+    """What the yield gate left out on the fixed boundary, as a clause; empty
+    where it left nothing out."""
+    if not gb or not int(gb.get("n", 0) or 0):
+        return ""
+    return (f"{int(gb['n'])} Gauss point(s) over the limit on the fixed boundary "
+            f"(worst {100.0 * float(gb['max']):.1f}% of local strength), left out "
+            f"of the yield reading")
+
+
 def _verdict_note(sol, hybrid=True):
+    """`_verdict_note_base`, with what the yield gate left out on the fixed
+    boundary appended where it left anything out."""
+    note = _verdict_note_base(sol, hybrid)
+    clause = _gate_boundary_clause(sol.get("gate_boundary"))
+    return f"{note}; {clause}" if clause else note
+
+
+def _verdict_note_base(sol, hybrid=True):
     """One-line trial outcome for the SSRM log, naming the hybrid verdict when the
     trial did not converge. Reads the same on the default criterion as it always
     has ("Converged" / "Did NOT converge") with the displacement evidence appended.
@@ -15932,6 +16074,10 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "yield_flagged": bool(sol.get("yield_flagged", False)),
             "gate_failed": bool(sol.get("gate_failed", False)),
             "gate_deferrals": int(sol.get("gate_deferrals", 0) or 0),
+            # Over-the-limit Gauss points the yield gate left out on the fixed
+            # boundary; absent where there were none.
+            **({} if not sol.get("gate_boundary")
+               else {"gate_boundary": _jsonable_gate_boundary(sol["gate_boundary"])}),
             # What the accelerated sweep did on this trial; absent with it off.
             **({} if sol.get("accelerate") is None
                else {"accelerate": sol["accelerate"],

@@ -11,9 +11,9 @@ install and no Python to set up.
 
 <div class="download-buttons" markdown="1">
 
-[Download for macOS](https://github.com/njones61/xslope/releases/latest/download/XSLOPE-Studio-macos-arm64.dmg){ .btn .btn-neutral .download-btn }
+[Download for macOS](https://xslope.org/download/macos){ .btn .btn-neutral .download-btn }
 
-[Download for Windows](https://github.com/njones61/xslope/releases/latest/download/XSLOPE-Studio-windows-x64-setup.exe){ .btn .btn-neutral .download-btn }
+[Download for Windows](https://xslope.org/download/windows){ .btn .btn-neutral .download-btn }
 
 </div>
 

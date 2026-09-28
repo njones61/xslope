@@ -17,50 +17,34 @@ shared [References](references.md) page.
 
 ## Methodology
 
-- **The models.** Geometry, materials, joint properties, restraints and loads are read from the
-  vendor's own `.fez` model rather than from the manual's tables, which carry errata the models do
-  not; the differences are listed under [where the vendor models depart from the
-  manual](#where-the-vendor-models-depart-from-the-manual). The manual supplies the referee each
-  problem is scored against and RS2's own two reported factors. The vendor models are stated in MPa
-  with unit weight in MN/m³; these files carry the metric kPa and kN/m³ the rest of the corpus
-  uses.
-- **The referee.** Where a closed-form rigid-block limit equilibrium exists for a problem, that is
-  what scores it, recomputed from the inputs the model carries rather than quoted from the source:
-  Goodman & Bray's iterative column analysis on problem 1's four cases and on problem 2, Alejano's
-  plowing equation on problems 11 to 14, and Alejano's footwall equations on problem 15. Where no
-  closed form exists the referee is the one the manual names, which is UDEC in every such case. Each row records both the recomputed
-  value and the one its source prints.
-- **The rigid-block bound.** A limit-equilibrium formula prices one mechanism and may be
-  conservative, but it cannot exceed what rigid-block statics admits: the two blocks each plowing
-  problem cuts out have a highest factor at which they admit any set of contact forces lying inside
-  their friction cones. The referee for problems 11 to 14 is therefore Alejano's Eq. (7) where it
-  sits on or under that bound, which is problems 12, 13 and 14, and the bound itself on problem 11,
-  where Eq. (7) stands half again above it.
-- **Apples to apples.** Every row carries XSLOPE's deviation from its referee beside RS2's deviation
-  from the same referee. RS2's "without joint improvement" factor is the vendor's default and the
-  same method family as XSLOPE's — a strength reduction on a continuum with interfaces in it — so it
-  is the yardstick for how close a finite element code of this kind gets. The manual reports each
-  problem twice. The "with joint improvement" run is the same model — the same mesh, joints,
-  strengths, stiffnesses and restraints, and the joints are still reduced with the rock — solved by
-  a different scheme: the vendor's `Improve Joint Convergence` option, which recalculates a joint's
-  stiffness once it has exceeded its strength, together with an accelerated initial stiffness and
-  a force-and-energy convergence test. Where the two settings disagree, the vendor's own answer
-  depends on how it was solved rather than on the problem, and that spread is the honest width of
-  the vendor's answer. Both of RS2's numbers are recorded in every row so a reader can see it.
-- **The mesh.** Every row is meshed at its own joint spacing — the column width, the bedding
-  spacing, the mean block width of a tessellation — so that one element spans the rock between one
-  discontinuity and the next, and every row states what a step of refinement does to its factor.
-  Problem 1's four cases are the exception: at their block width of 10 m that rule puts about one
-  element across a column, so those four are meshed at a 2D size of 5 m, where three successively finer
-  meshes return the same bracket.
-- **The search and the budget.** Each row's factor of safety is found by bisection: a trial is run
-  at a trial factor, and the search closes on the bracket [a, b] between the highest factor at which
-  the slope stands and the lowest at which it fails. A joint reaches equilibrium by growing slip, so
-  a jointed model takes tens of thousands of solver iterations (sweeps) to settle where a bonded one
-  takes hundreds; every row here allows 250,000. A trial that does not settle within that budget is
-  undecided, and a search that closes on an undecided trial cannot state a factor of safety: those
-  rows report the bracket without locking a value. How a jointed model is run and how its results
-  are read is covered under [running a jointed
+- **Models.** Geometry, materials, joint properties, restraints and loads come from the vendor's
+  own `.fez` files rather than the manual's tables, which carry errata the models do not; the
+  differences are listed under [where the vendor models depart from the
+  manual](#where-the-vendor-models-depart-from-the-manual). The vendor models are in MPa and
+  MN/m³; these files use kPa and kN/m³.
+- **Referee.** Where a closed-form rigid-block limit equilibrium exists for a problem it is the
+  referee, recomputed from the inputs the model carries: Goodman & Bray's column analysis on
+  problems 1 and 2, Alejano's plowing equation on problems 11 to 14 and footwall equations on
+  problem 15. Where none exists the referee is the one the manual names, UDEC in every such case.
+  Each row shows the recomputed value beside the one its source prints.
+- **Rigid-block bound.** Each plowing problem is two rigid blocks. The highest reduction factor at
+  which some set of joint forces, each inside its friction cone, can still hold both blocks in
+  place is a ceiling on any rigid-block answer: above it the blocks must move. Alejano's Eq. (7)
+  assumes one particular mechanism, so it may sit below that ceiling but not above it. On problems
+  12, 13 and 14 it sits on or below the ceiling and is the referee; on problem 11 it gives 1.76
+  against a ceiling of 1.21, so the ceiling is the referee there.
+- **RS2's two factors.** The manual reports each problem with and without the vendor's
+  `Improve Joint Convergence` option. The run without it is the vendor's default and the same
+  method as XSLOPE's, a strength reduction on a continuum with interfaces, so it is the yardstick.
+  Both are recorded in every row; their spread is the width of the vendor's own answer.
+- **Mesh.** Each row is meshed at its joint spacing, one element across the rock between one
+  discontinuity and the next, and states what a step of refinement does to its factor. Problem 1's
+  four cases are meshed at 5 m, half their 10 m block width, where three finer meshes return the
+  same bracket.
+- **Search.** The factor of safety is found by bisection on the bracket [a, b] between the highest
+  factor at which the slope stands and the lowest at which it fails. A jointed model takes tens of
+  thousands of iterations to settle, so every row allows 250,000. A search that closes on a trial
+  still undecided at that limit reports the bracket without a value. See [running a jointed
   model](../fem/joints.md#running-a-jointed-model).
 
 <!--
@@ -98,9 +82,9 @@ joint model whose output is a stress-displacement curve.
 | [1c](#rj-1c) | 🟢 | Goodman & Bray block toppling, case 1c | SSRM 1.037 vs Goodman & Bray 1.0185 (+1.8%) | 1.01 vs 1.0185 (−0.8%) | UDEC 1.01 (+2.7%) | 1.01 / 0.99 | |
 | [1d](#rj-1d) | 🟢 | Goodman & Bray block toppling, case 1d | SSRM 1.252 vs Goodman & Bray 1.2308 (+1.7%) | 1.19 vs 1.2308 (−3.3%) | UDEC 1.22 (+2.6%) | 1.19 / 1.16 | |
 | [2](#rj-2) | 🟢 | Alejano & Alonso block toppling | SSRM 0.783 vs Goodman & Bray 0.7734 (+1.2%) | 0.86 vs 0.7734 (+11.2%) | UDEC 0.87 (−10.0%) | 0.86 / 0.82 | All three programs stand above the closed form, this one by a percent and the other two by a tenth; the manual states no UDEC settings for this model. |
-| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | SSRM 1.213 reported vs UDEC 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | *reported, no lock* — the trial at the top of the bracket, F = 1.222656, does not settle within the 250,000-sweep budget, so the search cannot close. The vendor's two settings disagree with each other. |
+| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | SSRM 1.213 reported vs UDEC 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | *reported, no lock* — the trial at the top of the bracket, F = 1.222656, does not settle within the 250,000-iteration limit, so the search cannot close. The vendor's two settings disagree with each other. |
 | [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | — | 1.19 / 1.27 | |
-| [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | SSRM 1.818 reported vs UDEC 1.7 (+6.9%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | *reported, no lock* — four of the nine trials do not settle within the 250,000-sweep budget, two of them the ends of the bracket; a finer mesh settles two more and leaves an end of its own bracket unsettled. The reported value sits between the vendor's two settings. |
+| [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | SSRM 1.818 reported vs UDEC 1.7 (+6.9%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | *reported, no lock* — four of the nine trials do not settle within the 250,000-iteration limit, two of them the ends of the bracket; a finer mesh settles two more and leaves an end of its own bracket unsettled. The reported value sits between the vendor's two settings. |
 | [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | SSRM 1.271 reported vs UDEC 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | *reported, no lock* — every trial settles, but a step of mesh refinement moves the factor by twice the row's tolerance. The reported value sits between the vendor's two settings. |
 | [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | — | 1.57 / 1.59 | Both finite element codes land above the referee, on the same side and within half a point of each other. |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | 0.75 vs 0.76 (−1.3%) | — | 0.75 / 0.75 | |
@@ -115,7 +99,7 @@ joint model whose output is a stress-displacement curve.
 | [17](#rj-17) | 🟡 | Step-path, en-echelon joints | SSRM 1.213 vs UDEC 1.29 (−6.0%) | 1.24 vs 1.29 (−3.9%) | — | 1.24 / 1.2 | No closed form: three rock bridges decide the factor, and both finite element codes read them below the distinct-element run, 2.1 points apart. |
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | 1.01 vs 1.01 (0.0%) | — | 1.01 / 1.0 | |
 | [19](#rj-19) | 🔴 | Bi-planar step-path failure | SSRM 1.623 vs UDEC 1.46 (+11.2%) | 1.5 vs 1.46 (+2.7%) | — | 1.5 / 1.41 | The factor is set by the tensile cap on the rock bridge rather than by its cohesion, and the cap is reduced with the trial factor here as the vendor reduces it. |
-| [20](#rj-20) | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | 2.21 vs 2.46 (−10.2%) | — | 2.21 / 2.37 | *reported, no lock* — four of the nine trials do not settle within the 250,000-sweep budget, including both of the trials the search closes on. |
+| [20](#rj-20) | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | 2.21 vs 2.46 (−10.2%) | — | 2.21 / 2.37 | *reported, no lock* — four of the nine trials do not settle within the 250,000-iteration limit, including both of the trials the search closes on. |
 | 21 | <span class="nodata">⊘</span> | Shallow excavation, jointed tunnel | UDEC 8.16 | 8.27 vs 8.16 (+1.3%) | — | 8.27 / 8.5 | *blocked* — the second stage of the vendor model excavates a 2 m opening and the strength reduction runs on the excavated state, which carries the stress the first stage left behind; XSLOPE has no staged construction. |
 | 22 | <span class="nodata">⊘</span> | Joint model: hyperbolic softening | — | — | — | — | *not supported* — the problem exercises RS2's hyperbolic displacement- and work-softening joint law, which XSLOPE's interface element does not have; it reports no factor of safety. |
 | 23 | <span class="nodata">⊘</span> | Joint model: residual strength and dilation | — | — | — | — | *no lock possible* — the problem reports no factor of safety, and its six vendor models all carry `include_dilation: no`. See [The dilation problem](#the-dilation-problem). |
@@ -172,8 +156,7 @@ limit, and the base reaction of every toppling block sits on its downslope corne
 **The mesh moves this row by one step of the search, and no further.** At the block width of 10 m —
 2,072 nodes and 67 interface elements — the bracket reads 1.037; at 2D sizes of 7.0 m, 5.0 m and
 3.5 m it reads 1.018, and the three finer meshes agree with one another. The row is locked at
-5.0 m, where all nine trials settle within the budget, the longest of them in 225,001 sweeps of the
-250,000 allowed. What refinement does to the interface is let each contact open a
+5.0 m, where all nine trials settle within the iteration limit. What refinement does to the interface is let each contact open a
 little further, so the thrust it carries sits a little higher and implies a little less: the closed
 form the measured heights imply is 1.0279 at 10 m and 1.0271 at 5.0 m, and 1.02734375 — the value
 the two readings straddle — is one of the factors the search tries.
@@ -212,8 +195,7 @@ measured heights the recursion returns **1.0078**, the bottom of this row's brac
 <!-- test: file=files/rocscience/joints/rj001b.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1b, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
 
 The mesh does not move this row. At the block width of 10 m and at the 5.0 m of its lock it
-returns the same factor, and at 5.0 m every trial settles within the budget, the longest of them in
-177,381 sweeps of the 250,000 allowed. Case a's one-step move with refinement is not
+returns the same factor, and at 5.0 m every trial settles within the iteration limit. Case a's one-step move with refinement is not
 available here, for the reason the toe force gives: on this case the factor sits where a few hundred
 kilonewtons per meter of extra capacity is worth under two points of factor of safety, and the
 interface change refinement makes is smaller than that.
@@ -245,8 +227,7 @@ assumption, half a degree of friction further on.
 
 **The mesh moves this row the same way it moves case a.** At the block width of 10 m the bracket
 reads 1.057; at the 5.0 m of its lock it reads 1.037, one step of the search down and inside the
-row's own tolerance. Every trial at 5.0 m settles within the budget, the longest of them in 225,001
-sweeps of the 250,000 allowed.
+row's own tolerance. Every trial at 5.0 m settles within the iteration limit.
 
 **Input file:** [rj001c.xlsx](files/rocscience/joints/rj001c.xlsx).
 
@@ -270,8 +251,7 @@ the corner of the contact.
 <!-- test: file=files/rocscience/joints/rj001d.xlsx, type=fem_ssrm, expected_fs=1.252, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1d, tier=gate, f_stand=1.2421875, f_fail=1.26171875, check=edges -->
 
 The mesh does not move this row either: the block width of 10 m and the 5.0 m of its lock
-return the same bracket, end for end, and at 5.0 m every trial settles within the budget, the
-longest of them in 181,301 sweeps. Like case
+return the same bracket, end for end, and at 5.0 m every trial settles within the iteration limit. Like case
 b, this case is posed where the toe-force curve is steep, so the interface change that refinement
 makes cannot carry it across a step of the search.
 
@@ -304,8 +284,7 @@ triangle above it, weighing 1,361.8 kN/m. The recursion gives **0.7734**, agains
 
 A step of refinement — a 2D size of 0.35 m, which takes the mesh from 11,537 nodes to 21,110 —
 moves the factor by one step of the search, inside the row's own tolerance, and all nine trials
-decide on both meshes; the longest, the standing edge of the bracket, takes 144,462 sweeps of the
-250,000 allowed.
+decide on both meshes.
 
 **The two programs that are not the closed form land together above it.** Alejano & Alonso publish
 their own UDEC run at 0.87 beside their Goodman & Bray 0.76, and RS2 reports 0.86 and 0.82: all
@@ -340,10 +319,9 @@ The rock is elastic — the vendor's `Plasticity Specifications: Non` — so onl
 | 1.213 *reported, no lock* | 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | 1.12 / 1.09 |
 
 The row reports a factor but does not lock one. The search brackets 1.213 between 1.203, where
-the slope stands, and 1.222656, where the trial does not settle within the 250,000-sweep budget:
+the slope stands, and 1.222656, where the trial does not settle within the 250,000-iteration limit:
 the slope neither comes to rest nor runs away there, so the top of the bracket is a statement
-about the budget and the search cannot close. Every other trial settles, the longest of them in
-206,973 sweeps. [Problem 5](#rj-5) and [problem 20](#rj-20) are reported rather than locked for
+about the iteration limit and the search cannot close. Every other trial settles. [Problem 5](#rj-5) and [problem 20](#rj-20) are reported rather than locked for
 the same reason.
 
 The reported value stands above UDEC and above the vendor's default. The vendor's own two
@@ -374,8 +352,7 @@ E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°.
 
 A step of refinement — a 2D size of 8.4 m, which takes the mesh from 9,993 nodes and 936 interface
 elements to 19,130 and 1,325 — does not move the factor at all: the finer mesh returns the same
-bracket, end for end. Every trial settles on both meshes, the longest in 186,870 sweeps of the
-250,000 allowed.
+bracket, end for end. Every trial settles on both meshes.
 
 Every transcribed input class matches the vendor model, including the side restraint.
 
@@ -395,7 +372,7 @@ set at 40 m spacing. The rock is elastic — the vendor's `Plasticity Specificat
 | 1.818 *reported, no lock* | 1.7 (+6.9%) | 1.65 vs 1.7 (−2.9%) | 1.65 / 1.86 |
 
 This row is the corpus's hardest to settle. Four of its nine trials do not settle within the
-250,000-sweep budget, and two of the four are the ends of the bracket, 1.808594 and 1.828125, so
+250,000-iteration limit, and two of the four are the ends of the bracket, 1.808594 and 1.828125, so
 the search cannot close: the row reports the bracket's midpoint but does not lock it.
 
 The reported value stands above UDEC and above the vendor's default, and between the vendor's
@@ -427,7 +404,7 @@ slabs between them are free to slide out. The rock is Mohr-Coulomb (γ = 26.1 kN
 | 1.271 *reported, no lock* | 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | 1.25 / 1.31 |
 
 The row reports a factor but does not lock one, and what holds it back is the mesh rather than
-the budget. Every trial settles, the longest in 225,001 sweeps of the 250,000 allowed, but a step
+the iteration limit. Every trial settles, but a step
 of refinement to a 2D size of 8.4 m — which takes the mesh from 13,134 nodes and 1,864 interface
 elements to 25,232 and 2,654 — moves the factor by two steps of the search, where the row's
 tolerance is one.
@@ -461,8 +438,7 @@ higher than problem 6's.
 
 A step of refinement — a 2D size of 8.4 m, which takes the mesh from 9,986 nodes and 934 interface
 elements to 19,179 and 1,323 — does not move the factor at all: the finer mesh returns the same
-bracket, end for end. Every trial settles on both meshes, the longest in 118,821 sweeps of the
-250,000 allowed.
+bracket, end for end. Every trial settles on both meshes.
 
 Every transcribed input class matches the vendor model, including the side restraint. The manual's
 own table for this problem prints the slope angle as 5°; the figure and the model are the same 55°
@@ -494,8 +470,8 @@ against the set's usual 10<sup>8</sup>.
 
 A step of refinement — a 2D size of 1.05 m, which takes the mesh from 5,389 nodes to 10,684 —
 moves the factor by one step of the search, inside the row's own tolerance, and all nine trials
-settle on both meshes. This row settles fastest of any here: its longest trial takes 1,221 sweeps
-of the 250,000 allowed, where the [geotextile wall family](rs2.md#rs2-48) runs out of that budget
+settle on both meshes. This row settles fastest of any here, where the [geotextile wall
+family](rs2.md#rs2-48) runs out of its iteration limit
 on five trials across its eight rows.
 
 The two meshes disagree about one trial, the one the search closes on: at F = 0.754 the slope
@@ -531,8 +507,7 @@ decimals, so it lands 2 × 10⁻⁷ from the bedding plane it belongs on; see
 
 A step of refinement — a 2D size of 2.1 m, which takes the mesh from 12 620 nodes and 1 806
 interface elements to 26 565 and 2 579 — does not move the factor at all: the finer mesh returns
-the same bracket, end for end. Every trial settles on both meshes, the longest in 17,761 sweeps of
-the 250,000 allowed.
+the same bracket, end for end. Every trial settles on both meshes.
 
 RS2's own two factors straddle this row — 1.01 without the joint improvement option and 1.09 with
 it — which is true of only three other problems in this corpus.
@@ -566,8 +541,7 @@ see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-anoth
 
 A step of refinement — a 2D size of 2.1 m, which takes the mesh from 12,608 nodes and 1,806
 interface elements to 26,577 and 2,579 — does not move the factor at all: the finer mesh returns the
-same bracket, end for end. Every trial settles on both meshes, the longest in 60,715 sweeps of the
-250,000 allowed on the corpus mesh and 18,471 on the finer one.
+same bracket, end for end. Every trial settles on both meshes on the corpus mesh and 18,471 on the finer one.
 
 RS2's own two factors straddle this row — 0.92 without the joint improvement option and 1.08 with it,
 around 1.037 — as they do on [problem 9](#rj-9), [problem 5](#rj-5) and [problem 6](#rj-6) and on no
@@ -597,8 +571,7 @@ decimals, so it lands a part in 10⁷ from the bedding plane it belongs on; see
 
 A step of refinement — a 2D size of 1.05 m, which takes the mesh from 12 326 nodes and 1 768
 interface elements to 26 052 and 2 524 — does not move the factor at all: the finer mesh returns
-the same bracket, end for end. Every trial settles on both meshes, the longest in 59,761 sweeps of
-the 250,000 allowed.
+the same bracket, end for end. Every trial settles on both meshes.
 
 **This is the problem where Alejano's Eq. (7) is not a rigid-block answer.** The two blocks the
 mechanism cuts out — the slab and the toe block below it — admit no set of contact forces inside
@@ -647,8 +620,7 @@ the mesher's own crossing arithmetic carries — see the departures table.
 The factor is mesh independent over two steps of refinement. The corpus mesh at a 2D size of 1.5 m
 gives 2.033; a step to 1.05 m, which takes the mesh from 12,294 nodes and 1,818 interface elements
 to 26,407 and 2,572, gives 2.033; and a second step to 0.735 m gives 2.033 again, the same bracket
-end for end on all three. Every trial settles on all three meshes, the longest in 16,061 sweeps of
-the 250,000 allowed.
+end for end on all three. Every trial settles on all three meshes.
 
 **The three independent answers for this problem do not agree with one another, and this row is the
 one nearest the closed form.** Alejano's limit equilibrium is 1.9659 recomputed, the paper's UDEC run is 1.78 and
@@ -657,7 +629,7 @@ sliding — every source agrees on.
 
 **Input file:** [rj012.xlsx](files/rocscience/joints/rj012.xlsx).
 
-![RJ-12: Alejano et al. plowing toppling slab failure (rj012) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section, and only a few of its traces carry any slip: one release trace under the crest and the bedding beneath the toe block, which is the plowing pair. The two right-hand panels are the last standing trial of the bracket, the state below the factor rather than past it — on a rock this stiff the model moves by microns until it does not, so the deformed section is drawn at tens of thousands of times scale. The capture past the factor is not drawn: it was stopped in its first sweep, before the section had moved at all](images/RJ-12.png)
+![RJ-12: Alejano et al. plowing toppling slab failure (rj012) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section, and only a few of its traces carry any slip: one release trace under the crest and the bedding beneath the toe block, which is the plowing pair. The two right-hand panels are the last standing trial of the bracket, the state below the factor rather than past it — on a rock this stiff the model moves by microns until it does not, so the deformed section is drawn at tens of thousands of times scale. The capture past the factor is not drawn: it was stopped in its first iteration, before the section had moved at all](images/RJ-12.png)
 
 ### 🟢 RJ-13: Alejano et al. plowing sliding slab, example 4 (rj013) {#rj-13}
 
@@ -682,8 +654,7 @@ blocks, which is 0.9988, so the closed form and statics agree to three figures h
 
 A step of refinement — a 2D size of 1.05 m, which takes the mesh from 12 141 nodes and 1 788
 interface elements to 26,079 and 2,539 — does not move the factor at all: the finer mesh returns
-the same bracket, end for end. Every trial settles on both meshes, the longest in 23,161 sweeps of
-the 250,000 allowed.
+the same bracket, end for end. Every trial settles on both meshes.
 
 Every input class matches the vendor model: the
 rock's E, ν and γ, both joint friction angles, the joints' stiffness pair, cohesion and tensile
@@ -723,8 +694,7 @@ radius reduced it reports 0.9994 for the same model.
 The factor is mesh independent over two steps of refinement. The corpus mesh at a 2D size of 1.5 m
 gives 1.232; a step to 1.05 m, which takes the mesh from 12,316 nodes and 1,819 interface elements
 to 26,414 and 2,572, gives 1.232; and a second step to 0.735 m gives 1.232 again, the same bracket
-end for end on all three. Every trial settles on all three meshes, the longest in 15,511 sweeps of
-the 250,000 allowed.
+end for end on all three. Every trial settles on all three meshes.
 
 Every input class matches the vendor model: the
 rock's E, ν and γ, both joint friction angles, the joints' stiffness pair, cohesion and tensile
@@ -767,7 +737,7 @@ distinct-element run at 1.6 between. **Both finite element codes miss the refere
 amount and in the same direction**, which makes the gap a property of what the closed form is
 allowed to consider rather than of either program.
 
-Every trial settles, the longest in 225,001 sweeps of the 250,000 allowed. A step of refinement — a
+Every trial settles. A step of refinement — a
 2D size of 1.4 m, which takes the mesh from 14,964 nodes and 2,179 interface elements to 32,131 and
 3,090 — moves the factor by one step of the search, inside the row's own tolerance, and settles on
 all nine of its trials too, so the row is locked on the corpus mesh. Of the locked rows it is the
@@ -860,7 +830,7 @@ distinct-element run.
 
 A step of refinement — a 2D size of 0.7 m, which takes the mesh from 3,284 nodes and 14 interface
 elements to 6,484 and 21 — moves the factor by one step of the search, inside the row's tolerance,
-to 1.193. Every trial settles on both meshes, the longest in 225,001 sweeps of the 250,000 allowed.
+to 1.193. Every trial settles on both meshes.
 The row is locked on the corpus mesh, as every row here is.
 
 **What decides this row is the rock bridges.** The rock has no tensile capacity at all, so the
@@ -875,8 +845,7 @@ wandering about half an element either side of it, from x = 11.85 to 12.73 where
 12.221 and from y = 2.73 to 3.66 where it says 3.19011. Transcribed as an 84-vertex ring and run as
 a file of its own, it holds 693 elements of this mesh elastic where the rectangle holds 694 — the
 zone is an analysis overlay and never meshed, so both files mesh identically and only the
-membership can differ — and the bracket comes back identical trial for trial, sweep count for sweep
-count. What a mesh does to the edge of a search area is worth one element here, and nothing at all
+membership can differ — and the bracket comes back identical trial for trial, iteration count for iteration count. What a mesh does to the edge of a search area is worth one element here, and nothing at all
 to the factor.
 
 **Input files:** [rj017.xlsx](files/rocscience/joints/rj017.xlsx), and the staircase variant
@@ -900,8 +869,7 @@ k<sub>s</sub> = 10<sup>7</sup> kPa/m and are reduced with the rock in the streng
 
 A step of refinement — a 2D size of 0.7 m, which takes the mesh from 3,486 nodes and 48 interface
 elements to 6,707 and 66 — does not move the factor at all, and every trial on both meshes
-settles. This row uses most of its budget: the longest trial takes 196,201 sweeps of the 250,000
-allowed.
+settles.
 
 **Input file:** [rj018.xlsx](files/rocscience/joints/rj018.xlsx).
 
@@ -929,10 +897,10 @@ table. It is the one problem in the corpus where that setting reaches the answer
 
 <!-- test: file=files/rocscience/joints/rj019.xlsx, type=fem_ssrm, expected_fs=1.623, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=true, k0=1, benchmark=RJ-19, f_stand=1.61328125, f_fail=1.6328125, check=edges, tier=gate -->
 
-Every trial settles on the corpus mesh, the longest in 194,241 sweeps of the 250,000 allowed. A
+Every trial settles on the corpus mesh. A
 step of refinement — a 2D size of 2.1 m, which takes the mesh from 3,485 nodes to 6,910 — moves the
 factor by one step of the search, inside the row's own tolerance, but on that mesh the trial at the
-top of the bracket does not settle within the budget. The row is locked on the corpus mesh, where
+top of the bracket does not settle within the iteration limit. The row is locked on the corpus mesh, where
 every trial settles.
 
 The manual's table for this problem states one joint inclination as 59°. Its figure dimensions 56°
@@ -967,9 +935,9 @@ against the vendor's own 3,251 elements.
 |---|---|---|---|
 | *no lock* | 2.46 | 2.21 vs 2.46 (−10.2%) | 2.21 / 2.37 |
 
-The row prints no factor, and what holds it back is the budget. Four of the nine trials do not
-settle within the 250,000 sweeps allowed, and both of the trials the search closes on are among
-them, so a factor read off this bracket would be a statement about the budget rather than about the
+The row prints no factor, and what holds it back is the iteration limit. Four of the nine trials do not
+settle within the 250,000 iterations allowed, and both of the trials the search closes on are among
+them, so a factor read off this bracket would be a statement about the iteration limit rather than about the
 slope. The other five settle: three stand and two fail. The search, and the solve past the
 critical factor its figure is drawn from, take 3.7 hours between them, the longest run here.
 
@@ -1083,7 +1051,7 @@ changes what a faithful transcription is.
   (`joint_tangent`, at the vendor's own factor) and the corpus runs without it. It changes how the
   solver reaches a state, not the state it reaches, so on a model whose trials decide either way it
   returns the same bracket: [problem 1a](#rj-1a) and [problem 2](#rj-2) lock on the same two trials
-  with it on and off, and on problem 1a it reaches the failing verdict in a tenth of the sweeps. On
+  with it on and off, and on problem 1a it reaches the failing verdict in a tenth of the iterations. On
   the reinforced walls and embankments of the [RS2 corpus](rs2.md) and the FEM-3 tutorial it does
   move brackets, by one to four steps of the search in either direction, which is why it is a
   switch rather than the default and why every row here is run without it.

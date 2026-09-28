@@ -113,30 +113,19 @@ joint model whose output is a stress-displacement curve.
 
 ### 🟢 RJ-1a: Goodman & Bray block toppling, case a (rj001a) {#rj-1a}
 
-Goodman & Bray's own toppling example, and the section all four of problem 1's cases share: sixteen
-rock columns 10 m wide and 4 to 40 m tall standing on a base that steps up one meter per column at
-30°, their sides at 120° — normal to that base — and their tops cut off by a 56.6° face above column
-ten. The toe is at (−0.5, 0.866) and the crest at (130.564, 93.856), inside the 261 × 140 m
-rectangle the vendor cuts, with everything above the columns deleted. The rock is elastic
-(γ = 25 kN/m³, E = 20 GPa, ν = 0.3), the vendor's own material type, so the columns cannot break and
-every mechanism the model has is a joint one — which is the idealization the closed form makes.
+Goodman & Bray's own toppling example, the section all four of problem 1's cases share: sixteen
+rock columns 10 m wide and 4 to 40 m tall on a base that steps up at 30°, their sides at 120°,
+normal to that base, and their tops cut off by a 56.6° face. The rock is elastic (γ = 25 kN/m³,
+E = 20 GPa, ν = 0.3), so every mechanism the model has is a joint one, the idealization the closed
+form makes. The joints are the shared edges of the column
+outlines (see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint))
+and carry no cohesion, φ = 38.15°, the angle this case is posed at, and the corpus's standard
+stiffness pair.
 
-The joints are not a list. They are the **shared edges** of the seventeen polygons the vendor's
-sixteen column outlines and the rock beneath them make: 31 contacts over 460.0 m, merged into 31
-straight lines, so a pair of columns that touches over three meters gets a three-meter joint rather
-than a full-height one. Fifteen of those contacts **end on** another, because a stepped base begins
-each column's basal contact partway along its downslope neighbour's side joint; see
-[where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint). They carry no cohesion, φ = 38.15° — the angle
-this case is posed at — and the corpus's standard stiffness pair.
-
-The referee is Goodman & Bray's own iterative column analysis, recomputed on this section rather
-than quoted from the manual. Block by block from the crest down, the force a column needs from the
-one below it is the larger of what toppling about its downslope base corner demands and what sliding
-on its base demands. On this case the recursion reproduces the method's published mode pattern —
-columns 14 to 16 stable, 13 down to 3 toppling, 2 and 1 sliding — and the horizontal toe force it
-requires for limit equilibrium is 0.36 kN/m against the 0.5 kN the manual states. Carried into a
-strength reduction it gives the referee each of the four cases is scored against below, and each of
-the four is within a rounding of the value the manual prints for it.
+The referee is Goodman & Bray's iterative column analysis, recomputed on this section. It
+reproduces the method's published mode pattern and requires a horizontal toe force of 0.36 kN/m
+for limit equilibrium, against the 0.5 kN the manual states. Carried into a strength reduction, it gives each of the four cases a
+referee within a rounding of the value the manual prints for it.
 
 | XSLOPE SSRM | Goodman & Bray referee | RS2 vs referee | UDEC | RS2 without / with improvement |
 |---|---|---|---|---|
@@ -146,27 +135,16 @@ the four is within a rounding of the value the manual prints for it.
 
 **The excess over the closed form is one assumption, and it is where the thrust between two columns
 acts.** Goodman & Bray hand each column-to-column thrust to the top corner of its contact. A contact
-cannot do that: the two columns lean together, the face parts from the block's base upward and stays
-closed only over its upper quarter to half, and the stress there is distributed, so the resultant
-stands a tenth to a sixth of the face below the corner. Given those heights read off the solved
-state, and nothing else changed, the same recursion returns **1.0279**, the bottom of this row's
-own bracket. The closed form's other three assumptions the solution obeys exactly: every block
-balances in force and in moment on the interface stresses alone, every closed side pair is at its friction
-limit, and the base reaction of every toppling block sits on its downslope corner.
+cannot do that: the two columns lean together, the face stays closed only over its upper quarter to
+half, so the resultant stands a tenth to a sixth of the face
+below the corner. Given those heights read off the solved state, and nothing else changed, the same
+recursion returns **1.0279**, the bottom of this row's own bracket.
 
-**The mesh moves this row by one step of the search, and no further.** At the block width of 10 m —
-2,072 nodes and 67 interface elements — the bracket reads 1.037; at 2D sizes of 7.0 m, 5.0 m and
-3.5 m it reads 1.018, and the three finer meshes agree with one another. The row is locked at
-5.0 m, where all nine trials settle within the iteration limit. What refinement does to the interface is let each contact open a
-little further, so the thrust it carries sits a little higher and implies a little less: the closed
-form the measured heights imply is 1.0279 at 10 m and 1.0271 at 5.0 m, and 1.02734375 — the value
-the two readings straddle — is one of the factors the search tries.
+At the block width of 10 m the bracket reads 1.037; at 2D sizes of 7.0 m, 5.0 m and 3.5 m it reads
+1.018, one step of the search lower, and at the 5.0 m of the lock all nine trials settle.
 
-The manual's figure for this case labels the side boundaries as rollers. The model's restraint list
-does not: all 191 of its restrained nodes carry both components fixed, 111 of them on the base and
-80 on the two sides. The restraints follow the model. Its stabilizing toe force is 0.5 kN against a
-toe column weighing about a thousand times that, and the file carries no load at all; see the
-departures table.
+The manual's figure labels the side boundaries as rollers, but the model clamps them and the
+restraints follow the model; the 0.5 kN toe force is not carried (see the departures table).
 
 **Input file:** [rj001a.xlsx](files/rocscience/joints/rj001a.xlsx).
 
@@ -178,9 +156,6 @@ Case a's section and rock with the joints at φ = 33.0239°, the lowest of the f
 2013 kN horizontal force the case is posed with — about twice the lowest column's own weight, and
 what lets a stack on 33° joints stand where case a's needs 38°. It enters as a line load on the
 `lloads` sheet, at the point the departures table names.
-
-Nothing else about the mechanism changes: the stack still rotates forward over the face on slip up
-every column contact and along the stepped base.
 
 On this case the recursion requires a horizontal toe force of 2,012.86 kN/m for limit equilibrium,
 against the 2,013 kN the manual states — 0.007% on a stack weighing 83,500 kN/m.
@@ -195,16 +170,13 @@ measured heights the recursion returns **1.0078**, the bottom of this row's brac
 
 <!-- test: file=files/rocscience/joints/rj001b.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1b, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
 
-The mesh does not move this row. At the block width of 10 m and at the 5.0 m of its lock it
-returns the same factor, and at 5.0 m every trial settles within the iteration limit. Case a's one-step move with refinement is not
-available here, for the reason the toe force gives: on this case the factor sits where a few hundred
+The mesh does not move this row: the block width of 10 m and the 5.0 m of its lock return the same
+factor, and at 5.0 m every trial settles within the iteration limit. On this case a few hundred
 kilonewtons per meter of extra capacity is worth under two points of factor of safety, and the
 interface change refinement makes is smaller than that.
 
-Every input class matches the vendor model: the rock's
-E, ν and γ, the joints' stiffness pair, cohesion, friction angle and tensile cap, the 31 contacts the
-column outlines make, the side restraint the vendor clamps in both directions, and the force's
-magnitude and direction.
+Every input class matches the vendor model, including the side restraint and the force's magnitude
+and direction.
 
 **Input file:** [rj001b.xlsx](files/rocscience/joints/rj001b.xlsx).
 
@@ -264,18 +236,14 @@ Every input class matches the vendor model, the force reaching the same point ca
 
 ### 🟢 RJ-2: Alejano & Alonso block toppling (rj002) {#rj-2}
 
-A 30 × 19.85 m section whose 9.85 m face rises at 58.65° from (20, 10) to (14, 19.85). A basal
-joint runs from the toe of that face up to the crest at (2.9393, 19.85) at 30° — the stepped
-surface the columns stand on — and twenty-two columns at 64°, 1.6 m apart, pass through the same
-toe. Both carry φ = 31° and no cohesion. The rock is elastic (γ = 25 kN/m³, E = 20 GPa, ν = 0.3),
-the vendor's own `Plasticity Specifications: Non`, so the columns cannot yield and every mechanism
-the model has is a joint one.
+A 9.85 m face at 58.65°, a basal joint rising from its toe at 30° as the stepped surface the columns
+stand on, and twenty-two columns at 64°, 1.6 m apart, through the same toe. Both sets carry φ = 31°
+and no cohesion. The rock is elastic (γ = 25 kN/m³, E = 20 GPa, ν = 0.3), the vendor's own
+`Plasticity Specifications: Non`, so every mechanism the model has is a joint one.
 
-The referee is Goodman & Bray's iterative column analysis, recomputed on this section. The
-twenty-two column lines at 64° and the 30° basal joint cut **thirteen** columns out of the toppling
-mass — the rest of the set lies below the basal plane — and what stands on it is the 54.47 m²
-triangle above it, weighing 1,361.8 kN/m. The recursion gives **0.7734**, against the 0.76 Alejano
-& Alonso publish for the same method on the same problem.
+The referee is Goodman & Bray's iterative column analysis, recomputed on the thirteen columns the
+two sets cut out of the toppling mass: **0.7734**, against the 0.76 Alejano & Alonso publish for the
+same method on the same problem.
 
 | XSLOPE SSRM | Goodman & Bray referee | RS2 vs referee | UDEC | RS2 without / with improvement |
 |---|---|---|---|---|
@@ -283,24 +251,19 @@ triangle above it, weighing 1,361.8 kN/m. The recursion gives **0.7734**, agains
 
 <!-- test: file=files/rocscience/joints/rj002.xlsx, type=fem_ssrm, expected_fs=0.783, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-2, f_stand=0.7734375, f_fail=0.79296875, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 0.35 m, which takes the mesh from 11,537 nodes to 21,110 —
-moves the factor by one step of the search, inside the row's own tolerance, and all nine trials
-decide on both meshes.
+A step of refinement to 0.35 m moves the factor by one step of the search, inside the row's own
+tolerance, and all nine trials decide on both meshes.
 
 **The two programs that are not the closed form land together above it.** Alejano & Alonso publish
 their own UDEC run at 0.87 beside their Goodman & Bray 0.76, and RS2 reports 0.86 and 0.82: all
 three programs stand above the recomputed closed form, this row by 1.2% and the other two by a
-tenth. Neither of the two can be interrogated on this problem: the manual states nothing about the model's UDEC
-settings, no block rounding, no deformability and no stiffness, where the rigid-block note it gives
-for problems 9 to 14 is the only statement of the kind it makes anywhere.
+tenth. Neither of the two can be interrogated on this problem: the manual states nothing about the
+model's UDEC settings, no block rounding, no deformability and no stiffness, where the rigid-block
+note it gives for problems 9 to 14 is the only statement of the kind it makes anywhere.
 
-The joints reconstruct from the vendor's own 517 joint elements to 311.4 m of trace, 291.7 m at 64° and 19.7 m
-at 30°, against this file's 311.4 m at the same angles over the same extent; the rock's E, ν and γ,
-the joints' k<sub>n</sub>, k<sub>s</sub>, c, φ and tensile cap, and the clamped side restraint all
-match.
-
-The relief RS2 applies to a slipping joint's stiffness is off here as it is on every row of this
-corpus — see the departures table. Turned on, it returns this row's bracket unchanged, end for end.
+The joints total the vendor's own 311.4 m of trace at 64° and 30°, and every other input class
+matches, including the clamped side restraint. Turned on, RS2's relief of a slipping joint's
+stiffness returns this row's bracket unchanged; see the departures table.
 
 **Input file:** [rj002.xlsx](files/rocscience/joints/rj002.xlsx).
 
@@ -312,7 +275,7 @@ Problems 3 to 6 are the toppling and plane-failure examples of Lorig & Varona (2
 section at 55° that problems 3 to 7 share, cut by two sets: columns at 70° at 20 m
 spacing and a cross set at −20° at 30 m, both through the origin. The manual states the pair as
 "70 and 160" degrees, which is the same two planes measured the other way round the half circle.
-The rock is elastic — the vendor's `Plasticity Specifications: Non` — so only the joints can fail;
+The rock is elastic (see the departures table), so only the joints can fail;
 γ = 26.0946 kN/m³, E = 9072 MPa, ν = 0.26. The joints carry c = 100 kPa and φ = 40°.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
@@ -322,17 +285,17 @@ The rock is elastic — the vendor's `Plasticity Specifications: Non` — so onl
 The row reports a factor but does not lock one. The search brackets 1.213 between 1.203, where
 the slope stands, and 1.222656, where the trial does not settle within the 250,000-iteration limit:
 the slope neither comes to rest nor runs away there, so the top of the bracket is a statement
-about the iteration limit and the search cannot close. Every other trial settles. [Problem 5](#rj-5) and [problem 20](#rj-20) are reported rather than locked for
-the same reason.
+about the iteration limit and the search cannot close. Every other trial settles. [Problem 5](#rj-5)
+and [problem 20](#rj-20) are reported rather than locked because trials at the ends of their
+brackets do not settle either.
 
 The reported value stands above UDEC and above the vendor's default. The vendor's own two
 solution schemes give 1.12 and 1.09 for this problem, so the vendor's answer moves with how it is
 solved; this is one of the three problems the vendor reruns under its `Improve Joint
 Convergence` option, described under [Methodology](#methodology).
 
-Every input class matches the vendor model: the
-rock's E, ν and γ, the joints' normal and shear stiffness, cohesion, friction angle and tensile
-cap, the two sets' dips and spacings, and the side restraint the vendor clamps in both directions.
+Every input class matches the vendor model, including the side restraint the vendor clamps in both
+directions.
 
 **Input file:** [rj003.xlsx](files/rocscience/joints/rj003.xlsx).
 
@@ -363,10 +326,10 @@ Every transcribed input class matches the vendor model, including the side restr
 
 ### ⊘ RJ-5: Lorig & Varona backward block toppling (rj005) {#rj-5}
 
-The shared 260 m section cut by two sets: one at −55° at 10 m spacing through the toe at
-(560, 140), dipping out of the face so the blocks lean back rather than forward, and a horizontal
-set at 40 m spacing. The rock is elastic — the vendor's `Plasticity Specifications: Non` —
-γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26; the joints carry c = 100 kPa and φ = 40°.
+The shared 260 m section cut by two sets: one at −55° at 10 m spacing through the toe, dipping out
+of the face so the blocks lean back rather than forward, and a horizontal set at 40 m spacing. The
+rock is elastic (see the departures table): γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26; the joints carry
+c = 100 kPa and φ = 40°.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
@@ -381,11 +344,9 @@ own two numbers: its two solution schemes give 1.65 and 1.86 on the same model, 
 in the manual. The vendor needed its `Improve Joint Convergence` option to rerun
 this problem, and it reaches a different answer with it.
 
-A step of refinement — a 2D size of 8.4 m, which takes the mesh from 21,659 nodes and 3,056
-interface elements to 29,765 and 3,514 — settles two more of the nine and brackets a factor one
-step lower. Two trials still do not settle there, one of them an end of that bracket, so neither
-mesh closes the search. Together the two runs take about 16 hours, more than twice any other row
-here.
+A step of refinement to 8.4 m settles two more of the nine and brackets a factor one step lower. Two
+trials still do not settle there, one of them an end of that bracket, so neither mesh closes the
+search. Together the two runs take about 16 hours, more than twice any other row here.
 
 Every transcribed input class matches the vendor model, including the side restraint.
 
@@ -405,10 +366,8 @@ slabs between them are free to slide out. The rock is Mohr-Coulomb (γ = 26.1 kN
 | 1.271 *reported, no lock* | 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | 1.25 / 1.31 |
 
 The row reports a factor but does not lock one, and what holds it back is the mesh rather than
-the iteration limit. Every trial settles, but a step
-of refinement to a 2D size of 8.4 m — which takes the mesh from 13,134 nodes and 1,864 interface
-elements to 25,232 and 2,654 — moves the factor by two steps of the search, where the row's
-tolerance is one.
+the iteration limit. Every trial settles, but a step of refinement to 8.4 m moves the factor by two
+steps of the search, where the row's tolerance is one.
 
 The reported value matches UDEC and sits between the vendor's two numbers, 1.25 and 1.31: the
 vendor's own answer moves with its solution scheme on this model by more than the mesh moves
@@ -451,17 +410,13 @@ slope problem 6 uses.
 
 ### 🟢 RJ-8: Flexural toppling in a base friction model (rj008) {#rj-8}
 
-Pritchard & Savigny's base-friction table model, scaled up a hundred times: a 72.4 × 36.5 m
-section whose 30.5 m face rises at 78° from (15, 6) to (21.48, 36.5). Twelve columns at −60°,
-5.08 m apart, stand on a horizontal joint at y = 6 that runs the width of the model, with a
-vertical joint at x = 68.4 closing the back of the stack; the three highest columns reach that back
-joint rather than the base, which is where the vendor's own twelve chains end. The column set is
-bounded by those two joints rather than by the section, which makes it 301.555 m of column trace
-and 389.462 m of joint in all — the vendor's own totals to the millimetre. The rock is
-Mohr-Coulomb (γ = 25.506
-kN/m³, E = 22.771 GPa, ν = 0.139, c = 60 kPa, φ = 39°). The joints carry no cohesion, φ = 39°, and
-the softest normal stiffness in the corpus bar one: k<sub>n</sub> = 1.5 × 10<sup>7</sup> kPa/m
-against the set's usual 10<sup>8</sup>.
+Pritchard & Savigny's base-friction table model, scaled up a hundred times: a 30.5 m face at 78°
+with twelve columns at −60°, 5.08 m apart, standing on a horizontal basal joint and closed at the
+back by a vertical joint. The three highest columns end on that back joint, as the vendor's own do,
+and the network matches the vendor's totals to the millimeter; see the departures table. The rock
+is Mohr-Coulomb (γ = 25.506 kN/m³, E = 22.771 GPa, ν = 0.139, c = 60 kPa, φ = 39°). The joints
+carry no cohesion, φ = 39°, and the softest normal stiffness in the corpus bar one:
+k<sub>n</sub> = 1.5 × 10<sup>7</sup> kPa/m against the set's usual 10<sup>8</sup>.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
@@ -469,18 +424,14 @@ against the set's usual 10<sup>8</sup>.
 
 <!-- test: file=files/rocscience/joints/rj008.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-8, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 1.05 m, which takes the mesh from 5,389 nodes to 10,684 —
-moves the factor by one step of the search, inside the row's own tolerance, and all nine trials
-settle on both meshes. This row settles fastest of any here, where the [geotextile wall
-family](rs2.md#rs2-48) runs out of its iteration limit
-on five trials across its eight rows.
+A step of refinement to 1.05 m moves the factor by one step of the search, inside the row's own
+tolerance, and all nine trials settle on both meshes. The two meshes disagree about one trial, the
+one the search closes on: at F = 0.754 the slope stands on the corpus mesh and fails on the finer
+one. This row settles fastest of any here, where the [geotextile wall family](rs2.md#rs2-48) runs
+out of its iteration limit on five trials across its eight rows.
 
-The two meshes disagree about one trial, the one the search closes on: at F = 0.754 the slope
-stands on the corpus mesh and fails on the finer one, so the two brackets sit one step apart. The
-row is locked on the corpus mesh, as every row here is, with the refinement inside its tolerance.
-
-The model's stated tensile strength of 75 kPa is above the Mohr-Coulomb apex its own c and φ imply
-(c/tan φ = 74.1 kPa), so the cap never binds and the envelope's own apex governs.
+The model's 75 kPa tensile strength sits above the Mohr-Coulomb apex its own c and φ imply, so the
+cap never binds; see the departures table.
 
 **Input file:** [rj008.xlsx](files/rocscience/joints/rj008.xlsx).
 
@@ -491,14 +442,13 @@ The model's stated tensile strength of 75 kPa is above the Mohr-Coulomb apex its
 A 50 m slope at 50° cut by bedding dipping **out of the face** at −50° at 3 m spacing, φ = 30°, with
 a two-segment release trace at the toe at φ = 40° that undercuts the lowest slab. Two joint
 strengths, which the manual's own geometry table prints in the reverse order from its RS2 legend.
-The rock is elastic at E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3 — not a rock modulus but the manual's
-device for reproducing UDEC's rigid blocks, which it says outright.
+The rock is elastic at E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3, the manual's rigid-block device (see
+the departures table).
 
 The face and the bedding dip at the same angle, so no slab can slide out along a single plane: the
 mechanism is the bilinear one the problem is named for, sliding on a basal plane combined with
-sliding along the release that the face undercuts. The release trace's lower tip is stated to six
-decimals, so it lands 2 × 10⁻⁷ from the bedding plane it belongs on; see
-[where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
+sliding along the release that the face undercuts. The release trace ends on the bedding plane it
+belongs on; see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | LE (Alejano) | RS2 without / with improvement |
 |---|---|---|---|---|
@@ -506,9 +456,8 @@ decimals, so it lands 2 × 10⁻⁷ from the bedding plane it belongs on; see
 
 <!-- test: file=files/rocscience/joints/rj009.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-9, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 2.1 m, which takes the mesh from 12 620 nodes and 1 806
-interface elements to 26 565 and 2 579 — does not move the factor at all: the finer mesh returns
-the same bracket, end for end. Every trial settles on both meshes.
+A step of refinement to 2.1 m returns the same bracket, end for end, and every trial settles on both
+meshes.
 
 RS2's own two factors straddle this row — 1.01 without the joint improvement option and 1.09 with
 it — which is true of only three other problems in this corpus.
@@ -524,14 +473,12 @@ limit equilibrium here is. The distinct-element run is what the manual verifies 
 ### 🟢 RJ-10: Alejano et al. bilinear slab failure, example 1b (rj010) {#rj-10}
 
 Example 1a with the release joint moved five meters up the face, which the manual says is the whole
-difference between the two problems. The section, the bedding and both friction angles are
-[problem 9](#rj-9)'s: a 50 m slope at 50° cut by bedding dipping out of the face at −50° at 3 m
-spacing at φ = 30°, release at φ = 40°, and the same elastic rigid-block stand-in for the rock at
-E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3.
+difference between the two problems. The section, the bedding, both friction angles and the rock
+are [problem 9](#rj-9)'s.
 
 Moving the release upslope leaves the toe undercut where it was and cuts a second block out of the
 face above it: the trace that ran from the face to the toe in example 1a stays, and a new one leaves
-the face at (−9.977, 11.890) five meters higher. Both end on the bedding plane they are released by;
+the face five meters higher. Both end on the bedding plane they are released by;
 see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | LE (Alejano) | RS2 without / with improvement |
@@ -540,9 +487,8 @@ see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-anoth
 
 <!-- test: file=files/rocscience/joints/rj010.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-10, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 2.1 m, which takes the mesh from 12,608 nodes and 1,806
-interface elements to 26,577 and 2,579 — does not move the factor at all: the finer mesh returns the
-same bracket, end for end. Every trial settles on both meshes on the corpus mesh and 18,471 on the finer one.
+A step of refinement to 2.1 m returns the same bracket, end for end, and every trial settles on both
+meshes.
 
 RS2's own two factors straddle this row — 0.92 without the joint improvement option and 1.08 with it,
 around 1.037 — as they do on [problem 9](#rj-9), [problem 5](#rj-5) and [problem 6](#rj-6) and on no
@@ -560,9 +506,8 @@ release traces at φ = 20°: one at the toe running below the bench and one from
 the bedding plane that releases the toe block. Plowing failure is the paper's name for sliding on
 a primary discontinuity combining with sliding on a joint sub-parallel to the face, which lifts the
 toe block and eventually rotates it out of the slope. The rock is the family's elastic rigid-block
-stand-in at E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3. The lower tip of a release trace is stated to six
-decimals, so it lands a part in 10⁷ from the bedding plane it belongs on; see
-[where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
+stand-in at E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3. The release traces end on the bedding plane
+they belong on; see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
 
 | XSLOPE SSRM | Rigid-block bound referee | RS2 vs referee | UDEC | Alejano Eq. (7) | RS2 without / with improvement |
 |---|---|---|---|---|---|
@@ -570,9 +515,8 @@ decimals, so it lands a part in 10⁷ from the bedding plane it belongs on; see
 
 <!-- test: file=files/rocscience/joints/rj011.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-11, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 1.05 m, which takes the mesh from 12 326 nodes and 1 768
-interface elements to 26 052 and 2 524 — does not move the factor at all: the finer mesh returns
-the same bracket, end for end. Every trial settles on both meshes.
+A step of refinement to 1.05 m returns the same bracket, end for end, and every trial settles on both
+meshes.
 
 **This is the problem where Alejano's Eq. (7) is not a rigid-block answer.** The two blocks the
 mechanism cuts out — the slab and the toe block below it — admit no set of contact forces inside
@@ -582,10 +526,8 @@ above that, so it cannot be what scores this row and the bound is the referee in
 three on the bound. [Problem 15](#rj-15) has the same shape at a problem where no bound is
 available.
 
-Every input class matches the vendor model: the rock's
-E, ν and γ, both joint friction angles, the joints' stiffness pair, cohesion and tensile cap, the
-bedding dip and spacing, the release traces' endpoints, and the side restraint the vendor clamps in
-both directions.
+Every input class matches the vendor model, including the release traces' endpoints and the side
+restraint the vendor clamps in both directions.
 
 **Input file:** [rj011.xlsx](files/rocscience/joints/rj011.xlsx).
 
@@ -595,17 +537,14 @@ both directions.
 
 A 25 m slope at 60° cut by bedding dipping out of the face at −60° at 1.5 m spacing, φ = 30°, with
 two short release traces at φ = 40°: one at the toe running below the bench, and one from the face
-down onto the bedding plane that releases the toe block. Plowing failure is the paper's name for
-sliding on a primary discontinuity combining with sliding on a joint sub-parallel to the face, which
-lifts the toe block and rotates it out; at 60° the rotation rather than the sliding governs, which
-is what separates this row from problem 11. The rock is elastic at E = 2 × 10⁸ MPa, γ = 25 kN/m³,
-ν = 0.3 — not a rock modulus but the manual's own device for reproducing UDEC's rigid blocks.
+down onto the bedding plane that releases the toe block. It is problem 11's plowing mechanism, but
+at 60° the rotation of the toe block rather than the sliding governs. The rock is the family's
+elastic rigid-block stand-in at E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3.
 
-Alejano's Eq. (7) is the referee for this problem: a moment balance about the toe for exactly this
-mechanism, the slab thrusting on the toe block at one point and the toe block rotating out about
-the toe. Recomputed on the inputs the vendor file states, Eq. (7) gives **1.9659** against the 2.00
-the paper prints for the same example, and the same implementation reproduces the paper's own table
-on its other worked examples.
+Alejano's Eq. (7), a moment balance about the toe for exactly this mechanism, is the referee.
+Recomputed on the inputs the vendor file states, it gives **1.9659** against the 2.00 the paper
+prints for the same example, and the same implementation reproduces the paper's own table on its
+other worked examples.
 
 | XSLOPE SSRM | Alejano Eq. (7) referee | RS2 vs referee | Rigid-block bound | UDEC | RS2 without / with improvement |
 |---|---|---|---|---|---|
@@ -613,15 +552,12 @@ on its other worked examples.
 
 <!-- test: file=files/rocscience/joints/rj012.xlsx, type=fem_ssrm, expected_fs=2.033, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-12, f_stand=2.0234375, f_fail=2.04296875, check=edges, tier=gate -->
 
-The lower tip of each release trace is stated to six decimals, so it lands a part in 10⁷ from the
-bedding plane it belongs on; see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint). This row and
-problem 14 state their generated bedding network to six decimals as well, which is the precision
-the mesher's own crossing arithmetic carries — see the departures table.
+The release traces end on the bedding plane they belong on (see
+[where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint)), and the
+bedding network is stated to six decimals; see the departures table.
 
-The factor is mesh independent over two steps of refinement. The corpus mesh at a 2D size of 1.5 m
-gives 2.033; a step to 1.05 m, which takes the mesh from 12,294 nodes and 1,818 interface elements
-to 26,407 and 2,572, gives 2.033; and a second step to 0.735 m gives 2.033 again, the same bracket
-end for end on all three. Every trial settles on all three meshes.
+Two steps of refinement, to 1.05 m and 0.735 m, return the same bracket, end for end, and every
+trial settles on all three meshes.
 
 **The three independent answers for this problem do not agree with one another, and this row is the
 one nearest the closed form.** Alejano's limit equilibrium is 1.9659 recomputed, the paper's UDEC run is 1.78 and
@@ -639,9 +575,8 @@ two release traces at φ = 20°: one at the toe running below the bench and one 
 onto the bedding plane that releases the toe block. It is problem 11's mechanism at a steeper
 bedding and a weaker one — sliding on the primary discontinuity combining with sliding on a joint
 sub-parallel to the face, which lifts the toe block. The rock is the family's elastic rigid-block
-stand-in at E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3. The lower tip of each release trace is stated to
-six decimals, so it lands a part in 10⁷ from the bedding plane it belongs on; see
-[where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
+stand-in at E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3. The release traces end on the bedding plane they
+belong on; see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
 
 Alejano's Eq. (7) recomputed on this problem's inputs gives **1.0002**, its sliding mode governing,
 and the paper prints 1.00 for the same example. It sits on the rigid-block bound for these two
@@ -653,14 +588,11 @@ blocks, which is 0.9988, so the closed form and statics agree to three figures h
 
 <!-- test: file=files/rocscience/joints/rj013.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-13, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 1.05 m, which takes the mesh from 12 141 nodes and 1 788
-interface elements to 26,079 and 2,539 — does not move the factor at all: the finer mesh returns
-the same bracket, end for end. Every trial settles on both meshes.
+A step of refinement to 1.05 m returns the same bracket, end for end, and every trial settles on both
+meshes.
 
-Every input class matches the vendor model: the
-rock's E, ν and γ, both joint friction angles, the joints' stiffness pair, cohesion and tensile
-cap, the bedding dip and spacing, the release traces' endpoints, and the side restraint the vendor
-clamps in both directions.
+Every input class matches the vendor model, including the release traces' endpoints and the side
+restraint the vendor clamps in both directions.
 
 **Input file:** [rj013.xlsx](files/rocscience/joints/rj013.xlsx).
 
@@ -669,11 +601,10 @@ clamps in both directions.
 ### 🟢 RJ-14: Alejano et al. plowing sliding slab, example 5 (rj014) {#rj-14}
 
 Example 4's section at 60° with the two joint strengths the other way round: bedding dipping out of
-the face at −60° at 1.5 m spacing at φ = 20° — the weakest bedding of the six — and two release
-traces at φ = 30°, one at the toe below the bench and one from the face down onto the bedding plane
-it releases. The rock is the family's elastic rigid-block stand-in at E = 2 × 10⁸ MPa,
-γ = 25 kN/m³, ν = 0.3. Like problem 12, this row states its generated bedding network to six
-decimals; see the departures table.
+the face at −60° at 1.5 m spacing at φ = 20°, the weakest bedding of the six, and two release traces
+at φ = 30°. The rock is the family's elastic rigid-block stand-in at E = 2 × 10⁸ MPa, γ = 25 kN/m³,
+ν = 0.3, and the bedding network is stated to six decimals, as on problem 12; see the departures
+table.
 
 Alejano's Eq. (7), recomputed on the inputs the vendor file states, gives **1.2034** for this
 example, under the rigid-block bound for its two blocks. It is the referee.
@@ -684,23 +615,16 @@ example, under the rigid-block bound for its two blocks. It is the referee.
 
 <!-- test: file=files/rocscience/joints/rj014.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-14, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
 
-**The 1.00 the paper prints for this example does not follow from the inputs it prints.** Eq. (7)
-reads the bedding dip and spacing, the release joint's dip, the two friction angles, the length of
-the toe block's base and the unit weight. Every one of them matches the vendor's model — the base to
-five figures, 3.589 m against the 3.588 m printed — and on them the equation returns 1.2034. For it
-to return 1.00 the toe block's base would have to be 6.08 m, which is a different problem. The
-manual's other value, UDEC's 0.9, is corner rounding by the paper's own account: with the rounding
-radius reduced it reports 0.9994 for the same model.
+**The 1.00 the paper prints for this example does not follow from the inputs it prints.** Every
+input Eq. (7) reads matches the vendor's model — the toe block's base to five figures, 3.589 m
+against the 3.588 m printed — and on them the equation returns 1.2034. For it to return 1.00 the toe
+block's base would have to be 6.08 m, which is a different problem. The manual's other value,
+UDEC's 0.9, is corner rounding by the paper's own account: with the rounding radius reduced it
+reports 0.9994 for the same model.
 
-The factor is mesh independent over two steps of refinement. The corpus mesh at a 2D size of 1.5 m
-gives 1.232; a step to 1.05 m, which takes the mesh from 12,316 nodes and 1,819 interface elements
-to 26,414 and 2,572, gives 1.232; and a second step to 0.735 m gives 1.232 again, the same bracket
-end for end on all three. Every trial settles on all three meshes.
-
-Every input class matches the vendor model: the
-rock's E, ν and γ, both joint friction angles, the joints' stiffness pair, cohesion and tensile
-cap, the bedding dip and spacing, the release traces' endpoints, and the side restraint the vendor
-clamps in both directions.
+Two steps of refinement, to 1.05 m and 0.735 m, return the same bracket, end for end, and every
+trial settles on all three meshes. Every input class matches the vendor model, including the side
+restraint the vendor clamps in both directions.
 
 **Input file:** [rj014.xlsx](files/rocscience/joints/rj014.xlsx).
 
@@ -715,13 +639,11 @@ the one problem in the Alejano family whose rock can yield: Mohr-Coulomb, c = 20
 kPa/m and k<sub>s</sub> = 5 × 10<sup>5</sup> kPa/m, twenty times below the set's standard pair — with
 no cohesion and φ = 25°.
 
-Alejano's footwall limit equilibrium, Eqs. (9)–(10) of the source paper, is recomputed on the
-inputs the vendor file states. It resolves one block along and normal to its own break-out
-plane, and at the optimum the paper states — a break-out inclined 14° to the bedding and emerging at
-55°, with the failure taken at the face — it gives **1.7985** against the value the paper prints.
-Minimized over its own two angles it settles within half a degree of that same optimum. The referee
-is Rocscience's own Slide2 limit-equilibrium search at 1.25, for the reason given below the table:
-the formula prices a mechanism the slope does not take.
+Alejano's footwall limit equilibrium, Eqs. (9)–(10), recomputed on the vendor file's inputs at the
+optimum the paper states (a break-out inclined 14° to the bedding and
+emerging at 55°), gives **1.7985** against the value the paper prints, and minimized over its own
+two angles it settles within half a degree of that optimum. The referee is Rocscience's own Slide2
+limit-equilibrium search at 1.25.
 
 | XSLOPE SSRM | Slide2 LE search referee | RS2 vs referee | Alejano Eqs. (9)–(10) | UDEC-SSRT (Alejano) | RS2 without / with improvement |
 |---|---|---|---|---|---|
@@ -730,28 +652,20 @@ the formula prices a mechanism the slope does not take.
 <!-- test: file=files/rocscience/joints/rj015.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-15, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate -->
 
 **The closed form prices one mechanism, and every program free to search for a surface finds a
-weaker one.** Eqs. (9)–(10) admit a single slab of the stated bedding thickness driving a wedge out
-through the rock, and their own lengths hard-wire the break-out to cross exactly one 2 m bed; the
-factor they return rises with that thickness, so the shallowest case the formula allows is also the
-lowest it can report. Three programs of three different kinds are under no such restriction: this
-SSRM at 1.271, RS2's SSR at 1.28 and Rocscience's own Slide2 limit-equilibrium search at 1.25, the
-three inside 2.4% of one another and all three far below the closed form, with the paper's
-distinct-element run at 1.6 between. **Both finite element codes miss the closed form by the same
-amount and in the same direction**, which makes the gap a property of what the formula is allowed
-to consider rather than of either program, and is why the searched limit-equilibrium answer is the
-referee here, as the rigid-block bound is on [problem 11](#rj-11).
+weaker one.** Eqs. (9)–(10) drive a wedge out through a single slab and hard-wire the break-out to
+cross exactly one 2 m bed; their factor rises with that thickness, so the shallowest case the
+formula allows is also the lowest it can report. This SSRM at 1.271, RS2's SSR at 1.28 and the
+Slide2 search at 1.25 are under no such restriction and sit inside 2.4% of one another, far below
+the closed form. Both finite element codes miss it by the same amount and in the same direction, so
+the gap belongs to what the formula is allowed to consider rather than to either program, and the
+searched limit-equilibrium answer is the referee, as the rigid-block bound is on
+[problem 11](#rj-11).
 
-Every trial settles. A step of refinement — a
-2D size of 1.4 m, which takes the mesh from 14,964 nodes and 2,179 interface elements to 32,131 and
-3,090 — moves the factor by one step of the search, inside the row's own tolerance, and settles on
-all nine of its trials too, so the row is locked on the corpus mesh. Of the locked rows it is the
-longest to run: the search, and the solve past the critical factor its figure is drawn from, take
-about an hour and a half between them.
+A step of refinement to 1.4 m moves the factor by one step of the search, inside the row's own
+tolerance, and every trial settles on both meshes.
 
-Every input class matches the vendor model: the rock's E, ν, γ, c, φ and
-tensile cap; the joints' normal and shear stiffness, cohesion, friction angle and tensile cap; and
-the side restraint the vendor clamps in both directions. The stated tensile strength of 1000 kPa is
-above the Mohr-Coulomb apex its own c and φ imply (c/tan φ = 285.6 kPa), so it never binds.
+Every input class matches the vendor model, including the side restraint; the 1000 kPa tensile cap
+sits above the Mohr-Coulomb apex and never binds (see the departures table).
 
 **Input file:** [rj015.xlsx](files/rocscience/joints/rj015.xlsx).
 
@@ -759,21 +673,15 @@ above the Mohr-Coulomb apex its own c and φ imply (c/tan φ = 285.6 kPa), so it
 
 ### 🔴 RJ-16: Barla et al. tilt-table block toppling (rj016) {#rj-16}
 
-A laboratory test rather than a slope. Fourteen columns of 9 cm blocks are stacked into a 63.4°
-staircase on a plate, and the plate is tilted until the stack topples; what the problem reports is
-the angle at which it goes. The blocks are elastic (E = 350 MPa, ν = 0.2, γ = 28 kN/m³) on a plate
-that is elastic and effectively rigid (E = 200 GPa), and the 23 joints — thirteen vertical, eight
-horizontal, the plate contact along the base of the stack and the backstop behind it — carry no
-cohesion, φ = 38°, and the softest stiffness pair in the corpus: k<sub>n</sub> = 5 × 10<sup>6</sup>
-and k<sub>s</sub> = 5 × 10<sup>5</sup> kPa/m. The 0° model is also restrained with rollers, where
-the manual's slope models are clamped on their sides.
+A laboratory test rather than a slope: fourteen columns of 9 cm blocks stacked into a 63.4°
+staircase on a plate, and the plate tilted until the stack topples; the problem reports the angle
+at which it goes. The blocks are elastic (E = 350 MPa, ν = 0.2, γ = 28 kN/m³) on an effectively
+rigid plate, and the joints carry no cohesion, φ = 38°, and the corpus's softest stiffness
+pair; the 0° model runs on rollers (see the departures table).
 
-The vendor tilts the model itself: ten files, `#016_0deg` through `#016_9deg`, each the whole
-section rotated one degree further with its boundary pinned. XSLOPE turns the load instead. The
-finite element engine carries a horizontal seismic coefficient k, applied as a body force kγ whose
-sign is its direction, so a tilt of θ is k = tan θ toward the face, and the row is measured by
-sweeping k at full strength — F = 1, no reduction — until the stack stops standing. Every point is
-one solve on the corpus mesh, 0.09 m, which is the block size.
+The vendor tilts the model itself, one file per degree. XSLOPE turns the load instead: for a tilt θ, a
+horizontal seismic coefficient k = tan θ toward the face, raised at full strength (F = 1) until the stack stops
+standing, on the corpus mesh of 0.09 m, the block size.
 
 | XSLOPE tilt | UDEC referee | RS2 vs referee | Experiment | Goodman & Bray, plate tilted | RS2 without / with improvement |
 |---|---|---|---|---|---|
@@ -782,33 +690,24 @@ one solve on the corpus mesh, 0.09 m, which is the block size.
 <!-- test: file=files/rocscience/joints/rj016.xlsx, type=fem_tilt, k_stand=0.179846, k_fail=0.181396, expected_tilt=10.24, tolerance=0.1, element_type=tri6, target_size=0.09, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-16 -->
 
 The stack stands at k = 0.1798, which is 10.20°, and goes at k = 0.1814, which is 10.28°. It stands
-at every coefficient tried below that and fails at every one above, through 0.25, the largest
-tried. Run on with no stopping rule at all, the plain iteration agrees: the stack settles at every
-tilt through 9.9° and moves at a steady rate from 10.2°.
+at every coefficient tried below that and fails at every one above, through 0.25, and the row's
+check re-solves both coefficients at full strength.
 
 **A coefficient is not a rotation, and here the difference is measurable and measures zero.**
 Tilting the model by θ turns the body force through θ and leaves its magnitude at γ; a coefficient
 k = tan θ turns it through the same angle and multiplies its magnitude by 1/cos θ, which is 1.6% at
-10.2°. On this model that cannot move the answer, because every joint carries zero cohesion and no
-block can yield, so what the state depends on is the direction of the body force and not its size.
-Re-solving the two bracketing coefficients with every unit weight scaled by 1.016 and then by 0.5
-leaves both unchanged: the stack still stands at the lower coefficient and goes at the higher.
+10.2°. With zero joint cohesion and no block able to yield, the state depends on the body force's
+direction and not its size: re-solving the two bracketing coefficients with every unit weight
+scaled by 1.016 and then by 0.5 leaves both unchanged.
 
-**Where the five numbers sit.** Goodman & Bray's column analysis, with the plate tilted instead of
-the strength reduced, puts the toppling tilt of these fourteen rigid columns at 7.6°: every column
-tipping at once about its base corner, each thrust between columns at the top corner of the
-contact, friction fully mobilized everywhere. That construction allows no contact pressure below a
-corner, so it is a lower bound, and everything else sits above it: the physical stack and RS2 at
-9°, XSLOPE at 10.2°, and the distinct-element code, whose contacts roll and re-form as the columns
-lean, at 11°. The row is locked on its two coefficients: its check re-solves the stack at both, at
-full strength, and confirms that it stands at the first and topples at the second. Its figure is
-drawn the same way, two solves at the two coefficients, titled by the angle rather than by a
-factor.
+**Where the five numbers sit.** Goodman & Bray's column analysis, with the plate tilted, puts the
+toppling tilt of these rigid columns at 7.6°. It allows no contact pressure below a column's
+corner, so it is a lower bound, and everything else sits above it: the physical
+stack and RS2 at 9°, XSLOPE at 10.2°, and the distinct-element code, whose contacts roll and re-form
+as the columns lean, at 11°.
 
-The plate is weightless in the vendor model (`BodyForceSolid: 0` — it is the apparatus, not rock),
-and `build_fem_data` requires a positive unit weight, so it is built at the 27 kN/m³ its own
-property row states. Its weight is carried by its own restraints and the contact stress along the
-base of the stack is the weight of the blocks above it.
+The vendor's weightless plate is built at the 27 kN/m³ its property row states, because
+`build_fem_data` requires a positive unit weight.
 
 **Input file:** [rj016.xlsx](files/rocscience/joints/rj016.xlsx).
 
@@ -816,24 +715,16 @@ base of the stack is the weight of the blocks above it.
 
 ### 🟡 RJ-17: Step-path failure, en-echelon joints (rj017) {#rj-17}
 
-[Problem 18](#rj-18)'s section — a 45 × 20 m block of one Mohr-Coulomb rock (γ = 19.62 kN/m³,
-E = 20 GPa, ν = 0.3, c = 25 kPa, φ = 25°, no tensile capacity) whose face rises from (17, 8.2) to
-(26.9, 20) — cut by three joints at 36.1° that stop short of one another instead of running
-through: (18.33, 9.37) to (22.33, 12.25), (22.33, 13.5) to (26.26, 16), and (26.26, 17.16) to
-(29.33, 19.33). The rock bridges between them are what a step-path failure has to break through,
-and they are why this slope stands where problem 18's continuous joints let it go. The joints carry
-problem 18's own strength: c = 1 kPa, φ = 35°, and the corpus's standard stiffness pair.
+[Problem 18](#rj-18)'s section and Mohr-Coulomb rock (c = 25 kPa, φ = 25°, no tensile capacity),
+cut by three joints at 36.1° that stop short of one another instead of running through, at problem
+18's joint strength, c = 1 kPa and φ = 35°. The rock bridges between them are what a step-path
+failure has to break through, and they are why this slope stands where problem 18's continuous
+joints let it go.
 
-**The strength reduction is confined to a rectangle.** The vendor model carries an SSR search area —
-a polygon from (12.221, 3.19011) to (40.2504, 20.532), which the manual's geometry figure draws as
-a dashed box — and RS2 applies it by holding every element whose centroid falls outside it linear
-elastic. The model file shows that done: an auto-generated elastic twin of the rock, the same
-modulus and no plasticity of its own, on 1,173 of its 2,579 elements. XSLOPE states the same
-constraint as a polygon overlay on the model, classified by the same element-centroid test, so what
-is transcribed is the rectangle the vendor states.
-
-No closed form exists for a step path through rock bridges, so the referee is the manual's single
-distinct-element run.
+The strength reduction is confined to the vendor's SSR search area, a rectangle outside which RS2
+holds every element linear elastic; XSLOPE states it as a polygon overlay classified by the same
+element-centroid test (see the departures table). No closed form exists for a step path through
+rock bridges, so the referee is the manual's single distinct-element run.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
@@ -841,10 +732,8 @@ distinct-element run.
 
 <!-- test: file=files/rocscience/joints/rj017.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-17, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 0.7 m, which takes the mesh from 3,284 nodes and 14 interface
-elements to 6,484 and 21 — moves the factor by one step of the search, inside the row's tolerance,
-to 1.193. Every trial settles on both meshes.
-The row is locked on the corpus mesh, as every row here is.
+A step of refinement to 0.7 m moves the factor by one step of the search, inside the row's
+tolerance, to 1.193, and every trial settles on both meshes.
 
 **What decides this row is the rock bridges.** The rock has no tensile capacity at all, so the
 intact ligaments between the joint segments carry nothing across them, and the strength reduction
@@ -852,14 +741,9 @@ takes their 25 kPa cohesion down alongside the joint friction: the factor is the
 three short bridges shear through. Both finite element codes read that below the distinct-element
 run and on the same side of it, 2.1 points apart.
 
-**The same zone, transcribed the way the vendor's mesh resolved it, is the same model.** The
-element map of the vendor file is that rectangle rasterized onto element edges: a staircase
-wandering about half an element either side of it, from x = 11.85 to 12.73 where the rectangle says
-12.221 and from y = 2.73 to 3.66 where it says 3.19011. Transcribed as an 84-vertex ring and run as
-a file of its own, it holds 693 elements of this mesh elastic where the rectangle holds 694 — the
-zone is an analysis overlay and never meshed, so both files mesh identically and only the
-membership can differ — and the bracket comes back identical trial for trial, iteration count for iteration count. What a mesh does to the edge of a search area is worth one element here, and nothing at all
-to the factor.
+Transcribed instead as the staircase the vendor's mesh rasterized the rectangle into, the zone holds
+693 elements of this mesh elastic where the rectangle holds 694, and the bracket comes back
+identical trial for trial.
 
 **Input files:** [rj017.xlsx](files/rocscience/joints/rj017.xlsx), and the staircase variant
 [rj017_staircase.xlsx](files/rocscience/joints/rj017_staircase.xlsx).
@@ -890,19 +774,16 @@ settles.
 
 ### 🟢 RJ-19: Bi-planar step-path failure (rj019) {#rj-19}
 
-A 120 × 70 m section of one Mohr-Coulomb rock (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 10,500 kPa,
-φ = 35°, tensile capacity 200 kPa) with a slope face from (30, 20) to (60, 70), cut by two
-discontinuous joints with a rock bridge between them: a basal joint at 28.4° from (39.0149,
-35.0248) to (63, 48), and an upper joint at 56.3° from (62, 49) to (76, 70). Both carry c = 0,
-φ = 40° and the same stiffness pair as RJ-18.
+One Mohr-Coulomb rock (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 10,500 kPa, φ = 35°, tensile capacity
+200 kPa) cut by two discontinuous joints with a rock bridge between them: a basal joint at 28.4° and
+an upper joint at 56.3°. Both carry c = 0, φ = 40° and the same stiffness pair as RJ-18.
 
 **What decides this row is a tensile cap rather than a cohesion.** The two joints leave a rock
 bridge 1.414 m long between their tips. At the rock's 10,500 kPa cohesion that bridge carries
 14,849 kN/m in shear, which is 1.2 times the whole 11,929 kN/m sliding mass and 2.6 times its
 component down the basal joint, so it cannot be sheared through; what lets the block move is the
-same rock's 200 kPa tensile capacity, worth 283 kN/m across the bridge. Every model in this manual
-reduces that capacity with the trial factor, and this row is run the same way — see the departures
-table. It is the one problem in the corpus where that setting reaches the answer.
+same rock's 200 kPa tensile capacity, worth 283 kN/m across the bridge. This row reduces that
+capacity with the trial factor, as every vendor model does; see the departures table.
 
 The referee is the rigid-block limit equilibrium of that mechanism, recomputed from the inputs the
 workbook carries: the block slides on the basal joint, opens the upper joint behind it, and pulls
@@ -917,15 +798,12 @@ distinct-element run and RS2 fail this block by some route those statics do not 
 
 <!-- test: file=files/rocscience/joints/rj019.xlsx, type=fem_ssrm, expected_fs=1.623, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=true, k0=1, benchmark=RJ-19, f_stand=1.61328125, f_fail=1.6328125, check=edges, tier=gate -->
 
-Every trial settles on the corpus mesh. A
-step of refinement — a 2D size of 2.1 m, which takes the mesh from 3,485 nodes to 6,910 — moves the
-factor by one step of the search, inside the row's own tolerance, but on that mesh the trial at the
-top of the bracket does not settle within the iteration limit. The row is locked on the corpus mesh, where
-every trial settles.
+A step of refinement to 2.1 m moves the factor by one step of the search, inside the row's own
+tolerance, but on that mesh the trial at the top of the bracket does not settle within the
+iteration limit. The row is locked on the corpus mesh, where every trial settles.
 
-The manual's table for this problem states one joint inclination as 59°. Its figure dimensions 56°
-and 28°, and the vendor model's own endpoints give 56.3° and 28.4°, so the table is the outlier and
-the model is what is built.
+The joint inclinations are the model's; the manual's table states one as 59° (see the departures
+table).
 
 **Input file:** [rj019.xlsx](files/rocscience/joints/rj019.xlsx).
 
@@ -935,43 +813,34 @@ the model is what is built.
 
 ### ⊘ RJ-20: Hammah & Yacoub Voronoi slope (rj020) {#rj-20}
 
-An 80 × 70 m section with a 60 m face at 71.6°, from the toe at (10, 10) to the crest at (30, 70),
-tessellated into Voronoi blocks over the whole of it. The rock is Mohr-Coulomb (γ = 27 kN/m³,
-E = 20 GPa, ν = 0.3, c = 1,000 kPa, φ = 35°, no tensile capacity) and every block wall is a joint at
-c = 500 kPa, φ = 20° with the corpus's standard stiffness pair. The paper this comes from asks how
-the failure of a slope in blocky rock changes with the scale of its blocks; the manual's answer at
-this scale is UDEC's 2.46, with RS2 reporting 2.21 without joint improvement and 2.37 with it.
+An 80 × 70 m section with a 60 m face at 71.6°, tessellated into Voronoi blocks over the whole of it.
+The rock is Mohr-Coulomb (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 1,000 kPa, φ = 35°, no tensile
+capacity) and every block wall is a joint at c = 500 kPa, φ = 20° with the corpus's standard
+stiffness pair. The source paper asks how the failure of a slope in blocky rock changes with the
+scale of its blocks.
 
-**The network is in the model file.** The tessellation was generated in UDEC and imported, so RS2
-holds it as 523 joint boundaries — polylines of two to seven points — rather than as anything a
-block size and a seed regenerate. They are transcribed verbatim: 1,177 segments, one row of the
-joints sheet each, and every block corner a three-way junction of them. Measured on the traces
-themselves: 525 blocks over the section, a mean block area of 8.381 m² and a mean block width of
-2.895 m. That width is this row's mesh size — the block scale, standing in for the joint spacing
-every other row meshes at — and it gives 10,864 nodes, 3,567 elements and 4,582 interface elements
-against the vendor's own 3,251 elements.
+The tessellation was generated in UDEC and imported, and the model file holds it as 523 joint
+boundaries, transcribed verbatim (see the departures table). Their mean block width, 2.895 m, is this
+row's mesh size, standing in for the joint spacing every other row meshes at.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
 | *no lock* | 2.46 | 2.21 vs 2.46 (−10.2%) | 2.21 / 2.37 |
 
-The row prints no factor, and what holds it back is the iteration limit. Four of the nine trials do not
-settle within the 250,000 iterations allowed, and both of the trials the search closes on are among
-them, so a factor read off this bracket would be a statement about the iteration limit rather than about the
-slope. The other five settle: three stand and two fail. The search, and the solve past the
-critical factor its figure is drawn from, take 3.7 hours between them, the longest run here.
+The row prints no factor, and what holds it back is the iteration limit. Four of the nine trials do
+not settle within the 250,000 iterations allowed, and both of the trials the search closes on are
+among them, so a factor read off this bracket would be a statement about the iteration limit rather
+than about the slope. The other five settle: three stand and two fail. The search, and the solve
+past the critical factor its figure is drawn from, take 3.7 hours between them, the longest run
+here. The figure shows the mass failing on a surface picked through the block walls rather than
+along any one plane it contains, which is the observation the source paper is about.
 
-The figure shows how a mass of blocks at this scale fails: the slip picks its way from the toe up
-through the block walls on a curved path to the crest, and the only rock strained is a patch at the
-toe where the path has to turn. The mass fails on a surface rather than along any one plane it
-contains, which is the observation the source paper is about.
-
-**How much of that is the block size and how much is this particular tessellation** is the paper's
-own question, and answering it takes a second network of the same blocks drawn another way. The one
-`xslope.joints.voronoi` draws at that block size stops in the mesher: the generator keeps a trace
-down to a thousandth of the section diagonal, 0.106 m here, and a trace that short is pulled onto
-its own junction, where the line it leaves has no length left. Three seeds and two block sizes stop
-the same way, so this row is scored on the vendor's own tessellation alone.
+Separating the block size from this particular tessellation, the paper's own question, takes a
+second network of the same blocks drawn another way. The one `xslope.joints.voronoi` draws at that
+block size stops in the mesher: the generator keeps a trace down to a thousandth of the section
+diagonal, 0.106 m here, and a trace that short is pulled onto its own junction, where the line it
+leaves has no length left. Three seeds and two block sizes stop the same way, so this row is scored
+on the vendor's own tessellation alone.
 
 **Input file:** [rj020.xlsx](files/rocscience/joints/rj020.xlsx).
 

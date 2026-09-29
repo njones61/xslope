@@ -3,7 +3,10 @@
 The first two benchmarks below are backed by exact closed-form solutions; the
 third is an identical-mesh cross-check against an established seepage code.
 Further worked seepage examples are in the
-[seepage sample problems](../seep/samples.md).
+[seepage sample problems](../seep/samples.md). Every benchmark is meshed at its
+stated size, and a benchmark mentions refinement only where a finer mesh changes
+its answer, or where a mesh test is the evidence that a difference from the
+reference is not a mesh effect.
 
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
@@ -15,8 +18,8 @@ Match dots and status terms follow the shared [definitions](index.md#status-term
 
 | # | Match | Problem | Results | Notes |
 |---:|:-:|---|---|---|
-| [1](#verification-confined-radial) | 🟢 | Confined radial flow (quarter annulus) | Discharge q 28.5961 vs the exact Thiem solution 28.5960 (<0.01%) · max nodal head error 0.004 (0.02% of the total drop) | mesh-converged; quad8 and tri3 agree |
-| [2](#verification-sheetpile) | 🟢 | Partially penetrating sheetpile | s/T = 0.50: q 5.010 vs Pavlovsky's exact 5.000 (+0.2%) · s/T = 0.75: q 3.412 vs exact 3.403 (+0.3%) · wall-plane head below the tip 25.0000 vs exact 25 (0.0%) | error halves with refinement, converging from above |
+| [1](#verification-confined-radial) | 🟢 | Confined radial flow (quarter annulus) | Discharge q 28.5961 vs the exact Thiem solution 28.5960 (<0.01%) · max nodal head error 0.004 (0.02% of the total drop) | quad8 and tri3 agree |
+| [2](#verification-sheetpile) | 🟢 | Partially penetrating sheetpile | s/T = 0.50: q 5.010 vs Pavlovsky's exact 5.000 (+0.2%) · s/T = 0.75: q 3.412 vs exact 3.403 (+0.3%) · wall-plane head below the tip 25.0000 vs exact 25 (0.0%) | |
 | [3](#verification-seep2d-johnson) | 🟢 | SEEP2D cross-check — Johnson Reservoir | Total discharge 1.9546 vs SEEP2D 1.9544 ft³/day per ft (+0.0%) · nodal-head RMS Δh 0.037 ft (0.1% of the 60 ft head range) | identical-mesh cross-check |
 
 </div>
@@ -46,8 +49,8 @@ Results against the exact solution:
 | Discharge q | 28.5961 | 28.5960 (<0.01%) | |
 | Max nodal head error | 0.004 | 0 | 0.02% of total drop |
 
-The result is mesh-converged (identical at 2k and 6k nodes; quad8 gives the
-same value), and tri3 linear elements agree to within 0.01%. The only error source
+Quadratic quad8 elements give the same value, and tri3 linear elements agree to
+within 0.01%. The only error source
 is faceting of the curved arcs by the polygon boundary.
 
 **Source:** standard exact solution of Laplace's equation in polar coordinates
@@ -83,9 +86,7 @@ Results against the exact form factor (tri6, two mesh densities):
 | s/T = 0.50 (59k nodes) | 5.010 | 5.000 (+0.2%) | 25.0000 | 25 (0.0%) |
 | s/T = 0.75 (59k nodes) | 3.412 | 3.403 (+0.3%) | 25.0000 | 25 (0.0%) |
 
-The error halves with mesh refinement (set by the r^-1/2 singularity at the
-wall tip) and converges to the exact value from above. The head on the wall
-plane below the tip equals (h1+h2)/2 exactly — an antisymmetry property of the
+The head on the wall plane below the tip equals (h1+h2)/2 exactly — an antisymmetry property of the
 exact solution that the FE solution reproduces to four decimals. The
 Pavlovsky form factor itself is additionally confirmed by an independent
 finite-difference solution of the same boundary-value problem (~0.4–0.5%

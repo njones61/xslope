@@ -24,6 +24,8 @@ the shared [References](references.md) page.
 - **Elastic constants and tensile caps** follow the vendor model.
 - **Initial stress** is the at-rest field `k0 = 1` on every strength-reduction row.
 - **Flow rule.** Every strength-reduction row runs ψ = 0.
+- **Mesh.** Every row is meshed at its stated size. A row mentions refinement only where a finer
+  mesh changes its factor.
 - **Strength-reduction constraints.** A constraint the vendor model states (an SSR search polygon,
   an elastic twin) is carried in the file, or the row says why it is not.
 - **Deep mechanisms.** Where the published mechanism is deeper than the unconstrained one, the row
@@ -73,7 +75,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [13](#rs2-13) | 🟢 | Simple slope III (Yamagami & Ueta) | SSRM 1.332 vs RS2 SSRM 1.33 (+0.2%) | |
 | [14](#rs2-14) | 🟡 | Simple slope, pore pressure by r<sub>u</sub> | SSRM 0.934 vs RS2 SSRM 0.98 (−4.7%) | (caveat) the factor never becomes mesh-independent; the row reports the 2.0 m mesh. |
 | [15](#rs2-15) | 🟢 | Layered slope II (Greco ex. 4 / Yamagami & Ueta) | SSRM 1.372 vs RS2 SSRM 1.38 (−0.6%) | Scored against the Part IV VP19 model this file is built from. |
-| [16](#rs2-16) | 🟢 | Layered slope and water table with weak seam (Greco ex. 5 / Chen & Shao) | SSRM 0.978 inside Greco 0.973–1.1 · vs RS2 SSRM 1.02 (−4.1%) | Greco's own published range is the source author's and is the referee. Nearly mesh-invariant (0.997 at 4.0 m). |
+| [16](#rs2-16) | 🟢 | Layered slope and water table with weak seam (Greco ex. 5 / Chen & Shao) | SSRM 0.978 inside Greco 0.973–1.1 · vs RS2 SSRM 1.02 (−4.1%) | Greco's own published range is the source author's and is the referee. |
 | [17](#rs2-17) | 🟢 | Slope with three pore pressure conditions (Fredlund & Krahn) | Dry: SSRM 1.987 vs RS2 SSRM 1.98 (+0.4%) · r<sub>u</sub> = 0.25: SSRM 1.692 vs RS2 SSRM 1.68 (+0.7%) | (dry and r<sub>u</sub> cases; the water-table case is not built) |
 | [18](#rs2-18) | 🟢 | Three pore pressure conditions and a weak seam (Fredlund & Krahn) | Dry: SSRM 1.334 vs RS2 SSRM 1.34 (−0.4%) · r<sub>u</sub> = 0.25: SSRM 1.042 vs RS2 SSRM 1.05 (−0.8%) | (dry and r<sub>u</sub> cases; the water-table case is not built) RS2 publishes two runs from input-identical files — 1.34 / 1.05 on its own model, 1.26 / 0.99 on the Slide2 VP22 model imported into RS2 — and the row is scored on RS2's own run. |
 | [19](#rs2-19) | 🟡 | Undrained layered slope (Low 1989) | SSRM 1.488 vs Low 1.44 (+3.3%) · vs RS2 SSRM 1.41 (+5.5%) | (caveat) Low's own factor is the referee; the two SSRM values straddle the LEM. |
@@ -82,9 +84,9 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [22](#rs2-22) | 🟢 | Layered slope with undulating bedrock | SSRM 1.523 vs RS2 SSRM 1.52 (+0.2%) | (SSRM variant) on the vendor's boundary-load cap, carried at the vendor's own vertical load direction. |
 | [23](#rs2-23) | 🟢 | Underwater slope with linearly varying cohesion | Under RS2's own elastic partition: SSRM 1.112 vs RS2 SSRM 1.12 (−0.7%) | The vendor model states the "can't fail" region element by element (a full-depth vertical band, not the text's "above el. −20 and right of the bench"), and the file carries it. Partition removed, the same model reads 0.215. |
 | [24](#rs2-24) | 🟡 | Layered slope with geosynthetic reinforcement | 1.104 / 0.975 | RS2 SSR 1.15 (−4.0%) and 0.95 (+2.6%). Modeled as the vendor models are: the mesh split along the geotextile, the two faces on a frictional slip interface, and the ~1 m elastic strip up the embankment face. |
-| [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs RS2 SSRM 1.29 (−6.8%) | (caveat) refinement widens the gap rather than closing it: 1.188 at a 2.5 m mesh against 1.202 at 5 m. |
+| [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs RS2 SSRM 1.29 (−6.8%) | |
 | [26](#rs2-26) | 🟢 | Clarence Cannon dam (Wolff & Harr 1987) | SSRM 2.294 vs RS2 SSRM 2.29 (+0.2%) | |
-| [27](#rs2-27) | 🟢 | Homogeneous slope, pore pressure by r<sub>u</sub> | SSRM 1.342 vs RS2 SSRM 1.31 (+2.4%) | Reported at the 1.0 m mesh, flat from there down. |
+| [27](#rs2-27) | 🟢 | Homogeneous slope, pore pressure by r<sub>u</sub> | SSRM 1.342 vs RS2 SSRM 1.31 (+2.4%) | |
 | [28](#rs2-28) | 🟢 | Excavated slope, FE groundwater and matric suction (Ng & Shi 1998) | H = 61: SSRM 1.669 vs RS2 SSR 1.64 (+1.8%) · H = 62: SSRM 1.544 vs RS2 SSR 1.55 (−0.4%) · H = 63: SSRM 1.406 vs RS2 SSR 1.41 (−0.3%) | (three heads) The files derive from the native `#028` variant, whose material partition holds 63% of the domain elastic, so the Part I §28 values are the referee. |
 | [29](#rs2-29) | 🟢 | Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) | Sand: SSRM 1.219 vs RS2 SSRM 1.22 (−0.1%) · Clay: SSRM 0.997 vs RS2 SSR 0.99 (+0.7%) | (both cases) The sand model runs unconstrained, as both vendor twins did; the clay model states its tension crack as geometry (crest cut at 2c/γ plus the removed weight as surcharge) and is transcribed that way. |
 | [30](#rs2-30) | 🟡 | Homogeneous slope, power-curve strength (Perry 1993) | SSRM 1.023 vs RS2 SSR 0.97 (+5.5%) | Run under the vendor model's own three SSR exclusion areas, carried in the file as "SSR elastic" overlays. Unconstrained the file reads 0.898, on the native rebuild's own 0.91. |
@@ -117,10 +119,10 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [48](#rs2-48) | 🟡 | Multi-tiered geotextile wall, baseline (Leshchinsky & Han 2004) | SSRM 1.037 vs Leshchinsky &amp; Han FDM referee 0.99 (+4.7%) | Modeled as the paper's dry stack — elastic blocks on friction joints, sheets on their own interfaces — at the paper's reinforcement stiffness J = 1000 kN/m. RS2's own SSR 1.05 comes from a facing meshed as one body and is shown beside it, not scored against. |
 | [49](#rs2-49) | 🔴 | Geotextile wall, fill-quality variant | SSRM 1.096 vs L&amp;H FDM referee 0.99 (+10.7%) | RS2 SSR 1.08 beside; both codes sit above the paper, whose wall fails through a facing neither program lets fail that way — see [RS2-48](#rs2-48). |
 | [50](#rs2-50) | 🟢 | Geotextile wall, 4.2 m reinforcement variant | SSRM 0.998 vs L&amp;H FDM referee 0.98 (+1.8%) | RS2 SSR 0.93 shown beside — see [RS2-48](#rs2-48). |
-| [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type |  | *unconfirmed* — the search closed at 1.018, but refining the mesh moves the factor by twice the search tolerance. |
+| [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type |  | *unconfirmed* — the search closed at 1.018, but a finer mesh moves the factor by twice the search tolerance of 0.02. |
 | [52](#rs2-52) | 🔴 | Geotextile wall, weak-foundation variant | SSRM 0.783 vs L&amp;H FDM referee 0.86 (−9.0%) | RS2 SSR 0.84 beside; the two codes fail this wall in different ways — see [RS2-52](#rs2-52). |
-| [53](#rs2-53) | <span class="nodata">⊘</span> | Geotextile wall, water variant |  | *unconfirmed* — the search closed at 1.037, but refining the mesh moves the factor by six times the search tolerance. |
-| [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant |  | *unconfirmed* — the search closed at 1.037, but refining the mesh moves the factor by twice the search tolerance; modeled at the paper's 11.6 kN/m sheet strength, where the vendor's file carries 10. |
+| [53](#rs2-53) | <span class="nodata">⊘</span> | Geotextile wall, water variant |  | *unconfirmed* — the search closed at 1.037, but a finer mesh moves the factor by six times the search tolerance of 0.02. |
+| [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant |  | *unconfirmed* — the search closed at 1.037, but a finer mesh moves the factor by twice the search tolerance of 0.02; modeled at the paper's 11.6 kN/m sheet strength, where the vendor's file carries 10. |
 | [55](#rs2-55) | 🟢 | Geotextile wall, tier-count variant | SSRM 1.018 vs L&amp;H FDM referee 1.00 (+1.8%) | RS2 SSR 1.04 shown beside — see [RS2-48](#rs2-48). |
 | [56](#rs2-56) | 🟢 | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) | Case 2 (weakest): SSRM 0.664 vs RS2 SSRM 0.67 (−0.9%) · Case 5 (strongest): SSRM 2.096 vs RS2 SSRM 2.14 (−2.1%) | The weakest and strongest cases are scored; case 5 is the wider of them and sets the dot. |
 | [57](#rs2-57) | 🟢 | Pruska H = 10.5 m, 6 cases | Case 1 (weakest): SSRM 0.439 vs RS2 SSRM 0.44 (−0.2%) · Case 6 (strongest): SSRM 1.401 vs RS2 SSRM 1.42 (−1.3%) | The weakest and strongest cases are scored; case 6 is the wider of them and sets the dot. |
@@ -281,8 +283,7 @@ reflect RS2 finding the same band either way, not an inert exclusion area. Slide
 ACADS referee 1.95 are limit-equilibrium answers on the gentler upstream face, and
 [RS2 Part IV VP6](#p4-vp6) confines the same dam to that face.
 
-Both rows are taken at the 6.5 m tri6 mesh, 3,166 elements against the vendor model's 2,204, and
-both mechanisms drift mildly downward under refinement.
+Both rows are taken at the 6.5 m tri6 mesh, 3,166 elements against the vendor model's 2,204.
 
 <!-- test: file=files/rocscience/vp005.xlsx, type=mesh_elements, element_type=tri6, target_size=6.5, expected_elements=3166, benchmark=RS2-4-mesh -->
 <!-- test: file=files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.672, element_type=tri6, target_size=6.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-4 -->
@@ -505,7 +506,7 @@ Slide2 counterpart: [VP20](rocscience.md#vp20).
 | SSRM | 0.978 | Greco 0.973–1.1 (inside) | 1.02 (−4.1%) | 1.093 circular / 1.007 noncircular | 1.086–1.091 |
 
 Greco's own published range is the source author's factor and is the referee; RS2's SSRM is shown
-beside it at −4.1%. A step of refinement moves the factor little: 0.997 at 4.0 m, 0.978 at 3.0 and
+beside it at −4.1%. The factor reads 0.997 on a 4.0 m mesh and 0.978 at 3.0 and
 2.2 m. The model's base is an inclined polygon boundary, fixed along its whole length rather than at
 the nodes of the lowest elevation alone (as at [#22](#rs2-22)).
 
@@ -556,8 +557,7 @@ Slide2 counterpart: [VP22](rocscience.md#vp22).
 RS2 publishes two solutions of this problem from input-identical files that differ in mesh
 density and in whether the tensile strength is reduced with the shear strength; on the
 r<sub>u</sub> case the two vendor answers are 6.1% apart. XSLOPE lands within 0.8% of RS2's own
-model on both cases, and the row is scored against it. The dry case returns the same factor at
-2.0 m and 1.5 m, the mechanism following the weak seam. The water-table case, the only one whose
+model on both cases, and the row is scored against it. The water-table case, the only one whose
 vendor model carries an SSR polygon, is not built.
 
 <!-- test: file=files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-18-m2.0, f_stand=1.328125, f_fail=1.3390625, check=edges -->
@@ -707,7 +707,7 @@ partition; take the strip away and the same model slips on the face instead:
 | face strip held elastic, as the vendor models build it | 1.104 |
 | face strip yielding with the rest of the fill | 0.822 |
 
-A step of refinement from 2.0 m to 1.5 m raises each case by 0.024 (1.080 → 1.104 and
+A finer mesh, 1.5 m against 2.0 m, raises each case by 0.024 (1.080 → 1.104 and
 0.951 → 0.975), and the two 1.5 m values land on either side of RS2's own. Part IV publishes
 1.24 / 1.21 / 0.98 for this problem from Slide2 imports with an SSR search polygon and a much
 larger elastic region, a different constraint on the same problem, so the rows here are scored
@@ -734,7 +734,7 @@ Slide2 counterpart: [VP33](rocscience.md#vp33).
 | SSRM | 1.202 | 1.29 (−6.8%) | Bishop 1.305 | 1.31 | 1.320 on Slide's circle |
 
 Geometry, material zones, unit weights and elastic constants follow the RS2 vendor `.fez`
-(`slope stability #025.fez`). Refinement widens the deficit rather than closing it: at a 2.5 m
+(`slope stability #025.fez`). A finer mesh widens the deficit rather than closing it: at a 2.5 m
 element size the model meshes to 5,239 elements against 1,457 (3,080 nodes) at the 5 m size and
 reads **1.188**, further below RS2's 1.29, with finer meshes continuing in the same direction.
 
@@ -1147,8 +1147,8 @@ returns that band, at **1.521**, −0.6% on RS2's 1.53:
 | XSLOPE SSRM | 1.109 | 1.229 | 1.452 | **1.521** | 1.521 | 1.583 |
 
 The 30 and 50 ft cutoffs return the same 1.521, so the deep answer is the one they agree on; at
-80 ft the cutoff excludes the upper reach of the basal band along with the skin. A step of
-refinement moves the deep value from 1.521 at the 12.4 ft mesh (2,223 tri6) to 1.470 at 8 ft
+80 ft the cutoff excludes the upper reach of the basal band along with the skin. A finer mesh
+moves the deep value from 1.521 at the 12.4 ft mesh (2,223 tri6) to 1.470 at 8 ft
 (5,220 tri6), and the skin drifts as well, so both are reported at the 12.4 ft mesh.
 
 **The finite-element seepage case** runs [vp077a.xlsx](files/rocscience/vp077a.xlsx), the file the
@@ -1349,13 +1349,12 @@ limit-equilibrium factors are in the second table.
 | 55 — tier number | 1.00 | 1.04 | 0.92 / 0.94 / 0.94 |
 
 Every row allows 250,000 iterations per trial, extended up to a
-million while a trial is still slowing, and the refinement step takes the element size from 1.0 m
-to 0.7 m.
+million while a trial is still slowing, and is searched to a tolerance of 0.02 on a 1.0 m mesh; a
+row mentions a finer mesh, 0.7 m, only where it moves the factor by more than that.
 
 #### 🟡 RS2-48: Multi-tiered geotextile wall, baseline (vp087_fem) {#rs2-48-baseline}
 
-The wall as the paper builds it: fill c = 0, φ = 34°, sheets 6.3 m long at 10 kN/m. Refining the
-mesh moves the factor by one step of the search.
+The wall as the paper builds it: fill c = 0, φ = 34°, sheets 6.3 m long at 10 kN/m.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
@@ -1371,7 +1370,7 @@ mesh moves the factor by one step of the search.
 
 The fill is weaker, φ = 25°, and the sheets stronger, 22 kN/m. The sheets keep the vendor's
 sheet-to-fill friction angle of 28.35°, whose tangent is 0.8 tan 34°, where the paper's rule on
-this fill would give about 20.5°. Refining the mesh does not move the factor.
+this fill would give about 20.5°.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
@@ -1395,7 +1394,7 @@ surface the paper reports, reached at a higher factor because the facing holds.
 #### 🟢 RS2-50: Geotextile wall, 4.2 m reinforcement (vp089_fem) {#rs2-50}
 
 The sheets are shortened to 4.2 m. The failure surface runs from the toe up through the fill,
-crossing the lower sheets and passing behind the ends of the upper ones, which no longer reach it. Refining the mesh moves the factor by one step of the search.
+crossing the lower sheets and passing behind the ends of the upper ones, which no longer reach it.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
@@ -1411,7 +1410,7 @@ crossing the lower sheets and passing behind the ends of the upper ones, which n
 
 Two grades of sheet in one wall: the lower seven at 11.0 kN/m, the upper eight at 7.5, with the
 vendor's shear stiffness of 10,000 on the lower seven against 100,000 above. *Unconfirmed*: every
-trial came to rest, but refining the mesh moves the factor by twice the search tolerance.
+trial came to rest, but the 0.7 m mesh moves the factor by twice the search tolerance.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
@@ -1446,7 +1445,7 @@ tension.
 #### ⊘ RS2-53: Geotextile wall, water (vp092_fem) {#rs2-53}
 
 A pond stands against the wall, with the reinforced fill free-draining. *Unconfirmed*: every
-trial came to rest, but refining the mesh moves the factor by six times the search tolerance, the
+trial came to rest, but the 0.7 m mesh moves the factor by six times the search tolerance, the
 most in the family.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
@@ -1460,8 +1459,8 @@ most in the family.
 #### ⊘ RS2-54: Geotextile wall, crest surcharge (vp093_fem) {#rs2-54}
 
 A uniform 20 kPa surcharge on the top tier, from the back of the top facing column to the far
-boundary, as the vendor's model applies it. *Unconfirmed*: every trial came to rest, but refining
-the mesh moves the factor by twice the search tolerance.
+boundary, as the vendor's model applies it. *Unconfirmed*: every trial came to rest, but the
+0.7 m mesh moves the factor by twice the search tolerance.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
@@ -1481,8 +1480,7 @@ the sheet strength directly.
 
 #### 🟢 RS2-55: Geotextile wall, tier count (vp094_fem) {#rs2-55}
 
-The same 9 m of height in five 1.8 m tiers offset 0.6 m, three sheets per tier. Refining the mesh
-moves the factor by one step of the search.
+The same 9 m of height in five 1.8 m tiers offset 0.6 m, three sheets per tier.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
@@ -2142,8 +2140,8 @@ instead.)
 |---|---|---|---|---|
 | SSRM (1 m mesh) | 1.656 | 1.63 (+1.6%) | 1.65 (+0.4%) | 1.592 |
 
-The factor holds under refinement: 1.681 / 1.656 / 1.656 / 1.644 at 3 / 1.5 / 1.0 / 0.7 m, within
-one step of the search from 1.5 m down; at 3 m the zone is about one element thick.
+The factor reads 1.681 / 1.656 / 1.656 / 1.644 at 3 / 1.5 / 1.0 / 0.7 m; at 3 m the zone is about
+one element thick.
 
 <!-- test: file=files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.681, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP2-m3.0, f_stand=1.675, f_fail=1.6875, check=edges -->
 <!-- test: file=files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.656, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP2-m1.5, f_stand=1.65, f_fail=1.6625, check=edges -->
@@ -2371,7 +2369,7 @@ construction.
 *The Slide2 and USACE columns on the constrained row are on the specified toe circle.*
 
 Unconstrained, the SSRM finds a deep translational mechanism riding the foundation/bedrock contact
-through the soft φ = 2° clay, the same between the 8 and 4 ft element sizes, and XSLOPE's own
+through the soft φ = 2° clay, and XSLOPE's own
 circular LEM search finds the same deep family; the USACE specified circle does not probe it. RS2's
 1.33 bars strength reduction in the foundation below the circle's lowest point (≈ El. 81);
 vp067c splits the foundation there and excludes the lower zone, and the band moves up onto the toe
@@ -2517,8 +2515,6 @@ returns the same value with and without it.
 <!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.779, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c3, f_stand=1.7734375, f_fail=1.784375, check=edges -->
 <!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=2.173, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c3, f_stand=2.1671875, f_fail=2.178125, check=edges -->
 <!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.687, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-1500-c3, f_stand=2.68125, f_fail=2.6921875, check=edges -->
-
-The dry-case factor moves mildly between the 2.5 and 1.5 m element sizes.
 
 ![RS2 Part IV VP102: dry homogeneous earth dam (Huang & Jia 2008), SSRM 2.470 vs RS2 SSRM 2.43 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP102.png)
 

@@ -110,6 +110,10 @@ where possible on a value the model fixes and the chart must show. Every chart
 target is also checked on XSLOPE's own solved field, which catches any change
 in that field, with the chart comparison reported beside it.
 
+Every problem is meshed at its stated size. A problem mentions refinement only
+where a finer mesh changes its answer, or where a mesh test is the evidence that
+a gap to the published answer is not a mesh effect.
+
 ## Steady-state problems {#steady-state}
 
 ### 🟢 GW1: Shallow unconfined flow with rainfall {#gw1}
@@ -501,8 +505,7 @@ table at ≈0.25 m there; and on Fig 8.3's own labeled pressure-head contours *a
 reproduces all fourteen digitized station values to 0.010 m rms, while *a* = 2777.7 never
 reaches enough suction to draw the −0.17 m and −0.20 m contours the figure shows at all.
 
-**The flux boundary behaves exactly.** Total applied inflow is *q*·*L* = 4.44440×10⁻⁵ at every
-mesh size tested, from 243 to 14,867 nodes; the confined form of the same model produces a head
+**The flux boundary behaves exactly.** Total applied inflow is *q*·*L* = 4.44440×10⁻⁵; the confined form of the same model produces a head
 rise of 0.163998 m against the one-dimensional hand calculation
 *q*·(0.4/*k*<sub>B</sub> + 0.1/*k*<sub>A</sub>) = 0.163998 m, agreeing to six figures.
 

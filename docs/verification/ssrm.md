@@ -30,8 +30,10 @@ are on the shared [References](references.md) page.
   read off the plotted points. Torggler's factors are PLAXIS $\Sigma M_{sf}$ values printed to
   three decimals, beside a SLIDE limit-equilibrium table. Hammah et al. print their SSR factor
   to two decimals and their limit-equilibrium factors to three.
-- **Meshes.** Parameter series run on a coarse tri6 mesh; the stations that carry the argument
-  run again on a refined quad8 mesh.
+- **Meshes.** Every row is meshed at its stated size. Parameter series run on a coarse tri6 mesh;
+  the stations that carry the argument run again on a refined quad8 mesh, printed beside the
+  coarse values. Beyond that, a row mentions refinement only where a finer mesh changes its
+  factor.
 - **What the dot is scored against.** Every dot is scored against the source's own published
   result for the same problem, read with the matching failure criterion. Where a classical chart
   solution is also quoted (Taylor, Morgenstern, Bishop & Morgenstern, Cousins) it is labeled as
@@ -631,8 +633,7 @@ paper's 2.5 × 10⁻⁵ being a rounded print of exp(−95/9).
 
 The paper dimensions only the slope and leaves the foundation depth and lateral extents unstated.
 The answer does not depend on them: foundation depths of 2, 4, 6 and 10 m all return Bishop 1.150
-and Spencer 1.152, because the critical mechanism exits at the toe. The SSRM approaches the
-published value from above as the mesh refines. Corps of Engineers and Lowe & Karafiath, the two
+and Spencer 1.152, because the critical mechanism exits at the toe. Corps of Engineers and Lowe & Karafiath, the two
 methods that struggle on strong rock masses where the instantaneous friction angle at low
 confinement exceeds about 55°, are well behaved on this weak envelope; see the
 [LEM overview](../lem/overview.md#hoek-brown-strength).

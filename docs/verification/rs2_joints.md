@@ -44,10 +44,10 @@ shared [References](references.md) page.
   `Improve Joint Convergence` option. The run without it is the vendor's default and the same
   method as XSLOPE's, a strength reduction on a continuum with interfaces, so it is the yardstick.
   Both are recorded in every row; their spread is the width of the vendor's own answer.
-- **Mesh.** Each row is meshed at its joint spacing, one element across the rock between one
-  discontinuity and the next, and states what a step of refinement does to its factor. Problem 1's
-  four cases are meshed at 5 m, half their 10 m block width, where three finer meshes return the
-  same bracket.
+- **Mesh.** Every row is meshed at a single size, its joint spacing: one element across the rock
+  between one discontinuity and the next. Problem 1's four cases are meshed at 5 m, half their 10 m
+  block width. A row mentions refinement only where a finer mesh changes its factor, and on this
+  page none does.
 - **Search.** The factor of safety is found by bisection on the bracket [a, b] between the highest
   factor at which the slope stands and the lowest at which it fails. A jointed model takes tens of
   thousands of iterations to settle, so every row allows 250,000 per trial, and a trial that is
@@ -94,7 +94,7 @@ joint model whose output is a stress-displacement curve.
 | [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | SSRM 1.213 vs UDEC 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | *unconfirmed* — the search did not close: its top trial, F = 1.222656, stops moving at 500,000 iterations without its forces balancing. The vendor's two settings disagree with each other. |
 | [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | — | 1.19 / 1.27 | |
 | [5](#rj-5) | 🔴 | Lorig & Varona backward block toppling | SSRM 1.857 vs UDEC 1.7 (+9.2%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | The vendor's two settings disagree with each other by the widest margin in the manual; XSLOPE lands on the one with its convergence aid on. |
-| [6](#rj-6) | 🟢 | Plane failure, daylighting | SSRM 1.271 vs UDEC 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | A step of refinement returns the same bracket, end for end. |
+| [6](#rj-6) | 🟢 | Plane failure, daylighting | SSRM 1.271 vs UDEC 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | |
 | [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | — | 1.57 / 1.59 | Both finite element codes land above the referee, on the same side and within half a point of each other. |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | 0.75 vs 0.76 (−1.3%) | — | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.037 vs UDEC 1.03 (+0.7%) | 1.01 vs 1.03 (−1.9%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
@@ -151,9 +151,6 @@ assumptions the solution obeys exactly: every block balances in force and in mom
 interface stresses alone, every closed side pair is at its friction limit, and the base reaction of
 every toppling block sits on its downslope corner.
 
-At the block width of 10 m the bracket reads 1.037; at 2D sizes of 7.0 m, 5.0 m and 3.5 m it reads
-1.018, one step of the search lower, and at 5.0 m, the mesh the row is run on, all nine trials settle.
-
 The manual's figure labels the side boundaries as rollers, but the model clamps them and the
 restraints follow the model. The 0.5 kN toe force, negligible against the lowest block's weight,
 is not carried; the vendor's reruns of all four cases move the force from the toe at (−0.5, 0.866)
@@ -184,11 +181,6 @@ measured heights the recursion returns **1.0078**, the bottom of this row's brac
 
 <!-- test: file=files/rocscience/joints/rj001b.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1b, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
 
-The mesh does not move this row: the block width of 10 m and the 5.0 m the row is run on return the same
-factor, and at 5.0 m every trial settles within the iteration limit. On this case a few hundred
-kilonewtons per meter of extra capacity is worth under two points of factor of safety, and the
-interface change refinement makes is smaller than that.
-
 Every input class matches the vendor model, including the side restraint and the force's magnitude
 and direction.
 
@@ -212,10 +204,6 @@ Given the thrust heights read off the solved state at the block width of 10 m, t
 returns **1.0469**, the bottom of that mesh's bracket — case a's mechanism and case a's
 assumption, half a degree of friction further on.
 
-**The mesh moves this row the same way it moves case a.** At the block width of 10 m the bracket
-reads 1.057; at the 5.0 m the row is run on it reads 1.037, one step of the search down and inside the
-row's own tolerance. Every trial at 5.0 m settles within the iteration limit.
-
 **Input file:** [rj001c.xlsx](files/rocscience/joints/rj001c.xlsx).
 
 ![RJ-1c: Goodman & Bray block toppling, case c (rj001c) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The mechanism is case a's at half a degree more friction: the same forward rotation of the column stack over the face, and the same slip on every column contact and along the stepped base](images/RJ-1c.png)
@@ -236,11 +224,6 @@ the corner of the contact.
 | **1.252** | 1.2308 (+1.7%) | 1.19 vs 1.2308 (−3.3%) | 1.22 (+2.6%) | 1.19 / 1.16 |
 
 <!-- test: file=files/rocscience/joints/rj001d.xlsx, type=fem_ssrm, expected_fs=1.252, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1d, tier=gate, f_stand=1.2421875, f_fail=1.26171875, check=edges -->
-
-The mesh does not move this row either: the block width of 10 m and the 5.0 m the row is run on
-return the same bracket, end for end, and at 5.0 m every trial settles within the iteration limit. Like case
-b, this case is posed where the toe-force curve is steep, so the interface change that refinement
-makes cannot carry it across a step of the search.
 
 Every input class matches the vendor model, the force reaching the same point case b's does.
 
@@ -264,9 +247,6 @@ same method on the same problem.
 | **0.783** | 0.7734 (+1.2%) | 0.86 vs 0.7734 (+11.2%) | 0.87 (−10.0%) | 0.86 / 0.82 |
 
 <!-- test: file=files/rocscience/joints/rj002.xlsx, type=fem_ssrm, expected_fs=0.783, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-2, f_stand=0.7734375, f_fail=0.79296875, check=edges, tier=gate -->
-
-A step of refinement to 0.35 m moves the factor by one step of the search, inside the row's own
-tolerance, and all nine trials decide on both meshes.
 
 **The two programs that are not the closed form land together above it.** Alejano & Alonso publish
 their own UDEC run at 0.87 beside their Goodman & Bray 0.76, and RS2 reports 0.86 and 0.82: all
@@ -333,10 +313,6 @@ E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°.
 
 <!-- test: file=files/rocscience/joints/rj004.xlsx, type=fem_ssrm, expected_fs=1.311, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4, f_stand=1.30078125, f_fail=1.3203125, check=edges, tier=gate -->
 
-A step of refinement — a 2D size of 8.4 m, which takes the mesh from 9,993 nodes and 936 interface
-elements to 19,130 and 1,325 — does not move the factor at all: the finer mesh returns the same
-bracket, end for end. Every trial settles on both meshes.
-
 Every transcribed input class matches the vendor model, including the side restraint.
 
 **Input file:** [rj004.xlsx](files/rocscience/joints/rj004.xlsx).
@@ -362,9 +338,6 @@ vendor's default, and on the vendor's own second number: its two solution scheme
 1.86 on this model, the widest spread in the manual, and the vendor needed its `Improve Joint
 Convergence` option to rerun the problem at all.
 
-A step of refinement to 8.4 m, run with 250,000 iterations per trial, brackets a factor one step
-lower without closing; it has not been run with the longer limit.
-
 Every transcribed input class matches the vendor model, including the side restraint.
 
 **Input file:** [rj005.xlsx](files/rocscience/joints/rj005.xlsx).
@@ -383,9 +356,6 @@ slabs between them are free to slide out. The rock is Mohr-Coulomb (γ = 26.1 kN
 | **1.271** | 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | 1.25 / 1.31 |
 
 <!-- test: file=files/rocscience/joints/rj006.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-6, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate -->
-
-A step of refinement to a 2D size of 8.4 m returns the same bracket, end for end, and every trial
-comes to rest on both meshes.
 
 The factor matches UDEC and sits between the vendor's two numbers, 1.25 and 1.31.
 
@@ -407,10 +377,6 @@ higher than problem 6's.
 | **1.564** | 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | 1.57 / 1.59 |
 
 <!-- test: file=files/rocscience/joints/rj007.xlsx, type=fem_ssrm, expected_fs=1.564, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7, f_stand=1.5546875, f_fail=1.57421875, check=edges, tier=gate -->
-
-A step of refinement — a 2D size of 8.4 m, which takes the mesh from 9,986 nodes and 934 interface
-elements to 19,179 and 1,323 — does not move the factor at all: the finer mesh returns the same
-bracket, end for end. Every trial settles on both meshes.
 
 Every transcribed input class matches the vendor model, including the side restraint. The manual's
 own table for this problem prints the slope angle as 5°; the figure and the model are the same 55°
@@ -439,10 +405,7 @@ k<sub>n</sub> = 1.5 × 10<sup>7</sup> kPa/m against the set's usual 10<sup>8</su
 
 <!-- test: file=files/rocscience/joints/rj008.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-8, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
 
-A step of refinement to 1.05 m moves the factor by one step of the search, inside the row's own
-tolerance, and all nine trials settle on both meshes. The two meshes disagree about one trial, the
-one the search closes on: at F = 0.754 the slope stands on the corpus mesh and fails on the finer
-one. This row settles fastest of any here, where the [geotextile wall family](rs2.md#rs2-48) runs
+This row settles fastest of any here, where the [geotextile wall family](rs2.md#rs2-48) runs
 out of its iteration limit on five trials across its eight rows.
 
 The model's 75 kPa tensile strength sits above the Mohr-Coulomb apex its own c and φ imply, so the
@@ -472,9 +435,6 @@ belongs on; see [where a joint ends on another](../fem/joints.md#where-a-joint-e
 
 <!-- test: file=files/rocscience/joints/rj009.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-9, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
 
-A step of refinement to 2.1 m returns the same bracket, end for end, and every trial settles on both
-meshes.
-
 RS2's own two factors straddle this row — 1.01 without the joint improvement option and 1.09 with
 it — which is true of only three other problems in this corpus.
 
@@ -503,9 +463,6 @@ see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-anoth
 
 <!-- test: file=files/rocscience/joints/rj010.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-10, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
 
-A step of refinement to 2.1 m returns the same bracket, end for end, and every trial settles on both
-meshes.
-
 RS2's own two factors straddle this row — 0.92 without the joint improvement option and 1.08 with it,
 around 1.037 — as they do on [problem 9](#rj-9), [problem 5](#rj-5) and [problem 6](#rj-6) and on no
 other problem here. The paper's own limit equilibrium is again a range rather than an answer, 0.43 to
@@ -530,9 +487,6 @@ they belong on; see [where a joint ends on another](../fem/joints.md#where-a-joi
 | **1.213** | 1.2148 (−0.1%) | 1.22 vs 1.2148 (+0.4%) | 1.21 (+0.2%) | 1.7582 · the paper prints 1.75 | 1.22 / 1.3 |
 
 <!-- test: file=files/rocscience/joints/rj011.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-11, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
-
-A step of refinement to 1.05 m returns the same bracket, end for end, and every trial settles on both
-meshes.
 
 **This is the problem where Alejano's Eq. (7) is not a rigid-block answer.** The two blocks the
 mechanism cuts out — the slab and the toe block below it — admit no set of contact forces inside
@@ -571,9 +525,6 @@ other worked examples.
 The release traces end on the bedding plane they belong on (see
 [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint)).
 
-Two steps of refinement, to 1.05 m and 0.735 m, return the same bracket, end for end, and every
-trial settles on all three meshes.
-
 **The three independent answers for this problem do not agree with one another, and this row is the
 one nearest the closed form.** Alejano's limit equilibrium is 1.9659 recomputed, the paper's UDEC run is 1.78 and
 RS2 reads 1.39, on a mechanism whose governing mode — the toe block rotating out rather than
@@ -602,9 +553,6 @@ blocks, which is 0.9988, so the closed form and statics agree to three figures h
 | **0.998** | 1.0002 (−0.2%) | 1.0 vs 1.0002 (0.0%) | 0.9988 | 1.0 (−0.2%) | 1.0 / 1.05 |
 
 <!-- test: file=files/rocscience/joints/rj013.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-13, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
-
-A step of refinement to 1.05 m returns the same bracket, end for end, and every trial settles on both
-meshes.
 
 Every input class matches the vendor model, including the release traces' endpoints and the side
 restraint the vendor clamps in both directions.
@@ -636,8 +584,7 @@ block's base would have to be 6.08 m, which is a different problem. The manual's
 UDEC's 0.9, is corner rounding by the paper's own account: with the rounding radius reduced it
 reports 0.9994 for the same model.
 
-Two steps of refinement, to 1.05 m and 0.735 m, return the same bracket, end for end, and every
-trial settles on all three meshes. Every input class matches the vendor model, including the side
+Every input class matches the vendor model, including the side
 restraint the vendor clamps in both directions.
 
 **Input file:** [rj014.xlsx](files/rocscience/joints/rj014.xlsx).
@@ -678,9 +625,6 @@ the closed form. Both finite element codes miss it by the same amount and in the
 the gap belongs to what the formula is allowed to consider rather than to either program, and the
 searched limit-equilibrium answer is the referee, as the rigid-block bound is on
 [problem 11](#rj-11).
-
-A step of refinement to 1.4 m moves the factor by one step of the search, inside the row's own
-tolerance, and every trial settles on both meshes.
 
 Every input class matches the vendor model, including the side restraint; the 1000 kPa tensile cap
 sits above the Mohr-Coulomb apex and never binds.
@@ -755,9 +699,6 @@ rock bridges, so the referee is the manual's single distinct-element run.
 
 <!-- test: file=files/rocscience/joints/rj017.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-17, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
 
-A step of refinement to 0.7 m moves the factor by one step of the search, inside the row's
-tolerance, to 1.193, and every trial settles on both meshes.
-
 **What decides this row is the rock bridges.** The rock has no tensile capacity at all, so the
 intact ligaments between the joint segments carry nothing across them, and the strength reduction
 takes their 25 kPa cohesion down alongside the joint friction: the factor is the strength at which
@@ -786,10 +727,6 @@ k<sub>s</sub> = 10<sup>7</sup> kPa/m and are reduced with the rock in the streng
 | **0.998** | 1.01 (−1.2%) | 1.01 vs 1.01 (0.0%) | 1.01 / 1.00 |
 
 <!-- test: file=files/rocscience/joints/rj018.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-18, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
-
-A step of refinement — a 2D size of 0.7 m, which takes the mesh from 3,486 nodes and 48 interface
-elements to 6,707 and 66 — does not move the factor at all, and every trial on both meshes
-settles.
 
 **Input file:** [rj018.xlsx](files/rocscience/joints/rj018.xlsx).
 
@@ -820,10 +757,6 @@ distinct-element run and RS2 fail this block by some route those statics do not 
 | **1.623** | 1.5914 (+2.0%) | 1.5 vs 1.5914 (−5.7%) | 1.46 (+11.2%) | 1.5 / 1.41 |
 
 <!-- test: file=files/rocscience/joints/rj019.xlsx, type=fem_ssrm, expected_fs=1.623, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=true, k0=1, benchmark=RJ-19, f_stand=1.61328125, f_fail=1.6328125, check=edges, tier=gate -->
-
-A step of refinement to 2.1 m moves the factor by one step of the search, inside the row's own
-tolerance, but on that mesh the trial at the top of the bracket does not settle within the
-iteration limit. The row's value is taken on the corpus mesh, where every trial settles.
 
 The joint inclinations are the model's: the manual's table prints 59°, where its figure dimensions
 56° and 28° and the model's own endpoints give 56.3° and 28.4°.

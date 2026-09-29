@@ -3433,13 +3433,22 @@ def run_v21_roundtrip_test(test):
     if d2.get('side_bc') != 'fixed':
         problems.append(f"side_bc: {d2.get('side_bc')!r} != 'fixed'")
 
-    # A refine polygon with no Size is a no-op the user could not see — refused.
+    # A refine polygon with no Size is a no-op. It saves and reopens as drawn
+    # (anything Studio can save must reopen) and preflight names it before a
+    # mesh-based run — the loader no longer refuses it.
+    from xslope.preflight import preflight as _pf
     try:
-        _roundtrip(base, lambda d: d.update(
+        _, _d_nosize = _roundtrip(base, lambda d: d.update(
             refine_zones=[{'polygon': list(refine_ring), 'size': None}]))
-        problems.append("a refine polygon with no Size was accepted")
-    except ValueError:
-        pass
+        _rz = _d_nosize.get('refine_zones') or []
+        if len(_rz) != 1 or _rz[0].get('size') is not None:
+            problems.append(f"a refine polygon with no Size came back as {_rz!r}")
+        if not any(f.rule_id == 'mesh.refine_zone_no_size'
+                   for f in _pf(_d_nosize, 'fem').findings):
+            problems.append("a refine polygon with no Size reopened, but preflight "
+                            "did not name it")
+    except ValueError as exc:
+        problems.append(f"a refine polygon with no Size did not reopen: {exc}")
 
     # --- profile geometry: a per-line Size, and dload Directions ---
     prof_file = test.get('profile_file')
@@ -5485,6 +5494,50 @@ def _pf_joint_on_boundary(sd, on=True):
 #:             carry a paired 'excel' spec asserting the load-time refusal.
 #:   expect    a substring the finding's message must contain
 #:   load_error   for a paired spec: the substring the LOADER must refuse with
+def _pf_lload(sd, dy=0.0, **kw):
+    """One line load on the middle of the first ground-surface segment, raised by
+    ``dy`` off it; ``kw`` overrides x, y, P or angle."""
+    (xa, ya), (xb, yb) = list(sd['ground_surface'].coords)[:2]
+    row = {'x': 0.5 * (xa + xb), 'y': 0.5 * (ya + yb) + dy, 'P': 10.0,
+           'angle': -90.0, 'label': 'probe'}
+    row.update(kw)
+    sd['line_loads'] = [row]
+    return sd
+
+
+def _pf_profile_mat(sd, i, mat_id):
+    """Point profile line ``i`` (and the zone it builds) at a 0-based ``mat_id``."""
+    sd['profile_lines'][i]['mat_id'] = mat_id
+    sd['polygons'][i]['mat_id'] = mat_id
+    return sd
+
+
+def _pf_extra_profile_point(sd):
+    """Append a profile line carrying one point, inside the section."""
+    x, y = list(sd['ground_surface'].coords)[0]
+    sd['profile_lines'].append({'coords': [(x, y - 1.0)], 'mat_id': 0,
+                                'size': None})
+    return sd
+
+
+def _pf_overlap(sd):
+    """Draw a second copy of polygon 1 over it."""
+    p = sd['polygons'][0]
+    sd['polygons'].append(dict(p))
+    return sd
+
+
+def _pf_bc2(sd, **head_kw):
+    """Boundary set 2 built from set 1's specified heads, each updated with
+    ``head_kw`` (a reservoir kind, a series name)."""
+    bc = sd['seepage_bc']
+    sd['seepage_bc2'] = {
+        'specified_heads': [dict(b, **head_kw) for b in bc['specified_heads']],
+        'specified_fluxes': [], 'exit_face': list(bc.get('exit_face') or [])}
+    sd['has_seepage_bc2'] = True
+    return sd
+
+
 PREFLIGHT_RULE_SPECS = [
     # --- water and the unit weight of water --------------------------------
     dict(rule='water.gamma_water_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
@@ -6538,6 +6591,148 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_drop(_pf_mats(sd, sigma_c=1.0), 'mesh'),
          control=lambda sd: _pf_mats(sd, sigma_c=1.0),
          expect='generated automatically at a target element size'),
+
+    # --- values the file carries as typed ------------------------------------
+    # Each of these was a refusal at file load. Every spec runs through the real
+    # writer and the real loader ('excel'), so a pass is also the proof that the
+    # file a user saved with the value in it reopens, and the rule, not the loader,
+    # is what names it.
+    dict(rule='geometry.none_defined', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, profile_lines=[], polygons=[]),
+         expect='has no geometry yet'),
+    dict(rule='mat.none_defined', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, materials=[]),
+         expect='has no materials yet'),
+    dict(rule='geometry.material_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_profile_mat(sd, 0, 11),
+         expect='Profile line 1 has Mat ID 12'),
+    dict(rule='geometry.material_missing', base=PREFLIGHT_BASE_THIN, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: (sd['polygons'][0].update(mat_id=11), sd)[1],
+         expect='Polygon 1 has Mat ID 12'),
+    # A blank Mat ID: the writer used to drop such a zone on save, so the proof
+    # that it is kept is the rule finding it after the round trip.
+    dict(rule='geometry.material_missing', base=PREFLIGHT_BASE_THIN, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: (sd['polygons'][0].update(mat_id=None), sd)[1],
+         expect='Polygon 1 has no Mat ID'),
+    dict(rule='geometry.profile_line_too_short', base=PREFLIGHT_BASE_PROFILE,
+         mode='excel', mutation=_pf_extra_profile_point,
+         expect='so it bounds no zone'),
+    dict(rule='geometry.zones_overlap', base=PREFLIGHT_BASE_THIN, mode='excel',
+         analysis='fem', mutation=_pf_overlap,
+         expect='Material zones must tile the section'),
+    dict(rule='mat.gamma_sat_below_gamma', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, gamma_sat=1.0),
+         expect='Soil below the water table is at least as heavy'),
+    dict(rule='mat.pow_params_nonpositive', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='pow', pow_a=2.0, pow_b=0.0),
+         control=lambda sd: _pf_mats(sd, option='pow', pow_a=2.0, pow_b=0.7),
+         expect='pow_b = 0'),
+    dict(rule='mat.hb_params_invalid', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='hb', hb_sci=30000.0, hb_mi=10.0,
+                                      hb_gsi=0.0, hb_d=0.0),
+         control=lambda sd: _pf_mats(sd, option='hb', hb_sci=30000.0, hb_mi=10.0,
+                                     hb_gsi=60.0, hb_d=0.0),
+         expect='Geological Strength Index'),
+    dict(rule='piezo.line_too_short', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, piezo_line=sd['piezo_line'][:1]),
+         expect='Piezometric line 1 has one point'),
+    dict(rule='dload.line_too_short', base=PREFLIGHT_BASE_REINF, mode='excel',
+         mutation=lambda sd: _pf_set(sd, dloads=[sd['dloads'][0][:1]]),
+         expect='Distributed load #1 has one point'),
+    dict(rule='main.num_slices_too_few', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, num_slices=1),
+         control=lambda sd: _pf_set(sd, num_slices=30),
+         expect='Enter at least 2'),
+    dict(rule='fem.k0_nonpositive', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, k0=-0.5),
+         control=lambda sd: _pf_set(sd, k0=0.5),
+         expect='Enter a positive at-rest coefficient'),
+    dict(rule='mesh.size_nonpositive', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, target_size=0.0),
+         control=lambda sd: _pf_set(sd, target_size=2.0),
+         expect='Target element size is 0'),
+    dict(rule='mesh.size_nonpositive', base=PREFLIGHT_BASE_THIN, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: (sd['polygons'][0].update(size=-1.0), sd)[1],
+         expect='Polygon 1 has a Size of -1'),
+    dict(rule='mesh.refine_zone_no_size', base=PREFLIGHT_BASE_THIN, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, refine_zones=[
+             {'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)], 'size': None}]),
+         control=lambda sd: _pf_set(sd, refine_zones=[
+             {'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)], 'size': 0.5}]),
+         expect='Refine region 1 has no Size'),
+    dict(rule='ssrm.bracket_reversed', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_set(sd, ssrm_f_min=3.0, ssrm_f_max=1.0),
+         control=lambda sd: _pf_set(sd, ssrm_f_min=0.5, ssrm_f_max=3.0),
+         expect='F min must be the smaller'),
+    dict(rule='surface.search_window_reversed', base=PREFLIGHT_BASE_LEM,
+         mode='excel', selection={'surface': 'circular', 'search': True},
+         mutation=lambda sd: _pf_set(sd, search_window={'entry_x_min': 50.0,
+                                                        'entry_x_max': 10.0}),
+         control=lambda sd: _pf_set(sd, search_window={'entry_x_min': 10.0,
+                                                       'entry_x_max': 50.0}),
+         expect='nowhere to look'),
+    dict(rule='reinforce.pullout_length_missing', base=PREFLIGHT_BASE_REINF,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', lp1=float('nan')),
+         expect='leaves Lp1 blank'),
+    dict(rule='reinforce.spacing_nonpositive', base=PREFLIGHT_BASE_REINF,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', spacing=0.0),
+         expect='has Spacing = 0'),
+    dict(rule='reinforce.end_capacity_negative', base=PREFLIGHT_BASE_REINF,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', tend1=-1.0),
+         expect='has Tend1 = -1'),
+    dict(rule='joint.endpoints_incomplete', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, y2=float('nan')),
+         control=lambda sd: _pf_joint_sheet(sd),
+         expect='leaves y2 blank'),
+    dict(rule='lload.incomplete', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_lload(sd, P=float('nan')),
+         control=lambda sd: _pf_lload(sd),
+         expect='leaves P blank'),
+    dict(rule='lload.magnitude_nonpositive', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_lload(sd, P=-5.0),
+         control=lambda sd: _pf_lload(sd),
+         expect='has P = -5'),
+    dict(rule='lload.off_ground_surface', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_lload(sd, dy=5.0),
+         control=lambda sd: _pf_lload(sd),
+         expect='from the ground surface'),
+    dict(rule='seep.set2_reservoir', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_bc2(sd, kind='reservoir'),
+         control=lambda sd: _pf_bc2(sd, kind='head'),
+         expect='has Type reservoir'),
+    dict(rule='seep.set2_time_series', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_bc2(sd, head='t1'),
+         control=lambda sd: _pf_bc2(sd),
+         expect='names the time series'),
+    dict(rule='seep.series_undefined', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_set(sd, seepage_bc=dict(
+             sd['seepage_bc'],
+             specified_heads=[dict(sd['seepage_bc']['specified_heads'][0],
+                                   head='nosuch')]
+             + sd['seepage_bc']['specified_heads'][1:])),
+         expect="names the time series 'nosuch', which is not defined"),
+    dict(rule='seep.bc_polyline_too_short', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_set(_pf_bc2(sd), seepage_bc2=dict(
+             sd['seepage_bc2'], specified_fluxes=[
+                 {'flux': 0.0,
+                  'coords': sd['seepage_bc']['specified_heads'][0]['coords'][:1]}])),
+         control=lambda sd: _pf_bc2(sd),
+         expect='of boundary set 2 has fewer than two points'),
 ]
 
 

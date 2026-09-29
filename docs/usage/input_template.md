@@ -587,8 +587,8 @@ Size is **independent of Type**. A material zone with a Size is that soil zone, 
 zone with a Size is the same analysis overlay, with the elements it selects resolved more finely. And a
 polygon whose Type is **`refine`** is nothing but a Size: it carries no material, never becomes a mesh
 region, never generates slices and is invisible to every solver — the only thing it does is make the
-mesh finer where it is drawn. A `refine` polygon must therefore carry a Size; one without is rejected
-at load time rather than sitting silently in the file doing nothing.
+mesh finer where it is drawn. A `refine` polygon must therefore carry a Size; one without does nothing,
+and the [preflight check](preflight.md) says so before a mesh-based analysis runs.
 
 Use a refine region to resolve something the geometry does not mark out on its own — the ground under a
 footing, the zone a slip surface is expected to pass through, or the tip of a cutoff wall. Use a

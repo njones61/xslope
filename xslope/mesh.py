@@ -3927,7 +3927,11 @@ def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
     import copy
 
     # Extract profile lines and max depth from slope_data
-    profile_lines = slope_data.get('profile_lines', [])
+    # A line with fewer than two points bounds no zone. It can sit in a model that
+    # is still being drawn (it reopens as entered), and preflight's
+    # geometry.profile_line_too_short names it; here it is simply not a boundary.
+    profile_lines = [p for p in (slope_data.get('profile_lines') or [])
+                     if len(p.get('coords') or []) >= 2]
     max_depth = slope_data.get('max_depth', None)
 
     if not profile_lines:

@@ -407,18 +407,25 @@ def _make_v18(mutate=None, raw_cells=None):
     return tmp
 
 
-def _expect_load_error(path, needle, label):
+def _expect_preflight(path, rule_id, analysis, needle, label):
+    """The file opens (the loader reads structure only), and preflight names the
+    value when the analysis that reads it is checked."""
     import warnings as _w
     from xslope.fileio import load_slope_data
+    from xslope.preflight import preflight
     try:
         with _w.catch_warnings():
             _w.simplefilter("ignore")
-            load_slope_data(path)
+            sd = load_slope_data(path)
     except Exception as e:  # noqa: BLE001
-        if needle in str(e):
-            return []
-        return [f"{label}: raised but message lacked {needle!r}: {e!r}"]
-    return [f"{label}: expected a raise mentioning {needle!r}, none occurred"]
+        return [f"{label}: the file did not reopen: {e!r}"]
+    hits = [f for f in preflight(sd, analysis).findings if f.rule_id == rule_id]
+    if not hits:
+        return [f"{label}: reopened, but preflight({analysis!r}) did not report "
+                f"{rule_id}"]
+    if not any(needle in f.message for f in hits):
+        return [f"{label}: {rule_id} fired without {needle!r}: {hits[0].message!r}"]
+    return []
 
 
 def check_v18_selector_semantics():
@@ -553,7 +560,8 @@ def check_v18_tseep_absent_is_legacy():
 
 
 def check_v18_validation_errors():
-    """The four load-time validation rules fire with clear, specific messages."""
+    """The transient and boundary-set value rules: each file OPENS, and the
+    preflight rule for the analysis that reads the value names it."""
     import os as _os
     from xslope.fileio import write_cells_to_xlsx
     if not _v18_fixtures_present():
@@ -562,12 +570,14 @@ def check_v18_validation_errors():
 
     # tseep present but no time_unit declared.
     tmp = _make_v18(lambda sd: _transient_mutation(sd, time_unit=None))
-    fails += _expect_load_error(tmp, "Time unit", "tseep-requires-time_unit")
+    fails += _expect_preflight(tmp, "tseep.time_unit_missing", "tseep",
+                               "no time unit", "tseep-requires-time_unit")
     _os.remove(tmp)
 
     # Ss required for every material with a tseep sheet.
     tmp = _make_v18(lambda sd: _transient_mutation(sd, ss=None))
-    fails += _expect_load_error(tmp, "Ss", "Ss-required")
+    fails += _expect_preflight(tmp, "tseep.storage_nonpositive", "tseep", "Ss",
+                               "Ss-required")
     _os.remove(tmp)
 
     # Sy required when unconfined (the base file has an exit-face BC).
@@ -576,7 +586,8 @@ def check_v18_validation_errors():
                       or base["seepage_bc2"].get("exit_face"))
     if unconfined:
         tmp = _make_v18(lambda sd: _transient_mutation(sd, sy=None))
-        fails += _expect_load_error(tmp, "Sy", "Sy-required-unconfined")
+        fails += _expect_preflight(tmp, "tseep.storage_nonpositive", "tseep",
+                                   "Sy", "Sy-required-unconfined")
         _os.remove(tmp)
 
     # A BC bound to an undefined series name -> hard error.
@@ -584,7 +595,8 @@ def check_v18_validation_errors():
         _transient_mutation(sd)
         sd["seepage_bc"]["specified_heads"][0]["head"] = "does_not_exist"
     tmp = _make_v18(_bad_series)
-    fails += _expect_load_error(tmp, "not defined", "bad-series-name")
+    fails += _expect_preflight(tmp, "seep.series_undefined", "tseep",
+                               "not defined", "bad-series-name")
     _os.remove(tmp)
 
     # A non-numeric BC value with NO tseep sheet -> error (nothing to bind to).
@@ -596,7 +608,8 @@ def check_v18_validation_errors():
             m["Sy"] = None
     tmp = _make_v18(_no_tseep)
     write_cells_to_xlsx(tmp, {"seep bc": {"F3": "myseries"}})  # F3 = first block value cell
-    fails += _expect_load_error(tmp, "time-series", "string-BC-without-tseep")
+    fails += _expect_preflight(tmp, "seep.series_undefined", "seep",
+                               "defines no time series", "string-BC-without-tseep")
     _os.remove(tmp)
 
     # 'seep bc (2)' is the constant-steady rapid-drawdown set: a reservoir type there
@@ -607,7 +620,8 @@ def check_v18_validation_errors():
             {"head": 12.0, "kind": "reservoir", "coords": [(0.0, 0.0), (10.0, 5.0)]}]
         sd["has_seepage_bc2"] = True
     tmp = _make_v18(_bc2_reservoir)
-    fails += _expect_load_error(tmp, "reservoir", "bc2-reservoir-rejected")
+    fails += _expect_preflight(tmp, "seep.set2_reservoir", "seep", "reservoir",
+                               "bc2-reservoir-rejected")
     _os.remove(tmp)
 
     # A time-series value on 'seep bc (2)' is likewise rejected (even though the series
@@ -618,7 +632,8 @@ def check_v18_validation_errors():
             {"head": "res", "kind": "head", "coords": [(0.0, 0.0), (10.0, 5.0)]}]
         sd["has_seepage_bc2"] = True
     tmp = _make_v18(_bc2_series)
-    fails += _expect_load_error(tmp, "time-varying", "bc2-series-rejected")
+    fails += _expect_preflight(tmp, "seep.set2_time_series", "seep",
+                               "names the time series", "bc2-series-rejected")
     _os.remove(tmp)
 
     # A valid CONSTANT set-2 (plain head) loads clean and round-trips its value/kind.

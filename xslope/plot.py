@@ -1684,7 +1684,7 @@ def plot_piezo_line(ax, slope_data, style=None, only_if_used=True):
 #   set-1 reservoir  → azure  (dark cerulean boundary / light azure levels)
 #   set-2 head       → rose   (the constant-steady rapid-drawdown second set)
 # Set 2 is the constant-steady rapid-drawdown set and NEVER carries a reservoir or a
-# time-varying value (fileio rejects both at load time), so it has no reservoir hue.
+# time-varying value (preflight refuses both before a run), so it has no reservoir hue.
 _SEEP_BC_RESERVOIR = ("#0277bd", "#4fc3f7")   # set-1 reservoir  (dark azure / light azure)
 _SEEP_BC_SET2_HEAD = ("#9c2a6e", "#e39ec8")   # set-2 head       (dark / light)
 
@@ -1992,7 +1992,7 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
 
     # Plot second set of BCs if present. Set 2 is the constant-steady rapid-drawdown
     # set: it never carries a reservoir type or a time-varying (tseep series) value
-    # (fileio rejects both at load time), so it draws in its own single hue family —
+    # (preflight refuses both before a run), so it draws in its own single hue family —
     # a rose head pair (dark boundary / light level) distinct from set 1's navy head
     # and azure reservoir. It therefore needs no reservoir-color override and no tseep.
     if has_bc2:

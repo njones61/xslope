@@ -135,12 +135,13 @@ class ProjectDocument(QObject):
 
     # --- load ------------------------------------------------------------
     def load(self, path):
-        """Load a project from an Excel file. Raises ValueError on bad input.
+        """Load a project from an Excel file. Raises ValueError only on a workbook
+        that cannot be read as a template (a structural fault).
 
-        Loads with ``require_analysis_data=False``: Studio is an editor, so a model
-        that is not yet runnable (no surfaces, mesh, or seep BCs — e.g. saved
-        mid-build) must still open. The Run dialogs enforce runnability."""
-        self.slope_data = load_slope_data(str(path), require_analysis_data=False)
+        Anything Studio can save reopens: a model with no geometry, no materials or
+        a parameter still blank loads as it was saved, and the Run dialogs' preflight
+        says what the chosen analysis still needs."""
+        self.slope_data = load_slope_data(str(path))
         self.path = str(path)
         self.results.clear()
         self.style = self._read_styles_sidecar(self.path)

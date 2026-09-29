@@ -130,7 +130,7 @@ class Field:
 
     'optfloat' is an optional float: a blank cell reads back as None (not 0.0), so
     optional fields like a pile's H or capacities stay unset instead of becoming
-    zero (which the loader would reject).
+    zero (which preflight would refuse).
 
     'bool' is a YES/blank flag, edited through the same combo widget as 'choice' but
     stored as a real Python bool — matching what the loader produces for a YES/blank
@@ -2290,7 +2290,7 @@ class TableEditorDialog(QDialog):
     the table and above the buttons. It is reached back as ``dlg.extra``. Two optional
     hooks on it are honoured: ``set_on_change(cb)`` wires it to the live preview, and
     ``validate() -> message`` refuses OK with that message rather than letting the
-    dialog save something the loader would reject.
+    dialog save something a run would refuse.
 
     ``generate`` (a hook ``propose() -> (rows, message, reason)``) adds a button that
     derives the whole table from the model. It follows the same contract as a
@@ -5550,9 +5550,9 @@ class _SearchWindowGroup(QGroupBox):
     def validate(self):
         """The message to refuse OK with, or "" when the window is savable.
 
-        The one thing the loader rejects outright is a range that runs backwards, and
-        a file saved with one would not open again — so it is caught here, where the
-        user can still see which pair they typed."""
+        A range that runs backwards leaves a search nowhere to look (preflight's
+        surface.search_window_reversed) — so it is caught here, where the user can
+        still see which pair they typed."""
         window = self.result_values()
         for lo, hi in _SEARCH_WINDOW_PAIRS:
             if lo in window and hi in window and window[lo] > window[hi]:
@@ -6039,7 +6039,7 @@ class _SeepBcSetWidget(QWidget):
         self._unit_labels = unit_labels
         # Set 2 is the constant-steady rapid-drawdown boundary set: it can carry
         # neither a reservoir (submerged-only, time-varying) type nor a time-series
-        # value (fileio rejects both at load time — there is one transient timeline and
+        # value (preflight refuses both before a run — there is one transient timeline and
         # it belongs to set 1). When True the Type selector is hidden (every head is a
         # plain Dirichlet) and a non-numeric value entered here is coerced to 0.
         self._constant_only = bool(constant_only)
@@ -7452,7 +7452,7 @@ class PolygonEditor(CategoryEditor):
             if kind == "refine":
                 # A refine region with no Size is refused by accept(), so one cannot
                 # reach here from the dialog; drop it defensively rather than write a
-                # record the loader would reject on the next Open.
+                # region that does nothing.
                 if it.get("size") is None:
                     continue
                 refines.append({"polygon": [tuple(c) for c in coords],
@@ -7792,8 +7792,8 @@ class LineLoadsEditor(CategoryEditor):
                       "point on the ground surface — e.g. the weight of a facing "
                       "plate. P is the magnitude (positive); Angle is the direction "
                       "in degrees (−90 = straight down). Each load is snapped onto "
-                      "the ground surface on save, since the loader requires line "
-                      "loads to act on the surface.",
+                      "the ground surface on save, since a line load acts on the "
+                      "ground surface.",
             preview_draw=preview,
             preview_caption="Preview shows the line loads on the section (selected "
                             "load's arrow emphasized; others dimmed). The arrow points "

@@ -4,7 +4,7 @@
   "models": [
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -40,7 +40,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -212,7 +212,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -248,7 +248,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -277,7 +277,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -313,7 +313,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -342,7 +342,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -378,7 +378,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -407,7 +407,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -443,7 +443,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -472,7 +472,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -508,7 +508,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -537,7 +537,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -573,7 +573,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -736,7 +736,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -772,7 +772,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -804,7 +804,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -840,7 +840,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -871,7 +871,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -907,7 +907,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -939,7 +939,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -975,7 +975,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -1007,7 +1007,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -1043,7 +1043,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -1074,7 +1074,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -1110,7 +1110,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -1414,7 +1414,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
@@ -1452,7 +1452,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -1551,7 +1551,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
@@ -1563,7 +1563,7 @@
           "mc"
         ],
         "n_materials": 2,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [
           "free"
@@ -1589,7 +1589,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -1615,8 +1615,7 @@
         }
       ],
       "topics": [
-        "piles",
-        "non-circular"
+        "piles"
       ]
     },
     {
@@ -5622,7 +5621,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
@@ -5695,7 +5694,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
@@ -6540,7 +6539,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
@@ -6613,7 +6612,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
@@ -7792,7 +7791,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -7828,7 +7827,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7863,7 +7862,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -7899,7 +7898,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7933,7 +7932,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -7969,7 +7968,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -8002,7 +8001,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -8038,7 +8037,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 26,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -8073,7 +8072,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -8109,7 +8108,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10200,7 +10199,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10237,7 +10236,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": true,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10268,7 +10267,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10305,7 +10304,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": true,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10336,7 +10335,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10373,7 +10372,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": true,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10404,7 +10403,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 1,
         "element_type": null,
@@ -10440,7 +10439,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10538,7 +10537,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10574,7 +10573,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10605,7 +10604,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10641,7 +10640,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10672,7 +10671,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10708,7 +10707,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10739,7 +10738,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10775,7 +10774,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10806,7 +10805,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10842,7 +10841,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10873,7 +10872,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10909,7 +10908,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10940,7 +10939,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10976,7 +10975,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11007,7 +11006,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11043,7 +11042,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11342,7 +11341,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11378,7 +11377,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11475,7 +11474,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11511,7 +11510,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11542,7 +11541,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11578,7 +11577,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11609,7 +11608,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11645,7 +11644,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11676,7 +11675,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11712,7 +11711,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11743,7 +11742,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11779,7 +11778,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11810,7 +11809,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11846,7 +11845,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11878,7 +11877,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11914,7 +11913,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11946,7 +11945,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11982,7 +11981,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12014,7 +12013,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12050,7 +12049,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12085,7 +12084,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12121,7 +12120,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12151,7 +12150,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12187,7 +12186,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12217,7 +12216,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12253,7 +12252,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12283,7 +12282,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12319,7 +12318,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12349,7 +12348,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12385,7 +12384,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12415,7 +12414,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12451,7 +12450,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12482,7 +12481,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12518,7 +12517,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12550,7 +12549,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12586,7 +12585,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12618,7 +12617,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12654,7 +12653,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12686,7 +12685,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12722,7 +12721,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12754,7 +12753,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12790,7 +12789,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -13026,7 +13025,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -13062,7 +13061,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14943,7 +14942,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 2,
         "element_type": null,
@@ -14979,7 +14978,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15297,7 +15296,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -15336,7 +15335,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15592,7 +15591,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -15813,7 +15812,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -17316,7 +17315,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -17352,7 +17351,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -19526,7 +19525,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -19562,7 +19561,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20795,7 +20794,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -20831,7 +20830,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20862,7 +20861,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -20898,7 +20897,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22052,7 +22051,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -22272,7 +22271,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -22712,7 +22711,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24192,7 +24191,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24232,7 +24231,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24406,7 +24405,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24448,7 +24447,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24481,7 +24480,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24523,7 +24522,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25042,7 +25041,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25078,7 +25077,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25111,7 +25110,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25147,7 +25146,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25180,7 +25179,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25216,7 +25215,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25249,7 +25248,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25285,7 +25284,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25318,7 +25317,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25354,7 +25353,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25386,7 +25385,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25422,7 +25421,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25455,7 +25454,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25491,7 +25490,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25524,7 +25523,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25560,7 +25559,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25592,7 +25591,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25628,7 +25627,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25661,7 +25660,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25697,7 +25696,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25730,7 +25729,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25766,7 +25765,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25799,7 +25798,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25835,7 +25834,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25867,7 +25866,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25903,7 +25902,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25935,7 +25934,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25971,7 +25970,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26002,7 +26001,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26038,7 +26037,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26069,7 +26068,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26105,7 +26104,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26138,7 +26137,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26174,7 +26173,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26205,7 +26204,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26241,7 +26240,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26272,7 +26271,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26308,7 +26307,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26342,7 +26341,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26378,7 +26377,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26412,7 +26411,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26448,7 +26447,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26482,7 +26481,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26518,7 +26517,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26551,7 +26550,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26587,7 +26586,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26620,7 +26619,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26656,7 +26655,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26690,7 +26689,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26726,7 +26725,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26761,7 +26760,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26797,7 +26796,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26833,7 +26832,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26869,7 +26868,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26903,7 +26902,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26939,7 +26938,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26972,7 +26971,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -27008,7 +27007,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -27088,7 +27087,7 @@
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
       "homogeneous": 181,
-      "non-circular": 32,
+      "non-circular": 31,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
@@ -27318,7 +27317,6 @@
       "docs/fem/files/xslope_griffiths3_r0p2.xlsx",
       "docs/fem/files/xslope_noncircular_fem.xlsx",
       "docs/fem/files/xslope_torggler_3b_nopile.xlsx",
-      "docs/fem/files/xslope_torggler_3b_plate.xlsx",
       "docs/lem/files/xslope_acads_weak_layer.xlsx",
       "docs/lem/files/xslope_noncircular.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",

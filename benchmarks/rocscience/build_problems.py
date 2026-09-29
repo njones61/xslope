@@ -1510,7 +1510,8 @@ def vp029_split():
 
     Geometrically and materially IDENTICAL to vp029 -- same submerged Bay Mud
     (c = 100 psf at el -20 growing 9.8 psf/ft, gamma = 100 pcf), same piezometric
-    line and free-water load, same circle -- except the domain is cut into the
+    line and free-water load -- except the domain carries no failure surface
+    (strength reduction only) and is cut into the
     vendor's Mohr-Coulomb band (70.755 <= x <= 350.168, 48.8% of the domain against
     the vendor's 48.9% element fraction) and the two elastic pieces outside it, which
     carry the SAME properties and are named so the runner can pass them to
@@ -1548,6 +1549,8 @@ def vp029_split():
     sd['max_depth'] = None
     gsl, domp = build_ground_surface_from_polygons(sd['polygons'])
     sd['ground_surface'], sd['domain_polygon'] = gsl, domp
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp029_split.xlsx'))
     return 'vp029_split.xlsx'
 
@@ -1796,9 +1799,7 @@ def vp032a_fem():
     it. RS2 SSR 1.15; Borges & Cardoso 1.25 / 1.19 on the two circles the
     limit-equilibrium files vp032a / vp032b carry."""
     sd = _rs2_24_slope_data(1)
-    # Inert for a strength-reduction run; vp032a's own published circle is kept so
-    # the file still opens as a complete model.
-    sd['circles'] = [{'Xo': -4.8, 'Yo': 8.0, 'Depth': 8.0 - 21.83, 'R': 21.83}]
+    sd['circles'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032a_fem.xlsx'))
     return 'vp032a_fem.xlsx'
 
@@ -1807,7 +1808,7 @@ def vp032c_fem():
     """RS2-24, Part I case 2 — the 8.75 m embankment as vendor `#024_02.fez`
     builds it. RS2 SSR 0.95; Borges & Cardoso 0.99."""
     sd = _rs2_24_slope_data(2)
-    sd['circles'] = [{'Xo': -4.8, 'Yo': 14.0, 'Depth': 14.0 - 28.8, 'R': 28.8}]
+    sd['circles'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032c_fem.xlsx'))
     return 'vp032c_fem.xlsx'
 
@@ -3007,6 +3008,8 @@ def vp087_fem():
     split along every one of them. See :func:`_lh_wall_slope_data`.
     """
     sd = _lh_wall_slope_data(joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp087_fem.xlsx'))
     return 'vp087_fem.xlsx'
 
@@ -3014,6 +3017,8 @@ def vp087_fem():
 def vp088_fem():
     """RS2-49 — fill quality (phi = 25, Ta = 22), jointed dry stack."""
     sd = _lh_wall_slope_data(fill=(0.0, 25.0), ta_of=lambda i, n: 22.0, joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp088_fem.xlsx'))
     return 'vp088_fem.xlsx'
 
@@ -3021,6 +3026,8 @@ def vp088_fem():
 def vp089_fem():
     """RS2-50 — reinforcement length (L = 4.2, Ta = 11.4), jointed dry stack."""
     sd = _lh_wall_slope_data(L=4.2, ta_of=lambda i, n: 11.4, joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp089_fem.xlsx'))
     return 'vp089_fem.xlsx'
 
@@ -3034,6 +3041,8 @@ def vp090_fem():
     """
     sd = _lh_wall_slope_data(ta_of=lambda i, n: 11.0 if i < 7 else 7.5, joint=True,
                              ks_of=lambda i, n: 1.0e4 if i < 7 else 1.0e5)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp090_fem.xlsx'))
     return 'vp090_fem.xlsx'
 
@@ -3049,6 +3058,8 @@ def vp091_fem():
     than sharing one file.
     """
     sd = _lh_wall_slope_data(fnd=(0.0, 18.0), joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp091_fem.xlsx'))
     return 'vp091_fem.xlsx'
 
@@ -3056,6 +3067,8 @@ def vp091_fem():
 def vp092_fem():
     """RS2-53 — water (piezo at y = 9 with a 3 m pond, Ta = 9.25), jointed dry stack."""
     sd = _lh_wall_slope_data(ta_of=lambda i, n: 9.25, water=True, joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp092_fem.xlsx'))
     return 'vp092_fem.xlsx'
 
@@ -3078,6 +3091,8 @@ def vp093_fem():
     VP93 model carries and what its printed Bishop 0.958 is measured on.
     """
     sd = _lh_wall_slope_data(ta_of=lambda i, n: 11.6, surcharge=20.0, joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp093_fem.xlsx'))
     return 'vp093_fem.xlsx'
 
@@ -3086,6 +3101,8 @@ def vp094_fem():
     """RS2-55 — five 1.8 m tiers offset 0.6 m (Ta = 10.1), jointed dry stack."""
     sd = _lh_wall_slope_data(n_tiers=5, tier_h=1.8, offset=0.6,
                              ta_of=lambda i, n: 10.1, joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp094_fem.xlsx'))
     return 'vp094_fem.xlsx'
 
@@ -3839,11 +3856,7 @@ def _vp078_variant(ground, left_x, crest_x_r, out):
     sd['max_depth'] = 0.0
     sd['gamma_water'] = 62.4
     sd['circular'] = True
-    # base-tangent seed circle (SSRM-only benchmark; the circle is not exercised
-    # by fem_ssrm, kept only so the LEM sheet is well formed)
-    crest_y = ground[-1][1]
-    R = crest_y + 30.0
-    sd['circles'] = [{'Xo': 105.0, 'Yo': R, 'Depth': 0.0, 'R': R}]
+    sd['circles'] = []
     sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, out))
     return out
@@ -4126,6 +4139,8 @@ def vp027_fem():
     sd['piezo_line'] = [(0.0, 68.0), (22.0, 67.0), (38.0, 63.0),
                         (63.027, 72.931), (83.0, 78.0), (104.0, 82.0),
                         (122.0, 85.0), (140.0, 87.0), (200.0, 93.0)]
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp027_fem.xlsx'))
     return 'vp027_fem.xlsx'
 
@@ -4358,7 +4373,7 @@ def vp067c():
     """VP67 with an SSR Exclusion Area, for the constrained-SSRM head-to-head
     against RS2's published SSR 1.33.
 
-    Mechanically IDENTICAL to vp067 (same geometry, strengths, circle): the
+    Mechanically IDENTICAL to vp067 (same geometry and strengths): the
     100-ft foundation is merely split into two stacked zones at El. 81 — the
     lowest point of the USACE specified circle (Yo - R = 359 - 278 = 81) —
     'Foundation' above and 'Foundation lower' below, carrying the SAME
@@ -4369,7 +4384,6 @@ def vp067c():
     'SSR Exclusion Area' construction (Part 4 p.124, figs 67.2/67.3). E and nu
     come from the elastic classifier (same soil type -> identical in both
     zones), so they are not hand-set here. Do NOT edit vp067.xlsx."""
-    import math
     sd = load_slope_data(ACADS_1A)
     m0 = dict(sd['materials'][0]); m1 = dict(sd['materials'][0]); m2 = dict(sd['materials'][0])
     m0.update(name='Embankment', c=1780.0, phi=5.0, gamma=135.0, option='mc', u='none')
@@ -4385,8 +4399,7 @@ def vp067c():
     sd['max_depth'] = 0.0
     sd['gamma_water'] = 62.4
     sd['circular'] = True
-    R = math.hypot(101.0, 259.0)
-    sd['circles'] = [{'Xo': 101.0, 'Yo': 359.0, 'Depth': 359.0 - R, 'R': R}]
+    sd['circles'] = []
     sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp067c.xlsx'))
     return 'vp067c.xlsx'

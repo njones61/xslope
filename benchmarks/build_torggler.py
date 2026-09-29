@@ -211,6 +211,7 @@ def build_torggler_3a_plate():
     """Thesis §3.2.1, same slope with the 7.5 m plate and no interfaces —
     the variant that matches XSLOPE's shared-node beam.  SumMsf = 1.175."""
     sd = _sd_3a(True, 1.0)
+    sd['circles'] = []          # strength reduction only: no search runs on it
     dst = os.path.join(OUT, 'xslope_torggler_3a_plate.xlsx')
     save_slope_data_to_xlsx(sd, dst)
     return dst
@@ -283,6 +284,8 @@ def build_torggler_3b_plate():
     """Thesis §4.2, same slope with the 15 m plate.  SumMsf = 1.725, reported
     for the plate with interfaces and the plate without interfaces alike."""
     sd = _sd_3b(True, 1.0)
+    sd['circles'] = []          # strength reduction only: no search runs on it
+    sd['non_circ'] = []
     dst = os.path.join(OUT, 'xslope_torggler_3b_plate.xlsx')
     save_slope_data_to_xlsx(sd, dst)
     return dst

@@ -7269,6 +7269,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # way to this seed (see _vp_gate_armed). It belongs to the trial, not to the
         # driver that finished it, so a corrector-certified result reports it too.
         _sol["gate_deferrals"] = int(gate_deferrals)
+        # Likewise the extensions the loop was granted before the corrector finished
+        # the trial: the Newton path's own record starts that count at zero.
+        _sol["budget_extensions"] = int(n_extensions)
         if _acc is not None:
             _sol["accelerate"] = dict(_acc)
             _sol["acceleration"] = {"on": True,

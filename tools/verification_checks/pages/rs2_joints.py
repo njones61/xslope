@@ -17,25 +17,28 @@ CONFIG = PageConfig(
     # are seismic COEFFICIENTS and one unit-weight scale factor -- inputs to the
     # sweep, shaped like factors of safety and not one.
     untagged_allow=[
-        ('0.1477', 'The stack stands at k'),
-        ('0.1504', 'The stack stands at k'),
-        ('0.35', 'fails at every one above'),
-        ('1.011', 'every unit weight scaled by'),
-        # problem 17's staircase runs in metres of the section, not in factors
-        ('3.66', 'where it says 3.19011'),
+        ('0.1798', 'The stack stands at k'),
+        ('0.1814', 'The stack stands at k'),
+        ('0.25', 'fails at every one above'),
+        ('1.016', 'scaled by 1.016 and then by 0.5'),
+        # the plowing methodology bullet: Alejano's Eq. (7) and the rigid-block
+        # ceiling on problem 11 are referee values, not XSLOPE results
+        ('1.76', 'on problem 11 it gives 1.76'),
+        ('1.21', 'against a ceiling of 1.21'),
         # problem 2: the 0.76 is what Alejano & Alonso PRINT for their own
         # Goodman & Bray recursion; the page recomputes it as 0.7734.
         ('0.76', 'against the 0.76 Alejano'),
         ('0.76', 'their Goodman & Bray 0.76,'),
-        # problems 3, 5 and 6 are reported without a lock (the search does not
-        # decide, or the mesh moves the answer): the value is the midpoint of
-        # the bracket in the committed run record (rj003/rj005/rj006_fem_meta),
-        # shown beside the vendor's two numbers by ruling, never tagged.
-        ('1.213', 'reported, no lock'),
+        # problems 3, 5 and 6 are *unconfirmed* -- reported without a lock (the
+        # search does not decide, or the mesh moves the answer): the value is
+        # the midpoint of the bracket in the committed run record
+        # (rj003/rj005/rj006_fem_meta), shown beside the vendor's two numbers
+        # by ruling, never tagged.
+        ('1.213', 'unconfirmed'),
         ('1.213', 'The search brackets 1.213 between 1.203'),
         ('1.203', 'The search brackets 1.213 between 1.203'),
-        ('1.818', 'reported, no lock'),
-        ('1.271', 'reported, no lock'),
+        ('1.818', 'unconfirmed'),
+        ('1.271', 'unconfirmed'),
     ],
 
     abs_bounds=[

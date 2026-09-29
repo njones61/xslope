@@ -13,10 +13,6 @@ CONFIG = PageConfig(
     name="ssrm",
 
     bounds=[
-        # the match-dot legend, not a comparison
-        ('+3', 'within 3% of the vendor and/or reference figure'),
-        ('+6', '| 🟡 | 3–6% |'),
-        ('+6', 'more than 6% |'),
         # agreement bounds over a whole sweep, not over one pair
         ('+4', "the paper's wedge solution for the governing mechanism to within"),
         ('+1.4', 'lands within 1.4% of it at both bracket cases'),

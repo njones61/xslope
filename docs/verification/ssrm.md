@@ -16,41 +16,25 @@ problems converge without any special criterion (see
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
 
-**Match to the published value**
+Match dots and status terms follow the shared [definitions](index.md#status-terms) and
+[scoring](index.md#how-the-match-dots-are-scored).
 
-| Symbol | Meaning |
-|---|---|
-| 🟢 | within 3% of the vendor and/or reference figure |
-| 🟡 | 3–6% |
-| 🔴 | more than 6% |
-| 🟣 | in progress |
-| <span class="nodata">⊘</span> | insufficient data or out of scope |
-
-The dot scores the **match quality of what is locked**, not how much of a problem is built; the partial/blocked detail is in the row text.
-
-Every dot below is scored against **the source's own published result for the same
-problem, read with the matching failure criterion**. Griffiths & Lane's factors of safety are FE readings
-taken at non-convergence of a displacement test, and they are printed to limited precision —
-Examples 1 and 2 on a 0.05 trial grid, the Fig. 7 sweep "to the nearest 0.05" (p. 394),
-Example 6 to 0.1. Deltas are stated against the printed value as printed; where a classical
-chart solution is also quoted (Taylor, Morgenstern, Bishop & Morgenstern, Cousins) it is
-labeled as such and kept as context, never as the basis of the dot. A source's single
-headline factor of safety is its published answer and takes a delta whatever engine
-produced it — carrying a delta is a separate question from governing the dot; where the
-same source prints a per-method table, each value is read like any
-other column — same-method entries pair and carry a delta, cross-method entries stay bare.
-Torggler's factors of safety are PLAXIS $\Sigma M_{sf}$ values printed to three decimals,
+Griffiths & Lane's factors of safety are FE readings taken at non-convergence of a
+displacement test, and they are printed to limited precision — Examples 1 and 2 on a 0.05
+trial grid, the Fig. 7 sweep "to the nearest 0.05" (p. 394), Example 6 to 0.1. Deltas are
+stated against the printed value as printed; where a classical chart solution is also quoted
+(Taylor, Morgenstern, Bishop & Morgenstern, Cousins) it is labeled as such. Torggler's factors of safety are PLAXIS $\Sigma M_{sf}$ values printed to three decimals,
 alongside a SLIDE limit-equilibrium table read the same way.
 
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
 |---:|:-:|---|---|---|
-| [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | Displacement-vs-$F$ upturn $F \approx 1.40$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.37 vs their FE 1.4 (−2.1%) | criterion-matched FE-vs-FE reading is the basis of the dot |
+| [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | Displacement-vs-$F$ upturn $F \approx 1.40$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.37 vs their FE 1.4 (−2.1%) | |
 | [2](#verification-griffiths2) | 🟢 | Example 2 — homogeneous slope with a foundation layer | Upturn $F \approx 1.4$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.35 vs their FE 1.4 (−3.6%) · Spencer toe circle 1.37 vs the paper's "correct" 1.4 (−2.1%) | the foundation leaves the factor of safety unchanged, as the paper argues |
 | [3](#verification-griffiths3) | 🟢 | Example 3 — undrained clay slope with a thin weak layer | Worst station $c_{u2}/c_{u1} = 0.2$: Janbu 0.462 vs the paper's own Janbu three-line wedge 0.45–0.50 (inside the band) · Spencer 0.462 on the same surface · circular search 1.244 vs the paper's stated ≈1.3 (−4.3%) | scored at the source's own 0.05 read-off resolution |
 | [4](#verification-griffiths4) | 🟢 | Example 4 — undrained clay slope over a weak foundation | SSRM 1.45 vs Griffiths & Lane FE 1.45 (0.0%) · SSRM 2.058 vs their FE 2.03 (+1.4%) · relative jump ×1.42 vs their ×1.40 (+1.4%) | the critical mechanism flips base → toe, as in the paper's Fig. 11 |
-| [5](#verification-griffiths5) | 🟢 | Example 5 — "slow" drawdown sweep | Submerged plateau 1.89 vs Griffiths & Lane FE 1.85 (+2.2%) · minimum 1.31 vs their FE 1.30 at $L/H = 0.7$ (+0.8%) · drained end 1.39 vs their FE 1.40 (−0.7%) | two of the three refined quad8 locks read below the printed FE values and the third lands on one |
+| [5](#verification-griffiths5) | 🟢 | Example 5 — "slow" drawdown sweep | Submerged plateau 1.89 vs Griffiths & Lane FE 1.85 (+2.2%) · minimum 1.31 vs their FE 1.30 at $L/H = 0.7$ (+0.8%) · drained end 1.39 vs their FE 1.40 (−0.7%) | two of the three refined quad8 values read below the printed FE values and the third lands on one |
 | [6](#verification-griffiths6) | 🟢 | Example 6 — two-sided earth dam | Full reservoir 1.87 vs Griffiths & Lane FE 1.9 (−1.6%) · before filling 2.42 vs their FE 2.4 (+0.8%) | FE against FE, both printed to 0.1 |
 | [7](#verification-torggler3a) | 🟢 | Torggler §3 — homogeneous slope with a 7.5 m plate | Unsupported 1.129 vs Torggler PLAXIS 1.111 (+1.6%) · with plate 1.195 vs his 1.175 (+1.7%) · plate shear in the lower lobe 25.8 kN/m vs his 21 kN (+22.9%) | the plate variant without interfaces is XSLOPE's shared-node beam; the factors of safety pair closely and the plate's internal forces run above his |
 | [8](#verification-torggler3b) | 🟢 | Torggler §4 — weak-layer slope with a 15 m plate | Unsupported 1.064 vs Torggler PLAXIS 1.045 (+1.8%) · with plate 1.743 vs his 1.725 (+1.0%) | both factors of safety pair closely with his; the weak band still shears where his supported mechanism leaves it |
@@ -66,18 +50,16 @@ A homogeneous 2:1 slope at $c/\gamma H = 0.05$, $\phi = 20°$ — the base SSRM 
 | Displacement-vs-$F$ upturn (their criterion) | $F \approx 1.40$ | **1.4** (0.0%) | their Table 2 and Fig. 2 |
 | SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.37 | 1.4 (−2.1%) | |
 
-Cross-bearings on the same XSLOPE number — context, not the basis of the dot:
+Cross-bearings on the same XSLOPE number:
 
 | Quantity | XSLOPE | Cross-bearing | Note |
 |---|---|---|---|
 | SSRM FS, against the classical chart | 1.37 | Bishop & Morgenstern (1960) chart 1.380 (−0.7%) | printed on their Fig. 2 |
 | SSRM FS, against their trial table | 1.37 | the highest trial their Table 2 converged, **1.35** (+1.5%) | they fail at 1.40 |
 
-*The dot is scored on the first row — XSLOPE's upturn against the displacement-based reading
-Griffiths & Lane themselves report. The two criteria bracket the same failure: XSLOPE's
-bisection falls inside their own trial bracket — above the highest trial their Table 2
-converged and below the trial they report as failing — and its upturn lands on their
-reported FOS.*
+*XSLOPE's upturn and its bisection bracket the same failure: the bisection falls inside
+Griffiths & Lane's own trial bracket — above the highest trial their Table 2 converged and
+below the trial they report as failing — and the upturn lands on their reported FOS.*
 
 This is the benchmark problem from [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387), "Slope stability analysis by finite elements,"
 *Geotechnique*, 49(3), 387-403. It features a homogeneous slope with the following properties:
@@ -133,7 +115,7 @@ order of magnitude above that flat branch by F = 1.6.
 
 ![griffiths1_sweep.png](../fem/images/griffiths1_sweep.png){width=700}
 
-This slope is also locked across all three quadratic element types at 1.36, tri6, quad8 and
+This slope is also checked across all three quadratic element types at 1.36, tri6, quad8 and
 quad9 agreeing to within 0.04 of it, so the answer does not turn on which one is used.
 
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.372, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-1, f_stand=1.36875, f_fail=1.375, check=edges -->
@@ -155,17 +137,16 @@ can be misled.
 | SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.35 | FE FOS 1.4 (−3.6%) | |
 | Spencer, unconstrained circular search (toe circle) | 1.37 | the paper's "correct" FOS of **1.4** (−2.1%) | which it obtains only by forcing the circle through the toe (p. 394) |
 
-Cross-bearings on the false base circle — context, not the basis of the dot:
+Cross-bearings on the false base circle:
 
 | Quantity | XSLOPE | Cross-bearing | Note |
 |---|---|---|---|
 | Spencer, circles forced tangent to the foundation base (false base circle) | 1.70 | the proprietary slip-circle program's **1.7** (0%) | for that assumed circle (p. 394) |
 | — same, against the classical chart | 1.70 | Bishop & Morgenstern (1960) base-circle chart 1.752 (−3.0%) | which the paper quotes as "one possible solution" |
 
-*The dot is scored on the first row. Example 1, without the foundation, reads 1.37 on the same
-quad8 mesh against this model's 1.35 — adding the layer leaves the factor of safety essentially
-unchanged, which is the paper's point. A coarse tri6 run of this model is locked separately at
-1.39 on its own mesh.*
+*Example 1, without the foundation, reads 1.37 on the same quad8 mesh
+against this model's 1.35 — adding the layer leaves the factor of safety essentially unchanged,
+which is the paper's point. A coarse tri6 run of this model is checked separately at 1.39 on its own mesh.*
 
 This is Example 2 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
 (their Fig. 5): the Example 1 slope with a foundation layer of the **same soil** added
@@ -262,8 +243,7 @@ strength ratio $c_{u2}/c_{u1}$ to reproduce the paper's Fig. 7.
 | **Non-circular Spencer / Janbu at $0.2$** | **0.462 / 0.462** | **Janbu three-line wedge, 0.45–0.50 (inside the band)** | Fig. 7 at the paper's 0.05 resolution |
 | Circular search at $0.2$ (wrong mechanism family) | 1.244 | circular mechanism ≈1.3 (−4.3%) | stated in the text, p. 396 |
 
-*The dot is scored on the bolded row — the same method on the same mechanism. At
-$c_{u2}/c_{u1} = 1$ the paper's text anchors on Taylor's (1937) classical $\phi_u = 0$
+*At $c_{u2}/c_{u1} = 1$ the paper's text anchors on Taylor's (1937) classical $\phi_u = 0$
 stability-number solution, FOS = 1.47; its own FE point plots at 1.50 in Fig. 7 while Fig. 10
 plots the identical physical case at 1.45, so the paper's own reading of that station spans
 1.45–1.50. Every Fig. 7 comparison value here is graphical, read from the plotted points,
@@ -480,12 +460,10 @@ straddle a change of failure mechanism.
 | Spencer circular search, $c_{u2}/c_{u1} = 1$ (base circle) | 1.47 | their base-circle limit-equilibrium curve, 1.46 (+0.7%) |
 | Spencer circular search, $c_{u2}/c_{u1} = 2$ (toe circle) | 2.02 | their toe-circle limit-equilibrium curve, 2.04 (−1.0%) |
 
-*The dot is scored FE against FE, on the first two rows. Griffiths & Lane print two classical
-anchors on the same figure — Taylor's (1937) $\phi_u = 0$ stability-number solutions, FOS =
+*Griffiths & Lane print two classical anchors on the same figure — Taylor's (1937) $\phi_u = 0$ stability-number solutions, FOS =
 1.47 for the base circle at $c_{u2} = c_{u1}$ and FOS = 2.10 for the toe circle at
 $c_{u2} \gg c_{u1}$ (a jump of ×1.43). Both the paper's FE points and XSLOPE's sit a few
-percent below those chart values; the anchors are context, not the comparison. All Fig. 10
-values here are read from the plotted curves.*
+percent below those chart values. All Fig. 10 values here are read from the plotted curves.*
 
 This is Example 4 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
 (their Fig. 9): an **undrained** ($\phi_u = 0$) clay slope resting on a foundation layer,
@@ -579,7 +557,7 @@ and Spencer results agree on both the factor of safety and the base→toe transi
 ### 🟢 Griffiths & Lane (1999) Example 5 — "Slow" Drawdown Sweep {#verification-griffiths5}
 
 The Example 1 slope with a reservoir lowered from above the crest to the toe, swept across the
-drawdown ratio $L/H$ to reproduce the paper's Fig. 15. Five stations are locked and tabulated;
+drawdown ratio $L/H$ to reproduce the paper's Fig. 15. Five stations are checked and tabulated;
 the sweep figure below runs three more between them.
 
 | $L/H$ | XSLOPE SSRM (coarse tri6) | quad8 (refined) | Griffiths & Lane FE (Fig. 15) | Note |
@@ -590,16 +568,14 @@ the sweep figure below runs three more between them.
 | 0.7 | 1.31 | 1.29 | 1.30 (+0.8% / −0.8%) | **minimum** |
 | 1.0 | 1.39 | 1.37 | 1.40 (−0.7% / −2.1%) | |
 
-*The dot is scored FE against FE, on the coarse-tri6 sweep, which tracks Griffiths & Lane's
-own Fig. 15 curve within 2.2% at every one of its five stations. Two of the three refined quad8
-locks read below the printed FE values and the third lands on one — the criterion offset
+*The coarse-tri6 sweep tracks Griffiths & Lane's own Fig. 15 curve within 2.2% at every one
+of its five stations. Two of the three refined quad8 values read below the printed FE values and the third lands on one — the criterion offset
 documented in Example 1, where XSLOPE's equilibrium-based bisection settles inside the paper's
 own trial bracket rather than on the trial it reports as failing. The paper's FE points fall on a 0.05 grid; its stated
 minimum is $\approx 1.3$ at $L/H = 0.7$, and its plotted floor is flat at 1.30 across
-$L/H = 0.6$–$0.8$. The two classical chart anchors printed on the same figure —
-[Morgenstern (1963)](https://doi.org/10.1680/geot.1963.13.2.121) $F = 1.85$ at $L/H = 0$ and
-Bishop & Morgenstern (1960) FOS = 1.4 at $L/H = 1$ — are context; the paper's own FE points
-land on both.*
+$L/H = 0.6$–$0.8$. The paper's own FE points land on both classical chart anchors printed on
+the same figure, [Morgenstern (1963)](https://doi.org/10.1680/geot.1963.13.2.121) $F = 1.85$ at
+$L/H = 0$ and Bishop & Morgenstern (1960) FOS = 1.4 at $L/H = 1$.*
 
 This is Example 5 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
 (their Figs 12-15): the Example 1 homogeneous 2:1 slope with a **horizontal free
@@ -738,8 +714,7 @@ Cross-bearing against the paper's own limit-equilibrium solution:
 
 <!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.915, tolerance=0.005, benchmark=SSRM-2 -->
 
-*The dot is scored FE against FE, on the first two rows. Griffiths & Lane print their FE
-factors of safety for this example to 0.1.*
+*Griffiths & Lane print their FE factors of safety for this example to 0.1.*
 
 The second SSRM verification benchmark, from [Griffiths, D.V. & Lane, P.A. (1999)](https://doi.org/10.1680/geot.1999.49.3.387), *Géotechnique* 49(3),
 Example 6: an actual earth dam cross-section (Torres & Coffman, 1997) with
@@ -823,8 +798,7 @@ The plate's shear reverses sign along its length: an upper lobe peaking at
 30.3 kN/m at a depth of −1.70 m and a lower one peaking at 25.8 kN/m at −5.80 m. The
 lower lobe is the branch Torggler's Fig. 14 reads, so it is the one paired above.
 
-*The dot is scored on the two SSRM rows — FE against FE on the mechanism each
-engine finds for itself. The plate variant compared is the one without interfaces,
+*The plate variant compared is the one without interfaces,
 because a plate sharing nodes with the soil is exactly XSLOPE's beam formulation,
 and Torggler reports the internal forces of the two variants as almost identical.*
 
@@ -883,7 +857,7 @@ two element sizes rather than at one:
 
 The unsupported factor of safety falls with refinement, the last halving of element
 area moving it from 1.136 to 1.129 (−0.6%); the supported one reads the same at both
-sizes. The locks are taken at 0.7 m.
+sizes. The factors reported are the 0.7 m values.
 
 <!-- test: file=../fem/files/xslope_torggler_3a_nopile.xlsx, type=fem_ssrm, expected_fs=1.129, element_type=tri6, target_size=0.7, tolerance=0.01, f_min=1.0, f_max=1.25, max_iter=8000, benchmark=SSRM-TORGGLER, f_stand=1.125, f_fail=1.1328125, check=edges -->
 <!-- test: file=../fem/files/xslope_torggler_3a_plate.xlsx, type=fem_ssrm, expected_fs=1.195, element_type=tri6, target_size=0.7, tolerance=0.01, f_min=1.05, f_max=1.30, max_iter=8000, benchmark=SSRM-TORGGLER, f_stand=1.190625, f_fail=1.1984375, check=edges -->
@@ -908,8 +882,6 @@ Same-method limit-equilibrium pairing on his own published failure line:
 |---|---|---|
 | Spencer | 1.121 | 1.043 (+7.5%) |
 | Morgenstern-Price | 1.093 | GLE/Morgenstern-Price 1.039 (+5.2%) |
-
-*The dot is scored on the supported SSRM row.*
 
 The limit-equilibrium pair is read on the Table 18 polyline itself — a fixed
 surface — while SLIDE's figures come from a search, and the critical surface in a
@@ -945,7 +917,7 @@ Excel input files: [xslope_torggler_3b_nopile.xlsx](../fem/files/xslope_torggler
 ![torggler_3b_plate_results.png](../fem/images/torggler_3b_plate_results.png){width=900}
 
 **Mesh.** The weak layer carries a 0.5 m local element size of its own, so the band
-is resolved independently of the global size; both locks are taken at a 1.0 m global
+is resolved independently of the global size; both factors are taken at a 1.0 m global
 target.
 
 **The plate is heavily engaged, and the band still shears.** In PLAXIS the

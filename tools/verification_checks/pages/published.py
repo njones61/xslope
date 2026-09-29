@@ -17,10 +17,6 @@ CONFIG = PageConfig(
     name="published",
 
     bounds=[
-        # the match-dot legend, not a comparison
-        ('+3', 'within 3% of the vendor and/or reference figure'),
-        ('+6', '| 🟡 | 3–6% |'),
-        ('+6', 'more than 6% |'),
         # the summary row states a bound over the whole eleven-layer table; the
         # per-layer pairs it summarises are re-derived row by row in the entry
         ('+0.1', 'reproduced within 0.1% of the manual'),

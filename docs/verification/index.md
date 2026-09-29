@@ -22,18 +22,18 @@ whenever XSLOPE changes.
 
 Every comparison the suite runs is declared by a test tag on the page that
 publishes it, so the corpus counts itself: `python3 tools/count_verification_cases.py`
-prints how many tags, locked comparisons, locked values and distinct models
-these pages currently hold, broken down by source.
+prints how many tags, comparisons, values and distinct models these pages
+currently hold, broken down by source.
 
-A locked factor of safety is **proved** once, by the strength-reduction
-bisection that cut it, and **checked** afterwards. The two are not the same
-work: a bisection is nine solves rediscovering a number nobody has moved, while
-the pair of trials it closed on — the highest strength the slope stood at and
-the lowest it failed at — is what the lock is, and re-solving those two says
-whether it still reproduces. Rows whose tag carries that pair are checked in two
+A strength-reduction factor of safety is **proved** once, by the bisection
+that cut it, and **checked** afterwards. The two are not the same work: a
+bisection is nine solves rediscovering a number nobody has moved, while the pair
+of trials it closed on — the highest strength the slope stood at and the lowest
+it failed at — is what the factor rests on, and re-solving those two says whether
+it still reproduces. Rows whose tag carries that pair are checked in two
 solves; the rest are re-bisected. The heaviest rows of all, where one model is
 hours of iterations, are marked for the release gate and run there.
-`python run_tests.py --gate` is that gate: every row, every lock re-proved.
+`python run_tests.py --gate` is that gate: every row, every factor re-proved.
 
 ---
 
@@ -53,66 +53,51 @@ hours of iterations, are marked for the release gate and run there.
 
 ## How the match dots are scored {#how-the-match-dots-are-scored}
 
-Every corpus page's summary table carries a match dot per problem.
+Every row on a corpus page's summary table carries a match dot or one of the
+[status terms](#status-terms) below.
 
-| Symbol | Meaning |
-|---|---|
-| 🟢 | within 3% of the vendor and/or reference figure |
-| 🟡 | 3–6% |
-| 🔴 | more than 6% |
-| 🟣 | in progress |
-| <span class="nodata">⊘</span> | insufficient data or out of scope |
+**Each row has one referee.** Where a closed-form solution exists for the stated inputs,
+it is the referee; where that closed form prices a mechanism the slope does not take, the
+searched limit-equilibrium answer is the referee instead. Where no closed form exists, the
+referee is the reference the source names: the vendor's own result, the published referee
+or consensus value, or the source author's headline factor of safety. The dot is scored
+against that referee alone. An experiment (a field failure, a tilt table, a laboratory
+column) is a validation datum shown beside the referee, never the referee itself.
 
-The dot scores the **match quality of what is locked**, not how much of a problem is built: a
-partly built problem is scored on the stages that are built, and the partial or blocked detail is
-in the row text. **Only same-method pairings derive a dot.** Most rows here are strength-reduction
-rows, and their pairing is XSLOPE's SSRM against RS2's own SSR column — the same method under two
-names; another program's strength-reduction factor (PLAXIS, Z-Soil, GEO FEM, a published FEM/FDM
-referee) pairs the same way. On the rows verified with limit equilibrium instead
-([#51](rs2.md#p4-vp51), [#60](rs2.md#rs2-60), [#61](rs2.md#rs2-61) cases 1 and 3, [#68](rs2.md#rs2-68)) the method the
-source itself names governs, and where the source names no method the fallback is XSLOPE's Spencer
-or Morgenstern-Price against the published headline value. A pairing whose two sides are different
-methods is reported as information only and never governs a dot; neither does an unconstrained
-XSLOPE search against an unconstrained search of the vendor's, since two programs' searches may
-settle on different mechanisms, nor a band stitched together from several programs' answers. A
-comparison is scored at the source's own precision, so a difference smaller than the source's
-printed or figure resolution counts as a match. The problem's *published* answer — the
-referee/consensus value, or the source author's own factor — is a reference authority in its own
-right whatever engine produced it, as is a closed form, which governs only where XSLOPE is itself
-within band of it. Where a row has more than one valid pairing the dot takes the **best of them**;
-where a row locks several cases, the worst locked case sets it. These conventions apply to every
-summary table on this page.
+The dot scores the match on what is built, not how much of the problem is built: a partly built problem
+is scored on the cases that are built, and the row text names what remains. Where a row
+carries several cases, the worst case sets the dot. A comparison is scored at the source's
+own precision, so a difference smaller than the source's printed or figure resolution
+counts as a match.
 
-**How the tables show it.** Every valid pairing carries its difference inline, in parentheses,
-computed source-relative, (XSLOPE − source) / source, to one decimal. Where a table gives each
-authority a column of its own the difference sits beside the value it is measured against —
-`RS2 SSRM 1.33 (−2.0%)`; where a table gives the authority one column and the readings several, it
-sits beside each reading instead. So a column carries a percentage exactly when it is a pairing the
-dot could rest on, and a column that is **cross-method** for the row shows bare values, because it
-is context rather than a pairing. Against a published *range* the entry reads `(inside)` where
-XSLOPE falls within it and otherwise carries the difference to the nearer bound. A source author's
-numbers fall on either side of that line depending on how the source published them: a single
-headline factor for the problem is the published answer and takes a percentage whatever engine
-produced it (Low's factor at [#19](rs2.md#rs2-19), Perry's at [#30](rs2.md#rs2-30)), while a per-method table
-from the same author is a set of method-specific values, so each entry stays bare (Yamagami &
-Ueta's Bishop, Fredlund & Krahn's four methods).
+**How the tables show it.** A comparison carries its difference inline, in parentheses,
+computed source-relative, (XSLOPE − source) / source, to one decimal. Where a table gives
+each authority a column of its own, the difference sits beside the value it is measured
+against — `RS2 SSRM 1.33 (−2.0%)`; where a table gives the authority one column and the
+readings several, it sits beside each reading instead. Apart from the referee, a value
+from a method other than XSLOPE's on that row is context and stays bare. Against a
+published *range* the entry reads `(inside)` where XSLOPE falls within it and otherwise
+carries the difference to the nearer bound. A source author's single headline factor for the problem takes a percentage
+whatever engine produced it (Low's factor at [#19](rs2.md#rs2-19), Perry's at
+[#30](rs2.md#rs2-30)), while a per-method table from the same author is a set of
+method-specific values, so each entry stays bare (Yamagami & Ueta's Bishop, Fredlund &
+Krahn's four methods).
 
 ---
 
 ## Status terms {#status-terms}
 
-Every corpus page's summary table carries one of these in its Notes column where a
-row is not fully built and verified:
+Every row on a corpus page's summary table carries exactly one of these:
 
-- *covered* — the same problem is built under another corpus page, and the row links there;
-- *partial* — some cases are built, and the row names what remains;
-- *planned* — reachable with today's capability and source data, not yet built;
-- *blocked* — cannot be built today, and the row names what is missing (source data or a capability);
-- *no lock possible* — the source publishes no reproducible numeric target;
-- *not supported* — a deliberate scope exclusion.
+- **a match dot** — built, checked, and how close it lands on its referee: 🟢 within 3%, 🟡 3–6%, 🔴 more than 6%;
+- *unconfirmed* — a number was found but the run did not settle it; the row says why in one clause;
+- *planned* — can be built with the program and the source data as they stand, and is not built yet;
+- *blocked* — cannot be built yet; the row names what is missing;
+- *not supported* — left out on purpose;
+- *no reference value* — the source publishes nothing to compare against.
 
-A row with a match dot and none of these terms is fully built and verified; a parenthetical
-may narrow it (*(caveat)*, *(3 of 6)*).
+A row with a status term shows <span class="nodata">⊘</span> in place of a dot. A row whose
+problem is built on another corpus page reads *covered* and links there.
 
 ---
 

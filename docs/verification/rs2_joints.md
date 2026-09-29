@@ -89,10 +89,10 @@ joint model whose output is a stress-displacement curve.
 | [1c](#rj-1c) | 🟢 | Goodman & Bray block toppling, case 1c | SSRM 1.037 vs Goodman & Bray 1.0185 (+1.8%) | 1.01 vs 1.0185 (−0.8%) | UDEC 1.01 (+2.7%) | 1.01 / 0.99 | |
 | [1d](#rj-1d) | 🟢 | Goodman & Bray block toppling, case 1d | SSRM 1.252 vs Goodman & Bray 1.2308 (+1.7%) | 1.19 vs 1.2308 (−3.3%) | UDEC 1.22 (+2.6%) | 1.19 / 1.16 | |
 | [2](#rj-2) | 🟢 | Alejano & Alonso block toppling | SSRM 0.783 vs Goodman & Bray 0.7734 (+1.2%) | 0.86 vs 0.7734 (+11.2%) | UDEC 0.87 (−10.0%) | 0.86 / 0.82 | All three programs stand above the closed form, this one by a percent and the other two by a tenth; the manual states no UDEC settings for this model. |
-| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | SSRM 1.213 reported vs UDEC 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | *reported, no lock* — the trial at the top of the bracket, F = 1.222656, does not settle within the 250,000-iteration limit, so the search cannot close. The vendor's two settings disagree with each other. |
+| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | SSRM 1.213 reported vs UDEC 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | *unconfirmed* — the search did not close: its top trial, F = 1.222656, does not settle within the 250,000-iteration limit. The vendor's two settings disagree with each other. |
 | [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | — | 1.19 / 1.27 | |
-| [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | SSRM 1.818 reported vs UDEC 1.7 (+6.9%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | *reported, no lock* — four of the nine trials do not settle within the 250,000-iteration limit, two of them the ends of the bracket; a finer mesh settles two more and leaves an end of its own bracket unsettled. The reported value sits between the vendor's two settings. |
-| [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | SSRM 1.271 reported vs UDEC 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | *reported, no lock* — every trial settles, but a step of mesh refinement moves the factor by twice the row's tolerance. The reported value sits between the vendor's two settings. |
+| [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | SSRM 1.818 reported vs UDEC 1.7 (+6.9%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | *unconfirmed* — the search did not close: both ends of the bracket, and one end of a finer mesh's bracket, do not settle within the 250,000-iteration limit. The reported value sits between the vendor's two settings. |
+| [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | SSRM 1.271 reported vs UDEC 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | *unconfirmed* — the answer moves with the mesh: every trial settles, but a step of refinement moves the factor by twice the row's tolerance. The reported value sits between the vendor's two settings. |
 | [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | — | 1.57 / 1.59 | Both finite element codes land above the referee, on the same side and within half a point of each other. |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | 0.75 vs 0.76 (−1.3%) | — | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.037 vs UDEC 1.03 (+0.7%) | 1.01 vs 1.03 (−1.9%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
@@ -106,10 +106,10 @@ joint model whose output is a stress-displacement curve.
 | [17](#rj-17) | 🟡 | Step-path, en-echelon joints | SSRM 1.213 vs UDEC 1.29 (−6.0%) | 1.24 vs 1.29 (−3.9%) | — | 1.24 / 1.2 | No closed form: three rock bridges decide the factor, and both finite element codes read them below the distinct-element run, 2.1 points apart. |
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | 1.01 vs 1.01 (0.0%) | — | 1.01 / 1.0 | |
 | [19](#rj-19) | 🟢 | Bi-planar step-path failure | SSRM 1.623 vs rigid-block limit equilibrium 1.5914 (+2.0%) | 1.5 vs 1.5914 (−5.7%) | UDEC 1.46 (+11.2%) | 1.5 / 1.41 | One block sliding on the basal joint, held by friction and by the rock bridge in tension; its statics, with the tensile cap reduced with the trial factor as the vendor reduces it, is the referee, and both vendor numbers sit below it. |
-| [20](#rj-20) | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | 2.21 vs 2.46 (−10.2%) | — | 2.21 / 2.37 | *reported, no lock* — four of the nine trials do not settle within the 250,000-iteration limit, including both of the trials the search closes on. |
+| [20](#rj-20) | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | UDEC 2.46 | 2.21 vs 2.46 (−10.2%) | — | 2.21 / 2.37 | *unconfirmed* — the search did not close: four of the nine trials, both ends of the bracket among them, do not settle within the 250,000-iteration limit. |
 | 21 | <span class="nodata">⊘</span> | Shallow excavation, jointed tunnel | UDEC 8.16 | 8.27 vs 8.16 (+1.3%) | — | 8.27 / 8.5 | *not supported* — the second stage of the vendor model excavates a 2 m opening and the strength reduction runs on the excavated state, which carries the stress the first stage left behind; staged excavation is outside a slope program's scope. |
 | 22 | <span class="nodata">⊘</span> | Joint model: hyperbolic softening | — | — | — | — | *not supported* — the problem exercises RS2's hyperbolic displacement- and work-softening joint law, which XSLOPE's interface element does not have; it reports no factor of safety. |
-| 23 | <span class="nodata">⊘</span> | Joint model: residual strength and dilation | — | — | — | — | *no lock possible* — a shear test on one joint that reports no factor of safety. Its six vendor models all carry `include_dilation: no`, so the manual's dilation comparison never exercised dilation; XSLOPE's dilation and its peak and residual strengths are checked against their closed forms in `test/joint_element_check.py`. |
+| 23 | <span class="nodata">⊘</span> | Joint model: residual strength and dilation | — | — | — | — | *no reference value* — a shear test on one joint that reports no factor of safety. Its six vendor models all carry `include_dilation: no`, so the manual's dilation comparison never exercised dilation; XSLOPE's dilation and its peak and residual strengths are checked against their closed forms in `test/joint_element_check.py`. |
 
 </div>
 
@@ -150,7 +150,7 @@ interface stresses alone, every closed side pair is at its friction limit, and t
 every toppling block sits on its downslope corner.
 
 At the block width of 10 m the bracket reads 1.037; at 2D sizes of 7.0 m, 5.0 m and 3.5 m it reads
-1.018, one step of the search lower, and at the 5.0 m of the lock all nine trials settle.
+1.018, one step of the search lower, and at 5.0 m, the mesh the row is run on, all nine trials settle.
 
 The manual's figure labels the side boundaries as rollers, but the model clamps them and the
 restraints follow the model. The 0.5 kN toe force, negligible against the lowest block's weight,
@@ -182,7 +182,7 @@ measured heights the recursion returns **1.0078**, the bottom of this row's brac
 
 <!-- test: file=files/rocscience/joints/rj001b.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1b, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
 
-The mesh does not move this row: the block width of 10 m and the 5.0 m of its lock return the same
+The mesh does not move this row: the block width of 10 m and the 5.0 m the row is run on return the same
 factor, and at 5.0 m every trial settles within the iteration limit. On this case a few hundred
 kilonewtons per meter of extra capacity is worth under two points of factor of safety, and the
 interface change refinement makes is smaller than that.
@@ -211,7 +211,7 @@ returns **1.0469**, the bottom of that mesh's bracket — case a's mechanism and
 assumption, half a degree of friction further on.
 
 **The mesh moves this row the same way it moves case a.** At the block width of 10 m the bracket
-reads 1.057; at the 5.0 m of its lock it reads 1.037, one step of the search down and inside the
+reads 1.057; at the 5.0 m the row is run on it reads 1.037, one step of the search down and inside the
 row's own tolerance. Every trial at 5.0 m settles within the iteration limit.
 
 **Input file:** [rj001c.xlsx](files/rocscience/joints/rj001c.xlsx).
@@ -235,7 +235,7 @@ the corner of the contact.
 
 <!-- test: file=files/rocscience/joints/rj001d.xlsx, type=fem_ssrm, expected_fs=1.252, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1d, tier=gate, f_stand=1.2421875, f_fail=1.26171875, check=edges -->
 
-The mesh does not move this row either: the block width of 10 m and the 5.0 m of its lock
+The mesh does not move this row either: the block width of 10 m and the 5.0 m the row is run on
 return the same bracket, end for end, and at 5.0 m every trial settles within the iteration limit. Like case
 b, this case is posed where the toe-force curve is steep, so the interface change that refinement
 makes cannot carry it across a step of the search.
@@ -296,13 +296,13 @@ c = 675 kPa and φ = 43° and all five carry a joint cohesion of 100 kPa.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| 1.213 *reported, no lock* | 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | 1.12 / 1.09 |
+| 1.213 *unconfirmed* | 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | 1.12 / 1.09 |
 
-The row reports a factor but does not lock one. The search brackets 1.213 between 1.203, where
+The search brackets 1.213 between 1.203, where
 the slope stands, and 1.222656, where the trial does not settle within the 250,000-iteration limit:
 the slope neither comes to rest nor runs away there, so the top of the bracket is a statement
 about the iteration limit and the search cannot close. Every other trial settles. [Problem 5](#rj-5)
-and [problem 20](#rj-20) are reported rather than locked because trials at the ends of their
+and [problem 20](#rj-20) are unconfirmed for the same reason: trials at the ends of their
 brackets do not settle either.
 
 The reported value stands above UDEC and above the vendor's default. The vendor's own two
@@ -349,11 +349,11 @@ c = 100 kPa and φ = 40°.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| 1.818 *reported, no lock* | 1.7 (+6.9%) | 1.65 vs 1.7 (−2.9%) | 1.65 / 1.86 |
+| 1.818 *unconfirmed* | 1.7 (+6.9%) | 1.65 vs 1.7 (−2.9%) | 1.65 / 1.86 |
 
 This row is the corpus's hardest to settle. Four of its nine trials do not settle within the
 250,000-iteration limit, and two of the four are the ends of the bracket, 1.808594 and 1.828125, so
-the search cannot close: the row reports the bracket's midpoint but does not lock it.
+the search cannot close, and the value shown is the bracket's midpoint.
 
 The reported value stands above UDEC and above the vendor's default, and between the vendor's
 own two numbers: its two solution schemes give 1.65 and 1.86 on the same model, the widest spread
@@ -379,9 +379,9 @@ slabs between them are free to slide out. The rock is Mohr-Coulomb (γ = 26.1 kN
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| 1.271 *reported, no lock* | 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | 1.25 / 1.31 |
+| 1.271 *unconfirmed* | 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | 1.25 / 1.31 |
 
-The row reports a factor but does not lock one, and what holds it back is the mesh rather than
+What leaves this row unconfirmed is the mesh rather than
 the iteration limit. Every trial settles, but a step of refinement to 8.4 m moves the factor by two
 steps of the search, where the row's tolerance is one.
 
@@ -816,7 +816,7 @@ The referee is the rigid-block limit equilibrium of that mechanism, recomputed f
 workbook carries: the block slides on the basal joint, opens the upper joint behind it, and pulls
 the bridge apart in tension, with the joint's friction and the rock's tensile capacity both reduced
 by the trial factor. It holds up to 1.5914; friction alone holds it to 1.551. XSLOPE's 1.623 sits
-2.0% above 1.5914, and both vendor numbers sit below what the statics of the block admits, so the
+2.0% above that limit, and both vendor numbers sit below what the statics of the block admits, so the
 distinct-element run and RS2 fail this block by some route those statics do not contain.
 
 | XSLOPE SSRM | Rigid-block limit equilibrium referee | RS2 vs referee | UDEC (manual) | RS2 without / with improvement |
@@ -827,7 +827,7 @@ distinct-element run and RS2 fail this block by some route those statics do not 
 
 A step of refinement to 2.1 m moves the factor by one step of the search, inside the row's own
 tolerance, but on that mesh the trial at the top of the bracket does not settle within the
-iteration limit. The row is locked on the corpus mesh, where every trial settles.
+iteration limit. The row's value is taken on the corpus mesh, where every trial settles.
 
 The joint inclinations are the model's: the manual's table prints 59°, where its figure dimensions
 56° and 28° and the model's own endpoints give 56.3° and 28.4°.
@@ -853,7 +853,7 @@ row's mesh size, standing in for the joint spacing every other row meshes at.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| *no lock* | 2.46 | 2.21 vs 2.46 (−10.2%) | 2.21 / 2.37 |
+| *unconfirmed* | 2.46 | 2.21 vs 2.46 (−10.2%) | 2.21 / 2.37 |
 
 The row prints no factor, and what holds it back is the iteration limit. Four of the nine trials do
 not settle within the 250,000 iterations allowed, and both of the trials the search closes on are

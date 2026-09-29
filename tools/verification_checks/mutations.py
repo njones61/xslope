@@ -128,6 +128,11 @@ MUTATIONS = [
     # heading resolved that way is checked like any other, not left alone.
     ("rs2", "dots", "D3 dot changed on a multi-row section",
      "### \U0001F7E2 RS2-39/41/43:", "### \U0001F534 RS2-39/41/43:"),
+    # A ⊘ row carries one of the status terms index.md#status-terms defines; a
+    # retired one ("reported, no lock") in its place must fail.
+    ("rs2_joints", "dots", "D4 retired status term on a nodata row",
+     "*unconfirmed* \u2014 the answer moves with the mesh",
+     "*reported, no lock* \u2014 the answer moves with the mesh"),
 
     # A caption claiming all four panels of a composite on a figure that is a
     # single axes.  M14 runs the other way (a four-panel figure captioned as
@@ -300,6 +305,10 @@ VOICE_MUTATIONS = [
      "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}",
      "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}\n\n"
      "Those factors are withdrawn rather than restated.\n"),
+    ("seep", "voice", "V5 test vocabulary in prose",
+     "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}",
+     "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}\n\n"
+     "The discharge is locked at four decimals.\n"),
 ]
 
 #: Capability negations.  C1 is the sentence the check was written for: the
@@ -314,8 +323,7 @@ VOICE_MUTATIONS = [
 #: re-cut, which is how C1, C2 and N6 came to be anchored on text the page no
 #: longer carried; the terminations section that held it next moved to
 #: docs/fem/joints.md, which is why it is a methodology sentence now.
-CAP_ANCHOR = ("a corrector refusal is not a verdict of any kind: "
-              "it is the absence of one.")
+CAP_ANCHOR = "Each row shows the recomputed value beside the one its source prints."
 
 CAPABILITY_MUTATIONS = [
     ("rs2_joints", "capabilities", "C1 the line-load claim, restored",
@@ -337,8 +345,8 @@ NEGATIVE = [
     # grepped before writing it.
     ("rs2_joints", "capabilities", "N6 a sentence citing a listed absence",
      CAP_ANCHOR,
-     CAP_ANCHOR + " XSLOPE has no staged construction, so a model built in two "
-     "stages is out of reach."),
+     CAP_ANCHOR + " XSLOPE has no staged construction: staged excavation is "
+     "outside a slope program's scope."),
     ("rocscience_groundwater", "tags",
      "N1 a list element reprinted at the tag's own precision",
      "read 6.35 / 6.55", "read 6.346 / 6.55"),
@@ -361,15 +369,20 @@ NEGATIVE = [
     # it also exercises the narrowing that picks the quad8 lock out of the four
     # the section carries.
     ("ssrm", "tags", "N5 a correct restatement in a sentence of its own",
-     "*The dot is scored on the first row.",
+     "*Example 1, without the foundation, reads",
      "XSLOPE's SSRM on the same quad8 mesh reads 1.34 there too.\n\n"
-     "*The dot is scored on the first row."),
+     "*Example 1, without the foundation, reads"),
     # M5's control: the same planted table with the delta its authority column
     # implies, (0.781 − 0.81) / 0.81 = −3.6%.  Without this, M5 would be
     # satisfied by the check finding no pair at all rather than by the
     # authority-column pairing reading the wrong one.
     ("rs2", "deltas", "N4 authority-column table, delta correct",
      AUTH_HEAD, AUTH_HEAD + AUTH_TABLE.format("−3.6")),
+    # "block" and "blocked" are not "lock": the voice ban matches the whole word.
+    ("seep", "voice", "N7 blocked is not lock",
+     "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}",
+     "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}\n\n"
+     "No wall blocks the flow, and no boundary is blocked.\n"),
 ]
 
 #: Exemptions planted to prove that an exemption which never fires is itself a

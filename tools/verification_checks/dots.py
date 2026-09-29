@@ -1,8 +1,9 @@
 """Heading dots: a problem's section heading opens with its summary-table dot.
 
-Every corpus page's summary table carries a match dot per problem — 🟢 🟡 🔴 🟣
-and the ⊘ that means no data, scored as
-`docs/verification/index.md#how-the-match-dots-are-scored` describes.  The same
+Every corpus page's summary table carries a match dot per problem — 🟢 🟡 🔴 —
+or the ⊘ that stands for a status term, scored and defined as
+`docs/verification/index.md#how-the-match-dots-are-scored` and
+`docs/verification/index.md#status-terms` describe.  The same
 dot opens that problem's section heading, so a reader skimming the page, or its
 sidebar table of contents, sees the status without going back to the table:
 
@@ -27,6 +28,15 @@ What the check reads
   there is simply no heading of its own to open with a dot.  A row whose anchor
   the page does not define at all is a broken link and fails.
 
+Status terms
+------------
+A row that carries ⊘ instead of a dot carries one of the status terms
+`docs/verification/index.md#status-terms` defines, emphasized in the row:
+*unconfirmed*, *planned*, *blocked*, *not supported* or *no reference value*.
+A ⊘ row naming none of them fails, which is how a retired term ("no lock
+possible", "reported, no lock", "deferred") is caught in a table cell; the voice
+check catches the same words in prose.
+
 Several rows may name one heading — a section that covers three problems of the
 manual, or a catalog row that piggybacks on the section another row built.
 Where those rows agree, the heading takes their dot.  Where they disagree, the
@@ -46,11 +56,17 @@ import re
 import sys
 
 #: The match-quality dots, worst-to-best irrelevant here: the table decides.
-MATCH_DOTS = ("🟢", "🟡", "🔴", "🟣")
-#: "insufficient data or out of scope".  Written in a table as a span so the
+MATCH_DOTS = ("🟢", "🟡", "🔴")
+#: A row carrying a status term (unconfirmed, planned, blocked, not supported,
+#: no reference value) instead of a dot.  Written in a table as a span so the
 #: page can style it, and in a heading as the bare character.
 NODATA = "⊘"
 DOTS = MATCH_DOTS + (NODATA,)
+
+#: The status terms a ⊘ row may carry (docs/verification/index.md#status-terms).
+STATUS_TERMS = ("unconfirmed", "planned", "blocked", "not supported",
+                "no reference value")
+STATUS_TERM = re.compile(r"\*(?:" + "|".join(STATUS_TERMS) + r")\*", re.I)
 
 HEADING = re.compile(
     r"^(?P<hashes>#{2,6})\s+(?P<title>.*?)\s*"
@@ -103,6 +119,35 @@ def summary_rows(lines, marker="corpus-summary"):
     return rows
 
 
+def untermed_rows(lines, marker="corpus-summary"):
+    """(line number, first cell) for every ⊘ summary row, linked or not, that
+    names none of the status terms."""
+    out, in_block, cols = [], False, None
+    for i, line in enumerate(lines, 1):
+        s = line.strip()
+        if not in_block:
+            if s.startswith("<div") and marker in s:
+                in_block, cols = True, None
+            continue
+        if s.startswith("</div"):
+            in_block = False
+            continue
+        if not s.startswith("|"):
+            continue
+        cells = [c.strip() for c in s.strip("|").split("|")]
+        if cols is None:
+            cols = {c.lower(): j for j, c in enumerate(cells)}
+            continue
+        if set(s) <= SEPARATOR:
+            continue
+        j = cols.get("match")
+        if j is None or j >= len(cells):
+            continue
+        if _dot(cells[j]) == NODATA and not STATUS_TERM.search(s):
+            out.append((i, cells[0]))
+    return out
+
+
 def headings(lines):
     """anchor -> (line number, hashes, title, attrs) for anchored headings."""
     out = {}
@@ -140,6 +185,10 @@ def scan(path, cfg=None):
         by_anchor[anchor].append((lineno, label, dot))
 
     problems, fixes, notes, fired = [], [], [], set()
+    for lineno, first in untermed_rows(lines, marker):
+        problems.append(
+            f"line {lineno}: row {first} carries ⊘ but none of the status "
+            f"terms ({', '.join(STATUS_TERMS)})")
     for anchor in order:
         rows = by_anchor[anchor]
         dots = {d for _, _, d in rows}

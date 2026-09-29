@@ -8,17 +8,8 @@ Further worked seepage examples are in the
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
 
-**Match to the published value**
-
-| Symbol | Meaning |
-|---|---|
-| 🟢 | within 3% of the vendor and/or reference figure |
-| 🟡 | 3–6% |
-| 🔴 | more than 6% |
-| 🟣 | in progress |
-| <span class="nodata">⊘</span> | insufficient data or out of scope |
-
-The dot scores the **match quality of what is locked**, not how much of a problem is built; the partial/blocked detail is in the row text.
+Match dots and status terms follow the shared [definitions](index.md#status-terms) and
+[scoring](index.md#how-the-match-dots-are-scored).
 
 <div class="corpus-summary match" markdown>
 

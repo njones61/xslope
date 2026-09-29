@@ -37,7 +37,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [2.7](#acads-weak-layer) | 🟢 | ACADS Weak Layer | M-P 1.248 vs SLOPE/W M-P 1.261 (−1.0%) · Spencer 1.258 vs ACADS ≈ 1.26 (−0.2%) | **built** |
 | [2.8](#gs-2-8) | 🟢 | ACADS Weak Layer – Specified Surface | M-P 1.260 vs SLOPE/W 1.261 (−0.1%) | **built** |
 | [2.9](#gs-2-9) | 🟢 | ACADS External Loading | Spencer 0.724 vs the ACADS published band 0.67–0.81 (inside) · corrected Janbu 0.718 (inside) | **built**; search-sensitive. SLOPE/W's own Bishop 0.699 and M-P 0.689 are cross-method beside XSLOPE's Spencer and stay bare |
-| [2.10](#gs-2-10) | <span class="nodata">⊘</span> | Lanester Embankment | | *no lock possible* — measured pressures, with no flow field behind them |
+| [2.10](#gs-2-10) | <span class="nodata">⊘</span> | Lanester Embankment | | *planned* — the manual prints the pressure grid point by point, with coordinates |
 | [2.11](#gs-2-11) | 🟢 | Arai & Tagyo Homogeneous | Bishop 1.404 vs SLOPE/W 1.417 (−0.9%) · M-P 1.400 vs SLOPE/W 1.414 (−1.0%) | **built** |
 | [2.12](#gs-2-12) | 🟢 | Arai & Tagyo Pore-Water Pressure | Bishop 1.112 vs Arai & Tagyo's own Bishop 1.138 (−2.3%) · vs Slide 1.118 (−0.5%) | **built**; SLOPE/W is the outlier of the four sources |
 | [2.13](#gs-2-13) | 🟢 | Greco Layered Slope | Circular Spencer 1.429 vs SLOPE/W M-P 1.389 (+2.9%) | **built**; sits just above the Greco reference range |
@@ -79,7 +79,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.03 m of SEEP/W head at t = 46,800 s (0.4% of the 8 m suction step) | **built**; unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.02 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
 | [T03](#seepw-t03) | 🟢 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.09–0.23 m through the 30-day drawdown (1.1–2.9% of the 8 m drawdown); the published factor-of-safety-vs-time curve is reproduced at every saved step of both drawdown rates | **built** (both drawdown rates); the reference columns are the vendor's own solved `node.csv` field, sampled with the same probe used on XSLOPE's, and its solved minimum factor of safety per step |
 | [T04](#seepw-t04) | 🟢 | SEEP/W – Leakage from pond with clay liner | Interior head within ±0.02 m of SEEP/W at the near-steady leaking state (0.3% of the 6.5 m pond head) · 0.08–0.14 m low mid-fill (2.1% at worst) | **built**; the residual is in the filling *rate*, on a problem whose timing the saturated-only storage convention governs outright |
-| [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within 0.003 m of SEEP/W at the initial frame and 0.07 m at the high-rate near-steady, over the locked stations | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column, the van Genuchten pair fitted to the vendor's conductivity table over the suctions the column reaches |
+| [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within 0.003 m of SEEP/W at the initial frame and 0.07 m at the high-rate near-steady, over the checked stations | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column, the van Genuchten pair fitted to the vendor's conductivity table over the suctions the column reaches |
 | [T06](#seepw-t06) | <span class="nodata">⊘</span> | SEEP/W – Infiltration into multi-layered system | Two gates on the 14-layer infiltration leg: a measured, non-steady per-layer initial condition no steady solve returns, and a unit-gradient (free-drainage) base boundary that is not in the solver's boundary-condition set. The drainage leg is hysteretic, and XSLOPE carries one retention curve per material. | *blocked* |
 | [T07](#seepw-t07) | 🟢 | SEEP/W – GeoStudio-PEST Multistep Outflow | Column total head within 0.0003 m of SEEP/W's `node.csv` at every station and every reported stage — 0.3% of the 0.102 m the base suction is stepped through | **built**; stepped base suction through a time-varying head (plain-Dirichlet) series, carrying the vendor's own van Genuchten α, n and Mualem l read back out of its two tabulated curves |
 | [SRS](#sigmaw-wall) | 🔴 | SIGMA/W – Slope stabilization with a sheet pile wall | No wall: SSRM 1.048 vs SIGMA/W SRS 1.025 (+2.2%) — with the same project's FE stability 1.035 (+1.3%) and Morgenstern-Price 1.033 (+1.5%) · with the wall: SSRM 1.691 vs SIGMA/W SRS 1.4 (+20.8%) | **built**; the like-for-like case without the wall agrees. Both published factors are interpretations of an SRS sweep rather than solver outputs, and the wall case is read off a still-rising curve that the sweep never brackets from above. The wall's moment and shear reproduce the published shape and turning point at about four-fifths of the published peaks |
@@ -275,20 +275,16 @@ All four results fall inside the published band, which is wide because the bench
 A test embankment built on soft ground, with the manual supplying pore pressures as a
 grid of point values across the section rather than as a water table.
 
-That grid is what closes the problem to verification. Its values are **measured
-loading-induced pressures** — the excess pore pressure the fill generated in the soft
-foundation, recorded by piezometers as construction proceeded — not a steady flow field:
-they record how fast the foundation drained under load and decay with time toward a very
-different long-term state, and no seepage solution reproduces them.
+Its values are **measured loading-induced pressures** — the excess pore pressure the fill
+generated in the soft foundation, recorded by piezometers as construction proceeded — not a
+steady flow field, so no seepage solution reproduces them. The manual prints them as 22
+points with their coordinates (its Table 25), and SLOPE/W interpolates them linearly across
+the section. A printed grid of this kind enters XSLOPE as a nodal pore-pressure field
+interpolated onto a mesh, the way the 44-point grid of [RS2-9](rs2.md#rs2-9) does, so the
+row is *planned*. The factor Pilot et al. (1982) report for the embankment's failure is a
+field datum; SLOPE/W's own factor is the referee.
 
-Every way XSLOPE takes water into a limit-equilibrium analysis — a piezometric line, an
-r<sub>u</sub> ratio, a finite-element seepage solution — is a *model* of the pressure
-field, so transcribing a grid of measured point values back through an interpolator would
-only re-read the manual's own numbers. The row is therefore recorded as no lock possible
-rather than blocked: nothing in XSLOPE is missing, and the problem has no independently
-reproducible pore-pressure field behind it.
-
-Same problem as [Slide2 #12](rocscience.md), which is open for the same reason.
+Same problem as [Slide2 #12](rocscience.md).
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.10.
 
@@ -470,7 +466,7 @@ must rise monotonically along it, which the reversed ordering gives and the prin
 breaks. The reading is confined to that column: the paper's reliability-index entries for
 G and H do not show the same swap.
 
-**Why the circles are locked here and not on the Slide2 file.** The Slide2 corpus builds
+**Why the circles are checked here and not on the Slide2 file.** The Slide2 corpus builds
 this dam as [vp035.xlsx](files/rocscience/vp035.xlsx) from the paper's printed section,
 whose digitized frame is anisotropically scaled against this one and leaves a 1.8 m rms
 shape residual over the nine shared vertices. Fixed circles do not survive that: carried
@@ -738,11 +734,11 @@ published factor of safety is below 1.
 | Spencer, SLOPE/W's own circular search | — | 0.564 | — | — | a different (circular) surface — not comparable to the prescribed one |
 | Bishop, SLOPE/W's own circular search | — | 0.531 | — | — | as above |
 
-XSLOPE's force-family lock matches SLOPE/W's own current solve more closely than the
+XSLOPE's force-family value matches SLOPE/W's own current solve more closely than the
 historical inter-program spread this problem was built to expose. Spencer has no solution
 on the prescribed non-circular surface in XSLOPE — its force and moment residuals stay
 bounded away from zero over the whole admissible range of F and θ — so the
-force-equilibrium methods carry the lock,
+force-equilibrium methods carry the comparison,
 where SLOPE/W's own search rides a circular critical surface instead. The P&D (2000)
 report supplies the sand strengths, drawn-down water table and anchor layout.
 
@@ -950,8 +946,8 @@ is the whole of the difference:
 
 | Strength model (same surface) | XSLOPE | SLOPE/W | Note |
 |---|---|---|---|
-| Anisotropic function | — (not supported) | 1.113 | no XSLOPE counterpart — the orientation term has no equivalent |
-| Compound strength | — (not supported) | 1.118 | the two formulations differ by 0.4% on the *same* surface |
+| Anisotropic function | — (blocked) | 1.113 | no XSLOPE counterpart — the orientation term has no equivalent |
+| Compound strength | — (blocked) | 1.118 | the two formulations differ by 0.4% on the *same* surface |
 
 The two formulations of the same orientation-dependent idea agree with each other while
 the search is held fixed, so a factor of safety computed without the orientation term
@@ -972,7 +968,7 @@ verifications — the same physics XSLOPE's [transient solver](../seep/transient
 storage term, `div(kr K grad h) + Q = S dh/dt`. Six are built — T01 through T05 and T07 —
 and they span the range of that path, from the closed-form-anchored columns to the
 two-dimensional drawdown dam and the clay-lined pond whose water table rises through an
-exit face. Each is locked with `type=tseep_head` tags, the same transient head-profile
+exit face. Each is checked with `type=tseep_head` tags, the same transient head-profile
 check the [Rocscience groundwater](rocscience_groundwater.md) corpus uses: the solver
 marches the transient problem and the total head is sampled at named points at a save
 time. The seventh
@@ -981,7 +977,7 @@ below.
 
 As with the SLOPE/W corpus, the `.gsz` model files are Seequent's and are not
 redistributed here; their solved per-timestep `node.csv` results are read as the comparison
-values, which appear in the tables and locks below.
+values, which appear in the tables below.
 
 ### 🟢 SEEPW-T01 — Simulating consolidation with SEEP/W {#seepw-t01}
 
@@ -1010,7 +1006,7 @@ kPa.
 | 1460 | 75% | 3.95 kPa | 3.93 kPa (+0.02) | 4.77 kPa (−0.82) |
 
 XSLOPE sits on the Terzaghi closed form to within 0.02 kPa at the column center at every
-time, and the locked values are the analytical excess heads. SEEP/W is a second,
+time, and the values the row is held to are the analytical excess heads. SEEP/W is a second,
 independent comparison: it agrees at early time but lags the closed form by t = 1460 s
 (its own reported degree of consolidation is 24/48/69 % against Terzaghi's 25/50/75 %),
 because it runs only ten exponential time steps, where XSLOPE steps finely. This is visible in the figure as the
@@ -1059,7 +1055,7 @@ itself, where the mid-front (ψ = −4 m) crossing lands at y = 0.397 in XSLOPE 
 y = 0.380 in SEEP/W — the expected **lumped-mass vs consistent-mass front diffusion**,
 XSLOPE's lumped HRZ mass matrix damping the front oscillations SEEP/W's own dry-soil
 write-up warns about at the cost of a slightly smeared front position. The four
-wetted-zone points above are locked at a 0.08 m tolerance, wider than the 0.05 m used on
+wetted-zone points above are checked at a 0.08 m tolerance, wider than the 0.05 m used on
 the saturated groundwater page so that it carries that offset.
 
 **Sources:** GeoStudio SEEP/W example "Verification – Infiltration into Dry Soil";
@@ -1115,8 +1111,8 @@ uniformly a little below SEEP/W at every station and both drawdown rates, so the
 in the steady field the transient starts from rather than in the rate at which it drains.
 Two model-setup differences remain untranscribed and are the open candidates for it: the
 vendor refines the core to 0.5 m on a quad-dominant mesh where XSLOPE meshes one polygon
-at a uniform 0.7 m tri3 size, and its toe drain is saturated-only. The locks are the
-interior stations at the IC, mid-drawdown and end state, at a 0.03 m regression
+at a uniform 0.7 m tri3 size, and its toe drain is saturated-only. The row is checked at
+the interior stations at the IC, mid-drawdown and end state, at a 0.03 m regression
 tolerance.
 
 **Factor of safety versus time.** The example's *published* answer is a curve: the pore
@@ -1176,8 +1172,8 @@ Nineteen of the twenty-two steps agree to 0.014 or better, and every one of them
 lower pore pressures and higher factors of safety. The exception is the first step after
 the instantaneous drawdown, 0.941 against 0.829, which is that effect at its largest: 6
 hours after the reservoir is removed the slope is held up almost entirely by pore
-pressures that have not yet dissipated, so the head offset buys the most there. The locks
-are all 22 steps of both curves at a 0.005 regression tolerance, plus each curve's
+pressures that have not yet dissipated, so the head offset buys the most there. The row
+checks all 22 steps of both curves at a 0.005 regression tolerance, plus each curve's
 critical instant and minimum.
 
 A factor-of-safety-vs-time curve and a three-stage Duncan-Wright-Brandon rapid drawdown
@@ -1261,8 +1257,8 @@ model does not have, and on a 240-day leak into initially unsaturated fill that 
 governs the filling rate outright. The same term sets the timing of
 [GW18](rocscience_groundwater.md#gw18) on the Slide2 corpus.
 
-The locks are the interior stations at the two near-steady end members (IC and t = 240 d),
-at a 0.03 m regression tolerance.
+The row is checked at the interior stations at the two near-steady end members (IC and
+t = 240 d), at a 0.03 m regression tolerance.
 
 **Sources:** GeoStudio SEEP/W example "Leakage from Pond with Clay Liner" (Seequent).
 
@@ -1321,7 +1317,7 @@ state's deep column to 0.001 m. What stands off is the descending wetting front 
 boundary layer above the drained base, where the column reads up to 0.12 m drier across the
 front at the middle frame and 0.18 m in the bottom meter at the end frame — the storage
 side of the same (α, n), which the conductivity fit does not reach. The figure shows the
-XSLOPE markers on the SEEP/W profiles away from the front. The locks are XSLOPE's own
+XSLOPE markers on the SEEP/W profiles away from the front. The row checks XSLOPE's own
 solved total heads at interior elevations at the two frames, at a 0.03 m regression
 tolerance.
 
@@ -1344,14 +1340,14 @@ model:
    near the surface, which no steady solve returns. XSLOPE's transient solver *can* take an
    arbitrary initial field through its `h_init` argument, but the regression check here
    computes the initial condition as a t = 0 **steady** solve of the boundary
-   configuration, so the forward solve cannot be locked.
+   configuration, so the forward solve cannot be checked against the vendor's.
 
 2. **A unit-gradient (free-drainage) base boundary.** The base is a unit-gradient outlet
    (q = kr·Ksat out under gravity). XSLOPE's seepage BC set is specified head, specified
    flux and potential seepage face — there is no unit-gradient boundary, and an exit face
    clamps the base to ψ = 0 rather than letting it drain under a unit gradient.
 
-Either feature alone blocks a faithful lock. The van Genuchten storage and kr path this
+Either feature alone blocks a faithful build. The van Genuchten storage and kr path this
 example would exercise is already covered by [SEEPW-T02](#seepw-t02) and
 [SEEPW-T05](#seepw-t05). The model itself is written by
 `benchmarks/geostudio/build_gs2_mlayer.py`.
@@ -1392,7 +1388,7 @@ is. The sample's l is 0.295 because the example's own PEST loop calibrated it, a
 alongside α and n reproduces both curves exactly.
 
 The published external answer is the lab outflow curve the example's PEST loop fits, not a
-seepage headline number, so the lock is XSLOPE's own solved total-head field and the
+seepage headline number, so the row is held to XSLOPE's own solved total-head field and the
 SEEP/W `node.csv` pore-water pressures are read as the comparison.
 
 **Input:** [gs2_mso.xlsx](files/geostudio/gs2_mso.xlsx)

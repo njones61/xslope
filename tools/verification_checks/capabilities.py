@@ -78,10 +78,6 @@ ABSENT = [
            "as above; the .gsz importer flags the anisotropic-function material "
            "rather than dropping the orientation term"),
     Absent("orientation-dependent (anisotropic) shear strength",
-           "geostudio", "Compound strength",
-           "as above; SLOPE/W's compound-strength model is the same "
-           "orientation-dependent idea in its second formulation"),
-    Absent("orientation-dependent (anisotropic) shear strength",
            "rocscience", "no orientation-dependent strength model",
            "as above"),
 
@@ -136,7 +132,7 @@ ABSENT = [
            "docs/usage/input_template.md:256 states t_cut is the FEM's tensile "
            "control and the tension-crack parameters the LEM's"),
     Absent("staged construction: a stage that excavates part of the section",
-           "rs2_joints", "no staged construction",
+           "rs2_joints", "staged excavation is outside",
            "no 'excavat' anywhere in fem.py, fileio.py, mesh.py, solve.py or "
            "joints.py; fem.py's stage_list is a LOAD stage list (one entry, "
            "fem.py:5988), never a change of geometry or a removal of elements. "
@@ -232,8 +228,8 @@ NOT_A_CLAIM = re.compile(r"published\s+counterpart", re.I)
 #: or more of these words is the legend that defines them, not a verdict on a
 #: problem, and names no capability.
 STATUS_WORDS = re.compile(
-    r"\*{0,2}(?:built|covered|partial|planned|blocked|reported|"
-    r"no lock possible|not supported|not implemented)\*{0,2}", re.I)
+    r"\*{0,2}(?:built|covered|partial|unconfirmed|planned|blocked|"
+    r"not supported|no reference value|not implemented)\*{0,2}", re.I)
 
 #: XSLOPE, and the parts of it these pages name.  A negation is a capability
 #: claim only when the sentence naming it names one of these.

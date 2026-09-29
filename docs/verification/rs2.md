@@ -25,7 +25,8 @@ the shared [References](references.md) page.
 - **Initial stress** is the at-rest field `k0 = 1` on every strength-reduction row.
 - **Flow rule.** Every strength-reduction row runs ψ = 0.
 - **Mesh.** Every row is meshed at its stated size. A row mentions refinement only where a finer
-  mesh changes its factor.
+  mesh changes its factor, or where a series of mesh sizes is itself one of the row's checked
+  results.
 - **Strength-reduction constraints.** A constraint the vendor model states (an SSR search polygon,
   an elastic twin) is carried in the file, or the row says why it is not.
 - **Deep mechanisms.** Where the published mechanism is deeper than the unconstrained one, the row

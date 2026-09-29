@@ -1318,8 +1318,8 @@ each 3 m tall behind a facing of stacked blocks, with the finite-difference prog
 published a factor of safety for it and for seven variants: weaker fill, shorter sheets, two
 grades of sheet, a weak foundation, water behind the wall, a surcharge on top, and five short tiers
 in place of three tall ones. The RS2 manual re-runs the eight as its problems 48 to 55 by strength
-reduction and prints its own factors beside the paper's, together with three limit-equilibrium
-factors from Slide2. Slide2 counterparts: [VP87](rocscience.md#vp87)–VP94.
+reduction and prints its own factors beside the paper's, together with Slide2's Bishop, Spencer
+and GLE factors for the same walls. Slide2 counterparts: [VP87](rocscience.md#vp87)–VP94.
 
 XSLOPE builds the wall as the paper describes it: cohesionless fill at φ = 34°, geotextile sheets
 6.3 m long with an allowable strength of 10 kN/m and a stiffness of 1000 kN/m, and the mesh split
@@ -1333,11 +1333,11 @@ is free-draining, as in the paper.
 The paper's FLAC factor is each row's referee. RS2's factor is shown beside it, and the manual's
 limit-equilibrium factors are in the second table.
 
-| Published (baseline wall) | RS2 SSR | RS2 LEM (Bishop / Spencer / GLE) | L&H FDM referee | L&H Bishop | Slide2 Bishop |
+| Published (baseline wall) | RS2 SSR | Slide2 in the RS2 manual (Bishop / Spencer / GLE) | L&H FDM referee | L&H Bishop | Slide2 manual, Bishop |
 |---|---|---|---|---|---|
 | Leshchinsky & Han 2004 | 1.05 | 1.02 / 1.03 / 1.03 | 0.99 | 1.00 | 1.040 |
 
-| Variant (RS2 problem) | L&H FDM referee | RS2 SSR | RS2 LEM Bishop / Spencer / GLE |
+| Variant (RS2 problem) | L&H FDM referee | RS2 SSR | Slide2 in the RS2 manual, Bishop / Spencer / GLE |
 |---|---|---|---|
 | 48 — baseline | 0.99 | 1.05 | 1.02 / 1.03 / 1.03 |
 | 49 — fill quality | 0.99 | 1.08 | 0.98 / 0.97 / 0.97 |
@@ -1390,8 +1390,8 @@ this fill would give about 20.5°. Refining the mesh does not move the factor.
 
 <!-- test: file=files/rocscience/vp088_fem.xlsx, type=fem_ssrm, expected_fs=1.096, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, ssr_exclude=Blocks, benchmark=RS2-49, f_stand=1.0859375, f_fail=1.10546875, check=edges -->
 
-The published factors disagree among themselves here: the manual's limit-equilibrium columns for
-this wall read 0.98 / 0.97 / 0.97 against its own strength-reduction value of 1.08, with the
+The published factors disagree among themselves here: the Slide2 columns the RS2 manual prints for
+this wall read 0.98 / 0.97 / 0.97 against RS2's own strength-reduction value of 1.08, with the
 paper's 0.99 between them. Giving the facing blocks a cohesion instead of leaving them elastic does not bring
 the factor down to the paper's: with ten times the paper's block cohesion the wall fails at a small
 fraction of its present factor, so the facing's strength is a cliff rather than a dial, and the

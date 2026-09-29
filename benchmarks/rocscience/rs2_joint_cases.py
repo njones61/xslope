@@ -56,5 +56,5 @@ SWEEP_CASES = [
     {'file': 'files/rocscience/joints/rj016.xlsx', 'benchmark': 'RJ-16',
      'target_size': '0.09', 'max_iter': '250000', 'element_type': 'tri6',
      'tension_srf': 'false', 'k0': '1',
-     'k_stand': '0.147656', 'k_fail': '0.150391'},
+     'k_stand': '0.179846', 'k_fail': '0.181396'},
 ]

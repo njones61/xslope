@@ -5677,16 +5677,16 @@
       "model": "docs/tutorials/files/xslope_base_geotextile_bonded.xlsx",
       "references": [
         {
-          "anchor": "when-a-sheet-is-a-slip-surface-and-when-it-is-bonded",
+          "anchor": "a-base-geotextile-on-soft-clay",
           "checks": [
             "FEM-3-sheet-bonded-ssrm"
           ],
-          "level": 2,
+          "level": 3,
           "page": "tutorials/fem03_block_wall_joints/",
           "resolution": "input-link",
           "source_md": "docs/tutorials/fem03_block_wall_joints.md",
-          "title": "When a sheet is a slip surface, and when it is bonded",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#when-a-sheet-is-a-slip-surface-and-when-it-is-bonded"
+          "title": "A base geotextile on soft clay",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#a-base-geotextile-on-soft-clay"
         }
       ],
       "topics": [
@@ -5750,16 +5750,16 @@
       "model": "docs/tutorials/files/xslope_base_geotextile_jointed.xlsx",
       "references": [
         {
-          "anchor": "when-a-sheet-is-a-slip-surface-and-when-it-is-bonded",
+          "anchor": "a-base-geotextile-on-soft-clay",
           "checks": [
             "FEM-3-sheet-jointed-ssrm"
           ],
-          "level": 2,
+          "level": 3,
           "page": "tutorials/fem03_block_wall_joints/",
           "resolution": "input-link",
           "source_md": "docs/tutorials/fem03_block_wall_joints.md",
-          "title": "When a sheet is a slip surface, and when it is bonded",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#when-a-sheet-is-a-slip-surface-and-when-it-is-bonded"
+          "title": "A base geotextile on soft clay",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#a-base-geotextile-on-soft-clay"
         }
       ],
       "topics": [
@@ -5768,7 +5768,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
@@ -5834,7 +5834,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
@@ -6595,16 +6595,16 @@
       "model": "docs/tutorials/files/xslope_liner_bonded.xlsx",
       "references": [
         {
-          "anchor": "when-a-sheet-is-a-slip-surface-and-when-it-is-bonded",
+          "anchor": "a-smooth-geomembrane-liner-on-a-firm-foundation",
           "checks": [
             "FEM-3-liner-bonded-ssrm"
           ],
-          "level": 2,
+          "level": 3,
           "page": "tutorials/fem03_block_wall_joints/",
           "resolution": "input-link",
           "source_md": "docs/tutorials/fem03_block_wall_joints.md",
-          "title": "When a sheet is a slip surface, and when it is bonded",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#when-a-sheet-is-a-slip-surface-and-when-it-is-bonded"
+          "title": "A smooth geomembrane liner on a firm foundation",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#a-smooth-geomembrane-liner-on-a-firm-foundation"
         }
       ],
       "topics": [
@@ -6668,16 +6668,16 @@
       "model": "docs/tutorials/files/xslope_liner_jointed.xlsx",
       "references": [
         {
-          "anchor": "when-a-sheet-is-a-slip-surface-and-when-it-is-bonded",
+          "anchor": "a-smooth-geomembrane-liner-on-a-firm-foundation",
           "checks": [
             "FEM-3-liner-jointed-ssrm"
           ],
-          "level": 2,
+          "level": 3,
           "page": "tutorials/fem03_block_wall_joints/",
           "resolution": "input-link",
           "source_md": "docs/tutorials/fem03_block_wall_joints.md",
-          "title": "When a sheet is a slip surface, and when it is bonded",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#when-a-sheet-is-a-slip-surface-and-when-it-is-bonded"
+          "title": "A smooth geomembrane liner on a firm foundation",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#a-smooth-geomembrane-liner-on-a-firm-foundation"
         }
       ],
       "topics": [
@@ -6970,7 +6970,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
@@ -7105,7 +7105,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
@@ -7154,16 +7154,83 @@
       "model": "docs/tutorials/files/xslope_rock_toppling.xlsx",
       "references": [
         {
-          "anchor": "running-the-toppling-stack",
+          "anchor": "tutorial-fem-5-a-rock-slope-on-its-joints",
           "checks": [
             "FEM-5-topple-ssrm"
           ],
-          "level": 2,
+          "level": 1,
           "page": "tutorials/fem05_rock_slope_joints/",
           "resolution": "input-link",
           "source_md": "docs/tutorials/fem05_rock_slope_joints.md",
-          "title": "Running the toppling stack",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem05_rock_slope_joints/#running-the-toppling-stack"
+          "title": "Tutorial FEM-5 — A Rock Slope on Its Joints",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem05_rock_slope_joints/#tutorial-fem-5-a-rock-slope-on-its-joints"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_rock_voronoi.xlsx",
+      "references": [
+        {
+          "anchor": "what-a-network-costs",
+          "checks": [
+            "FEM-5-voronoi-ssrm"
+          ],
+          "level": 3,
+          "page": "tutorials/fem05_rock_slope_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem05_rock_slope_joints.md",
+          "title": "What a network costs",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem05_rock_slope_joints/#what-a-network-costs"
         }
       ],
       "topics": [
@@ -8874,7 +8941,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -8924,7 +8991,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -8942,7 +9008,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -8992,7 +9058,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -9010,7 +9075,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9060,7 +9125,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -9078,7 +9142,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9128,7 +9192,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -9146,7 +9209,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9196,13 +9259,12 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9269,7 +9331,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9348,7 +9410,7 @@
           "mc"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9398,7 +9460,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -9416,7 +9477,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9466,7 +9527,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -9484,7 +9544,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9534,7 +9594,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -9552,7 +9611,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9602,7 +9661,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -9620,7 +9678,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9670,7 +9728,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -9688,7 +9745,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9738,7 +9795,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -9756,7 +9812,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9806,13 +9862,12 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9879,7 +9934,72 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj016.xlsx",
+      "references": [
+        {
+          "anchor": "rj-16",
+          "checks": [
+            "RJ-16"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-16: Barla et al. tilt-table block toppling (rj016)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-16"
+        }
+      ],
+      "topics": []
+    },
+    {
+      "features": {
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9958,7 +10078,7 @@
           "mc"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -10008,7 +10128,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -10026,7 +10145,7 @@
           "mc"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -10076,7 +10195,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -26924,7 +27042,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 379,
+    "models": 381,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -26965,12 +27083,12 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 645,
+    "tags": 647,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 180,
-      "non-circular": 46,
+      "homogeneous": 181,
+      "non-circular": 32,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
@@ -27052,6 +27170,7 @@
       "docs/tutorials/files/xslope_rock_joints.xlsx",
       "docs/tutorials/files/xslope_rock_slope.xlsx",
       "docs/tutorials/files/xslope_rock_toppling.xlsx",
+      "docs/tutorials/files/xslope_rock_voronoi.xlsx",
       "docs/tutorials/files/xslope_ssrm_embankment.xlsx",
       "docs/tutorials/files/xslope_ssrm_embankment_start.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
@@ -27204,20 +27323,6 @@
       "docs/lem/files/xslope_noncircular.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
       "docs/verification/files/geostudio/gs2_33.xlsx",
-      "docs/verification/files/rocscience/joints/rj001a.xlsx",
-      "docs/verification/files/rocscience/joints/rj001b.xlsx",
-      "docs/verification/files/rocscience/joints/rj001c.xlsx",
-      "docs/verification/files/rocscience/joints/rj001d.xlsx",
-      "docs/verification/files/rocscience/joints/rj002.xlsx",
-      "docs/verification/files/rocscience/joints/rj008.xlsx",
-      "docs/verification/files/rocscience/joints/rj009.xlsx",
-      "docs/verification/files/rocscience/joints/rj010.xlsx",
-      "docs/verification/files/rocscience/joints/rj011.xlsx",
-      "docs/verification/files/rocscience/joints/rj012.xlsx",
-      "docs/verification/files/rocscience/joints/rj013.xlsx",
-      "docs/verification/files/rocscience/joints/rj014.xlsx",
-      "docs/verification/files/rocscience/joints/rj018.xlsx",
-      "docs/verification/files/rocscience/joints/rj019.xlsx",
       "docs/verification/files/rocscience/vp008.xlsx",
       "docs/verification/files/rocscience/vp009.xlsx",
       "docs/verification/files/rocscience/vp017.xlsx",

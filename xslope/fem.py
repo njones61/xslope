@@ -15861,9 +15861,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 result["capture_error"] = f"{type(exc).__name__}: {exc}"[:200]
                 if not isinstance(exc, _CORRECTOR_NUMERICAL_ERRORS):
                     print(f"    WARNING: the at-failure capture raised "
-                          f"{type(exc).__name__}: {exc}. This is a defect in the "
-                          "code, not a property of the model; continuing without "
-                          "the capture.")
+                          f"{type(exc).__name__}: {exc}. The program has a defect "
+                          "here; the run continues without the capture.")
                 elif debug_level >= 1:
                     print(f"    at-failure capture failed ({type(exc).__name__}: "
                           f"{exc}); continuing without it.")

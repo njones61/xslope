@@ -300,9 +300,9 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
         vg_n_by_mat[i] = material.get("vg_n", 0.0)
         _l = material.get("vg_l")
         vg_l_by_mat[i] = 0.5 if _l is None else float(_l)
-        # v18 transient storage: None (blank) -> 0 here; the transient path
-        # validates presence at load time (fileio), so a 0 only survives on the
-        # steady path where it is never read. Never affects steady behavior.
+        # v18 transient storage: None (blank) -> 0 here; a transient run is refused
+        # by preflight's tseep.storage_nonpositive before it gets here, so a 0 only
+        # survives on the steady path where it is never read.
         _ss = material.get("Ss")
         _sy = material.get("Sy")
         ss_by_mat[i] = 0.0 if _ss is None else float(_ss)

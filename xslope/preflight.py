@@ -1820,6 +1820,109 @@ def _circular_only_message(method, search):
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
+# Family: the model itself -- geometry and materials
+#
+# A file with no geometry, no materials, or a zone pointing at a material row
+# that does not exist yet OPENS: the loader reads structure only, and a model is
+# drawn before it is complete. These are the questions a run asks of it. They
+# apply to every analysis, and they gate the Run choices, so an empty model dims
+# every analysis with the reason rather than failing inside one.
+# ---------------------------------------------------------------------------
+
+@rule("geometry.none_defined", ERROR, ("*",), capability="analysis",
+      summary="Every analysis needs the section's geometry: profile lines or "
+              "material polygons.")
+def _geometry_none(ctx):
+    if ctx.sd.get("polygons"):
+        return None
+    return ("This model has no geometry yet. Draw the cross section as profile "
+            "lines (Profile lines; profile sheet) or as material polygons "
+            "(Polygons; polygon sheet).")
+
+
+@rule("mat.none_defined", ERROR, ("*",), capability="analysis",
+      summary="Every analysis needs at least one material.")
+def _mat_none(ctx):
+    if ctx.materials:
+        return None
+    return ("This model has no materials yet. Add a material for each zone of the "
+            "cross section, then set each zone's Mat ID to its row "
+            f"{_AT_MAT}.")
+
+
+@rule("geometry.material_missing", ERROR, ("*",),
+      "Every geometry zone must name a row of the Materials table.")
+def _geometry_material_missing(ctx):
+    polys = ctx.sd.get("polygons") or []
+    if not polys or not ctx.materials:
+        return None                      # mat.none_defined / geometry.none_defined
+    n = len(ctx.materials)
+    # A profile model's zones are built one per profile line, so the Mat ID the
+    # user typed is on the line; a polygon model's is on the polygon.
+    lines = ctx.sd.get("profile_lines") or []
+    if lines:
+        where, noun = _AT_PROFILE, "Profile line"
+        items = [ln for ln in lines if isinstance(ln, dict)
+                 and len(_coords(ln.get("coords"))) >= 2]
+    else:
+        where, noun = _AT_POLYGON, "Polygon"
+        items = [p for p in polys if isinstance(p, dict)]
+    for k, poly in enumerate(items):
+        mid = poly.get("mat_id")
+        try:
+            mid = None if mid is None else int(mid)
+        except (TypeError, ValueError):
+            mid = None
+        if mid is not None and 0 <= mid < n:
+            continue
+        what = ("has no Mat ID" if mid is None else
+                f"has Mat ID {mid + 1}, and the Materials table has "
+                f"{n} row{'s' if n != 1 else ''}")
+        yield (f"{noun} {k + 1} {what}, so the zone it bounds has no material. "
+               f"Set its Mat ID to a row of the Materials table (1 to {n}) "
+               f"{where}.")
+
+
+@rule("geometry.profile_line_too_short", ERROR, ("*",),
+      "A profile line needs at least two points to bound a zone.")
+def _profile_line_short(ctx):
+    for k, line in enumerate(ctx.sd.get("profile_lines") or []):
+        pts = _coords(line.get("coords") if isinstance(line, dict) else line)
+        if len(pts) >= 2:
+            continue
+        yield (f"Profile line {k + 1} has {len(pts)} point"
+               f"{'' if len(pts) == 1 else 's'}, so it bounds no zone and the "
+               f"section is built without it. Add at least one more point, or "
+               f"delete the line {_AT_PROFILE}.")
+
+
+@rule("geometry.zones_overlap", ERROR, ("*",),
+      "Material zones must tile the section without overlapping.")
+def _zones_overlap(ctx):
+    # Measured: a high-conductivity zone drawn over a low-conductivity barrier
+    # bridges it in the mesh and can inflate the seepage flowrate several-fold;
+    # the slicer weighs the overlap twice. Touching along shared edges is the
+    # normal case and has zero overlap area.
+    polys = [p for p in (ctx.sd.get("polygons") or []) if isinstance(p, dict)
+             and p.get("polygon") is not None]
+    tol = 1e-6
+    for i in range(len(polys)):
+        for j in range(i + 1, len(polys)):
+            try:
+                area = polys[i]["polygon"].intersection(polys[j]["polygon"]).area
+            except Exception:
+                continue
+            if area <= tol:
+                continue
+            yield (f"Polygon {i + 1} and polygon {j + 1} overlap by "
+                   f"{area:.4g} square units. Material zones must tile the section: "
+                   f"neighboring zones share an edge, and a zone inside another (a "
+                   f"lens, a dam core) is cut out of the zone around it, which is "
+                   f"then one polygon with a notch or a hole. Redraw them so they "
+                   f"meet along a shared edge {_AT_POLYGON}.")
+
+
+# ---------------------------------------------------------------------------
 # Family: water and unit weight of water
 # ---------------------------------------------------------------------------
 
@@ -3445,6 +3548,16 @@ def _seep_bc_short(ctx):
         out.append(f"Exit face has fewer than two points, so it binds no mesh "
                    f"nodes and the model would silently solve as fully confined "
                    f"{_AT_SEEPBC}.")
+    # Boundary set 2 (the rapid-drawdown drawn-down state) is solved the same way.
+    bc2 = ctx.sd.get("seepage_bc2") or {}
+    for n, b in enumerate(bc2.get("specified_heads") or []):
+        if len(_coords(b.get("coords"))) < 2:
+            out.append(f"Specified head #{n + 1} of boundary set 2 has fewer than "
+                       f"two points, so it binds no mesh nodes {_AT_SEEPBC2}.")
+    for n, b in enumerate(bc2.get("specified_fluxes") or []):
+        if len(_coords(b.get("coords"))) < 2:
+            out.append(f"Specified flux #{n + 1} of boundary set 2 has fewer than "
+                       f"two points, so it binds no mesh nodes {_AT_SEEPBC2}.")
     return out
 
 
@@ -3919,8 +4032,8 @@ def _thin_zone_unresolved(ctx):
 # ---------------------------------------------------------------------------
 # Family: transient seepage
 #
-# The storage rules are where the silence is worst: the loader refuses a MISSING
-# Ss or Sy and says so clearly, but an explicit ZERO passes both guards and runs.
+# The storage rules are where the silence is worst: a blank Ss or Sy and an
+# explicit ZERO both reach a transient run, and nothing but this rule refuses them.
 # With Sy = 0 the phreatic surface tracks a falling pool instantly, which is the
 # least conservative drawdown pore pressure the model can produce -- and nothing
 # says a word.
@@ -6148,6 +6261,373 @@ def _mat_phi_range(ctx):
                f"Mohr-Coulomb strength is c + σ′·tan(φ), which has no finite value "
                f"at 90 degrees and changes sign above it. Enter an angle below 90 "
                f"{_AT_MAT}.")
+
+
+# ===========================================================================
+# Family: values the file carries as typed
+#
+# Each rule here was a refusal at file load until 2026-09-27. A value a run
+# cannot use is a question about the run, so the file opens with the value in
+# it -- exactly as typed, so the fix is made where it was entered -- and the
+# rule names it when an analysis that reads it is checked.
+# ===========================================================================
+
+def _stability_rows(ctx):
+    """The material rows a stability run reads: every row for a finite element
+    run (the engine builds each one), the rows a failure surface can cross for a
+    limit-equilibrium run."""
+    if "fem" in ctx.analyses:
+        return ctx.fem_materials()
+    return list(ctx.strength_materials())
+
+
+@rule("mat.gamma_sat_below_gamma", ERROR, ("lem", "fem"),
+      "The saturated unit weight cannot be less than the moist unit weight.",
+      fields=("gamma", "gamma_sat"))
+def _mat_gamma_sat_below(ctx):
+    for i, m in _stability_rows(ctx):
+        g, gs = _num(m.get("gamma")), _num(m.get("gamma_sat"))
+        if g is None or gs is None or gs >= g:
+            continue
+        yield (f"{ctx.mat_label(i)} has gsat = {gs:g}, less than g = {g:g}. Soil "
+               f"below the water table is at least as heavy as the same soil above "
+               f"it. Enter the saturated unit weight, or leave gsat blank to use g "
+               f"throughout {_AT_MAT}.")
+
+
+@rule("mat.pow_params_nonpositive", ERROR, ("lem", "fem"),
+      "The power-curve envelope needs positive pow_a and pow_b.",
+      fields=("pow_a", "pow_b"))
+def _mat_pow_params(ctx):
+    for i, m in _stability_rows(ctx):
+        if str(m.get("option") or "").strip().lower() != "pow":
+            continue
+        bad = [f"{col} = {_fmt(m.get(key))}" for key, col in
+               (("pow_a", "pow_a"), ("pow_b", "pow_b")) if not _pos(m.get(key))]
+        if not bad:
+            continue
+        yield (f"{ctx.mat_label(i)} uses the power-curve strength model (option = "
+               f"pow) with {' and '.join(bad)}. The envelope is "
+               f"τ = pow_a·(σn + pow_d)^pow_b + pow_c, so pow_a and pow_b must both "
+               f"be greater than zero. Enter them {_AT_MAT}.")
+
+
+@rule("mat.hb_params_invalid", ERROR, ("lem", "fem"),
+      "Hoek-Brown needs a positive σci and mi, a GSI from 0 to 100 and a D from 0 to 1.",
+      fields=("hb_sci", "hb_gsi", "hb_mi", "hb_d"))
+def _mat_hb_params(ctx):
+    for i, m in _stability_rows(ctx):
+        if str(m.get("option") or "").strip().lower() != "hb":
+            continue
+        lab = ctx.mat_label(i)
+        for key, col, what in (("hb_sci", "hb_sci", "the intact rock strength σci"),
+                               ("hb_mi", "hb_mi", "the intact rock constant mi")):
+            if not _pos(m.get(key)):
+                yield (f"{lab} uses the Hoek-Brown strength model with {col} = "
+                       f"{_fmt(m.get(key))}. Enter {what}; it must be greater than "
+                       f"zero {_AT_MAT}.")
+        gsi = _num(m.get("hb_gsi"))
+        if gsi is None or not (0.0 < gsi <= 100.0):
+            yield (f"{lab} uses the Hoek-Brown strength model with hb_gsi = "
+                   f"{_fmt(m.get('hb_gsi'))}. Enter the Geological Strength Index, "
+                   f"greater than 0 and at most 100 {_AT_MAT}.")
+        d = _num(m.get("hb_d"))
+        if d is None or not (0.0 <= d <= 1.0):
+            yield (f"{lab} uses the Hoek-Brown strength model with hb_d = "
+                   f"{_fmt(m.get('hb_d'))}. Enter the disturbance factor, from 0 "
+                   f"(undisturbed) to 1 (heavily blast-damaged) {_AT_MAT}.")
+
+
+@rule("piezo.line_too_short", ERROR, ("lem", "fem"),
+      "A piezometric line needs at least two points.")
+def _piezo_line_short(ctx):
+    for key, name in (("piezo_line", "Piezometric line 1"),
+                      ("piezo_line2", "Piezometric line 2")):
+        n = len(_coords(ctx.sd.get(key)))
+        if n == 1:
+            yield (f"{name} has one point. A water table is a line across the "
+                   f"section; add at least one more point, or delete the line "
+                   f"{_AT_PIEZO}.")
+
+
+@rule("dload.line_too_short", ERROR, ("lem", "fem"),
+      "A distributed load needs at least two points.")
+def _dload_line_short(ctx):
+    for stage in (1, 2):
+        for label, pts in ctx.dload_blocks(stage):
+            if len(pts) == 1:
+                yield (f"{label} has one point. A distributed load acts along a "
+                       f"stretch of the ground surface; add at least one more point, "
+                       f"or delete the load {_at_dloads(stage)}.")
+
+
+@rule("main.num_slices_too_few", ERROR, ("lem",),
+      "A limit-equilibrium run needs at least two slices.")
+def _num_slices_few(ctx):
+    n = _num(ctx.sd.get("num_slices"))
+    if n is None or n >= 2:
+        return None
+    return (f"Number of slices is {_fmt(n)}. Enter at least 2 (30 to 50 is usual), "
+            f"or leave it blank for the default (Run LEM; main D15).")
+
+
+@rule("fem.k0_nonpositive", ERROR, ("fem",),
+      "K0 initial stress must be greater than zero where it is given.")
+def _k0_nonpositive(ctx):
+    k0 = _num(ctx.sd.get("k0"))
+    if k0 is None or k0 > 0:
+        return None
+    return (f"K0 initial stress (FEM) is {k0:g}. Enter a positive at-rest "
+            f"coefficient (about 1 − sin φ′ for a normally consolidated soil, 1.0 to "
+            f"reproduce an RS2 model), or leave it blank for the gravity turn-on "
+            f"initialization {_at_global('D16')}.")
+
+
+def _main_row(ctx, base_row):
+    """The main-sheet row of a run option at or below D20, which moved down one
+    row when the 1D element size arrived (template version 25)."""
+    from .fileio import _ELEMENT_SIZE_1D_TEMPLATE_VERSION as _v1d
+    tv = _num(ctx.sd.get("template_version"))
+    return base_row + (1 if tv is None or tv >= _v1d else 0)
+
+
+@rule("mesh.size_nonpositive", ERROR, ("fem", "seep"),
+      "Every element size the model states must be greater than zero.")
+def _mesh_size_nonpositive(ctx):
+    def _bad(v):
+        f = _num(v)
+        return f is not None and f <= 0
+    sd = ctx.sd
+    if _bad(sd.get("target_size")):
+        yield (f"Target element size is {_fmt(sd.get('target_size'))}. Enter a "
+               f"positive size, or leave it blank for the automatic size (Build "
+               f"mesh; main D19).")
+    if _bad(sd.get("element_size_1d")):
+        yield (f"1D element size is {_fmt(sd.get('element_size_1d'))}. Enter a "
+               f"positive size, or leave it blank to follow the target element size "
+               f"(Build mesh; main D20).")
+    if sd.get("profile_lines"):
+        for k, line in enumerate(sd.get("profile_lines") or []):
+            if isinstance(line, dict) and _bad(line.get("size")):
+                yield (f"Profile line {k + 1} has a Size of {_fmt(line.get('size'))}. "
+                       f"Enter a positive element size for its zone, or leave Size "
+                       f"blank to use the target element size {_AT_PROFILE}.")
+    else:
+        for k, poly in enumerate(sd.get("polygons") or []):
+            if isinstance(poly, dict) and _bad(poly.get("size")):
+                yield (f"Polygon {k + 1} has a Size of {_fmt(poly.get('size'))}. "
+                       f"Enter a positive element size, or leave Size blank to use "
+                       f"the target element size {_AT_POLYGON}.")
+    for kind, label in (("ssr_zones", "SSR zone"), ("refine_zones", "Refine region"),
+                        ("joint_zones", "Joint region")):
+        for k, z in enumerate(sd.get(kind) or []):
+            if isinstance(z, dict) and _bad(z.get("size")):
+                yield (f"{label} {k + 1} has a Size of {_fmt(z.get('size'))}. Enter "
+                       f"a positive element size, or leave Size blank "
+                       f"{_AT_POLYGON}.")
+
+
+@rule("mesh.refine_zone_no_size", WARNING, ("fem", "seep"),
+      "A refine polygon does nothing without a Size.")
+def _refine_zone_no_size(ctx):
+    for k, z in enumerate(ctx.sd.get("refine_zones") or []):
+        if isinstance(z, dict) and _num(z.get("size")) is None:
+            yield (f"Refine region {k + 1} has no Size. A refine polygon carries no "
+                   f"material; its only effect is the element size inside it, so "
+                   f"without one the mesh ignores it. Enter a Size, or delete the "
+                   f"polygon {_AT_POLYGON}.")
+
+
+@rule("ssrm.bracket_reversed", ERROR, ("ssrm",),
+      "The strength-reduction search range must run from a lower F min to a higher F max.")
+def _ssrm_bracket(ctx):
+    lo, hi = _num(ctx.sd.get("ssrm_f_min")), _num(ctx.sd.get("ssrm_f_max"))
+    if lo is None or hi is None or lo < hi:
+        return None
+    r = _main_row(ctx, 20)
+    return (f"F min (SSRM) is {lo:g} and F max (SSRM) is {hi:g}. The search for the "
+            f"factor of safety runs from F min up to F max, so F min must be the "
+            f"smaller. Enter them in that order, or leave both blank for the "
+            f"defaults (Run FEM; main D{r} and D{r + 1}).")
+
+
+@rule("surface.search_window_reversed", ERROR, ("lem",),
+      "Each search window range must run from its lower to its higher end.")
+def _search_window_reversed(ctx):
+    if not ctx.is_search:
+        return None                      # a single-surface run never reads it
+    sw = ctx.sd.get("search_window") or {}
+    for lo, hi, label in (("entry_x_min", "entry_x_max", "Entry x"),
+                          ("exit_x_min", "exit_x_max", "Exit x"),
+                          ("center_box_x_min", "center_box_x_max", "Center box x"),
+                          ("center_box_y_min", "center_box_y_max", "Center box y")):
+        a, b = _num(sw.get(lo)), _num(sw.get(hi))
+        if a is None or b is None or a <= b:
+            continue
+        yield (f"The search window's {label} range runs from {a:g} to {b:g}, so no "
+               f"value lies inside it and the search has nowhere to look. Enter the "
+               f"smaller value first (Circles, Search window; circles sheet J8:K17).")
+
+
+@rule("reinforce.pullout_length_missing", ERROR, ("lem", "fem"),
+      "A line on the development-length law needs Lp1 and Lp2.",
+      fields=("lp1", "lp2"))
+def _reinf_lp_missing(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        if _num(r.get("adhesion")) is not None and _num(r.get("delta")) is not None:
+            continue                     # the overburden law does not read Lp
+        blank = [col for key, col in (("lp1", "Lp1"), ("lp2", "Lp2"))
+                 if _num(r.get(key)) is None]
+        if not blank:
+            continue
+        yield (f"{ctx.reinf_label(i)} leaves {' and '.join(blank)} blank. The "
+               f"development length at each end sets how the line's capacity builds "
+               f"up from that end: enter it, or 0 for an end that is fully anchored "
+               f"{_AT_REINF}.")
+
+
+@rule("reinforce.spacing_nonpositive", ERROR, ("lem", "fem"),
+      "A reinforcement Spacing must be greater than zero where it is given.",
+      fields=("spacing",))
+def _reinf_spacing(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        s = _num(r.get("spacing"))
+        if s is None or s > 0:
+            continue
+        yield (f"{ctx.reinf_label(i)} has Spacing = {s:g}. Spacing is the distance "
+               f"between discrete supports along the slope, which converts the "
+               f"per-support capacities to per unit width. Enter it, or leave it "
+               f"blank (or 1) for a continuous sheet {_AT_REINF}.")
+
+
+@rule("reinforce.end_capacity_negative", ERROR, ("lem", "fem"),
+      "Tend1 and Tend2 are end anchorage capacities and cannot be negative.",
+      fields=("tend1", "tend2"))
+def _reinf_tend_negative(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        for key, col in (("tend1", "Tend1"), ("tend2", "Tend2")):
+            v = _num(r.get(key))
+            if v is None or v >= 0:
+                continue
+            yield (f"{ctx.reinf_label(i)} has {col} = {v:g}. {col} is the capacity "
+                   f"of the anchorage at that end (a plate, a bearing block); enter "
+                   f"it, or 0 for an end with none {_AT_REINF}.")
+
+
+@rule("joint.endpoints_incomplete", ERROR, ("fem",),
+      "A joint line needs both endpoints: x1, y1, x2 and y2.")
+def _joint_endpoints(ctx):
+    for i, j in enumerate(ctx.joints):
+        blank = [k for k in ("x1", "y1", "x2", "y2") if _num(j.get(k)) is None]
+        if not blank:
+            continue
+        yield (f"{ctx.joint_label(i)} leaves {', '.join(blank)} blank. Enter both "
+               f"endpoints of the line (Joints; joints sheet).")
+
+
+_AT_LLOADS = "(Line loads; lloads sheet)"
+
+
+def _lload_label(ll, n):
+    name = ll.get("label") if isinstance(ll, dict) else None
+    base = f"Line load {n + 1}"
+    return f"{base} ('{name}')" if name and name != f"Load {n + 1}" else base
+
+
+@rule("lload.incomplete", ERROR, ("lem", "fem"),
+      "A line load needs x, y and P.")
+def _lload_incomplete(ctx):
+    for n, ll in enumerate(ctx.sd.get("line_loads") or []):
+        blank = [col for key, col in (("x", "x"), ("y", "y"), ("P", "P"))
+                 if _num(ll.get(key)) is None]
+        if blank:
+            yield (f"{_lload_label(ll, n)} leaves {' and '.join(blank)} blank. Enter "
+                   f"the point on the ground surface where the load acts and its "
+                   f"magnitude P {_AT_LLOADS}.")
+
+
+@rule("lload.magnitude_nonpositive", ERROR, ("lem", "fem"),
+      "A line load's magnitude P must be greater than zero.", fields=())
+def _lload_magnitude(ctx):
+    for n, ll in enumerate(ctx.sd.get("line_loads") or []):
+        p = _num(ll.get("P"))
+        if p is None or p > 0:
+            continue
+        yield (f"{_lload_label(ll, n)} has P = {p:g}. Enter the magnitude as a "
+               f"positive number and give the direction with Angle (−90 is straight "
+               f"down) {_AT_LLOADS}.")
+
+
+@rule("lload.off_ground_surface", ERROR, ("lem", "fem"),
+      "A line load must act on the ground surface.")
+def _lload_off_ground(ctx):
+    from shapely.geometry import Point
+    from .fileio import line_load_ground_tolerance
+    gs = ctx.sd.get("ground_surface")
+    tol = line_load_ground_tolerance(gs)
+    if tol is None:
+        return None
+    for n, ll in enumerate(ctx.sd.get("line_loads") or []):
+        x, y = _num(ll.get("x")), _num(ll.get("y"))
+        if x is None or y is None:
+            continue                     # lload.incomplete
+        d = gs.distance(Point(x, y))
+        if d <= tol:
+            continue
+        yield (f"{_lload_label(ll, n)} at ({x:g}, {y:g}) is {d:.3g} from the ground "
+               f"surface. A line load acts on the ground surface: move the point "
+               f"onto it (within {tol:.3g}) {_AT_LLOADS}.")
+
+
+@rule("seep.set2_reservoir", ERROR, ("seep", "rapid"),
+      "Boundary set 2 is a steady state and cannot hold a reservoir boundary.")
+def _seep_set2_reservoir(ctx):
+    bc2 = ctx.sd.get("seepage_bc2") or {}
+    for n, b in enumerate(bc2.get("specified_heads") or []):
+        if str(b.get("kind", "head")).strip().lower() == "reservoir":
+            yield (f"Specified head #{n + 1} of boundary set 2 has Type reservoir. "
+                   f"Set 2 is the steady drawn-down state of a rapid drawdown, and a "
+                   f"reservoir boundary follows a pool level through time. Set its "
+                   f"Type to head with the drawn-down level, and put reservoir "
+                   f"boundaries on boundary set 1 {_AT_SEEPBC2}.")
+
+
+@rule("seep.set2_time_series", ERROR, ("seep", "rapid"),
+      "Boundary set 2 is a steady state and its values must be numbers.")
+def _seep_set2_series(ctx):
+    bc2 = ctx.sd.get("seepage_bc2") or {}
+    for kind, vk, noun in (("specified_heads", "head", "Specified head"),
+                           ("specified_fluxes", "flux", "Specified flux")):
+        for n, b in enumerate(bc2.get(kind) or []):
+            v = b.get(vk)
+            if isinstance(v, str):
+                yield (f"{noun} #{n + 1} of boundary set 2 names the time series "
+                       f"{v!r}. Set 2 is the steady drawn-down state of a rapid "
+                       f"drawdown, so its {vk} is one number: enter it. Time-varying "
+                       f"boundaries belong on boundary set 1 {_AT_SEEPBC2}.")
+
+
+@rule("seep.series_undefined", ERROR, ("seep",),
+      "A boundary value that names a time series must name one on the tseep sheet.")
+def _seep_series_undefined(ctx):
+    tseep = ctx.tseep
+    names = set((tseep or {}).get("series") or {})
+    bc = ctx.sd.get("seepage_bc") or {}
+    for kind, vk, noun in (("specified_heads", "head", "Specified head"),
+                           ("specified_fluxes", "flux", "Specified flux")):
+        for n, b in enumerate(bc.get(kind) or []):
+            v = b.get(vk)
+            if not isinstance(v, str) or v in names:
+                continue
+            if not names:
+                have = ("This model defines no time series, so the value has "
+                        "nothing to follow.")
+            else:
+                have = f"The series defined are: {', '.join(sorted(names))}."
+            yield (f"{noun} #{n + 1} names the time series {v!r}, which is not "
+                   f"defined. {have} Enter a number for a steady boundary (Seep BC; "
+                   f"seep bc sheet), or add a series with that name (Transient "
+                   f"seepage; tseep sheet).")
 
 
 # ===========================================================================

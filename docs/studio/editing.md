@@ -176,7 +176,9 @@ maximum tangent depth and a minimum slip depth. They are the `circles` sheet's o
 J8:K17 block, and each is independent: a blank field is a limit that is not applied,
 a range applies only when both of its ends are filled, and an all-blank group is the
 unconstrained search. A range typed backwards is refused when you press **OK**,
-naming the pair, because a file carrying one will not load. Whatever the group
+naming the pair, because it leaves a search nowhere to look; a file that carries one
+from elsewhere still opens, and the Run dialog refuses the search with the same
+reason. Whatever the group
 holds is drawn on the preview with the circles: the entry and exit ranges as bars
 lying on the ground surface, the center box as a dashed rectangle. Editing a limit
 drops any solution already computed — it changes what a search would find — but

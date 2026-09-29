@@ -100,6 +100,10 @@ ABSENT = [
            "advanced.py rapid_drawdown() is the three-stage Duncan-Wright-Wong "
            "procedure and the only staged strength path; no 2-stage variant in "
            "solve.py or advanced.py"),
+    Absent("helical-anchor plate capacity (Perko plate bearing)",
+           "rocscience", "*not supported* — XSLOPE takes an anchor's capacity",
+           "no helical or perko hit anywhere in xslope/; an anchor's capacity is "
+           "entered as a standard anchor force"),
     Absent("the Corps of Engineers 2-stage drawdown procedure",
            "rocscience", "*not supported* — Corps 2-stage",
            "as above"),

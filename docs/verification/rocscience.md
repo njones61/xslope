@@ -211,7 +211,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [11](#vp11) | <span class="nodata">⊘</span> | Embankment, (2) materials, pore pressure grid |  | *blocked* — the manual marks the grid points but prints no values for them; they come from isobars drawn only in the source paper |
 | [12](#vp12) | <span class="nodata">⊘</span> | Embankment, (4) materials, tension crack, pore pressure grid |  | *planned* — the manual prints the 22-point pressure grid with its coordinates (Table 12.2) |
 | [13](#vp13) | <span class="nodata">⊘</span> | Embankment, (3) materials, pore pressure grid |  | *planned* — the manual prints the 44-point pressure grid with its coordinates (Table 13.2), the grid [RS2-9](rs2.md#rs2-9) already carries |
-| [14](#vp14) | 🟢 | Slope, homogenous | Bishop 1.404 vs Slide 1.409 (−0.4%) · SLOPE/W 1.417 · Bishop 1.404 vs A&T 1.451 (−3.2%) | Slide2's own Bishop is the referee; A&T report Bishop, so Bishop is the method compared |
+| [14](#vp14) | 🟢 | Slope, homogenous | Bishop 1.404 vs SLOPE/W 1.417 (−0.9%) · Bishop 1.404 vs A&T 1.451 (−3.2%) | A&T report Bishop, so Bishop governs like-for-like |
 | [15](#vp15) | 🟢 | Slope, (3) materials, weak layer | Bishop 0.419 vs A&T 0.417 (+0.5%) · Bishop 0.419 vs Slide 0.420 (−0.2%) | A&T report Bishop, so Bishop governs like-for-like |
 | [16](#vp16) | 🟢 | Slope, homogenous, water table | Bishop 1.112 vs Slide 1.118 (−0.5%) · Bishop 1.112 vs A&T 1.138 (−2.3%) | A&T report Bishop, so Bishop governs like-for-like |
 | [17](#vp17) | 🟢 | Slope, homogenous | Bishop 1.342 vs Slide 1.344 (−0.1%) · Bishop 1.342 vs Y&U 1.348 (−0.4%) | circular search; the local non-circular search hits the same ceiling as #19/#20 |

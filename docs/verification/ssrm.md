@@ -5,7 +5,8 @@ examples of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387
 stability analysis by finite elements," *Géotechnique* 49(3), 387–403, and on two problems of
 [Torggler (2016)](https://diglib.tugraz.at/download.php?id=5891c94c5ba8d&location=browse),
 "Numerical Studies of Embedded Beam Row in Safety Analysis in PLAXIS 2D," MSc thesis, Graz
-University of Technology. Full bibliographic details for the author-year citations on this page
+University of Technology, and on Example 1 of Hammah et al. (2005b), "The shear strength
+reduction method for the generalized Hoek-Brown criterion," ARMA/USRMS 05-810. Full bibliographic details for the author-year citations on this page
 are on the shared [References](references.md) page.
 
 ## Methodology
@@ -27,7 +28,8 @@ are on the shared [References](references.md) page.
 - **Source precision.** Griffiths & Lane print Examples 1 and 2 on a 0.05 trial grid, read Fig. 7
   "to the nearest 0.05" (p. 394), and print Example 6 to 0.1. Values from Figs. 7, 10 and 15 are
   read off the plotted points. Torggler's factors are PLAXIS $\Sigma M_{sf}$ values printed to
-  three decimals, beside a SLIDE limit-equilibrium table.
+  three decimals, beside a SLIDE limit-equilibrium table. Hammah et al. print their SSR factor
+  to two decimals and their limit-equilibrium factors to three.
 - **Meshes.** Parameter series run on a coarse tri6 mesh; the stations that carry the argument
   run again on a refined quad8 mesh.
 - **Referee.** Where a stability chart covers the stated inputs it is the referee: Bishop &
@@ -58,6 +60,7 @@ Match dots and status terms follow the shared [definitions](index.md#status-term
 | [6](#verification-griffiths6) | 🟢 | Example 6 — two-sided earth dam | Full reservoir 1.87 vs Griffiths & Lane FE 1.9 (−1.6%) · before filling 2.42 vs their FE 2.4 (+0.8%) | FE against FE, both printed to 0.1 |
 | [7](#verification-torggler3a) | 🟢 | Torggler §3 — homogeneous slope with a 7.5 m plate | Unsupported 1.129 vs Torggler PLAXIS 1.111 (+1.6%) · with plate 1.195 vs his 1.175 (+1.7%) · plate shear in the lower lobe 25.8 kN/m vs his 21 kN (+22.9%) | the dot scores the two factors of safety; the plate's internal force is shown for information. The plate variant without interfaces is XSLOPE's shared-node beam |
 | [8](#verification-torggler3b) | 🟢 | Torggler §4 — weak-layer slope with a 15 m plate | Unsupported 1.064 vs Torggler PLAXIS 1.045 (+1.8%) · with plate 1.743 vs his 1.725 (+1.0%) | both factors of safety pair closely with his; the weak band still shears where his supported mechanism leaves it |
+| [9](#hoek-brown) | 🟢 | Hammah et al. Example 1 — Hoek-Brown rock slope, GSI = 5 | SSRM 1.166 vs Hammah et al. SSR 1.15 (+1.4%) · Bishop 1.150 vs their 1.153 (−0.3%) · Spencer 1.152 vs their 1.152 (0.0%) | the generalized Hoek-Brown criterion on a strongly curved envelope, $a$ = 0.619 |
 
 </div>
 
@@ -573,3 +576,55 @@ target.
 <!-- test: file=../fem/files/xslope_torggler_3b_plate.xlsx, type=fem_ssrm, expected_fs=1.743, element_type=tri6, target_size=1.0, tolerance=0.01, f_min=1.45, f_max=1.95, max_iter=8000, benchmark=SSRM-TORGGLER, f_stand=1.7390625, f_fail=1.746875, check=edges -->
 <!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=single_noncirc, method=spencer, num_slices=40, expected_fs=1.121, tolerance=0.01, benchmark=SSRM-TORGGLER -->
 <!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=single_noncirc, method=mprice, num_slices=40, expected_fs=1.093, tolerance=0.01, benchmark=SSRM-TORGGLER -->
+
+### 🟢 Hammah et al. (2005) Example 1 — Hoek-Brown Rock Slope, GSI = 5 {#hoek-brown}
+
+A 10 m high homogeneous rock slope at 45° in a very weak rock mass, from Example 1 of the paper
+that introduced shear-strength reduction for the generalized Hoek-Brown criterion. The row tests
+the criterion rather than the geometry: at GSI = 5 the envelope is strongly curved, and the
+exponent $a$ = 0.619 is far from the $a$ = 0.5 special case. It is the low-GSI counterpart to
+[RS2-60](rs2.md#rs2-60), which runs the same criterion at GSI = 70. The referee is Hammah et al.'s
+finite-element factor; their limit-equilibrium factors are shown beside it.
+
+| Quantity | XSLOPE | Referee: Hammah et al. SSR | Hammah et al. limit equilibrium |
+|---|---|---|---|
+| SSRM FS (tri6, 0.9 m) | **1.166** | 1.15 (+1.4%) | — |
+| Bishop simplified | 1.150 | — | 1.153 (−0.3%) |
+| Spencer | 1.152 | — | 1.152 (0.0%) |
+| Janbu corrected | 1.144 | — | — |
+| Morgenstern-Price | 1.148 | — | — |
+
+The paper reports the same SSR factor, 1.15, for the generalized Hoek-Brown criterion and for its
+equivalent Mohr-Coulomb form.
+
+| Derived constant | XSLOPE | Hammah et al. (Table 1) |
+|---|---|---|
+| $m_b$ | 0.0672 | 0.067 |
+| $s$ | 2.605e-5 | 2.5e-5 |
+| $a$ | 0.61921 | 0.619 |
+
+$m_b$ and $a$ reproduce the paper's Table 1 to its printed digits; $s$ differs by 4.2%, the
+paper's 2.5 × 10⁻⁵ being a rounded print of exp(−95/9).
+
+| Property | Value |
+|----------|-------|
+| Slope | 10 m high, 10 m run (45°) |
+| Intact strength, $\sigma_{ci}$ | 30 MPa |
+| GSI / $m_i$ / $D$ | 5 / 2 / 0 |
+| Unit weight, $\gamma$ | 25 kN/m³ |
+| Young's modulus, $E$ / Poisson's ratio, $\nu$ | 5000 MPa / 0.3 |
+
+The paper dimensions only the slope and leaves the foundation depth and lateral extents unstated.
+The answer does not depend on them: foundation depths of 2, 4, 6 and 10 m all return Bishop 1.150
+and Spencer 1.152, because the critical mechanism exits at the toe. The SSRM approaches the
+published value from above as the mesh refines. Corps of Engineers and Lowe & Karafiath, the two
+methods that struggle on strong rock masses where the instantaneous friction angle at low
+confinement exceeds about 55°, are well behaved on this weak envelope; see the
+[LEM overview](../lem/overview.md#hoek-brown-strength).
+
+**Input file:** [hammah_hb1.xlsx](files/rocscience/hammah_hb1.xlsx).
+
+![Hoek-Brown SSRM (Hammah et al. 2005 example 1): a 10 m, 45° slope in a GSI = 5 rock mass, SSRM 1.166 against the paper's 1.15 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the band exiting at the toe](images/HB-ssrm.png)
+
+<!-- test: file=files/rocscience/hammah_hb1.xlsx, type=circular_search, num_slices=40, fs_bishop=1.150, fs_spencer=1.152, fs_janbu=1.144, fs_mprice=1.148, benchmark=HB-lem -->
+<!-- test: file=files/rocscience/hammah_hb1.xlsx, type=fem_ssrm, expected_fs=1.166, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.8, f_max=1.6, max_iter=16000, k0=1, benchmark=HB-ssrm, f_stand=1.1625, f_fail=1.16875, check=edges -->

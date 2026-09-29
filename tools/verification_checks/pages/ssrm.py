@@ -18,6 +18,10 @@ CONFIG = PageConfig(
         # summary-row cell: the L/H station value (0.7) sits between the two
         # factors the delta is measured from, so the pair is named explicitly
         ('+0.8', 'minimum 1.31 vs their FE 1.30', '1.31', '1.30'),
+        # Hammah et al. Hoek-Brown row: the derived constant s is printed in
+        # scientific notation (2.605e-5 against the paper's 2.5 × 10⁻⁵), which
+        # the pairer does not read, so the pair is named explicitly
+        ('+4.2', "the paper's 2.5 × 10⁻⁵", '2.605', '2.5'),
     ],
 
     untagged_allow=[

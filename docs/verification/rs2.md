@@ -77,8 +77,8 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [14](#rs2-14) | 🟡 | Simple slope, pore pressure by r<sub>u</sub> | SSRM 0.934 vs RS2 SSRM 0.98 (−4.7%) | (caveat) the factor never becomes mesh-independent; the row reports the 2.0 m mesh. |
 | [15](#rs2-15) | 🟢 | Layered slope II (Greco ex. 4 / Yamagami & Ueta) | SSRM 1.372 vs RS2 SSRM 1.38 (−0.6%) | Scored against the Part IV VP19 model this file is built from. |
 | [16](#rs2-16) | 🟢 | Layered slope and water table with weak seam (Greco ex. 5 / Chen & Shao) | SSRM 0.978 inside Greco 0.973–1.1 · vs RS2 SSRM 1.02 (−4.1%) | Greco's own published range is the source author's and is the referee. Nearly mesh-invariant (0.997 at 4.0 m). |
-| [17](#rs2-17) | 🟢 | Slope with three pore pressure conditions (Fredlund & Krahn) | Dry: SSRM 1.987 vs RS2 SSRM 1.98 (+0.4%) · r<sub>u</sub> = 0.25: SSRM 1.692 vs RS2 SSRM 1.68 (+0.7%) | *partial* (dry + r<sub>u</sub>) — the water-table case is not built. |
-| [18](#rs2-18) | 🟢 | Three pore pressure conditions and a weak seam (Fredlund & Krahn) | Dry: SSRM 1.334 vs RS2 SSRM 1.34 (−0.4%) · r<sub>u</sub> = 0.25: SSRM 1.042 vs RS2 SSRM 1.05 (−0.8%) | *partial* (dry + r<sub>u</sub>) — the water-table case is not built. RS2 publishes two runs from input-identical files — 1.34 / 1.05 on its own model, 1.26 / 0.99 on the Slide2 VP22 model imported into RS2 — and the row is scored on RS2's own run. |
+| [17](#rs2-17) | 🟢 | Slope with three pore pressure conditions (Fredlund & Krahn) | Dry: SSRM 1.987 vs RS2 SSRM 1.98 (+0.4%) · r<sub>u</sub> = 0.25: SSRM 1.692 vs RS2 SSRM 1.68 (+0.7%) | (dry and r<sub>u</sub> cases; the water-table case is not built) |
+| [18](#rs2-18) | 🟢 | Three pore pressure conditions and a weak seam (Fredlund & Krahn) | Dry: SSRM 1.334 vs RS2 SSRM 1.34 (−0.4%) · r<sub>u</sub> = 0.25: SSRM 1.042 vs RS2 SSRM 1.05 (−0.8%) | (dry and r<sub>u</sub> cases; the water-table case is not built) RS2 publishes two runs from input-identical files — 1.34 / 1.05 on its own model, 1.26 / 0.99 on the Slide2 VP22 model imported into RS2 — and the row is scored on RS2's own run. |
 | [19](#rs2-19) | 🟡 | Undrained layered slope (Low 1989) | SSRM 1.488 vs Low 1.44 (+3.3%) · vs RS2 SSRM 1.41 (+5.5%) | (caveat) Low's own factor is the referee; the two SSRM values straddle the LEM. |
 | [20](#rs2-20) | 🟢 | Slope with vertical load (Prandtl's wedge) | SSRM 1.003 vs Prandtl closed form 1.0 (+0.3%) · vs RS2 SSRM 1.01 (−0.7%) | The Prandtl closed form is the referee; RS2's SSR is shown beside it. |
 | [21](#rs2-21) | 🟢 | Bearing capacity test prism (Prandtl II) | SSRM 1.011 vs Prandtl closed form 1.0 (+1.1%) · vs RS2 SSRM 1.01 (+0.1%) | The Prandtl closed form is the referee; RS2's SSR is shown beside it. One trial does not settle within the iteration limit. |
@@ -118,11 +118,11 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [46](#rs2-46) | 🟢 | Varying undrained strength profiles II (D&W Fig 15.9, c<sub>u</sub> = 300 + c<sub>z</sub>·z) | a: SSRM 0.773 vs RS2 SSRM 0.78 (−0.9%) · b: SSRM 0.929 vs RS2 SSRM 0.93 (−0.1%) · c: SSRM 1.043 vs RS2 SSRM 1.05 (−0.7%) · d: SSRM 1.145 vs RS2 SSRM 1.15 (−0.4%) | |
 | [47](#rs2-47) | 🟢 | Purely cohesive slope, varying thickness (D&W Fig 14.3) | 30 ft: SSRM 1.061 vs RS2 SSRM 1.06 (+0.1%) · 46.5 ft: SSRM 1.061 vs RS2 SSRM 1.06 (+0.1%) · 60 ft: SSRM 1.045 vs RS2 SSRM 1.07 (−2.3%) | (all 3 thicknesses) scored against the Part IV VP78 case-(a) models these files are built from. |
 | [48](#rs2-48) | 🔴 | Multi-tiered geotextile wall, baseline (Leshchinsky & Han 2004) | SSRM 1.057 vs Leshchinsky &amp; Han FDM referee 0.99 (+6.8%) | Modeled as the paper's dry stack — elastic blocks on friction joints, sheets on their own interfaces — at the paper's reinforcement stiffness J = 1000 kN/m. RS2's own SSR 1.05 comes from a facing meshed as one body and is shown beside it. |
-| [49](#rs2-49) | <span class="nodata">⊘</span> | Geotextile wall, fill-quality variant | | *unconfirmed* — two trials of the search do not settle within the iteration limit. |
+| [49](#rs2-49) | <span class="nodata">⊘</span> | Geotextile wall, fill-quality variant | | *unconfirmed* — two trials of the search stand only on the Newton corrector's certificate at the 125,000-iteration trend reading. |
 | [50](#rs2-50) | 🟢 | Geotextile wall, 4.2 m reinforcement variant | SSRM 0.998 vs L&amp;H FDM referee 0.98 (+1.8%) | RS2 SSR 0.93 shown beside — see [RS2-48](#rs2-48). |
 | [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type | | *unconfirmed* — a step of refinement moves the factor by twice the search tolerance. |
-| [52](#rs2-52) | <span class="nodata">⊘</span> | Geotextile wall, weak-foundation variant | | *unconfirmed* — one trial of the search does not settle within the iteration limit. The two codes do not describe the same mechanism — see the section. |
-| [53](#rs2-53) | <span class="nodata">⊘</span> | Geotextile wall, water variant | | *unconfirmed* — two trials do not settle within the iteration limit on each of two meshes, and a step of refinement moves the factor by six times the search tolerance. |
+| [52](#rs2-52) | <span class="nodata">⊘</span> | Geotextile wall, weak-foundation variant | | *unconfirmed* — one trial of the search stands only on the Newton corrector's certificate at the 125,000-iteration trend reading. The two codes do not describe the same mechanism — see the section. |
+| [53](#rs2-53) | <span class="nodata">⊘</span> | Geotextile wall, water variant | | *unconfirmed* — a step of refinement moves the factor by six times the search tolerance. On the stored run every trial is decided, the longest counted sliding at 225,000 of its 250,000 iterations. |
 | [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant | | *unconfirmed* — a step of refinement moves the factor by twice the search tolerance. Modeled at the paper's T<sub>a</sub> = 11.6 kN/m, the strength the referee's wall carries; the vendor model ships the baseline's 10 kN/m. |
 | [55](#rs2-55) | 🟢 | Geotextile wall, tier-count variant | SSRM 1.018 vs L&amp;H FDM referee 1.00 (+1.8%) | RS2 SSR 1.04 shown beside — see [RS2-48](#rs2-48). |
 | [56](#rs2-56) | 🟢 | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) | Case 2 (weakest): SSRM 0.664 vs RS2 SSRM 0.67 (−0.9%) · Case 5 (strongest): SSRM 2.096 vs RS2 SSRM 2.14 (−2.1%) | The weakest and strongest cases are scored; case 5 is the wider of them and sets the dot. |
@@ -142,7 +142,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [61](#rs2-61) | 🟢 | Local and global minima, homogeneous slope | Case 1: Spencer 1.338 vs Slide2 1.336 (+0.1%) · Case 3: Spencer 1.437 vs Slide2 1.443 (−0.4%) · Case 2: constrained SSRM 1.383 vs RS2 SSRM 1.36 (+1.7%) | (cases 1, 3, 2) one geometry, four search regions; case 2 uses RS2's own Search-Area polygon. Case 4's constrained run reads further above RS2 than case 2 does and is not scored. |
 | [62](#rs2-62) | 🟡 | Three-layered slope with a soft band | SSRM 0.769 vs RS2 SSR 0.81 (−5.1%) | (Analysis III) the decisive input is the vendor per-material tensile strength reduced with the SRF; without it the FE equilibrates at F ≥ 1.3. |
 | [63](#rs2-63) | 🟢 | Homogeneous slope assessment | Spencer 1.398 vs Slide2 1.380 (+1.3%) · SSRM 1.391 vs RS2 SSRM 1.38 (+0.8%) | Cheng et al. (2007), 11 m homogeneous slope. |
-| [64](#rs2-64) | 🔴 | Three homogeneous landslides | C1: SSRM 5.189 vs RS2 SSR 5.14 (+1.0%) · C3: SSRM 4.807 vs RS2 SSR 4.69 (+2.5%) · C5: SSRM 5.620 vs RS2 SSR 5.47 (+2.7%) · C7: SSRM 1.639 vs RS2 SSR 1.70 (−3.6%) · C11: SSRM 1.413 vs RS2 SSR 1.46 (−3.2%) · C12: SSRM 1.147 vs RS2 SSR 1.22 (−6.0%) · C2: SSRM 6.564 vs RS2 SSR 6.10 (+7.6%) · C4: SSRM 5.461 vs RS2 SSR 4.95 (+10.3%) | *partial* — 8 of 12 cases scored; C6 and C8–C10 are built and measured but not scored. Teoman et al. (2004) Ankara clay E90 highway, each case pinned by RS2 to a digitized proposed slip surface. C4 sets the dot; on it and C2 the Teoman and Slide2 Bishop columns (5.32 / 5.32 and 6.67 / 6.64) sit beside XSLOPE, but they are cross-method and cannot carry the comparison. |
+| [64](#rs2-64) | 🔴 | Three homogeneous landslides | C1: SSRM 5.189 vs RS2 SSR 5.14 (+1.0%) · C3: SSRM 4.807 vs RS2 SSR 4.69 (+2.5%) · C5: SSRM 5.620 vs RS2 SSR 5.47 (+2.7%) · C7: SSRM 1.639 vs RS2 SSR 1.70 (−3.6%) · C11: SSRM 1.413 vs RS2 SSR 1.46 (−3.2%) · C12: SSRM 1.147 vs RS2 SSR 1.22 (−6.0%) · C2: SSRM 6.564 vs RS2 SSR 6.10 (+7.6%) · C4: SSRM 5.461 vs RS2 SSR 4.95 (+10.3%) | (8 of 12 cases scored; C6 and C8–C10 are built and measured but not scored) Teoman et al. (2004) Ankara clay E90 highway, each case pinned by RS2 to a digitized proposed slip surface. C4 sets the dot; on it and C2 the Teoman and Slide2 Bishop columns (5.32 / 5.32 and 6.67 / 6.64) sit beside XSLOPE, but they are cross-method and cannot carry the comparison. |
 | [65](#rs2-65) | 🟢 | Tailings dam | SSRM 1.306 vs RS2 SSRM 1.29 (+1.2%) | Tzenkov (2008) Padina dam, 8 materials on a 225 × 77 m section, at the vendor's own mesh density. The reference FEM 1.41 and the LEM columns are shown beside it. |
 | [66](#rs2-66) | 🟢 | Embankment basal stability | Face skin, worst case (h₁ = 4, 6 and 8 m): SSRM 1.031 vs closed form 1.050 (−1.8%) · thinnest and thickest bands (h₁ = 2 and 10 m): SSRM 1.044 vs 1.050 (−0.6%) | Two mechanisms, both scored across all five soft-layer thicknesses; the deep run uses `min_slip_depth` = 4 m. The dot is the face skin's, against a closed form that does not depend on the flow rule. The deep family (1.169 at h₁ = 2 and 4 m, 1.044–1.094 at 6, 8 and 10 m) is shown beside RS2's SSR column: every published strength-reduction solution of this problem runs associated flow, ψ = φ, where XSLOPE runs ψ = 0. |
 | [67](#rs2-67) | 🟢 | Earth dam under steady & transient unsaturated seepage | Case 1 (dry): SSRM 2.502 vs RS2 SSR 2.48 (+0.9%) · Case 2 (steady): SSRM 1.695 vs RS2 SSR 1.70 (−0.3%) · Case 3 (90 h, downstream): SSRM 1.820 vs RS2 SSR 1.83 (−0.5%) · Case 3 (90 h, upstream): SSRM 2.023 vs RS2 SSR 2.04 (−0.8%) · Case 4 (1500 h, downstream): SSRM 2.320 vs RS2 SSR 2.34 (−0.9%) · Case 4 (1500 h, upstream): SSRM 2.742 vs RS2 SSR 2.76 (−0.7%) | (6 of 6) Three run on RS2's own imported drawdown pore-pressure fields; three reconstruct the flow by an own steady solve from the vendor's boundary conditions. |
@@ -1377,8 +1377,9 @@ The three-tier wall as the paper builds it: fill c = 0, φ = 34°, T<sub>a</sub>
 
 The reinforced fill is reduced to φ = 25° with T<sub>a</sub> raised to 22 kN/m. The sheets keep the
 vendor's δ = 28.35°, the angle whose tangent is 0.8 tan 34°, where the paper's rule on this fill
-would give about 20.5°. *Unconfirmed*: two trials of the search do not settle within the iteration
-limit, while a step of refinement does not move the factor.
+would give about 20.5°. *Unconfirmed*: two trials of the search stand only on the Newton
+corrector's certificate at the 125,000-iteration trend reading, while a step of refinement does not
+move the factor.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
@@ -1424,7 +1425,8 @@ tolerance.
 #### ⊘ RS2-52: Geotextile wall, weak foundation (vp091_fem) {#rs2-52}
 
 The foundation is c = 0, φ = 18°, and this is the lowest factor in the family for all three codes.
-*Unconfirmed*: one trial of the search does not settle within the iteration limit.
+*Unconfirmed*: one trial of the search stands only on the Newton corrector's certificate at the
+125,000-iteration trend reading.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
@@ -1443,9 +1445,10 @@ are the 24 m section.
 
 #### ⊘ RS2-53: Geotextile wall, water (vp092_fem) {#rs2-53}
 
-A pond against the wall, with the reinforced fill free-draining. *Unconfirmed*: two trials of the
-search do not settle within the iteration limit on each of two meshes, and a step of refinement
-moves the factor by six times the search tolerance, so it is the family's least settled row.
+A pond against the wall, with the reinforced fill free-draining. *Unconfirmed*: a step of refinement
+moves the factor by six times the search tolerance, so it is the family's least settled row. On the
+stored run every trial of the search is decided, the longest counted sliding at 225,000 of its
+250,000 iterations.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|

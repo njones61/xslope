@@ -794,7 +794,7 @@
           "page": "verification/ssrm/",
           "resolution": "input-link",
           "source_md": "docs/verification/ssrm.md",
-          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown Sweep",
+          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown",
           "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-griffiths5"
         }
       ],
@@ -861,7 +861,7 @@
           "page": "verification/ssrm/",
           "resolution": "input-link",
           "source_md": "docs/verification/ssrm.md",
-          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown Sweep",
+          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown",
           "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-griffiths5"
         }
       ],
@@ -929,7 +929,7 @@
           "page": "verification/ssrm/",
           "resolution": "input-link",
           "source_md": "docs/verification/ssrm.md",
-          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown Sweep",
+          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown",
           "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-griffiths5"
         }
       ],
@@ -997,7 +997,7 @@
           "page": "verification/ssrm/",
           "resolution": "input-link",
           "source_md": "docs/verification/ssrm.md",
-          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown Sweep",
+          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown",
           "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-griffiths5"
         }
       ],
@@ -1064,7 +1064,7 @@
           "page": "verification/ssrm/",
           "resolution": "input-link",
           "source_md": "docs/verification/ssrm.md",
-          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown Sweep",
+          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown",
           "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-griffiths5"
         }
       ],
@@ -8915,12 +8915,12 @@
             "HB-lem",
             "HB-ssrm"
           ],
-          "level": 2,
-          "page": "verification/rs2/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/verification/rs2.md",
-          "title": "Hoek-Brown verification (Hammah et al. 2005)",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#hoek-brown"
+          "level": 3,
+          "page": "verification/ssrm/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/ssrm.md",
+          "title": "Hammah et al. (2005) Example 1 — Hoek-Brown Rock Slope, GSI = 5",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#hoek-brown"
         }
       ],
       "topics": [
@@ -22108,16 +22108,16 @@
       "model": "docs/verification/files/rocscience/vp087_fem.xlsx",
       "references": [
         {
-          "anchor": "the-facing-and-which-published-factor-the-row-is-scored-against",
+          "anchor": "rs2-48",
           "checks": [
             "RS2-48"
           ],
-          "level": 4,
+          "level": 3,
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "The facing, and which published factor the row is scored against",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#the-facing-and-which-published-factor-the-row-is-scored-against"
+          "title": "RS2-48–55: Multi-tiered geotextile walls (Leshchinsky & Han 2004)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-48"
         }
       ],
       "topics": [
@@ -22768,16 +22768,16 @@
       "model": "docs/verification/files/rocscience/vp094_fem.xlsx",
       "references": [
         {
-          "anchor": "the-facing-and-which-published-factor-the-row-is-scored-against",
+          "anchor": "rs2-48",
           "checks": [
             "RS2-55"
           ],
-          "level": 4,
+          "level": 3,
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "The facing, and which published factor the row is scored against",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#the-facing-and-which-published-factor-the-row-is-scored-against"
+          "title": "RS2-48–55: Multi-tiered geotextile walls (Leshchinsky & Han 2004)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-48"
         }
       ],
       "topics": [

@@ -104,6 +104,11 @@ ABSENT = [
            "rocscience", "*not supported* — XSLOPE takes an anchor's capacity",
            "no helical or perko hit anywhere in xslope/; an anchor's capacity is "
            "entered as a standard anchor force"),
+    Absent("associated flow (psi = phi) in the FEM / SSRM",
+           "rs2", "*not supported*: XSLOPE's SSRM is non-associated only",
+           "fem.py: the closest-point return is to the Mohr-Coulomb cone with "
+           "psi = 0 (the return mapping and the material setup both fix the "
+           "dilation at zero); no associated-flow switch anywhere in xslope/"),
     Absent("the Corps of Engineers 2-stage drawdown procedure",
            "rocscience", "*not supported* — Corps 2-stage",
            "as above"),

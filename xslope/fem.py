@@ -39,6 +39,184 @@ from .joint import (mesh_has_joints as _joint_mesh_has_joints,
 from .units import require_gamma_water
 
 
+class FemInvariantError(ValueError):
+    """A broken internal contract of the FEM solver: a carried state, seed or
+    prepared model that does not belong to the solve it was handed to, or a shared
+    array that changed when nothing may write it.
+
+    It is a statement about the code, never about the slope, so no path that turns
+    a numerical failure into a refusal or a fallback may catch it. It is a
+    ValueError so that callers that already catch the contract errors the solver
+    raised before this class existed keep catching them.
+    """
+
+
+#: The failures a Newton corrector attempt, or its hold test, may legitimately end
+#: on, each of which is recorded as a refusal (with its class name) and nothing
+#: more: a singular or indefinite tangent (SuperLU's RuntimeError, numpy's
+#: LinAlgError), an arithmetic failure on a state that ran away (ArithmeticError
+#: covers FloatingPointError, ZeroDivisionError and OverflowError), a model the
+#: Newton path does not carry (NotImplementedError is a RuntimeError), a value
+#: check in the solver's own code or a non-finite value reaching an int or a
+#: scipy routine (ValueError), and a factorization that does not fit in memory.
+#: Everything else -- NameError, UnboundLocalError, AttributeError, TypeError,
+#: KeyError, IndexError, AssertionError, and FemInvariantError, which is re-raised
+#: before this tuple is consulted -- is a defect in the code and propagates.
+_CORRECTOR_NUMERICAL_ERRORS = (np.linalg.LinAlgError, ArithmeticError, RuntimeError,
+                               ValueError, MemoryError)
+
+#: The failures a sparse factorization of a stiffness matrix may end on when the
+#: matrix itself is singular or indefinite, or too large: SuperLU raises
+#: RuntimeError ("Factor is exactly singular"), a dense fallback LinAlgError.
+#: A ValueError from splu means a malformed (non-square) input, which is a defect.
+_FACTOR_FAILURES = (np.linalg.LinAlgError, ArithmeticError, RuntimeError, MemoryError)
+
+
+def _digest_update(h, v):
+    """Feed a canonical byte encoding of ``v`` into the hash ``h``.
+
+    Arrays are hashed by dtype, shape and contents, containers recursively (dict
+    keys and set members in sorted order, so the encoding does not depend on
+    insertion order), sparse matrices by their CSR arrays, shapely geometries by
+    WKB. Anything else contributes its type name only.
+    """
+    import numbers
+    if v is None:
+        h.update(b"N")
+    elif isinstance(v, (bool, np.bool_)):
+        h.update(b"b1" if v else b"b0")
+    elif isinstance(v, numbers.Integral):
+        h.update(b"i" + repr(int(v)).encode())
+    elif isinstance(v, numbers.Real):
+        h.update(b"f" + repr(float(v)).encode())
+    elif isinstance(v, str):
+        h.update(b"s" + str(len(v)).encode() + b":" + v.encode("utf-8", "replace"))
+    elif isinstance(v, (bytes, bytearray)):
+        h.update(b"y" + bytes(v))
+    elif isinstance(v, np.ndarray):
+        h.update(b"a" + v.dtype.str.encode() + repr(v.shape).encode())
+        if v.dtype.hasobject:
+            for x in v.ravel():
+                _digest_update(h, x)
+        else:
+            h.update(np.ascontiguousarray(v).view(np.uint8).ravel().tobytes())
+    elif isinstance(v, dict):
+        h.update(b"d" + str(len(v)).encode())
+        for k in sorted(v, key=lambda k: repr(k)):
+            _digest_update(h, repr(k))
+            _digest_update(h, v[k])
+    elif isinstance(v, (list, tuple)):
+        h.update(b"l" + str(len(v)).encode())
+        for x in v:
+            _digest_update(h, x)
+    elif isinstance(v, (set, frozenset)):
+        h.update(b"S" + str(len(v)).encode())
+        for x in sorted(v, key=lambda x: repr(x)):
+            _digest_update(h, x)
+    elif issparse(v):
+        m = v.tocsr()
+        h.update(b"M" + repr(m.shape).encode())
+        for a in (m.indptr, m.indices, m.data):
+            _digest_update(h, np.asarray(a))
+    elif isinstance(v, shapely.Geometry):
+        h.update(b"g" + shapely.to_wkb(v))
+    else:
+        h.update(b"o" + type(v).__name__.encode())
+
+
+def _digest(v):
+    """A hex digest of ``v`` (see _digest_update)."""
+    import hashlib
+    h = hashlib.blake2b(digest_size=16)
+    _digest_update(h, v)
+    return h.hexdigest()
+
+
+#: The options that shape a prepared model (see _prepare_fem_model): a solve that
+#: reuses one with ``_prepared=`` must have been called with the same values, or
+#: it silently solves on the prepared model's dt, suction, elastic set, tension
+#: caps and skin mask instead of its own. ``k0`` is not here: the prepared model
+#: only decides whether the overburden field exists, and solve_fem already raises
+#: when a trial asks for K0 on a prepared model built without it.
+_PREP_OPTION_NAMES = ("dt_scale", "suction_phi_b", "suction_cap", "elastic_mask",
+                      "tension_cap_by_elem", "tension_cutoff", "min_slip_depth")
+
+
+def _prep_options_fingerprint(dt_scale, suction_phi_b, suction_cap, elastic_mask,
+                              tension_cap_by_elem, tension_cutoff, min_slip_depth):
+    """The per-option digests of the options that shape a prepared model, in the
+    form the prepared model reads them: ``tension_cutoff`` as a truth value, a
+    ``min_slip_depth`` of zero or less as none, the masks and caps as arrays."""
+    def _arr(v, dtype):
+        return None if v is None else np.asarray(v, dtype=dtype)
+    msd = (None if (min_slip_depth is None or float(min_slip_depth) <= 0)
+           else float(min_slip_depth))
+    vals = dict(dt_scale=float(dt_scale),
+                suction_phi_b=suction_phi_b,
+                suction_cap=(None if suction_cap is None else suction_cap),
+                elastic_mask=_arr(elastic_mask, bool),
+                tension_cap_by_elem=_arr(tension_cap_by_elem, float),
+                tension_cutoff=bool(tension_cutoff),
+                min_slip_depth=msd)
+    return {k: _digest(vals[k]) for k in _PREP_OPTION_NAMES}
+
+
+def _prep_static_digest(prep):
+    """A digest of every array a prepared model shares by reference into the
+    solves that reuse it: the Gauss-point groups' static arrays, the gravity load,
+    the free-DOF partition, the pore-pressure fields, the overburden and the free
+    stiffness. None of them may change after the prepared model is built (the
+    tensile-cap base is left out: the predictor's capped copy replaces it)."""
+    import hashlib
+    h = hashlib.blake2b(digest_size=16)
+    for grp in prep["gp_groups_static"]:
+        for k in sorted(grp):
+            if isinstance(grp[k], np.ndarray):
+                _digest_update(h, k)
+                _digest_update(h, grp[k])
+    for k in ("F_gravity", "free_dofs", "u_gp", "u_gp_signed", "sv0_gp", "dt_r",
+              "K_free"):
+        _digest_update(h, k)
+        _digest_update(h, prep.get(k))
+    return h.hexdigest()
+
+
+def _check_prepared(prep, opts_fp):
+    """Raise where a prepared model does not belong to the solve reusing it: its
+    build options differ from this solve's, or an array it shares has changed."""
+    have = prep.get("_opts_fp")
+    if have is None:
+        raise FemInvariantError(
+            "the prepared model carries no record of the options it was built with; "
+            "build it with _prepare_fem_model.")
+    diff = [k for k in _PREP_OPTION_NAMES if have.get(k) != opts_fp.get(k)]
+    if diff:
+        raise FemInvariantError(
+            "this solve was called with different " + ", ".join(diff) + " from the "
+            "prepared model it reuses; build the prepared model with the same "
+            "options the solves pass.")
+    if _prep_static_digest(prep) != prep.get("_static_digest"):
+        raise FemInvariantError(
+            "an array the prepared model shares with every solve has changed since "
+            "it was built; a solve wrote into the prepared model.")
+
+
+def _check_seed_state(u, evp, groups, n_dof, what):
+    """Raise where a carried (u, per-group plastic strain) seed does not match this
+    solve's degrees of freedom and Gauss-point groups."""
+    u = np.asarray(u)
+    sizes = [len(g['pairs']) for g in groups]
+    got = [len(a) for a in evp]
+    if u.shape != (n_dof,) or got != sizes:
+        raise FemInvariantError(
+            f"{what} does not match this solve: its displacement has shape "
+            f"{u.shape} against ({n_dof},) degrees of freedom and its plastic strain "
+            f"{len(got)} group(s) against {len(sizes)}"
+            + ("" if len(got) != len(sizes) or got == sizes
+               else " of different sizes")
+            + "; the state must be produced on the same prepared model.")
+
+
 # ===================== Phase 0 profiling (SPIKE, "THE FACTORIZATION") ============
 # Timers only. Nothing here reads or writes solver state, so a profiled run and an
 # unprofiled one execute the same arithmetic in the same order and return the same
@@ -449,7 +627,9 @@ def _ssrm_length_unit(fem_data):
         if system is None:
             return ""
         return labels(system, (fem_data or {}).get("time_unit")).get("length") or ""
-    except Exception:
+    except ValueError:
+        # An unrecognized unit system: the summary carries no unit, as for an
+        # undeclared one.
         return ""
 
 
@@ -1555,7 +1735,11 @@ def import_fem_meta(output_stem):
     try:
         with open(meta_file) as f:
             return json.load(f)
-    except Exception:
+    except (OSError, ValueError) as exc:
+        # Unreadable or not JSON (JSONDecodeError and UnicodeDecodeError are
+        # ValueErrors). Said, so a corrupt sidecar does not read as "no sidecar".
+        print(f"Warning: the FEM meta sidecar {meta_file} could not be read "
+              f"({type(exc).__name__}: {exc}); it is ignored.")
         return None
 
 
@@ -1686,8 +1870,9 @@ def import_fem_solution(fem_data, output_stem):
             try:
                 with open(f_meta_file) as f:
                     failure_solution.update(json.load(f))
-            except Exception:
-                pass
+            except (OSError, ValueError) as exc:
+                print(f"Warning: the at-failure meta sidecar {f_meta_file} could not "
+                      f"be read ({type(exc).__name__}: {exc}); it is ignored.")
         # The snapshot is by definition the UNCONVERGED at-failure field; keep that
         # honest even if a stale/absent meta sidecar leaves it unset.
         failure_solution.setdefault("converged", False)
@@ -3559,6 +3744,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     # from the same zone polygons and the same pair of unit weights the 'ru' option
     # integrates, so the two definitions of "the soil column above this point" can
     # never drift apart.
+    _overburden_error = None
     try:
         from .mesh import get_material_polygons as _gmp3
         _overburden_columns = []
@@ -3570,9 +3756,13 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                  float(materials[_midx].get('gamma', 0.0)),
                  float(gamma_sat_by_mat[_midx]) if _midx < n_materials else float('nan')))
     except Exception as _e:
-        # A model with no usable zone geometry simply cannot offer K0 initialization;
-        # solve_fem raises there rather than silently initializing to zero stress.
+        # Kept broad on purpose: the zone geometry is only read by the optional K0
+        # initialization, and a model whose polygons cannot be built must still load
+        # and solve without it. A model with no usable zone geometry simply cannot
+        # offer K0 initialization; solve_fem raises there rather than silently
+        # initializing to zero stress, and quotes this reason.
         _overburden_columns = []
+        _overburden_error = f"{type(_e).__name__}: {_e}"
 
     # Get other parameters
     unit_weight = require_gamma_water(slope_data, "FEM analysis")
@@ -3670,6 +3860,8 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         # _gauss_point_overburden. Same zones and same moist-gamma convention as the
         # 'ru' nodal sigma_v above.
         "overburden_columns": _overburden_columns,
+        **({} if _overburden_error is None
+           else {"overburden_columns_error": _overburden_error}),
         "u": u,
         "u_signed": u_signed,  # raw (un-clamped) nodal seep field for the suction option; None if no seep suction
         "sigma_v": sigma_v,  # nodal vertical soil stress (ru option; else None)
@@ -3933,7 +4125,9 @@ def _gauss_point_overburden(fem_data, elem_gp_data):
         raise ValueError(
             "K0 initial stress requires material-zone geometry to integrate the "
             "overburden, and this model carries none. Rebuild fem_data from a "
-            "slope_data with profile lines or polygons.")
+            "slope_data with profile lines or polygons."
+            + (f" Building the zone columns failed with {fem_data['overburden_columns_error']}."
+               if fem_data.get("overburden_columns_error") else ""))
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
@@ -4028,14 +4222,19 @@ def _factorize_free_stiffness(K_free):
     if mode in ("auto", "cholmod"):
         try:
             from sksparse.cholmod import cholesky as _cholmod_cholesky
-        except Exception:
+            import sksparse.cholmod as _cholmod_mod
+        except (ImportError, OSError, ValueError):
+            # Optional accelerator: absent, or present but unloadable (a missing
+            # shared library, or a numpy ABI mismatch, which numpy reports as a
+            # ValueError at import).
             if mode == "cholmod":
                 raise
         else:
             try:
                 return (_CholmodFactorSolver(_cholmod_cholesky(K_free.tocsc())),
                         _CholmodFactorSolver.kind)
-            except Exception:
+            except (getattr(_cholmod_mod, "CholmodError", RuntimeError),
+                    *_FACTOR_FAILURES):
                 if mode == "cholmod":
                     raise
 
@@ -4045,7 +4244,7 @@ def _factorize_free_stiffness(K_free):
                          diag_pivot_thresh=0.0,
                          options=dict(SymmetricMode=True)),
                     "SuperLU symmetric mode")
-        except Exception:
+        except _FACTOR_FAILURES:
             if mode == "symmetric":
                 raise
 
@@ -4080,7 +4279,13 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
 
     The kwargs here mirror the same-named solve_fem parameters and must match the
     values the trials will use (solve_ssrm holds them fixed across the bisection).
+    The prepared model records them (``_opts_fp``) and a digest of the arrays it
+    shares (``_static_digest``), and solve_fem raises on a reuse that differs in
+    either (see _check_prepared).
     """
+    _opts_fp = _prep_options_fingerprint(
+        dt_scale, suction_phi_b, suction_cap, elastic_mask, tension_cap_by_elem,
+        tension_cutoff, min_slip_depth)
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
@@ -4604,7 +4809,7 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                 _ids = [int(_n) - 1 for _n in _en[_e] if int(_n) > 0]
                 _skin_elem_mask[_e] = bool(np.all(_nd_all[_ids] < float(min_slip_depth)))
 
-    return {
+    _prep = {
         "K_factor": K_factor,
         # The matrix the factorization above was taken of. It is kept so that a
         # driver which has to CHANGE it — the interface relief, which takes the
@@ -4654,7 +4859,11 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         # when K0 initialization is off — which is the default, and why an ordinary
         # run is bit-identical to before.
         "sv0_gp": sv0_gp,
+        # What shaped this prepared model (see _check_prepared).
+        "_opts_fp": _opts_fp,
     }
+    _prep["_static_digest"] = _prep_static_digest(_prep)
+    return _prep
 
 
 # ===================== Hybrid failure criterion (opt-in) =====================
@@ -6126,7 +6335,9 @@ def corrector_hold_test(fem_data, F, state, softened=None, **solve_kw):
     starts on, so on a state that does not move at all the loop's relative-change
     test divides round-off by round-off and need not fire (FEM-5-topple at
     1.1015625: 3,000 sweeps, 5.5e-12 elastic displacements moved, STABLE_STUCK). Returns a record whose ``held`` says which; any other ending,
-    an exception included, is ``held=False`` and nothing more.
+    a numerical failure of the continuation included (``_CORRECTOR_NUMERICAL_ERRORS``,
+    named in ``error_type``), is ``held=False`` and nothing more. Any other
+    exception is a defect in the code and propagates.
     """
     _t0 = time.perf_counter()
     _out = dict(held=False, verdict=None, exit_reason=None, sweeps=0,
@@ -6148,8 +6359,11 @@ def corrector_hold_test(fem_data, F, state, softened=None, **solve_kw):
                accelerate=False, progress_callback=None)
     try:
         _h = solve_fem(fem_data, F=F, **_kw)
-    except Exception as _exc:      # KeyboardInterrupt is a BaseException
+    except FemInvariantError:
+        raise
+    except _CORRECTOR_NUMERICAL_ERRORS as _exc:
         _out["verdict"] = f"{type(_exc).__name__}: {_exc}"[:200]
+        _out["error_type"] = type(_exc).__name__
         _out["wall"] = time.perf_counter() - _t0
         return _out
     _ue = float(_h.get("u_elastic_scale") or 0.0)
@@ -6721,6 +6935,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # factorization and geometry precompute; a standalone call builds its own here.
     if _prepared is not None:
         prep = _prepared
+        _check_prepared(prep, _prep_options_fingerprint(
+            dt_scale, suction_phi_b, suction_cap, elastic_mask,
+            tension_cap_by_elem, tension_cutoff, min_slip_depth))
     else:
         prep = _prepare_fem_model(
             fem_data, dt_scale=dt_scale, suction_phi_b=suction_phi_b,
@@ -7176,9 +7393,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         state may not end a trial while any Gauss point sits more than
         `_CORRECTOR_YIELD_TOL` of its own strength outside the surface.
 
-        Any exception from the corrector is a refusal and nothing more — a model the
-        Newton path cannot carry must fall back to the viscoplastic verdict rather
-        than lose its trial to a traceback.
+        A NUMERICAL failure of the corrector (``_CORRECTOR_NUMERICAL_ERRORS``) is a
+        refusal and nothing more — a model the Newton path cannot carry must fall
+        back to the viscoplastic verdict rather than lose its trial to a traceback —
+        and the refusal names the exception's class (``refusal_type``). Any other
+        exception is a defect in the code and propagates: recorded as a refusal it
+        would hand every trial to the stopping rules with nothing to say so.
         """
         _t0 = time.perf_counter()
         _seed = {"u": np.asarray(u_now, dtype=float).copy(),
@@ -7195,14 +7415,27 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 'open_prev': joint_open.copy(),
                 'slipped': None if joint_slipped is None else joint_slipped.copy(),
                 'dil_p': None if joint_dil is None else joint_dil.copy()}
+        # The post-peak set is handed by reference; a refusal must leave it as it
+        # was (see "a refusal changes nothing" at JOINT_NEWTON_ON).
+        _soft_before = (None if softened_now is None
+                        else np.array(softened_now, copy=True))
         try:
             _sol = _solve_fem_newton(fem_data, F, prep, _nr_seed_state=_seed, **_kw)
-        except Exception as _exc:      # KeyboardInterrupt is a BaseException
+        except FemInvariantError:
+            raise
+        except _CORRECTOR_NUMERICAL_ERRORS as _exc:
             _corr_attempts.append(dict(
                 at=where, vp_iterations=int(vp_iterations), certified=False,
                 refusal=f"{type(_exc).__name__}: {_exc}"[:200],
+                refusal_type=type(_exc).__name__,
                 wall=time.perf_counter() - _t0))
             return None
+        finally:
+            if (_soft_before is not None
+                    and not np.array_equal(_soft_before, softened_now)):
+                raise FemInvariantError(
+                    f"the corrector attempt at {where} changed the post-peak bar "
+                    "set it was handed; it must work on a copy.")
         _wall = time.perf_counter() - _t0
         _oob = float(_sol.get("unbalanced_force_ratio", np.inf))
         _yv = float(_sol.get("nr_max_yield_violation", np.inf))
@@ -7317,46 +7550,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             failure_criterion=failure_criterion, k0=k0,
             early_failure=early_failure,
             joint_slip_stiffness_factor=joint_slip_stiffness_factor)
-        _soft = _sol.get("softened_1d_elements")
-        if _soft is not None and not np.any(_soft):
-            _soft = None
-        _hs = {"u": _st["u"], "evp": _st["evp"], "joint": _st.get("joint"),
-               "_hold": True}
-        try:
-            _h = solve_fem(
-                fem_data, F=F, debug_level=max(0, debug_level - 1),
-                max_iterations=int(_CORRECTOR_HOLD_SWEEPS),
-                max_iterations_ceiling=int(_CORRECTOR_HOLD_SWEEPS),
-                tolerance=tolerance, max_disp_factor=max_disp_factor,
-                tension_cutoff=tension_cutoff, dt_scale=dt_scale,
-                force_tol=force_tol, oob_window=oob_window,
-                early_exit=early_exit, min_slip_depth=min_slip_depth,
-                ssr_exclude_mask=ssr_exclude_mask,
-                tension_cap_by_elem=tension_cap_by_elem,
-                tension_srf=tension_srf, elastic_mask=elastic_mask,
-                suction_phi_b=suction_phi_b, suction_cap=suction_cap,
-                _prepared=prep, fast_kernel=fast_kernel,
-                failure_criterion=failure_criterion, k0=k0,
-                early_failure=early_failure, _init_state=_hs,
-                _softened_seed=_soft, fem_solver='viscoplastic',
-                joint_slip_stiffness_factor=joint_slip_stiffness_factor,
-                joint_tangent='off')
-        except Exception as _exc:      # KeyboardInterrupt is a BaseException
-            _out["verdict"] = f"{type(_exc).__name__}: {_exc}"[:200]
-            _out["wall"] = time.perf_counter() - _t0
-            return _out
-        _ue = float(_h.get("u_elastic_scale") or 0.0)
-        _drift = float(_h.get("max_displacement", np.inf))
-        _drift_rel = (_drift / _ue) if _ue > 0.0 else np.inf
-        _out.update(
-            verdict=_h.get("verdict"), exit_reason=_h.get("exit_reason"),
-            sweeps=int(_h.get("iterations", 0) or 0), drift=_drift,
-            drift_u_el=float(_drift_rel), u_elastic_scale=_ue,
-            oob=float(_h.get("unbalanced_force_ratio", np.nan)),
-            wall=time.perf_counter() - _t0)
-        _out["held"] = bool(_h.get("converged")) and \
-            _drift_rel <= float(_CORRECTOR_HOLD_DRIFT)
-        return _out
 
     def _creep_attempt(rd, u_now, groups_now, vp_iterations, softened_now=None):
         """The trend reading's corrector attempt (see `creep_trend`): one bounded
@@ -7405,6 +7598,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
     n_1d_elements = len(elements_1d)
     has_1d_elements = n_1d_elements > 0
+    if (_softened_seed is not None
+            and len(_softened_seed) not in (0, n_1d_elements)):
+        raise FemInvariantError(
+            f"the carried post-peak bar set (_softened_seed) has "
+            f"{len(_softened_seed)} entries and this model {n_1d_elements} 1D "
+            "elements; it must come from a solve of the same model.")
 
     if has_1d_elements:
         k_by_1d_elem = fem_data["k_by_1d_elem"]
@@ -8685,7 +8884,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                             try:
                                 _fac, _kind = _factorize_free_stiffness(
                                     (_K_free_base - _dK).tocsc())
-                            except Exception:
+                            except _FACTOR_FAILURES:
                                 # A relieved set that leaves the block with no
                                 # stiffness at all is a singular matrix, and it
                                 # is also a true statement about the model. The
@@ -9293,6 +9492,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                       f"vp iter {iteration + 1}/{budget}, "
                                       f"oob={unbalanced_force_ratio:.1e}")
                 except Exception:
+                    # Kept broad: the caller's display code, never solver state.
                     pass
 
             # Displacement limit check: detect false convergence from unbounded plastic flow
@@ -11115,10 +11315,15 @@ def _nr_joint_slip(joints, st):
     if st is None:
         return np.zeros((0, 3))
     slip_p = None
+    ks = None
     for jg in (joints or ()):
         if jg.get('kind') == 'joint':
             slip_p = jg.get('slip_p')
             ks = jg['jd']['ks'][:, None]
+    if ks is None:
+        raise FemInvariantError(
+            "_nr_joint_slip was handed an interface state but no joint group; a "
+            "joint state exists only on a model whose Newton groups carry one.")
     slip_p = np.zeros(st["tn"].shape) if slip_p is None else np.asarray(slip_p)
     closed = np.divide(st["ts"], ks, out=np.zeros_like(st["ts"]), where=ks > 0.0)
     return np.where(st["open"], slip_p, st["dt"] - closed)
@@ -12749,6 +12954,14 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # reached) and the ramp (a bar that ruptured at one strength is ruptured at the
     # next). Softening only ever grows, so the seed is a lower bound and never a
     # verdict.
+    if _softened_seed is not None:
+        _n1d = len(fem_data.get("elements_1d", ()))
+        _nss = np.asarray(_softened_seed).size
+        if _nss not in (0, _n1d):
+            raise FemInvariantError(
+                f"the carried post-peak bar set (_softened_seed) has {_nss} entries "
+                f"and this model {_n1d} 1D elements; it must come from a solve of "
+                "the same model.")
     if bars is not None and _softened_seed is not None:
         _seed = np.asarray(_softened_seed, dtype=bool)
         if _seed.size == len(fem_data.get("elements_1d", ())):
@@ -12771,6 +12984,23 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                 _nr_joint_state = _src["joint"]
                 break
     joints = _nr_build_joints(fem_data, F, state=_nr_joint_state)
+    # The joint law this driver can carry on a COLD start is the stateless one:
+    # with no interface history handed in, a line's residual strength and its
+    # dilation are never armed (see _nr_build_joints). Not a refusal (the ramp and
+    # fem_solver='newton' have always run this way), but said, and recorded.
+    _nr_joint_law_off = []
+    if joints is not None:
+        _jg0 = next((g for g in joints if g.get('kind') == 'joint'), None)
+        if _jg0 is not None:
+            if (_jg0.get('slipped') is None
+                    and joint_reduced_residual_strength(_jg0['jd'], F) is not None):
+                _nr_joint_law_off.append("residual strength")
+            if _jg0.get('dil_p') is None and _jg0['jd'].get("has_dilation"):
+                _nr_joint_law_off.append("dilation")
+    if _nr_joint_law_off:
+        print("  WARNING: the Newton driver solves this trial's joints without "
+              + " or ".join(_nr_joint_law_off) + ", which it carries only from an "
+              "interface history handed in by the viscoplastic sweep.")
     pattern = _nr_prepare_assembly(groups, free_dofs, n_dof, bars=bars,
                                    piles=piles, joints=joints)
 
@@ -12837,6 +13067,12 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # than a shared array name.
     if _nr_seed is not None:
         u_seed, ep_seed = _nr_seed
+        if np.shape(u_seed) != (n_dof,) or len(ep_seed) != n_elements:
+            raise FemInvariantError(
+                f"_nr_seed does not match this solve: its displacement has shape "
+                f"{np.shape(u_seed)} against ({n_dof},) degrees of freedom and its "
+                f"plastic strain {len(ep_seed)} element(s) against {n_elements}; "
+                "the state must be produced on the same model.")
         u = np.asarray(u_seed, dtype=float)[:n_dof].copy()
         for grp in groups:
             ep = np.empty_like(grp['ep'])
@@ -12876,6 +13112,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # no-K0 route, where the viscoplastic driver's reported displacement IS the
     # absolute one and its plastic strain comes back per element.)
     if _nr_seed_state is not None:
+        _check_seed_state(_nr_seed_state["u"], _nr_seed_state["evp"], groups, n_dof,
+                          "_nr_seed_state")
         u = np.asarray(_nr_seed_state["u"], dtype=float)[:n_dof].copy()
         for grp, ev in zip(groups, _nr_seed_state["evp"]):
             grp['ep'] = np.array(ev, dtype=float, copy=True)
@@ -12959,6 +13197,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                 try:
                     progress_callback(lam, f"newton lambda={lam:.3f}, {it} iters")
                 except Exception:
+                    # Kept broad: the caller's display code, never solver state.
                     pass
         else:
             n_cuts += 1
@@ -13317,6 +13556,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                     if nr_disp_limit is not None else "")))
 
     return {
+        **({"nr_joint_law_off": list(_nr_joint_law_off)} if _nr_joint_law_off
+           else {}),
         "converged": bool(converged),
         "stable": bool(converged),
         "verdict": verdict,
@@ -13670,10 +13911,17 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                     # in-situ datum; its `_k0_state` carries the absolute field and
                     # the plastic strain in this model's own group order.
                     _ks = _vp['_k0_state']
+                    _check_seed_state(_ks['u'], _ks['evp'], groups, n_dof,
+                                      "the ramp predictor's in-situ state")
                     _u_seed = np.asarray(_ks['u'], dtype=float)[:n_dof].copy()
                     for grp, _ev in zip(groups, _ks['evp']):
                         grp['ep'] = np.array(_ev, dtype=float, copy=True)
                 else:
+                    if np.shape(_vp['displacements']) != (n_dof,):
+                        raise FemInvariantError(
+                            "the ramp predictor's displacement has shape "
+                            f"{np.shape(_vp['displacements'])} against ({n_dof},) "
+                            "degrees of freedom.")
                     _u_seed = np.asarray(_vp['displacements'],
                                          dtype=float)[:n_dof].copy()
                     _ep_vp = _vp['plastic_strains']
@@ -13753,6 +14001,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                         min(1.0, (F_stands - F0) / max(1e-9, F_max - F0)),
                         f"ramp F={F_stands:.3f}")
                 except Exception:
+                    # Kept broad: the caller's display code, never solver state.
                     pass
         else:
             # Reject the step and retry from the SAME converged state at half the
@@ -14371,6 +14620,7 @@ def _ssrm_progress(callback, done, total, label):
         try:
             callback(int(done), int(total), str(label))
         except Exception:
+            # Kept broad: the caller's display code, never solver state.
             pass
 
 
@@ -14453,6 +14703,30 @@ def _failed_edge_softened(solution):
         return None
     soft = np.asarray(solution.get("softened_1d_elements", []), dtype=bool)
     return soft if soft.size and soft.any() else None
+
+
+def _ssrm_nonmonotone(trials):
+    """A standing trial above a failed one, or None.
+
+    Only DECIDED trials count: one that stood, and one that did not stand and did
+    not end undecided (``SSRM_UNDECIDED_EXITS``). Returns ``{"stood_F", "failed_F"}``
+    for the highest standing F and the lowest failed F when the first exceeds the
+    second.
+    """
+    stood, failed = [], []
+    for t in trials or ():
+        if not isinstance(t, dict):
+            continue
+        tF = _finite_or_none(t.get("F"))
+        if tF is None:
+            continue
+        if _trial_stood(t):
+            stood.append(tF)
+        elif t.get("exit_reason") not in SSRM_UNDECIDED_EXITS:
+            failed.append(tF)
+    if stood and failed and max(stood) > min(failed):
+        return {"stood_F": float(max(stood)), "failed_F": float(min(failed))}
+    return None
 
 
 def _ssrm_bisect_steps(width, tolerance):
@@ -15039,6 +15313,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                               progress_callback=progress_callback)
 
     t_start = time.perf_counter()
+    # The model as it stands when the run starts, which a continuation of this run
+    # is compared against (see _ssrm_continue).
+    _model_fp_at_start = _fem_model_fingerprint(fem_data)
 
     # Template-carried defaults (v16): a t_cut column / an option=elastic material
     # read from the input file populates fem_data['tension_cutoff_by_material'] /
@@ -15376,6 +15653,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 f"'{failure_criterion}'. A probe trial is read for the "
                 "standing/failing verdict the non-convergence and hybrid "
                 "criteria produce.")
+    # The in-situ state is every trial's datum and is handed to each by reference;
+    # no trial may write it (checked before the run returns).
+    _init_digest = None if init_state is None else _digest(init_state)
     if _driver == 'ramp':
         if resolve_fem_solver(fem_solver) != 'newton':
             raise ValueError(
@@ -15565,6 +15845,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                     # exists to show.
                     _corrector=False, _finite_guard=True,
                     _softened_seed=result.get("failed_edge_softened"))
+            except FemInvariantError:
+                raise
             except Exception as exc:
                 # A failed capture must never sink a good FS result; the figure path
                 # simply falls back to last_solution when failure_solution is absent.
@@ -15572,7 +15854,17 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 # exception is NAMED: a capture that dies inside the linear solve on a
                 # non-finite right-hand side and one that dies on a missing key are
                 # different defects, and a bare "failed" line cannot tell them apart.
-                if debug_level >= 1:
+                # A numerical failure is what this solve past critical can end on;
+                # anything else is a defect in the code, said at every debug level
+                # and recorded on the result (``capture_error``), but still not
+                # allowed to sink the factor of safety, which it cannot have moved.
+                result["capture_error"] = f"{type(exc).__name__}: {exc}"[:200]
+                if not isinstance(exc, _CORRECTOR_NUMERICAL_ERRORS):
+                    print(f"    WARNING: the at-failure capture raised "
+                          f"{type(exc).__name__}: {exc}. This is a defect in the "
+                          "code, not a property of the model; continuing without "
+                          "the capture.")
+                elif debug_level >= 1:
                     print(f"    at-failure capture failed ({type(exc).__name__}: "
                           f"{exc}); continuing without it.")
                 return None
@@ -15691,6 +15983,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             prep=prep,
             init_state=init_state, equilibration=equilibration,
             options=dict(_call_options), fem_data=fem_data,
+            model_fp=_model_fp_at_start,
             limit=int(max(max_iterations, max_iterations_ceiling or 0)))
         result["resumable"] = store
         if ssrm_continue_refusal(result) is not None:
@@ -15701,10 +15994,30 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     # and the wall time, in words. Printed on every run, whatever the debug level,
     # because it is where a reader learns that the answer depends on the
     # iteration limit.
+    if _init_digest is not None and _digest(init_state) != _init_digest:
+        raise FemInvariantError(
+            "the in-situ state every trial starts from changed during the run; a "
+            "trial wrote into it.")
+    if _prep_static_digest(prep) != prep.get("_static_digest"):
+        raise FemInvariantError(
+            "an array the prepared model shares with every trial changed during the "
+            "run; a trial wrote into it.")
     result["summary"] = ssrm_run_summary(result, fem_data)
     print(f"\n{result['summary']}")
 
     return result
+
+
+#: fem_data entries a solve itself adds or rewrites (derived caches), left out of
+#: the continuation's model fingerprint.
+_MODEL_FINGERPRINT_SKIP = frozenset(("K_local",))
+
+
+def _fem_model_fingerprint(fem_data):
+    """Per-entry digests of a model (every fem_data entry but the solver's own
+    caches): nodes, elements, materials, loads, water, reinforcement, joints."""
+    return {str(k): _digest(v) for k, v in (fem_data or {}).items()
+            if str(k) not in _MODEL_FINGERPRINT_SKIP}
 
 
 def _ssrm_continue(fem_data, previous, max_iterations, max_iterations_ceiling,
@@ -15725,12 +16038,20 @@ def _ssrm_continue(fem_data, previous, max_iterations, max_iterations_ceiling,
         raise ValueError(why)
     store = previous["resumable"]
     model = store["fem_data"]
-    if fem_data is not None and fem_data is not model:
-        same = all(np.shape((fem_data or {}).get(k)) == np.shape(model.get(k))
-                   for k in ("nodes", "elements"))
-        if not same:
-            raise ValueError("The model has changed since that run, so it cannot "
-                             "be continued.")
+    # The model is compared by CONTENT, whether a different dict was passed or the
+    # run's own one edited in place: a continuation runs on the stored prepared
+    # model, so an edited material, load or water table would otherwise be
+    # reported under the new model's name with the old model's answer.
+    _then = store.get("model_fp")
+    if _then is None:
+        raise FemInvariantError("the continuation store carries no fingerprint of "
+                                "the model it was made on.")
+    _now = _fem_model_fingerprint(model if fem_data is None else fem_data)
+    _changed = sorted(k for k in set(_then) | set(_now)
+                      if _then.get(k) != _now.get(k))
+    if _changed:
+        raise ValueError("The model has changed since that run, so it cannot "
+                         "be continued (changed: " + ", ".join(_changed) + ").")
     opts = dict(store["options"])
     opts.update(max_iterations=new_limit,
                 max_iterations_ceiling=max(
@@ -16333,6 +16654,18 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                    and abs(undecided[0] - F_right) <= 1e-12 * max(1.0, abs(F_right)))
     critical_FS = F_left if lower_bound else 0.5 * (F_left + F_right)
 
+    # The bisection assumes the verdict is monotone in F: it never re-solves a
+    # bracket edge, and the grid mode never solves its snapped endpoints. The trial
+    # record holds the evidence, so it is read here: a trial that stood above one
+    # that failed is reported (plainly, at every debug level) and recorded. The
+    # answer is not changed.
+    _nonmono = _ssrm_nonmonotone(trials)
+    if _nonmono is not None:
+        print(f"  WARNING: the trials are not monotone in F: the slope stood at "
+              f"F = {_nonmono['stood_F']:.6g} but failed at the lower "
+              f"F = {_nonmono['failed_F']:.6g}. The bracket assumes the opposite, "
+              "so the reported factor of safety rests on that assumption.")
+
     _ssrm_progress(progress_callback, _total() * SUBDIV, _total() * SUBDIV,
                    ssrm_fs_text(critical_FS, lower_bound))
     if debug_level >= 1:
@@ -16368,6 +16701,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         # growth, exit_reason, iterations. Populated on every criterion so an A/B
         # between criteria costs no extra solves.
         "trials": trials,
+        # Present only where a standing trial sits above a failed one (see
+        # _ssrm_nonmonotone): the highest such standing F and the lowest failed F.
+        **({} if _nonmono is None else {"nonmonotone_trials": _nonmono}),
         # Trials the search could not decide (empty on a clean run). Where the
         # last of them is still the top of the final bracket the reported FS is
         # the bracket's bottom, a lower bound (`fs_is_lower_bound`); `note` says
@@ -16748,8 +17084,11 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
                 print(f"Warning: Element type {elem_type} not supported")
                 continue
         except Exception as e:
-            print(f"Error building stiffness for element {elem_idx}, type {elem_type}: {e}")
-            continue
+            # An element left out of K keeps its weight and its Gauss points, so the
+            # model would be solved with a hole in its stiffness. Refused instead.
+            raise ValueError(
+                f"The stiffness of element {elem_idx} (type {elem_type}, material "
+                f"{mat_id + 1}) could not be built: {type(e).__name__}: {e}") from e
 
         # Assemble into global matrix using dof_offset for global DOF indices.
         # An element matrix smaller than its 2 x n_node DOF count contributes

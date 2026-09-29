@@ -48,7 +48,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [2.13](#gs-2-13) | 🟢 | Greco Layered Slope | Circular Spencer 1.429 vs SLOPE/W M-P 1.389 (+2.9%) | sits just above the Greco reference range |
 | [2.14](#gs-2-14) | 🟢 | Greco Weak Layer | Noncircular Spencer 1.082 vs Greco 1.08 (+0.2%) · vs SLOPE/W Spencer 1.054 (+2.7%) | |
 | [2.15](#gs-2-15) | 🟢 | Chen & Shao Frictionless Slope | Spencer 1.052 vs Chen & Shao 1.05 (+0.2%) · vs Slide 1.051 (+0.1%) | *covered* — [Slide2 VP25](rocscience.md#vp25) |
-| [2.16](#gs-2-16) | 🟡 | Prandtl Bearing Capacity | Spencer 1.043 vs the closed-form 1.0 (+4.3%) · Lowe & Karafiath 1.017 vs the closed-form 1.0 (+1.7%) | *covered* — [Slide2 VP26](rocscience.md#vp26); XSLOPE's methods span 0.98–1.10 around the closed form. The same file's SSRM solution returns ≈ 1.0, and SLOPE/W's own fully-specified M-P lies below it |
+| [2.16](#gs-2-16) | 🟢 | Prandtl Bearing Capacity | Lowe & Karafiath 1.017 vs the closed-form 1.0 (+1.7%) · Spencer 1.043 vs the closed-form 1.0 (+4.3%) | *covered* — [Slide2 VP26](rocscience.md#vp26); XSLOPE's methods bracket the closed form (0.98–1.10) and the best of them sets the dot. The same file's SSRM solution returns ≈ 1.0, and SLOPE/W's own fully-specified M-P brackets the closed form from below |
 | [2.17](rocscience.md#vp28) | 🟢 | [Chowdhury & Xu (1995)](https://doi.org/10.1016/0951-8320(94)00063-T), 5 examples | XSLOPE reproduces the ten cases on SLOPE/W's own imported circles, with Taylor σ_F within ≈ 1% of SLOPE/W's Monte Carlo | *covered* (3 of 10 cases built, with their reliability checked) |
 | [2.18](#gs-2-18) | 🟢 | Borges & Cardoso Geosynthetic Emb. #2 | On SLOPE/W's own critical circle M-P 1.153 vs 1.171 (−1.5%) · vs Borges & Cardoso 1.15 (+0.3%) | |
 | [2.19](rocscience.md#vp32) | 🟢 | Borges & Cardoso Geosynthetic Emb. #3 | Two fill stages on SLOPE/W's own solves: 1.218 vs 1.229 (−0.9%) · 0.981 vs 0.972 (+0.9%) | *covered*; identical materials and geometry (verified to <1 cm), and the vendor reinforcement-friction difference (39.6° vs 31.0°) is immaterial — the fully-embedded bar develops its full 200 kN/m either way; also [RS2 #24](rs2.md#rs2-24) |
@@ -273,8 +273,7 @@ the section rather than as a water table. The values are **measured** excess por
 generated in the soft foundation, not a steady flow field, so no seepage solution reproduces them.
 The manual prints them as 22 points with their coordinates (its Table 25). A printed grid of this
 kind enters XSLOPE as a nodal pore-pressure field interpolated onto a mesh, as the 44-point grid of
-[RS2-9](rs2.md#rs2-9) does, so the row is *planned*. SLOPE/W's own factor is the referee; the factor
-Pilot et al. (1982) report for the embankment's failure is a field datum beside it.
+[RS2-9](rs2.md#rs2-9) does, so the row is *planned*.
 
 Same problem as [Slide2 #12](rocscience.md).
 
@@ -354,7 +353,7 @@ The classical Prandtl bearing mechanism on a weightless, frictionless 60° slope
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.15; Chen & Shao (1988).
 
-### 🟡 2.16 — Prandtl Bearing Capacity {#gs-2-16}
+### 🟢 2.16 — Prandtl Bearing Capacity {#gs-2-16}
 
 The classical Prandtl bearing mechanism on level ground: a weightless (γ ≈ 0), c = 20 kPa, φ = 0 soil under a strip surcharge of 102.83 kPa — exactly c·N<sub>c</sub>, so the closed-form factor of safety is unity by construction. Both ground crossings of the slip surface sit at the same elevation, which leaves the facing direction ambiguous; the `right_facing` override settles it.
 

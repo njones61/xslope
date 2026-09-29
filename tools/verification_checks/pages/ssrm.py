@@ -12,7 +12,10 @@ from ..config import PageConfig
 CONFIG = PageConfig(
     name="ssrm",
 
-    bounds=[],
+    bounds=[
+        # an agreement bound over a whole sweep, not over one pair
+        ('+2.2', '15 curve within 2.2% at every one of its five stations'),
+    ],
 
     whitelist=[
         # summary-row cell: the L/H station value (0.7) sits between the two

@@ -64,6 +64,7 @@ CONFIG = PageConfig(
         ('+2.3', 'within 2.3% of RS2 at all three thicknesses'),
         ('+2.2', 'that still lands within 2.2%'),
         ('+2.1', 'lands within 2.1% of'),
+        ('+3.5', 'Every case lands within 3.5% of unity'),
         ('+20', 'runs about 20% low'),
         # RS2-18: a bound over both cases against the scored vendor column.
         ('+0.8', "lands within 0.8% of RS2's own model"),
@@ -83,6 +84,11 @@ CONFIG = PageConfig(
         # Part IV twin, row 76) is deferred with no lock of its own, which is
         # what its ⊘ says.  The section's locked comparisons are the 🟢 pair.
         ('rs2-39', '🟢'),
+        # "RS2-68" carries the three seismic cases together.  Parts I-III score
+        # the problem 🔴 on case 3, and Part IV's rows split the same section:
+        # case 1 (row 62) 🟢 and case 3 (row 63) 🔴.  The worst locked case sets
+        # the dot, here and in the summary table.
+        ('rs2-68', '🔴'),
         # "RS2 Part IV VP65 / VP66" carries the two upstream-pool dams of one
         # family in a single section, because what separates them is one
         # argument about how each is watered.  VP66 (row 66) is the section's

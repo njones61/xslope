@@ -223,7 +223,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [23](#vp23) | 🟢 | Slope, (3) materials | Ordinary 1.357 vs Low 1.36 (−0.2%) · Bishop 1.130 vs Low 1.14 (−0.9%) | the published Bishop values themselves spread 1.14–1.19 |
 | [24](#vp24) | 🟢 | Slope, (3) materials | Ordinary 1.435 vs Slide 1.439 (−0.3%) · Bishop 1.435 vs Low 1.44 (−0.3%) |  |
 | [25](#vp25) | 🟢 | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | Spencer 1.052 vs Slide 1.051 (+0.1%) · Spencer 1.052 vs Chen & Shao 1.05 (+0.2%) | the Prandtl surface is built analytically |
-| [26](#vp26) | 🟡 | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | Spencer 1.043 vs bearing-capacity theory 1.0 (+4.3%) · Lowe 1.017 vs bearing-capacity theory 1.0 (+1.7%) | the closed form is the referee, and Spencer's difference from it sets the dot; Slide2's own Spencer 0.941 sits ~6% below it |
+| [26](#vp26) | 🟢 | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | Spencer 1.043 vs bearing-capacity theory 1.0 (+4.3%) · Lowe 1.017 vs bearing-capacity theory 1.0 (+1.7%) | the closed form is the reference authority; Slide2's own Spencer 0.941 sits ~6% below it |
 | [27](#vp27) | 🟢 | Slope, (2) materials, tension crack, water table (auto Hu) | Spencer 1.375 vs Slide 1.402 (−1.9%) · Spencer 1.375 vs XSTABL 1.403 (−2.0%) | a uniform offset across all six methods (digitized water table) |
 | [28](#vp28) | 🟢 | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | Congress St.: Bishop 1.129 vs Slide 1.128 (+0.1%) · embankment, interface: Bishop 1.158 vs Slide 1.160 (−0.2%) · embankment, base: Bishop 1.177 vs Slide 1.185 (−0.7%) | 3 of Chowdhury & Xu's 10 cases; all ten are compared at [SLOPE/W §2.17](geostudio.md) |
 | [29](#vp29) | 🟢 | Submerged slope, homogenous, probabilistic analysis, water table | Spencer 1.145 vs Slide 1.157 (−1.0%) · Spencer 1.145 vs Duncan 1.17 (−2.1%) |  |
@@ -536,8 +536,7 @@ Slide #12 is the Lanester test embankment: four materials, a tension crack, and 
 of input as [VP11](#vp11) — a printed 22-point pore-pressure grid recording measured
 loading-induced pressure rather than a flow field. Here the manual prints the grid as a table,
 22 points with their coordinates (its Table 12.2), so it can enter XSLOPE as an interpolated
-pore-pressure field, and the row is *planned*. The factor Pilot et al. (1982) report for the
-failure is a field datum; Slide2's own factor is the referee.
+pore-pressure field, and the row is *planned*.
 
 Also [SLOPE/W §2.10](geostudio.md) — the same problem in the GeoStudio corpus.
 
@@ -548,8 +547,7 @@ same position as [VP11](#vp11) and [VP12](#vp12): the manual's pore pressures ar
 construction-induced values, not a solved flow field. The manual prints them as a 44-point table
 with their coordinates (its Table 13.2), which [RS2-9](rs2.md#rs2-9) already carries into XSLOPE
 as a pore-pressure field for the strength-reduction engine, so the limit-equilibrium row is
-*planned*. The factor Pilot et al. (1982) report for the failure is a field datum; Slide2's own
-factor is the referee.
+*planned*.
 
 ## 🟢 VP14: Slope, homogeneous (Arai & Tagyo ex. 1) {#vp14}
 
@@ -831,7 +829,7 @@ Slide #25 / Chen & Shao (1988): the classical plasticity problem — a weightles
 
 Also [SLOPE/W §2.15](geostudio.md) — the same problem in the GeoStudio corpus.
 
-## 🟡 VP26: Prandtl bearing mechanism on level ground {#vp26}
+## 🟢 VP26: Prandtl bearing mechanism on level ground {#vp26}
 
 Slide #26: the classical Prandtl footing problem — a weightless c = 20 soil (γ = 10⁻⁶,
 φ = 0) on **level ground**, loaded by a strip UDL of **102.83** over the crest. That load

@@ -1383,9 +1383,10 @@ The published factors disagree among themselves here: the Slide2 columns for thi
 paper's 0.99 between them. Giving the facing blocks a cohesion instead of leaving them elastic does not bring
 the factor down to the paper's: with ten times the paper's block cohesion the wall fails at a small
 fraction of its present factor, so the facing's strength is a cliff rather than a dial, and the
-elastic facing sets an upper bound for the family rather than explaining the difference. At the
-factor where this wall stands, no soil is yielding and the sheets have reached their limit, where
-the paper's wall fails on a shear zone through the reinforced fill.
+elastic facing sets an upper bound for the family rather than explaining the difference. At
+failure the surface runs from the toe of the lowest facing column up through the reinforced fill
+and out at the crest, with the sheets it crosses at their allowable tension: the same kind of
+surface the paper reports, reached at a higher factor because the facing holds.
 
 **Input file:** [vp088_fem.xlsx](files/rocscience/vp088_fem.xlsx).
 
@@ -1393,8 +1394,8 @@ the paper's wall fails on a shear zone through the reinforced fill.
 
 #### 🟢 RS2-50: Geotextile wall, 4.2 m reinforcement (vp089_fem) {#rs2-50}
 
-The sheets are shortened to 4.2 m, and the failure runs behind them through fill they no longer
-cross. Refining the mesh moves the factor by one step of the search.
+The sheets are shortened to 4.2 m. The failure surface runs from the toe up through the fill,
+crossing the lower sheets and passing behind the ends of the upper ones, which no longer reach it. Refining the mesh moves the factor by one step of the search.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
@@ -1481,8 +1482,7 @@ the sheet strength directly.
 #### 🟢 RS2-55: Geotextile wall, tier count (vp094_fem) {#rs2-55}
 
 The same 9 m of height in five 1.8 m tiers offset 0.6 m, three sheets per tier. Refining the mesh
-moves the factor by one step of the search; the five short tiers put more sheets across the
-failing surface than the three tall ones do.
+moves the factor by one step of the search.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|

@@ -283,8 +283,7 @@ def build_base_geotextile(is_joint):
     line = [sheet("base geotextile", (EMB_TOE_L, 0.0), (EMB_TOE_R, 0.0),
                   t_max=100.0, adhesion=5.0, delta=20.0, E=2.0e6,
                   is_joint=is_joint)]
-    return model(mats, emb_polygons(-4.0),
-                 {"Xo": 30.0, "Yo": 15.0, "Depth": -4.0, "R": 19.0},
+    return model(mats, emb_polygons(-4.0), None,
                  EMB_TARGET_SIZE, reinforcement_lines=line, max_depth=-4.0)
 
 
@@ -302,8 +301,7 @@ def build_liner(is_joint):
                   t_max=50.0, adhesion=0.5, delta=10.0, E=2.0e6,
                   is_joint=is_joint)]
     # The same 4 m foundation as the geotextile pair: one section, one sketch.
-    return model(mats, emb_polygons(-4.0),
-                 {"Xo": 30.0, "Yo": 15.0, "Depth": -4.0, "R": 19.0},
+    return model(mats, emb_polygons(-4.0), None,
                  EMB_TARGET_SIZE, reinforcement_lines=line, max_depth=-4.0)
 
 

@@ -104,53 +104,9 @@ ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
 # ---------------------------------------------------------------------------
 
 
-def _circle_through(p1, p2, yn):
-    """The circle through ground points p1, p2 whose lowest point sits at
-    elevation yn - the standing starting-circle rule (enter near the crest,
-    tangent near the base of the governing zone, daylight near the toe) made
-    constructive.  These groundwater decks never search or lock a factor of
-    safety (every tag here is seep/seep_head/tseep_head, none of which read
-    the circles sheet), but a shipped first circle still has to slice, so
-    each caller below solves for one through two real points on its own
-    ground/top boundary rather than carrying a generic placeholder.
-
-    Returns {'Xo','Yo','Depth','R'}; raises if no such real circle exists
-    (both points must sit above yn)."""
-    (x1, y1), (x2, y2) = p1, p2
-    A, B = y1 - yn, y2 - yn
-    if A <= 0 or B <= 0:
-        raise ValueError(f'_circle_through: p1/p2 must sit above yn={yn}: {p1} {p2}')
-    a = B - A
-    b = 2.0 * (A * x2 - B * x1)
-    c = B * x1 * x1 - A * x2 * x2 - A * B * (y2 - y1)
-    roots = []
-    if abs(a) < 1e-14:
-        if abs(b) > 1e-14:
-            roots = [-c / b]
-    else:
-        disc = b * b - 4 * a * c
-        if disc < 0:
-            raise ValueError(f'_circle_through: no real circle for {p1} {p2} yn={yn}')
-        sq = math.sqrt(disc)
-        roots = [(-b + sq) / (2 * a), (-b - sq) / (2 * a)]
-    lo, hi = min(x1, x2), max(x1, x2)
-    best = None
-    for Xo in roots:
-        Yo = ((Xo - x1) ** 2 + y1 * y1 - yn * yn) / (2.0 * A)
-        R = Yo - yn
-        if R <= 0:
-            continue
-        pen = 0.0 if lo <= Xo <= hi else min(abs(Xo - lo), abs(Xo - hi))
-        if best is None or pen < best[0]:
-            best = (pen, {'Xo': Xo, 'Yo': Yo, 'Depth': yn, 'R': R})
-    if best is None:
-        raise ValueError(f'_circle_through: no admissible root for {p1} {p2} yn={yn}')
-    return best[1]
-
-
 def _base_sd(k1=1e-5, kr0=1e-3, h0=-0.4, time_unit=None):
-    """Seepage-only base model: one material with u='seep'; the LEM circle is
-    a placeholder (these problems are never solved for a factor of safety).
+    """Seepage-only base model: one material with u='seep' and no failure
+    surface (these problems are never solved for a factor of safety).
 
     ``time_unit`` is the TIME BASE the case's conductivities are expressed against,
     and every caller states it rather than inheriting a default: a conductivity is
@@ -170,7 +126,7 @@ def _base_sd(k1=1e-5, kr0=1e-3, h0=-0.4, time_unit=None):
     sd['piezo_line'] = []
     sd['circular'] = True
     sd['non_circ'] = []
-    sd['circles'] = [{'Xo': 5.0, 'Yo': 10.0, 'Depth': 0.0, 'R': 10.0}]
+    sd['circles'] = []
     return sd
 
 
@@ -198,11 +154,6 @@ def gw001():
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
         [(0.0, 0.0), (10.0, 0.0), (10.0, 5.0), (0.0, 5.0)])}]
     sd['max_depth'] = None
-    # First circle: enters/daylights on the flat top near the two ends of the
-    # domain (1.0, 5.0) - (9.0, 5.0), tangent at el 1.5. Unused by the flowrate/
-    # head locks (seep tags never read circles), but must slice per the standing
-    # rule; the placeholder {5,10,0,10} did not.
-    sd['circles'] = [_circle_through((1.0, 5.0), (9.0, 5.0), 1.5)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 3.75, 'coords': [(0.0, 0.0), (0.0, 3.75)]},
@@ -276,9 +227,6 @@ def gw007():
             [(1.0, 0.7), (2.4, 0.7), (2.4, 1.0), (1.6, 1.0)])},
     ]
     sd['max_depth'] = None
-    # First circle: enters on the toe slope (0.24, 0.32) and daylights on the
-    # crest (2.16, 1.0), tangent at el 0.096 near the base of the fine lens.
-    sd['circles'] = [_circle_through((0.24, 0.32), (2.16, 1.0), 0.096)]
     sd['seepage_bc'] = {
         'specified_heads': [{'head': 0.3, 'coords': [(0.0, 0.2), (0.2, 0.3)]}],
         'specified_fluxes': [{'flux': 2.1e-4, 'coords': [(1.6, 1.0), (2.4, 1.0)]}],
@@ -305,9 +253,6 @@ def gw002():
     sd['polygons'] = [{'mat_id': 0,
                        'polygon': Polygon(coords + [(8.0, 4.0), (0.0, 4.0)])}]
     sd['max_depth'] = None
-    # First circle: flat-top entry/daylight points (0.8, 4.0) - (7.2, 4.0),
-    # tangent at el 1.2.
-    sd['circles'] = [_circle_through((0.8, 4.0), (7.2, 4.0), 1.2)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 1.0, 'coords': [(0.0, 0.0), (0.0, 4.0)]},
@@ -335,9 +280,6 @@ def gw003():
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
         [(0.0, -10.0), (40.0, -10.0), (40.0, 0.0), (0.0, 0.0)])}]
     sd['max_depth'] = None
-    # First circle: entry/daylight on the top edge (4.0, 0.0) - (36.0, 0.0),
-    # tangent at el -7.0 near the base of the 10 m block.
-    sd['circles'] = [_circle_through((4.0, 0.0), (36.0, 0.0), -7.0)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 5.0, 'coords': [(0.0, 0.0), (8.0, 0.0)]},
@@ -466,9 +408,6 @@ def gw005():
                                           (30.0, 2.0), (30.0, 4.0), (0.0, 4.0)])},
     ]
     sd['max_depth'] = None
-    # First circle: enters on the upper block's flat crest (4.0, 10.0) and
-    # daylights on the shelf (36.0, 2.0), tangent at el 0.6 near the shelf.
-    sd['circles'] = [_circle_through((4.0, 10.0), (36.0, 2.0), 0.6)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 10.0, 'coords': [(0.0, 0.0), (0.0, 10.0)]},
@@ -572,9 +511,6 @@ def gw010():
                               kr0=0.001, h0=-1.0)
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 10.0), (10.0, 10.0)]}]
     sd['max_depth'] = 0.0
-    # First circle: flat-top entry/daylight (1.0, 10.0) - (9.0, 10.0),
-    # tangent at el 7.0.
-    sd['circles'] = [_circle_through((1.0, 10.0), (9.0, 10.0), 7.0)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 10.0, 'coords': [(0.0, 0.0), (0.0, 10.0)]},
@@ -600,9 +536,6 @@ def gw012():
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 40.0), (15.0, 40.0),
                                                     (25.0, 50.0), (100.0, 50.0)]}]
     sd['max_depth'] = 0.0
-    # First circle: enters on the ditch bank (10.0, 40.0) and daylights on the
-    # far flat (90.0, 50.0), tangent at el 12.0.
-    sd['circles'] = [_circle_through((10.0, 40.0), (90.0, 50.0), 12.0)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 50.0, 'coords': [(0.0, 40.0), (15.0, 40.0), (25.0, 50.0)]},
@@ -624,9 +557,6 @@ def gw013():
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 40.0), (10.0, 50.0),
                                                     (100.0, 50.0)]}]
     sd['max_depth'] = 0.0
-    # First circle: flat-top entry/daylight (10.0, 50.0) - (90.0, 50.0),
-    # tangent at el 15.0.
-    sd['circles'] = [_circle_through((10.0, 50.0), (90.0, 50.0), 15.0)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 50.0, 'coords': [(0.0, 40.0), (10.0, 50.0)]},
@@ -939,10 +869,6 @@ def gw008():
         {'mat_id': 1, 'coords': [(0.0, 0.1), (1.0, 0.1)]},
     ]
     sd['max_depth'] = 0.0
-    # First circle: this section is essentially flat (a 1 x 0.5 m ditch-drain
-    # box, no slope) - the simplest circle that genuinely slices, flat-top
-    # entry/daylight (0.1, 0.5) - (0.9, 0.5), tangent at el 0.15.
-    sd['circles'] = [_circle_through((0.1, 0.5), (0.9, 0.5), 0.15)]
     sd['seepage_bc'] = {
         'specified_heads': [],
         'specified_fluxes': [
@@ -984,9 +910,9 @@ _H_REF = 100.0
 
 
 def _tseep_base_sd(gamma_w, time_unit, unit_system='si'):
-    """Seepage-only transient base: one placeholder material, no LEM circle used
-    (these problems are never solved for a factor of safety).  Callers overwrite
-    materials / polygons / seepage_bc / tseep."""
+    """Seepage-only transient base: one placeholder material and no failure
+    surface (these problems are never solved for a factor of safety).  Callers
+    overwrite materials / polygons / seepage_bc / tseep."""
     sd = load_slope_data(ACADS_1A)
     sd['gamma_water'] = gamma_w
     sd['time_unit'] = time_unit
@@ -995,6 +921,7 @@ def _tseep_base_sd(gamma_w, time_unit, unit_system='si'):
     sd['piezo_line'] = []
     sd['circular'] = True
     sd['non_circ'] = []
+    sd['circles'] = []
     sd['profile_lines'] = []
     sd['max_depth'] = None
     return sd
@@ -1089,10 +1016,6 @@ def _gw15_column(single_drainage):
     sd['materials'] = [_tseep_material(sd['materials'][0], 'Soil', _GW15_K, ss)]
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
         [(0.0, 0.0), (0.25, 0.0), (0.25, 1.0), (0.0, 1.0)])}]
-    # First circle: this section is flat (a 0.25 x 1.0 m 1-D column, no
-    # slope) - the simplest circle that genuinely slices, flat-top
-    # entry/daylight (0.025, 1.0) - (0.225, 1.0), tangent at el 0.95.
-    sd['circles'] = [_circle_through((0.025, 1.0), (0.225, 1.0), 0.95)]
     heads = [{'head': 'res', 'coords': [(0.0, 1.0), (0.25, 1.0)]}]  # top drain
     if not single_drainage:
         heads.append({'head': 'res', 'coords': [(0.0, 0.0), (0.25, 0.0)]})  # bottom
@@ -1151,10 +1074,6 @@ _GW16_B = (10.0, 10.0)
 
 def _gw16_base():
     sd = _tseep_base_sd(gamma_w=1.0, time_unit='sec', unit_system=None)
-    # First circle: this section is flat (a 0.5 x 1.0 m 1-D column, no
-    # slope) - the simplest circle that genuinely slices, flat-top
-    # entry/daylight (0.05, 1.0) - (0.45, 1.0), tangent at el 0.85.
-    sd['circles'] = [_circle_through((0.05, 1.0), (0.45, 1.0), 0.85)]
     sd['seepage_bc'] = {'specified_heads': [
         {'head': 'res', 'coords': [(0.0, 1.0), (0.5, 1.0)]}], 'exit_face': []}  # top drain
     base = _H_REF + _GW16_U0
@@ -1233,7 +1152,6 @@ def _gw21_build(ic_excess, fname):
                                        _GW21_K, _gw21_ss())]
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
         [(0.0, 0.0), (100.0, 0.0), (100.0, 5.0), (0.0, 5.0)])}]
-    sd['circles'] = [{'Xo': 50.0, 'Yo': 10.0, 'Depth': 0.0, 'R': 10.0}]
     # left face is the only Dirichlet: series holds base at t=0 (uniform IC via the
     # t=0 steady solve) then steps +dH; the far/other boundaries are no-flow, which
     # matches the semi-infinite erfc far field at 600 hr (the front reaches ~40 ft).
@@ -1346,7 +1264,6 @@ def gw018():
     sd['materials'] = [m]
     sd['profile_lines'] = [{'mat_id': 0, 'coords': list(_DAM_PROFILE)}]
     sd['max_depth'] = 0.0
-    sd['circles'] = [{'Xo': 26.0, 'Yo': 24.0, 'Depth': 0.0, 'R': 20.0}]
     sd['seepage_bc'] = {
         # upstream face: submerged-only reservoir series (4 -> 10 at t=0); nodes
         # above the water line auto-convert to exit-face nodes each step.
@@ -1395,7 +1312,6 @@ def gw017():
             [(40.0, 0.0), (52.0, 0.0), (52.0, -0.5), (40.0, -0.5)])},
     ]
     sd['max_depth'] = None
-    sd['circles'] = [{'Xo': 26.0, 'Yo': 24.0, 'Depth': 0.0, 'R': 20.0}]
     sd['seepage_bc'] = {
         'specified_heads': [
             # upstream reservoir series (submerged-only), 4 -> 10 at t=0
@@ -1502,9 +1418,6 @@ def gw019():
             [(0.0, 9.0), (19.0, 9.0), (19.0, 10.0), (0.0, 10.0)])},
     ]
     sd['max_depth'] = None
-    # First circle: flat-top entry/daylight (1.9, 10.0) - (17.1, 10.0),
-    # tangent at el 3.0 near the base of the 9 m soil layer.
-    sd['circles'] = [_circle_through((1.9, 10.0), (17.1, 10.0), 3.0)]
     sd['seepage_bc'] = {
         'specified_heads': [
             # lagoon floor (x 0-2, y=10): ponded reservoir series, 5 -> 11 at t=0
@@ -1590,10 +1503,6 @@ def gw020():
             [(1.0, 0.7), (2.4, 0.7), (2.4, 1.0), (1.6, 1.0)])},
     ]
     sd['max_depth'] = None
-    # Same slope face as gw007() (this is its transient re-run): entry on the
-    # toe slope (0.24, 0.32), daylight on the crest (2.16, 1.0), tangent at
-    # el 0.096 near the base of the fine lens.
-    sd['circles'] = [_circle_through((0.24, 0.32), (2.16, 1.0), 0.096)]
     sd['seepage_bc'] = {
         'specified_heads': [{'head': 0.3, 'coords': [(0.0, 0.2), (0.2, 0.3)]}],
         # rainfall flux: 0 at t=0 (IC), stepped to 2.1e-4 for t>0 (series 'infil')

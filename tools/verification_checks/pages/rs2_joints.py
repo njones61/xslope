@@ -38,7 +38,6 @@ CONFIG = PageConfig(
         ('1.213', 'The search brackets 1.213 between 1.203'),
         ('1.203', 'The search brackets 1.213 between 1.203'),
         ('1.818', 'unconfirmed'),
-        ('1.271', 'unconfirmed'),
     ],
 
     abs_bounds=[

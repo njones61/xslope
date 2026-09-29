@@ -141,7 +141,7 @@ the four is within a rounding of the value the manual prints for it.
 |---|---|---|---|---|
 | **1.018** | 1.0000 (+1.8%) | 0.99 vs 1.0000 (−1.0%) | 0.99 (+2.8%) | 0.99 / 0.97 |
 
-<!-- test: file=files/rocscience/joints/rj001a.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1a, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
+<!-- test: file=files/rocscience/joints/rj001a.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1a, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
 
 **The excess over the closed form is one assumption, and it is where the thrust between two columns
 acts.** Goodman & Bray hand each column-to-column thrust to the top corner of its contact. A contact
@@ -192,7 +192,7 @@ measured heights the recursion returns **1.0078**, the bottom of this row's brac
 |---|---|---|---|---|
 | **1.018** | 1.0000 (+1.8%) | 0.97 vs 1.0000 (−3.0%) | 0.99 (+2.8%) | 0.97 / 0.94 |
 
-<!-- test: file=files/rocscience/joints/rj001b.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1b, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
+<!-- test: file=files/rocscience/joints/rj001b.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1b, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
 
 The mesh does not move this row. At the block width of 10 m and at the 5.0 m of its lock it
 returns the same factor, and at 5.0 m every trial settles within the iteration limit. Case a's one-step move with refinement is not
@@ -219,7 +219,7 @@ is what the closed form's own pair of answers for cases a and c says as well —
 |---|---|---|---|---|
 | **1.037** | 1.0185 (+1.8%) | 1.01 vs 1.0185 (−0.8%) | 1.01 (+2.7%) | 1.01 / 0.99 |
 
-<!-- test: file=files/rocscience/joints/rj001c.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1c, tier=gate, f_stand=1.02734375, f_fail=1.046875, check=edges -->
+<!-- test: file=files/rocscience/joints/rj001c.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1c, tier=gate, f_stand=1.02734375, f_fail=1.046875, check=edges -->
 
 Given the thrust heights read off the solved state at the block width of 10 m, the recursion
 returns **1.0469**, the bottom of that mesh's bracket — case a's mechanism and case a's
@@ -248,7 +248,7 @@ the corner of the contact.
 |---|---|---|---|---|
 | **1.252** | 1.2308 (+1.7%) | 1.19 vs 1.2308 (−3.3%) | 1.22 (+2.6%) | 1.19 / 1.16 |
 
-<!-- test: file=files/rocscience/joints/rj001d.xlsx, type=fem_ssrm, expected_fs=1.252, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-1d, tier=gate, f_stand=1.2421875, f_fail=1.26171875, check=edges -->
+<!-- test: file=files/rocscience/joints/rj001d.xlsx, type=fem_ssrm, expected_fs=1.252, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1d, tier=gate, f_stand=1.2421875, f_fail=1.26171875, check=edges -->
 
 The mesh does not move this row either: the block width of 10 m and the 5.0 m of its lock
 return the same bracket, end for end, and at 5.0 m every trial settles within the iteration limit. Like case
@@ -280,7 +280,7 @@ triangle above it, weighing 1,361.8 kN/m. The recursion gives **0.7734**, agains
 |---|---|---|---|---|
 | **0.783** | 0.7734 (+1.2%) | 0.86 vs 0.7734 (+11.2%) | 0.87 (−10.0%) | 0.86 / 0.82 |
 
-<!-- test: file=files/rocscience/joints/rj002.xlsx, type=fem_ssrm, expected_fs=0.783, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-2, f_stand=0.7734375, f_fail=0.79296875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj002.xlsx, type=fem_ssrm, expected_fs=0.783, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-2, f_stand=0.7734375, f_fail=0.79296875, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 0.35 m, which takes the mesh from 11,537 nodes to 21,110 —
 moves the factor by one step of the search, inside the row's own tolerance, and all nine trials
@@ -348,7 +348,7 @@ E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°.
 |---|---|---|---|
 | **1.311** | 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | 1.19 / 1.27 |
 
-<!-- test: file=files/rocscience/joints/rj004.xlsx, type=fem_ssrm, expected_fs=1.311, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-4, f_stand=1.30078125, f_fail=1.3203125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj004.xlsx, type=fem_ssrm, expected_fs=1.311, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4, f_stand=1.30078125, f_fail=1.3203125, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 8.4 m, which takes the mesh from 9,993 nodes and 936 interface
 elements to 19,130 and 1,325 — does not move the factor at all: the finer mesh returns the same
@@ -434,7 +434,7 @@ higher than problem 6's.
 |---|---|---|---|
 | **1.564** | 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | 1.57 / 1.59 |
 
-<!-- test: file=files/rocscience/joints/rj007.xlsx, type=fem_ssrm, expected_fs=1.564, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-7, f_stand=1.5546875, f_fail=1.57421875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj007.xlsx, type=fem_ssrm, expected_fs=1.564, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7, f_stand=1.5546875, f_fail=1.57421875, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 8.4 m, which takes the mesh from 9,986 nodes and 934 interface
 elements to 19,179 and 1,323 — does not move the factor at all: the finer mesh returns the same
@@ -466,7 +466,7 @@ against the set's usual 10<sup>8</sup>.
 |---|---|---|---|
 | **0.764** | 0.76 (+0.5%) | 0.75 vs 0.76 (−1.3%) | 0.75 / 0.75 |
 
-<!-- test: file=files/rocscience/joints/rj008.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-8, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj008.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-8, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 1.05 m, which takes the mesh from 5,389 nodes to 10,684 —
 moves the factor by one step of the search, inside the row's own tolerance, and all nine trials
@@ -503,7 +503,7 @@ decimals, so it lands 2 × 10⁻⁷ from the bedding plane it belongs on; see
 |---|---|---|---|---|
 | **1.037** | 1.03 (+0.7%) | 1.01 vs 1.03 (−1.9%) | 0.40–1.45 | 1.01 / 1.09 |
 
-<!-- test: file=files/rocscience/joints/rj009.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-9, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj009.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-9, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 2.1 m, which takes the mesh from 12 620 nodes and 1 806
 interface elements to 26 565 and 2 579 — does not move the factor at all: the finer mesh returns
@@ -537,7 +537,7 @@ see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-anoth
 |---|---|---|---|---|
 | **1.037** | 1.03 (+0.7%) | 0.92 vs 1.03 (−10.7%) | 0.43–1.45 | 0.92 / 1.08 |
 
-<!-- test: file=files/rocscience/joints/rj010.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-10, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj010.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-10, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 2.1 m, which takes the mesh from 12,608 nodes and 1,806
 interface elements to 26,577 and 2,579 — does not move the factor at all: the finer mesh returns the
@@ -567,7 +567,7 @@ decimals, so it lands a part in 10⁷ from the bedding plane it belongs on; see
 |---|---|---|---|---|---|
 | **1.213** | 1.2148 (−0.1%) | 1.22 vs 1.2148 (+0.4%) | 1.21 (+0.2%) | 1.7582 · the paper prints 1.75 | 1.22 / 1.3 |
 
-<!-- test: file=files/rocscience/joints/rj011.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-11, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj011.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-11, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 1.05 m, which takes the mesh from 12 326 nodes and 1 768
 interface elements to 26 052 and 2 524 — does not move the factor at all: the finer mesh returns
@@ -610,7 +610,7 @@ on its other worked examples.
 |---|---|---|---|---|---|
 | **2.033** | 1.9659 (+3.4%) | 1.39 vs 1.9659 (−29.3%) | 2.0324 | 1.78 (+14.2%) · Alejano prints 2.00 | 1.39 / 1.75 |
 
-<!-- test: file=files/rocscience/joints/rj012.xlsx, type=fem_ssrm, expected_fs=2.033, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-12, f_stand=2.0234375, f_fail=2.04296875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj012.xlsx, type=fem_ssrm, expected_fs=2.033, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-12, f_stand=2.0234375, f_fail=2.04296875, check=edges, tier=gate -->
 
 The lower tip of each release trace is stated to six decimals, so it lands a part in 10⁷ from the
 bedding plane it belongs on; see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint). This row and
@@ -650,7 +650,7 @@ blocks, which is 0.9988, so the closed form and statics agree to three figures h
 |---|---|---|---|---|---|
 | **0.998** | 1.0002 (−0.2%) | 1.0 vs 1.0002 (0.0%) | 0.9988 | 1.0 (−0.2%) | 1.0 / 1.05 |
 
-<!-- test: file=files/rocscience/joints/rj013.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-13, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj013.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-13, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 1.05 m, which takes the mesh from 12 141 nodes and 1 788
 interface elements to 26,079 and 2,539 — does not move the factor at all: the finer mesh returns
@@ -681,7 +681,7 @@ example, under the rigid-block bound for its two blocks. It is the referee.
 |---|---|---|---|---|---|
 | **1.232** | 1.2034 (+2.4%) | 0.89 vs 1.2034 (−26.0%) | 1.2686 | 0.9 (+36.9%), 0.9994 with the paper's corner rounding corrected · the paper prints 1.00 | 0.89 / 1.09 |
 
-<!-- test: file=files/rocscience/joints/rj014.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-14, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj014.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-14, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
 
 **The 1.00 the paper prints for this example does not follow from the inputs it prints.** Eq. (7)
 reads the bedding dip and spacing, the release joint's dip, the two friction angles, the length of
@@ -724,7 +724,7 @@ Minimized over its own two angles it settles within half a degree of that same o
 |---|---|---|---|---|---|
 | **1.271** | 1.7985 (−29.3%) | 1.28 vs 1.7985 (−28.8%) | 1.6 (−20.6%) | 1.25 | 1.28 / 1.42 |
 
-<!-- test: file=files/rocscience/joints/rj015.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-15, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj015.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-15, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate -->
 
 **The closed form prices one mechanism, and every program free to search for a surface finds a
 weaker one.** Eqs. (9)–(10) admit a single slab of the stated bedding thickness driving a wedge out
@@ -826,7 +826,7 @@ distinct-element run.
 |---|---|---|---|
 | **1.213** | 1.29 (−6.0%) | 1.24 vs 1.29 (−3.9%) | 1.24 / 1.2 |
 
-<!-- test: file=files/rocscience/joints/rj017.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-17, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj017.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-17, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 0.7 m, which takes the mesh from 3,284 nodes and 14 interface
 elements to 6,484 and 21 — moves the factor by one step of the search, inside the row's tolerance,
@@ -865,7 +865,7 @@ k<sub>s</sub> = 10<sup>7</sup> kPa/m and are reduced with the rock in the streng
 |---|---|---|---|
 | **0.998** | 1.01 (−1.2%) | 1.01 vs 1.01 (0.0%) | 1.01 / 1.00 |
 
-<!-- test: file=files/rocscience/joints/rj018.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-18, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj018.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-18, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
 
 A step of refinement — a 2D size of 0.7 m, which takes the mesh from 3,486 nodes and 48 interface
 elements to 6,707 and 66 — does not move the factor at all, and every trial on both meshes
@@ -895,7 +895,7 @@ table. It is the one problem in the corpus where that setting reaches the answer
 |---|---|---|---|
 | **1.623** | 1.46 (+11.2%) | 1.5 vs 1.46 (+2.7%) | 1.5 / 1.41 |
 
-<!-- test: file=files/rocscience/joints/rj019.xlsx, type=fem_ssrm, expected_fs=1.623, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, tension_srf=true, k0=1, benchmark=RJ-19, f_stand=1.61328125, f_fail=1.6328125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj019.xlsx, type=fem_ssrm, expected_fs=1.623, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=true, k0=1, benchmark=RJ-19, f_stand=1.61328125, f_fail=1.6328125, check=edges, tier=gate -->
 
 Every trial settles on the corpus mesh. A
 step of refinement — a 2D size of 2.1 m, which takes the mesh from 3,485 nodes to 6,910 — moves the

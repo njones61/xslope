@@ -74,6 +74,24 @@ SWEEP_CASES = [
 ]
 
 
+#: The iteration ceiling a jointed row's trials extend into, as a multiple of the
+#: per-trial limit. solve_fem extends a trial still slowing at its limit up to
+#: max_iterations_ceiling and takes max(ceiling, limit), so a row at 250 000 with
+#: no ceiling of its own has a ceiling EQUAL to its limit and cannot extend at
+#: all. Four times the limit lets a slow equilibrium finish; a trial holding
+#: steady still stops at its limit, since the extension is conditional on the
+#: movement dying away. A tag's own max_iter_ceiling wins.
+CEILING_FACTOR = 4
+
+
+def _with_ceiling(tag):
+    """``tag`` with its ``max_iter_ceiling`` stated: the tag's own, else
+    ``CEILING_FACTOR`` times its ``max_iter``."""
+    max_iterations = int(float(tag.get('max_iter', 250000)))
+    return {**tag, 'max_iter_ceiling': str(int(float(
+        tag.get('max_iter_ceiling', CEILING_FACTOR * max_iterations))))}
+
+
 def sweep_registered():
     """Every sweep row, by benchmark."""
     return {t['benchmark']: t for t in SWEEP_CASES}
@@ -105,6 +123,8 @@ def _solve_at(sd, mesh, k, tag):
     with RT._force_fast_kernel(_fem, False):
         sol = solve_fem(fem_data, F=1.0, debug_level=0,
                         max_iterations=int(tag.get('max_iter', 250000)),
+                        max_iterations_ceiling=int(
+                            _with_ceiling(tag)['max_iter_ceiling']),
                         tension_srf=str(tag.get('tension_srf', '')).lower()
                         in ('true', '1', 'yes'),
                         k0=float(tag['k0']) if tag.get('k0') else None,
@@ -162,7 +182,8 @@ def registered():
     """
     tagged = parse_tags()
     have = {t.get('benchmark') for t in tagged}
-    return tagged + [t for t in EXTRA_CASES if t.get('benchmark') not in have]
+    return [_with_ceiling(t) for t in
+            tagged + [t for t in EXTRA_CASES if t.get('benchmark') not in have]]
 
 
 def superseded():

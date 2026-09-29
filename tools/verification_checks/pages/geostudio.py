@@ -21,7 +21,6 @@ CONFIG = PageConfig(
         ('+0.5', 'Bishop within 0.5% of Slide2 Table'),
         ('+0.17', 'Bishop within 0.5% of Slide2 Table'),
         ('+0.17', 'per-slice table to'),
-        ('+1.5', 'biases the factor of safety roughly'),
         ('+372', 'too much weight'),
         ('+0.01', 'to within 0.01%, and the Baker'),
         ('+0.004', "Total sliding weight matches SLOPE/W's to"),

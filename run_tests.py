@@ -9506,6 +9506,16 @@ MODULE_CHECKS = {
         "of it (the trial audit, lock_edges and the suite's own edge check) to "
         "the same answer, and holds the certification into a committed sidecar "
         "without its machine time."),
+    'fem_guards': (
+        'fem_guards_check.py',
+        "The solver's guards: a programming error inside the Newton corrector or "
+        "the hold test stops the run instead of being filed as a refusal, and a "
+        "numerical failure is filed with its class; a prepared model reused with "
+        "different options, a shared array changed behind the solver, a continued "
+        "run on an edited model, and a seed that does not fit its model each "
+        "raise and say what differs; an element whose stiffness cannot be built "
+        "raises; a search whose trials contradict each other records the pair; no "
+        "function carries code after a return."),
     'ssrm_curve': (
         'ssrm_curve_check.py',
         "The strength reduction run's own record of itself: every trial carries "

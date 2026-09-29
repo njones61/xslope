@@ -1430,11 +1430,13 @@ The foundation is c = 0, φ = 18°, and this is the lowest factor in the family 
 
 <!-- test: file=files/rocscience/vp091_fem.xlsx, type=fem_ssrm, expected_fs=0.783, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, ssr_exclude=Blocks, benchmark=RS2-52, f_stand=0.7734375, f_fail=0.79296875, check=edges -->
 
-The two codes fail this wall in different ways. The paper's wall fails on a deep wedge that turns
-under the toe and comes out several meters into the foundation, a surface its own authors call
-"somewhat unrealistic as it emerges very steeply", so the published factor is the least settled in
-the family on their own account. XSLOPE's wall fails in a patch under the toe of the lowest facing
-column, on the sheets rather than in the soil.
+The two codes fail this wall through the foundation, but the surfaces come out in different
+places. The paper's wall fails on a deep wedge that turns under the toe and comes out several
+meters in front of the wall, a surface its own authors call "somewhat unrealistic as it emerges
+very steeply", so the published factor is the least settled in the family on their own account.
+XSLOPE's surface starts under the toe of the lowest facing column, drops into the weak foundation,
+and climbs back up behind the reinforced fill to the crest, with every sheet at its full allowable
+tension.
 
 **Input file:** [vp091_fem.xlsx](files/rocscience/vp091_fem.xlsx).
 

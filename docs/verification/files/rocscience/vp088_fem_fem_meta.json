@@ -370,7 +370,6 @@
         "iteration": 125000,
         "attempts": [
           {
-            "seed": "as_is",
             "certified": true,
             "r_first": 0.0643966007511959,
             "nr_iterations": 15,
@@ -387,9 +386,7 @@
             }
           }
         ],
-        "seed": "as_is",
         "corrector": {
-          "seed": "as_is",
           "certified": true,
           "r_first": 0.0643966007511959,
           "nr_iterations": 15,
@@ -496,7 +493,6 @@
         "iteration": 125000,
         "attempts": [
           {
-            "seed": "as_is",
             "certified": true,
             "r_first": 0.004307139306908573,
             "nr_iterations": 16,
@@ -513,9 +509,7 @@
             }
           }
         ],
-        "seed": "as_is",
         "corrector": {
-          "seed": "as_is",
           "certified": true,
           "r_first": 0.004307139306908573,
           "nr_iterations": 16,

@@ -83,10 +83,13 @@ CAPTURE_FALLBACK_TITLE = "last converged state — at-failure capture not availa
 def _fallback_clause(solution, title):
     """``title``, naming the state a failure panel is actually drawing.
 
-    Two cases, and a panel drawing a capture that ran to its own ceiling gets
-    neither. A capture the finite guard STOPPED is the mechanism — the state the
-    section was in a few iterations into coming apart — and the clause names the
-    iteration it was taken at, so the reader knows the field is a moment and not
+    Two cases, and a panel drawing a capture that ran to its own ceiling, or that
+    the distance fence stopped (see ``xslope.fem._CAPTURE_DISTANCE_FRAC``), gets
+    neither: a fenced capture is the at-failure state the panel's own title
+    names, taken at a set distance instead of a set iteration count. A capture
+    the finite guard STOPPED is the mechanism — the state the section was in a
+    few iterations into coming apart — and the clause names the iteration it
+    was taken at, so the reader knows the field is a moment and not
     an equilibrium. A panel standing on the converged field because there was no
     capture at all says that instead.
 
@@ -99,7 +102,8 @@ def _fallback_clause(solution, title):
     """
     if solution.get("_capture_fallback", False):
         return f"{title}\n{CAPTURE_FALLBACK_TITLE}"
-    if solution.get("capture_truncated"):
+    if (solution.get("capture_truncated")
+            and solution.get("capture_truncated_kind") != "distance"):
         at = solution.get("capture_truncated_at")
         # Every stop but one is the section running away; the exception is the
         # arithmetic giving out, and it is the only one named differently.

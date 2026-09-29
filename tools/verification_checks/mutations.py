@@ -566,6 +566,23 @@ CAPTURE_MUTATIONS = [
       "capture_truncated_at": 1, "capture_truncated_kind": "runaway_jump"}),
     ("capture moving less than the state it left",
      {"max_displacement": 1.6961024750084593e-05}),
+    # The distance fence (xslope.fem._CAPTURE_DISTANCE_FRAC) is a stop like the
+    # others: one that fires inside the first sweep has drawn nothing, and the
+    # iteration floor refuses it whatever the stop is called.
+    ("distance stop inside the first sweep",
+     {"iterations": 40, "converged": False, "capture_truncated": True,
+      "capture_truncated_at": 40, "capture_truncated_kind": "distance",
+      "capture_fence": 28.8}),
+]
+
+#: Readings planted into the same sound row that must still be ACCEPTED: a capture
+#: the distance fence stopped once the mechanism had run is the at-failure state,
+#: and it clears the iteration floor and moves more than the standing field.
+CAPTURE_SOUND = [
+    ("distance stop past the floor (control)",
+     {"iterations": 345, "converged": False, "capture_truncated": True,
+      "capture_truncated_at": 345, "capture_truncated_kind": "distance",
+      "capture_fence": 28.8}),
 ]
 
 #: A sound committed capture the mutations are planted into — a jointed row, so
@@ -584,7 +601,8 @@ def _capture_fixtures(fails):
     from . import captures
     src = os.path.join(certify.REPO, CAPTURE_STEM)
     total = 0
-    for name, planted in [("sound capture (control)", None)] + CAPTURE_MUTATIONS:
+    sound = [("sound capture (control)", None)] + CAPTURE_SOUND
+    for name, planted in sound + CAPTURE_MUTATIONS:
         total += 1
         tmp = tempfile.mkdtemp()
         try:
@@ -599,7 +617,7 @@ def _capture_fixtures(fails):
             why = captures.scan_stem(stem)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
-        if planted is None:
+        if (name, planted) in sound:
             print(f"  {'FLAGGED' if why else 'PASSED '} {name} (captures)")
             if why:
                 fails.append(name + f" (refused a sound capture: {why})")

@@ -793,7 +793,8 @@ set to what the model needs rather than left to absorb hopeless trials.
 that trial's own elastic displacement and still growing, or the out-of-balance flat over the last
 2000 iterations while the field gains a whole elastic displacement — and stops there with
 `exit_reason = 'diverging'` instead of spending the rest of its budget (`early_failure=False` turns
-it off; the at-failure capture solve always runs to its own budget). Both thresholds are measured in
+it off; the at-failure capture solve does not use this rule, and ends instead at the distance limit
+described under `capture_failure_state` below or at its own budget). Both thresholds are measured in
 the trial's own elastic response, and both sit far outside the range occupied by trials that go on
 to reach equilibrium — which near the critical factor grow past five times elastic with a flat
 residual — so the rule catches only gross runaways. On the default driver the runaway signal
@@ -1358,9 +1359,13 @@ Its principal arguments:
 >  backstop and early exit off and a generous ceiling — so the unconverged field develops the
 >  **at-failure mechanism** (the rotational collapse: crest settlement, toe heave). Right at the
 >  critical factor the collapse develops too slowly to become visible in a finite number of
->  iterations, hence the margin. A slope beyond critical never passes through equilibrium, and a
->  reinforcement element drops to its residual only on an equilibrium state, so the capture solve
->  starts from the post-peak set the bracket's failed-edge trial shed to: a layer that gave way at
+>  iterations, hence the margin. The capture stops once the section has moved 20% of the mesh
+>  height, and keeps the last state short of that distance. Past critical the slide moves at a
+>  steady rate, so without the limit the size of the drawn displacement would be set by the
+>  iteration ceiling alone; the shear band forms long before the section has moved that far. A
+>  capture that reaches its ceiling first is kept as it stands. A slope beyond critical never
+>  passes through equilibrium, and a reinforcement element drops to its residual only on an
+>  equilibrium state, so the capture solve starts from the post-peak set the bracket's failed-edge trial shed to: a layer that gave way at
 >  its residual is shown at that residual in the at-failure field (`failed_edge_softened` in the
 >  result). The field is returned as `failure_solution` and changes nothing
 >  else, so turning it off leaves the factor of safety, the bracket and `last_solution` untouched —

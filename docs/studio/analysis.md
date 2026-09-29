@@ -723,10 +723,12 @@ bracket resolves, **Capture failure-state mechanism** (on by default) re-solves
 once just beyond the critical factor with the displacement cap off, so the
 unconverged field develops the actual collapse *mechanism* the deformation and
 displacement-vector figures render — rather than the diffuse settlement of the last
-converged trial. **Capture margin** sets how far beyond critical that snapshot is
-solved (a fraction of FS), and an optional **capture iteration budget** overrides
-the automatic ceiling. Turning capture off skips the extra solve; the factor of
-safety and the bracket are unaffected either way. The controls are gated to the
+converged trial. The re-solve stops once the section has moved 20% of the model
+height, well after the mechanism has formed, and keeps the last state short of that
+distance; otherwise it runs to its iteration ceiling. **Capture margin** sets how far
+beyond critical that snapshot is solved (a fraction of FS), and an optional **capture
+iteration budget** overrides the automatic ceiling. Turning capture off skips the
+extra solve; the factor of safety and the bracket are unaffected either way. The controls are gated to the
 SSRM analysis, since a single trial has no bracket to capture beyond.
 
 The run produces **FEM · Data** (mesh + boundary conditions + reinforcement) and

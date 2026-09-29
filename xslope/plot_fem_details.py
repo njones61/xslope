@@ -228,6 +228,14 @@ BAND_LABEL = "Shear band crossing"
 CAPTURE_TRUNCATED_NOTE = "capture stopped early"
 
 
+def capture_distance_words():
+    """How far a capture the distance fence stopped had moved, in words:
+    "moved 20% of the model height"."""
+    from xslope.fem import _CAPTURE_DISTANCE_FRAC
+    frac = _CAPTURE_DISTANCE_FRAC or 0.0
+    return f"moved {100.0 * frac:.0f}% of the model height"
+
+
 def capture_stop_note(profile):
     """What a panel says about the capture it is drawing, or "".
 
@@ -241,8 +249,13 @@ def capture_stop_note(profile):
     if not stop:
         return CAPTURE_TRUNCATED_NOTE if profile.get("capture_truncated") else ""
     at, kind, _max_u = stop
-    # Every stop but one is the section running away; the exception is the
-    # arithmetic giving out, and it is the only one named differently.
+    if kind == "distance":
+        # Not a runaway: the section had moved as far as the capture is let run
+        # (see xslope.fem._CAPTURE_DISTANCE_FRAC), and this is the state it was in.
+        return (f"capture stopped at iteration {at} ({capture_distance_words()})"
+                if at is not None else f"capture {capture_distance_words()}")
+    # Every other stop is the section running away, except the arithmetic giving
+    # out, which is named as what it is.
     why = "not a number" if kind == "non_finite" else "runaway"
     if at is None:
         return CAPTURE_TRUNCATED_NOTE
@@ -318,7 +331,12 @@ def _title(profile):
     # readings follow it: the mechanism is what the panel is drawing, and its
     # forces are the forces at the state the guard stopped on — quoted, with the
     # iteration they belong to standing beside them.
-    if profile.get("capture_truncated"):
+    # A capture the distance fence stopped is the at-failure state the title
+    # already names, so the title says nothing more about it; the note is carried
+    # where the readings are quoted (the pile panel's mobilization note, the
+    # Studio status line).
+    stop = profile.get("capture_stop")
+    if profile.get("capture_truncated") and not (stop and stop[1] == "distance"):
         note = capture_stop_note(profile)
         if note:
             bits.append(note)

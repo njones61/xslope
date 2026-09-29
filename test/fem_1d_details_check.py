@@ -1901,6 +1901,9 @@ _HEALTHY_MODEL = os.path.join(_REPO, "docs", "fem", "files",
                               "xslope_griffiths6_dry.xlsx")
 _HEALTHY_MAX_U = 5.88764437275831
 _HEALTHY_ITERS = 12000
+#: A fenced capture must still have run far past its first sweep (see
+#: tools/verification_checks/captures.py, MIN_ITERATIONS).
+_CAPTURE_MIN_DEVELOPED_FLOOR = 100
 
 
 def test_a_healthy_capture_is_untouched():
@@ -1908,12 +1911,18 @@ def test_a_healthy_capture_is_untouched():
 
     Griffiths & Lane 6 dry, run as the corpus runs it: its capture is a developed
     mechanism that takes its whole budget to get there, growing a few percent an
-    iteration and flattening at the end. Nothing about it is a runaway, and the
-    field it returns is asserted to the last digit against the value it had before
-    the growth tests existed. The growth reading is printed beside it — that is the
-    healthy end of the distribution the thresholds were set from.
+    iteration and flattening at the end. Nothing about it is a runaway. With the
+    distance fence off (``_CAPTURE_DISTANCE_FRAC = None``) the field it returns is
+    asserted to the last digit against the value it had before the growth tests
+    existed, so neither growth test moves it. The growth reading is printed beside
+    it — that is the healthy end of the distribution the thresholds were set from.
+
+    The same run with the fence on is then held to what the fence promises: the
+    factor of safety and every trial identical, and the capture stopped by the
+    fence and nothing else, on a state short of 20% of the mesh height.
     """
     fails = []
+    import xslope.fem as _fem
     from xslope.fem import (_CAPTURE_RUNAWAY_RATIO, _CAPTURE_RUNAWAY_WINDOW,
                             build_fem_data, solve_ssrm)
     from xslope.fileio import load_slope_data
@@ -1923,21 +1932,28 @@ def test_a_healthy_capture_is_untouched():
     with contextlib.redirect_stdout(io.StringIO()):
         mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
                                         target_size=2.0, element_type="quad8")
+    fem_data = build_fem_data(slope_data, mesh)
+
+    def _run(fence):
         # A last-digit lock is a reference-path quantity: solve_ssrm has no
         # kernel switch of its own, so its trials are pinned the way the suite
         # pins them (run_tests._force_fast_kernel).
-        import xslope.fem as _fem
-        _orig_solve_fem = _fem.solve_fem
+        _orig_solve_fem, real_fence = _fem.solve_fem, _fem._CAPTURE_DISTANCE_FRAC
 
         def _reference_solve_fem(*a, **k):
             k["fast_kernel"] = False
             return _orig_solve_fem(*a, **k)
 
         _fem.solve_fem = _reference_solve_fem
+        _fem._CAPTURE_DISTANCE_FRAC = fence
         try:
-            result = solve_ssrm(build_fem_data(slope_data, mesh), F_min=2.0, F_max=2.8)
+            with contextlib.redirect_stdout(io.StringIO()):
+                return solve_ssrm(fem_data, F_min=2.0, F_max=2.8)
         finally:
             _fem.solve_fem = _orig_solve_fem
+            _fem._CAPTURE_DISTANCE_FRAC = real_fence
+
+    result = _run(None)
     capture = result.get("failure_solution")
     if capture is None:
         return ["the healthy model captured no at-failure field at all"]
@@ -1963,6 +1979,49 @@ def test_a_healthy_capture_is_untouched():
         fails.append(f"the healthy capture's longest compounding run is {run}, "
                      f"within 2 of the {_CAPTURE_RUNAWAY_WINDOW} that stops a "
                      f"capture: the threshold is too close to normal growth")
+
+    # The fence on: the same run, one capture different.
+    frac = _fem._CAPTURE_DISTANCE_FRAC
+    fenced = _run(frac)
+    import json
+
+    def _trials(r):
+        # Every recorded reading of every trial, less the wall-clock times, which
+        # are the one thing two runs of the same trial never share.
+        def _strip(v):
+            if isinstance(v, dict):
+                return {k: _strip(x) for k, x in v.items() if "wall" not in k}
+            if isinstance(v, (list, tuple)):
+                return [_strip(x) for x in v]
+            return v
+        return json.dumps(_strip(r.get("trials")), sort_keys=True, default=repr)
+
+    if fenced["FS"] != result["FS"] or _trials(fenced) != _trials(result):
+        fails.append("the distance fence changed the factor of safety or a trial; "
+                     "it may change only the capture")
+    fc = fenced.get("failure_solution") or {}
+    nodes = np.asarray(fem_data["nodes"], dtype=float)
+    fence = frac * float(nodes[:, 1].max() - nodes[:, 1].min())
+    print("    CAPTURE-FENCE healthy capture: stopped at iteration %s (%s), max|u| "
+          "%.6g against a fence of %.6g"
+          % (fc.get("capture_truncated_at"), fc.get("capture_truncated_kind"),
+             fc.get("max_displacement") or float("nan"), fence))
+    if fc.get("capture_truncated_kind") != "distance":
+        fails.append(f"the fenced capture was not stopped by the distance fence "
+                     f"(kind {fc.get('capture_truncated_kind')!r}); the unfenced "
+                     f"one reaches {_HEALTHY_MAX_U:.4g}, past the {fence:.4g} fence")
+    else:
+        if abs(float(fc.get("capture_fence") or 0.0) - fence) > 1e-9 * fence:
+            fails.append(f"the fenced capture records a fence of "
+                         f"{fc.get('capture_fence')!r}, not {fence!r}")
+        if not float(fc["max_displacement"]) < fence:
+            fails.append(f"the fenced capture kept a state at {fc['max_displacement']}"
+                         f", not short of the {fence} fence")
+        if fc.get("capture_truncated_max_u") != fc.get("max_displacement"):
+            fails.append("the fenced capture's recorded stop displacement is not the "
+                         "displacement of the state it kept")
+        if not (_CAPTURE_MIN_DEVELOPED_FLOOR < int(fc["iterations"]) < _HEALTHY_ITERS):
+            fails.append(f"the fenced capture ran {fc['iterations']} iterations")
     return fails
 
 

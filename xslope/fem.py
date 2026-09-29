@@ -323,6 +323,9 @@ _FEM_FAILURE_META_KEYS = (
     # field say the capture stopped early instead of quoting it flat.
     "capture_truncated", "capture_truncated_at", "capture_truncated_reason",
     "capture_truncated_kind", "capture_truncated_max_u",
+    # The distance a capture stopped by the distance fence was fenced at (see
+    # `_CAPTURE_DISTANCE_FRAC`); absent on every other capture.
+    "capture_fence",
     # And the other outcome: no capture was publishable at all, so this field is the
     # last CONVERGED one standing in for it. Carried across the file for the same
     # reason — a reloaded snapshot must not present itself as the failure state.
@@ -6020,6 +6023,21 @@ def _vp_gate_armed(iteration, last_progress_iter, disp_hist, u_elastic_scale):
 # NOT a failure criterion and nothing reads a factor of safety off it; it is the point
 # past which the capture stops drawing.
 _FINITE_GUARD_U_FACTOR = 10.0
+# How far the at-failure capture is let run, as a fraction of the mesh height. The
+# capture is solved past the failure strength with the displacement cap off, so on a
+# steady slide its displacement grows in proportion to the iterations it is given and
+# says nothing more about the mechanism once the band has formed: on Griffiths & Lane
+# Example 1 the band is complete by 0.5% of the height and only its magnitude grows
+# after that. The fence stops the capture once the section has moved this far,
+# measured the way the growth tests below measure it (translational max|u| from the
+# capture's datum), and keeps the last state short of it.
+#
+# 0.20 stands above every trial that STOOD across the verification corpus (the
+# largest reaches 9.9% of the mesh height), so an at-failure field can never be one a
+# standing slope also reaches, and it sits just above the 15% the deformed-mesh panel
+# is scaled to (see plot_fem.deformation_scale). Like the bound above it is not a
+# failure criterion and nothing reads a factor of safety off it. None turns it off.
+_CAPTURE_DISTANCE_FRAC = 0.20
 # What ends the at-failure capture: the runaway itself, read off how fast the section
 # is moving from one iteration to the next.
 #
@@ -6394,6 +6412,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               _nr_rescue_rungs=None, _nr_seed_first=False, _corrector=True,
               _corrector_rungs=None,
               _finite_guard=False, _finite_guard_u_max=None,
+              _capture_distance_frac=None,
               joint_slip_stiffness_factor=None,
               joint_tangent=None, joint_tangent_factor=None,
               joint_newton=None, accelerate=None, _creep_certify=True,
@@ -6502,6 +6521,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             default, and what solve_ssrm passes) falls back to the mesh-height fence:
             what normally ends a capture is the growth of the field, and this is one
             of the backstops under it.
+        _capture_distance_frac (float or None): INTERNAL, for the at-failure capture
+            only, and read only with `_finite_guard` on. The fraction of the mesh
+            height the section may move, from its datum, before the capture is
+            stopped (solve_ssrm passes `_CAPTURE_DISTANCE_FRAC`). The state kept is
+            the last one short of it, and the solution says so with
+            `capture_truncated_kind` 'distance', `capture_fence` (the distance) and
+            `capture_truncated_max_u` (how far the kept state had moved). None (the
+            default) leaves the capture to its budget and the backstops above.
         tolerance (float): Convergence tolerance ||du|| / ||u|| (default 1e-3).
             Normalized by the current displacement (Smith & Griffiths CHECON-style),
             so steady benign viscoplastic creep is accepted as converged; false
@@ -8036,6 +8063,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 guard_u_bound = min(guard_u_bound, _fence)
         else:
             guard_u_bound = _fence
+    # The capture's distance fence (see `_CAPTURE_DISTANCE_FRAC`): a stop of its own,
+    # read before the backstop above and reported as what it is, a capture that has
+    # moved as far as the figure needs, not a runaway.
+    guard_distance = None
+    if (guard_on and _capture_distance_frac is not None
+            and float(_capture_distance_frac) > 0.0 and mesh_height > 0):
+        guard_distance = float(_capture_distance_frac) * float(mesh_height)
     u_safe = np.zeros(n_dof) if guard_on else None
     evp_safe = ([np.zeros_like(grp['evp']) for grp in gp_groups]
                 if guard_on else None)
@@ -8067,7 +8101,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     _g_run_max_at = None
     truncated_at = None            # iteration the guard stopped the solve at
     truncated_reason = None        # which of its three tests fired, in words
-    truncated_kind = None          # 'non_finite' or 'runaway'
+    truncated_kind = None          # 'non_finite', 'runaway', 'runaway_jump' or 'distance'
     truncated_max_u = None         # max|u| of the state that was kept
 
     for stage_idx, (base_loads, u_gp_active, u_gp_signed_active, stage_label) in enumerate(stage_list):
@@ -9316,6 +9350,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                 f"(now {_peak:.4g})")
                             _guard_kind = 'runaway_jump'
                     _u_prev = _peak
+                    if (_guard_kind is None and guard_distance is not None
+                            and _peak >= guard_distance):
+                        # The distance fence: the section has moved as far as the
+                        # capture is let run. Not a runaway and not a failure
+                        # reading; the mechanism was drawn long before this.
+                        _guard_reason = (
+                            f"stopped once the section had moved "
+                            f"{100.0 * float(_capture_distance_frac):.0f}% of the "
+                            f"model height")
+                        _guard_kind = 'distance'
                     if _guard_kind is None and guard_u_bound is not None:
                         if _peak > guard_u_bound:
                             # The fence: displacements marching out of the model
@@ -9331,7 +9375,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     for _buf, _grp in zip(evp_safe, gp_groups):
                         np.copyto(_grp['evp'], _buf)
                     converged = False
-                    exit_reason = 'nonfinite'
+                    # A distance stop has an exit of its own: the arithmetic did not
+                    # give out, and no log or classifier may call it non-finite.
+                    exit_reason = ('capture_distance' if _guard_kind == 'distance'
+                                   else 'nonfinite')
                     truncated_at = iteration
                     truncated_reason = _guard_reason
                     truncated_kind = _guard_kind
@@ -10332,10 +10379,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # WHICH test stopped it, and where the field stood when it did:
         # 'runaway_jump' (the growth tests — the section was coming apart, and this is
         # the state it was in a few iterations in), 'runaway' (the mesh-height fence
-        # or the early-failure rule) or 'non_finite' (the arithmetic gave out first).
-        # All are published; the panels name the iteration and the reason.
+        # or the early-failure rule), 'non_finite' (the arithmetic gave out first) or
+        # 'distance' (the section had moved as far as the capture is let run, see
+        # `_CAPTURE_DISTANCE_FRAC`). All are published.
         "capture_truncated_kind": truncated_kind,
         "capture_truncated_max_u": truncated_max_u,
+        # The distance the capture was fenced at, carried only where the fence is
+        # what stopped it, so a capture that never reached it is recorded exactly as
+        # it was before the fence existed.
+        **({"capture_fence": guard_distance}
+           if truncated_kind == 'distance' else {}),
         # The growth this capture showed, whether or not it was stopped: the largest
         # single-iteration multiple of max|u| and where it happened, and the longest
         # run of consecutive iterations above `_CAPTURE_RUNAWAY_RATIO` and where that
@@ -15232,6 +15285,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             picture, and it is published flagged rather than run to a budget that
             only takes it further from the slope.
 
+            A capture neither test stops is stopped once the section has moved
+            `_CAPTURE_DISTANCE_FRAC` of the mesh height (kind 'distance', with the
+            distance in `capture_fence`). On a steady slide the displacement grows
+            in proportion to the iterations, so without it the size of the drawn
+            displacement is set by the budget alone; the band itself is formed at
+            a small fraction of that distance.
+
             The one refusal is a capture that came back with nothing usable: a solve
             that raised, or a field that is not a number. Then
             result['capture_failed'] and result['capture_failed_reason'] are set and
@@ -15844,6 +15904,10 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                     # equilibrium on this path would replace the runaway field the figure
                     # exists to show.
                     _corrector=False, _finite_guard=True,
+                    # The distance fence: the capture stops once the section has
+                    # moved `_CAPTURE_DISTANCE_FRAC` of the mesh height, which is
+                    # far past the formed mechanism and short of the budget.
+                    _capture_distance_frac=_CAPTURE_DISTANCE_FRAC,
                     _softened_seed=result.get("failed_edge_softened"))
             except FemInvariantError:
                 raise

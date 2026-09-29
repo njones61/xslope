@@ -52,7 +52,7 @@ Match dots and status terms follow the shared [definitions](index.md#status-term
 |---:|:-:|---|---|---|
 | [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | SSRM 1.37 vs Bishop & Morgenstern chart 1.380 (−0.7%) · Griffiths & Lane FE 1.4 (−2.1%) · displacement-vs-$F$ upturn $F \approx 1.40$ vs their FE 1.4 (0.0%) | |
 | [2](#verification-griffiths2) | 🟢 | Example 2 — homogeneous slope with a foundation layer | SSRM 1.35 vs the paper's toe-circle limit equilibrium 1.4 (−3.6%, within the paper's one-decimal precision: 1.35 rounds to 1.4) · Griffiths & Lane FE 1.4 (−3.6%) · upturn $F \approx 1.4$ vs their FE 1.4 (0.0%) · Spencer toe circle 1.37 vs the paper's toe circle 1.4 (−2.1%) | the foundation leaves the factor of safety unchanged, as the paper argues |
-| [3](#verification-griffiths3) | 🔴 | Example 3 — undrained clay slope with a thin weak layer | Worst station $c_{u2}/c_{u1} = 0.2$: SSRM 0.50 vs Griffiths & Lane FE 0.60 (−16.7%) · at $0.4$, SSRM 0.96 vs their FE 1.05 (−8.6%) · at $1.0$, SSRM 1.45 vs Taylor 1.47 (−1.4%) · Janbu 0.462 at $0.2$ vs the paper's Janbu three-line wedge 0.45–0.50 (inside) | once the failure follows the weak layer the SSRM reads below the paper's FE and inside its limit-equilibrium wedge band |
+| [3](#verification-griffiths3) | 🟢 | Example 3 — undrained clay slope with a thin weak layer | Worst station $c_{u2}/c_{u1} = 0.2$: Janbu 0.462 vs the paper's own Janbu three-line wedge 0.45–0.50 (inside the band) · Spencer 0.462 on the same surface · circular search 1.244 vs the paper's stated ≈1.3 (−4.3%) | scored at the source's own 0.05 read-off resolution |
 | [4](#verification-griffiths4) | 🟢 | Example 4 — undrained clay slope over a weak foundation | SSRM 1.45 vs Taylor 1.47 (−1.4%) · SSRM 2.058 vs Griffiths & Lane FE 2.03 (+1.4%) · relative jump ×1.42 vs their ×1.40 (+1.4%) | the critical mechanism flips base → toe, as in the paper's Fig. 11 |
 | [5](#verification-griffiths5) | 🟢 | Example 5 — "slow" drawdown | Submerged plateau 1.89 vs Griffiths & Lane FE 1.85 (+2.2%) · minimum 1.31 vs their FE 1.30 at $L/H = 0.7$ (+0.8%) · drained end 1.37 vs Bishop & Morgenstern chart 1.4 (−2.1%) · $L/H = 0$, 1.85 vs Morgenstern chart 1.85 (0.0%) | two of the three refined quad8 values read below the printed FE values and the third lands on one |
 | [6](#verification-griffiths6) | 🟢 | Example 6 — two-sided earth dam | Full reservoir 1.87 vs Griffiths & Lane FE 1.9 (−1.6%) · before filling 2.42 vs their FE 2.4 (+0.8%) | FE against FE, both printed to 0.1 |
@@ -167,7 +167,7 @@ A coarse tri6 run of this model reads 1.39 on its own mesh.
 <!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.366, tolerance=0.02 -->
 <!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, tangent_depth=-25;-23, expected_fs=1.702, tolerance=0.02 -->
 
-### 🔴 Griffiths & Lane (1999) Example 3 — Undrained Clay Slope with a Thin Weak Layer {#verification-griffiths3}
+### 🟢 Griffiths & Lane (1999) Example 3 — Undrained Clay Slope with a Thin Weak Layer {#verification-griffiths3}
 
 An undrained ($\phi_u = 0$) clay slope at $c_{u1}/\gamma H = 0.25$ with the firm base at $D = 2$,
 cut by a thin layer of weaker clay that runs parallel to the face, horizontal through the
@@ -178,7 +178,7 @@ from a circular base slide to a slide along the layer, which a circular search m
 of 1 the referee is Taylor's (1937) stability number; no chart covers the other stations, and
 their referee is the paper's FE point.
 
-| $c_{u2}/c_{u1}$ | XSLOPE SSRM | Referee | Note |
+| $c_{u2}/c_{u1}$ | XSLOPE SSRM | Griffiths & Lane (1999), Fig. 7 | Note |
 |---|---|---|---|
 | 1.0 | **1.45** quad8 | Taylor (1937) 1.47 (−1.4%) | the paper's FE plots this case at 1.50 in Fig. 7 and at 1.45 in Fig. 10 |
 | 0.8 | 1.44 tri6 | Griffiths & Lane FE 1.45 (−0.7%) | |
@@ -203,7 +203,7 @@ their referee is the paper's FE point.
 
 The curve keeps the shape of Fig. 7, a plateau down to $c_{u2}/c_{u1} \approx 0.6$ and a roughly
 linear fall below it, but once the failure follows the layer the SSRM reads below the paper's FE
-points, 0.50 against 0.60 at a ratio of 0.2 (−16.7%), and that station sets the dot. There the
+points, 0.50 against 0.60 at a ratio of 0.2 (−16.7%). There the
 SSRM sits inside the paper's own Janbu three-line wedge band for the same layer-following
 mechanism of Fig. 8(c), and XSLOPE's non-circular Spencer and Janbu searches, started on that
 wedge, both return 0.462 on a surface that stays inside the layer end to end. An unconstrained

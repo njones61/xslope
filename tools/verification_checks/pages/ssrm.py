@@ -12,14 +12,7 @@ from ..config import PageConfig
 CONFIG = PageConfig(
     name="ssrm",
 
-    bounds=[
-        # agreement bounds over a whole sweep, not over one pair
-        ('+4', "the paper's wedge solution for the governing mechanism to within"),
-        ('+1.4', 'lands within 1.4% of it at both bracket cases'),
-        ('+2.2', '15 curve within 2.2% at every one of its five stations'),
-        ('+0.8', "within 0.8% of the paper's own plotted FE value at"),
-        ('+1', 'the location the paper states and within'),
-    ],
+    bounds=[],
 
     whitelist=[
         # summary-row cell: the L/H station value (0.7) sits between the two
@@ -28,15 +21,6 @@ CONFIG = PageConfig(
     ],
 
     untagged_allow=[
-        # A dimensionless displacement E'*delta/(gamma*H^2) quoted from
-        # Griffiths & Lane's Example 1, not a factor of safety.
-        ('0.544', 'jumps from'),
-        # Published values quoted in prose rather than tabulated in a source
-        # column.  Griffiths & Lane's Table 2 trial grid (Example 1 reads their
-        # iteration counts at F = 1.30 and 1.35), and Torggler's own published
-        # mesh study (his Table 2).
-        ('1.30', 'against 41 at F ='),
-        ('1.106', 'Torggler publishes his own mesh study'),
         # Example 6's reservoir effect is a RATIO of the section's own two
         # locked factors of safety — 1.867 wet over 2.422 dry, both printed in
         # the table above it — against Griffiths & Lane's 1.9 / 2.4.  A ratio

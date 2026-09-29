@@ -63,47 +63,34 @@ Problem 14 is the one blocked row.
 
 ## Status
 
-**Match to the published value**
-
-| Symbol | Meaning |
-|---|---|
-| 🟢 | within 3% of the vendor and/or reference figure |
-| 🟡 | 3–6% |
-| 🔴 | more than 6% |
-| 🟣 | in progress |
-| <span class="nodata">⊘</span> | insufficient data or out of scope |
-
-The dot scores the **match quality of what is locked**, not how much of a problem is built; the partial/blocked detail is in the row text.
+Match dots and status terms follow the shared [definitions](index.md#status-terms) and
+[scoring](index.md#how-the-match-dots-are-scored).
 
 <div class="corpus-summary match" markdown>
 
-Status values follow the [shared vocabulary](rocscience.md)
-used across this section (**built**, *covered*, *partial*, *planned*, *blocked*,
-*no lock possible*, *not supported*).
-
 | # | Match | Problem | Results | Notes |
 |---:|:-:|---|---|---|
-| [1](#gw1) | 🟢 | Shallow unconfined flow with rainfall | Crest x_a ≈ 4.1 vs Slide2 4.06 (~0.05 m) · h_max 4.61 vs Slide2 4.49 (~0.12 m), inside the 0.16 m Slide2 and RS2 differ by · Q = P·L = 2.5×10⁻⁵ locked | slightly-high free-surface family, above Haar's Dupuit closed form (SEEP2D cross-check) |
+| [1](#gw1) | 🟢 | Shallow unconfined flow with rainfall | Crest x_a ≈ 4.1 vs Slide2 4.06 (~0.05 m) · h_max 4.61 vs Slide2 4.49 (~0.12 m), inside the 0.16 m Slide2 and RS2 differ by · Q = P·L = 2.5×10⁻⁵, exact by construction | slightly-high free-surface family, above Haar's Dupuit closed form (SEEP2D cross-check) |
 | [2](#gw2) | 🟢 | Flow around cylinder | Solved heads within 0.0013 m of Slide2 at every printed point · closed form matched within its own idealization error | |
 | [3](#gw3) | 🟢 | Confined flow under dam foundation | Head profiles under and beyond the dam within 0.08 m of the published Rushton & Redshaw / Slide2 chart everywhere | |
 | [4](#gw4) | 🔴 | Steady unconfined flow through earth dam | Phreatic surface within 0.02–0.06 m of the Kozeny basic parabola over the dam body · y₁ above the drain toe 0.401 vs RS2's own solve of this model 0.395 (+1.5%) · drain-face entry offset x₁ 0.272 vs 0.226 (**+20.4%**, and it sets the dot) | RS2's Table 4.1 publishes both quantities and governs; x₁ turns on an unsaturated curve the vendor file does not store |
-| [5](#gw5) | 🟢 | Unsaturated flow behind an embankment | Q = 8.165×10⁻¹¹ vs the one-dimensional closed form *k·b·i* = 8.0×10⁻¹¹ (+2.1%) · solved pressure head inside Fig 5-4's own 1 m color bands at 46 of 49 grid points | **built**; chart-keyed target, locked on XSLOPE's own field |
-| [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1, against Slide2: cases 2 and 5 within 0.10 m, cases 1 and 4 within 0.37 m, case 3 the outlier at 0.98 m near the crest, where Slide2 and Ref[1] themselves differ by 0.9 m | **built** (5 of 5 cases); chart-only target, locked on XSLOPE's own field; one conductivity curve serves all five |
-| [7](#gw7) | 🟢 | Seepage within layered slope | Total head along the manual's own query line within 0.005 m rms of RS2's Fig 22.7 steady markers over 21 stations (≈1% of the profile's head range) · water table at the toe el 0.30 vs the stated Slide2 / Rulon & Freeze 0.3 m · perched zone and slope-face spring reproduced | **built**; problem 7's own figures are chart-only, so the numeric target comes from the RS2 manual's Fig 22.7 steady frame |
-| [8](#gw8) | 🟢 | Flow through ditch-drained soils | Flux boundary exact — total inflow = *q*·*L*, the confined response matching the closed form to six figures · water table within 0.004–0.006 m of the Fig 8.3/8.4 line over the whole span · Fig 8.3's labeled pressure-head contours within 0.010 m rms over 14 stations | **built**; flux rate and Soil B's Gardner *a* taken from the vendor model where it disagrees with the printed tables |
-| [9](#gw9) | 🟢 | Seepage through dam | Dam 1: Q = 1.384×10⁻³ vs Slide2 1.378×10⁻³ m³/(min·m) (+0.4%) · dam 2: Q = 4.28×10⁻⁶ vs Slide2 4.23×10⁻⁶ m³/(s·m) (+1.2%) | **built** (both dams); body k read from Bowles (1984) Fig E9-2b, not the Chapuis caption |
+| [5](#gw5) | 🟢 | Unsaturated flow behind an embankment | Q = 8.165×10⁻¹¹ vs the one-dimensional closed form *k·b·i* = 8.0×10⁻¹¹ (+2.1%) · solved pressure head inside Fig 5-4's own 1 m color bands at 46 of 49 grid points | chart-keyed target; the pressure-head field is read against Fig 5-4's color bands |
+| [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1, against Slide2: cases 2 and 5 within 0.10 m, cases 1 and 4 within 0.37 m, case 3 the outlier at 0.98 m near the crest, where Slide2 and Ref[1] themselves differ by 0.9 m | *unconfirmed* — the targets are charts with no tabulated values, and on case 3 the two published curves themselves differ by 0.9 m; all five cases built on one conductivity curve |
+| [7](#gw7) | 🟢 | Seepage within layered slope | Total head along the manual's own query line within 0.005 m rms of RS2's Fig 22.7 steady markers over 21 stations (≈1% of the profile's head range) · water table at the toe el 0.30 vs the stated Slide2 / Rulon & Freeze 0.3 m · perched zone and slope-face spring reproduced | problem 7's own figures are chart-only, so the numeric target comes from the RS2 manual's Fig 22.7 steady frame |
+| [8](#gw8) | 🟢 | Flow through ditch-drained soils | Flux boundary exact — total inflow = *q*·*L*, the confined response matching the closed form to six figures · water table within 0.004–0.006 m of the Fig 8.3/8.4 line over the whole span · Fig 8.3's labeled pressure-head contours within 0.010 m rms over 14 stations | flux rate and Soil B's Gardner *a* taken from the vendor model where it disagrees with the printed tables |
+| [9](#gw9) | 🟢 | Seepage through dam | Dam 1: Q = 1.384×10⁻³ vs Slide2 1.378×10⁻³ m³/(min·m) (+0.4%) · dam 2: Q = 4.28×10⁻⁶ vs Slide2 4.23×10⁻⁶ m³/(s·m) (+1.2%) | both dams; body k read from Bowles (1984) Fig E9-2b, not the Chapuis caption |
 | [10](#gw10) | 🟢 | Steady unconfined flow, van Genuchten permeability | Q = 6.070×10⁻⁵ vs Slide2 6.066×10⁻⁵ (+0.1%) · vs Clement 6.076×10⁻⁵ (−0.1%) · phreatic exit el. 4.87 vs Slide2 5.0 (−0.13 m) · vs Clement 4.8 (+0.07 m) | |
-| [11](#gw11) | 🔴 | Earth/rock-fill dam, Gardner permeability function | Free-surface release point el. 17.90 vs Slide2 19.397 (−1.50 m) · vs ABAQUS 19.64 (−1.74 m) · the free surface itself within 0.76 m rms of Slide2's own drawn line over 18 stations | **built** (case 1 of 2, discrepancy); unsaturated law, mesh size, element order, the *k*<sub>r</sub> floor and the exit-face extent are each measured and none moves the release point |
+| [11](#gw11) | 🔴 | Earth/rock-fill dam, Gardner permeability function | Free-surface release point el. 17.90 vs Slide2 19.397 (−1.50 m) · vs ABAQUS 19.64 (−1.74 m) · the free surface itself within 0.76 m rms of Slide2's own drawn line over 18 stations | case 1 of 2 (case 2, the zoned dam with a foundation and toe drain, is not built); unsaturated law, mesh size, element order, the *k*<sub>r</sub> floor and the exit-face extent are each measured and none moves the release point |
 | [12](#gw12) | 🟢 | Seepage from a trapezoidal ditch into a deep drainage layer | Q = 4.137×10⁻⁴ vs Slide2 4.093×10⁻⁴ (+1.1%) · vs Vedernikov theory 4.0×10⁻⁴ (+3.4%) · flow-bulb half-width ≈42 vs Slide2 41 (+1) · vs theory 40 (+2) | |
 | [13](#gw12) | 🟢 | Seepage from a triangular ditch into a deep drainage layer | Q = 2.086×10⁻² vs Slide2 2.050×10⁻² (+1.8%) · vs Vedernikov theory 2.0×10⁻² (+4.3%) | |
 | [14](#gw14) | <span class="nodata">⊘</span> | Unsaturated soil column | | *blocked* — the closed form assumes an exponential conductivity law XSLOPE does not implement |
-| [15](#gw15) | 🟢 | 1-D consolidation, uniform initial excess pore pressure | Isochrones within ≈0.3% of u₀ of the Terzaghi Eq 17.3 closed form | **built** (both cases) |
-| [16](#gw16) | 🟢 | Pore pressure dissipation of stratified soil | Within ≈0.3–0.5% of u₀ of the recomputed Pyrah 1996 two-layer eigen-series | **built** (3 cases) |
-| [17](#gw17) | <span class="nodata">⊘</span> | Transient seepage, earth fill dam with toe drain | At 15 h XSLOPE's *h* = 7 front stands 1.1–1.8 m inside the upstream face against RS2's 1.5–3.3 m · the steady field reproduces RS2's Fig 19-5 total-head contours, and the 16383 h frame is still short of it, settling to within 0.01 m of steady by ≈5×10⁴ h | **built** (both vendor stage times + steady); contour-only target, locked as a regression guard; the retention transcription that closed [GW20](#gw20) is measured here and moves the 15 h front by under 0.1 m |
-| [18](#gw18) | 🟢 | Transient seepage through an earth fill dam | Toe-slope total head within 0.058 m rms of the digitized RS2 Fig 20.5 profile at t = 0.6 h and 0.197 m rms at t = 19656 h, over 11 stations · XSLOPE's steady profile within 0.127 m rms of that chart's 19656 h curve | **built** (both vendor stage times + steady); the elastic *S*<sub>s</sub> acts in the saturated zone only, as Slide2's *m*<sub>v</sub> does — the term that sets the drainage time-scale of every transient row here |
-| [19](#gw19) | 🟢 | Transient seepage below a lagoon | Near-steady (11340 min) pressure head along the top boundary within 0.045 m rms of the digitized RS2 Fig 21.9 markers over 20 stations — under 1% of the driving head · early frames 0.07–0.35 m rms, XSLOPE's mound running slightly *ahead* of RS2's | **built** (all four frames); both vendor curves are reproduced rather than fitted, and the near-steady frame is locked against the vendor profile |
-| [20](#gw20) | 🟢 | Transient seepage in a layered slope | Total head down RS2's own Fig 22.7 query line within 0.007 / 0.003 / 0.001 m rms of RS2's markers at 4.6 / 31 / 208 s over 21 stations · closer to each published series than the two are to each other at every frame | **built** (all three frames); storage is the vendor's straight water-content line, and the conductivity fit is placed over the suctions the model reaches |
-| [21](#gw21) | 🟢 | Transient seepage through a fully confined aquifer | Within ≈0.02 ft of the Ferris erfc closed form at 600 hr | **built** (both cases) |
+| [15](#gw15) | 🟢 | 1-D consolidation, uniform initial excess pore pressure | Isochrones within ≈0.3% of u₀ of the Terzaghi Eq 17.3 closed form | both cases |
+| [16](#gw16) | 🟢 | Pore pressure dissipation of stratified soil | Within ≈0.3–0.5% of u₀ of the recomputed Pyrah 1996 two-layer eigen-series | 3 cases |
+| [17](#gw17) | <span class="nodata">⊘</span> | Transient seepage, earth fill dam with toe drain | At 15 h XSLOPE's *h* = 7 front stands 1.1–1.8 m inside the upstream face against RS2's 1.5–3.3 m · the steady field reproduces RS2's Fig 19-5 total-head contours, and the 16383 h frame is still short of it, settling to within 0.01 m of steady by ≈5×10⁴ h | *unconfirmed* — the targets are contour plates with no tabulated profile, and the 16383 h frame is still short of steady where RS2 has arrived; both vendor stage times and the steady field are built, and the retention transcription that closed [GW20](#gw20) is measured here and moves the 15 h front by under 0.1 m |
+| [18](#gw18) | 🟢 | Transient seepage through an earth fill dam | Toe-slope total head within 0.058 m rms of the digitized RS2 Fig 20.5 profile at t = 0.6 h and 0.197 m rms at t = 19656 h, over 11 stations · XSLOPE's steady profile within 0.127 m rms of that chart's 19656 h curve | both vendor stage times and the steady field; the elastic *S*<sub>s</sub> acts in the saturated zone only, as Slide2's *m*<sub>v</sub> does — the term that sets the drainage time-scale of every transient row here |
+| [19](#gw19) | 🟢 | Transient seepage below a lagoon | Near-steady (11340 min) pressure head along the top boundary within 0.045 m rms of the digitized RS2 Fig 21.9 markers over 20 stations — under 1% of the driving head · early frames 0.07–0.35 m rms, XSLOPE's mound running slightly *ahead* of RS2's | all four frames; both vendor curves are reproduced rather than fitted, and the near-steady frame is checked against the vendor profile |
+| [20](#gw20) | 🟢 | Transient seepage in a layered slope | Total head down RS2's own Fig 22.7 query line within 0.007 / 0.003 / 0.001 m rms of RS2's markers at 4.6 / 31 / 208 s over 21 stations · closer to each published series than the two are to each other at every frame | all three frames; storage is the vendor's straight water-content line, and the conductivity fit is placed over the suctions the model reaches |
+| [21](#gw21) | 🟢 | Transient seepage through a fully confined aquifer | Within ≈0.02 ft of the Ferris erfc closed form at 600 hr | both cases |
 
 </div>
 
@@ -120,8 +107,8 @@ point, and the comparison reports the fraction of points inside the vendor's
 band; a plate without a key supports only a qualitative reading. A line or
 marker plot on labeled axes is digitized and compared numerically, calibrated
 where possible on a value the model fixes and the chart must show. Every chart
-target is locked on XSLOPE's own solved field, with the chart comparison
-reported beside it.
+target is also checked on XSLOPE's own solved field, which catches any change
+in that field, with the chart comparison reported beside it.
 
 ## Steady-state problems {#steady-state}
 
@@ -150,8 +137,8 @@ The mound crest lands within ~0.05 m of Slide2 in position and ~0.12 m in height
 0.16 m the two programs differ by, and the same slightly-high free-surface bias the
 [SEEP2D cross-check](#seep2d-crosscheck) documents across this panel; all three
 finite-element solutions sit above Haar's Dupuit closed form, which neglects the vertical
-flow near the crest. The flowrate lock Q = P·L is exact by construction, and a head
-regression at three interior stations guards the mound shape.
+flow near the crest. The flowrate Q = P·L is exact by construction, and a head
+check at three interior stations guards the mound shape.
 
 ![gw001: mesh and solved heads](images/gw001.png)
 
@@ -178,7 +165,7 @@ same points to the decimals both tables carry, so the two programs agree here.
 The two finite-element solutions agree with each other within 0.0013 m everywhere; both depart
 from the closed form near the downstream edge, where the analytical solution assumes an
 infinite domain, so its −0.031 at the finite model's zero-head boundary measures that
-idealization rather than an error. Flowrate is locked as a regression value.
+idealization rather than an error. The flowrate is held as a regression value on XSLOPE's own solve.
 
 ![gw002: mesh and solved heads](images/gw002.png)
 
@@ -213,7 +200,7 @@ zero-head boundary, and the top of line 2-2 sits on that corner — which is why
 is quoted as a band rather than a delta, and why this problem is solved at `target_size`
 0.1 rather than the panel's 0.4.
 
-Flowrate 2.351×10⁻⁷ m³/s per m is locked as a regression value: the manual publishes head
+Flowrate 2.351×10⁻⁷ m³/s per m is held as a regression value on XSLOPE's own solve: the manual publishes head
 profiles for this problem, not a discharge.
 
 ![gw003: mesh and solved heads](images/gw003.png)
@@ -288,7 +275,7 @@ here. Off a 300 dpi render calibrated on the domain outline, XSLOPE's solved pre
 falls inside RS2's own band at **46 of 49** grid points across the whole domain, and the
 three exceptions miss a band edge by less than the ±0.5 m the banding itself resolves.
 
-The published target is a chart, so the lock is XSLOPE's own flowrate and total-head field.
+The published target is a chart, so the regression check holds XSLOPE's own flowrate and total-head field.
 
 ![gw005: mesh and solved heads](images/gw005.png)
 
@@ -303,8 +290,8 @@ The published target is a chart, so the lock is XSLOPE's own flowrate and total-
 Fredlund & Rahardjo (1993)'s saturated–unsaturated earth dam — 12 m high, symmetric 2:1
 faces, reservoir at 10 m, a 12 m horizontal drain at the downstream toe — run through five
 cases. The published target in every case is the pressure-head profile along **line 1-1**, the
-crest centerline at x = 26, a chart with no tabulated value and no numeric key, so each case
-locks XSLOPE's own flowrate and total-head field. The charts read here are the **Slide2**
+crest centerline at x = 26, a chart with no tabulated value and no numeric key, so each case is
+checked on XSLOPE's own flowrate and total-head field. The charts read here are the **Slide2**
 manual's Figs 6.6, 6.9, 6.14, 6.18 and 6.23; the RS2 manual draws the same five profiles from
 its own solve as its Figs 6-8, 6-12, 6-20, 6-24 and 6-25. All five cases' material and
 boundary data are read from the vendor RS2 models (`groundwater #006_01…05.slw`).
@@ -332,7 +319,7 @@ the two published curves over the lower half of the line. The offset does not mo
 refinement, and XSLOPE's free surface daylights where SEEP2D's does on the identical mesh —
 see [the SEEP2D cross-check](#seep2d-crosscheck) below.*
 
-Flowrate 2.808×10⁻⁷ m³/s per m (locked with the total-head field).
+Flowrate 2.808×10⁻⁷ m³/s per m (checked with the total-head field).
 
 ![gw006a: mesh and solved heads](images/gw006a.png)
 
@@ -349,7 +336,7 @@ Slide2's on Fig 6.9 at the scale the chart can be read to, so one column carries
 | 6 | 1.86 | ≈1.85 (≈+0.01 m) |
 | 8 | 0.42 | ≈0.4 (≈+0.02 m) |
 
-Flowrate 1.692×10⁻⁶ m³/s per m (locked with the total-head field).
+Flowrate 1.692×10⁻⁶ m³/s per m (checked with the total-head field).
 
 ![gw006b: mesh and solved heads (9:1 anisotropy)](images/gw006b.png)
 
@@ -406,7 +393,7 @@ case is posed to show. The drain is XSLOPE's exit face here, as on cases 1–3, 
 specified head of 0 the vendor writes: without an exit face the model has no free surface to
 track and would solve confined, dropping the unsaturated law this problem is about.
 
-Flowrate 4.737×10⁻⁷ m³/s per m (locked with the total-head field), of which the rain accounts
+Flowrate 4.737×10⁻⁷ m³/s per m (checked with the total-head field), of which the rain accounts
 for 2.800×10⁻⁷.
 
 ![gw006d: mesh and solved heads (steady-state infiltration)](images/gw006d.png)
@@ -425,7 +412,7 @@ Fig 6.23 within the chart's read precision, so one column carries both:
 | 6 | 2.47 | ≈2.5 (≈−0.03 m) |
 | 8 | 0.52 | ≈0.55 (≈−0.03 m) |
 
-Flowrate 1.777×10⁻⁷ m³/s per m (locked with the total-head field).
+Flowrate 1.777×10⁻⁷ m³/s per m (checked with the total-head field).
 
 ![gw006e: mesh and solved heads (seepage face)](images/gw006e.png)
 
@@ -454,7 +441,7 @@ The vendor's four-point table is flat at k<sub>r</sub> = 1 out to ψ = 0.306 m, 
 value, and the whole steady field sits inside ψ ≤ 0.132 m in the medium sand and 0.118 m in
 the fine lens, so the fit range lies entirely on the plateau: every curve that stays flat
 there reproduces the table exactly. The field is insensitive to match. Solved with
-k<sub>r</sub> held at the vendor's table in place of the van Genuchten pair, the locked
+k<sub>r</sub> held at the vendor's table in place of the van Genuchten pair, the checked
 stations move by at most 0.003 m of head against the 0.02 m tolerance and the flowrate is
 unchanged, so the pair below is the one that ships.
 
@@ -482,7 +469,7 @@ right place:
 The second series on the same chart, the Ref [1] (Fredlund & Rahardjo) curve, runs a little
 above both, so XSLOPE sits between the two published sources and closer to RS2. The Slide2
 manual's Fig 20.7 is the same comparison from Slide2's solve and its markers run above RS2's
-— [GW20](#gw20) sets that spread out. Five stations of the profile are locked alongside
+— [GW20](#gw20) sets that spread out. Five stations of the profile are checked alongside
 the flowrate (Q = q·L, exact by construction on the flux boundary) and a three-station
 regression on the solved field.
 
@@ -539,8 +526,8 @@ from its own solve.
 
 The solved water table sits a uniform 0.004–0.006 m above the digitized line over the whole
 1.0 m span — 2.4% of the 0.25 m divide mound at its largest, the same slightly-high free-surface
-bias the [SEEP2D cross-check](#seep2d-crosscheck) documents across this panel. The flowrate lock
-(*q*·*L*, exact by construction) is joined by a five-station head lock.
+bias the [SEEP2D cross-check](#seep2d-crosscheck) documents across this panel. The flowrate
+(*q*·*L*, exact by construction) is checked together with the head at five stations.
 
 <!-- test: file=files/rocscience_gw/gw008.xlsx, type=seep, target_size=0.025, element_type=tri3, expected_flowrate=4.4444e-05, tolerance=0.02, benchmark=GW8-q -->
 <!-- test: file=files/rocscience_gw/gw008.xlsx, type=seep_head, target_size=0.025, element_type=tri3, points=0.25:0.25:0.183;0.5:0.25:0.220;0.75:0.25:0.243;1:0.25:0.253;1:0.5:0.347, tolerance=0.01, benchmark=GW8-h -->
@@ -582,7 +569,7 @@ k = 2×10⁻⁵ cm/s = 2.0×10⁻⁷ m/s and whose flow net gives the same 3.8×
 independent hand-check. That figure resolves two errata in the secondary sources: the Chapuis
 et al. (2001) Fig 5 caption's 2.0×10⁻⁶ m/s is a −6/−7 exponent slip, which run through the
 model puts Q an order of magnitude high; and the published Q, tabulated as m³/(min·m) beside
-dam 1, is per second. The locked value is XSLOPE's own Q at Bowles' conductivity.
+dam 1, is per second. The value checked is XSLOPE's own Q at Bowles' conductivity.
 
 ![gw009a: mesh and solved heads](images/gw009a.png)
 
@@ -606,7 +593,7 @@ discharge and the same seepage-face elevation, so the two programs agree here.
 | Phreatic exit elevation | 4.87 | 5.0 (−0.13 m) | 4.8 (+0.07 m) |
 
 The manual's "seepage face" column tabulates the phreatic exit *elevation*, not a face
-length. Only the tailwater-2 case carries published numbers and is locked.
+length. Only the tailwater-2 case carries published numbers, and it is the case compared.
 
 ![gw010: mesh and solved heads](images/gw010.png)
 
@@ -655,7 +642,7 @@ release point stays more than a meter below Slide2's, so the gap is not a nodal-
 artifact. Two notes on reading the manual: its text gives the downstream slope as 1:1.171
 where the printed dimensions on Fig. 11.1 give 76.9/45 = 1.709, a digit transposition, and the
 figure's dimensions are used here; and $k_s$ is not printed for this case, which is why the
-regression tag below locks XSLOPE's own flowrate rather than a published one.
+regression check holds XSLOPE's own flowrate rather than a published one.
 
 GW11 is the single exit-face problem in this panel where XSLOPE releases low. The
 [SEEP2D cross-check](#seep2d-crosscheck) below puts XSLOPE on the *same* release point as the
@@ -715,7 +702,7 @@ through-flux, which the [flux cross-check](#flux-crosscheck) verifies to machine
 
 These problems exercise XSLOPE's uncoupled
 [transient seepage solver](../seep/transient.md). Three of them — GW15, GW16 and GW21 — have a
-closed-form or recomputed-series target, so the lock is the analytical value itself and the
+closed-form or recomputed-series target, so the check is against the analytical value itself and the
 tolerance only absorbs the numerical (mesh + backward-Euler) error, which is reported for each.
 
 These are Slide2's problems 15–21 and the **RS2** manual's chapters 17–23, and the figures
@@ -758,7 +745,7 @@ XSLOPE reproduces the isochrones at every interior sample point and time:
 | 2 — drained at the top only | 1.0 m | 0.47% of $u_0$ |
 
 Both maxima fall at the **earliest** sampled time, where the isochrone is steepest and a
-uniform initial condition is hardest to resolve. The tags lock the closed-form total head
+uniform initial condition is hardest to resolve. The check holds the closed-form total head
 $h_\text{ref}+u_0\,(u_e/u_0)$ at three depths and two time factors per case, tolerance 0.6 m.
 
 ![gw015: Terzaghi isochrones, analytical vs XSLOPE](images/gw015.png)
@@ -801,7 +788,7 @@ XSLOPE tracks the recomputed series across all three cases:
 
 As in [GW15](#gw15) each maximum falls at the earliest sampled time. The interface kink and
 the effect of layer order are clear in the isochrones: with the low-permeability Soil A **on
-top** (case 2) the underlying Soil B stays near its initial pressure far longer. The tags lock
+top** (case 2) the underlying Soil B stays near its initial pressure far longer. The check holds
 the closed-form head at three depths and two times per case, tolerance 4–6 m (of $u_0=1000$),
 with small time steps (`max_head_change_frac=0.005`) since the residual error at the interface
 is temporal.
@@ -836,8 +823,8 @@ heads by 0.1–0.2 m, so the substitution is not what this row's discrepancy is 
 
 The published targets are total-head and pressure-head **contours** at 15 h and 16383 h
 (the **RS2** manual's Figs 19-4…19-7, vs FlexPDE and SEEP/W, Pentland et al. 2001;
-Slide2's Figs 17.4–17.7 are the same four plates) — chart-only, no tabulated profile. Both vendor stage times are solved and locked, along with XSLOPE's own steady
-field, as regression guards on XSLOPE's own values.
+Slide2's Figs 17.4–17.7 are the same four plates) — chart-only, no tabulated profile. Both vendor stage times are solved, along with XSLOPE's own steady
+field, and checked as regression guards on XSLOPE's own values.
 
 **The early frame lands where the vendor puts it.** Sampled at five elevations, XSLOPE's
 $h=7$ m contour stands **1.1 to 1.8 m** inside the upstream face at 15 h against RS2's wetting
@@ -851,8 +838,8 @@ there against a steady 7.06 / 7.25 / 5.77 / 4.21, settling to within 0.01 m of s
 $\approx5\times10^{4}$ h; the two stations furthest from steady sit between the crest and the
 drain, where the drain paces the last of the drawdown. At 238 nodes this is one of the coarsest
 transient meshes in the corpus, and a triangulation change moves those station heads by a few
-tenths of a meter while leaving the shape of the field unchanged, which is why the locks are
-XSLOPE's own values.
+tenths of a meter while leaving the shape of the field unchanged, which is why the station
+checks hold XSLOPE's own values.
 
 *Reading Fig 19-4: its color ramp runs the opposite way to Fig 19-5's on the same page, so
 read with Fig 19-5's key it places the 15 h front at the wrong end of the dam.*
@@ -893,7 +880,7 @@ and the Ref [1] reference curve ("Analytical", lines) — and here they coincide
 markers are the comparison. Slide2's Fig 18.5 is the same comparison with Slide2's markers
 on the same curve, at the same values to the precision the chart can be read to. Fig 20.5 is
 a labeled chart, so it is digitized at all eleven of its own $x$ stations; XSLOPE's steady
-profile is solved and locked as a third frame.
+profile is solved and checked as a third frame.
 
 | $x$ (m) | 28 | 30 | 32 | 34 | 36 | 38 | 40 | 42 | 44 | 46 | 48 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -958,7 +945,7 @@ digitized against those it resolves to ≈0.005 m.
 
 **The near-steady frame.** Against RS2's own markers at 20 stations along the top boundary,
 XSLOPE's 11340 min profile agrees to **0.045 m rms and 0.126 m at worst** — under 1% of the
-driving head. Five of those stations are locked.
+driving head. Five of those stations are checked.
 
 | $x$ (m) | 3 | 6 | 10 | 14 | 19 |
 |---|---|---|---|---|---|
@@ -1052,7 +1039,7 @@ to about 0.01 m. The two programs disagree at the crest at every time, and XSLOP
 between them. That crest value is converged: it moves under 0.003 m between a 396-node mesh
 and a 5375-node one, and under 0.001 m at a fifth of the time step.
 
-Seven stations of the query line are locked at each of the three report times.
+Seven stations of the query line are checked at each of the three report times.
 
 | $y$ on the query line ($x=1.6$) | 1.00 | 0.85 | 0.70 | 0.65 | 0.60 | 0.30 | 0.00 |
 |---|---|---|---|---|---|---|---|
@@ -1084,7 +1071,7 @@ $$ \Delta h(x,t)=\Delta H\,\operatorname{erfc}\!\left(\frac{x}{\sqrt{4Dt}}\right
 
 Case 1 starts from zero head; case 2 from a uniform 5 ft steady head and steps to 10 ft.
 XSLOPE reproduces the erfc profile at 600 hr to within **0.015 ft** across the domain (below).
-The tags lock the closed-form head at five stations, tolerance 0.05 ft.
+The check holds the closed-form head at five stations, tolerance 0.05 ft.
 
 ![gw021: Ferris confined-aquifer profile, erfc vs XSLOPE](images/gw021.png){width=800px}
 
@@ -1114,7 +1101,7 @@ compared node for node (`benchmarks/run_seep2d_compare.py --gw`).
 the face fully drained on gw012 and gw013; and gw009a differs by one element at that mesh.
 The head fields agree to a relative RMS of order 10⁻⁴ throughout. Where this corpus sits
 above a published profile, the difference is therefore between the SEEP2D family and the
-reference code's exit-face convention, not an XSLOPE defect, so those problems are locked on
+reference code's exit-face convention, not an XSLOPE defect, so those problems are checked on
 XSLOPE's own values with the offset reported.
 
 One difference remains between the two codes. On the **van Genuchten** problems the total

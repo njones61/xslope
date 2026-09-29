@@ -115,10 +115,10 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [46](#rs2-46) | 🟢 | Varying undrained strength profiles II (D&W Fig 15.9, c<sub>u</sub> = 300 + c<sub>z</sub>·z) | a: SSRM 0.773 vs RS2 SSRM 0.78 (−0.9%) · b: SSRM 0.929 vs RS2 SSRM 0.93 (−0.1%) · c: SSRM 1.043 vs RS2 SSRM 1.05 (−0.7%) · d: SSRM 1.145 vs RS2 SSRM 1.15 (−0.4%) | |
 | [47](#rs2-47) | 🟢 | Purely cohesive slope, varying thickness (D&W Fig 14.3) | 30 ft: SSRM 1.061 vs RS2 SSRM 1.06 (+0.1%) · 46.5 ft: SSRM 1.061 vs RS2 SSRM 1.06 (+0.1%) · 60 ft: SSRM 1.045 vs RS2 SSRM 1.07 (−2.3%) | (all 3 thicknesses) scored against the Part IV VP78 case-(a) models these files are built from. |
 | [48](#rs2-48) | 🟡 | Multi-tiered geotextile wall, baseline (Leshchinsky & Han 2004) | SSRM 1.037 vs Leshchinsky &amp; Han FDM referee 0.99 (+4.7%) | Modeled as the paper's dry stack — elastic blocks on friction joints, sheets on their own interfaces — at the paper's reinforcement stiffness J = 1000 kN/m. RS2's own SSR 1.05 comes from a facing meshed as one body and is shown beside it, not scored against. |
-| [49](#rs2-49) | <span class="nodata">⊘</span> | Geotextile wall, fill-quality variant |  | *unconfirmed* — the search closed at 1.096, but two of its trials took more than 125,000 iterations to come to rest; refining the mesh does not move the factor. |
+| [49](#rs2-49) | 🔴 | Geotextile wall, fill-quality variant | SSRM 1.096 vs L&amp;H FDM referee 0.99 (+10.7%) | RS2 SSR 1.08 beside; both codes sit above the paper, whose wall fails through a facing neither program lets fail that way — see [RS2-48](#rs2-48). |
 | [50](#rs2-50) | 🟢 | Geotextile wall, 4.2 m reinforcement variant | SSRM 0.998 vs L&amp;H FDM referee 0.98 (+1.8%) | RS2 SSR 0.93 shown beside — see [RS2-48](#rs2-48). |
 | [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type |  | *unconfirmed* — the search closed at 1.018, but refining the mesh moves the factor by twice the search tolerance. |
-| [52](#rs2-52) | <span class="nodata">⊘</span> | Geotextile wall, weak-foundation variant |  | *unconfirmed* — the search closed at 0.783, but one of its trials took more than 125,000 iterations to come to rest; the two codes fail this wall in different ways. |
+| [52](#rs2-52) | 🔴 | Geotextile wall, weak-foundation variant | SSRM 0.783 vs L&amp;H FDM referee 0.86 (−9.0%) | RS2 SSR 0.84 beside; the two codes fail this wall in different ways — see [RS2-52](#rs2-52). |
 | [53](#rs2-53) | <span class="nodata">⊘</span> | Geotextile wall, water variant |  | *unconfirmed* — the search closed at 1.037, but refining the mesh moves the factor by six times the search tolerance. |
 | [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant |  | *unconfirmed* — the search closed at 1.037, but refining the mesh moves the factor by twice the search tolerance; modeled at the paper's 11.6 kN/m sheet strength, where the vendor's file carries 10. |
 | [55](#rs2-55) | 🟢 | Geotextile wall, tier-count variant | SSRM 1.018 vs L&amp;H FDM referee 1.00 (+1.8%) | RS2 SSR 1.04 shown beside — see [RS2-48](#rs2-48). |
@@ -1349,12 +1349,14 @@ limit-equilibrium factors are in the second table.
 | 55 — tier number | 1.00 | 1.04 | 0.92 / 0.94 / 0.94 |
 
 **What the eight rows show.** The wall with shorter sheets and the wall with five tiers land
-close to the paper's factors. The baseline lands well above it, and the difference is the facing: at the
-factor where the paper's wall gives way, XSLOPE's is still held by blocks the paper's model lets fail.
-On the other five walls the failure runs through the cohesionless fill, and a failure surface in
-soil with no cohesion has no thickness of its own, so its factor changes when the mesh is refined,
-by two to six times the search tolerance on these rows. Those rows print the factor the search
-found but do not confirm it. Every row allows 250,000 iterations per trial, extended up to a
+close to the paper's factors. The baseline and the wall with weaker fill land above it, and the
+difference is the facing: at the factor where the paper's wall gives way, XSLOPE's is still held by
+blocks the paper's model lets fail. The wall on the weak foundation lands below it, because the
+two codes fail it in different ways. On the other three walls, two grades of sheet, water and a
+surcharge, the failure runs through the cohesionless fill, and a failure surface in soil with no
+cohesion has no thickness of its own, so its factor changes when the mesh is refined, by two to
+six times the search tolerance on these rows. Those three print the factor the search found but
+do not confirm it. Every row allows 250,000 iterations per trial, extended up to a
 million while a trial is still slowing, and the refinement step takes the element size from 1.0 m
 to 0.7 m.
 
@@ -1376,16 +1378,17 @@ mesh moves the factor by one step of the search.
 
 ![RS2-48: the baseline three-tier geotextile wall (vp087_fem, φ = 34°, Ta = 10 kN/m) built as a dry stack — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. The back-face joint of every column has opened, and the band runs from the toe of the lowest column up through the reinforced fill behind them](images/RS2-48.png)
 
-#### ⊘ RS2-49: Geotextile wall, fill quality (vp088_fem) {#rs2-49}
+#### 🔴 RS2-49: Geotextile wall, fill quality (vp088_fem) {#rs2-49}
 
 The fill is weaker, φ = 25°, and the sheets stronger, 22 kN/m. The sheets keep the vendor's
 sheet-to-fill friction angle of 28.35°, whose tangent is 0.8 tan 34°, where the paper's rule on
-this fill would give about 20.5°. *Unconfirmed*: the search closed, but two of its trials took more
-than 125,000 iterations to come to rest, and refining the mesh does not move the factor.
+this fill would give about 20.5°. Refining the mesh does not move the factor.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
-| 1.096 *unconfirmed* | 0.99 | 1.08 |
+| **1.096** | 0.99 (+10.7%) | 1.08 |
+
+<!-- test: file=files/rocscience/vp088_fem.xlsx, type=fem_ssrm, expected_fs=1.096, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, ssr_exclude=Blocks, benchmark=RS2-49, f_stand=1.0859375, f_fail=1.10546875, check=edges -->
 
 The published factors disagree among themselves here: the manual's limit-equilibrium columns for
 this wall read 0.98 / 0.97 / 0.97 against its own strength-reduction value of 1.08, with the
@@ -1423,15 +1426,15 @@ trial came to rest, but refining the mesh moves the factor by twice the search t
 
 ![RS2-51: two geotextile grades in one wall (vp090_fem, Ta = 11.0 kN/m on the lower seven layers, 7.5 kN/m above) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. The geometry is the baseline's; the two grades differ in tensile capacity, anchorage length and interface shear stiffness, not in layout](images/RS2-51-wall.png)
 
-#### ⊘ RS2-52: Geotextile wall, weak foundation (vp091_fem) {#rs2-52}
+#### 🔴 RS2-52: Geotextile wall, weak foundation (vp091_fem) {#rs2-52}
 
 The foundation is c = 0, φ = 18°, and this is the lowest factor in the family for all three codes.
-*Unconfirmed*: the search closed, but one of its trials took more than 125,000 iterations to come
-to rest.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
-| 0.783 *unconfirmed* | 0.86 | 0.84 |
+| **0.783** | 0.86 (−9.0%) | 0.84 |
+
+<!-- test: file=files/rocscience/vp091_fem.xlsx, type=fem_ssrm, expected_fs=0.783, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, ssr_exclude=Blocks, benchmark=RS2-52, f_stand=0.7734375, f_fail=0.79296875, check=edges -->
 
 The two codes fail this wall in different ways. The paper's wall fails on a deep wedge that turns
 under the toe and comes out several meters into the foundation, a surface its own authors call

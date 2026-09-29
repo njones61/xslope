@@ -1348,15 +1348,7 @@ limit-equilibrium factors are in the second table.
 | 54 — surcharge | 1.02 | 0.92 | 0.87 / 0.91 / 0.91 |
 | 55 — tier number | 1.00 | 1.04 | 0.92 / 0.94 / 0.94 |
 
-**What the eight rows show.** The wall with shorter sheets and the wall with five tiers land
-close to the paper's factors. The baseline and the wall with weaker fill land above it, and the
-difference is the facing: at the factor where the paper's wall gives way, XSLOPE's is still held by
-blocks the paper's model lets fail. The wall on the weak foundation lands below it, because the
-two codes fail it in different ways. On the other three walls, two grades of sheet, water and a
-surcharge, the failure runs through the cohesionless fill, and a failure surface in soil with no
-cohesion has no thickness of its own, so its factor changes when the mesh is refined, by two to
-six times the search tolerance on these rows. Those three print the factor the search found but
-do not confirm it. Every row allows 250,000 iterations per trial, extended up to a
+Every row allows 250,000 iterations per trial, extended up to a
 million while a trial is still slowing, and the refinement step takes the element size from 1.0 m
 to 0.7 m.
 
@@ -1488,6 +1480,16 @@ failing surface than the three tall ones do.
 <!-- test: file=files/rocscience/vp094_fem.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-55, f_stand=1.0078125, f_fail=1.02734375, check=edges, tier=gate -->
 
 ![RS2-55: five 1.8 m tiers offset 0.6 m (vp094_fem, Ta = 10.1 kN/m) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. Spreading the same 9 m of height over five tiers instead of three leaves the mechanism where the baseline puts it](images/RS2-55.png)
+
+**Across the eight rows.** The wall with shorter sheets and the wall with five tiers land
+close to the paper's factors. The baseline and the wall with weaker fill land above it, and the
+difference is the facing: at the factor where the paper's wall gives way, XSLOPE's is still held by
+blocks the paper's model lets fail. The wall on the weak foundation lands below it, because the
+two codes fail it in different ways. On the other three walls, two grades of sheet, water and a
+surcharge, the failure runs through the cohesionless fill, and a failure surface in soil with no
+cohesion has no thickness of its own, so its factor changes when the mesh is refined, by two to
+six times the search tolerance on these rows. Those three print the factor the search found but
+do not confirm it.
 
 ### 🟢 RS2-56: Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) {#rs2-56}
 

@@ -37,6 +37,12 @@ CONFIG = PageConfig(
     # shallow rebuild of problem 43 is a different model's number.
     untagged_allow=[
         ('1.19', 'The 1.19 published for this problem'),
+        # the geotextile wall rows that print the factor their search found
+        # without confirming it (RS2-49, 51, 52, 53, 54)
+        ('1.096', 'unconfirmed'),
+        ('1.018', 'unconfirmed'),
+        ('0.783', 'unconfirmed'),
+        ('1.037', 'unconfirmed'),
         # RS2-49's published spread needed two entries here while its section
         # printed those numbers in prose alone. The section now opens with the
         # same table a locked row has — referee and RS2 SSR, XSLOPE reading

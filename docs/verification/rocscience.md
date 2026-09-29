@@ -237,7 +237,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [37](#vp37) | 🟢 | Slope, homogenous, distributed load, back analysis of required support force and length | Bishop 0.764 vs Slide 0.764 (0.0%) · Bishop 0.764 vs XSTABL 0.734 (+4.1%) · support force 351.4 vs Slide 351 kN/m (+0.1%) | base slope and the required support force; the reinforced-zone length needs a variable-length material zone |
 | [38](#vp38) | 🟢 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | H = 61: Bishop 1.612 vs Slide 1.621 (−0.6%) · H = 62: Bishop 1.533 vs Slide 1.538 (−0.3%) · H = 63: Bishop 1.413 vs Slide 1.407 (+0.4%) |  |
 | [39](#vp39) | 🟢 | Reinforced embankment, (2) materials, tension crack, geosynthetic | clay fill: Spencer 0.968 vs Slide 0.975 (−0.7%) · sand fill: Spencer 1.200 vs Slide 1.209 (−0.7%) | circular cases; the noncircular variants are not compared, because XSLOPE's noncircular search returns seed-dependent minima on this φ = 0 problem |
-| [40](#vp40) | 🟢 | Slope, homogenous, sensitivity analysis | Janbu(corr) 1.003 vs Perry 0.98 (+2.3%) | the A and b sensitivity sweeps track Slide's published curves within about a percent |
+| [40](#vp40) | 🟢 | Slope, homogenous, sensitivity analysis | Janbu(corr) 1.003 vs Perry 0.98 (+2.3%) | the A and b sensitivity series track Slide's published curves within about a percent |
 | [41](#vp41) | 🟢 | Slope, homogenous, ru pore pressure | Bishop 1.668 vs Slide 1.656 (+0.7%) · Bishop 1.668 vs Charles & Soares 1.66 (+0.5%) |  |
 | [42](#vp42) | 🟢 | Dam, (3) materials, water table, ponded water, tension crack | Slide's circle: Spencer 1.926 vs Slide 1.925 (+0.1%) · Baker's noncircular: Spencer 1.882 vs Baker & Leshchinsky 1.91 (−1.5%) | the reservoir is carried as an explicit hydrostatic face load |
 | [43](#vp43) | 🟢 | Slope, homogenous, planar surface, RocPlane comparison | Spencer 1.352 vs RocPlane 1.351 (+0.1%) · Spencer 1.352 vs SLOPE/W 1.352 (0.0%) | the SLOPE/W model pins the crest-offset geometry |
@@ -495,7 +495,7 @@ The weak seam is 0.6 m thick and inclined, the piezometric line has 8 points, an
 
 ## 🟢 VP10: Slope, homogenous, pore pressure grid, ponded water {#vp10}
 
-**Input files:** [vp010.xlsx](files/rocscience/vp010.xlsx) (+ seepage sidecars)
+**Input files:** [vp010.xlsx](files/rocscience/vp010.xlsx) (+ seepage results)
 
 ACADS problem #5 (Giam & Donald 1989): a slope excavated at 1:2 below initially horizontal
 ground, analyzed for the long-term condition with 1 m of ponded water over the excavation floor.
@@ -1196,7 +1196,7 @@ $$\tau = c' + (\sigma_n - u_a)\tan\varphi' + (u_a - u_w)\tan\varphi^{\,b}$$
 
 whose last term is an apparent cohesion from suction. Material (Table 38.1): $c' = 10$ kPa, $\varphi' = 38°$, $\varphi^{\,b} = 15°$, $\gamma = 16$ kN/m³.
 
-**Input files:** [vp038a](files/rocscience/vp038a.xlsx) / [vp038b](files/rocscience/vp038b.xlsx) / [vp038c](files/rocscience/vp038c.xlsx) (right-side head $H = 61 / 62 / 63$ m), each with its `_mesh.json` / `_seep.csv` seepage sidecars.
+**Input files:** [vp038a](files/rocscience/vp038a.xlsx) / [vp038b](files/rocscience/vp038b.xlsx) / [vp038c](files/rocscience/vp038c.xlsx) (right-side head $H = 61 / 62 / 63$ m), each with its `_mesh.json` / `_seep.csv` seepage results.
 
 **The seepage.** Geometry is read from the vendor RS2 mesh's external boundary, the domain closing down the right edge and along an impermeable base to the toe. XSLOPE solves the steady unsaturated field itself (`u='seep'`): total head $H$ on the right side, head 6 m on the left, the ground surface a seepage/exit face, base and far edges no-flow. Relative permeability is Ng (1998)'s measured $k$-function cast as a Gardner curve with $a = 7.479$, $n = 2.908$ and $k_s = 4.19$ m/day — measured data, not a fitted knob, and a van Genuchten cast of the same curve moves the factor of safety by < 0.005. The solved field carries bounded matric suction above the water table, unlike a deep piezometric line's unbounded hydrostatic suction, so no suction cap is required.
 
@@ -1261,7 +1261,7 @@ Also [SLOPE/W §2.24](geostudio.md) — the same problem in the GeoStudio corpus
 
 Perry (1993, Fig. 10): a dry homogeneous slope with power-curve strength
 τ = A·σ′ᵇ (A = 2, b = 0.7, γ = 20) evaluated on the specified five-segment surface —
-and the corpus's first *sensitivity* benchmark: the manual sweeps A and b over ±15% of
+and the corpus's first *sensitivity* benchmark: the manual varies A and b over ±15% of
 their means and publishes the FS-vs-parameter curves. The XSLOPE sweep runs through `sensitivity()` on the fixed surface
 (`search=False`, since the surface is specified), and the base case and both range endpoints
 are checked for each parameter.
@@ -1388,7 +1388,7 @@ A=0.58, n=0.86, T=0).
 
 Slide #46 / Baker (1993): a three-loading-stage dam — end of construction with an empty reservoir, steady-state seepage with a full reservoir, and rapid drawdown. Stages 1 and 2 are built; stage 3 is not, because its undrained-strength field is printed only as a two-dimensional contour map. A small compacted-clay embankment (crest el 101, toes at x = 80 and x = 128, both el 95) sits on a deep natural-clay foundation; downstream the ground drops on a **4H:1V** face from (128, 95) to the toe bench (148, 90) and runs flat to x = 220. Geometry from Figure 46.1; materials (Table 46.1) compacted clay c′ = 6.5 kPa, φ′ = 40°, γ = 18 and natural clay c′ = 0, φ′ = 32°, γ = 18.
 
-**Input files:** [vp046.xlsx](files/rocscience/vp046.xlsx) (stage 1, dry) / [vp046b.xlsx](files/rocscience/vp046b.xlsx) (stage 2, steady seepage, with `_mesh.json` / `_seep.csv` sidecars)
+**Input files:** [vp046.xlsx](files/rocscience/vp046.xlsx) (stage 1, dry) / [vp046b.xlsx](files/rocscience/vp046b.xlsx) (stage 2, steady seepage, with `_mesh.json` / `_seep.csv` seepage results)
 
 The critical mechanism is the cohesionless downstream natural-clay face, where the depth-independent infinite-slope value tan 32° / tan 14.04° = **2.50** is the manual's "Theoretical FS = 2.5". XSLOPE's circular search rides that face and lands on it:
 

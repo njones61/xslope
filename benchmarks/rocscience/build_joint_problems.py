@@ -44,7 +44,7 @@ from xslope.fileio import load_slope_data                           # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx    # noqa: E402
 from xslope.fileio import build_ground_surface_from_polygons        # noqa: E402
 from xslope.joints import cross_jointed, parallel_set               # noqa: E402
-from benchmarks.tag_k0 import apply_tag_k0                          # noqa: E402
+from benchmarks.tag_k0 import apply_declared_k0                     # noqa: E402
 from rj020_voronoi import EXTERNAL as RJ20_RING, TRACES as RJ20_TRACES  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -152,17 +152,19 @@ def _finish(sd, rings_and_ids, materials):
 
 
 def _write(sd, name):
-    """Write one corpus file, declaring the K0 its own test tag names.
+    """Write one corpus file, declaring the K0 its row is run under.
 
     The initial stress has to live in the FILE, not only in the tag, or the
     locked factor is reproducible from the suite and from nothing a user would
-    open. ``apply_tag_k0`` reads the page's own tag and clears K0 where no tag
-    names one, which is what stops a donor's value riding into a problem that
-    never asked for it.
+    open. ``apply_declared_k0`` reads the page's own tag; for a row reported
+    without a tag it reads the producer's registration of that row
+    (``rs2_joint_cases``), the same entry the reported factor was solved with.
+    Where neither names a K0 it clears it, which is what stops a donor's value
+    riding into a problem that never asked for it.
     """
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, name)
-    apply_tag_k0(sd, path)
+    apply_declared_k0(sd, path)
     _write_xlsx(sd, path)
     return name
 

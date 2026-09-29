@@ -93,3 +93,43 @@ def apply_tag_k0(slope_data, path):
     value = tag_k0(path)
     slope_data['k0'] = value
     return value
+
+
+def registered_k0_entries():
+    """``[(file, K0)]`` over the RS2 joint rows registered WITHOUT a tag, each
+    ``file`` relative to ``docs/verification`` as the registration states it.
+
+    Those rows (``benchmarks/rocscience/rs2_joint_cases.py``) are solved by their
+    producer at the settings the table states, K0 among them, so the workbook has
+    to declare the same K0 for the same reason a tagged file does. The table is
+    read, not restated, so the producer and the file cannot disagree.
+    """
+    from benchmarks.rocscience.rs2_joint_cases import EXTRA_CASES, SWEEP_CASES
+    return [(case['file'], float(case['k0']))
+            for case in list(EXTRA_CASES) + list(SWEEP_CASES)
+            if 'k0' in case and 'file' in case]
+
+
+def registered_k0_map():
+    """{file basename: K0} over :func:`registered_k0_entries`."""
+    return {os.path.basename(f): v for f, v in registered_k0_entries()}
+
+
+def declared_k0(path):
+    """The K0 ``path`` must declare: its test tag's, else its producer
+    registration's (a tag wins, as it does in the producer), else None."""
+    value = tag_k0(path)
+    if value is None:
+        value = registered_k0_map().get(os.path.basename(str(path)))
+    return value
+
+
+def apply_declared_k0(slope_data, path):
+    """:func:`apply_tag_k0`, extended to the rows registered without a tag.
+
+    Always assigns, clearing to None where neither source names a K0. Returns
+    the value written.
+    """
+    value = declared_k0(path)
+    slope_data['k0'] = value
+    return value

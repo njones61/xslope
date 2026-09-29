@@ -8538,6 +8538,18 @@ def run_tag_k0_test(test):
                               f"({prev[0]:g} and {value:g})")
             wanted.setdefault(os.path.normpath(path), (value, md.name))
 
+    # The RS2 joint rows reported WITHOUT a tag are solved at the K0 their
+    # producer registration states (benchmarks/rocscience/rs2_joint_cases.py), so
+    # their files owe it too, read from that same table. A tag wins, as it does in
+    # the producer.
+    from benchmarks.tag_k0 import registered_k0_entries
+    tagged_names = {os.path.basename(p) for p in wanted}
+    for rel, value in registered_k0_entries():
+        if os.path.basename(rel) in tagged_names:
+            continue
+        path = _repo(os.path.join('docs', 'verification', rel))
+        wanted[os.path.normpath(path)] = (value, 'rs2_joint_cases.py')
+
     problems = []
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')

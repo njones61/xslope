@@ -35,6 +35,10 @@ CONFIG = PageConfig(
         # (rj003/rj005/rj006_fem_meta), shown beside the vendor's two numbers
         # by ruling, never tagged.
         ('1.213', 'unconfirmed'),
+        # RJ-20 stands at 2.512 and its search does not close above it
+        ('2.512', 'unconfirmed'),
+        ('2.512', 'The slope stands at 2.512'),
+        ('2.531', 'the trial at 2.531'),
         ('1.213', 'The search brackets 1.213 between 1.203'),
         ('1.203', 'The search brackets 1.213 between 1.203'),
         ('1.818', 'unconfirmed'),

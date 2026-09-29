@@ -31,7 +31,7 @@ of safety is actually sensitive to.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">Hoek-Brown</span><span class="tg-pill">GSI</span><span class="tg-pill">disturbance factor</span><span class="tg-pill">instantaneous tangent</span><span class="tg-pill">circular search</span><span class="tg-pill">quadratic triangles</span><span class="tg-pill">strength reduction</span><span class="tg-pill">parametric study</span><span class="tg-pill">design sweep</span><span class="tg-pill">model checks</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_rock_slope.xlsx](files/xslope_rock_slope.xlsx),
-the weak rock mass of [the Hoek-Brown verification problem](../verification/rs2.md#hoek-brown).
+the weak rock mass of [the Hoek-Brown verification problem](../verification/ssrm.md#hoek-brown).
 It carries no mesh, so the meshing step is done on the file as downloaded</div>
 </div>
 

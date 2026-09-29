@@ -41,7 +41,6 @@ CONFIG = PageConfig(
         ('2.531', 'the trial at 2.531'),
         ('1.213', 'The search brackets 1.213 between 1.203'),
         ('1.203', 'The search brackets 1.213 between 1.203'),
-        ('1.818', 'unconfirmed'),
     ],
 
     abs_bounds=[

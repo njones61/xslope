@@ -93,7 +93,7 @@ joint model whose output is a stress-displacement curve.
 | [2](#rj-2) | 🟢 | Alejano & Alonso block toppling | SSRM 0.783 vs Goodman & Bray 0.7734 (+1.2%) | 0.86 vs 0.7734 (+11.2%) | UDEC 0.87 (−10.0%) | 0.86 / 0.82 | All three programs stand above the closed form, this one by a percent and the other two by a tenth; the manual states no UDEC settings for this model. |
 | [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | SSRM 1.213 vs UDEC 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | *unconfirmed* — the search did not close: its top trial, F = 1.222656, stops moving at 500,000 iterations without its forces balancing. The vendor's two settings disagree with each other. |
 | [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | — | 1.19 / 1.27 | |
-| [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | SSRM 1.818 reported vs UDEC 1.7 (+6.9%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | *unconfirmed* — the search did not close: both ends of the bracket, and one end of a finer mesh's bracket, do not settle within the 250,000-iteration limit. The reported value sits between the vendor's two settings. |
+| [5](#rj-5) | 🔴 | Lorig & Varona backward block toppling | SSRM 1.857 vs UDEC 1.7 (+9.2%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | The vendor's two settings disagree with each other by the widest margin in the manual; XSLOPE lands on the one with its convergence aid on. |
 | [6](#rj-6) | 🟢 | Plane failure, daylighting | SSRM 1.271 vs UDEC 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | A step of refinement returns the same bracket, end for end. |
 | [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | — | 1.57 / 1.59 | Both finite element codes land above the referee, on the same side and within half a point of each other. |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | 0.75 vs 0.76 (−1.3%) | — | 0.75 / 0.75 | |
@@ -343,7 +343,7 @@ Every transcribed input class matches the vendor model, including the side restr
 
 ![RJ-4: Lorig & Varona flexural toppling (rj004) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. Here the rock can yield, and it does: a band of shear strain climbs from the toe across the columns, and drawn without exaggeration the columns are bent through that band rather than rotated about it, which is what separates flexural toppling from the block toppling of problem 3](images/RJ-4.png)
 
-### ⊘ RJ-5: Lorig & Varona backward block toppling (rj005) {#rj-5}
+### 🔴 RJ-5: Lorig & Varona backward block toppling (rj005) {#rj-5}
 
 The shared 260 m section cut by two sets: one at −55° at 10 m spacing through the toe, dipping out
 of the face so the blocks lean back rather than forward, and a horizontal set at 40 m spacing. The
@@ -352,20 +352,18 @@ c = 100 kPa and φ = 40°.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| 1.818 *unconfirmed* | 1.7 (+6.9%) | 1.65 vs 1.7 (−2.9%) | 1.65 / 1.86 |
+| **1.857** | 1.7 (+9.2%) | 1.65 vs 1.7 (−2.9%) | 1.65 / 1.86 |
 
-This row is the corpus's hardest to settle. Four of its nine trials do not settle within the
-250,000-iteration limit, and two of the four are the ends of the bracket, 1.808594 and 1.828125, so
-the search cannot close, and the value shown is the bracket's midpoint.
+<!-- test: file=files/rocscience/joints/rj005.xlsx, type=fem_ssrm, expected_fs=1.857, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5, f_stand=1.84765625, f_fail=1.8671875, check=edges, tier=gate -->
 
-The reported value stands above UDEC and above the vendor's default, and between the vendor's
-own two numbers: its two solution schemes give 1.65 and 1.86 on the same model, the widest spread
-in the manual. The vendor needed its `Improve Joint Convergence` option to rerun
-this problem, and it reaches a different answer with it.
+This row is the corpus's slowest to settle: the trial at the standing edge took 865,564 iterations
+to balance, and the search takes about thirteen hours. The factor stands above UDEC and above the
+vendor's default, and on the vendor's own second number: its two solution schemes give 1.65 and
+1.86 on this model, the widest spread in the manual, and the vendor needed its `Improve Joint
+Convergence` option to rerun the problem at all.
 
-A step of refinement to 8.4 m settles two more of the nine and brackets a factor one step lower. Two
-trials still do not settle there, one of them an end of that bracket, so neither mesh closes the
-search. Together the two runs take about 16 hours, more than twice any other row here.
+A step of refinement to 8.4 m, run with 250,000 iterations per trial, brackets a factor one step
+lower without closing; it has not been run with the longer limit.
 
 Every transcribed input class matches the vendor model, including the side restraint.
 

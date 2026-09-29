@@ -51,7 +51,7 @@ Match dots and status terms follow the shared [definitions](index.md#status-term
 | # | Match | Problem | Results | Notes |
 |---:|:-:|---|---|---|
 | [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | SSRM 1.37 vs Bishop & Morgenstern chart 1.380 (−0.7%) · Griffiths & Lane FE 1.4 (−2.1%) · displacement-vs-$F$ upturn $F \approx 1.40$ vs their FE 1.4 (0.0%) | |
-| [2](#verification-griffiths2) | 🟡 | Example 2 — homogeneous slope with a foundation layer | SSRM 1.35 vs the paper's toe-circle limit equilibrium 1.4 (−3.6%) · Griffiths & Lane FE 1.4 (−3.6%) · upturn $F \approx 1.4$ vs their FE 1.4 (0.0%) · Spencer toe circle 1.37 vs the paper's toe circle 1.4 (−2.1%) | the foundation leaves the factor of safety unchanged, as the paper argues |
+| [2](#verification-griffiths2) | 🟢 | Example 2 — homogeneous slope with a foundation layer | SSRM 1.35 vs the paper's toe-circle limit equilibrium 1.4 (−3.6%, within the paper's one-decimal precision: 1.35 rounds to 1.4) · Griffiths & Lane FE 1.4 (−3.6%) · upturn $F \approx 1.4$ vs their FE 1.4 (0.0%) · Spencer toe circle 1.37 vs the paper's toe circle 1.4 (−2.1%) | the foundation leaves the factor of safety unchanged, as the paper argues |
 | [3](#verification-griffiths3) | 🔴 | Example 3 — undrained clay slope with a thin weak layer | Worst station $c_{u2}/c_{u1} = 0.2$: SSRM 0.50 vs Griffiths & Lane FE 0.60 (−16.7%) · at $0.4$, SSRM 0.96 vs their FE 1.05 (−8.6%) · at $1.0$, SSRM 1.45 vs Taylor 1.47 (−1.4%) · Janbu 0.462 at $0.2$ vs the paper's Janbu three-line wedge 0.45–0.50 (inside) | once the failure follows the weak layer the SSRM reads below the paper's FE and inside its limit-equilibrium wedge band |
 | [4](#verification-griffiths4) | 🟢 | Example 4 — undrained clay slope over a weak foundation | SSRM 1.45 vs Taylor 1.47 (−1.4%) · SSRM 2.058 vs Griffiths & Lane FE 2.03 (+1.4%) · relative jump ×1.42 vs their ×1.40 (+1.4%) | the critical mechanism flips base → toe, as in the paper's Fig. 11 |
 | [5](#verification-griffiths5) | 🟢 | Example 5 — "slow" drawdown | Submerged plateau 1.89 vs Griffiths & Lane FE 1.85 (+2.2%) · minimum 1.31 vs their FE 1.30 at $L/H = 0.7$ (+0.8%) · drained end 1.37 vs Bishop & Morgenstern chart 1.4 (−2.1%) · $L/H = 0$, 1.85 vs Morgenstern chart 1.85 (0.0%) | two of the three refined quad8 values read below the printed FE values and the third lands on one |
@@ -114,7 +114,7 @@ Maximum displacement against $F$, the paper's Fig. 2 criterion:
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.39, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.5, f_max=1.9, max_iter=4000, f_stand=1.371875, f_fail=1.4125, check=edges -->
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.42, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.5, f_max=0.9, max_iter=4000 -->
 
-### 🟡 Griffiths & Lane (1999) Example 2 — Homogeneous Slope with a Foundation Layer {#verification-griffiths2}
+### 🟢 Griffiths & Lane (1999) Example 2 — Homogeneous Slope with a Foundation Layer {#verification-griffiths2}
 
 Example 1's slope and soil with a foundation of the same soil beneath it, $H/2$ thick, so the firm
 base sits $1.5\,H$ below the crest (their Fig. 5). The paper shows that the foundation leaves the

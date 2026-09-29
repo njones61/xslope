@@ -141,7 +141,7 @@ COLOR_BLOCKS = False
 #
 _WALL = dict(element_type='tri6', target_size='1.0', tolerance='0.02',
              f_min='0.5', f_max='3.0', max_iter='250000',
-             max_iter_ceiling='500000',
+             max_iter_ceiling='1000000',
              tension_srf='false', k0='1', ssr_exclude='Blocks')
 
 EXTRA_CASES = [

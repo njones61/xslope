@@ -92,7 +92,7 @@ joint model whose output is a stress-displacement curve.
 | [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | SSRM 1.213 reported vs UDEC 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | *unconfirmed* — the search did not close: its top trial, F = 1.222656, does not settle within the 250,000-iteration limit. The vendor's two settings disagree with each other. |
 | [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | — | 1.19 / 1.27 | |
 | [5](#rj-5) | <span class="nodata">⊘</span> | Lorig & Varona backward block toppling | SSRM 1.818 reported vs UDEC 1.7 (+6.9%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | *unconfirmed* — the search did not close: both ends of the bracket, and one end of a finer mesh's bracket, do not settle within the 250,000-iteration limit. The reported value sits between the vendor's two settings. |
-| [6](#rj-6) | <span class="nodata">⊘</span> | Plane failure, daylighting | SSRM 1.271 reported vs UDEC 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | *unconfirmed* — the answer moves with the mesh: every trial settles, but a step of refinement moves the factor by twice the row's tolerance. The reported value sits between the vendor's two settings. |
+| [6](#rj-6) | 🟢 | Plane failure, daylighting | SSRM 1.271 vs UDEC 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | A step of refinement returns the same bracket, end for end. |
 | [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | — | 1.57 / 1.59 | Both finite element codes land above the referee, on the same side and within half a point of each other. |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | 0.75 vs 0.76 (−1.3%) | — | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.037 vs UDEC 1.03 (+0.7%) | 1.01 vs 1.03 (−1.9%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
@@ -370,7 +370,7 @@ Every transcribed input class matches the vendor model, including the side restr
 
 ![RJ-5: Lorig & Varona backward block toppling (rj005) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own; slip runs along the −55° joints in the wedge behind the face while the horizontal bedding opens, and the deformed section shows the slabs stepping out over one another down the face, each leaning back into the slope as it goes](images/RJ-5.png)
 
-### ⊘ RJ-6: Plane failure with daylighting discontinuities (rj006) {#rj-6}
+### 🟢 RJ-6: Plane failure with daylighting discontinuities (rj006) {#rj-6}
 
 The same section cut by one set at −35° at 10 m spacing through the origin. The joints dip out of
 the 55° face at a shallower angle than the face itself, so every one of them daylights and the
@@ -379,19 +379,14 @@ slabs between them are free to slide out. The rock is Mohr-Coulomb (γ = 26.1 kN
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| 1.271 *unconfirmed* | 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | 1.25 / 1.31 |
+| **1.271** | 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | 1.25 / 1.31 |
 
-What leaves this row unconfirmed is the mesh rather than
-the iteration limit. Every trial settles, but a step of refinement to 8.4 m moves the factor by two
-steps of the search, where the row's tolerance is one.
+<!-- test: file=files/rocscience/joints/rj006.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-6, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate -->
 
-The reported value matches UDEC and sits between the vendor's two numbers, 1.25 and 1.31: the
-vendor's own answer moves with its solution scheme on this model by more than the mesh moves
-XSLOPE's.
+A step of refinement to a 2D size of 8.4 m returns the same bracket, end for end, and every trial
+comes to rest on both meshes.
 
-It is the only row in the corpus whose factor moves with the mesh: repeatable, but an answer that
-belongs to the mesh rather than to the slope. Every other row that states a refinement step either
-returns the same bracket, end for end, or moves inside its own tolerance.
+The factor matches UDEC and sits between the vendor's two numbers, 1.25 and 1.31.
 
 Every transcribed input class matches the vendor model, including the side restraint.
 

@@ -1352,11 +1352,6 @@ Every row allows 250,000 iterations per trial, extended up to a
 million while a trial is still slowing, and the refinement step takes the element size from 1.0 m
 to 0.7 m.
 
-**Input files:** [vp087_fem.xlsx](files/rocscience/vp087_fem.xlsx) (baseline) through
-[vp094_fem.xlsx](files/rocscience/vp094_fem.xlsx). Their limit-equilibrium siblings
-[vp087.xlsx](files/rocscience/vp087.xlsx)–[vp094.xlsx](files/rocscience/vp094.xlsx) keep the
-sheets 0.25 m inside the facing columns, where the eight Slide2 circles were measured.
-
 #### 🟡 RS2-48: Multi-tiered geotextile wall, baseline (vp087_fem) {#rs2-48-baseline}
 
 The wall as the paper builds it: fill c = 0, φ = 34°, sheets 6.3 m long at 10 kN/m. Refining the
@@ -1367,6 +1362,8 @@ mesh moves the factor by one step of the search.
 | **1.037** | 0.99 (+4.7%) | 1.05 |
 
 <!-- test: file=files/rocscience/vp087_fem.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-48, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
+
+**Input file:** [vp087_fem.xlsx](files/rocscience/vp087_fem.xlsx).
 
 ![RS2-48: the baseline three-tier geotextile wall (vp087_fem, φ = 34°, Ta = 10 kN/m) built as a dry stack — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. The back-face joint of every column has opened, and the band runs from the toe of the lowest column up through the reinforced fill behind them](images/RS2-48.png)
 
@@ -1390,6 +1387,8 @@ elastic facing sets an upper bound for the family rather than explaining the dif
 factor where this wall stands, no soil is yielding and the sheets have reached their limit, where
 the paper's wall fails on a shear zone through the reinforced fill.
 
+**Input file:** [vp088_fem.xlsx](files/rocscience/vp088_fem.xlsx).
+
 ![RS2-49: reduced-strength fill (vp088_fem, φ = 25°, Ta = 22 kN/m) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. The mechanism stays inside the reinforced mass, as on the baseline](images/RS2-49.png)
 
 #### 🟢 RS2-50: Geotextile wall, 4.2 m reinforcement (vp089_fem) {#rs2-50}
@@ -1403,6 +1402,8 @@ cross. Refining the mesh moves the factor by one step of the search.
 
 <!-- test: file=files/rocscience/vp089_fem.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-50, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
 
+**Input file:** [vp089_fem.xlsx](files/rocscience/vp089_fem.xlsx).
+
 ![RS2-50: shortened 4.2 m geotextile layers (vp089_fem, Ta = 11.4 kN/m) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. Shortening the sheets pulls the mechanism back into the reinforced mass behind their ends](images/RS2-50.png)
 
 #### ⊘ RS2-51: Geotextile wall, dual reinforcement type (vp090_fem) {#rs2-51-wall}
@@ -1414,6 +1415,8 @@ trial came to rest, but refining the mesh moves the factor by twice the search t
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
 | 1.018 *unconfirmed* | 1.01 | 1.00 |
+
+**Input file:** [vp090_fem.xlsx](files/rocscience/vp090_fem.xlsx).
 
 ![RS2-51: two geotextile grades in one wall (vp090_fem, Ta = 11.0 kN/m on the lower seven layers, 7.5 kN/m above) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. The geometry is the baseline's; the two grades differ in tensile capacity, anchorage length and interface shear stiffness, not in layout](images/RS2-51-wall.png)
 
@@ -1433,6 +1436,8 @@ under the toe and comes out several meters into the foundation, a surface its ow
 the family on their own account. XSLOPE's wall fails in a patch under the toe of the lowest facing
 column, on the sheets rather than in the soil.
 
+**Input file:** [vp091_fem.xlsx](files/rocscience/vp091_fem.xlsx).
+
 ![RS2-52: cohesionless foundation (vp091_fem, c = 0, φ = 18°) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. The strain leaves the reinforced fill almost entirely and concentrates in the weak foundation directly under the toe of the lowest facing column, where the wall bears on it](images/RS2-52.png)
 
 #### ⊘ RS2-53: Geotextile wall, water (vp092_fem) {#rs2-53}
@@ -1444,6 +1449,8 @@ most in the family.
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
 | 1.037 *unconfirmed* | 1.01 | 1.03 |
+
+**Input file:** [vp092_fem.xlsx](files/rocscience/vp092_fem.xlsx).
 
 ![RS2-53: pond against the wall (vp092_fem, piezometric line at y = 9 with a 3 m pond on the lower tier, Ta = 9.25 kN/m) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. The reinforced fill is modeled free-draining, so pore pressure acts on the foundation only and the pond enters as a distributed load on the lower tier](images/RS2-53.png)
 
@@ -1465,6 +1472,8 @@ This file carries 11.6, the strength the paper ran; its limit-equilibrium siblin
 their allowable tension wherever the failing surface crosses them, so the wall's strength follows
 the sheet strength directly.
 
+**Input file:** [vp093_fem.xlsx](files/rocscience/vp093_fem.xlsx).
+
 ![RS2-54: 20 kPa surcharge on the uppermost tier (vp093_fem, Ta = 11.6 kN/m) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. The band runs from the toe of the lowest facing column up through the reinforced fill of the lowest tier, and the surcharge settles the crest behind the wall](images/RS2-54.png)
 
 #### 🟢 RS2-55: Geotextile wall, tier count (vp094_fem) {#rs2-55}
@@ -1478,6 +1487,8 @@ failing surface than the three tall ones do.
 | **1.018** | 1.00 (+1.8%) | 1.04 |
 
 <!-- test: file=files/rocscience/vp094_fem.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-55, f_stand=1.0078125, f_fail=1.02734375, check=edges, tier=gate -->
+
+**Input file:** [vp094_fem.xlsx](files/rocscience/vp094_fem.xlsx).
 
 ![RS2-55: five 1.8 m tiers offset 0.6 m (vp094_fem, Ta = 10.1 kN/m) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. Spreading the same 9 m of height over five tiers instead of three leaves the mechanism where the baseline puts it](images/RS2-55.png)
 

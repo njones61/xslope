@@ -9272,6 +9272,73 @@
         "k0": 1.0,
         "line_loads": 0,
         "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj003.xlsx",
+      "references": [
+        {
+          "anchor": "rj-3",
+          "checks": [
+            "RJ-3"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-3: Lorig & Varona forward block toppling (rj003)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-3"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
           "mc"
         ],
         "n_materials": 1,
@@ -9322,6 +9389,140 @@
           "source_md": "docs/verification/rs2_joints.md",
           "title": "RJ-4: Lorig & Varona flexural toppling (rj004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-4"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj005.xlsx",
+      "references": [
+        {
+          "anchor": "rj-5",
+          "checks": [
+            "RJ-5"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-5: Lorig & Varona backward block toppling (rj005)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-5"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj006.xlsx",
+      "references": [
+        {
+          "anchor": "rj-6",
+          "checks": [
+            "RJ-6"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-6: Plane failure with daylighting discontinuities (rj006)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-6"
         }
       ],
       "topics": [
@@ -22107,16 +22308,16 @@
       "model": "docs/verification/files/rocscience/vp087_fem.xlsx",
       "references": [
         {
-          "anchor": "rs2-48",
+          "anchor": "rs2-48-baseline",
           "checks": [
             "RS2-48"
           ],
-          "level": 3,
+          "level": 4,
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-48–55: Multi-tiered geotextile walls (Leshchinsky & Han 2004)",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-48"
+          "title": "RS2-48: Multi-tiered geotextile wall, baseline (vp087_fem)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-48-baseline"
         }
       ],
       "topics": [
@@ -22190,6 +22391,80 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp088_fem.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-49",
+          "checks": [
+            "RS2-49"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-49: Geotextile wall, fill quality (vp088_fem)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-49"
         }
       ],
       "topics": [
@@ -22333,7 +22608,7 @@
           ],
           "level": 4,
           "page": "verification/rs2/",
-          "resolution": "nearest-heading",
+          "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
           "title": "RS2-50: Geotextile wall, 4.2 m reinforcement (vp089_fem)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-50"
@@ -22483,6 +22758,80 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp091_fem.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-52",
+          "checks": [
+            "RS2-52"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-52: Geotextile wall, weak foundation (vp091_fem)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-52"
         }
       ],
       "topics": [
@@ -22767,16 +23116,16 @@
       "model": "docs/verification/files/rocscience/vp094_fem.xlsx",
       "references": [
         {
-          "anchor": "rs2-48",
+          "anchor": "rs2-55",
           "checks": [
             "RS2-55"
           ],
-          "level": 3,
+          "level": 4,
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-48–55: Multi-tiered geotextile walls (Leshchinsky & Han 2004)",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-48"
+          "title": "RS2-55: Geotextile wall, tier count (vp094_fem)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-55"
         }
       ],
       "topics": [
@@ -27041,7 +27390,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 381,
+    "models": 386,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -27082,16 +27431,16 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 647,
+    "tags": 652,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 181,
+      "homogeneous": 184,
       "non-circular": 31,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
-      "reinforcement": 33,
+      "reinforcement": 35,
       "seepage-coupled": 74,
       "seismic": 11,
       "soil-nails": 5,
@@ -27185,7 +27534,10 @@
       "docs/verification/files/rocscience/joints/rj001c.xlsx",
       "docs/verification/files/rocscience/joints/rj001d.xlsx",
       "docs/verification/files/rocscience/joints/rj002.xlsx",
+      "docs/verification/files/rocscience/joints/rj003.xlsx",
       "docs/verification/files/rocscience/joints/rj004.xlsx",
+      "docs/verification/files/rocscience/joints/rj005.xlsx",
+      "docs/verification/files/rocscience/joints/rj006.xlsx",
       "docs/verification/files/rocscience/joints/rj007.xlsx",
       "docs/verification/files/rocscience/joints/rj008.xlsx",
       "docs/verification/files/rocscience/joints/rj009.xlsx",
@@ -27415,10 +27767,12 @@
       "docs/verification/files/rocscience/vp087.xlsx",
       "docs/verification/files/rocscience/vp087_fem.xlsx",
       "docs/verification/files/rocscience/vp088.xlsx",
+      "docs/verification/files/rocscience/vp088_fem.xlsx",
       "docs/verification/files/rocscience/vp089.xlsx",
       "docs/verification/files/rocscience/vp089_fem.xlsx",
       "docs/verification/files/rocscience/vp090.xlsx",
       "docs/verification/files/rocscience/vp091.xlsx",
+      "docs/verification/files/rocscience/vp091_fem.xlsx",
       "docs/verification/files/rocscience/vp092.xlsx",
       "docs/verification/files/rocscience/vp093.xlsx",
       "docs/verification/files/rocscience/vp094.xlsx",

@@ -182,6 +182,31 @@ JOINT_RS2_SLIP_STIFFNESS_FACTOR = 0.01
 #: leaving the iteration's contraction at the same one percent.
 JOINT_TANGENT_FACTOR = JOINT_RS2_SLIP_STIFFNESS_FACTOR
 
+#: The one-sided stick/slip band: a pair that was SLIPPING on the last sweep is
+#: read as slipping until its trial shear falls below this fraction of its limit,
+#: where the plain test re-sticks it the moment the trial shear dips under the
+#: limit by any amount.
+#:
+#: After a slipping sweep a pair sits exactly on its limit, and the next solve
+#: moves the field by a ripple of about a nanometre. On RJ-3's undecided trial
+#: that ripple puts 123 pairs over and under their limits by a few parts in 1e8
+#: (1st/50th/99th percentile of (|trial shear| - limit)/limit on the flipping
+#: pairs: -2.6e-5 / -1.4e-8 / +1.4e-6), so they read slipping on one sweep and
+#: sticking on the next, in an exact 7-sweep cycle, while their slip moves by
+#: 8e-9 m over 358 sweeps (r41_joint_cycle_proposal.md §2). The flip carries no
+#: physics, but everything that reads the pair's STATE sees it: the accelerated
+#: sweep resets on every one, and the interface relief restores and re-relieves.
+#:
+#: The band is ONE-SIDED so the arithmetic stays exactly what it was. Slip grows
+#: only where the trial shear EXCEEDS the limit, and every such pair is classed
+#: slipping with or without the band; a pair held slipping inside the band has a
+#: non-positive excess, takes no slip increment, keeps its residual latch (it was
+#: slipping on the sweep before, so it is latched already), and carries the
+#: traction it carries. So the body load, the slip, the displacement field and
+#: every quantity the stopping rules read from them are unchanged; what changes is
+#: only the pair's slipping / sticking CODE.
+JOINT_RESTICK_FRAC = 0.999
+
 #: Newton-Cotes (Lobatto) weights on [0, 1] in the node order the mesh writes,
 #: (start, end, midside): Simpson's rule for the three-pair element and the
 #: trapezoidal rule for the two-pair one.
@@ -814,7 +839,7 @@ def _limit_normal(jd, tn):
 
 
 def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
-                slipped=None, res_r=None, dil_p=None):
+                slipped=None, res_r=None, dil_p=None, slip_prev=None):
     """The joint tractions at displacement ``u``.
 
     ``slip_p`` is the accumulated plastic tangential offset (the viscoplastic
@@ -828,6 +853,11 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
     closing is measured against. All three are ``None`` on a model that states
     neither residual strength nor dilation, and the arithmetic below is then
     exactly what it was before either existed.
+
+    ``slip_prev`` is the (n, 3) record of which pairs were SLIPPING on the last
+    sweep; passed, a pair in it stays slipping until its trial shear falls below
+    :data:`JOINT_RESTICK_FRAC` of its limit (the one-sided band). ``None`` is the
+    plain test.
 
     Returns a dict with ``dt``, ``dn``, ``tn``, ``ts``, ``tlim``, ``open`` and
     ``slipping``, each (n, 3).
@@ -858,11 +888,20 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
         cj_eff = np.where(slipped, res_r[0][:, None], cj_r[:, None])
         tanphi_eff = np.where(slipped, res_r[1][:, None], tanphi_r[:, None])
     tlim = cj_eff + np.maximum(tn_lim, 0.0) * tanphi_eff
-    slipping = (~opened) & (np.abs(ts_el) > tlim)
+    over = np.abs(ts_el) > tlim
+    if slip_prev is None:
+        slipping = (~opened) & over
+    else:
+        # The one-sided band (see JOINT_RESTICK_FRAC): a pair slipping on the
+        # last sweep re-sticks only once its trial shear is clearly below the
+        # limit. The traction below is still clipped only where the trial shear
+        # is OVER the limit, so a pair held inside the band carries its own.
+        slipping = (~opened) & (over | (slip_prev & (
+            np.abs(ts_el) >= JOINT_RESTICK_FRAC * tlim)))
 
     tn_true = np.where(opened, 0.0, tn)
     ts_true = np.where(opened, 0.0,
-                       np.where(slipping, np.sign(ts_el) * tlim, ts_el))
+                       np.where(over, np.sign(ts_el) * tlim, ts_el))
     return {"dt": dt, "dn": dn, "tn": tn_true, "ts": ts_true, "tlim": tlim,
             "open": opened, "slipping": slipping, "ts_trial": ts_el}
 
@@ -870,7 +909,7 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
 def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
                    dt_vp=JOINT_VP_DT, slipped=None, res_r=None, dil_p=None,
                    ks_slip_factor=None, ks_asm=None, kn_asm=None,
-                   loads_relief=None):
+                   loads_relief=None, slip_state=None):
     """One viscoplastic sweep over the joints: update the slip, load the residual.
 
     The global stiffness carries every joint's FULL elastic block, so ``K u``
@@ -915,12 +954,20 @@ def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
     (max|u| = 3.8e+50 in 41 sweeps on one corpus row). The measured behavior over
     milder factors is in r15_joint_convergence.md §3.
 
+    ``slip_state`` is the (n, 3) record of which pairs were slipping on the last
+    sweep, read for the one-sided stick/slip band (see
+    :data:`JOINT_RESTICK_FRAC`) and updated in place, like ``open_state``. It
+    moves the slipping / sticking code only; ``None`` is the plain test.
+
     Mutates ``slip_p`` and ``open_state`` in place, adds into ``loads``, and
     returns the number of pairs that are slipping or open.
     """
     st = joint_state(jd, u, cj_r, tanphi_r, slip_p=slip_p, open_prev=open_state,
-                     slipped=slipped, res_r=res_r, dil_p=dil_p)
+                     slipped=slipped, res_r=res_r, dil_p=dil_p,
+                     slip_prev=slip_state)
     np.copyto(open_state, st["open"])
+    if slip_state is not None:
+        np.copyto(slip_state, st["slipping"])
 
     ks = jd["ks"][:, None]
     excess = np.abs(st["ts_trial"]) - st["tlim"]

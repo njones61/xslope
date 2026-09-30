@@ -29,18 +29,12 @@ CONFIG = PageConfig(
         # Goodman & Bray recursion; the page recomputes it as 0.7734.
         ('0.76', 'against the 0.76 Alejano'),
         ('0.76', 'their Goodman & Bray 0.76,'),
-        # problems 3, 5 and 6 are *unconfirmed* -- reported without a lock (the
-        # search does not decide, or the mesh moves the answer): the value is
-        # the midpoint of the bracket in the committed run record
-        # (rj003/rj005/rj006_fem_meta), shown beside the vendor's two numbers
-        # by ruling, never tagged.
-        ('1.213', 'unconfirmed'),
-        # RJ-20 stands at 2.512 and its search does not close above it
+        # RJ-20 stands at 2.512 and its search does not close above it: the
+        # value is the standing edge in the committed run record (rj020_fem_meta),
+        # shown as a lower bound by ruling, never tagged.
         ('2.512', 'unconfirmed'),
         ('2.512', 'The slope stands at 2.512'),
         ('2.531', 'the trial at 2.531'),
-        ('1.213', 'The search brackets 1.213 between 1.203'),
-        ('1.203', 'The search brackets 1.213 between 1.203'),
     ],
 
     abs_bounds=[

@@ -91,7 +91,7 @@ joint model whose output is a stress-displacement curve.
 | [1c](#rj-1c) | 🟢 | Goodman & Bray block toppling, case 1c | SSRM 1.037 vs Goodman & Bray 1.0185 (+1.8%) | 1.01 vs 1.0185 (−0.8%) | UDEC 1.01 (+2.7%) | 1.01 / 0.99 | |
 | [1d](#rj-1d) | 🟢 | Goodman & Bray block toppling, case 1d | SSRM 1.252 vs Goodman & Bray 1.2308 (+1.7%) | 1.19 vs 1.2308 (−3.3%) | UDEC 1.22 (+2.6%) | 1.19 / 1.16 | |
 | [2](#rj-2) | 🟢 | Alejano & Alonso block toppling | SSRM 0.783 vs Goodman & Bray 0.7734 (+1.2%) | 0.86 vs 0.7734 (+11.2%) | UDEC 0.87 (−10.0%) | 0.86 / 0.82 | All three programs stand above the closed form, this one by a percent and the other two by a tenth; the manual states no UDEC settings for this model. |
-| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | SSRM 1.213 vs UDEC 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | *unconfirmed* — the search did not close: its top trial, F = 1.222656, stops moving at 500,000 iterations without its forces balancing. The vendor's two settings disagree with each other. |
+| [3](#rj-3) | 🔴 | Lorig & Varona forward block toppling | SSRM 1.232 vs UDEC 1.13 (+9.0%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | The source chapter states no joint cohesion for this run; the vendor's file carries 100 kPa on every joint, and the row is posed on the vendor's file. |
 | [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | — | 1.19 / 1.27 | |
 | [5](#rj-5) | 🔴 | Lorig & Varona backward block toppling | SSRM 1.857 vs UDEC 1.7 (+9.2%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | The vendor's two settings disagree with each other by the widest margin in the manual; XSLOPE lands on the one with its convergence aid on. |
 | [6](#rj-6) | 🟢 | Plane failure, daylighting | SSRM 1.271 vs UDEC 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | |
@@ -263,7 +263,7 @@ stiffness returns this row's bracket unchanged.
 
 ![RJ-2: Alejano & Alonso block toppling (rj002) — FEM inputs, mesh, joint slip at the critical SRF and the section deformed 17×. The rock carries no strain of its own because it cannot yield, so every movement in the section is on a joint: slip gathers where the basal joint reaches the toe of the face, the columns standing on it open along their upper halves, and the deformed section shows them rotating out over the face while the rock below the basal joint stays put](images/RJ-2.png)
 
-### ⊘ RJ-3: Lorig & Varona forward block toppling (rj003) {#rj-3}
+### 🔴 RJ-3: Lorig & Varona forward block toppling (rj003) {#rj-3}
 
 Problems 3 to 6 are the toppling and plane-failure examples of Lorig & Varona (2004). The 260 m
 section at 55° that problems 3 to 7 share, cut by two sets: columns at 70° at 20 m
@@ -278,23 +278,22 @@ c = 675 kPa and φ = 43° and all five carry a joint cohesion of 100 kPa.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| 1.213 *unconfirmed* | 1.13 (+7.3%) | 1.12 vs 1.13 (−0.9%) | 1.12 / 1.09 |
+| **1.232** | 1.13 (+9.0%) | 1.12 vs 1.13 (−0.9%) | 1.12 / 1.09 |
 
-The search brackets 1.213 between 1.203, where
-the slope stands, and 1.222656, where the trial stops moving at 500,000 iterations without its
-forces balancing:
-the slope neither comes to rest nor runs away there, so the top of the bracket is a statement
-about the iteration limit and the search cannot close. Every other trial settles. [Problem 5](#rj-5)
-and [problem 20](#rj-20) are unconfirmed for the same reason: trials at the ends of their
-brackets do not settle either.
+<!-- test: file=files/rocscience/joints/rj003.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-3, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
 
-The reported value stands above UDEC and above the vendor's default. The vendor's own two
-solution schemes give 1.12 and 1.09 for this problem, so the vendor's answer moves with how it is
-solved; this is one of the three problems the vendor reruns under its `Improve Joint
-Convergence` option, described under [Methodology](#methodology).
+The slope stands at the lower end of the bracket, where the joints come to rest after several
+hundred thousand iterations, and runs away at the upper end. The search takes about four hours.
+The factor stands above UDEC and above the vendor's default. The vendor's own two solution
+schemes give 1.12 and 1.09 for this problem, so the vendor's answer moves with how it is solved;
+this is one of the three problems the vendor reruns under its `Improve Joint Convergence` option,
+described under [Methodology](#methodology).
 
 Every input class matches the vendor model, including the side restraint the vendor clamps in both
-directions.
+directions. The vendor's file departs from the source chapter in two inputs: the chapter's property
+list for this section gives the joints a friction angle and no cohesion, and a rock that can yield,
+where the vendor's file gives every joint 100 kPa of cohesion and holds the rock elastic. The row is
+posed on the vendor's file, and its UDEC value is the chapter's.
 
 **Input file:** [rj003.xlsx](files/rocscience/joints/rj003.xlsx).
 
@@ -332,8 +331,8 @@ c = 100 kPa and φ = 40°.
 
 <!-- test: file=files/rocscience/joints/rj005.xlsx, type=fem_ssrm, expected_fs=1.857, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5, f_stand=1.84765625, f_fail=1.8671875, check=edges, tier=gate -->
 
-This row is the corpus's slowest to settle: the trial at the standing edge took 865,564 iterations
-to balance, and the search takes about thirteen hours. The factor stands above UDEC and above the
+This row is the corpus's slowest to settle: the trial at the standing edge balances only after
+most of a million iterations, and the search takes about thirteen hours. The factor stands above UDEC and above the
 vendor's default, and on the vendor's own second number: its two solution schemes give 1.65 and
 1.86 on this model, the widest spread in the manual, and the vendor needed its `Improve Joint
 Convergence` option to rerun the problem at all.

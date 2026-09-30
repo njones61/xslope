@@ -35,14 +35,19 @@ CONFIG = PageConfig(
         ('2.512', 'unconfirmed'),
         ('2.512', 'The slope stands at 2.512'),
         ('2.531', 'the trial at 2.531'),
-        # RJ-3 on the source chapter's inputs stands at 1.027 and its search does
-        # not close above it (the trial at 1.047 is undecided; 1.125 fails): the
-        # values are trials in the committed run record (rj003_fem_meta), shown
-        # as a lower bound by ruling, never tagged.
-        ('1.027', 'unconfirmed'),
-        ('1.027', 'the slope stands at 1.027'),
+        # RJ-3 on the chapter's printed list (rj003_chapter, RJ-3c) stands at 1.027
+        # and its search does not close above it (the trial at 1.047 is
+        # undecided; 1.125 fails): trials in the committed run record
+        # (rj003_chapter_fem_meta), shown as a lower bound by ruling, never tagged.
+        ('1.027', 'unconfirmed*, at least 1.027'),
         ('1.125', 'and fails at 1.125'),
         ('1.047', 'the trial at 1.047'),
+        # The joint-cohesion-removed readings of problems 3 and 5 (problem 7's
+        # equals its tagged chapter-list value): scratch runs
+        # of the vendor's files with every joint's c set to zero, kept in the
+        # private reports (r44_data/zero_cohesion), shown by ruling, never tagged.
+        ('1.115', "everything else as the vendor's file: 1.115"),
+        ('1.799', "everything else as the vendor's file: 1.799"),
     ],
 
     abs_bounds=[

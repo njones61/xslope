@@ -25,12 +25,12 @@ EXTRA_CASES = [
     # registered here at the settings the page states, and their figures read the
     # mechanism the same way a locked row's does.
     #
-    # Problem 3 on the source chapter's inputs: the trial above its standing
-    # edge stops moving without balancing its forces, so the row reports a
-    # lower bound. Its vendor's-file variant (rj003_vendor, RJ-3v) locks and
-    # carries a tag.
-    {**_JOINT, 'file': 'files/rocscience/joints/rj003.xlsx',
-     'target_size': '12.0', 'benchmark': 'RJ-3'},
+    # Problem 3 on the source chapter's printed property list (rj003_chapter,
+    # shown beside RJ-3, which is posed on the vendor's file and carries a tag):
+    # the trial above its standing edge stops moving without balancing its
+    # forces, so the page reports a lower bound.
+    {**_JOINT, 'file': 'files/rocscience/joints/rj003_chapter.xlsx',
+     'target_size': '12.0', 'benchmark': 'RJ-3c'},
     # Problem 20's Voronoi mass. Corpus size is the mean BLOCK width measured on
     # the vendor's own traces, this row's stand-in for a joint spacing. The rest
     # of the termination family — the four problem-1 cases and problems 9 and 11

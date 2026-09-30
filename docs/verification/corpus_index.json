@@ -9309,12 +9309,12 @@
           "lf"
         ]
       },
-      "model": "docs/verification/files/rocscience/joints/rj003_vendor.xlsx",
+      "model": "docs/verification/files/rocscience/joints/rj003.xlsx",
       "references": [
         {
           "anchor": "rj-3",
           "checks": [
-            "RJ-3v"
+            "RJ-3"
           ],
           "level": 3,
           "page": "verification/rs2_joints/",
@@ -9443,16 +9443,16 @@
           "lf"
         ]
       },
-      "model": "docs/verification/files/rocscience/joints/rj004_vendor.xlsx",
+      "model": "docs/verification/files/rocscience/joints/rj004_chapter.xlsx",
       "references": [
         {
           "anchor": "rj-4",
           "checks": [
-            "RJ-4v"
+            "RJ-4c"
           ],
           "level": 3,
           "page": "verification/rs2_joints/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/verification/rs2_joints.md",
           "title": "RJ-4: Lorig & Varona flexural toppling (rj004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-4"
@@ -9473,7 +9473,7 @@
         "k0": 1.0,
         "line_loads": 0,
         "material_options": [
-          "mc"
+          "elastic"
         ],
         "n_materials": 1,
         "non_circular": false,
@@ -9540,7 +9540,7 @@
         "k0": 1.0,
         "line_loads": 0,
         "material_options": [
-          "elastic"
+          "mc"
         ],
         "n_materials": 1,
         "non_circular": false,
@@ -9577,16 +9577,16 @@
           "lf"
         ]
       },
-      "model": "docs/verification/files/rocscience/joints/rj005_vendor.xlsx",
+      "model": "docs/verification/files/rocscience/joints/rj005_chapter.xlsx",
       "references": [
         {
           "anchor": "rj-5",
           "checks": [
-            "RJ-5v"
+            "RJ-5c"
           ],
           "level": 3,
           "page": "verification/rs2_joints/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/verification/rs2_joints.md",
           "title": "RJ-5: Lorig & Varona backward block toppling (rj005)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-5"
@@ -9778,16 +9778,16 @@
           "lf"
         ]
       },
-      "model": "docs/verification/files/rocscience/joints/rj007_vendor.xlsx",
+      "model": "docs/verification/files/rocscience/joints/rj007_chapter.xlsx",
       "references": [
         {
           "anchor": "rj-7",
           "checks": [
-            "RJ-7v"
+            "RJ-7c"
           ],
           "level": 3,
           "page": "verification/rs2_joints/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/verification/rs2_joints.md",
           "title": "RJ-7: Plane failure with non-daylighting discontinuities (rj007)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-7"
@@ -27735,14 +27735,14 @@
       "docs/verification/files/rocscience/joints/rj001c.xlsx",
       "docs/verification/files/rocscience/joints/rj001d.xlsx",
       "docs/verification/files/rocscience/joints/rj002.xlsx",
-      "docs/verification/files/rocscience/joints/rj003_vendor.xlsx",
+      "docs/verification/files/rocscience/joints/rj003.xlsx",
       "docs/verification/files/rocscience/joints/rj004.xlsx",
-      "docs/verification/files/rocscience/joints/rj004_vendor.xlsx",
+      "docs/verification/files/rocscience/joints/rj004_chapter.xlsx",
       "docs/verification/files/rocscience/joints/rj005.xlsx",
-      "docs/verification/files/rocscience/joints/rj005_vendor.xlsx",
+      "docs/verification/files/rocscience/joints/rj005_chapter.xlsx",
       "docs/verification/files/rocscience/joints/rj006.xlsx",
       "docs/verification/files/rocscience/joints/rj007.xlsx",
-      "docs/verification/files/rocscience/joints/rj007_vendor.xlsx",
+      "docs/verification/files/rocscience/joints/rj007_chapter.xlsx",
       "docs/verification/files/rocscience/joints/rj008.xlsx",
       "docs/verification/files/rocscience/joints/rj009.xlsx",
       "docs/verification/files/rocscience/joints/rj010.xlsx",

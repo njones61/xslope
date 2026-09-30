@@ -10,7 +10,7 @@ them report a factor of safety (or, for problem 16, a tilt angle); problems 22 a
 **Naming.** One file per problem, ``rjNNN.xlsx`` with the manual's own problem
 number — ``rj018.xlsx`` is problem 18 — and a letter suffix where the manual
 carries lettered cases (``rj001a``…``rj001d``). Variants the manual does not
-letter take a descriptive suffix (``rj016_3deg``, ``rj003_vendor``). The ``rj`` prefix separates
+letter take a descriptive suffix (``rj016_3deg``, ``rj003_chapter``). The ``rj`` prefix separates
 this corpus from the ``vpNNN`` Slide2 one and the ``rs2_NN`` RS2 slope-stability
 one, both of which are numbered by a different manual.
 
@@ -22,15 +22,17 @@ referee — the closed form or the UDEC run each problem is scored against — a
 RS2's own two reported factors. The vendor files are NOT redistributed; the page
 records what was read from them.
 
-The one exception is problems 3, 4, 5 and 7, the Lorig & Varona examples. Their
-source (Wyllie & Mah 2004, ch. 10) gives one property list for the section, and
-it states strength inputs the vendor's files depart from: joints with no
-cohesion where the files carry 100 kPa, and a rock that can yield where the
-files for problems 3 and 5 hold it elastic. Those four problems are posed on
-the chapter's inputs (``rj003.xlsx`` …), and the vendor's own inputs are kept
-beside each as a second file with the suffix ``_vendor`` (``rj003_vendor.xlsx``
-…). Geometry, stiffnesses and restraints are the vendor's in both. Problem 6
-states its own joint cohesion, 100 kPa, and is built with it.
+Problems 3, 4, 5 and 7, the Lorig & Varona examples, carry a second file each.
+Their source (Wyllie & Mah 2004, ch. 10) prints one property list for the
+section, with joints that have no cohesion where the vendor's files carry
+100 kPa, and a rock that can yield where the files for problems 3 and 5 hold it
+elastic. The chapter does not say the list was used unchanged in its toppling
+runs, and as printed it reproduces neither the chapter's answers nor its
+mechanism here, so each row is posed on the vendor's file (``rj003.xlsx`` …) and
+the printed list is kept beside it with the suffix ``_chapter``
+(``rj003_chapter.xlsx`` …). Geometry, stiffnesses and restraints are the
+vendor's in both. Problem 6 states its own joint cohesion, 100 kPa, and has one
+file.
 
 **Units.** The vendor models are Metric MPa with unit weight in MN/m^3. These
 files are written in metric kPa / kN/m^3, which is the unit system the rest of the
@@ -187,16 +189,15 @@ LV_RING = [(0.0, 0.0), (700.0, 0.0), (700.0, 140.0), (560.0, 140.0),
 
 #: The joint the vendor's models for problems 3 to 7 carry: c = 0.1 MPa,
 #: phi = 40 degrees. Problem 6 is the one example in the source chapter (Wyllie
-#: & Mah 2004, ch. 10, Lorig & Varona) that states this cohesion itself, so
-#: problem 6 is built with it; the ``_vendor`` variants of problems 3, 4, 5 and 7
-#: carry it because the vendor's files do.
+#: & Mah 2004, ch. 10, Lorig & Varona) that states this cohesion itself;
+#: problems 3, 4, 5 and 7 carry it because the vendor's files do.
 LV_JOINT = {'c': 100.0, 'phi': 40.0, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
 
 #: The joint the source chapter's property list gives the 260 m / 55 degree
 #: section: friction 40 degrees, dilation 0, and no cohesion, the list naming a
 #: cohesion only for the rock mass. Problem 7's text calls its planes
-#: "cohesionless". Problems 3, 4, 5 and 7 are posed on it; the stiffness pair
-#: is the vendor's, which the chapter does not state.
+#: "cohesionless". The ``_chapter`` files of problems 3, 4, 5 and 7 carry it;
+#: the stiffness pair is the vendor's, which the chapter does not state.
 LV_JOINT_BOOK = {'c': 0.0, 'phi': 40.0, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
 
 #: The rock mass of the same list: 2660 kg/m^3 (26.1 kN/m^3), c = 675 kPa,
@@ -500,40 +501,36 @@ def _rj003(name, rock, joint):
 
 
 def rj003():
-    """RJ-3 — Lorig & Varona forward block toppling, on the source chapter's inputs.
+    """RJ-3 — Lorig & Varona forward block toppling (vendor `joint #003.fez`).
 
     The shared 260 m / 55 degree section cut by two sets: columns at 70 degrees
     at 20 m spacing, and a cross set at -20 degrees at 30 m, both through the
-    origin (the vendor's `joint #003.fez` geometry). The manual states the two as
-    "70 and 160" degrees, which is the same pair measured the other way round
-    the half circle.
+    origin. The manual states the two as "70 and 160" degrees, which is the
+    same pair measured the other way round the half circle.
 
-    The chapter states this example's geometry and its UDEC factor, and one
-    property list for the section: the rock is Mohr-Coulomb with c = 675 kPa,
-    phi = 43 degrees and no tension, E = 9.072 GPa, nu = 0.26, and the joints
-    have phi = 40 degrees and no cohesion. gamma = 26.0946 kN/m^3 is the
-    vendor's value. The vendor's file differs in two inputs: its joints carry
-    100 kPa of cohesion and its rock is elastic; that model is
-    :func:`rj003_vendor`. Referee: UDEC 1.13. RS2 reports 1.12 without joint
-    improvement and 1.09 with it, on its own file.
+    The rock is ELASTIC, so only the joints can fail. gamma = 26.0946 kN/m^3,
+    E = 9.072 GPa, nu = 0.26. The joints carry c = 100 kPa and phi = 40 degrees.
+    Referee: UDEC 1.13. RS2 reports 1.12 without joint improvement and 1.09
+    with it.
     """
     return _rj003('rj003.xlsx',
-                  _rock('Rock', 26.0946, LV_ROCK_E, LV_ROCK_NU, LV_ROCK_C,
-                        LV_ROCK_PHI, t_cut=0.0),
-                  LV_JOINT_BOOK)
-
-
-def rj003_vendor():
-    """RJ-3v — problem 3 exactly as the vendor's `joint #003.fez` carries it.
-
-    The rock is ELASTIC, so only the joints can fail: gamma = 26.0946 kN/m^3,
-    E = 9.072 GPa, nu = 0.26. The joints carry c = 100 kPa and phi = 40 degrees.
-    Same geometry and referee as :func:`rj003`.
-    """
-    return _rj003('rj003_vendor.xlsx',
                   _rock('Rock', 26.0946, LV_ROCK_E, LV_ROCK_NU, 0.0, 0.0,
                         option='elastic'),
                   LV_JOINT)
+
+
+def rj003_chapter():
+    """RJ-3c — problem 3 on the source chapter's printed property list.
+
+    Same geometry as :func:`rj003`. The rock is Mohr-Coulomb with c = 675 kPa,
+    phi = 43 degrees and no tension, E = 9.072 GPa, nu = 0.26, and the joints
+    have phi = 40 degrees and no cohesion; gamma = 26.0946 kN/m^3 is the
+    vendor's value. Shown beside the row, not scored.
+    """
+    return _rj003('rj003_chapter.xlsx',
+                  _rock('Rock', 26.0946, LV_ROCK_E, LV_ROCK_NU, LV_ROCK_C,
+                        LV_ROCK_PHI, t_cut=0.0),
+                  LV_JOINT_BOOK)
 
 
 # ---------------------------------------------------------------------------
@@ -551,28 +548,26 @@ def _rj004(name, joint):
 
 
 def rj004():
-    """RJ-4 — Lorig & Varona flexural toppling, on the source chapter's inputs.
+    """RJ-4 — Lorig & Varona flexural toppling (vendor `joint #004.fez`).
 
     The shared section cut by ONE set of columns at 70 degrees at 20 m spacing
-    through the origin (the vendor's `joint #004.fez` geometry) — problem 3's
-    first set without its cross joints, so the columns bend rather than topple
-    as blocks.
+    through the origin — problem 3's first set without its cross joints, so the
+    columns bend rather than topple as blocks.
 
     The rock is Mohr-Coulomb and carries a tensile cutoff of zero, which is what
     lets a column break in flexure: gamma = 26.1 kN/m^3, E = 9.072 GPa,
-    nu = 0.26, c = 675 kPa, phi = 43 degrees, T = 0. The joints have
-    phi = 40 degrees and no cohesion, as the chapter's property list gives
-    them. The vendor's file differs in one input, a joint cohesion of 100 kPa;
-    that model is :func:`rj004_vendor`. Referee: UDEC 1.3. RS2 reports 1.19
-    without joint improvement and 1.27 with it, on its own file.
+    nu = 0.26, c = 675 kPa, phi = 43 degrees, T = 0. The joints carry
+    c = 100 kPa and phi = 40 degrees. Referee: UDEC 1.3. RS2 reports 1.19
+    without joint improvement and 1.27 with it.
     """
-    return _rj004('rj004.xlsx', LV_JOINT_BOOK)
+    return _rj004('rj004.xlsx', LV_JOINT)
 
 
-def rj004_vendor():
-    """RJ-4v — problem 4 exactly as the vendor's `joint #004.fez` carries it:
-    the same rock as :func:`rj004`, joints at c = 100 kPa and phi = 40 degrees."""
-    return _rj004('rj004_vendor.xlsx', LV_JOINT)
+def rj004_chapter():
+    """RJ-4c — problem 4 on the source chapter's printed property list: the same
+    rock as :func:`rj004`, joints at phi = 40 degrees with no cohesion. Shown
+    beside the row, not scored."""
+    return _rj004('rj004_chapter.xlsx', LV_JOINT_BOOK)
 
 
 # ---------------------------------------------------------------------------
@@ -592,38 +587,35 @@ def _rj005(name, rock, joint):
 
 
 def rj005():
-    """RJ-5 — Lorig & Varona backward block toppling, on the source chapter's inputs.
+    """RJ-5 — Lorig & Varona backward block toppling (vendor `joint #005.fez`).
 
     The shared section cut by a set at -55 degrees at 10 m spacing through the
     toe at (560, 140) — dipping out of the face, so the blocks topple backward —
-    and a horizontal set at 40 m spacing through (0, 400) (the vendor's
-    `joint #005.fez` geometry).
+    and a horizontal set at 40 m spacing through (0, 400).
 
-    The rock is Mohr-Coulomb as the chapter's property list gives it:
-    gamma = 26.1 kN/m^3, E = 9.072 GPa, nu = 0.26, c = 675 kPa, phi = 43
-    degrees, no tension. The joints have phi = 40 degrees and no cohesion. The
-    vendor's file differs in two inputs: its joints carry 100 kPa of cohesion
-    and its rock is elastic; that model is :func:`rj005_vendor`. Referee:
-    UDEC 1.7. RS2 reports 1.65 without joint improvement and 1.86 with it, on
-    its own file — the widest "joint improvement" spread in the manual.
+    The rock is ELASTIC. gamma = 26.1 kN/m^3, E = 9.072 GPa, nu = 0.26. The
+    joints carry c = 100 kPa and phi = 40 degrees. Referee: UDEC 1.7. RS2
+    reports 1.65 without joint improvement and 1.86 with it — the widest
+    "joint improvement" spread in the manual.
     """
     return _rj005('rj005.xlsx',
-                  _rock('Rock', 26.1, LV_ROCK_E, LV_ROCK_NU, LV_ROCK_C,
-                        LV_ROCK_PHI, t_cut=0.0),
-                  LV_JOINT_BOOK)
-
-
-def rj005_vendor():
-    """RJ-5v — problem 5 exactly as the vendor's `joint #005.fez` carries it.
-
-    The rock is ELASTIC: gamma = 26.1 kN/m^3, E = 9.072 GPa, nu = 0.26. The
-    joints carry c = 100 kPa and phi = 40 degrees. Same geometry and referee as
-    :func:`rj005`.
-    """
-    return _rj005('rj005_vendor.xlsx',
                   _rock('Rock', 26.1, LV_ROCK_E, LV_ROCK_NU, 0.0, 0.0,
                         option='elastic'),
                   LV_JOINT)
+
+
+def rj005_chapter():
+    """RJ-5c — problem 5 on the source chapter's printed property list.
+
+    Same geometry as :func:`rj005`. The rock is Mohr-Coulomb:
+    gamma = 26.1 kN/m^3, E = 9.072 GPa, nu = 0.26, c = 675 kPa, phi = 43
+    degrees, no tension; the joints have phi = 40 degrees and no cohesion.
+    Shown beside the row, not scored.
+    """
+    return _rj005('rj005_chapter.xlsx',
+                  _rock('Rock', 26.1, LV_ROCK_E, LV_ROCK_NU, LV_ROCK_C,
+                        LV_ROCK_PHI, t_cut=0.0),
+                  LV_JOINT_BOOK)
 
 
 # ---------------------------------------------------------------------------
@@ -664,30 +656,27 @@ def _rj007(name, joint):
 
 
 def rj007():
-    """RJ-7 — plane failure with non-daylighting discontinuities, on the source
-    chapter's inputs.
+    """RJ-7 — plane failure with non-daylighting discontinuities (`joint #007.fez`).
 
     The same section and the same rock as problem 6, cut by one set at
-    -70 degrees at 20 m spacing through the origin (the vendor's
-    `joint #007.fez` geometry). The joints now dip out of the face STEEPER than
-    the 55 degree face, so none of them daylights: a slab cannot slide out
-    along one without shearing rock, and the slope stands higher than
-    problem 6's.
+    -70 degrees at 20 m spacing through the origin. The joints now dip out of
+    the face STEEPER than the 55 degree face, so none of them daylights: a slab
+    cannot slide out along one without shearing rock, and the slope stands
+    higher than problem 6's. The joints carry c = 100 kPa and phi = 40 degrees.
 
-    The chapter calls this example's sliding planes "cohesionless", so the
-    joints have phi = 40 degrees and no cohesion. The vendor's file differs in
-    one input, a joint cohesion of 100 kPa; that model is :func:`rj007_vendor`.
     Referee: UDEC 1.5. RS2 reports 1.57 without joint improvement and 1.59 with
-    it, on its own file. The manual's own table prints the slope angle as
-    5 degrees; the figure and the model are the same 55 degrees problem 6 uses.
+    it. The manual's own table prints the slope angle as 5 degrees; the figure
+    and the model are the same 55 degrees problem 6 uses.
     """
-    return _rj007('rj007.xlsx', LV_JOINT_BOOK)
+    return _rj007('rj007.xlsx', LV_JOINT)
 
 
-def rj007_vendor():
-    """RJ-7v — problem 7 exactly as the vendor's `joint #007.fez` carries it:
-    the same rock as :func:`rj007`, joints at c = 100 kPa and phi = 40 degrees."""
-    return _rj007('rj007_vendor.xlsx', LV_JOINT)
+def rj007_chapter():
+    """RJ-7c — problem 7 on the source chapter's printed property list, whose
+    text calls these sliding planes "cohesionless": the same rock as
+    :func:`rj007`, joints at phi = 40 degrees with no cohesion. Shown beside the
+    row, not scored."""
+    return _rj007('rj007_chapter.xlsx', LV_JOINT_BOOK)
 
 
 # ---------------------------------------------------------------------------
@@ -1278,8 +1267,8 @@ def rj020():
 #: ``joints`` group is this list, so a builder missing here is a corpus file
 #: nothing guards.
 BUILDERS = [rj001a, rj001b, rj001c, rj001d, rj002, rj015, rj016,
-            rj003, rj003_vendor, rj004, rj004_vendor, rj005, rj005_vendor,
-            rj006, rj007, rj007_vendor, rj008, rj009, rj010, rj011, rj012, rj013, rj014,
+            rj003, rj003_chapter, rj004, rj004_chapter, rj005, rj005_chapter,
+            rj006, rj007, rj007_chapter, rj008, rj009, rj010, rj011, rj012, rj013, rj014,
             rj017, rj017_staircase, rj018, rj019, rj020]
 
 

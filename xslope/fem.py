@@ -1623,6 +1623,84 @@ def _import_1d_result_sidecars(fem_data, solution, output_stem, tag):
         solution.setdefault("sidecar_notes", []).extend(notes)
 
 
+def export_fem_failure_solution(fem_data, failure_solution, output_stem):
+    """Write the at-failure picture's files alone: ``{stem}_fem_failure_nodes.csv``,
+    ``{stem}_fem_failure_elements.csv``, ``{stem}_fem_failure_meta.json`` and, where
+    the model has them, the reinforcement, pile and joint twins.
+
+    This is the at-failure half of :func:`export_fem_solution`, which calls it; on
+    its own it is how a picture redrawn from a stored search record
+    (:func:`capture_failure_from_record`) is written without touching the standing
+    field's files or the search record beside them.
+    """
+    import json
+    from pathlib import Path
+
+    output_stem = Path(output_stem)
+    f_nodes_file = output_stem.parent / f"{output_stem.name}_fem_failure_nodes.csv"
+    f_elements_file = output_stem.parent / f"{output_stem.name}_fem_failure_elements.csv"
+    f_meta_file = output_stem.parent / f"{output_stem.name}_fem_failure_meta.json"
+
+    f_node_df, f_element_df = _fem_solution_dataframes(fem_data, failure_solution)
+    with open(f_nodes_file, "w") as f:
+        _write_units_header(f, fem_data)
+        f_node_df.to_csv(f, index=False)
+    with open(f_elements_file, "w") as f:
+        _write_units_header(f, fem_data)
+        f_element_df.to_csv(f, index=False)
+
+    f_meta = {}
+    for key in _FEM_FAILURE_META_KEYS:
+        if key in failure_solution:
+            val = failure_solution[key]
+            # np scalars (max_displacement, residual, plastic_fraction, …) are
+            # not JSON-serializable — coerce to plain Python.
+            if isinstance(val, np.generic):
+                val = val.item()
+            f_meta[key] = val
+    with open(f_meta_file, "w") as f:
+        json.dump(f_meta, f, indent=2)
+
+    print(f"Exported FEM at-failure nodal results to {f_nodes_file}")
+    print(f"Exported FEM at-failure element results to {f_elements_file}")
+
+    for kind, path in (_write_1d_result_sidecars(
+            fem_data, failure_solution, output_stem, "fem_failure")
+            + _write_joint_result_sidecar(
+                fem_data, failure_solution, output_stem, "fem_failure")):
+        print(f"Exported FEM at-failure {kind} results to {path}")
+
+
+def capture_report(result):
+    """One plain line on how a run's at-failure picture was taken: at what
+    strength reduction factor, in how many iterations, and why it stopped."""
+    fs = result.get("FS")
+    fs_txt = "no factor of safety" if fs is None else (
+        f"FS {'>= ' if result.get('fs_is_lower_bound') else ''}{float(fs):.4f}")
+    cap = result.get("failure_solution") or {}
+    if not cap:
+        return f"{fs_txt}; no at-failure picture was taken"
+    if cap.get("capture_failed") or result.get("capture_failed"):
+        why = result.get("capture_failed_reason") or cap.get("capture_failed_reason")
+        return (f"{fs_txt}; no at-failure picture could be taken ({why}), so the "
+                "last standing field is drawn")
+    if cap.get("undecided_trial"):
+        return (f"{fs_txt}; the top trial at F = {float(cap.get('F', 0.0)):.4f} "
+                f"found no failure, and it is drawn as it ended after "
+                f"{int(cap.get('iterations', 0)):,} iterations "
+                f"({cap.get('exit_reason') or 'undecided'})")
+    F = cap.get("capture_F", cap.get("F"))
+    iters = int(cap.get("iterations", 0))
+    if cap.get("capture_truncated"):
+        why = cap.get("capture_truncated_reason") or cap.get("capture_truncated_kind")
+    elif cap.get("converged"):
+        why = "the slope came to rest"
+    else:
+        why = "ran to its iteration limit"
+    return (f"{fs_txt}; picture taken at F = {float(F):.4f} in {iters:,} "
+            f"iterations ({why})")
+
+
 def export_fem_solution(fem_data, solution, output_stem, meta=None,
                         failure_solution=None):
     """Export FEM nodal and element results to CSV files using a common stem.
@@ -1685,39 +1763,7 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None,
         print(f"Exported FEM {kind} results to {path}")
 
     if failure_solution is not None:
-        import json
-        f_nodes_file = output_stem.parent / f"{output_stem.name}_fem_failure_nodes.csv"
-        f_elements_file = output_stem.parent / f"{output_stem.name}_fem_failure_elements.csv"
-        f_meta_file = output_stem.parent / f"{output_stem.name}_fem_failure_meta.json"
-
-        f_node_df, f_element_df = _fem_solution_dataframes(fem_data, failure_solution)
-        with open(f_nodes_file, "w") as f:
-            _write_units_header(f, fem_data)
-            f_node_df.to_csv(f, index=False)
-        with open(f_elements_file, "w") as f:
-            _write_units_header(f, fem_data)
-            f_element_df.to_csv(f, index=False)
-
-        f_meta = {}
-        for key in _FEM_FAILURE_META_KEYS:
-            if key in failure_solution:
-                val = failure_solution[key]
-                # np scalars (max_displacement, residual, plastic_fraction, …) are
-                # not JSON-serializable — coerce to plain Python.
-                if isinstance(val, np.generic):
-                    val = val.item()
-                f_meta[key] = val
-        with open(f_meta_file, "w") as f:
-            json.dump(f_meta, f, indent=2)
-
-        print(f"Exported FEM at-failure nodal results to {f_nodes_file}")
-        print(f"Exported FEM at-failure element results to {f_elements_file}")
-
-        for kind, path in (_write_1d_result_sidecars(
-                fem_data, failure_solution, output_stem, "fem_failure")
-                + _write_joint_result_sidecar(
-                    fem_data, failure_solution, output_stem, "fem_failure")):
-            print(f"Exported FEM at-failure {kind} results to {path}")
+        export_fem_failure_solution(fem_data, failure_solution, output_stem)
 
     if meta is not None:
         import json
@@ -15392,7 +15438,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                joint_slip_stiffness_factor=None,
                joint_tangent=None, joint_tangent_factor=None,
                joint_newton=None, accelerate=None, resume=None,
-               _resume_ctx=None):
+               _resume_ctx=None, _capture_record=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -15772,6 +15818,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     # The run's own options, kept for a later continuation (see ``resume``).
     _call_options = {k: v for k, v in locals().items()
                      if k not in ("fem_data", "resume", "_resume_ctx",
+                                  "_capture_record",
                                   "cancel_check", "progress_callback",
                                   "debug_level")}
     if resume is not None:
@@ -16105,7 +16152,20 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         raise ValueError(
             f"Unknown ssrm_driver {ssrm_driver!r}. Supported: 'bisection' "
             "(default) and 'ramp'.")
-    if trial_factors:
+    # A search read back from its stored record (capture_failure_from_record)
+    # searches nothing: it re-solves the record's own bracket edges as fixed
+    # trials, through the same path as ``trial_factors``, and the answer is the
+    # record's. With no record this is ``trial_factors`` itself.
+    _record_edges = None
+    _probe_factors = trial_factors
+    if _capture_record is not None:
+        if trial_factors or _resume_ctx is not None:
+            raise ValueError(
+                "A stored search record is redrawn on its own; it cannot be combined "
+                "with trial_factors or with continuing a run.")
+        _record_edges = _ssrm_record_edges(_capture_record, fem_data_trials)
+        _probe_factors = _record_edges["factors"]
+    if _probe_factors:
         # The probe is a set of trials read for their verdicts, so it lives only
         # where a trial's verdict is the standing/failing question the bisection
         # asks. The displacement measures answer a different question (how far the
@@ -16169,12 +16229,12 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
             early_failure=early_failure, fem_solver=fem_solver,
             _prepared=prep, _init_state=init_state,
-            trial_factors=trial_factors,
+            trial_factors=_probe_factors,
             joint_slip_stiffness_factor=joint_slip_stiffness_factor,
             joint_tangent=joint_tangent,
             joint_tangent_factor=joint_tangent_factor,
             joint_newton=joint_newton, accelerate=accelerate,
-            _keep_resume=not trial_factors, _resume=_resume_ctx)
+            _keep_resume=not _probe_factors, _resume=_resume_ctx)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -16215,6 +16275,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             "'displacement_increase' (displacement-catastrophe sweep) - see "
             "docs/fem/overview.md, 'Choosing a Failure Criterion'.")
 
+    # The fields of the fixed trials, by F: read here only by a search read back
+    # from its record, and never left on a result.
+    _probe_solutions = result.pop("_probe_solutions", None) or {}
+    if _record_edges is not None:
+        result = _ssrm_result_from_record(_capture_record, _record_edges, result,
+                                          _probe_solutions)
+
     if equilibration is not None:
         # What the in-situ equilibration cost and found — reported so a run can be
         # read for whether the initial state was established at all.
@@ -16234,6 +16301,327 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     if _joint_cap is not None:
         result["joint_stiffness_cap"] = dict(_joint_cap)
 
+    # The at-failure capture (one rule, shared with capture_failure_from_record).
+    _ssrm_capture_failure(
+        result, fem_data_trials, prep, init_state,
+        capture_failure_state=capture_failure_state, capture_margin=capture_margin,
+        capture_max_iterations=capture_max_iterations, max_iterations=max_iterations,
+        force_tol=force_tol, oob_window=oob_window, dt_scale=dt_scale,
+        convergence_tol=convergence_tol, tension_cutoff=tension_cutoff,
+        min_slip_depth=min_slip_depth, ssr_exclude_mask=ssr_exclude_mask,
+        tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
+        elastic_mask=elastic_mask, suction_phi_b=suction_phi_b,
+        suction_cap=suction_cap, k0=k0, debug_level=debug_level)
+
+    # What a BONDED run says about a sheet that wanted to be a joint: the strain
+    # band lying along one, and a sheet every bar of which is at its cap. One
+    # pass over the critical solution, reported where the run is read, because a
+    # joint option nobody knows to set is not much use.
+    _advisories = joint_advisories(fem_data, result.get("last_solution"))
+    if _advisories:
+        result["joint_advisories"] = _advisories
+        for _msg in _advisories:
+            print(f"\n*** {_msg}")
+
+    elapsed = time.perf_counter() - t_start
+    if _resume_ctx is not None:
+        # A continued run is one run: its wall time is the sum of both parts.
+        elapsed += float(_resume_ctx["result"].get("elapsed_time") or 0.0)
+        result["resumed"] = {
+            "from_F": float(_resume_ctx["result"]["final_interval"][1]),
+            "max_iterations": int(max(max_iterations,
+                                      max_iterations_ceiling or 0)),
+            "previous_max_iterations": int(_resume_ctx["limit"]),
+            # The F of each trial on the path that was reused from the earlier
+            # run, continued from where it stopped, or solved afresh.
+            "reused": list(_how.get("reused") or []),
+            "continued": list(_how.get("continued") or []),
+            "fresh": list(_how.get("fresh") or [])}
+    result["elapsed_time"] = elapsed
+    if debug_level >= 1:
+        print(f"  SSRM completed in {elapsed:.1f} seconds")
+    if _kept_states:
+        store = SsrmContinuation(
+            states=_kept_states, soft=_kept_soft, solutions=_kept_solutions,
+            prep=prep,
+            init_state=init_state, equilibration=equilibration,
+            options=dict(_call_options), fem_data=fem_data,
+            model_fp=_model_fp_at_start,
+            limit=int(max(max_iterations, max_iterations_ceiling or 0)))
+        result["resumable"] = store
+        if ssrm_continue_refusal(result) is not None:
+            # The top trial is decided: nothing here could change the answer.
+            del result["resumable"]
+
+    # The closing summary: the answer, what happened at each end of its bracket,
+    # and the wall time, in words. Printed on every run, whatever the debug level,
+    # because it is where a reader learns that the answer depends on the
+    # iteration limit.
+    if _init_digest is not None and _digest(init_state) != _init_digest:
+        raise FemInvariantError(
+            "the in-situ state every trial starts from changed during the run; a "
+            "trial wrote into it.")
+    if _prep_static_digest(prep) != prep.get("_static_digest"):
+        raise FemInvariantError(
+            "an array the prepared model shares with every trial changed during the "
+            "run; a trial wrote into it.")
+    if _record_edges is not None:
+        # The search is the record's and is summarized there; this run only
+        # re-solved its edges and took the picture.
+        return result
+    result["summary"] = ssrm_run_summary(result, fem_data)
+    print(f"\n{result['summary']}")
+
+    return result
+
+
+def capture_failure_from_record(fem_data, record, **solve_ssrm_kwargs):
+    """Redraw the at-failure picture of a finished search from its stored record.
+
+    A strength reduction search spends nearly all of its time finding the
+    factor of safety: seven to ten trials, each up to its full iteration limit.
+    The picture of the slope at failure is one more solve on top of that, and
+    it depends on the search only through three numbers the search's record
+    already holds: the factor of safety, the final interval, and whether the
+    top of that interval was a trial the search could not decide. Redrawing
+    the picture (after a change to how it is taken, say) does not need the
+    search again. This takes the stored record instead and does only what the
+    picture needs:
+
+      1. prepares the model exactly as :func:`solve_ssrm` does (the same
+         prepared model, and the same full-strength in-situ state where ``k0``
+         is set);
+      2. solves the trial at the bottom of the record's final interval once,
+         the highest strength reduction the slope stood at, which is the
+         standing field the left-hand panels draw (``last_solution``);
+      3. where the model has reinforcement that can lose strength after its
+         peak, also solves the trial at the top of the interval, because the
+         picture shows those bars at the state the slope failed in;
+      4. takes the picture with the same rule, the same margin, the same
+         half-margin retry and the same stopping distance as solve_ssrm
+         (it is solve_ssrm's own code, not a copy).
+
+    A record whose top trial was undecided (``fs_is_lower_bound``) found no
+    failure, and its picture is that undecided trial itself, exactly as in
+    solve_ssrm. That trial is solved again the way the record says it ran, at
+    its F and with the same iteration limit, and it costs what it cost the
+    first time: an undecided trial usually ran to its full iteration ceiling,
+    so a lower-bound row saves only the rest of the search.
+
+    Each re-solved trial is compared with the record. Where it no longer does
+    what the record says (it stood where the record says it did not, or the
+    other way round), the record does not describe the model as it is now,
+    and this raises ValueError rather than draw a picture of a different
+    search. A trial that reaches the same verdict in a different number of
+    iterations is reported (``edges_resolved``) and printed, and the picture
+    is still taken, since it depends on the record's numbers and not on that
+    trial's field.
+
+    Arguments:
+        fem_data: the model, built the way the search's model was built.
+        record (dict): the stored search record, the dict
+            :func:`ssrm_run_record` wrote (as read back from ``*_fem_meta.json``),
+            with the factor of safety under ``FS``: needs ``FS``,
+            ``final_interval`` and ``trials``, and reads ``fs_is_lower_bound``.
+            It is only read.
+        **solve_ssrm_kwargs: the options the search was run with, exactly as
+            passed to :func:`solve_ssrm` (iteration limits, k0, zones, capture
+            margin and so on). The search range and tolerance are accepted and
+            not used. Only the default search (bisection, with the hybrid or
+            non-convergence criterion) can be redrawn this way.
+
+    Returns:
+        dict shaped like solve_ssrm's: ``FS``, ``final_interval``,
+        ``converged`` (True), ``fs_is_lower_bound``, ``last_solution``,
+        ``failure_solution`` and, where they apply, ``capture_failed``,
+        ``capture_failed_reason`` and ``capture_error``; ``trials`` is a copy of
+        the record's own trial list, ``from_record`` is True, and
+        ``edges_resolved`` lists each re-solved trial with its F, its iteration
+        count and the record's.
+    """
+    for key in ("resume", "trial_factors", "_resume_ctx", "_capture_record"):
+        if solve_ssrm_kwargs.get(key):
+            raise ValueError(f"capture_failure_from_record does not take {key!r}.")
+    if str(solve_ssrm_kwargs.get("ssrm_driver") or "bisection").strip().lower() \
+            != "bisection":
+        raise ValueError("Only a bisection search can be redrawn from its record.")
+    if solve_ssrm_kwargs.get("failure_criterion", "hybrid") not in (
+            "hybrid", "non_convergence"):
+        raise ValueError(
+            "Only a search run with the hybrid or non-convergence criterion can be "
+            "redrawn from its record; the displacement criteria decide each trial "
+            "differently.")
+    # Refuse a record that cannot be redrawn before anything is solved.
+    _ssrm_record_edges(record, fem_data)
+    return solve_ssrm(fem_data, _capture_record=record, **solve_ssrm_kwargs)
+
+
+def _model_can_soften(fem_data):
+    """True where a reinforcement bar of the model can drop from its peak to a
+    lower residual capacity (the same test solve_fem makes, ``can_soften_1d``)."""
+    elements_1d = fem_data.get("elements_1d")
+    n_1d = 0 if elements_1d is None else len(elements_1d)
+    if not n_1d:
+        return False
+    t_res = np.asarray(fem_data.get("t_res_by_1d_elem", np.full(n_1d, np.nan)),
+                       dtype=float)
+    t_allow = np.asarray(fem_data.get("t_allow_by_1d_elem", np.full(n_1d, np.nan)),
+                         dtype=float)
+    return bool(np.any(np.isfinite(t_res) & (t_res < t_allow - 1e-12)))
+
+
+def _ssrm_record_edges(record, fem_data):
+    """What a stored search record says about its own bracket, checked.
+
+    Returns the factor of safety, the final interval, whether it is a lower
+    bound, the record's trials at the two ends of the interval, and the F values
+    that have to be solved again to redraw its picture. Raises ValueError, in
+    words, where the record cannot be redrawn.
+    """
+    if not isinstance(record, dict):
+        raise ValueError("The stored search record is not a record of a search.")
+    missing = [k for k in ("FS", "final_interval", "trials") if record.get(k) is None]
+    if missing:
+        raise ValueError(f"The stored search record has no {', '.join(missing)}, so "
+                         "the search it describes cannot be redrawn.")
+    F_lo, F_hi = (float(v) for v in record["final_interval"])
+    FS = float(record["FS"])
+    lower = bool(record.get("fs_is_lower_bound"))
+    expected = F_lo if lower else 0.5 * (F_lo + F_hi)
+    if abs(FS - expected) > 1e-9 * max(1.0, abs(expected)):
+        raise ValueError(
+            f"The record's factor of safety {FS!r} is not the one its final "
+            f"interval [{F_lo!r}, {F_hi!r}] gives ({expected!r}); the record does "
+            "not describe a single search.")
+    trials = [t for t in record["trials"] if isinstance(t, dict)]
+
+    def _trial_at(F):
+        hits = [t for t in trials if _finite_or_none(t.get("F")) is not None
+                and abs(float(t["F"]) - F) <= 1e-12 * max(1.0, abs(F))]
+        return hits[-1] if hits else None
+
+    t_lo, t_hi = _trial_at(F_lo), _trial_at(F_hi)
+    if t_lo is None or not t_lo.get("stable"):
+        raise ValueError(
+            f"The record holds no trial at F = {F_lo:.6g} that stood, although "
+            "that is the bottom of its final interval. A search on a fixed grid "
+            "does not solve the ends of its interval and cannot be redrawn this way.")
+    if t_hi is None:
+        raise ValueError(f"The record holds no trial at F = {F_hi:.6g}, the top of "
+                         "its final interval.")
+    hi_undecided = (t_hi.get("exit_reason") in SSRM_UNDECIDED_EXITS
+                    and not t_hi.get("stable"))
+    if lower and not hi_undecided:
+        raise ValueError(
+            f"The record calls its factor of safety a lower bound, but its trial at "
+            f"F = {F_hi:.6g} was not left undecided.")
+    if not lower and t_hi.get("stable"):
+        raise ValueError(
+            f"The record's trial at F = {F_hi:.6g}, the top of its final interval, "
+            "stood; a search's interval ends on a failure.")
+    # The top trial is solved again where the picture reads it: a lower bound's
+    # picture IS that trial, and a failure's picture shows the reinforcement at
+    # the post-peak state that trial shed to. Otherwise only the standing trial is.
+    solve_top = lower or _model_can_soften(fem_data)
+    return {"FS": FS, "final_interval": (F_lo, F_hi), "lower_bound": lower,
+            "trial_stand": t_lo, "trial_top": t_hi, "solve_top": solve_top,
+            "factors": [F_lo] + ([F_hi] if solve_top else [])}
+
+
+def _ssrm_result_from_record(record, edges, probe, solutions):
+    """A solve_ssrm-shaped result for a stored search, from its re-solved edges.
+
+    ``probe`` is the fixed-trial run of the edges (its ``trials`` list) and
+    ``solutions`` the fields of those trials by F. Raises ValueError where a
+    re-solved trial reached a different verdict from the record's.
+    """
+    def _at(store, F):
+        for k, v in store.items():
+            if abs(float(k) - F) <= 1e-12 * max(1.0, abs(F)):
+                return v
+        return None
+
+    F_lo, F_hi = edges["final_interval"]
+    new_trials = {float(t["F"]): t for t in (probe.get("trials") or [])}
+    resolved = []
+    fields = {}
+    for F, old, edge in ((F_lo, edges["trial_stand"], "standing"),
+                         (F_hi, edges["trial_top"], "top")):
+        if F not in edges["factors"]:
+            continue
+        new = _at(new_trials, F)
+        sol = _at(solutions, F)
+        if new is None or sol is None:
+            raise FemInvariantError(f"the trial at F = {F!r} was asked for and not "
+                                    "solved.")
+
+        def _said(t):
+            if t.get("stable"):
+                return "stood"
+            if t.get("exit_reason") in SSRM_UNDECIDED_EXITS:
+                return "was left undecided"
+            return "did not stand"
+
+        if _said(new) != _said(old):
+            raise ValueError(
+                f"Solved again at F = {F:.6g}, the slope {_said(new)}; the record "
+                f"says it {_said(old)}. The record does not describe this model as "
+                "it is now, so its picture cannot be redrawn from it. Run the full "
+                "search.")
+        same = int(new.get("iterations", -1)) == int(old.get("iterations", -2))
+        if not same:
+            print(f"  Note: the trial at F = {F:.6g} {_said(new)} again, in "
+                  f"{int(new.get('iterations', 0)):,} iterations against the "
+                  f"record's {int(old.get('iterations', 0)):,}.")
+        resolved.append({"F": float(F), "edge": edge, "verdict": new.get("verdict"),
+                         "iterations": int(new.get("iterations", 0)),
+                         "record_iterations": old.get("iterations"),
+                         "same_iterations": bool(same)})
+        fields[edge] = sol
+    lower = edges["lower_bound"]
+    top = fields.get("top")
+    return {
+        "converged": True,
+        "FS": edges["FS"],
+        "fs_is_lower_bound": lower,
+        "undecided_solution": top if lower else None,
+        "last_solution": fields["standing"],
+        "final_interval": (F_lo, F_hi),
+        "interval_width": F_hi - F_lo,
+        "iterations_ssrm": record.get("iterations_ssrm"),
+        "failed_edge_softened": (None if lower or top is None
+                                 else _failed_edge_softened(top)),
+        "trials": copy.deepcopy(list(record.get("trials") or [])),
+        "inconclusive": [],
+        "note": None,
+        "failure_criterion": record.get("failure_criterion",
+                                        probe.get("failure_criterion")),
+        "method": record.get("method", probe.get("method")),
+        "from_record": True,
+        "edges_resolved": resolved,
+    }
+
+
+def _ssrm_capture_failure(result, fem_data_trials, prep, init_state, *,
+                          capture_failure_state, capture_margin,
+                          capture_max_iterations, max_iterations, force_tol,
+                          oob_window, dt_scale, convergence_tol, tension_cutoff,
+                          min_slip_depth, ssr_exclude_mask, tension_cap_by_elem,
+                          tension_srf, elastic_mask, suction_phi_b, suction_cap, k0,
+                          debug_level):
+    """Take the at-failure picture for a finished search, in place on ``result``.
+
+    ``result`` carries the search's answer (FS, final_interval, converged,
+    fs_is_lower_bound, last_solution, and, where they apply, undecided_solution
+    and failed_edge_softened). This adds ``failure_solution`` (and, where the
+    picture could not be taken, ``capture_failed`` / ``capture_failed_reason`` /
+    ``capture_error``) and changes nothing else. It is the one place the rule
+    for the at-failure picture lives: :func:`solve_ssrm` calls it at the end of
+    its search, and :func:`capture_failure_from_record` calls it (through
+    solve_ssrm) on a search read back from its stored record. The other
+    arguments are solve_ssrm's own, already resolved (the model with the
+    template defaults taken off, the prepared model, the in-situ state).
+    """
     # === Post-bracket capture of the at-failure (unconverged) mechanism ===
     # The bisection keeps only the last CONVERGED field, which is sub-critical and
     # reads as diffuse settlement. The deformed-mesh figures Griffiths & Lane plot are
@@ -16420,63 +16808,6 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             fallback = _capture_fallback(result.get("last_solution"), capture_reason)
             if fallback is not None:
                 result["failure_solution"] = fallback
-
-    # What a BONDED run says about a sheet that wanted to be a joint: the strain
-    # band lying along one, and a sheet every bar of which is at its cap. One
-    # pass over the critical solution, reported where the run is read, because a
-    # joint option nobody knows to set is not much use.
-    _advisories = joint_advisories(fem_data, result.get("last_solution"))
-    if _advisories:
-        result["joint_advisories"] = _advisories
-        for _msg in _advisories:
-            print(f"\n*** {_msg}")
-
-    elapsed = time.perf_counter() - t_start
-    if _resume_ctx is not None:
-        # A continued run is one run: its wall time is the sum of both parts.
-        elapsed += float(_resume_ctx["result"].get("elapsed_time") or 0.0)
-        result["resumed"] = {
-            "from_F": float(_resume_ctx["result"]["final_interval"][1]),
-            "max_iterations": int(max(max_iterations,
-                                      max_iterations_ceiling or 0)),
-            "previous_max_iterations": int(_resume_ctx["limit"]),
-            # The F of each trial on the path that was reused from the earlier
-            # run, continued from where it stopped, or solved afresh.
-            "reused": list(_how.get("reused") or []),
-            "continued": list(_how.get("continued") or []),
-            "fresh": list(_how.get("fresh") or [])}
-    result["elapsed_time"] = elapsed
-    if debug_level >= 1:
-        print(f"  SSRM completed in {elapsed:.1f} seconds")
-    if _kept_states:
-        store = SsrmContinuation(
-            states=_kept_states, soft=_kept_soft, solutions=_kept_solutions,
-            prep=prep,
-            init_state=init_state, equilibration=equilibration,
-            options=dict(_call_options), fem_data=fem_data,
-            model_fp=_model_fp_at_start,
-            limit=int(max(max_iterations, max_iterations_ceiling or 0)))
-        result["resumable"] = store
-        if ssrm_continue_refusal(result) is not None:
-            # The top trial is decided: nothing here could change the answer.
-            del result["resumable"]
-
-    # The closing summary: the answer, what happened at each end of its bracket,
-    # and the wall time, in words. Printed on every run, whatever the debug level,
-    # because it is where a reader learns that the answer depends on the
-    # iteration limit.
-    if _init_digest is not None and _digest(init_state) != _init_digest:
-        raise FemInvariantError(
-            "the in-situ state every trial starts from changed during the run; a "
-            "trial wrote into it.")
-    if _prep_static_digest(prep) != prep.get("_static_digest"):
-        raise FemInvariantError(
-            "an array the prepared model shares with every trial changed during the "
-            "run; a trial wrote into it.")
-    result["summary"] = ssrm_run_summary(result, fem_data)
-    print(f"\n{result['summary']}")
-
-    return result
 
 
 #: fem_data entries a solve itself adds or rewrites (derived caches), left out of
@@ -16924,6 +17255,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "inconclusive": inconclusive,
             "note": (inconclusive[-1]["message"] if inconclusive else None),
             "probe": True,
+            # INTERNAL (solve_ssrm takes it off the result): each fixed trial's
+            # field by F, which a search read back from its record draws from.
+            "_probe_solutions": dict(_solutions),
             "failure_criterion": ("hybrid" if hybrid else
                                   "non_convergence" if max_disp_factor is None
                                   else "displacement_limit"),

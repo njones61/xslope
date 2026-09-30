@@ -14,6 +14,8 @@ Usage, the same as its sibling's:
     python benchmarks/rocscience/make_rs2_joint_figures.py RJ-18      # one row
     python benchmarks/rocscience/make_rs2_joint_figures.py --from-sidecar
     python benchmarks/rocscience/make_rs2_joint_figures.py --audit
+    python benchmarks/rocscience/make_rs2_joint_figures.py --capture-only RJ-18
+        # redraw the at-failure picture from the row's stored search record
 """
 
 import os
@@ -210,6 +212,10 @@ if __name__ == '__main__':
         bad = F.audit_captures(registered())
         sys.exit(1 if (missing or dead or bad) else 0)
     from_sidecar = '--from-sidecar' in args
+    capture_only = '--capture-only' in args
+    if from_sidecar and capture_only:
+        sys.exit('--from-sidecar and --capture-only are two different redraws; '
+                 'pass one.')
     only = set(a for a in args if not a.startswith('--'))
     sweeps = sweep_cases()
     cases = list(registered()) + list(sweeps)
@@ -223,13 +229,15 @@ if __name__ == '__main__':
         t0 = time.time()
         try:
             if bench in sweep_registered():
-                if from_sidecar:
+                if from_sidecar or capture_only:
                     print(f'skip {bench:10s} a sweep row is re-rendered by '
-                          f're-solving (seconds), not from sidecars', flush=True)
+                          f're-solving (seconds); it has no search record',
+                          flush=True)
                     continue
                 out, fs = make_sweep_figure(tag)
             else:
                 out, fs = (F.make_figure_from_sidecar(tag) if from_sidecar
+                           else F.make_figure_capture_only(tag) if capture_only
                            else F.make_figure(tag))
             exp = tag.get('expected_fs')
             fsx = ('inputs-only' if tag.get('figure') == 'inputs'

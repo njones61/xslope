@@ -39,9 +39,15 @@ Each solve costs several minutes. Pass prefixes to render a subset.
 Run from the repo root:
     PYTHONPATH=. python3 benchmarks/make_torggler_figures.py
     PYTHONPATH=. python3 benchmarks/make_torggler_figures.py torggler_3a_plate
+    PYTHONPATH=. python3 benchmarks/make_torggler_figures.py --capture-only torggler_3a_plate
+        # redraw the results figure from the case's stored search record
+        # ({stem}_fem_meta.json beside the workbook): the standing trial and the
+        # picture are solved, the search is not. This script's full run writes
+        # no such record, so a case refuses until one has been written.
 """
 import contextlib
 import io
+import json
 import os
 import sys
 import time
@@ -56,7 +62,8 @@ import matplotlib.pyplot as plt
 
 import run_tests as RT
 from xslope.fileio import load_slope_data
-from xslope.fem import build_fem_data, solve_fem, solve_ssrm
+from xslope.fem import (build_fem_data, capture_failure_from_record, solve_fem,
+                        solve_ssrm)
 import xslope.fem as _fem
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                          extract_constraint_line_geometry, extract_point_constraints,
@@ -111,9 +118,8 @@ def stem(tag):
     return os.path.splitext(os.path.basename(tag['file']))[0]
 
 
-def render(tag):
-    name = stem(tag)
-    t0 = time.time()
+def _model(tag):
+    """The case's mesh and model, built exactly as its lock builds them."""
     sd = load_slope_data(tag['file'])
     lines, _nr, _np = extract_constraint_line_geometry(sd)
     polys = get_material_polygons(sd, reinf_lines=lines)
@@ -125,6 +131,65 @@ def render(tag):
             point_constraints=extract_point_constraints(sd),
             size_regions=extract_size_regions(sd), **RT._refine_kwargs(tag))
         fem_data = build_fem_data(sd, mesh)
+    return mesh, fem_data
+
+
+def _options(tag):
+    """The search options and the iteration limit the case is solved with."""
+    options = {'F_min': tag.get('f_min', 0.5), 'F_max': tag.get('f_max', 3.0),
+               'tolerance': tag.get('tolerance', 0.05)}
+    kwargs = {'max_iterations': int(tag['max_iter'])} if 'max_iter' in tag else {}
+    return options, kwargs
+
+
+def _draw(fem_data, result, failure, name):
+    with contextlib.redirect_stdout(io.StringIO()):
+        plot_fem_results(fem_data, result['last_solution'], fs=result['FS'],
+                         failure_solution=failure)
+    prefix = name.replace('xslope_', '')
+    path = os.path.join(OUT, f'{prefix}_results.png')
+    plt.gcf().savefig(path, dpi=DPI, bbox_inches='tight')
+    plt.close('all')
+    return path
+
+
+def render_capture_only(tag):
+    """Redraw one case's results figure from its stored search record: the
+    standing trial (xslope.fem.capture_failure_from_record, which re-solves only
+    what the picture needs) and this script's own at-failure solve, not the
+    search. A case with no stored record is refused."""
+    name = stem(tag)
+    t0 = time.time()
+    base = os.path.splitext(tag['file'])[0]
+    record_path = f'{base}_fem_meta.json'
+    if not os.path.exists(record_path):
+        raise RuntimeError(f'{name}: no stored search record at '
+                           f'{os.path.relpath(record_path, ROOT)}; run the full '
+                           'search for this case first')
+    with open(record_path) as fh:
+        record = json.load(fh)
+    _mesh, fem_data = _model(tag)
+    options, kwargs = _options(tag)
+    with contextlib.redirect_stdout(io.StringIO()):
+        with RT._force_fast_kernel(_fem, False):
+            # This script takes its own picture (see THE AT-FAILURE FIELD), so the
+            # solver's is not taken here either.
+            result = capture_failure_from_record(
+                fem_data, record, debug_level=0, capture_failure_state=False,
+                **options, **kwargs)
+    f_fail, failure = capture_failure(fem_data, result,
+                                      kwargs.get('max_iterations', 3000))
+    path = _draw(fem_data, result, failure, name)
+    print(f'  {name}: FS {result["FS"]:.4f} from the record; picture taken at '
+          f'F = {f_fail:.4f} in {failure["iterations"]:,} iterations '
+          f'({failure.get("exit_reason") or "ran to its end"}); wrote '
+          f'{os.path.relpath(path, ROOT)} ({time.time() - t0:.0f}s)', flush=True)
+
+
+def render(tag):
+    name = stem(tag)
+    t0 = time.time()
+    mesh, fem_data = _model(tag)
 
     if name in MESH_FIGURE:
         with contextlib.redirect_stdout(io.StringIO()):
@@ -135,9 +200,7 @@ def render(tag):
         print(f'  wrote {os.path.relpath(path, ROOT)}  '
               f'({len(mesh["elements"])} elements)', flush=True)
 
-    options = {'F_min': tag.get('f_min', 0.5), 'F_max': tag.get('f_max', 3.0),
-               'tolerance': tag.get('tolerance', 0.05)}
-    kwargs = {'max_iterations': int(tag['max_iter'])} if 'max_iter' in tag else {}
+    options, kwargs = _options(tag)
     with contextlib.redirect_stdout(io.StringIO()):
         with RT._force_fast_kernel(_fem, False):
             result = solve_ssrm(fem_data, debug_level=0,
@@ -149,25 +212,30 @@ def render(tag):
                                       kwargs.get('max_iterations', 3000))
     print(f'  at-failure field: F={f_fail:.3f}  iterations={failure["iterations"]}  '
           f'max|u|={failure["max_displacement"]:.3g}', flush=True)
-    with contextlib.redirect_stdout(io.StringIO()):
-        plot_fem_results(fem_data, result['last_solution'], fs=result['FS'],
-                         failure_solution=failure)
-    prefix = name.replace('xslope_', '')
-    path = os.path.join(OUT, f'{prefix}_results.png')
-    plt.gcf().savefig(path, dpi=DPI, bbox_inches='tight')
-    plt.close('all')
+    path = _draw(fem_data, result, failure, name)
     print(f'  wrote {os.path.relpath(path, ROOT)}  FS={result["FS"]:.4f}  '
           f'({time.time() - t0:.0f}s)', flush=True)
 
 
-def main(only=()):
+def main(only=(), capture_only=False):
+    failed = 0
     for tag in figure_tags():
         name = stem(tag)
         if only and not any(s in name for s in only):
             continue
         print(name, flush=True)
-        render(tag)
+        if not capture_only:
+            render(tag)
+            continue
+        try:
+            render_capture_only(tag)
+        except Exception as exc:              # one refused case does not stop the rest
+            failed += 1
+            print(f'  {exc}', flush=True)
+    return 1 if failed else 0
 
 
 if __name__ == '__main__':
-    main(only=tuple(sys.argv[1:]))
+    argv = sys.argv[1:]
+    sys.exit(main(only=tuple(a for a in argv if not a.startswith('--')),
+                  capture_only='--capture-only' in argv))

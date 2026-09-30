@@ -50,6 +50,9 @@ Run from the repo root:
     python benchmarks/rocscience/make_rs2_figures.py            # all
     python benchmarks/rocscience/make_rs2_figures.py RS2-30 RS2-31a
     python benchmarks/rocscience/make_rs2_figures.py --audit    # coverage only
+    python benchmarks/rocscience/make_rs2_figures.py --capture-only RS2-53
+        # redraw the at-failure picture from the row's stored search record:
+        # the standing trial and the picture are solved, the search is not
 """
 
 import glob
@@ -74,7 +77,8 @@ import matplotlib.pyplot as plt
 
 from xslope.fileio import load_slope_data
 from xslope.fem import (build_fem_data, solve_ssrm, export_fem_solution,
-                       ssrm_run_record)
+                       ssrm_run_record, capture_failure_from_record,
+                       export_fem_failure_solution, capture_report)
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                          extract_constraint_line_geometry, extract_joint_options,
                          extract_point_constraints,
@@ -579,7 +583,40 @@ def build_and_solve(tag):
     its trials decided or ran out of budget.
     """
     sd, fem_data, path, mesh = _build(tag)
+    options, ssr_zone, ssr_exclude = _solve_options(tag)
+    with contextlib.redirect_stdout(io.StringIO()), _reference_kernel():
+        sol = solve_ssrm(fem_data, **options)
+    if not sol.get('converged'):
+        raise RuntimeError(f'SSRM did not converge: {sol.get("error")}')
 
+    # Record the tag-carried zone for DRAWING only — after the solve, so the kwarg
+    # stays the solver's single source of truth (see _record_ssr_zone).
+    sd = _record_ssr_zone(sd, ssr_zone, fem_data)
+
+    field = sol.get('last_solution')
+    if field is None:
+        raise RuntimeError('SSRM returned no last_solution to plot')
+    # The at-failure (unconverged) mechanism for the strain/vector panels; None if
+    # the capture was skipped/failed (the panels then fall back to ``field``).
+    failure = sol.get('failure_solution')
+    # What the bracket CHOSE and what its trials found. A row locked at a value no
+    # trial decided — every trial at its iteration ceiling, the final bracket's
+    # edges among them — is a statement about the budget rather than about the
+    # slope, and without the per-trial record in the sidecar nothing downstream can
+    # tell the two apart (tools/ssrm_trial_audit.py is what reads it).
+    run = ssrm_run_record(sol, fem_data=fem_data, options={
+        'tolerance': float(tag.get('tolerance', 0.02)),
+        'F_min': float(tag.get('f_min', 0.5)),
+        'F_max': float(tag.get('f_max', 3.0)),
+        'ssr_exclude': ssr_exclude,
+    })
+    return sd, fem_data, field, failure, sol['FS'], path, mesh, run
+
+
+def _solve_options(tag):
+    """The solve_ssrm options a row's tag names, as ``(options, ssr_zone,
+    ssr_exclude)``: one place, so the full search and the redraw from the stored
+    record (``--capture-only``) solve the same model the same way."""
     # SSR-exclusion material names (semicolon-separated within the tag value,
     # since tag key=value pairs are comma-split) — held at full strength.
     ssr_exclude = None
@@ -633,55 +670,30 @@ def build_and_solve(tag):
     if 'max_iter_ceiling' in tag:
         extra['max_iterations_ceiling'] = int(tag['max_iter_ceiling'])
 
-    with contextlib.redirect_stdout(io.StringIO()), _reference_kernel():
-        sol = solve_ssrm(fem_data,
-                         F_min=float(tag.get('f_min', 0.5)),
-                         F_max=float(tag.get('f_max', 3.0)),
-                         tolerance=float(tag.get('tolerance', 0.02)),
-                         max_iterations=int(tag.get('max_iter', 4000)),
-                         ssr_exclude=ssr_exclude,
-                         ssr_zone=ssr_zone,
-                         elastic_materials=elastic_materials,
-                         **extra,
-                         # tension_srf mirrors run_tests: divide each tension cap by
-                         # the trial F (RS2's tensilestrength_SRF=1). Without this the
-                         # figure re-solve would disagree with the tag's lock on any
-                         # benchmark that uses it (RS2-62c: 0.744 static vs 0.769 SRF).
-                         # Absent tag -> the solver's own default (on); an explicit
-                         # tension_srf=false in a tag is honored, so the figure and the
-                         # lock always solve the same envelope.
-                         tension_srf=(str(tag['tension_srf']).lower() in ('true','1','yes')
-                                      if 'tension_srf' in tag else True),
-                         # capture_failure_state is default-on; keep it explicit so
-                         # the at-failure mechanism (the right-panel field) is always
-                         # captured and exported.
-                         capture_failure_state=True,
-                         debug_level=0)
-    if not sol.get('converged'):
-        raise RuntimeError(f'SSRM did not converge: {sol.get("error")}')
-
-    # Record the tag-carried zone for DRAWING only — after the solve, so the kwarg
-    # stays the solver's single source of truth (see _record_ssr_zone).
-    sd = _record_ssr_zone(sd, ssr_zone, fem_data)
-
-    field = sol.get('last_solution')
-    if field is None:
-        raise RuntimeError('SSRM returned no last_solution to plot')
-    # The at-failure (unconverged) mechanism for the strain/vector panels; None if
-    # the capture was skipped/failed (the panels then fall back to ``field``).
-    failure = sol.get('failure_solution')
-    # What the bracket CHOSE and what its trials found. A row locked at a value no
-    # trial decided — every trial at its iteration ceiling, the final bracket's
-    # edges among them — is a statement about the budget rather than about the
-    # slope, and without the per-trial record in the sidecar nothing downstream can
-    # tell the two apart (tools/ssrm_trial_audit.py is what reads it).
-    run = ssrm_run_record(sol, fem_data=fem_data, options={
-        'tolerance': float(tag.get('tolerance', 0.02)),
-        'F_min': float(tag.get('f_min', 0.5)),
-        'F_max': float(tag.get('f_max', 3.0)),
-        'ssr_exclude': ssr_exclude,
-    })
-    return sd, fem_data, field, failure, sol['FS'], path, mesh, run
+    options = dict(
+        F_min=float(tag.get('f_min', 0.5)),
+        F_max=float(tag.get('f_max', 3.0)),
+        tolerance=float(tag.get('tolerance', 0.02)),
+        max_iterations=int(tag.get('max_iter', 4000)),
+        ssr_exclude=ssr_exclude,
+        ssr_zone=ssr_zone,
+        elastic_materials=elastic_materials,
+        **extra,
+        # tension_srf mirrors run_tests: divide each tension cap by
+        # the trial F (RS2's tensilestrength_SRF=1). Without this the
+        # figure re-solve would disagree with the tag's lock on any
+        # benchmark that uses it (RS2-62c: 0.744 static vs 0.769 SRF).
+        # Absent tag -> the solver's own default (on); an explicit
+        # tension_srf=false in a tag is honored, so the figure and the
+        # lock always solve the same envelope.
+        tension_srf=(str(tag['tension_srf']).lower() in ('true', '1', 'yes')
+                     if 'tension_srf' in tag else True),
+        # capture_failure_state is default-on; keep it explicit so
+        # the at-failure mechanism (the right-panel field) is always
+        # captured and exported.
+        capture_failure_state=True,
+        debug_level=0)
+    return options, ssr_zone, ssr_exclude
 
 
 # ── Composite geometry (inches). These are the figure's structural chrome —
@@ -1519,6 +1531,90 @@ def make_figure(tag, dpi=150):
     return out, fs
 
 
+def _stored_record_path(tag, stem):
+    """Where the row's stored search record is: its own per-row copy where the
+    workbook is shared by several rows (see _write_row_meta), else
+    ``{stem}_fem_meta.json``."""
+    if stem in _shared_stems():
+        sys.path.insert(0, os.path.join(ROOT, 'tools'))
+        import ssrm_trial_audit as audit
+        return audit.row_meta_name(stem, tag)
+    return f'{stem}_fem_meta.json'
+
+
+def _set_refusal(meta_path, why):
+    """Record in the row's meta whether its at-failure picture was refused, and
+    nothing else: the key is written or removed only where it changes."""
+    try:
+        with open(meta_path) as fh:
+            meta = json.load(fh)
+    except OSError:
+        return
+    if meta.get('at_failure_capture_refused') == (why or None):
+        return
+    if why:
+        meta['at_failure_capture_refused'] = why
+    else:
+        meta.pop('at_failure_capture_refused', None)
+    with open(meta_path, 'w') as fh:
+        json.dump(meta, fh, indent=2)
+
+
+def make_figure_capture_only(tag, dpi=150):
+    """Redraw the row's at-failure picture from its stored search record.
+
+    The model is built exactly as the full search builds it and solved with the
+    same options, but only where the picture needs it: the trial at the bottom of
+    the record's final interval (the standing field), the at-failure solve itself,
+    and the top trial where the record or the model needs it (see
+    xslope.fem.capture_failure_from_record). The figure and the at-failure files
+    are written; the search record, the standing field's files and the mesh are
+    not. A row with no stored record is refused. Returns (out_path, fs)."""
+    bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
+    if tag.get('figure') == 'inputs':
+        raise RuntimeError('an inputs-only row has no at-failure picture to redraw')
+    sd, fem_data, path, _mesh = _build(tag)
+    stem = _sidecar_stem(tag, path)
+    record_path = _stored_record_path(tag, stem)
+    if not os.path.exists(record_path):
+        raise RuntimeError(
+            f'no stored search record at {os.path.relpath(record_path, ROOT)}; '
+            'run the full search for this row first')
+    with open(record_path) as fh:
+        record = json.load(fh)
+    options, ssr_zone, _ssr_exclude = _solve_options(tag)
+    with contextlib.redirect_stdout(io.StringIO()), _reference_kernel():
+        sol = capture_failure_from_record(fem_data, record, **options)
+    sd = _record_ssr_zone(sd, ssr_zone, fem_data)
+    field = sol['last_solution']
+    failure = sol.get('failure_solution')
+    fs = sol['FS']
+    print(f'  [{bench}] {capture_report(sol)} '
+          f'(record {os.path.relpath(record_path, ROOT)})', flush=True)
+
+    # The same refusal as the full path, with the same consequences for the
+    # picture's files; the meta beside them only learns whether it was refused.
+    note = None
+    why = _refused_capture(failure, field,
+                           has_joints=solution_has_joint_state(fem_data, failure or {}))
+    if why:
+        interval = sol.get('final_interval') or []
+        f_standing = field.get('F') or (interval[0] if interval else None)
+        note = _standing_note(f_standing)
+        print(f'  [{bench}] at-failure capture REFUSED: {why}; drawing the '
+              f'{note}', flush=True)
+        failure = None
+        _drop_failure_sidecars(stem)
+    else:
+        with contextlib.redirect_stdout(io.StringIO()):
+            export_fem_failure_solution(fem_data, failure, stem)
+    _set_refusal(f'{stem}_fem_meta.json', why)
+
+    out = render_figure(bench, sd, fem_data, field, failure=failure, fs=fs, dpi=dpi,
+                        standing_note=note)
+    return out, fs
+
+
 def _record_refusal(stem, why):
     """Write the refusal into the row's run-meta sidecar.
 
@@ -1690,10 +1786,17 @@ if __name__ == '__main__':
         sys.exit(1 if (ml or mr or dead or bad) else 0)
     # --from-sidecar re-renders SOLVE-FREE from the committed sidecars (no solver).
     from_sidecar = '--from-sidecar' in args
+    # --capture-only redraws the at-failure picture from each row's stored search
+    # record: the standing trial and the picture, not the search.
+    capture_only = '--capture-only' in args
+    if from_sidecar and capture_only:
+        sys.exit('--from-sidecar and --capture-only are two different redraws; '
+                 'pass one.')
     only = set(a for a in args if not a.startswith('--'))
     cases = parse_tags() + EXTRA_CASES
     print(f'{len(cases)} registered rows (fem_ssrm tags + EXTRA_CASES)'
-          f"{'  (solve-free re-render from sidecars)' if from_sidecar else ''}")
+          f"{'  (solve-free re-render from sidecars)' if from_sidecar else ''}"
+          f"{'  (at-failure picture from the stored search record)' if capture_only else ''}")
     for tag in cases:
         bench = tag.get('benchmark', '?')
         if only and bench not in only:
@@ -1701,6 +1804,7 @@ if __name__ == '__main__':
         t0 = time.time()
         try:
             out, fs = (make_figure_from_sidecar(tag) if from_sidecar
+                       else make_figure_capture_only(tag) if capture_only
                        else make_figure(tag))
             exp = tag.get('expected_fs')
             fsx = ('inputs-only' if tag.get('figure') == 'inputs'

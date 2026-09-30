@@ -40,12 +40,16 @@ are defined on.
     PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py               # every model
     PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py noncircular   # one
     PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py --meshes-only # mesh only
+    PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py --capture-only reinforce
+        # rewrite only the at-failure files, from the model's stored search
+        # record: the standing trial and the picture are solved, the search is not
 
 A model whose materials read a shipped seepage field is solved on the mesh
 committed beside it rather than on a rebuilt one; see ``COMMITTED_MESH``.
 """
 import contextlib
 import io
+import json
 import os
 import sys
 import time
@@ -55,7 +59,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import run_tests as RT                                                  # noqa: E402
 from xslope.fileio import load_slope_data                               # noqa: E402
 from xslope.fem import (build_fem_data, export_fem_solution,            # noqa: E402
-                        solve_ssrm, ssrm_run_record)
+                        solve_ssrm, ssrm_run_record, capture_failure_from_record,
+                        export_fem_failure_solution, capture_report)
 import xslope.fem as _fem                                               # noqa: E402
 from xslope.mesh import (build_mesh_from_polygons, export_mesh_to_json,  # noqa: E402
                          extract_constraint_line_geometry, extract_joint_options,
@@ -207,17 +212,70 @@ def _write(fem_data, result, stem, mesh, extra):
     export_mesh_to_json(mesh, f"{stem}_mesh.json")
 
 
-def build_tagged(name):
+def _tagged_model(name):
+    """(path, tag, mesh, fem_data, options, max_iterations) for a TAGGED model."""
     xlsx = TAGGED[name]
     path = os.path.join(REPO_ROOT, "docs", "fem", "files", xlsx)
     tag = RETIRED.get(name) or _tag(
         SAMPLES_MD, lambda t: os.path.basename(t["file"]) == xlsx)
-    t0 = time.time()
     slope_data, mesh = _mesh_for(tag, path)
     fem_data = _quiet(build_fem_data, slope_data, mesh)
     options = {"F_min": tag["f_min"], "F_max": tag["f_max"],
                "tolerance": tag["tolerance"]}
-    result = _solve(fem_data, options, int(tag["max_iter"]))
+    return path, tag, mesh, fem_data, options, int(tag["max_iter"])
+
+
+def _untagged_model(name):
+    """(path, mesh, fem_data, options, max_iterations) for an UNTAGGED model."""
+    spec = UNTAGGED[name]
+    path = spec["xlsx"]
+    slope_data = load_slope_data(path)
+    mesh = slope_data.get("mesh")
+    if mesh is None:
+        raise RuntimeError(f"{name}: no committed mesh companion to solve on")
+    fem_data = _quiet(build_fem_data, slope_data, mesh)
+    return path, mesh, fem_data, spec["options"], spec["max_iterations"]
+
+
+def capture_only(name):
+    """Rewrite one model's at-failure files from its stored search record.
+
+    The model is built as its full run builds it and solved with the same
+    options, but only where the picture needs it
+    (xslope.fem.capture_failure_from_record): the standing trial and the
+    at-failure solve, not the search. Only the at-failure files are written; the
+    record, the standing field's files and the mesh are left as they are. A model
+    with no stored record, or one whose files carry no at-failure picture, is
+    refused."""
+    t0 = time.time()
+    if name in TAGGED:
+        path, _tag_, _mesh, fem_data, options, max_iterations = _tagged_model(name)
+    elif name in UNTAGGED:
+        path, _mesh, fem_data, options, max_iterations = _untagged_model(name)
+    else:
+        raise RuntimeError(f"{name}: its files carry no at-failure picture to redraw")
+    stem = os.path.splitext(path)[0]
+    record_path = f"{stem}_fem_meta.json"
+    if not os.path.exists(record_path):
+        raise RuntimeError(f"{name}: no stored search record at "
+                           f"{os.path.relpath(record_path, REPO_ROOT)}; run the "
+                           "full search for this model first")
+    with open(record_path) as fh:
+        record = json.load(fh)
+    with RT._force_fast_kernel(_fem, False):
+        result = _quiet(capture_failure_from_record, fem_data, record,
+                        debug_level=0, capture_failure_state=True,
+                        max_iterations=max_iterations, **options)
+    failure = result.get("failure_solution")
+    if failure is not None:
+        _quiet(export_fem_failure_solution, fem_data, failure, stem)
+    print(f"{name}: {capture_report(result)} ({time.time() - t0:.0f}s)")
+
+
+def build_tagged(name):
+    t0 = time.time()
+    path, tag, mesh, fem_data, options, max_iterations = _tagged_model(name)
+    result = _solve(fem_data, options, max_iterations)
     if not result.get("converged"):
         raise RuntimeError(f"{name}: SSRM did not converge")
     fs = result["FS"]
@@ -246,13 +304,8 @@ def build_tagged(name):
 
 def build_untagged(name):
     spec = UNTAGGED[name]
-    path = spec["xlsx"]
     t0 = time.time()
-    slope_data = load_slope_data(path)
-    mesh = slope_data.get("mesh")
-    if mesh is None:
-        raise RuntimeError(f"{name}: no committed mesh companion to solve on")
-    fem_data = _quiet(build_fem_data, slope_data, mesh)
+    path, mesh, fem_data, _options, _max_iterations = _untagged_model(name)
     result = _solve(fem_data, spec["options"], spec["max_iterations"])
     if not result.get("converged"):
         raise RuntimeError(f"{name}: SSRM did not converge")
@@ -325,6 +378,17 @@ def build_mesh_only(name):
 def main(argv):
     wanted = [a for a in argv if not a.startswith("-")]
     meshes_only = "--meshes-only" in argv
+    if "--capture-only" in argv:
+        failed = 0
+        for name in list(TAGGED) + list(UNTAGGED) + list(COMMITTED_MESH):
+            if wanted and name not in wanted:
+                continue
+            try:
+                capture_only(name)
+            except Exception as exc:      # one refused model does not stop the rest
+                failed += 1
+                print(f"{name}: {exc}" if not str(exc).startswith(name) else str(exc))
+        return 1 if failed else 0
     for name in MESH_ONLY:
         if not wanted or name in wanted:
             build_mesh_only(name)

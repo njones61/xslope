@@ -1904,6 +1904,9 @@ _HEALTHY_ITERS = 12000
 #: A fenced capture must still have run far past its first sweep (see
 #: tools/verification_checks/captures.py, MIN_ITERATIONS).
 _CAPTURE_MIN_DEVELOPED_FLOOR = 100
+#: The healthy model's search with the distance fence on, as the check above ran
+#: it, so the redraw-from-record check reads the same run instead of a third one.
+_HEALTHY_RUN = {}
 
 
 def test_a_healthy_capture_is_untouched():
@@ -1983,6 +1986,8 @@ def test_a_healthy_capture_is_untouched():
     # The fence on: the same run, one capture different.
     frac = _fem._CAPTURE_DISTANCE_FRAC
     fenced = _run(frac)
+    # Kept for the redraw-from-record check below, which needs exactly this run.
+    _HEALTHY_RUN["fenced"] = (fem_data, fenced)
     import json
 
     def _trials(r):
@@ -2025,8 +2030,125 @@ def test_a_healthy_capture_is_untouched():
     return fails
 
 
+def test_the_picture_redrawn_from_the_record_is_the_search_s():
+    """Redrawing the at-failure picture from a stored search record gives the
+    picture the search itself took, and leaves the record alone.
+
+    The healthy model's search (distance fence on, as the check above runs it) is
+    written to its record the way every producer writes one, through JSON, and
+    ``capture_failure_from_record`` is run from that record. The picture it takes
+    must be the search's own: the same F, the same stop and where, the same
+    displacement to 1e-9, the same field. The standing field must be the same
+    trial's field, and the record must come back exactly as it went in. A record
+    that does not describe one search is refused before anything is solved.
+    """
+    fails = []
+    import json
+    import xslope.fem as _fem
+    from xslope.fem import (build_fem_data, capture_failure_from_record,
+                            solve_ssrm, ssrm_run_record)
+
+    _orig_solve_fem = _fem.solve_fem
+
+    def _reference_solve_fem(*a, **k):
+        k["fast_kernel"] = False
+        return _orig_solve_fem(*a, **k)
+
+    def _pinned(fn, *a, **k):
+        _fem.solve_fem = _reference_solve_fem
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                return fn(*a, **k)
+        finally:
+            _fem.solve_fem = _orig_solve_fem
+
+    if "fenced" in _HEALTHY_RUN:
+        fem_data, search = _HEALTHY_RUN["fenced"]
+    else:
+        from xslope.fileio import load_slope_data
+        from xslope.mesh import build_mesh_from_polygons, get_material_polygons
+        slope_data = load_slope_data(_HEALTHY_MODEL)
+        with contextlib.redirect_stdout(io.StringIO()):
+            mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
+                                            target_size=2.0, element_type="quad8")
+        fem_data = build_fem_data(slope_data, mesh)
+        search = _pinned(solve_ssrm, fem_data, F_min=2.0, F_max=2.8)
+
+    options = {"F_min": 2.0, "F_max": 2.8, "tolerance": 0.01}
+    record = ssrm_run_record(search, fem_data, options)
+    record["FS"] = search["FS"]
+    record = json.loads(json.dumps(record))          # as read back from the file
+    before = json.dumps(record, sort_keys=True)
+
+    redrawn = _pinned(capture_failure_from_record, fem_data, record,
+                      F_min=2.0, F_max=2.8)
+    if json.dumps(record, sort_keys=True) != before:
+        fails.append("redrawing from the record changed the record")
+    if json.dumps(redrawn.get("trials"), sort_keys=True) != json.dumps(
+            record["trials"], sort_keys=True):
+        fails.append("the redrawn result does not carry the record's own trials")
+    if redrawn.get("FS") != search["FS"] or tuple(redrawn.get("final_interval")) \
+            != tuple(search["final_interval"]):
+        fails.append(f"the redrawn result reads FS {redrawn.get('FS')} on "
+                     f"{redrawn.get('final_interval')}, not the search's "
+                     f"{search['FS']} on {search['final_interval']}")
+    if "_probe_solutions" in redrawn:
+        fails.append("an internal key was left on the redrawn result")
+
+    a, b = search.get("failure_solution") or {}, redrawn.get("failure_solution") or {}
+    if not a or not b:
+        return fails + ["the search or the redraw took no at-failure picture"]
+    print("    REDRAW healthy capture: search F %.6g stopped at %s (%s), max|u| %.12g; "
+          "redrawn F %.6g stopped at %s (%s), max|u| %.12g"
+          % (a.get("capture_F"), a.get("capture_truncated_at"),
+             a.get("capture_truncated_kind"), a.get("max_displacement"),
+             b.get("capture_F"), b.get("capture_truncated_at"),
+             b.get("capture_truncated_kind"), b.get("max_displacement")))
+    for key in ("capture_F", "capture_margin", "capture_truncated",
+                "capture_truncated_at", "capture_truncated_kind", "iterations",
+                "converged"):
+        if a.get(key) != b.get(key):
+            fails.append(f"the redrawn picture's {key} is {b.get(key)!r}, the "
+                         f"search's {a.get(key)!r}")
+    for key in ("max_displacement", "plastic_fraction", "capture_fence"):
+        va, vb = a.get(key), b.get(key)
+        if (va is None) != (vb is None) or (
+                va is not None and abs(float(va) - float(vb)) > 1e-9):
+            fails.append(f"the redrawn picture's {key} is {vb!r}, the search's {va!r}")
+    ua = np.asarray(a["displacements"], float)
+    ub = np.asarray(b["displacements"], float)
+    if ua.shape != ub.shape or np.max(np.abs(ua - ub)) > 1e-9:
+        fails.append("the redrawn picture's displacement field is not the search's")
+    la, lb = search["last_solution"], redrawn["last_solution"]
+    if (la["iterations"] != lb["iterations"]
+            or abs(float(la["max_displacement"]) - float(lb["max_displacement"]))
+            > 1e-9):
+        fails.append("the standing field redrawn from the record is not the "
+                     "search's standing field")
+    if not all(e.get("same_iterations") for e in redrawn.get("edges_resolved", [])):
+        fails.append(f"a re-solved trial took a different number of iterations: "
+                     f"{redrawn.get('edges_resolved')}")
+
+    # A record that does not describe one search is refused before any solve.
+    bad = dict(record, FS=record["FS"] + 0.1)
+    try:
+        capture_failure_from_record(fem_data, bad)
+        fails.append("a record whose FS is not its interval's was accepted")
+    except ValueError:
+        pass
+    try:
+        capture_failure_from_record(fem_data, {k: v for k, v in record.items()
+                                               if k != "final_interval"})
+        fails.append("a record with no final interval was accepted")
+    except ValueError:
+        pass
+    return fails
+
+
 CHECKS = [
     ("a healthy capture is untouched", test_a_healthy_capture_is_untouched),
+    ("the picture redrawn from the record is the search's",
+     test_the_picture_redrawn_from_the_record_is_the_search_s),
     ("a stopped capture is published and named",
      test_a_stopped_capture_is_published_and_named),
     ("a capture that came back with nothing falls back",

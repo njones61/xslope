@@ -9516,6 +9516,15 @@ MODULE_CHECKS = {
         "raise and say what differs; an element whose stiffness cannot be built "
         "raises; a search whose trials contradict each other records the pair; no "
         "function carries code after a return."),
+    'driver_agreement': (
+        'driver_agreement_check.py',
+        "The three strength-reduction drivers (the plain viscoplastic loop, the "
+        "default with its Newton corrector, and the Newton driver) on problems "
+        "with a known answer: a homogeneous soil slope against Bishop & "
+        "Morgenstern's chart, a block on a plane and the same block cut in two "
+        "against tan phi_j / tan beta. Each driver must land on the answer, the "
+        "three within one bisection step of each other, and their displacement "
+        "fields must agree at the highest factor all three stood at."),
     'ssrm_curve': (
         'ssrm_curve_check.py',
         "The strength reduction run's own record of itself: every trial carries "

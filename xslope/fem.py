@@ -472,6 +472,30 @@ def _edge_trial(trials, F, stood):
 SSRM_UNDECIDED_EXITS = ('inconclusive', 'yield_gate')
 
 
+def ambiguous_at_ceiling(disp_hist, u_elastic_scale, budget, ceiling,
+                         mesh_height=None):
+    """Is a trial at its HARD iteration ceiling that the classifier cannot rule on?
+
+    Such a trial ends 'inconclusive' (undecided) whether or not its residual is
+    still falling over the last window. Below the ceiling an AMBIGUOUS trial keeps
+    the legacy count (failed), since a higher limit was available and the trend
+    reading declined it (RS2-4-zone's failing edge, 1.9 at 32,000 of 50,000).
+
+    This reverses, for this one case, the older rule that only a residual still
+    measurably falling may halt the bisection at the ceiling. RJ-20's trial at
+    F = 2.53125 is the case: it was granted every extension to 1,000,000 because
+    its movement kept reading as settling, and at the ceiling whether its
+    residual read as falling over the last window flipped with a change to the
+    interface's stick/slip code that moved nothing else (r44). A limit reached is
+    not a verdict; the classifier's AMBIGUOUS is the verdict, and it is undecided.
+    """
+    if budget < ceiling:
+        return False
+    verdict = classify_nonconvergence(disp_hist, u_elastic_scale, 'iteration_cap',
+                                      model_height=mesh_height)[0]
+    return verdict == 'AMBIGUOUS'
+
+
 def ssrm_undecided_top(result):
     """The trial at the top of a run's final bracket, where that trial ended
     undecided (:data:`SSRM_UNDECIDED_EXITS`); None on every other run.
@@ -5059,6 +5083,87 @@ JOINT_NEWTON_CROSS = True
 #: fixed point the step is far under it and the cap never binds.
 _JOINT_RELIEF_STEP = 0.1
 
+# === The late finisher: the open-crack relief on a trial that ends undecided ===
+# r41_joint_cycle_proposal.md measured what RJ-3's undecided top trial was doing
+# when its movement read as still at 500,000 sweeps: 98% of its out-of-balance
+# force sat on the open cracks of two joint lines near the crest, and the slab of
+# rock between them was still tilting, steadily, at 2.3e-8 m per sweep. The plain
+# loop crawls there because the matrix it inverts still holds the full joint
+# stiffness across the open cracks (the correction cancels it every sweep, which
+# is the initial-stiffness method's slowest mode), and the stillness reading
+# missed the tilt because it reads the GLOBAL max|u|, which sat elsewhere and had
+# moved 750 times less. With the open cracks' stiffness taken out of the matrix
+# (the existing `joint_tangent='open'` relief) the slab finished its remaining
+# ~4 mm in about 3,000 sweeps and stopped.
+#
+# So a trial that is about to end UNDECIDED at its iteration limit (the
+# displacement classifier reads it AMBIGUOUS, after the rule-exit corrector has
+# refused) and whose out-of-balance force is CONFINED to open joint pairs is
+# handed to that relief from the state it reached: a side computation, like the
+# corrector, that never touches the trial's own state. The relieved run is read
+# for stillness at the nodes carrying the residual, not at the global maximum;
+# once they are still, the corrector is asked, and a state it certifies must pass
+# the hold test, which continues the PLAIN loop, with no relief and no
+# acceleration, from that state (see corrector_hold_test). Only a state that loop
+# stays on stands. Anything else leaves the trial exactly as it would have ended:
+# undecided, with the same state, the same exit and the same verdict.
+#
+# Every threshold is one this file already defines or one the r41 probe measured:
+#: The finisher at all. False restores the loop as it was for a whole process.
+JOINT_FINISHER_ON = True
+#: The share of the out-of-balance force (the squared windowed load change, the
+#: quantity the loop's own out-of-balance reading is built from) that must sit on
+#: the degrees of freedom of OPEN joint pairs for the trial to be handed over.
+#: RJ-3's still state reads 0.98; its flipping pairs carry 0.02.
+_FINISHER_CONFINED = 0.9
+#: The degrees of freedom the local stillness reading watches: the fewest that
+#: carry this share of the out-of-balance force, at the hand-over and at each
+#: reading.
+_FINISHER_HOT_SHARE = 0.9
+#: Sweeps the relieved run may take in all. The probe's slab finished in ~3,000
+#: and had stopped by 12,000; this is the start-of-trial relief's own window
+#: (_JOINT_RELIEF_SWEEPS), so the relief never reaches its hand-over inside it.
+_FINISHER_SWEEPS = 20000
+#: Sweeps per local stillness reading. The hot nodes are still when they moved
+#: less than `_CREEP_STILL` elastic displacements over one block: RJ-3's slab,
+#: at its plain-loop crawl of 2.3e-8 m a sweep, moves 1.4 times that line in a
+#: block, so the reading does not call the crawl still.
+_FINISHER_BLOCK = 1000
+#: Corrector attempts one finisher may make, each from a still reading.
+_FINISHER_ATTEMPTS = 3
+
+
+def _finisher_hot_dofs(dload, share=None):
+    """The fewest degrees of freedom carrying ``share`` of ``sum(dload**2)``."""
+    share = _FINISHER_HOT_SHARE if share is None else float(share)
+    q = np.asarray(dload, dtype=float) ** 2
+    tot = float(q.sum())
+    if not (tot > 0.0):
+        return np.zeros(0, dtype=np.int64)
+    order = np.argsort(q)[::-1]
+    k = int(np.searchsorted(np.cumsum(q[order]), share * tot)) + 1
+    return np.sort(order[:min(k, len(order))]).astype(np.int64)
+
+
+def _finisher_open_share(jd, open_mask, dload):
+    """How much of the out-of-balance force sits on OPEN joint pairs.
+
+    ``dload`` is the loop's windowed load change per degree of freedom (the
+    quantity its out-of-balance reading is built from), ``open_mask`` the (n, 3)
+    open-pair record. Returns ``(share, dofs)``: the fraction of ``sum(dload**2)``
+    on the four degrees of freedom of every open pair (both faces), and those
+    degrees of freedom. The r41 probe read RJ-3's undecided state this way.
+    """
+    q = np.asarray(dload, dtype=float) ** 2
+    tot = float(q.sum())
+    e_i, p_i = np.nonzero(np.asarray(open_mask, dtype=bool) & (jd["w"] > 0.0))
+    if e_i.size == 0 or not (tot > 0.0):
+        return 0.0, np.zeros(0, dtype=np.int64)
+    dof = jd["dof"]
+    dofs = np.unique(np.concatenate((dof[e_i, 2 * p_i], dof[e_i, 2 * p_i + 1],
+                                     dof[e_i, 6 + 2 * p_i], dof[e_i, 7 + 2 * p_i])))
+    return float(q[dofs].sum() / tot), dofs.astype(np.int64)
+
 # === The accelerated sweep (a step multiplier on the initial-stiffness loop) ===
 # The viscoplastic loop IS the initial-stiffness method: one elastic factorization,
 # the out-of-balance load re-applied every sweep. Where that iteration converges
@@ -6416,7 +6521,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               joint_slip_stiffness_factor=None,
               joint_tangent=None, joint_tangent_factor=None,
               joint_newton=None, accelerate=None, _creep_certify=True,
-              _resume_state=None, _keep_resume=False):
+              _resume_state=None, _keep_resume=False, _finisher_watch=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -6844,6 +6949,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             ``_resume_state`` so that solve_ssrm can continue the trial later with
             a higher limit (see ``_resume_state``). Off by default: every other
             caller gets ``_resume_state = None`` and nothing is copied.
+        _finisher_watch (dict or None): INTERNAL. The late finisher's relieved run
+            (see JOINT_FINISHER_ON): ``{"dofs": ..., "block": ...}``, the degrees of
+            freedom that carried the out-of-balance force when the trial was handed
+            over and the sweeps per local stillness reading. The call must also pass
+            ``_init_state`` (the trial's state) and ``joint_tangent='open'``. The run
+            stops when the watched nodes, and the ones carrying the residual at
+            each reading, moved less than ``_CREEP_STILL`` elastic displacements
+            over a block, when the relieved matrix settles, when the relief is put
+            away, or at ``max_iterations``; it decides nothing, and returns its end
+            state under ``_finisher_state`` for the corrector. None everywhere else.
         _resume_state (dict or None): INTERNAL. A ``_resume_state`` returned by an
             earlier call of this function on the same prepared model, the same F
             and the same settings. The trial CONTINUES from the iteration it
@@ -7613,6 +7728,174 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             print("  " + creep_sentence(rd, _c.get('F', F)))
         return _c
 
+    _fin_box = [None]
+
+    def _run_finisher(vp_iterations, softened_now=None):
+        """The late finisher on this trial's current state (see JOINT_FINISHER_ON).
+
+        Reads where the out-of-balance force sits; where at least
+        `_FINISHER_CONFINED` of it is on open joint pairs, runs the open-crack
+        relief from the trial's state (a separate call on a copy, through
+        `_finisher_watch`), and asks the corrector, with its hold test, from each
+        still reading. Returns the certified solution, or None; the trial's own
+        state is never changed either way, and ``_fin_box[0]`` keeps the record.
+        """
+        _share, _odofs = _finisher_open_share(
+            joint_data, joint_state_last["open"], _oob_dload)
+        rec = dict(armed=False, at_iteration=int(vp_iterations),
+                   share_open_before=float(_share),
+                   confined_frac=float(_FINISHER_CONFINED))
+        _fin_box[0] = rec
+        if _share < _FINISHER_CONFINED:
+            rec["outcome"] = "not confined"
+            if debug_level >= 1:
+                print(f"  Late finisher not armed: {_share:.0%} of the "
+                      f"out-of-balance force is on open joints (needs "
+                      f"{_FINISHER_CONFINED:.0%})")
+            return None
+        _hot = _finisher_hot_dofs(_oob_dload)
+        # Where it is, in the words a reader needs: which joint lines' open pairs
+        # carry it, and the middle of the nodes that do.
+        _dof_node = np.full(n_dof, -1, dtype=np.int64)
+        _dof_node[node_dof_x] = np.arange(len(node_dof_x))
+        _dof_node[node_dof_y] = np.arange(len(node_dof_y))
+        _hot_open = np.intersect1d(_hot, _odofs)
+        _e_o, _p_o = np.nonzero(joint_state_last["open"] & (joint_data["w"] > 0.0))
+        _jd_dof = joint_data["dof"]
+        _lines = set()
+        _lid = np.asarray(joint_data.get("line_id", np.zeros(joint_data["n"])))
+        for _e, _p in zip(_e_o, _p_o):
+            _d4 = (_jd_dof[_e, 2 * _p], _jd_dof[_e, 2 * _p + 1],
+                   _jd_dof[_e, 6 + 2 * _p], _jd_dof[_e, 7 + 2 * _p])
+            if np.isin(_d4, _hot_open).any():
+                _lines.add(int(_lid[_e]))
+        _nd = np.unique(_dof_node[_hot_open if _hot_open.size else _hot])
+        _nd = _nd[_nd >= 0]
+        _xy = np.asarray(fem_data["nodes"], dtype=float)[_nd, :2]
+        _near = ([float(v) for v in _xy.mean(axis=0)] if len(_xy) else None)
+        rec.update(armed=True, joint_lines=sorted(_lines),
+                   n_joint_lines=len(_lines), near=_near,
+                   hot_dofs=int(_hot.size))
+        _unit = _ssrm_length_unit(fem_data)
+        _where = ("" if _near is None
+                  else f" near ({_near[0]:.0f}, {_near[1]:.0f})")
+        _nl = len(_lines)
+        print(f"  At F = {F:.4f} the slope had stopped moving except along "
+              f"{_nl} open joint{'s' if _nl != 1 else ''}{_where}, which carried "
+              f"{_share:.0%} of the unbalanced force; softening "
+              f"{'them' if _nl != 1 else 'it'} to let that block finish moving.")
+        _u_arm = np.asarray(u, dtype=float).copy()
+        _state = {"u": _u_arm.copy(),
+                  "evp": [g_['evp'].copy() for g_ in gp_groups],
+                  "joint": {"slip_p": joint_slip.copy(),
+                            "open_prev": joint_open.copy(),
+                            "slipped": (None if joint_slipped is None
+                                        else joint_slipped.copy()),
+                            "dil_p": (None if joint_dil is None
+                                      else joint_dil.copy())},
+                  "_hold": True}
+        _kw = dict(debug_level=max(0, debug_level - 1),
+                   tolerance=tolerance, max_disp_factor=max_disp_factor,
+                   tension_cutoff=tension_cutoff, dt_scale=dt_scale,
+                   force_tol=force_tol, oob_window=oob_window,
+                   early_exit=early_exit, min_slip_depth=min_slip_depth,
+                   ssr_exclude_mask=ssr_exclude_mask,
+                   tension_cap_by_elem=tension_cap_by_elem,
+                   tension_srf=tension_srf, elastic_mask=elastic_mask,
+                   suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                   _prepared=prep, fast_kernel=fast_kernel,
+                   failure_criterion=failure_criterion, k0=k0,
+                   early_failure=early_failure,
+                   joint_slip_stiffness_factor=joint_slip_stiffness_factor,
+                   fem_solver='viscoplastic', joint_tangent='open',
+                   joint_tangent_factor=joint_tangent_factor,
+                   accelerate=False, progress_callback=None,
+                   _softened_seed=softened_now,
+                   _finisher_watch={"dofs": _hot, "block": _FINISHER_BLOCK})
+        _swept = 0
+        _runs, _atts = [], []
+        _cert = None
+        _end = None
+        _u_end = _u_arm
+        _share_after = None
+        while _swept < _FINISHER_SWEEPS:
+            _r = solve_fem(fem_data, F=F,
+                           max_iterations=int(_FINISHER_SWEEPS - _swept),
+                           max_iterations_ceiling=int(_FINISHER_SWEEPS - _swept),
+                           _init_state=_state, **_kw)
+            _fs = _r.get("_finisher_state")
+            if _fs is None:
+                _end = str(_r.get("exit_reason"))
+                break
+            _swept += int(_r.get("iterations", 0) or 0)
+            _end = _fs["end"]
+            _u_end = _fs["u"]
+            _share_after = _fs["share_open"]
+            _runs.append(dict(end=_end, sweeps=int(_r.get("iterations", 0) or 0),
+                              blocks=list(_fs["blocks"]),
+                              share_open=_share_after,
+                              refactorizations=int(_fs["rebuilds"])))
+            _state = {"u": _fs["u"], "evp": _fs["evp"], "joint": _fs["joint"],
+                      "_hold": True}
+            if _end not in ("still", "settled"):
+                break
+            # The corrector from the finisher's state: its joint history goes in
+            # through the arrays the corrector reads, and comes straight back out.
+            _saved = [(a, a.copy()) for a in (joint_slip, joint_open,
+                                             joint_slipped, joint_dil)
+                      if a is not None]
+            try:
+                for _dst, _key in ((joint_slip, "slip_p"),
+                                   (joint_open, "open_prev"),
+                                   (joint_slipped, "slipped"),
+                                   (joint_dil, "dil_p")):
+                    if _dst is not None and _fs["joint"].get(_key) is not None:
+                        np.copyto(_dst, _fs["joint"][_key])
+                _n_before = len(_corr_attempts)
+                _c = _try_corrector(
+                    _fs["u"], [{"evp": e_} for e_ in _fs["evp"]],
+                    f"finisher:{int(vp_iterations) + _swept}",
+                    int(vp_iterations) + _swept, softened_now)
+            finally:
+                for _a, _b in _saved:
+                    np.copyto(_a, _b)
+            _att = _corr_attempts[-1] if len(_corr_attempts) > _n_before else {}
+            _atts.append(dict(
+                after_sweeps=int(_swept), certified=_c is not None,
+                oob=_att.get("oob"), exit_reason=_att.get("exit_reason"),
+                r_best=(_att.get("nr_diag") or {}).get("r_best"),
+                hold=(None if _att.get("hold") is None else {
+                    k: _att["hold"].get(k) for k in (
+                        "held", "verdict", "exit_reason", "sweeps",
+                        "drift_u_el")})))
+            if _c is not None:
+                _cert = _c
+                break
+            if len(_atts) >= _FINISHER_ATTEMPTS:
+                break
+        _travel = (float(np.abs(np.asarray(_u_end)[_hot] - _u_arm[_hot]).max())
+                   if _hot.size else 0.0)
+        rec.update(sweeps=int(_swept), end=_end, runs=_runs, attempts=_atts,
+                   travel=_travel, unit=_unit,
+                   share_open_after=_share_after,
+                   outcome=("balanced" if _cert is not None else "not balanced"))
+        if _unit == "m":
+            _tr = f"{_travel * 1000.0:.1f} mm"
+        else:
+            _tr = f"{_travel:.3g}{(' ' + _unit) if _unit else ''}"
+        _how = ({"still": "and stopped", "settled": "and stopped",
+                 "limit": f"and was still moving after {_swept:,} iterations",
+                 "relief_off": "before the softening had to be put away"}
+                .get(_end, ""))
+        print(f"  At F = {F:.4f} the block moved a further {_tr} {_how}; "
+              + ("balanced, and the unsoftened solver held that state: the "
+                 "trial stands." if _cert is not None else
+                 "not balanced; the trial stays undecided."))
+        if _cert is not None:
+            _cert["finisher"] = rec
+            return _cert
+        return None
+
     if debug_level >= 1:
         print(f"  c: {c_by_elem[0]:.1f} -> {c_reduced[0]:.1f}")
         print(f"  phi: {phi_by_elem[0]:.1f} -> {np.degrees(phi_reduced[0]):.1f}")
@@ -7729,6 +8012,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         joint_cj_r, joint_tanphi_r = joint_reduced_strength(joint_data, F)
         joint_slip = np.zeros((joint_data["n"], 3))
         joint_open = np.zeros((joint_data["n"], 3), dtype=bool)
+        # Which pairs were slipping on the last sweep: the one-sided stick/slip
+        # band reads it (see joint.JOINT_RESTICK_FRAC). A carried-in state starts
+        # it empty, so the first sweep is the plain test.
+        joint_slip_prev = np.zeros((joint_data["n"], 3), dtype=bool)
         # The residual and dilation histories, allocated only where a line states
         # one. On a model that states neither all three stay None and every call
         # below takes the path it took before those columns existed.
@@ -7766,6 +8053,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         if _jt_mode not in ('off', 'open', 'slip'):
             raise ValueError(f"joint_tangent must be 'off', 'open' or 'slip', "
                              f"got {joint_tangent!r}")
+        # 'slip' from the START of a trial, RS2's own setting, runs away on RJ-3 at
+        # F = 1 (r41_joint_cycle_proposal.md §4): the elastic-first field already
+        # overstresses the interface (256 slipping and 525 open pairs at sweep 0),
+        # 755 pairs are relieved at once at sweep 26, and the relieved set then only
+        # grows while max|u| climbs at the relief's own step cap every sweep. From a
+        # SETTLED state the same relief is bounded (3,000 sweeps from the F = 1.2227
+        # still state left max|u| unchanged). No relieved pair was found re-stuck, so
+        # it is not the gain-of-100 hazard below; the fitting explanation is slip and
+        # opening laid down on large fictitious steps far from equilibrium, which
+        # friction cannot undo, but that is not isolated (the falsifier is the same
+        # relief armed only once the plain in-situ solve settles). This start-up
+        # use is left as it was; the late finisher (JOINT_FINISHER_ON) is the one
+        # that relieves, and it starts from a trial's settled-but-undecided state.
         joint_relief_on = _jt_mode in ('open', 'slip')
         joint_relief_open_only = (_jt_mode == 'open')
         _jt_factor = (JOINT_TANGENT_FACTOR if joint_tangent_factor is None
@@ -8276,6 +8576,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                        if u[free_dofs].size else 0.0]
         creep_certify = bool(_creep_certify and _corrector_on and not guard_on)
         creep_last = None              # the last trend reading taken
+        # The late finisher's relieved run (see _finisher_watch): what it watches,
+        # its block, the field at the last reading and each block's movement.
+        _fw = _finisher_watch if stage_idx == 0 else None
+        _fw_end = None
+        _fw_blocks = []
+        if _fw is not None:
+            if not (has_joints and joint_relief_on and _init_state is not None):
+                raise ValueError(
+                    "_finisher_watch needs a jointed model, joint_tangent='open' "
+                    "and the trial's state as _init_state.")
+            _fw_dofs = np.asarray(_fw.get("dofs", ()), dtype=np.int64)
+            _fw_block = max(1, int(_fw.get("block", _FINISHER_BLOCK)))
+            _fw_mark = u.copy()
 
         iteration = -1
         if _resume_state is not None and stage_idx == 0:
@@ -8310,6 +8623,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 if joint_dil is not None:
                     np.copyto(joint_dil, _jr["dil_p"])
                 joint_code_prev = np.array(_jr["code_prev"], copy=True)
+                np.copyto(joint_slip_prev, joint_code_prev == 1)
                 joint_n_changed = int(_jr["n_changed"])
                 joint_sweeps_changed = int(_jr["sweeps_changed"])
             if has_1d_elements and _rs.get("one_d") is not None:
@@ -8373,6 +8687,31 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                       f"with Max iterations per trial {budget:,}")
         while True:
             iteration += 1
+            # ---- the late finisher's relieved run (see JOINT_FINISHER_ON) ----
+            # It decides nothing: it ends on a still reading at the nodes carrying
+            # the residual, on the relieved matrix settling (below), on the relief
+            # being put away, or at its own limit, and hands its state back.
+            if _fw is not None:
+                if not joint_relief_on and iteration > 0:
+                    _fw_end = 'relief_off'
+                elif iteration >= budget:
+                    _fw_end = 'limit'
+                elif iteration > 0 and iteration % _fw_block == 0:
+                    _fw_hot = _finisher_hot_dofs(_oob_dload)
+                    _fw_watch = np.union1d(_fw_dofs, _fw_hot)
+                    _fw_moved = (float(np.abs(u[_fw_watch]
+                                              - _fw_mark[_fw_watch]).max())
+                                 if _fw_watch.size else 0.0)
+                    _fw_blocks.append(_fw_moved / u_elastic_scale
+                                      if u_elastic_scale > 0 else float('inf'))
+                    _fw_mark = u.copy()
+                    if _fw_blocks[-1] < _CREEP_STILL:
+                        _fw_end = 'still'
+                if _fw_end is not None:
+                    converged = False
+                    exit_reason = f"finisher_{_fw_end}"
+                    iteration -= 1
+                    break
             if iteration >= budget:
                 # The iteration limit. A trial still moving here is read by the
                 # trend of its movement (see `creep_trend`): dying away, the
@@ -8449,6 +8788,27 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                   f"({unbalanced_force_ratio:.2e} against tolerance "
                                   f"{force_tol:.1e}) - INCONCLUSIVE, neither "
                                   f"converged nor failed")
+                    elif (not guard_on
+                          and ambiguous_at_ceiling(disp_hist, u_elastic_scale,
+                                                   budget, ceiling,
+                                                   mesh_height)):
+                        # At the HARD ceiling and still unreadable (see
+                        # ambiguous_at_ceiling): undecided, whether or not the
+                        # residual happens to be falling over the last window.
+                        exit_reason = 'inconclusive'
+                        _k = max(2, int(trend_window // _HYBRID_SAMPLE_EVERY))
+                        stop_reading = dict(
+                            rule='inconclusive', reason='ambiguous_at_ceiling',
+                            oob_from=(float(sum(oob_hist[-2 * _k:-_k]) / _k)
+                                      if len(oob_hist) >= 2 * _k else None),
+                            oob_to=(float(sum(oob_hist[-_k:]) / _k)
+                                    if len(oob_hist) >= _k else None),
+                            window=int(2 * _k * _HYBRID_SAMPLE_EVERY),
+                            force_tol=float(force_tol))
+                        if debug_level >= 1:
+                            print(f"  Iteration ceiling {ceiling} reached with the "
+                                  f"displacement evidence unreadable - "
+                                  f"INCONCLUSIVE, neither converged nor failed")
                     if exit_reason == 'iteration_cap' and _tr == 'dying':
                         # Slowing, but the corrector could not finish it: the
                         # reading is kept for the closing summary, and the
@@ -8463,6 +8823,22 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     if _corrector_on and exit_reason in _CORRECTOR_RULE_EXITS:
                         _c = _try_corrector(
                             u, gp_groups, f"rule:{exit_reason}",
+                            total_iterations + iteration,
+                            softened_1d if has_1d_elements else None)
+                        if _c is not None:
+                            return _c
+                    # The late finisher (see JOINT_FINISHER_ON): a trial about to
+                    # end UNDECIDED whose residual sits on open joint pairs. It
+                    # reads the trial's state and never changes it, so a trial it
+                    # cannot balance ends here exactly as it did without it.
+                    if (has_joints and JOINT_FINISHER_ON and _corrector_on
+                            and _fw is None and not guard_on
+                            and not joint_relief_on and not has_pile_elements
+                            and prep.get("K_free") is not None
+                            and classify_nonconvergence(
+                                disp_hist, u_elastic_scale, exit_reason,
+                                model_height=mesh_height)[0] == 'AMBIGUOUS'):
+                        _c = _run_finisher(
                             total_iterations + iteration,
                             softened_1d if has_1d_elements else None)
                         if _c is not None:
@@ -8861,7 +9237,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         joint_data, u, joint_cj_r, joint_tanphi_r,
                         slip_p=joint_slip, open_prev=joint_open,
                         slipped=joint_slipped, res_r=joint_res_r,
-                        dil_p=joint_dil))
+                        dil_p=joint_dil, slip_prev=joint_slip_prev))
                     if joint_relief_open_only:
                         _code_now = np.where(_code_now == 2, 2, 0).astype(np.int8)
                     # Hysteresis: a pair is relieved only once it has held the
@@ -8943,7 +9319,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     res_r=joint_res_r, dil_p=joint_dil,
                     ks_slip_factor=joint_slip_stiffness_factor,
                     ks_asm=joint_ks_asm, kn_asm=joint_kn_asm,
-                    loads_relief=joint_relief_load)
+                    loads_relief=joint_relief_load,
+                    slip_state=joint_slip_prev)
                 # The active set's movement (see joint_code_prev). 0 sticking,
                 # 1 slipping, 2 open.
                 _jcode = (joint_state_last["slipping"].astype(np.int8)
@@ -9222,11 +9599,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         _u_try[free_dofs] = _acc_prev + _alpha * _acc_g
                         _s_try = _acc_ref_slip + _alpha * (joint_slip
                                                            - _acc_ref_slip)
+                        # Read with the same one-sided band the sweep used,
+                        # from this sweep's own code, so a pair the band holds
+                        # slipping is not refused for a flip it never makes.
                         _st_try = joint_state(
                             joint_data, _u_try, joint_cj_r, joint_tanphi_r,
                             slip_p=_s_try, open_prev=joint_open,
                             slipped=joint_slipped, res_r=joint_res_r,
-                            dil_p=joint_dil)
+                            dil_p=joint_dil,
+                            slip_prev=joint_state_last["slipping"])
                         if (bool(np.any(_st_try["open"]
                                         != joint_state_last["open"]))
                                 or bool(np.any(_st_try["slipping"]
@@ -9592,6 +9973,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 # relief produces is therefore a verdict of the loop that defines
                 # every locked factor of safety, and the relief only decides how
                 # many sweeps it took to get there.
+                if joint_relief_on and _fw is not None:
+                    # The finisher's relieved run has settled on the relieved
+                    # matrix: its state goes back to the trial, whose corrector
+                    # and hold test judge it (see JOINT_FINISHER_ON).
+                    converged = False
+                    exit_reason = 'finisher_settled'
+                    u = u_new
+                    break
                 if joint_relief_on:
                     K_factor = prep["K_factor"]
                     joint_ks_asm = joint_kn_asm = None
@@ -10451,6 +10840,25 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # INTERNAL: what a higher limit continues this trial from (see
         # _keep_resume); None unless asked for and the trial stopped undecided.
         "_resume_state": resume_state,
+        # What the late finisher did on this trial (see JOINT_FINISHER_ON); the
+        # key is absent where the trial never reached it.
+        **({} if _fin_box[0] is None else {"finisher": _fin_box[0]}),
+        # INTERNAL: the late finisher's relieved run hands its end state back to
+        # the trial that asked for it (see _finisher_watch).
+        **({} if _finisher_watch is None else {"_finisher_state": {
+            "end": (exit_reason[len("finisher_"):]
+                    if str(exit_reason).startswith("finisher_") else exit_reason),
+            "u": u.copy(),
+            "evp": [g_['evp'].copy() for g_ in gp_groups],
+            "joint": {"slip_p": joint_slip.copy(),
+                      "open_prev": joint_open.copy(),
+                      "slipped": (None if joint_slipped is None
+                                  else joint_slipped.copy()),
+                      "dil_p": None if joint_dil is None else joint_dil.copy()},
+            "blocks": [float(b) for b in _fw_blocks],
+            "rebuilds": int(joint_n_rebuilds),
+            "share_open": _finisher_open_share(
+                joint_data, joint_state_last["open"], _oob_dload)[0]}}),
     }
 
 
@@ -16307,6 +16715,10 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             **({} if sol.get("accelerate") is None
                else {"accelerate": sol["accelerate"],
                      "acceleration": sol.get("acceleration")}),
+            # What the late finisher did (see JOINT_FINISHER_ON); absent where the
+            # trial never reached it.
+            **({} if sol.get("finisher") is None
+               else {"finisher": sol["finisher"]}),
         })
         if _stable(sol):
             _carried[0] = (float(F) if _carried[0] is None

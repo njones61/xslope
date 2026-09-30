@@ -331,6 +331,213 @@ def check_wiring():
           hasattr(fem, 'JOINT_TRACE_SINK') and fem.JOINT_TRACE_SINK is None)
 
 
+def _toy_pairs(n_pairs=2):
+    """A single joint element with two live pairs (the third padded), horizontal,
+    k_n = 1e8, k_s = 1e7, no cohesion, tan phi = 0.5, no tension."""
+    import numpy as np
+    jd = {"n": 1, "dof": np.arange(12)[None, :], "tx": np.array([1.0]),
+          "ty": np.array([0.0]), "nx": np.array([0.0]), "ny": np.array([1.0]),
+          "kn": np.array([1e8]), "ks": np.array([1e7]), "tcut": np.array([0.0]),
+          "tip": np.zeros((1, 3), dtype=bool),
+          "w": np.array([[0.5, 0.5, 0.0]]) if n_pairs == 2 else np.ones((1, 3))}
+    return jd
+
+
+def _toy_u(dt, dn=1e-4):
+    """Displacements giving each pair a tangential offset ``dt[p]`` (side a moved
+    +x) and a normal closing ``dn`` (side a moved -y, compression positive)."""
+    import numpy as np
+    u = np.zeros(12)
+    for p in range(3):
+        u[2 * p] = dt[p] if p < len(dt) else 0.0
+        u[2 * p + 1] = -dn
+    return u
+
+
+def check_restick_band():
+    """The one-sided stick/slip band (joint.JOINT_RESTICK_FRAC) on a two-pair toy."""
+    import numpy as np
+    import xslope.joint as J
+    print("\n6. the one-sided stick/slip band — a two-pair toy")
+    jd = _toy_pairs()
+    cj, tp = np.array([0.0]), np.array([0.5])
+    # t_n = 1e8 * 1e-4 = 1e4, t_lim = 5e3, the limit offset is 5e-4.
+    lim = 5e-4
+    frac = J.JOINT_RESTICK_FRAC
+    check("the band is a small one below the limit", 0.99 <= frac < 1.0,
+          f"JOINT_RESTICK_FRAC = {frac}")
+    in_band = lim * (1.0 - 0.5 * (1.0 - frac))       # inside the band
+    below = lim * (1.0 - 2.0 * (1.0 - frac))         # clearly below it
+    over = lim * 1.001
+    u = _toy_u([in_band, below])
+    plain = J.joint_state(jd, u, cj, tp, slip_p=np.zeros((1, 3)),
+                          open_prev=np.zeros((1, 3), bool))
+    prev = np.array([[True, True, False]])
+    held = J.joint_state(jd, u, cj, tp, slip_p=np.zeros((1, 3)),
+                         open_prev=np.zeros((1, 3), bool), slip_prev=prev)
+    check("plain test: both pairs under the limit read sticking",
+          not plain["slipping"][0, :2].any())
+    check("a pair slipping last sweep and inside the band stays slipping",
+          bool(held["slipping"][0, 0]))
+    check("a pair slipping last sweep and clearly below the band re-sticks",
+          not bool(held["slipping"][0, 1]))
+    check("a pair held inside the band carries its own traction, not the limit",
+          held["ts"][0, 0] == plain["ts"][0, 0] and abs(held["ts"][0, 0]) < 5e3)
+    stick = J.joint_state(jd, u, cj, tp, slip_p=np.zeros((1, 3)),
+                          open_prev=np.zeros((1, 3), bool),
+                          slip_prev=np.zeros((1, 3), bool))
+    check("ONE-SIDED: a sticking pair inside the band stays sticking",
+          not stick["slipping"][0, :2].any())
+    u2 = _toy_u([over, below])
+    a = J.joint_state(jd, u2, cj, tp, slip_p=np.zeros((1, 3)),
+                      open_prev=np.zeros((1, 3), bool))
+    b = J.joint_state(jd, u2, cj, tp, slip_p=np.zeros((1, 3)),
+                      open_prev=np.zeros((1, 3), bool),
+                      slip_prev=np.zeros((1, 3), bool))
+    check("a pair over the limit slips with or without the band",
+          bool(a["slipping"][0, 0]) and bool(b["slipping"][0, 0]))
+    for k in ("tn", "ts", "tlim", "open"):
+        check(f"no band held: '{k}' identical to the plain test",
+              np.array_equal(a[k], b[k]))
+
+    # The sweep: a sequence that crosses the limit, dips into the band (the
+    # flip) and unloads, run with and without the band. The body load, the slip,
+    # the open record and the residual latch must be BIT-IDENTICAL; only the
+    # slipping code may differ, and only on the dip.
+    # Pair 0 is loaded past its limit, then ripples about the offset it slipped
+    # to by a part in 1e5 of the limit (the RJ-3 flip); pair 1 is loaded past
+    # its limit and then unloads for real, well below the band.
+    rip = lim * 1e-5
+    seq = [[over, over], [over - rip, over], [over + rip, lim * 0.9],
+           [over - rip, lim * 0.5], [over + rip, lim * 0.5],
+           [over - rip, lim * 0.5], [over, lim * 0.2]]
+    res = {}
+    for band in (False, True):
+        slip = np.zeros((1, 3))
+        opn = np.zeros((1, 3), bool)
+        latch = np.zeros((1, 3), bool)
+        sp = np.zeros((1, 3), bool) if band else None
+        loads_all, codes = [], []
+        for dts in seq:
+            loads = np.zeros(12)
+            _, st = J.joint_vp_sweep(jd, _toy_u(dts), loads, cj, tp, slip, opn,
+                                     slipped=latch,
+                                     res_r=(np.array([0.0]), np.array([0.5])),
+                                     slip_state=sp)
+            loads_all.append(loads.copy())
+            codes.append(st["slipping"].copy())
+        res[band] = (np.array(loads_all), slip.copy(), opn.copy(), latch.copy(),
+                     np.array(codes))
+    check("sweep: the body load is bit-identical with the band",
+          np.array_equal(res[False][0], res[True][0]))
+    check("sweep: the accumulated slip is bit-identical with the band",
+          np.array_equal(res[False][1], res[True][1]))
+    check("sweep: the open record and the residual latch are bit-identical",
+          np.array_equal(res[False][2], res[True][2])
+          and np.array_equal(res[False][3], res[True][3]))
+    flips_plain = int((res[False][4][1:] != res[False][4][:-1]).sum())
+    flips_band = int((res[True][4][1:] != res[True][4][:-1]).sum())
+    check("sweep: the band removes the ripple's code changes",
+          flips_band < flips_plain, f"{flips_plain} -> {flips_band}")
+    check("sweep: a pair that really unloads still re-sticks under the band",
+          not bool(res[True][4][-1][0, 1]))
+
+
+def check_finisher_reading():
+    """The late finisher's confinement reading (fem._finisher_open_share) and its
+    hot-node selection, on a synthetic residual."""
+    import inspect
+    import numpy as np
+    print("\n7. the late finisher — confinement reading on a synthetic residual")
+    jd = _toy_pairs(3)
+    jd["dof"] = np.arange(12)[None, :] + 4          # joint dofs 4..15 of 20
+    open_mask = np.array([[True, False, False]])     # pair 0: dofs 4,5 and 10,11
+    dload = np.zeros(20)
+    dload[[4, 5, 10, 11]] = [3.0, 4.0, -3.0, -4.0]   # 50 on the open pair
+    dload[[0, 17]] = [1.0, 2.0]                      # 5 elsewhere
+    share, dofs = fem._finisher_open_share(jd, open_mask, dload)
+    check("the share is the squared load change on the open pair's four dofs",
+          abs(share - 50.0 / 55.0) < 1e-12, f"{share:.4f}")
+    check("...both faces of the pair", list(dofs) == [4, 5, 10, 11])
+    check("that share sits just above the arming line",
+          share >= fem._FINISHER_CONFINED)
+    dload[0] = 5.0
+    share2, _ = fem._finisher_open_share(jd, open_mask, dload)
+    check("a residual that spreads into the soil drops below the arming line",
+          share2 < fem._FINISHER_CONFINED, f"{share2:.4f}")
+    check("no open pair reads zero",
+          fem._finisher_open_share(jd, np.zeros((1, 3), bool), dload)[0] == 0.0)
+    check("no residual reads zero",
+          fem._finisher_open_share(jd, open_mask, np.zeros(20))[0] == 0.0)
+    hot = fem._finisher_hot_dofs(np.array([0.0, 10.0, 1.0, 0.0, 3.0]))
+    check("the hot set is the fewest dofs carrying 90% of the squared residual",
+          list(hot) == [1], f"{list(hot)}")
+    hot = fem._finisher_hot_dofs(np.array([0.0, 3.0, 3.0, 1.0]))
+    check("...taking more where one is not enough", list(hot) == [1, 2])
+    check("an all-zero residual has no hot dofs",
+          fem._finisher_hot_dofs(np.zeros(5)).size == 0)
+    check("the finisher is on, and can be switched off for an A/B",
+          fem.JOINT_FINISHER_ON is True)
+    check("its relieved run is a solve_fem call the trial makes on a copy",
+          "_finisher_watch" in inspect.signature(fem.solve_fem).parameters)
+    check("its sweep allowance is inside the start-of-trial relief's window",
+          fem._FINISHER_SWEEPS <= fem._JOINT_RELIEF_SWEEPS)
+
+
+def check_ambiguous_at_ceiling():
+    """An AMBIGUOUS trial at its HARD ceiling is undecided (fem.ambiguous_at_ceiling),
+    built on RJ-20's trial at F = 2.53125: 2.87x elastic, still, 1,000,000 sweeps
+    at a 1,000,000 ceiling, the late finisher armed and refused."""
+    print("\n8. an unreadable trial at its hard ceiling is undecided (RJ-20)")
+    u_el = 0.002429200750969142
+    n = 100000                                       # 1,000,000 sweeps / 10
+    disp = [2.8739644749953936 * u_el - 5.2e-05 * u_el * (1.0 - k / n)
+            for k in range(n)]
+    verdict = fem.classify_nonconvergence(disp, u_el, 'iteration_cap',
+                                          model_height=60.0)[0]
+    check("the trial reads AMBIGUOUS (2.87x elastic, not growing)",
+          verdict == 'AMBIGUOUS', verdict)
+    check("at its ceiling it is undecided",
+          fem.ambiguous_at_ceiling(disp, u_el, 1000000, 1000000, 60.0))
+    check("below its ceiling it keeps the legacy count (failed)",
+          not fem.ambiguous_at_ceiling(disp, u_el, 500000, 1000000, 60.0))
+    # RS2-4-zone's failing edge: AMBIGUOUS, still, 32,000 of a 50,000 ceiling.
+    check("RS2-4-zone's failing edge (32,000 of 50,000) is still counted failed",
+          not fem.ambiguous_at_ceiling(disp, u_el, 32000, 50000, 60.0))
+    moving = [x * (1.0 + 0.2 * k / n) for k, x in enumerate(disp)]
+    check("a trial still moving at its ceiling is not undecided by this rule",
+          not fem.ambiguous_at_ceiling(moving, u_el, 1000000, 1000000, 60.0))
+    stuck = [0.5 * u_el] * n
+    check("a trial frozen at elastic scale is not undecided by this rule",
+          not fem.ambiguous_at_ceiling(stuck, u_el, 1000000, 1000000, 60.0))
+
+    # The bracket as the run record reads it: RJ-20's nine trials, the top one
+    # ending as the loop now labels it.
+    def run(top_exit):
+        trials = [
+            (0.5, 'CONVERGED', 'converged', True), (3.0, 'FAILED', 'diverging', False),
+            (1.75, 'JOINT_SETTLED', 'joint_settled', True),
+            (2.375, 'JOINT_SETTLED', 'joint_settled', True),
+            (2.6875, 'FAILED', 'diverging', False),
+            (2.53125, 'AMBIGUOUS', top_exit, False),
+            (2.453125, 'STABLE_STUCK', 'iteration_cap', True),
+            (2.4921875, 'STABLE_STUCK', 'iteration_cap', True),
+            (2.51171875, 'CONVERGED', 'converged', True)]
+        return {"final_interval": [2.51171875, 2.53125],
+                "trials": [dict(F=F, verdict=v, exit_reason=e, stable=st,
+                                converged=(v == 'CONVERGED'),
+                                finisher=({"armed": True, "outcome": "not balanced"}
+                                          if F == 2.53125 else None))
+                           for F, v, e, st in trials]}
+    top = fem.ssrm_undecided_top(run('inconclusive'))
+    check("at the ceiling: the bracket's top is undecided, the answer a lower "
+          "bound at 2.512 (FS not closed)",
+          top is not None and top["F"] == 2.53125)
+    check("below the ceiling (exit 'iteration_cap'): counted failed, the "
+          "bracket closes as before",
+          fem.ssrm_undecided_top(run('iteration_cap')) is None)
+
+
 def main():
     print("=" * 72)
     print("Joint verdict checks")
@@ -340,6 +547,9 @@ def main():
     check_inert()
     check_churn()
     check_wiring()
+    check_restick_band()
+    check_finisher_reading()
+    check_ambiguous_at_ceiling()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"FAILED ({len(FAILURES)}): " + ", ".join(FAILURES))

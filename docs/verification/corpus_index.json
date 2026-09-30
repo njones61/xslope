@@ -9309,12 +9309,12 @@
           "lf"
         ]
       },
-      "model": "docs/verification/files/rocscience/joints/rj003.xlsx",
+      "model": "docs/verification/files/rocscience/joints/rj003_vendor.xlsx",
       "references": [
         {
           "anchor": "rj-3",
           "checks": [
-            "RJ-3"
+            "RJ-3v"
           ],
           "level": 3,
           "page": "verification/rs2_joints/",
@@ -9406,7 +9406,74 @@
         "k0": 1.0,
         "line_loads": 0,
         "material_options": [
-          "elastic"
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj004_vendor.xlsx",
+      "references": [
+        {
+          "anchor": "rj-4",
+          "checks": [
+            "RJ-4v"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-4: Lorig & Varona flexural toppling (rj004)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-4"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
         ],
         "n_materials": 1,
         "non_circular": false,
@@ -9449,6 +9516,73 @@
           "anchor": "rj-5",
           "checks": [
             "RJ-5"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-5: Lorig & Varona backward block toppling (rj005)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-5"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj005_vendor.xlsx",
+      "references": [
+        {
+          "anchor": "rj-5",
+          "checks": [
+            "RJ-5v"
           ],
           "level": 3,
           "page": "verification/rs2_joints/",
@@ -9583,6 +9717,73 @@
           "anchor": "rj-7",
           "checks": [
             "RJ-7"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-7: Plane failure with non-daylighting discontinuities (rj007)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-7"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj007_vendor.xlsx",
+      "references": [
+        {
+          "anchor": "rj-7",
+          "checks": [
+            "RJ-7v"
           ],
           "level": 3,
           "page": "verification/rs2_joints/",
@@ -27390,7 +27591,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 386,
+    "models": 389,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -27431,11 +27632,11 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 652,
+    "tags": 655,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 184,
+      "homogeneous": 187,
       "non-circular": 31,
       "piles": 15,
       "probabilistic": 16,
@@ -27534,11 +27735,14 @@
       "docs/verification/files/rocscience/joints/rj001c.xlsx",
       "docs/verification/files/rocscience/joints/rj001d.xlsx",
       "docs/verification/files/rocscience/joints/rj002.xlsx",
-      "docs/verification/files/rocscience/joints/rj003.xlsx",
+      "docs/verification/files/rocscience/joints/rj003_vendor.xlsx",
       "docs/verification/files/rocscience/joints/rj004.xlsx",
+      "docs/verification/files/rocscience/joints/rj004_vendor.xlsx",
       "docs/verification/files/rocscience/joints/rj005.xlsx",
+      "docs/verification/files/rocscience/joints/rj005_vendor.xlsx",
       "docs/verification/files/rocscience/joints/rj006.xlsx",
       "docs/verification/files/rocscience/joints/rj007.xlsx",
+      "docs/verification/files/rocscience/joints/rj007_vendor.xlsx",
       "docs/verification/files/rocscience/joints/rj008.xlsx",
       "docs/verification/files/rocscience/joints/rj009.xlsx",
       "docs/verification/files/rocscience/joints/rj010.xlsx",

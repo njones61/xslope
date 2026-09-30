@@ -19,8 +19,9 @@ shared [References](references.md) page.
 
 - **Models.** Geometry, materials, joint properties, restraints and loads come from the vendor's
   own `.fez` files rather than the manual's tables, which carry errata the models do not; each
-  row states where its model departs from the manual. The vendor models are in MPa and MN/m³;
-  these files use kPa and kN/m³.
+  row states where its model departs from the manual, and problems 3, 4, 5 and 7 take their
+  strengths from their source chapter instead (see Transcription). The vendor models are in MPa
+  and MN/m³; these files use kPa and kN/m³.
 - **Transcription.** No problem from 1 to 21 states a joint residual strength or a dilation angle,
   and material residual values, where they appear, equal the peak. Every vendor file drops a
   slipping joint's stiffness a hundredfold (`joint_stiffness_factor: 0.01`); XSLOPE has the same
@@ -28,6 +29,16 @@ shared [References](references.md) page.
   embankments of the [RS2 corpus](rs2.md) it moves brackets by one to four steps of the search.
   Every vendor file also divides the rock's tensile cap by the trial factor, which the corpus does
   only on [problem 19](#rj-19), the one problem where the cap governs the answer.
+  Problems 3, 4, 5 and 7 depart from the vendor's files in their strengths. Lorig & Varona's
+  chapter in Wyllie & Mah (2004), the source of problems 3 to 7, gives one property list for
+  their 260 m section: a rock mass
+  with c = 675 kPa, φ = 43° and no tensile strength, and joints with φ = 40°, no dilation and no
+  cohesion. The vendor's files give every joint 100 kPa of cohesion, and on problems 3 and 5 hold
+  the rock elastic. Problems 3, 4, 5 and 7 are posed on the chapter's list; each row also solves
+  the vendor's file and shows it as a second line of its table, beside the vendor's own two
+  numbers, which were computed on that file. Problem 6 is the one example whose text states its
+  own joints, at c = 100 kPa and φ = 40°, and it is built with them. The joint stiffnesses, which
+  the chapter does not state, are the vendor's throughout.
 - **Referee.** Where a closed-form rigid-block limit equilibrium exists for a problem it is the
   referee, recomputed from the inputs the model carries: Goodman & Bray's column analysis on
   problems 1 and 2, Alejano's plowing equation on problems 11 to 14, the sliding block with its tensile bridge on
@@ -91,11 +102,11 @@ joint model whose output is a stress-displacement curve.
 | [1c](#rj-1c) | 🟢 | Goodman & Bray block toppling, case 1c | SSRM 1.037 vs Goodman & Bray 1.0185 (+1.8%) | 1.01 vs 1.0185 (−0.8%) | UDEC 1.01 (+2.7%) | 1.01 / 0.99 | |
 | [1d](#rj-1d) | 🟢 | Goodman & Bray block toppling, case 1d | SSRM 1.252 vs Goodman & Bray 1.2308 (+1.7%) | 1.19 vs 1.2308 (−3.3%) | UDEC 1.22 (+2.6%) | 1.19 / 1.16 | |
 | [2](#rj-2) | 🟢 | Alejano & Alonso block toppling | SSRM 0.783 vs Goodman & Bray 0.7734 (+1.2%) | 0.86 vs 0.7734 (+11.2%) | UDEC 0.87 (−10.0%) | 0.86 / 0.82 | All three programs stand above the closed form, this one by a percent and the other two by a tenth; the manual states no UDEC settings for this model. |
-| [3](#rj-3) | 🔴 | Lorig & Varona forward block toppling | SSRM 1.232 vs UDEC 1.13 (+9.0%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | The source chapter states no joint cohesion for this run; the vendor's file carries 100 kPa on every joint, and the row is posed on the vendor's file. |
-| [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | — | 1.19 / 1.27 | |
-| [5](#rj-5) | 🔴 | Lorig & Varona backward block toppling | SSRM 1.857 vs UDEC 1.7 (+9.2%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | The vendor's two settings disagree with each other by the widest margin in the manual; XSLOPE lands on the one with its convergence aid on. |
+| [3](#rj-3) | <span class="nodata">⊘</span> | Lorig & Varona forward block toppling | SSRM at least 1.027 vs UDEC 1.13 | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | *unconfirmed* — on the source chapter's inputs the slope stands at 1.027 and fails at 1.125, but the trial at 1.047 stopped moving without balancing its forces, so the search does not close. On the vendor's file, whose joints carry 100 kPa over an elastic rock and on which RS2's numbers were computed, XSLOPE gives 1.232 (+9.0%). |
+| [4](#rj-4) | 🟡 | Lorig & Varona flexural toppling | SSRM 1.232 vs UDEC 1.3 (−5.2%) | 1.19 vs 1.3 (−8.5%) | — | 1.19 / 1.27 | Posed on the source chapter's cohesionless joints. On the vendor's file, whose joints carry 100 kPa and on which RS2's numbers were computed, XSLOPE gives 1.311 (+0.8%). |
+| [5](#rj-5) | 🔴 | Lorig & Varona backward block toppling | SSRM 1.096 vs UDEC 1.7 (−35.5%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | Posed on the source chapter's inputs, the slabs slide down the cohesionless face-parallel joints and break out through the rock at the toe instead of toppling. On the vendor's file, whose joints carry 100 kPa over an elastic rock and on which RS2's numbers were computed, XSLOPE gives 1.857 (+9.2%). |
 | [6](#rj-6) | 🟢 | Plane failure, daylighting | SSRM 1.271 vs UDEC 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | |
-| [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | — | 1.57 / 1.59 | Both finite element codes land above the referee, on the same side and within half a point of each other. |
+| [7](#rj-7) | 🟢 | Plane failure, non-daylighting | SSRM 1.486 vs UDEC 1.5 (−0.9%) | 1.57 vs 1.5 (+4.7%) | — | 1.57 / 1.59 | Posed on the source chapter's cohesionless joints. On the vendor's file, whose joints carry 100 kPa and on which RS2's numbers were computed, XSLOPE gives 1.564 (+4.3%). |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | 0.75 vs 0.76 (−1.3%) | — | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.037 vs UDEC 1.03 (+0.7%) | 1.01 vs 1.03 (−1.9%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
 | [10](#rj-10) | 🟢 | Bilinear slab failure, example 1b | SSRM 1.037 vs UDEC 1.03 (+0.7%) | 0.92 vs 1.03 (−10.7%) | LE (Alejano) 0.43–1.45 | 0.92 / 1.08 | |
@@ -263,85 +274,111 @@ stiffness returns this row's bracket unchanged.
 
 ![RJ-2: Alejano & Alonso block toppling (rj002) — FEM inputs, mesh, joint slip at the critical SRF and the section deformed 17×. The rock carries no strain of its own because it cannot yield, so every movement in the section is on a joint: slip gathers where the basal joint reaches the toe of the face, the columns standing on it open along their upper halves, and the deformed section shows them rotating out over the face while the rock below the basal joint stays put](images/RJ-2.png)
 
-### 🔴 RJ-3: Lorig & Varona forward block toppling (rj003) {#rj-3}
+### ⊘ RJ-3: Lorig & Varona forward block toppling (rj003) {#rj-3}
 
-Problems 3 to 6 are the toppling and plane-failure examples of Lorig & Varona (2004). The 260 m
-section at 55° that problems 3 to 7 share, cut by two sets: columns at 70° at 20 m
-spacing and a cross set at −20° at 30 m, both through the origin. The manual states the pair as
-"70 and 160" degrees, which is the same two planes measured the other way round the half circle.
-The rock is elastic, the vendor file setting its plasticity to none, so only the joints can fail;
-γ = 26.0946 kN/m³, E = 9072 MPa, ν = 0.26. The joints carry c = 100 kPa and φ = 40°.
+Problems 3 to 7 are the toppling and plane-failure examples of Lorig & Varona (2004), all on one
+260 m section at 55°. Here it is cut by two sets: columns at 70° at 20 m spacing and a cross set
+at −20° at 30 m, both through the origin. The manual states the pair as "70 and 160" degrees,
+which is the same two planes measured the other way round the half circle. The chapter states
+this example's geometry and its UDEC factor, and one property list for the whole section, which
+is what the row is posed on: the rock is Mohr-Coulomb with c = 675 kPa, φ = 43° and no tensile
+strength, E = 9072 MPa and ν = 0.26 (the chapter's bulk and shear moduli of 6.3 and 3.6 GPa), and
+the joints carry φ = 40° and no cohesion; γ = 26.0946 kN/m³ is the vendor's value. The vendor's
+file differs in two inputs: its joints carry c = 100 kPa and its rock is elastic.
 
-The manual's tables for problems 3 to 7 state only the slope geometry, the joint friction angle and
-the rock's tensile strength, where the models of problems 4, 6 and 7 carry a rock strength of
-c = 675 kPa and φ = 43° and all five carry a joint cohesion of 100 kPa.
+| Inputs | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
+|---|---|---|---|---|
+| Chapter's list (joints cohesionless; rock Mohr-Coulomb) | at least 1.027 *unconfirmed* | 1.13 | — | — |
+| Vendor's file (joints 100 kPa; rock elastic) | 1.232 | 1.13 (+9.0%) | 1.12 vs 1.13 (−0.9%) | 1.12 / 1.09 |
 
-| XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
-|---|---|---|---|
-| **1.232** | 1.13 (+9.0%) | 1.12 vs 1.13 (−0.9%) | 1.12 / 1.09 |
+<!-- test: file=files/rocscience/joints/rj003_vendor.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-3v, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
 
-<!-- test: file=files/rocscience/joints/rj003.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-3, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
+On the chapter's inputs the slope stands at 1.027 and fails at 1.125, but the search does not
+close between them: the trial at 1.047 ran its 250,000 iterations, stopped moving, and never
+balanced its forces, so the row prints its standing factor as a lower bound and does not confirm
+a value. Every trial it did decide places the factor below UDEC's 1.13. The figure shows the
+blocks between the two sets rotating forward over the face above a surface stepped along the
+cross joints, with the rock yielding behind the crest where the columns part.
 
-The slope stands at the lower end of the bracket, where the joints come to rest after several
-hundred thousand iterations, and runs away at the upper end. The search takes about four hours.
-The factor stands above UDEC and above the vendor's default. The vendor's own two solution
-schemes give 1.12 and 1.09 for this problem, so the vendor's answer moves with how it is solved;
-this is one of the three problems the vendor reruns under its `Improve Joint Convergence` option,
-described under [Methodology](#methodology).
+On the vendor's file the slope stands at 1.232, above UDEC and above RS2's default on the same
+file; the vendor's two solution schemes give 1.12 and 1.09 there, so its answer moves with how it
+is solved.
 
-Every input class matches the vendor model, including the side restraint the vendor clamps in both
-directions. The vendor's file departs from the source chapter in two inputs: the chapter's property
-list for this section gives the joints a friction angle and no cohesion, and a rock that can yield,
-where the vendor's file gives every joint 100 kPa of cohesion and holds the rock elastic. The row is
-posed on the vendor's file, and its UDEC value is the chapter's.
+Geometry, stiffnesses and the side restraint, which the vendor clamps in both directions, match
+the vendor model.
 
-**Input file:** [rj003.xlsx](files/rocscience/joints/rj003.xlsx).
+**Input files:** [rj003.xlsx](files/rocscience/joints/rj003.xlsx) (chapter's list),
+[rj003_vendor.xlsx](files/rocscience/joints/rj003_vendor.xlsx) (vendor's file).
 
-![RJ-3: Lorig & Varona forward block toppling (rj003) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own, so the whole mechanism is on the two sets: the steep 70° joints slip behind the crest while the −20° cross joints open along it, and the deformed section shows the blocks between them rotating forward over the face](images/RJ-3.png)
+![RJ-3: Lorig & Varona forward block toppling on the chapter's inputs (rj003) — FEM inputs, mesh, viscoplastic shear strain with joint slip, and the deformed section, drawn at the trial above the last one the slope stood at. The steep 70° joints slip behind the face while the −20° cross joints open along the crest, the rock yields where the columns part behind the crest, and the deformed section shows the blocks between the two sets rotating forward over the face](images/RJ-3.png)
 
-### 🟢 RJ-4: Lorig & Varona flexural toppling (rj004) {#rj-4}
+![RJ-3v: the same problem on the vendor's file, joints at 100 kPa and the rock elastic (rj003_vendor) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own, so the whole mechanism is on the two sets: the steep 70° joints slip behind the crest while the −20° cross joints open along it, and the deformed section shows the blocks between them rotating forward over the face](images/RJ-3v.png)
+
+### 🟡 RJ-4: Lorig & Varona flexural toppling (rj004) {#rj-4}
 
 The same section cut by one set of columns at 70° at 20 m spacing — problem 3's first set without
-its cross joints, so the columns bend rather than topple as blocks. Here the rock is Mohr-Coulomb
-and carries a tensile cutoff of zero, which is what lets a column break in flexure: γ = 26.1 kN/m³,
-E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°.
+its cross joints, so the columns bend rather than topple as blocks. The row is posed on the
+chapter's property list. The rock is Mohr-Coulomb and carries a tensile cutoff of zero, which is
+what lets a column break in flexure: γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26, c = 675 kPa,
+φ = 43°. The joints carry φ = 40° and no cohesion. The vendor's file differs in one input: its
+joints carry c = 100 kPa.
 
-| XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
-|---|---|---|---|
-| **1.311** | 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | 1.19 / 1.27 |
+| Inputs | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
+|---|---|---|---|---|
+| Chapter's list (joints cohesionless) | **1.232** | 1.3 (−5.2%) | — | — |
+| Vendor's file (joints 100 kPa) | 1.311 | 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | 1.19 / 1.27 |
 
-<!-- test: file=files/rocscience/joints/rj004.xlsx, type=fem_ssrm, expected_fs=1.311, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4, f_stand=1.30078125, f_fail=1.3203125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj004.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4, tier=gate, f_stand=1.22265625, f_fail=1.2421875, check=edges -->
+<!-- test: file=files/rocscience/joints/rj004_vendor.xlsx, type=fem_ssrm, expected_fs=1.311, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4v, f_stand=1.30078125, f_fail=1.3203125, check=edges, tier=gate -->
 
-Every transcribed input class matches the vendor model, including the side restraint.
+On the chapter's inputs the slope stands 5.2% below UDEC. The columns bend through a band of
+rock that yields from the toe to behind the crest, and without cohesion every joint in the moving
+mass slips along most of its length. The vendor's joint cohesion raises XSLOPE's factor from
+1.232 to 1.311 (+6.4%), onto UDEC's value; RS2's two numbers were computed on the vendor's file.
 
-**Input file:** [rj004.xlsx](files/rocscience/joints/rj004.xlsx).
+Geometry, stiffnesses and the side restraint match the vendor model.
 
-![RJ-4: Lorig & Varona flexural toppling (rj004) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. Here the rock can yield, and it does: a band of shear strain climbs from the toe across the columns, and drawn without exaggeration the columns are bent through that band rather than rotated about it, which is what separates flexural toppling from the block toppling of problem 3](images/RJ-4.png)
+**Input files:** [rj004.xlsx](files/rocscience/joints/rj004.xlsx) (chapter's list),
+[rj004_vendor.xlsx](files/rocscience/joints/rj004_vendor.xlsx) (vendor's file).
+
+![RJ-4: Lorig & Varona flexural toppling on the chapter's inputs (rj004) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock yields in a band that climbs from the toe to behind the crest, the cohesionless joints above it slip along most of their length, and the deformed section shows the columns bent through that band rather than rotated about it, which is what separates flexural toppling from the block toppling of problem 3](images/RJ-4.png)
+
+![RJ-4v: the same problem on the vendor's file, joints at 100 kPa (rj004_vendor) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. Here the rock can yield, and it does: a band of shear strain climbs from the toe across the columns, and drawn without exaggeration the columns are bent through that band rather than rotated about it, which is what separates flexural toppling from the block toppling of problem 3](images/RJ-4v.png)
 
 ### 🔴 RJ-5: Lorig & Varona backward block toppling (rj005) {#rj-5}
 
-The shared 260 m section cut by two sets: one at −55° at 10 m spacing through the toe, dipping out
-of the face so the blocks lean back rather than forward, and a horizontal set at 40 m spacing. The
-rock is elastic, its plasticity set to none in the vendor file: γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26; the joints carry
-c = 100 kPa and φ = 40°.
+The shared 260 m section cut by two sets: one at −55° at 10 m spacing through the toe, parallel to
+the face and dipping out of it, and a horizontal set at 40 m spacing. The chapter describes the
+blocks as toppling backward, into the slope. The row is posed on the chapter's property list: the
+rock is Mohr-Coulomb (γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°, no tensile
+capacity) and the joints carry φ = 40° and no cohesion. The vendor's file differs in two inputs:
+its joints carry c = 100 kPa and its rock is elastic.
 
-| XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
-|---|---|---|---|
-| **1.857** | 1.7 (+9.2%) | 1.65 vs 1.7 (−2.9%) | 1.65 / 1.86 |
+| Inputs | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
+|---|---|---|---|---|
+| Chapter's list (joints cohesionless; rock Mohr-Coulomb) | **1.096** | 1.7 (−35.5%) | — | — |
+| Vendor's file (joints 100 kPa; rock elastic) | 1.857 | 1.7 (+9.2%) | 1.65 vs 1.7 (−2.9%) | 1.65 / 1.86 |
 
-<!-- test: file=files/rocscience/joints/rj005.xlsx, type=fem_ssrm, expected_fs=1.857, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5, f_stand=1.84765625, f_fail=1.8671875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj005.xlsx, type=fem_ssrm, expected_fs=1.096, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5, tier=gate, f_stand=1.0859375, f_fail=1.10546875, check=edges -->
+<!-- test: file=files/rocscience/joints/rj005_vendor.xlsx, type=fem_ssrm, expected_fs=1.857, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5v, f_stand=1.84765625, f_fail=1.8671875, check=edges, tier=gate -->
 
-This row is the corpus's slowest to settle: the trial at the standing edge balances only after
-most of a million iterations, and the search takes about thirteen hours. The factor stands above UDEC and above the
-vendor's default, and on the vendor's own second number: its two solution schemes give 1.65 and
-1.86 on this model, the widest spread in the manual, and the vendor needed its `Improve Joint
-Convergence` option to rerun the problem at all.
+On the chapter's inputs the slope does not topple backward. The 10 m slabs between the face and
+the first few face-parallel joints slide down those joints, which carry friction alone at the
+angle of the face, and the rock at the toe, where the slabs have to push out, yields beneath
+them. The factor lands 35.5% below UDEC's.
 
-Every transcribed input class matches the vendor model, including the side restraint.
+On the vendor's file the joints' cohesion holds the slabs and the rock cannot yield, and the factor
+rises to 1.857, above UDEC and above RS2's default on the same file. The vendor's two solution
+schemes give 1.65 and 1.86 on that file, the widest spread in the manual.
 
-**Input file:** [rj005.xlsx](files/rocscience/joints/rj005.xlsx).
+Geometry, stiffnesses and the side restraint match the vendor model.
 
-![RJ-5: Lorig & Varona backward block toppling (rj005) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own; slip runs along the −55° joints in the wedge behind the face while the horizontal bedding opens, and the deformed section shows the slabs stepping out over one another down the face, each leaning back into the slope as it goes](images/RJ-5.png)
+**Input files:** [rj005.xlsx](files/rocscience/joints/rj005.xlsx) (chapter's list),
+[rj005_vendor.xlsx](files/rocscience/joints/rj005_vendor.xlsx) (vendor's file).
+
+![RJ-5: Lorig & Varona backward block toppling on the chapter's inputs (rj005) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. Slip runs down the face-parallel joints nearest the face from the crest to the toe, the shear strain gathers in the rock at the toe where those slabs push out, and the deformed section shows the slabs sliding down the face rather than leaning back into the slope](images/RJ-5.png)
+
+![RJ-5v: the same problem on the vendor's file, joints at 100 kPa and the rock elastic (rj005_vendor) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own; slip runs along the −55° joints in the wedge behind the face while the horizontal bedding opens, and the deformed section shows the slabs stepping out over one another down the face, each leaning back into the slope as it goes](images/RJ-5v.png)
 
 ### 🟢 RJ-6: Plane failure with daylighting discontinuities (rj006) {#rj-6}
 
@@ -364,26 +401,38 @@ Every transcribed input class matches the vendor model, including the side restr
 
 ![RJ-6: plane failure with daylighting discontinuities (rj006) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. Slip runs the full length of every joint that reaches the face, over a wedge bounded below by the joint through the toe, and the rock between them carries only a faint strain: the slabs slide out along the joints rather than breaking through anything](images/RJ-6.png)
 
-### 🟡 RJ-7: Plane failure with non-daylighting discontinuities (rj007) {#rj-7}
+### 🟢 RJ-7: Plane failure with non-daylighting discontinuities (rj007) {#rj-7}
 
 The same section and the same rock as problem 6, cut by one set at −70° at 20 m spacing through
 the origin. The joints now dip out of the face more steeply than the 55° face itself, so none of
 them daylights: a slab cannot slide out along one without shearing rock, and the slope stands
-higher than problem 6's.
+higher than problem 6's. The chapter calls this example's sliding planes cohesionless, and the
+row is posed on its property list: the rock is Mohr-Coulomb (γ = 26.1 kN/m³, E = 9072 MPa,
+ν = 0.26, c = 675 kPa, φ = 43°, no tensile capacity) and the joints carry φ = 40° and no
+cohesion. The vendor's file differs in one input: its joints carry c = 100 kPa.
 
-| XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
-|---|---|---|---|
-| **1.564** | 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | 1.57 / 1.59 |
+| Inputs | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
+|---|---|---|---|---|
+| Chapter's list (joints cohesionless) | **1.486** | 1.5 (−0.9%) | — | — |
+| Vendor's file (joints 100 kPa) | 1.564 | 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | 1.57 / 1.59 |
 
-<!-- test: file=files/rocscience/joints/rj007.xlsx, type=fem_ssrm, expected_fs=1.564, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7, f_stand=1.5546875, f_fail=1.57421875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj007.xlsx, type=fem_ssrm, expected_fs=1.486, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7, tier=gate, f_stand=1.4765625, f_fail=1.49609375, check=edges -->
+<!-- test: file=files/rocscience/joints/rj007_vendor.xlsx, type=fem_ssrm, expected_fs=1.564, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7v, f_stand=1.5546875, f_fail=1.57421875, check=edges, tier=gate -->
 
-Every transcribed input class matches the vendor model, including the side restraint. The manual's
-own table for this problem prints the slope angle as 5°; the figure and the model are the same 55°
-slope problem 6 uses.
+On the chapter's inputs the slope stands 0.9% below UDEC. The vendor's joint cohesion
+raises XSLOPE's factor from 1.486 to 1.564 (+5.2%); RS2's two numbers were computed on the
+vendor's file and belong beside the second.
 
-**Input file:** [rj007.xlsx](files/rocscience/joints/rj007.xlsx).
+Geometry, stiffnesses and the side restraint match the vendor model. The manual's own table for
+this problem prints the slope angle as 5°; the figure and the model are the same 55° slope
+problem 6 uses.
 
-![RJ-7: plane failure with non-daylighting discontinuities (rj007) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. No joint reaches the face at a shallower angle than the face itself, so the failure cannot slide out along one: a strong band of shear strain cuts across the steep joints from the toe, and the mass above it moves out over rock it has had to break](images/RJ-7.png)
+**Input files:** [rj007.xlsx](files/rocscience/joints/rj007.xlsx) (chapter's list),
+[rj007_vendor.xlsx](files/rocscience/joints/rj007_vendor.xlsx) (vendor's file).
+
+![RJ-7: plane failure with non-daylighting discontinuities on the chapter's inputs (rj007) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. No joint reaches the face at a shallower angle than the face itself, so the failure cannot slide out along one: a band of shear strain cuts across the steep joints from the toe up toward the crest, the cohesionless joints above it slip along their full length, and the mass moves out over rock it has had to break](images/RJ-7.png)
+
+![RJ-7v: the same problem on the vendor's file, joints at 100 kPa (rj007_vendor) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The same band of shear strain cuts across the steep joints from the toe, and the mass above it moves out over rock it has had to break; with cohesion on the joints the slip is broken into shorter lengths](images/RJ-7v.png)
 
 ### 🟢 RJ-8: Flexural toppling in a base friction model (rj008) {#rj-8}
 

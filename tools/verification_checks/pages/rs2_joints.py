@@ -35,6 +35,14 @@ CONFIG = PageConfig(
         ('2.512', 'unconfirmed'),
         ('2.512', 'The slope stands at 2.512'),
         ('2.531', 'the trial at 2.531'),
+        # RJ-3 on the source chapter's inputs stands at 1.027 and its search does
+        # not close above it (the trial at 1.047 is undecided; 1.125 fails): the
+        # values are trials in the committed run record (rj003_fem_meta), shown
+        # as a lower bound by ruling, never tagged.
+        ('1.027', 'unconfirmed'),
+        ('1.027', 'the slope stands at 1.027'),
+        ('1.125', 'and fails at 1.125'),
+        ('1.047', 'the trial at 1.047'),
     ],
 
     abs_bounds=[

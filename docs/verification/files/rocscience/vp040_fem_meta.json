@@ -206,7 +206,6 @@
         "iteration": 27200,
         "attempts": [
           {
-            "seed": "as_is",
             "certified": false,
             "r_first": 2012.1062600484904,
             "nr_iterations": 2,
@@ -214,33 +213,17 @@
             "yield_violation": 9.020591121766426e-08,
             "exit_reason": "diverging",
             "hold": null
-          },
-          {
-            "seed": "extrapolated",
-            "certified": false,
-            "r_first": 2427.0690947172584,
-            "nr_iterations": 2,
-            "oob": 3113688280.259417,
-            "yield_violation": 1.0643854645722306e-07,
-            "exit_reason": "diverging",
-            "hold": null
           }
         ],
-        "seed": null,
         "corrector": {
-          "seed": "extrapolated",
           "certified": false,
-          "r_first": 2427.0690947172584,
+          "r_first": 2012.1062600484904,
           "nr_iterations": 2,
-          "oob": 3113688280.259417,
-          "yield_violation": 1.0643854645722306e-07,
+          "oob": 183340982.32300997,
+          "yield_violation": 9.020591121766426e-08,
           "exit_reason": "diverging",
           "hold": null
-        },
-        "field_ratio": 0.854261914333846,
-        "extrapolated": 1.3590401450638403,
-        "extrapolated_u_ratio": 15.517102350363794,
-        "extrapolation": "ratio"
+        }
       },
       "plateau_iteration": 1512,
       "budget_extensions": 1,

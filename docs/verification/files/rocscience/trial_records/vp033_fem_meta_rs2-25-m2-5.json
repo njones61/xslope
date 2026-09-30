@@ -185,7 +185,7 @@
       "stop_reading": null,
       "creep_reading": null,
       "plateau_iteration": null,
-      "budget_extensions": 0,
+      "budget_extensions": 2,
       "diverging_iteration": null,
       "ee_suppressed": false,
       "iterations": 33006,

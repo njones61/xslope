@@ -292,7 +292,6 @@
         "iteration": 8000,
         "attempts": [
           {
-            "seed": "as_is",
             "certified": true,
             "r_first": 180.30937637663285,
             "nr_iterations": 47,
@@ -302,9 +301,7 @@
             "hold": null
           }
         ],
-        "seed": "as_is",
         "corrector": {
-          "seed": "as_is",
           "certified": true,
           "r_first": 180.30937637663285,
           "nr_iterations": 47,

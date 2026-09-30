@@ -1,15 +1,16 @@
 {
   "F": 1.1531445312500002,
   "converged": false,
-  "iterations": 16000,
-  "max_displacement": 18.229381224469385,
+  "iterations": 2106,
+  "max_displacement": 2.3991860713344475,
   "algorithm": "Griffiths & Lane (1999) Viscoplastic",
-  "residual": 6.249446458803677e-05,
-  "unbalanced_force_ratio": 63.29078288828282,
+  "residual": 0.0004748905823504206,
+  "unbalanced_force_ratio": 63.271407419203484,
   "plastic_fraction": 0.4752116082224909,
-  "capture_truncated": false,
-  "capture_truncated_at": null,
-  "capture_truncated_reason": null,
-  "capture_truncated_kind": null,
-  "capture_truncated_max_u": null
+  "capture_truncated": true,
+  "capture_truncated_at": 2105,
+  "capture_truncated_reason": "stopped once the section had moved 20% of the model height",
+  "capture_truncated_kind": "distance",
+  "capture_truncated_max_u": 2.3991860713344475,
+  "capture_fence": 2.4000000000000004
 }

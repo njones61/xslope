@@ -2,7 +2,7 @@
   "benchmark": "RS2-48",
   "analysis": "ssrm",
   "FS": 1.037109375,
-  "expected_fs": "1.057",
+  "expected_fs": "1.037",
   "file": "files/rocscience/vp087_fem.xlsx",
   "max_iter": 250000,
   "failure_criterion": "hybrid",

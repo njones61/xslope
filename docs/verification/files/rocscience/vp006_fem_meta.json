@@ -322,7 +322,6 @@
         "iteration": 19200,
         "attempts": [
           {
-            "seed": "as_is",
             "certified": true,
             "r_first": 18.871857623759468,
             "nr_iterations": 15,
@@ -332,9 +331,7 @@
             "hold": null
           }
         ],
-        "seed": "as_is",
         "corrector": {
-          "seed": "as_is",
           "certified": true,
           "r_first": 18.871857623759468,
           "nr_iterations": 15,
@@ -348,7 +345,7 @@
       },
       "creep_reading": null,
       "plateau_iteration": null,
-      "budget_extensions": 0,
+      "budget_extensions": 1,
       "diverging_iteration": null,
       "ee_suppressed": false,
       "iterations": 19215,

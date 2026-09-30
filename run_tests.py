@@ -15614,6 +15614,12 @@ def main():
                              'The element rows solve and strength-reduce '
                              'several small models, so this scope runs in '
                              'minutes rather than seconds.')
+    parser.add_argument('--drivers', action='store_true',
+                        help='Run only the driver-agreement check: the plain '
+                             'viscoplastic loop, the default path and the Newton '
+                             'driver on three small known-answer models. Opt-in '
+                             'while it reports open disagreements (about four '
+                             'minutes).')
     parser.add_argument('--mesh', action='store_true',
                         help='Run only the mesh-size locks (type=mesh_elements): '
                              'the element and node counts the verification pages '
@@ -16662,6 +16668,22 @@ def main():
         tests.append({'type': 'ssrm_curve',
                       'file': 'the displacement curve and the closing summary',
                       'method': '-', 'source': 'ssrm_curve'})
+        # The solver's own guards: a prepared model that no longer matches its
+        # options, a seed of the wrong size, a continuation from another model,
+        # a non-monotone search — each raised, never worked around. Seconds.
+        tests.append({'type': 'fem_guards',
+                      'file': 'the FEM invariant guards',
+                      'method': '-', 'source': 'fem_guards'})
+    if args.drivers:
+        # The three strength-reduction drivers (the plain viscoplastic loop, the
+        # default path with its corrector, and the Newton driver) on three small
+        # known-answer models. Opt-in: it reports real disagreements today (the
+        # Newton driver on a jointed junction; the plain loop's early stop on a
+        # coarse soil slope), recorded as open diagnoses in the joints campaign's
+        # loose ends, and it must not turn --joints red until they are ruled on.
+        tests.append({'type': 'driver_agreement',
+                      'file': 'the three drivers on known answers',
+                      'method': '-', 'source': 'driver_agreement'})
         # Continuing a run with a higher limit: a stand-in solver for the
         # bookkeeping, then the smallest shipped model and Studio (seconds).
         tests.append({'type': 'ssrm_resume',

@@ -457,7 +457,7 @@ Also [SLOPE/W §2.6](geostudio.md) — the same problem in the GeoStudio corpus.
 
 ## 🟢 VP8: Slope, (2) materials, weak layer, predefined slip surface {#vp8}
 
-ACADS 3(b): the weak-layer slope (= LEM sample 13 / Slide #7) evaluated on the fully specified non-circular surface of Table 8.2.
+ACADS 3(b): the weak-layer slope (Slide #7) evaluated on the fully specified non-circular surface of Table 8.2.
 
 **Input files:** [vp008.xlsx](files/rocscience/vp008.xlsx)
 
@@ -1904,7 +1904,7 @@ Slide #72 / Duncan & Wright (2005) Figs. 6.39–6.40: a symmetric embankment dam
 
 Pore pressures are modeled both ways, as in the manual: FE seepage from XSLOPE's own solver, and
 Slide's piezometric line vertex-extracted from Figure 72.2. This dam is also
-[LEM sample problem 8](../lem/samples.md#8-earth-dam), built independently from the book; the
+[LEM sample problem 4](../lem/samples.md#4-earth-dam), built independently from the book; the
 corpus file follows Slide's slightly different crest and core-top dimensions rather than the
 book's, since Slide's published numbers are the benchmark here.
 

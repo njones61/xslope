@@ -1989,16 +1989,16 @@
       "model": "docs/lem/files/xslope_crest_surcharge.xlsx",
       "references": [
         {
-          "anchor": "1-simple-embankment",
+          "anchor": "tutorial-lem-2-loads-on-the-crest",
           "checks": [
             "circular_search"
           ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "1. Simple Embankment",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#1-simple-embankment"
+          "level": 1,
+          "page": "tutorials/lem02_loads_on_the_crest/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem02_loads_on_the_crest.md",
+          "title": "Tutorial LEM-2 — Loads on the Crest",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem02_loads_on_the_crest/#tutorial-lem-2-loads-on-the-crest"
         }
       ],
       "topics": [
@@ -2056,7 +2056,7 @@
       "model": "docs/lem/files/xslope_earth_dam_down.xlsx",
       "references": [
         {
-          "anchor": "8-earth-dam",
+          "anchor": "4-earth-dam",
           "checks": [
             "circular_search"
           ],
@@ -2064,8 +2064,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "8. Earth Dam",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#8-earth-dam"
+          "title": "4. Earth Dam",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#4-earth-dam"
         }
       ],
       "topics": [
@@ -2123,7 +2123,7 @@
       "model": "docs/lem/files/xslope_earth_dam_up.xlsx",
       "references": [
         {
-          "anchor": "8-earth-dam",
+          "anchor": "4-earth-dam",
           "checks": [
             "circular_search"
           ],
@@ -2131,8 +2131,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "8. Earth Dam",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#8-earth-dam"
+          "title": "4. Earth Dam",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#4-earth-dam"
         }
       ],
       "topics": [
@@ -2190,7 +2190,7 @@
       "model": "docs/lem/files/xslope_eight_layers.xlsx",
       "references": [
         {
-          "anchor": "6-slope-with-eight-layers",
+          "anchor": "3-slope-with-eight-layers",
           "checks": [
             "circular_search"
           ],
@@ -2198,8 +2198,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "6. Slope with Eight Layers",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-slope-with-eight-layers"
+          "title": "3. Slope with Eight Layers",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#3-slope-with-eight-layers"
         }
       ],
       "topics": [
@@ -2257,7 +2257,7 @@
       "model": "docs/lem/files/xslope_gsat_nowater.xlsx",
       "references": [
         {
-          "anchor": "16-saturated-vs-moist-unit-weight-_sat",
+          "anchor": "6-saturated-vs-moist-unit-weight-_sat",
           "checks": [
             "circular_search"
           ],
@@ -2265,8 +2265,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "16. Saturated vs. Moist Unit Weight (γ_sat)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat"
+          "title": "6. Saturated vs. Moist Unit Weight (γ_sat)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat"
         }
       ],
       "topics": [
@@ -2324,7 +2324,7 @@
       "model": "docs/lem/files/xslope_gsat_piezo.xlsx",
       "references": [
         {
-          "anchor": "16-saturated-vs-moist-unit-weight-_sat",
+          "anchor": "6-saturated-vs-moist-unit-weight-_sat",
           "checks": [
             "circular_search"
           ],
@@ -2332,8 +2332,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "16. Saturated vs. Moist Unit Weight (γ_sat)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat"
+          "title": "6. Saturated vs. Moist Unit Weight (γ_sat)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat"
         }
       ],
       "topics": [
@@ -2391,7 +2391,7 @@
       "model": "docs/lem/files/xslope_gsat_rapid.xlsx",
       "references": [
         {
-          "anchor": "16-saturated-vs-moist-unit-weight-_sat",
+          "anchor": "6-saturated-vs-moist-unit-weight-_sat",
           "checks": [
             "circular_search"
           ],
@@ -2399,8 +2399,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "16. Saturated vs. Moist Unit Weight (γ_sat)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat"
+          "title": "6. Saturated vs. Moist Unit Weight (γ_sat)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat"
         }
       ],
       "topics": [
@@ -2459,7 +2459,7 @@
       "model": "docs/lem/files/xslope_gsat_seep.xlsx",
       "references": [
         {
-          "anchor": "16-saturated-vs-moist-unit-weight-_sat",
+          "anchor": "6-saturated-vs-moist-unit-weight-_sat",
           "checks": [
             "circular_search"
           ],
@@ -2467,8 +2467,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "16. Saturated vs. Moist Unit Weight (γ_sat)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat"
+          "title": "6. Saturated vs. Moist Unit Weight (γ_sat)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat"
         }
       ],
       "topics": [
@@ -2527,7 +2527,7 @@
       "model": "docs/lem/files/xslope_gsat_sidecar.xlsx",
       "references": [
         {
-          "anchor": "16-saturated-vs-moist-unit-weight-_sat",
+          "anchor": "6-saturated-vs-moist-unit-weight-_sat",
           "checks": [
             "circular_search"
           ],
@@ -2535,8 +2535,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "16. Saturated vs. Moist Unit Weight (γ_sat)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat"
+          "title": "6. Saturated vs. Moist Unit Weight (γ_sat)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat"
         }
       ],
       "topics": [
@@ -2594,7 +2594,7 @@
       "model": "docs/lem/files/xslope_gsat_zoned.xlsx",
       "references": [
         {
-          "anchor": "16-saturated-vs-moist-unit-weight-_sat",
+          "anchor": "6-saturated-vs-moist-unit-weight-_sat",
           "checks": [
             "circular_search",
             "gsat_pair"
@@ -2603,8 +2603,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "16. Saturated vs. Moist Unit Weight (γ_sat)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat"
+          "title": "6. Saturated vs. Moist Unit Weight (γ_sat)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat"
         }
       ],
       "topics": []
@@ -2660,7 +2660,7 @@
       "model": "docs/lem/files/xslope_hassiotis.xlsx",
       "references": [
         {
-          "anchor": "17-pile-stabilized-slope-hassiotis-et-al-1997",
+          "anchor": "7-pile-stabilized-slope-hassiotis-et-al-1997",
           "checks": [
             "LEM-HASSIOTIS"
           ],
@@ -2668,8 +2668,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "17. Pile-Stabilized Slope (Hassiotis et al. 1997)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#17-pile-stabilized-slope-hassiotis-et-al-1997"
+          "title": "7. Pile-Stabilized Slope (Hassiotis et al. 1997)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997"
         }
       ],
       "topics": [
@@ -2729,7 +2729,7 @@
       "model": "docs/lem/files/xslope_hassiotis_p1.xlsx",
       "references": [
         {
-          "anchor": "17-pile-stabilized-slope-hassiotis-et-al-1997",
+          "anchor": "7-pile-stabilized-slope-hassiotis-et-al-1997",
           "checks": [
             "LEM-HASSIOTIS"
           ],
@@ -2737,8 +2737,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "17. Pile-Stabilized Slope (Hassiotis et al. 1997)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#17-pile-stabilized-slope-hassiotis-et-al-1997"
+          "title": "7. Pile-Stabilized Slope (Hassiotis et al. 1997)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997"
         }
       ],
       "topics": [
@@ -2799,7 +2799,7 @@
       "model": "docs/lem/files/xslope_hassiotis_p2.xlsx",
       "references": [
         {
-          "anchor": "17-pile-stabilized-slope-hassiotis-et-al-1997",
+          "anchor": "7-pile-stabilized-slope-hassiotis-et-al-1997",
           "checks": [
             "LEM-HASSIOTIS"
           ],
@@ -2807,8 +2807,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "17. Pile-Stabilized Slope (Hassiotis et al. 1997)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#17-pile-stabilized-slope-hassiotis-et-al-1997"
+          "title": "7. Pile-Stabilized Slope (Hassiotis et al. 1997)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997"
         }
       ],
       "topics": [
@@ -2932,16 +2932,16 @@
       "model": "docs/lem/files/xslope_johnson_rapid_KEY.xlsx",
       "references": [
         {
-          "anchor": "12-rapid-drawdown-johnson-reservoir-dam",
+          "anchor": "factor-of-safety-by-method",
           "checks": [
             "single_circle"
           ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "12. Rapid Drawdown (Johnson Reservoir Dam)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#12-rapid-drawdown-johnson-reservoir-dam"
+          "level": 2,
+          "page": "tutorials/combo02_rapid_drawdown/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/combo02_rapid_drawdown.md",
+          "title": "Factor of safety by method",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#factor-of-safety-by-method"
         }
       ],
       "topics": [
@@ -3067,21 +3067,10 @@
       "model": "docs/lem/files/xslope_method_slices_problem.xlsx",
       "references": [
         {
-          "anchor": "5-slope-with-multiple-materials-and-piezometric-line",
-          "checks": [
-            "single_circle"
-          ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "5. Slope with Multiple Materials and Piezometric Line",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#5-slope-with-multiple-materials-and-piezometric-line"
-        },
-        {
           "anchor": "tutorial-lem-4-water-in-the-slope",
           "checks": [
-            "circular_search"
+            "circular_search",
+            "single_circle"
           ],
           "level": 1,
           "page": "tutorials/lem04_water_in_the_slope/",
@@ -3146,16 +3135,16 @@
       "model": "docs/lem/files/xslope_method_slices_problem2.xlsx",
       "references": [
         {
-          "anchor": "5-slope-with-multiple-materials-and-piezometric-line",
+          "anchor": "factor-of-safety-by-method",
           "checks": [
             "circular_search"
           ],
-          "level": 3,
-          "page": "lem/samples/",
+          "level": 2,
+          "page": "tutorials/lem04_water_in_the_slope/",
           "resolution": "input-link",
-          "source_md": "docs/lem/samples.md",
-          "title": "5. Slope with Multiple Materials and Piezometric Line",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#5-slope-with-multiple-materials-and-piezometric-line"
+          "source_md": "docs/tutorials/lem04_water_in_the_slope.md",
+          "title": "Factor of safety by method",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem04_water_in_the_slope/#factor-of-safety-by-method"
         }
       ],
       "topics": [
@@ -3213,21 +3202,10 @@
       "model": "docs/lem/files/xslope_mult_min_KEY.xlsx",
       "references": [
         {
-          "anchor": "13-multiple-local-minima",
-          "checks": [
-            "single_circle"
-          ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "13. Multiple Local Minima",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#13-multiple-local-minima"
-        },
-        {
           "anchor": "opening-the-model",
           "checks": [
-            "circular_search"
+            "circular_search",
+            "single_circle"
           ],
           "level": 3,
           "page": "tutorials/lem10_global_minimum/",
@@ -3290,20 +3268,9 @@
       "model": "docs/lem/files/xslope_noncircular.xlsx",
       "references": [
         {
-          "anchor": "7-non-circular-failure-surface",
-          "checks": [
-            "noncircular_search"
-          ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "7. Non-Circular Failure Surface",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#7-non-circular-failure-surface"
-        },
-        {
           "anchor": "tutorial-lem-5-a-weak-layer-non-circular",
           "checks": [
+            "noncircular_search",
             "single_noncirc"
           ],
           "level": 1,
@@ -3372,18 +3339,6 @@
       "model": "docs/lem/files/xslope_piles.xlsx",
       "references": [
         {
-          "anchor": "lem-vs-fem-comparison",
-          "checks": [
-            "circular_search"
-          ],
-          "level": 4,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "LEM vs. FEM Comparison",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#lem-vs-fem-comparison"
-        },
-        {
           "anchor": "opening-the-model-and-reading-the-pile-rows",
           "checks": [
             "FEM-4-piles-ssrm"
@@ -3398,6 +3353,7 @@
         {
           "anchor": "opening-the-model",
           "checks": [
+            "circular_search",
             "single_circle"
           ],
           "level": 3,
@@ -3467,18 +3423,18 @@
       "model": "docs/lem/files/xslope_prob_submerged_KEY.xlsx",
       "references": [
         {
-          "anchor": "15-reliability-analysis-submerged-slope",
+          "anchor": "the-deterministic-run",
           "checks": [
             "reliability",
             "reliability_mc",
             "reliability_rs"
           ],
-          "level": 3,
-          "page": "lem/samples/",
+          "level": 2,
+          "page": "tutorials/lem11_reliability/",
           "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "15. Reliability Analysis (Submerged Slope)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#15-reliability-analysis-submerged-slope"
+          "source_md": "docs/tutorials/lem11_reliability.md",
+          "title": "The deterministic run",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem11_reliability/#the-deterministic-run"
         }
       ],
       "topics": [
@@ -3543,16 +3499,16 @@
       "model": "docs/lem/files/xslope_reinforce.xlsx",
       "references": [
         {
-          "anchor": "9-reinforced-slope",
+          "anchor": "tutorial-lem-8-a-reinforced-slope-geogrids",
           "checks": [
             "circular_search"
           ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "9. Reinforced Slope",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#9-reinforced-slope"
+          "level": 1,
+          "page": "tutorials/lem08_reinforced_slope/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem08_reinforced_slope.md",
+          "title": "Tutorial LEM-8 — A Reinforced Slope (Geogrids)",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem08_reinforced_slope/#tutorial-lem-8-a-reinforced-slope-geogrids"
         }
       ],
       "topics": [
@@ -3616,18 +3572,18 @@
       "model": "docs/lem/files/xslope_reinforce_rface.xlsx",
       "references": [
         {
-          "anchor": "9-reinforced-slope",
+          "anchor": "what-dir-and-appl-change",
           "checks": [
             "circular_search",
             "mp_spencer",
             "roundtrip"
           ],
           "level": 3,
-          "page": "lem/samples/",
+          "page": "tutorials/lem08_reinforced_slope/",
           "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "9. Reinforced Slope",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#9-reinforced-slope"
+          "source_md": "docs/tutorials/lem08_reinforced_slope.md",
+          "title": "What Dir and Appl change",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem08_reinforced_slope/#what-dir-and-appl-change"
         }
       ],
       "topics": [
@@ -3757,16 +3713,16 @@
       "model": "docs/lem/files/xslope_simple_embankment.xlsx",
       "references": [
         {
-          "anchor": "1-simple-embankment",
+          "anchor": "check-its-work",
           "checks": [
             "circular_search"
           ],
           "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "1. Simple Embankment",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#1-simple-embankment"
+          "page": "tutorials/lem01_simple_embankment/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem01_simple_embankment.md",
+          "title": "Check its work",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem01_simple_embankment/#check-its-work"
         }
       ],
       "topics": [
@@ -3824,16 +3780,16 @@
       "model": "docs/lem/files/xslope_simple_embankment_mods.xlsx",
       "references": [
         {
-          "anchor": "1-simple-embankment",
+          "anchor": "factor-of-safety-by-method",
           "checks": [
             "circular_search"
           ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "input-link",
-          "source_md": "docs/lem/samples.md",
-          "title": "1. Simple Embankment",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#1-simple-embankment"
+          "level": 2,
+          "page": "tutorials/lem02_loads_on_the_crest/",
+          "resolution": "nearest-heading",
+          "source_md": "docs/tutorials/lem02_loads_on_the_crest.md",
+          "title": "Factor of safety by method",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem02_loads_on_the_crest/#factor-of-safety-by-method"
         }
       ],
       "topics": [
@@ -3892,7 +3848,7 @@
       "model": "docs/lem/files/xslope_simple_foundation.xlsx",
       "references": [
         {
-          "anchor": "2-simple-slope-with-foundation",
+          "anchor": "1-simple-slope-with-foundation",
           "checks": [
             "circular_search"
           ],
@@ -3900,8 +3856,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "2. Simple Slope with Foundation",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#2-simple-slope-with-foundation"
+          "title": "1. Simple Slope with Foundation",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#1-simple-slope-with-foundation"
         }
       ],
       "topics": [
@@ -3959,20 +3915,9 @@
       "model": "docs/lem/files/xslope_simple_mult_layers.xlsx",
       "references": [
         {
-          "anchor": "3-simple-slope-with-multiple-layers",
-          "checks": [
-            "circular_search"
-          ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "3. Simple Slope with Multiple Layers",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#3-simple-slope-with-multiple-layers"
-        },
-        {
           "anchor": "tutorial-lem-3-a-layered-slope",
           "checks": [
+            "circular_search",
             "single_circle"
           ],
           "level": 1,
@@ -4048,20 +3993,9 @@
       "model": "docs/lem/files/xslope_sloping_bottom.xlsx",
       "references": [
         {
-          "anchor": "11-polygon-input-with-a-sloping-bottom",
-          "checks": [
-            "circular_search"
-          ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "11. Polygon Input with a Sloping Bottom",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#11-polygon-input-with-a-sloping-bottom"
-        },
-        {
           "anchor": "tutorial-lem-6-polygon-geometry",
           "checks": [
+            "circular_search",
             "single_circle"
           ],
           "level": 1,
@@ -4125,7 +4059,7 @@
       "model": "docs/lem/files/xslope_submerged.xlsx",
       "references": [
         {
-          "anchor": "4-submerged-slope",
+          "anchor": "2-submerged-slope",
           "checks": [
             "circular_search"
           ],
@@ -4133,8 +4067,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "4. Submerged Slope",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#4-submerged-slope"
+          "title": "2. Submerged Slope",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#2-submerged-slope"
         }
       ],
       "topics": [
@@ -4192,7 +4126,7 @@
       "model": "docs/lem/files/xslope_tension_KEY.xlsx",
       "references": [
         {
-          "anchor": "14-tension-crack",
+          "anchor": "5-tension-crack",
           "checks": [
             "circular_search"
           ],
@@ -4200,8 +4134,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "14. Tension Crack",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#14-tension-crack"
+          "title": "5. Tension Crack",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#5-tension-crack"
         }
       ],
       "topics": [
@@ -27915,11 +27849,14 @@
       "tutorials/fem03_block_wall_joints/",
       "tutorials/fem04_piles/",
       "tutorials/fem05_rock_slope_joints/",
+      "tutorials/lem01_simple_embankment/",
+      "tutorials/lem02_loads_on_the_crest/",
       "tutorials/lem03_layered_slope/",
       "tutorials/lem04_water_in_the_slope/",
       "tutorials/lem05_weak_layer_noncircular/",
       "tutorials/lem06_polygon_geometry/",
       "tutorials/lem07_strength_envelopes/",
+      "tutorials/lem08_reinforced_slope/",
       "tutorials/lem09_tieback_wall/",
       "tutorials/lem10_global_minimum/",
       "tutorials/lem11_reliability/",
@@ -27941,7 +27878,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 659,
+    "tags": 661,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

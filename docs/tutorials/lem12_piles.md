@@ -30,7 +30,7 @@ lateral force by Ito & Matsui, what pile spacing and structural capacity do to
 it, and how to check for the shallow surface that bypasses the row.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">piles</span><span class="tg-pill">Ito &amp; Matsui</span><span class="tg-pill">pile spacing</span><span class="tg-pill">structural capacity</span><span class="tg-pill">specified pile force</span><span class="tg-pill">circular search</span><span class="tg-pill">grid seeding</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx), the same file used by [LEM Sample Problem 10](../lem/samples.md#10-slope-stabilized-with-piles)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx)</div>
 </div>
 
 ---
@@ -512,10 +512,28 @@ This tutorial covered:
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Piles and Concrete Piers](../lem/piles.md) derives the Ito & Matsui equations,
 the capacity checks and the per-unit-width convention;
-[Sample Problem 10](../lem/samples.md#10-slope-stabilized-with-piles) catalogs
-this model with its factor of safety by every method;
 in [LEM-9](lem09_tieback_wall.md) we enter a pile with its force stated, beside
 the tieback anchors it carries; and
 [VP106](../verification/rocscience.md#vp106) and
 [VP54](../verification/rocscience.md#vp54) check the computed and stated routes
 against published solutions.
+
+---
+
+## Factor of safety by method
+
+The table gives each method's own search on the model with both pile rows, each
+started from the file's circle:
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1.617 | 1.852 | 1.648 | 1.884 | 1.978 | 1.842 | 1.843 |
+
+<!-- test: file=../lem/files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.617, fs_bishop=1.852, fs_janbu=1.648, fs_corps=1.884, fs_lowe=1.978, fs_spencer=1.842, fs_mprice=1.843 -->
+
+Morgenstern-Price agrees with Spencer to within 0.001, and Bishop sits 0.5%
+above it. The Corps of Engineers method and Lowe & Karafiath come out 2.3% and
+7.4% above Spencer, and Janbu and the Ordinary Method of Slices (OMS) 10.5% and
+12.2% below it. The grid search in
+[Looking above the pile row](#looking-above-the-pile-row) finds Spencer a lower
+surface, at 1.702, that slides over the top of the piles.

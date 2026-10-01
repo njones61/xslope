@@ -26,7 +26,7 @@ how the seed circle steers what a search finds, how a minimum slip depth rejects
 surficial slivers, and when grid seeding beats any hand-placed seed.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">grid seeding</span><span class="tg-pill">minimum slip depth</span></p>
-<div class="tgm-model" markdown>**Completed models** — [xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) (the same file used by [LEM Sample Problem 13](../lem/samples.md#13-multiple-local-minima)) and, for Part B, [xslope_james_bay.xlsx](../lem/files/xslope_james_bay.xlsx) — the James Bay dyke of [verification problem VP75](../verification/rocscience.md#vp75), with a single mid-depth starting circle</div>
+<div class="tgm-model" markdown>**Completed models** — [xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) and, for Part B, [xslope_james_bay.xlsx](../lem/files/xslope_james_bay.xlsx) — the James Bay dyke of [verification problem VP75](../verification/rocscience.md#vp75), with a single mid-depth starting circle</div>
 </div>
 
 ---
@@ -240,6 +240,23 @@ This tutorial covered:
   seed converged 23% high.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
-[Sample Problem 13](../lem/samples.md#13-multiple-local-minima) catalogs this
-model, in [LEM-3](lem03_layered_slope.md) we build the per-layer starting-circle
+In [LEM-3](lem03_layered_slope.md) we build the per-layer starting-circle
 rule, and [Automated Search](../lem/search.md) documents the search itself.
+
+---
+
+## Factor of safety by method
+
+The table gives every method on the Part A file's starting circle, solved as
+entered with no search:
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1.354 | 1.434 | 1.417 | 1.719 | 1.524 | 1.426 | 1.431 |
+
+<!-- test: file=../lem/files/xslope_mult_min_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.354, fs_bishop=1.434, fs_janbu=1.417, fs_corps=1.719, fs_lowe=1.524, fs_spencer=1.426, fs_mprice=1.431 -->
+
+Spencer's 1.426 is the value the starting circle gave before the search moved it.
+On the same slices Morgenstern-Price agrees with Spencer to 0.4% and Bishop to
+0.6%, Janbu is 0.6% lower and the Ordinary Method of Slices (OMS) 5.0% lower. Lowe
+& Karafiath and the Corps of Engineers method come out 6.9% and 20.5% higher.

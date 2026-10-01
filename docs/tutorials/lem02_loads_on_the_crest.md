@@ -399,3 +399,21 @@ where the critical surface migrates as the parameter moves.
 [Back-Analysis](../parametric/back_analysis.md) carry the sweep above further —
 every parameter it can vary, and what a sweep that never reaches its target
 reports instead.
+
+---
+
+## Factor of safety by method
+
+The table gives each method's own search on the model with the crest surcharge:
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 0.918 | 0.918 | 0.950 | 0.953 | 0.939 | 0.918 | 0.918 |
+
+<!-- test: file=../lem/files/xslope_crest_surcharge.xlsx, type=circular_search, num_slices=40, fs_oms=0.918, fs_bishop=0.918, fs_janbu=0.950, fs_corps=0.953, fs_lowe=0.939, fs_spencer=0.918, fs_mprice=0.918 -->
+<!-- test: file=../lem/files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.986, fs_bishop=0.986, fs_janbu=0.969, fs_corps=1.050, fs_lowe=1.039, fs_spencer=0.986, fs_mprice=0.986 -->
+
+The Ordinary Method of Slices (OMS), Bishop, Spencer and Morgenstern-Price all
+give 0.918. The three force-equilibrium procedures come out 2.3 to 3.8% higher:
+Lowe & Karafiath at 0.939, Janbu at 0.950 and the Corps of Engineers at 0.953.
+All seven put the loaded slope below 1.

@@ -24,7 +24,7 @@ circular surface, and how to read the result closely enough to catch what a
 first model gets wrong.
 </div>
 <p><span class="tg-pill">profile lines</span><span class="tg-pill">one material</span><span class="tg-pill">Mohr-Coulomb</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">tension crack</span><span class="tg-pill">water in crack</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx) — the same file used by [LEM Sample Problem 1](../lem/samples.md#1-simple-embankment)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx)</div>
 </div>
 
 ---
@@ -497,8 +497,8 @@ are 0.06% apart in factor of safety. The verge depth is the most defensible mode
 of the soil; the theoretical depth is the conservative habit. What is not
 defensible is the uncracked model: both cracked answers sit far below its 1.276.
 
-The [sample page](../lem/samples.md#1-simple-embankment) catalogs the uncracked
-variant of this model; the cracked model is yours — keep it with **Save As**.
+The completed file linked at the top of this page is the uncracked model; keep the
+cracked one with **Save As**.
 
 ---
 
@@ -521,3 +521,23 @@ This tutorial covered:
 **Where to go next:** [Tutorial LEM-2](lem02_loads_on_the_crest.md) adds loads to
 this same section — a surcharge on the crest, the same force as a line load, an
 earthquake, and the strength it would take to carry them.
+
+---
+
+## Factor of safety by method
+
+The table gives each method's own search on the uncracked model, before the
+tension crack is added:
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1.215 | 1.215 | 1.335 | 1.319 | 1.263 | 1.276 | 1.226 |
+
+<!-- test: file=../lem/files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, fs_oms=1.215, fs_bishop=1.215, fs_janbu=1.335, fs_corps=1.319, fs_lowe=1.263, fs_spencer=1.276, fs_mprice=1.226 -->
+
+The Ordinary Method of Slices (OMS) lands on Bishop's 1.215: with φ = 0 the
+strength on a slice base does not depend on the normal force, so the two compute
+the same factor of safety on any circle. Morgenstern-Price also satisfies moment
+equilibrium, so its 1.226, 0.9% above Bishop, means its search settled on a
+different circle. The three force-equilibrium procedures come out higher still:
+Lowe & Karafiath 4.0% above Bishop, the Corps of Engineers 8.6% and Janbu 9.9%.

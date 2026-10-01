@@ -85,8 +85,7 @@ def _sweep_cached(tag, model_path, compute, **kw):
         pickle.dump(res, fh)
     return res
 
-#: The tutorial's model is the sample's model — one file, two pages (the tutorial
-#: builds it, ``docs/lem/samples.md`` catalogues it). Nothing is copied.
+#: The tutorial's completed model, linked from its page. Nothing is copied.
 LEM01 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_simple_embankment.xlsx")
 LEM01_SLICES = 40
 
@@ -4567,8 +4566,7 @@ def fem01_plots():
 # FEM-2 — Reinforcement: LEM against FEM
 # --------------------------------------------------------------------------- #
 #: FEM-2's file pair, written by ``tools/build_reinforced_slope_tutorial.py`` from
-#: the LEM reinforced-slope model (docs/lem/samples.md problem 9, the model
-#: Tutorial LEM-8 builds) and its finite element counterpart
+#: the LEM reinforced-slope model (the model Tutorial LEM-8 builds) and its finite element counterpart
 #: (docs/fem/samples.md problem 1).  The starter carries the limit-equilibrium
 #: model only — the six geogrid lines, but no elastic constants, no mesh and no
 #: FEM reinforcement data; the completed file adds the soils' E and nu, Tres, the
@@ -5028,12 +5026,9 @@ def fem02_tres_sweep():
 # FEM-4 — Piles: LEM against FEM
 # --------------------------------------------------------------------------- #
 #: FEM-4's two models, both on the same slope.  The discrete row is the pile
-#: sample problem — one model, two sample pages: docs/lem/samples.md problem 10
-#: locks Spencer's search on it and docs/fem/samples.md problem 2 locks a
-#: strength-reduction run on it.  The sample's locked run is made over its own
-#: bracket on the mesh committed beside its finite element copy; the tutorial
-#: runs below are made at the settings the page has the reader enter, so they
-#: build their own mesh from the limit-equilibrium copy the page links.
+#: model of Tutorial LEM-12, whose page locks Spencer's search on it.  The
+#: tutorial runs below are made at the settings the page has the reader enter,
+#: so they build their own mesh from the limit-equilibrium copy the page links.
 FEM04_PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
 #: The continuous wall: the pair written by ``tools/build_pile_wall_tutorial.py``
 #: from that same slope — the starter with no structural line in it, and the same
@@ -5044,7 +5039,7 @@ FEM04_WALL_START = os.path.join(REPO_ROOT,
 FEM04_WALL_DONE = os.path.join(REPO_ROOT,
                                "docs/tutorials/files/xslope_pile_wall.xlsx")
 #: The limit-equilibrium method and slice count the piles model's own locked
-#: search runs at (docs/lem/samples.md's circular_search tag).
+#: search runs at (the circular_search tag on docs/tutorials/lem12_piles.md).
 FEM04_METHOD = "spencer"
 FEM04_SLICES = 40
 #: The mesh every figure on the page is drawn on: quadratic triangles at 2 ft,

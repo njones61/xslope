@@ -48,7 +48,7 @@ probability of failure by the Taylor series and by Monte Carlo, and how to find
 which uncertainty drives the answer.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">undrained strength</span><span class="tg-pill">distributed load</span><span class="tg-pill">standard deviations</span><span class="tg-pill">Taylor series (TSPM)</span><span class="tg-pill">Monte Carlo</span><span class="tg-pill">variance Pareto</span><span class="tg-pill">circular search</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_reliability.xlsx](../lem/files/xslope_reliability.xlsx) — essentially the same problem as [LEM Sample Problem 15](../lem/samples.md#15-reliability-analysis-submerged-slope), with the standing water entered as a piezometric line instead of hand-typed surface loads</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_reliability.xlsx](../lem/files/xslope_reliability.xlsx)</div>
 </div>
 
 ---
@@ -136,6 +136,9 @@ of this page is about: not whether 1.354 is right, but how much of it is real.
 
 <!-- test: file=../lem/files/xslope_reliability.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.354, tolerance=0.005 -->
 <!-- test: file=../lem/files/xslope_reliability.xlsx, type=single_circle, circle_index=0, method=spencer, num_slices=40, expected_fs=1.366, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_prob_submerged_KEY.xlsx, type=reliability, method=spencer, expected_beta=0.935, tolerance=0.03 -->
+<!-- test: file=../lem/files/xslope_prob_submerged_KEY.xlsx, type=reliability_mc, method=spencer, search=true, n_samples=10000, converge_rel=0.10, expected_beta=0.979, tolerance=0.02, expected_pf=0.165, pf_tol=0.02 -->
+<!-- test: file=../lem/files/xslope_prob_submerged_KEY.xlsx, type=reliability_rs, method=spencer, search=true, n_surrogate=10000000, expected_beta=0.997, tolerance=0.01, expected_pf=0.1657, pf_tol=0.005 -->
 
 ---
 

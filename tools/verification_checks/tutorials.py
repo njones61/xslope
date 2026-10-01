@@ -13,7 +13,7 @@ page are
 
 * the tags on the page itself, and
 * the tags anywhere under ``docs/`` on a model file the page links —
-  ``docs/lem/samples.md`` locks the seven methods of the same workbook LEM-3
+  LEM-12's page locks the seven methods of the pile workbook FEM-4
   walks the reader through, and ``docs/verification`` locks the vendor models
   the LEM pages borrow.
 
@@ -117,8 +117,8 @@ def doc_locks(repo=None):
     """Every test tag under ``docs/``, keyed by the model file it names.
 
     The map is what lets a tutorial inherit a guard it does not carry itself:
-    LEM-3 walks ``xslope_simple_mult_layers.xlsx``, whose seven method locks
-    live on ``docs/lem/samples.md``, and LEM-9 walks a Rocscience model locked
+    FEM-4 walks ``xslope_piles.xlsx``, whose seven method locks live on
+    ``docs/tutorials/lem12_piles.md``, and LEM-9 walks a Rocscience model locked
     on a verification page.  Keyed by base name, because a tag writes the path
     relative to its own page.
     """

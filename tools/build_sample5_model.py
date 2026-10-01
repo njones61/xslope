@@ -1,7 +1,6 @@
-"""Build LEM Sample Problem 5's model: three layers over a piezometric line.
+"""Build Tutorial LEM-4's model: three layers over a piezometric line.
 
-``docs/lem/files/xslope_method_slices_problem.xlsx`` — the section of
-[samples §5](../docs/lem/samples.md) and the model
+``docs/lem/files/xslope_method_slices_problem.xlsx`` — the model
 [Tutorial LEM-4](../docs/tutorials/lem04_water_in_the_slope.md) builds.
 
 The section is a 44 ft slope in three soils on a rigid base at elevation 0, with a

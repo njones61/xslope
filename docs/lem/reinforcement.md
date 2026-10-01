@@ -128,7 +128,7 @@ $\psi$ is a property of the force, not of the line, and the **Dir** setting is w
 - **Axial** ($\psi$ = the inclination of the reinforcement line itself) — rigid supports such as soil nails,
   grouted tiebacks, and anchored bars carry their force along their own axis; the soil cannot reorient them.
   UTEXAS/UTEXASED uses this convention, which is why xslope's tangent results for nail problems differ from
-  UTEXASED's (see the [reinforced slope sample](samples.md), where the UTEXASED axial result is FS = 1.646 versus
+  UTEXASED's (see [Tutorial LEM-8](../tutorials/lem08_reinforced_slope.md#the-utexased-solution), where the UTEXASED axial result is FS = 1.646 versus
   the tangent 1.587).
 
 The direction affects each solution method the same way the pile force does: the force is resolved into components

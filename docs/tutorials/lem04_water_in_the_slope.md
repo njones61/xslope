@@ -26,7 +26,7 @@ piezometric line and the pore pressure it produces on every slice base, what the
 two unit-weight columns do, and when to reach for the r<sub>u</sub> alternative.
 </div>
 <p><span class="tg-pill">three materials</span><span class="tg-pill">piezometric line</span><span class="tg-pill">effective stress</span><span class="tg-pill">saturated unit weight</span><span class="tg-pill">circular search</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_method_slices_problem.xlsx](../lem/files/xslope_method_slices_problem.xlsx) — the same file used by [LEM Sample Problem 5](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_method_slices_problem.xlsx](../lem/files/xslope_method_slices_problem.xlsx)</div>
 </div>
 
 ---
@@ -117,6 +117,14 @@ this page measures is the one the search finds, not this one:
 | Xo | Yo | Option | Depth |
 | :---: | :---: | --- | :---: |
 | 195 | 150 | Depth | 18.1 |
+
+The section and this circle come from two exercises in CE 544, Slope Stability
+Analysis, a graduate course at Brigham Young University — the
+[Ordinary Method of Slices exercise](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_class/)
+and the
+[Bishop Simplified Procedure homework](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_hw/)
+— which solve the method of slices on this one circle in a spreadsheet, with
+material properties different from the ones above.
 
 Every number the model needs is in the tables above, and each table is laid out
 exactly as its destination — the template's worksheets and Studio's editors,
@@ -502,8 +510,42 @@ This tutorial covered:
 **Where to go next:** [Tutorial LEM-5](lem05_weak_layer_noncircular.md) puts the
 failure surface itself in your hands — a 2 ft seam of soft clay no circle can
 follow, entered as a table of vertices and searched from there.
-[Sample Problem 5](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)
-carries this same section into a three-seed search and reports every method on
-both surfaces, and the
-[seepage documentation](../seep/overview.md) replaces the hand-drawn line
+The [seepage documentation](../seep/overview.md) replaces the hand-drawn line
 with a computed flow field — the `seep` setting the `u` column left unused.
+
+---
+
+## Factor of safety by method
+
+The two tables give every method on the starting circle as entered, the circle
+the CE 544 exercises analyze, and each method's own search.
+
+**On the starting circle**, solved as a single surface with no search:
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1.310 | 1.475 | 1.469 | 1.641 | 1.522 | 1.462 | 1.464 |
+
+<!-- test: file=../lem/files/xslope_method_slices_problem.xlsx, type=single_circle, num_slices=40, fs_oms=1.310, fs_bishop=1.475, fs_janbu=1.469, fs_corps=1.641, fs_lowe=1.522, fs_spencer=1.462, fs_mprice=1.464 -->
+
+Spencer reads 1.462 on this circle, against the 1.301 its search reaches. On the
+same slices Spencer and Morgenstern-Price agree to 0.1% and Bishop sits 0.9% above
+them; the Ordinary Method of Slices (OMS) comes out 10.4% below and the Corps of
+Engineers method 12.2% above.
+
+**Each method's own search**, run on
+[xslope_method_slices_problem2.xlsx](../lem/files/xslope_method_slices_problem2.xlsx),
+which is this model with three starting circles spread across the section in place
+of the one above:
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1.084 | 1.327 | 1.253 | 1.436 | 1.376 | 1.301 | 1.302 |
+
+<!-- test: file=../lem/files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=1.084, fs_bishop=1.327, fs_janbu=1.253, fs_corps=1.436, fs_lowe=1.376, fs_spencer=1.301, fs_mprice=1.302 -->
+
+Spencer's search returns the same 1.301 as the search from the single circle, and
+Morgenstern-Price's 1.302 agrees with it. Bishop sits 2.0% above Spencer. Of the
+force-equilibrium procedures, Janbu comes out 3.7% below Spencer, Lowe & Karafiath
+5.8% above and the Corps of Engineers 10.4% above, and OMS is the lowest of the
+seven at 1.084, 16.7% below Spencer.

@@ -4,7 +4,7 @@ Five files come out of the single set of constants below, so the rapid-drawdown
 family cannot drift apart:
 
   ``docs/lem/files/xslope_johnson_rapid_KEY.xlsx``
-      The rapid-drawdown sample of ``docs/lem/samples.md``, and the locked anchor for
+      The seven-method table of Tutorial COMBO-2, and the locked anchor for
       the **two-steady** route: the two pools stated as the two steady seepage
       boundary sets, ``u = seep`` on every material, and the fixed circle. The mesh
       and the two solved fields ship beside it as ``_mesh.json``, ``_seep.csv`` and
@@ -236,7 +236,7 @@ def build_lem_worked_example():
 
 
 def build_lem_sample():
-    """``docs/lem/samples.md``'s rapid-drawdown sample: the two-steady route.
+    """The seven-method rapid-drawdown model of Tutorial COMBO-2: the two-steady route.
 
     The dam of the tutorial family with each pool stated as its own steady seepage
     problem — set 1 at full pool, set 2 at the residual pool — and ``u = seep`` on

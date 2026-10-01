@@ -27,7 +27,7 @@ the way each force acts, and how to read what the layers are worth against the
 unreinforced slope and the force each crossing actually mobilizes.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">distributed load</span><span class="tg-pill">reinforcement lines</span><span class="tg-pill">capacity envelope</span><span class="tg-pill">pullout length</span><span class="tg-pill">support types</span><span class="tg-pill">circular search</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_reinforce.xlsx](../lem/files/xslope_reinforce.xlsx) — the same file used by [LEM Sample Problem 9](../lem/samples.md#9-reinforced-slope)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_reinforce.xlsx](../lem/files/xslope_reinforce.xlsx)</div>
 </div>
 
 ---
@@ -451,6 +451,8 @@ Each method gets its own search and its own critical circle:
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 1.480 | 1.594 | 1.524 | 1.608 | 1.598 | 1.587 | 1.587 |
 
+<!-- test: file=../lem/files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.480, fs_bishop=1.594, fs_janbu=1.524, fs_corps=1.608, fs_lowe=1.598, fs_spencer=1.587, fs_mprice=1.587 -->
+
 Spencer and Morgenstern-Price agree to four figures on the same circle and are
 the ones to report. Below them sit the two procedures that leave an equilibrium
 condition out: OMS neglects the interslice forces altogether and comes out 7%
@@ -458,6 +460,14 @@ low, and Janbu's corrected method, which satisfies force equilibrium but not
 moment equilibrium, 4%. Bishop, Lowe & Karafiath and the Corps of Engineers land
 0.4 to 1.3% above Spencer, each on a shallow circle of its own that daylights at
 the toe and cuts the same reinforced block.
+
+### The UTEXASED solution
+
+UTEXASED's Example 5 reports FS = 1.646 by Spencer's method, on a critical circle
+centered at (3.2, 42.0) with a radius of 43.4. Solved as a single surface on that
+circle, XSLOPE's Spencer method gives the same 1.646. The search on this page
+finds a shallower circle, centered at (−5.13, 46.98), at 1.587, which is 3.6%
+lower.
 
 ### What the reinforcement is worth
 
@@ -534,6 +544,10 @@ as an ultimate capacity divided by the factor of safety, the search returns
 conventions, which is why the type presets set them together and the reference
 page states which support wants which.
 
+<!-- test: file=../lem/files/xslope_reinforce_rface.xlsx, type=circular_search, num_slices=40, fs_oms=1.282, fs_bishop=1.475, fs_janbu=1.420, fs_spencer=1.471, fs_corps=1.485, fs_lowe=1.477, fs_mprice=1.471 -->
+<!-- test: file=../lem/files/xslope_reinforce_rface.xlsx, type=mp_spencer -->
+<!-- test: file=../lem/files/xslope_reinforce_rface.xlsx, type=roundtrip -->
+
 ---
 
 ## Conclusion
@@ -559,9 +573,7 @@ changes both **Dir** and **Appl**. In [FEM-2](fem02_reinforcement.md) we run
 this same model through the finite element engine, where each line is meshed
 into bar elements that carry an axial stiffness and develop their force from the
 movement of the soil around them. The [tutorials index](index.md) lists the
-series, and the sample problems carry each page further.
-[Sample Problem 9](../lem/samples.md#9-reinforced-slope) catalogs this model
-alongside the published solution it comes from,
+series.
 [Soil Reinforcement in LEM](../lem/reinforcement.md) derives the capacity
 envelope and the per-method equations the force enters, and
 [Piles and Concrete Piers](../lem/piles.md) is the other support family — where

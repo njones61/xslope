@@ -1,12 +1,12 @@
 """Build the earth-dam sample workbooks under docs/lem/files from one definition
 of the dam.
 
-  xslope_earth_dam_up       docs/lem/samples.md, problem 8 (upstream slope,
+  xslope_earth_dam_up       docs/lem/samples.md, problem 4 (upstream slope,
                             steady piezometric line)
-  xslope_earth_dam_down     docs/lem/samples.md, problem 8 (downstream slope)
-  xslope_gsat_seep          docs/lem/samples.md, problem 16 (gamma_sat with the
+  xslope_earth_dam_down     docs/lem/samples.md, problem 4 (downstream slope)
+  xslope_gsat_seep          docs/lem/samples.md, problem 6 (gamma_sat with the
                             water table from a steady seepage solution)
-  xslope_gsat_rapid         docs/lem/samples.md, problem 16 (gamma_sat under
+  xslope_gsat_rapid         docs/lem/samples.md, problem 6 (gamma_sat under
                             rapid drawdown, staged piezometric lines)
   xslope_earth_dam_rapid    the rapid-drawdown model with two seepage stages
                             (seep-bc and seep-bc (2)); a fixture of the seepage
@@ -165,7 +165,7 @@ def _write(sd, name):
 
 
 # =============================================================================
-# docs/lem/samples.md, problem 8: steady piezometric line, both slopes
+# docs/lem/samples.md, problem 4: steady piezometric line, both slopes
 # =============================================================================
 def build_earth_dam_up():
     sd = _dam(u='piezo', rapid=False, gsat=False, seep_props=False)
@@ -180,7 +180,7 @@ def build_earth_dam_down():
 
 
 # =============================================================================
-# docs/lem/samples.md, problem 16: gamma_sat with a seepage water table
+# docs/lem/samples.md, problem 6: gamma_sat with a seepage water table
 # =============================================================================
 def build_gsat_seep():
     sd = _dam(u='seep', rapid=False, gsat=True, seep_props=True)
@@ -189,7 +189,7 @@ def build_gsat_seep():
 
 
 # =============================================================================
-# docs/lem/samples.md, problem 16: gamma_sat under rapid drawdown
+# docs/lem/samples.md, problem 6: gamma_sat under rapid drawdown
 # =============================================================================
 def build_gsat_rapid():
     """Staged piezometric lines (pool at El. 302, then El. 250). E and nu are

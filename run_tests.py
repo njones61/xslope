@@ -8631,8 +8631,8 @@ def run_tutorial_restatements_test(test):
     written. tools/verification_checks/tutorials.py reads every factor of
     safety a tutorial attributes to a run of its own and scores it against the
     tags in scope — the page's own, and the tags anywhere under docs/ on a
-    model file the page links, which is how LEM-3 inherits the seven method
-    locks its workbook carries on docs/lem/samples.md.
+    model file the page links, which is how FEM-4 inherits the seven method
+    locks its pile workbook carries on docs/tutorials/lem12_piles.md.
 
     Each number is guarded (it restates a lock, verbatim or correctly rounded),
     disagreeing (its own column header, row label or sentence names a method

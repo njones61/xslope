@@ -30,7 +30,7 @@ to read what the search did to each vertex and where the track belongs in the
 seam.
 </div>
 <p><span class="tg-pill">four materials</span><span class="tg-pill">piezometric line</span><span class="tg-pill">non-circular surface</span><span class="tg-pill">non-circular search</span><span class="tg-pill">Movement options</span><span class="tg-pill">weak-zone generator</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_noncircular.xlsx](../lem/files/xslope_noncircular.xlsx) — the same file used by [LEM Sample Problem 7](../lem/samples.md#7-non-circular-failure-surface)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_noncircular.xlsx](../lem/files/xslope_noncircular.xlsx)</div>
 </div>
 
 ---
@@ -479,8 +479,9 @@ refused before it starts:
 **OMS and Bishop are circle methods.** Both satisfy moment equilibrium by summing
 moments about the center a circle has and a polyline does not, so on this family
 they are not conservative or approximate — they are undefined. That is why the
-sample page's factor-of-safety table shows a dash in their two columns rather than
-a number. The five that remain, each one run as its own search:
+[table at the end of this page](#factor-of-safety-by-method) shows a dash in their
+two columns rather than a number. The five that remain, each one run as its own
+search:
 
 | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: |
@@ -630,9 +631,23 @@ This tutorial covered:
 **Where to go next:** [Tutorial LEM-6](lem06_polygon_geometry.md) changes how the
 section itself is entered — closed material-zone polygons instead of profile
 lines, on bedrock that dips across the model and refuses the circles that would
-cut below it. The sample problems carry each page further:
-[Sample Problem 7](../lem/samples.md#7-non-circular-failure-surface)
-catalogs this same model and its per-method searches, and
-[Sample Problem 13](../lem/samples.md#13-multiple-local-minima) is the circular
+cut below it. [Tutorial LEM-10](lem10_global_minimum.md) is the circular
 counterpart of the same hazard — a section where the surface a search settles on
 depends entirely on where it was started.
+
+---
+
+## Factor of safety by method
+
+The table gives each method's own search on the non-circular model as built in
+this tutorial:
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| — | — | 1.575 | 1.523 | 1.357 | 1.656 | 1.634 |
+
+<!-- test: file=../lem/files/xslope_noncircular.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.575, fs_corps=1.523, fs_lowe=1.357, fs_spencer=1.656, fs_mprice=1.634 -->
+
+OMS and Bishop take moments about a circle center, so they have no answer on this
+surface. Morgenstern-Price comes out 1.3% below Spencer's 1.656. Janbu is 4.9%
+below Spencer, the Corps of Engineers 8.0% below and Lowe & Karafiath 18.1% below.

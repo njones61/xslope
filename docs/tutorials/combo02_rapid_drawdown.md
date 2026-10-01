@@ -298,7 +298,7 @@ elsewhere, and click **Run → Run LEM…**
 ![Run LEM, with Rapid drawdown ticked](images/combo02_studio_run_lem.png)
 
 **Method** opens on **Spencer**, which satisfies both force and moment
-equilibrium, and every number on this page is Spencer's. One field changes from
+equilibrium, and every search on this page is Spencer's. One field changes from
 the dialog's defaults:
 
 **Analysis** stays on **Auto search**, which the dialog opens on. The search
@@ -943,3 +943,24 @@ in full. In [SEEP-3](seep03_reservoir_drawdown.md) we build a transient drawdown
 model from nothing; in [SEEP-2](seep02_johnson_dam.md) we build this dam, and in
 [COMBO-1](combo01_seepage_stability.md) we run it under a standing pool. The
 [tutorials index](index.md) lists the series.
+
+---
+
+## Factor of safety by method
+
+The table gives every method on the starting circle, solved as entered with
+**Rapid drawdown** ticked, using
+[xslope_johnson_rapid_KEY.xlsx](../lem/files/xslope_johnson_rapid_KEY.xlsx): this
+dam with its two steady seepage solutions already solved beside it, on a mesh of
+its own.
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1.247 | 1.439 | 1.366 | 1.719 | 1.548 | 1.498 | 1.510 |
+
+<!-- test: file=../lem/files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.247, fs_bishop=1.439, fs_janbu=1.366, fs_corps=1.719, fs_lowe=1.548, fs_spencer=1.498, fs_mprice=1.510 -->
+
+On the same slices Morgenstern-Price comes out 0.8% above Spencer and Bishop 3.9%
+below. Of the force-equilibrium procedures, Lowe & Karafiath is 3.3% above
+Spencer, the Corps of Engineers 14.8% above and Janbu 8.8% below, and the Ordinary
+Method of Slices (OMS) is the lowest of the seven, 16.8% below Spencer.

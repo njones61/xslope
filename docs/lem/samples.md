@@ -9,72 +9,13 @@ The following examples illustrate how to use XSLOPE to perform limit equilibrium
 
 The notebook allows the user to select a variety of analysis options using simple form inputs and then runs the analysis using the selected method and plots the results.
 
-For each problem below, the solution figure shows the critical surface and factor of safety for Spencer's method, and a **Factor of safety by method** table reports the result for every applicable method. On a solution figure, the green bars on the base of each slice are the effective stress there, the red bars are tension, and the red dashed line is the line of thrust computed with Spencer's method. The tables follow these conventions:
+For each problem below, the solution figure shows the critical surface and factor of safety for Spencer's method, and most problems carry a **Factor of safety by method** table with the result for every method. On a solution figure, the green bars on the base of each slice are the effective stress there, the red bars are tension, and the red dashed line is the line of thrust computed with Spencer's method. The tables follow these conventions:
 
 - Each value is that method's **own** critical surface — every method runs its own search, so the surfaces (and therefore the factors of safety) are not identical between methods.
-- The Ordinary Method of Slices (OMS) and Bishop's method apply only to **circular** surfaces, so they show "—" for non-circular problems.
 - The methods differ by how much equilibrium they satisfy: OMS is the most approximate (and usually the most conservative), while Bishop, Janbu (corrected), Spencer, the Corps of Engineers method, and Lowe-Karafiath each enforce more of the force/moment balance. The Corps and Lowe-Karafiath force-equilibrium methods are sensitive to the assumed interslice-force inclination and can fall above the rigorous Spencer value.
 - For **purely cohesive** soils ($\phi = 0$), the methods are theoretically identical on any given surface. Small differences in those tables therefore come from each method's search settling on a slightly different critical surface, not from the methods themselves.
 
-### 1. Simple Embankment
-
-Built and run step by step in [Tutorial LEM-1](../tutorials/lem01_simple_embankment.md).
-
-![simple_embankment_results1.png](sample_images/simple_embankment_results1.png){width=700}
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1.215 | 1.215 | 1.335 | 1.319 | 1.263 | 1.276 | 1.226 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, fs_oms=1.215, fs_bishop=1.215, fs_janbu=1.335, fs_corps=1.319, fs_lowe=1.263, fs_spencer=1.276, fs_mprice=1.226 -->
-
-Here is a copy of the model with the following variations/changes:
-
-a) Distributed load on top of slope. q = 750 psf<br>
-b) Tension crack. Depth = 3 ft. <br>
-c) Tension crack filled with water.<br>
-d) Submerged by 10 ft depth of water (distributed load)
-
-Excel input file: [xslope_simple_embankment_mods.xlsx](files/xslope_simple_embankment_mods.xlsx){width=700}
-
-Inputs:
-
-![simple_embankment_inputs2.png](sample_images/simple_embankment_inputs2.png){width=700}
-
-Solution (critical surface and factor of safety):
-
-![simple_embankment_results2.png](sample_images/simple_embankment_results2.png){width=700}
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 0.986 | 0.986 | 0.969 | 1.050 | 1.039 | 0.986 | 0.986 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.986, fs_bishop=0.986, fs_janbu=0.969, fs_corps=1.050, fs_lowe=1.039, fs_spencer=0.986, fs_mprice=0.986 -->
-
-The crest-surcharge variant is built and run step by step in
-[Tutorial LEM-2](../tutorials/lem02_loads_on_the_crest.md).
-
-![crest_surcharge_results.png](../tutorials/images/lem02_solution_load.png){width=700}
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 0.918 | 0.918 | 0.950 | 0.953 | 0.939 | 0.918 | 0.918 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_crest_surcharge.xlsx, type=circular_search, num_slices=40, fs_oms=0.918, fs_bishop=0.918, fs_janbu=0.950, fs_corps=0.953, fs_lowe=0.939, fs_spencer=0.918, fs_mprice=0.918 -->
-
-### 2. Simple Slope with Foundation
+### 1. Simple Slope with Foundation
 
 This problem involves a uniform material extending below the toe of the slope. 
 
@@ -100,27 +41,7 @@ Solution (critical surface and factor of safety):
 
 <!-- test: file=files/xslope_simple_foundation.xlsx, type=circular_search, num_slices=40, fs_oms=0.964, fs_bishop=0.964, fs_janbu=1.029, fs_corps=1.120, fs_lowe=1.041, fs_spencer=0.964, fs_mprice=0.964 -->
 
-### 3. Simple Slope with Multiple Layers
-
-Built and run step by step in [Tutorial LEM-3](../tutorials/lem03_layered_slope.md).
-
-![simple_mult_layers_results.png](sample_images/simple_mult_layers_results.png){width=900}
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_simple_mult_layers.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.314, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244, fs_mprice=1.244 -->
-
-This geometry is reused (with elastic properties added and the strength retuned to a
-marginally-stable c–φ profile) for a finite-element **reliability** example — see
-[FEM Sample Problems, problem 2](../fem/samples.md#2-reliability-analysis-two-layer-c-slope).
-
-### 4. Submerged Slope
+### 2. Submerged Slope
 
 This problem features a slope submerged by 10 ft of water. 
 
@@ -149,62 +70,7 @@ Solution (critical surface and factor of safety):
 
 <!-- test: file=files/xslope_submerged.xlsx, type=circular_search, num_slices=40, fs_oms=1.154, fs_bishop=1.154, fs_janbu=1.248, fs_corps=2.011, fs_lowe=1.861, fs_spencer=1.154, fs_mprice=1.154 -->
 
-### 5. Slope with Multiple Materials and Piezometric Line
-
-Built and run step by step in [Tutorial LEM-4](../tutorials/lem04_water_in_the_slope.md).
-
-This problem is similar to one used in two exercises in a graduate course on slope stability analysis
-(CE 544 - Slope Stability Analysis) at Brigham Young University, where limit equilibrium problems are solved
-with the method of slices in an Excel spreadsheet. The exercise descriptions are here:
-
-[Ordinary Method of Slices Exercise](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_class/)<br>
-[Bishop Simplified Procedure Homework](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_hw/)
-
-This sample shares the exercises' geometry but carries a different set of material properties, including both
-moist and saturated unit weights. In the exercises, a single circular surface was analyzed, which is the surface
-solved below with Spencer's method:
-
-![method_slices_problem_results.png](sample_images/method_slices_problem_results.png){width=900}
-
-<!-- fs-table -->
-**Factor of safety by method** (each method on the same specified circle):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1.310 | 1.475 | 1.469 | 1.641 | 1.522 | 1.462 | 1.464 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_method_slices_problem.xlsx, type=single_circle, num_slices=40, fs_oms=1.310, fs_bishop=1.475, fs_janbu=1.469, fs_corps=1.641, fs_lowe=1.522, fs_spencer=1.462, fs_mprice=1.464 -->
-
-Here is the Excel input file with multiple starting circles for a global search for the critical surface:
-
-Excel input file: [xslope_method_slices_problem2.xlsx](files/xslope_method_slices_problem2.xlsx)
-
-Inputs plotted with the XSLOPE plot_inputs() function:
-
-![method_slices_problem_inputs2.png](sample_images/method_slices_problem_inputs2.png){width=900}
-
-Search results. The figure shows the search path and the large number of circles the search tests on this problem.
-The searches from all three starting circles end on the same deep circle, which enters the crest at x = 121, reaches
-13 ft into the foundation clay at its lowest point, and exits on the flat ground at x = 220.
-
-![method_slices_problem_search_results2.png](sample_images/method_slices_problem_search_results2.png){width=900}
-
-Solution (critical surface and factor of safety):
-
-![method_slices_problem_results2.png](sample_images/method_slices_problem_results2.png){width=900}
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1.084 | 1.327 | 1.253 | 1.436 | 1.376 | 1.301 | 1.302 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=1.084, fs_bishop=1.327, fs_janbu=1.253, fs_corps=1.436, fs_lowe=1.376, fs_spencer=1.301, fs_mprice=1.302 -->
-
-### 6. Slope with Eight Layers
+### 3. Slope with Eight Layers
 
 This problem features a slope with eight soil layers. This problem was featured in the user manual for the UTEXASED 
 slope stability analysis software developed by Stephen G. Wright at the University of Texas at Austin. It 
@@ -245,23 +111,17 @@ Solution (critical surface and factor of safety):
 
 <!-- test: file=files/xslope_eight_layers.xlsx, type=circular_search, num_slices=40, fs_oms=0.805, fs_bishop=1.154, fs_janbu=1.160, fs_corps=1.240, fs_lowe=1.060, fs_spencer=1.189, fs_mprice=1.170 -->
 
-### 7. Non-Circular Failure Surface
+A grid search on this model (`seed='grid'`, which sweeps a coarse grid of centers and
+tangent depths before refining) reaches circles that the search from the file's circles
+never visits, and on one of them the **force-equilibrium** equation has no root that
+corresponds to a physically possible sliding mass. Its ten roots there range from 0.12 to
+2.55, while Bishop, Spencer and Morgenstern-Price all give about 9.1 on the same slices.
+The Corps of Engineers method rejects that surface with a message giving the reason
+instead of reporting 0.12 (see
+[Force Equilibrium Methods](force_eq.md#solving-for-the-factor-of-safety)), and its
+grid-seeded search reports 1.240, the same as the table above.
 
-Built and run step by step in [Tutorial LEM-5](../tutorials/lem05_weak_layer_noncircular.md).
-
-![noncircular_results.png](sample_images/noncircular_results.png){width=900}
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| — | — | 1.575 | 1.523 | 1.357 | 1.656 | 1.634 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_noncircular.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.575, fs_corps=1.523, fs_lowe=1.357, fs_spencer=1.656, fs_mprice=1.634 -->
-
-### 8. Earth Dam 
+### 4. Earth Dam
 
 This problem features a dam with a shell and a clay core on top of a foundation with a clay layer and a sand layer. 
 This problem was featured on page 121 of Shear Strength and Slope Stability - Second Edition by Duncan, Wright, and 
@@ -338,210 +198,7 @@ Solution (critical surface and factor of safety):
 
 <!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, num_slices=40, fs_oms=1.386, fs_bishop=1.561, fs_janbu=1.470, fs_corps=1.595, fs_lowe=1.568, fs_spencer=1.558, fs_mprice=1.559 -->
 
-### 9. Reinforced Slope
-
-Built and run step by step in [Tutorial LEM-8](../tutorials/lem08_reinforced_slope.md).
-
-![reinforce_results.png](sample_images/reinforce_results.png){width=900}
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1.480 | 1.594 | 1.524 | 1.608 | 1.598 | 1.587 | 1.587 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.480, fs_bishop=1.594, fs_janbu=1.524, fs_corps=1.608, fs_lowe=1.598, fs_spencer=1.587, fs_mprice=1.587 -->
-
-!!! note
-    This problem is UTEXASED's Example 5 (Wright), whose reported solution is FS = 1.646 (Spencer) on a critical
-    circle centered at (3.2, 42.0) with R = 43.4. XSLOPE's Spencer solution **on that same circle is FS = 1.646**,
-    so the two programs' treatments of the reinforcement agree. This holds with either the Tangent or the Axial
-    direction setting: the geogrid crossings on this deep circle occur where the slip surface is nearly parallel to
-    the horizontal reinforcement, so the two directions differ by less than 0.1% here. The lower value in the table
-    above comes from a **shallower critical surface** (center near (−5, 47), FS = 1.587) that XSLOPE's automated
-    search finds in a region UTEXASED's tangent-line grid search modes did not explore. UTEXASED's own example
-    documentation notes that this model's thin cohesive face layer was added to discourage shallow face surfaces.
-    The shallower minimum belongs to the model as defined; both programs give the same factor of safety on the
-    same circle.
-
-A mirrored (right-facing) copy of this model has the reinforcement set to Type = Nail (Axial direction, Passive
-application). For each Dir/Appl combination, every method gives the same factor of safety on the mirrored
-geometry as on the original.
-
-<!-- test: file=files/xslope_reinforce_rface.xlsx, type=circular_search, num_slices=40, fs_oms=1.282, fs_bishop=1.475, fs_janbu=1.420, fs_spencer=1.471, fs_corps=1.485, fs_lowe=1.477, fs_mprice=1.471 -->
-<!-- test: file=files/xslope_reinforce_rface.xlsx, type=mp_spencer -->
-<!-- test: file=files/xslope_reinforce_rface.xlsx, type=roundtrip -->
-
-### 10. Slope Stabilized with Piles
-
-Built and run step by step in [Tutorial LEM-12](../tutorials/lem12_piles.md).
-
-![piles_results.png](sample_images/piles_results.png){width=900}
-
-#### Ito & Matsui Summary
-
-The pile force $H$ is not specified directly in the input file. Instead, XSLOPE auto-computes $H$ using the
-[Ito & Matsui (1975)](https://doi.org/10.3208/sandf1972.15.4_43) method, which models the plastic flow of soil between adjacent piles to determine the lateral
-resistance. Because $H$ is computed for each trial failure surface during the search, the pile resistance varies
-with the depth of the failure surface at the pile location.
-
-Structural capacity limits ($V_{\text{cap}}$ = 46,000 lb, $M_{\text{cap}}$ = 60,000 ft·lb) are specified for
-each pile, consistent with a 2-ft diameter reinforced concrete section ($f'_c$ = 4000 psi). For the critical
-failure surface, the Ito & Matsui soil forces far exceed the structural capacity, and the moment capacity
-controls:
-
-```text
-  === Ito & Matsui Summary (pile) ===
-  Pile diameter (D)          = 2.0
-  Pile spacing (S)           = 6.0
-  Clear spacing (D1 = S - D) = 4.0
-  Depth to failure surface   = 10.1
-  Coefficients: A1 = 7.569, A2 = 4.755
-  Force per pile (F_pile)    = 44178
-  Force per unit width (H)   = 7363.0
-  --- Structural Capacity Check ---
-  V_cap = 46000  (F_pile within shear capacity)
-  M_cap = 60000, L_m = 3.94, F_limit = M_cap/L_m = 15244  (F_pile exceeds moment capacity)
-  Controlled by moment (M_cap/L_m)
-  F_pile: 44178 -> 15244 (capped)
-  H:      7363.0 -> 2540.7 (capped)
-  === Ito & Matsui Summary (pile) ===
-  Pile diameter (D)          = 2.0
-  Pile spacing (S)           = 6.0
-  Clear spacing (D1 = S - D) = 4.0
-  Depth to failure surface   = 14.5
-  Coefficients: A1 = 7.569, A2 = 4.755
-  Force per pile (F_pile)    = 81729
-  Force per unit width (H)   = 13621.5
-  --- Structural Capacity Check ---
-  V_cap = 46000  (F_pile exceeds shear capacity)
-  M_cap = 60000, L_m = 5.47, F_limit = M_cap/L_m = 10962  (F_pile exceeds moment capacity)
-  Controlled by moment (M_cap/L_m)
-  F_pile: 81729 -> 10962 (capped)
-  H:      13621.5 -> 1827.0 (capped)
-```
-
-The Ito & Matsui soil forces (44,178 and 81,729 lb per pile) represent the theoretical upper bound on what the soil
-can push onto the pile. These greatly exceed the moment capacity, and the deeper pile exceeds the shear capacity as
-well. After capping, the effective pile forces are reduced by 65% and 87% respectively, with the moment capacity
-($M_{\text{cap}} / L_m$) controlling in both cases. Without the capacity checks, the LEM would overestimate the pile resistance and produce an
-unconservatively high factor of safety.
-
-#### LEM vs. FEM Comparison
-
-The same model solved with the finite element engine (see
-[Tutorial FEM-4](../tutorials/fem04_piles.md)) gives FS = 1.363 with the
-piles and 1.137 without them, while Spencer's method gives 1.842 with them and 1.149 without. The piles
-raise the factor of safety by a factor of 1.20 in the finite element run and 1.60 in the limit equilibrium
-run. The difference comes from how each engine represents the row. A plane-strain finite element model
-has no space between the piles, so it treats the row as a continuous wall with one pile's stiffness spread
-over the spacing, while the Ito & Matsui force comes from a theory of the soil flowing between the piles.
-For a discrete row of piles at this spacing, use the limit equilibrium factor of safety, and use the finite
-element run for the pile's internal forces. See [LEM vs. FEM Pile Modeling](piles.md#lem-vs-fem-pile-modeling).
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1.617 | 1.852 | 1.648 | 1.884 | 1.978 | 1.842 | 1.843 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.617, fs_bishop=1.852, fs_janbu=1.648, fs_corps=1.884, fs_lowe=1.978, fs_spencer=1.842, fs_mprice=1.843 -->
-
-### 11. Polygon Input with a Sloping Bottom
-
-Built and run step by step in [Tutorial LEM-6](../tutorials/lem06_polygon_geometry.md).
-
-![sloping_bottom_results.png](sample_images/sloping_bottom_results.png){width=900}
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_sloping_bottom.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.314, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244, fs_mprice=1.244 -->
-
----
-
-The remaining problems are **verification benchmarks**: published cases used to
-validate the limit-equilibrium implementation. Each is checked by XSLOPE's
-automated test suite. See also the [Verification](../verification/index.md) page.
-
-### 12. Rapid Drawdown (Johnson Reservoir Dam)
-
-Built and run step by step in [Tutorial COMBO-2](../tutorials/combo02_rapid_drawdown.md).
-
-![johnson_rapid_results1.png](sample_images/johnson_rapid_results1.png){width=900}
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1.247 | 1.439 | 1.366 | 1.719 | 1.548 | 1.498 | 1.510 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.247, fs_bishop=1.439, fs_janbu=1.366, fs_corps=1.719, fs_lowe=1.548, fs_spencer=1.498, fs_mprice=1.510 -->
-
-### 13. Multiple Local Minima
-
-Built and run step by step in [Tutorial LEM-10](../tutorials/lem10_global_minimum.md).
-
-Seeded from the generated embankment circles, the search ends on a shallow, nearly
-planar sliver near the crest, which behaves like an infinite slope (critical circle in red,
-$FS \approx 1.30$):
-
-![mult_min_degenerate.png](sample_images/mult_min_degenerate.png){width=900}
-
-The global minimum is the deep foundation failure found from a circle tangent to the
-limiting depth (Spencer's method). All methods are evaluated on this same deep
-circle:
-
-![mult_min_results1.png](sample_images/mult_min_results1.png){width=900}
-
-A search started from a single set of circles can stop at a local minimum when the
-model has concentrated forces. On the pile-stabilized sample
-([Problem 10](#10-slope-stabilized-with-piles)), the search seeded from its circles
-sheet converges to the deep surface tabulated there (Spencer 1.842, Lowe 1.978), but
-the grid-seeded global search (`seed='grid'`, which sweeps a coarse grid of centers
-and tangent depths before refining) finds a *shallower* surface at $FS \approx 1.70$
-for every complete-equilibrium method. The pile forces make the deep surface a local
-minimum, while a shallower surface has the lower factor of safety. Pile design
-includes checking that the slope cannot fail *around* its piles on a shallower
-surface.
-
-A grid sweep also reaches circles that no single-seed search visits, and on some of
-them the **force-equilibrium** equation has no root that corresponds to a physically
-possible sliding mass. The eight-layer slope has one such circle: the equation's ten
-roots there range from 0.12 to 2.55, while Bishop, Spencer and Morgenstern-Price all
-give about 9.1 on the same slices. The Corps of Engineers method rejects that surface
-with a message giving the reason, instead of reporting 0.12 (see
-[Force Equilibrium Methods](force_eq.md#solving-for-the-factor-of-safety)). The
-grid-seeded Corps search on that model reports a factor of safety of 1.240, the same
-as its single-seed search.
-
-The tabulated sample values come from single-seed searches. When checking a result,
-you may wish to run the free search, then repeat it with `seed='grid'` and with
-tangent-seeded circles at each candidate depth, and compare the critical surfaces as
-well as the factors of safety before accepting one.
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1.354 | 1.434 | 1.417 | 1.719 | 1.524 | 1.426 | 1.431 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_mult_min_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.354, fs_bishop=1.434, fs_janbu=1.417, fs_corps=1.719, fs_lowe=1.524, fs_spencer=1.426, fs_mprice=1.431 -->
-
-### 14. Tension Crack
+### 5. Tension Crack
 
 A slope whose upper layer has cohesion, so an unmodified analysis produces
 non-physical **tension at the crest** (and an inverted line of thrust) that
@@ -576,24 +233,7 @@ Solution (critical surface with the tension crack, Spencer's method):
 
 <!-- test: file=files/xslope_tension_KEY.xlsx, type=circular_search, num_slices=40, fs_oms=1.413, fs_bishop=1.414, fs_janbu=1.448, fs_corps=1.673, fs_lowe=1.544, fs_spencer=1.414, fs_mprice=1.414 -->
 
-### 15. Reliability Analysis (Submerged Slope)
-
-Built and run step by step in [Tutorial LEM-11](../tutorials/lem11_reliability.md).
-
-Reliability result — the $F_{MLV}$ critical surface (Spencer's method) with the
-analysis summary:
-
-![prob_submerged_reliability.png](sample_images/prob_submerged_reliability.png){width=900}
-
-| $F_{MLV}$ | $\sigma_F$ | $COV_F$ | $\beta_{LN}$ | Reliability $R$ | $P_f$ |
-|---:|---:|---:|---:|---:|---:|
-| 1.354 | 0.389 | 28.7% | 0.935 | 82.5% | 17.5% |
-
-<!-- test: file=files/xslope_prob_submerged_KEY.xlsx, type=reliability, method=spencer, expected_beta=0.935, tolerance=0.03 -->
-<!-- test: file=files/xslope_prob_submerged_KEY.xlsx, type=reliability_mc, method=spencer, search=true, n_samples=10000, converge_rel=0.10, expected_beta=0.979, tolerance=0.02, expected_pf=0.165, pf_tol=0.02 -->
-<!-- test: file=files/xslope_prob_submerged_KEY.xlsx, type=reliability_rs, method=spencer, search=true, n_surrogate=10000000, expected_beta=0.997, tolerance=0.01, expected_pf=0.1657, pf_tol=0.005 -->
-
-### 16. Saturated vs. Moist Unit Weight (γ_sat)
+### 6. Saturated vs. Moist Unit Weight (γ_sat)
 
 Soil below the water table weighs more than the same soil above it. On the **mat**
 sheet, `gamma` is the moist unit weight and `gamma_sat` the saturated unit weight;
@@ -646,7 +286,7 @@ Solution (critical surface and factor of safety, Spencer's method):
 <!-- test: file=files/xslope_gsat_piezo.xlsx, type=circular_search, num_slices=40, fs_bishop=1.538, fs_spencer=1.539, fs_janbu=1.503 -->
 
 The water table can also come from a seepage solution. This is the upstream slope
-of the earth dam of [Problem 8](#8-earth-dam) with a saturated unit weight for each
+of the earth dam of [Problem 4](#4-earth-dam) with a saturated unit weight for each
 zone and `u = seep`: pore pressures are interpolated from the finite-element
 seepage solution, and the phreatic surface of that same solution — the heavy
 contour carrying the water-table marker in the figure below — is the water table
@@ -677,7 +317,7 @@ Solution (governing rapid-drawdown surface and factor of safety):
 
 <!-- test: file=files/xslope_gsat_rapid.xlsx, type=circular_search, num_slices=40, rapid=true, fs_bishop=1.100, fs_spencer=1.099 -->
 
-### 17. Pile-Stabilized Slope (Hassiotis et al. 1997)
+### 7. Pile-Stabilized Slope (Hassiotis et al. 1997)
 
 This is a published pile-stabilization benchmark. It checks that XSLOPE's built-in
 Ito & Matsui force reproduces the force used in the source's design. The slope is

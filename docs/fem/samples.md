@@ -12,8 +12,8 @@ The FEM implementation is described in the [FEM Overview](overview.md) page.
 
 ### 1. Non-Circular Failure Surface with Thin Weak Layer
 
-This is the FEM counterpart of the LEM non-circular failure surface example described in the [LEM Samples](../lem/samples.md)
-page (Problem 7). The problem features a thin weak clay layer in the foundation of a slope, which controls the
+This is the FEM counterpart of the non-circular failure surface model of [Tutorial LEM-5](../tutorials/lem05_weak_layer_noncircular.md).
+The problem features a thin weak clay layer in the foundation of a slope, which controls the
 failure mechanism. This problem was also featured in the user manual for the UTEXASED slope stability analysis
 software developed by Stephen G. Wright at the University of Texas at Austin.
 
@@ -70,8 +70,8 @@ with each factor of safety computed by SSRM. See
 
 Excel input file: [xslope_simple_mult_layers_fem.xlsx](files/xslope_simple_mult_layers_fem.xlsx)
 
-It uses the geometry of the LEM
-[Simple Slope with Multiple Layers](../lem/samples.md) example, an embankment
+It uses the geometry of the layered slope of
+[Tutorial LEM-3](../tutorials/lem03_layered_slope.md), an embankment
 over a foundation layer. The elastic properties ($E$, $\nu$) are added for the
 finite-element solve, and the strengths are lowered to give a **marginally stable c–φ slope**
 whose probability of failure is not negligible:

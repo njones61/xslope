@@ -25,7 +25,7 @@ zones with stacked profile lines, where starting circles belong when each layer
 could fail, and how to read which layer the critical surface runs in and why.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">per-layer starting circles</span><span class="tg-pill">generated circles</span><span class="tg-pill">circular search</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_simple_mult_layers.xlsx](../lem/files/xslope_simple_mult_layers.xlsx) — the same file used by [LEM Sample Problem 3](../lem/samples.md#3-simple-slope-with-multiple-layers)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_simple_mult_layers.xlsx](../lem/files/xslope_simple_mult_layers.xlsx)</div>
 </div>
 
 ---
@@ -359,8 +359,7 @@ model's minimum rather than one neighborhood's.
 
 Other sections genuinely hold two competing mechanisms, and layering is the
 usual way to get one: [Tutorial LEM-10](lem10_global_minimum.md) works a
-cohesionless embankment on soft clay —
-[Sample Problem 13](../lem/samples.md#13-multiple-local-minima) — where the two
+cohesionless embankment on soft clay where the two
 mechanisms answer differently and the search returns whichever one its starting
 circle sits nearest, so a circle placed in the fill finds a shallow sliver on
 the face and the deep foundation surface is found only when a circle is placed
@@ -400,6 +399,8 @@ The search finds each method its own critical circle:
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |
 
+<!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.314, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244, fs_mprice=1.244 -->
+
 The four methods that satisfy moment equilibrium — the Ordinary Method of
 Slices (OMS), Bishop, Spencer and
 Morgenstern-Price — land on the same circle and the same 1.244. With φ = 0 they
@@ -429,10 +430,8 @@ This tutorial covered:
 **Where to go next:** [Tutorial LEM-4](lem04_water_in_the_slope.md) adds the
 input every layer here went without — a piezometric line through a three-layer
 section, and a measure of what the pore pressure it produces costs on the
-critical circle. The series carries the layering further —
-[three layers with a piezometric line](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)
-through them, a section whose
-[layers are polygons](lem06_polygon_geometry.md)
-rather than profile lines because its base dips, and
-[the two-basin slope](../lem/samples.md#13-multiple-local-minima) where the
-starting circles decide the answer.
+critical circle. The series carries the layering further.
+[Tutorial LEM-6](lem06_polygon_geometry.md) enters the layers as polygons rather
+than profile lines because the base dips, and
+[Tutorial LEM-10](lem10_global_minimum.md) works a slope with two competing
+mechanisms, where the starting circles decide the answer.

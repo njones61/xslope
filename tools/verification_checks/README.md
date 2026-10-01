@@ -258,8 +258,8 @@ because a tag guards them, and the tutorial keeps printing what it printed the
 day it was written.
 
 The locks in scope for a page are its own tags plus every tag anywhere under
-`docs/` on a model file the page links, so LEM-3 inherits the seven method locks
-its workbook carries on `docs/lem/samples.md` and LEM-9 inherits the Rocscience
+`docs/` on a model file the page links, so FEM-4 inherits the seven method locks
+its pile workbook carries on `docs/tutorials/lem12_piles.md` and LEM-9 inherits the Rocscience
 lock on the vendor model it borrows. Every factor-of-safety-shaped number the
 page attributes to a run of its own then lands in one of three buckets:
 

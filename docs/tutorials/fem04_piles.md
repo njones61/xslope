@@ -218,7 +218,7 @@ limited by the shafts' moment capacity rather than by what the soil could
 supply. That calculation is worked through in
 [LEM-12](lem12_piles.md#how-the-force-is-computed).
 
-<!-- Spencer's 1.842 on this same file at 40 slices is locked by the LEM sample tag on docs/lem/samples.md (Problem 10, fs_spencer=1.842); not duplicated here. -->
+<!-- Spencer's 1.842 on this same file at 40 slices is locked by the seven-method tag on docs/tutorials/lem12_piles.md (fs_spencer=1.842); not duplicated here. -->
 
 ### The finite element answer
 

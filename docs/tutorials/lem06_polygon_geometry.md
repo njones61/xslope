@@ -25,7 +25,7 @@ polygons beat profile lines, how a dipping base constrains the circular search,
 and how to let circles truncate against the base instead of being refused by it.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">polygons</span><span class="tg-pill">dipping base</span><span class="tg-pill">composite surfaces</span><span class="tg-pill">circular search</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_sloping_bottom.xlsx](../lem/files/xslope_sloping_bottom.xlsx) — the same file used by [LEM Sample Problem 11](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_sloping_bottom.xlsx](../lem/files/xslope_sloping_bottom.xlsx)</div>
 </div>
 
 ---
@@ -339,6 +339,8 @@ Each method gets its own search and its own critical circle:
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |
 
+<!-- test: file=../lem/files/xslope_sloping_bottom.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.314, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244, fs_mprice=1.244 -->
+
 The four that satisfy moment equilibrium — OMS, Bishop, Spencer and
 Morgenstern-Price — land on the same circle and the same 1.244; with φ = 0 they
 cannot disagree about one. The three force-equilibrium procedures each settle on
@@ -419,9 +421,7 @@ This tutorial covered:
 **Where to go next:**
 [LEM-8 — A Reinforced Slope](lem08_reinforced_slope.md) builds a slope that only
 stands because of what is buried in it. The [tutorials index](index.md) lists the
-series, and the sample problems carry each page further.
-[Sample Problem 11](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)
-catalogs this model, [DXF Import/Export](../usage/dxf.md) is the route from a
+series. [DXF Import/Export](../usage/dxf.md) is the route from a
 CAD drawing to the `polygon` sheet we filled by hand here, and
 [Composite Failure Surfaces](../lem/overview.md#composite-failure-surfaces)
 derives what the truncated surface does to the moment methods that assumed a

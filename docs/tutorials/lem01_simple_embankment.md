@@ -397,18 +397,16 @@ The Spencer run output reports how many circles were left unsolved:
 [⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (56 admit no admissible solution); 26 of them rank lower than the reported minimum by the moment measure.
 ```
 
-A Spencer solution is *admissible* when the interslice forces, all at the one
-inclination, leave every slice pressing down on its base rather than pulling away
-from it. On 56 of the 211 circles the search tried, no inclination does that:
-balancing those circles needs the soil near the crest to carry tension, which it
-cannot, so Spencer's method has no admissible solution and the search drops them.
-The output ranks the dropped circles by their moment-equilibrium factor of safety,
-which is the factor of safety Bishop's method computes. Twenty-six of them rank
-below the reported circle, and Bishop's 1.215 circle is one of them, so the lowest
-factor of safety for this model lies among circles Spencer cannot solve. The
-disagreement between the methods, the
-amber warnings, the red bars and the unsolved circles all have the same cause: the
-model as built needs tension near the crest.
+Spencer's method could not solve 56 of the 211 circles the search tried. On those
+circles the forces balance only if the soil near the crest pulls in tension, and
+soil cannot do that, so the search skips them. Twenty-six of the skipped circles
+would give a lower factor of safety than the reported 1.276, and Bishop's 1.215
+circle is one of them. So 1.276 is not the lowest value for this slope. It is only
+the lowest among the circles Spencer could solve.
+
+The amber warnings, the red bars, the unsolved circles and the difference between
+Spencer and Bishop all have one cause: the model, as built, needs the soil near
+the crest to carry tension.
 
 ### Adding a tension crack {#the-fix-is-in-the-ground-not-the-settings}
 

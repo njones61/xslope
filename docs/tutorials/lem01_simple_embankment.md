@@ -397,21 +397,16 @@ The Spencer run output reports how many circles were left unsolved:
 [⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (56 admit no admissible solution); 26 of them rank lower than the reported minimum by the moment measure.
 ```
 
-Spencer's method could not solve 56 of the 211 circles the search tried. On those
-circles the solution puts so much tension in the soil near the crest that
-Spencer's equations have no valid solution, and the search skips them.
+Spencer's method could not solve 56 of the 211 circles. Spencer has to satisfy both
+force and moment equilibrium, and on those circles the tension near the crest is so
+large that no solution satisfies both. Bishop's method satisfies moment equilibrium
+only, so it still returns a value. On 26 of those circles its value is below 1.276,
+and its critical circle, at 1.215, is one of them.
 
-Bishop's method can still solve those circles, because it uses moment equilibrium
-only. On 26 of them it gives a factor of safety below 1.276, and its critical
-circle, at 1.215, is one of them. So 1.276 is not the lowest value for this slope.
-It is only the lowest among the circles Spencer could solve.
-
-The amber warnings, the red bars, the unsolved circles and the difference between
-Spencer and Bishop all have one cause. The clay in this model has cohesion and no
-friction, and near the crest the solution puts it in tension: the top of the
-sliding mass hangs on the soil behind it. Real soil cannot carry tension. It
-cracks. The model is counting on strength that is not there, so its factor of
-safety is too high.
+Neither number is right. Both solutions put the clay near the crest in tension: the
+top of the sliding mass hangs on the soil behind it. Real soil cannot carry tension.
+It cracks. So both factors of safety count on strength that is not there. The
+warnings, the red bars and the unsolved circles all come from that tension.
 
 ### Adding a tension crack {#the-fix-is-in-the-ground-not-the-settings}
 

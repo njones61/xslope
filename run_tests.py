@@ -208,8 +208,11 @@ LEGACY_TEMPLATE_FMT = _repo('docs/inputs/input_template_v{}.xlsx')
 # is post-shift but pre-v21/v22 — so the set spans every layout the loader must
 # still read. Content-wise it spans circular & non-circular surfaces, profile &
 # polygon geometry, reinforcement, piles, distributed loads (both sets), a second
-# piezo line, reliability sigmas, and seepage BCs (both sets).
+# piezo line, reliability sigmas, and seepage BCs (both sets). The non-circular
+# surface is the LEM non-circular sample's, the one file here that carries one:
+# the finite element files carry no surface, since nothing runs one on them.
 ROUNDTRIP_FILES = [
+    (_repo('docs/lem/files/xslope_noncircular.xlsx'), 12),
     (_repo('docs/inputs/slope/xslope_simple1.xlsx'), 12),
     (_repo('docs/inputs/slope/xslope_dam.xlsx'), 12),
     (_repo('docs/inputs/slope/xslope_rapid.xlsx'), 12),

@@ -1,17 +1,17 @@
 ---
 title: "Tutorial LEM-10 — Finding the Global Minimum"
-description: "Two slopes with competing failure mechanisms in XSLOPE: an embankment on soft clay where moving the starting circle moves the answer, and the James Bay dyke, where a single credible seed reads 23% high — resolved with a minimum slip depth and grid seeding."
+description: "Two slopes with competing failure mechanisms in XSLOPE: an embankment on soft clay where moving the starting circle moves the answer, and the James Bay dyke, where a search from a single reasonable starting circle gives a factor of safety 23% too high — resolved with a minimum slip depth and grid seeding."
 ---
 
 # Tutorial LEM-10 — Finding the Global Minimum
 
-Two slopes that each hold more than one failure mechanism, and searches that
+Two slopes that each have more than one failure mechanism, and searches that
 return whichever one their starting circles sit nearest. Part A is a 15 ft
 cohesionless embankment on 20 ft of soft clay — a shallow slide in the sand
-face against a deep failure through the foundation. Part B is the same trap at
-full scale on a real section, the James Bay dyke, where a single credible seed
-reads 23% high. **The lower of the two numbers is not necessarily the
-answer.**
+face against a deep failure through the foundation. Part B is the same problem
+at full scale on a real section, the James Bay dyke, where a search from a single
+reasonable starting circle gives a factor of safety 23% too high. The lower of
+two factors of safety is not necessarily the design case.
 
 ![A 15 ft embankment on a clay foundation](images/lem10_problem_sketch.png){width=1000}
 
@@ -35,11 +35,11 @@ surficial slivers, and when grid seeding beats any hand-placed seed.
 
 A 15 ft embankment of clean sand — 120 pcf, cohesionless, φ = 30° — stands at
 2.25:1 on 20 ft of soft undrained clay, 120 pcf with c = 450 psf and φ = 0.
-**c = 0 in the fill** is what makes the section interesting: nothing in the
+The fill has **c = 0**, which gives this section two mechanisms: nothing in the
 embankment resists a shallow slide except friction along its base, so a slab
 of sand of any thickness — including a vanishingly thin one — has the same
 factor of safety against sliding down the face, while the soft clay puts a
-second, deep mechanism underneath. The completed file carries the section as
+second, deep mechanism underneath. The completed file has the section as
 two profile lines with the maximum depth at the bottom of the clay, and one
 starting circle, centered above the face and reaching the bottom of the
 foundation. That circle is the one input we change here.
@@ -66,20 +66,20 @@ Now we run the search. Click **Run LEM…** and choose **Method** = `Spencer` an
 
 ![The Run LEM dialog on the loaded model](images/lem10_studio_run_lem.png)
 
-The circle the file carries reaches the bottom of the clay, and the search it
-seeds finds the deep mechanism:
+The circle in the file reaches the bottom of the clay, and the search started
+from it finds the deep mechanism:
 
 ![Spencer on the deep foundation surface](images/lem10_solution_deep.png){width=1000}
 
 **FS = 1.376**, on a circle centered at (16.90, 26.22) with a radius of 46.22 —
 tangent to the limiting depth at elevation −20, entering at the crest and exiting
 21 ft beyond the toe, 105.7 ft of failure surface carrying 204,041 lb/ft of soil.
-The starting circle is a seed and not an answer — solved as entered it gives
+The starting circle is only a starting point — solved as entered it gives
 1.426, and the search deepens and lengthens it to 1.376.
 
 <!-- test: file=../lem/files/xslope_mult_min_KEY.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.376, tolerance=0.005 -->
 
-### Move the seed and the answer moves
+### Changing the starting circle {#move-the-seed-and-the-answer-moves}
 
 The rule from
 [LEM-3](lem03_layered_slope.md#guarding-against-local-minima) is one
@@ -99,23 +99,23 @@ Click **OK** and run the same Spencer auto search again:
 ![The search from the embankment circle](images/lem10_search_shallow.png){width=1000}
 
 **FS = 1.299.** The gray arcs are the trial circles, fanning across the fill and
-shrinking toward the face as the search walks its center up and left; the red
+shrinking toward the face as the search moves its center up and left; the red
 critical circle is the short mark high on the slope — 0.9 ft long, never more
 than 0.01 ft below the ground surface, moving 0.3 lb/ft of sand.
 
 That number is not an artifact of the search. On a cohesionless face the factor
 of safety against an infinitely shallow slide is tan φ′ / tan β, which is
-tan 30° / tan 23.96° = **1.299** for this 2.25:1 face. The search is converging on
-a real limit — and the limit belongs to a slide with no mass in it. It is the
-minimum of this model and not a mechanism anything is designed against. Two
-searches on one model, 6% apart, on mechanisms that share almost nothing: the
-sliver rides the sand face; the deep circle cuts the full depth of the clay.
+tan 30° / tan 23.96° = **1.299** for this 2.25:1 face. The search converges on a
+real limit, for a slide with almost no mass. It is the minimum of this model, but
+not a mechanism a design would be checked against. The two searches on one model
+differ by 6%, on mechanisms that share almost nothing: the sliver runs along the
+sand face, and the deep circle cuts the full depth of the clay.
 
-That is the answer moving with the seed, and it is what the check in
-[LEM-3](lem03_layered_slope.md#guarding-against-local-minima) is for. On the
-layered section there the check passes: every start walks to the same
-contact-tangent surface, even one wildly out of scale with the model. Here it
-does not, and the seed is an input to the answer rather than a convenience.
+The answer changes with the starting circle, which is what the check in
+[LEM-3](lem03_layered_slope.md#guarding-against-local-minima) is meant to detect.
+On the layered section there the check passes: every start reaches the same
+contact-tangent surface, even one far out of scale with the model. Here it does
+not, and the starting circle affects the answer.
 
 ### The surficial filter
 
@@ -132,31 +132,31 @@ of the foundation:
 
 ![Spencer on the filtered fill circle](images/lem10_solution_filter5.png){width=1000}
 
-Only at 8 ft does the embankment seed reach 1.376. The filter decides which
-surfaces are admissible; the seeding decides which of them the search ever
-looks at. Commercial searches carry the same filter for the same reason: on
+Only at 8 ft does the embankment seed reach 1.376. The filter sets which
+surfaces are admissible; the starting circles set which of them the search
+examines. Commercial searches have the same filter for the same reason: on
 [verification problem VP107](../verification/rocscience.md#vp107), Slide2's
 unfiltered optimization reports minima near 1.03 on small surfaces at a gabion
 wall's face, and the manual excludes them with its own limit sets before
 reporting the answer.
 
-### Which answer the model reports
+### Searching from both circles at once {#which-answer-the-model-reports}
 
 One search over both circles does not report both mechanisms. A seeded search
 scores each starting circle's own neighborhood first and then refines only the
 best-scoring one, so with the deep circle and the embankment circle together on
 the sheet it follows the deep one and returns **1.376**, in either row order. The
 1.299 sliver is the lower of the two answers and a single seeded run does not
-reach it. **A competing mechanism is found by a search per seed — the two
-runs above — or by the grid seeding of [Part B](#grid-search)**; where two searches
-disagree, the surfaces decide which answer is the design case, and here it is the
-deep one.
+reach it. A competing mechanism is found by running a search from each starting
+circle — the two runs above — or by the grid seeding of [Part B](#grid-search);
+where two searches disagree, comparing the surfaces shows which is the design
+case, and here it is the deep one.
 
 ---
 
 ## Part B — The James Bay dyke
 
-The same lesson at full scale, on a real section.
+Part B applies the same check at full scale, on a real section.
 [Verification problem VP75](../verification/rocscience.md#vp75) is one of the
 planned James Bay dykes, from Duncan & Wright's Fig. 7.16, in metric units: a
 granular fill embankment — c′ = 0, φ′ = 30° — with a wide berm, resting on
@@ -169,7 +169,7 @@ that runs beneath it and daylights beyond.
 
 We download
 [xslope_james_bay.xlsx](../lem/files/xslope_james_bay.xlsx) — the dyke's
-model, carrying a single starting circle an engineer might reasonably place:
+model, with a single starting circle an engineer might reasonably place:
 centered over the slope face, reaching mid-depth into the clays — and open it
 in Studio with **File → Open**. The Inputs plot draws the four profile lines
 in their materials' colors with that one seed:
@@ -188,17 +188,17 @@ Click **Run**:
 
 ![Spencer from the single mid-depth seed](images/lem10_vp75_single.png){width=1000}
 
-**FS = 1.744**, and nothing about it looks wrong: the circle bottoms on the
-base of the model, cuts all three clays, and converged cleanly. It exits
-through the berm — and that is exactly what is wrong with it, because the berm
-is there to hold that mechanism.
+**FS = 1.744**, with no warnings: the circle bottoms on the base of the model,
+cuts all three clays, and converged cleanly. It exits through the berm, however,
+and the berm is there to resist that mechanism, so a surface that passes beneath
+the berm also needs to be checked.
 
 <!-- test: file=../lem/files/xslope_james_bay.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.744, tolerance=0.005 -->
 
 ### Grid search
 
-Now we bring in the seeding-independent tool. **Grid search (auto-seed the
-circular search)**, the checkbox beside the surficial filter, sweeps a grid of
+Next we use grid search, which does not depend on the starting circles.
+**Grid search (auto-seed the circular search)**, the checkbox beside the surficial filter, sweeps a grid of
 circle centers against a range of tangent elevations before refining, instead of
 refining only the neighborhood of the circles on the sheet. Back in
 **Run LEM…**, tick it — the grid ignores the circles sheet entirely, so it
@@ -215,9 +215,9 @@ it — 19% below the single seed's answer, against Slide's 1.464 and Duncan &
 Wright's published 1.45. The wrongly seeded search missed by far more than the
 programs and the textbook differ among themselves, and it reported nothing
 unusual. The full **Generate starting circles…** set also finds 1.420 with the
-2 m filter on — the deep member of the per-layer family reaches it, which is the
-[LEM-3](lem03_layered_slope.md#guarding-against-local-minima) rule doing its
-job. Grid search is the version of that rule that does not depend on any
+2 m filter on — the deep member of the per-layer family reaches it, as the
+per-layer rule of [LEM-3](lem03_layered_slope.md#guarding-against-local-minima)
+intends. Grid search is the version of that rule that does not depend on any
 circle having been placed at all.
 
 <!-- test: file=../lem/files/xslope_james_bay.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.420, tolerance=0.005 -->
@@ -232,12 +232,12 @@ This tutorial covered:
   mechanism its starting circle sits nearest.
 - The surficial skin slide a cohesionless face produces — a real minimum, and
   not a design case.
-- **Min slip depth** to reject the skin, and **Grid search** to sweep the whole
+- **Min slip depth** to reject skin slides, and **Grid search** to sweep the whole
   section with no seed at all.
 - Reading a search by the surface it converged on, since two answers on one
   model can describe entirely different failures.
-- The same trap at full scale on the James Bay dyke, where a single credible
-  seed converged 23% high.
+- The same problem at full scale on the James Bay dyke, where a search from a
+  single reasonable starting circle converged 23% high.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 In [LEM-3](lem03_layered_slope.md) we build the per-layer starting-circle

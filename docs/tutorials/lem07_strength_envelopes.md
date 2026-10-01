@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-7 — Strength Options Beyond Mohr-Coulomb"
-description: "Two slopes whose strength is not a straight line in XSLOPE: Baker's compacted clay, where a curved envelope says the slope is failing and its linear fit says 1.5, and Low's layered clay, where undrained strength grows with depth and holds the critical surface off the model floor."
+description: "Two slopes whose strength is not a straight line in XSLOPE: Baker's compacted clay, where a curved envelope gives a factor of safety below one and its linear fit gives 1.5, and Low's layered clay, where undrained strength grows with depth and keeps the critical surface above the base of the model."
 ---
 
 # Tutorial LEM-7 — Strength Options Beyond Mohr-Coulomb
@@ -8,11 +8,11 @@ description: "Two slopes whose strength is not a straight line in XSLOPE: Baker'
 Two slopes whose soil strength is not a pair of numbers. Part A is a 6 m
 compacted-clay slope where the same triaxial data set is fitted twice — once as
 a curved power envelope, once as the straight Mohr-Coulomb line — and the two
-fits disagree about whether the slope stands up. Part B is a layered undrained
+fits give opposite results on whether the slope stands. Part B is a layered undrained
 slope whose lowest clay gets stronger the deeper the surface cuts, and where
 flattening that profile to a single strength moves the failure to the bottom of
-the model. **The strength model is an input, and it decides the answer as
-firmly as the geometry does.**
+the model. The choice of strength model can change the answer as much as the
+geometry can.
 
 ![A 6 m slope in compacted clay with a nonlinear strength envelope](images/lem07_problem_sketch.png){width=1000}
 
@@ -28,7 +28,7 @@ to measure what each choice does to the factor of safety and the critical
 surface against its linear or constant stand-in.
 </div>
 <p><span class="tg-pill">power-curve envelope</span><span class="tg-pill">Mohr-Coulomb</span><span class="tg-pill">strength with depth</span><span class="tg-pill">undrained strength</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span></p>
-<div class="tgm-model" markdown>**Completed models** — [xslope_baker_clay.xlsx](../lem/files/xslope_baker_clay.xlsx), the compacted-clay slope of [verification problem VP44](../verification/rocscience.md#vp44) carrying its power-curve envelope, and [xslope_low_clay.xlsx](../lem/files/xslope_low_clay.xlsx), the layered undrained slope of [verification problem VP23](../verification/rocscience.md#vp23) carrying its depth-varying strength</div>
+<div class="tgm-model" markdown>**Completed models** — [xslope_baker_clay.xlsx](../lem/files/xslope_baker_clay.xlsx), the compacted-clay slope of [verification problem VP44](../verification/rocscience.md#vp44) with its power-curve envelope, and [xslope_low_clay.xlsx](../lem/files/xslope_low_clay.xlsx), the layered undrained slope of [verification problem VP23](../verification/rocscience.md#vp23) with its depth-varying strength</div>
 </div>
 
 ---
@@ -40,15 +40,14 @@ A straight 43° slope, H = 6 m, cut in compacted Israeli clays at
 depth 4 m below the toe, and a single starting circle. This is example problem
 1 of Baker (2003), "Inter-relations between experimental and computational
 aspects of slope stability analysis" (International Journal for Numerical and
-Analytical Methods in Geomechanics 27, 379–401), and everything here turns on
-the strength.
+Analytical Methods in Geomechanics 27, 379–401).
 
 The clay was tested in triaxial compression, and the results were fitted twice.
-The completed file carries the first fit — a **power curve**, τ = 1.107·σ′^0.86
+The completed file contains the first fit — a **power curve**, τ = 1.107·σ′^0.86
 (Baker's A = 0.58, n = 0.86, T = 0), which curves down toward the origin and
 gives the soil no strength at all at zero normal stress. The second fit, which
 we enter later, is the straight Mohr-Coulomb envelope through the same test
-points: c′ = 11.64 kPa, φ′ = 24.7°, which at zero normal stress still promises
+points: c′ = 11.64 kPa, φ′ = 24.7°, which at zero normal stress still gives
 11.64 kPa of cohesion.
 
 ### Opening the model
@@ -56,8 +55,8 @@ points: c′ = 11.64 kPa, φ′ = 24.7°, which at zero normal stress still prom
 We start by downloading
 [xslope_baker_clay.xlsx](../lem/files/xslope_baker_clay.xlsx) and opening it in
 Studio — **File → Open**. The Inputs plot draws the section: one profile line,
-the hatched maximum depth at elevation −4, and the starting circle the file
-carries.
+the hatched maximum depth at elevation −4, and the starting circle in the
+file.
 
 ![The loaded model](images/lem07_baker_inputs.png){width=1000}
 
@@ -73,8 +72,8 @@ which reduces it to τ = 1.107·σ′^0.86:
 
 ![The power-curve material](images/lem07_studio_materials_pow.png)
 
-The plot's title spells out the law those cells assemble,
-τ = 1.107·(σ′+0)^0.86 + 0, and the curve beneath it is the check that the
+The plot's title shows the equation those cells define,
+τ = 1.107·(σ′+0)^0.86 + 0, and the curve beneath it shows whether the
 coefficients were entered as intended. `pow_d` shifts the normal stress before
 the power is taken and `pow_c` adds a constant strength on top; both are zero
 here, so the curve passes through the origin.
@@ -86,7 +85,7 @@ Now we run the search. Click **Run LEM…** and choose **Method** = `Spencer` an
 
 ![The Run LEM dialog on the loaded model](images/lem07_studio_run_lem.png)
 
-Click **Run**. The search refines the file's circle onto a surface that hugs
+Click **Run**. The search refines the file's circle onto a surface close to
 the slope face:
 
 ![Spencer on the power envelope](images/lem07_baker_pow.png){width=1000}
@@ -100,12 +99,12 @@ pane, or on the console for a scripted run — and the slice table a
 figures quoted through the rest of this page the same way. Slide
 reports 0.960 on this case and Baker's own solution is 0.97. The surface is
 shallow, and the effective normal stress along its slice bases averages
-8.3 kPa: the low-stress end of the envelope, where a curve running into the
-origin has almost nothing left to give.
+8.3 kPa: the low-stress end of the envelope, where a curve passing through the
+origin gives very little strength.
 
 <!-- test: file=../lem/files/xslope_baker_clay.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=0.958, tolerance=0.005 -->
 
-### Enter the linear fit
+### Entering the linear fit {#enter-the-linear-fit}
 
 Next we swap in the straight-line fit. Open **Materials** again, and on the same
 clay change **Model (option)** from `pow` to `mc`, then enter Baker's fitted
@@ -130,27 +129,28 @@ Click **OK**, then run the same Spencer auto search again:
 **FS = 1.518** — Slide reports 1.536 and Baker 1.50 — on a circle centered at
 (−0.23, 9.22), tangent to elevation 0.00 and 10.96 m long, carrying
 306.7 kN/m of soil. That is three times the mass of the surface the power curve
-found, and it is why the two answers differ so far: the straight envelope's
-cohesion holds the shallow, low-stress mechanism shut, so the critical surface
-retreats to a deeper one where the friction term is doing the work.
+found, and it explains why the two answers differ so much: the straight
+envelope's cohesion gives the shallow, low-stress surface enough strength that
+the critical surface moves to a deeper one, where friction contributes more of
+the strength.
 
 Same slope, same soil, same triaxial data — 0.958 against 1.518. The two
 envelopes cross at σ′ = 89.4 kPa and give the same strength there, so the fits
-agree wherever the clay was tested hard. But 6 m of this clay generates at most
+agree at the high stresses where the clay was tested. But 6 m of this clay generates at most
 γH = 18 × 6 = 108 kPa of vertical stress, and the surfaces the search actually
 chooses run far below that: 8.3 kPa on average along the power curve's, 24.2
-along the Mohr-Coulomb one. At 10 kPa the curve offers 8.02 kPa of shear
-strength where the line promises 16.24, and nearly all of the line's share is
-the 11.64 kPa of cohesion it carries unchanged down to zero stress. **The
-straight fit is being extrapolated into a stress range no test covered**, and
-there it credits the clay with a strength the curve says it does not have.
-That is Baker's point in the example, and it is what makes the difference
-between a slope that is failing and one that reads a comfortable 1.5.
+along the Mohr-Coulomb one. At 10 kPa the curve gives 8.02 kPa of shear
+strength where the line gives 16.24, and most of the line's value is the
+11.64 kPa of cohesion, which it keeps unchanged down to zero stress. The
+straight fit is extrapolated into a stress range no test covered, and there it
+gives the clay a strength the curve does not. Baker makes this point with the
+example: the extrapolated cohesion is the difference between a factor of safety
+below one and one of 1.5.
 
 ### London clay, where the two fits agree
 
-Curvature by itself does no harm; extrapolating past the tested range does.
-Baker's example problem 3,
+The difference on the compacted clay comes from extrapolating the straight fit beyond the
+tested range, not from the curvature itself. Baker's example problem 3,
 [verification problem VP61](../verification/rocscience.md#vp61), is the same
 43°, 6 m slope with strength functions fitted to Perry's CD triaxial data on
 London clay — a power curve τ = 3.39344·(σ′+0.152)^0.6 (Baker A = 0.535,
@@ -158,8 +158,8 @@ n = 0.60, T = 0.0015) and a fitted Mohr-Coulomb envelope c′ = 6.0 kPa,
 φ′ = 32°. This data set includes measurements at very low normal stress, so
 neither fit has to be extended past what was measured.
 
-Each fit is its own model, and both ship with the verification corpus:
-[vp061a.xlsx](../verification/files/rocscience/vp061a.xlsx) carries the power
+Each fit is its own model, and both are in the verification corpus:
+[vp061a.xlsx](../verification/files/rocscience/vp061a.xlsx) has the power
 curve and [vp061b.xlsx](../verification/files/rocscience/vp061b.xlsx) the
 straight line, with the same geometry under both. Open the first and run
 Spencer's search on the power curve:
@@ -171,11 +171,12 @@ model, the fitted Mohr-Coulomb envelope:
 
 ![Spencer on the London clay Mohr-Coulomb fit](images/lem07_london_mc.png){width=1000}
 
-**FS = 1.367**, against Slide's 1.366 and Baker's 1.35. The curve reads 7%
-above the line here, where on the compacted clay it read 58% below it, and the
-two critical surfaces are nearly the same shape and depth. Where the tests
-reach the stresses the slope actually applies, the choice between a curve and a
-line is a detail; where they do not, it decides the answer.
+**FS = 1.367**, against Slide's 1.366 and Baker's 1.35. The curve gives a
+factor of safety 7% above the line's here, where on the compacted clay the
+line's was 58% above the curve's, and the two critical surfaces are nearly the
+same shape and depth. Where the tests cover the stresses on the critical
+surface, the choice between a curve and a line makes little difference; where
+they do not, it can change the result substantially.
 
 ---
 
@@ -203,14 +204,14 @@ with depth.
 
 We download [xslope_low_clay.xlsx](../lem/files/xslope_low_clay.xlsx) and open
 it in Studio. The Inputs plot draws the three profile lines in their materials'
-colors, the rigid base at elevation 0, and the starting circle the file
-carries:
+colors, the rigid base at elevation 0, and the starting circle in the
+file:
 
 ![The loaded model](images/lem07_low_inputs.png){width=1000}
 
 Open **Materials**, switch to **List view**, and select the third row. Its
 **Model (option)** is `cp` — undrained strength varying linearly with
-elevation — and the three fields under it are what that law needs:
+elevation — and the three fields under it define that relation:
 
 ![The depth-varying material](images/lem07_studio_low_materials_cp.png)
 
@@ -242,24 +243,24 @@ and Slide's 1.192 — the published values themselves spread 1.14 to 1.19 on
 this deep φ = 0 problem, and the
 [VP23 page](../verification/rocscience.md#vp23) measures where the spread
 comes from. The circle is centered at (18.00, 16.04), 38.09 m of surface carrying
-4943.5 kN/m of soil, and what we watch is where it stops: **tangent at
-elevation 0.82**, four fifths of a meter above the rigid base it could have
-reached. Of the 38.09 m of surface, 20.05 m lies in the lowest clay, and the
+4943.5 kN/m of soil, and its lowest point is at **elevation 0.82**, four fifths
+of a meter above the rigid base, although the search could have reached the
+base. Of the 38.09 m of surface, 20.05 m lies in the lowest clay, and the
 strength mobilized along that stretch averages 22.91 kPa.
 
 <!-- test: file=../lem/files/xslope_low_clay.xlsx, type=circular_search, method=bishop, num_slices=50, expected_fs=1.130, tolerance=0.005 -->
 
-### Flatten the profile
+### Replacing the profile with a constant strength {#flatten-the-profile}
 
-The search stopped short of the base because going deeper costs more than it
-gains: every meter down adds driving weight, but it also buys 3.75 kPa of
-strength along the part of the arc that goes there. Now we take that trade away
-and watch the balance change.
+The search stopped short of the base because a deeper surface has a higher
+factor of safety here: every meter down adds driving weight, but it also adds
+3.75 kPa of strength along the part of the arc that goes there. Next we replace
+the depth-varying strength with a constant one and see how the critical surface
+changes.
 
 Open **Materials**, select the third row again, and change **Model (option)**
 from `cp` to `mc` with a single constant strength — the average of the layer's
-15 kPa top and 30 kPa bottom, which is what an engineer reaching for one number
-would use:
+15 kPa top and 30 kPa bottom, a typical choice for a single value:
 
 | option | c | φ |
 | --- | :---: | :---: |
@@ -276,13 +277,12 @@ Click **OK** and run the same Bishop auto search at 50 slices:
 
 **FS = 1.075**, and the critical circle now sits **tangent to elevation 0** —
 flat on the rigid base, the deepest surface the model allows. It is 40.63 m
-long against 38.09 m, and 23.12 m of it runs through the lowest clay. Nothing
-holds it up any more: with a constant strength there is no longer any reward
-for staying shallow, so the search takes the largest circle the geometry
-permits.
+long against 38.09 m, and 23.12 m of it runs through the lowest clay. With a
+constant strength a shallower surface has no advantage, so the search takes the
+largest circle the geometry permits.
 
-The lost 5% is not simply the constant being too low. We can separate the two
-effects by running the same edit at four different constants:
+The 5% drop is not only because the constant is too low. To separate the two
+effects, we run the same edit at four different constants:
 
 | Lower-layer strength | s<sub>u</sub> (kPa) | Bishop FS | Tangent elevation |
 | --- | :---: | :---: | :---: |
@@ -294,12 +294,12 @@ effects by running the same edit at four different constants:
 The third row makes the fairest comparison: 22.91 kPa is the strength the `cp`
 profile actually mobilized, length-weighted, along its own critical surface. Set
 as a constant it still gives only 1.086, because the surface does not stay
-where it was — freed from the penalty on depth, it drops to the base, lengthens
-by 2.5 m, and picks up 654 kN/m more soil to drive it. **Matching the average
-strength on the old surface does not reproduce the old answer, because the
-strength profile was choosing the surface.** A constant taken from the top of
-the layer reads 0.872 and one taken from the bottom reads 1.268 — the second
-45% above the first, on one section, on the strength of a modeling choice
+where it was — with no gain in strength with depth, it drops to the base,
+lengthens by 2.5 m, and picks up 654 kN/m more soil to drive it. Matching the
+average strength on the old surface does not reproduce the old answer, because
+the strength profile determined which surface was critical. A constant taken
+from the top of the layer gives 0.872 and one taken from the bottom gives 1.268
+— the second 45% above the first, on one section, from the modeling choice
 alone.
 
 ---

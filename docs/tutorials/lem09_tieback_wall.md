@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-9 — A Tieback Wall"
-description: "Build a 30 ft soldier-pile tieback wall in XSLOPE — two grouted anchors entered as axial reinforcement with a bond length at the far end, plus the pile that carries their heads — search it for its critical wedge, solve the wedge the reference manual gives, and read what the anchors and the Appl option are worth."
+description: "Build a 30 ft soldier-pile tieback wall in XSLOPE — two grouted anchors entered as axial reinforcement with a bond length at the far end, plus the pile that carries their heads — search it for its critical wedge, solve the wedge the reference manual gives, and measure how much the anchors and the Appl option change the factor of safety."
 ---
 
 # Tutorial LEM-9 — A Tieback Wall
@@ -12,7 +12,7 @@ centers, 15,043 and 20,527 lb per foot of wall. The soldier pile at the face car
 heads and 5,900 lb/ft of shear across any surface that cuts it. The problem comes from the Caltrans SNAILZ
 reference manual, by way of the Rocscience Slide2 verification corpus — it is
 [verification problem VP49](../verification/rocscience.md#vp49), and this page
-reproduces that row's locked values.
+reproduces the values verified there.
 
 ![A soldier-pile tieback wall: two anchor rows in two soil layers](images/lem09_problem_sketch.png){width=1000}
 
@@ -25,8 +25,8 @@ reproduces that row's locked values.
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to model a tieback wall: how to enter grouted anchors
 with the Anchor preset and per-foot-of-wall capacities, how to search for the
-critical wedge and solve a specified one, and how to read what the anchors are
-worth and the two ways their force can be applied.
+critical wedge and solve a specified one, and how to measure the anchors'
+contribution and the two ways their force can be applied.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">reinforcement lines</span><span class="tg-pill">support types</span><span class="tg-pill">anchors</span><span class="tg-pill">piles</span><span class="tg-pill">non-circular search</span><span class="tg-pill">active vs passive</span></p>
 <div class="tgm-model" markdown>**Completed model** — [vp049.xlsx](../verification/files/rocscience/vp049.xlsx) — the same file used by [verification problem VP49](../verification/rocscience.md#vp49)</div>
@@ -58,7 +58,7 @@ it — and three things about it are different from a geogrid:
 lower one more frictional and heavier.
 
 Unit weights are pcf, cohesions psf and φ degrees; the row order is the Mat ID,
-and neither soil carries pore pressures — `u` stays `none` — so the table ends
+and neither soil has pore pressures — `u` stays `none` — so the table ends
 at φ:
 
 | name | γ | γsat | option | c | φ |
@@ -68,7 +68,7 @@ at φ:
 
 **Geometry** — a profile line is the *top* of a material layer. Layer 1 is the
 upper wedge of ground, so its line is the ground surface behind the wall; Layer 2
-runs beneath it and carries the wall face itself, a vertical run from (0, 0) to
+runs beneath it and includes the wall face itself, a vertical run from (0, 0) to
 (0, 30).
 
 **Profile Line 1 — material 1 (Layer 1):**
@@ -137,13 +137,13 @@ between.
 horizontal spacing between anchors — which is why **Spacing** stays at 1: the
 division has already been done.
 
-**Lp1 = 0 is the plate.** A pullout length of zero means *fully anchored*: the
+**Lp1 = 0 represents the plate.** A pullout length of zero means *fully anchored*: the
 whole capacity is available right at that end, which is what a bearing plate on
 the wall face provides. **Lp2** is the far end's bond length — the length of grout
 it takes to develop Tmax — so the tension available tapers from full capacity down
 to zero over the last 8.87 ft of the upper anchor and the last 12.1 ft of the
-lower one. **Adhesion** and **Delta** stay blank, which is what keeps the bond lengths in
-force; they are the alternative law, where the grout's resistance would follow the
+lower one. **Adhesion** and **Delta** stay blank, which keeps the bond lengths in
+effect; they are the alternative law, where the grout's resistance would follow the
 effective overburden instead. **Tend1** and **Tend2**, the end anchorage
 capacities, are 0 because
 the plate is already expressed as Lp1 = 0.
@@ -163,7 +163,7 @@ foot of wall, delivered to any surface that crosses the pile axis; **S** = 1
 because the division by spacing is already in that number — a
 continuous-equivalent of the discrete row, exactly as the anchors are entered —
 and **D** = 0.5 is the pile diameter. `θp` and `Appl` stay empty, and blank
-means what this model wants: the force acts along the pile's own axis, applied
+gives what this model needs: the force acts along the pile's own axis, applied
 `active` — an allowable working load, the same meaning it has on an anchor.
 
 `H` does not have to be given. Left blank, xslope computes the limiting force
@@ -185,7 +185,7 @@ manual this problem comes from, entered as three points:
 | 61 | 67.069 | Free |
 
 `Free` lets a search move a point, and the two end vertices can never leave
-the ground: the search walks an end point horizontally and re-anchors its Y to
+the ground: the search moves an end point horizontally and re-anchors its Y to
 the ground surface at the new x, so a `Free` end tracks the ground
 automatically — the behavior some programs mark with an `Auto` vertex is built
 in. In [LEM-5](lem05_weak_layer_noncircular.md) we cover the column and what the
@@ -216,7 +216,7 @@ Whichever you choose, rejoin at [Running the analysis](#running-the-analysis).
 
 ## A — Building it with the AI assistant {#a-building-it-with-the-ai-assistant}
 
-The drawing at the top of this page carries the geometry, both strengths and the
+The drawing at the top of this page shows the geometry, both strengths and the
 anchor layout. Paste it into the chat box and type `Build this model`, or describe
 it:
 
@@ -237,7 +237,7 @@ Build a model for a 30 ft vertical soldier-pile wall with its toe at (0, 0), gro
   anchor from this one.
 - **The capacities are per foot of wall**, not per anchor. An anchor at 8 ft
   centers delivers an eighth of its bar capacity to each foot of wall, and the
-  numbers above already carry that division with Spacing left at 1.
+  numbers above already include that division, with Spacing left at 1.
 - **The pile is on the piles sheet, not the reinforcement sheet.** A soldier pile
   is a shear element; entering its 5,900 lb/ft as a tensile capacity would apply
   it in the wrong direction entirely.
@@ -281,8 +281,8 @@ the capacity values from `Tmax` through `Spacing`:
 ![The finished reinforce worksheet](images/lem09_sheet_reinforce.png)
 
 **Leave Dir and Appl alone.** Typing into either replaces the formula, which is
-how a preset gets overridden deliberately, and pasting blanks across them erases
-it for nothing.
+how a preset is overridden deliberately, and pasting blanks across them erases
+the formula.
 
 ### 4. The `piles` worksheet
 
@@ -346,8 +346,8 @@ x-range it spans:
 
 ![The reinforcement editor's list view on the upper tieback](images/lem09_studio_reinforcement.png){width=1000}
 
-In the **Type** group the preset shows its work: **Dir** reads `axial` and
-**Appl** `active` beside the `anchor` Type; typing over either afterwards keeps
+In the **Type** group, **Dir** reads `axial` and **Appl** `active` beside the
+`anchor` Type; typing over either afterwards keeps
 what you typed, and choosing the Type again puts the preset back. The preview
 draws the anchors on the section with the selected one bold: a marker at each
 end, and one more where its capacity envelope reaches full Tmax, 8.87 ft in
@@ -387,7 +387,7 @@ from the wall toe is the failure surface as entered.
 
 Now we search it. Click **Run LEM…** and choose **Method** =
 `Janbu (Corrected)` — the method both of this problem's references report their
-factor of safety in, so we can read our results directly against theirs — and
+factor of safety in, so the results can be compared with theirs directly — and
 **Analysis** = `Auto search`, with the slice count left at 40:
 
 ![The Run LEM dialog on the wall](images/lem09_studio_run_lem.png)
@@ -399,13 +399,13 @@ factor of safety in, so we can read our results directly against theirs — and
 
 ### What the search finds
 
-The search starts from the three points the model carries and walks them, and the
+The search starts from the three points in the model and moves them, and the
 plot draws every surface it tried in gray with the one it kept in red:
 
 ![The Janbu search on the wall](images/lem09_search.png){width=1000}
 
 **FS = 1.431**, on a surface that runs from the wall toe at (0, 0) through
-(32.64, 37.52) and out at (55.05, 63.62). The kink barely bends it — the lower leg
+(32.64, 37.52) and out at (55.05, 63.62). The bend at the middle point is slight — the lower leg
 rises at 49.0° and the upper at 49.4° — so the search has straightened the manual's
 two-part wedge into what is very nearly a single plane from the toe, and pulled
 the exit point 6 ft closer to the wall.
@@ -438,7 +438,7 @@ which a polyline does not have, so they refuse the run rather than approximate i
 Spencer and Morgenstern-Price, the two that satisfy force and moment equilibrium
 together, agree to 0.1% at 1.414 and 1.416.
 
-### Why not a circle?
+### Comparison with a circular search {#why-not-a-circle}
 
 The wedge family is a modeling choice, and we can test it. Open **Circles**
 and click **Generate starting circles…** to give the search one circular seed —
@@ -448,11 +448,11 @@ becomes a choice — and run the same Janbu auto search on `Circular`:
 ![Janbu on the best circle](images/lem09_solution_circle.png){width=1000}
 
 The best circle bottoms out deep and climbs back to the crest break, because a
-circle cannot run flat along a plane. It reads **FS = 1.473, 3% above the
+circle cannot run flat along a plane. It gives **FS = 1.473, 3% above the
 wedge's 1.431**, and the other methods agree: Spencer 1.473 against 1.414, and
 Bishop — which joins the list because a circle restores its moment arm — 1.487.
-Searched only in circles, this wall would look 3 to 4% safer than it is, and the
-non-circular family is what carries its real mechanism.
+Searched only in circles, this wall would look 3 to 4% safer than it is; the
+non-circular surface represents its mechanism better.
 
 ### The wedge the reference manual gives
 
@@ -470,17 +470,18 @@ the published solutions. The wedge carries 157,936 lb/ft on a 90.1 ft base, 33%
 more soil than the searched surface, and takes the same 35,570 lb/ft from the
 anchors, since a crossing anywhere in the free length gives full capacity. Its
 lower leg leaves the toe at 42° against the search's 49°. A specified surface is a
-candidate, not an answer, which is why the search comes first.
+trial surface, not necessarily the critical one, which is why the search comes
+first.
 
-### What the tiebacks are worth
+### Effect of the tiebacks {#what-the-tiebacks-are-worth}
 
 Now we take both anchors out and search the same wall again — same soils, same
 pile, same starting points, a separate search with its own critical surface:
 
 ![Janbu on the wall with no tiebacks](images/lem09_solution_bare.png){width=1000}
 
-**FS = 0.921** against 1.431 — an unstable wall. The mechanism moves with the
-anchors, not just the number: without them the critical surface exits at
+**FS = 0.921** against 1.431 — an unstable wall. Removing the anchors changes the
+mechanism as well as the number: without them the critical surface exits at
 (41.77, 57.22) on the cut slope, 13 ft closer to the wall, and cuts 87,264 lb/ft
 of soil against 119,150.
 
@@ -499,7 +500,7 @@ The wall does not stand at all without the anchors, and the pile is worth about
 
 ### Active or passive
 
-**Appl** decides whether the capacity entered is an allowable force applied as it
+**Appl** sets whether the capacity entered is an allowable force applied as it
 stands, or an ultimate capacity that mobilizes with the soil and is therefore
 divided by the factor of safety. The
 [VP85 verification problem](../verification/rocscience.md#vp85) is the same slope
@@ -512,13 +513,13 @@ evaluated on the circle its source prints for it:
 | `vp085a` | Active | 1.567 |
 | `vp085b` | Passive | 1.319 |
 
-Those two answers sit on two different circles, so to isolate the setting we hold
-the surface still. On the vp085a circle — **one surface, no search, Bishop, only
-Appl changing** — active reads 1.567 and passive 1.331, against 0.914 with no
-anchor at all. Passive delivers about six-tenths of what active is worth here, and
+Those two answers are on two different circles, so to isolate the setting we fix
+the surface. On the vp085a circle — **one surface, no search, Bishop, only
+Appl changing** — active gives 1.567 and passive 1.331, against 0.914 with no
+anchor at all. Passive provides about six-tenths of the increase active provides here, and
 that fraction is not a constant, since the divisor is the factor of safety being
 solved for. Neither convention is a correction of the other, which is why the Type
-presets set it rather than leaving it to habit: `Geosynthetic`, `Tieback` and
+presets set it: `Geosynthetic`, `Tieback` and
 `Anchor` are active, `Nail` is passive.
 
 ---
@@ -535,10 +536,10 @@ This tutorial covered:
   wall.
 - A soldier pile as a separate shear contribution beside the tensile rows.
 - The wall searched with and without its support, and the active/passive
-  application difference measured on one held surface.
+  application difference measured on one fixed surface.
 
 **Where to go next:** in [LEM-10](lem10_global_minimum.md) we search a section
-that holds two competing mechanisms, where the surface a search returns depends
+that has two competing mechanisms, where the surface a search returns depends
 on the circle it started from. The [tutorials index](index.md) lists the series.
 [VP49](../verification/rocscience.md#vp49) catalogs this model against the
 published solutions it comes from, [Soil Reinforcement in LEM](../lem/reinforcement.md)

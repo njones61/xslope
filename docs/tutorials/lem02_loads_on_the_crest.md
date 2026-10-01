@@ -5,10 +5,10 @@ description: "Put a surcharge on the crest of a slope in XSLOPE — as a distrib
 
 # Tutorial LEM-2 — Loads on the Crest
 
-A stockpile is going on the crest of [LEM-1](lem01_simple_embankment.md)'s
-embankment: 750 psf over a 10 ft strip, set back 5 ft from the top of the face.
-The slope, the soil and the rigid base are unchanged — the load is the only new
-input, and it is the one that decides the answer.
+A stockpile is going on the crest of the embankment from
+[Tutorial LEM-1](lem01_simple_embankment.md): 750 psf over a 10 ft strip, set back
+5 ft from the top of the face. The slope, the soil and the rigid base are
+unchanged — the load is the only new input.
 
 ![The embankment carrying the crest surcharge](images/lem02_problem_sketch.png){width=1000}
 
@@ -25,7 +25,7 @@ does, how each load moves the factor of safety and the critical surface, and how
 to sweep strength against a target factor of safety.
 </div>
 <p><span class="tg-pill">distributed loads</span><span class="tg-pill">line loads</span><span class="tg-pill">load direction</span><span class="tg-pill">seismic coefficient</span><span class="tg-pill">design mode</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_crest_surcharge.xlsx](../lem/files/xslope_crest_surcharge.xlsx) — LEM-1's embankment with the surcharge added</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_crest_surcharge.xlsx](../lem/files/xslope_crest_surcharge.xlsx) — the LEM-1 embankment with the surcharge added</div>
 </div>
 
 ---
@@ -45,7 +45,7 @@ directly — [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankme
 
 The surcharge is a **distributed load**: an intensity in force per unit area,
 applied along a line of points on the ground surface, per unit width of slope.
-Two points are the whole load here, because the intensity is uniform between
+Two points define the load here, because the intensity is uniform between
 them:
 
 | X (ft) | Y (ft) | N (psf) |
@@ -121,7 +121,7 @@ Continue at [Running the analysis](#running-the-analysis).
 Open your copy of the embankment workbook and go to the **dloads** worksheet.
 Everything else in the file is already right.
 
-The sheet carries six load blocks side by side, four columns apart — **X**,
+The sheet has six load blocks side by side, four columns apart — **X**,
 **Y**, **N**, then a gap. This model uses the first, and the rest stay empty.
 Enter (or copy-paste) the two load points from the table above, and leave
 `dloads!D5` **Direction** blank. A blank cell means `normal` — the load acts
@@ -133,8 +133,7 @@ further down this page.
 
 **Points run left to right.** The loader re-orients a line entered the other way
 round, but the intensity between two points is interpolated along the line, so
-the order is what decides which end carries which value on a load that is not
-uniform.
+the order decides which end carries which value on a load that is not uniform.
 
 Save the file and continue at [Running the analysis](#running-the-analysis).
 
@@ -179,7 +178,7 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 
 ## Exploring the results
 
-### What the surcharge did
+### The effect of the surcharge {#what-the-surcharge-did}
 
 The solution plot draws the critical circle the search settled on, with the base
 stresses under it and the surcharge standing on the crest:
@@ -187,9 +186,9 @@ stresses under it and the surcharge standing on the crest:
 ![Spencer on the loaded model](images/lem02_solution_load.png){width=1000}
 
 **FS = 0.918.** The unloaded slope stood at 1.276; 750 psf over 10 ft of crest
-takes 28% off it and puts the embankment below 1. That is a large answer from a
-small-looking input, and the reason is visible in the figure rather than in the
-number: **the surface moved to find the load.**
+takes 28% off it and puts the embankment below 1. The drop is large for a
+small-looking load because the critical surface moved to the loaded strip, as the
+figure and the table below show.
 
 | | unloaded | with the surcharge |
 | --- | :---: | :---: |
@@ -216,17 +215,17 @@ admitted no solution at all. Now we run the loaded model with Bishop, the Ordina
 Method of Slices (OMS) and Morgenstern-Price: all three return **0.918 on the same
 circle** as Spencer, and no trial circle below the minimum goes unsolved.
 
-The surcharge is what changed: pressing down on the crest is the opposite of the
-tension that was breaking those solutions, and it shows up between the slices
-rather than under them. On the critical surface in LEM-1 Spencer's most tensile
+The surcharge presses down on the crest, against the tension that left those
+circles unsolved, and the change shows up between the slices rather than under
+them. On the critical surface in LEM-1 Spencer's most tensile
 interslice force was −3258 lb/ft against a largest compression of 5568 — 58% of
 it. Under the surcharge it is −822 lb/ft against 6234, or 13%, and Spencer's
 line-of-thrust warning clears. The base itself barely moves: the most tensile
-base stress goes from −666 psf to −561 psf. So the interslice tension warning is
-still there, smaller — the crest of a φ = 0 slope is a place where tension is
-always near, and Morgenstern-Price still puts its line of thrust outside the
-slice on 15% of the boundaries — but no tensile boundary now decides which
-surface the search is able to report.
+base stress goes from −666 psf to −561 psf. The interslice tension warning
+therefore remains, smaller: the crest of a φ = 0 slope is prone to tension, and
+Morgenstern-Price still puts its line of thrust outside the slice on 15% of the
+boundaries. But the tension no longer leaves any circle unsolved, so it no longer
+limits which surface the search can report.
 
 ### The same force as a line load
 
@@ -259,13 +258,14 @@ magnitude and must be positive; the direction lives entirely in the angle.
 concentrated form is the more severe of the two, and the reason is the same one
 as before: the critical surface stops where the load stops. It exits the crest at
 x = 30.0 — the load point — where the spread version had to run out to x = 35 to
-collect the last of the strip. That is 3.7 ft less arc, and with φ = 0 arc length
-*is* resistance: 19,552 lb/ft of it against 21,418. Identical resultants, and the
-concentrated one lets the slope fail on a shorter surface.
+collect the last of the strip. That is 3.7 ft less arc, and with φ = 0 the
+resistance is c times the arc length: 19,552 lb/ft against 21,418. The two loads
+have the same resultant, and the concentrated one lets the slope fail on a
+shorter surface.
 
-### Which way the load pushes {#which-way-the-load-pushes}
+### Direction of a distributed load {#which-way-the-load-pushes}
 
-Every distributed load carries a **Direction**, and it has two settings:
+Every distributed load has a **Direction**, and it has two settings:
 
 - **`normal`** — the load acts perpendicular to its own line. This is a pressure
   on a surface, and it is what water does. It is what a blank cell means.
@@ -282,7 +282,7 @@ elevations 5 and 15 — and they are not:
 **FS = 1.643** with **Direction** = `normal`. The arrows in that figure point
 into the hill at 45°, because perpendicular to a 1:1 face is 45° from vertical:
 the reading gives the load a horizontal component equal to its own magnitude,
-shoving the slope sideways into itself. The answer comes out *above* the unloaded
+pushing the slope horizontally into the hill. The answer comes out *above* the unloaded
 1.276 — the surcharge is holding the slope up.
 
 ![750 psf on the face, read as vertical](images/lem02_face_vertical.png){width=1000}
@@ -292,17 +292,17 @@ total force, pointed the way gravity points: essentially the unloaded answer,
 which is what a weight added to the middle of a face does — it drives and resists
 in almost equal measure.
 
-**The two readings differ by 28% here, and one of them is wrong for a
-stockpile.** A pile of gravel does not push horizontally into a hillside. Choose
-`normal` for a pressure — ponded water, a reservoir, anything acting *on* a
-surface — and `vertical` for anything whose load is its own weight. On level
-ground the choice is free; on a face it costs a quarter of the factor of safety.
+The two settings differ by 28% here, and `normal` is wrong for a stockpile: a
+pile of gravel does not push horizontally into a hillside. Choose `normal` for a
+pressure — ponded water, a reservoir, anything acting *on* a surface — and
+`vertical` for anything whose load is its own weight. On level ground the two
+settings give the same answer; on a face they do not.
 
-### A second kind of demand
+### Adding a seismic coefficient {#a-second-kind-of-demand}
 
 A **seismic coefficient** applies a horizontal force of k × W to every slice, at
-the slice's center of gravity — the pseudo-static way of asking what an
-earthquake would do. It is a single global number:
+the slice's center of gravity — the pseudo-static representation of earthquake
+loading. It is a single global number:
 
 - **Studio** — open **Global parameters** and set **Seismic coefficient k**.
 - **Excel** — `main!D13`.
@@ -323,12 +323,11 @@ against the 7,500 lb/ft the surcharge itself weighs. Pushed sideways rather than
 pressed down, the same order of force costs less — 0.144 off the factor of
 safety, where the surcharge took 0.358.
 
-### What strength would carry it
+### Finding the cohesion for a target factor of safety {#what-strength-would-carry-it}
 
 The model as it stands is not supportable: 0.918 is below 1 before any
-earthquake. The question an engineer asks next is not *what is the factor of
-safety* but *what would it take to reach the one I need* — and that is a sweep,
-not a guess.
+earthquake. The next question is what strength would raise the factor of safety
+to the value required, and a parametric sweep answers it.
 
 **Design mode** varies one input across a range, solves the model at every step,
 and reports the value where the answer crosses a target. Here we ask it what
@@ -345,10 +344,10 @@ In Studio, click **Run → Parametric…**:
 4. Leave **Re-search the critical surface at each step** ticked. On this model it
    changes nothing: one uniform φ = 0 soil, so raising c raises the resistance
    along every surface at once and every step comes back on the same circle.
-   That is the exception. **Give the model layers, or a friction angle, and the
-   critical surface migrates as the parameter moves** — and a sweep that
-   re-solves one fixed surface is then answering about a surface that stopped
-   being critical several steps ago.
+   This model is an exception: with layers or a friction angle, the critical
+   surface moves as the parameter changes, and a sweep that re-solves one fixed
+   surface would then report the factor of safety of a surface that is no longer
+   critical.
 5. **Run**.
 
 ![The design sweep](images/lem02_design.png){width=1000}
@@ -356,9 +355,9 @@ In Studio, click **Run → Parametric…**:
 **c = 817 psf.** The soil would have to be 63% stronger than the 500 psf it has
 to carry this stockpile at a factor of safety of 1.5.
 
-Reading the curve:
+In the design sweep plot:
 
-- **It is a straight line.** With φ = 0 the strength along the surface is c ×
+- **The curve is a straight line.** With φ = 0 the strength along the surface is c ×
   length and the driving side does not involve c at all; the search returns the
   same circle at every step, so that length is the same one throughout and the
   factor of safety is exactly proportional to cohesion. A sweep on a φ > 0 soil,
@@ -366,15 +365,15 @@ Reading the curve:
 - **The target is bracketed.** The sweep crossed 1.5 inside the range it was
   given, so 817 psf is interpolated between two solved points rather than
   extrapolated past the last one. A target that never crosses is reported as
-  such, with the direction to widen the range — a design sweep never invents an
-  answer outside what it solved.
+  such, with the direction to widen the range — a design sweep does not report a
+  value outside the range it solved.
 
 Cohesion is only the parameter that was asked about. The same sweep runs on the
 unit weight, on the seismic coefficient, or — through **Back-Analysis**, the same
 dialog with the target fixed at FS = 1.0 — backwards out of a slope that has
 already failed. Flattening the face, shrinking the stockpile or moving it further
-back from the crest are the other three answers to the same question, and each of
-them is a model you now know how to build.
+back from the crest are other ways to reach the target, and each can be modeled
+with the inputs used on this page.
 
 ---
 

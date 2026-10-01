@@ -7,9 +7,9 @@ description: "Build a two-layer slope in XSLOPE — a weak embankment on a stron
 
 A 20 ft embankment with a 2:1 face, built on a 10 ft foundation layer over rigid
 rock. Two soils, both undrained, and the fill is the weaker of them: c = 400 psf
-against the foundation's 800. Nothing in the geometry says how deep the failure
-surface will go — **the contact between the two layers decides that**, and the
-model has to be built so the search can ask about both sides of it.
+against the foundation's 800. The geometry does not show how deep the failure
+surface will go: the contact between the two layers controls that, and the model
+needs a starting circle at the base of each layer so the search tries both.
 
 ![The layered slope: a 20 ft embankment with a 2:1 face on a 10 ft foundation over rigid rock](images/lem03_problem_sketch.png){width=1000}
 
@@ -34,7 +34,7 @@ could fail, and how to read which layer the critical surface runs in and why.
 
 **Materials** — two Mohr-Coulomb (`mc`) soils, both undrained. Unit weights are
 pcf and cohesions psf; the row order is the Mat ID the profile lines reference,
-and neither soil carries pore pressures — `u` stays `none` — so the table ends
+and neither soil has pore pressures — `u` stays `none` — so the table ends
 at φ:
 
 | name | γ | γsat | option | c | φ |
@@ -48,7 +48,7 @@ two-layer section takes two lines and the second is the boundary between the
 layers. Geometry can be entered as profile lines or as polygons — one closed
 region per material — but profile lines are the faster input for simple layered
 sections like this one. One line per material, listed top down, each table one
-vertex per row in the paired `x` / `y` columns its worksheet block carries.
+vertex per row in the paired `x` / `y` columns its worksheet block has.
 
 **Profile Line 1 — material 1 (`embankment`):**
 
@@ -112,7 +112,7 @@ Whichever you choose, rejoin at [Running the analysis](#running-the-analysis).
 
 ## A — Building it with the AI assistant {#a-building-it-with-the-ai-assistant}
 
-The drawing at the top of this page carries what the assistant needs — layer
+The drawing at the top of this page has what the assistant needs — layer
 thicknesses, the face inclination, both unit weights, both strengths. Paste it
 into the chat box and type `Build this model`, or describe it:
 
@@ -188,10 +188,10 @@ slope height — x = 20, y = 40 — and differing only in how deep they reach. E
 ![The finished circles worksheet](images/lem03_sheet_circles.png)
 
 **Depth is the elevation of the circle's lowest point**, so `0` is a circle
-tangent to the top of the foundation and `-10` one tangent to the rock. One per
-layer base is the rule on layered ground: each circle asks about the mechanism
-that rides that layer's bottom, and the search reports whichever turns out to be
-worse.
+tangent to the top of the foundation and `-10` one tangent to the rock. On
+layered ground, put one circle at the base of each layer: each circle starts the
+search on the mechanism along that layer's base, and the search reports whichever
+has the lower factor of safety.
 
 Save the file and continue at [Running the analysis](#running-the-analysis).
 
@@ -205,7 +205,7 @@ We start with **File → New** and work down the **Inputs** tree.
 
 Click **Materials**. The editor opens on **Table view**, which mirrors the `mat`
 worksheet one material per row — the right shape here, because the two soils are
-read against each other and the row order is what fixes the Mat IDs.
+read against each other and the row order fixes the Mat IDs.
 
 Press **Add row** twice and enter (or copy-paste) the two materials from the
 table above — the block starts at the first `name` cell, and its columns are the
@@ -284,7 +284,7 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 
 ## Exploring the results
 
-### What the starting circles say before anything is searched
+### Solving the starting circles {#what-the-starting-circles-say-before-anything-is-searched}
 
 Each starting circle is a complete failure surface in its own right, so we solve
 the three of them — the two the file carries, plus the generator's toe circle —
@@ -317,7 +317,7 @@ the critical one in red:
 
 The gray circles show both families being tried — the shallow set clustered on
 the contact, the deep set running down to the rock. The green arrows trace the
-center's walk from the two circles' shared start at (20, 40) to (18.5, 43.75):
+center's path from the two circles' shared start at (20, 40) to (18.5, 43.75):
 both seeds are refined together, and both end on the same surface.
 
 ![Spencer's critical surface](images/lem03_solution.png){width=1000}
@@ -327,11 +327,11 @@ lowest point is at elevation 0.000: the critical surface is tangent to the
 contact, running along the top of the foundation without entering it. Every one
 of the 40 slice bases carries c = 400 psf, the fill's strength.
 
-The solution carries two admissibility warnings — interslice tension (a most
+The solution has two admissibility warnings — interslice tension (a most
 tensile −1436 lb/ft against a largest compression of 7382) and a line of thrust
 outside the slice on 15% of the boundaries. This is the crest tension of a φ = 0
-slope that [LEM-1](lem01_simple_embankment.md) diagnoses and fixes with a tension
-crack; adding one here at z<sub>c</sub> = 2c/γ = 6.15 ft gives a clean solution at
+slope, which is diagnosed and fixed with a tension crack in
+[Tutorial LEM-1](lem01_simple_embankment.md); adding one here at z<sub>c</sub> = 2c/γ = 6.15 ft gives a clean solution at
 **FS = 1.175**, on a circle still tangent to the contact. It changes nothing
 about which surface is critical, and unlike in the uncracked embankment of LEM-1
 the tension never prevented a surface from being solved: Spencer answered on all
@@ -339,35 +339,35 @@ the tension never prevented a surface from being solved: Spencer answered on all
 
 ### Guarding against local minima
 
-A search walks downhill from its starting circle, so what it returns is the best
+A search moves downhill from its starting circle, so what it returns is the best
 surface in the neighborhood it started in — not necessarily the model's minimum.
-The guard is simple: **try several starting circle locations and confirm they
-agree.** That is what the per-layer set is for. We run the search from the shallow
+To guard against a local minimum, try several starting circle locations and
+confirm they agree; the circles at the base of each layer serve that purpose. We
+run the search from the shallow
 circle, the deep circle and the generator's toe circle: every one returns the same
 surface here — tangent to the contact, FS = 1.244.
 
-The check passes here even from starts that have no business working. Seed the
-search with an arc wildly out of scale with the section — a center 220 ft above
-the slope, R = 269 ft — and it moves back down to the same contact-tangent circle
-and reports the same **1.244**. The soils are why: in a uniform φ = 0 fill the
+The check passes here even from starting circles far from the answer. Started
+from an arc far out of scale with the section — a center 220 ft above the slope,
+R = 269 ft — the search moves back down to the same contact-tangent circle and
+reports the same **1.244**, because of the two soils: in a uniform φ = 0 fill the
 deepest surface available is the critical one, so the search drives down through
 the embankment, and everything below the contact is twice as strong, so a trial
 surface that dips into the foundation gains more strength than the weight it
 adds and is pushed back up. The minimum sits on the contact and is reached
-downhill from either side. That every start agrees is what makes 1.244 the
-model's minimum rather than one neighborhood's.
+downhill from either side. Because every start agrees, 1.244 is the minimum for
+the model and not only for one neighborhood.
 
-Other sections genuinely hold two competing mechanisms, and layering is the
-usual way to get one: [Tutorial LEM-10](lem10_global_minimum.md) works a
-cohesionless embankment on soft clay where the two
-mechanisms answer differently and the search returns whichever one its starting
-circle sits nearest, so a circle placed in the fill finds a shallow sliver on
-the face and the deep foundation surface is found only when a circle is placed
-for it. Which is why the rule is per layer rather than per model: the
-circle you can argue was unnecessary costs one row on a worksheet, and the one
-you left out costs the answer.
+Other sections have two competing mechanisms, and layering is the usual cause:
+[Tutorial LEM-10](lem10_global_minimum.md) works a cohesionless embankment on
+soft clay where the two mechanisms have different factors of safety and the
+search returns whichever one its starting circle sits nearest, so a circle placed
+in the fill finds a shallow sliver on the face and the deep foundation surface is
+found only when a circle is placed for it. For this reason the starting circles
+go one per layer rather than one per model: an unnecessary circle costs one row
+on a worksheet, while a missing one can miss the critical surface.
 
-### When the deep circle is the answer
+### A weak foundation {#when-the-deep-circle-is-the-answer}
 
 Which layer is weak is a property of the soils, not of the geometry, and it
 decides which circle is critical. Now we take the same section and give the foundation
@@ -379,19 +379,20 @@ c = 300 psf — below the fill's 400 — with everything else unchanged:
 now tangent to the rock at elevation −10; it exits 9 ft beyond the toe, on the
 flat ground the section provides for it, and reaches back to x = 63 in the crest.
 It weighs 149,933 lb/ft against the 61,393 of the answer above, and its base runs
-through both soils. Deeper is now lower: a circle tangent to the contact lies
-wholly in the fill, where nothing has changed, so held still it returns the same
-1.247 it did before — against the 0.792 at the rock.
+through both soils. The deeper surface now has the lower factor of safety: a
+circle tangent to the contact lies wholly in the fill, where nothing has changed,
+so solved alone it returns the same 1.247 it did before — against the 0.792 at
+the rock.
 
-**A layered model has one candidate mechanism per layer**, and
-a set of starting circles that names them all is how the model states that — the
-circle that looked redundant here becomes the critical one under a different soil.
-**A search cannot be audited by its own number**: 1.244 and 0.792 come from
-the same geometry, the same three build paths and the same run settings, and the
-only thing that tells them apart is reading how deep the reported surface went
-and what it ran through.
+A layered model has one candidate mechanism per layer, and a starting circle at
+the base of each layer gives the search each of them: the circle that looked
+unnecessary on the original section is the critical one with the weak
+foundation. The factor of safety alone does not show which mechanism the search
+found. 1.244 and 0.792 come from the same geometry, the same three build paths
+and the same run settings, and only the depth of the reported surface and the
+soils it passes through tell them apart.
 
-### What the other methods say
+### Factor of safety by method {#what-the-other-methods-say}
 
 The search finds each method its own critical circle:
 
@@ -404,8 +405,8 @@ The search finds each method its own critical circle:
 The four methods that satisfy moment equilibrium — the Ordinary Method of
 Slices (OMS), Bishop, Spencer and
 Morgenstern-Price — land on the same circle and the same 1.244. With φ = 0 they
-cannot disagree about a circle, and here nothing stopped any of them solving the
-critical one. The three force-equilibrium procedures each settle on a flatter,
+give the same factor of safety on any circle, and here each of them could solve
+the critical one. The three force-equilibrium procedures each settle on a flatter,
 larger-radius circle of their own (Janbu R = 45.6, Lowe 47.7, Corps 52.9, against
 Spencer's 43.75) and come out 3–7% higher. Spencer satisfies both force and
 moment equilibrium and is the one to report.
@@ -420,18 +421,17 @@ This tutorial covered:
   boundaries where the material changes and nowhere else.
 - Starting circles at the base of each layer — and trying several to confirm
   the search found the minimum rather than a local one.
-- Reading a search at depth: the critical surface rides the contact, staying
-  above the stronger layer.
-- A strong layer under a weak one puts a floor under the answer; soften it and
-  both the surface and the factor of safety drop.
+- Checking the depth of the critical surface: here it runs along the contact,
+  staying above the stronger layer.
+- A strong layer under a weak one keeps the critical surface above it; with a
+  weaker foundation, the surface goes deeper and the factor of safety drops.
 - Moment-equilibrium methods agreeing exactly on a φ = 0 circle, with the
   force-equilibrium procedures a few percent higher.
 
-**Where to go next:** [Tutorial LEM-4](lem04_water_in_the_slope.md) adds the
-input every layer here went without — a piezometric line through a three-layer
-section, and a measure of what the pore pressure it produces costs on the
-critical circle. The series carries the layering further.
-[Tutorial LEM-6](lem06_polygon_geometry.md) enters the layers as polygons rather
-than profile lines because the base dips, and
+**Where to go next:** [Tutorial LEM-4](lem04_water_in_the_slope.md) adds pore
+pressure — a piezometric line through a three-layer section — and measures how
+much it lowers the factor of safety on the critical circle. Two later tutorials
+extend the layering. [Tutorial LEM-6](lem06_polygon_geometry.md) enters the
+layers as polygons rather than profile lines because the base dips, and
 [Tutorial LEM-10](lem10_global_minimum.md) works a slope with two competing
-mechanisms, where the starting circles decide the answer.
+mechanisms, where the starting circles determine which one the search finds.

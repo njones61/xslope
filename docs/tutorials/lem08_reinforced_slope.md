@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-8 — A Reinforced Slope (Geogrids)"
-description: "Build a 24 ft sand fill held up by six layers of geogrid in XSLOPE — reinforcement lines with a tensile capacity and a pullout length at each end — then search it, measure what the reinforcement is worth against the same slope without it, and read where the critical surface meets the lines."
+description: "Build a 24 ft sand fill held up by six layers of geogrid in XSLOPE — reinforcement lines with a tensile capacity and a pullout length at each end — then search it, measure how much the reinforcement raises the factor of safety over the same slope without it, and read where the critical surface meets the lines."
 ---
 
 # Tutorial LEM-8 — A Reinforced Slope (Geogrids)
@@ -23,8 +23,8 @@ UTEXASED user manual, S. G. Wright's educational version of UTEXAS.
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to model soil reinforcement: how to enter geogrid
 layers with their tensile capacity and pullout lengths, how a support type sets
-the way each force acts, and how to read what the layers are worth against the
-unreinforced slope and the force each crossing actually mobilizes.
+the way each force acts, and how to compare the reinforced slope with the
+unreinforced one and read the force each crossing actually mobilizes.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">distributed load</span><span class="tg-pill">reinforcement lines</span><span class="tg-pill">capacity envelope</span><span class="tg-pill">pullout length</span><span class="tg-pill">support types</span><span class="tg-pill">circular search</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_reinforce.xlsx](../lem/files/xslope_reinforce.xlsx)</div>
@@ -38,7 +38,7 @@ unreinforced slope and the force each crossing actually mobilizes.
 apart by their cohesion:
 
 Unit weights are pcf and cohesions psf; the row order is the Mat ID the profile
-lines reference, and neither soil carries pore pressures — `u` stays `none` —
+lines reference, and neither soil has pore pressures — `u` stays `none` —
 so the table ends at φ:
 
 | name | γ | γsat | option | c | φ |
@@ -75,7 +75,7 @@ in the paired `x` / `y` columns:
 
 Line 1 is the toe, the top of the 1.25:1 face and 2 ft of crest behind it. Line
 2 runs 30 ft out in front of the toe at elevation 0, then climbs the face 2 ft
-behind line 1 and carries the crest back to x = 100. The band between the two
+behind line 1 and continues along the crest to x = 100. The band between the two
 is the face wrap. Maximum depth = `-10`, the elevation of the bottom of the
 model.
 
@@ -91,7 +91,7 @@ The direction is left blank, which means the load acts normal to the ground
 surface; on a level crest that is straight down.
 
 **Reinforcement** — six lines. A reinforcement line is a straight segment
-between two endpoints carrying a tensile capacity: wherever a trial failure
+between two endpoints with a tensile capacity: wherever a trial failure
 surface crosses one, that tension is applied to the sliding mass at the
 crossing point. Each line here starts on the face and runs 20 ft back into the
 fill, the lowest at the toe:
@@ -134,8 +134,8 @@ between.
 
 **How much force is available depends on where the surface crosses.** A geogrid
 does not carry its full capacity at its free end — the tension is developed by
-friction against the soil, over some length of embedment. That is what the second
-block says, the same eight values on every line:
+friction against the soil, over some length of embedment. The second block
+defines this, with the same eight values on every line:
 
 | Tmax | Lp1 | Lp2 | Adhesion | Delta | Tend1 | Tend2 | Spacing |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -160,7 +160,7 @@ line's *capacity envelope*, whose breakpoints are drawn on every plot as tension
 points.
 
 Four feet at both ends is the published example's own value, and it treats the
-two ends as alike. They are not. The buried end sits under 4 to 16 ft of fill and
+two ends alike, although they differ. The buried end sits under 4 to 16 ft of fill and
 grips within about two feet; the face end has almost no soil above it and needs
 about four. A practitioner would either shorten `Lp2` to match, or leave the
 lengths out and fill `Adhesion` and `Delta` instead, which makes the resistance
@@ -207,7 +207,7 @@ Whichever you choose, rejoin at [Running the analysis](#running-the-analysis).
 
 ## A — Building it with the AI assistant {#a-building-it-with-the-ai-assistant}
 
-The drawing at the top of this page carries the geometry, both strengths, the
+The drawing at the top of this page shows the geometry, both strengths, the
 surcharge and the reinforcement layout. Paste it into the chat box and type
 `Build this model`, or describe it:
 
@@ -223,9 +223,8 @@ Build a model for a 24 ft embankment with a 1.25:1 face, toe at (0, 0) and crest
   first x is 1.25 times its elevation: 0, 5, 10, 15, 20, 25. A layer that starts
   at the same x on every row is a stack of lines hanging in space at the bottom
   and buried at the top.
-- **Type is `Geosynthetic` on all six lines.** It is the column that says what
-  the reinforcement *is*, and it fills `Dir` with tangent and `Appl` with
-  active. If it came back empty, say: *"Set the support type to Geosynthetic on
+- **Type is `Geosynthetic` on all six lines.** It sets the kind of
+  reinforcement, and it fills `Dir` with tangent and `Appl` with active. If it came back empty, say: *"Set the support type to Geosynthetic on
   every reinforcement line."*
 - **Both ends have a pullout length.** `Lp1` and `Lp2` = 4 on every line. A
   blank or 0 means *fully anchored* — the whole 800 lb/ft available right at the
@@ -288,11 +287,11 @@ columns and the capacity values into `Tmax` through `Spacing`:
 ![The finished reinforce worksheet](images/lem08_sheet_reinforce.png)
 
 Pick `Geosynthetic` from the **Type** drop-down, and **leave Dir and Appl
-alone**: both hold a formula that reads Type and answers on its own. Typing into
-either replaces the formula, which is how a preset gets overridden deliberately;
-pasting blanks across them erases it for nothing.
+alone**: both hold a formula that fills them from Type. Typing into either
+replaces the formula, which is how a preset is overridden deliberately; pasting
+blanks across them erases the formula.
 
-The header colors say which engine reads a column: green for the LEM alone, red
+The header colors show which engine reads a column: green for the LEM alone, red
 for both, blue for the FEM alone — `Tres`, `E` and `Area` model the lines as
 truss elements in a finite element run and are ignored here.
 
@@ -352,19 +351,19 @@ that draws the lines on the section:
 
 ![The reinforcement editor's list view on the first layer](images/lem08_studio_reinforcement.png){width=1000}
 
-The capacity fields carry their units — `Tmax (per unit width, lb/ft)` — so a
+The capacity fields show their units — `Tmax (per unit width, lb/ft)` — so a
 per-element capacity entered without a spacing is visible as the wrong
 quantity. The preview draws the selected line bold with a marker at each end
 and at its pullout breakpoints: the shape of its capacity envelope, in place on
 the slope. Click a line in the preview to select it, and click **OK** when the
-six lines read as the tables above.
+six lines match the tables above.
 
 ### 5. Starting circles
 
 Click **Circles** and enter the two circles from the table above, or paste the
 block into the first cell — its four columns are the editor's first four, and
 the rows come with it. **Depth is an elevation**: 0 is the toe, -10 the bottom
-of the model. The `R` column answers on its own, and the preview draws both arcs
+of the model. The `R` column fills in automatically, and the preview draws both arcs
 on the section:
 
 ![The circles editor on the two starting circles](images/lem08_studio_circles.png)
@@ -415,7 +414,7 @@ five lines at the full 800.
 ### Where the surface meets the lines
 
 The critical circle crosses five of the six layers, and the capacity envelope
-decides what each one gives:
+sets the force each one provides:
 
 | Line | Crossing x | To the nearer end (ft) | T (lb/ft) |
 | :---: | :---: | :---: | :---: |
@@ -443,7 +442,7 @@ the soil below the sliding mass. A layer the critical surface never crosses is
 not in the analysis — which is why we read the plotted lines against the
 plotted surface rather than counting rows in the sheet.
 
-### What the other methods say
+### Factor of safety by method {#what-the-other-methods-say}
 
 Each method gets its own search and its own critical circle:
 
@@ -469,7 +468,9 @@ circle, XSLOPE's Spencer method gives the same 1.646. The search on this page
 finds a shallower circle, centered at (−5.13, 46.98), at 1.587, which is 3.6%
 lower.
 
-### What the reinforcement is worth
+<!-- test: file=../lem/files/xslope_reinforce.xlsx, type=single_circle, circle_xo=3.2, circle_yo=42.0, circle_r=43.4, method=spencer, num_slices=40, expected_fs=1.646, tolerance=0.005 -->
+
+### Effect of the reinforcement {#what-the-reinforcement-is-worth}
 
 Now we take the six lines out and search the same section again — same soils,
 same surcharge, same starting circles, a separate search with its own critical
@@ -479,16 +480,15 @@ circle:
 
 **FS = 1.167** against 1.587: the six layers raise the factor of safety by 36%.
 The mechanism changes with them. Without the lines the critical surface is a thin
-sliver behind the face, 17,376 lb/ft of soil; with them, the cheapest mechanism
-left is the deeper, heavier one above, which has to cut the whole reinforced
-block.
+sliver behind the face, 17,376 lb/ft of soil; with them, the critical mechanism
+is the deeper, heavier one above, which cuts through the reinforced block.
 
 Solved on the reinforced model's own critical circle instead — one surface, no
 search — the unreinforced section returns 1.247. The gap between that and the
 searched 1.167 is the part of the loss that comes from the slope having a worse
 mechanism available, not from the missing tension.
 
-### How long the lines have to be
+### Effect of the reinforcement length {#how-long-the-lines-have-to-be}
 
 Next we re-cut all six layers to a different length and search again — the face
 end of each line held, the back end moved, so length is the only thing changing.
@@ -504,21 +504,21 @@ Every length gets its own search and its own critical circle:
 | 40 | 1.587 | 4,000 | 5 of 6 |
 
 At 40 ft — double the design length — the search returns the same circle and
-the same 1.587, with the lines reaching far past every crossing: the picture
-of length buying nothing.
+the same 1.587, with the lines reaching far past every crossing: the extra
+length adds nothing.
 
 ![Spencer with 40 ft geogrids](images/lem08_solution_long.png){width=1000}
 
-Beyond 20 ft the answer stops moving, and the four searches that produced it say
-why: each settles on the same circle — center (−5.13, 46.98), the same five
+Beyond 20 ft the answer does not change, and the four searches that produced it
+show why: each settles on the same circle — center (−5.13, 46.98), the same five
 crossings at the same x — and every one of those crossings already lies at least
 8.4 ft from the nearer end of its line, twice the 4 ft it takes to develop Tmax.
 All five deliver the full 800 lb/ft before anything is lengthened. Adding length
-moves the back end further from crossings the back end never governed. What caps
-the reinforcement on this section is rupture capacity, and length cannot buy more
-of it.
+moves the back end further from crossings the back end never governed. On this
+section the reinforcement force is limited by rupture capacity, which length does
+not increase.
 
-Short lines fail the other way. At 10 ft the critical surface passes *behind* the
+Short lines are limited in a different way. At 10 ft the critical surface passes *behind* the
 back ends of most of the layers:
 
 ![Spencer on the same section with 10 ft geogrids](images/lem08_solution_short.png){width=1000}
@@ -527,22 +527,23 @@ The gray bars stop well short of the surface in the middle of the face: only two
 of the six lines are crossed at all, and both crossings are caught within 1.7 ft
 of a tip, inside the pullout ramp, where they mobilize 193 and 340 lb/ft instead
 of 800. At 1.270 that section is barely better than the 1.167 of no reinforcement at
-all. Between the two regimes — 15 ft, four crossings, 1,466 lb/ft — length is
-buying reach and anchorage together, and it is the only part of the range where
+all. Between the two regimes — 15 ft, four crossings, 1,466 lb/ft — added length
+both reaches more crossings and anchors them better, and it is the only part of
+the range where
 lengthening a geogrid changes the answer.
 
-### What Dir and Appl change
+### Effect of Dir and Appl {#what-dir-and-appl-change}
 
 Both settings are per line, and both move this answer. When we switch all six
 lines to `Axial` — the direction a nail or a tieback would use — the search
 returns **1.606**: the horizontal geogrids now pull along their own axis rather
-than along the slip surface, which delivers less force down the slice bases but
-presses the mass onto them, and on a φ = 37° sand that trade gains a little more
-than it costs. Switching instead to `Passive`, so the same 800 lb/ft is treated
+than along the slip surface, which gives less force along the slice bases but
+more normal force on them, and on a φ = 37° sand the added friction slightly
+outweighs the loss. Switching instead to `Passive`, so the same 800 lb/ft is treated
 as an ultimate capacity divided by the factor of safety, the search returns
 **1.453**. Neither is a correction to the other; they are two published
 conventions, which is why the type presets set them together and the reference
-page states which support wants which.
+page states which setting suits each support.
 
 <!-- test: file=../lem/files/xslope_reinforce_rface.xlsx, type=circular_search, num_slices=40, fs_oms=1.282, fs_bishop=1.475, fs_janbu=1.420, fs_spencer=1.471, fs_corps=1.485, fs_lowe=1.477, fs_mprice=1.471 -->
 <!-- test: file=../lem/files/xslope_reinforce_rface.xlsx, type=mp_spencer -->
@@ -563,8 +564,9 @@ This tutorial covered:
   direction and application columns in one pick.
 - The reinforced search against the unreinforced one: a different factor of
   safety and a different mechanism.
-- A length study finding where added embedment stops buying anything — once
-  every crossing clears its pullout ramp, rupture capacity governs.
+- A length study finding where added embedment stops changing the factor of
+  safety — once every crossing clears its pullout ramp, rupture capacity
+  governs.
 
 **Where to go next:** in [LEM-9](lem09_tieback_wall.md) we build the other
 reinforced problem — a tieback wall, where the support is discrete and stiff

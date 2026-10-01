@@ -54,9 +54,22 @@ Each rule is a name, a scope and a pattern. The groups:
                builds" (say "in Tutorial SEEP-3").
 ``process``    project bookkeeping in public prose: "regression guard",
                "held pending", "recorded as open".
+``voice``      the program given a voice or a will: "said out loud", "the
+               search says", "the model admits", "the plot tells", "the run
+               says so in the Log". The program reports, prints, shows,
+               returns, lists. A text artifact may say things ("the warning
+               says", "the Log says"), and results may agree ("the methods
+               agree", "XSLOPE agrees with Slide"): those do not match.
+``heading``    headings that are not plain labels of what the section
+               contains: a contrast ("The fix is in the ground, not the
+               settings"), a question ("Why not a circle?"), an "X is the Y"
+               punchline in any clause not opened by a question word ("the
+               zones are the story"; "What is in a report" is a label), a
+               program voice ("What the other methods say", "What it
+               knows"), a rhetorical noun ("the story", "the lesson").
 
-The rules from ``punchline`` down are docs-only; program strings keep the
-first group. ``SELFTEST`` plants a violation for every rule and a near-miss
+The rules from ``punchline`` down are docs-only, except ``voice``, which also
+covers program strings; program strings keep the first group. ``SELFTEST`` plants a violation for every rule and a near-miss
 sentence beside it; ``run()`` fails if a planted violation is missed or a
 near miss is flagged, so a rule cannot be loosened into uselessness or
 widened onto ordinary sentences without the battery saying so.
@@ -255,6 +268,52 @@ RULES: list[tuple[str, tuple[str, ...], re.Pattern]] = [
     # ---- process --------------------------------------------------------
     ("process", DOCS_ONLY, re.compile(
         r"\b(?:regression guard|held pending|recorded as open)\b", I)),
+    # ---- voice ----------------------------------------------------------
+    # The program as a speaker or a mind. The subject is an agent that has
+    # no voice (search, model, solver, plot, run...), never a text artifact
+    # (warning, Log, message, output, answer), which may "say" what it says;
+    # and "agrees" is caught only with such a subject, so numeric agreement
+    # ("the two methods agree", "XSLOPE agrees with Slide") does not match.
+    ("voice", ALL, re.compile(r"\bout loud\b", I)),
+    ("voice", ALL, re.compile(
+        r"\b(?:the|this|that|its|each|every|a) (?:[\w'-]+ )?"
+        r"(?:search(?:es)?|model|solver|program|engine|analysis|software|plot|figure|run|"
+        r"XSLOPE|Studio) (?:says|said|is saying|tells|told|admits|admitted|agrees|agreed|"
+        r"knows|wants|insists|believes|thinks|complains)\b", I)),
+]
+
+
+class _HeadingPunch:
+    """An "X is the Y" pronouncement in a heading clause (split at dashes,
+    colons, semicolons and commas) that a question word does not open:
+    "The fix is in the ground", "the zones are the story" match; "What is in
+    a report" is a label and does not."""
+
+    _CLAUSE = re.compile(r"[^—–:;,]+")
+    _IS = re.compile(r"\b(?:is|are|was|were) (?:the|in|what|where|why|how)\b", I)
+    _WH = re.compile(r"^\s*(?:What|How|Which|When|Where|Why|Who)\b", I)
+
+    def finditer(self, text: str):
+        for c in self._CLAUSE.finditer(text):
+            if self._WH.match(c.group(0)):
+                continue
+            for m in self._IS.finditer(c.group(0)):
+                yield m
+
+
+# Heading rules run on each heading's text alone (its {#anchor} and inline
+# code removed); docs only. A heading is a plain label of what the section
+# contains.
+HEADING_RULES: list[tuple[str, tuple[str, ...], object]] = [
+    ("heading", DOCS_ONLY, re.compile(r",\s*not\b|\s[—–]\s*(?:but\s+)?not\b", I)),
+    ("heading", DOCS_ONLY, re.compile(r"\?\s*$")),
+    ("heading", DOCS_ONLY, _HeadingPunch()),
+    ("heading", DOCS_ONLY, re.compile(
+        r"\b(?:it|search(?:es)?|model|solver|program|engine|analysis|plot|figure|methods?|"
+        r"XSLOPE|Studio|assistant) (?:says?|said|tells?|knows?|wants?|admits?|agrees?|"
+        r"thinks?|believes?)\b", I)),
+    ("heading", DOCS_ONLY, re.compile(
+        r"\bthe (?:story|lesson|moral|catch|trick|secret|punchline|crux)\b", I)),
 ]
 
 # Each rule's planted violation and the nearest ordinary sentence it must
@@ -306,6 +365,34 @@ SELFTEST: list[tuple[str, str, bool]] = [
     ("process", "The model is included to check the support mechanics on a mirrored slope.", False),
     ("flourish", "Crucially, the core drains slowly. Notably, the shell does not.", True),
     ("signpost", "Two things follow. The core drains slowly.", True),
+    ("voice", "The search says this out loud. Its run output includes the line:", True),
+    ("voice", "Being uncertain out loud is not a failure.", True),
+    ("voice", "Fifty-six trial circles admit no solution, and the model admits it.", True),
+    ("voice", "The run says so in the Log rather than counting it as a failure.", True),
+    ("voice", "If it never crosses, the plot says which way to widen the range.", True),
+    ("voice", "XSLOPE's circular search on the weak-layer model agrees.", True),
+    ("voice", "The plot tells the whole history of the search.", True),
+    ("voice", "The run output reports this. The search prints the circle when it converges.", False),
+    ("voice", "The warning says the table has no tensile cutoff, and the Log says the same.", False),
+    ("voice", "Spencer and Morgenstern-Price agree to 0.1%, and XSLOPE agrees with Slide.", False),
+    ("voice", "With no tension in the model, the methods agree.", False),
+    ("voice", "Nothing in the output says so, and the answer says which of the two it computed.", False),
+    ("voice", "A system that admits no admissible root is reported as such.", False),
+    ("heading", "The fix is in the ground, not the settings", True),
+    ("heading", "Why not a circle?", True),
+    ("heading", "How deep does the crack really need to be?", True),
+    ("heading", "What to observe — the zones are the story", True),
+    ("heading", "What the other methods say", True),
+    ("heading", "What it knows before it runs anything", True),
+    ("heading", "The lesson of the second search", True),
+    ("heading", "Factor of safety by method", False),
+    ("heading", "Adding a tension crack", False),
+    ("heading", "What is in a report", False),
+    ("heading", "Part 3 — When a sheet is a slip surface, and when it is bonded", False),
+    ("heading", "London clay, where the two fits agree", False),
+    ("heading", "Choose how you want to build it", False),
+    ("heading", "How the search finds the answer", False),
+    ("heading", "A flux is a rate normal to the boundary", False),
 ]
 
 
@@ -313,7 +400,7 @@ def selftest() -> list[str]:
     """Run every SELFTEST case through its rule group; return the failures."""
     fails = []
     for rule, text, must in SELFTEST:
-        hit = any(True for name, scope, pat in RULES if name == rule
+        hit = any(True for name, scope, pat in RULES + HEADING_RULES if name == rule
                   for _ in pat.finditer(text))
         if hit != must:
             fails.append(f"selftest [{rule}] {'missed' if must else 'false hit'}: {text!r}")
@@ -368,6 +455,27 @@ def _paragraphs(md: Path):
         yield start, " ".join(buf)
 
 
+_HEADING_TEXT = re.compile(r"^#{1,6}\s+(.*?)\s*(?:\{[^}]*\})?\s*#*\s*$")
+
+
+def _headings(md: Path):
+    """Yield (line, text) for each Markdown heading of a page outside fenced
+    code and HTML comments, with its {#anchor}/attribute list and inline code
+    removed."""
+    raw = md.read_text(encoding="utf-8")
+    raw = _COMMENT.sub(lambda m: "\n" * m.group(0).count("\n"), raw)
+    in_fence = False
+    for i, line in enumerate(raw.split("\n"), 1):
+        if _FENCE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        m = _HEADING_TEXT.match(line)
+        if m:
+            yield i, _INLINE_CODE.sub("", m.group(1)).strip()
+
+
 def _strings(py: Path):
     """Yield (line, text) for each user-facing string literal in a module: a
     constant with a space in it, twelve characters or longer, that is not a
@@ -412,6 +520,12 @@ def scan_page(md: Path):
                 continue
             for m in pat.finditer(text):
                 hits.append((rule, rel, line, m.group(0), _excerpt(text, m)))
+    for line, text in _headings(md):
+        for rule, scope, pat in HEADING_RULES:
+            if not scopes & set(scope):
+                continue
+            for m in pat.finditer(text):
+                hits.append((rule, rel, line, m.group(0), text))
     return hits
 
 

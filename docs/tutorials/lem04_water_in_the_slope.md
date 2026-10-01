@@ -1,16 +1,15 @@
 ---
 title: "Tutorial LEM-4 — Water in the Slope"
-description: "Build a three-layer slope with a piezometric line in XSLOPE, search it for the critical circle, and measure what the water is worth on that circle: pore pressure on the slice bases, the γ/γ_sat unit-weight split, and the r_u alternative."
+description: "Build a three-layer slope with a piezometric line in XSLOPE, search it for the critical circle, and measure how much the water lowers the factor of safety on that circle: pore pressure on the slice bases, the γ/γ_sat unit-weight split, and the r_u alternative."
 ---
 
 # Tutorial LEM-4 — Water in the Slope
 
 A 44 ft slope in three soil layers, with a piezometric line falling from
 elevation 80 behind the crest to the toe. Every strength here is an **effective
-stress** strength — a c′ and a φ′ — so every one of them is read against the
-pore pressure on the failure surface, and the water is the input the answer
-turns on: the critical circle reads **1.667 with the pore pressures switched
-off and 1.301 with them on.**
+stress** strength — a c′ and a φ′ — so each one depends on the pore pressure on
+the failure surface: on the critical circle the factor of safety is **1.667 with
+the pore pressures switched off and 1.301 with them on.**
 
 ![The slope: 44 ft in three soils on a rigid base, with the piezometric line falling from behind the crest to the toe](images/lem04_problem_sketch.png){width=1000}
 
@@ -33,8 +32,8 @@ two unit-weight columns do, and when to reach for the r<sub>u</sub> alternative.
 
 ## The problem
 
-**Materials** — three Mohr-Coulomb (`mc`) soils, listed top down, every one an
-effective-stress strength reading the piezometric line. Each states **two** unit
+**Materials** — three Mohr-Coulomb (`mc`) soils, listed top down, each an
+effective-stress strength with its pore pressure from the piezometric line. Each states **two** unit
 weights: γ, what the soil weighs above the water table, and γ_sat, what it
 weighs below it.
 
@@ -61,7 +60,7 @@ than the two layers above it, and it is where the critical surface goes.
 its layer (the faster of the two geometry inputs for layered ground; polygons
 are the other), with the maximum depth at `0`, the elevation of the rigid base.
 Each table is one vertex per row, in the paired `x` / `y` columns its worksheet
-block carries.
+block has.
 
 **Profile Line 1 — material 1 (`soil 1`):**
 
@@ -153,7 +152,7 @@ Whichever you choose, rejoin at [Running the analysis](#running-the-analysis).
 
 ## A — Building it with the AI assistant {#a-building-it-with-the-ai-assistant}
 
-The problem drawing above carries the layers, the strengths, the water line and
+The problem drawing above shows the layers, the strengths, the water line and
 the dimensions, but not the coordinates the profile lines take. Paste it into the
 chat box with the numbers, or describe the whole model:
 
@@ -206,12 +205,11 @@ material properties from the table above, as shown below:
 
 ![The finished mat worksheet](images/lem04_sheet_mat.png)
 
-Two parts of each row are the subject of this page. **`u` is where each
-material's pore pressure comes from** — `piezo` reads the piezometric line,
-`none` reads nothing, and the [other two options](#r_u-a-pore-pressure-without-a-line)
-appear later. And the pair **C:D** are the unit-weight columns: **γ** is what
-the soil weighs above the water table, **gsat** what it weighs below it, and
-filling both is what lets the engine
+**`u` is where each material's pore pressure comes from** — `piezo` reads the
+piezometric line, `none` reads nothing, and the
+[other two options](#r_u-a-pore-pressure-without-a-line) appear later. The pair
+**C:D** are the unit-weight columns: **γ** is what the soil weighs above the
+water table, **gsat** what it weighs below it, and filling both lets the engine
 [split each slice's weight](#the-two-unit-weight-columns) at the line. Leaving
 **gsat** blank is legal and means *γ throughout*.
 
@@ -224,7 +222,7 @@ filling both is what lets the engine
 
 ![The finished profile worksheet](images/lem04_sheet_profile.png)
 
-Lines 1 and 2 each carry a stretch of the face, which is why they take three
+Lines 1 and 2 each include a stretch of the face, which is why they take three
 points; line 3 is the flat top of the bottom layer, and two points draw it.
 
 ### 3. The `piezo` worksheet
@@ -336,19 +334,19 @@ the critical one in red:
 **FS = 1.301**, and the critical circle is not the one we entered: the search
 settled on a deep circle through the soft foundation clay — **Xo = 182.37,
 Yo = 88.32, Depth = 26.90** — entering the crest well behind the shoulder and
-exiting past the toe, with most of its base in soil 3. That is where the answer
-should live: soil 3 is the weakest soil in the section, and circles that stay
+exiting past the toe, with most of its base in soil 3. That is to be expected:
+soil 3 is the weakest soil in the section, and circles that stay
 above it come back around 1.37 or higher.
 
 <!-- test: file=../lem/files/xslope_method_slices_problem.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.301, tolerance=0.005 -->
 
 ### Holding the circle still {#holding-the-circle-still}
 
-Everything below asks what the water costs on this slope, and the way to ask a
-question about one variable is to change one variable. So we put the circle the
-search found into the model and stop searching.
+The rest of this page measures how much the water lowers the factor of safety.
+To change only that one variable, we put the circle the search found into the
+model and stop searching.
 
-There is no need to read the circle off the picture: the search states it when
+There is no need to read the circle off the picture: the search prints it when
 it converges, in Studio's **Log** pane, as
 `at (x=182.37, y=88.32, depth=26.90)`. Those are the three numbers to enter:
 
@@ -363,15 +361,14 @@ it converges, in Studio's **Log** pane, as
 
 ![Spencer on the held circle, wet](images/lem04_solution_wet.png){width=1000}
 
-**FS = 1.301** — the search's answer, reproduced on a surface that will now sit
-still. The blue bars on the slice bases are the legend's **Pore Pressure (u)**,
+**FS = 1.301** — the search's answer, reproduced on the fixed circle. The blue bars on the slice bases are the legend's **Pore Pressure (u)**,
 and on 38 of the 39 slice bases they are not zero. Each one is the piezometric
 reading — u = γ<sub>w</sub> × the vertical distance from the base to the line
 — and the largest, **2064 psf at x = 163.6**, is a base sitting 33.1 ft below
 the line (62.4 × 33.1). Only the first slice reads zero: the circle enters the
 crest at elevation 84 and that slice's base, at 77.5, is still above the line.
 
-### What the water costs
+### Effect of the pore pressure {#what-the-water-costs}
 
 Now we take the water out of the strength calculation. Set every material's pore
 pressure option to `none` and leave everything else exactly as it is:
@@ -386,19 +383,20 @@ We run the same single surface again:
 
 **FS = 1.667.** Same circle, same 131.4 ft of base, same 349,677 lb/ft of soil
 — the pore pressure costs **22% of the factor of safety** and nothing else
-moved. (The weight is identical because the piezometric line is still there
-doing its *other* job, [splitting the weight](#the-two-unit-weight-columns);
+moved. (The weight is identical because the piezometric line is still in the
+model for its *other* use, [splitting the weight](#the-two-unit-weight-columns);
 switching `u` off stops the line producing pressure, not the soil below it
 being saturated.) The green bars are the legend's **Eff Normal Stress (σ')**,
 and with u = 0 everywhere the effective normal stress *is* the total normal
-stress: every pound of it earns frictional strength at tan φ′.
+stress: all of it contributes frictional strength at tan φ′.
 
-The mechanics are one line long: τ = c′ + (σ − u) tan φ′. Cohesion is untouched
+The strength on each base is τ = c′ + (σ − u) tan φ′. Cohesion is untouched
 — c′ Δℓ summed over the base is **99,507 lb/ft** in both states, because
-neither c′ nor the base changed — so every pound the water costs comes out of
-friction, and it is countable: Σ u Δℓ tan φ′ over the 39 slices is
-**46,471 lb/ft** of frictional resistance that the pore pressure erases. In the
-wet figure the blue bars visibly hollow out the green ones.
+neither c′ nor the base changed — so all of the strength the water removes is
+friction, and it can be computed: Σ u Δℓ tan φ′ over the 39 slices is
+**46,471 lb/ft** of frictional resistance that the pore pressure removes. In the
+wet figure the green effective-stress bars are reduced by the blue pore-pressure
+bars.
 
 We run the other methods on both states, and the pattern holds everywhere:
 
@@ -412,14 +410,14 @@ Spencer and Morgenstern-Price agree to 0.2% wet or dry — both satisfy force
 the one to report because it reaches the same complete equilibrium on the
 simpler assumption — one constant interslice force inclination, where
 Morgenstern-Price assumes an interslice force distribution function — which is
-what makes it the standard reference method. Bishop, which satisfies moment
+why it is the standard reference method. Bishop, which satisfies moment
 equilibrium alone, sits 2% above them on this circle. The water also widens the
 spread between methods: the Ordinary Method of Slices (OMS) sits 10% under
 Spencer dry but 14% under it wet,
 because OMS computes each slice's normal force from the weight alone and then
 subtracts the full u·dℓ from it — on a deep circle under high pore pressure
-that approximation sheds too much normal force, a known conservatism of the
-method at its worst exactly here.
+that approximation removes too much normal force. This is a known conservative
+error of the method, and it is largest in conditions like these.
 
 A held surface also cannot show that the water changes *which* mechanism is
 critical, not just how strong it is. Set the three `u` cells to `none` and run
@@ -433,7 +431,7 @@ Put the water back — the three cells, returned to `piezo` — before going on.
 
 ### The two unit-weight columns {#the-two-unit-weight-columns}
 
-The `mat` sheet carries two unit weights per material and this model fills
+The `mat` sheet has two unit weights per material and this model fills
 both. **γ** is the total unit weight of the soil as it sits above the water
 table — solids plus whatever moisture it holds. **gsat** is the total unit
 weight when the voids are full, which is what the soil below the water table
@@ -454,20 +452,20 @@ The sliding mass gains 2.7% of its weight, all of it below the water table,
 and the factor of safety falls 0.8%. Both effects are small and neither
 direction is a rule: added weight adds driving moment, but it also adds normal
 stress on a base whose pore pressure is fixed by the line, and which of the two
-wins depends on where the extra weight sits on the arc.
+dominates depends on where the extra weight sits on the arc.
 
-Note what did **not** change: `u`. Pore pressure comes from the line's
+The pore pressure `u` did **not** change. Pore pressure comes from the line's
 elevation and the base's, never from what the soil weighs — the two columns and
 the `u` option are separate inputs about the same water.
 
-What γ_sat is **not** is a buoyant unit weight. Both columns are *total* unit
+γ_sat is **not** a buoyant unit weight. Both columns are *total* unit
 weights, and the water's effects enter the analysis explicitly — the weight of
 the pore water through γ_sat, and its pressure through u — never by
 pre-subtracting them into an effective weight. A γ_sat entered as
 γ − 62.4 builds a model that is wrong twice: the slices weigh too little,
 and u is still subtracted from a normal stress that no longer contains the
-water it removes. If the two effects are to cancel, the analysis is where
-they cancel, not the input file.
+water it removes. Any cancellation between the two effects belongs in the
+analysis, not in the input file.
 
 Restore the three **gsat** cells (or undo) before going on.
 
@@ -476,20 +474,20 @@ Restore the three **gsat** cells (or undo) before going on.
 The `u` column has two more settings. `seep` reads pore pressures from a
 finite element seepage solution — the subject of the
 [seepage documentation](../seep/overview.md), and the step to take when the
-flow field matters. `ru` needs no companion at all: it computes
+flow field matters. `ru` needs no piezometric line or seepage solution: it computes
 u = r<sub>u</sub> × σ<sub>v</sub> on each slice base, where σ<sub>v</sub> is
 the vertical stress of the soil column above it and r<sub>u</sub> is a
 per-material ratio entered in the column beside `u` (`mat!P`). It is the
 classic chart parameter — Bishop and Morgenstern's stability coefficients are
 tabulated against it — and it survives as a quick global estimate
 ("pore pressures run about a third of overburden") where no line has been
-drawn. Note what it couples: an r<sub>u</sub> pore pressure *scales with the
-soil weight*, where a piezometric line's u is pure geometry — the two models
-answer weight questions differently, which is one reason the line, when you
-have one, is the better input.
+drawn. An r<sub>u</sub> pore pressure *scales with the soil weight*, while a
+piezometric line's u depends only on geometry — the two models respond
+differently to a change in weight, which is one reason the line, when you have
+one, is the better input.
 
 Before saving, confirm the three `u` cells read `piezo` and put back whichever
-circle you want the file to carry.
+circle you want the file to contain.
 
 ---
 
@@ -500,18 +498,19 @@ This tutorial covered:
 - A piezometric line as the model's water table — one polyline, read by every
   material whose `u` option is `piezo`.
 - The search finding the deep mechanism a wet foundation really has.
-- Effective stress doing the work: pore pressure cuts the factor of safety
-  through friction alone — about a fifth of it here.
+- Effective stress: pore pressure lowers the factor of safety through friction
+  alone — by about a fifth here.
 - The two unit-weight columns, γ above the water table and gsat below — both
   *total* unit weights, never buoyant.
 - r<sub>u</sub> as the chart-era alternative: pore pressure from vertical
   stress, no line required.
 
-**Where to go next:** [Tutorial LEM-5](lem05_weak_layer_noncircular.md) puts the
-failure surface itself in your hands — a 2 ft seam of soft clay no circle can
+**Where to go next:** [Tutorial LEM-5](lem05_weak_layer_noncircular.md) has you
+define the failure surface yourself — a 2 ft seam of soft clay no circle can
 follow, entered as a table of vertices and searched from there.
 The [seepage documentation](../seep/overview.md) replaces the hand-drawn line
-with a computed flow field — the `seep` setting the `u` column left unused.
+with a computed flow field — the `seep` option of the `u` column, which this page
+does not use.
 
 ---
 
@@ -528,7 +527,7 @@ the CE 544 exercises analyze, and each method's own search.
 
 <!-- test: file=../lem/files/xslope_method_slices_problem.xlsx, type=single_circle, num_slices=40, fs_oms=1.310, fs_bishop=1.475, fs_janbu=1.469, fs_corps=1.641, fs_lowe=1.522, fs_spencer=1.462, fs_mprice=1.464 -->
 
-Spencer reads 1.462 on this circle, against the 1.301 its search reaches. On the
+Spencer gives 1.462 on this circle, against the 1.301 its search reaches. On the
 same slices Spencer and Morgenstern-Price agree to 0.1% and Bishop sits 0.9% above
 them; the Ordinary Method of Slices (OMS) comes out 10.4% below and the Corps of
 Engineers method 12.2% above.

@@ -1803,30 +1803,9 @@ def vp032c_fem():
     return 'vp032c_fem.xlsx'
 
 
-def vp033():
-    """Slide #33 / El-Ramly, Morgenstern & Cruden (2003): the Syncrude
-    tailings dyke (simplified probabilistic case). Cohesionless section over a
-    presheared disturbed clay-shale (Kca, phi 7.5 +- 2.1); the critical
-    surface is COMPOSITE - Slide's drawn circle (center (327.5, 394), R 124)
-    is tangent to el 270, ~19 m below the model base (~289), so it truncates at
-    the base and runs flat inside the Kca band. Slide assigns three
-    piezometric lines per-material; xslope's single line follows the lower (WT5)
-    line everywhere - bracketing both lines everywhere moves FS only 1-3%.
-
-    Geometry, material zonation and unit weights (TS gamma 20; Pf4/Pgs/Pgc/Kca
-    gamma 17) are taken from the RS2 vendor .fez (`slope stability #025.fez`):
-    the 15-vertex external boundary, the four internal material interfaces, and
-    the DIAGONAL Pgc/Kca wedge cut (233.679, 288.999)->(249.262, 295.287) - a
-    small left-hand Pgc wedge with the large Kca zone to its right. The vendor
-    file gives Clayey till (Pgc) phi = 7.5 (identical to Kca), not the earlier
-    'assumed = Pgs' phi = 34; corrected here. The same vendor model specifies the
-    elastic constants (nu = 0.4, E = 50 000 kPa on every zone), which now
-    transcribe verbatim through vendor_tcut.VENDOR_E_NU rather than being filled
-    in by soil type; see the note beside that entry for why the vendor-first pass
-    originally missed this file. Targets (composite, Bishop): Slide
-    1.305 / El-Ramly 1.31. PF deliberately not locked: published Monte Carlo
-    1.5-1.6e-3 rests on the paper's variance bookkeeping (spatial averaging),
-    which a slope-scale sigma reproduces only qualitatively."""
+def _vp033_slope_data():
+    """The vp033 model (see vp033), returned unsaved so the RS2-25 search file
+    (rs2_25_noncirc) is the same model by construction."""
     from shapely.geometry import Polygon
     from xslope.fileio import build_ground_surface_from_polygons
     sd = load_slope_data(LEVEE_POLY)   # polygon-mode base (diagonal wedge needs it)
@@ -1869,8 +1848,73 @@ def vp033():
     sd['circular'] = True
     sd['non_circ'] = []
     sd['circles'] = [{'Xo': 327.5, 'Yo': 394.0, 'Depth': 270.0, 'R': 124.0}]
+    return sd
+
+
+
+
+def vp033():
+    """Slide #33 / El-Ramly, Morgenstern & Cruden (2003): the Syncrude
+    tailings dyke (simplified probabilistic case). Cohesionless section over a
+    presheared disturbed clay-shale (Kca, phi 7.5 +- 2.1); the critical
+    surface is COMPOSITE - Slide's drawn circle (center (327.5, 394), R 124)
+    is tangent to el 270, ~19 m below the model base (~289), so it truncates at
+    the base and runs flat inside the Kca band. Slide assigns three
+    piezometric lines per-material; xslope's single line follows the lower (WT5)
+    line everywhere - bracketing both lines everywhere moves FS only 1-3%.
+
+    Geometry, material zonation and unit weights (TS gamma 20; Pf4/Pgs/Pgc/Kca
+    gamma 17) are taken from the RS2 vendor .fez (`slope stability #025.fez`):
+    the 15-vertex external boundary, the four internal material interfaces, and
+    the DIAGONAL Pgc/Kca wedge cut (233.679, 288.999)->(249.262, 295.287) - a
+    small left-hand Pgc wedge with the large Kca zone to its right. The vendor
+    file gives Clayey till (Pgc) phi = 7.5 (identical to Kca), not the earlier
+    'assumed = Pgs' phi = 34; corrected here. The same vendor model specifies the
+    elastic constants (nu = 0.4, E = 50 000 kPa on every zone), which now
+    transcribe verbatim through vendor_tcut.VENDOR_E_NU rather than being filled
+    in by soil type; see the note beside that entry for why the vendor-first pass
+    originally missed this file. Targets (composite, Bishop): Slide
+    1.305 / El-Ramly 1.31. PF deliberately not locked: published Monte Carlo
+    1.5-1.6e-3 rests on the paper's variance bookkeeping (spatial averaging),
+    which a slope-scale sigma reproduces only qualitatively."""
+    sd = _vp033_slope_data()
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp033.xlsx'))
     return 'vp033.xlsx'
+
+
+def rs2_25_noncirc():
+    """RS2-25 (RS2 Part I #25, the vp033 model): a non-circular Spencer search.
+
+    The strength reduction on vp033 fails on a slide no circle can follow: an
+    active scarp through the tailings sand, a flat run along the bottom of the
+    clay-shale band and a passive exit through the till past the toe. RS2-25 is
+    scored against XSLOPE's own non-circular limit equilibrium on the same
+    model, and this file carries that search's starting surface. It is a
+    separate file so that vp033 keeps Slide's circle as its one surface: the
+    VP33 limit-equilibrium row and its figure read that file.
+
+    The starting surface is nine points: a scarp from the crest slope down to
+    the band at (289.07, 289.24), the band's base to (395.44, 289.66), and an
+    exit to the ground past the toe; the two ends move along the ground
+    (Movement 'Horiz'), the interior points freely. No circle, and no
+    probabilistic spreads (VP33's sigma_phi), which a deterministic search
+    does not read."""
+    sd = _vp033_slope_data()
+    for m in sd['materials']:
+        m['sigma_phi'] = 0.0
+        # the vendor model's elastic constants, as vp033 carries them through
+        # vendor_tcut.VENDOR_E_NU (keyed by file name, so stated here)
+        m['E'], m['nu'] = 50000.0, 0.4
+    seed = [(249.346, 336.263), (269.45, 312.465), (289.07, 289.24),
+            (315.663, 289.345), (342.255, 289.45), (368.848, 289.555),
+            (395.44, 289.66), (414.53, 299.16), (434.739, 309.217)]
+    sd['circular'] = False
+    sd['circles'] = []
+    sd['non_circ'] = [{'X': x, 'Y': y,
+                       'Movement': 'Horiz' if k in (0, len(seed) - 1) else 'Free'}
+                      for k, (x, y) in enumerate(seed)]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_25_noncirc.xlsx'))
+    return 'rs2_25_noncirc.xlsx'
 
 
 def vp034():
@@ -5407,7 +5451,7 @@ BUILDERS = [
     vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp010, vp015, vp016, vp017, vp018,
     vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp026, vp027,
     vp027_fem, vp028a, vp028b, vp028c, vp029, vp029_split, vp030a, vp030b, vp032a,
-    vp032a_fem, vp032b, vp032c, vp032c_fem, vp033, vp034, vp035, vp036, vp037, vp039a,
+    vp032a_fem, vp032b, vp032c, vp032c_fem, vp033, rs2_25_noncirc, vp034, vp035, vp036, vp037, vp039a,
     vp039b, vp039c, vp039d, vp040, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp045a,
     vp045b, vp046, vp047, vp048, vp049, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b,
     vp055, vp056, vp057, vp058, vp059, vp060, vp061a, vp061b, vp062a, vp062b, vp063, vp064,

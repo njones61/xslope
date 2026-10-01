@@ -85,7 +85,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [22](#rs2-22) | 🟢 | Layered slope with undulating bedrock | SSRM 1.523 vs RS2 SSRM 1.52 (+0.2%) | (SSRM variant) on the vendor's boundary-load cap, carried at the vendor's own vertical load direction. |
 | [23](#rs2-23) | 🟢 | Underwater slope with linearly varying cohesion | Under RS2's own elastic partition: SSRM 1.112 vs RS2 SSRM 1.12 (−0.7%) | The vendor model states the "can't fail" region element by element (a full-depth vertical band, not the text's "above el. −20 and right of the bench"), and the file carries it. Partition removed, the same model reads 0.215. |
 | [24](#rs2-24) | 🟡 | Layered slope with geosynthetic reinforcement | 1.104 / 0.975 | RS2 SSR 1.15 (−4.0%) and 0.95 (+2.6%). Modeled as the vendor models are: the mesh split along the geotextile, the two faces on a frictional slip interface, and the ~1 m elastic strip up the embankment face. |
-| [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs RS2 SSRM 1.29 (−6.8%) | The cause of the shortfall is not known; the stiff layer the vendor's model leaves out under the band does not change it. The paper's own Bishop 1.30 is on measured band pore pressures the vendor's model does not carry, and is shown, not scored. |
+| [25](#rs2-25) | 🟢 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs XSLOPE non-circular Spencer 1.194 (+0.7%) | The strength reduction fails on a scarp through the tailings sand, a flat run along the bottom of the clay-shale band and an exit past the toe, a shape no circle can follow; XSLOPE's non-circular limit equilibrium on the same model finds the same slide. RS2's SSR 1.29 on the same model sits above that minimum and is shown beside. |
 | [26](#rs2-26) | 🟢 | Clarence Cannon dam (Wolff & Harr 1987) | SSRM 2.294 vs RS2 SSRM 2.29 (+0.2%) | |
 | [27](#rs2-27) | 🟢 | Homogeneous slope, pore pressure by r<sub>u</sub> | SSRM 1.342 vs RS2 SSRM 1.31 (+2.4%) | |
 | [28](#rs2-28) | 🟢 | Excavated slope, FE groundwater and matric suction (Ng & Shi 1998) | H = 61: SSRM 1.669 vs RS2 SSR 1.64 (+1.8%) · H = 62: SSRM 1.544 vs RS2 SSR 1.55 (−0.4%) · H = 63: SSRM 1.406 vs RS2 SSR 1.41 (−0.3%) | (three heads) The files derive from the native `#028` variant, whose material partition holds 63% of the domain elastic, so the Part I §28 values are the referee. |
@@ -729,21 +729,29 @@ against Part I. The limit-equilibrium side is Slide2 [VP32](rocscience.md#vp32).
 
 ![RS2-24b: the 8.75 m case, same construction — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-24b.png)
 
-### 🔴 RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003) {#rs2-25}
+### 🟢 RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003) {#rs2-25}
 
 Slide2 counterpart: [VP33](rocscience.md#vp33).
 
-**Input files:** [vp033.xlsx](files/rocscience/vp033.xlsx)
+**Input files:** [vp033.xlsx](files/rocscience/vp033.xlsx) ·
+[rs2_25_noncirc.xlsx](files/rocscience/rs2_25_noncirc.xlsx) (the same model, carrying the
+non-circular search's starting surface)
 
-| Method | XSLOPE | RS2 SSRM | Slide2 | XSLOPE LEM |
-|---|---|---|---|---|
-| SSRM | 1.202 | 1.29 (−6.8%) | Bishop 1.305 | Bishop 1.320 on Slide's circle |
+| Case | XSLOPE SSRM | Published |
+|---|---|---|
+| Strength reduction (5 m mesh) | 1.202 | XSLOPE non-circular limit equilibrium, Spencer, **1.194** (+0.7%) |
+| Beside it | | RS2 SSRM 1.29 · Slide2 Bishop 1.305 and XSLOPE Bishop 1.320 on Slide's circle |
 
-Geometry, material zones, unit weights and elastic constants follow the RS2 vendor `.fez`
-(`slope stability #025.fez`). The row is scored against RS2's SSR on that shared model. A finer
-mesh widens the deficit rather than closing it: at a 2.5 m element size the model meshes to 5,239
-elements against 1,457 (3,080 nodes) at the 5 m size and reads **1.188**, further below RS2's
-1.29, with finer meshes continuing in the same direction.
+**One mechanism, found by both engines.** Geometry, material zones, unit weights and elastic
+constants follow the RS2 vendor `.fez` (`slope stability #025.fez`). The strength reduction fails
+the dyke as one block: an active scarp through the tailings sand, a flat run along the bottom of
+the clay-shale band and a passive exit through the till past the toe. No circle can follow that
+shape. XSLOPE's non-circular Spencer search on the same model, started from a surface of that
+shape, finds the same slide at **1.194**, and the strength reduction lands on it. The circle values,
+Slide2's 1.305 and XSLOPE's 1.320 on Slide's circle, sit above it because the circle cannot run
+along the band. RS2's SSR on the same model, 1.29, sits above that limit-equilibrium minimum and is
+shown beside. A finer mesh lowers the strength reduction a little further: at a 2.5 m element size
+the model meshes to 5,239 elements against 1,457 (3,080 nodes) at the 5 m size and reads **1.188**.
 
 The paper's own deterministic answer is 1.30: Bishop's method on a circle that runs flat along the
 base of the clay-shale, with the band's pore pressures set from measured pore-pressure ratios. The
@@ -752,23 +760,19 @@ pressure in the band under the upper slope, so the paper's 1.30 answers a differ
 condition and is shown here as the paper's result, not as a referee for this model. The 1.31 both
 vendor manuals quote is the mean of the paper's Monte Carlo run on another surface.
 
-The cause of the shortfall against RS2 is not known. The paper places about 2 m of stiff
-clay-shale under the band, which the vendor's model leaves out, so the band rests on the fixed
-base of the mesh. With that layer added the factor is unchanged at both mesh sizes, 1.202 and
-1.188, and no element of the layer yields, so the missing layer does not explain it. On the same
-file XSLOPE's Bishop, 1.320, sits beside Slide2's 1.305.
-
 The vendor model carries two piezometric lines, the second 0.7–3.6 m lower under the four zones
 beneath the Tailing sand; the file applies the lower line throughout, so the pore pressure along
-the tailings-sand base runs about 20% low. That makes the file read stronger, not weaker, so it
-cannot be what puts XSLOPE below the vendor.
+the tailings-sand base runs about 20% low, which makes the file read stronger than the vendor's
+model, not weaker. The 2 m of stiff clay-shale that the paper places under the band, which the
+vendor's model leaves out, does not change the strength reduction at either mesh size.
 
+<!-- test: file=files/rocscience/rs2_25_noncirc.xlsx, type=noncircular_search, num_slices=60, fs_spencer=1.194, benchmark=RS2-25-lem -->
 <!-- test: file=files/rocscience/vp033.xlsx, type=mesh_elements, element_type=tri6, target_size=5.0, expected_elements=1457, expected_nodes=3080, benchmark=RS2-25-mesh -->
 <!-- test: file=files/rocscience/vp033.xlsx, type=mesh_elements, element_type=tri6, target_size=2.5, expected_elements=5239, benchmark=RS2-25-mesh-fine -->
 <!-- test: file=files/rocscience/vp033.xlsx, type=fem_ssrm, expected_fs=1.188, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, k0=1, benchmark=RS2-25-m2.5, f_stand=1.18125, f_fail=1.1953125, check=edges -->
 <!-- test: file=files/rocscience/vp033.xlsx, type=fem_ssrm, expected_fs=1.202, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, k0=1, benchmark=RS2-25, f_stand=1.1953125, f_fail=1.209375, check=edges -->
 
-![RS2-25: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-25.png)
+![RS2-25: SSRM 1.202 vs XSLOPE's non-circular Spencer 1.194 on the same model — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the scarp through the tailings sand, the flat run along the bottom of the clay-shale band and the exit past the toe](images/RS2-25.png)
 
 ### 🟢 RS2-26: Clarence Cannon dam (Wolff & Harr 1987) {#rs2-26}
 

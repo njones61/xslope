@@ -1257,7 +1257,7 @@
       "model": "docs/fem/files/xslope_noncircular_fem.xlsx",
       "references": [
         {
-          "anchor": "3-non-circular-failure-surface-with-thin-weak-layer",
+          "anchor": "1-non-circular-failure-surface-with-thin-weak-layer",
           "checks": [
             "fem_ssrm"
           ],
@@ -1265,8 +1265,8 @@
           "page": "fem/samples/",
           "resolution": "input-link",
           "source_md": "docs/fem/samples.md",
-          "title": "3. Non-Circular Failure Surface with Thin Weak Layer",
-          "url": "https://xslope.readthedocs.io/en/latest/fem/samples/#3-non-circular-failure-surface-with-thin-weak-layer"
+          "title": "1. Non-Circular Failure Surface with Thin Weak Layer",
+          "url": "https://xslope.readthedocs.io/en/latest/fem/samples/#1-non-circular-failure-surface-with-thin-weak-layer"
         }
       ],
       "topics": [
@@ -1328,7 +1328,7 @@
       "model": "docs/fem/files/xslope_simple_mult_layers_fem.xlsx",
       "references": [
         {
-          "anchor": "4-reliability-analysis-two-layer-c-slope",
+          "anchor": "2-reliability-analysis-two-layer-c-slope",
           "checks": [
             "REL-FEM"
           ],
@@ -1336,8 +1336,8 @@
           "page": "fem/samples/",
           "resolution": "input-link",
           "source_md": "docs/fem/samples.md",
-          "title": "4. Reliability Analysis: Two-Layer c–φ Slope",
-          "url": "https://xslope.readthedocs.io/en/latest/fem/samples/#4-reliability-analysis-two-layer-c-slope"
+          "title": "2. Reliability Analysis: Two-Layer c–φ Slope",
+          "url": "https://xslope.readthedocs.io/en/latest/fem/samples/#2-reliability-analysis-two-layer-c-slope"
         }
       ],
       "topics": [
@@ -10596,6 +10596,74 @@
       ],
       "topics": [
         "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 5,
+        "non_circular": true,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_25_noncirc.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-25",
+          "checks": [
+            "RS2-25-lem"
+          ],
+          "level": 3,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-25"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "zoned-dams"
       ]
     },
     {
@@ -27844,7 +27912,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 393,
+    "models": 394,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -27885,12 +27953,12 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 658,
+    "tags": 659,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
       "homogeneous": 188,
-      "non-circular": 32,
+      "non-circular": 33,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
@@ -27900,7 +27968,7 @@
       "soil-nails": 5,
       "tension-cracks": 19,
       "transient-seepage": 25,
-      "zoned-dams": 46
+      "zoned-dams": 47
     },
     "unloadable": 0
   },
@@ -28130,6 +28198,7 @@
       "docs/lem/files/xslope_noncircular.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
       "docs/verification/files/geostudio/gs2_33.xlsx",
+      "docs/verification/files/rocscience/rs2_25_noncirc.xlsx",
       "docs/verification/files/rocscience/rs2_30.xlsx",
       "docs/verification/files/rocscience/rs2_30_split.xlsx",
       "docs/verification/files/rocscience/vp008.xlsx",
@@ -28408,6 +28477,7 @@
       "docs/tutorials/files/xslope_johnson_res_solved.xlsx",
       "docs/verification/files/geostudio/gs2_wall.xlsx",
       "docs/verification/files/geostudio/gs2_wall_none.xlsx",
+      "docs/verification/files/rocscience/rs2_25_noncirc.xlsx",
       "docs/verification/files/rocscience/rs2_51.xlsx",
       "docs/verification/files/rocscience/rs2_64l_split.xlsx",
       "docs/verification/files/rocscience/rs2_65.xlsx",

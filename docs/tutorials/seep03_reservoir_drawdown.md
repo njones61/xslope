@@ -776,9 +776,9 @@ This tutorial covered:
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Transient Seepage](../seep/transient.md) carries the formulation, the storage
 tables, the time-stepping scheme and the boundary types in full;
-[Sample Problem 8](../seep/samples.md#8-earth-dam-reservoir-drawdown-transient)
+[Sample Problem 7](../seep/samples.md#7-earth-dam-reservoir-drawdown-transient)
 is this dam with the stage times filled in, and
-[Sample Problem 9](../seep/samples.md#9-johnson-reservoir-zoned-drawdown-transient)
+[Sample Problem 8](../seep/samples.md#8-johnson-reservoir-zoned-drawdown-transient)
 is the larger Johnson Reservoir dam from SEEP-2, taken through a drawdown of its
 own. [Rapid Drawdown Analysis](../lem/rapid.md) is where the stage times left
 blank here are used, taking a transient solution like this one into a stability

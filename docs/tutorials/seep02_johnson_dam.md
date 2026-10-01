@@ -45,7 +45,7 @@ face are found, what the three unsaturated conductivity models are each worth,
 and how to scale a flow net on a zoned section.
 </div>
 <p><span class="tg-pill">three materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">unconfined flow</span><span class="tg-pill">seepage face</span><span class="tg-pill">phreatic surface</span><span class="tg-pill">unsaturated models</span><span class="tg-pill">relative conductivity</span><span class="tg-pill">flow net base material</span><span class="tg-pill">convergence</span><span class="tg-pill">underseepage</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx), the same model as [Seepage Sample Problem 5](../seep/samples.md#johnson-reservoir); open it to skip the construction and start at [Building the mesh](#building-the-mesh)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx), the same model as [Seepage Sample Problem 4](../seep/samples.md#johnson-reservoir); open it to skip the construction and start at [Building the mesh](#building-the-mesh)</div>
 </div>
 
 ---
@@ -921,7 +921,7 @@ The discharge point matters beyond the seepage analysis. Water emerging partway 
 a downstream slope carries a seepage force out of the face and saturates the soil
 above the toe, which is the condition that drives shallow downstream instability and
 the reason a real dam of this kind carries a filter or a toe drain.
-[Sample Problem 6](../seep/samples.md#6-earth-dam-with-core-and-filter) is a dam
+[Sample Problem 5](../seep/samples.md#5-earth-dam-with-core-and-filter) is a dam
 that carries one.
 
 ---
@@ -978,11 +978,11 @@ boundaries move and the answer depends on when you look. The
 [tutorials index](index.md) lists the series.
 [Seepage Analysis](../seep/overview.md) carries the governing equations, all three
 unsaturated models with their parameter tables, and the convergence conditions in
-full; [Sample Problem 5](../seep/samples.md#johnson-reservoir) catalogs this model
+full; [Sample Problem 4](../seep/samples.md#johnson-reservoir) catalogs this model
 and reports its cross-check against the USACE SEEP2D program on a mesh identical to
 the one it exported to SEEP2D;
 [Seepage and Slope Stability](../seep/seep_slope.md) takes this head field into a
 limit equilibrium search and a finite element strength reduction on the same file;
-and [Sample Problem 9](../seep/samples.md#9-johnson-reservoir-zoned-drawdown-transient)
+and [Sample Problem 8](../seep/samples.md#8-johnson-reservoir-zoned-drawdown-transient)
 is this same dam solved through a 45-day reservoir drawdown.
 [SEEP-1](seep01_sheetpile.md) is where we build a seepage model from nothing.

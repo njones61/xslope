@@ -761,8 +761,8 @@ go further.
 
 **Continuing a run with a higher limit.** Where the iteration limit is what stopped the trial at
 the top of the final bracket (undecided at the limit, or counted failed while still slowing), the
-run can be continued from where its trials stopped: `solve_ssrm(fem_data, resume=result,
-max_iterations=N)`, or **Continue with a higher limit…** in Studio. The search walks the path a
+run can be continued from where its trials stopped: 
+`solve_ssrm(fem_data, resume=result, max_iterations=N)`, or **Continue with a higher limit…** in Studio. The search walks the path a
 fresh search at the new limit walks, from the original bracket. A trial on it the earlier run
 decided is reused; one the earlier run left unfinished goes on from the iteration it stopped at,
 with its displacements, plastic strains, joint state and every history the stopping rules read,

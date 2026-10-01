@@ -15803,7 +15803,7 @@ def main():
                       'file': 'transient seepage through the Studio panels',
                       'method': '-', 'source': 'transient_studio_smoke'})
 
-    # docs/seep/samples.md carries the steady seep sample locks AND (Problems 8-9)
+    # docs/seep/samples.md carries the steady seep sample locks AND (Problems 7-8)
     # the transient tseep_head locks — route each by type so --tseep picks up the
     # transient sample locks and --seep the steady ones (mirrors the verification
     # pages and seep_slope.md).

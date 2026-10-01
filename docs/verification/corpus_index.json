@@ -4257,22 +4257,10 @@
       "model": "docs/seep/files/xslope_clay_blanket.xlsx",
       "references": [
         {
-          "anchor": "1-sheetpile-with-clay-blanket",
+          "anchor": "check-its-work",
           "checks": [
             "seep",
             "seep_elements"
-          ],
-          "level": 3,
-          "page": "seep/samples/",
-          "resolution": "input-link",
-          "source_md": "docs/seep/samples.md",
-          "title": "1. Sheetpile with Clay Blanket",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#1-sheetpile-with-clay-blanket"
-        },
-        {
-          "anchor": "check-its-work",
-          "checks": [
-            "seep"
           ],
           "level": 3,
           "page": "tutorials/seep01_sheetpile/",
@@ -4404,7 +4392,7 @@
       "model": "docs/seep/files/xslope_earth_dam1.xlsx",
       "references": [
         {
-          "anchor": "3-earth-dam-with-core",
+          "anchor": "2-earth-dam-with-core",
           "checks": [
             "seep",
             "seep_elements"
@@ -4413,8 +4401,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "3. Earth Dam with Core",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#3-earth-dam-with-core"
+          "title": "2. Earth Dam with Core",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#2-earth-dam-with-core"
         }
       ],
       "topics": []
@@ -4468,7 +4456,7 @@
       "model": "docs/seep/files/xslope_earth_dam1_vg.xlsx",
       "references": [
         {
-          "anchor": "4-earth-dam-with-core-van-genuchten-unsaturated-model",
+          "anchor": "3-earth-dam-with-core-van-genuchten-unsaturated-model",
           "checks": [
             "seep"
           ],
@@ -4476,8 +4464,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "4. Earth Dam with Core — van Genuchten Unsaturated Model",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#4-earth-dam-with-core-van-genuchten-unsaturated-model"
+          "title": "3. Earth Dam with Core — van Genuchten Unsaturated Model",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#3-earth-dam-with-core-van-genuchten-unsaturated-model"
         }
       ],
       "topics": []
@@ -4531,7 +4519,7 @@
       "model": "docs/seep/files/xslope_earth_dam2.xlsx",
       "references": [
         {
-          "anchor": "6-earth-dam-with-core-and-filter",
+          "anchor": "5-earth-dam-with-core-and-filter",
           "checks": [
             "seep"
           ],
@@ -4539,8 +4527,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "6. Earth Dam with Core and Filter",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#6-earth-dam-with-core-and-filter"
+          "title": "5. Earth Dam with Core and Filter",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#5-earth-dam-with-core-and-filter"
         }
       ],
       "topics": [
@@ -4596,7 +4584,7 @@
       "model": "docs/seep/files/xslope_earth_dam_tseep.xlsx",
       "references": [
         {
-          "anchor": "8-earth-dam-reservoir-drawdown-transient",
+          "anchor": "7-earth-dam-reservoir-drawdown-transient",
           "checks": [
             "tseep_head"
           ],
@@ -4604,8 +4592,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "8. Earth Dam — Reservoir Drawdown (Transient)",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#8-earth-dam-reservoir-drawdown-transient"
+          "title": "7. Earth Dam — Reservoir Drawdown (Transient)",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#7-earth-dam-reservoir-drawdown-transient"
         }
       ],
       "topics": [
@@ -4671,7 +4659,7 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "5. Johnson Reservoir",
+          "title": "4. Johnson Reservoir",
           "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#johnson-reservoir"
         },
         {
@@ -4744,7 +4732,7 @@
       "model": "docs/seep/files/xslope_johnson_res_tseep.xlsx",
       "references": [
         {
-          "anchor": "9-johnson-reservoir-zoned-drawdown-transient",
+          "anchor": "8-johnson-reservoir-zoned-drawdown-transient",
           "checks": [
             "tseep_head"
           ],
@@ -4752,8 +4740,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "9. Johnson Reservoir — Zoned Drawdown (Transient)",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#9-johnson-reservoir-zoned-drawdown-transient"
+          "title": "8. Johnson Reservoir — Zoned Drawdown (Transient)",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#8-johnson-reservoir-zoned-drawdown-transient"
         }
       ],
       "topics": [
@@ -4811,7 +4799,7 @@
       "model": "docs/seep/files/xslope_levee_poly.xlsx",
       "references": [
         {
-          "anchor": "7-levee-with-grouted-foundation",
+          "anchor": "6-levee-with-grouted-foundation",
           "checks": [
             "seep"
           ],
@@ -4819,8 +4807,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "7. Levee with Grouted Foundation",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#7-levee-with-grouted-foundation"
+          "title": "6. Levee with Grouted Foundation",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#6-levee-with-grouted-foundation"
         }
       ],
       "topics": [
@@ -5011,7 +4999,7 @@
       "model": "docs/seep/files/xslope_sea_trench.xlsx",
       "references": [
         {
-          "anchor": "2-sea-trench",
+          "anchor": "1-sea-trench",
           "checks": [
             "seep"
           ],
@@ -5019,8 +5007,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "2. Sea Trench",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#2-sea-trench"
+          "title": "1. Sea Trench",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#1-sea-trench"
         }
       ],
       "topics": [

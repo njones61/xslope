@@ -9,28 +9,16 @@ The following examples illustrate how to use XSLOPE to perform seepage analysis.
 
 These problems feature standalone seepage analyses. For instructions on how to run an integrated seepage analysis with slope stability analysis, see the [Integrated Seepage and Slope Stability Analysis](seep_slope.md) page.
 
-### 1. Sheetpile with Clay Blanket
+### 1. Sea Trench
 
-Built and run step by step in [Tutorial SEEP-1](../tutorials/seep01_sheetpile.md).
-
-Excel input file: [xslope_clay_blanket.xlsx](files/xslope_clay_blanket.xlsx)
-
-![clay_blanket_solution.png](images/clay_blanket_solution.png){width=1200px}
-
-<!-- test: file=files/xslope_clay_blanket.xlsx, type=seep, expected_flowrate=39.983, tolerance=0.05 -->
-<!-- Element-type coverage (saturated/confined): solve with tri3, tri6, quad4, quad8, quad9. -->
-<!-- test: file=files/xslope_clay_blanket.xlsx, type=seep_elements, expected_flowrate=39.983, tolerance=0.05, target_size=1.5 -->
-
-### 2. Sea Trench
-
-This is another saturated problem representing the excavation of a trench in a harbor supported by a parallel set of sheetpile walls. The sheetpiles pass through an upper silt layer down to a lower permeability silty clay layer.
+This is a saturated problem representing the excavation of a trench in a harbor supported by a parallel set of sheetpile walls. The sheetpiles pass through an upper silt layer down to a lower permeability silty clay layer. [Tutorial SEEP-1](../tutorials/seep01_sheetpile.md) builds a single sheetpile of this kind step by step.
 
 ![The sea trench: two sheetpile walls through the silt into the silty clay, the sea on both sides and the pumped trench between them](images/sea_trench_problem_sketch.png){width=1000}
 
 The properties of the soil layers are as follows:
 
-| Soil Layer | K1  | K2  |
-|:----------:|:---:|:---:|
+| Soil Layer | K1 (ft/day) | K2 (ft/day) |
+|:----------:|:-----------:|:-----------:|
 |    Silt    | 0.5 | 0.5 |
 | Silty Clay | 0.1 | 0.1 |
 
@@ -44,7 +32,7 @@ Solution:
 
 <!-- test: file=files/xslope_sea_trench.xlsx, type=seep, expected_flowrate=4.283, tolerance=0.05 -->
 
-### 3. Earth Dam with Core
+### 2. Earth Dam with Core
 
 The following diagram illustrates a simple earth dam with a clay core and a granular shell:
 
@@ -70,9 +58,9 @@ The solution should look something like this:
 <!-- and all five types converge to within 0.3% of each other. -->
 <!-- test: file=files/xslope_earth_dam1.xlsx, type=seep_elements, expected_flowrate=38.754, tolerance=0.05, target_size=0.6 -->
 
-### 4. Earth Dam with Core — van Genuchten Unsaturated Model
+### 3. Earth Dam with Core — van Genuchten Unsaturated Model
 
-This is the same earth dam as [Problem 3](#3-earth-dam-with-core) — identical geometry, conductivities, and boundary conditions — but the unsaturated zone is modeled with the **van Genuchten** relative-conductivity function (`unsat = "vg"`) rather than the linear front. Only the per-material unsaturated parameters change: the `a` column (van Genuchten α) and the `n` column, set to representative values for the shell (sandy loam, α = 0.075 /cm) and core (loam, α = 0.036 /cm), converted to the model's length unit — α = 7.5 /m and 3.6 /m. See the [van Genuchten Model](overview.md#van-genuchten-model) section for the typical-value table and the unit convention for α.
+This is the same earth dam as [Problem 2](#2-earth-dam-with-core) — identical geometry, conductivities, and boundary conditions — but the unsaturated zone is modeled with the **van Genuchten** relative-conductivity function (`unsat = "vg"`) rather than the linear front. Only the per-material unsaturated parameters change: the `a` column (van Genuchten α) and the `n` column, set to representative values for the shell (sandy loam, α = 0.075 /cm) and core (loam, α = 0.036 /cm), converted to the model's length unit — α = 7.5 /m and 3.6 /m. See the [van Genuchten Model](overview.md#van-genuchten-model) section for the typical-value table and the unit convention for α.
 
 [xslope_earth_dam1_vg.xlsx](files/xslope_earth_dam1_vg.xlsx)
 
@@ -80,11 +68,11 @@ The solution should look something like this:
 
 ![earth_dam1_vg_solution.png](images/earth_dam1_vg_solution.png){width=1200px}
 
-The computed flow rate (≈37.8 m³/yr per m) is within 3% of the linear-front result of Problem 3 (≈38.8): with both models calibrated to the same soils, the unsaturated conductivity curve has little influence on the through-flow — consistent with the modeling guidance in the [seepage overview](overview.md#unsaturated-flow-formulation).
+The computed flow rate (≈37.8 m³/yr per m) is within 3% of the linear-front result of Problem 2 (≈38.8): with both models calibrated to the same soils, the unsaturated conductivity curve has little influence on the through-flow — consistent with the modeling guidance in the [seepage overview](overview.md#unsaturated-flow-formulation).
 
 <!-- test: file=files/xslope_earth_dam1_vg.xlsx, type=seep, expected_flowrate=37.848, tolerance=0.05 -->
 
-### 5. Johnson Reservoir {#johnson-reservoir}
+### 4. Johnson Reservoir {#johnson-reservoir}
 
 Built and run step by step in [Tutorial SEEP-2](../tutorials/seep02_johnson_dam.md).
 
@@ -113,9 +101,9 @@ elevation, el. 102.58. See the
 <!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.955, tolerance=0.05, benchmark=SEEP-2 -->
 
 A **transient drawdown** variant of this dam — the same zones followed through a 45-day reservoir
-drawdown — is worked in [Problem 9](#9-johnson-reservoir-zoned-drawdown-transient) below.
+drawdown — is worked in [Problem 8](#8-johnson-reservoir-zoned-drawdown-transient) below.
 
-### 6. Earth Dam with Core and Filter
+### 5. Earth Dam with Core and Filter
 
 This problem has the following cross-section:
 
@@ -133,7 +121,7 @@ The solution should look something like this:
 
 <!-- test: file=files/xslope_earth_dam2.xlsx, type=seep, max_iter=1000, expected_flowrate=1.282, tolerance=0.05 -->
 
-### 7. Levee with Grouted Foundation
+### 6. Levee with Grouted Foundation
 
 The following problem represents a levee underlain by a foundation with a grout curtain. 
 
@@ -175,7 +163,7 @@ Solution:
 
 <!-- test: file=files/xslope_levee_poly.xlsx, type=seep, expected_flowrate=1.430, tolerance=0.05 -->
 
-### 8. Earth Dam — Reservoir Drawdown (Transient)
+### 7. Earth Dam — Reservoir Drawdown (Transient)
 
 Built and run step by step in [Tutorial SEEP-3](../tutorials/seep03_reservoir_drawdown.md).
 
@@ -192,12 +180,12 @@ where Tutorial SEEP-3's copy leaves them blank.
 <!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=47, points=30:6:6.355;40:8:7.014;55:5:7.272, tolerance=0.05 -->
 <!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=360, points=30:6:2.011;40:8:2.012;55:5:2.027, tolerance=0.05 -->
 
-### 9. Johnson Reservoir — Zoned Drawdown (Transient)
+### 8. Johnson Reservoir — Zoned Drawdown (Transient)
 
-This is the **transient** companion to the [Johnson Reservoir dam](#johnson-reservoir) of Problem 5 —
+This is the **transient** companion to the [Johnson Reservoir dam](#johnson-reservoir) of Problem 4 —
 the same zoned cross-section (a granular shell over a low-permeability clay core carried down into the
 foundation) with its upstream reservoir **drawn down** and the pore-pressure field followed through
-time. Where [Problem 8](#8-earth-dam-reservoir-drawdown-transient) drew down a homogeneous dam, this
+time. Where [Problem 7](#7-earth-dam-reservoir-drawdown-transient) drew down a homogeneous dam, this
 one adds the feature that makes rapid drawdown hazardous in a real embankment: **zones of contrasting
 permeability**. The full transient formulation (storage, the theta time-stepper, the boundary types,
 and the coupling to [rapid drawdown](../lem/rapid.md)) is described on the
@@ -222,7 +210,7 @@ and the coupling to [rapid drawdown](../lem/rapid.md)) is described on the
   t = 0) / `stage_2` (end of drawdown, t = 50) pair marks the critical rapid-drawdown states.
 
 The conductivities are **already in ft/day** in the base file — the steady Johnson model's discharge
-is the 1.955 ft³/day per ft SEEP2D benchmark of Problem 5 — so they need no conversion and already
+is the 1.955 ft³/day per ft SEEP2D benchmark of Problem 4 — so they need no conversion and already
 share the day time base: shell `k = 1.0`, core `k = 0.001`, foundation `k = 0.1` ft/day. Only the
 storage columns and the `tseep` sheet are new.
 

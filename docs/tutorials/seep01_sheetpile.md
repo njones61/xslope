@@ -36,7 +36,7 @@ read a flow net and the discharge it carries, and how to measure whether the
 mesh or the physics is setting the answer.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">confined flow</span><span class="tg-pill">specified head</span><span class="tg-pill">no-flow boundaries</span><span class="tg-pill">mesh generation</span><span class="tg-pill">element types</span><span class="tg-pill">flow net</span><span class="tg-pill">feature refinement</span><span class="tg-pill">parametric study</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_clay_blanket.xlsx](../seep/files/xslope_clay_blanket.xlsx), the same file used by [Seepage Sample Problem 1](../seep/samples.md#1-sheetpile-with-clay-blanket)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_clay_blanket.xlsx](../seep/files/xslope_clay_blanket.xlsx)</div>
 </div>
 
 ---
@@ -779,11 +779,14 @@ and the discharge keeps creeping down. In practice the refinement stops where th
 change stops mattering: going from 0.25 m to 0.125 m nearly quadrupled the node
 count and moved the discharge by 0.4%.
 
-The cataloged discharge on the [sample page](../seep/samples.md#1-sheetpile-with-clay-blanket)
-is **39.983**, computed at that page's own meshing convention of the section width
-divided by 120 — an element size of about 0.42 m — and it lands between the 0.5 m
+At the default meshing convention of the section width divided by 120 — an element
+size of about 0.42 m — the discharge is **39.983**, and it lands between the 0.5 m
 and 0.25 m rows exactly where the sequence says it should. A seepage discharge is
 only meaningful together with the mesh it was computed on.
+
+<!-- test: file=../seep/files/xslope_clay_blanket.xlsx, type=seep, expected_flowrate=39.983, tolerance=0.05 -->
+<!-- Element-type coverage (saturated/confined): solve with tri3, tri6, quad4, quad8, quad9. -->
+<!-- test: file=../seep/files/xslope_clay_blanket.xlsx, type=seep_elements, expected_flowrate=39.983, tolerance=0.05, target_size=1.5 -->
 
 The element type moves the answer the same way, and more cheaply. The quadratic
 types (`tri6`, `quad8`, `quad9`) carry extra nodes at the element midsides and let
@@ -1009,7 +1012,6 @@ is part of the answer and the unsaturated conductivity model we left at its
 default here starts doing work. The [tutorials index](index.md) lists the series.
 [Seepage Analysis](../seep/overview.md) carries the governing equations, the
 boundary-condition types in full, and the flow-net rule the channel count follows;
-[Sample Problem 1](../seep/samples.md#1-sheetpile-with-clay-blanket) catalogs
-this model; [Seepage and Slope Stability](../seep/seep_slope.md) is how a solved
+[Seepage and Slope Stability](../seep/seep_slope.md) is how a solved
 head field becomes the pore pressure on a slice base, and where the requirement for
 quadratic elements comes from.

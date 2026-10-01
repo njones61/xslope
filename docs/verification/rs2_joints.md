@@ -351,8 +351,8 @@ c = 100 kPa and φ = 40°.
 This row is the corpus's slowest to settle: the trial at the standing edge balances only after
 most of a million iterations, and the search takes about thirteen hours. The factor stands above UDEC and above the
 vendor's default, and on the vendor's own second number: its two solution schemes give 1.65 and
-1.86 on this model, the widest spread in the manual, and the vendor needed its `Improve Joint
-Convergence` option to rerun the problem at all.
+1.86 on this model, the widest spread in the manual, and the vendor needed its 
+`Improve Joint Convergence` option to rerun the problem at all.
 
 Every transcribed input class matches the vendor model, including the side restraint.
 

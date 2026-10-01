@@ -11,13 +11,13 @@ template with ``save_slope_data_to_xlsx``.
 
   ``earth_dam``  -> docs/seep/files/xslope_earth_dam_tseep.xlsx
       Transient variant of the cored earth dam of
-      [Problem 3](../seep/samples.md) (``xslope_earth_dam1.xlsx``): the SAME
+      [Problem 2](../seep/samples.md) (``xslope_earth_dam1.xlsx``): the SAME
       cross-section, zones and downstream boundaries, driven by a falling
       upstream reservoir. Metric, like its base.
 
   ``johnson``    -> docs/seep/files/xslope_johnson_res_tseep.xlsx
       Transient variant of the zoned Johnson Reservoir dam of
-      [Problem 5](../seep/samples.md#johnson-reservoir) (``xslope_johnson_res.xlsx``):
+      [Problem 4](../seep/samples.md#johnson-reservoir) (``xslope_johnson_res.xlsx``):
       shell over a low-permeability clay core carried down into the foundation.
       The zones are the story here — the core drains far slower than the shells,
       so it holds an elevated interior head long after the shells have emptied.
@@ -107,7 +107,7 @@ SILT_STORAGE = dict(Ss=2.0e-4, Sy=0.15)      # silty-sand foundation, 1/ft
 # base file's material order), the index of the upstream head boundary to retype as
 # a reservoir, and the tseep control block (times/series/run controls/stage pair).
 SAMPLES = {
-    # Cored earth dam (Problem 3).  Metric; base k is in m/yr, so k is reset to
+    # Cored earth dam (Problem 2).  Metric; base k is in m/yr, so k is reset to
     # representative m/day values (shell ~ fine sand, core ~ compacted clay).
     "earth_dam": dict(
         base="xslope_earth_dam1.xlsx",
@@ -128,7 +128,7 @@ SAMPLES = {
             stage_2=47.0,
         ),
     ),
-    # Zoned Johnson Reservoir dam (Problem 5).  Base k is already in ft/day (its
+    # Zoned Johnson Reservoir dam (Problem 4).  Base k is already in ft/day (its
     # steady discharge IS the 1.958 SEEP2D benchmark), so k is reused verbatim and
     # only storage is added.  The reservoir is drawn from full pool (el 160) to the
     # tailwater datum (el 100) over 45 days; the low-k core paces the relaxation, so

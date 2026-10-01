@@ -12,20 +12,27 @@ of the dam.
                             (seep-bc and seep-bc (2)); a fixture of the seepage
                             and report checks and of the Studio screenshots
 
+and, under docs/inputs/slope (the driver scripts' download set, and fixtures of
+the regression suite and of Studio's screenshots and checks):
+
+  xslope_dam                the steady upstream model (problem 8's, same name
+                            set as the driver scripts use)
+  xslope_rapid              the staged-piezometric-line rapid-drawdown model
+
 The dam is Duncan, Wright & Brandon's earth dam (Shear Strength and Slope
 Stability, 2nd ed., p. 121): a shell and a clay core on a clay layer over sand,
 crest at El. 317, foundation surface at El. 227, clay to El. 197 and sand to
-El. 182, the base of the model. All five files are built from ``_dam()`` below,
+El. 182, the base of the model. All seven files are built from ``_dam()`` below,
 so the section, the strengths and the base cannot differ between them.
 
 The rapid-drawdown strength parameters d and psi (the Duncan, Wright & Wong
 total-stress envelope of a low-permeability material) are written only into the
-two rapid-drawdown runs, with the values of the course problem the model comes
+rapid-drawdown runs, with the values of the course problem the model comes
 from (CE 544, unit 2, rapid drawdown homework): core d = 300 psf, psi = 20 deg;
 clay d = 100 psf, psi = 18 deg; shell and sand blank, as free-draining
 materials. A blank d or psi loads as 0, and a slice whose material has d = 0 and
 psi = 0 is treated as drained by the rapid-drawdown solver, which is how the
-shell and sand have always been analyzed. The three steady runs leave d and psi
+shell and sand have always been analyzed. The steady runs leave d and psi
 blank on every material: nothing in a steady analysis reads them.
 
 The seepage meshes and solutions beside the two ``u = seep`` workbooks
@@ -34,9 +41,10 @@ here; tools/make_seep_sidecars.py solves them. Nothing written here changes what
 they depend on (section, permeabilities, boundary conditions).
 
 Every value below is the value the shipped workbooks carried on 2026-10-01
-except: the base of xslope_gsat_rapid (Max depth 0 -> El. 182, problem 8's
-base); the clay's psi in xslope_gsat_rapid (19 -> 18, the course problem's
-value); and d and psi on the three steady runs (removed). Each model is
+except: the base of xslope_gsat_rapid and xslope_rapid (Max depth 0 -> El. 182,
+problem 8's base); the clay's psi in xslope_gsat_rapid and xslope_rapid
+(19 -> 18, the course problem's value); and d and psi on the steady runs
+(removed). Each model is
 written through :func:`xslope.fileio.save_slope_data_to_xlsx`, which copies the
 current template and never writes a formula cell.
 
@@ -48,6 +56,9 @@ from xslope.fileio import save_slope_data_to_xlsx
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'docs', 'lem', 'files')
+#: The downloadable driver-script inputs (docs/inputs/slope), a second output
+#: directory so verify_rebuild can check the two sets against their own folders.
+OUT_INPUTS = os.path.join(ROOT, 'docs', 'inputs', 'slope')
 
 _EMPTY_BC = {'specified_heads': [], 'specified_fluxes': [], 'exit_face': []}
 
@@ -158,8 +169,8 @@ def _dam(*, u, rapid, gsat, seep_props, xo=_XO_UP, **mat_extra):
     }
 
 
-def _write(sd, name):
-    dst = os.path.join(OUT, name)
+def _write(sd, name, out=None):
+    dst = os.path.join(out or OUT, name)
     save_slope_data_to_xlsx(sd, dst)
     return dst
 
@@ -216,6 +227,32 @@ def build_earth_dam_rapid():
     return _write(sd, 'xslope_earth_dam_rapid.xlsx')
 
 
+# =============================================================================
+# docs/inputs/slope: the dam as the driver scripts and the test fixtures load it
+# =============================================================================
+def build_input_dam():
+    """The steady upstream model (problem 8's xslope_earth_dam_up) under the
+    download set's name. As shipped, the sand row's E and nu are entered as 0
+    where every other row carries 700,000 and 0.3; kept as found and reported,
+    since only limit equilibrium is run on this file."""
+    sd = _dam(u='piezo', rapid=False, gsat=False, seep_props=False)
+    sd['piezo_line'] = list(_PIEZO_FULL)
+    sand = sd['materials'][3]
+    sand['E'], sand['nu'] = 0.0, 0.0
+    return _write(sd, 'xslope_dam.xlsx', OUT_INPUTS)
+
+
+def build_input_rapid():
+    """The staged-piezometric-line rapid-drawdown model: problem 16's rapid run
+    without the saturated unit weights. E and nu entered as 0 and t_cut blank,
+    as shipped."""
+    sd = _dam(u='piezo', rapid=True, gsat=False, seep_props=False,
+              E=0.0, nu=0.0, t_cut=None)
+    sd['piezo_line'] = list(_PIEZO_FULL)
+    sd['piezo_line2'] = list(_PIEZO_DRAWN)
+    return _write(sd, 'xslope_rapid.xlsx', OUT_INPUTS)
+
+
 BUILDERS = [
     build_earth_dam_up,
     build_earth_dam_down,
@@ -224,10 +261,16 @@ BUILDERS = [
     build_earth_dam_rapid,
 ]
 
+INPUT_BUILDERS = [
+    build_input_dam,
+    build_input_rapid,
+]
+
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    for fn in BUILDERS:
+    os.makedirs(OUT_INPUTS, exist_ok=True)
+    for fn in BUILDERS + INPUT_BUILDERS:
         print('built', fn())
 
 

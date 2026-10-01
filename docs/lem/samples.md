@@ -675,7 +675,7 @@ Solution (governing rapid-drawdown surface and factor of safety):
 
 ![gsat_rapid_results.png](sample_images/gsat_rapid_results.png){width=900}
 
-<!-- test: file=files/xslope_gsat_rapid.xlsx, type=circular_search, num_slices=40, rapid=true, fs_bishop=1.120, fs_spencer=1.121 -->
+<!-- test: file=files/xslope_gsat_rapid.xlsx, type=circular_search, num_slices=40, rapid=true, fs_bishop=1.100, fs_spencer=1.099 -->
 
 ### 17. Pile-Stabilized Slope (Hassiotis et al. 1997)
 

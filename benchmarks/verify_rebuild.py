@@ -194,9 +194,9 @@ GROUPS = {
                         corpus='docs/fem/files',
                         builders=lambda m: list(m.BUILDERS),
                         slow=False),
-    # The limit-equilibrium samples built as variants of another shipped sample
-    # (problem 16's rapid-drawdown dam is problem 8's dam read from its own
-    # workbook). They only WRITE files -- no solve.
+    # The five earth-dam workbooks (samples problems 8 and 16 and the two-stage
+    # rapid-drawdown fixture), built from one definition of the dam. They only
+    # WRITE files -- no solve; the seepage companions are staged, not rebuilt.
     'lem_samples': dict(module='benchmarks.build_lem_samples', outattr='OUT',
                         corpus='docs/lem/files',
                         builders=lambda m: list(m.BUILDERS),
@@ -218,6 +218,13 @@ GROUPS = {
                                      lambda: m.build_sheetpile(0.5),
                                      lambda: m.build_sheetpile(0.75)],
                  slow=False),
+    # The steady seepage samples no other builder writes (the sea trench and the
+    # earth dam with a filter on docs/seep/samples.md). They only WRITE files --
+    # no solve; earth_dam2's mesh and field companions are staged from the corpus.
+    'seep_samples': dict(module='benchmarks.build_seep_samples', outattr='OUT',
+                         corpus='docs/seep/files',
+                         builders=lambda m: list(m.BUILDERS),
+                         slow=False),
 }
 
 DEFAULT_GROUPS = tuple(k for k, v in GROUPS.items() if not v['slow'])

@@ -477,3 +477,11 @@
 .wy-menu-vertical p.caption.nav-collapsible .caption-text::before {
   content: "\25BE"; display: inline-block; width: 1em; }
 .wy-menu-vertical p.caption.nav-closed .caption-text::before { content: "\25B8"; }
+
+/* Program output quoted on a page (```text blocks): a long line wraps at the
+   content edge instead of running out of sight behind a horizontal scroll.
+   Code blocks in other languages keep their horizontal-scroll behavior. */
+.rst-content pre code.language-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}

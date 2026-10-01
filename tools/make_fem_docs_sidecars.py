@@ -44,6 +44,9 @@ are defined on.
         # rewrite only the at-failure files, from the model's stored search
         # record: the standing trial and the picture are solved, the search is not
 
+A model in ``RESULTS_FIGURE`` also gets its page's results figure redrawn from
+the at-failure field, by either path.
+
 A model whose materials read a shipped seepage field is solved on the mesh
 committed beside it rather than on a rebuilt one; see ``COMMITTED_MESH``.
 """
@@ -161,6 +164,40 @@ MESH_ONLY = {
 }
 
 
+#: The results figure a model's write-up shows, drawn from the at-failure field
+#: every time that field is written — by the full run and by ``--capture-only``
+#: alike — so the picture has one generating path. The panels are
+#: ``plot_fem_results`` at its defaults, titled "... at Failure  FS = X" with X the
+#: published factor of safety, the tag's ``expected_fs``: the factor the page
+#: prints, not the factor the capture was solved at (a margin above critical, so
+#: the mechanism develops) nor the run's bracket midpoint.
+RESULTS_FIGURE = {
+    "noncircular": os.path.join(REPO_ROOT, "docs", "fem", "images",
+                                "non_circ_results.png"),
+}
+
+#: The resolution docs/fem results figures are written at, as
+#: ``benchmarks/make_griffiths_figures.py`` writes its own.
+FIGURE_DPI = 200
+
+
+def _draw_results(name, fem_data, field, failure, fs):
+    """Write ``name``'s results figure, if its write-up shows one."""
+    path = RESULTS_FIGURE.get(name)
+    if path is None:
+        return
+    if failure is None:
+        raise RuntimeError(f"{name}: no at-failure field to draw — figure not written")
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from xslope.plot_fem import plot_fem_results
+    _quiet(plot_fem_results, fem_data, field, fs=fs, failure_solution=failure)
+    plt.gcf().savefig(path, dpi=FIGURE_DPI, bbox_inches="tight")
+    plt.close("all")
+    print(f"{name}: wrote {os.path.relpath(path, REPO_ROOT)} (FS = {fs:.3f})")
+
+
 def _quiet(fn, *a, **k):
     with contextlib.redirect_stdout(io.StringIO()):
         return fn(*a, **k)
@@ -248,8 +285,9 @@ def capture_only(name):
     with no stored record, or one whose files carry no at-failure picture, is
     refused."""
     t0 = time.time()
+    tag = None
     if name in TAGGED:
-        path, _tag_, _mesh, fem_data, options, max_iterations = _tagged_model(name)
+        path, tag, _mesh, fem_data, options, max_iterations = _tagged_model(name)
     elif name in UNTAGGED:
         path, _mesh, fem_data, options, max_iterations = _untagged_model(name)
     else:
@@ -269,6 +307,9 @@ def capture_only(name):
     failure = result.get("failure_solution")
     if failure is not None:
         _quiet(export_fem_failure_solution, fem_data, failure, stem)
+    if name in RESULTS_FIGURE:
+        _draw_results(name, fem_data, result["last_solution"], failure,
+                      float(tag["expected_fs"]))
     print(f"{name}: {capture_report(result)} ({time.time() - t0:.0f}s)")
 
 
@@ -297,6 +338,8 @@ def build_tagged(name):
                  "max_iter": int(tag["max_iter"]),
                  "expected_fs": expected},
     })
+    _draw_results(name, fem_data, result["last_solution"],
+                  result.get("failure_solution"), expected)
     print(f"{name}: FS = {fs:.4f} (tag {expected:.3f}), "
           f"{len(mesh['nodes'])} nodes, {len(mesh['elements'])} elements, "
           f"{len(result['trials'])} trials, {time.time() - t0:.0f}s")

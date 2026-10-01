@@ -46,8 +46,8 @@ stiffens the thin layer artificially and distorts the strain field within it:
 
 ![non_circ_mesh.png](images/non_circ_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.616**. The plots show the solution
-at the computed factor of safety. The middle plot shows the viscoplastic shear strain
+SSRM results. The computed factor of safety is **FS = 1.616**. The plots show the slope
+at failure. The middle plot shows the viscoplastic shear strain
 concentration, which clearly reveals the non-circular failure mechanism passing through the
 thin weak clay layer — matching the expected behavior without any prior assumption about
 the failure surface shape. The bottom plot shows the displacement vectors, confirming

@@ -23,7 +23,7 @@ enter a section as profile lines with a material, how to search for the critical
 circular surface, and how to read the result closely enough to catch what a
 first model gets wrong.
 </div>
-<p><span class="tg-pill">profile lines</span><span class="tg-pill">one material</span><span class="tg-pill">Mohr-Coulomb</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">tension crack</span></p>
+<p><span class="tg-pill">profile lines</span><span class="tg-pill">one material</span><span class="tg-pill">Mohr-Coulomb</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">tension crack</span><span class="tg-pill">water in crack</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx) — the same file used by [LEM Sample Problem 1](../lem/samples.md#1-simple-embankment)</div>
 </div>
 
@@ -432,6 +432,8 @@ Bishop or Morgenstern-Price on the cracked model and they land on the *same* cir
 and the *same* factor of safety — once the model stops asking the soil to carry
 tension, the methods stop disagreeing.
 
+<!-- test: file=../lem/files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, tcrack_depth=8, tcrack_water=0, fs_spencer=1.084, fs_bishop=1.084, fs_mprice=1.084, tolerance=0.005 -->
+
 What the cracked run showed:
 
 - **The cracked answer is lower.** 1.276 → 1.084 is a 15% drop: the uncracked model
@@ -440,6 +442,40 @@ What the cracked run showed:
 - **The warnings did their job.** The amber strip, the red bars and the
   method disagreement all pointed at the same modeling omission. Reading them — not
   silencing them — is what turned a plausible-looking 1.276 into a defensible 1.084.
+
+### Filling the crack with water
+
+A tension crack open at the crest can fill with water after rain. The water pushes
+horizontally on the face of the crack, toward the slope, and adds to the forces
+driving the slide. We fill the 8 ft crack to the top and run the search again:
+
+- **Studio** — open **Global parameters** and set **Water in crack** = `8`.
+- **Excel** — `main!D12` **Depth of water in crack** = `8`.
+- **Assistant** — say: *"Fill the tension crack with water to its full 8 ft depth."*
+
+The water pressure rises from zero at the crest to 62.4 × 8 = 499 psf at the bottom
+of the crack, so the force on the crack face is the area of that triangle:
+
+$$ P_w = \tfrac{1}{2}\gamma_w d_w^2 = \tfrac{1}{2} \times 62.4 \times 8^2 = 1{,}997 \text{ lb/ft} $$
+
+where γw is the unit weight of water and dw the depth of water in the crack.
+XSLOPE applies this force to the slice against the crack, horizontally, at one third
+of the water depth (2.67 ft) above the bottom of the crack.
+
+![Spencer on the cracked model with the crack full of water](images/lem01_solution_crack_water.png){width=1000}
+
+**FS = 1.013**, 6.5% below the dry-crack 1.084. The blue triangle at the crack is the
+water pressure, with its arrows pointing into the sliding mass. Bishop and
+Morgenstern-Price land on the same circle and the same 1.013. One base-stress bar is
+red: the slice against the crack, where Spencer's solution puts about −340 psf of
+tension on the base. With φ = 0 the strength along the base does not depend on the
+normal stress, so the tension on that one slice does not change the factor of
+safety. The line of thrust stays inside the sliding mass.
+
+<!-- test: file=../lem/files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, tcrack_depth=8, tcrack_water=8, fs_spencer=1.013, fs_bishop=1.013, fs_mprice=1.013, tolerance=0.005 -->
+
+Set **Water in crack** back to `0` before going on; the rest of this page uses the
+dry crack.
 
 ### How deep does the crack really need to be?
 
@@ -479,6 +515,8 @@ This tutorial covered:
   solution requiring impossible soil behavior.
 - Reading past the factor of safety: crest tension on a φ = 0 slope is a
   modeling omission, fixed with a tension crack.
+- Water in the tension crack as a horizontal force on the crack face, and the
+  factor of safety it costs.
 
 **Where to go next:** [Tutorial LEM-2](lem02_loads_on_the_crest.md) adds loads to
 this same section — a surcharge on the crest, the same force as a line load, an

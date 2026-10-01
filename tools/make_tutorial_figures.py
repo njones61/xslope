@@ -272,6 +272,28 @@ def lem01_plots():
           % (crit_sp["FS"], crit_b["FS"], crit_c["FS"], LEM01_SLICES))
 
 
+def lem01_crack_water():
+    """The cracked model with the 8 ft crack full of water, Spencer's search re-run.
+
+    Same in-memory edit as the dry crack in ``lem01_plots``, plus the one input the
+    page's last step changes (main!D12, Water in crack = 8). Kept as its own group
+    so the water-filled run can be redrawn without re-solving the four searches
+    above.
+    """
+    sw = copy.deepcopy(load_slope_data(LEM01))
+    sw["tcrack_depth"] = 8.0
+    sw["tcrack_water"] = 8.0
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _, _ = circular_search(
+            sw, "spencer", num_slices=LEM01_SLICES, diagnostic=False,
+            **file_search_window(sw))
+    crit = fs_cache[0]
+    capture("lem01_solution_crack_water.png", plot_solution, sw, crit["slices"],
+            crit["failure_surface"], crit["solver_result"], frame="content")
+    print("   water-filled crack spencer %.4f (%d slices)"
+          % (crit["FS"], LEM01_SLICES))
+
+
 def lem01_placeholders():
     """The two LEM-1 figures no script can take.
 
@@ -7216,6 +7238,7 @@ GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
     "lem01_plots": lem01_plots,
+    "lem01_crack_water": lem01_crack_water,
     "lem01_placeholders": lem01_placeholders,
     "lem02_sheets": lem02_sheets,
     "lem02_plots": lem02_plots,

@@ -779,6 +779,28 @@ def run_lem_test(test):
         for m in slope_data.get('materials', []):
             m['u'] = u_option
 
+    # `tcrack_depth=<ft|m>` and `tcrack_water=<ft|m>` override main!D11/D12, the
+    # tension crack depth and the depth of water standing in it. They exist for a
+    # tutorial that runs its shipped (uncracked) workbook with a crack added — LEM-1's
+    # dry crack and water-filled crack — so the page's numbers are guarded without a
+    # second copy of the model. The derived crack line is rebuilt exactly as
+    # load_slope_data builds it from those two cells (fileio, "BUILD TENSILE CRACK
+    # LINE"), so the run sees what loading a workbook with the cells set would give.
+    # Absent keys leave the loaded model untouched.
+    _tc_depth = str(test.get('tcrack_depth', '')).strip()
+    _tc_water = str(test.get('tcrack_water', '')).strip()
+    if _tc_depth or _tc_water:
+        from shapely.geometry import LineString
+        if _tc_depth:
+            slope_data['tcrack_depth'] = float(_tc_depth)
+        if _tc_water:
+            slope_data['tcrack_water'] = float(_tc_water)
+        _d = slope_data.get('tcrack_depth') or 0.0
+        _gs = slope_data.get('ground_surface')
+        slope_data['tcrack_surface'] = (
+            LineString([(x, y - _d) for (x, y) in _gs.coords])
+            if _d > 0 and _gs is not None and not _gs.is_empty else None)
+
     # `seep=steady|transient` runs the model's own seepage first and stages the
     # field(s) a u = 'seep' run reads (see _stage_seep_fields).
     err = _stage_seep_fields(slope_data, test)

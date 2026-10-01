@@ -187,6 +187,13 @@ GROUPS = {
                      corpus='docs/fem/files',
                      builders=lambda m: list(m.BUILDERS),
                      slow=False),
+    # The finite element samples and fixtures no other builder writes (the
+    # samples page's problems 3 and 4, the two-pile slope and its twin, the
+    # loaded Griffiths slope). They only WRITE files -- no solve.
+    'fem_samples': dict(module='benchmarks.build_fem_samples', outattr='OUT',
+                        corpus='docs/fem/files',
+                        builders=lambda m: list(m.BUILDERS),
+                        slow=False),
     # The worked design-manual problems of docs/verification/published.md: the
     # FHWA MSE wall examples.  They only WRITE files -- no solve -- so they are
     # cheap.  build_fhwa_e1 exposes one builder, build_fhwa_e3_e7 a BUILDERS

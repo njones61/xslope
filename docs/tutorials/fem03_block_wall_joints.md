@@ -263,7 +263,7 @@ the joint faces in green colored by how far they have slid, the undeformed
 outline dashed behind, and the whole thing exaggerated by the scale printed in
 the title. The element grid steps back to a light gray under the blocks: on a
 jointed model the movement happens at the joints, not spread through the
-elements, so the faces carry the story and the grid only shows how each block
+elements, so the faces show the movement and the grid only shows how each block
 deformed inside them. Read the panel first. The block column has leaned away
 from the fill behind it, and the fill has come forward into the gap.
 

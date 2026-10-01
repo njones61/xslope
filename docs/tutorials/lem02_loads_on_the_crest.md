@@ -207,7 +207,7 @@ every extra foot of arc adds strength without adding load: with φ = 0 the
 resistance is c times the length of the surface, and this one is 8 ft shorter
 than the unloaded critical surface while carrying 7500 lb/ft more force.
 
-### The warnings LEM-1 left behind
+### The warnings from Tutorial LEM-1 {#the-warnings-lem-1-left-behind}
 
 The uncracked embankment in LEM-1 could not be solved cleanly: Spencer and Bishop
 disagreed (1.276 against 1.215) because the crest slices were being asked to

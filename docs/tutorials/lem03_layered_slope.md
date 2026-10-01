@@ -348,7 +348,7 @@ surface here — tangent to the contact, FS = 1.244.
 
 The check passes here even from starts that have no business working. Seed the
 search with an arc wildly out of scale with the section — a center 220 ft above
-the slope, R = 269 ft — and it walks back down to the same contact-tangent circle
+the slope, R = 269 ft — and it moves back down to the same contact-tangent circle
 and reports the same **1.244**. The soils are why: in a uniform φ = 0 fill the
 deepest surface available is the critical one, so the search drives down through
 the embankment, and everything below the contact is twice as strong, so a trial
@@ -370,8 +370,8 @@ you left out costs the answer.
 
 ### When the deep circle is the answer
 
-Which layer is weak is a property of the soils, not of the geometry, and it is
-the whole question. Now we take the same section and give the foundation
+Which layer is weak is a property of the soils, not of the geometry, and it
+decides which circle is critical. Now we take the same section and give the foundation
 c = 300 psf — below the fill's 400 — with everything else unchanged:
 
 ![Spencer on the same section with a weak foundation](images/lem03_solution_weak.png){width=1000}
@@ -386,7 +386,7 @@ wholly in the fill, where nothing has changed, so held still it returns the same
 
 **A layered model has one candidate mechanism per layer**, and
 a set of starting circles that names them all is how the model states that — the
-circle that looked redundant here is the whole answer under a different soil.
+circle that looked redundant here becomes the critical one under a different soil.
 **A search cannot be audited by its own number**: 1.244 and 0.792 come from
 the same geometry, the same three build paths and the same run settings, and the
 only thing that tells them apart is reading how deep the reported surface went

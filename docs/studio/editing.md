@@ -38,7 +38,7 @@ at and press `Ctrl+V` (`⌘V` on macOS). Columns are separated by tabs and
 rows by newlines — what a spreadsheet copies, and how the tables in the
 [tutorials](../tutorials/index.md) are laid out — and the values fill right and
 down from the cell you clicked. Rows are added when the block runs past the last
-one, so pasting into an empty table is the whole of filling it; columns are not,
+one, so pasting into an empty table fills it in one step; columns are not,
 and a block wider than the table has its extra columns dropped. A column of
 choices (Option, Movement, Type, …) takes any spelling of one of its own entries;
 text naming none of them, and a cell the row's own settings hold read-only, are

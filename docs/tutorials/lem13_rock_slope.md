@@ -192,8 +192,8 @@ kPa.
 
 That single pair is not a substitute for the criterion. Entered as a
 Mohr-Coulomb material it would over-credit the lightly loaded slices near the
-crest and under-credit the heavily loaded ones near the toe, which is the whole
-reason the outer iteration exists: **the equivalent Mohr-Coulomb pair is an output
+crest and under-credit the heavily loaded ones near the toe, which is why
+the outer iteration exists: **the equivalent Mohr-Coulomb pair is an output
 of the analysis, one per slice, not an input to it.**
 
 ### The same file through strength reduction

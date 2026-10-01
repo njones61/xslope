@@ -27,8 +27,8 @@ authorizes nothing beyond them: the search it names is the run to offer, not the
 
 **A verification run is still a run.** "Let me verify the model", "quick check", "just making
 sure it solves" — a single-surface solve or a search under any of those headings is the analysis
-the user did not ask for. Loading the file, plotting the inputs, and preflight are the whole of
-the verification a build request authorizes; if one of them refuses, fix the input and say so.
+the user did not ask for. Loading the file, plotting the inputs, and preflight are the only
+verification a build request authorizes; if one of them refuses, fix the input and say so.
 The same split applies downstream: result plots, reports, sensitivity sweeps and method
 comparisons happen when asked, not as a bonus. Ending with *"the model is ready — want me to run
 Spencer with an auto search?"* is the right shape.
@@ -1611,7 +1611,7 @@ plot_sensitivity(res["df"], target_fs=res["target_fs"], save_png=True)
 - `plot_sensitivity(df, target_fs=...)` draws FS vs the parameter with FS = 1 and the
   target as guide lines and marks the base case.
 
-**Honest misses — never extrapolate.** When `bracketed` is False the target is not reached
+**Do not extrapolate a missed target.** When `bracketed` is False the target is not reached
 in the swept range. Report `fs_range` and widen the range the way `extend` says; do NOT
 project a crossing past the last solve:
 

@@ -129,8 +129,8 @@ a track runs the lower the factor of safety it returns — an 11% spread across 
 layer ([measured below](#where-the-track-belongs-inside-the-seam)) — so the track
 sits as low as it can while keeping clear of the contact itself. The two end
 segments are ramps: one down from the toe at x = 0, one up to the back of the
-crest. That shape — ramp down, run along the seam, ramp up — is the whole of a
-weak-layer mechanism, and it is the shape no circle has.
+crest. That shape — ramp down, run along the seam, ramp up — is the shape of a
+weak-layer mechanism, and no circle has it.
 
 The third column, **Movement**, is each vertex's instruction to the automated
 search: what the search may do with that point when it walks the surface

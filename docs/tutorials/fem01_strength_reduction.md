@@ -159,7 +159,7 @@ closest limit equilibrium statement of what a finite element run solves.
 
 The **Model checks** column reads **No problems found for this run.** The file
 has no Young's modulus and no Poisson's ratio, and limit equilibrium does not
-care. Strength, geometry and weight are the whole of what it reads. Click
+care. It reads only strength, geometry and weight. Click
 **Run**.
 
 ![Spencer's critical circle](images/fem01_lem_solution.png){width=1000}
@@ -302,7 +302,7 @@ all three moduli. **The displacements scale exactly as 1/E**: ten times the
 stiffness, a tenth of the movement, to four significant figures, in every field
 the run reports.
 
-That is the whole of what E does here. It sets the scale of the deformation
+That is all E does here. It sets the scale of the deformation
 picture and it has no vote in the stability answer, because the answer turns on
 whether an equilibrium state exists, not on how far the slope had to move to
 reach it. A rough E is therefore fine when a factor of safety is what you want.
@@ -536,8 +536,7 @@ instead, which is how two figures are compared at one setting; Auto size dims wh
 redraw the view at every step, and that turns the control into something better
 than a setting: start at Auto and hold the up arrow, and the mesh deforms a
 step at a time — the crest dropping and the toe bulging in what amounts to an
-animation of the slope failing. The reason Auto exists is on display in the
-next section — the same 15% asks for 7.5× on the converged state, because the
+animation of the slope failing. The next section shows why Auto exists — the same 15% asks for 7.5× on the converged state, because the
 two states differ eightfold in how far the slope moved.
 
 ### Displacement vectors
@@ -583,7 +582,7 @@ iteration settles, and there is an equilibrium state to report. At *F* = 1.58
 there is none: 522 elements yield, the movement passes a hundred and forty
 times the elastic response, and it is still growing when the iteration budget
 runs out. Nothing broke in the model. It simply never stopped moving, and that
-is the whole of what the method means by failure.
+is what the method means by failure.
 
 That second field is captured deliberately. Right at the critical factor the
 collapse develops too slowly to draw, so once the bracket resolves the run

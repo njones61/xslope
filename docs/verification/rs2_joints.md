@@ -469,7 +469,7 @@ limit equilibrium here is. The distinct-element run is what the manual verifies 
 
 ### 🟢 RJ-10: Alejano et al. bilinear slab failure, example 1b (rj010) {#rj-10}
 
-Example 1a with the release joint moved five meters up the face, which the manual says is the whole
+Example 1a with the release joint moved five meters up the face, which the manual says is the only
 difference between the two problems. The section, the bedding, both friction angles and the rock
 are [problem 9](#rj-9)'s.
 
@@ -720,7 +720,7 @@ rock bridges, so the referee is the manual's single distinct-element run.
 
 <!-- test: file=files/rocscience/joints/rj017.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-17, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
 
-**What decides this row is the rock bridges.** The rock has no tensile capacity at all, so the
+**The rock bridges control this row.** The rock has no tensile capacity at all, so the
 intact ligaments between the joint segments carry nothing across them, and the strength reduction
 takes their 25 kPa cohesion down alongside the joint friction: the factor is the strength at which
 three short bridges shear through. Both finite element codes read that below the distinct-element
@@ -759,7 +759,7 @@ One Mohr-Coulomb rock (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 10,500 kPa, φ 
 200 kPa) cut by two discontinuous joints with a rock bridge between them: a basal joint at 28.4° and
 an upper joint at 56.3°. Both carry c = 0, φ = 40° and the same stiffness pair as RJ-18.
 
-**What decides this row is a tensile cap rather than a cohesion.** The two joints leave a rock
+**A tensile cap, rather than a cohesion, controls this row.** The two joints leave a rock
 bridge 1.414 m long between their tips. At the rock's 10,500 kPa cohesion that bridge carries
 14,849 kN/m in shear, which is 1.2 times the whole 11,929 kN/m sliding mass and 2.6 times its
 component down the basal joint, so it cannot be sheared through; what lets the block move is the

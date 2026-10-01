@@ -537,7 +537,7 @@ that way, somewhere between about a twentieth and a tenth of the flow crossing t
 downstream shell travels through unsaturated soil. That is small, and it is not
 zero, which is what gives the choice of unsaturated model something to act on.
 
-The pore-pressure field draws the same story as a field rather than as numbers.
+The pore-pressure field shows the same result as a field rather than as numbers.
 In the **Display** panel, set **Variable** to `Pore pressure`:
 
 ![Pore pressure and the phreatic surface](images/seep02_pressure.png){width=1000}
@@ -767,7 +767,7 @@ surface changes.
 | `gard` | 1.8654 | 29 | 8.6% |
 
 The two calibrated models agree with each other to **0.07%** in discharge, and
-both sit **4.6% below** the linear front. That gap is the whole of what the
+both sit **4.6% below** the linear front. That gap is all that the
 choice of model changes in this dam's total discharge.
 
 On the phreatic surface it changes less still:
@@ -888,7 +888,7 @@ which on a stability model is the usual case.
 The seepage face has been quiet on every run so far: one of its 31 nodes active,
 at (544.5, 102.58), 2.6 ft above the downstream toe. That is a correct answer and a
 poor demonstration, because it makes the exit face look like a boundary condition
-that barely earns its keep. The reason it is quiet is the core. The core drops the
+that does very little. The reason it is quiet is the core. The core drops the
 head to within about 13 ft of the tailwater, so the phreatic surface in the
 downstream shell runs low — elevation 113.3 at the downstream edge of the core,
 103.7 at x = 540 — and stays well under the slope above it, meeting the face 2.6 ft

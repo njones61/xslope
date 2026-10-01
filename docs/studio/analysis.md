@@ -15,7 +15,7 @@ follows the mode: **Run LEM…**, **Run Seep…**, **Run FEM…**).
 
 Every run dialog checks the model against what the analysis it is about to start
 actually needs, and shows the result in a **Model checks** column beside the run
-controls. The point is the answer that looks fine: a blank pore-pressure ratio, a
+controls. The checks are aimed at the answer that looks fine: a blank pore-pressure ratio, a
 hydraulic conductivity of zero, a material with no tensile cap, a boundary set that
 drives no flow — each of those runs to completion and returns a number, and the
 number is wrong. The checks say so before the solve rather than after the report.
@@ -771,7 +771,7 @@ that shape these plots. When SSRM captured an at-failure mechanism, a **Field
 state** switch chooses which field every panel renders — **At failure** (the
 default: the developed collapse mechanism) or **Last converged** (the sub-critical
 converged solution) — and it applies to the deformation, shear-strain, and
-displacement-vector plots alike, so they always tell the same story. The
+displacement-vector plots alike, so they always show the same state. The
 deformation plot adds its own controls: the **Original mesh** reference (dashed
 outline, full grid, or off), the **Deformed color** of the displaced grid, and
 the exaggeration pair — **Scale ×**, the displacement multiplier the plot title
@@ -794,7 +794,7 @@ one-line note in place of the plot. How to read the curve is set out in
 The displacement-vector plot draws the arrow field on every model, jointed or not. On a jointed model the deformation
 plot draws the scaled deformed mesh as the blocks the joints cut the section into — each under a faint tint, its joint faces green, the deformed outside of the mesh a dark line
 against the dashed undeformed outline: a jointed slope fails by blocks moving as bodies on their joints, and an arrow
-field sampled at nodes misses the parting and sliding that is the whole mechanism. On a network of more than eight
+field sampled at nodes misses the parting and sliding that make up the mechanism. On a network of more than eight
 jointed lines the element edges come off so the blocks can be seen; that sets the **Element edges** box for the
 result, and the box overrides it either way. Where the displacements are too small to draw the
 mesh is shown undeformed and the title says so. A **Show joints** switch, set separately for the deformation plot

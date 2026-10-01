@@ -11,7 +11,7 @@ These problems feature standalone seepage analyses. For instructions on how to r
 
 ### 1. Sea Trench
 
-This is a saturated problem representing the excavation of a trench in a harbor supported by a parallel set of sheetpile walls. The sheetpiles pass through an upper silt layer down to a lower permeability silty clay layer. [Tutorial SEEP-1](../tutorials/seep01_sheetpile.md) builds a single sheetpile of this kind step by step.
+This is a saturated problem representing the excavation of a trench in a harbor supported by a parallel set of sheetpile walls. The sheetpiles pass through an upper silt layer down to a lower permeability silty clay layer. A single sheetpile of this kind is built step by step in [Tutorial SEEP-1](../tutorials/seep01_sheetpile.md).
 
 ![The sea trench: two sheetpile walls through the silt into the silty clay, the sea on both sides and the pumped trench between them](images/sea_trench_problem_sketch.png){width=1000}
 
@@ -68,7 +68,7 @@ The solution should look something like this:
 
 ![earth_dam1_vg_solution.png](images/earth_dam1_vg_solution.png){width=1200px}
 
-The computed flow rate (≈37.8 m³/yr per m) is within 3% of the linear-front result of Problem 2 (≈38.8): with both models calibrated to the same soils, the unsaturated conductivity curve has little influence on the through-flow — consistent with the modeling guidance in the [seepage overview](overview.md#unsaturated-flow-formulation).
+The computed flow rate (≈37.8 m³/yr per m) is within 3% of the linear-front result of Problem 2 (≈38.8): with both models calibrated to the same soils, the unsaturated conductivity curve has little influence on the through-flow. This agrees with the modeling guidance in the [seepage overview](overview.md#unsaturated-flow-formulation).
 
 <!-- test: file=files/xslope_earth_dam1_vg.xlsx, type=seep, expected_flowrate=37.848, tolerance=0.05 -->
 
@@ -80,7 +80,7 @@ Excel input file: [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx)
 
 ![johnson_res_solution.png](images/johnson_res_solution.png){width=1200px}
 
-**Verification — SEEP2D cross-check.** This problem doubles as a verification
+**SEEP2D cross-check.** This problem is also a verification
 benchmark against an established code: it was exported to a SEEP2D input file
 with the **exact same tri3 mesh topology, boundary conditions, and material
 parameters** (`benchmarks/run_seep2d_compare.py`) and solved with the original
@@ -100,8 +100,8 @@ elevation, el. 102.58. See the
 
 <!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.955, tolerance=0.05, benchmark=SEEP-2 -->
 
-A **transient drawdown** variant of this dam — the same zones followed through a 45-day reservoir
-drawdown — is worked in [Problem 8](#8-johnson-reservoir-zoned-drawdown-transient) below.
+A **transient drawdown** variant of this dam, with the same zones followed through a 45-day reservoir
+drawdown, is worked in [Problem 8](#8-johnson-reservoir-zoned-drawdown-transient) below.
 
 ### 5. Earth Dam with Core and Filter
 
@@ -170,8 +170,8 @@ Built and run step by step in [Tutorial SEEP-3](../tutorials/seep03_reservoir_dr
 [xslope_earth_dam_tseep.xlsx](files/xslope_earth_dam_tseep.xlsx)
 
 This copy sets `stage_1` (full pool, t = 0) and `stage_2` (end of drawdown,
-t = 47) — the two states a [rapid drawdown](../lem/rapid.md) analysis reads —
-where Tutorial SEEP-3's copy leaves them blank.
+t = 47), the two states a [rapid drawdown](../lem/rapid.md) analysis reads.
+The copy used in Tutorial SEEP-3 leaves them blank.
 
 ![earth_dam_tseep_flownet.png](images/earth_dam_tseep_flownet.png){width=760px}
 
@@ -185,33 +185,32 @@ where Tutorial SEEP-3's copy leaves them blank.
 This is the **transient** companion to the [Johnson Reservoir dam](#johnson-reservoir) of Problem 4 —
 the same zoned cross-section (a granular shell over a low-permeability clay core carried down into the
 foundation) with its upstream reservoir **drawn down** and the pore-pressure field followed through
-time. Where [Problem 7](#7-earth-dam-reservoir-drawdown-transient) drew down a homogeneous dam, this
-one adds the feature that makes rapid drawdown hazardous in a real embankment: **zones of contrasting
-permeability**. The full transient formulation (storage, the theta time-stepper, the boundary types,
+time. Like the dam of [Problem 7](#7-earth-dam-reservoir-drawdown-transient), this one has
+**zones of contrasting permeability**, which make rapid drawdown more hazardous in an embankment,
+and it also has a foundation zone that the core extends into. The full transient formulation (storage, the theta time-stepper, the boundary types,
 and the coupling to [rapid drawdown](../lem/rapid.md)) is described on the
-[Transient Seepage](transient.md) page; this entry is the worked zoned example.
+[Transient Seepage](transient.md) page.
 
-**What makes it transient.** Two things are added to the steady Johnson model:
+The transient model adds two things to the steady Johnson model:
 
 - **Per-zone storage** on the `mat` sheet, assigned by material (see the
   [storage tables](transient.md#storage)): shell (sand) `Ss = 1e-4` /ft, `Sy = 0.22`; core (clay)
   `Ss = 1e-3` /ft, `Sy = 0.03`; foundation (silty sand) `Ss = 2e-4` /ft, `Sy = 0.15`. With the
   linear-front law the drainable-band storage is about `Sy`, so each zone's water table drains at
   its own unconfined rate `k/Sy`. Because the core's `k` is a thousandfold smaller than the shell's
-  while its `Sy` is smaller by less than a factor of ten, the core drains far slower than the shell —
-  the crux of the zoned-drawdown problem.
+  while its `Sy` is smaller by less than a factor of ten, the core drains far more slowly than the shell.
 - A **tseep sheet** carrying the drawdown schedule and run controls. The upstream boundary is retyped
   from a fixed head to a submerged-only **`reservoir`** boundary (see
   [head types](transient.md#head-types-head-and-reservoir)) bound to a `pool` series: the pool is
   held at full pool (el 160) briefly, drawn down to the tailwater datum (el 100) over **45 days**,
-  then held. The run lasts **1000 days** — the low-permeability core paces the relaxation, so the
-  field takes far longer to settle than the homogeneous dam did (by the end the boundary outflow has
+  then held. The run lasts **1000 days** because the low-permeability core drains slowly, so the
+  field takes far longer to settle than the dam of the previous problem did (by the end the boundary outflow has
   decayed to under 1% of its drawdown peak). Twelve frames are saved, and the `stage_1` (full pool,
   t = 0) / `stage_2` (end of drawdown, t = 50) pair marks the critical rapid-drawdown states.
 
-The conductivities are **already in ft/day** in the base file — the steady Johnson model's discharge
-is the 1.955 ft³/day per ft SEEP2D benchmark of Problem 4 — so they need no conversion and already
-share the day time base: shell `k = 1.0`, core `k = 0.001`, foundation `k = 0.1` ft/day. Only the
+The conductivities in the base file are **already in ft/day** (the steady Johnson model's discharge
+is the 1.955 ft³/day per ft SEEP2D benchmark of Problem 4), so they need no conversion and already
+use days as the time unit: shell `k = 1.0`, core `k = 0.001`, foundation `k = 0.1` ft/day. Only the
 storage columns and the `tseep` sheet are new.
 
 [xslope_johnson_res_tseep.xlsx](files/xslope_johnson_res_tseep.xlsx)
@@ -223,41 +222,42 @@ drawn-down level at `t = end` — each carrying the standard apex-down water sym
 
 ![johnson_res_tseep_inputs.png](images/johnson_res_tseep_inputs.png){width=1000px}
 
-As before, solving writes the per-frame results to a `{base}_tseep.csv` sidecar (with a
-`{base}_tseep_meta.json` ledger). The material zone fills are drawn under the head contours and the
-phreatic surface, so the core stands out against the shells, and each panel carries the instantaneous
-reservoir water level for that frame so the pool drop reads directly. Flow lines are not shown — a
-transient state has no flow net (see [Transient outputs](transient.md#outputs)):
+Solving writes the per-frame results to a `{base}_tseep.csv` file, with a
+`{base}_tseep_meta.json` metadata file. The material zone fills are drawn under the head contours and the
+phreatic surface, so the core is distinct from the shells, and each panel shows the reservoir
+water level at that time, so the drop in the pool can be read from panel to panel. Flow lines are not
+shown, because a transient state has no flow net (see [Transient outputs](transient.md#outputs)):
 
 ![johnson_res_tseep_flownet.png](images/johnson_res_tseep_flownet.png){width=760px}
 
-**What to observe — the zones are the story:**
+The figure shows the following:
 
-- **The low-permeability core holds its head up.** As the shells drain, the core desaturates only at
-  its edges and its relative conductivity collapses, so it bleeds off pressure far slower than the
-  material around it. Long after the shells and foundation have equilibrated to the drawn-down pool
-  (essentially uniform at el 100–105 by t = 400), the core is still a distinct high-head pocket —
-  peaking near el 149 at t = 400 and still el 131 at t = 1000, a hot island of trapped total head
-  straddling the crest. This retained core pressure is precisely why rapid drawdown is dangerous in
-  a zoned dam.
-- **The shells drain quickly and the phreatic surface lags the falling pool.** The high-permeability
-  shell empties within days, but not instantly: at the end of the 45-day drawdown (t = 50) the pool
-  is already at el 100 while the interior water table is still perched well above it. That lag is the
-  pore pressure a rapid-drawdown check must carry.
-- **The exit point migrates down the upstream face.** As the level falls, face nodes the water leaves
-  convert from held reservoir head to a free-draining exit face, and the point where the phreatic
-  surface meets the face walks down the slope from el 160 to the tailwater datum, trailing the pool.
-- **The field approaches a new steady state — slowly, and unevenly.** By a few hundred days the
-  shells and foundation are essentially stationary at the low tailwater level, yet the core is still
-  slowly relaxing at t = 1000 — the zoned dam reaches equilibrium zone by zone, on each zone's own
-  `k/Sy` clock.
+- The core keeps a high total head long after the shells have drained. As the shells drain, the
+  core desaturates only at its edges and its relative conductivity drops sharply, so its pore
+  pressure dissipates far more slowly than in the material around it. The shells and foundation
+  equilibrate to the drawn-down pool (essentially uniform at el 100–105 by t = 400), while the core
+  still has a distinct zone of high total head straddling the crest, peaking near el 149 at t = 400
+  and still el 131 at t = 1000. Rapid drawdown is dangerous in a zoned dam because of this
+  pressure retained in the core.
+- The shells drain within days, and the phreatic surface lags behind the falling pool. At the end
+  of the 45-day drawdown (t = 50) the pool is already at el 100, while the water table inside the
+  dam is still well above it. A rapid-drawdown analysis has to include the pore pressure from this
+  higher water table.
+- The exit point moves down the upstream face. As the level falls, the face nodes above the pool
+  change from reservoir head to a free-draining exit face, and the point where the phreatic surface
+  meets the face moves down the slope from el 160 to the tailwater datum, staying above the falling
+  pool.
+- The field approaches a new steady state slowly, and at a different rate in each zone. After a few
+  hundred days the shells and foundation are essentially stationary at the low tailwater level,
+  while the core is still draining at t = 1000. Each zone drains at its own rate, `k/Sy`.
 
-The history plot summarizes the same run — the phreatic and exit-point lag (top), and the boundary
-flows (bottom, inflow blue, outflow a contrasting dark red). The **exit-point** trace
-reports the top of the upstream seepage face and clamps to the pool waterline once upstream seeping
-stops. **Inflow and outflow differ**: once the upstream face becomes an
-exit face the inflow falls to zero, while the outflow spikes on the water released from storage and
-then decays as the dam empties — the storage change a single steady "total flowrate" cannot capture
+The history plot summarizes the same run: the lag of the phreatic surface and the exit point behind
+the pool (top), and the boundary flows (bottom, inflow in blue, outflow in dark red). The **exit-point**
+trace reports the top of the upstream seepage face and follows the pool waterline once seepage out of
+the upstream face stops. Inflow and outflow differ. Once the upstream face becomes an
+exit face the inflow falls to zero, while the outflow rises sharply with the water released from
+storage and then decays as the dam drains. A single steady "total flowrate" cannot represent this
+change in storage
 (see [Per-frame outputs](transient.md#outputs)).
 
 ![johnson_res_tseep_history.png](images/johnson_res_tseep_history.png){width=720px}
@@ -265,9 +265,3 @@ then decays as the dam empties — the storage change a single steady "total flo
 <!-- Transient regression: total head sampled at interior stations at end of drawdown and quasi-equilibrium, re-solved through the run_tests tseep_head path (tri3, target_size=15.0). -->
 <!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=50, points=300:115:130.528;350:115:148.797;400:110:122.059, tolerance=0.05 -->
 <!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=1000, points=300:115:100.769;350:115:118.513;400:110:112.545, tolerance=0.05 -->
-
----
-
-The remaining problems are **verification benchmarks**: analytically-anchored
-cases used to validate the seepage implementation. Each is locked into the
-automated regression suite. See also the [Verification](../verification/index.md) page.

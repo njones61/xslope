@@ -16,8 +16,8 @@ calculation.
 ![seep_tr_phreatic_lag.png](images/seep_tr_phreatic_lag.png){width=1000px}
 
 *The phreatic surface in an earth dam through a reservoir drawdown, at successive saved times
-against the pool level at each (dotted). The water table lags the pool — most of all in the
-low-conductivity core — which is the whole reason the instant matters.*
+against the pool level at each (dotted). The water table lags the pool, most of all in the
+low-conductivity core, so the result depends on which instant is analyzed.*
 
 An analysis becomes transient when the input file carries a filled-in **tseep** sheet and the
 materials carry storage properties. With no tseep sheet the analysis is steady and the results
@@ -276,7 +276,7 @@ to seep. The physical motivation is that a freshly exposed face does not become 
 boundary — the soil behind it is still saturated, and that water can seep back out. Pinning
 such nodes to the now-lower level, or sealing them, would both misstate the physics. As the
 level moves, nodes cross between the two regimes and the exit point migrates up and down the
-face, which is precisely what a drawdown demands. (A constant numeric reservoir level behaves
+face, as a drawdown requires. (A constant numeric reservoir level behaves
 the same way, so draw the face only up to the level unless that migration is intended.)
 
 ![transient_reservoir_bc.png](images/transient_reservoir_bc.png){width=860px}

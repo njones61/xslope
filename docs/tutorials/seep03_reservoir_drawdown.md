@@ -75,7 +75,7 @@ this problem are shown here:
 
 ![The vertex coordinates of the section](../seep/images/earth_dam1_pts.png){width=650}
 
-The history the reservoir follows is the whole of what makes this problem
+The history the reservoir follows is what makes this problem
 transient. The pool is held at elevation 18 for 2 days, drawn down 16 m to the
 tailwater datum at elevation 2 over the next 45 days, and then held there for the
 remaining 313 days of a 360-day run while the dam relaxes toward its new steady
@@ -197,7 +197,7 @@ with soil type: the clay is the *more* compressible of the two and so has the
 larger *S<sub>s</sub>*, but it holds nearly all of its pore water against gravity
 and so has by far the smaller *S<sub>y</sub>*.
 
-That opposition is the source of everything we measure here. A falling water
+Every result on this page comes from that opposition. A falling water
 table drains **downward**, so the rate it can fall through a zone goes as that
 zone's *vertical* conductivity over its *S<sub>y</sub>* — the conductivity that
 moves the water divided by the volume that has to be moved. For the shell that is
@@ -489,7 +489,7 @@ submerged either way. Drawn above its own level, a constant-value reservoir face
 turns the nodes standing above it into an exit face even in a steady run.
 
 Then clear the **Head value (m):** field and type `pool` in place of the number
-18. That is the whole of what makes a boundary condition time-varying: a value
+18. That is all it takes to make a boundary condition time-varying: a value
 cell holding the name of a series is driven by that series instead of by a
 constant. Click **OK**.
 
@@ -592,8 +592,8 @@ frame's time, and the subtitle carries **Inflow 0 / Outflow 1.658 m³/day per m*
 — two numbers where a steady solution reports one, because under storage exchange
 the water entering and the water leaving are no longer the same.
 
-The frame shown is day 30, in the middle of the drawdown, and it is the whole
-problem in one picture. The pool has fallen to elevation 8. The phreatic surface
+The frame shown is day 30, in the middle of the drawdown, and it shows the main
+features of the problem in one picture. The pool has fallen to elevation 8. The phreatic surface
 inside the dam still stands at elevation 13.2 over the core, more than 5 m above
 the water that used to hold it up.
 
@@ -663,7 +663,7 @@ kind of figure from the same data.
 ![Total head against time at three nodes](images/seep03_history.png){width=1000}
 
 The gray dashed line is the pool, the shaded band is the drawdown window, and the
-three solid traces are the nodes. Four instants tell the story:
+three solid traces are the nodes. The table gives the values at four instants:
 
 | t (day) | pool (m) | core *h* (m) | shell *h* (m) | core ψ (m) | shell ψ (m) |
 | :---: | :---: | :---: | :---: | :---: | :---: |

@@ -97,7 +97,7 @@ On the shipped ACADS slope this brackets the target — FS climbs from about 1.0
 built-in `param` reference and a `modify=` callable are **one code path** — every reference
 resolves internally to exactly the setter signature `modify=` takes — so the answer is
 identical whichever way you name the swept axis, and the engine validates the modified model
-at each step (polygon validity, ground surface present) precisely because a setter may be
+at each step (polygon validity, ground surface present) because a setter may be
 user-written: a broken edit becomes an honest `success=False` sweep point, never a silently
 inconsistent crossing.
 

@@ -662,7 +662,7 @@ select **Head 1** on **Set 1**, and change two fields. Set
 while that node is at or below the water level, and converts any node the
 falling pool has left standing above it to an exit face. Then clear **Head value (ft)** and type `pool` in its place. A
 value cell holding the name of a series is driven by that series instead of by a
-constant, and that is the whole of what makes a boundary time-varying.
+constant. Nothing else is needed to make a boundary time-varying.
 
 Nothing about the numbers already computed changes. A steady solve reads a
 series-bound value at t = 0, so Set 1 with `pool` bound to it solves at 160 and
@@ -730,8 +730,8 @@ while 15.243 ft³/day per ft still leaves the section, every bit of it drained
 storage. The upstream shell has followed the pool partway down, with the
 foundation beneath the upstream slope beginning to unload. The core has barely
 moved. It still holds a pocket of head near 150 ft, in the middle of the section,
-exactly where every critical surface on this page crosses it. That pocket is the
-whole difference between this route and the two steady solves, where the same
+exactly where every critical surface on this page crosses it. That pocket is what
+distinguishes this route from the two steady solves, in which the same
 region has come back to within a few feet of the pool.
 
 ### The third answer

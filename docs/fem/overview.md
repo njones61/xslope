@@ -944,7 +944,7 @@ That reading is also a check. A viscoplastic state that satisfies both convergen
 sits more than $10^{-2}$ of the local strength outside the yield surface does not end the trial: it
 is handed to the corrector, and where the corrector certifies an admissible field the trial stands
 on that. The force test cannot see this on its own, because the viscoplastic scheme is in force
-balance at every iteration and yield is precisely what it relaxes.
+balance at every iteration and yield is what it relaxes.
 
 **A refusal there ends the trial only from a state the loop has stopped changing.** Settling in
 force and settling in yield are separate questions, and a state outside the surface is one the
@@ -1001,7 +1001,7 @@ the iteration, not the joint law. The loop factorizes the elastic stiffness once
 everything the material cannot carry as a body load, so its error contracts by the ratio of the
 stiffness the assembly holds to the stiffness the material has — and a pair at its Mohr-Coulomb
 limit carries a traction pinned at that limit, so its tangential stiffness is zero while the matrix
-still holds the full $k_s$. Where slipping and open pairs are the whole of what holds a block up,
+still holds the full $k_s$. Where slipping and open pairs are all that holds a block up,
 the contraction factor is within a ten-thousandth of one: measured at 0.99947 on one rock-toppling
 bracket edge, which is 13,000 sweeps to take the error down by a factor of a thousand. A trial that
 is *failing* is slow for the mirror-image reason — both residuals go flat within a few hundred

@@ -30,6 +30,36 @@ Each rule is a name, a scope and a pattern. The groups:
                verdict, out-of-balance, continuum, Gauss point.
 ``british``    the spellings the docs do not use: centre, metre, colour, grey,
                labelled, behaviour, mobilised, modelled, whilst...
+``punchline``  the rhetorical identification in place of a plain sentence:
+               "the zones are the story", "that is the point.", "That is the
+               whole of what makes...", "This pressure is precisely why...",
+               a bold "**What decides this row is...**". Plain definitions
+               ("phi is the friction angle", "That gap is the clay blanket")
+               do not match.
+``slogan``     a bold lead-in or note title with a dash or colon tail that
+               editorializes: "**What to observe — the zones are the story:**",
+               "The result depends on the mesh — but not on the bracket",
+               "**The field approaches a new steady state — slowly, and
+               unevenly.**"; and a dash tail that draws a moral, "— a
+               reminder that...". Labels such as "**Head 1 — the reservoir.**"
+               do not match.
+``figurative`` figures of speech standing in for the physics: "holds its head
+               up", "a hot island of trapped head", "walks down the slope",
+               "earns its keep", "on display".
+``intensifier`` drama: "precisely why", "the real problem", "the story",
+               "strikingly", "the crux", "a reminder that".
+``teaser``     a bold lead-in that withholds its point: "**What makes it
+               transient.**", "**Why it matters:**".
+``entity``     a tutorial as the subject of a verb: "LEM-1 left", "SEEP-3
+               builds" (say "in Tutorial SEEP-3").
+``process``    project bookkeeping in public prose: "regression guard",
+               "held pending", "recorded as open".
+
+The rules from ``punchline`` down are docs-only; program strings keep the
+first group. ``SELFTEST`` plants a violation for every rule and a near-miss
+sentence beside it; ``run()`` fails if a planted violation is missed or a
+near miss is flagged, so a rule cannot be loosened into uselessness or
+widened onto ordinary sentences without the battery saying so.
 
 A hit is a failure. The fix is to rewrite the sentence, never to widen a rule
 or add an exemption; a rule that fires on a sentence a colleague would write
@@ -41,6 +71,8 @@ Run it alone::
 
     python test/docs_prose_check.py            # every hit, grouped by rule
     python test/docs_prose_check.py --summary  # counts by rule and by file
+    python test/docs_prose_check.py docs/lem/samples.md   # named pages only
+    python test/docs_prose_check.py --selftest # the planted-violation test
 
 or through ``run_tests.py``, where it is the ``docs_prose`` row.
 """
@@ -60,6 +92,33 @@ PY_DIRS = (ROOT / "xslope", ROOT / "studio")
 ALL = ("docs", "strings")
 
 I = re.IGNORECASE
+
+# Sentence start inside a joined paragraph.
+_SS = r"(?:^|(?<=[.!?:] ))"
+
+
+class _Bold:
+    """A rule over the bold spans of a paragraph (and a note's quoted title):
+    a span matches when its text satisfies ``cond``. ``lead_only`` keeps the
+    spans that open a sentence. ``finditer`` yields the span matches, so the
+    scanner treats it like a compiled pattern."""
+
+    _SPAN = re.compile(r"(?<![\w*])\*\*(?=\S)([^*]+?)(?<=\S)\*\*|^!!! ?\w+ \"([^\"]+)\"")
+    _LEAD = re.compile(r"[.!?:]\s$")
+
+    def __init__(self, cond: re.Pattern, lead_only: bool = False):
+        self.cond = cond
+        self.lead_only = lead_only
+
+    def finditer(self, text: str):
+        for m in self._SPAN.finditer(text):
+            if self.lead_only and m.start() and not self._LEAD.search(text[:m.start()]):
+                continue
+            if self.cond.search(m.group(1) or m.group(2)):
+                yield m
+
+
+DOCS_ONLY = ("docs",)
 
 RULES: list[tuple[str, tuple[str, ...], re.Pattern]] = [
     # ---- flourish -------------------------------------------------------
@@ -129,7 +188,136 @@ RULES: list[tuple[str, tuple[str, ...], re.Pattern]] = [
         r"recogn|visual|summar|emphas|character|parametr|parameter|organ|util)is"
         r"(?:e|es|ed|ing|ation)|favour(?:s|ed|ing|able|ite)?|programme|catalogue|"
         r"defence|licence|artefacts?|aluminium|whilst|amongst)\b", I)),
+    # ---- punchline ------------------------------------------------------
+    # "The X is the Y" where Y is a rhetorical noun, not a definition.
+    ("punchline", DOCS_ONLY, re.compile(
+        r"\b(?:is|are|was|were) (?:the|its|their) (?:real |entire |)"
+        r"(?:story|crux|moral|catch|twist|punchline|lesson|heart of the matter)\b", I)),
+    ("punchline", DOCS_ONLY, re.compile(
+        r"\b(?:is|are|was|were) the whole (?:of|reason|question|answer|story|point|"
+        r"difference|problem|mechanism|game|trick|[\d.]+\b)", I)),
+    ("punchline", DOCS_ONLY, re.compile(
+        r"\b(?:is|are|was) (?:the|its|their) (?:real |entire |)point\s*[.;:!)]", I)),
+    ("punchline", DOCS_ONLY, re.compile(
+        _SS + r"(?:The|That|This|Here) (?:point|lesson|story|crux|catch|trick|moral|upshot|takeaway)"
+        r"(?: here)? (?:is|was) (?:that|the|to|not|this|simple|clear)\b")),
+    ("punchline", DOCS_ONLY, re.compile(
+        _SS + r"(?:That|This) is (?:the|what|where|why|how) (?:lesson|point|story|statement|"
+        r"crux|catch|trick|moral)\b")),
+    ("punchline", DOCS_ONLY, re.compile(
+        _SS + r"(?:That|This|These|Those) (?!is\b|are\b|was\b)[\w'-]+(?: [\w'-]+){0,2} "
+        r"(?:is|are|was) (?:(?:precisely|exactly|really|simply) (?:why|the reason)|"
+        r"the source of everything)\b")),
+    ("punchline", DOCS_ONLY, _Bold(re.compile(
+        r"^What (?!to\b)(?:[\w'-]+ ){1,5}(?:is|are) (?:the|a|an)\b"), lead_only=True)),
+    # ---- slogan ---------------------------------------------------------
+    # A bold lead-in or note title whose dash/colon tail editorializes: a
+    # "but/not/never" turn, an "is the" verdict, a comma contrast, or a short
+    # verbless flourish after a full clause. "**Head 1 — the reservoir.**" is
+    # a label (fewer than four words before the dash) and does not match.
+    ("slogan", DOCS_ONLY, _Bold(re.compile(
+        r" [—–] (?:but|not|and not|yet|never)\b|"
+        r"[—–:] [^—–:]*\b(?:is|are|was) (?:the|what|where|why)\b|"
+        r" [—–] [^—–]*\w, not \w|"
+        r"^(?:[^\s—–]+ ){4,}[—–] (?:(?:and|but|yet|or|[a-z]+ly),? ?){1,4}[.!]?$"))),
+    ("slogan", DOCS_ONLY, re.compile(
+        r"[—–] (?:a|an|the) (?:(?:useful|stark|sobering|good|clear|simple|classic|textbook|"
+        r"telltale) )?(?:reminder|hallmark|signature|lesson|moral|testament|recipe|"
+        r"essence)\b", I)),
+    # ---- figurative -----------------------------------------------------
+    ("figurative", DOCS_ONLY, re.compile(
+        r"\b(?:holds? (?:its|their) (?:head|heads|breath)|keeps? (?:its|their) head|"
+        r"earns? (?:its|their) keep|speaks? for itself|front and center|on (?:full )?display|"
+        r"wins? out|comes? alive|steals? the|hot island|islands? of (?:trapped|high|low)|"
+        r"pockets? of trapped|smoking gun|sweet spot|silver bullet|double-edged|"
+        r"walks? (?:down|up|along|across|back)|"
+        r"(?:on|by) (?:its|each zone's|their) own [\w/]+ clock)\b", I)),
+    # ---- intensifier ----------------------------------------------------
+    ("intensifier", DOCS_ONLY, re.compile(
+        r"\b(?:precisely (?:why|what|where|how|because)|exactly why)\b", I)),
+    ("intensifier", DOCS_ONLY, re.compile(
+        r"\bthe real (?:story|question|problem|issue|lesson|answer|reason|culprit|danger|"
+        r"test|work|point|cause|difference|risk)\b", I)),
+    ("intensifier", DOCS_ONLY, re.compile(
+        r"\b(?:the|a|whole|same|different|full) story\b|\btells? (?:the|a) story\b", I)),
+    ("intensifier", DOCS_ONLY, re.compile(
+        r"\b(?:strikingly|remarkabl[ey]|tellingly|starkly|"
+        r"staggering(?:ly)?|unmistakabl[ey]|the crux|a (?:\w+ )?reminder that)\b", I)),
+    # ---- teaser ---------------------------------------------------------
+    ("teaser", DOCS_ONLY, _Bold(re.compile(
+        r"^(?:What|Why) (?:makes|made|it matters|this matters|this means|that means|"
+        r"it buys|changes)\b"), lead_only=True)),
+    # ---- entity ---------------------------------------------------------
+    ("entity", DOCS_ONLY, re.compile(
+        r"(?<![Tt]utorial )(?<![Tt]utorials )\b(?:LEM|SEEP|FEM|COMBO|W)-\d+(?:'s)? "
+        r"(?:builds?|built|adds?|added|shows?|showed|teaches|taught|runs?|ran|uses?|used|"
+        r"covers?|takes?|took|leaves?|left|sets?|walks?|introduces?|introduced|drew|draws?)\b")),
+    # ---- process --------------------------------------------------------
+    ("process", DOCS_ONLY, re.compile(
+        r"\b(?:regression guard|held pending|recorded as open)\b", I)),
 ]
+
+# Each rule's planted violation and the nearest ordinary sentence it must
+# leave alone: (rule, text, must_hit).
+SELFTEST: list[tuple[str, str, bool]] = [
+    ("punchline", "**What to observe:** the zones are the story.", True),
+    ("punchline", "It is small enough to check by hand, and that is the point.", True),
+    ("punchline", "That is the whole of what makes a boundary time-varying.", True),
+    ("punchline", "That cascade is the whole 0.031.", True),
+    ("punchline", "The point is the answer that looks fine.", True),
+    ("punchline", "That is the statement the table makes.", True),
+    ("punchline", "This retained core pressure is precisely why drawdown is dangerous.", True),
+    ("punchline", "**What decides this row is the rock bridges.** The bridges fail first.", True),
+    ("punchline", "That opposition is the source of everything we measure here.", True),
+    ("punchline", "That tension is why the two searches disagree.", False),
+    ("punchline", "That amplification is why the yield acceleration is the compared quantity.", False),
+    ("punchline", "Here phi is the friction angle and c is the cohesion.", False),
+    ("punchline", "That gap is the clay blanket. That last edge is the dipping bedrock.", False),
+    ("punchline", "The point is selected automatically after the coarse sweep.", False),
+    ("punchline", "The seepage solution covers the whole model. This is the main sheet.", False),
+    ("punchline", "Each line's capacity is the whole mat, and the core is the whole material.", False),
+    ("slogan", "**What to observe — the zones are the story:**", True),
+    ('slogan', '!!! note "The result depends on the mesh — but not on the bracket"', True),
+    ("slogan", "**The field approaches a new steady state — slowly, and unevenly.** By day 400 it is.", True),
+    ("slogan", "**Van Genuchten discharge vs SEEP2D — a reporting difference, not a solver difference**", True),
+    ("slogan", "The probability is 11.6% — a reminder that a high factor of safety is not enough.", True),
+    ("slogan", "**Head 1 — the reservoir.** Select the upstream face.", False),
+    ("slogan", "**Profile Line 1 — material 1:** enter the points below.", False),
+    ("slogan", "**Stage 1 — full pool, drained.** The first stage uses the drained strengths.", False),
+    ("slogan", "**Surficial skin slides are filtered — in grid mode only.** On a steep face...", False),
+    ("slogan", "Read every warning — a warning passed over silently is a defect.", False),
+    ("figurative", "The low-permeability core holds its head up.", True),
+    ("figurative", "The core is a hot island of trapped total head.", True),
+    ("figurative", "The exit point walks down the slope.", True),
+    ("figurative", "The pile holds its own line, and the search walks the entry along the ground.", False),
+    ("figurative", "The core keeps a high head long after the shell has drained.", False),
+    ("intensifier", "This is precisely why rapid drawdown is dangerous.", True),
+    ("intensifier", "The real problem is the core.", True),
+    ("intensifier", "The story is in the colors on the layers.", True),
+    ("intensifier", "The two results differ strikingly.", True),
+    ("intensifier", "The factor of safety drops dramatically.", False),
+    ("intensifier", "The total is reproduced exactly. Studio shows exactly what the log reports.", False),
+    ("teaser", "**What makes it transient.** Two things are added.", True),
+    ("teaser", "**Why it matters:** the core drains slowly.", True),
+    ("teaser", "**What to observe:** the core drains slowly. **How it is set.** On the mat sheet.", False),
+    ("entity", "The warnings LEM-1 left behind are cleared here.", True),
+    ("entity", "Tutorial SEEP-3 builds the dam. In Tutorial LEM-1 the slope is homogeneous.", False),
+    ("process", "This file is included as a regression guard on the support mechanics.", True),
+    ("process", "The model is included to check the support mechanics on a mirrored slope.", False),
+    ("flourish", "Crucially, the core drains slowly. Notably, the shell does not.", True),
+    ("signpost", "Two things follow. The core drains slowly.", True),
+]
+
+
+def selftest() -> list[str]:
+    """Run every SELFTEST case through its rule group; return the failures."""
+    fails = []
+    for rule, text, must in SELFTEST:
+        hit = any(True for name, scope, pat in RULES if name == rule
+                  for _ in pat.finditer(text))
+        if hit != must:
+            fails.append(f"selftest [{rule}] {'missed' if must else 'false hit'}: {text!r}")
+    return fails
 
 _FENCE = re.compile(r"^\s*(```|~~~)")
 _COMMENT = re.compile(r"<!--.*?-->", re.S)
@@ -209,18 +397,32 @@ def _excerpt(text: str, m: re.Match, width: int = 90) -> str:
     return ("…" if a else "") + out + ("…" if b < len(text) else "")
 
 
-def scan():
-    """Return the hits: (rule, scope_label, path, line, match, excerpt)."""
+def scan_page(md: Path):
+    """The hits on one docs page: (rule, path, line, match, excerpt)."""
+    md = Path(md).resolve()
+    try:
+        rel = str(md.relative_to(ROOT))
+    except ValueError:
+        rel = str(md)
+    scopes = {"docs"} | ({"tutorials"} if "tutorials" in md.parts else set())
+    hits = []
+    for line, text in _paragraphs(md):
+        for rule, scope, pat in RULES:
+            if not scopes & set(scope):
+                continue
+            for m in pat.finditer(text):
+                hits.append((rule, rel, line, m.group(0), _excerpt(text, m)))
+    return hits
+
+
+def scan(pages=None):
+    """Return the hits: (rule, path, line, match, excerpt). With ``pages``,
+    only those docs pages are scanned and the program strings are skipped."""
+    if pages:
+        return [h for p in pages for h in scan_page(p)]
     hits = []
     for md in sorted(DOCS.rglob("*.md")):
-        rel = md.relative_to(ROOT)
-        scopes = {"docs"} | ({"tutorials"} if "tutorials" in md.parts else set())
-        for line, text in _paragraphs(md):
-            for rule, scope, pat in RULES:
-                if not scopes & set(scope):
-                    continue
-                for m in pat.finditer(text):
-                    hits.append((rule, str(rel), line, m.group(0), _excerpt(text, m)))
+        hits.extend(scan_page(md))
     for d in PY_DIRS:
         for py in sorted(d.rglob("*.py")):
             if "__pycache__" in py.parts or "ai" in py.parts:
@@ -238,11 +440,18 @@ def scan():
 def run():
     """The battery entry point: a list of failure strings, empty when clean."""
     hits = scan()
-    return [f"{p}:{ln}: [{rule}] {mt!r} — {ex}" for rule, p, ln, mt, ex in hits]
+    return selftest() + [f"{p}:{ln}: [{rule}] {mt!r} — {ex}" for rule, p, ln, mt, ex in hits]
 
 
 def main(argv):
-    hits = scan()
+    if "--selftest" in argv:
+        fails = selftest()
+        for f in fails:
+            print(f)
+        print(f"selftest: {len(SELFTEST) - len(fails)}/{len(SELFTEST)} cases pass")
+        return 1 if fails else 0
+    pages = [a for a in argv if not a.startswith("--")]
+    hits = scan(pages or None)
     if "--summary" in argv:
         from collections import Counter
         by_rule = Counter(h[0] for h in hits)

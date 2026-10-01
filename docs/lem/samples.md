@@ -9,7 +9,7 @@ The following examples illustrate how to use XSLOPE to perform limit equilibrium
 
 The notebook allows the user to select a variety of analysis options using simple form inputs and then runs the analysis using the selected method and plots the results.
 
-For each problem below, the solution figure shows the critical surface and factor of safety for Spencer's method, and a **Factor of safety by method** table reports the result for every applicable method. On a solution figure, the green bars on the base of each slice are the effective stress there, the red bars are tension, and the red dashed line is the line of thrust computed with Spencer's method. How to read those tables:
+For each problem below, the solution figure shows the critical surface and factor of safety for Spencer's method, and a **Factor of safety by method** table reports the result for every applicable method. On a solution figure, the green bars on the base of each slice are the effective stress there, the red bars are tension, and the red dashed line is the line of thrust computed with Spencer's method. The tables follow these conventions:
 
 - Each value is that method's **own** critical surface — every method runs its own search, so the surfaces (and therefore the factors of safety) are not identical between methods.
 - The Ordinary Method of Slices (OMS) and Bishop's method apply only to **circular** surfaces, so they show "—" for non-circular problems.
@@ -184,9 +184,9 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 
 ![method_slices_problem_inputs2.png](sample_images/method_slices_problem_inputs2.png){width=900}
 
-Search results. This problem is a good example of the search path and the large number of circles that are sometimes 
-tested in the search algorithm. The three seeds converge on one mechanism: a deep circle entering the crest at 
-x = 121, bottoming out 13 ft into the foundation clay, and exiting on the flat ground at x = 220.
+Search results. The figure shows the search path and the large number of circles the search tests on this problem.
+The searches from all three starting circles end on the same deep circle, which enters the crest at x = 121, reaches
+13 ft into the foundation clay at its lowest point, and exits on the flat ground at x = 220.
 
 ![method_slices_problem_search_results2.png](sample_images/method_slices_problem_search_results2.png){width=900}
 
@@ -207,8 +207,8 @@ Solution (critical surface and factor of safety):
 ### 6. Slope with Eight Layers
 
 This problem features a slope with eight soil layers. This problem was featured in the user manual for the UTEXASED 
-slope stability analysis software developed by  at the University of Texas at Austin by Stephen G. Wright. If 
-features a series of alternating layers, some of which are analyzed with an effective stress analysis and a 
+slope stability analysis software developed by Stephen G. Wright at the University of Texas at Austin. It 
+has a series of alternating layers, some of which are analyzed with an effective stress analysis and a 
 piezometric line, and some of which are analyzed using a total stress analysis. We will assume that the base (max 
 depth) is 10 ft below the top of the bottom material.
 
@@ -356,19 +356,19 @@ Built and run step by step in [Tutorial LEM-8](../tutorials/lem08_reinforced_slo
 
 !!! note
     This problem is UTEXASED's Example 5 (Wright), whose reported solution is FS = 1.646 (Spencer) on a critical
-    circle centered at (3.2, 42.0) with R = 43.4. XSLOPE's Spencer solution **on that same circle is FS = 1.646**
-    — the two programs' reinforcement mechanics agree (with either the Tangent or Axial direction setting; the
-    geogrid crossings on this deep circle occur where the slip surface is nearly parallel to the horizontal
-    reinforcement, so the two directions differ by less than 0.1% here). The lower value in the table above arises
-    because XSLOPE's automated search finds a **shallower critical surface** (center near (−5, 47), FS = 1.587)
-    in a region UTEXASED's tangent-line grid search modes did not explore. UTEXASED's own example documentation
-    notes that this model's thin cohesive face layer was added specifically to discourage shallow face surfaces —
-    the shallower minimum is a real feature of the model, not a solver disagreement.
+    circle centered at (3.2, 42.0) with R = 43.4. XSLOPE's Spencer solution **on that same circle is FS = 1.646**,
+    so the two programs' treatments of the reinforcement agree. This holds with either the Tangent or the Axial
+    direction setting: the geogrid crossings on this deep circle occur where the slip surface is nearly parallel to
+    the horizontal reinforcement, so the two directions differ by less than 0.1% here. The lower value in the table
+    above comes from a **shallower critical surface** (center near (−5, 47), FS = 1.587) that XSLOPE's automated
+    search finds in a region UTEXASED's tangent-line grid search modes did not explore. UTEXASED's own example
+    documentation notes that this model's thin cohesive face layer was added to discourage shallow face surfaces.
+    The shallower minimum belongs to the model as defined; both programs give the same factor of safety on the
+    same circle.
 
-A mirrored (right-facing) variant of this model, with the reinforcement set to Type = Nail (Axial direction,
-Passive application), is included as a regression guard on the v12 support mechanics: every method must return
-the same factor of safety on the mirrored geometry as on the original for each Dir/Appl combination, and the
-values below pin the axial + passive path on a right-facing slope.
+A mirrored (right-facing) copy of this model has the reinforcement set to Type = Nail (Axial direction, Passive
+application). For each Dir/Appl combination, every method gives the same factor of safety on the mirrored
+geometry as on the original.
 
 <!-- test: file=files/xslope_reinforce_rface.xlsx, type=circular_search, num_slices=40, fs_oms=1.282, fs_bishop=1.475, fs_janbu=1.420, fs_spencer=1.471, fs_corps=1.485, fs_lowe=1.477, fs_mprice=1.471 -->
 <!-- test: file=files/xslope_reinforce_rface.xlsx, type=mp_spencer -->
@@ -432,14 +432,14 @@ unconservatively high factor of safety.
 #### LEM vs. FEM Comparison
 
 The same model solved with the finite element engine (see
-[Tutorial FEM-4](../tutorials/fem04_piles.md)) reads FS = 1.363 with the
-piles and 1.137 without them, where Spencer reads 1.842 with them and 1.149 without. The two engines
-credit the same row by factors of 1.20 and 1.60. That gap is an idealization, not a numerical difference:
-a plane-strain finite element model has no space between the piles, so it represents the row as a
-continuous wall carrying one pile's stiffness smeared over the spacing, while the Ito & Matsui force is
-a theory of the soil flowing between them. For a discrete row at spacing the limit equilibrium result is the applicable one,
-and the finite element run is read for the pile's internal forces rather than for its factor of safety —
-see [LEM vs. FEM Pile Modeling](piles.md#lem-vs-fem-pile-modeling).
+[Tutorial FEM-4](../tutorials/fem04_piles.md)) gives FS = 1.363 with the
+piles and 1.137 without them, while Spencer's method gives 1.842 with them and 1.149 without. The piles
+raise the factor of safety by a factor of 1.20 in the finite element run and 1.60 in the limit equilibrium
+run. The difference comes from how each engine represents the row. A plane-strain finite element model
+has no space between the piles, so it treats the row as a continuous wall with one pile's stiffness spread
+over the spacing, while the Ito & Matsui force comes from a theory of the soil flowing between the piles.
+For a discrete row of piles at this spacing, use the limit equilibrium factor of safety, and use the finite
+element run for the pile's internal forces. See [LEM vs. FEM Pile Modeling](piles.md#lem-vs-fem-pile-modeling).
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -470,8 +470,8 @@ Built and run step by step in [Tutorial LEM-6](../tutorials/lem06_polygon_geomet
 ---
 
 The remaining problems are **verification benchmarks**: published cases used to
-validate the limit-equilibrium implementation. Each is locked into the
-automated regression suite. See also the [Verification](../verification/index.md) page.
+validate the limit-equilibrium implementation. Each is checked by XSLOPE's
+automated test suite. See also the [Verification](../verification/index.md) page.
 
 ### 12. Rapid Drawdown (Johnson Reservoir Dam)
 
@@ -493,42 +493,43 @@ Built and run step by step in [Tutorial COMBO-2](../tutorials/combo02_rapid_draw
 
 Built and run step by step in [Tutorial LEM-10](../tutorials/lem10_global_minimum.md).
 
-Degenerate infinite-slope search — seeded from the generated embankment circles, the
-search collapses to a near-planar sliver near the crest (critical circle in red,
+Seeded from the generated embankment circles, the search ends on a shallow, nearly
+planar sliver near the crest, which behaves like an infinite slope (critical circle in red,
 $FS \approx 1.30$):
 
 ![mult_min_degenerate.png](sample_images/mult_min_degenerate.png){width=900}
 
-Global minimum — the deep foundation failure found from a circle tangent to the
+The global minimum is the deep foundation failure found from a circle tangent to the
 limiting depth (Spencer's method). All methods are evaluated on this same deep
 circle:
 
 ![mult_min_results1.png](sample_images/mult_min_results1.png){width=900}
 
-**Single-seed searches can trap on problems with concentrated forces.** The
-pile-stabilized sample ([Problem 10](#10-slope-stabilized-with-piles)) is a measured
-example: seeded from its circles sheet, the search converges to the deep surface
-tabulated there (Spencer 1.842, Lowe 1.978), but the grid-seeded global search
-(`seed='grid'`, which sweeps a coarse grid of centers and tangent depths before
-refining) finds a *shallower* surface at $FS \approx 1.70$ for every
-complete-equilibrium method — the pile forces make the deep basin locally
-attractive while a shallower mechanism governs. Checking that a stabilized slope
-cannot fail *around* its piles on a shallower surface is part of pile design.
+A search started from a single set of circles can stop at a local minimum when the
+model has concentrated forces. On the pile-stabilized sample
+([Problem 10](#10-slope-stabilized-with-piles)), the search seeded from its circles
+sheet converges to the deep surface tabulated there (Spencer 1.842, Lowe 1.978), but
+the grid-seeded global search (`seed='grid'`, which sweeps a coarse grid of centers
+and tangent depths before refining) finds a *shallower* surface at $FS \approx 1.70$
+for every complete-equilibrium method. The pile forces make the deep surface a local
+minimum, while a shallower surface has the lower factor of safety. Pile design
+includes checking that the slope cannot fail *around* its piles on a shallower
+surface.
 
-A grid sweep also reaches circles no single-seed search visits, and on some of
-them the **force-equilibrium** closure carries no root that describes a body of
-soil. On the eight-layer slope it finds one such circle: the closure's ten roots
-there run from 0.12 to 2.55 while Bishop, Spencer and Morgenstern-Price all read
-about 9.1 on the identical slices, so Corps of Engineers refuses the surface and
-says why rather than reporting the 0.12 (see
+A grid sweep also reaches circles that no single-seed search visits, and on some of
+them the **force-equilibrium** equation has no root that corresponds to a physically
+possible sliding mass. The eight-layer slope has one such circle: the equation's ten
+roots there range from 0.12 to 2.55, while Bishop, Spencer and Morgenstern-Price all
+give about 9.1 on the same slices. The Corps of Engineers method rejects that surface
+with a message giving the reason, instead of reporting 0.12 (see
 [Force Equilibrium Methods](force_eq.md#solving-for-the-factor-of-safety)). The
-factor of safety the grid-seeded Corps search reports on that model is 1.240, the
-same answer its single-seed search gives.
+grid-seeded Corps search on that model reports a factor of safety of 1.240, the same
+as its single-seed search.
 
-The tabulated sample values remain single-seed by deliberate choice, and the
-working practice is this: run the free search, then cross-check with `seed='grid'`
-and with tangent-seeded circles at each candidate depth, and judge the surfaces —
-not just the numbers — before accepting any of them.
+The tabulated sample values come from single-seed searches. When checking a result,
+you may wish to run the free search, then repeat it with `seed='grid'` and with
+tangent-seeded circles at each candidate depth, and compare the critical surfaces as
+well as the factors of safety before accepting one.
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -664,8 +665,8 @@ Solution (critical surface and factor of safety, with the seepage head contours)
 The same dam analyzed for [rapid drawdown](rapid.md), with the reservoir at
 El. 302 ft before drawdown and El. 250 ft after. The premise of *rapid* drawdown is
 that the pool falls faster than the low-permeability zones can drain, so the soil
-stays saturated while the pore pressures fall: slice weights key off the
-pre-drawdown water table through all three stages, while the pore pressures follow
+stays saturated while the pore pressures fall. The slice weights use the
+pre-drawdown water table in all three stages, while the pore pressures follow
 the staged piezometric lines.
 
 Excel input file: [xslope_gsat_rapid.xlsx](files/xslope_gsat_rapid.xlsx)
@@ -678,8 +679,8 @@ Solution (governing rapid-drawdown surface and factor of safety):
 
 ### 17. Pile-Stabilized Slope (Hassiotis et al. 1997)
 
-A published pile-stabilization benchmark, and the check that XSLOPE's built-in
-Ito & Matsui force reproduces the force the source designed with. The slope is
+This is a published pile-stabilization benchmark. It checks that XSLOPE's built-in
+Ito & Matsui force reproduces the force used in the source's design. The slope is
 homogeneous, 13.7 m high at 30°, with $c = 23.94$ kPa, $\phi = 10°$ and
 $\gamma = 19.63$ kN/m³, and is dry. One row of 1.0 m piles at 2.5 m centers is
 placed 13.7 m horizontally from the toe, and in a second case 23.1 m from the toe.
@@ -739,8 +740,8 @@ Bishop's method gives 1.289 against 1.64 (Hassiotis et al., −21%). The row sit
 0.6 m short of the crest, so every surface that reaches it crosses it within a few
 meters of the pile head, where the soil column above the surface — and with it the
 Ito & Matsui force — is small. Moving the entry limit 2 m further behind the crest
-moves this factor of safety to 1.48, so the number is a reading of where the search
-is allowed to start rather than a converged property of the slope.
+moves this factor of safety to 1.48, so for this row the result depends on where the
+search is allowed to start.
 
 #### Search limits
 
@@ -748,10 +749,9 @@ Both pile files declare a search window on their circles sheet: the surface
 daylights within a few meters of the toe (exit 25–32 m), enters behind the crest
 (entry 54–75 m) and keeps its lowest point above the pile tip. Without it the
 search returns a deep surface that passes *below* the pile tip and collects no pile
-force at all — 1.327 for the 13.7 m row, which is the unreinforced slope's
-next-deepest mechanism rather than a pile-stabilized one. The published
-comparisons are for the mechanism through the row and restrict the search the same
-way.
+force at all: 1.327 for the 13.7 m row, on a deeper mechanism of the unreinforced
+slope that the piles do not cross. The published comparisons are for the mechanism
+through the row, and their searches are restricted in the same way.
 
 #### Ito & Matsui summary
 
@@ -778,11 +778,11 @@ gives 1170.2 kN, a difference of 1.3%.
 XSLOPE applies the pile reaction horizontally for a vertical pile and does not
 divide it by the computed factor of safety (`Appl = active`). Hull & Poulos note
 that the plastic-deformation theory derives the force horizontally, which is the
-direction used here; Hassiotis et al. apply it parallel to the slip surface and
-also leave it unfactored, which is why their 1.82 is the value this case is read
-against. Their 1.45 comes from a boundary-element shear and moment divided by the
-global factor of safety — a different force model, quoted here as the published
-spread rather than as a target.
+direction used here. Hassiotis et al. apply it parallel to the slip surface and
+also leave it unfactored, so their 1.82 is the value this case is compared with.
+Their 1.45 comes from a boundary-element shear and moment divided by the global
+factor of safety. That is a different force model, and the value is quoted only to
+show the range of published results.
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface, 13.7 m row):

@@ -248,8 +248,8 @@ The help line above the rows states the rule the table depends on: *"Each
 polygon is a closed region (the ring closes automatically, so list each vertex
 once)."*
 
-Two things the profile-lines editor has are missing here, and both are the
-point. There is no **Max depth** field, because a polygon model's bottom
+Two things the profile-lines editor has are missing here, and both come from
+the polygon geometry. There is no **Max depth** field, because a polygon model's bottom
 boundary is drawn rather than typed. And the preview beside the table draws
 filled zones instead of lines — the selected zone outlined and hatched, the
 other dimmed — with the hatched base beneath them following the dip. Click a

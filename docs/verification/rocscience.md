@@ -982,7 +982,7 @@ three published anchors reconcile: Borges' column is the uncracked arc integrate
 geosynthetic, Slide's and XSLOPE's are the cracked arc plus the same geosynthetic, and what
 separates the two pairs is the cost of the crack.
 
-**The tension crack is the whole problem.** Both circles have their center below the crest, so the
+**How each program handles the tension crack.** Both circles have their center below the crest, so the
 arc's uphill end is buried at its equator and the daylight point sits *above* it, and the arc they
 bound exceeds a semicircle. Slide resolves this by auto-cracking the reverse-curvature portion.
 XSLOPE never synthesizes a crack from curvature — the equivalent is an explicit `tcrack_depth`

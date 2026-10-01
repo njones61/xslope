@@ -63,7 +63,7 @@ anything
 
 The first pass is the simplest jointed slope there is: one slab, sitting on a
 bedding plane it can slide along, with a release joint behind it that lets it
-go. It is small enough to check by hand, and that is the point. The run has to
+go. It is small enough to check by hand. The run has to
 reproduce a number we can work out on paper before the method is trusted on
 anything larger.
 

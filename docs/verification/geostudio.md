@@ -893,7 +893,7 @@ angle is measured against a discontinuity dip, and the strength on that base is 
 the discontinuity's strength and the intact rock's. XSLOPE's material model has no such term — a
 material's cohesion and friction angle are the same on every slice base that crosses it — so the
 section cannot be built, and the `.gsz` importer flags this on import rather than returning a
-plausible wrong answer. The vendor's own results show that the strength model is the whole of the
+plausible wrong answer. The vendor's own results show that the strength model accounts for all of the
 difference:
 
 | Strength model (same surface) | XSLOPE | SLOPE/W | Note |
@@ -1218,7 +1218,7 @@ Both columns carry the same gradient through the sample at every reporting time:
 apart at the first stage and 0.0002 m at the last, against the 0.102 m the base suction is
 stepped through over the test. At the middle row the nearest SEEP/W frame, 133,130 s, is 130 s
 past the fourth step, so its base station has begun to follow the new stage while XSLOPE's has
-not; that is the whole of the 0.0045 m in that row's first column, and the vendor's last
+not; that accounts for all of the 0.0045 m in that row's first column, and the vendor's last
 pre-step frame reads −0.1341 m there, XSLOPE's value to four decimals.
 
 <!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, target_size=0.004, time=46000, points=0.003:0.02:-0.0932;0.003:0.06:-0.0932;0.003:0.1:-0.0930, tolerance=0.01, benchmark=SEEPW-T07-t46000 -->

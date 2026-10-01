@@ -101,7 +101,7 @@ under the same convention). The distinction is silent but not small: resolved ag
 the wrong list, a water table can double back on itself or land meters off and the model
 still solves — at pore pressures several percent wrong in factor of safety.
 
-Ponded water needs no conversion at all, and that is the point. GeoStudio stores no
+Ponded water needs no conversion at all. GeoStudio stores no
 ponded-water object: where the water rises **above** the ground surface, SLOPE/W simply
 carries its weight implicitly, from the water surface itself. XSLOPE models it the same
 way — with **Water loads** set to `auto` on the main sheet, the engine derives the
@@ -130,7 +130,7 @@ exists only as a computed result.
 A SLOPE/W analysis can take its pore pressure from a **parent SEEP/W run** rather than a
 piezometric line — a whole finite-element head field, which is the point of using SEEP/W
 at all (a piezo line *means* hydrostatic pressure beneath it, and a drawdown or a
-transient seepage problem is precisely where that assumption fails).
+transient seepage problem is where that assumption fails).
 
 XSLOPE imports that field. A solved `.gsz` carries the transferred pore pressure in the
 stability analysis's **own** result folder, on the mesh SEEP/W solved on, so nothing has

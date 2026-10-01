@@ -207,7 +207,7 @@ for the offsets of the slice base center from the center of rotation, the three 
 | $S$ (along the base)   | $a_S = x_r \sin \alpha - y_r \cos \alpha$     |   $R$                  |
 | $N$ (normal to the base) | $a_N = x_r \cos \alpha + y_r \sin \alpha$   |   $0$                  |
 
-The load and support moments need no generalization — they were always true moments about the center, which is precisely why the classical equation divides them by $R$. Multiplying equation (8) through by $R$ and substituting the general arms:
+The load and support moments need no generalization — they were always true moments about the center, which is why the classical equation divides them by $R$. Multiplying equation (8) through by $R$ and substituting the general arms:
 
 >$F = \dfrac{\sum \left( c \Delta \ell + N' \tan \phi \right) a_S}{\sum W x_r - \sum \left( N' + u \Delta \ell \right) a_N + \sum D \cos \beta \, a_{dx} + k \sum W \, a_k + T \, a_t - \ldots}   \qquad (8a)$
 

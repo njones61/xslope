@@ -147,8 +147,8 @@ scores each starting circle's own neighborhood first and then refines only the
 best-scoring one, so with the deep circle and the embankment circle together on
 the sheet it follows the deep one and returns **1.376**, in either row order. The
 1.299 sliver is the lower of the two answers and a single seeded run does not
-reach it. **What exposes a competing mechanism is a search per seed — the two
-runs above — or the grid seeding of [Part B](#grid-search)**; where two searches
+reach it. **A competing mechanism is found by a search per seed — the two
+runs above — or by the grid seeding of [Part B](#grid-search)**; where two searches
 disagree, the surfaces decide which answer is the design case, and here it is the
 deep one.
 

@@ -495,7 +495,7 @@ ruptured yet: the largest force on any line is 787 lb/ft, on line 2, and every
 layer is held by its bond. Reduce the soil strength a little further, to the
 next trial in the search, and the first layer reaches 800 and drops — and on
 this slope the redistribution cannot be carried:
-lines 3, 4 and 5 follow it down and the trial fails. That cascade is the whole
+lines 3, 4 and 5 follow it down and the trial fails. That cascade accounts for all of the
 0.031. The residual does not weaken the layers; it means the first rupture is
 the last one this slope can afford.
 
@@ -649,7 +649,7 @@ understates what changed:
 The band is where it was — from the toe up behind the buried tips to the
 crest, its center within a foot of the stated-length run's — and the
 strain in it is more concentrated, 52 elements above half the peak against 117.
-The story is in the colors on the layers. Under the stated lengths every layer
+The difference shows in the colors on the layers. Under the stated lengths every layer
 faded from red to white over its last 4 ft, because the ramp allowed less and
 less toward the tip, and the band cut through those weakening tails. Under the
 law the layers are red to the tip: the buried ends develop the full 800 lb/ft

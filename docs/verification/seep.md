@@ -121,8 +121,7 @@ elevation, el. 102.58.
 
 ![Johnson Reservoir: inputs and SEEP2D cross-check solution](images/johnson_res.png)
 
-**Van Genuchten discharge vs SEEP2D — a reporting difference, not a solver
-difference.** On problems with van Genuchten conductivity, XSLOPE's total
+**Van Genuchten discharge vs SEEP2D.** On problems with van Genuchten conductivity, XSLOPE's total
 discharge reads 3.5–4.7% below SEEP2D's self-reported flow (gw009a
 2.307×10⁻⁵ vs 2.421×10⁻⁵; gw010 6.07×10⁻⁵ vs 6.29×10⁻⁵) even though the head
 fields agree to a relative RMS of ~10⁻⁴ and the linear-front problems above

@@ -66,7 +66,7 @@ Taylor Series Probability Method as the [LEM reliability analysis](../reliabilit
 but with each factor of safety computed by SSRM. See
 [Reliability Analysis (FEM)](../reliability/fem.md) for the method.
 
-![two_layer_slope.png](images/two_layer_slope.png){width=600}
+![Two-layer c–φ slope](images/two_layer_slope_problem_sketch.png){width=1000}
 
 Excel input file: [xslope_simple_mult_layers_fem.xlsx](files/xslope_simple_mult_layers_fem.xlsx)
 

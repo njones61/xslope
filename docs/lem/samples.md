@@ -18,7 +18,7 @@ For each problem below, the solution figure shows the critical surface and facto
 
 ### 1. Simple Embankment
 
-Built and run step by step in [LEM-1](../tutorials/lem01_simple_embankment.md).
+Built and run step by step in [Tutorial LEM-1](../tutorials/lem01_simple_embankment.md).
 
 ![simple_embankment_results1.png](sample_images/simple_embankment_results1.png){width=700}
 
@@ -60,7 +60,7 @@ Solution (critical surface and factor of safety):
 <!-- test: file=files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.986, fs_bishop=0.986, fs_janbu=0.969, fs_corps=1.050, fs_lowe=1.039, fs_spencer=0.986, fs_mprice=0.986 -->
 
 The crest-surcharge variant is built and run step by step in
-[LEM-2](../tutorials/lem02_loads_on_the_crest.md).
+[Tutorial LEM-2](../tutorials/lem02_loads_on_the_crest.md).
 
 ![crest_surcharge_results.png](../tutorials/images/lem02_solution_load.png){width=700}
 
@@ -78,7 +78,7 @@ The crest-surcharge variant is built and run step by step in
 
 This problem involves a uniform material extending below the toe of the slope. 
 
-![simple_foundation.png](sample_images/simple_foundation.png){width=700}
+![Simple slope with a foundation](sample_images/simple_foundation_problem_sketch.png){width=1000}
 
 Excel input file: [xslope_simple_foundation.xlsx](files/xslope_simple_foundation.xlsx) 
 
@@ -102,7 +102,7 @@ Solution (critical surface and factor of safety):
 
 ### 3. Simple Slope with Multiple Layers
 
-Built and run step by step in [LEM-3](../tutorials/lem03_layered_slope.md).
+Built and run step by step in [Tutorial LEM-3](../tutorials/lem03_layered_slope.md).
 
 ![simple_mult_layers_results.png](sample_images/simple_mult_layers_results.png){width=900}
 
@@ -118,13 +118,13 @@ Built and run step by step in [LEM-3](../tutorials/lem03_layered_slope.md).
 
 This geometry is reused (with elastic properties added and the strength retuned to a
 marginally-stable c–φ profile) for a finite-element **reliability** example — see
-[FEM Sample Problems §4](../fem/samples.md).
+[FEM Sample Problems, problem 2](../fem/samples.md#2-reliability-analysis-two-layer-c-slope).
 
 ### 4. Submerged Slope
 
 This problem features a slope submerged by 10 ft of water. 
 
-![submerged_slope.png](sample_images/submerged_slope.png){width=600}
+![Submerged slope](sample_images/submerged_slope_problem_sketch.png){width=1000}
 
 The submerged slope is analyzed by applying a distributed load over the entire slope based on the unit weight of 
 water (62.4 lb/ft3) and the depth of the water at a particular point on the slope. 
@@ -151,7 +151,7 @@ Solution (critical surface and factor of safety):
 
 ### 5. Slope with Multiple Materials and Piezometric Line
 
-Built and run step by step in [LEM-4](../tutorials/lem04_water_in_the_slope.md).
+Built and run step by step in [Tutorial LEM-4](../tutorials/lem04_water_in_the_slope.md).
 
 This problem is similar to one used in two exercises in a graduate course on slope stability analysis
 (CE 544 - Slope Stability Analysis) at Brigham Young University, where limit equilibrium problems are solved
@@ -212,7 +212,7 @@ features a series of alternating layers, some of which are analyzed with an effe
 piezometric line, and some of which are analyzed using a total stress analysis. We will assume that the base (max 
 depth) is 10 ft below the top of the bottom material.
 
-![eight_layers.png](sample_images/eight_layers.png){width=900}
+![Slope with eight layers](sample_images/eight_layers_problem_sketch.png){width=1000}
 
 In the input file, the slope face rises 20 ft over a 45-ft run (2.25H:1V), and the water
 table / piezometric line is horizontal at 2 ft below the toe-level ground surface
@@ -247,7 +247,7 @@ Solution (critical surface and factor of safety):
 
 ### 7. Non-Circular Failure Surface
 
-Built and run step by step in [LEM-5](../tutorials/lem05_weak_layer_noncircular.md).
+Built and run step by step in [Tutorial LEM-5](../tutorials/lem05_weak_layer_noncircular.md).
 
 ![noncircular_results.png](sample_images/noncircular_results.png){width=900}
 
@@ -267,7 +267,7 @@ This problem features a dam with a shell and a clay core on top of a foundation 
 This problem was featured on page 121 of Shear Strength and Slope Stability - Second Edition by Duncan, Wright, and 
 Brandon. 
 
-![earth_dam.png](sample_images/earth_dam.png){width=700}
+![Earth dam with a clay core](sample_images/earth_dam_problem_sketch.png){width=1000}
 
 The material properties are as follows:
 
@@ -340,7 +340,7 @@ Solution (critical surface and factor of safety):
 
 ### 9. Reinforced Slope
 
-Built and run step by step in [LEM-8](../tutorials/lem08_reinforced_slope.md).
+Built and run step by step in [Tutorial LEM-8](../tutorials/lem08_reinforced_slope.md).
 
 ![reinforce_results.png](sample_images/reinforce_results.png){width=900}
 
@@ -376,7 +376,7 @@ values below pin the axial + passive path on a right-facing slope.
 
 ### 10. Slope Stabilized with Piles
 
-Built and run step by step in [LEM-12](../tutorials/lem12_piles.md).
+Built and run step by step in [Tutorial LEM-12](../tutorials/lem12_piles.md).
 
 ![piles_results.png](sample_images/piles_results.png){width=900}
 
@@ -453,7 +453,7 @@ see [LEM vs. FEM Pile Modeling](piles.md#lem-vs-fem-pile-modeling).
 
 ### 11. Polygon Input with a Sloping Bottom
 
-Built and run step by step in [LEM-6](../tutorials/lem06_polygon_geometry.md).
+Built and run step by step in [Tutorial LEM-6](../tutorials/lem06_polygon_geometry.md).
 
 ![sloping_bottom_results.png](sample_images/sloping_bottom_results.png){width=900}
 
@@ -475,7 +475,7 @@ automated regression suite. See also the [Verification](../verification/index.md
 
 ### 12. Rapid Drawdown (Johnson Reservoir Dam)
 
-Built and run step by step in [COMBO-2](../tutorials/combo02_rapid_drawdown.md).
+Built and run step by step in [Tutorial COMBO-2](../tutorials/combo02_rapid_drawdown.md).
 
 ![johnson_rapid_results1.png](sample_images/johnson_rapid_results1.png){width=900}
 
@@ -491,7 +491,7 @@ Built and run step by step in [COMBO-2](../tutorials/combo02_rapid_drawdown.md).
 
 ### 13. Multiple Local Minima
 
-Built and run step by step in [LEM-10](../tutorials/lem10_global_minimum.md).
+Built and run step by step in [Tutorial LEM-10](../tutorials/lem10_global_minimum.md).
 
 Degenerate infinite-slope search — seeded from the generated embankment circles, the
 search collapses to a near-planar sliver near the crest (critical circle in red,
@@ -550,8 +550,10 @@ $d_{crack} = \dfrac{2 c_d}{\gamma}\tan\!\left(45 + \dfrac{\phi_d}{2}\right)$ wit
 mobilized strengths $c_d = c/F$, $\tan\phi_d = \tan\phi / F$. Because the crack
 depth depends on $F$, it is iterated to convergence; this model carries the
 converged depth (`tcrack_depth` = 4.5 ft on the **main** sheet), at which the crest
-tension just vanishes. The complete-equilibrium methods agree (Spencer and
+tension just vanishes. The crack is taken as full of water (`tcrack_water` = 4.5 ft). The complete-equilibrium methods agree (Spencer and
 Morgenstern-Price both 1.414, matching Bishop).
+
+![Slope with a tension crack](sample_images/tension_problem_sketch.png){width=1000}
 
 Excel input file: [xslope_tension_KEY.xlsx](files/xslope_tension_KEY.xlsx)
 
@@ -575,7 +577,7 @@ Solution (critical surface with the tension crack, Spencer's method):
 
 ### 15. Reliability Analysis (Submerged Slope)
 
-Built and run step by step in [LEM-11](../tutorials/lem11_reliability.md).
+Built and run step by step in [Tutorial LEM-11](../tutorials/lem11_reliability.md).
 
 Reliability result — the $F_{MLV}$ critical surface (Spencer's method) with the
 analysis summary:
@@ -606,6 +608,8 @@ an internal water table: γ = 120 pcf above the water table and γ_sat = 127 pcf
 below. The strength is a total-stress strength, so pore pressure never enters the
 analysis (`u = none`) and the piezometric line serves only to locate the water
 table. Spencer's method gives $F = 1.420$.
+
+![Clay slope with an internal water table](sample_images/gsat_problem_sketch.png){width=1000}
 
 Excel input file: [xslope_gsat_sidecar.xlsx](files/xslope_gsat_sidecar.xlsx)
 
@@ -681,6 +685,8 @@ $\gamma = 19.63$ kN/m³, and is dry. One row of 1.0 m piles at 2.5 m centers is
 placed 13.7 m horizontally from the toe, and in a second case 23.1 m from the toe.
 The published clear-to-center spacing ratio $D_2/D_1 = 0.6$ is reproduced exactly:
 a 1.0 m pile at 2.5 m centers leaves a 1.5 m clear opening, and $1.5/2.5 = 0.6$.
+
+![Pile-stabilized slope with the two pile stations](sample_images/hassiotis_problem_sketch.png){width=1000}
 
 Inputs, with both pile stations drawn together:
 

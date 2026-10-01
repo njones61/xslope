@@ -118,7 +118,7 @@ At the bottom of the dock, the **Styles…** button opens the project-wide
 [Styles dialog](editing.md#styles) for per-feature colors, hatches, and line
 styles.
 
-The two live in different places because they are different things. *Display options*
+The two are kept separate. *Display options*
 are per-view and ephemeral — what a plot shows. *Styles* are project-global and
 persistent — how a feature looks, its color, hatch, and line style.
 

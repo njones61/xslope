@@ -1,6 +1,6 @@
 # Seepage - Slope Stability Integration
 
-## Why pore pressure governs
+## Pore pressure and effective stress {#why-pore-pressure-governs}
 
 The shear strength of soil — and therefore the stability of a slope — is governed by
 **effective stress**, not total stress. Terzaghi's principle gives $\sigma' = \sigma - u$, and
@@ -14,7 +14,7 @@ infiltration, a rising reservoir, seepage through an embankment — the factor o
 
 Pore pressures can be estimated from a **piezometric line** for simple groundwater conditions.
 For slopes with real seepage — earth dams, levees, slopes beside a reservoir — a finite-element
-seepage analysis produces a spatially varying pore-pressure field that honours the actual flow
+seepage analysis produces a spatially varying pore-pressure field that honors the actual flow
 and the material conductivities. The conversion from the seepage solution to what stability
 needs is
 
@@ -77,7 +77,7 @@ if slope_data.get("has_seepage_bc2"):
 ```
 
 `has_seepage_bc2` is set by `load_slope_data()` when the workbook carries a **seep bc (2)**
-sheet with valid data, and `seep_bc=2` tells `build_seep_data` to bake that second set. Both
+sheet with valid data, and `seep_bc=2` makes `build_seep_data` use that second set. Both
 solutions must use the same mesh, since one mesh file serves both.
 
 !!! note "Transient runs read a frame instead of a file"
@@ -98,8 +98,8 @@ solutions must use the same mesh, since one mesh file serves both.
     The [Colab seepage notebook](https://colab.research.google.com/github/njones61/xslope/blob/main/notebooks/xslope_seep.ipynb)
     accepts a **zip archive** in place of a bare `.xlsx`, so a workbook can be uploaded
     together with a pre-built mesh (and existing solution files) in one step: the notebook
-    extracts the archive, finds the `.xlsx` inside, and the naming convention above does the
-    rest. It packages the run's outputs back into a results zip for download, which can be
+    extracts the archive, finds the `.xlsx` inside, and matches the other files by the naming
+    convention above. It packages the run's outputs back into a results zip for download, which can be
     re-uploaded next session to skip the meshing.
 
 ### Pore-pressure options
@@ -143,8 +143,8 @@ interpolated with that element's shape functions,
 smooth traverse of the field, not a lookup against a drawn line.*
 
 A slice base that falls **outside** the seepage mesh is assigned $u = 0$ and a warning is
-issued: below the phreatic surface that over-predicts the factor of safety, so the warning is
-telling you the mesh does not span the full depth of the failure surface.
+issued: below the phreatic surface that over-predicts the factor of safety, so the warning
+means that the mesh does not span the full depth of the failure surface.
 
 ## Using the field in a FEM analysis
 
@@ -167,7 +167,7 @@ maximum shear stress. Positive $F$ means the stress state has passed the yield s
 reducing the effective stress, positive pore pressures shrink the elastic domain and make
 yielding more likely — the physical effect of pore pressure on strength.
 
-### Element type matters for FEM {#element-type-considerations-for-fem}
+### Element type for FEM {#element-type-considerations-for-fem}
 
 Build the seepage mesh with **quadratic elements** (`tri6`, `quad8`, `quad9`) whenever it will
 also carry an SSRM analysis. Linear elements (`tri3`, `quad4`) lock volumetrically in the
@@ -182,7 +182,7 @@ The Johnson Reservoir dam, built and run step by step in
 
 [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx)
 
-The two factors of safety below are read on the mesh and nodal solution in the same
+The two factors of safety below are computed with the mesh and nodal solution in the same
 folder as the workbook — [xslope_johnson_res_mesh.json](files/xslope_johnson_res_mesh.json)
 and [xslope_johnson_res_seep.csv](files/xslope_johnson_res_seep.csv) — which
 `load_slope_data()` picks up by name.
@@ -195,7 +195,7 @@ critical-circle search with Spencer's method settles at **FS = 1.258**:
 <!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, expected_fs=1.258, num_slices=50, tolerance=0.02 -->
 
 The same workbook, mesh and solution then run an SSRM analysis with the default
-non-convergence criterion, at **FS = 1.258**:
+failure criterion, at **FS = 1.258**:
 
 ![seep_slope_fem_results.png](images/seep_slope_fem_results.png){width=1200px}
 
@@ -209,7 +209,7 @@ agreement is a mutual check on the combined seepage and stability workflow.
 
 ## Piezometric line vs. seepage-derived pore pressures
 
-A piezometric line is a drawn estimate of the phreatic surface; a seepage solution honours the
+A piezometric line is a drawn estimate of the phreatic surface; a seepage solution honors the
 flow field and the conductivities. The right-facing slope below (a three-layer silt / sand /
 clay profile) is solved both ways on the **same single circle** ($X_0 = 175$, $Y_0 = 100$), so
 the pore-pressure model is the only difference between the two runs.

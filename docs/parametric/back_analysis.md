@@ -5,7 +5,8 @@ investigation*. A slide has already occurred, so the factor of safety at the mom
 failure is known to be exactly 1.0; the unknown is a strength (or pore-pressure, or loading)
 parameter, and the study back-calculates the value **consistent with the observed failure** —
 the mobilized shear strength implied by the slide, most commonly. `back_analysis()` is
-`design()` with `target_fs` defaulting to 1.0 and the result worded for the forensic reading.
+`design()` with `target_fs` defaulting to 1.0 and the result message worded for a failure
+investigation.
 It takes the same parameter grammar (see
 [Addressing a parameter](index.md#addressing-a-parameter)) and the same `mode=`/`fem_opts=`/
 `seep_opts=` engine controls as `design()` — in `mode='seep'` the back-calculated quantity is
@@ -31,14 +32,14 @@ print(result['message'])
 
 `result['crossing']` is the back-calculated value; `result['study']` is `'back_analysis'`;
 every other field carries the same meaning as [`design()`](design.md#running-a-design-study).
-The same [*never-extrapolate* discipline](design.md#honest-about-misses) applies — if the
+The same [*never-extrapolate* rule](design.md#honest-about-misses) applies — if the
 swept range never reaches FS = 1.0, `bracketed` is `False` and `extend` says which way to
 widen it, rather than guessing a value past the last solve.
 
 ## Inherited `modify=` callable
 
 Because `back_analysis()` is `design()` with a forensic target, it inherits the same
-[`modify=` escape hatch](design.md#sweeping-anything-else-modify) unchanged: pass a
+[`modify=` option](design.md#sweeping-anything-else-modify) unchanged: pass a
 `(slope_data, value) -> slope_data` callable and a `label` in place of a `param` reference
 (exactly one per call) whenever the unknown is not a single stored scalar. A common forensic
 use is a **water-table elevation** — the phreatic surface at the moment of a slide is rarely
@@ -63,4 +64,4 @@ print(result['message'])
 
 `result['crossing']` is the back-calculated elevation; every other field carries the same
 meaning as [`design()`](design.md#running-a-design-study), and the same never-extrapolate
-discipline applies whichever way the swept axis is named.
+rule applies whichever way the swept axis is named.

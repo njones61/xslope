@@ -1,7 +1,7 @@
 # Parametric Studies
 
-Vary the inputs and watch the answer move. XSLOPE groups three closely related studies
-under one **Parametric** umbrella — one Studio button, one API family, one parameter
+A parametric study varies the inputs and reports how the result changes. XSLOPE groups
+three closely related studies under one **Parametric** heading — one Studio button, one API family, one parameter
 grammar:
 
 - **[Sensitivity](sensitivity.md)** — sweep one or more parameters and see how the factor of
@@ -18,17 +18,17 @@ A fourth study sweeps **time** rather than an input:
 [factor of safety versus time](sensitivity.md#factor-of-safety-versus-time) runs the
 stability analysis against every saved instant of a
 [transient seepage](../seep/transient.md) solution and reports when the slope is at its
-weakest. It shares the machinery above and needs no parameter reference at all — nothing
+weakest. It uses the same sweep engine and needs no parameter reference at all — nothing
 is substituted, because each point solves the same model against a different computed
 pore-pressure field. Studio offers it as the Parametric dialog's
 [Factor of safety vs time](../studio/analysis.md#factor-of-safety-vs-time) mode, which
 ticks the transient run's saved frames and draws the curve in an **FS vs Time** result tab.
 
-This is the geotechnical staple — Duncan & Wright present exactly these charts (FS vs
-parameter, and tornado diagrams comparing several parameters at their low/high bounds) —
-and half of slope-stability judgment is knowing *which* parameter matters on a given slope.
+Duncan & Wright present these charts (FS vs parameter, and tornado diagrams comparing
+several parameters at their low/high bounds), and knowing *which* parameter controls a given
+slope is a large part of slope-stability judgment.
 
-Sensitivity is deliberately distinct from [reliability analysis](../reliability/taylor.md): the
+Sensitivity analysis differs from [reliability analysis](../reliability/taylor.md): the
 Taylor-series method perturbs parameters by ±σ to estimate the *distribution* of FS,
 which requires the parameters to be independent. A sensitivity sweep asserts nothing
 statistical — it simply evaluates the model across a range — which also makes it the
@@ -44,7 +44,7 @@ run, not a property of the model, so nothing is added to the Excel input templat
 engine drives the point-and-click
 [Parametric study dialog in Studio](../studio/analysis.md#parametric-study)
 and the recipes in the [`/xslope` Claude Code skill](../usage/claude/index.md), so a study
-set up one way reads the same the others.
+gives the same result whichever way it is set up.
 
 ## Analysis modes: LEM, FEM, seepage
 

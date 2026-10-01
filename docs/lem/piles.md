@@ -313,13 +313,13 @@ force. The full per-slice accounting remains in the
 
 ## LEM vs. FEM Pile Modeling
 
-A pile row can be put into either of XSLOPE's engines, but the two are not alternative ways of solving the same problem. Which one is appropriate is decided by the member's geometry out of plane.
+A pile row can be put into either of XSLOPE's engines, but the two engines represent the row differently, and the member's geometry out of plane determines which one applies.
 
-**How LEM models piles**: the pile contributes a single concentrated force $H$ at the point where the failure surface crosses it. With Ito & Matsui that force is computed from the diameter $D$ and the center-to-center spacing $S$ — a plasticity solution for soil squeezing *between* adjacent piles — then capped by $V_{\text{cap}}$ and $M_{\text{cap}}$, resolved onto the slice base, and carried into the equilibrium equations. Spacing is a first-class input: change $S$ and the arching coefficients, the force per pile and the force per unit width of slope all change with it.
+**How LEM models piles**: the pile contributes a single concentrated force $H$ at the point where the failure surface crosses it. With Ito & Matsui that force is computed from the diameter $D$ and the center-to-center spacing $S$ — a plasticity solution for soil squeezing *between* adjacent piles — then capped by $V_{\text{cap}}$ and $M_{\text{cap}}$, resolved onto the slice base, and carried into the equilibrium equations. Spacing is a direct input: change $S$ and the arching coefficients, the force per pile and the force per unit width of slope all change with it.
 
 **How FEM models piles**: the pile is meshed as a chain of Euler-Bernoulli beam elements sharing nodes with the soil continuum, and its $EA$ and $EI$ are divided by $S$ and smeared over a unit width of section (see [Assembly](../fem/piles.md#assembly)). Nothing is prescribed — the beam carries whatever the deforming soil pushes onto it, over its whole length rather than at one point — and the analysis returns the moment, shear, deflection and soil reaction down the member.
 
-**Why the two are not interchangeable**: a two-dimensional analysis is plane strain, so every member in it is continuous out of plane. There is no gap between piles for soil to move through. A discrete row modeled in the FEM is therefore a *wall* at $1/S$ of one pile's stiffness, and the mechanism has to pass over, under or around it. Spacing enters the finite element model exactly once, as that divisor, so the quantity that governs the real three-dimensional mechanism reaches the model only as a stiffness.
+**Plane strain and pile spacing**: a two-dimensional analysis is plane strain, so every member in it is continuous out of plane. There is no gap between piles for soil to move through. A discrete row modeled in the FEM is therefore a *wall* at $1/S$ of one pile's stiffness, and the mechanism has to pass over, under or around it. Spacing enters the finite element model exactly once, as that divisor, so the quantity that governs the real three-dimensional mechanism reaches the model only as a stiffness.
 
 ### Which engine for which member
 
@@ -329,18 +329,18 @@ A pile row can be put into either of XSLOPE's engines, but the two are not alter
 | Contiguous or very closely spaced row | nearly continuous | FEM, with the smear stated | the same, with the gap unrepresented |
 | Discrete row at spacing | discrete | LEM with Ito & Matsui | factor of safety per spacing, force per row, capacity checks |
 
-For a **continuous member** the beam formulation is an exact description rather than an idealization, its $EA$ and $EI$ already are per unit width, and it returns internal actions that a limit equilibrium analysis cannot produce at all. That path is measured end to end against GeoStudio's SIGMA/W sheet pile wall example, where XSLOPE reads 1.020 without the wall against their about 1.025 and recovers the published moment and shear distributions in shape and turning point; with the wall in place it reads 1.647 against their about 1.4 — see [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) and [Applicability](../fem/piles.md#applicability-continuous-walls-and-discrete-pile-rows) in the FEM pile documentation.
+For a **continuous member** the beam formulation is an exact description rather than an idealization, its $EA$ and $EI$ already are per unit width, and it returns internal actions that a limit equilibrium analysis cannot produce at all. This approach has been compared with GeoStudio's SIGMA/W sheet pile wall example: XSLOPE gives 1.020 without the wall against about 1.025 from SIGMA/W and recovers the published moment and shear distributions in shape and turning point; with the wall in place it gives 1.647 against about 1.4 — see [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) and [Applicability](../fem/piles.md#applicability-continuous-walls-and-discrete-pile-rows) in the FEM pile documentation.
 
-For a **discrete row** the limit equilibrium route is the one whose mechanism is the real one. The size of the difference is measured on the pile model of [Tutorial LEM-12](../tutorials/lem12_piles.md) and [FEM-4](../tutorials/fem04_piles.md) — a 1:1 slope in c = 200 psf, $\phi$ = 20° soil with two rows of 2 ft drilled shafts at 6 ft spacing — which is solved by both engines on the same section, soil and pile rows:
+For a **discrete row** the limit equilibrium analysis models the actual mechanism, with the soil moving between the piles. The size of the difference is measured on the pile model of [Tutorial LEM-12](../tutorials/lem12_piles.md) and [FEM-4](../tutorials/fem04_piles.md) — a 1:1 slope in c = 200 psf, $\phi$ = 20° soil with two rows of 2 ft drilled shafts at 6 ft spacing — which is solved by both engines on the same section, soil and pile rows:
 
 | | Without piles | With piles | Credit for the row |
 |---|---|---|---|
 | **LEM** (Spencer) | 1.149 | 1.842 | ×1.60 |
 | **FEM** (SSRM) | 1.137 | 1.363 | ×1.20 |
 
-Without the piles the two engines agree to about 1%, so nothing structural separates them and what the second column adds is the pile row alone. With the row in place they credit it by a factor of 1.60 and 1.20 — a disagreement on the quantity being designed, not a rounding.
+Without the piles the two engines agree to about 1%, so the difference in the second column comes from the pile row alone. The row raises the factor of safety by a factor of 1.60 in the limit equilibrium analysis and 1.20 in the finite element analysis, a difference in the quantity being designed that is far larger than rounding.
 
-Neither of those is a three-dimensional answer, and the direction of the error is only known where a three-dimensional reference exists. Cai & Ugai (2000) analyzed a pile-stabilized slope with a shear-strength-reduction finite element model that meshes the individual piles, the soil between them and the slip interfaces on each pile's surface. XSLOPE runs the same slope through both of its own engines:
+Neither of those is a three-dimensional answer, and the direction of the error is only known where a three-dimensional reference exists. Cai & Ugai (2000) analyzed a pile-stabilized slope with a shear-strength-reduction finite element model that meshes the individual piles, the soil between them and the slip interfaces on each pile's surface. XSLOPE solves the same slope with both of its engines:
 
 | Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
 |---|---|---|
@@ -348,9 +348,9 @@ Neither of those is a three-dimensional answer, and the direction of the error i
 | Pile at $D_1/D$ = 3, free head | 1.472 | 1.36 (+8.2%) |
 | Pile, head rotation restrained | 1.594 | 1.45 (+9.9%) |
 
-The unpiled case agrees to 0.4%, which is what makes the other two readable. With the row in place the plane-strain model reads high: it credits the row with multiplying the unreinforced factor of safety by 1.296 where the three-dimensional model credits 1.193. On the same slope a Bishop search with the Ito & Matsui force reads 1.451 against the paper's own limit-equilibrium value of 1.37 and Slide2's 1.43, a credit of 1.269. Both two-dimensional credits stand well above the three-dimensional one — the beam by 0.103 and the limit-equilibrium search by 0.076 — and the 0.027 between them is small beside either gap. Neither two-dimensional credit recovers the three-dimensional one. What the one benchmark with a published three-dimensional answer settles is the direction of the plane-strain error, not a ranking of the two routes. Both comparisons are quantified in [VP106](../verification/rocscience.md#vp106) and [the VP106 finite-element diagnostic](../verification/rocscience.md#vp106-fem).
+The unpiled case agrees to 0.4%, so the differences in the other two rows come from the pile. With the row in place the plane-strain model gives higher values: it credits the row with multiplying the unreinforced factor of safety by 1.296 where the three-dimensional model credits 1.193. On the same slope a Bishop search with the Ito & Matsui force gives 1.451 against the paper's own limit-equilibrium value of 1.37 and Slide2's 1.43, a credit of 1.269. Both two-dimensional credits stand well above the three-dimensional one — the beam by 0.103 and the limit-equilibrium search by 0.076 — and the 0.027 between them is small beside either gap. Neither two-dimensional credit recovers the three-dimensional one. This benchmark, the only one with a published three-dimensional answer, establishes the direction of the plane-strain error; it does not rank the two two-dimensional approaches. Both comparisons are quantified in [VP106](../verification/rocscience.md#vp106) and [the VP106 finite-element diagnostic](../verification/rocscience.md#vp106-fem).
 
-**Practical implications**: take the factor of safety for a discrete pile row from the limit equilibrium analysis with Ito & Matsui, and read its finite element counterpart as a stiffness-and-force study rather than as a competing factor of safety. Do not repair the plane-strain smear by adjusting the pile stiffness or by imposing the Ito & Matsui limit pressure on the beam — the limit pressure is a theory of the very mechanism the two-dimensional model does not contain, and applying it there counts the same resistance twice. Where the member really is continuous, use the finite element path: it is the only one that reports what the member carries.
+**Practical implications**: take the factor of safety for a discrete pile row from the limit equilibrium analysis with Ito & Matsui, and read its finite element counterpart as a stiffness-and-force study rather than as a competing factor of safety. Do not repair the plane-strain smear by adjusting the pile stiffness or by imposing the Ito & Matsui limit pressure on the beam — the limit pressure is a theory of the very mechanism the two-dimensional model does not contain, and applying it there counts the same resistance twice. Where the member really is continuous, use the finite element analysis: it is the only one that reports the member's internal forces.
 
 
 ## Stabilizing Piles vs. Load-Bearing Piles
@@ -402,7 +402,7 @@ For load-bearing piles near slopes, the recommended approach in XSLOPE is:
 2. If the pile tip is below the failure surface, omit the structural load from the slope stability model (lower bound). If the structural load is significant, also run with full surcharge (upper bound) to bracket the result.
 3. If the pile also provides lateral resistance to sliding, model that separately as a stabilizing pile force $H$
 
-The existing distributed load capability in XSLOPE handles the surcharge case. No additional code is needed for load-bearing piles — only clear guidance on when and how to apply the structural load.
+The distributed loads in XSLOPE handle the surcharge case, so load-bearing piles need no additional input.
 
 For a more complete treatment of load-bearing piles that avoids these bounding assumptions, see the [FEM pile-soil interface discussion](../fem/piles.md#pile-soil-interface-and-load-transfer).
 

@@ -324,9 +324,9 @@ This iterative solution continues until the residuals $R_1$ and $R_2$ converge t
 
 In **xslope** the Newton direction of equations (31) and (32) is formed from the four first-order partial derivatives — equations (35), (36), (40) and (41). The second-order derivatives are given above for completeness and are not currently evaluated by the solver.
 
-### Which root is the answer
+### Selecting the root {#which-root-is-the-answer}
 
-Equations (27) and (28) can have more than one root on a surface, and only one of them describes a body of soil. The denominator of $m_\alpha$, $\cos(\alpha - \theta) + \sin(\alpha - \theta)\tan\phi'/F$, vanishes when $\theta$ falls a right angle away from a slice's base inclination, less the friction that base mobilizes. Past that point the slice's base normal has reversed, and roots on the far side of it read low.
+Equations (27) and (28) can have more than one root on a surface, and only one of them corresponds to a physically possible sliding mass. The denominator of $m_\alpha$, $\cos(\alpha - \theta) + \sin(\alpha - \theta)\tan\phi'/F$, vanishes when $\theta$ falls a right angle away from a slice's base inclination, less the friction that base mobilizes. Past that point the slice's base normal has reversed, and roots on the far side of it give factors of safety that are too low.
 
 **xslope** holds $\theta$ inside the band where $m_\alpha$ keeps its sign on every slice. This is the geometric bound Spencer and Duncan & Wright describe (the interslice inclination lies between the inclinations of the ground surface and the slip surface) written in the form the equations give, and no fixed cap is applied on top of it. A root reached outside the band is discarded. Each root inside it is tested on two further measures: the largest interslice resultant stays within the total driving load on the mass, and no more than half the slices carry base tension. Where more than one root survives, the one nearest the moment-equilibrium factor of safety on the same slices is reported, and a root that pushes the [line of thrust](#line-of-thrust) outside the slice on most boundaries triggers a sweep of the band so that the alternative is found. The roots passed over are listed in the solution warnings with the measure each failed. Where none survives, the method reports that it has no admissible solution on the surface rather than substituting another method's.
 
@@ -379,26 +379,27 @@ Engineers and Lowe-Karafiath — returns a list of admissibility notes in
 cohesionless slice, interslice tension, or a line of thrust that leaves the slices
 (the last only from Spencer and Morgenstern–Price, the two that reconstruct one).
 The warnings never change the factor of safety — they describe the internal force
-distribution — and they are not all equally alarming.
+distribution — and some indicate a more serious problem than others.
 
 A thrust line running outside the slices near the crest is common and natural wherever
 the top of the slope is cohesive: that soil is in tension, the interslice forces
-reflect it, and the reconstructed thrust line responds by leaving the physical slice.
+reflect it, and the reconstructed thrust line falls outside the slice.
 The classical remedy is a tension crack, which removes the tension zone from the
 analysis — but a crack should be modeled only when the reference analysis or the field
 condition calls for one; adding a crack merely to tidy the thrust line changes the
 problem being solved. A deep-seated case like the Talbingo dam
-([VP5](../verification/rocscience.md#vp5)) shows exactly this signature while its
+([VP5](../verification/rocscience.md#vp5)) shows this pattern while its
 factor of safety matches the moment methods and the published values.
 
-Base tension on a cohesionless slice is a sharper signal: that slice has no strength
-at all under the solution it is part of. See the VP30 discussion in the
+Base tension on a cohesionless slice indicates a more serious problem: that slice has
+no strength at all under the solution. See the VP30 discussion in the
 [verification corpus](../verification/rocscience.md#vp30) for a worked case where the
-warnings flag a root that is arithmetic rather than mechanics.
+warnings identify a root that satisfies the equations but does not represent a
+physically possible sliding mass.
 
 The interslice-tension note is measured and worded identically by all four methods,
-and it is a report, not a verdict — [Interslice tension](overview.md#interslice-tension)
-gives the measure and says why nothing is refused on it.
+and it does not stop the solution. [Interslice tension](overview.md#interslice-tension)
+gives the measure and the reasons.
 
 
 

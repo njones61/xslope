@@ -253,7 +253,7 @@ The figure shows the following:
 
 The history plot summarizes the same run: the lag of the phreatic surface and the exit point behind
 the pool (top), and the boundary flows (bottom, inflow in blue, outflow in dark red). The **exit-point**
-trace reports the top of the upstream seepage face and follows the pool waterline once seepage out of
+trace shows the top of the upstream seepage face and follows the pool waterline once seepage out of
 the upstream face stops. Inflow and outflow differ. Once the upstream face becomes an
 exit face the inflow falls to zero, while the outflow rises sharply with the water released from
 storage and then decays as the dam drains. A single steady "total flowrate" cannot represent this

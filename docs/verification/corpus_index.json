@@ -2932,16 +2932,16 @@
       "model": "docs/lem/files/xslope_johnson_rapid_KEY.xlsx",
       "references": [
         {
-          "anchor": "factor-of-safety-by-method",
+          "anchor": "conclusion",
           "checks": [
             "single_circle"
           ],
           "level": 2,
           "page": "tutorials/combo02_rapid_drawdown/",
-          "resolution": "input-link",
+          "resolution": "nearest-heading",
           "source_md": "docs/tutorials/combo02_rapid_drawdown.md",
-          "title": "Factor of safety by method",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#factor-of-safety-by-method"
+          "title": "Conclusion",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#conclusion"
         }
       ],
       "topics": [
@@ -3501,7 +3501,8 @@
         {
           "anchor": "tutorial-lem-8-a-reinforced-slope-geogrids",
           "checks": [
-            "circular_search"
+            "circular_search",
+            "single_circle"
           ],
           "level": 1,
           "page": "tutorials/lem08_reinforced_slope/",
@@ -3582,7 +3583,7 @@
           "page": "tutorials/lem08_reinforced_slope/",
           "resolution": "nearest-heading",
           "source_md": "docs/tutorials/lem08_reinforced_slope.md",
-          "title": "What Dir and Appl change",
+          "title": "Effect of Dir and Appl",
           "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem08_reinforced_slope/#what-dir-and-appl-change"
         }
       ],
@@ -7149,7 +7150,7 @@
           "page": "tutorials/fem05_rock_slope_joints/",
           "resolution": "input-link",
           "source_md": "docs/tutorials/fem05_rock_slope_joints.md",
-          "title": "What a network costs",
+          "title": "Solution time for a joint network",
           "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem05_rock_slope_joints/#what-a-network-costs"
         }
       ],
@@ -27878,7 +27879,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 661,
+    "tags": 662,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

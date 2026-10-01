@@ -17,8 +17,8 @@ Based on the user's request, do one or more of the following:
 When the user asks you to **build** a model (or import or fix one), build it, validate it with
 `plot_inputs` and the input checks, report that it is ready, and **stop there**. Then name what
 a run would involve — the method, single surface or search, roughly how long — and offer it. The
-user has not confirmed the geometry yet, and a factor of safety computed off an unconfirmed
-model is a number they have to unlearn.
+user has not confirmed the geometry yet, and a factor of safety computed on an unconfirmed
+model may have to be discarded.
 
 **A build request that names the analysis is still a build request.** "Add a starting circle for
 a critical-surface search", "set it up for a rapid drawdown", "build the mesh for an SSRM" — the
@@ -187,7 +187,7 @@ xslope.pack("inputs/problem_name.xlsx")           # -> inputs/problem_name.xslz
 slope_data = load_slope_data("handed_to_me.xslz") # unpacks beside it, then loads
 ```
 
-`load_slope_data` refuses rather than write over an existing unpack folder; pass
+`load_slope_data` raises an error rather than write over an existing unpack folder; pass
 `dest=` for a fresh location or `overwrite=True`. Never work "inside" a package — it is
 a transport format, and the loose workbook is what everything else reads and writes.
 
@@ -246,15 +246,15 @@ anything unless the question genuinely needs it. Three classes:
 
 ### Grounding rules
 
-**Capability questions — check, never impress.** Never answer one from a general sense of what
+**Capability questions — check before answering.** Never answer one from a general sense of what
 a slope-stability program probably does. Two sources settle it: `capabilities(slope_data)` (see
 Input Checks) when a model is loaded — it returns availability *and the reason* for every
 analysis and every LEM method — and this skill's own coverage otherwise, which is a map of the
 inputs and solvers xslope accepts. If neither settles it, grep the package, or say plainly what
 you checked and what you did not: *"I found no input for that in the material schema or the
 solver API, so I don't believe it exists, but please confirm it against the docs."* A wrong "no,
-xslope can't" costs the user a workaround they never needed; a wrong "yes it can" costs them an
-afternoon. Both are failures. Being uncertain out loud is not.
+xslope can't" sends the user to a workaround they do not need, and a wrong "yes it can" costs
+them time. When you are uncertain, say so.
 
 **Theory questions — answer, then cite.** Answer from knowledge, pitched at the level the
 question was asked at, and state the conventions: sign, units (Imperial vs SI), degrees not
@@ -302,11 +302,11 @@ published comparisons against the source or vendor program, not illustrations.
 | Topic | Worked examples |
 |:------|:----------------|
 | Reinforcement & geosynthetics | [VP87–VP94 — Geosynthetic multitiered MSE walls (Leshc…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87) · [2.18 — Borges & Cardoso – Geosynthetic Embankmen…](https://xslope.readthedocs.io/en/latest/verification/geostudio/#gs-2-18) · [Opening the starter file](https://xslope.readthedocs.io/en/latest/tutorials/fem02_reinforcement/#opening-the-starter-file) · [A base geotextile on soft clay](https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#a-base-geotextile-on-soft-clay) · [A smooth geomembrane liner on a firm foundation](https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#a-smooth-geomembrane-liner-on-a-firm-foundation) · [FHWA Example E1 — MSE wall with a broken backslope](https://xslope.readthedocs.io/en/latest/verification/published/#fhwa-e1) |
-| Soil nails | [What Dir and Appl change](https://xslope.readthedocs.io/en/latest/tutorials/lem08_reinforced_slope/#what-dir-and-appl-change) · [VP47 — Soil-nailed wall in clay (Amherst test wa…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp47) · [VP48 — Soil-nailed wall in sand (Clouterre test…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp48) · [RS2 Part IV VP60 — Soil-nailed wall (Pockoski & Duncan slope…](https://xslope.readthedocs.io/en/latest/verification/rs2/#p4-vp60) |
+| Soil nails | [Effect of Dir and Appl](https://xslope.readthedocs.io/en/latest/tutorials/lem08_reinforced_slope/#what-dir-and-appl-change) · [VP47 — Soil-nailed wall in clay (Amherst test wa…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp47) · [VP48 — Soil-nailed wall in sand (Clouterre test…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp48) · [RS2 Part IV VP60 — Soil-nailed wall (Pockoski & Duncan slope…](https://xslope.readthedocs.io/en/latest/verification/rs2/#p4-vp60) |
 | Anchors & tiebacks | [VP49 — Retaining wall, grouted tiebacks, soldier…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp49) · [VP58 — Tied-back wall in layered soil](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp58) · [VP59 — Tieback wall in sand, drawdown water table](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp59) |
 | Piles & drilled shafts | [7. Pile-Stabilized Slope (Hassiotis et al. 1997)](https://xslope.readthedocs.io/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997) · [Torggler (2016) §3 — Homogeneous slope with a vertical plate](https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-torggler3a) · [Torggler (2016) §4 — Slope with a weak layer and a 15 m plate](https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-torggler3b) · [Opening the model and reading the pile rows](https://xslope.readthedocs.io/en/latest/tutorials/fem04_piles/#opening-the-model-and-reading-the-pile-rows) · [Opening the model](https://xslope.readthedocs.io/en/latest/tutorials/lem12_piles/#opening-the-model) · [SIGMAW-SRS — Slope stabilization with a sheet pile wall](https://xslope.readthedocs.io/en/latest/verification/geostudio/#sigmaw-wall) |
 | Sheet-pile & cutoff walls | [1. Sea Trench](https://xslope.readthedocs.io/en/latest/seep/samples/#1-sea-trench) · [Check its work](https://xslope.readthedocs.io/en/latest/tutorials/seep01_sheetpile/#check-its-work) · [Partially Penetrating Sheetpile](https://xslope.readthedocs.io/en/latest/verification/seep/#verification-sheetpile) |
-| Rapid drawdown | [VP98 — Walter Bouldin Dam rapid drawdown (Duncan…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp98) · [VP99 — Pumped-storage project dam rapid drawdown…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp99) · [6. Saturated vs. Moist Unit Weight (γ_sat)](https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat) · [Factor of safety by method](https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#factor-of-safety-by-method) · [The dam](https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#the-dam) |
+| Rapid drawdown | [VP98 — Walter Bouldin Dam rapid drawdown (Duncan…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp98) · [VP99 — Pumped-storage project dam rapid drawdown…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp99) · [6. Saturated vs. Moist Unit Weight (γ_sat)](https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat) · [Conclusion](https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#conclusion) · [The dam](https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#the-dam) |
 | Transient seepage | [7. Earth Dam — Reservoir Drawdown (Transient)](https://xslope.readthedocs.io/en/latest/seep/samples/#7-earth-dam-reservoir-drawdown-transient) · [8. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.readthedocs.io/en/latest/seep/samples/#8-johnson-reservoir-zoned-drawdown-transient) · [Opening the model](https://xslope.readthedocs.io/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model) · [Opening the model](https://xslope.readthedocs.io/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model_1) · [Rain that comes and goes](https://xslope.readthedocs.io/en/latest/tutorials/seep04_dam_infiltration/#rain-that-comes-and-goes) · [SEEPW-T01 — Simulating consolidation with SEEP/W](https://xslope.readthedocs.io/en/latest/verification/geostudio/#seepw-t01) |
 | Seepage-coupled stability | [VP102 — Earth dam before rapid drawdown (Huang &…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp102) · [VP46 — Baker (1993) three-stage dam — stages 1-2…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp46) · [RS2 Part IV VP102 — Homogeneous earth dam, dry (Huang & Jia 2…](https://xslope.readthedocs.io/en/latest/verification/rs2/#p4-vp102) · [RS2-28 — Excavated slope with FE groundwater and m…](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-28) · [8. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.readthedocs.io/en/latest/seep/samples/#8-johnson-reservoir-zoned-drawdown-transient) · [4. Johnson Reservoir](https://xslope.readthedocs.io/en/latest/seep/samples/#johnson-reservoir) |
 | Probabilistic & reliability | [RS2-25 — Syncrude tailings dyke (El-Ramly et al. 2…](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-25) · [RS2-26 — Clarence Cannon dam (Wolff & Harr 1987)](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-26) · [2. Reliability Analysis — Two-Layer c–φ Slope](https://xslope.readthedocs.io/en/latest/fem/samples/#2-reliability-analysis-two-layer-c-slope) · [Worked sample](https://xslope.readthedocs.io/en/latest/parametric/sensitivity/#worked-sample) · [Opening the model](https://xslope.readthedocs.io/en/latest/tutorials/lem11_reliability/#opening-the-model) · [The deterministic run](https://xslope.readthedocs.io/en/latest/tutorials/lem11_reliability/#the-deterministic-run) |
@@ -501,7 +501,7 @@ slope_data['materials'] = [
         # --- tensile-strength cutoff (v16): Rankine cap on the major principal stress, stress
         #     units. Read by mc/cp/pow/hb (NOT 'elastic', which cannot fail regardless). None/
         #     blank = the material's own envelope decides and the engine enforces it: on 'mc'
-        #     every element is capped at its apex c/tan(phi), all Mohr-Coulomb admits, so a
+        #     every element is capped at its apex c/tan(phi), the most Mohr-Coulomb allows, so a
         #     c = 0 soil carries no tension whether the cell is blank or 0. Tension is
         #     unbounded only where phi = 0 ('cp', or 'mc' at phi = 0), where there is no apex.
         #     0 = soil carries no tension. FEM only; LEM ignores it (model a tension crack
@@ -515,7 +515,7 @@ slope_data['materials'] = [
         # --- matric-suction strength (v17): opt-in Fredlund extended Mohr-Coulomb apparent
         #     cohesion, read by BOTH solvers (LEM via generate_slices' suction_phi_b/
         #     suction_cap kwargs; FEM/SSRM via solve_fem/solve_ssrm's same-named kwargs) —
-        #     auto-wired from these two columns, an explicit kwarg overrides the file. In the
+        #     read from these two columns, an explicit kwarg overrides the file. In the
         #     SSRM the suction term is reduced by the strength-reduction factor F alongside c'
         #     and tan(phi'). phi_b = the unsaturated friction angle phi^b (degrees); None/blank
         #     = no suction strength credited — the default, exactly pre-v17 behavior. s_cap =
@@ -834,8 +834,6 @@ def skimming_circle(A, B, k=15.0):
 circles.append(skimming_circle(seg_start, seg_end))   # steepest c=0 face segment
 ```
 
-Two things that will bite you:
-
 - **Use the steepest *segment*, not the whole face.** On a benched face, chording crest-to-toe
   just averages the benches away. (Talbingo: the steepest bench segment gives the true 1.669;
   a crest-to-toe chord returns 1.95 and misses the mechanism entirely.)
@@ -850,8 +848,8 @@ infinite-slope answer. If your search returns something well above that, it miss
 If the face is **submerged or has seepage exiting it**, the skin is weaker still — use
 `FS = (gamma - gamma_w)/gamma * tan(phi)/tan(beta)` as the expected value.
 
-Whether such a surficial "skin" failure is the answer you *want* is an engineering judgement —
-it is often surface ravelling rather than a stability concern — but the search should find it
+Whether such a surficial "skin" failure is the answer you *want* is an engineering judgment —
+it is often surface raveling rather than a stability concern — but the search should find it
 and you should decide consciously, not miss it by accident.
 
 A **FEM-only** or seepage-only model needs no circle: leave the sheet empty. Only a
@@ -861,8 +859,8 @@ limit-equilibrium run needs a surface, and preflight refuses that run when there
 or `'non-circular'` — decides which one runs, and the loader uses it to set
 `slope_data['circular']`, so the run, the plots and the next session all read the same surface.
 Blank is normal and means "whichever family the model defines"; on a file carrying both, the
-circular one wins and the model checks say so. A family named there is honoured only where the
-model actually defines it.
+circular one is used and the model checks report this. A family named there is honored only
+where the model actually defines it.
 
 **Search window (optional, v19).** `slope_data['search_window']` confines the automated circular
 search to a region: `entry_x_min`/`entry_x_max`, `exit_x_min`/`exit_x_max`,
@@ -1003,7 +1001,7 @@ slope_data['reinforcement_lines'] = [
 ]
 ```
 
-Two pullout laws, one envelope. With `lp1`/`lp2` the capacity develops at a constant rate
+The two pullout laws share one envelope. With `lp1`/`lp2` the capacity develops at a constant rate
 `t_max/lp` from each end. With `adhesion` and `delta` both set it develops at
 `2*(adhesion + sigma'_v*tan(delta))` per unit length, integrated along the line — `sigma'_v`
 being the weight of the soil column above each point (gamma_sat below the water table where a
@@ -1021,13 +1019,13 @@ already per unit width.
 `joint` decides how the FEM represents the sheet, and the choice is about the mechanism, not
 the material: does the slip surface CUT the reinforcement or run ALONG it? A bonded bar is right
 where the surface crosses the layers (a circle through a geogrid slope, a nail wall, a pile
-row) — it is the FE twin of the LEM treatment. A joint is right where the surface can run along
+row) — it corresponds to the LEM treatment. A joint is right where the surface can run along
 the layer: a base geotextile under an embankment on soft clay, a wrapped-face or block-faced
 wall whose fill slides on its sheets, a smooth liner. On a jointed line `lp1`/`lp2` and `t_res`
 are not read (the grip is the interface traction), a blank `tend1`/`tend2` leaves that end free
 to pull out, and a filled one ties it at that capacity. LEM ignores `joint` entirely. Preflight
-reports the geometry that says a bonded line should have been a joint. See
-`docs/fem/reinforcement.md`, "Bonded bar or joint?".
+reports the geometry that indicates a bonded line should have been a joint. See
+`docs/fem/reinforcement.md`, "Choosing a Bonded Bar or a Joint".
 
 ### Joint lines (v27 `joints` sheet, FEM only)
 
@@ -1315,7 +1313,7 @@ caps["analysis"]["seep"].available     # False without a mesh
 OMS and Bishop sum moments about a circle center, so they cannot run on a non-circular surface;
 the other five take either family.
 
-### Remedies — offered, never applied silently
+### Remedies
 
 A rule may name a fix. It is always an explicit act, and the fixed model comes back as a
 **copy** — hand *that* to the solver:
@@ -1357,16 +1355,16 @@ volume, so it resists the mechanism and needs a larger reduction to collapse —
 **too high, in the unconservative direction**. On Griffiths & Lane Example 1 (reference ≈ 1.40)
 `tri3` returns 1.70 (+21%) and `quad4` 1.56 (+11%), while `tri6`, `quad8` and `quad9` all return
 1.41. Use `tri6` (conforms best to irregular/zoned geometry — the default choice) or `quad8`/
-`quad9` (more regular layout on block-like sections). The run gate warns before an SSRM on a
-linear mesh; it warns rather than refuses, so do not read it as permission.
+`quad9` (more regular layout on block-like sections). The model checks warn before an SSRM on a
+linear mesh; it is a warning rather than an error, but a linear mesh is still wrong for an SSRM.
 
 **`tri3` is the right choice for seepage.** The field is scalar, nothing can lock, and the
 smaller system solves faster. If the SAME mesh will be reused for FEM, build it quadratic.
 
 **`quad_style`** (quad element types only): `'free'` (default, works on any shape) or
 `'structured'`, which additionally sweeps a regular grid through every zone a conservative
-mappability check accepts and free-meshes the rest. It can never produce a worse mesh than
-`'free'` — choose it for block-like sections (layered foundations, a rectangular core, a cutoff).
+mappability check accepts and free-meshes the rest; a declined zone is meshed exactly as in
+`'free'`. Choose it for block-like sections (layered foundations, a rectangular core, a cutoff).
 
 **Per-zone element size.** A `'size'` key on a material polygon or a profile line, and the
 `refine_zones` overlays, all drive the local size down to that value (see the refine-regions
@@ -1532,7 +1530,7 @@ Method notes:
 
 ### Parametric studies (sensitivity, design, back-analysis)
 
-`xslope.sensitivity` groups three related studies under one **Parametric** umbrella, all
+`xslope.sensitivity` groups three related studies under one **Parametric** heading, all
 sharing one parameter grammar. **Sensitivity**: `sensitivity()` sweeps one input and reports
 the OUTPUT per point; the sweeps feed a family of plots (below). **Design**: `design()`
 sweeps one input to find the value where the output meets a target. **Back-analysis**:
@@ -1568,8 +1566,8 @@ ok, res = sensitivity(slope_data, param="mat:Clay:c", rel_range=0.5, n=9,
   `label`, `value`, and `sigma` (the reliability std-dev if the model carries one). This
   is the menu a picker or a design/tornado study draws from. Pass `mode="seep"` to switch
   the menu to the seepage set (hydraulic `k`/unsaturated fields + `seep_bc` head refs).
-- `search=True` (default) re-searches the critical surface per point — the honest setting,
-  since the critical surface moves; `search=False` re-solves `circles[0]` / `non_circ`
+- `search=True` (default) re-searches the critical surface per point, because the critical
+  surface moves; `search=False` re-solves `circles[0]` / `non_circ`
   (~50x faster, for prescribed-surface questions).
 - For geometry or anything without a ref, pass `modify=fn, label="..."` where
   `fn(slope_data, value) -> slope_data` and MUST rebuild derived geometry itself
@@ -1590,7 +1588,7 @@ ok, res = sensitivity(slope_data, param="mat:Clay:c", rel_range=0.5, n=9,
 
 #### Design: find the value that hits a target FS
 
-The deterministic-design staple — "vary the undrained strength between X and Y and find
+A common deterministic design calculation — "vary the undrained strength between X and Y and find
 where FS = 1.5". `design()` runs `steps` evenly spaced solves across `[low, high]` and
 linearly interpolates the parameter value where the FS curve crosses `target_fs`:
 
@@ -1652,7 +1650,7 @@ print(res["crossing"])         # the k1 (or head) that produces the target q
 plot_sensitivity(res["df"], target_fs=res["target_fs"])   # y-axis auto-labels "Total discharge, q"
 ```
 
-`crossing` / `bracketed` / `fs_range` / `extend` carry the same honest-miss semantics as
+`crossing` / `bracketed` / `fs_range` / `extend` follow the same rule for a missed target as
 the FS case — never extrapolate a crossing past the swept range. The classic reservoir
 study sweeps a specified-head boundary instead, charting discharge against reservoir level:
 
@@ -1663,7 +1661,7 @@ ok, res = design(slope_data, {"seep_bc": {"set": 1, "head_index": 0}},
 
 #### FS vs time: the factor of safety across a transient run
 
-The coupled-analysis curve the vendors publish. `fs_vs_time` runs a stability analysis against
+This is the coupled-analysis curve that vendor programs publish. `fs_vs_time` runs a stability analysis against
 **every saved frame** of a transient seepage solution and tabulates the result. No input is
 modified at any step — the axis is time, and each point solves the same model against a
 different computed pore-pressure field. **Recommend it whenever a model has a transient solution
@@ -1680,17 +1678,17 @@ plot_sensitivity(res["df"], save_png=True)      # x-axis is time; param == 'time
 
 - `times=` restricts (or extends) the set; the default is every saved frame. An instant with no
   saved frame is served by ONE rerun of the transient seepage analysis with all of them injected
-  (`seep_data=seep_data`, `remarch=True`) — otherwise it is a `success=False` row saying so. Never interpolated.
+  (`seep_data=seep_data`, `remarch=True`) — otherwise it is a `success=False` row with that reason. Never interpolated.
 - `search=True` is the right default here: the critical surface MOVES as the pore pressures
-  change, and that is the phenomenon. Use `search_opts` (or the file's window) to hold the curve
+  change, which is the effect being studied. Use `search_opts` (or the file's window) to hold the curve
   on one mechanism.
 - `mode='fem'` runs a full SSRM per frame — minutes each, so restrict `times`. `mode='seep'` is
-  refused: the seepage solution is this run's input.
+  rejected: the seepage solution is this run's input.
 - `rapid=True` makes every instant a three-stage rapid drawdown instead: stage 1 the transient
   run's initial state (`tseep` `stage_1`, normally t = 0 at full pool), stage 2 the frame at t, and the
   reported value the drawdown's own — the lower of stages 2 and 3. Rows gain `stage1_FS`,
   `stage2_FS`, `stage3_FS`, `stage3_run` and `governs`. LEM only; every point is an auto search
-  from the starting circle, so `search` is not consulted. Use it when the question is "how safe
+  from the starting circle, so `search` is not used. Use it when the question is "how safe
   is the slope if the pool falls to where it stands at t"; leave it off for "how safe is the
   slope in the state it is in at t".
 - The run prints an aligned per-instant table when the sweep is done (t, FS, the critical
@@ -1756,7 +1754,7 @@ print(res["message"])        # "Back-analysis: mat:Soil:c = 3.25 gives FS = 1 (.
 print(res["crossing"])       # the back-calculated value; res['study'] == 'back_analysis'
 ```
 
-Same fields and the same never-extrapolate honesty as `design()` — if FS = 1.0 is not
+Same fields and the same never-extrapolate rule as `design()` — if FS = 1.0 is not
 reached in the range, `bracketed` is False and `extend` says which way to widen it.
 
 ---
@@ -1991,9 +1989,9 @@ else:
     print(f"SSRM failed: {result.get('error', 'Unknown error')}")
 ```
 
-**A trial still moving at the iteration limit is read by its trend.** At `max_iterations`
-(default 12000) a trial that has not converged is read by how its movement changed over the
-second half of its iterations. Movement dying away at a steady rate is handed to the Newton
+**Trials at the iteration limit.** At `max_iterations`
+(default 12000) a trial that has not converged is classified by how its movement changed over
+the second half of its iterations. Movement dying away at a steady rate is handed to the Newton
 corrector (from where the trial is, then from where the movement is heading), and a certified
 state counts as standing; movement that does not slow ends the trial as sliding
 (`exit_reason = 'not_slowing'`); movement still dying away that the corrector cannot finish, or
@@ -2008,7 +2006,7 @@ iterations per trial to go further. To go further without starting over, continu
 the same Python session: `solve_ssrm(fem_data, resume=result, max_iterations=N)` with `N` above
 the limit it used. `xslope.fem.ssrm_can_continue(result)` says whether a run can be (the
 iteration limit stopped its top trial: undecided at the limit, or counted failed while still
-slowing; a yield-gate top cannot). The search follows the path a fresh run at the new limit
+slowing; a top trial that ended on the yield check cannot). The search follows the path a fresh run at the new limit
 takes, reusing decided trials and finishing the unfinished ones from where they stopped; the
 result is the whole run's (`trials` once each, a continued one with `resumed_from`;
 `result['resumed']` lists reused, continued and fresh trials; the summary names the F and the
@@ -2023,17 +2021,17 @@ failed at that point rather than spending the rest of its budget (`exit_reason =
 `solve_ssrm` lengthen each iteration's step where the last two show the solution still heading
 the same way (`accelerate=None`, the default; `accelerate=False` for the ordinary iteration).
 It reaches the same balanced state in fewer iterations; the Log's opening lines for a run
-say whether acceleration was on.
+show whether acceleration was on.
 
 **Read the closing summary and the curve before quoting the number.** Every run ends with
 `result['summary']`, printed as its last lines. When the trial at the top of the bracket hit the
-iteration limit, the summary reads it one of two ways. **Still moving fast** (the trial's verdict
+iteration limit, the summary classifies it one of two ways. **Still moving fast** (the trial's verdict
 is FAILED: several times its elastic displacement and still growing) means the slope was failing,
 and the number stands. **Still moving, but slowly** means the factor of safety depends on the
 iteration limit, and raising Max iterations per trial may change it. The `'ssrm_curve'` plot
 shows the same thing: a flat run of displacements and a sharp knee is a strength limit; a steady
 climb with no knee means the slope never stopped moving. In that second case say so to the user
-rather than reporting the number bare. Any other ending is quoted with the reading that fired it
+rather than reporting the number bare. Any other ending is quoted with the measurement that triggered it
 (the trend of the movement at the limit, joint slip growth and rate, the elastic multiple
 reached, the displacement against its limit); pass those numbers on rather than paraphrasing
 them.
@@ -2044,7 +2042,7 @@ the trial, a bounded Newton corrector attempts to finish it from the state the l
 A trial stands only on a state that is in force equilibrium at full gravity, inside the yield
 surface, and under a tenth of the model height in displacement — and that applies to a viscoplastic
 state too, so a trial that settles in force while a Gauss point sits far outside the yield surface
-does not stand on it. A corrector refusal decides nothing: the loop carries on untouched. Each
+does not stand on it. An attempt the corrector cannot certify changes nothing: the loop continues unchanged. Each
 solution therefore carries a yield reading (`max_yield_violation`, `n_yield_above_1pct`,
 `max_yield_at`), and a trial the corrector decided carries a `corrector` record naming the
 checkpoint and the three readings.
@@ -2058,11 +2056,10 @@ real cohesion sitting far outside its surface usually wants a declared tension c
 cohesionless material already has zero tensile capacity, so writing `t_cut = 0` on it changes
 nothing.
 
-**The escape hatch.** `fem_solver='viscoplastic'` on `solve_fem()`/`solve_ssrm()` runs the plain
-viscoplastic loop with no corrector and no yield check — the driver every locked and published
-factor of safety was produced on before the corrector. `XSLOPE_FEM_SOLVER` sets it for a whole
-process and prints a warning when it does. Use it to reproduce an older number; leave it alone
-otherwise.
+**Turning the corrector off.** `fem_solver='viscoplastic'` on `solve_fem()`/`solve_ssrm()` runs
+the plain viscoplastic loop with no corrector and no yield check. `XSLOPE_FEM_SOLVER` sets it for
+a whole process and prints a warning when it does. Use it to reproduce a number computed with the
+plain loop; leave it alone otherwise.
 
 **FEM-only models need no starting circle.** `load_slope_data()` loads a model with no
 surface, mesh or seepage boundary conditions; the SSRM never reads the circles sheet, and

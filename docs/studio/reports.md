@@ -3,10 +3,9 @@
 **File → Generate Report…** (also on the toolbar) turns the open model and its
 results into a Word document: a title page, a table of contents, running heads
 and footers, numbered figures and tables, and a section for every engine that
-was run. The action becomes available once something has been solved — a report
-documents results, and any engine's solution counts.
+was run. The action is available once any engine has produced a solution.
 
-Nothing in it is a screenshot. The plots are rendered at 300 dpi by the same
+The plots are not screenshots: they are rendered at 300 dpi by the same
 plotting code the canvas draws with, and every table is built from the same
 DataFrames the solvers produce. The figures are embedded, so a report is one
 file.
@@ -24,14 +23,15 @@ that was not run gets no section.
 ### Traceability
 
 The reproducibility stamp: the xslope version, the input file's name and its
-SHA-256 digest, when the analysis was run where the run's own record says, the
-mesh where no analysis section counts it out, and when the report was generated.
+SHA-256 digest, the time of the analysis where the run's own record gives one, the
+mesh where no analysis section describes it, and when the report was generated.
 The digest identifies the exact inputs the numbers came from. A run whose record
 carries no solve time gets no row rather than a guessed one.
 
 ### Project definition
 
-The model every analysis in the report shares, and only what they share:
+This section describes the model that every analysis in the report shares, and only
+what they share:
 
 - **The section** — how many material zones it is defined by, how they are
   described, and what they are called.
@@ -51,13 +51,13 @@ The model every analysis in the report shares, and only what they share:
 ### Seepage analysis
 
 Written where a flow solution is present, and placed ahead of the analyses that
-consume it. See [Seepage Analysis](../seep/overview.md) for the formulation.
+use it. See [Seepage Analysis](../seep/overview.md) for the formulation.
 
 **Analysis inputs** — the seepage model plot, the mesh, the unit weight of
 water, and the material table: major and minor saturated conductivity and the
 angle of the major axis, plus the unsaturated model, its dry relative
 conductivity and its fall-off where the problem is unconfined. A confined
-problem is solved saturated throughout and prints none of that apparatus. Where
+problem is solved saturated throughout and prints none of these. Where
 a material carries an unsaturated model, its curve is drawn twice — against
 matric suction and against the pressure head the solver works in — with every
 material on one set of axes. Then the mesh colored by material with the
@@ -80,7 +80,7 @@ the difference between the two figures.
 at a few of its saved states — four by default. The first and the last are two
 of them; the rest are weighted onto the interval the reservoir level falls over,
 so a drawdown report shows the drawdown happening rather than its two ends, and
-a run no level falls in is spaced evenly through the states it saved. Each
+a run in which no level falls is spaced evenly through the states it saved. Each
 state is drawn for the same four fields, on one color scale across every state
 so the run can be read down the page. A history figure closes the
 section: the level the reservoir boundary is held at, the phreatic elevation and
@@ -98,29 +98,30 @@ tension crack and the maximum surface depth.
 **Materials** — every referenced material with the strength option it is
 analyzed under, the properties that option uses, and where its pore pressure
 comes from, followed by a statement of the water conditions. A model with no
-groundwater and no external water collapses to one sentence saying the section
-is analyzed dry. Where the water surface comes from computed heads, the sentence
-sends the reader to the seepage section rather than restating it.
+groundwater and no external water is reduced to one sentence stating that the
+section is analyzed dry. Where the water surface comes from computed heads, the
+sentence refers the reader to the seepage section rather than restating it.
 
 **Loads**, and **Reinforcement** and **Piles** where the model carries them —
 the properties the method of slices reads, which are not the ones the finite
 element analysis reads.
 
 **Factors of safety** — one table of the factor of safety each documented method
-reported, with its solution parameters, under a sentence saying where those
-surfaces came from. A report of a single method has no such table: one row is
-the number that method's own section states.
+reported, with its solution parameters, under a sentence stating where those
+surfaces came from. A report of a single method has no such table, since its one
+row would repeat the number in that method's own section.
 
 Then **one block per method**, under that method's own heading:
 
 - **Search for the critical surface**, where that method searched — how many
   trial surfaces it evaluated, over how many refinement stages, the range of
-  factors of safety it saw, the window it worked in, and a plot of every trial
-  with the critical one highlighted. The search belongs to the method, not to
-  the section: two methods searched separately settle on different surfaces.
+  factors of safety it found, the window it worked in, and a plot of every trial
+  with the critical one highlighted. Each method has its own search, because two
+  methods searched separately settle on different surfaces.
 - **Results** — the factor of safety, the surface plot with its slices and base
   stresses, and any admissibility notes the solution reported. A surface that
-  was entered rather than searched for says so, and is not called critical.
+  was entered rather than searched for is identified as entered, and is not
+  called critical.
 - **Rapid drawdown** — the three stage factors of safety and which one governs,
   for a [rapid drawdown](../lem/rapid.md) run.
 - **The slice table** — geometry, forces and strengths on a landscape page, with
@@ -141,7 +142,7 @@ in it. The equation is the one published for that method — the derivation on i
 documentation page, in that page's own symbols, which the section links — with a
 force diagram above it and a nomenclature table below.
 
-It is compact by design. Each slice's contribution to the two sums is a column
+The section is compact. Each slice's contribution to the two sums is a column
 of the slice table, and the section links that table rather than walking through
 every slice. What it prints is the published equation with its named sums under
 it, one sentence naming the forces this model does not carry and the reduced
@@ -163,11 +164,11 @@ equilibrium sums evaluating to their residuals at the converged (F, θ), as
 Morgenstern–Price does at its (F, λ).
 
 Every number is printed at a precision the factor of safety can be rebuilt from:
-divide the two sums as printed and the printed factor of safety comes back. That
-reproduction is a test, so the section cannot drift away from the solver. Where
-a model uses a feature the compact form cannot show — passive support in a
-force-equilibrium method, whose capacity mobilizes with the soil and so carries
-1/F on both sides — the section says so rather than printing an equation that
+divide the two sums as printed and the printed factor of safety comes back.
+XSLOPE's tests check that reproduction, so the section stays consistent with the
+solver. Where a model uses a feature the compact form cannot show — passive support
+in a force-equilibrium method, whose capacity mobilizes with the soil and so carries
+1/F on both sides — the section states this rather than printing an equation that
 does not reproduce.
 
 ### Deformation and strength reduction
@@ -195,18 +196,18 @@ from is a choice:
 | Both | — | Each state in turn, every variable on one scale across the pair |
 
 A run that captured no at-failure snapshot falls back to the converged field and
-the report says so, rather than printing the same three panels twice under two
+the report states this, rather than printing the same three panels twice under two
 headings. The field state applies to the first three; displacement vs F is drawn
 once per run, from the run's record of its trials: every trial's maximum
 displacement against its factor, marked by whether the slope reached equilibrium,
 with the factor of safety and the final bracket. It is drawn only where that
 record carries the displacements. Where the trial at the top of the bracket hit
 the iteration limit while the slope was still moving slowly, the paragraph beside
-it says the factor of safety depends on the iteration limit.
+it states that the factor of safety depends on the iteration limit.
 
 **Reinforcement forces** and **Pile forces** are written where the run solved
-members of that kind and its saved fields carry their forces — a solution that
-records none says so and reports none. Each subsection carries a locator figure
+members of that kind and its saved fields carry their forces; for a solution that
+records none, the report states this and gives no forces. Each subsection carries a locator figure
 naming the members in the section, a table of what the analysis put in them, and
 a detail plot per member: axial force over the capacity envelope with the bond
 transfer beneath it for a reinforcement line, and displacement, shear, moment
@@ -225,8 +226,8 @@ The [model-check](../usage/preflight.md) findings, in the checker's own words,
 scoped to the report: every check declares which analyses it applies to, so a
 limit equilibrium report never prints a finding about the finite element engine.
 The section is **off by default** — turn it on for a submittal where the checks
-belong on the record. Switched on with nothing to report, it says the checks
-raised no findings, which is the statement a reviewer came for.
+belong on the record. Switched on with nothing to report, it states that the checks
+raised no findings.
 
 ---
 
@@ -239,10 +240,10 @@ Word (`.docx`) is what is available; PDF is listed and dimmed. The path defaults
 to `<model>_report.docx` beside the model. **Template** reads *Shipped template*
 until **Browse…** points it at a company template; **Shipped template** puts it
 back. A template that does not declare the styles the report is written in is
-refused when Generate is pressed, naming the style it lacks, rather than after a
-build. The choice is remembered between sessions — and a remembered template
-that has since been moved or deleted falls back to the shipped one and says
-which file went, on the field.
+rejected when Generate is pressed, with a message naming the style it lacks, rather
+than after a build. The choice is remembered between sessions — and a remembered
+template that has since been moved or deleted falls back to the shipped one, and
+the field names the missing file.
 
 **Analysis.** Which methods the report documents in full — each ticked method
 gets its own block, and the factor of safety table lists exactly those. Every
@@ -276,14 +277,12 @@ report action dims until it is finished.
 
 ## Reporting a model that is already solved
 
-Solving again to write a report would be a waste of a strength reduction
-bisection. It is never necessary:
+A model that is already solved does not have to be solved again for a report:
 
 - **In Studio**, opening a model restores the seepage solutions saved beside it,
-  steady and transient, and the finite element solution. A restored solution is
-  a solved one as far as the report is concerned, and the whole record the run
-  kept of itself comes back with it, so the document says how the answer was
-  reached and not only what it was.
+  steady and transient, and the finite element solution. The report treats a
+  restored solution as solved, and the run's full record is restored with it, so
+  the document states how the answer was reached and not only what it was.
 - **From Python**, `solutions_from_sidecars()` assembles the same bundles from
   the same companion files.
 
@@ -296,12 +295,12 @@ from a bundle the caller solved.
 ## Building the page numbers
 
 The contents page is a real Word `TOC` field, and page numbers only exist once a
-page layout engine has laid the document out. Rather than guess them, the
-written document is handed to a program that lays pages out. Either way it is a
-labeled stretch of the progress bar, and either way the field stays live: F9 in
-Word still rebuilds the whole table.
+page layout engine has laid the document out. XSLOPE does not guess them: the
+written document is passed to a program that lays pages out, Word or LibreOffice as
+described below. The step shows as a labeled stretch of the progress bar, and the
+field stays live: F9 in Word still rebuilds the whole table.
 
-**Word**, where the machine has it, does its own job. On macOS it is driven over
+**Word**, where it is installed, updates the fields itself. On macOS it is driven over
 Apple events and given a **copy**: it updates every field and every table of
 contents in the copy, saves, and closes, and the copy takes the report's place
 when it comes back — a finish that fails or is killed halfway leaves the report
@@ -312,38 +311,38 @@ file sits beside the report while it is open, and a finish killed partway
 interrupts a save of the report itself rather than of a disposable copy.
 
 **LibreOffice** finishes the report where there is no Word, or where Word
-declines. It cannot update a Word field, so it is used as what it is: the
-document is laid out to PDF, the page each heading landed on is read off that
+does not respond. It cannot update a Word field, so it is used only to lay the
+document out: the document is laid out to PDF, the page each heading landed on is read off that
 PDF's outline — which LibreOffice builds from the heading styles and the
 document's own numbering — and those pages are written into the contents field's
 cached result, which is where Word puts them too. The work happens on a copy,
-which takes the report's place only once every number has been proved: the
+which takes the report's place only once every number has been checked: the
 finished copy is laid out a second time, and every number it carries has to be
 the page its heading lands on in the document that carries it. An entry that
-cannot be placed at all is a refusal that names the entry, not a contents page
-that is quietly wrong about one line. This leg needs LibreOffice on the machine
-and the `pypdf` package (`pip install pypdf`); without either it says so and the
-report is left as written. It also needs the document to be one xslope wrote: a
-`.docx` that has been re-saved *through* LibreOffice keeps its contents field
-inside a content control, where this does not look for it, and the answer is
-that the document has no table of contents to number.
+cannot be placed stops the step with a message naming the entry, rather than
+leaving a contents page that is wrong about one line. This step needs LibreOffice
+on the machine and the `pypdf` package (`pip install pypdf`); without either it
+reports this and the report is left as written. It also needs the document to be
+one xslope wrote: a `.docx` that has been re-saved *through* LibreOffice keeps its
+contents field inside a content control, where this step does not look for it, and
+the step reports that the document has no table of contents to number.
 
-Every way this can fail is ordinary — no Word and no LibreOffice, no permission
+Each way this step can fail is ordinary — no Word and no LibreOffice, no permission
 to drive Word, a Word that does not answer within a minute — and each one leaves
 a complete report whose contents page lists the headings without page numbers. A
-line under that list says how to fill them in (right-click → **Update Field**, or
+line under that list explains how to fill them in (right-click → **Update Field**, or
 select all and press F9), and it sits inside the field result, so Word's first
-update replaces it along with the rest. The page numbers in the footer keep
-themselves current regardless.
+update replaces it along with the rest. The page numbers in the footer update
+themselves in any case.
 
-The finish can be switched off on a machine where it is unwelcome:
+The finishing step can be switched off on a machine where it is not wanted:
 
 ```
 defaults write "com.xslope.XSlope Studio" report.finalize -bool NO
 ```
 
-Report generation itself never finishes a report — a script that writes fifty
-must not open fifty documents — so a script that wants the finish asks for it:
+Report generation itself never runs the finishing step, so that a script writing
+fifty reports does not open fifty documents; a script that wants the step calls it:
 
 ```python
 from xslope.report_finalize import finalize_report
@@ -351,8 +350,8 @@ ok, msg = finalize_report("north_levee_report.docx")
 ```
 
 `finalize_report` uses Word where there is one and LibreOffice where there is
-not. A run that must not take over the Word the user is working in names the
-other one, either in the call (`prefer="libreoffice"`) or in the environment
+not. A script that must not take over a Word session the user is working in
+selects LibreOffice, either in the call (`prefer="libreoffice"`) or in the environment
 (`XSLOPE_FINALIZE=libreoffice`); `XSLOPE_SOFFICE` names LibreOffice's `soffice`
 program where it is installed somewhere unusual.
 
@@ -360,7 +359,7 @@ program where it is installed somewhere unusual.
 
 ## Page layout
 
-The document is built on a Word template shipped with xslope, which owns the
+The document is built on a Word template shipped with xslope, which sets the
 page size and margins, the Title, Heading, Body Text and Caption styles, the
 rule under the title, and the header and footer frames; the report supplies only
 content. Body text is 10.5 pt, a first-level heading 14 pt and the title 24 pt
@@ -386,8 +385,7 @@ it and to nothing after it.
 
 ### A company template
 
-A report goes out on the firm's letterhead by being built on the firm's own
-template. Start from the one xslope ships —
+To put a report on a firm's letterhead, build it on the firm's own template. Start from the one xslope ships —
 [report_template.docx](files/report_template.docx) — and edit it in Word: the
 page size and margins, the header and footer, a letterhead in either of them, and
 the fonts and colors of the Title, Heading, Body Text and Caption styles.
@@ -395,15 +393,15 @@ Then pick it in the report dialog's **Template** field, or pass it to
 `generate_report` as the `template` option.
 [W-3](../tutorials/w03_report.md) walks the whole of it on a worked example.
 
-Three things make a template one of these reports can be built on:
+A template must meet three conditions:
 
 - **Keep the style names.** The report is written in *Title*, *Heading 1*,
-  *Heading 2*, *Heading 3*, *Body Text* and *Caption*, and it asks the template
-  for them by name. Restyle them as far as you like; renaming one is what the
-  refusal on Generate is about.
+  *Heading 2*, *Heading 3*, *Body Text* and *Caption*, and it looks them up in the
+  template by name. Restyle them freely; renaming one causes the error on
+  Generate.
 - **Leave the metadata to the fields.** The title, project number, organization
   and author reach the document as Word document properties — `Title`, `Subject`,
-  `Category` and `Author`, which are the names a `DOCPROPERTY` field asks for, not
+  `Category` and `Author`, which are the names a `DOCPROPERTY` field uses, not
   the dialog's own labels. A template can place them wherever it likes, in the
   header or on a cover page of its own, and they fill in with what the dialog was
   given.
@@ -470,7 +468,7 @@ the dialog does not offer:
 `generate_report` reads one option of its own, `template`: the Word template to
 build the document on, in place of the one shipped with xslope — the same choice
 the dialog's Template field makes (see [A company template](#a-company-template)). A second, `dpi`, sets the figure resolution (default 300).
-A template that does not declare the styles the report is written in is refused
+A template that does not declare the styles the report is written in is rejected
 before anything is built, and the message names the style it lacks.
 
 Report generation is headless: it renders through the Agg backend, opens no

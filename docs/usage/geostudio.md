@@ -5,10 +5,9 @@ GeoStudio can be brought into XSLOPE without redrawing it, and an XSLOPE model c
 handed to a GeoStudio user.
 
 A `.gsz` is a ZIP holding the model as a single XML document. Unlike a DXF — which is
-just lines on layers, and needs a human to say what each layer *means* — a `.gsz` is
-semantically complete: its regions, materials and water conditions already know what
-they are. So the import needs no mapping wizard. The one thing it does ask is **which
-analysis** to import.
+just lines on layers, and needs a person to state what each layer *means* — a `.gsz`
+identifies its regions, materials and water conditions, so the import needs no mapping
+wizard. The only choice is **which analysis** to import.
 
 ## Importing a GeoStudio model
 
@@ -41,12 +40,12 @@ analysis** to import.
     caveats = import_gsz("Cannon Dam.gsz", default_template_path(), "cannon.xlsx")
     ```
 
-### Why the analysis matters
+### Choosing the analysis {#why-the-analysis-matters}
 
 A `.gsz` usually holds several analyses over one geometry, and they differ in more than
 the slip surface. GeoStudio assigns **materials per analysis**, not per region — so the
 same slope can be one soil in the first analysis and a different soil in the second. The
-choice is not cosmetic, which is why XSLOPE makes you make it rather than guessing.
+choice changes the model, so XSLOPE asks for it rather than guessing.
 
 ### What comes across
 
@@ -97,9 +96,9 @@ strength credited.
 
 A piezometric surface's points belong to the **analysis that owns it**, not to the
 shared geometry table, and the import resolves them that way (export writes them back
-under the same convention). The distinction is silent but not small: resolved against
-the wrong list, a water table can double back on itself or land meters off and the model
-still solves — at pore pressures several percent wrong in factor of safety.
+under the same convention). Resolved against the wrong list, a water table can double
+back on itself or land meters off, and the model still solves, with pore pressures that
+change the factor of safety by several percent.
 
 Ponded water needs no conversion at all. GeoStudio stores no
 ponded-water object: where the water rises **above** the ground surface, SLOPE/W simply
@@ -112,18 +111,18 @@ programs hold the reservoir implicitly, and the dloads sheet of an imported mode
 non-water loads only.
 
 The load itself is unchanged — γ_w × depth, normal to the ground and tapering to zero at
-the waterline. What changed is who states it. Import caveats say so explicitly: *water
+the waterline. Only the source of the load differs. The import caveats state this: *water
 loads derive automatically from the imported water definition*. Do not add the reservoir
 to the dloads sheet as well; that is the double count preflight warns about.
 
 Where the water comes from a **SEEP/W field**, there is no water surface to carry —
-**nothing in the file says where the water is** — and SLOPE/W still loads the submerged
+**the file does not state where the water is** — and SLOPE/W still loads the submerged
 face. That reservoir has to be recovered from the head field itself, which the import
 does (described next), and because nothing downstream can re-derive a load from an
 imported field, those models import with **Water loads = `manual`** and the recovered
 load written on the dloads sheet. The caveat names the cell. It is the one GeoStudio
-import that carries a water load explicitly, and the reason is that its water surface
-exists only as a computed result.
+import that carries a water load explicitly, because its water surface exists only as a
+computed result.
 
 ### Pore pressure from a SEEP/W analysis
 
@@ -137,7 +136,7 @@ stability analysis's **own** result folder, on the mesh SEEP/W solved on, so not
 to be re-solved: the mesh becomes XSLOPE's mesh and the nodal pressures become its
 `seep_u`, with every material set to the `seep` option. The file must have been saved
 **solved** — an unsolved one holds no field, and XSLOPE cannot run SEEP/W's analysis for
-it. That is said loudly rather than assumed away.
+it. The import reports this.
 
 Such an analysis records **no water surface anywhere**, and yet SLOPE/W still puts the
 weight of the reservoir on the submerged face. It derives that reservoir from the head
@@ -146,13 +145,13 @@ elevation `y + u/γ_w`.
 
 That single rule reproduces both cases exactly. Under a reservoir the ground is a
 specified-head boundary, so `u = γ_w (H − y)` and the implied level comes out at the
-reservoir level *H*, to the millimetre, at every submerged point. On a drained or
+reservoir level *H*, to the millimeter, at every submerged point. On a drained or
 seepage face `u = 0`, the implied level collapses onto the ground, and no load is
 produced. On GeoStudio's own rapid-drawdown example this puts water on the face at the
 full-reservoir step and none at any drawn-down step — which is exactly what SLOPE/W's
-own per-slice surcharge forces do. The load is worth more than the pressures it
-accompanies: of the 13% of factor of safety that example loses without this treatment,
-**most is the missing reservoir, not the missing pore pressures.**
+own per-slice surcharge forces do. In that example the load matters more than the
+pressures: of the 13% of factor of safety lost without this treatment, most comes from
+the missing reservoir rather than the missing pore pressures.
 
 This is the one import that writes a water load, and it sets **Water loads** to
 `manual` so the engine does not derive a second one. XSLOPE's automatic mode reads a
@@ -160,14 +159,14 @@ piezometric line or seepage head boundaries; an imported head field is neither, 
 model left on `auto` here would simply have no reservoir. Keep the mode on `manual`
 unless you replace the field with a water definition the engine can read.
 
-!!! warning "A transient analysis is many models, and XSLOPE is one"
+!!! warning "Importing a transient analysis"
     A SEEP/W run that marches in time saves a result set per time step, and SLOPE/W
     solves the slope at **every one** — the factor of safety in a drawdown problem can
     swing by 50% across them. An XSLOPE model is a single state in time, so the import
-    must choose.
+    selects one step.
 
-    It chooses the **governing** step: the one where SLOPE/W's own factor of safety is
-    lowest, which is the condition a drawdown analysis exists to find. The choice, the
+    It selects the **governing** step: the one where SLOPE/W's own factor of safety is
+    lowest. The choice, the
     full list of steps and their factors of safety are all reported, and `step='NNN'`
     takes any other.
 
@@ -176,8 +175,8 @@ unless you replace the field with a water definition the engine can read.
 A tension crack imports as `tcrack_depth`, with its percent filled with water as
 `tcrack_water`. GeoStudio switches a crack **off by omitting the option**, while keeping
 the crack line's geometry in the file. The import honors the option, not the leftover
-geometry, so a crack the analysis no longer uses is not resurrected. Read naively, those
-leftover points would put a water-filled crack into models that have none — invisible in
+geometry, so a crack the analysis no longer uses is not restored. If those leftover
+points were read, they would put a water-filled crack into models that have none — invisible in
 a φ = 0 undrained analysis, but worth a few percent in a c′ = 0 one.
 
 ### Reinforcement
@@ -185,8 +184,8 @@ a φ = 0 undrained analysis, but worth a few percent in a c′ = 0 one.
 A GeoStudio reinforcement carries a capacity, a plate capacity, a pullout resistance and
 an out-of-plane spacing — but **no direction and no dependence on the factor of safety**.
 Both are implied by the reinforcement type. XSLOPE stores them explicitly, so the import
-has to supply them, and the mapping is *measured against SLOPE/W's own factors of safety*
-rather than reasoned about: reinforcement acts **along the bar** (`dir='axial'`), as a
+has to supply them, and the mapping was chosen by comparison with *SLOPE/W's own factors
+of safety*: reinforcement acts **along the bar** (`dir='axial'`), as a
 known load (`appl='active'`). On the manual's reinforced-embankment benchmark this
 reproduces SLOPE/W to within 0.3%, where applying the force tangent to the slip surface
 does not converge at all.
@@ -199,7 +198,7 @@ face.
 
 Where a geosynthetic defines its pullout through **interface adhesion and friction**
 rather than a constant resistance, XSLOPE's constant-rate bond length is an approximation
-of a stress-dependent law, and the import says so.
+of a stress-dependent law, and the import reports this.
 
 ### What does not come across, and why
 
@@ -212,24 +211,24 @@ without telling you. Read the caveats it returns.
   which makes the model complete, and lets you compare the two programs on identical
   geometry. Run a search afterwards to find XSLOPE's own critical surface. If that circle
   will not build on the model (SLOPE/W may have scored a *composite* surface, truncated
-  along a bedrock boundary), no surface is imported and you are told so.
+  along a bedrock boundary), no surface is imported and the caveats report this.
 - **Reinforcement *sets*** — GeoStudio's out-of-plane staging groups. The reinforcement
   itself imports; the grouping does not.
 - **Inclined tension cracks.** XSLOPE's crack is vertical. Where GeoStudio's crack line
   sits at a varying depth, the deepest is taken (conservative) and the difference reported.
 - **Vertical seismic coefficient.** XSLOPE models only the horizontal one.
 - **Pore pressure that is neither a piezometric surface nor a SEEP/W field.** Ru and
-  spatial pore-pressure functions import as zero, and say so. The traffic here is
+  spatial pore-pressure functions import as zero, and the caveats report this. This is
   one-way: export *writes* a spatial function (it is how a seepage field crosses), but
   import does not read one back, so an XSLOPE model exported and re-imported returns
-  dry — loudly, not quietly.
+  dry, with a caveat reporting it.
 - **The SEEP/W analysis itself** — its mesh is imported, but its conductivity functions
   and boundary conditions are not, so XSLOPE cannot *re-solve* the seepage problem, only
   read the answer SEEP/W already computed. An **unsolved** SEEP/W-fed file therefore
   arrives with no pore pressure at all, and is flagged.
-- **Anything XSLOPE has never seen.** Unrecognised GeoStudio elements are reported by
-  name rather than ignored, so a feature added in a future version cannot silently change
-  someone's factor of safety.
+- **Anything XSLOPE does not recognize.** Unrecognized GeoStudio elements are reported
+  by name rather than ignored, so a feature added in a later GeoStudio version cannot
+  change a factor of safety without notice.
 
 ## Unit systems
 
@@ -274,8 +273,8 @@ is rejected rather than approximated.
     Ponded water is the one distributed load that is deliberately **not** written, and it
     must not be added by hand. GeoStudio has no ponded-water object: it *derives* the
     reservoir, and the pressure it puts on the slope, from the **piezometric surface** —
-    which is written. Re-creating it as a surcharge would count the water twice. Export
-    says so explicitly when it happens.
+    which is written. Re-creating it as a surcharge would count the water twice. The export
+    caveats report this when it happens.
 
     This is the mirror image of the import, and of XSLOPE's own automatic mode. A model
     with **Water loads** on `auto` has no water block to leave out in the first place:
@@ -295,15 +294,15 @@ Where the model's pore pressure is a finite-element **seepage field**, the *pres
 cross and the *seepage model* does not.
 
 SLOPE/W accepts pore pressure as a **spatial function**: a set of discrete points, each
-carrying a pressure head, which it interpolates between. That is a data input, not a
-seepage analysis, and it is exactly the shape of what XSLOPE has. So the export writes
+carrying a pressure head, which it interpolates between. That is a data input rather than
+a seepage analysis, and it matches what XSLOPE has. So the export writes
 one point per node of XSLOPE's seepage mesh, at full resolution, carrying `u / γ_w`, and
 points the analysis at it — the intent being that a GeoStudio user opening the file
 solves the slope on the same pore pressures XSLOPE solved on. Every tag XSLOPE writes is
 taken from GeoStudio's own sample and verification files, including models that carry a
 points-only spatial function, and the export is checked against that schema; it has not
-yet been exercised in a GeoStudio installation, so treat the first open of an exported
-coupled model as a check, not a formality.
+been tested in a GeoStudio installation, so check an exported coupled model carefully the
+first time it is opened in GeoStudio.
 
 What does **not** cross is the seepage problem: there is no SEEP/W analysis in the file,
 no mesh, no conductivity functions and no boundary conditions, so the field cannot be
@@ -314,8 +313,8 @@ computed would be indistinguishable, in the file, from a real one.
 
 A piezometric line is still *not* offered as a substitute. It **means** hydrostatic
 pressure beneath it, which is the very assumption a seepage analysis is run to avoid, so
-XSLOPE will not quietly swap one for the other. Where a model defines both, the seepage
-field wins and the export says so.
+XSLOPE does not substitute one for the other. Where a model defines both, the seepage
+field takes precedence and the export reports this.
 
 GeoStudio applies a spatial function to **every
 material in the analysis**, so a model where only some materials
@@ -328,29 +327,27 @@ water entirely.
 Suction (negative pore pressure above the phreatic surface) is written as it stands.
 Neither program credits it by default — SLOPE/W only through a φᵇ, which is not written,
 and XSLOPE clamps the effective-normal pore pressure at zero — so the two agree unless you
-set a φᵇ in GeoStudio. The count of negative points is reported so the question is at
-least asked.
+set a φᵇ in GeoStudio. The count of negative points is reported.
 
 The export reports all of this: how many points were written, that they are the pressures
 and not the model, the suction count, and the ponded-water rule.
 
 ### How export is checked
 
-A round-trip through XSLOPE's own reader proves **nothing** — reader and writer share the
-same idea of the schema, agree perfectly with each other, and pass while GeoStudio quietly
-refuses half the file. So export is checked against GeoStudio's own documents instead, in
-both directions:
+A round trip through XSLOPE's own reader would not test the export, because the reader and
+writer share the same reading of the schema and would agree with each other even where
+GeoStudio rejects the file. Export is therefore checked against GeoStudio's own documents,
+in both directions:
 
 - **Every tag XSLOPE writes is one GeoStudio writes.** This catches an invented tag.
 - **Every tag GeoStudio *always* writes, XSLOPE writes too** — unless it is on an explicit
-  list of things XSLOPE consciously omits, each with a reason. This is the direction that
-  matters, and the one that is easy to forget: the first check cannot catch an
-  **omission**, and an omission is worse, because the file still opens and still looks
+  list of things XSLOPE deliberately omits, each with a reason. This direction is the more
+  important one: the first check cannot catch an **omission**, and an omission is worse, because the file still opens and still looks
   right. A file missing its `ComputedPhysics` block, for instance, draws perfectly and
   names and colors its materials correctly while leaving their strengths unreachable,
-  saying nothing.
+  with no warning.
 
-Both directions are locked in the test suite, so a regression fails locally rather than in
+Both directions are checked in the test suite, so a regression fails locally rather than in
 GeoStudio. `tools/gsz_export_diff.py` regenerates them: it imports a real `.gsz`, exports
 it straight back out, and diffs XSLOPE's XML against the vendor's.
 

@@ -42,8 +42,8 @@ and Windows 10 / 11 · [Install guide](getting_started/install.md) ·
 
 A defensible slope analysis needs three things: a seepage solution for the pore
 pressures, a limit equilibrium factor of safety, and — increasingly — a finite
-element strength reduction check that finds the failure mechanism without being
-told where it is. Commercial suites sell those as separate modules. XSLOPE runs
+element strength reduction check that finds the failure mechanism without an
+assumed surface. Commercial suites sell those as separate modules. XSLOPE runs
 all three from a single problem definition: enter the geometry, materials and
 water conditions once, and the computed pore pressure field passes straight into
 both stability analyses, on the same mesh, with no re-meshing and no manual
@@ -127,13 +127,12 @@ sweeps and reliability, drive it from a notebook, run it in
 
 ## Verified against the manuals practitioners already trust
 
-Open geotechnical software usually meets one reasonable objection: how do you
-know the numbers are right? XSLOPE answers it at scale. Rather than a handful of
-textbook cases, it is checked problem by problem against the published
+Rather than a handful of textbook cases, XSLOPE is checked problem by problem
+against the published
 verification manuals of the major commercial codes — the Rocscience Slide2,
 Slide2 groundwater and RS2 manuals and the GeoStudio SLOPE/W manual and SEEP/W
 examples — alongside classical closed-form solutions. More than 800 cases are
-locked into an automated regression suite that re-runs on every change, and every
+checked by an automated regression suite that re-runs on every change, and every
 comparison is published here, problem by problem, including the ones where
 XSLOPE and the vendor disagree.
 
@@ -164,8 +163,8 @@ interface, editing, and running analyses.
 
 ## An AI assistant inside the application
 
-The most tedious part of routine practice is building the input file. Studio's
-built-in assistant does it from what you already have: paste a photograph of a
+Building the input file takes much of the time in routine practice. Studio's
+built-in assistant builds it from what you already have: paste a photograph of a
 hand sketch, a figure from a report, or a CAD export, and it reads the geometry,
 materials, water conditions and loads, writes the input file, runs the analysis,
 and explains the result. It can also drive the engine — "vary the slope angle
@@ -225,9 +224,9 @@ pip install xslope
 
 Scripts and notebooks call the same solvers, meshers and plotting functions that
 Studio calls, and read and write the same Excel problems — so a model can be
-built in Studio and swept in a notebook, or the reverse. That is what makes
-parametric sweeps, Monte Carlo reliability studies and AI-assisted workflows
-ordinary here and awkward in a closed graphical program. The
+built in Studio and swept in a notebook, or the reverse. This makes parametric
+sweeps, Monte Carlo reliability studies and AI-assisted workflows routine, where
+they are awkward in a closed graphical program. The
 [Usage Guide](usage/index.md) covers the input template,
 [Colab Notebooks](usage/notebooks.md) runs XSLOPE in a browser with nothing
 installed, and the [API](api/solve.md) section documents every function.

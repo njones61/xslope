@@ -25,15 +25,15 @@ series, the FS histogram for the two sampling engines. See
 
 ## The reliability family
 
-All of the methods described in this section are reached through a single front door:
+All of the methods described in this section are reached through a single entry point:
 
 >>`reliability(slope_data, method, engine='taylor')`
 
 The `engine` argument selects the analysis engine. `engine='taylor'` (the default)
 runs the Taylor Series Probability Method; `engine='mc'` runs a Monte Carlo campaign;
 `engine='rs'` runs the same campaign against a fitted response surface.
-Because the default is the Taylor series, an existing call such as
-`reliability(slope_data, 'bishop')` keeps its exact meaning. Every engine is also
+Because the default is the Taylor series, a call such as
+`reliability(slope_data, 'bishop')` runs the Taylor series. Every engine is also
 public directly under its own name, so a script can call whichever it wants:
 
 | Function | Method | Solver | Cost | Page |
@@ -139,15 +139,15 @@ To calculate the $COV_F$, there are two common approaches to calculate these val
 ## When to use Monte Carlo versus the Taylor series
 
 For ordinary parameter scatter the two methods agree, and the [Taylor series](taylor.md) is far
-cheaper (1 + 2N solves versus $10^4$), so it is the default. Reach for [Monte Carlo](monte_carlo.md)
+cheaper (1 + 2N solves versus $10^4$), so it is the default. Use [Monte Carlo](monte_carlo.md)
 when the Taylor series' straight-line (first-order) treatment of the
 factor of safety breaks down:
 
 - **Large coefficients of variation.** When a standard deviation approaches or
   exceeds its mean, the Taylor series cannot evaluate $F(\text{MLV} - \sigma)$
-  without a negative parameter and declines the analysis. Monte Carlo handles it by
+  without a negative parameter and stops without a result. Monte Carlo handles it by
   truncating the draw at zero. The worked example is **VP34** (Clarence Cannon Dam),
-  whose Phase I fill has a friction-angle COV of 124%: the Taylor series declines,
+  whose Phase I fill has a friction-angle COV of 124%: the Taylor series cannot run,
   while Monte Carlo returns a probability of failure inside the range the published
   studies span.
 - **A strongly curved or skewed response.** When the factor of safety does not
@@ -181,16 +181,11 @@ offers the Rosenblueth **point-estimate method** (two point estimates per variab
 **PLAXIS**'s reliability module likewise provides Monte Carlo, Latin Hypercube and an
 (alternative) point-estimate method with sensitivity analysis
 ([New Developments in PLAXIS: Material Point Method and Reliability Analysis, TU Delft](https://research.tudelft.nl/en/publications/new-developments-in-plaxis-material-point-method-and-reliability-)).
-xslope's `reliability_fem` sits squarely in this point-estimate family: its 1 + 2N
+xslope's `reliability_fem` belongs to this point-estimate family: its 1 + 2N
 Taylor-series perturbation is a two-point-per-variable estimate of the factor-of-safety
 variance — the same economical strategy the FE vendors adopt in place of mass sampling.
 
-On the limit-equilibrium side xslope ships the response-surface half of that
+On the limit-equilibrium side xslope provides the response-surface part of that
 vendor strategy as `reliability_rs`
 ([Sampling a fitted response surface](monte_carlo.md#sampling-a-fitted-response-surface));
-on the finite-element side it is not implemented. The 1 + 2N SSRM
-solves that `reliability_fem` already runs trace out a first-order response surface of
-the factor of safety in the uncertain parameters, and fitting that surface would allow
-a Monte Carlo campaign *on the surface* — thousands of samples, no additional
-finite-element solves — yielding an empirical FEM probability of failure and a full FS
-distribution. That extension would complement, not replace, the Taylor-series index.
+on the finite-element side it uses the Taylor series only.

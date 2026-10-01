@@ -1,6 +1,6 @@
 # Project Packaging
 
-## A project is a set of files
+## Project files {#a-project-is-a-set-of-files}
 
 An XSLOPE project starts as one Excel workbook, but it does not stay that way. Every
 analysis that produces a stored result writes it to a **sidecar** file beside
@@ -17,7 +17,7 @@ the workbook, named after it:
 
 The workbook is loaded by name and the sidecars follow it automatically — opening
 `slope1.xlsx` picks up `slope1_mesh.json`, and the pore-pressure field from
-`slope1_seep.csv` where the materials ask for one, in Studio and in Python alike. That
+`slope1_seep.csv` where the materials use one, in Studio and in Python alike. That
 is why they are named the way they are, and why a project moved by copying only the
 workbook arrives without its results.
 
@@ -27,14 +27,13 @@ A **project package** is a `.xslz` file: a plain zip holding the workbook and al
 sidecars, and nothing else. It exists so a project can be emailed, uploaded, or handed
 to a colleague as one file.
 
-A package is a way for a project to travel, not a place to work in. Nothing edits or
-saves inside one: opening a package unpacks it back to loose files first, and the
+A package is used only to move a project. Nothing edits or saves inside one: opening a package unpacks it back to loose files first, and the
 workbook that comes out is an ordinary `.xlsx` you can also open in Excel. Day-to-day
 work never involves a package at all — Save writes loose files, and recent files point
 at the loose workbook.
 
-Because the workbook and the results are zipped at one moment, everything in a package
-agrees with everything else. A project sent as loose attachments can arrive with a
+Because the workbook and the results are zipped at one moment, the files in a package are
+consistent with each other. A project sent as loose attachments can arrive with a
 workbook from Tuesday and a mesh from Monday; a package cannot.
 
 ## Creating a package
@@ -47,8 +46,8 @@ it.
 
 The package is built from the files on disk, so if the project has edits or a solution
 this session has not written out yet, Studio offers to save first. Cancelling that
-prompt cancels the export — a package whose workbook disagreed with the results zipped
-beside it would defeat the point.
+prompt cancels the export, because a package whose workbook did not match its results
+would defeat its purpose.
 
 ### Python
 
@@ -59,7 +58,7 @@ xslope.pack("slope1.xlsx")                    # writes slope1.xslz beside it
 xslope.pack("slope1.xlsx", dest="~/outbox")   # or into a folder of your choosing
 ```
 
-`pack` returns the path it wrote. It refuses to replace a package that already exists
+`pack` returns the path it wrote. It does not replace a package that already exists
 unless you pass `overwrite=True`.
 
 To see what would go in without writing anything:
@@ -126,9 +125,8 @@ import xslope
 workbook = xslope.unpack("slope1.xslz")       # returns .../slope1/slope1.xlsx
 ```
 
-A script cannot be asked a question, so the already-exists case is a refusal rather
-than a guess. If the destination folder is there, both calls raise, and the message
-names the three ways forward:
+A script cannot answer a prompt, so if the destination folder already exists both calls
+raise an error rather than guess. The message names the three options:
 
 ```
 FileExistsError: /work/slope1 already exists, and unpacking slope1.xslz would write
@@ -171,6 +169,7 @@ with your operating system; it also registers `.xslz`, so a downloaded package o
 a double-click. A `pip install` registers neither — those links will do nothing, and
 Download is the way in.
 
-Studio fetches only from this documentation site, refuses any other address by name,
-and never opens a file on your computer through a link: a page can put an `xslope://`
-link in front of you, but it cannot make Studio act on it without your say-so.
+Studio fetches only from this documentation site, rejects any other address with a
+message naming it, and never opens a file on your computer through a link: a page can
+put an `xslope://` link in front of you, but it cannot make Studio act on it without
+your confirmation.

@@ -2434,7 +2434,7 @@ class SensitivityDialog(QDialog):
             self.note.setText(
                 f"Design: sweeps the one parameter above across [From, To] and "
                 f"annotates where {q} meets the target (interpolated). If it never "
-                f"crosses, the plot says which way to widen the range.")
+                f"crosses, the plot shows which way to widen the range.")
         else:
             self._on_plot_type_changed()
 

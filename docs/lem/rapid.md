@@ -8,7 +8,7 @@ The design of a dam or levee must consider the potential for rapid drawdown of t
 
 To simulate this scenario, we utilize a "multi-stage" approach in our analysis. In the first stage, we apply the initial conditions with the water level at its full height and use the consolidation stresses resulting from these conditions to determine the undrained strength of the soils. In the second stage, we use these undrained strengths and the loading conditions corresponding to the lowered water level and determine the factor of safety for rapid drawdown conditions. The **xslope** package provides a convenient way to perform this analysis using the `rapid_drawdown` function. The equations and methodology used in this function are described in the following sections.
 
-## When Does Rapid Drawdown Apply?
+## Conditions for Rapid Drawdown {#when-does-rapid-drawdown-apply}
 
 Rapid drawdown occurs when the pool is lowered rapidly enough that pore water pressures in some of the soils cannot dissipate quickly enough to maintain stability. To determine when rapid drawdown may apply, Duncan, et al. (1992) suggested using the dimensionless time factor, T, from consolidation theory. T is defined as:
 
@@ -145,7 +145,7 @@ These two equations go negative for different reasons, and only one of them invo
 - Equation (8) carries the $c' \cos \phi'$ term, so a **significant cohesion** drives it negative. This is the case illustrated above.
 - Equation (7) has **no cohesion term at all**. It goes negative when $\tau_{fc}$ is large — and since $\tau_{fc} = \frac{1}{F}(c' + \sigma'_{fc} \tan \phi')$, that means a **low Stage 1 factor of safety**.
 
-### The Stage 1 slope must be stable
+### Stage 1 stability requirement {#the-stage-1-slope-must-be-stable}
 
 Equation (5) *interpolates* between the $K_c = 1$ and $K_c = K_f$ envelopes, which bound the physically possible consolidation states. So $K_1$ must satisfy
 
@@ -155,7 +155,7 @@ $K_1$ increases monotonically with $\tau_{fc}$, and $\tau_{fc} \propto 1/F$. Sub
 
 >> $K_1 > K_f \iff F < 1$ in Stage 1
 
-which is to say: **the full-pool slope is already failing.** Its mobilized shear stress lies above the failure envelope, so there is no equilibrium consolidation stress state for Stage 2 to use, and equation (5) would extrapolate beyond $K_c = K_f$ rather than interpolate. Note this condition is not caught by the negative-stress check above — $\sigma'_{3c}$ from equation (7) remains positive well below $F = 1$.
+In other words, the full-pool slope is already failing. Its mobilized shear stress lies above the failure envelope, so there is no equilibrium consolidation stress state for Stage 2 to use, and equation (5) would extrapolate beyond $K_c = K_f$ rather than interpolate. Note this condition is not caught by the negative-stress check above — $\sigma'_{3c}$ from equation (7) remains positive well below $F = 1$.
 
 Because $F$ is a single global value, $K_1 > K_f$ holds for every slice at once. xslope therefore checks the Stage 1 factor of safety directly, and `rapid_drawdown` returns an error rather than a factor of safety when $F < 1$. Rapid drawdown presupposes a slope that is stable before the pool is lowered.
 
@@ -189,7 +189,7 @@ In summary, the calculations are done in the following process:
 
 **Stage 1**
 
-1. Using the drained strength ($c'$ and $\phi'$) strength properties for all materials and using the piezometric line and distributed loads for the full pool condition, calculate the factor of safety using the selected solver. This will return a factor of safety (FS) and a set of effective normal forces ($N'$) on the base of the slice. If this Stage 1 FS is less than 1, the slope is already failing at full pool and the analysis is halted — see [The Stage 1 slope must be stable](#the-stage-1-slope-must-be-stable).<br>
+1. Using the drained strength ($c'$ and $\phi'$) strength properties for all materials and using the piezometric line and distributed loads for the full pool condition, calculate the factor of safety using the selected solver. This will return a factor of safety (FS) and a set of effective normal forces ($N'$) on the base of the slice. If this Stage 1 FS is less than 1, the slope is already failing at full pool and the analysis is halted — see [Stage 1 stability requirement](#the-stage-1-slope-must-be-stable).<br>
 
 2.  Calculate $\sigma'_{fc}$ and $\tau_{fc}$ using equations (2) and (3).<br>
 
@@ -215,19 +215,19 @@ In summary, the calculations are done in the following process:
 
 ## Rapid Drawdown from a Transient Solution {#transient-solution}
 
-The three-stage method needs two pore-pressure fields along the slip surface: one for the pre-drawdown, full-pool consolidation state used in [Stage 1](#stage-1-pre-drawdown-conditions), and one for the drawn-down state used in [Stage 2](#stage-2-compute-fs-for-post-drawdown-conditions). The [Inputs and Calculations](#inputs-and-calculations) summary supplies these from two piezometric lines, and a finite-element workflow can instead supply them from two steady seepage solutions saved next to the workbook as `{base}_seep.csv` (full pool) and `{base}_seep2.csv` (lowered pool). A [**transient** seepage solve](../seep/transient.md) is the natural third source: a transient run *is* a time-history of pore-pressure fields as the reservoir is lowered on a schedule, so the two stage fields are simply two frames read from that one history rather than two independent steady solves assembled by hand.
+The three-stage method needs two pore-pressure fields along the slip surface: one for the pre-drawdown, full-pool consolidation state used in [Stage 1](#stage-1-pre-drawdown-conditions), and one for the drawn-down state used in [Stage 2](#stage-2-compute-fs-for-post-drawdown-conditions). The [Inputs and Calculations](#inputs-and-calculations) summary supplies these from two piezometric lines, and a finite-element workflow can instead supply them from two steady seepage solutions saved next to the workbook as `{base}_seep.csv` (full pool) and `{base}_seep2.csv` (lowered pool). A [**transient** seepage solve](../seep/transient.md) is a third source: a transient run produces a time history of pore-pressure fields as the reservoir is lowered on a schedule, and the two stage fields are two frames read from that history.
 
 ### Stage times on the tseep sheet
 
 A transient run is driven by the [**tseep** sheet](../usage/input_template.md#worksheet-tseep), which carries two optional control times, **stage_1** and **stage_2** (with `stage_1 < stage_2`). They tag the two frames the drawdown analysis will use — for instance the full-reservoir steady state at `stage_1` and the drawn-down state at `stage_2`. Both times are forced into the transient solver's saved-frame schedule, so each is a *computed* frame, never interpolated between steps. Set both or neither; setting one without the other is an error, as is a `stage_1` at or after `stage_2`.
 
-The stage times are pure *extraction* parameters — they say which two instants are read out of the transient solution, and change nothing about how that solution is computed, since the drawdown schedule itself lives in the boundary conditions. That is why XSLOPE Studio lets them be set at their point of use, in the [Run LEM dialog](../studio/analysis.md#stage-times), as well as in the transient inputs editor; the file stores them either way. Stage times that name instants a solved transient run never saved are served by rerunning the transient seepage analysis with those times added to the save schedule.
+The stage times only select which two instants are read out of the transient solution. They change nothing about how that solution is computed, since the drawdown schedule itself is set in the boundary conditions. XSLOPE Studio therefore lets them be set where they are used, in the [Run LEM dialog](../studio/analysis.md#stage-times), as well as in the transient inputs editor; the file stores them either way. Stage times at instants that a solved transient run did not save cause the transient seepage analysis to be rerun with those times added to the save schedule.
 
 ### In-memory staging
 
-Once the transient run is solved, `stage_transient_for_drawdown(slope_data, solution)` pulls the frames at `stage_1` and `stage_2` **in memory** and writes their pore-pressure fields into `slope_data['seep_u']` and `slope_data['seep_u2']` — exactly the structures the classic two-file path produces. No intermediate `seep.csv` / `seep2.csv` files are written; the two stage fields go straight into the structures the three-stage machinery already consumes, and `rapid_drawdown` then runs unchanged.
+Once the transient run is solved, `stage_transient_for_drawdown(slope_data, solution)` pulls the frames at `stage_1` and `stage_2` **in memory** and writes their pore-pressure fields into `slope_data['seep_u']` and `slope_data['seep_u2']` — exactly the structures the classic two-file path produces. No intermediate `seep.csv` / `seep2.csv` files are written; the two stage fields go straight into the structures the three-stage analysis already reads, and `rapid_drawdown` then runs as usual.
 
-Staging also settles where the **stage-2 water load** comes from under [automatic water loads](../usage/preflight.md#where-the-water-load-comes-from): the drawn-down pool is boundary set `seep bc` as the schedule leaves it at the `stage_2` time — the same instant the stage-2 field was read at — and `seep bc (2)`, which states a separate steady drawn-down analysis, is not read at all. A boundary set 2 left on a file being staged this way is reported by preflight (`rapid.stage2_bc_ignored`) rather than silently used. It also follows that the fall has to be in the schedule itself: a `seep bc` reservoir head typed as a fixed number, or bound to a series holding the same level at both stage times, gives two identical frames and a factor of safety that is the full-pool one, which preflight reports as `rapid.pool_static_between_stages`.
+Staging also settles where the **stage-2 water load** comes from under [automatic water loads](../usage/preflight.md#where-the-water-load-comes-from): the drawn-down pool is boundary set `seep bc` as the schedule leaves it at the `stage_2` time — the same instant the stage-2 field was read at — and `seep bc (2)`, which states a separate steady drawn-down analysis, is not read at all. A boundary set 2 left on a file being staged this way is reported by preflight (`rapid.stage2_bc_ignored`) rather than silently used. The drop in pool level must therefore be in the schedule itself: a `seep bc` reservoir head typed as a fixed number, or bound to a series holding the same level at both stage times, gives two identical frames and a factor of safety that is the full-pool one, which preflight reports as `rapid.pool_static_between_stages`.
 
 **Resolution order.** The classic two-file path remains fully supported. When `{base}_seep.csv` and `{base}_seep2.csv` sit next to the input workbook, `load_slope_data` reads their `u` columns into `seep_u` and `seep_u2` at load time. Calling `stage_transient_for_drawdown` afterward overwrites those two fields with the staged transient frames, so a transient solution carrying stage times takes precedence over the classic files. A model with no stage times cannot be staged this way — the call requires both `stage_1` and `stage_2` — so it falls back to the classic two-file path.
 
@@ -237,7 +237,7 @@ Two independent steady solves treat the lowered-pool field as a new steady state
 
 - **Real drawdown schedules.** A reservoir is lowered over hours or days, not instantaneously. A transient run honors the actual lowering rate and the elapsed time, so the Stage 2 field reflects how far pore-pressure dissipation has *actually* progressed — the same physics the time factor $T$ at the [top of this page](#when-does-rapid-drawdown-apply) estimates, now resolved directly by the solve.
 - **Partial drawdown.** The pool need not be lowered all the way. `stage_2` can be tagged at any intermediate reservoir level, and the staged field is the true partially-drawn-down state.
-- **Intermediate times.** Because every saved frame is a computed state, `stage_2` can be tagged at any time along the drawdown to ask how the factor of safety evolves as the pool falls and pressures bleed off, rather than only at the fully-dissipated endpoint.
+- **Intermediate times.** Because every saved frame is a computed state, `stage_2` can be tagged at any time along the drawdown to find how the factor of safety changes as the pool falls and pore pressures dissipate, rather than only at the fully-dissipated endpoint.
 
 ### Worked example: Johnson Reservoir {#worked-example}
 
@@ -251,11 +251,11 @@ The Johnson Reservoir zoned earth dam is the [transient drawdown seepage sample]
 | Core (compacted clay) | 125 | 400 | 18 | 250 | 14 | **undrained** |
 | Foundation (silty sand) | 127 | 100 | 27 | — | — | drained |
 
-**Loads and slip surface.** The full-pool reservoir standing against the upstream face is the Stage 1 distributed load (3744 psf at the toe, tapering to zero at the elevation-160 pool line). At Stage 2 the pool has been drawn all the way down to the elevation-100 datum, so no water remains on the upstream slope — that removed load is the destabilising essence of rapid drawdown. The critical surface is a circle on the upstream (reservoir) face, located by a rapid-drawdown circular search: it toes near the upstream base, daylights just past the crest, and cuts twelve slices of core so the undrained zone governs Stage 2.
+**Loads and slip surface.** The full-pool reservoir standing against the upstream face is the Stage 1 distributed load (3744 psf at the toe, tapering to zero at the elevation-160 pool line). At Stage 2 the pool has been drawn all the way down to the elevation-100 datum, so no water remains on the upstream slope. Removing that load is the main cause of the loss of stability in rapid drawdown. The critical surface is a circle on the upstream (reservoir) face, located by a rapid-drawdown circular search: it toes near the upstream base, daylights just past the crest, and cuts twelve slices of core so the undrained zone governs Stage 2.
 
 Excel input file: [xslope_johnson_res_rapid.xlsx](files/xslope_johnson_res_rapid.xlsx). Every material uses `u = seep`; the two stage pore-pressure fields are supplied from the transient frames in memory, so no `_seep.csv` / `_seep2.csv` companions are shipped.
 
-**The two staged pore-pressure fields.** Staging pulls the frame at `stage_1` (full pool) and the frame at `stage_2` (end of drawdown) straight from the transient history. Between them the reservoir head has drained away on the upstream side, but the low-permeability core still holds an elevated head pocket exactly where the slip circle crosses it — the retained pore pressure that the drawdown check must carry.
+**The two staged pore-pressure fields.** Staging pulls the frame at `stage_1` (full pool) and the frame at `stage_2` (end of drawdown) straight from the transient history. Between them the reservoir head has drained away on the upstream side, but the low-permeability core still holds a zone of elevated head where the slip circle crosses it, and that retained pore pressure enters the Stage 2 analysis.
 
 ![johnson_res_rapid_stages.png](rapid_images/johnson_res_rapid_stages.png)
 

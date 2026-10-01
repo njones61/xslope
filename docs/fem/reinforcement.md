@@ -31,15 +31,15 @@ Each truss element stands on every node of the 2D element edge it lies on. On a 
 end nodes and the element is a 2-node bar. On a quadratic mesh (tri6, quad8, quad9) the edge also carries a midside
 node, and the truss element is a 3-node bar carrying that node too.
 
-The midside node is what ties the bar to the soil in the middle of the edge. The soil's displacement along a quadratic
+The midside node ties the bar to the soil in the middle of the edge. The soil's displacement along a quadratic
 edge is a parabola through all three nodes, so a bar attached at the corners alone leaves the edge free to bow away
 from it between them, and leaves the midside node free to slide along it: the bar and the soil around it displace
-together at only half the stations the edge has. Carrying the node closes that gap, and it costs no node and moves
-none, because the node is already there as part of the 2D element.
+together at only half the stations the edge has. Including the midside node removes that gap without adding or moving
+any node, because the node is already there as part of the 2D element.
 
 The 3-node bar is the standard isoparametric quadratic bar, and its axial force at the element center is
-$EA(u_2 - u_1)/L$ — the same chord expression the 2-node bar uses, so an element's reported force means what it always
-did.
+$EA(u_2 - u_1)/L$ — the same chord expression the 2-node bar uses, so the reported force has the same meaning for both
+bar types.
 
 The meshing algorithms used in XSLOPE, including the integration of 1D and 2D elements for problems involving soil
 reinforcement are documented in the [Mesh Generation](mesh.md) page.
@@ -92,10 +92,10 @@ body load equal to the part of the elastic force the element **cannot** carry:
 >>$f_{body} = (T - T_{true}) \cdot [-\cos\psi,\; -\sin\psi,\; +\cos\psi,\; +\sin\psi]$
 
 where $T_{true}$ is the force the bar can actually deliver: the elastic $T$ clipped into $[0, T_{cap}]$. Because
-equilibrium is solved as $K u - f_{body}$, this leaves exactly $T_{true}$ in the bar. (The sign matters. Adding
-the *opposite* correction makes an overloaded bar carry $2T - T_{cap}$ — it gets **stiffer** the more it is
-overloaded, an "anti-cap" under which a reinforced slope can never be driven to failure and the SSR factor is
-insensitive to $T_{allow}$ altogether.)
+equilibrium is solved as $K u - f_{body}$, this leaves exactly $T_{true}$ in the bar. (With the opposite sign the
+correction would make an overloaded bar carry $2T - T_{cap}$, so the bar would become **stiffer** as it is
+overloaded, a reinforced slope could never be driven to failure, and the SSR factor would not depend on
+$T_{allow}$.)
 
 ![reinf_bar_law.png](images/reinf_bar_law.png)
 
@@ -117,10 +117,9 @@ residual capacity, which is $T_{res}$ or the capacity its embedment can develop,
 for ductile materials where the published capacity is a peak rather than a plateau; typical residual ratios for
 geosynthetics are $T_{res}/T_{allow} = 0.3-0.7$.
 
-The drop is decided **only on a converged equilibrium state**, never inside the viscoplastic iteration. This
-matters: the first iterate of a viscoplastic solve is the elastic predictor, whose bar forces overshoot badly
-before the soil sheds load into them, so a mid-iteration trigger would condemn bars for a transient that never
-physically existed, and the answer would depend on the path the solver happened to take. Instead the solver
+The drop is decided **only on a converged equilibrium state**, never inside the viscoplastic iteration. The first
+iterate of a viscoplastic solve is the elastic predictor, whose bar forces overshoot badly before the soil sheds
+load into them, so a mid-iteration trigger would soften bars because of a transient that never physically existed, and the answer would depend on the path the solver happened to take. Instead the solver
 converges with the bars capped at $T_{allow}$, then drops any bar whose elastic demand exceeded its capacity to
 $T_{res}$ and re-solves. Shedding that load can push neighbors over, so the process repeats until the softened set
 stops growing — a genuine progressive-failure fixed point, and one that is independent of the solution path.
@@ -133,8 +132,8 @@ Appropriate for brittle materials (some steel cables, fiber reinforcement).
 !!! warning "Post-peak behavior makes the SSR factor mesh-sensitive"
     Once $T_{res} < T_{allow}$ actually engages, the reinforcement is strain-**softening**. A softening system in
     an unregularized continuum has no length scale to arrest localization, so the computed factor of safety can
-    drift with mesh refinement instead of converging, and the SSRM bracket becomes less crisp. This is physics, not
-    a numerical defect — but it means $T_{res}$ is best treated as a forensics/back-analysis parameter rather than
+    drift with mesh refinement instead of converging, and the SSRM bracket becomes less sharp. This is a physical
+    effect rather than a numerical defect, but it means $T_{res}$ is best treated as a forensics/back-analysis parameter rather than
     a design default. Leave it blank unless you specifically intend to model post-peak strength loss.
 
 **Pullout Failure Model:**
@@ -238,7 +237,7 @@ During mesh generation, each reinforcement line is discretized into multiple tru
 Elastic modulus: $E$<br>
 Element stiffness: $K_e = AE/L$ (where L varies based on element length)<br>
 
-2. **Tensile Capacity Assignment**: Each truss element is assigned an allowable $T_{allow}$ and residual $T_{res}$ tensile capacity. $T_{allow}$ is the capacity envelope at the element centroid — the **same** envelope the limit-equilibrium engine applies at a slip-surface crossing, evaluated by the same function, so the two engines cannot drift:
+2. **Tensile Capacity Assignment**: Each truss element is assigned an allowable $T_{allow}$ and residual $T_{res}$ tensile capacity. $T_{allow}$ is the capacity envelope at the element centroid — the **same** envelope the limit-equilibrium engine applies at a slip-surface crossing, evaluated by the same function, so the two engines always use the same capacity:
 
 >>For an element whose centroid is at distances $d_1$ and $d_2$ from the two ends of a line of length $L$:
 >>
@@ -296,7 +295,7 @@ These equations are a general guide that can be used to come up with reasonable 
 
 ### Wished-in-Place Analysis and EA Selection
 
-XSLOPE currently uses a **wished-in-place** approach: the entire slope (all soil layers and all reinforcement) is
+XSLOPE uses a **wished-in-place** approach: the entire slope (all soil layers and all reinforcement) is
 assumed to exist in its final geometry, and gravity is applied in a single step. The reinforcement starts at zero
 strain and zero force. Tension develops only through deformation that occurs during the gravity application and
 subsequent SSRM strength reduction. This differs from reality, where reinforcement accumulates tension progressively
@@ -374,19 +373,18 @@ RS2/Phase2, SIGMA/W) and is the recommended approach when:
 - Accurate prediction of reinforcement forces is important (not just the factor of safety)
 - The analysis needs to match instrumented field measurements
 
-For the wished-in-place approach currently used by XSLOPE, selecting $EA$ values at the stiffer end of the
+For the wished-in-place approach used by XSLOPE, selecting $EA$ values at the stiffer end of the
 recommended range (see table above) partially compensates for the absence of construction-induced pre-tension and
-produces conservative but reasonable factors of safety. Staged construction analysis may be implemented in a future
-version of XSLOPE.
+produces conservative but reasonable factors of safety.
 
 ## Inspecting the Results
 
-The FEM results view colors each reinforcement element by the force it carries, which shows at a glance which
-lines are working hardest. To read one line along its length, use the **1D Details…** button on that view's
+The FEM results view colors each reinforcement element by the force it carries, which shows which lines carry the
+most force. To read one line along its length, use the **1D Details…** button on that view's
 toolbar. It opens a panel listing every reinforcement line and pile in the model with its utilization and a badge
 colored by it — a reinforcement row also names the state the line is in — and draws the selected member's profiles
-beside the list. Under the list is a map of the section with the selected member picked out, so a name in a list is
-a place on the slope. The button is dimmed for a model with no reinforcement lines and no piles.
+beside the list. Under the list is a map of the section with the selected member picked out, so each listed member can
+be located on the slope. The button is dimmed for a model with no reinforcement lines and no piles.
 
 ![Reinforcement detail for Line 4 of the reinforcement sample](images/reinforce_fem_details.png){width=1000}
 
@@ -394,8 +392,8 @@ The main plot is the mobilized axial force $T$ against position along the line, 
 envelope of the [pullout section above](#determining-reinforcement-line-pullout-lengths): the friction ramp
 developing from each free end over its pullout length $L_p$, the tensile plateau at $T_{max}$ in the middle, and
 the step to the end anchorage capacity $T_{end}$ where one is declared. That envelope is the same expression the
-solver evaluates at each element centroid to set $T_{allow}$, so the curve and the element capacities cannot
-disagree. Where $T_{res}$ is filled in, the residual capacity is drawn as a dotted step beneath it — flat at
+solver evaluates at each element centroid to set $T_{allow}$, so the curve and the element capacities are
+consistent. Where $T_{res}$ is filled in, the residual capacity is drawn as a dotted step beneath it — flat at
 $T_{res}$ along the middle of the line, and following the friction ramp wherever the embedment develops less than
 that — and elements that have softened onto it are marked. An element left with no residual at all, and therefore
 carrying no force, is marked at zero.
@@ -403,20 +401,18 @@ carrying no force, is marked at zero.
 The greatest utilization along a line is usually held over a stretch rather than at a point, the force being capped
 by a flat envelope. Where it is a point, that point is ringed. Where it is a stretch, every sample on the stretch is
 ringed and the run of curve between them is thickened — and a stretch with a sample inside it that stands below the
-rest is drawn as the runs it really is, so a break in the thickened curve is where the line comes off capacity. The
+rest is drawn as separate runs, so a break in the thickened curve is where the line comes off capacity. The
 legend calls the mark **At capacity**, or **Peak utilization** on a line that never reaches its envelope, and the
 title states the fraction of capacity the peak reaches.
 
-The profile draws no mark for where the shear band crosses the line. The field figure is where a crossing is
-read — the band is drawn there as strain contours — and the profile is where what the line carries is read; a
-shaded stretch derived from a threshold on the sampled strain added a rule between the two that the legend
-could not explain.
+The profile does not mark where the shear band crosses the line; the crossing is shown on the field figure,
+where the band is drawn as strain contours.
 
 Every mark on the panel is named in the legend, and nothing is labeled over the curves: the panel is wide and
 shallow, and a label placed in it stands over the profile it describes.
 
-Beneath the force profile is the bond transfer rate $dT/ds$: the force the ground hands the bar per unit of its
-length, which is the gradient of the profile above it. There is no companion slip series because the formulation
+Beneath the force profile is the bond transfer rate $dT/ds$: the force transferred from the ground to the bar per
+unit length, which is the gradient of the profile above it. There is no companion slip series because the formulation
 has no slip degree of freedom — a reinforcement element is a truss bar on the continuum's own nodes, so bar and
 soil displacement are the same number at every node. Load transfer is expressed through the capacity envelope, not through a slip law.
 
@@ -435,7 +431,7 @@ with, so it can stay open beside the results view; it works the same on a soluti
 sidecar files as on a fresh solve.
 
 The screenshot above is a strength reduction run on the reinforced slope built in
-[FEM-2](../tutorials/fem02_reinforcement.md), read at the mechanism it developed.
+[FEM-2](../tutorials/fem02_reinforcement.md), shown at the mechanism it developed.
 
 ### The state of a line
 
@@ -453,9 +449,9 @@ report.
 | ruptured | has softened with no residual capacity left and now carries nothing |
 | inactive | carries no tension anywhere and is not engaged |
 
-Pullout and yielded read alike on a badge: both are a line standing at
-100% of what is available to it. **Pullout** is an end element at the reduced capacity its embedment can develop —
-the friction ramp doing what a friction ramp does, with the interior of the line still below capacity. **Yielded**
+Pullout and yielded look alike on a badge: both are a line standing at
+100% of what is available to it. **Pullout** is an end element at the reduced capacity its embedment can develop,
+limited by the friction ramp, with the interior of the line still below capacity. **Yielded**
 is an element out on the $T_{max}$ plateau, where the whole tensile strength of the geosynthetic is mobilized. A
 line in both states at once is reported yielded, the more serious of the two. **Softened** and **ruptured** need a
 $T_{res}$: a line that declares none cannot reach them.
@@ -516,9 +512,10 @@ connected to its facing.
 
 On a jointed line the bar keeps its own law — tension only, rupture at $T_{max}$, softening to $T_{res}$ where
 stated — **minus the bond-slip cap**. The grip on the soil is now the interface traction the joints integrate, so
-applying the pullout envelope as well would count it twice; `Lp1` and `Lp2` are not read there. Preflight says so.
+applying the pullout envelope as well would count it twice; `Lp1` and `Lp2` are not read there, and the preflight
+checks report this.
 
-### Strength reduction, and what decides a jointed trial
+### Strength reduction on a jointed line {#strength-reduction-and-what-decides-a-jointed-trial}
 
 A strength reduction divides $c_j$ and $\tan\phi_j$ by the trial factor along with the soil's, on every jointed
 line unless that line sets `Jred = No`. The stiffnesses $k_n$ and $k_s$, the ties and $T_{max}$ are structural and
@@ -526,7 +523,7 @@ are not reduced, exactly as the bar's properties are not.
 
 A jointed model reaches equilibrium by growing slip, so it takes tens of thousands of viscoplastic sweeps where a
 bonded one takes hundreds, and a trial that runs out of them is undecided rather than failed. What that costs, what
-budget to allow and how such a trial is read are under [running a jointed model](joints.md#running-a-jointed-model).
+budget to allow and how such a trial is classified are under [running a jointed model](joints.md#running-a-jointed-model).
 
 ## Joints Without Reinforcement
 
@@ -562,8 +559,8 @@ A model may carry both, and the multi-tiered geotextile wall is the case that ne
 reinforcement line with `Joint = Yes`, so the fill can slide on it while the sheet still carries tension, and each
 facing column stands on joints-sheet lines that let the blocks slide on each other, on the fill behind them and on
 the foundation beneath. A sheet whose front end stops on the back face of a column is **tied** there, and the tie
-takes the material the line runs into past its end — the column — so the wrap's connection to the facing is what the
-tie represents.
+takes the material the line runs into past its end — the column — so the tie represents the wrap's connection to the
+facing.
 
 A sheet that ends on a joint line — the back face of a column, or a course joint between blocks — must itself be
 jointed, or stop short of the joint. The mesh is split along the joint, so the node at the sheet's end exists once
@@ -571,32 +568,34 @@ for each side of it, and a bonded bar, which shares the soil's own nodes, has no
 reports a bonded reinforcement or pile line that ends on or crosses a jointed line, naming both, before the mesh is
 built.
 
-## Bonded Bar or Joint?
+## Choosing a Bonded Bar or a Joint {#bonded-bar-or-joint}
 
-The choice is about the mechanism, not about the material: does the slip surface **cut** the reinforcement, or run
-**along** it?
+The choice depends on the mechanism rather than on the material: whether the slip surface **cuts** the
+reinforcement or runs **along** it.
 
-**A bonded bar is right where the surface crosses the layers.** A circle through a geogrid slope, a nail wall, a
-pile row: the soil on both sides of each layer moves together, the layer carries tension across the surface, and
-the only interface question is pullout, which is a capacity the bar's cap answers. It is the finite element twin of
-the limit equilibrium treatment — a force where the surface crosses the line — so the two engines compare like for
+**Surface crossing the layers.** A bonded bar is appropriate where the surface crosses the layers: a circle through
+a geogrid slope, a nail wall, a pile row. The soil on both sides of each layer moves together, the layer carries
+tension across the surface, and the only interface question is pullout, which the bar's capacity cap represents.
+It corresponds to the limit equilibrium treatment — a force where the surface crosses the line — so the two engines compare like for
 like.
 
-**A joint is right where the surface can run along the layer.** A reinforced embankment on soft clay sliding on
+**Surface along the layer.** A joint is appropriate where the surface can run along the layer: a reinforced
+embankment on soft clay sliding on
 its base geotextile, a wrapped-face or block-faced wall where the fill between the sheets moves relative to them
 and each sheet anchors to a facing, a smooth geomembrane or liner whose interface friction is well below the soil's,
 any long flat sheet under a sliding mass. The interface shear strength along the sheet governs, the two sides move
 differently, and a bonded bar cannot represent it: it reports the bars at their cap while the mesh decides the
 answer.
 
-Joints are off by default, because tripled nodes and a penalty stiffness cost something. On a wall or a base sheet,
-running both ways settles it: a bonded answer that matches the jointed one says the mechanism is crossing, and one
-that sits above it says the mechanism was sliding and the bond was holding it up.
+Joints are off by default, because tripled nodes and a penalty stiffness add cost. On a wall or a base sheet,
+running both ways answers the question: a bonded answer that matches the jointed one shows that the mechanism
+crosses the sheets, and one that sits above it shows that the mechanism slides along them and the bond was holding
+it up.
 
-### What says a joint was needed
+### Signs that a joint is needed {#what-says-a-joint-was-needed}
 
-Preflight cannot know the mechanism, but four of these cases show in the inputs, and it reports each of them as a
-warning naming the line:
+The preflight checks cannot determine the mechanism, but four of these cases show in the inputs, and the checks
+report each of them as a warning naming the line:
 
 - a sheet **lying on a material boundary** over most of its length — the base geotextile of a reinforced
   embankment, which slides on its own interface;

@@ -122,7 +122,7 @@ Limitations:
 with the sign its own inclination gives it, so reservoir water standing against
 an upstream face resists the slide rather than driving it — the same way the
 complete-equilibrium methods treat it. On the upstream face of the
-[earth dam sample](samples.md#4-earth-dam) Janbu reads 1.736 against Spencer's
+[earth dam sample](samples.md#4-earth-dam) Janbu gives 1.736 against Spencer's
 1.800 and Bishop's 1.815, the few-percent conservatism expected of an approximate
 method.
 

@@ -30,7 +30,7 @@ method behaves the way it does, whether XSLOPE can handle a particular case, whe
 an input lives, or what a result means — and it answers in conversation, without
 building or running anything unless the question needs it. Theory and how-to answers
 end with a link into this documentation, and links in the transcript **open in your
-browser**, so a chat reply is a starting point rather than the last word. When a
+browser**, so a chat reply leads directly into the documentation. When a
 question matches a topic the [verification corpus](../verification/index.md) covers,
 it points at the worked problems too.
 
@@ -137,7 +137,7 @@ dependency is missing. See [Installation](index.md#installation).
 
 ## How it works
 
-The assistant is an **agent with code execution**, not a chatbot. Its core tool is
+The assistant is an **agent that executes code**. Its core tool is
 an in-process Python kernel: the model writes small Python snippets, and Studio runs
 them with `xslope` imported and the **live project in scope** — `doc` (the project),
 `slope_data` (its inputs), and `results` are all preloaded. Most requests reduce to
@@ -152,7 +152,7 @@ one rather than reassembling the engine by hand:
 | `run_lem(search=True)` | One limit-equilibrium solve. `search=True` searches for the critical surface for that method, exactly as [Run LEM](analysis.md) does; `search=False` solves the surface already on the project. The method defaults to the one the **model** declares (the `main` sheet's LEM method, which is what the Run LEM dialog opens on), so the assistant and the dialog run the same method unless you name another. The result carries the surface it was solved on — `Xo`, `Yo`, `R`, `Depth`, and the `x_entry`/`x_exit` ends of the trace — and the run is stored where a dialog run is stored, so the results tabs show it and the report documents it. |
 | `run_seep(bc=1)` | One steady seepage solve. The solved pore pressures are attached to the model, so a later stability run with `u = seep` reads them. |
 | `run_tseep()` | The transient run, on the project's own transient sheet — the same run as [Run Seep](analysis.md) with **Transient** ticked. Its frames are stored where Studio stores them, so the **Seep · Transient** tab plays them and a stability run can read one. It hands back a transient run that is already loaded (a project opened with its `_tseep.csv` sidecar has one) rather than repeating it. |
-| `run_lem(seep_time=t)` | One instant of that march as the run's pore pressure; with `rapid=True`, the transient sheet's two drawdown stages. Which instant was used is stated in the log. |
+| `run_lem(seep_time=t)` | One instant of that transient run as the run's pore pressure; with `rapid=True`, the transient sheet's two drawdown stages. Which instant was used is stated in the log. |
 | `fs_vs_time()` | The factor of safety at every saved instant — the curve the **FS vs Time** tab shows, with its lowest point and the time it falls at. |
 | `run_fem(analysis='ssrm')` | One finite element run — the SSRM factor of safety, or a single trial. Minutes, not seconds. |
 | `generate_report(path=None)` | The [Analysis Report](reports.md), built and finished exactly as the Report dialog builds it — over every engine the session has solved, and stamped with the project file and its SHA-256 where the project has been saved. With no path it is written to the assistant's output folder as `<project>_report.docx`, so it opens from **Files…** with everything else the conversation produced. |
@@ -176,10 +176,10 @@ The assistant **builds into the live document**, not a file. Review the result o
 the canvas, then persist it with **Save As**. (An empty project is opened
 automatically if none is, so the first snippet works.)
 
-### What it knows before it runs anything
+### Context given at the start of a conversation {#what-it-knows-before-it-runs-anything}
 
-Two things arrive with every conversation, so the assistant does not have to spend
-model calls discovering them. The first is a **Studio reference** — the kernel and
+Each conversation is given two things at the start, so the assistant does not have to
+spend model calls discovering them. The first is a **Studio reference** — the kernel and
 every preloaded helper with its signature, the `slope_data` record schemas, the
 modeling rules (extents, starting circles, water as loads, units), and the
 documentation links — carried in the system prompt and served from the provider's
@@ -190,18 +190,17 @@ That summary is given at the start of the conversation and refreshed the first t
 you write after an edit has changed the model, so what the assistant is looking at
 is never out of date and never has to be re-read out of `slope_data`.
 
-The practical effect is that a question about the open model is usually answered in
-a single snippet: compute, then answer.
+As a result, a question about the open model is usually answered with a single
+snippet.
 
 ### What a turn costs
 
 Tokens are reported live under the input box, and the numbers are small enough to
 plan around. A one-question turn against Claude Opus on a built model — *"What is
 the factor of safety of this model with Spencer?"*, which runs a full critical-surface
-search — measures **two model calls and about 26,000 input tokens** (roughly half of
+search — takes **two model calls and about 26,000 input tokens** (roughly half of
 them served from the prompt cache) for around 450 tokens of reply. The reference and
-the model summary are what keep it there: the same question used to take six model
-calls and roughly 356,000 tokens. Building a model from a sketch costs more, because
+the model summary keep the count that low. Building a model from a sketch costs more, because
 it is more turns; a long autonomous build is the case to watch, and the running
 turn total is on screen while it works.
 
@@ -225,8 +224,8 @@ sketch of a cross section is one of the things the assistant is for, and a text-
 model turns that request into a conversation about what the picture shows. So a
 provider whose API takes no images is not listed, and where a provider's catalog is
 mixed — Z.ai's text GLMs beside its V models, a local library that is mostly text —
-the list is filtered to the part of it that can see, and the caption under the box
-says so. The model box still accepts free text, so a text-only id can be typed in if
+the list is filtered to the models that can read images, and the caption under the
+box states this. The model box still accepts free text, so a text-only id can be typed in if
 you want one.
 
 ![Assistant Settings dialog](images/assistant_settings.png)
@@ -260,9 +259,9 @@ pressing **Refresh** — asks the selected provider for its own list of models,
 using the key you have stored, and shows what comes back. If the provider can't
 be reached, the list falls back to the last one it returned, and then to the
 models this version shipped with, so there is always something to choose offline.
-A caption under the box says which of the three you are looking at.
+A caption under the box shows which of the three is listed.
 
-A curated set of recommendations is published alongside XSLOPE releases and read
+A set of recommendations is published alongside XSLOPE releases and read
 at most once a day. It marks one model per provider as **recommended** — the one
 a new install starts on — sorts a few good choices to the top with a one-line
 label, and marks models the provider has superseded. Superseded models stay in
@@ -274,7 +273,7 @@ choice.
 
 ---
 
-## Every edit is checked
+## Checking each edit {#every-edit-is-checked}
 
 When the assistant changes the model, the change is validated before you see the
 reply. Studio rebuilds the derived geometry and runs the same
@@ -283,10 +282,10 @@ back to the assistant as part of its own result — errors and warnings both. Th
 assistant is required to resolve what comes back, or to tell you why it stands,
 before it reports the model ready.
 
-This matters most for the changes whose consequences are somewhere else. Correct
-the base elevation of a model and the circles that were tangent to the old base
-are now underneath the new one; nothing about editing that one field says so, and
-the model would otherwise look finished until a run failed on it. The checks run
+The checks matter most for changes whose consequences appear elsewhere in the model.
+Correct the base elevation of a model and the circles that were tangent to the old
+base are now underneath the new one; nothing in that one edit shows this, and the
+model would otherwise look finished until a run failed on it. The checks run
 on the edit that caused it, so the stranded circles are named in the same reply.
 
 Each finding is quoted in full once, in the first block with room for it: a block
@@ -296,8 +295,8 @@ then on the block quotes what is new or has changed and names the rest by rule o
 a single line — a long build on a model that carries standing faults does not
 re-read the same paragraphs after every edit. Findings an edit can answer are the
 exception: they stay quoted in every block until they are resolved. A finding
-whose cure is an analysis rather than an edit collapses like the rest, onto a
-line that keeps saying it is staged by that run. A new chat, or a newly opened
+that an analysis rather than an edit resolves is shortened like the rest, to a
+line stating that it waits on that run. A new chat, or a newly opened
 project, starts the reporting over.
 
 A read-only question — anything that reads the model without changing it — skips
@@ -305,9 +304,8 @@ the checks entirely.
 
 ### How the assistant itself is tested
 
-What a model does with a sentence of instruction cannot be settled by asserting
-it, so the assistant is measured rather than asserted. A scored suite of
-conversations (`tools/assistant_suite.py`) plays thirty tasks against real models
+The assistant is tested with a scored suite of conversations
+(`tools/assistant_suite.py`) that plays thirty tasks against real models
 taken from the sample, tutorial and verification files — building from a written
 description and from a drawing, editing geometry, loads, materials, reinforcement
 and piles, running each engine, the parametric and reliability modes, answering
@@ -320,14 +318,14 @@ be one a snippet actually printed. A second mode of the same tool (`--corpus`)
 sweeps every workbook the project ships instead of thirty chosen tasks, asking
 each one to run the analysis its file declares and grouping what comes back by the
 input columns that file uses — piles, reinforcement, a tension crack, seepage
-boundary conditions — so a weakness that shows on one kind of input reads as a
-pattern rather than an anecdote. Adding `--sample` narrows that sweep to a
+boundary conditions — so a weakness on one kind of input shows as a pattern
+rather than a single case. Adding `--sample` narrows that sweep to a
 stratified draw of the corpus and widens what is asked of each file to a menu of
 tasks — describing the model, making one named edit and re-solving, explaining
 which slices carry the surface, comparing methods, sweeping a parameter, finding
 a planted fault, writing the report, and building a model from a tutorial's
 problem drawing or its written description — so the measurement covers the kinds
-of question as well as the kinds of model. The suite's own plumbing is a standing check in
+of question as well as the kinds of model. The suite itself is checked in
 `run_tests.py`, where a dry run exercises the whole path — window, chat dock,
 transcript, scoring — with canned replies and reaches no provider at all. A
 recording run states its provider, model and autonomy in a store of its own rather
@@ -351,8 +349,8 @@ Every action is visible in the transcript as a collapsible "ran code" block, and
 **Stop** button halts the agent at any time. The kernel runs in Studio's own process,
 so a snippet that never returns would otherwise take the window with it: one snippet
 may run for **ten minutes** before it is stopped, and the assistant is told what
-happened and left to try something narrower. The limit is generous because a real
-SSRM run or a long sweep is minutes of honest work; raise or lower it with the
+happened and left to try something narrower. The limit is long because an SSRM run
+or a long sweep can take several minutes; raise or lower it with the
 `ai/run_timeout` setting, or switch it off with a zero.
 
 !!! warning "Network egress"
@@ -394,7 +392,7 @@ SSRM run or a long sweep is minutes of honest work; raise or lower it with the
 ## Relationship to the Claude Code skill
 
 The standalone [`/xslope` Claude Code skill](../usage/claude/index.md) is a
-first-class, **file-first** workflow for the CLI or an IDE: it builds an `.xlsx`
+**file-first** workflow for the CLI or an IDE: it builds an `.xlsx`
 input file from a description or a sketch and runs it from a script. Studio's
 assistant is **document-first** — it populates the live `slope_data` of the open
 project and never writes an input file, so the two carry different references and

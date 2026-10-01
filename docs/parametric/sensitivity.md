@@ -25,29 +25,28 @@ success, result = sensitivity(
 plot_sensitivity(result['df'], target_fs=1.2)
 ```
 
-`search=True` is the default and the honest setting: **the critical surface moves as
-parameters change**, and re-solving a fixed surface silently understates sensitivity.
+`search=True` is the default because **the critical surface moves as parameters
+change**, and re-solving a fixed surface understates sensitivity.
 `search=False` re-solves the stored surface (`circles[0]` or the non-circular polyline)
 instead — roughly fifty times faster, and correct when the question is "given this
 surface" (prescribed-surface benchmarks, for example).
 
-**A searched sweep honours the model's own search window.** If the circles sheet declares
+**A searched sweep uses the model's own search window.** If the circles sheet declares
 entry and exit ranges, a center box, a maximum tangent depth or a minimum slip depth, every
 point is searched inside those limits — exactly as Studio's Run LEM path reads them, so a
 windowed model gives the same surface family from a script as from the interface. Pass
-`search_opts={...}` to set or override any limit per call (a circular-search keyword wins
-over the file), or `use_file_window=False` to search unconstrained regardless of what the
+`search_opts={...}` to set or override any limit per call (a circular-search keyword takes
+precedence over the file), or `use_file_window=False` to search unconstrained regardless of what the
 file declares. The same two settings are available on `design`, `back_analysis`, `tornado`,
 `scaled_sensitivity`, `fs_vs_time`, `reliability` and `reliability_mc`, and they mean the same
 thing on each — every path that searches on the model's behalf reads the window the same way.
 
-The window matters because a sweep answers "how far does FS move when this input moves", and
-it answers by re-searching at every point. Left unconstrained on a slope with competing
-minima — a benched face, an embankment on a soft foundation — one point can settle in a deep
-foundation circle where its neighbour found a shallow one, and the step between them reads as
-sensitivity to the parameter when it is really a change in what was measured. The `Xo`/`Yo`/`R`
-columns are there to make such a jump visible when no window is declared; declaring one keeps
-it from happening.
+The window matters because a sweep re-searches at every point. Left unconstrained on a slope
+with competing minima — a benched face, an embankment on a soft foundation — one point can
+settle in a deep foundation circle where its neighbor found a shallow one, and the step between
+them appears as sensitivity to the parameter when it is really a change in what was measured.
+The `Xo`/`Yo`/`R` columns make such a jump visible when no window is declared; declaring one
+prevents it.
 
 The result is a tidy long-format DataFrame — one row per (value × method), with the
 unmodified model included as a flagged `is_base` row:
@@ -63,7 +62,7 @@ unmodified model included as a flagged `is_base` row:
 
 `plot_sensitivity` draws one line per method with FS = 1 (and an optional `target_fs`) as
 guide lines, marks the unmodified model as a labeled **base case** entry in the legend — so
-the black square in the plot reads as `base case (value, FS = …)` rather than an unexplained
+the black square in the plot is labeled `base case (value, FS = …)` rather than an unexplained
 point — and draws any point where the critical surface jumped as an open circle.
 
 `mode=` selects the engine that evaluates each swept point (see
@@ -75,14 +74,14 @@ the model must carry a mesh in `slope_data['mesh']`. `mode='seep'` rebuilds and 
 seepage problem at every point and reports the **total discharge q** through the section
 (the same flow rate the seepage solver returns), and likewise needs a mesh. The result's
 value column stays `fs` for a consistent schema; `result['output']` (`'FS'` or `'q'`) and
-`result['output_label']` say what it really is, so a discharge sweep is never mislabelled a
+`result['output_label']` state what it is, so a discharge sweep is never mislabeled a
 factor of safety.
 
-## Sweeping anything else: `modify=`
+## Sweeping other quantities: `modify=` {#sweeping-anything-else-modify}
 
 For changes that are not a single stored scalar — geometry above all — pass a callable
 instead of a parameter reference. The callable receives a copy of the model and the
-swept value, and owns whatever consistency its edit requires (rebuilding the material
+swept value, and is responsible for keeping the model consistent after its edit (rebuilding the material
 polygons and ground surface after moving profile points, keeping reinforcement anchored
 to a moved face):
 
@@ -122,7 +121,7 @@ A sweep validates in two stages.
 
 **Once, before the first point,** the base model goes through the full
 [preflight input check](../usage/preflight.md) for whichever engine the sweep will run.
-A model that cannot be analyzed at all is refused there, with the field named — rather
+A model that cannot be analyzed at all is rejected there, with the field named — rather
 than failing identically at every one of nine points.
 
 **Then, per point,** the substituted value is re-checked against only the rules that read
@@ -137,16 +136,15 @@ is the search's no-admissible-surface flag rather than an answer, and a negative
 a result either. Both become failed rows with a stated reason instead of numbers that would
 dominate every plot and derivative built from the sweep.
 
-Pass `check_inputs=False` to skip both validation stages. The result screen still runs — a
-sentinel recorded as a success is a defect in the record, not a strictness setting.
+Pass `check_inputs=False` to skip both validation stages. The result screen still runs,
+because a sentinel value recorded as a success would be an error in the record.
 
 ## Factor of safety versus time
 
 A [transient seepage](../seep/transient.md) run produces a *sequence* of pore-pressure
 fields, one per saved instant. `fs_vs_time` runs the stability analysis against each of
-them in turn and tabulates the result — the coupled output a drawdown or an infiltration
-study is actually run for, and the answer to *when* the slope is at its weakest rather
-than only *how weak*:
+them in turn and tabulates the result. This is the result a drawdown or infiltration study
+is run for: when the slope is at its weakest, as well as how weak it is:
 
 ```python
 from xslope.sensitivity import fs_vs_time
@@ -164,10 +162,10 @@ if success:
 
 It is a sweep like every other mode on this page — run the model N times and tabulate —
 and it returns the same tidy long-format DataFrame, so `plot_sensitivity` draws it with no
-special handling. One difference: **no input is modified at any step.**
+special handling. The difference is that **no input is modified at any step.**
 Each point solves the same model against a different *computed* field, so there is no
 substituted value to validate and no base case to compare against. The axis is time, and
-the `param` column reads `time`.
+the `param` column contains `time`.
 
 Alongside `df` the result carries `critical_time` and `min_fs` — the instant of the lowest
 factor of safety and its value — plus `critical` (the same pair per method when several
@@ -201,15 +199,15 @@ ok, result = fs_vs_time(slope_data, transient_solution, rapid=True)
 Stage 1 is the transient run's **initial** state — the `tseep` sheet's `stage_1` (normally t = 0 at
 full pool), or the earliest saved frame where the sheet names none — and stage 2 is the frame
 at *t*, with stage 3 re-checking the drawn-down section against drained strengths where they
-are the lower. The reported value is the drawdown's own, the lower of stages 2 and 3, so the
-curve answers *how safe is this slope if the pool falls to where it stands at t* — asked
-against pore pressures the transient run computed rather than a single assumed drawn-down state. The
+are the lower. The reported value is the drawdown's own, the lower of stages 2 and 3, so each
+point is the factor of safety of the slope if the pool falls to its level at that instant,
+computed with the transient run's pore pressures rather than a single assumed drawn-down state. The
 rows carry `stage1_FS`, `stage2_FS`, `stage3_FS`, `stage3_run` and `governs` beside `fs`.
 `plot_fs_vs_time` draws the reported curve alone; the stage values are in the run's printed
 table and in `result['df']`.
 
 * Every point is an **auto search from the model's starting circle**, never the stored
-  circle, so `search` is not consulted on this branch — a drawdown's critical surface is not
+  circle, so `search` is not used on this branch — a drawdown's critical surface is not
   the drained one, and it moves with the drawn-down field.
 * The stage values on a row are read **on that row's critical surface**, which is the
   drawdown's, so `stage1_FS` varies slightly along the curve. It is the full-pool factor of
@@ -217,17 +215,17 @@ table and in `result['df']`.
   have found.
 
 The instant stage 1 itself is read at cannot be a drawdown — a fall from the pool to itself —
-and comes back as a `success=False` row saying so. `mode='fem'` is refused: the three-stage
+and comes back as a `success=False` row with that reason. `mode='fem'` is rejected: the three-stage
 procedure is a limit-equilibrium construction with no SSRM equivalent.
 
-**The instant is never interpolated.** A time that names no saved frame is served by
+Instants are never interpolated. A time that names no saved frame is obtained by
 rerunning the transient seepage analysis with that instant injected into the saved schedule —
 pass `seep_data=` to allow it, and the whole set of missing times is served by *one* rerun
-before the first solve. Without `seep_data` such a time becomes a `success=False` row saying so. A field
-blended between two frames is not a solution of anything, which is why the mode declines
-to invent one.
+before the first solve. Without `seep_data` such a time becomes a `success=False` row with that
+reason. A field blended between two frames is not a solution of anything, so the mode does not
+create one.
 
-Two settings matter more here than in a value sweep:
+Three settings matter more here than in a value sweep:
 
 * `search=True` (the default) re-searches the critical surface at every instant. That is
   the right default because the critical surface *moves* as the pore pressures change,
@@ -237,38 +235,38 @@ Two settings matter more here than in a value sweep:
   depth) from the model, exactly as Studio's Run LEM path does, so a windowed model gives
   the same family from a script; `search_opts=` overrides it per call and
   `use_file_window=False` ignores it. Without a window, a curve can jump between competing
-  minima from one instant to the next, and the jump reads as a change in the slope rather
+  minima from one instant to the next, and the jump appears as a change in the slope rather
   than a change in which surface was measured.
 * `search_opts={'seed': 'grid'}` — Studio's **Grid search (auto-seed the circular search)**
   box on the same dialog — seeds every instant from a geometry-derived sweep of centers and
-  tangent elevations instead of the circles sheet alone, which is what a curve needs when
+  tangent elevations instead of the circles sheet alone, which a curve needs when
   the critical mechanism sits in a different part of the section at one end of the run than
   at the other (a dam governed by its downstream face at full pool and by its upstream face
   during a drawdown).
 
 `mode='fem'` runs a full SSRM solve per instant instead (needs a mesh in
-`slope_data['mesh']`); `mode='seep'` is refused, because the seepage solution is this
+`slope_data['mesh']`); `mode='seep'` is rejected, because the seepage solution is this
 run's input rather than its output.
 
-The per-instant contract is the same as a value sweep's: the base model is preflighted
-once before the first solve, and an instant that produces no result is a `success=False`
-row **carrying its reason**, never a gap. That matters more for a curve than for a sweep —
-a dropped instant moves the curve's minimum to a healthier value with nothing in the
-record to say a point went missing.
+Each instant is handled as in a value sweep: the base model is checked once before the
+first solve, and an instant that produces no result is a `success=False` row **carrying
+its reason**, never a gap. This matters more for a curve than for a sweep, because a dropped
+instant could move the curve's minimum to a higher value with nothing in the record to show
+that a point is missing.
 
 A worked comparison against a vendor-published curve — both drawdown rates of the
 GeoStudio rapid-drawdown example, 11 instants each — is on the
 [GeoStudio verification page](../verification/geostudio.md#seepw-t03).
 
-!!! note "Two different questions"
+!!! note "Two different analyses"
     The default curve and the `rapid=True` curve are different analyses of the same
     physical problem. The default is a sequence of single-stage analyses, one per instant,
-    each reading the pore pressures computed for that moment — *how safe is the slope in
-    the state it is in at t*. The drawdown curve is a sequence of three-stage
-    [rapid drawdowns](../lem/rapid.md), each reading two instants through undrained
-    strength envelopes — *how safe is the slope if the pool falls from full to where it
-    stands at t*. Neither substitutes for the other, and on a model that carries `d` and ψ
-    the drawdown curve is the lower of the two everywhere the undrained envelope bites.
+    each using the pore pressures computed for that moment: the factor of safety of the
+    slope in its state at time t. The drawdown curve is a sequence of three-stage
+    [rapid drawdowns](../lem/rapid.md), each using two instants through undrained
+    strength envelopes: the factor of safety of the slope if the pool falls from full to
+    its level at time t. Neither substitutes for the other, and on a model that carries `d`
+    and ψ the drawdown curve is the lower of the two everywhere the undrained envelope governs.
 
 ## Sensitivity plots
 
@@ -301,13 +299,13 @@ success, result = tornado(
 plot_tornado(result)
 ```
 
-For the shipped ACADS sample (a weak c–φ soil), the tornado ranks φ far ahead of c and
+For the ACADS sample (a weak c–φ soil), the tornado ranks φ far ahead of c and
 γ — the ±25% φ band alone swings FS from 0.77 to 1.21 across FS = 1.
 
 `plot_tornado` draws the base-case FS as a labeled vertical reference line and stacks the
 bars widest-on-top by default — the classic Duncan ordering that gives the diagram its name.
-Pass `widest_on_top=False` to invert the stack (widest at the bottom); the parameter is kept
-for programmatic callers, and Studio deliberately exposes no toggle for it.
+Pass `widest_on_top=False` to invert the stack (widest at the bottom); the option is available
+only from the API, and Studio has no control for it.
 
 When you have already run *full* per-parameter sweeps — a GUI that draws an FS-vs-value curve
 per parameter for click-through, for instance — `tornado_from_sweeps()` assembles the same
@@ -359,7 +357,7 @@ docstring.
 
 `plot_spider()` overlays every parameter's FS-vs-value curve on one **normalized** x-axis
 (percent change from the base value), with a black base-case marker at the origin and an
-FS = 1 guide. The steepness of each line *is* its sensitivity, and a curving line reveals
+FS = 1 guide. The steepness of each line shows its sensitivity, and a curving line reveals
 nonlinearity a single tornado bar would hide. It reuses the per-parameter sweeps you already
 ran:
 
@@ -377,8 +375,8 @@ plot_spider(sweeps)
 
 ### Variance-contribution Pareto
 
-When the model carries standard deviations, `variance_contribution()` asks *which
-uncertainties actually drive the scatter in FS*. It reuses the Taylor-series
+When the model carries standard deviations, `variance_contribution()` finds which
+uncertainties contribute most to the scatter in FS. It reuses the Taylor-series
 [reliability](../reliability/taylor.md) machinery — each parameter's variance term is
 $\left(\dfrac{\partial F}{\partial p}\,\sigma_p\right)^2$, exactly the $(\Delta F/2)^2$ the
 TSPM already computes — normalizes each to a percent of $\mathrm{Var}(F)$, and
@@ -396,9 +394,9 @@ plot_variance_pareto(result)
 
 Note how this reorders the parameters versus the elasticity bars: c and φ contribute almost
 equally to $\mathrm{Var}(F)$ even though φ has the larger elasticity, because c's standard
-deviation is a much larger fraction of its mean. A scaled bar answers *how strong is the
-response*; the Pareto answers *how much does this parameter's uncertainty matter* — the
-per-σ scaling above is the bridge between the two.
+deviation is a much larger fraction of its mean. A scaled bar shows how strong the response
+is; the Pareto shows how much each parameter's uncertainty contributes; the per-σ scaling
+above connects the two.
 
 ### Monte Carlo rank correlation
 
@@ -426,7 +424,7 @@ disagree, and the disagreement is itself informative; read the two together.
 The sweep below reproduces the base case of the ACADS simple slope sample
 ([xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx), the same file used
 throughout these pages) and brackets it over ±50% of the cohesion, re-searching the
-critical surface at every point. The regression suite locks the end points: at c = 1.5
+critical surface at every point. The test suite checks the end points: at c = 1.5
 the critical circle has retreated toward the face (the surface-jump columns show the
 radius growing as cohesion falls), and at c = 4.5 the slope crosses FS = 1.
 
@@ -438,9 +436,8 @@ radius growing as cohesion falls), and at c = 4.5 the slope crosses FS = 1.
 | 3.0 (base) | 0.985 |
 | 4.5 (+50%) | 1.073 |
 
-A `geom:piezo:dy` sweep on any of the water-table samples answers the most common
-geometry question — "how sensitive is this slope to the water table?" — without writing
-a setter: the reference shifts the piezometric line vertically by the swept delta.
+A `geom:piezo:dy` sweep on any of the water-table samples shows how sensitive the slope is
+to the water table without writing a setter: the reference shifts the piezometric line vertically by the swept delta.
 
 For a published benchmark of the sweep itself, see
 [verification problem VP40](../verification/rocscience.md#vp40) — [Perry (1993)](https://doi.org/10.1144/GSL.QJEGH.1994.027.P3.04)'s

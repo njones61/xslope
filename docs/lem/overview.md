@@ -90,7 +90,7 @@ The instantaneous tangent follows in closed form:
 > $\tan\phi_i = \dfrac{\partial\sigma'_1/\partial\sigma'_3 - 1}{2\sqrt{\partial\sigma'_1/\partial\sigma'_3}},
 > \qquad c_i = \tau - \sigma'_n \tan\phi_i$
 
-From there Hoek-Brown rides exactly the same outer iteration as the power curve: linearize at the current normal
+From there Hoek-Brown uses the same outer iteration as the power curve: linearize at the current normal
 stress, solve, update the normal stresses, re-linearize, repeat until the factor of safety is stationary. The
 same restriction applies — Hoek-Brown materials are not supported in rapid drawdown analysis.
 
@@ -106,15 +106,15 @@ same restriction applies — Hoek-Brown materials are not supported in rapid dra
 The envelope's shape has two consequences for rock slopes. A Hoek-Brown envelope is
 very steep at low confinement: the instantaneous friction angle on a shallow, lightly-loaded slice near the crest
 routinely exceeds 60°. The Corps of Engineers and Lowe & Karafiath methods, which fix the interslice-force
-inclination up front rather than solving for it, can fail to converge at friction angles that high. This is a
-pre-existing property of those force-equilibrium methods, not of the Hoek-Brown implementation — plain
+inclination up front rather than solving for it, can fail to converge at friction angles that high. The limitation
+belongs to those force-equilibrium methods rather than to the Hoek-Brown envelope: plain
 Mohr-Coulomb materials with $\phi > 55°$ fail the same way. Prefer Bishop, Spencer, or Morgenstern-Price on rock
-slopes. The [preflight checks](../usage/preflight.md#what-is-checked) report both traps before a run — either of
+slopes. The [preflight checks](../usage/preflight.md#what-is-checked) report both conditions before a run — either of
 those two methods selected on a Hoek-Brown material, and a $\sigma_{ci}$ small enough to have been carried over
 in MPa rather than the model's own stress units.
 
 !!! warning "Weak rock masses and shallow surfaces"
-    The other side of the same coin: a Hoek-Brown envelope has very little strength at *zero* confinement. The
+    A Hoek-Brown envelope also has very little strength at *zero* confinement. The
     unconfined strength of the rock mass is $\sigma_{ci}\,s^{\,a}$, which for a low GSI is a tiny fraction of the
     intact strength — at GSI = 15 a 2.5 MPa intact rock has a rock-mass unconfined strength of only about 2.5 kPa,
     i.e. it is effectively rubble. A material with essentially no cohesion has no depth scale to arrest failure,
@@ -161,8 +161,8 @@ from outside it: if a slice base whose material takes `u = piezo` falls beyond e
 and reports the failure surface, the slice, its x-coordinate and the line's extent, rather than reading zero pore
 pressure and returning an unconservatively high factor of safety. Where a region really is dry, carry the line on
 at an elevation below the section to say so. The finite element solver applies the same rule at every mesh node and
-Gauss point. Setting `u = piezo` on a material when the file defines no piezometric line at all is refused the same
-way — a dry model is `u = none`, not a piezometric line that does not exist.
+Gauss point. XSLOPE also stops when a material has `u = piezo` and the file defines no piezometric line at all; a
+dry material takes `u = none`.
 
 **Pore pressure ratio** (`u = ru`). The pore pressure is taken as a fixed fraction of the vertical overburden,
 $u = r_u \sigma_v$, with $r_u$ entered per material. $\sigma_v$ is the *soil-column* stress only — distributed loads
@@ -175,7 +175,7 @@ the element basis functions. This is the most accurate option, and the only one 
 two-dimensional flow field — including perched water, anisotropy, and internal drains — rather than assuming a head
 distribution up front.
 
-A note on all of them: XSLOPE always uses the *explicit* water-force formulation, never buoyant unit weights. Total
+With all four options, XSLOPE uses the *explicit* water-force formulation, never buoyant unit weights. Total
 unit weights are used for the slice weights and the pore pressure enters separately through $u$.
 
 ### Matric suction (apparent cohesion above the water table)
@@ -192,14 +192,15 @@ the suction credit back on, following the Fredlund extended Mohr-Coulomb criteri
 > $\tau = c' + (\sigma_n - u_a)\tan\phi' + (u_a - u_w)\tan\phi^b$
 
 With $u_a = 0$, the last term is $s\tan\phi^b$, where $s = \max(0,\,-u_w)$ is the (unclamped) suction — an
-apparent cohesion added on top of $c'$. The effective-normal term still uses the ordinary clamped $u$, so nothing
-about the $N'$/interslice-force machinery changes; only the resisting-side cohesion picks up the extra term.
-$\phi^b$ defaults to off (no material carries it), which is bit-identical to every pre-v17 result.
+apparent cohesion added on top of $c'$. The effective-normal term still uses the ordinary clamped $u$, so the
+base normal forces and interslice forces are computed as before; only the cohesion on the resisting side gains the
+extra term. $\phi^b$ is off unless a material is given a value, and with it off the strength is the ordinary
+Mohr-Coulomb strength.
 
 **Setting it up.** The **mat** sheet carries this per material as of template version 17 — see
 [phi_b / s_cap](../usage/input_template.md#worksheet-mat) in the input template docs for the columns, the
 dependency on strength option and pore-pressure source, and the caution about capping suction on a piezometric
-line. Loading a file with `phi_b` set auto-wires the suction credit into every solve; no extra code is needed.
+line. When a file with `phi_b` set is loaded, every solve includes the suction credit; no extra code is needed.
 
 The **finite-element solver reads the same two columns** and credits the identical apparent cohesion; in an SSRM
 run the suction term is reduced by the strength-reduction factor alongside $c'$ and $\tan\phi'$. See
@@ -219,8 +220,8 @@ success, result = generate_slices(
 An explicit `suction_phi_b` always **overrides** the file — the same precedence `t_cut` uses — so a script can
 turn the credit on for a file with no `phi_b` column, force it off with `suction_phi_b={}` on a file that does
 carry one, or override a template value for a sensitivity study, all without touching the input file. Passing
-`suction_phi_b=None` (the default) auto-wires from whatever the mat sheet's `phi_b`/`s_cap` columns specify,
-which is `None` (off) on a pre-v17 file.
+`suction_phi_b=None` (the default) takes the values in the mat sheet's `phi_b`/`s_cap` columns,
+which is `None` (off) on a file older than template version 17.
 
 ## Developed Shear Strength
 
@@ -300,19 +301,19 @@ XSLOPE deliberately offers **no buoyant-unit-weight option**. Water always enter
 
 > *"Never use buoyant unit weights. Always use external loads, piezometric lines, etc."*
 
-The reason is not stylistic. The buoyant shortcut — γ′ = γ − γ<sub>w</sub> below the water table, with pore pressures and boundary water loads dropped in exchange — is provably identical to the explicit formulation **only when the water is static** (a horizontal water table, no flow). The moment the phreatic surface is inclined, water is moving, and the shortcut silently omits the seepage forces (γ<sub>w</sub>·i per unit volume) that the flow exerts on the soil skeleton. The explicit formulation costs nothing extra and never carries that hidden assumption: it reproduces the buoyant answer automatically when water happens to be static, and the correct answer when it is not.
+The buoyant shortcut — γ′ = γ − γ<sub>w</sub> below the water table, with pore pressures and boundary water loads dropped in exchange — is provably identical to the explicit formulation **only when the water is static** (a horizontal water table, no flow). When the phreatic surface is inclined, water is moving, and the shortcut omits the seepage forces (γ<sub>w</sub>·i per unit volume) that the flow exerts on the soil skeleton. The explicit formulation makes no such assumption: it gives the buoyant answer when the water is static, and the correct answer when it is not.
 
-The error is not academic. The classic bracket is the infinite slope: fully submerged under a still pool, FS = tanφ′/tanβ, and the shortcut is exact; with seepage parallel to the face, FS ≈ (γ′/γ<sub>sat</sub>)·tanφ′/tanβ — roughly **half** — while the buoyant weight is identical in both cases and cannot tell them apart. The infinite-slope bracket above is the cleanest quantitative illustration of the trap; for a full-scale reservoir-loaded dam analyzed with the explicit formulation, see verification problem [VP42](../verification/rocscience.md#vp42).
+The infinite slope shows the size of the error: fully submerged under a still pool, FS = tanφ′/tanβ, and the shortcut is exact; with seepage parallel to the face, FS ≈ (γ′/γ<sub>sat</sub>)·tanφ′/tanβ — roughly **half** — while the buoyant weight is identical in both cases and cannot tell them apart. For a full-scale reservoir-loaded dam analyzed with the explicit formulation, see verification problem [VP42](../verification/rocscience.md#vp42).
 
 ## Composite Failure Surfaces
 
-Every model has a floor: bedrock in a polygon-defined problem, or the `max_depth` line in a profile-line problem. No material is defined below it, so no slip surface may pass through it. A trial circle, however, knows nothing about the floor — make it deep enough and it will dip below.
+Every model has a floor: bedrock in a polygon-defined problem, or the `max_depth` line in a profile-line problem. No material is defined below it, so no slip surface may pass through it. A trial circle is not limited by the floor, and a deep enough circle passes below it.
 
 XSLOPE handles this the way every limit equilibrium code does, by **truncating** the circle at the floor. The surface follows the arc down until it meets the floor, runs *along* the floor to the far crossing, and climbs back out on the arc. Because the floor is single-valued in $x$, the truncated surface is just the upper envelope of the two:
 
 >$y(x) = \max \left[ \, y_{circle}(x), \; y_{floor}(x) \, \right]$
 
-The result is called a **composite surface**. Far from being a special case, it is the correct failure mechanism whenever a slope is underlain by a weak seam or a hard stratum: the mass shears along the arc where it can, and along the weak base where that is cheaper. The example below is the [Fredlund & Krahn (1977)](https://doi.org/10.1139/t77-045) benchmark, where a 1-ft weak seam sits on the model base — half the slices ride the seam.
+The result is called a **composite surface**. It is the correct failure mechanism whenever a slope is underlain by a weak seam or a hard stratum: the mass shears along the arc where it can, and along the weak base where that is cheaper. The example below is the [Fredlund & Krahn (1977)](https://doi.org/10.1139/t77-045) benchmark, where a 1-ft weak seam sits on the model base and half the slices have their bases on the seam.
 
 ![composite_surface.png](images/composite_surface.png)
 
@@ -321,7 +322,7 @@ XSLOPE handles the kink where arc meets floor in two ways:
 - **The crossings become slice boundaries.** A boundary is forced at each point where the arc meets the floor, so no slice base straddles the kink. Every slice then lies wholly on the arc or wholly on the floor, and its base angle $\alpha$ is exact on either one — the circle's tangent on the arc, the floor's own slope on the floor.
 - **The moment methods lose their constant radius.** OMS and Bishop take moments about the center of the circle, and both classically assume that every slice base sits at radius $R$ and that every base normal points straight at the center. Neither is true along the floor. XSLOPE uses generalized moment arms, derived in [Ordinary Method of Slices](oms.md); they collapse identically to the classic form on a true circle, so no circular result changes. The force-equilibrium and complete-equilibrium methods (Janbu, Corps of Engineers, Lowe & Karafiath, Spencer, Morgenstern–Price) never reference a circle at all, so they need no change.
 
-Composite surfaces are **opt-in**, because the floor does not always mean the same thing. In a polygon model it is the bottom of the material — a real boundary. In a profile-line model it is `max_depth`, which is usually just a bound on how deep you want to look, and truncating a circle against an arbitrary search bound would be meaningless. So you say when the floor is real:
+Composite surfaces are **opt-in**, because the floor does not always mean the same thing. In a polygon model it is the bottom of the material — a real boundary. In a profile-line model it is `max_depth`, which is usually just a bound on how deep you want to look, and truncating a circle against an arbitrary search bound would be meaningless. The `composite` option states that the floor is a real boundary:
 
 ```python
 # a single circle that dips below the base
@@ -331,7 +332,7 @@ success, result = generate_slices(slope_data, circle=circle, composite=True)
 fs_cache, converged, path, cache = circular_search(slope_data, 'bishop', composite=True)
 ```
 
-With `composite=False` (the default) a circle deeper than the floor is rejected, and the search will not go below it — at best it finds a circle tangent to the base. That is exactly the limitation `composite=True` removes: the critical mechanism for a soft layer resting on bedrock *runs along the bedrock*, and no clamped circle can reach it.
+With `composite=False` (the default) a circle deeper than the floor is rejected, and the search will not go below it — at best it finds a circle tangent to the base. The critical mechanism for a soft layer resting on bedrock runs along the bedrock, and only `composite=True` lets the search reach it.
 
 ## Advanced Loading Conditions
 
@@ -346,19 +347,18 @@ surcharge loads from buildings, roads, or other structures above the slope.
 
 **Where the water load comes from.** The weight of water standing on the slope is a
 distributed load like any other, but it is not one you need to enter. The main sheet's
-**Water loads** selector decides who supplies it. On `auto` — what a new file carries —
+**Water loads** selector sets where it comes from. On `auto` — what a new file carries —
 the engine derives the ponded-water load at solve time from the model's own statement of
 where the water stands: the seepage boundary conditions wherever a seepage analysis is
 defined, otherwise the piezometric line. The dloads sheets then carry non-water loads
-only, and the derived load is drawn on every plot in its own color so a load nobody
-typed is more visible rather than less. On `manual` — what every file written before
-template version 22 means, so that no existing model changes — the water load is whatever
-is on the dloads sheets, exactly as before. See
+only, and the derived load is drawn on every plot in its own color so that a load that was
+not entered by hand is visible. On `manual`, the setting a file written before template
+version 22 loads with, the water load is whatever is on the dloads sheets. See
 [Automatic water loads](../usage/preflight.md#automatic-water-loads).
 
-The derivation is unconditional in the water it applies: a piezometric line above the
-ground surface loads the slope whatever the materials' pore-pressure option says. `mat!u`
-decides only who *samples* that water as pore pressure. A submerged slope analyzed in
+The derived load does not depend on the materials' pore-pressure option: a piezometric line
+above the ground surface loads the slope whatever `mat!u` says. `mat!u` controls only
+whether a material takes pore pressure from that water. A submerged slope analyzed in
 total stress — every material undrained, `u = none` — therefore carries the reservoir's
 weight with zero pore pressure, which is what a total-stress analysis means.
 
@@ -444,7 +444,7 @@ force and moment equilibrium on both circular and non-circular surfaces, but ins
 of a single constant interslice inclination it lets the inclination vary along the 
 surface as $\tan\theta(x) = \lambda\,f(x)$, where $f(x)$ is a prescribed interslice 
 force function (XSLOPE offers a constant function — which reproduces Spencer exactly — 
-and a half-sine, the textbook default). The computed factor of safety is famously 
+and a half-sine, the textbook default). The computed factor of safety is generally 
 insensitive to the choice of $f(x)$, so in practice Morgenstern–Price and Spencer 
 agree very closely; Morgenstern–Price is the method to use when you want to match a 
 named $f(x)$ convention (for example, GeoStudio SLOPE/W's half-sine default). 
@@ -478,10 +478,10 @@ boundaries** ($j = 1 \ldots n-1$; the two end boundaries carry no force by
 definition) whose resultant is tensile, with $Z$ taken in the physical convention,
 tension negative. The measure applies only where the field is *mixed* — some
 boundaries compressive, some tensile. Where every interior boundary carries the same
-sign, the fraction saturates at 0 or 1 and reads the sign convention rather than the
-mechanics, and no reading is offered.
+sign, the fraction is 0 or 1, which reflects the sign convention rather than the
+mechanics, and no value is reported.
 
-The reading is **reported, never refused**. It appears in `results['warnings']`
+The fraction is reported and does not stop the solution. It appears in `results['warnings']`
 alongside the base-tension and line-of-thrust notes, in the same words from every
 method, and it changes no factor of safety:
 
@@ -495,13 +495,12 @@ crest, and an undrained slope, where moment equilibrium fixes the factor of safe
 whatever the side forces do, can show it on a third of its boundaries while every
 method returns the same answer.
 
-This is also what the reference tools do. SLOPE/W reports its interslice forces and
-flags the negative ones; Slide2 and RS2 apply no such test. Duncan and Wright treat
-interslice tension as a check the engineer makes on a reported solution, whose usual
-remedy is to model the tension crack the tension zone implies — and that is a change
-to the problem, not to the solver.
+SLOPE/W reports its interslice forces and flags the negative ones; Slide2 and RS2
+apply no such test. Duncan and Wright treat interslice tension as a check the engineer
+makes on a reported solution; the usual remedy is to add to the model the tension crack
+that the tension zone implies.
 
-What XSLOPE does refuse is a solution that contradicts its own strength model: a
+XSLOPE rejects a solution that contradicts its own strength model: a
 non-positive factor of safety, and base tension on more than half the slices. A base
 in tension mobilizes no Mohr-Coulomb strength, so past that extent the answer rests
 on strength the model does not have. Bishop and Janbu also refuse an answer on which

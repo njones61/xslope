@@ -193,7 +193,7 @@ Note that:
 
 ### Composite Surfaces
 
-Everything above assumes that the base of every slice lies on the circle, and that assumption buys two simplifications: the moment arm of $S$ (and of $W \sin \alpha$) is the constant $R$, and the normal force $N$ points straight at the center, so it produces no moment at all and never appears. On a [composite surface](overview.md#composite-failure-surfaces) — a circle truncated at bedrock — neither is true of the slices that run along the floor. Their bases are not at radius $R$, and their normals miss the center.
+Everything above assumes that the base of every slice lies on the circle, and that assumption gives two simplifications: the moment arm of $S$ (and of $W \sin \alpha$) is the constant $R$, and the normal force $N$ points straight at the center, so it produces no moment at all and never appears. On a [composite surface](overview.md#composite-failure-surfaces) — a circle truncated at bedrock — neither is true of the slices that run along the floor. Their bases are not at radius $R$, and their normals miss the center.
 
 XSLOPE therefore uses the general moment arms, taken about the center of rotation $(X_o, Y_o)$. Writing
 
@@ -211,7 +211,7 @@ The load and support moments need no generalization — they were always true mo
 
 >$F = \dfrac{\sum \left( c \Delta \ell + N' \tan \phi \right) a_S}{\sum W x_r - \sum \left( N' + u \Delta \ell \right) a_N + \sum D \cos \beta \, a_{dx} + k \sum W \, a_k + T \, a_t - \ldots}   \qquad (8a)$
 
-where the trailing terms are the reinforcement, pile, line-load and distributed-load moments of equation (8), now unscaled. Substituting $a_S = R$, $a_N = 0$ and $x_r = R \sin \alpha$ recovers equation (8) term for term — which is why every circular factor of safety is unchanged.
+where the trailing terms are the reinforcement, pile, line-load and distributed-load moments of equation (8), now unscaled. Substituting $a_S = R$, $a_N = 0$ and $x_r = R \sin \alpha$ recovers equation (8) term for term, so on a true circle equations (8) and (8a) give the same factor of safety.
 
 The new term is $\sum (N' + u \Delta \ell)\, a_N$, the moment of the **total** base normal about the center. It vanishes on every slice of a true arc and it is easy to overlook, but it is not small: on the Fredlund & Krahn weak-seam benchmark ([VP22](../verification/rocscience.md#vp22)) dropping it moves Bishop's factor of safety from 1.380 to 1.189.
 
@@ -231,7 +231,7 @@ The new term is $\sum (N' + u \Delta \ell)\, a_N$, the moment of the **total** b
     a **fully-submerged slope**, for example the upstream face of a dam under a full
     reservoir — $N'$ goes negative, and the shear resistance computed from it is
     meaningless. On the `earth_dam_up` sample this happens on a quarter of the slices
-    and drags the factor of safety to 0.886 against Bishop's 1.815, which is why that
+    and lowers the factor of safety to 0.886 against Bishop's 1.815, which is why that
     problem reports OMS as *n/a*. Use a method whose base normal comes from vertical
     equilibrium — Bishop, Janbu, or a complete-equilibrium method such as Spencer — for
     such cases.

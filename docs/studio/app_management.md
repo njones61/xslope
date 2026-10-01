@@ -5,16 +5,16 @@ files, and uninstalling it are on [Install](../getting_started/install.md).
 
 ## Checking for updates
 
-**Help → Check for Updates…** asks whether a newer XSLOPE Studio has been
+**Help → Check for Updates…** checks whether a newer XSLOPE Studio has been
 released. The check reads a small version manifest attached to the newest
 [GitHub release](https://github.com/njones61/xslope/releases) — it never scrapes a
-web page — and answers with one of three dialogs: you are up to date, version *N*
+web page — and shows one of three dialogs: you are up to date, version *N*
 is available (with a link to its release notes), or the check could not reach the
 network.
 
-Studio also checks on its own, quietly. **Help → Check for Updates at Startup** is
+Studio also checks automatically. **Help → Check for Updates at Startup** is
 on by default and runs at most once a day, a few seconds after the window opens.
-It says nothing at all unless a newer version exists, in which case it raises the
+It shows nothing unless a newer version exists, in which case it shows the
 same notification the menu item does — a window you can dismiss and keep working
 behind. A failed automatic check is silent; only a check you asked for reports
 that it failed. Turn the preference off and Studio never contacts the network on
@@ -34,8 +34,8 @@ drag **XSLOPE Studio** to Applications, replacing the old copy, then quit and
 relaunch.
 
 If a release states that it cannot be installed on top of your version — or
-publishes no download for your platform — the dialog says so and sends you to the
-releases page to install it fresh instead.
+publishes no download for your platform — the dialog states this and links to the
+releases page so the new version can be installed fresh instead.
 
 ## Managing the pip install
 

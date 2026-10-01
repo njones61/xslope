@@ -119,7 +119,7 @@ zero-strength soil.
 yield criterion — $[D_e]$ is its complete stress-strain law at every strength reduction factor, and
 only $\gamma$/$\gamma_{sat}$, $E$ and $\nu$ are meaningful for it. This mirrors RS2's "Plasticity
 Specifications: None". `solve_fem()` and `solve_ssrm()` take the affected names through
-`elastic_materials`, auto-wired from the **option** column when left unset; a
+`elastic_materials`, taken from the **option** column when left unset; a
 [polygon-addressed twin](#ssr-exclusion-zones) names the same treatment by outline. See
 [Worksheet: mat](../usage/input_template.md#worksheet-mat).
 
@@ -128,13 +128,13 @@ Specifications: None". `solve_fem()` and `solve_ssrm()` take the affected names 
 Two strength options are not straight lines in $\tau$–$\sigma'_n$ space: the power curve (`pow`) and
 the generalized Hoek-Brown criterion (`hb`), both described in the
 [LEM overview](../lem/overview.md#hoek-brown-strength). The FEM carries no separate yield function
-for either. It keeps the Mohr-Coulomb machinery and **re-linearizes the curve into an instantaneous
+for either. It uses the Mohr-Coulomb formulation and **re-linearizes the curve into an instantaneous
 tangent $(c_i, \phi_i)$ at every Gauss point on every viscoplastic iteration**, using that
 iteration's own stress state. Because the algorithm is already iterating the stress field to
 convergence, the tangent converges with it: at equilibrium every yielding Gauss point sits on the
 true curved envelope at its own normal stress.
 
-**Where the curve is linearized matters.** The power curve uses the in-plane Mohr-circle center,
+**Linearization point.** The power curve uses the in-plane Mohr-circle center,
 $s' = -(\sigma_x + \sigma_y)/2$ (compression-positive) — mild enough curvature that the center is a
 stable, fully vectorizable choice. Hoek-Brown is far more sharply curved and uses the normal stress
 on the **failure plane**,
@@ -150,7 +150,7 @@ after the tangent is computed. The curve's own constants are never reduced — $
 different envelope entirely because of the exponent $a$, and would give the wrong factor of safety.
 For the same reason the minor principal stress $\sigma'_3$ is not used as the abscissa: Balmer's
 $\sigma'_3 \rightarrow$ tangency mapping is derived for the **unreduced** envelope, so under
-reduction it names a stale point, and because the Hoek-Brown envelope is concave a tangent taken
+reduction it gives an out-of-date point, and because the Hoek-Brown envelope is concave a tangent taken
 there lies above the true envelope and inflates the factor of safety.
 
 !!! note "Verification"
@@ -192,7 +192,7 @@ from the [tension cutoff](#tensile-strength-in-ssrm), which caps a stress.
 
 $\phi^b$ is blank for every material unless set, so the credit is **off by default**. It is
 controlled by the `phi_b` and `s_cap` columns on the
-[mat worksheet](../usage/input_template.md#worksheet-mat) and auto-wired into `solve_fem()` and
+[mat worksheet](../usage/input_template.md#worksheet-mat) and read automatically by `solve_fem()` and
 `solve_ssrm()`; their `suction_phi_b` / `suction_cap` arguments override the file.
 
 !!! warning "Cap the suction on a piezometric source"
@@ -221,10 +221,10 @@ construction is covered in [Mesh Generation](mesh.md).
 
 Reinforcement and pile lines are embedded in the same mesh, so their 1D elements are edges of the
 soil elements around them and every 1D node is a soil node. That coupling makes their discretization
-a mesh question rather than a per-member one: refining a member means refining the soil it hands its
-load to. A line enters the mesh as its two endpoints, subdivided at the 1D element size — its
+a mesh question rather than a per-member one: refining a member means refining the soil it transfers
+its load to. A line enters the mesh as its two endpoints, subdivided at the 1D element size — its
 capacity, and the law behind it, are read by the solver and never decide the discretization. The
-**1D element size** on the main sheet is where a model states it — the element size
+**1D element size** on the main sheet sets it — the element size
 along those lines, blank to mesh them at the global target size like everything else. A stated size
 is applied as a graded band around the lines, so the structural elements and the soil sharing their
 nodes both come back at that size and grow back to the target away from them, and a member can be
@@ -278,8 +278,8 @@ solvers, which convert them to a resultant on each slice.
 Hydrostatic pressure on a submerged face need not be entered at all. With the main sheet's **Water
 loads** selector on `auto`, the ponded-water load is derived from the model's own water definition
 and applied here as tractions — from the *same* derivation the limit-equilibrium slice forces use,
-so the two engines cannot end up carrying different water. It is a load, not a strength, so a
-strength reduction leaves it alone: the derived reservoir is constant across an SSRM bracket. See
+so the two engines always apply the same water. Because it is a load rather than a strength,
+strength reduction does not change it: the derived reservoir is constant across an SSRM bracket. See
 [Automatic water loads](../usage/preflight.md#automatic-water-loads).
 
 For the FEM the loads are converted to nodal forces by **consistent** edge integration of the shape
@@ -301,8 +301,8 @@ the same magnitude straight down, which is what a gravity surcharge on an inclin
 normal form would give it a horizontal thrust of $\tan\beta$ times the surcharge that the load does
 not have. A model may mix the two. Derived water loads always act normal to the surface.
 
-**Which way "into the slope" is** is decided by the mesh, not by the order the load line's points
-were entered. For each loaded edge the material lies on one side — the centroid of the element that
+**Load direction into the slope.** The mesh, not the order in which the load line's points were
+entered, decides which way is into the slope. For each loaded edge the material lies on one side — the centroid of the element that
 owns the edge — and the pressure is directed at it; where an edge is shared by elements on both
 sides the contributions cancel and the load acts along the tangent-normal as usual. The same rule
 applies node-by-node on the tributary-lumping fallback used when a load line does not follow
@@ -399,9 +399,9 @@ A piezometric line assigns pore pressure only over its own horizontal extent, ex
 samples the line at every node and Gauss point, the whole mesh must lie within that extent — a point
 outside stops the build with an error naming the point, its x-coordinate and the line's extent. A
 line that deliberately stops short (a reservoir on one side of a dam only) is modeled by carrying
-it on at an elevation below the mesh, which states that the ground beyond is dry. Selecting
-`u = piezo` when the file defines no piezometric line is refused on the same grounds: a model with
-no water is `u = none`.
+it on at an elevation below the mesh, which states that the ground beyond is dry. The build also
+stops when a material has `u = piezo` and the file defines no piezometric line; a material with no
+water takes `u = none`.
 
 **How pore pressure enters the equilibrium.** The total-stress statement
 $\int B^T (\sigma' - u\,m)\,dV = F_{ext}$, $m = [1, 1, 0, 1]^T$, is
@@ -429,8 +429,8 @@ soil property at all — solving the elastic problem under a body force with zer
 >>$\sigma'_h = \dfrac{\nu}{1-\nu}\,\sigma'_v$
 
 so the model's at-rest coefficient is fixed by **Poisson's ratio**. Normally consolidated sand does
-sit near Jaky's $K_0 = 1 - \sin\phi' \approx 0.43$, so at $\nu = 0.3$ the accident is often a happy
-one. Compacted fill and overconsolidated clay do not: they carry locked-in lateral stress at
+sit near Jaky's $K_0 = 1 - \sin\phi' \approx 0.43$, so at $\nu = 0.3$ the gravity turn-on often
+gives a reasonable lateral stress by coincidence. Compacted fill and overconsolidated clay do not: they carry locked-in lateral stress at
 $K_0 = 1$ and beyond.
 
 **At-rest initialization** states the in-situ stress directly instead of inferring it from the
@@ -439,10 +439,10 @@ is $K_0$ times it, and $K_0$ is a modeling input carrying the soil's stress hist
 
 ![fem_ov_k0_initial.png](images/fem_ov_k0_initial.png){width=700}
 
-Where the choice matters most is a **part of the model whose strength depends on confinement** — the
+The choice matters most for a **part of the model whose strength depends on confinement** — the
 reinforced-soil block of a geosynthetic wall being the clearest case, and any near-cohesionless
 material a close second, since with $c'$ near zero the confinement is essentially the whole of the
-strength. Where it matters least is a homogeneous cohesive embankment.
+strength. It matters least for a homogeneous cohesive embankment.
 [What to expect](#what-to-expect) quantifies both ends.
 
 ### Formulation
@@ -459,8 +459,8 @@ from the overburden instead:
 the point, obtained by intersecting a vertical ray with the material zones and weighing it
 $\gamma_{sat}$ below the water table and $\gamma$ above — the same definition the `ru` pore-pressure
 option uses). $\sigma_h$ is set both **in-plane and out-of-plane**: the
-out-of-plane stress is no longer $\nu(\sigma_x+\sigma_y)$ but the same $K_0\sigma'_v$, which is what
-makes the state genuinely at-rest rather than plane-strain elastic.
+out-of-plane stress is no longer $\nu(\sigma_x+\sigma_y)$ but the same $K_0\sigma'_v$, so the state
+is at rest rather than plane-strain elastic.
 
 The state is carried by the classical **initial-stress method**. Writing
 
@@ -474,7 +474,7 @@ so the only changes are one extra load term and one extra addend at the yield ch
 still **iterates to equilibrium under the body forces**; it simply starts from the $K_0$ state
 rather than from nothing.
 
-Two details follow from the definition:
+Under this definition:
 
 - The overburden is **soil only**. Surface tractions — a reservoir load, a distributed load, a
   footing — are not in-situ stress and are applied as boundary forces during the equilibrium
@@ -485,10 +485,9 @@ Two details follow from the definition:
 On **level ground** the $K_0$ field is an exact equilibrium for any $K_0$ whatsoever: vertical
 equilibrium contains only $\sigma_v(z)$, which the overburden integral satisfies by construction,
 and horizontal equilibrium contains only the lateral variation of $\sigma_h$, which vanishes when
-nothing varies horizontally. A correct implementation therefore has nothing to redistribute under
-flat ground — it converges on the first iteration, leaves the mesh undisplaced to machine precision
-and yields nowhere. That is the one configuration where the answer is known in closed form, and the
-verification suite runs it on every pass as the standing check on the whole path.
+nothing varies horizontally. Under flat ground the solution therefore has nothing to redistribute:
+it converges on the first iteration, leaves the mesh undisplaced to machine precision and yields
+nowhere. This is the one configuration with a closed-form answer, and XSLOPE's test suite checks it.
 
 ### In-situ equilibration
 
@@ -496,8 +495,8 @@ Under a **slope** the same field is not an equilibrium. There is no soil column 
 balance the lateral stress there, so a substantial share of the weight is left out of balance and
 has to redistribute — about a quarter of it on Griffiths & Lane Example 1.
 
-That redistribution belongs to **establishing the in-situ state**, not to strength reduction, and
-the SSRM runs them as the two separate steps they are. A $K_0$ analysis begins with one
+That redistribution is part of **establishing the in-situ state** rather than of strength reduction,
+and the SSRM runs the two as separate steps. A $K_0$ analysis begins with one
 **full-strength equilibration solve**: the $K_0$ field settles against the real geometry at
 unreduced strength, and every bisection trial then starts from the resulting stress state, with a
 zero displacement datum, and reduces strength from there. On a jointed model the state carried
@@ -507,9 +506,9 @@ the trial where the settling left it, not pushed back onto its limit as if it ha
 equilibration is solved once and shared by all trials, and its outcome is returned in
 `result['k0_equilibration']`.
 
-Run the two steps together instead and every trial repeats the in-situ redistribution against soil
-already weakened by $F$, then charges the displacement and plastic strain it produces to the trial.
-On Example 1 at $K_0 = 1$, $F = 1.2$, that reports about three times the displacement the strength
+If the two steps were run together, every trial would repeat the in-situ redistribution against soil
+already weakened by $F$ and charge the displacement and plastic strain it produces to the trial.
+On Example 1 at $K_0 = 1$, $F = 1.2$, that gives about three times the displacement the strength
 reduction actually causes.
 
 Displacements are reported relative to the equilibrated state, because the in-situ travel is an
@@ -544,7 +543,7 @@ $\sigma_x = \sigma_y = \sigma_z$ and $K_x = K_z = 1$ — an isotropic at-rest st
 uniformly across the verification corpus. **Set $K_0 = 1$ whenever the target is an RS2 SSR
 number.** Plaxis takes the other convention: its $K_0$ procedure defaults to Jaky's
 $1 - \sin\phi'$ per material. XSLOPE's own default — gravity turn-on — matches Griffiths & Lane and
-the academic literature built on it, which is why it stays the default.
+the academic literature built on it.
 
 **How it is set.** The **K0 initial stress (FEM)** cell on the main sheet carries it with the model;
 `k0=` on `solve_fem()` / `solve_ssrm()` sets it from a script; Studio's Run FEM dialog exposes it as
@@ -555,12 +554,12 @@ a checkbox and a value. Blank everywhere means the gravity turn-on.
 $K_0$ initialization is **off by default**. Every SSRM row on the
 [RS2 corpus page](../verification/rs2.md) runs with it, because RS2 authors its verification
 models at $K_x = K_z = 1$; the rest of the verification suite is computed without it. It is a
-modeling choice, not a correction.
+modeling choice.
 
-How much it changes is a property of the model, and the pattern is **cohesion**. Raising the
-confinement raises the initial deviatoric demand as well as the frictional capacity, so a slope
-whose strength is mostly cohesive barely notices; a slope whose envelope passes near the origin has
-almost nothing *but* confinement to draw on:
+How much it changes is a property of the model, and the controlling factor is **cohesion**. Raising
+the confinement raises the initial deviatoric demand as well as the frictional capacity, so a slope
+whose strength is mostly cohesive changes little; a slope whose envelope passes near the origin
+takes almost all of its strength from confinement:
 
 | Model | Gravity turn-on | $K_0 = 1$ | Change |
 |---|---|---|---|
@@ -571,12 +570,12 @@ almost nothing *but* confinement to draw on:
 | [RS2-48](../verification/rs2.md#rs2-48) multi-tier geosynthetic wall | 0.956 | 0.994 | +3.9% |
 | [RS2-4](../verification/rs2.md#rs2-4) Talbingo dam, under RS2's own exclusion area | 1.869 | 1.894 | +1.3% |
 
-The three members of RS2-31 are the cleanest statement of the pattern, being the same slope under
+The three members of RS2-31 show the pattern most clearly, being the same slope under
 three strength models: the one with real cohesion does not move at all, and the one whose envelope
 passes through the origin moves the most. In every model measured the at-rest state gives the
 *higher* factor of safety, so the default gravity turn-on is the conservative side of the choice.
 
-One consequence to keep in mind when reading a non-converged trial: the displacement scale the
+For a non-converged trial, note that the displacement scale the
 [hybrid criterion](#ssrm-failure-criteria) measures against is the elastic response to the
 **applied** load, which is the same quantity with or without $K_0$. What $K_0$ changes is the zero —
 a trial's displacement is counted from the equilibrated in-situ state, so it carries only the
@@ -602,7 +601,7 @@ point on each iteration:
 >- Total in-plane strains come from the current displacements, $\{\varepsilon\} = [B]\{u_e\}$, and
 >  the **elastic** strains are $\{\varepsilon\} - \{\varepsilon^{vp}\}$, with
 >  $\varepsilon_z^{el} = -\varepsilon_z^{vp}$ (total $\varepsilon_z = 0$). Using the elastic strain
->  rather than the total strain is what accounts for the stress relief already taken by plastic flow.<br>
+>  rather than the total strain accounts for the stress relief already taken by plastic flow.<br>
 >- The stress $\{\sigma\} = [D_e^{4}]\{\varepsilon^{el}\}$ is reduced to the invariants
 >  $\sigma_m$, $\bar{\sigma} = \sqrt{3J_2}$ and $\theta$, and the yield function is evaluated in
 >  invariant form.<br>
@@ -610,20 +609,20 @@ point on each iteration:
 >  $\Delta\varepsilon^{vp} = f \cdot \partial Q/\partial\sigma \cdot \Delta t$ is accumulated, using
 >  the non-associated plastic potential with dilation angle $\psi = 0$ (no plastic volume change).
 >  Within about 0.7° of the Lode-angle corners ($|\sin\theta| > 0.49$) the $\theta$-dependence is
->  frozen at the corner value, keeping the flow direction finite where $\tan 3\theta$ blows up.<br>
+>  frozen at the corner value, keeping the flow direction finite where $\tan 3\theta$ becomes infinite.<br>
 >- The accumulated strains form the body-load correction
 >  $\{F\} \mathrel{+}= \sum_{e} \int [B]^T [D_e] \{\varepsilon^{vp}\} \, dA$, and the system is
 >  re-solved with the existing factorization.
 
 The **pseudo-time step** $\Delta t$ is a numerical parameter, not physical time, taken from Smith &
 Griffiths' Program 6.1 as $\Delta t = 4(1+\nu)/(3E)$. The alternative Mohr-Coulomb stability bound
-$4(1+\nu)(1-2\nu)/[E(1-2\nu+\sin^2\phi)]$ was found to drive a sustained limit cycle at Gauss points
+$4(1+\nu)(1-2\nu)/[E(1-2\nu+\sin^2\phi)]$ drives a sustained limit cycle at Gauss points
 in mild effective tension beneath reservoir loading; the smaller value is in the stable regime. The
 per-iteration displacement increment scales with $\Delta t$, so the convergence tolerance and the
 failure criterion are calibrated jointly with it — see the warning on `dt_scale` below.
 
 A **tension cutoff** runs as a second viscoplastic yield surface through the same mechanism; because
-it decides SSRM answers rather than ordinary stress analyses, it is described under
+it mainly affects SSRM results rather than ordinary stress analyses, it is described under
 [Tensile strength in the SSRM](#tensile-strength-in-ssrm).
 
 ### Convergence criterion
@@ -651,11 +650,11 @@ strains. What is still out of balance is therefore the amount by which the visco
 failing, flow never ceases and the increment plateaus at a non-zero value that feeds displacement
 indefinitely.
 
-The **locality** of the test is what makes it trustworthy. The increment is non-zero only at nodes
+The test is **local**, which makes it reliable. The increment is non-zero only at nodes
 adjacent to Gauss points that are still flowing, so material that merely sits in equilibrium — a
 deeper foundation, a longer runout — contributes exactly zero and cannot shift the maximum. A global
 norm ratio measures the mechanism against the weight of the entire mesh and offers no such
-protection: padding the domain changes the yardstick without changing the slope. The denominator is
+protection: enlarging the domain changes the denominator without changing the slope. The denominator is
 a **lumped** tributary weight, $\sum_e \gamma_e A_e / n_e$ over the elements touching the node, not
 the consistent nodal gravity load — the consistent load is exactly zero at a tri6 corner node and
 slightly negative at a quad8 corner, which would make the ratio there meaningless.
@@ -665,7 +664,7 @@ A slope can stand perfectly still while the residual stalls above an absolute th
 reaches. The size of the gap between the two regimes is problem-dependent — several orders of
 magnitude on a Hoek-Brown slope, about two on the Griffiths & Lane benchmark, and on a Mohr-Coulomb
 slope with a non-associated flow rule it can close entirely. The
-[hybrid criterion](#2-hybrid-hybrid-default), the default, is what asks the displacement field
+[hybrid criterion](#2-hybrid-hybrid-default), the default, checks the displacement field
 directly in that case.
 
 Because the tolerance is absolute, four things affect it:
@@ -688,7 +687,7 @@ Because the tolerance is absolute, four things affect it:
 >- **Timestep scale.** The residual is the *increment* of the viscoplastic body load and is
 >  proportional to $\Delta t$. Shrinking `dt_scale` shrinks the residual without making the slope any
 >  more stable, so a failing state can be driven under an absolute `force_tol` and reported as
->  converged. Leave `dt_scale` at 1.0, and never lower it to force a reluctant model to "converge".
+>  converged. Leave `dt_scale` at 1.0, and never lower it to make a model converge.
 
 **Defaults and budgets.** $\text{tol} = 10^{-3}$ (displacement) and
 $\texttt{force\_tol} = 10^{-3}$ (force equilibrium, Dawson's published value), with a budget of
@@ -700,15 +699,15 @@ reinforced slope reaches equilibrium at $F = 1.25$ in 5,054 iterations at 2.5 ft
 
 #### Trials that reach the iteration limit {#creep-trend}
 
-**A trial still moving at the limit is read by its trend.** A trial that reaches `max_iterations`
-without converging is read by the trend of its movement over the second half of its iterations,
+A trial that reaches `max_iterations`
+without converging is classified by the trend of its movement over the second half of its iterations,
 split into five equal blocks: how far max&#124;u&#124; moved in each block, and the ratio of each
 block's movement to the one before. The ratio is a ratio of movements, not a count of iterations, so
-two runs that cover the same ground at different paces read the same way.
+two runs that cover the same ground at different paces are classified the same way.
 
 | Trend over the window | What happens |
 |---|---|
-| **Dying away**: every block moved forward, none moved more than the one before, and the movement shrinks at a steady ratio below 0.9 a block | The [Newton corrector](#finishing-a-trial-with-the-newton-corrector) is asked for the balanced state from where the trial is. A state the corrector certifies (force, yield and, on a jointed model, the hold test) stands, and the trial's `stop_reading` records the reading and the corrector's result. Where the corrector refuses, the trial is decided as below |
+| **Dying away**: every block moved forward, none moved more than the one before, and the movement shrinks at a steady ratio below 0.9 a block | The [Newton corrector](#finishing-a-trial-with-the-newton-corrector) is asked for the balanced state from where the trial is. A state the corrector certifies (force, yield and, on a jointed model, the hold test) stands, and the trial's `stop_reading` records the reading and the corrector's result. Where the corrector does not certify a state, the trial is decided as below |
 | **Holding steady or growing**: the window moved at least 0.02 elastic displacements at a ratio of 0.9 or more a block; on a jointed model also the joint slip gaining 2% of itself or more at a rate not falling below 0.9 of the half-window before | `exit_reason = 'not_slowing'`, `FAILED`: the slope is sliding |
 | **Still** (under $10^{-4}$ elastic displacements over the window) or **unclear** | The [hybrid classifier](#2-hybrid-hybrid-default) decides, as for any trial stopped at the limit |
 
@@ -723,7 +722,7 @@ its iterations. Every level is one the classifier or the joint verdict already u
 verdict's "not decaying", 0.02 elastic displacements the classifier's "still moving", $10^{-4}$ the
 joint verdict's "stopped".
 
-**On a model with joints the iteration is accelerated by default** (`accelerate=None`; pass
+**Acceleration on jointed models.** On a model with joints the iteration is accelerated by default (`accelerate=None`; pass
 `accelerate=False` for the ordinary iteration, `True` to accelerate a model without joints).
 From the trial's last corrector checkpoint on, each iteration's step is multiplied by a factor
 between 1 and 50 read from the last two steps (Irons and Tuck), with the plastic strains and
@@ -732,7 +731,7 @@ trip its residual latch or add dilation is taken at the ordinary length. The bal
 the ordinary iteration's; what changes is how many iterations reach it. Over the 32 jointed
 verification rows the answers are the same, and the whole set runs about a fifth faster. The
 K0 in-situ solve and the hold test always run the ordinary iteration, and the Log's opening
-lines for a run say whether acceleration was on.
+lines for a run show whether acceleration was on.
 
 Whether a trial dying away is certified depends on how close to rest it has come. On the
 [Griffiths and Lane Example 2 slope](../verification/ssrm.md#verification-griffiths2) at
@@ -746,17 +745,17 @@ certified, and the trial is counted as sliding.
 
 **Inconclusive trials.** A trial that reaches `max_iterations_ceiling` still dying away or with no
 clear trend, and with its out-of-balance still falling (the mean over the last 500 iterations at
-least 1% below the mean over the 500 before), is neither settled nor failed, and it is reported as `exit_reason = 'inconclusive'`. This is where the
-[Newton corrector](#finishing-a-trial-with-the-newton-corrector) does most of its work — a trial
-still improving at the ceiling is exactly the one a locally quadratic iteration can finish — so on
-the default driver an inconclusive trial is rare, and it survives only where the corrector also
-refuses. The bisection does
-not count it as a failure — that is what biases a factor of safety low. It carries on below the
-inconclusive $F$. `inconclusive` lists such trials and `note` names the last of them in a sentence,
+least 1% below the mean over the 500 before), is neither settled nor failed, and it is reported as `exit_reason = 'inconclusive'`. The
+[Newton corrector](#finishing-a-trial-with-the-newton-corrector) is applied to such trials, since a
+trial still improving at the ceiling is the kind a locally quadratic iteration can finish; with the
+default driver an inconclusive trial is therefore rare, and remains only where the corrector also
+cannot certify a state. The bisection does
+not count it as a failure, because doing so would bias the factor of safety low. It continues below
+the inconclusive $F$. `inconclusive` lists such trials and `note` names the last of them in a sentence,
 which is also printed to the log. When an inconclusive trial is still the top of the final bracket,
 the search found no failure, so it reports the factor of safety as at least the bracket's bottom,
 the highest strength the slope was confirmed to stand at (`fs_is_lower_bound = True`), because a
-midpoint would stand on a failure no trial showed. Raise the ceiling or Max iterations per trial to
+midpoint would assume a failure that no trial showed. Raise the ceiling or Max iterations per trial to
 go further.
 
 **Continuing a run with a higher limit.** Where the iteration limit is what stopped the trial at
@@ -770,22 +769,22 @@ and reaches the state a trial run straight through at the new limit reaches; any
 solved as usual. A trial the path never reaches keeps its earlier record. `trials` holds each
 trial once, a continued one with `resumed_from`, `result['resumed']` lists the trials reused,
 continued and solved afresh, and the closing summary names the F the run was continued from and
-the new limit, with the wall time of both parts together. A top trial that ended on the yield
-gate is not offered one: a higher limit does not change that ending. The trials' end states are held in memory for the session the run was made in
+the new limit, with the wall time of both parts together. Continuation is not offered for a top trial that ended on the yield
+check, since a higher limit does not change that result. The trials' end states are held in memory for the session the run was made in
 (`result['resumable']`) and are never saved, so a run read back from its files cannot be
 continued.
 
 A **no-progress plateau** — 1500 iterations without improving on the lowest out-of-balance value
 seen by more than 1% — is recorded (`plateau_iteration`, `plateau_ratio`) and **does not stop the
 solve**: a trial runs to convergence, to its iteration ceiling, or to the displacement cap, and
-nothing else ends it. A plateau is an observation about the residual, not a verdict on the slope.
-It cannot be one, for two measured reasons: the residual is **not monotone** — a reinforced slope
+nothing else ends it. A plateau describes the residual and does not show whether the slope fails,
+for two reasons: the residual is **not monotone** — a reinforced slope
 whose out-of-balance sits at twice `force_tol` around iteration 9,500 climbs back an order of
 magnitude and then converges at 16,242 — and the iterations a trial needs **grow with mesh
 refinement** while a fixed window does not, so on that model a 1500-iteration window was 30% of the
-required work at 2.5 ft element size and 9% at 1 ft. Stopping on the plateau reported those trials
-as failed and the bisection closed on the false failure, biasing the factor of safety low by 18% on
-the finest mesh. The price of letting them run is paid by trials that genuinely fail: they spend
+required work at 2.5 ft element size and 9% at 1 ft. Stopping on the plateau would report those
+trials as failed, and the bisection would close on the false failure, biasing the factor of safety
+low by 18% on the finest mesh. The cost of letting trials run is borne by trials that do fail: they spend
 the whole budget unless the rule below closes them sooner, which is why `max_iterations` should be
 set to what the model needs rather than left to absorb hopeless trials.
 
@@ -799,8 +798,8 @@ the trial's own elastic response, and both sit far outside the range occupied by
 to reach equilibrium — which near the critical factor grow past five times elastic with a flat
 residual — so the rule catches only gross runaways. On the default driver the runaway signal
 triggers a [corrector](#finishing-a-trial-with-the-newton-corrector) attempt before it ends
-anything: a displacement ratio read on an iterate is weaker evidence than an equilibrium the
-corrector can certify, so the rule stands only where that attempt is refused.
+anything: a displacement ratio taken on an iterate is weaker evidence than an equilibrium the
+corrector can certify, so the rule applies only where that attempt fails.
 
 The **displacement limit** (`max_disp_factor`) is disabled on the default criterion, and
 deliberately so: its yardstick is the height of the *mesh*, not of the *slope*, so it loosens as a
@@ -816,7 +815,7 @@ boundary pore pressures — rather than the solver knobs. Quadratic **triangles*
 over quad8 for this problem class, because the 2×2 reduced-integration quad has a zero-energy
 hourglass mode that persistent near-surface forcing can excite.
 
-#### A jointed model: the verdict comes from the interface {#the-joint-verdict}
+#### Classifying trials on a jointed model {#the-joint-verdict}
 
 On a model with [interface (joint) elements](reinforcement.md#joints-without-reinforcement) the
 force-equilibrium test above is measured almost entirely on the joints. The residual is the
@@ -826,7 +825,7 @@ had fallen to $3\times10^{-8}$, the same solve's joint residual was $3\times10^{
 magnitude apart on one mesh, in one solve.
 
 That matters because the joint residual has a mode of its own. A pair sitting at its slip limit
-alternates between slipping and sticking as the field around it breathes, and the resulting
+alternates between slipping and sticking as the stresses around it change, and the resulting
 oscillation in the body load is **not** the period-2 flicker `oob_window` was built to cancel: its
 period is tens of sweeps, so the ten-sweep average passes it straight through. On a settled jointed
 slope the joint residual therefore oscillates in a band with a **flat mean** — between
@@ -834,8 +833,8 @@ $1.2\times10^{-2}$ and $4.7\times10^{-2}$ on that slope, its mean constant to 0.
 half of the solve — and no iteration budget brings it under any tolerance. Such a trial reaches its
 ceiling with nothing wrong with the slope and nothing left for the solver to do.
 
-So a jointed trial that neither converges nor fails is read from the **interface** rather than from
-the displacement field, over the trailing half of its sweep history, in two ratios that carry no
+A jointed trial that neither converges nor fails is therefore classified from the **interface**
+rather than from the displacement field, over the trailing half of its sweep history, in two ratios that carry no
 length, stiffness or mesh size: the slip gained over the window as a fraction of the slip already
 there, and the displacement gained over the window in the trial's own elastic displacements.
 
@@ -845,50 +844,50 @@ there, and the displacement gained over the window in the trial's own elastic di
 | The slip gains ≤ 0.01% of itself, max&#124;u&#124; gains ≤ 10⁻⁴ elastic displacements, the residual on the nodes carrying *no* joint is under `force_tol` across the window, **and** the joint residual has stopped falling (its window mean at least 0.85 of the previous window's) | `joint_settled` | `JOINT_SETTLED` | **Not** failed: the slope is standing, and the bracket moves up |
 | Anything else | unchanged | unchanged | The [hybrid classifier's](#2-hybrid-hybrid-default) verdict stands |
 
-Both readings are asked only of a trial that would otherwise spend its whole budget, and only on a
-jointed model (the sliding one through the trend reading, which every model has) — a trial that converges, a trial already failing, and every model without a joint
+Both tests apply only to a trial that would otherwise spend its whole budget, and only on a
+jointed model (the sliding test through the trend reading, which every model has) — a trial that converges, a trial already failing, and every model without a joint
 reach neither.
 
-Each strict condition is there because the looser version was measured wrong.
+Each condition is strict because a looser version misclassifies trials, as the following cases show.
 
-**The sliding reading is taken only in the last tenth of the trial's budget, and it is not an early
-exit.** There is no early reading that separates a jointed mechanism from a jointed trial that
+**Timing of the sliding test.** The sliding test is applied only in the last tenth of the trial's
+budget and does not end a trial early. There is no early reading that separates a jointed mechanism from a jointed trial that
 converges late. One bracket-edge trial that reaches force equilibrium at 185,381 sweeps has, at
 50,000 sweeps, gained 30% of its slip and 1.76 elastic displacements of movement with an
 *accelerating* slip rate, and sits at 4.3 times its elastic response — every reading a runaway
-produces. It then settles. So the rule waits until a trial that could still converge would have,
-and what it does at the cap is replace an `AMBIGUOUS` verdict read off a displacement ratio with a
-measurement of the thing that is actually moving.
+produces. It then settles. The test therefore waits until a trial that could still converge would
+have done so, and at the limit it replaces an `AMBIGUOUS` classification based on a displacement
+ratio with a measurement of the joint slip.
 
-**The rate test is 0.9, not "decaying slowly".** A trial that converges after 203,000 sweeps and one
+**Rate threshold.** The rate test uses 0.9. A trial that converges after 203,000 sweeps and one
 that never converges had gained 16.2% and 18.7% of their slip, and 0.375 and 0.488 elastic
 displacements, read at 25,000 sweeps — indistinguishable. They are separated only by the rate, which
 falls away steadily on the one that finishes (0.64 at 25,000 sweeps, 0.44 at 100,000, 0.21 at
-200,000) and does not move at all on a real mechanism (1.0002). A creep that is merely slowing is
-left to the displacement classifier, which already calls it failed.
+200,000) and does not change at all on a real mechanism (1.0002). A creep that is only slowing is
+left to the displacement classifier, which already classifies it as failed.
 
-**The settled verdict asks the joint residual whether it has stopped falling**, because without that
-it caught a trial nine thousand sweeps short of a clean convergence: the slip, the field and the soil
-were already at rest, and only the joint residual, still coming down 35% per window, said otherwise.
+**Joint residual test.** The settled classification also requires the joint residual to have
+stopped falling. Without that condition, one trial was classified as settled nine thousand sweeps
+before it converged: the slip, the displacement field and the soil were already at rest, and only
+the joint residual was still falling, by 35% per window.
 
-A `JOINT_SETTLED` trial does **not** claim convergence: it never met the force tolerance and
-`converged` stays `False`. What it claims is the thing the bracket asks about — that the slope
-stands at that strength — and it says so with the interface, the displacement field and the soil all
-measured at rest. The per-trial record carries the verdict and its `exit_reason` like any other, so
-neither reading is ever silent.
+A `JOINT_SETTLED` trial is **not** a converged trial: it never met the force tolerance and
+`converged` stays `False`. It establishes what the bisection needs, that the slope stands at that
+strength, with the interface, the displacement field and the soil all at rest. The per-trial record
+carries the verdict and its `exit_reason` like any other, so both tests are recorded.
 
 ### Finishing a trial with the Newton corrector
 
 The viscoplastic iteration approaches equilibrium from outside the yield surface, and its
 convergence rate is linear, so a trial near the critical strength can spend tens of thousands of
 iterations still improving and still undecided. XSLOPE runs a second, locally quadratic iteration on
-top of it. The viscoplastic loop drives the solve and builds the plastic history; at a short ladder
+top of it. The viscoplastic loop drives the solve and builds the plastic history; at a short series
 of checkpoints — 300, 1,000 and 3,000 viscoplastic passes — at every block end where the
 [trend reading](#creep-trend) finds the movement dying away, and again wherever one of the stopping
 rules above would end the trial, the current displacement field and plastic strains are handed to a
 single bounded Newton-Raphson solve at full gravity and this trial's reduced strengths. That solve
-uses the consistent tangent of the Mohr-Coulomb return map, and from a seed that has already walked
-the load path it reaches equilibrium in tens of iterations where the viscoplastic loop needs
+uses the consistent tangent of the Mohr-Coulomb return map, and from a starting state that has
+already followed the load path it reaches equilibrium in tens of iterations where the viscoplastic loop needs
 thousands.
 
 A state the corrector returns ends the trial as standing only when it passes three checks:
@@ -903,18 +902,18 @@ A state the corrector returns ends the trial as standing only when it passes thr
 
 On a jointed model a fourth check follows, the **hold test**: the viscoplastic sweep is restarted
 from the certified state, with its joint history, and the certificate stands only if that sweep
-reads the state as standing within 3,000 more sweeps having moved it by no more than a hundredth
+classifies the state as standing within 3,000 more sweeps having moved it by no more than a hundredth
 of an elastic displacement. A Newton equilibrium on a set of contacts can be a saddle — a state the
-sweep leaves as soon as it is allowed to — and the hold test is what separates it from a state the
-slope stays on. Models without joints never run it.
+sweep leaves as soon as it is allowed to — and the hold test separates it from a state the slope
+remains in. Models without joints never run it.
 
-**A corrector refusal is not a verdict.** Where any of the checks fails, or the Newton solve does not
+**When the corrector does not certify a state.** Where any of the checks fails, or the Newton solve does not
 converge, the attempt is recorded and control returns to the viscoplastic loop with nothing about
 its state changed — the corrector works on a copy of the displacement field and of every plastic
-strain, so a refused attempt leaves no mark on the iteration that continues. The loop then runs on
-to its next checkpoint or to its own exit exactly as it would have. So the corrector can convert a
-trial the stopping rules would have closed into one that is certified standing; it cannot fail a
-trial the loop would have carried.
+strain, so an attempt that fails leaves the continuing iteration unchanged. The loop then runs on
+to its next checkpoint or to its own exit exactly as it would have. The corrector can therefore turn
+a trial that the stopping rules would have ended into one certified as standing, but it cannot make
+a trial fail.
 
 A trial the corrector decides carries a record of how, under `corrector`: which checkpoint produced
 the certified state, how many viscoplastic passes seeded it, the corrector's iterations and force
@@ -938,7 +937,7 @@ because both terms of that scale vanish together in a cohesionless material near
 Gauss point there can carry a fraction of a millipascal of numerical residue over a strength scale
 of a few tens of micropascals and read as several times its own strength outside the surface, which
 is a statement about the denominator rather than about the slope. The floor is orders of magnitude
-below any stress a mechanism is carried at, so it leaves a real violation exactly where it was.
+below any stress that carries a mechanism, so it leaves a real violation exactly where it was.
 
 That reading is also a check. A viscoplastic state that satisfies both convergence conditions but
 sits more than $10^{-2}$ of the local strength outside the yield surface does not end the trial: it
@@ -946,29 +945,29 @@ is handed to the corrector, and where the corrector certifies an admissible fiel
 on that. The force test cannot see this on its own, because the viscoplastic scheme is in force
 balance at every iteration and yield is what it relaxes.
 
-**A refusal there ends the trial only from a state the loop has stopped changing.** Settling in
-force and settling in yield are separate questions, and a state outside the surface is one the
-relaxation has not finished with, so the check arms on the loop's own no-progress watch — 1500
+**When the yield check ends a trial.** A failed yield check ends the trial only from a state the
+loop has stopped changing. Settling in force and settling in yield are separate questions, and a
+state outside the surface is one the relaxation has not finished with, so the check becomes active
+only on the loop's own no-progress condition — 1500
 iterations without bettering the lowest out-of-balance value seen by more than 1%, the same reading
 the plateau observation is taken from. Before that the iteration simply carries on, through the
 corrector's checkpoints, the runaway watch and the budget like any other unsettled trial, and the
 reading is taken again on whatever state it reaches next; the trial is then decided by the criteria
 that decide every trial the loop does not settle. Once the residual has gone flat the check is
-armed, the corrector gets the last word on that state, and a refusal fails the trial with
-`exit_reason = 'yield_gate'`. A state that passes the reading ends the trial exactly where it
-always would have.
+active, the corrector makes a final attempt on that state, and if it does not certify the state the
+trial fails with `exit_reason = 'yield_gate'`. A state that passes the check ends the trial as it
+otherwise would.
 
-The threshold is looser than the corrector's $10^{-6}$, and the asymmetry is structural rather than
-a concession. A Newton state solves the equations the reading is taken from and measures $10^{-8}$
+The threshold is looser than the corrector's $10^{-6}$ because the two states are reached in
+different ways. A Newton state solves the equations the reading is taken from and measures $10^{-8}$
 or better. A viscoplastic state approaches the surface from outside along the relaxation and stops
 when the *displacement* increment settles, so what is left of its yield violation is set by a
-displacement tolerance and not by a yield one; holding it to the corrector's figure would condemn
-most of the states on the verification corpus that are simply not finished relaxing. $10^{-2}$ is
-where that residual ends and unrelaxed yield begins, and it is also the fraction the reported
-Gauss-point count is taken against, so the check and the number printed beside it say the same thing
-about the same state.
+displacement tolerance and not by a yield one; holding it to the corrector's figure would reject
+most of the verification states, which have simply not finished relaxing. $10^{-2}$ is where that
+residual ends and unrelaxed yield begins, and it is also the fraction the reported Gauss-point count
+is taken against, so the check and the reported count are consistent.
 
-Where a state is condemned, the material at `max_yield_at` is where to look. In a material with
+When a state fails the check, look first at the material at `max_yield_at`. In a material with
 $c = 0$ the Mohr-Coulomb surface passes through the origin, so any tensile mean stress there is
 outside it — a cohesionless soil carries no tensile capacity whether or not a Rankine cap is written
 beside it, which is why declaring `t_cut = 0` on such a material changes nothing about the surface.
@@ -986,7 +985,7 @@ modeling answer; see [Tensile strength in the SSRM](#tensile-strength-in-ssrm).
 
 Setting `XSLOPE_FEM_SOLVER` selects the driver for a whole process. When the environment rather than
 a call argument selects a non-default driver, one warning line is printed, because a shell variable
-left from an earlier session otherwise changes every factor of safety in a run without saying so.
+left from an earlier session otherwise changes every factor of safety in a run without any indication.
 
 The at-failure capture solve that `solve_ssrm()` makes past the critical strength runs the
 viscoplastic loop with the corrector off. That solve exists to let the failure mechanism develop for
@@ -997,7 +996,7 @@ drawn to show.
 
 A trial on a model with [interface (joint) elements](reinforcement.md#joints-without-reinforcement)
 costs tens or hundreds of thousands of sweeps where an unjointed one costs hundreds. The cause is
-the iteration, not the joint law. The loop factorizes the elastic stiffness once and gives back
+the iteration, not the joint law. The loop factorizes the elastic stiffness once and returns
 everything the material cannot carry as a body load, so its error contracts by the ratio of the
 stiffness the assembly holds to the stiffness the material has — and a pair at its Mohr-Coulomb
 limit carries a traction pinned at that limit, so its tangential stiffness is zero while the matrix
@@ -1008,7 +1007,7 @@ is *failing* is slow for the mirror-image reason — both residuals go flat with
 sweeps and the block then slides at a few billionths of an elastic displacement per sweep until it
 has moved the eight that the runaway rule reads.
 
-**On a jointed model `'auto'` offers the state to the corrector, the same as on any other.** The
+On a jointed model, `'auto'` passes the state to the corrector as on any other model. The
 interface's consistent tangent carries the friction cross term
 $\partial t_s/\partial\Delta_n = \pm k_n\tan\phi_j$ — non-symmetric, and only the Newton path's
 general factorization ever sees it — and the corrector's interface law is seeded with the sweep's
@@ -1019,9 +1018,9 @@ asperities — are advanced by the step's own return map, so what the corrector 
 it was seeded with. It certifies on the same three checks it applies anywhere: one
 rock-toppling bracket edge that the plain loop takes 185,381 sweeps to converge is certified at 300
 sweeps, at a force residual of $3\times10^{-11}$ with no Gauss point outside its surface, and that
-model's whole bracket closes where it closed before at a thirteenth of the wall-clock cost. A
-corrector refusal changes nothing, here as everywhere, so the corrector cannot fail a jointed trial
-the loop would have carried.
+model's whole bracket closes at the same place as with the plain loop, at a thirteenth of the
+wall-clock time. An attempt that fails changes nothing, here as elsewhere, so the corrector cannot
+make a jointed trial fail.
 
 `joint_newton=False` on `solve_fem()` and `solve_ssrm()` runs the viscoplastic loop alone on a
 jointed model, deciding the trial on the stopping rules and on
@@ -1036,16 +1035,16 @@ because it has no equilibrium to certify:
 >  `joint_tangent_factor` (default 0.01) of their elastic value, and the matrix is refactorized
 >  whenever the slipping and open set moves. The traction limit, the slip return and the state a
 >  trial converges to are untouched. The relief runs as a **predictor** — until its state settles or
->  its own sweep budget runs out — and then puts itself away and hands the trial to the plain loop,
+>  its own sweep budget runs out — and then switches off and passes the trial to the plain loop,
 >  which decides it on its own trace, because every level and rate in the stopping rules is
->  calibrated on that trace. It cuts one benchmark's 196,201-sweep failing edge to 20,991; it also
->  moves a bracket the corrector reproduces exactly, which is why it is a switch and not the
+>  calibrated on that trace. It cuts one benchmark's 196,201-sweep failing edge to 20,991, but it
+>  also moves a bracket that the corrector reproduces exactly, so it is an option rather than the
 >  default. Inert on a model with no joint.
 
 `fem_solver='newton'` on a jointed model runs from a cold start with no accumulated slip behind it,
 and on the rock-joint benchmarks it diverges on trials the viscoplastic loop converges. A divergence
-there is reported as a failed trial, not as an error, but it is not a driver those models can be
-bracketed on.
+there is reported as a failed trial, not as an error, but the Newton driver cannot bracket those
+models.
 
 ### Surficial (skin) failures and the minimum-slip-depth filter
 
@@ -1054,23 +1053,23 @@ the slope, with $FS = \tan\phi / \tan\beta$ — a result *independent of depth*,
 surface governs. The per-node force-equilibrium criterion detects this "skin" faithfully, and
 because it is the true global minimum the reported factor of safety can sit well below a deeper,
 more conventional mechanism, and below published values that report the deeper one. This is
-physically correct but often not the engineering question, and the steep frictional faces of
-embankment dams are where it shows up.
+physically correct but often not the engineering question; it occurs mainly on the steep frictional
+faces of embankment dams.
 
 The optional **`min_slip_depth`** parameter — on `solve_fem()`/`solve_ssrm()` and on the LEM
 searches, **off by default** — excludes any failure shallower than the given depth below the ground
 surface. In the FEM it acts on the **failure verdict**, not on the strength: nodes shallower than
-the cutoff are left out of the per-node out-of-balance maximum, so a shallow skin can no longer
-declare the slope failing on its own, while a deep-seated mechanism still trips the criterion
-through its deep nodes. The filter reaches both readings a trial is decided on: the
+the cutoff are left out of the per-node out-of-balance maximum, so a shallow skin alone can no
+longer cause the slope to be classified as failing, while a deep-seated mechanism still trips the
+criterion through its deep nodes. The filter applies to both tests a trial is decided on: the
 [corrector](#finishing-a-trial-with-the-newton-corrector) measures its displacement bound on the
 same deep degrees of freedom, so a skin that is sliding while the mass beneath it stands cannot
-refuse an otherwise admissible state either. Nothing is held at full strength and no element is
-masked — the skin still yields, it simply stops casting the deciding vote. It is a
+cause an otherwise admissible state to be rejected either. Nothing is held at full strength and no
+element is masked — the skin still yields, but it no longer decides the classification. It is a
 **run option rather than a file setting**:
 pass `min_slip_depth=` to a solve or to a `circular_search()` / `noncircular_search()` call, or set
-**Min slip depth** in Studio's Run FEM dialog. A depth deeper than the mesh is refused rather than
-answered.
+**Min slip depth** in Studio's Run FEM dialog. A depth greater than the depth of the mesh is
+rejected.
 
 Steering the mechanism by **depth** is one of two ways to keep a competing failure out of the
 answer; the other is to steer it by **region**, which is what
@@ -1079,7 +1078,7 @@ mechanism to exclude is defined by how shallow it is (a face-parallel skin, whic
 separates from the deep surface because both run through the same material); use a zone when it
 belongs to an identifiable part of the model (a stiff foundation, a shell, a bench).
 
-**Choosing a value — sweep it and find the plateau.** As the depth increases, the factor of safety
+**Choosing a value.** Sweep the depth and look for a plateau. As the depth increases, the factor of safety
 holds at the surficial-skin value while the cutoff is still inside the failing band, rises as the
 cutoff clears the band, then **flattens onto a plateau**: the deep-seated factor of safety. Any
 depth on the flat part returns the same FS, so the choice is robust. Run a handful of depths (say
@@ -1098,7 +1097,7 @@ soft ground of [RS2-66](../verification/rs2.md#rs2-66), on a 4 m soft band, is o
 of [RS2-4](../verification/rs2.md#rs2-4) is already on its plateau by 10 m (its 1.67
 downstream-bench skin against a 1.82–1.83 plateau held flat from 10 m out to 30 m). The same
 model on a 2 m band has no plateau there — 4 m returns 1.131, and 6 or 8 m return 1.206, a
-different and higher reading. A plateau is read on the model in hand, not carried over from a
+different and higher value. The plateau must be found on each model; it does not carry over from a
 similar one.
 Set the same `min_slip_depth` in the LEM search and the SSRM run so both report the same mechanism.
 
@@ -1187,9 +1186,9 @@ The sweep above is the [Griffiths & Lane Example 1](../verification/ssrm.md#veri
 sample file solved at fixed strength reduction factors on a deliberately coarse mesh: trials below
 the critical factor settle to equilibrium with small viscoplastic displacement, trials above it
 never settle and their displacement runs away. The bisection locates that transition — here 1.36 on
-this illustration mesh, against the paper's 1.4 and the finer meshes used for the locked benchmark.
-Note that the displacement of a failing trial depends on the iteration budget it was given, which is
-why the *verdict*, not the displacement magnitude, is what the bisection reads.
+this illustration mesh, against the paper's 1.4 and the finer meshes used for the verification
+benchmark. The displacement of a failing trial depends on the iteration budget it was given, which is
+why the bisection uses the trial's *verdict* rather than the displacement magnitude.
 
 ### SSRM failure criteria
 
@@ -1216,15 +1215,16 @@ limit-equilibrium Spencer value 1.59 on the same model).
 
 The same bisection, with one addition: **a trial that fails to reach equilibrium must also show
 displacement evidence of failure before the bisection counts it as a failed slope.**
-Non-convergence on its own is a statement about the solver; the hybrid asks the slope as well.
+Non-convergence on its own describes the solver; the hybrid criterion also checks the displacement
+of the slope.
 
 Two signals are read from the trial's own iteration history, both measured against its **elastic
 displacement** — the purely elastic response to the same loads, which every solve already computes:
 
->- **Scale.** $u_{ratio} = \max|u| / \max|u|_{elastic}$ at the end of the solve. Is the field beyond
->  elastic scale at all?<br>
->- **Growth.** The gain in $\max|u|$ over the last quarter of the history, in elastic displacements.
->  Is it still moving?
+>- **Scale.** $u_{ratio} = \max|u| / \max|u|_{elastic}$ at the end of the solve, which shows whether
+>  the field is beyond elastic scale.<br>
+>- **Growth.** The gain in $\max|u|$ over the last quarter of the history, in elastic displacements,
+>  which shows whether it is still moving.
 
 `max|u|` is sampled every 10 iterations from the value the CHECON test already computes, so the
 instrumentation costs nothing measurable and no extra solves are needed.
@@ -1238,18 +1238,18 @@ instrumentation costs nothing measurable and no extra solves are needed.
 On a model with joints these two signals are not enough, because the quantity that separates a
 settled jointed slope from one sliding on its joints is the **slip**, which the displacement field
 does not report: a rock slope gaining 0.4 elastic displacements of movement every 25,000 sweeps
-reads `AMBIGUOUS` here because its max&#124;u&#124; has not yet passed 1.5× an elastic response set
-by loading stiff rock. Such a trial is read from the interface instead — see
+is classified `AMBIGUOUS` here because its max&#124;u&#124; has not yet passed 1.5× an elastic
+response set by loading stiff rock. Such a trial is classified from the interface instead — see
 [the joint verdict](#the-joint-verdict).
 
-Requiring *both* signals in each direction is what keeps this conservative: the hybrid overrides only
+Requiring *both* signals in each direction keeps this conservative: the hybrid overrides only
 where the evidence is unambiguous, and every trial's verdict, $u_{ratio}$ and growth come back in
 `result['trials']`, so an override is never silent.
 
-**The history must be a full-budget history.** Both signals are calibrated on solves that ran to
+**Full-budget history.** Both signals are calibrated on solves that ran to
 their iteration ceiling. A slow runaway takes far longer to become visible in the displacement field
 than a residual plateau takes to appear, so a truncated history can look frozen while the slope is
-accelerating. Every trial now spends its whole budget — a plateau is reported, never acted on — so
+accelerating. Every trial spends its whole budget — a plateau is reported, never acted on — so
 the classifier always reads a full-budget history.
 
 **Calibration.** The thresholds are $u_{ratio} \le 1.25$ for "at elastic scale", $u_{ratio} \ge 1.5$
@@ -1259,19 +1259,19 @@ are frozen there whether the budget is 10,000 iterations or 80,000, while genuin
 reach **4–21×** and are still growing when the budget runs out. Both signals are ratios, so when the
 elastic displacement comes back smaller than $10^{-6}$ of the model height — a level model whose
 initial stress is already in equilibrium — the verdict is `AMBIGUOUS` rather than a ratio taken
-against rounding noise. The one verdict that survives a missing yardstick is a trial stopped by the
-displacement limit, which is an absolute fraction of mesh height and is evidence in its own right.
+against rounding noise. The only verdict that does not depend on the elastic displacement is a
+trial stopped by the displacement limit, which is an absolute fraction of mesh height and is evidence in its own right.
 
 **Why it is the default.** All 103 FEM benchmarks were solved under both criteria on the same mesh
 with the same options. No row comes back **lower** under the hybrid, and all but a few come back
 identical to the last digit, because on a healthy model every non-converged trial carries real
-displacement evidence and the extra test simply agrees with non-convergence.
+displacement evidence and the extra test gives the same result as non-convergence.
 
 | Case | Non-convergence | Hybrid | What the hybrid changes |
 |---|---|---|---|
-| [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) | 1.372 | 1.372 | Nothing — the majority case. Every non-converged trial is beyond elastic scale and still growing, so the displacement test agrees with non-convergence trial for trial |
-| [RS2-62c](../verification/rs2.md#rs2-62) as locked | 0.769 | 0.769 | Nothing, by the other route: the $F = 0.775$ trial that sets the bracket spends its whole budget still at elastic scale ($u_{ratio} = 1.23$) but still moving (growth 0.22), one signal without the other, so its verdict is `AMBIGUOUS` and non-convergence's failed verdict stands |
-| [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | An outright rescue. Under the vendor's $T = 0$ cap the trials are stationary rather than collapsing, so non-convergence has no failure side to bisect: it drives the auto-bracket to its floor and returns no factor of safety, while the hybrid brackets the same model |
+| [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) | 1.372 | 1.372 | Nothing — the majority case. Every non-converged trial is beyond elastic scale and still growing, so the displacement test gives the same result as non-convergence on every trial |
+| [RS2-62c](../verification/rs2.md#rs2-62) | 0.769 | 0.769 | Nothing, by the other route: the $F = 0.775$ trial that sets the bracket spends its whole budget still at elastic scale ($u_{ratio} = 1.23$) but still moving (growth 0.22), one signal without the other, so its verdict is `AMBIGUOUS` and non-convergence's failed verdict stands |
+| [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | The hybrid gives a result where non-convergence gives none. Under the vendor's $T = 0$ cap the trials are stationary rather than collapsing, so non-convergence has no failure side to bisect: it drives the auto-bracket to its floor and returns no factor of safety, while the hybrid brackets the same model |
 
 Agreement is therefore the usual outcome, and it is reached two ways: on a healthy model the
 displacement evidence confirms the non-converged trial has failed, and where the evidence is
@@ -1301,7 +1301,7 @@ the measurement on the mechanism rather than on any localized background deforma
 
 | Problem class | Criterion | Why |
 |---|---|---|
-| All slope problems, including submerged boundaries and reservoir loading | `hybrid` (default) | Bisection on true equilibrium, with a non-converged trial required to show displacement evidence before it counts as failed. Certified over the whole FEM benchmark corpus: it matches `non_convergence` on all but a few rows and never returns a lower factor of safety |
+| All slope problems, including submerged boundaries and reservoir loading | `hybrid` (default) | Bisection on true equilibrium, with a non-converged trial required to show displacement evidence before it counts as failed. Checked over the whole FEM benchmark set: it matches `non_convergence` on all but a few rows and never returns a lower factor of safety |
 | Reproducing the classical Griffiths & Lane (1999) verdict, or a published result obtained that way | `non_convergence` | The same bisection without the displacement-evidence test. Expect agreement with the default except where a slow-but-converging trial is truncated at the no-progress exit |
 | Evidence and reporting | `displacement_increase` | Produces the displacement-vs-$F$ curve; read the upturn at the automatically selected characteristic point |
 
@@ -1378,7 +1378,7 @@ the per-trial records (`trials`), and — with the capture on — `failure_solut
 
 ### SSR search areas and exclusion zones {#ssr-exclusion-zones}
 
-A strength reduction run finds the weakest mechanism the model admits, which is not always the
+A strength reduction run finds the weakest mechanism in the model, which is not always the
 mechanism the analysis is about: a stiff foundation, a bench, a shell or a face skin can hold the
 global minimum while the surface of interest lies elsewhere. Both XSLOPE and the vendor codes handle
 that by naming **where** the reduction applies, in one of two complementary forms.
@@ -1407,8 +1407,8 @@ result = solve_ssrm(fem_data, F_min=1.2, F_max=1.5, tolerance=0.02,
 Names must match a material's `name` exactly; an unknown name raises `ValueError` rather than
 silently reducing nothing. [RS2-P4-VP67](../verification/rs2.md#p4-vp67) works through the
 constrained/unconstrained pair on a USACE end-of-construction embankment: an unconstrained SSRM of
-1.076 riding a deep foundation mechanism, against 1.303 with the foundation's lower zone excluded,
-landing on the same toe-circle family RS2 reports at 1.33 under its own exclusion area. In Studio
+1.076 on a deep foundation mechanism, against 1.303 with the foundation's lower zone excluded,
+on the same toe-circle family RS2 reports at 1.33 under its own exclusion area. In Studio
 this is the **SSR exclusions…** button in the Run FEM dialog.
 
 **By polygon, on the input file.** A zone is drawn where the rest of the model is drawn: a row on
@@ -1449,7 +1449,7 @@ A vendor **exclusion** polygon passed through `ssr_zone` must therefore be conve
 shell of the Talbingo dam at full strength, and reproducing that answer through the argument means
 passing the complementary ring — everything upstream of the shell — as the search area.
 
-Which route to reach for follows the shape of the region. If it **is** a material zone,
+The choice between the two depends on the shape of the region. If it **is** a material zone,
 `ssr_exclude` names it directly and the mesh follows the zone boundary exactly. If it cuts across
 the materials, it has to be a polygon. On [RS2-64b](../verification/rs2.md#rs2-64) the two paths
 give identical factors of safety on the same mesh, and the conforming mesh's own answer sits about
@@ -1490,10 +1490,9 @@ positive value caps the major principal stress there. The column is read automat
 per material with `tension_cutoff_by_material`, or globally with the `tension_cutoff` flag, which is
 simply the $T = 0$ case applied everywhere.
 
-**A blank cutoff means the envelope alone.** Where the cell is blank the material's own envelope
-decides how much tension it carries, and the engine enforces what the envelope says: every
-Mohr-Coulomb element runs a Rankine cap at its own apex $c/\tan\phi$, the most tension Mohr-Coulomb
-admits. The working cap is the smaller of the two, so a stated $T$ below the apex governs and the
+**Blank cutoff.** Where the cell is blank the material's own envelope decides how much tension it
+carries, and XSLOPE enforces the envelope's limit: every Mohr-Coulomb element runs a Rankine cap at
+its own apex $c/\tan\phi$, the most tension the Mohr-Coulomb envelope allows. The working cap is the smaller of the two, so a stated $T$ below the apex governs and the
 apex governs where nothing is stated. It takes no state away from the shear envelope — every state
 it can act on is one Mohr-Coulomb already forbids — and what it adds is a **return path**. The
 $\psi = 0$ flow is purely deviatoric: it can shrink a stress circle but cannot move the circle's
@@ -1502,8 +1501,8 @@ returns it, and the iteration cannot settle. The Rankine flow is volumetric at t
 supplies exactly that return.
 
 A **cohesionless** material carries no tension whether its cell is blank or
-`0`: its apex sits at the origin, so the two entries describe the same admissible set and now give
-the same answer. And at $\phi = 0$ — a `cp` material, or `mc` entered with $\phi = 0$ — the apex is
+`0`: its apex sits at the origin, so the two entries describe the same admissible set and give the
+same answer. And at $\phi = 0$ — a `cp` material, or `mc` entered with $\phi = 0$ — the apex is
 at infinity, so only a stated $T$ bounds the tension there. Power-curve and Hoek-Brown elements are
 left to their own envelopes, which carry a tensile strength of their own.
 
@@ -1524,7 +1523,7 @@ checkbox in Studio's Run FEM dialog, which is dimmed on both of those kinds of m
 
 **Which convention to run.** XSLOPE's default is *the envelope's own limit* — the Griffiths & Lane
 convention, since those analyses state no separate tensile strength and a plain Mohr-Coulomb
-material admits tension to its apex and no further. Every
+material allows tension up to its apex and no further. Every
 [Griffiths & Lane anchor](../verification/ssrm.md) in the verification suite is locked under
 it. RS2 and Plaxis cap tension as a matter of course, writing an explicit per-material tensile
 strength into the model (in Rocscience's own published verification models it is almost always
@@ -1535,7 +1534,7 @@ the vendor's tension-SRF switch. XSLOPE's RS2 reader does the first half automat
 `xslope.rs2.read_fez` maps each material's tensile strength onto `t_cut`.
 
 [RS2-62](../verification/rs2.md#rs2-62) — Cheng, Lansivaara & Wei's three-layer slope with a soft
-band — is the benchmark where this decides the answer. Its vendor model caps the three materials at
+band — is a benchmark where the tension cap controls the answer. Its vendor model caps the three materials at
 $T$ = 20 / 0 / 10 kPa and reduces them with the SRF. Run uncapped, the cap soil's implicit
 $c/\tan\phi \approx 28$ kPa holds the crest entry cut shut and the model equilibrates to
 $F \ge 1.3$; run with the vendor caps and the tension SRF, the band mechanism mobilizes as limit
@@ -1552,13 +1551,12 @@ It is **used automatically when it is available**: the `fast_kernel` argument of
 defaults to `"auto"`, meaning the compiled kernel if it is built and the NumPy path if it is not.
 (`solve_ssrm()` has no such argument; its trials inherit the same automatic choice.) The installer
 builds compile the kernel; a `pip install` gets a pure-Python wheel and therefore the NumPy path.
-Both give the same answers, certified over all 103 FEM benchmarks, so which one a machine has
+Both give the same answers, checked over all 103 FEM benchmarks, so which one a machine has
 affects wall-clock time and nothing else. You never need the kernel to run XSLOPE.
 
-The pure-NumPy path remains the permanent reference implementation and the **oracle**: every locked
-factor of safety in the verification suite is defined by it, and the compiled kernel is required to
-reproduce it bit-for-bit. Do not use the compiled kernel to define or re-record a locked factor of
-safety; pin `fast_kernel=False` for that work. `fast_kernel=True` *requires* the kernel but warns
+The pure-NumPy path is the reference implementation: every factor of safety in the verification
+suite is computed with it, and the compiled kernel reproduces it bit-for-bit. `fast_kernel=False`
+forces the NumPy path. `fast_kernel=True` *requires* the kernel but warns
 and falls back to NumPy if it has not been built, so the flag is always safe to set.
 
 The kernel handles the standard Mohr-Coulomb path, including the Rankine tension cutoff, the
@@ -1605,17 +1603,17 @@ $\phi = 20°$, slope angle 26.57°) at a target mesh size of 5, against an expec
 | **quad8** | **8** | **1.41** | **< 1%** | **Recommended** |
 | **quad9** | **9** | **1.41** | **< 1%** | **Recommended** |
 
-The three quadratic types converge on the same answer; the low-order ones read 11–21% high, which is
-unconservative.
+The three quadratic types converge on the same answer; the low-order ones give values 11–21% high,
+which is unconservative.
 
 In practice: **use tri6, quad8 or quad9 for any factor of safety.** `build_mesh_from_polygons()`
 defaults to `tri6`, so a quadratic mesh is what a FEM run gets unless something else is asked for
 explicitly (on the call or on the main sheet); `tri3` is the lighter explicit choice, typical of
-seepage meshes. The run gate warns before a FEM or SSRM solve starts on a linear mesh.
+seepage meshes. The model checks warn before a FEM or SSRM solve starts on a linear mesh.
 
 quad8 with 2×2 reduced integration is the Griffiths & Lane combination and avoids locking while
 giving accurate stress fields; tri6 conforms better to complex geometry where quads would distort,
-and is preferred for submerged problems, where quad8's reduced integration admits an hourglass mode;
+and is preferred for submerged problems, where quad8's reduced integration allows an hourglass mode;
 quad9 with full 3×3 integration is correct too, at the cost of the extra Gauss points and center
 node. tri3 and quad4 remain useful for seepage, for elastic stress distributions and for qualitative
 work — never for a factor of safety. [Element types](mesh.md#element-types) on the mesh page carries
@@ -1635,7 +1633,7 @@ horizontal equilibrium equation gains the corresponding term:
 
 >>$\dfrac{\partial \sigma_x}{\partial x} + \dfrac{\partial \tau_{xy}}{\partial y} + k\gamma = 0$
 
-**The sign of $k$ matters in the FEM.** The driving direction is the one that promotes sliding:
+**Sign of $k$ in the FEM.** The driving direction is the one that promotes sliding:
 negative $x$ for a left-facing slope, positive $x$ for a right-facing one. The limit-equilibrium
 solvers work out which from the location and geometry of the failure surface and use the magnitude
 of $k$ only. The finite element solver has no failure surface to read, and analyses both faces of a
@@ -1685,8 +1683,8 @@ the mechanism:
 
 ![non_circ_results.png](images/non_circ_results.png){width=1000}
 
-The deformed mesh, the shear-strain concentration through the clay layer, and the displacement
-vectors confirming lateral sliding along it.
+The figure shows the deformed mesh, the concentration of shear strain in the clay layer, and the
+displacement vectors showing lateral sliding along it.
 
 Common options:
 
@@ -1746,7 +1744,7 @@ bracket is shaded behind it. The same plot is available alone as
 
 ![fem01_ssrm_curve.png](images/fem01_ssrm_curve.png){width=800}
 
-**Reading it.** A flat run of displacements that turns up in a sharp knee is a strength limit. The
+**Interpreting the plot.** A flat run of displacements that turns up in a sharp knee is a strength limit. The
 slope reached equilibrium at every factor below the knee and could not above it, and the factor of
 safety sits at the knee. The trial above the knee was still moving fast when it was stopped. A
 steady climb with no knee is a different result. The slope kept moving at every strength the
@@ -1757,9 +1755,9 @@ dashed line sits at the highest strength the slope came to rest at and the key r
 trial above that strength was shown to fail. Where the iteration limit stopped the trial at the
 top, the run can be [continued with a higher limit](#creep-trend) from where its trials stopped.
 
-The run's closing summary says the same in words. It is printed as the last lines of every
-strength reduction run and returned as `result['summary']`. It says what happened at each end of
-the bracket. When the trial at the top hit the iteration limit, the summary says whether it was
+The run's closing summary gives the same information in words. It is printed as the last lines of
+every strength reduction run and returned as `result['summary']`. It reports what happened at each
+end of the bracket. When the trial at the top hit the iteration limit, the summary states whether it was
 still moving fast (*the slope was failing; more iterations would only have let it move further*)
 or still moving slowly (*the factor of safety depends on the iteration limit here*). Both quote
 the largest displacement, its multiple of the elastic value and how much it grew over the last

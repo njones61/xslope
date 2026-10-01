@@ -2690,7 +2690,7 @@ limits that exclude small wall-hugging surfaces.
 
 The joint layers do not govern overall stability: Slide's constrained block search
 lands within 0.7% of the plain VP108 deep circle, which passes beneath wall and
-bands alike, and XSLOPE's unconstrained circular search on the weak-layer model agrees. The last table row is the unfiltered block minimum Slide's figure reports for a small
+bands alike, and XSLOPE's unconstrained circular search on the weak-layer model gives the same result. The last table row is the unfiltered block minimum Slide's figure reports for a small
 surface at the wall face, excluded by its limit set and not compared here.
 
 ![vp109: inputs and representative solution](images/vp109.png)

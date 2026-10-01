@@ -1,9 +1,9 @@
 # Design Mode
 
-Where a sweep asks *how much does FS move*, a **design study** asks the inverse — *what value
-of this parameter gives FS = 1.5?* `design()` runs a fixed number of evenly spaced solves
+A sensitivity sweep shows how much FS changes; a **design study** does the inverse and finds
+the value of a parameter that gives a target FS, such as 1.5. `design()` runs a fixed number of evenly spaced solves
 across an explicit `[low, high]` range and linearly interpolates the parameter value where the
-FS curve crosses the target. It is the deterministic-design staple: "vary the undrained
+FS curve crosses the target. This is a common deterministic design calculation: "vary the undrained
 strength between X and Y and find where FS reaches the design factor." It shares the same
 parameter grammar as [Sensitivity](sensitivity.md) — see
 [Addressing a parameter](index.md#addressing-a-parameter) — and the same three
@@ -51,15 +51,15 @@ plot_sensitivity(result['df'], target_fs=result['target_fs'])
 callback and a cooperative cancel), which is how Studio streams a progress bar and a Cancel
 button over a background sweep; a plain data-in/data-out call leaves both `None`.
 
-## Sweeping anything else: `modify=`
+## Sweeping other quantities: `modify=` {#sweeping-anything-else-modify}
 
-`design()` shares the sensitivity engine's escape hatch, so the quantity you design need not
+`design()` accepts the same `modify=` callable as the sensitivity engine, so the quantity you design need not
 be a single stored scalar. When it is **geometry** — a slope angle, a berm width — pass a
 callable in place of a parameter reference: `modify` is a `(slope_data, value) -> slope_data`
 setter and `label` names the swept axis, and the two are mutually exclusive with `param`
 (exactly one per call). `low`/`high`/`steps` sweep the callable's value the same way, and the
-crossing, bracketing, and `extend`/`direction` reporting are identical. The callable owns
-whatever consistency its edit requires — here, rebuilding the material polygons and ground
+crossing, bracketing, and `extend`/`direction` reporting are identical. The callable is
+responsible for keeping the model consistent after its edit — here, rebuilding the material polygons and ground
 surface after it moves a profile point, since slice weights come from the polygons, not the
 raw profile lines:
 
@@ -92,18 +92,18 @@ print(result['message'])
 # FS = 1.5 at slope angle (deg) = 16.74 (interpolated between solves).
 ```
 
-On the shipped ACADS slope this brackets the target — FS climbs from about 1.04 at 25° to
+On the ACADS sample slope this brackets the target — FS climbs from about 1.04 at 25° to
 2.02 at 12° as the face flattens, crossing FS = 1.5 at a slope angle of **16.74°**. A
 built-in `param` reference and a `modify=` callable are **one code path** — every reference
 resolves internally to exactly the setter signature `modify=` takes — so the answer is
 identical whichever way you name the swept axis, and the engine validates the modified model
 at each step (polygon validity, ground surface present) because a setter may be
-user-written: a broken edit becomes an honest `success=False` sweep point, never a silently
-inconsistent crossing.
+user-written: a broken edit gives a `success=False` sweep point rather than an inconsistent
+crossing.
 
-## Honest about misses
+## Targets outside the swept range {#honest-about-misses}
 
-**The engine never extrapolates.** A crossing is reported *only* when
+The engine does not extrapolate. A crossing is reported *only* when
 the target is bracketed by two actual solves. If the swept range never reaches the target,
 `bracketed` is `False`, `crossing` is `None`, and `extend` names the direction to widen the
 range — the study reports that it fell short rather than projecting a value past the last
@@ -125,7 +125,7 @@ interpolated c = 13.40 returns FS = 1.500 — the linear interpolation between t
 c = 14 solves lands the target to within 0.01%.
 
 Ask the same question over a range that never reaches the target — say c from 3 to 9 — and the
-study declines to guess:
+study reports that the target is not reached:
 
 ```
 FS = 1.5 is not reached for mat:Soil:c in [3, 9] — FS spans [0.985, 1.302].

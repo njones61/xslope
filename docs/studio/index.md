@@ -56,7 +56,7 @@ Windows — that carries the whole engine, including **gmsh** for meshing and th
 installed. See **[Install](../getting_started/install.md)** for the downloads,
 system requirements, first launch, and uninstalling.
 
-Once installed, **Help → Check for Updates…** tells you when a newer version is
+Once installed, **Help → Check for Updates…** reports when a newer version is
 released, and can install it for you — see [App management](app_management.md).
 
 ### Install with pip

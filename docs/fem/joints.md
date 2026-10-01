@@ -40,7 +40,7 @@ geomembrane or liner, a wrap-around geotextile wall (no facing blocks: each lift
 sheet, which is folded back over the face and buried under the next lift): the fill slides *on* the
 sheet at the interface friction. Those are reinforce-sheet lines with `Joint = Yes`; which of the two a sheet
 needs is set out under
-[Bonded bar or joint?](reinforcement.md#bonded-bar-or-joint).
+[Choosing a bonded bar or a joint](reinforcement.md#bonded-bar-or-joint).
 
 ![A segmental block wall: the blocks stand on a joint under the base, a joint on the back face against the fill and a joint between every course of blocks, with geogrid layers tied into the blocks and running back through the reinforced fill](images/joints_block_wall.png){width=900}
 
@@ -51,8 +51,8 @@ around it**. A node in the middle of a line has material above and below, so it 
 the same point, one on each side. Where two joint lines cross, the node sits at the middle of four
 wedges of material and becomes four; where one joint line ends on another, three wedges and three
 copies. Each element keeps the copy on its own side of every line through the point, so the pieces
-are free to move relative to one another, and the interface elements between the copies are what
-hold them together.
+are free to move relative to one another, and the interface elements between the copies hold them
+together.
 
 ![The mesh around one node on a joint line, at a crossing of two joint lines and at a termination, with the pieces of material drawn pulled apart along the joint traces and one node copy standing in each](images/joint_mesh_split.png){width=760}
 
@@ -66,8 +66,8 @@ along its neighbor's side. Where two joint lines are meant to meet but the coord
 hair, the end is moved onto the other line before the mesh is built, so nothing has to be entered
 to more decimals than the drawing gives.
 
-Two things a joint line may not do, and the model checks refuse both by name: run along another
-joint line for part of its length, and run along the outer boundary of the section, where there is
+A joint line may not do two things, and the model checks reject both, naming the line: run along
+another joint line for part of its length, and run along the outer boundary of the section, where there is
 rock on one side only.
 
 ## The Interface Element
@@ -219,9 +219,9 @@ contacts as they go, or a rockfall program that follows each block down the slop
 A jointed model needs far more iterations than one without joints. A joint reaches equilibrium
 by slipping a little at a time, so a jointed model settles over tens or hundreds of thousands of
 iterations where a model without joints settles in hundreds, and a trial cut off before it has
-settled reads as a failure or as undecided when it would have come to rest. The closing summary
-in the Log says when that has happened: it gives the factor of safety as "at least" some value,
-or says the answer depends on the iteration limit. Either way the run needs more iterations;
+settled is classified as a failure or as undecided when it would have come to rest. The closing
+summary in the Log reports when that has happened: it gives the factor of safety as "at least" some
+value, or states that the answer depends on the iteration limit. Either way the run needs more iterations;
 [Running a Jointed Model](#how-many-iterations-a-jointed-model-needs) says how to set the limit
 and how to continue a run that stopped short.
 [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) shows the effect on a geogrid wall:
@@ -325,8 +325,8 @@ model, in place of the 12,000 it opens with (`max_iterations` on `solve_fem()` a
 `solve_ssrm()` in Python). Allowing more costs almost nothing, because a trial that settles stops
 as soon as it has.
 
-When a run stops short, the closing summary in the Log says so: it gives the factor of safety
-as "at least" some value, or says the answer depends on the iteration limit. There are two ways
+When a run stops short, the closing summary in the Log reports it: it gives the factor of safety
+as "at least" some value, or states that the answer depends on the iteration limit. There are two ways
 to give the run more iterations. On the FEM · Results toolbar, press
 **Continue with a higher limit…**, enter a new **Max iterations per trial** (the dialog offers
 five times the limit the run stopped at), and the search picks up where its trials stopped,
@@ -347,12 +347,12 @@ slope is failing on its joints. If the slip has stopped growing and the movement
 the slope is standing. [The joint verdict](overview.md#the-joint-verdict) and
 [the trend reading](overview.md#creep-trend) on the overview page give the thresholds.
 
-That standing reading counts only under the default `hybrid`
+The standing classification applies only under the default `hybrid`
 [failure criterion](overview.md#ssrm-failure-criteria), which is the right choice for a jointed
 model. The `non_convergence` criterion is the classical rule of Griffiths and Lane, where any
 trial that has not converged by the iteration limit counts as failed; it is kept for
 reproducing published results obtained that way. On a jointed model it counts a standing slope
-as failed, so leave it alone.
+as failed, so do not use it there.
 
 While a trial is slowing down, the run periodically takes a shortcut: from the state the trial
 has reached, it solves directly for a state in which the forces balance (the
@@ -412,22 +412,22 @@ interface, the shear stress with its Mohr-Coulomb limit drawn beside it, and the
 reinforcement line that is also a joint gets a fourth panel above those, the bar's tension against
 its capacity; a joints-sheet line has no bar and shows the three. Where the shear stress meets its
 limit is where the interface is slipping. A
-generated report carries the same reading as a table: the share of each line's length standing at
+generated report gives the same information as a table: the share of each line's length standing at
 its limit, and the largest offset the two faces reached.
 
 ![1D Details for a reinforcement line built as a slip surface, a geogrid layer in a block wall. Because this line carries a bar, it has the four panels: the bar's tension against its capacity, then the normal stress on the interface, the shear stress against its Mohr-Coulomb limit, and the slip along the line. A joints-sheet line has no bar and shows the last three only](../tutorials/images/fem03_1d_details.png){width=900}
 
-**Why the shear traction can zigzag where an interface grips.** Along a stretch of interface
+**Shear traction zigzag on a gripping interface.** Along a stretch of interface
 that is not slipping, the shear traction plotted station by station can alternate high and low:
 the end stations of each interface element read low and the middle station reads high. The
 stations are the element's three node pairs, and each pair's traction is the force passed
 through that node divided by the length of interface the node stands for, one sixth of the
 element at each end and two thirds in the middle. Where the interface grips, its relative
 displacement is tiny, so the traction at a pair is set by the force the neighboring soil
-elements pass through that node. Quadratic soil elements hand the forces carried through their
+elements pass through that node. Quadratic soil elements pass the forces carried through their
 bodies to their mid-side nodes (the weight of a six-node triangle, for instance, is carried
-entirely at its three mid-side nodes), and that is what the middle stations show. The zigzag is
-that sharing, not a variation of the stress along the sheet: the element average, one sixth of
+entirely at its three mid-side nodes), and that is what the middle stations show. The zigzag comes
+from that sharing rather than from a variation of the stress along the sheet: the element average, one sixth of
 each end station plus two thirds of the middle one, is the force the element actually
 transfers, it runs smoothly, and a ten times stiffer interface does not change it. It
 disappears where the interface slips, because every slipping station is held at its own

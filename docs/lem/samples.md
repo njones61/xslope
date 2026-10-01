@@ -200,8 +200,8 @@ Solution (critical surface and factor of safety):
 
 ### 5. Tension Crack
 
-A slope whose upper layer has cohesion, so an unmodified analysis produces
-non-physical **tension at the crest** (and an inverted line of thrust) that
+This problem is a slope whose upper layer has cohesion, so an analysis without a
+crack produces non-physical **tension at the crest** (and an inverted line of thrust) that
 unconservatively raises the factor of safety. The remedy is a **tension crack** at
 the top of the slope, whose depth follows
 $d_{crack} = \dfrac{2 c_d}{\gamma}\tan\!\left(45 + \dfrac{\phi_d}{2}\right)$ with the
@@ -240,9 +240,9 @@ sheet, `gamma` is the moist unit weight and `gamma_sat` the saturated unit weigh
 when a material carries both, the water table splits each slice's weight — γ_sat
 below the water table, γ above it. The water table comes from whichever the model
 defines: a piezometric line on the **piezo** sheet, or the phreatic surface of a
-finite-element seepage solution. It belongs to the problem rather than to any one
-material, so it splits the weight whether or not the material's pore-pressure
-option also reads pore pressures from it.
+finite-element seepage solution. The water table is part of the model rather than of
+any one material, so it splits the weight whether or not the material's pore-pressure
+option also takes pore pressures from it.
 
 This problem features a slope in undrained clay ($S_u = 600$ psf, $\phi = 0$) with
 an internal water table: γ = 120 pcf above the water table and γ_sat = 127 pcf
@@ -405,7 +405,7 @@ $$H = \frac{F_{\text{pile}}}{S} = \frac{945.4}{2.5} = 378.2 \ \text{kN/m of slop
 which is the per-unit-width value the slice equations apply, horizontally, at the
 pile–surface intersection.
 
-The same coefficients reproduce the force the source designed with. Hassiotis et
+The same coefficients reproduce the force used in the source's design. Hassiotis et
 al. state 72.4 kN/m at the pile head and a 561.7 kN/m overburden term at 17 m
 depth; XSLOPE's $c\,A_1 = 77.3$ kN/m (+6.8%) and $\gamma A_2 \cdot 17 = 523.8$ kN/m
 (−6.7%). The two departures are in opposite directions and largely cancel in the

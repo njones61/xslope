@@ -128,9 +128,9 @@ high, in the unconservative direction**. On the Griffiths & Lane Example 1 bench
 target size of 5 against a reference of about 1.40, `tri3` returns 1.70 (+21%) and `quad4`
 returns 1.56 (+11%), while `tri6`, `quad8` and `quad9` all return 1.41 (under 1%).
 
-Use `tri6`, `quad8` or `quad9` for any finite element or strength-reduction run. The run
-gate warns before a FEM or SSRM solve starts on a linear mesh; it is a warning rather than
-a refusal, because demonstrating the locking is itself a legitimate reason to solve one.
+Use `tri6`, `quad8` or `quad9` for any finite element or strength-reduction run. The model
+checks warn before a FEM or SSRM solve starts on a linear mesh; it is a warning rather than
+an error, because a run that demonstrates the locking is a legitimate use of a linear mesh.
 
 `tri3` remains the right choice for **seepage**. The seepage field is scalar, no
 incompressibility constraint exists, nothing can lock, and the smaller system solves
@@ -162,10 +162,9 @@ same node spacing with no hanging nodes. Choose it when the section is built of 
 zones — a layered foundation, a cutoff or grout curtain, a rectangular core — where rows
 of aligned elements are useful.
 
-A zone the check declines is simply meshed by the free mesher, and the rest of the model
-is unaffected. The sweep is a per-zone improvement, never a whole-mesh commitment, so this
-style cannot produce a worse mesh than the default — at worst it *is* the default. The
-three sections below show what that means in practice. Each is meshed with `quad4`
+A zone the check declines is meshed by the free mesher, and the rest of the model is
+unaffected. The sweep is applied zone by zone, so a declined zone is meshed exactly as in
+the default style. The three sections below show the effect. Each is meshed with `quad4`
 elements at the same requested size in both panels, the section width divided by 100.
 AR95 is the 95th-percentile element aspect ratio — longest corner edge over shortest — so
 lower is better, and the last figure in each caption is the median delivered element size
@@ -187,9 +186,9 @@ leaves a few more triangles behind than the free mesh did.
 
 **A dredged trench in silt.** No zone passes the check — the trench gives each of them
 more corners than the four a swept grid needs — so every zone falls back to the free
-mesher and the two panels are the same mesh, element for element. A section like this is
-the reason the style is named *where possible*: a partly structured mesh, or no structure
-at all, is the expected result rather than a sign that something went wrong.
+mesher and the two panels are the same mesh, element for element. The style is named
+*where possible* for this reason: a partly structured mesh, or no structure at all, is an
+expected result.
 
 ![Free and structured quadrilateral meshes of the sea trench section](images/quad_styles_sea_trench.png)
 
@@ -217,16 +216,16 @@ the shortfall is gmsh rounding a curve up to a whole number of divisions, which 
 make an edge finer.
 
 Where a band is refined, the size grows back to the target at about 1.2 per element.
-That rate is fixed and internal: it is the value that keeps the worst element in the
-corpus well shaped on both families, and there is nothing to set.
+The rate is fixed: it keeps the worst element in the sample and verification sections well
+shaped on both families.
 
-Structured quadrilateral sweeps are the one exception, and deliberately so — a swept
+Structured quadrilateral sweeps are the one exception: a swept
 zone's rows and columns are counted from the requested size and laid down as a grid, so
 the field governs the free zones around it rather than the sweep itself.
 
 ### A Size on one zone
 
-A material zone can ask for a finer size of its own through the **Size** cell on its
+A material zone can be given a finer size of its own through the **Size** cell on its
 polygon (or on its profile line). Everything outside keeps the global target size, and the
 size grows smoothly back to it across the zone boundary rather than stepping, so there is
 no abrupt change in element size at the interface:
@@ -241,9 +240,9 @@ makes the mesh finer where it is drawn. Refine polygons reach the mesher through
 [Input Template](../usage/input_template.md#refine-regions) page.
 
 A Size resolves a zone it is entered on, however thin the zone is — the size field
-reaches the zone's boundary as well as its interior. What a Size cannot do is find the
-zone: for that, and for a section whose thin bands nobody has gone through by hand, use
-the automatic thin-zone refinement below.
+reaches the zone's boundary as well as its interior. A Size does not locate thin zones; to
+find them, and for a section whose thin bands have not been checked by hand, use the
+automatic thin-zone refinement below.
 
 ### Refining near features
 
@@ -299,16 +298,16 @@ so a refined mesh is reproducible from run to run. Each band holds its local siz
 about two element widths and then grows back to the target at 1.2 per element, so a
 refined region joins the far field gradually instead of stepping.
 
-Because nothing else can outrank the field, a feature is meshed at the size that was
-asked for: at a sheet-pile tip and along a reinforcement line the delivered size is
+Because the field alone sets the size, a feature is meshed at the size that was
+requested: at a sheet-pile tip and along a reinforcement line the delivered size is
 within about 15 % of the request on either family.
 
 ### Thin material zones {#thin-material-zones}
 
 A thin zone is the one refinement case that is not an efficiency question. A soft seam
 one element thick cannot carry a shear band, so the model finds no mechanism through it
-and the analysis returns a factor of safety that is too high — quietly, with nothing in
-the output to say the mesh was the reason. Because the failure is silent, Studio's
+and the analysis returns a factor of safety that is too high, with nothing in the output
+to show that the mesh was the reason. Because of this, Studio's
 **Build mesh** dialog carries a **Refine thin zones** checkbox that is **on by default**;
 it sizes every thin zone for about four element rows across its local width. A section
 with no thin zone is meshed exactly as it would be with the box clear, and the Log names
@@ -322,24 +321,23 @@ resolves is left alone even where its individual pieces would not be.
 
 The refinement factor plays no part: a thin zone's size is its own thickness over four,
 and the same at any factor. Two limits apply to that size. It is never coarser than the
-global target — a zone the mesh already resolves is dropped from the plan, which is what
-makes the option free on a section with no thin zone. And it is never finer than one
+global target — a zone the mesh already resolves is dropped from the plan, so the option
+has no effect on a section with no thin zone. And it is never finer than one
 sixth of the global target.
 
-That cap matters on a model whose thin band is small against its overall size. vp005's
-filter zone is 2.9 units wide in a 648-unit section, so a quarter of its width is
-eighteen times finer than the target element size — a refinement large enough to multiply
-the node count, from a checkbox that is on by default and was never asked for on this
-run. Capped, the zone gets six times the target instead, and carries about two element
-rows rather than four.
+The cap matters on a model whose thin band is small against its overall size. In one
+verification model the filter zone is 2.9 units wide in a 648-unit section, so a quarter of
+its width is eighteen times finer than the target element size, a refinement large enough
+to multiply the node count. With the cap the zone gets one sixth of the target size
+instead, and carries about two element rows rather than four.
 
-A zone the cap leaves short is not left silent. The model checks measure the mesh that
+The model checks report a zone the cap leaves under-resolved. They measure the mesh that
 was actually built and name any zone carrying fewer than three element rows, whatever the
 reason, so an under-resolved band shows up in the checks panel rather than in a factor of
-safety nobody can explain. The two ways to give such a zone the size it wants are a
+safety nobody can explain. The two ways to give such a zone the size it needs are a
 **Size** on the zone, which is not capped, and a finer global target.
 
-Both element families take the same mechanism: the `thin_zones` refine feature, whose
+Both element families use the same mechanism: the `thin_zones` refine feature, whose
 size field resolves the zone's interior and its own boundary alike. It composes with a
 **Size** declared on the zone by taking the smaller of the two, so a declared size finer
 than the derived one is what the zone is meshed at, and a declared size too coarse to
@@ -382,8 +380,8 @@ mesh-ready zones, and it does the same preparation for both paths:
 Inside the mesher, one more pass makes adjacent zones conforming: where a zone's vertex
 lands in the interior of a neighbor's edge, that edge is split there, so the interface
 meshes without a slit. Every polygon becomes one gmsh surface tagged with its material,
-and points shared between zones are created once and reused, which is what makes the
-resulting mesh continuous across material boundaries.
+and points shared between zones are created once and reused, so the resulting mesh is
+continuous across material boundaries.
 
 ## Quadratic elements
 
@@ -410,15 +408,15 @@ form, along with the count of each kind.
 
 The lines are embedded in the 2D mesh rather than meshed separately: gmsh is required to
 place element edges along each polyline, and the 1D elements are then extracted from those
-edges. Every 1D node is therefore a node of the surrounding 2D mesh, which is what
-transfers load between the reinforcement and the soil. A line that runs along the domain
+edges. Every 1D node is therefore a node of the surrounding 2D mesh, and load transfers
+between the reinforcement and the soil through these shared nodes. A line that runs along the domain
 boundary — on the base at `max_depth`, or along the ground surface — or that extends
 outside the section cannot be embedded; it is rejected before meshing starts, with a
 message naming the line, rather than producing a mesh the line is silently missing from.
 
 Node spacing along a line comes from the size field like everything else — the global
 target away from any refinement, and the local size where the line itself is a refined
-feature. `element_size_1d` asks for a finer size along the lines specifically. It is a
+feature. `element_size_1d` sets a finer size along the lines specifically. It is a
 model input, **1D element size** on the main sheet, which Studio's *Build mesh* dialog
 edits and every model-driven caller passes through; left at `None` the lines simply
 follow the field. The stated size is applied as a graded band around the lines, so the
@@ -448,8 +446,8 @@ mesh = build_mesh_from_polygons(
 ```
 
 The defaults are chosen for slope geometry — Frontal-Delaunay for triangles, and
-Frontal-Delaunay-for-quads with Blossom recombination for quadrilaterals — so this is an
-escape hatch rather than a routine control.
+Frontal-Delaunay-for-quads with Blossom recombination for quadrilaterals — so this option
+is rarely needed.
 
 ## Saving and reusing a mesh
 

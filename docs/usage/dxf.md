@@ -96,12 +96,12 @@ and its layer name becomes the material name.
     become inputs (see [DXF import and export](../studio/analysis.md#dxf-import-and-export)).
     That is the one path where the drawing can state the same water twice, so the
     import chooses the model's [Water loads](input_template.md#worksheet-main) mode
-    from what it finds: a load block lying along the ground the piezo line covers is
-    ponded water somebody drew, so the model imports **manual** and that block carries
+    from what it finds: a load block lying along the ground the piezo line covers
+    represents ponded water that was drawn in, so the model imports **manual** and that block carries
     the reservoir; a piezo line with no such block imports **auto**, and the engine
     derives the reservoir itself. The test is the block's *footprint*, because a DXF
-    carries no pressures — every imported load block arrives at zero and is priced
-    afterward.
+    carries no pressures — every imported load block arrives at zero and its pressures
+    are entered afterward.
 
 ### Step 1 — Organize the CAD drawing
 
@@ -219,8 +219,8 @@ Each plotted artifact lands on its own layer:
 | Seepage | `HEAD_CONTOURS`, `FLOWLINES`, `PHREATIC`, `CONTOUR_FILL`, `ZONE_FILL`, `MESH`, `MESH_BOUNDARY`, `MESH_NODES`, `SEEP_FIXED_HEAD`, `SEEP_EXIT_FACE` |
 | FEM | `MESH`, `MESH_FILL`, `<quantity>_CONTOURS` (e.g. `VP_MAX_SHEAR_STRAIN_CONTOURS`), `STRESS_CONTOURS`, `REINFORCEMENT`, `PILES` |
 
-One class of artifact does not survive: velocity and displacement **vector (quiver)
-fields** do not export cleanly to DXF, so the rest of that plot's geometry is written
+Velocity and displacement **vector (quiver) fields** are the exception: they do not
+export cleanly to DXF, so the rest of that plot's geometry is written
 but the arrows are omitted.
 
 PNG generated from the plot_solution function:
@@ -243,5 +243,5 @@ DXF file generated from the same plot using the `save_dxf` option:
 - **Round-trip.** Exporting a model and re-importing it reproduces the
   material-zone geometry exactly (feature layers are written by export but ignored
   on import).
-- **Format.** DXF only for now. DWG requires Autodesk libraries or the ODA File
-  Converter and may be added based on demand.
+- **Format.** XSLOPE reads and writes DXF only; DWG requires Autodesk libraries or
+  the ODA File Converter.

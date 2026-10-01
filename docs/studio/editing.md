@@ -1,6 +1,6 @@
 # Editing Inputs
 
-Studio is, at heart, a structured editor over the model's inputs. Every edit you
+Studio is an editor for the model's inputs. Every edit you
 make updates the in-memory model and re-renders the canvas immediately. This page
 covers the editors, double-click-to-edit, undo/redo, styles, and the file
 lifecycle.
@@ -42,8 +42,8 @@ one, so pasting into an empty table fills it in one step; columns are not,
 and a block wider than the table has its extra columns dropped. A column of
 choices (Option, Movement, Type, …) takes any spelling of one of its own entries;
 text naming none of them, and a cell the row's own settings hold read-only, are
-left as they were. A line under the table reports what landed, and counts
-anything that did not. `Ctrl+C` (`⌘C`) copies the selected rows back out in the same
+left as they were. A line under the table reports what was pasted, and counts
+anything that was not. `Ctrl+C` (`⌘C`) copies the selected rows back out in the same
 form, and the paste is an edit like any other — **Cancel** discards it.
 
 The materials editor has two interchangeable views. **Table view** mirrors the
@@ -58,9 +58,9 @@ weights, Strength, Pore pressure, Conductivity — showing only the fields the
 ticked analyses and the selected strength and conductivity options use; a group
 whose every field hides disappears whole. The **Reliability** toggle reveals the
 **± σ** field next to each value, and is available when LEM or FEM is on, since
-the σ's ride on those parameters. The confirmation plots on the right — the
+the σ values belong to those parameters. The confirmation plots on the right — the
 strength envelope with LEM or FEM shown, the unsaturated-conductivity curve with
-Seepage — redraw as you type, so a wrong option choice is obvious at a glance:
+Seepage — redraw as you type, so a wrong option is easy to see:
 
 ![Materials list view](images/editing_materials_list.png)
 
@@ -146,7 +146,7 @@ Use a refine region to resolve something the geometry does not already mark out 
 ground beneath a footing, the zone a slip surface is expected to cross, the tip of a
 cutoff wall (above). Where a Size is what you want on a layer that already exists,
 put it on that material zone or profile line instead. Refine regions may overlap
-anything, including each other; where several apply, the smallest size wins.
+anything, including each other; where several apply, the smallest size applies.
 
 The remaining feature editors follow the same pattern — a table (or master/detail
 list) plus a live preview of the feature on the section.
@@ -155,7 +155,7 @@ list) plus a live preview of the feature on the section.
 uses: a circle table, or the **non-circular surface** as a list of vertices ordered
 left→right, each with a **Movement** setting (*Free*, *Horiz*, *Fixed*). Movement
 governs what the search may do with the interior vertices; the entry and exit
-points always slide along the ground surface, whatever their Movement says.
+points always slide along the ground surface, whatever their Movement setting.
 Clicking a vertex in the preview selects its row, and vice versa. The circle table
 has seven columns, so its preview sits below the table rather than beside it.
 
@@ -164,21 +164,21 @@ generator the Run LEM model checks offer as a remedy when a model has no failure
 surface. It reads the slope's own geometry and proposes, for each significant face,
 a circle through the toe and one at the base of each layer, centered above the
 middle of the face at twice the slope height; candidates that would leave through a
-vertical edge of the section are dropped. It reports what it built and what it
-dropped, under the button, which is what you audit the rows against. With circles
+vertical edge of the section are dropped. A note under the button lists what it
+built and what it dropped, so the rows can be checked against it. With circles
 already in the table it asks first, and can add to them instead of replacing them.
 On a section with no room for a circle to daylight the button is dimmed and its
-tooltip says so.
+tooltip gives the reason.
 
 Under the table, the **Search window** group holds the ten optional limits that
 confine an automated circular search — entry and exit x ranges, a center box, a
 maximum tangent depth and a minimum slip depth. They are the `circles` sheet's own
 J8:K17 block, and each is independent: a blank field is a limit that is not applied,
 a range applies only when both of its ends are filled, and an all-blank group is the
-unconstrained search. A range typed backwards is refused when you press **OK**,
-naming the pair, because it leaves a search nowhere to look; a file that carries one
-from elsewhere still opens, and the Run dialog refuses the search with the same
-reason. Whatever the group
+unconstrained search. A range typed backwards is rejected when you press **OK**,
+with a message naming the pair, because it leaves a search nowhere to look; a file
+that carries one from elsewhere still opens, and the Run dialog rejects the search
+for the same reason. Whatever the group
 holds is drawn on the preview with the circles: the entry and exit ranges as bars
 lying on the ground surface, the center box as a dashed rectangle. Editing a limit
 drops any solution already computed — it changes what a search would find — but
@@ -190,21 +190,20 @@ passes through that mechanism — the surface runs flat inside the seam and turn
 sharply at each end — so a model with a weak seam needs a surface a circular search
 cannot produce. The button builds one: it ranks the material zones by the shear
 strength each can mobilize at the stress it actually carries, lays a track just above
-the base of the weakest, and ramps up to the ground surface at both ends. It puts a
-vertex only where one earns its place — where the track bends, or where the search
+the base of the weakest, and ramps up to the ground surface at both ends. It places a
+vertex only where one is needed — where the track bends, or where the search
 could move it — so a flat seam comes out as the two ends of its track rather than a
-subdivision of a straight line. It reports
-which zone it chose and why, under the button, so the surface can be read against the
-reasoning that produced it. On an empty table it simply builds the surface; where
+subdivision of a straight line. A note
+under the button gives the zone it chose and the reason, so the surface can be checked
+against it. On an empty table it simply builds the surface; where
 there are points already, it asks first. Either way the generated points land in the
 table, so you can edit them and Cancel still discards them.
 
 When no zone is clearly the weakest, a **Choose the weak zone** dialog lists every
 zone with its material color, its strength model and its computed strength, and the
-surface is built for the one you pick. The same list is how you override a choice you
-disagree with, so there is one thing to learn either way. On a model that has nothing
-to track — a single material zone, or no zones at all — the button is dimmed and its
-tooltip says which.
+surface is built for the one you pick. The same list is used to override the
+automatic choice. On a model that has nothing to track — a single material zone, or
+no zones at all — the button is dimmed and its tooltip gives the reason.
 
 **Distributed loads** are pressures spread along a line on the ground surface. Each
 load is a left→right series of points carrying a stress, and each has its own
@@ -252,7 +251,7 @@ at the top of the Anchorage group chooses per line: **Development length (Lp1,
 Lp2)**, or **Overburden (Adhesion, Delta)**, where the resistance follows the
 effective overburden along the line. The pair not in use is grayed rather than
 cleared, in both views — the values stay in their cells, and switching back brings
-them into force again. The selector is a reading of the line itself: a line arrives
+them into force again. The selector is set from the line itself: a line arrives
 on **Overburden** when it carries both Adhesion and Delta, and on **Development
 length** otherwise, so a file edited outside Studio opens showing the law it
 actually uses.
@@ -286,7 +285,7 @@ bedding at a spacing, a conjugate pair, a blocky mass — is generated by
 
 Beside **Add** and **Remove** (which take one line), both views carry
 **Remove set** — every line of the set the selected row belongs to, which is how
-a generated network is removed: as the one thing it was built as, in one press —
+a generated network is removed: as the one set it was built as, in one step —
 and **Remove all**, which clears the list after asking. Remove set is available
 only on a generated row; a line you entered yourself belongs to no set. Nothing
 is committed until the editor's **OK**.
@@ -312,9 +311,9 @@ with the selected one highlighted, and clicking a boundary there selects it:
 
 ### Build network {#build-network}
 
-A jointed rock mass is not entered one line at a time. What a section carries is a
-**set** — bedding at a dip and a spacing, a conjugate set crossing it, a blocky
-mass with no preferred orientation — and **Build network…**, at the top right of
+A jointed rock mass is entered as a **set** rather than one line at a time — bedding
+at a dip and a spacing, a conjugate set crossing it, a blocky mass with no preferred
+orientation — and **Build network…**, at the top right of
 the joints editor, is where that set is described. Pick the kind, give it its
 parameters, say where it exists, and fill in the one property set every trace in it
 gets; the preview draws the traces the description resolves to, over the model's
@@ -344,7 +343,7 @@ a joint by putting material on both sides of it and there is none out there; a
 trace along a band's own edge is kept, since a band is a line drawn through
 material.
 
-**What it writes.** The lines. Every row is named for the set it came from and its
+**What it writes.** The dialog writes the lines. Every row is named for the set it came from and its
 place in it — `bed-01`, `bed-02`, … — which is the name the plots, the messages
 and the report show, and which is what groups the rows of one network:
 
@@ -411,9 +410,9 @@ this works on:
   at that zone, and on a profile file (whose zones are derived from the profile
   lines rather than entered directly) it opens the materials editor for that zone.
 
-A feature within the pick radius always wins — a line, point, or vertex is picked
-even where it lies on a zone boundary — and the zone interior answers only where
-nothing else is near. Where zones overlap or nest, the smallest zone containing
+A feature within the pick radius always takes precedence — a line, point, or vertex
+is picked even where it lies on a zone boundary — and a zone interior is picked only
+where nothing else is near. Where zones overlap or nest, the smallest zone containing
 the click is the one that opens.
 
 The hit-test is **mode-aware** — seepage BCs are only pickable in Seepage mode,
@@ -435,7 +434,7 @@ jumps straight to that point in one action (an Office/Photoshop-style history).
 
 ![Undo history dropdown](images/editing_undo_history.png)
 
-A few behaviors to know:
+Undo and redo behave as follows:
 
 - **Assistant edits are undoable** just like manual ones — if the assistant changes
   something you didn't want, undo reverts it. A failed assistant snippet rolls back
@@ -454,7 +453,7 @@ makes that result stale. Studio handles this automatically:
 - Editing any input clears a stale **LEM solution** (its tab is removed).
 - Editing the **geometry** (profile/polygon lines, max depth, the endpoints of a
   reinforcement or pile row, or adding or removing a row) also clears the
-  **mesh**, so Seepage and FEM re-gate on a fresh **Build Mesh**. Changing a
+  **mesh**, so Seepage and FEM runs need a new **Build Mesh**. Changing a
   row's other properties — spacing, capacities, stiffness, how its force is
   applied — leaves the mesh in place, because a row enters the mesh only as a
   constraint line.

@@ -69,16 +69,16 @@ where $a$ is the soil–reinforcement adhesion (stress units), $\delta$ the inte
 $\sigma'_v(s)$ the **effective** vertical stress at the point $s$ along the line: the weight of the soil column
 standing above that point — every material zone it crosses at that material's unit weight, saturated below the
 water table where the material declares a $\gamma_{sat}$ — less the pore pressure the model declares there
-(piezometric line, $r_u$, or seepage field, exactly as a slice base reads it).
+(piezometric line, $r_u$, or seepage field, in the same way as for a slice base).
 
 The envelope is then the same three-way minimum, with the ramps integrated rather than assumed linear:
 
 >$T(s) = \min\left(T_{max},\;\; T_{end1} + \displaystyle\int_0^s r,\;\; T_{end2} + \int_s^L r\right)$
 
 A constant $r$ recovers the straight ramps above, so the two laws are one formula. Both columns filled selects
-this law and $L_{p1}$/$L_{p2}$ are then not read; both blank is the default and leaves the development-length law
-exactly as it was. One filled and one blank is refused — half a law is not a law. LEM and FEM read the same
-envelope under either law.
+this law and $L_{p1}$/$L_{p2}$ are then not read; both blank is the default and selects the development-length
+law. Filling one column and leaving the other blank is an input error. LEM and FEM use the same envelope under
+either law.
 
 **FHWA pullout capacity.** The FHWA form $F^{*}\alpha\sigma'_v$ per unit area is this law with $a = 0$ and
 $\delta = \arctan(F^{*}\alpha)$. Written out, FHWA's nominal pullout resistance of a layer is
@@ -87,7 +87,7 @@ fraction of the wall the reinforcement covers. For a continuous geosynthetic ($R
 above, term for term: the factor of two is already in $r(s)$, and the per-unit-width convention is what $R_c = 1$
 means. In FHWA's Example E1 — a 20 ft geogrid-reinforced wall — the geogrids take $F^{*} = 0.45$ and
 $\alpha = 0.8$ from the manual's Table 3-6 ($\alpha$ is 0.8 for geogrids, 0.6 for geotextiles, 1.0 for metallic
-reinforcement), so the two columns read Adhesion = 0 and
+reinforcement), so the two columns are Adhesion = 0 and
 Delta = $\arctan(0.45 \times 0.8) = 19.80°$, and nothing else about the bond is entered. Reading the envelope
 where the design failure surface crosses each of that wall's eleven layers reproduces the manual's whole pullout
 table; the entry is under
@@ -118,7 +118,7 @@ $\psi$ measured from the horizontal — the same reference the slice base inclin
 
 ![slice_adv.png](images/slice_adv.png)
 
-$\psi$ is a property of the force, not of the line, and the **Dir** setting is what fixes it:
+The **Dir** setting sets $\psi$:
 
 - **Tangent to slip surface** ($\psi = \alpha$) — the **default**. Flexible
   reinforcement cannot resist bending; as the sliding mass moves, the reinforcement deforms with it and the force
@@ -127,9 +127,13 @@ $\psi$ is a property of the force, not of the line, and the **Dir** setting is w
   geogrids, and is discussed by Duncan & Wright (2005).
 - **Axial** ($\psi$ = the inclination of the reinforcement line itself) — rigid supports such as soil nails,
   grouted tiebacks, and anchored bars carry their force along their own axis; the soil cannot reorient them.
-  UTEXAS/UTEXASED uses this convention, which is why xslope's tangent results for nail problems differ from
-  UTEXASED's (see [Tutorial LEM-8](../tutorials/lem08_reinforced_slope.md#the-utexased-solution), where the UTEXASED axial result is FS = 1.646 versus
-  the tangent 1.587).
+
+On the geogrid-reinforced slope of
+[Tutorial LEM-8](../tutorials/lem08_reinforced_slope.md#the-utexased-solution), UTEXASED's Example 5 reports
+FS = 1.646 by Spencer's method on a circle centered at (3.2, 42.0) with R = 43.4. XSLOPE's Spencer method gives
+1.646 on that same circle with either Dir setting; the two differ there by less than 0.1% because the geogrids
+cross that deep circle nearly parallel to the slip surface. XSLOPE's search finds a shallower circle at
+FS = 1.587. The two values are on different circles and do not indicate a difference in direction convention.
 
 The direction affects each solution method the same way the pile force does: the force is resolved into components
 normal and tangential to the slice base — $P\sin(\alpha - \psi)$ normal (zero for tangent) and
@@ -138,11 +142,10 @@ through its real moment arm at point $r$.
 
 ![reinf_direction.png](images/reinf_direction.png)
 
-Tangent reinforcement delivers its whole magnitude along the base and nothing across it. Axial reinforcement
-delivers less along the base, and the remainder presses the sliding mass onto the base, where it earns
-frictional resistance $P\sin(\alpha - \psi)\tan\phi$. Which of the two gives the larger factor of safety
-therefore depends on $\phi$ and on the angle between the line and the surface it crosses; for the nail sample
-above, the axial result is the higher one. For tangent reinforcement on a circular surface the force is tangent to
+Tangent reinforcement acts with its whole magnitude along the base and has no component across it. Axial
+reinforcement has a smaller component along the base, and the remainder presses the sliding mass onto the base,
+where it adds frictional resistance $P\sin(\alpha - \psi)\tan\phi$. Which of the two gives the larger factor of
+safety therefore depends on $\phi$ and on the angle between the line and the surface it crosses. For tangent reinforcement on a circular surface the force is tangent to
 the circle and its moment arm is exactly $R$, which is why the classical formulation reduces to a bare $\sum P$ in
 the OMS and Bishop denominators. The per-method equations are given on the
 [OMS](oms.md), [Bishop](bishop.md), [Janbu](janbu.md), [force equilibrium](force_eq.md), [Spencer](spencer.md),
@@ -150,8 +153,8 @@ and [Morgenstern-Price](mprice.md) pages.
 
 ## Force Application (Appl)
 
-Two conventions exist for how a support force enters the factor of safety, and published solutions use both —
-so the choice is exposed per line:
+Two conventions exist for how a support force enters the factor of safety, and published solutions use both,
+so the choice is set per line:
 
 - **Active** (Slide2's "Method A", the **default**): the force is a known, *allowable* working load. It is applied
   to the driving side of the equilibrium equations and is **not** divided by $F$ — the factor of safety applies to
@@ -176,10 +179,9 @@ The **Type** column fills Dir and Appl automatically (either can be overridden b
 | Tieback | Axial | Active | pre-tensioned grouted anchors |
 | Anchor | Axial | Active | end-anchored bars |
 
-Leave Type blank for a generic tensile line with the defaults (Tangent, Active) — the behavior of earlier
-versions of xslope.
+Leave Type blank for a generic tensile line with the defaults (Tangent, Active).
 
-## Which sheet models my support?
+## Choosing the sheet for a support {#which-sheet-models-my-support}
 
 | Support | Sheet | Settings | Why |
 |---|---|---|---|
@@ -191,7 +193,7 @@ versions of xslope.
 
 ## LEM vs. FEM
 
-The same reinforcement lines drive both engines, but the mechanics differ:
+Both engines use the same reinforcement lines, but the mechanics differ:
 
 - **LEM** applies the capacity envelope value as a *prescribed* force at the crossing point, in the Dir direction,
   factored per Appl. The residual strength $T_{res}$ is not used — LEM has no strain compatibility, so there is no

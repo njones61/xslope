@@ -76,10 +76,10 @@ reinforcement, and boundary conditions to scale.
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks the template format for compatibility. The current version is **26**. xslope refuses a file whose version is newer than it understands, so an older install cannot silently mis-read a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
-- **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial), so existing files behave exactly as before.
+- **Template version**: Tracks the template format for compatibility. The current version is **26**. xslope rejects a file whose version is newer than the installed version supports, so an older install cannot misread a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
+- **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial).
 - **Time** (`sec`, `min`, `hr`, `day`, or `yr`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
-- **Unit weight of water** (γw) — **[F/L³]**: used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type wins (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
+- **Unit weight of water** (γw) — **[F/L³]**: used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type takes precedence (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
 - **Tension crack parameters**: Depth **[L]** and water-surface elevation **[L]** within tension cracks at the top of the failure surface
 - **Seismic coefficient** (kh) — **[–]**: Horizontal seismic acceleration coefficient (dimensionless) for pseudo-static earthquake analysis
 
@@ -88,19 +88,19 @@ The **main** worksheet provides global parameters that apply to all analyses and
 The cells below the seismic coefficient record **how this model is meant to be
 analyzed**, so the analysis travels with the file instead of living only in a dialog.
 Every one of them is optional, and **blank always means unspecified** — the solver or
-the Studio dialog uses its own default, exactly as it did before these cells existed.
-A choice you make in a Studio dialog always wins over the value in the file.
+the Studio dialog uses its own default. A choice you make in a Studio dialog always takes
+precedence over the value in the file.
 
 - **LEM method** (`oms`, `janbu`, `bishop`, `corps`, `lowe`, `spencer`, `mprice`, or `all`) — **[–]**: the limit-equilibrium method this model is built for. `all` means "run every method" and is used by the batch drivers; the Studio run dialog, which solves one method at a time, leaves its own default in place for it. An unrecognized value is an error at load time, never a silent fallback to some other method.
 - **Number of slices** — **[–]**: the slice count for limit-equilibrium runs. Minimum 2; blank uses the solver default.
 - **K0 initial stress (FEM)** — **[–]**: at-rest lateral earth pressure coefficient for the FEM's **initial stress state**. Blank starts from zero stress and switches gravity on in one step, so the initial lateral stress is whatever elasticity produces — σ<sub>h</sub> = ν/(1−ν)·σ<sub>v</sub>, about 0.43·σ<sub>v</sub> at ν = 0.3, a number set by the stiffness rather than by the soil. Enter a value and the initial stress is built from the overburden instead, σ<sub>h</sub> = K0·σ<sub>v</sub> both in-plane and out-of-plane, and then iterated to equilibrium — in an SSRM run as a separate full-strength step, so that establishing the in-situ state is not charged to the strength reduction. Normally consolidated sand sits near Jaky's 1 − sin φ′; compacted fills and overconsolidated clays run at 1.0 and above. Set **1.0** to reproduce an RS2 result, whose models are authored with an isotropic K = 1 field stress. The effect is small on a cohesive slope and worth several percent on a reinforced or near-cohesionless one, always in the direction of a higher factor of safety. A value here must be positive; leave the cell blank for the gravity turn-on. See [K0 initial stress](../fem/overview.md#k0-initial-stress) for the formulation, how to choose a value, and the measured sensitivity.
 - **Tension SRF (FEM)** (`YES` or `NO`) — **[–]**: whether the tensile-strength cap (`t_cut`) is reduced along with c and tan φ during a strength reduction. `YES` (what the template ships with) makes the factor of safety the factor on the whole strength envelope, shear and tensile. `NO` holds each cap at its authored value through the bisection. The setting changes nothing unless some material declares a cutoff **above zero**: a blank `t_cut` leaves the material its envelope's own apex, which strength reduction never moves, and a cutoff of `0` — a soil that carries no tension — is still `0` however it is divided. Studio's Run FEM dialog dims the matching checkbox on both kinds of model.
 - **Mesh element type** (`tri3`, `tri6`, `quad4`, `quad8`, or `quad9`) — **[–]**: the element type the Build Mesh dialog opens on. Quadratic elements (`tri6`, `quad8`, `quad9`) are strongly preferred for FEM/SSRM; the linear ones lock volumetrically and overestimate the factor of safety.
-- **Mesh target size** — **[L]**: the target element size the Build Mesh dialog opens on. Setting it also turns auto-sizing off, since a size in the file means the file meant that size.
+- **Mesh target size** — **[L]**: the target element size the Build Mesh dialog opens on. Setting it also turns auto-sizing off, because a size in the file is taken as the intended size.
 - **1D element size** — **[L]**: the target element size along the model's 1D members — the pile and reinforcement lines — where it should differ from the mesh target size above. Blank means the members follow the mesh target size; a value here must be positive.
 - **SSRM F min** / **SSRM F max** — **[–]**: the strength-reduction bracket the SSRM search starts from. F min must be less than F max.
-- **Water loads** (`auto` or `manual`) — **[–]**: who supplies the weight of water standing on the slope. `auto` — what a new file carries — hands it to the engine, which derives the ponded-water load at solve time from the model's own water definition: the seepage boundary conditions wherever a seepage analysis is defined, otherwise the piezometric line. The two dloads sheets then carry **non-water** loads only — a surcharge, a footing, traffic — and the derived load is drawn on every plot in its own color, since a load you did not type is the kind that needs to be more visible rather than less. `manual` leaves the water load to you on the dloads sheets. In Studio the same selector sits in the **Global parameters** dialog. A blank cell means `auto` in a version-22-or-newer file and `manual` in every older one, and that is a correctness requirement rather than a preference: an older file already carries its water load typed in, and deriving a second one under it would count the reservoir twice. Use `manual` for a deliberate exception, and for a vendor-faithful transcription whose point is to reproduce another program's input exactly. See [Automatic water loads](preflight.md#automatic-water-loads).
-- **Surface family** (`circular` or `non-circular`) — **[–]**: which failure-surface family a model that defines **both** a circular surface (the [circles](#worksheet-circles) sheet) and a non-circular one (the [non-circ](#worksheet-non-circ) sheet) actually means. Blank — what the template ships, and the normal state — means "whichever family the model defines", which is unambiguous for all but the rare file carrying both; there the circular surface is used and the non-circular one is ignored, and the [model checks](preflight.md) say so. Fill the cell (or answer the **Surface** selector in Studio's Run LEM dialog, which writes your choice here) and that answer travels with the file: the run, the plots and the next session all read the same one. A family named here is only honoured when the model actually defines it, so a value left behind by a surface you later deleted can never claim a surface that is not there.
+- **Water loads** (`auto` or `manual`) — **[–]**: who supplies the weight of water standing on the slope. `auto` — what a new file carries — hands it to the engine, which derives the ponded-water load at solve time from the model's own water definition: the seepage boundary conditions wherever a seepage analysis is defined, otherwise the piezometric line. The two dloads sheets then carry **non-water** loads only — a surcharge, a footing, traffic — and the derived load is drawn on every plot in its own color, so that a load you did not enter is clearly visible. `manual` leaves the water load to you on the dloads sheets. In Studio the same selector sits in the **Global parameters** dialog. A blank cell means `auto` in a version-22-or-newer file and `manual` in every older one, and that is a correctness requirement rather than a preference: an older file already carries its water load typed in, and deriving a second one under it would count the reservoir twice. Use `manual` for a deliberate exception, and for a vendor-faithful transcription whose point is to reproduce another program's input exactly. See [Automatic water loads](preflight.md#automatic-water-loads).
+- **Surface family** (`circular` or `non-circular`) — **[–]**: which failure-surface family a model that defines **both** a circular surface (the [circles](#worksheet-circles) sheet) and a non-circular one (the [non-circ](#worksheet-non-circ) sheet) actually means. Blank — what the template ships, and the normal state — means "whichever family the model defines", which is unambiguous for all but the rare file carrying both; there the circular surface is used and the non-circular one is ignored, and the [model checks](preflight.md) report this. Fill the cell (or answer the **Surface** selector in Studio's Run LEM dialog, which writes your choice here) and that answer travels with the file: the run, the plots and the next session all read the same one. A family named here is only honored when the model actually defines it, so a value left behind by a surface you later deleted can never select a surface that is not there.
 - **Side BC** (`rollers` or `fixed`) — **[–]**: how the FEM restrains the left and right truncation boundaries of the model. `rollers` (the default, and what every file that leaves this blank gets) fixes horizontal movement and leaves the face free to settle vertically. `fixed` clamps both directions. Rollers are the usual choice: a truncation boundary is an artificial cut through ground that continues, and the ground on the other side of it does not hold the face up. `fixed` adds shear restraint that ground does not have, and stiffens a domain truncated close to the slope; use it to reproduce a program that fixes its side boundaries. The bottom boundary is fully fixed either way.
 
 **Dimensional notation.** The field descriptions on this page tag each quantity with its dimensions in
@@ -127,8 +127,7 @@ library caller gets them on the loaded `slope_data` (`lem_method`, `num_slices`,
 
 The declared **Units** and **Time** selectors are carried through to the display layer as well: they set the unit labels shown on generated plots and a
 units-provenance line (for example `# units: SI, time: day`) written at the top of exported seepage and FEM result
-files. When nothing is declared, those labels and the provenance line are simply omitted, so a legacy file's plots
-and exports are unchanged.
+files. When nothing is declared, those labels and the provenance line are omitted.
 
 ---
 
@@ -332,10 +331,10 @@ the Fredlund extended Mohr-Coulomb criterion:
 With the pore-air pressure $u_a = 0$ (the standard slope-stability idealization), the last term reduces to
 $s\tan\phi^b$, where $s = \max(0,\, -u_w)$ is the suction at the point being evaluated (the slice base in the LEM,
 a Gauss point in the FEM) — an **apparent cohesion** added to the resisting side of the effective-stress envelope.
-Below the water table $u_w \geq 0$, so $s = 0$ and the term vanishes; the material behaves exactly as it always has.
+Below the water table $u_w \geq 0$, so $s = 0$ and the term vanishes, leaving the ordinary effective-stress strength.
 
-- **phi_b** ($\phi^b$): the unsaturated friction angle. **Blank** (the default): no suction strength — exactly
-  today's behavior, bit-identical FS. A positive value turns the credit on.
+- **phi_b** ($\phi^b$): the unsaturated friction angle. **Blank** (the default): no suction strength. A positive
+  value turns the credit on.
 - **s_cap** — **[F/L²]**: the maximum suction credited (stress) — a cap on $s$ before it is multiplied by
   $\tan\phi^b$. **Blank**: uncapped.
 
@@ -362,7 +361,7 @@ construction), so the columns stay inert there even on an `mc`/`pow`/`hb` materi
 Both the limit-equilibrium and the finite-element solvers read `phi_b`/`s_cap` and credit the same apparent
 cohesion — the red header marks the pair **LEM & FEM**. See
 [Matric suction](../lem/overview.md#matric-suction-apparent-cohesion-above-the-water-table) in the LEM overview for
-the effective-cohesion form and the `generate_slices` run-option (kwarg) path this auto-wires,
+the effective-cohesion form and the `generate_slices` run-option (kwarg) path these columns feed,
 [Matric suction](../fem/overview.md#matric-suction-apparent-cohesion-above-the-water-table) in the FEM overview for
 how the finite-element solve credits it (reducing the term by the strength-reduction factor $F$ alongside $c'$ and
 $\tan\phi'$ in an SSRM run), and [VP38](../verification/rocscience.md#vp38) for a worked seepage-to-suction example.
@@ -390,7 +389,7 @@ The remaining columns hold the seepage properties, shown in the third view below
     - `gard` (Gardner): $a$ and $n$ **[–]** of the power form $k_r = 1/(1 + a\,\psi^{\,n})$, with $\psi$ the suction
       head **[L]**; $a$'s units follow from $n$ so that $a\,\psi^{\,n}$ is dimensionless.
 
-  The columns are deliberately law-agnostic — one pair serves both models rather than two near-duplicate pairs.
+  The same two columns serve both models rather than two near-duplicate pairs.
 
 - **l** **[–]**: the Mualem pore-connectivity exponent of the van Genuchten conductivity curve,
   $k_r = S_e^{\,l}\left[1 - (1 - S_e^{1/m})^m\right]^2$. Mualem derived $l = 1/2$ from a bundle of
@@ -537,15 +536,13 @@ which part of the model to weaken.
 Any other word is rejected at load time rather than ignored, so a typo can never quietly run the
 model unconstrained.
 
-Template version 20 wrote these three as **negative Material IDs** (−1, −2, −3) with no Type row.
-Those files still load exactly as they always did, and mean exactly the same thing; the Type
-dropdown replaced the codes so the Material ID column is never asked to carry two unrelated
-meanings at once.
+Files from template version 20 store these three as **negative Material IDs** (−1, −2, −3) with no
+Type row; such files load with the same meaning.
 
-**They are overlays, not geometry.** An SSR zone is never meshed, never becomes a material region and
+**Overlays.** An SSR zone is never meshed, never becomes a material region and
 never generates slices. It changes nothing about the model except which elements the strength reduction
-touches, and it is classified element by element, by where each element's center falls. That is what
-makes a zone safe to add to a finished model: the mesh and the factor of safety are untouched unless the
+touches, and it is classified element by element, by where each element's center falls. A zone can
+therefore be added to a finished model safely: the mesh and the factor of safety are untouched unless the
 zone actually constrains something. Zones may overlap each other and may cross material boundaries
 freely — the no-overlap rule above applies to material zones only. The limit-equilibrium solvers ignore
 them entirely.
@@ -588,7 +585,7 @@ zone with a Size is the same analysis overlay, with the elements it selects reso
 polygon whose Type is **`refine`** is nothing but a Size: it carries no material, never becomes a mesh
 region, never generates slices and is invisible to every solver — the only thing it does is make the
 mesh finer where it is drawn. A `refine` polygon must therefore carry a Size; one without does nothing,
-and the [preflight check](preflight.md) says so before a mesh-based analysis runs.
+and the [preflight check](preflight.md) reports this before a mesh-based analysis runs.
 
 Use a refine region to resolve something the geometry does not mark out on its own — the ground under a
 footing, the zone a slip surface is expected to pass through, or the tip of a cutoff wall. Use a
@@ -599,14 +596,14 @@ A Size only ever **refines**. A value at or above the global target size cannot 
 there; xslope warns at mesh time rather than leaving a setting with no effect to pass unnoticed.
 
 Refine regions may overlap anything, including each other and material boundaries; where several apply,
-the smallest size wins.
+the smallest size applies.
 
 ### Joint regions {#joint-regions}
 
-A polygon whose **Type** is `joints` is an **authoring region**: it says where a generated joint network exists.
+A polygon whose **Type** is `joints` is an **authoring region**: it marks where a generated joint network exists.
 Like a refine region it carries no material, is never meshed as a region, never generates slices and is invisible
 to every solver — and unlike one it does not change the mesh either. The only thing that reads it is a
-[generated joint set](#joint-sets) that names it as its region, and a region no set names costs nothing.
+[generated joint set](#joint-sets) that names it as its region, and a region no set names has no effect.
 
 Draw one when the ground a set exists in is not a material zone: one block of an outcrop, the rock behind a wall,
 the part of a unit above a bench. A set that *is* confined to a material needs no polygon at all — it can name the
@@ -616,8 +613,8 @@ The region's **name** is the block header over its column — the `Polygon #3` c
 refers to it by that name (`poly:North block`) or by its number among the joint regions (`poly:1`). A header left
 as the template wrote it is the block's number rather than a name, so such a region is referred to by number.
 
-Two cells on a joint region do nothing, and the [model checks](preflight.md) say so rather than letting either pass
-unnoticed: a **Material ID**, because the region is not a soil zone (if the polygon was meant to *be* that zone, its
+Two cells on a joint region do nothing, and the [model checks](preflight.md) report both rather than letting either
+pass unnoticed: a **Material ID**, because the region is not a soil zone (if the polygon was meant to *be* that zone, its
 Type is the cell to change), and a **Size**, because nothing about the region is meshed — draw a `refine` polygon
 over the same ground to refine the mesh there.
 
@@ -660,8 +657,7 @@ side of a dam and no tailwater on the other). It does mean the line must reach e
 base, mesh node, or Gauss point in a material set to "piezo" falls beyond the end of the line, the analysis stops
 with an error rather than treating that point as having no pore pressure. To model dry ground past the end of a
 line, carry the line on at an elevation below the section. For the same reason, a material set to "piezo" in a file
-whose piezo worksheet is empty is an error too — a model with no water is **none**, not a piezometric line that was
-never drawn.
+whose piezo worksheet is empty is an error too; a material with no water takes **none**.
 
 The worksheet provides space for two lines, which supports rapid drawdown analysis:
 
@@ -671,8 +667,7 @@ The worksheet provides space for two lines, which supports rapid drawdown analys
 Each line has its own Type cell and requires at least two XY coordinate pairs **[L]**, ordered from left to right. The table
 is formatted for 20 rows, but coordinates can be entered beyond the bottom of the table as needed.
 
-Older input files load unchanged: a file with no Type cell
-behaves as **piezo**, which reproduces their previous results exactly.
+A file with no Type cell treats its lines as **piezo**.
 
 ---
 
@@ -738,10 +733,9 @@ The same ten cells are edited in XSLOPE Studio by the **Search window** group un
 circles table (see [Editing inputs](../studio/editing.md)), which draws the entry and exit
 ranges and the center box on its preview.
 
-A range is applied only when **both** of its ends are filled — half a range is not a
-window, and XSLOPE will not invent the missing end. Entry and exit ranges and the
-tangent-depth limit **reject** a trial surface that violates them rather than clamping it,
-so the reported minimum genuinely honors the window; the center box confines the grid
+A range is applied only when **both** of its ends are filled; XSLOPE does not supply a
+missing end. Entry and exit ranges and the tangent-depth limit **reject** a trial surface
+that violates them rather than clamping it, so the reported minimum lies within the window; the center box confines the grid
 itself. Both ends of every range must be increasing (min ≤ max), which is checked when the
 file loads.
 
@@ -815,7 +809,7 @@ reservoir loads always use it. `vertical` applies the same intensity **straight 
 a dead-weight surcharge does: a stockpile, a fill, or an equipment load presses down under gravity
 whatever the ground beneath it is doing.
 
-The distinction only matters on an **inclined** loaded surface, and there it matters a lot. On ground
+The distinction matters only on an **inclined** loaded surface, where it can be large. On ground
 falling at angle β the perpendicular reading carries a horizontal component of tan β times the load —
 on a 6° crest that is 11% of the surcharge, pushed sideways into the hill, which is a real restraining
 force the surcharge does not actually apply. Both readings carry the same total force; they differ
@@ -915,7 +909,7 @@ to see what a given combination of columns actually produces.
 interface strength, and the pullout resistance then follows the effective overburden along the line —
 $2(a + \sigma'_v\tan\delta)$ per unit length, with $\sigma'_v$ the weight of the soil column above each point less
 the pore pressure the model declares there. Fill **both** to use it, in which case `Lp1` and `Lp2` are not read;
-leave **both** blank for the development-length law. One filled and one blank is refused. See
+leave **both** blank for the development-length law. Filling one and leaving the other blank is an input error. See
 [Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden).
 
 How the force is then *used* differs by analysis:
@@ -937,8 +931,8 @@ strength. Use it where the failure surface can run **along** a sheet rather than
 an embankment, a wall whose fill slides on its sheets, a smooth liner. `Lp1`, `Lp2` and `Tres` are not read on a
 jointed line: the grip is what the interface elements integrate, and the bar's only limit is `Tmax`. A non-blank
 `Tend1` / `Tend2` ties that end of the sheet to the soil or facing at the stated capacity; a blank end is free and
-can pull out. LEM ignores `Joint` entirely and reads the line as it always did. See
-[Bonded bar or joint?](../fem/reinforcement.md#bonded-bar-or-joint).
+can pull out. LEM ignores `Joint` and reads the line as a reinforcement force either way. See
+[Choosing a bonded bar or a joint](../fem/reinforcement.md#bonded-bar-or-joint).
 
 ---
 
@@ -994,7 +988,7 @@ through the point. That is what lets a facing column with a joint on its back fa
 joint between every course of blocks slide and tip the way a stack of blocks does, instead of behaving as one solid.
 What two joint lines may not do is lie **on** one another along part of their length, or run along the outer
 boundary of the section, where there is material on one side only and nothing for the other face of the joint to be;
-preflight refuses both by name.
+preflight reports both as errors, naming the lines.
 
 The interface element, its constitutive law, the derived stiffnesses and what the results show are the same as for a
 jointed reinforcement line: see
@@ -1033,7 +1027,7 @@ Each pile is defined by:
 - **LEM Properties**:<br>
 >>H — **[F/L]** (per unit width of slope): Pile force magnitude. If the user has a row of piles at spacing $S$ with individual capacity $H_{\text{single}}$, input $H = H_{\text{single}} / S$.<br>
 >>The force direction $\theta$ is not an input: it is computed as the direction perpendicular to the pile axis (0°, i.e. horizontal, for vertical piles). Files from template v22 and earlier may carry a $\theta$ ("qp") override column, which is still honored when present.<br>
->>Appl: Force application. **Active** = $H$ is a known *allowable* force, not divided by the factor of safety. **Passive** = $H$ is an *ultimate* capacity added to the resisting side and divided by FS. A blank cell is read as Active (the behavior of earlier xslope versions); files XSLOPE saves write the choice out explicitly. Has no effect on FEM analysis, where the pile resistance is computed rather than prescribed.<br>
+>>Appl: Force application. **Active** = $H$ is a known *allowable* force, not divided by the factor of safety. **Passive** = $H$ is an *ultimate* capacity added to the resisting side and divided by FS. A blank cell is read as Active; files XSLOPE saves write the choice out explicitly. Has no effect on FEM analysis, where the pile resistance is computed rather than prescribed.<br>
 - **Pile Geometry**:<br>
 >>D **[L]**: Pile diameter. Required for Ito & Matsui auto-computation of $H$. Also used by FEM to compute $I$ and $Area$ if those columns are left blank.<br>
 >>S **[L]**: Center-to-center spacing. Required for Ito & Matsui auto-computation of $H$. Also required when structural capacity limits (V_cap, M_cap) are specified, since capacity is per-pile and must be compared against the per-pile force F = H &times; S. Recommended in general so that xslope can report per-pile forces in the summary output.<br>
@@ -1134,7 +1128,7 @@ Unlike a head boundary, whose points are simply pinned, a flux boundary's points
 along the boundary of the mesh. Zero flux is the default condition on any boundary that is not
 otherwise specified, so a flux boundary only needs to be defined where the flux is non-zero. A
 model with no specified-head boundary and no exit face anywhere is singular — head would be
-determined only up to an additive constant — and xslope will refuse to solve it.
+determined only up to an additive constant — and xslope does not solve it.
 
 **Time-varying boundaries (transient).** A head or flux **value** cell may hold the *name* of a
 time series defined on the [**tseep** sheet](#worksheet-tseep) instead of a number. When it does,
@@ -1143,8 +1137,7 @@ type) follows the named series through the run. A series is simply a curve of nu
 whether those numbers mean head or flux is decided by the block's own **type** cell, so one series
 can drive several boundaries. The name must match a series header on the tseep sheet exactly —
 xslope reports an error listing the available series names if it does not — and a name is only
-valid when a tseep sheet is present. Constant boundaries keep taking a plain number, exactly as
-before. A series on a `head` block is a plain Dirichlet held at $h(t)$ at every node of the
+valid when a tseep sheet is present. A constant boundary takes a plain number. A series on a `head` block is a plain Dirichlet held at $h(t)$ at every node of the
 polyline at all times; a series on a `reservoir` block is the rising/falling level. For a
 series-driven **reservoir** boundary, draw the polyline over the *full* face the water can ever
 cover: at each time step only the currently submerged nodes are held at the series level, while
@@ -1189,9 +1182,8 @@ section for sample input files illustrating various boundary conditions
 The **tseep** worksheet defines a **transient** (time-dependent) seepage analysis: a set of time
 series that drive time-varying boundary conditions, together with the controls for the transient
 run. It is used only for seepage. **A filled-in tseep sheet is what makes a seepage analysis
-transient** — leave the sheet empty (as it is in the blank template) and seepage behaves exactly
-as the steady-state analysis described in the [seep bc](#worksheet-seep-bc) section, with results
-bit-for-bit unchanged.
+transient** — leave the sheet empty (as it is in the blank template) and seepage is the
+steady-state analysis described in the [seep bc](#worksheet-seep-bc) section.
 
 This section documents the tseep sheet as an *input*. How the transient analysis is formulated and
 solved — the storage term, the time-stepping scheme, the initial and boundary conditions, and the
@@ -1231,9 +1223,9 @@ repeating a time on two consecutive rows with different values.
   [LEM or FEM stability analysis](../seep/transient.md#stability-time) with `u = seep` reads its
   pore pressures from. Like the stage times it selects a frame out of the transient solution rather than
   changing it, and the stepper is forced to land on it. **Leave it blank and a stability
-  run reads the LAST saved frame** — usually the drained end state. A run started from Studio can
-  name a different instant for that run alone; storing it here is what makes a scripted or
-  headless re-run read the same frame. (Version 22 and later.)
+  run reads the last saved frame** — usually the drained end state. A run started from Studio can
+  name a different instant for that run alone; storing it here makes a scripted or headless
+  re-run read the same frame. (Version 22 and later.)
 
 A tseep sheet requires the **Time** unit on the [main](#worksheet-main) sheet to be set, and every
 material to carry a specific storage `Ss` (with `Sy` as well on unconfined models) — see

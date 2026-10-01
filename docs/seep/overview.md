@@ -75,7 +75,7 @@ Three models for $k_r$ are available, selected per material through the `unsat` 
 input columns, `a` and `n`; van Genuchten reads a third, `l`. Both of those curves are
 clipped from below at $k_{r,\min} = 10^{-8}$ — a numerical guard rather than a material
 property, keeping the conduction matrix nonsingular where a dry element would otherwise
-carry nothing, set below the conductivity any shipped model reaches and low enough that
+carry nothing, set below the conductivity any sample model reaches and low enough that
 the solved fields do not move when it is lowered further. The linear front carries its
 own floor in $kr_0$ and never reaches it.
 
@@ -160,13 +160,13 @@ This is the *power* form, not the exponential form $k_r = e^{\alpha\psi}$ that a
 Gardner's name. There is no $m = 1 - 1/n$ coupling, so $n$ need only be positive.
 
 **Fitted parameters** by USDA soil-texture class. Gardner has no published texture table of
-its own — its parameters normally arrive with an imported SEEP/W or Slide model, or from
+its own — its parameters normally come with an imported SEEP/W or Slide model, or from
 fitted measurements. The values below are least-squares fits (in $\log_{10} k_r$ over 0.01
 to 100 ft of suction, with both curves clipped at $k_r = 10^{-4}$ so the dry tail does not
 dominate the misfit) to each texture's van Genuchten curve
 from the Carsel & Parrish table above, so the underlying dataset is the same; the RMS column
 is the misfit of the power form to that curve — small for coarse textures, about a quarter
-of a decade for the clays. They are produced by `tools/fit_gardner_table.py`:
+of a log cycle for the clays. They are produced by `tools/fit_gardner_table.py`:
 
 | Soil texture | `a` (ψ in m) | `a` (ψ in ft) | `n` | RMS log₁₀k_r |
 | --- | --- | --- | --- | --- |
@@ -259,16 +259,15 @@ An exit edge is a boundary edge whose corners are both exit-face nodes — **or*
 corner and one specified-head corner. The second kind is the last edge of a seepage face where
 it meets a head line at a shared corner, which is what the downstream toe of a dam under
 tailwater looks like: the toe node belongs to the tailwater head boundary, and the edge above
-it belongs to the seepage face. Counting that edge is what makes the face run **to** the head
+it belongs to the seepage face. Counting that edge makes the face run **to** the head
 line. Left out, it would belong to no exit edge at all — its midside node given no state, its
 upper corner tied to the dry edge above — and the face would end one edge short of the toe with
 the head standing above the ground over that reach. The fixed corner is a Dirichlet row
 already, so in the edge test it counts as saturated and is never itself switched by it.
 
 The set is called stable only while every **inactive** seepage-face node stands at or below
-its own elevation. A free face carrying pressure is not a solution of the problem posed:
-either the face is there and the pressure is atmospheric, or the pressure is atmospheric
-because the face is there. So an inactive exit node whose head reaches its elevation is taken
+its own elevation. A free face carrying positive pressure is not a valid solution, because
+water under pressure at a free boundary would seep out. So an inactive exit node whose head reaches its elevation is taken
 into the face and the iteration continues rather than closing on that state, and on a
 quadratic mesh the edges it lies on are resolved per node from that point — the state a partly
 wet edge needs, which all-or-nothing cannot express. A node the ordinary tests keep shedding
@@ -294,7 +293,7 @@ unknowns in the solve, since a flux is a natural boundary condition.
 
 **A model with only flux boundaries is singular.** A flux constrains the gradient of the head,
 not the head, so the solution is determined only up to an additive constant. At least one
-specified-head boundary or exit face must be present, and XSLOPE refuses the model if none is.
+specified-head boundary or exit face must be present, and XSLOPE rejects the model if none is.
 
 **A flux boundary can be over-specified.** Nothing prevents forcing in more water than the
 soil can transmit; the solver simply raises the pressure until the flow balances, producing
@@ -308,14 +307,14 @@ a slope that also seeps. The two interact node by node. Where the exit face is *
 node is a free unknown, so the rain lands on it, infiltrates, and counts toward the reported
 inflow. Where the exit face is *active* the head is prescribed and the load is discarded: rain
 falling on an already-draining face runs off, counted neither as inflow nor outflow. As the
-water table rises, nodes cross from the first regime to the second. The one posing XSLOPE
+water table rises, nodes cross from the first regime to the second. The one case XSLOPE
 cannot resolve is an inflow onto a seepage face larger than the face can drain — such a node
 has no steady answer under either condition, so the iteration oscillates and the run reports
 `converged = False` rather than a plausible-looking number.
 
 **A flux boundary may also overlap a specified head**, which is what happens wherever rain
 falling on a slope meets the reservoir: the same node is on both polylines. The specified head
-wins. The load is assembled onto that node like any other and then discarded when the head is
+takes precedence. The load is assembled onto that node like any other and then discarded when the head is
 enforced, so none of the water that load stood for enters the domain — the reservoir already
 fixes the head at that node, and a flux cannot move a prescribed head.
 
@@ -368,9 +367,9 @@ pore pressures in a confined solution are not a water table and no phreatic surf
 recomputes the pressure head, evaluates $k_r$ at the element's Gauss points, scales that
 element's saturated stiffness by the quadrature-weighted average, solves, and updates the
 exit-face active set. (Averaging $k_r$ over the element's integration points, rather than
-switching it node by node, is what smears the phreatic transition over one element instead of
-snapping it.) The iteration is under-relaxed when it needs to be, and **how much is
-decided by the head change, not by the sweep number**. The relaxation factor starts at 1
+switching it node by node, smears the phreatic transition over one element instead of
+snapping it.) The iteration is under-relaxed when it needs to be, and the amount is set by
+the **head change** rather than by the sweep number. The relaxation factor starts at 1
 and walks a fixed ladder — 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01 — on this rule:
 
 - **Step down** one rung after five consecutive sweeps on which the largest head change
@@ -380,12 +379,11 @@ and walks a fixed ladder — 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01 — on this rule
 - **Hold** while it keeps setting new lows.
 - **Step back up** one rung after ten consecutive new lows — twenty the second time that
   rung is tried, forty the third. A rung that was too coarse for the field early on may be
-  right for it later, and the doubling is what keeps the ladder from thrashing between two
-  rungs while still letting it climb back to the coarsest one that works.
+  right for it later, and the doubling keeps the factor from alternating between two rungs
+  while still letting it climb back to the coarsest one that works.
 
 An under-relaxed sweep is a small step, so a factor finer than the problem needs costs
-sweeps rather than accuracy. Feeding the ladder the head change is what stops it paying
-that cost: the tall unsaturated column of the heap model closes in 337 sweeps where a
+sweeps rather than accuracy. Basing the steps on the head change avoids that cost: the tall unsaturated column of the heap model closes in 337 sweeps where a
 fixed schedule that reached 0.01 by sweep 121 and stayed there took 739, and lands on the
 same field.
 
@@ -393,32 +391,32 @@ Convergence is a **hybrid** test — all three conditions must hold at once:
 
 1. **Head change.** $||h_{new} - h_{old}||_\infty$ — a head, in the model's own length units —
    below `tol` times the model's **head scale**: the larger of the mesh height and the range of
-   the specified heads. Both of those are differences, so the gate is the same length wherever
+   the specified heads. Both of those are differences, so the tolerance is the same length wherever
    the elevation datum is put: one physical problem is held to one head tolerance whether its
-   ground line is drawn at elevation 0 or at 1000. Asking for the tolerance as a fraction of
-   the model's own scale rather than as a length is what lets one default work on a 10 m
+   ground line is drawn at elevation 0 or at 1000. Stating the tolerance as a fraction of
+   the model's own scale rather than as a length lets one default work on a 10 m
    sheetpile section and on a 180 ft dam. This condition alone is not sufficient: how a given
    head tolerance maps to mass-balance error varies from problem to problem.
 2. **Flow closure.** The unsigned nodal flow residual at the free nodes, evaluated with the
    conductivity rebuilt from the current unrelaxed heads, below `closure_tol` (default 0.1%)
    of the inflow. This measures the remaining $k_r$ lag directly in flow units — it is not a
    mass balance on the reported flowrate — so a run does not stop until the conductivity field
-   has stopped lagging the head field to within `closure_tol` of the inflow, which is what
-   makes the converged discharge tolerance-independent.
+   has stopped lagging the head field to within `closure_tol` of the inflow, so the converged
+   discharge does not depend on the tolerance.
 3. **Exit-face stability.** The active set unchanged from the previous iteration, and no
    inactive exit node standing above its own elevation — the flowrate is not meaningful while
    exit nodes are still switching, and a seepage face with pressure on it is not a free
    boundary.
 
 A run that hits `max_iter` (default 400) without satisfying all three returns
-`converged = False` and says so.
+`converged = False` and reports it.
 
 ### Input checks
 
 `build_seep_data` runs the model through [preflight](../usage/preflight.md) and
-`run_seepage_analysis` refuses to solve on an error — a conductivity of zero, a boundary set
-that drives no flow, a mesh built against a different material table. The gate is on the
-solve rather than the build, because building a `seep_data` is not always a run: importing a
+`run_seepage_analysis` does not solve when the checks find an error — a conductivity of zero,
+a boundary set that drives no flow, a mesh built against a different material table. The checks
+run at the solve rather than at the build, because building a `seep_data` is not always a run: importing a
 stored solution for re-plotting uses one purely as the shape of the mesh. Pass
 `check_inputs=False` to bypass the checks.
 
@@ -478,17 +476,17 @@ using $[K]/\det[K]$ (with the same $k_r$ field on an unconfined problem). The nu
 channels drawn follows the flow-net rule $q = k \, \Delta h \, N_f / N_d$: with $N_d$ = the
 number of head drops requested through `levels`, the equivalent conductivity
 $k = \sqrt{k_1 k_2}$ of the material named by `base_mat`, and the computed flowrate $q$, the
-renderer draws the $N_f$ that makes the count consistent. So the flow net reads as
+renderer draws the $N_f$ that makes the count consistent. The flow net therefore forms
 curvilinear squares in the base material, and choosing a different `base_mat` re-scales the
 channel count to that material.
 
 A stream function exists only for divergence-free flow, so flow lines are available for steady
 solutions only. A [transient frame](transient.md#outputs) exchanges water with storage, has no
-stream function, and is read with velocity vectors instead.
+stream function, and is shown with velocity vectors instead.
 
 **Phreatic surface.** The $\psi = 0$ contour, drawn on unconfined solutions where the pore
 pressure goes negative somewhere. It is the boundary between the saturated and unsaturated
-zones and is what a stability analysis effectively sees as the water table.
+zones and acts as the water table in a stability analysis.
 
 ## Usage
 

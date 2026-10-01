@@ -1,7 +1,7 @@
 # Transient Seepage in XSLOPE
 
-The [steady](overview.md) seepage analysis answers *what does the flow field look like once it
-has settled?* Many slope-stability problems are governed by conditions that are still
+The [steady](overview.md) seepage analysis gives the flow field once it has settled. Many
+slope-stability problems are governed by conditions that are still
 changing: a reservoir drawn down over days, a storm that falls and stops, an embankment
 shedding excess pore pressure over weeks. In each case the pore pressures that drive stability
 depend on *when* the slope is examined.
@@ -21,8 +21,8 @@ low-conductivity core, so the result depends on which instant is analyzed.*
 
 An analysis becomes transient when the input file carries a filled-in **tseep** sheet and the
 materials carry storage properties. With no tseep sheet the analysis is steady and the results
-are bit-for-bit those of the [Overview](overview.md); the transient machinery is an additive
-path that leaves the steady solve untouched.
+are bit-for-bit those of the [Overview](overview.md); the transient calculation is separate and
+does not change the steady solve.
 
 Transient runs can also be launched point-and-click in [XSLOPE Studio](../studio/index.md) —
 see [Studio](#studio) below.
@@ -31,7 +31,7 @@ see [Studio](#studio) below.
 
 The steady equation balances the divergence of the Darcy flux against any distributed source,
 with no accumulation term: whatever flows into a control volume flows straight back out.
-A transient problem relaxes exactly that. When the head at a point changes, the water content
+A transient problem removes that restriction. When the head at a point changes, the water content
 of the surrounding soil changes with it, and the rate at which water is stored or released
 enters the continuity balance:
 
@@ -66,7 +66,7 @@ this, marched through time.*
 
 ## Storage properties {#storage}
 
-The storage coefficient is what makes a transient solve differ from a steady one, and its
+The storage coefficient distinguishes a transient solve from a steady one, and its
 value depends on whether the soil is saturated. XSLOPE builds it from two per-material inputs
 on the **mat** sheet, `Ss` and `Sy`.
 
@@ -182,7 +182,7 @@ $t + \Delta t$,
    = \dfrac{[M]}{\Delta t}\{h\}_{t} + \{Q\} - (1-\theta)[K]\{h\}_{t}$
 
 **$\theta = 1$ is backward Euler**, the default — unconditionally stable and free of the
-oscillations that dog explicit and centered schemes on sharp infiltration fronts.
+oscillations that affect explicit and centered schemes on sharp infiltration fronts.
 **$\theta = 0.5$ is Crank–Nicolson**, second-order accurate in time but more prone to ringing
 on rapidly switching boundaries. Backward Euler is recommended for slope-stability work.
 
@@ -323,13 +323,13 @@ The unconfined branch is an iteration and carries a sweep budget, `max_iter`, wh
 steady runners take for the same solve. It is spent once, before the transient run starts, and has nothing to do
 with the time steps. Raising it is the remedy for a model whose steady state is slow to reach; a
 tall unsaturated column draining at unit gradient is the usual such model, and it converges
-monotonically, just slowly. What that solve spends its sweeps on is the ordinary
+monotonically, just slowly. That solve uses the ordinary
 [unconfined iteration](overview.md#confined-and-unconfined-problems), relaxation ladder and all,
 at the tighter head tolerance the initial condition uses — 1e-6 of the model's head scale, against
-the 1e-4 a steady run takes. The outcome of that solve belongs to the run: an initial condition that
-does not close within the budget leaves `converged` False on the returned dictionary, the same flag
-a force-accepted time step clears, so a transient run begun from a field that is not a steady state says so
-in its result.
+the 1e-4 a steady run takes. The outcome of that solve is part of the run's result: an initial
+condition that does not close within the budget leaves `converged` False on the returned dictionary,
+the same flag a force-accepted time step clears, so a transient run begun from a field that is not a
+steady state reports this in its result.
 
 Because of that rule, the way to start from a particular steady state — a full reservoir before
 drawdown, say — is simply to give the driving series that value at $t = 0$. To hold it briefly
@@ -341,7 +341,7 @@ value later. This is the standard drawdown setup.
 
 ### Saved-frame schedule
 
-The solver stores a curated set of **saved frames**, not every computed step. The saved times
+The solver stores a selected set of **saved frames**, not every computed step. The saved times
 are the **union** of
 
 - the **save_interval** grid (defaults to roughly 50 frames over the duration when blank),
@@ -360,8 +360,8 @@ every saved frame is a computed state.
 stage times, and every series breakpoint — de-duplicated, sorted, and always including
 $t = 0$.*
 
-Since the schedule is what a stability run can read, a time that has to be available later has
-to be on it. A time that is **not** a saved frame is served by rerunning the transient seepage
+A stability run can read only saved frames, so a time needed later must be on the schedule. A
+time that is **not** a saved frame is obtained by rerunning the transient seepage
 analysis with that time added to `save_times` — never by interpolating between two frames, since a field blended from two
 solutions is not itself a solution of anything.
 
@@ -376,7 +376,7 @@ solutions is not itself a solution of anything.
   time unit, the theta/lumped provenance, the `dt` history, the per-frame inflow/outflow, the
   mass-balance ledger, the stage times, and the source input/mesh file names.
 
-### Per-frame outputs, and why inflow ≠ outflow
+### Per-frame inflow and outflow {#per-frame-outputs-and-why-inflow-outflow}
 
 Each saved frame reports separate **inflow** and **outflow** totals. Under storage exchange
 these **differ** — the difference is exactly the water being stored in, or released from, the
@@ -417,7 +417,7 @@ signal to tighten the step controls.
 
 A transient run produces a *sequence* of pore-pressure fields, but a stability analysis with
 `u = seep` consumes exactly **one**. The tseep controls carry an optional **stability_time**
-naming which instant that is. It is a consumption time, not a control on the analysis: it selects
+naming which instant that is. It does not control the analysis: it selects
 which frame is read out and changes nothing about how the transient solution is computed. Like the stage times
 it is forced into the saved-frame schedule, so the instant it names is always a computed frame.
 
@@ -427,7 +427,7 @@ Which instant a run reads, in order of precedence:
    which governs that run only;
 2. the model's `stability_time`;
 3. with both absent, the **last saved frame** — usually the drained end state, which is often
-   but not always the critical one. A run says which of the three it used.
+   but not always the critical one. A run reports which of the three it used.
 
 `select_transient_frame_u(slope_data, solution, time=...)` places the chosen frame's pore
 pressures into `slope_data['seep_u']`; `apply_transient_stability_frame` wraps the whole
@@ -444,7 +444,7 @@ print(info["times"], info["source"])       # e.g. [47.0] 'file'
 apply_transient_stability_frame(slope_data, solution, time=30.0)
 ```
 
-A time with no saved frame is refused by default, listing the times that do exist. Passing
+A time with no saved frame is rejected by default, listing the times that do exist. Passing
 `remarch=True` together with the run's `seep_data` reruns the transient seepage analysis
 instead, with the requested
 instant injected into `save_times`:
@@ -480,9 +480,9 @@ steady start, and inflow zero while the dam drains.*
 `stage_transient_for_drawdown` pulls those two frames **in memory** — no intermediate files —
 and places their pore-pressure fields into `slope_data['seep_u']` and `slope_data['seep_u2']`,
 which are exactly the structures the classic two-steady-file drawdown path produces. The
-existing three-stage machinery then runs unchanged. A transient solution with stage times takes
+three-stage analysis then runs as usual. A transient solution with stage times takes
 precedence over the classic `{base}_seep.csv` / `{base}_seep2.csv` files; a model without stage
-times continues to use the classic path.
+times uses the classic path.
 
 See [Rapid Drawdown Analysis](../lem/rapid.md#transient-solution) for the stability methodology
 the staged pore pressures feed.
@@ -545,7 +545,7 @@ slope_data = stage_transient_for_drawdown(slope_data, solution)
 
 **Verification** — transient rows in the corpus, each page entered at its transient section:
 
-- [Rocscience Slide2 groundwater — transient problems](../verification/rocscience_groundwater.md#transient): the Terzaghi / Ferris / Pyrah consolidation columns and the earth-dam and lagoon seepage runs (GW15–GW21, all built), locked against closed-form or recomputed-analytical targets.
+- [Rocscience Slide2 groundwater — transient problems](../verification/rocscience_groundwater.md#transient): the Terzaghi / Ferris / Pyrah consolidation columns and the earth-dam and lagoon seepage runs (GW15–GW21, all built), checked against closed-form or recomputed-analytical targets.
 - [GeoStudio SEEP/W transient seepage](../verification/geostudio.md#transient-seepage): the consolidation, infiltration, reservoir-drawdown, clay-lined-pond, leach-column, and stepped-suction examples (SEEPW-T01–T05 and T07 built), with the multi-layer infiltration case (T06) documented as blocked and why.
 - [RS2 earth dam under transient unsaturated seepage](../verification/rs2.md#rs2-67): the RS2-67 SSRM family, driven both by RS2's own imported 90 h drawdown pore-pressure field and by XSLOPE's own steady reconstruction of the vendor's boundary conditions.
 - [Rocscience Slide2 — VP102](../verification/rocscience.md#vp102): a rapid-drawdown earth dam whose factor of safety is tracked across the 60–1500 h drawdown from a single uncoupled transient seepage solve.

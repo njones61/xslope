@@ -29,7 +29,7 @@ The analysis uses the same **Taylor Series Probability Method (TSPM)**:
 The analysis runs $1 + 2N$ SSRM solves (one at the most-likely values plus a
 $F^+$/$F^-$ pair for each of the $N$ uncertain parameters), all on a **single
 shared mesh** — only the material-to-element mapping is rebuilt per perturbation.
-The [auto-expanding SSRM bracket](../fem/overview.md) is what makes this practical:
+The [auto-expanding SSRM bracket](../fem/overview.md) makes this practical:
 each perturbation shifts the factor of safety, and the bracket adjusts itself so a
 fixed `F_min`/`F_max` does not have to bracket every perturbed case in advance.
 
@@ -55,12 +55,12 @@ reliability between two bracket choices.
 To remove that entirely, `reliability_fem` runs each SSRM on a **fixed global grid**
 (`grid = tolerance`, default 0.001; see [`solve_ssrm`](../fem/overview.md)). Instead of
 halving your bracket, it locates the single global grid cell that straddles the
-failure threshold — a fact of the slope and mesh, not of the bracket — so *every*
+failure threshold — a property of the slope and mesh rather than of the bracket — so *every*
 starting bracket lands in the same cell. The result is **identical to every decimal
 regardless of `F_min`/`F_max`**, at the same cost (~log₂ solves) and precision
 (the grid step) as ordinary bisection.
 
-Two things still legitimately change the result and are **not** numerical noise:
+The result still depends on two things that are **not** numerical noise:
 the **mesh** (a finer or different-element mesh gives a slightly different factor
 of safety, as with any FE analysis — use a converged mesh and report which one),
 and genuinely larger parameter uncertainty (a higher $COV_F$ both lowers the
@@ -79,11 +79,11 @@ directly comparable.
 ### Why the elastic parameters E and ν are excluded
 
 Unlike a limit-equilibrium analysis, a finite-element analysis also takes the
-elastic modulus $E$ and Poisson's ratio $\nu$ as inputs. It is conventional
-wisdom that these affect the computed **displacements** but have little effect on
-the **factor of safety**, which is governed by the strength. We confirmed this
-directly on [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387) Example 1 ($c/\gamma H = 0.05$, $\phi = 20°$),
-holding the strength fixed and varying $E$ and $\nu$ across their full plausible
+elastic modulus $E$ and Poisson's ratio $\nu$ as inputs. These are generally taken
+to affect the computed **displacements** but to have little effect on the **factor of
+safety**, which is governed by the strength. The table shows this for
+[Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387) Example 1 ($c/\gamma H = 0.05$, $\phi = 20°$),
+with the strength held fixed and $E$ and $\nu$ varied across their full plausible
 ranges:
 
 | Variation                       | FS     | ΔFS vs. base |
@@ -118,8 +118,7 @@ the analysis stops with an error).
 
 ## Usage
 
-In **XSLOPE Studio**, build a mesh, then choose **Run FEM → Analysis: Reliability
-(SSRM)**. It uses the `F min`/`F max` bracket from the dialog (auto-expanding) and
+In **XSLOPE Studio**, build a mesh, then click **Reliability…** in FEM mode. It uses the `F min`/`F max` bracket from the dialog (auto-expanding) and
 the material standard deviations from the mat sheet; the bisection tolerance,
 however, is set internally to the tight reliability default (not the dialog's
 single-run *Tolerance* field — see [Numerical precision](#numerical-precision-and-reproducibility)).

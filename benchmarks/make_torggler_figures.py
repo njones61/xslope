@@ -160,8 +160,15 @@ def render_capture_only(tag):
     search. A case with no stored record is refused."""
     name = stem(tag)
     t0 = time.time()
-    base = os.path.splitext(tag['file'])[0]
+    base = os.path.splitext(os.path.normpath(tag['file']))[0]
+    # The search record of a row on this page is its per-row trial record
+    # (tools/ssrm_trial_audit.row_meta_name), the one store these cases have;
+    # a record beside the workbook is read first where one exists.
     record_path = f'{base}_fem_meta.json'
+    if not os.path.exists(record_path):
+        sys.path.insert(0, os.path.join(ROOT, 'tools'))
+        import ssrm_trial_audit as audit
+        record_path = audit.row_meta_name(base, tag)
     if not os.path.exists(record_path):
         raise RuntimeError(f'{name}: no stored search record at '
                            f'{os.path.relpath(record_path, ROOT)}; run the full '

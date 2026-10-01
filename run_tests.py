@@ -808,6 +808,30 @@ def run_lem_test(test):
         return None, err
 
     if test_type == 'single_circle':
+        # `circle_xo=`, `circle_yo=`, `circle_r=` give the circle in the tag itself,
+        # for a published circle that is not on the workbook's circles sheet (a
+        # source's critical circle, say). All three solve that circle instead of
+        # the sheet's `circle_index` circle; none leaves the sheet in charge; a
+        # partial set is an error. The dict is the loader's own structure for a
+        # circle with an explicit radius (fileio, Option = Radius: Depth = Yo - R).
+        _cc = [str(test.get(k, '')).strip() for k in ('circle_xo', 'circle_yo', 'circle_r')]
+        if any(_cc) and not all(_cc):
+            return None, ("circle_xo, circle_yo and circle_r must all be given to "
+                          "put a circle in the tag; got only "
+                          + ", ".join(k for k, v in zip(('circle_xo', 'circle_yo', 'circle_r'), _cc) if v))
+        if all(_cc):
+            _xo, _yo, _r = (float(v) for v in _cc)
+            circle = {"Xo": _xo, "Yo": _yo, "Depth": _yo - _r, "R": _r}
+            success, result = generate_slices(slope_data, circle=circle, num_slices=num_slices,
+                                              composite=composite, right_facing=right_facing,
+                                              suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+            if not success:
+                return None, f"generate_slices failed: {result}"
+            slice_df, failure_surface = result
+            solver_result = solve_selected(method, slice_df, rapid=rapid)
+            if isinstance(solver_result, str):
+                return None, f"solve failed: {solver_result}"
+            return solver_result['FS'], None
         # circle_index picks one of several specified surfaces stored in the same
         # file (default 0, the historical behaviour). A model whose published
         # answers are per-surface — SLOPE/W's Cannon Dam #2 stores nine of

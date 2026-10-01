@@ -1678,10 +1678,10 @@ elements as designed.
 | `ssrm_curve` | Displacement vs F: the maximum displacement of every strength reduction trial against its factor, drawn from the run record passed as `ssrm_record` (see [Displacement vs F](#displacement-vs-f)). |
 
 The default is `['deformation', 'shear_strain', 'displace_vector']`. The example below is the
-non-circular problem from [FEM Samples](samples.md) Problem 3, where a thin weak clay layer controls
+non-circular problem from [FEM Samples](samples.md) Problem 1, where a thin weak clay layer controls
 the mechanism:
 
-![noncircular.png](../lem/sample_images/noncircular.png){width=900}
+![Slope with a weak clay layer](../tutorials/images/lem05_problem_sketch.png){width=1000}
 
 ![non_circ_results.png](images/non_circ_results.png){width=1000}
 

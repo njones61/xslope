@@ -10,14 +10,14 @@ the Shear Strength Reduction Method (SSRM). Each of the Excel input files below 
 
 The FEM implementation is described in the [FEM Overview](overview.md) page.
 
-### 3. Non-Circular Failure Surface with Thin Weak Layer
+### 1. Non-Circular Failure Surface with Thin Weak Layer
 
 This is the FEM counterpart of the LEM non-circular failure surface example described in the [LEM Samples](../lem/samples.md)
 page (Problem 7). The problem features a thin weak clay layer in the foundation of a slope, which controls the
 failure mechanism. This problem was also featured in the user manual for the UTEXASED slope stability analysis
 software developed by Stephen G. Wright at the University of Texas at Austin.
 
-![noncircular.png](../lem/sample_images/noncircular.png){width=900}
+![Slope with a weak clay layer](../tutorials/images/lem05_problem_sketch.png){width=1000}
 
 The slope geometry and strength properties are the same as the LEM problem. Young's modulus ($E$) and Poisson's
 ratio ($\nu$) are estimated from typical correlations for each soil type:
@@ -59,7 +59,7 @@ lateral sliding of the slope mass along the clay layer.
      target_size=1.0 or finer -->
 <!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.616, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000 -->
 
-### 4. Reliability Analysis: Two-Layer c–φ Slope
+### 2. Reliability Analysis: Two-Layer c–φ Slope
 
 This example demonstrates a **finite-element reliability analysis** — the same
 Taylor Series Probability Method as the [LEM reliability analysis](../reliability/taylor.md),

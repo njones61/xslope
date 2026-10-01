@@ -232,8 +232,8 @@ Engineers).
 - Perry, J. (1994). A technique for defining non-linear shear strength
   envelopes, and their incorporation in a slope stability method of analysis.
   *Quarterly Journal of Engineering Geology* 27(3), 231–241.
-  [doi:10.1144/GSL.QJEGH.1994.027.P3.04](https://doi.org/10.1144/GSL.QJEGH.1994.027.P3.04). *(Cited as "Perry (1993)" in the Slide2
-  and RS2 manuals.)*
+  [doi:10.1144/GSL.QJEGH.1994.027.P3.04](https://doi.org/10.1144/GSL.QJEGH.1994.027.P3.04). *(Cited as "Perry (1993)", Fig. 10, in the
+  Slide2 and RS2 manuals; the worked example is the paper's Fig. 6.)*
 - Pilot, G., Trak, B. & La Rochelle, P. (1982). Effective stress analysis of the
   stability of embankments on soft soils (Saint-Alban test embankment).
   *Canadian Geotechnical Journal* 19(4), 433–450. [doi:10.1139/t82-048](https://doi.org/10.1139/t82-048). *(Author list/pages not fully

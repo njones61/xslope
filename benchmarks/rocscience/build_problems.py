@@ -810,14 +810,24 @@ def vp017():
 
 
 def vp024():
-    """Slide #24: Low (1989) three-layer undrained slope (phi=0). Circular
-    search. Slide2: Ordinary 1.439, Bishop 1.439; Low reference 1.44 both.
+    """Slide #24: Low (1989) Example 1, a 6 m cut in three undrained layers (phi=0).
+    Circular search. Slide2: Ordinary 1.439, Bishop 1.439. Low's own method gives
+    1.45 (Fig. 10, p. 220); the 1.44 the vendor manuals attribute to Low is the
+    STABR circle search (Duncan & Wong 1984) that Low printed for comparison.
 
     Geometry from the RS2 vendor .fez (`slope stability #019.fez`): three EQUAL
     4.5 m layers (crest at y=13.5, bench at y=7.5, internal boundaries at y=9
-    and y=4.5, slope break at x=33.5). Earlier this file carried unequal 5/4/5 m
-    layers with the crest at y=14; the vendor geometry makes the weak Middle
-    layer (c=20) a full 4.5 m thick rather than 4.0 m."""
+    and y=4.5, slope break at x=33.5), which is Low's own statement of the
+    example: "three horizontal clay layers each 4.5 m thick", c = 30/20/150.
+
+    The Middle layer (c = 20) carries a local element size of 0.25 m (profile
+    Size). The strength-reduction row RS2-19 runs on this file, and its
+    mechanism shears the 3 m of c = 20 clay below the base of the cut: at the
+    1.0 m global size that band is about three element rows, and the six-node
+    triangles overshoot the collapse load there (1.488 against a best circle of
+    1.435, which for a purely cohesive soil is a ceiling). At 0.25 m the band is
+    about twelve rows. The size is a mesh input only; the limit-equilibrium row
+    VP24 does not read it."""
     sd = load_slope_data(ACADS_1A)
     base = dict(sd['materials'][0])
     props = [('Upper Layer', 30.0), ('Middle Layer', 20.0), ('Bottom Layer', 150.0)]
@@ -828,7 +838,8 @@ def vp024():
         sd['materials'].append(m)
     sd['profile_lines'] = [
         {'mat_id': 0, 'coords': [(0.0, 13.5), (20.0, 13.5), (33.5, 9.0), (38.0, 7.5), (60.0, 7.5)]},
-        {'mat_id': 1, 'coords': [(0.0, 9.0), (33.5, 9.0), (38.0, 7.5), (60.0, 7.5)]},
+        {'mat_id': 1, 'coords': [(0.0, 9.0), (33.5, 9.0), (38.0, 7.5), (60.0, 7.5)],
+         'size': 0.25},
         {'mat_id': 2, 'coords': [(0.0, 4.5), (60.0, 4.5)]},
     ]
     sd['max_depth'] = 0.0
@@ -1165,10 +1176,11 @@ def vp054b():
 
 
 def vp040():
-    """Slide #40 / Perry (1993) Fig. 10: homogeneous dry slope, power-curve
+    """Slide #40 / Perry (1994) Fig. 6: homogeneous dry slope, power-curve
     strength tau = A*sigma'^b (A=2, b=0.7, gamma=20), specified noncircular
-    surface (all vertices printed in Fig 40.1). The benchmark is BOTH the
-    fixed-surface FS and the published sensitivity study: A and b are swept
+    surface (all vertices printed in Fig 40.1, as rounded labels: the toe
+    (105, 3) and the vertex (80, 1) are Perry's (105, 2.8) and (80, 0.5)).
+    The benchmark is BOTH the fixed-surface FS and the published sensitivity study: A and b are swept
     +-15% (Slide's "Rel. max/min" 0.3 and 0.105 are the absolute deltas =
     15% of the means, matching Perry's Fig 40.4 axis). FS is exactly linear
     in A on a fixed dry surface; the b-sweep is strongly nonlinear. Targets:
@@ -1177,7 +1189,11 @@ def vp040():
     the fo convention for a power-curve soil). Relative sensitivities:
     xslope dFS -45%/+82% over the b range vs Slide -44%/+81%; A exactly
     +-15% in both. Locked via type=sensitivity tags (search=false: the
-    surface is specified)."""
+    surface is specified).
+
+    Limit equilibrium only. The strength-reduction row RS2-30 runs on its own
+    two files at Perry's toe (build_rs2.rs2_30 / rs2_30_split), so this file
+    carries none of the vendor's SSR exclusion areas."""
     sd = load_slope_data(ACADS_1A)
     m = dict(sd['materials'][0])
     m.update(name='Soil', c=0.0, phi=0.0, gamma=20.0, gamma_sat=20.0,
@@ -1200,32 +1216,6 @@ def vp040():
         {'X': 60.0, 'Y': 4.0, 'Movement': 'Free'},
         {'X': 80.0, 'Y': 1.0, 'Movement': 'Free'},
         {'X': 105.0, 'Y': 3.0, 'Movement': 'Free'},
-    ]
-    # RS2 Part IV VP40's own SSR constraint, read verbatim from the Slide2-import
-    # model `slope stability #040.fez` (SSR_polygonal_zones, three kind-1 rings =
-    # EXCLUSION areas). This file is that model -- both twins share the geometry
-    # exactly, and the strength model decides: vp040 carries Perry's power curve,
-    # which is what #040 carries, where RS2's native #030 carries a Generalized
-    # Hoek-Brown envelope fitted to the same data. The published 0.97 was produced
-    # WITH these rings, so the corpus file carries them rather than leaving the
-    # constraint on the vendor's side of the comparison.
-    #
-    # Sentinel -3 ("SSR elastic"), not -2 ("SSR hold"): the vendor does not merely
-    # hold these regions at full strength, it assigns them a linear-elastic material
-    # partition that cannot yield at all (50.65% of the domain by the vendor's own
-    # materials, 50.4% by the polygons -- the two agree, which is what identifies the
-    # partition and the polygons as one construction). On a sub-unity model a
-    # full-strength hold cannot bracket the solve; only the non-plastic hold can.
-    # Ring 3 is wholly interior, so the reducible region is a polygon with a hole --
-    # the band along Perry's specified failure surface.
-    sd['ssr_zones'] = [
-        {'kind': 'hold_elastic',
-         'polygon': [(0.0, 53.0), (0.0, -10.0), (4.0, -9.8681), (4.0, 53.0)]},
-        {'kind': 'hold_elastic',
-         'polygon': [(105.0, 2.8), (105.0, -10.0), (115.0, -10.0), (115.0, 2.8)]},
-        {'kind': 'hold_elastic',
-         'polygon': [(20.0, 16.0), (40.0, 8.0), (60.0, 4.0), (80.0, 1.0),
-                     (102.392, 4.09622), (6.53543, 51.7398)]},
     ]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp040.xlsx'))
     return 'vp040.xlsx'

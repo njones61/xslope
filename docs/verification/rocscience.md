@@ -221,7 +221,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [21](#vp21) | 🟢 | Slope, homogenous, ru pore pressure | dry: Spencer 2.071 vs F&K 2.073 (−0.1%) · r<sub>u</sub> = 0.25: Spencer 1.757 vs F&K 1.761 (−0.2%) · water table: Spencer 1.827 vs F&K 1.830 (−0.2%) |  |
 | [22](#vp22) | 🟢 | Slope, (2) materials, weak layer, ru pore pressure | dry: Spencer 1.379 vs Slide 1.382 (−0.2%) · r<sub>u</sub> = 0.25: Spencer 1.122 vs Slide 1.124 (−0.2%) | the corpus's first composite-surface problem |
 | [23](#vp23) | 🟢 | Slope, (3) materials | Ordinary 1.357 vs Low 1.36 (−0.2%) · Bishop 1.130 vs Low 1.14 (−0.9%) | the published Bishop values themselves spread 1.14–1.19 |
-| [24](#vp24) | 🟢 | Slope, (3) materials | Ordinary 1.435 vs Slide 1.439 (−0.3%) · Bishop 1.435 vs Low 1.44 (−0.3%) |  |
+| [24](#vp24) | 🟢 | Slope, (3) materials | Ordinary 1.435 vs Slide 1.439 (−0.3%) · Bishop 1.435 vs STABR, printed by Low, 1.44 (−0.3%) | The 1.44 is the circle search by another program that Low printed for comparison; Low's own method gives 1.45. |
 | [25](#vp25) | 🟢 | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | Spencer 1.052 vs Slide 1.051 (+0.1%) · Spencer 1.052 vs Chen & Shao 1.05 (+0.2%) | the Prandtl surface is built analytically |
 | [26](#vp26) | 🟢 | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | Spencer 1.043 vs bearing-capacity theory 1.0 (+4.3%) · Lowe 1.017 vs bearing-capacity theory 1.0 (+1.7%) | the closed form is the reference authority; Slide2's own Spencer 0.941 sits ~6% below it |
 | [27](#vp27) | 🟢 | Slope, (2) materials, tension crack, water table (auto Hu) | Spencer 1.375 vs Slide 1.402 (−1.9%) · Spencer 1.375 vs XSTABL 1.403 (−2.0%) | a uniform offset across all six methods (digitized water table) |
@@ -230,7 +230,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [30](#vp30) | 🟢 | Reinforced embankment, (4) materials, tension crack, geosynthetic | circle A: Bishop 1.679 vs Slide 1.69 (−0.7%) · circle B: Bishop 1.650 vs Slide 1.66 (−0.6%) | the manual specifies Bishop for this problem |
 | [31](geostudio.md#gs-2-18) | 🟢 | Reinforced embankment, (5) materials, geosynthetic | M-P 1.153 vs SLOPE/W 1.171 (−1.5%) · M-P 1.153 vs Borges & Cardoso 1.15 (+0.3%) · Bishop 1.154 vs SLOPE/W 1.170 (−1.4%) | *covered* — Borges & Cardoso Case 2, built in the GeoStudio corpus as [SLOPE/W §2.18](geostudio.md#gs-2-18) (identical embankment c'=0, φ'=35, γ=20; soft-clay layers Clay1 33, Clay2 16, Clay3 16→18.4, Clay4 18.4→55.1, matching Slide2's Table 31.2 to rounding; unanchored 200 kN/m geosynthetic at δ=33.7°). Slide2's own Circle A/B read 1.18 / 1.16 (Borges 1.19 / 1.15); the VP30 reverse-curvature blocker does not arise here. |
 | [32](#vp32) | 🟢 | Reinforced embankment, (7) materials, geosynthetic | H = 7, circle A: Bishop 1.218 vs Slide 1.23 (−1.0%) · circle B: Bishop 1.216 vs Slide 1.22 (−0.3%) · H = 8.75, circle C: Bishop 0.981 vs Slide 0.98 (+0.1%) |  |
-| [33](#vp33) | 🟢 | Dike, (5) materials, probabilistic analysis, water table | Bishop 1.320 vs Slide 1.305 (+1.1%) · Bishop 1.320 vs El-Ramly et al. 1.31 (+0.8%) | deterministic factor of safety; composite critical surface; the probability of failure sits about twenty times above El-Ramly et al.'s, a spread difference not yet explained |
+| [33](#vp33) | 🟢 | Dike, (5) materials, probabilistic analysis, water table | Bishop 1.320 vs Slide 1.305 (+1.1%) | deterministic factor of safety; composite critical surface. El-Ramly et al.'s own deterministic Bishop, 1.30, rests on measured band pore pressures the model does not carry and is shown, not scored; the 1.31 the manual quotes is their Monte Carlo mean. The probability of failure sits about two times above the paper's simplified-analysis figure, 1.6×10⁻². |
 | [34](#vp34) | 🟢 | Dam, (3) materials, probabilistic analysis, water table | M-P 2.384 vs Wolff & Harr 2.36 (+1.0%) | deterministic factor of safety; the Phase I COV of 124% is outside the Taylor series' domain |
 | [35](#vp35) | 🟢 | Dam, (5) materials, probabilistic analysis, reliability index | Bishop critical FS at mean strengths 2.529 vs Slide 2.551 (−0.9%) | reproduced by procedure; β spreads with the estimator at these COVs · the paper's nine fixed surfaces are reproduced at [§2.22](geostudio.md#gs-2-22) |
 | [36](#vp36) | 🟢 | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | Bishop 1.333 vs H&W 1.334 (−0.1%) · Bishop 1.333 vs Slide 1.340 (−0.5%) |  |
@@ -801,11 +801,12 @@ Slide #24 / Low (1989), the companion example to [#23](#vp23): a three-layer
 undrained slope, φ = 0 and γ = 18 kN/m³ throughout, with cu = 30 kPa in the
 upper layer, 20 kPa in the middle band, and 150 kPa in the stiff bottom layer.
 Circular search. On a φ = 0 section the Ordinary and Bishop methods coincide,
-and Low's published 1.44 is the same for both.
+and so does the 1.44 that Low printed for comparison, the circle search of another
+program (STABR). Low's own method gives 1.45.
 
 **Input files:** [vp024.xlsx](files/rocscience/vp024.xlsx)
 
-| Method | XSLOPE | Slide | Low |
+| Method | XSLOPE | Slide | STABR (printed by Low) |
 |---|---|---|---|
 | Ordinary | 1.435 | 1.439 (−0.3%) | 1.44 (−0.3%) |
 | Bishop | 1.435 | 1.439 (−0.3%) | 1.44 (−0.3%) |
@@ -1046,26 +1047,26 @@ model base, so the surface is **composite** — truncated at the base and runnin
 weak band. This is the [composite-surface option](../lem/overview.md#composite-failure-surfaces)
 exercised on a published benchmark.
 
-|  | XSLOPE (composite) | Slide | El-Ramly et al. |
+|  | XSLOPE (composite) | Slide | El-Ramly et al. (deterministic Bishop) |
 |---|---|---|---|
-| Bishop, Slide's circle | 1.320 | 1.305 (+1.1%) | 1.31 (+0.8%) |
+| Bishop, Slide's circle | 1.320 | 1.305 (+1.1%) | 1.30 |
 
 *Slide assigns three piezometric lines to different materials; XSLOPE's single line uses the
 lowest everywhere — applying each of Slide's lines in turn brackets the factor of safety within
 1–3%, well inside the digitizing tolerance. The clayey till's properties are not printed in the
-manual, so the geometry and material zonation follow the RS2 vendor `.fez`. The published
-probability of failure (1.5–1.6×10⁻³ by Monte Carlo) is not matched, and the dot scores the
-deterministic factor of safety alone. Slide2's manual
-states that this example does not consider the spatial variation of soil properties — it is the
-paper's simplified analysis — so the published probabilities and XSLOPE's rest on the same
-variance model, one standard deviation per material and no averaging along the slip surface. Run
-on it, the Taylor series and a 10,000-sample Monte Carlo agree with each other and both sit
-roughly twenty times above El-Ramly et al.'s value. The disagreement is in the spread rather than
-in the estimator: on the same two random variables with the same input standard deviations, the
-standard deviation XSLOPE computes on the factor of safety is about 1.5 to 1.7 times the one the
-published probability implies, and essentially all of it comes from the clay-shale friction angle.
-What makes this model's factor of safety that much more sensitive to that angle is not
-identified.*
+manual, so the geometry and material zonation follow the RS2 vendor `.fez`. El-Ramly et al.'s
+own deterministic answer, 1.30, is Bishop's method with the band's pore pressures set from
+measured pore-pressure ratios; the vendor's model, which the file follows, carries a piezometric
+line with roughly half that pressure in the band under the upper slope, so the paper's 1.30 is
+shown beside and is not scored. The 1.31 the manual quotes is the mean of the paper's Monte Carlo
+run on another surface. The dot scores the deterministic factor of safety alone.*
+
+*The paper publishes two probabilities of failure: 1.6×10⁻² from its simplified analysis, one
+standard deviation per material and no averaging along the slip surface, and 1.6×10⁻³ from its
+analysis with spatial averaging. Slide2's manual states that this example does not consider the
+spatial variation of soil properties, so the like-for-like figure is the simplified analysis's
+1.6×10⁻². On that variance model the Taylor series and a 10,000-sample Monte Carlo agree with each
+other and both sit about two times above it.*
 
 ![vp033: inputs and representative solution](images/vp033.png)
 
@@ -1259,7 +1260,7 @@ Also [SLOPE/W §2.24](geostudio.md) — the same problem in the GeoStudio corpus
 
 **Input files:** [vp040.xlsx](files/rocscience/vp040.xlsx)
 
-Perry (1993, Fig. 10): a dry homogeneous slope with power-curve strength
+Perry (1994, Fig. 6): a dry homogeneous slope with power-curve strength
 τ = A·σ′ᵇ (A = 2, b = 0.7, γ = 20) evaluated on the specified five-segment surface —
 and the corpus's first *sensitivity* benchmark: the manual varies A and b over ±15% of
 their means and publishes the FS-vs-parameter curves. The XSLOPE sweep runs through `sensitivity()` on the fixed surface
@@ -1268,7 +1269,7 @@ are checked for each parameter.
 
 | Quantity | XSLOPE (Janbu) | Slide | Perry | Note |
 |---|---|---|---|---|
-| FS on the specified surface | 1.003 (Janbu corrected) | 0.944 (simplified — cross-method) | 0.98 (+2.3%) | Perry's value pairs with the corrected factor |
+| FS on the specified surface | 1.003 (Janbu corrected) | Janbu simplified 0.944 · Spencer 1.088 · GLE 1.064 (cross-method) | 0.98 (+2.3%) | Perry's value pairs with the corrected factor; Slide2's Spencer and GLE on the same surface are from RS2's Part IV manual, Table 40.2 |
 | ΔFS over the A range (±15%) — **sweep result** | −15.0% / +15.0% | −15.2% / +14.4% | ≈ ±13% | these cells are percent *changes* in FS, not factors of safety, so they are compared directly rather than ratioed: XSLOPE lands within 0.2 and 0.6 percentage points of Slide, and 2.0 pp of Perry's chart read at each end |
 | ΔFS over the b range (±15%) — **sweep result** | −45.0% / +82.5% | −44.4% / +81.1% | ≈ −38% / +82% | within 0.6 and 1.4 percentage points of Slide; against Perry, 7.0 pp at the −15% end and 0.5 pp at the +15% end — Perry's endpoints are read off the published curve, as the ≈ marks |
 

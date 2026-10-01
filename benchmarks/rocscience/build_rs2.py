@@ -1127,6 +1127,86 @@ def vp102_transient():
 # fails at ~0.78 (XSLOPE Spencer 0.784, RS2 0.81, Plaxis 0.82). With the vendor caps
 # + SRF reduction the failure boundary is crisp: F = 0.75 converges at 1.03x elastic,
 # F = 0.80 runs away (1.7x -> 10.7x by F = 1).
+# RS2 #30 (Part I) and Part IV VP40 -- Perry (1994), Fig. 6: a 50.2 m dry slope at
+# 1 in 2 in a soil with the power-curve strength tau = A*sigma'^b (A = 2, b = 0.7,
+# gamma = 20). Perry's example is five slices on one specified surface,
+# (4, 53) -> (20, 16) -> (40, 8) -> (60, 4) -> (80, 0.5) -> (105, 2.8), with the toe at
+# (105, 2.8). The vendor's models add a foundation to el. -10 and a 10 m apron at the
+# toe level. The limit-equilibrium row VP40 keeps its own file (vp040.xlsx, built by
+# build_problems.vp040), whose surface and toe are read from the manual's rounded
+# figure labels; these two files are the strength-reduction models at Perry's toe.
+_RS2_30_SURFACE = [(4.0, 53.0), (20.0, 16.0), (40.0, 8.0), (60.0, 4.0), (80.0, 0.5),
+                   (105.0, 2.8)]
+_RS2_30_SOIL = dict(name='Soil', c=0.0, phi=0.0, gamma=20.0, gamma_sat=20.0,
+                    option='pow', pow_a=2.0, pow_b=0.7, pow_c=0.0, pow_d=0.0,
+                    u='none')
+
+
+def _rs2_30_finish(sd):
+    """The settings both RS2-30 files share: dry, foundation to el. -10, and
+    Perry's specified surface (the limit-equilibrium surface of the paper; the
+    strength reduction does not read it)."""
+    sd['max_depth'] = -10.0
+    sd['gamma_water'] = 9.81
+    sd['dloads'] = []
+    sd['circular'] = False
+    sd['circles'] = []
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in _RS2_30_SURFACE]
+    return sd
+
+
+def rs2_30():
+    """RS2 #30 -- Perry (1994) Fig. 6, unconstrained: the whole section can yield.
+    The vendor's native model `slope stability #030.fez`: boundary (0, 53), (4, 53),
+    (105, 2.8), (115, 2.8), base at -10, no strength-reduction constraint. Published
+    RS2 SSR 0.91 (Part I). Perry gives the critical factor for this slope as about
+    0.92 by his own method and about 0.90 from the Charles & Soares charts (p. 239);
+    his 0.98 is the factor on the one specified surface, which he says is not the
+    critical one. The vendor's #030 carries a Generalized Hoek-Brown fit to the
+    power curve; this file carries the power curve itself, as #040 does."""
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(_RS2_30_SOIL)
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 53.0), (4.0, 53.0), (105.0, 2.8), (115.0, 2.8)]},
+    ]
+    save_slope_data_to_xlsx(_rs2_30_finish(sd), os.path.join(OUT, 'rs2_30.xlsx'))
+    return 'rs2_30.xlsx'
+
+
+def rs2_30_split():
+    """RS2 Part IV VP40 -- Perry (1994) Fig. 6 under the vendor's constraint. The
+    Slide2-import model `slope stability #040.fez` carries three SSR exclusion areas
+    that neither Perry nor the manual's text or tables mention (they are drawn on
+    Figs. 40.2-40.3): a strip x = 0-4, the toe block x = 105-115 below 2.8, and a ring
+    whose top is the ground line and whose lower edge follows the specified surface,
+    i.e. the sliding body itself. The vendor backs them with an elastic material
+    partition ('rock2', plasticity None, 50.65% of the area), and its mesh follows the
+    ring edges. Here the three areas are material polygons of an `elastic` material
+    (same unit weight, same E and nu as the soil), so the mesh follows their edges as
+    the vendor's does; the soil is the rest of the section (50.69% held). Ring 3 keeps
+    the vendor's (80, 1) vertex, read off the manual's rounded label rather than
+    Perry's (80, 0.5). The left strip sits on the flat -10 base (the vendor's
+    (4, -9.8681) is a 0.13 m sag of its own base). Published RS2 SSR 0.97 (Part IV)."""
+    soil = dict(_RS2_30_SOIL)
+    held = dict(name='Held', c=0.0, phi=0.0, gamma=20.0, gamma_sat=20.0,
+                option='elastic', u='none')
+    ring3 = [(20.0, 16.0), (40.0, 8.0), (60.0, 4.0), (80.0, 1.0), (102.392, 4.09622),
+             (6.53543, 51.7398)]
+    polys = [
+        (1, [(0.0, 53.0), (0.0, -10.0), (4.0, -10.0), (4.0, 53.0)]),
+        (1, [(105.0, 2.8), (105.0, -10.0), (115.0, -10.0), (115.0, 2.8)]),
+        (1, ring3),
+        (0, [(4.0, 53.0), (6.53543, 51.7398)] + ring3[:5] + [(105.0, 2.8), (105.0, -10.0),
+                                                            (4.0, -10.0)]),
+    ]
+    sd = _poly_slope_data(polygons=polys, materials=[soil, held], circle=None,
+                          max_depth=-10.0)
+    save_slope_data_to_xlsx(_rs2_30_finish(sd), os.path.join(OUT, 'rs2_30_split.xlsx'))
+    return 'rs2_30_split.xlsx'
+
+
 _RS2_62_SOILS = [
     dict(name='Soil 1', c=20.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3),
     dict(name='Soil 2 (soft band)', c=0.0, phi=25.0, gamma=19.0, gamma_sat=19.0,
@@ -1141,13 +1221,14 @@ def _rs2_62_slope_data(polys):
         Cheng, Y.M., Lansivaara, T. & Wei, W.B. (2007), "Two-dimensional slope stability
         analysis by limit equilibrium and strength reduction methods." Comput. Geotech. 34.
 
-    A 10 m slope carries a thin SOFT band (Soil 2: c = 0, phi = 25 deg) dipping through it,
-    between a stronger cap (Soil 1: c = 20, phi = 35) and base (Soil 3: c = 10, phi = 35);
-    gamma = 19, E = 14 MPa, nu = 0.3 throughout. Three geometries vary the band's DAYLIGHT
-    width (Analysis I / II / III = 28 / 20 / 12 m domains), and each was run at two dilation
-    angles (Case 1 psi = 0, Case 2 psi = phi). XSLOPE's SSRM is non-associated only (psi = 0),
-    so ONLY the Case-1 (psi = 0) column is reproducible here; the Case-2 associated-flow column
-    and Flac3D's much higher associated-flow values are recorded in rs2.md for context.
+    A 10 m slope carries a thin SOFT band (Soil 2: c = 0, phi = 25 deg; 0.5 m thick in the
+    paper, p. 143) dipping through it, between a stronger cap (Soil 1: c = 20, phi = 35) and
+    base (Soil 3: c = 10, phi = 35); gamma = 19, E = 14 MPa, nu = 0.3 throughout. The three
+    analyses cut the same slope off at a right-hand boundary of x = 28 / 20 / 12 m (Analysis
+    I / II / III), the paper's study of the boundary effect; the band daylights at the same
+    place in all three. Each was run at two dilation angles (Case 1 psi = 0, Case 2 psi = phi).
+    XSLOPE's SSRM is non-associated only (psi = 0), so ONLY the Case-1 (psi = 0) column is
+    reproducible here; the Case-2 associated-flow column is recorded in rs2.md for context.
 
     ``polys`` are the three zone polygons (mat_id 0 = Soil 1, 1 = soft band, 2 = Soil 3),
     transcribed from the RS2 vendor models 'slope stability #062_0N.fez' via the .fez zone
@@ -1160,8 +1241,9 @@ def _rs2_62_slope_data(polys):
 
 
 def rs2_62a():
-    """RS2 #62 Analysis I (28 m domain), psi = 0. Published (psi = 0): RS2 SSR 0.88,
-    Plaxis 0.86 | Flac3D 1.64 (associated). Case 2 psi = phi: RS2 0.98 (not reproducible)."""
+    """RS2 #62 Analysis I (right-hand boundary at 28 m), psi = 0. Published (psi = 0):
+    Cheng et al. Phase 0.87, Plaxis 0.86, Flac3D 1.64; the vendor's RS2 re-run 0.88.
+    Case 2 psi = phi: RS2 0.98 (not reproducible)."""
     polys = [
         (0, [(5.0, 5.0), (8.0, 8.0), (20.0, 15.0), (28.0, 15.0), (28.0, 10.0), (8.0, 7.5)]),
         (1, [(28.0, 10.0), (28.0, 9.5), (8.0, 7.1), (5.0, 4.5), (0.0, 5.0), (5.0, 5.0),
@@ -1173,8 +1255,9 @@ def rs2_62a():
 
 
 def rs2_62b():
-    """RS2 #62 Analysis II (20 m domain), psi = 0. Published (psi = 0): RS2 SSR 0.89,
-    Plaxis 0.85 | Flac3D 1.30 (associated). Case 2 psi = phi: RS2 0.98 (not reproducible)."""
+    """RS2 #62 Analysis II (right-hand boundary at 20 m), psi = 0. Published (psi = 0):
+    Cheng et al. Phase 0.84, Plaxis 0.85, Flac3D 1.30; the vendor's RS2 re-run 0.89.
+    Case 2 psi = phi: RS2 0.98 (not reproducible)."""
     polys = [
         (0, [(5.0, 5.0), (8.0, 8.0), (20.0, 15.0), (20.0, 8.911), (8.0, 7.5)]),
         (1, [(20.0, 8.911), (20.0, 8.287), (8.0, 7.1), (5.0, 4.5), (0.0, 5.0), (5.0, 5.0),
@@ -1186,8 +1269,10 @@ def rs2_62b():
 
 
 def rs2_62c():
-    """RS2 #62 Analysis III (12 m domain), psi = 0. Published (psi = 0): RS2 SSR 0.81,
-    Plaxis 0.82 | Flac3D 1.03 (associated). Case 2 psi = phi: RS2 0.93 (not reproducible)."""
+    """RS2 #62 Analysis III (right-hand boundary at 12 m), psi = 0. Published (psi = 0):
+    Cheng et al. Phase 0.77 (0.74-0.84 with mesh and tolerance, Table 4), Plaxis 0.82,
+    Flac3D 1.03; the vendor's RS2 re-run 0.81. Case 2 psi = phi: RS2 0.93 (not
+    reproducible)."""
     polys = [
         (0, [(5.0, 5.0), (8.0, 8.0), (12.0, 10.333), (12.0, 7.97), (8.0, 7.5)]),
         (1, [(12.0, 7.97), (12.0, 7.496), (8.0, 7.1), (5.0, 4.5), (0.0, 5.0), (5.0, 5.0),
@@ -1455,19 +1540,27 @@ def rs2_68c():
 # after Teoman, M.B., Topal, T. & Isik, N.S. (2004), and the RS2 Slope Stability
 # Verification Manual Part III Problem 64 (pp. 219-227).
 #
-# Twelve cases: three Ankara-clay road-cut landslides (Slopes 1/2/3), each in its
-# ORIGINAL and its FAILED (post-slide, with scarp) geometry, evaluated SHORT-TERM
-# (total-stress, dry, no seismic; cases 1-6) and LONG-TERM (effective-stress with a
-# piezometric line + a 0.03 g horizontal pseudo-static coefficient; cases 7-12).
-# Each model is a SINGLE homogeneous Mohr-Coulomb zone; strengths are Tables 1-2 and
-# are read straight from the vendor '.fez'. The manual reports three FS columns: RS2
-# SSR, the Teoman reference (Bishop on a digitized PROPOSED slip surface), and Slide2
-# Bishop on that same surface. The proposed surface exists in NO vendor file -- the
-# '.fez' carry only an SSR Search-Area region -- so XSLOPE can reproduce ONLY the RS2
-# SSR column (an SSRM run); the Ref/Slide2 Bishop columns are recorded as context.
+# Twelve CASES on three cross sections: three Ankara-clay road-cut landslides (Slopes
+# 1/2/3), each drawn as one section and analysed in its ORIGINAL and its FAILED
+# (post-slide, with scarp) profile, SHORT-TERM (total-stress UU, dry, no seismic;
+# cases 1-6) and LONG-TERM (effective-stress CD with a piezometric line + a 0.03 g
+# horizontal pseudo-static coefficient; cases 7-12). Each model is a SINGLE homogeneous
+# Mohr-Coulomb zone; strengths are Tables 1-2 and are read straight from the vendor
+# '.fez'. The manual reports three FS columns: RS2 SSR, the Teoman reference, and
+# Slide2 Bishop. Every Teoman value (paper Table 4, Figs 8-10) is the minimum of a
+# SLOPE/W v.4 Bishop circle search over a grid of centers (30 slices): not a back
+# analysis, not posed at FS = 1, and not on a proposed or observed surface. The
+# vendor's SSR search polygons and elastic material corridors surround a surface of
+# the vendor's own (labelled "Slide (Bishop Method)" in the manual); they are the
+# vendor's construction, absent from the paper. That surface exists in NO vendor
+# file -- the '.fez' carry only the SSR Search-Area region and the partition -- so
+# the scored comparison is the RS2 SSR column (an SSRM run under the same
+# constraint); the Ref/Slide2 Bishop columns are recorded as context.
 #
-# Elastic constants are the corpus convention (E = 14000 kPa, nu = 0.3, psi = 0 --
-# Griffiths non-associated): the '.fez' reader imports E/nu = 0. The 0.03 g seismic is
+# Elastic constants: the helpers below write E = 14000 kPa, nu = 0.3, but the files
+# carry the vendor's own constants (E = 50000 kPa; nu = 0.4 on cases 2, 7 and 12, 0.3
+# elsewhere), because save_slope_data_to_xlsx applies vendor_tcut.VENDOR_E_NU, which
+# overrides a builder literal; psi = 0 (non-associated). The 0.03 g seismic is
 # stored in the '.fez' as a per-element 'seismic forces: bx 0.03' body force that the
 # reader does not extract (it returns k_seismic = 0), so it is set here by hand. For
 # these LEFT-high slopes (crest at x = 0, toe descending to +x) RS2's bx = +0.03
@@ -1543,7 +1636,7 @@ _RS2_64L_PZ = [(0.0, 2.745), (3.603, 2.745), (3.668, 2.457), (5.531, 2.457),
 # --- Vendor MATERIAL PARTITION corridors (elastic-materials run option) -----------
 # The RS2 #64 long-term-Failed sub-unity cases C8/C12 constrain their SSR two ways at
 # once: an SSR_polygonal_zones search area AND a material partition — the Mohr-Coulomb
-# material ('rock1') is placed only in a corridor hugging the proposed slip surface,
+# material ('rock1') is placed only in a corridor hugging the vendor's own Bishop surface,
 # while the rest is 'rock2' with "Plasticity Specifications: None" (linear-elastic,
 # cannot yield). ssr_zone can only hold the outside at FULL STRENGTH, so for these
 # sub-unity slopes the failing skin outside the corridor could not be suppressed and
@@ -2128,6 +2221,7 @@ if __name__ == '__main__':
     for fn in tuple(globals()[n] for n in PRUSKA_BUILDERS) + (hammah_hb1,
                rs2_60a, rs2_60b, rs2_60c, rs2_31d, rs2_61a, rs2_59, rs2_63,
                rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
+               rs2_30, rs2_30_split,
                rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51,
                rs2_67a, rs2_67b, rs2_67c, rs2_67d, rs2_67e, rs2_67f,
                rs2_68a, rs2_68b, rs2_68c,

@@ -1220,7 +1220,7 @@
           "mc"
         ],
         "n_materials": 4,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": true,
         "pile_fixities": [],
         "piles": 0,
@@ -1244,7 +1244,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -1270,13 +1270,12 @@
         }
       ],
       "topics": [
-        "non-circular",
         "zoned-dams"
       ]
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -1316,7 +1315,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10870,6 +10869,142 @@
     },
     {
       "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "pow"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_30.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-30",
+          "checks": [
+            "RS2-30"
+          ],
+          "level": 3,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-30: Homogeneous slope, power-curve strength (Perry 1994)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-30"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "pow"
+        ],
+        "n_materials": 2,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_30_split.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-30",
+          "checks": [
+            "RS2-30-split"
+          ],
+          "level": 3,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-30: Homogeneous slope, power-curve strength (Perry 1994)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-30"
+        }
+      ],
+      "topics": [
+        "non-circular"
+      ]
+    },
+    {
+      "features": {
         "circular": true,
         "cutoff_walls": 0,
         "dloads": 0,
@@ -11740,6 +11875,136 @@
       "topics": [
         "homogeneous"
       ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_62a.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-62",
+          "checks": [
+            "RS2-62a"
+          ],
+          "level": 3,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-62: Three-layered slope with a soft band (Cheng et al. 2007)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-62"
+        }
+      ],
+      "topics": []
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_62b.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-62",
+          "checks": [
+            "RS2-62b"
+          ],
+          "level": 3,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-62: Three-layered slope with a soft band (Cheng et al. 2007)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-62"
+        }
+      ],
+      "topics": []
     },
     {
       "features": {
@@ -15078,7 +15343,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -17187,7 +17452,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": true,
-        "k0": 1.0,
+        "k0": null,
         "line_loads": 0,
         "material_options": [
           "pow"
@@ -17215,9 +17480,9 @@
         "seepage_problem": false,
         "seismic_k": 0.0,
         "sigmas": [],
-        "ssr_zones": 3,
+        "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -17242,18 +17507,6 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP40: Slope, homogenous, sensitivity analysis",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp40"
-        },
-        {
-          "anchor": "rs2-30",
-          "checks": [
-            "RS2-30"
-          ],
-          "level": 3,
-          "page": "verification/rs2/",
-          "resolution": "input-link",
-          "source_md": "docs/verification/rs2.md",
-          "title": "RS2-30: Homogeneous slope, power-curve strength (Perry 1993)",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-30"
         }
       ],
       "topics": [
@@ -27591,7 +27844,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 389,
+    "models": 393,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -27632,12 +27885,12 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 655,
+    "tags": 658,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 187,
-      "non-circular": 31,
+      "homogeneous": 188,
+      "non-circular": 32,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
@@ -27754,6 +28007,7 @@
       "docs/verification/files/rocscience/joints/rj017.xlsx",
       "docs/verification/files/rocscience/joints/rj018.xlsx",
       "docs/verification/files/rocscience/joints/rj019.xlsx",
+      "docs/verification/files/rocscience/rs2_30.xlsx",
       "docs/verification/files/rocscience/rs2_56a.xlsx",
       "docs/verification/files/rocscience/rs2_56b.xlsx",
       "docs/verification/files/rocscience/rs2_57a.xlsx",
@@ -27871,12 +28125,13 @@
     ],
     "non-circular": [
       "docs/fem/files/xslope_griffiths3_r0p2.xlsx",
-      "docs/fem/files/xslope_noncircular_fem.xlsx",
       "docs/fem/files/xslope_torggler_3b_nopile.xlsx",
       "docs/lem/files/xslope_acads_weak_layer.xlsx",
       "docs/lem/files/xslope_noncircular.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
       "docs/verification/files/geostudio/gs2_33.xlsx",
+      "docs/verification/files/rocscience/rs2_30.xlsx",
+      "docs/verification/files/rocscience/rs2_30_split.xlsx",
       "docs/verification/files/rocscience/vp008.xlsx",
       "docs/verification/files/rocscience/vp009.xlsx",
       "docs/verification/files/rocscience/vp017.xlsx",

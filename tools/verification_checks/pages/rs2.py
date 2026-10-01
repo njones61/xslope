@@ -17,12 +17,9 @@ CONFIG = PageConfig(
     # page makes in its own voice rather than XSLOPE-against-source.
     #   (printed, distinctive substring of the line, value-for, value-against)
     whitelist=[
-        ('+5.5', 'the other φ = 0 foundation problem', '1.488', '1.41'),
         # RS2 against itself: the section's two vendor columns, read out of the
         # table the sentence sits under.
         ('+6.1', 'vendor answers are 6.1% apart', '1.05', '0.99'),
-        ('+1.8', 'The same uncapped machinery is within 1.8%', '1.669', '1.64'),
-        ('+3.2', 'baseline is within 3.2% at every frame', '1.713', '1.77'),
         ('+1.1', 'The two vendor numbers landing within', '1.9', '1.88'),
         ('+2.5', 'the three answers agree within', '1.25', '1.219'),
         ('+15.6', "above Slide2's own Spencer on an identical slope", '1.11', '0.960'),
@@ -41,6 +38,16 @@ CONFIG = PageConfig(
         # without confirming it (RS2-49, 51, 52, 53, 54)
         ('1.018', 'unconfirmed'),
         ('1.037', 'unconfirmed'),
+        # Source papers' own numbers quoted in prose, each named as the paper's:
+        # El-Ramly et al.'s deterministic Bishop on measured band pressures
+        # (RS2-25, shown, not scored); Cheng et al.'s Fig. 13c value for the
+        # surface RS2-61's case-3 window does not reach; the low end of the
+        # paper's Table 4 range for Phase on RS2-62 Analysis III; and the paper's
+        # own strength-reduction value on RS2-63, recorded, not a referee.
+        ('1.30', "so the paper's 1.30 answers a different water"),
+        ('1.415', 'toe-to-top-crest surface of Fig. 13c (Cheng 1.415'),
+        ('0.74', 'inside the 0.74–0.84 the paper reports for Phase'),
+        ('1.47', "The paper's own strength-reduction result for this slope is 1.47"),
         # RS2-49's published spread needed two entries here while its section
         # printed those numbers in prose alone. The section now opens with the
         # same table a locked row has — referee and RS2 SSR, XSLOPE reading
@@ -67,7 +74,6 @@ CONFIG = PageConfig(
         ('+1', 'stages land within 1% of'),
         ('+2.3', 'within 2.3% of RS2 at all three thicknesses'),
         ('+2.2', 'that still lands within 2.2%'),
-        ('+2.1', 'lands within 2.1% of'),
         ('+3.5', 'Every case lands within 3.5% of unity'),
         ('+20', 'runs about 20% low'),
         # RS2-18: a bound over both cases against the scored vendor column.

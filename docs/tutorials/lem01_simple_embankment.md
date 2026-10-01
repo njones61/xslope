@@ -397,21 +397,24 @@ The Spencer run output reports how many circles were left unsolved:
 [⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (56 admit no admissible solution); 26 of them rank lower than the reported minimum by the moment measure.
 ```
 
-Spencer's method could not solve 56 of the 211 circles the search tried. On those
-circles the forces balance only if the soil near the crest pulls in tension, and
-soil cannot do that, so the search skips them. Twenty-six of the skipped circles
-would give a lower factor of safety than the reported 1.276, and Bishop's 1.215
-circle is one of them. So 1.276 is not the lowest value for this slope. It is only
-the lowest among the circles Spencer could solve.
+Spencer's method could not solve 56 of the 211 circles the search tried. Twenty-six
+of those would give a lower factor of safety than the reported 1.276, and Bishop's
+1.215 circle is one of them. So 1.276 is only the lowest among the circles Spencer
+could solve.
 
 The amber warnings, the red bars, the unsolved circles and the difference between
-Spencer and Bishop all have one cause: the model, as built, needs the soil near
-the crest to carry tension.
+Spencer and Bishop all have one cause. The clay in this model has cohesion and no
+friction, and near the crest the solution puts it in tension: the top of the
+sliding mass hangs on the soil behind it. Real soil cannot carry tension. It
+cracks. The model is counting on strength that is not there, so its factor of
+safety is too high. On some circles the tension is large enough that Spencer's
+equations have no valid solution at all.
 
 ### Adding a tension crack {#the-fix-is-in-the-ground-not-the-settings}
 
-An undrained soil with cohesion but no friction cannot carry tension near a free
-surface — in the field, it cracks. The theoretical depth of that tension crack is
+The remedy is to put the crack in the model, so that the solution no longer relies
+on tension near the crest. For a soil with cohesion and no friction, the
+theoretical depth of the tension crack is
 
 $$ z_c = \frac{2c}{\gamma} = \frac{2 \times 500}{125} = 8 \text{ ft} $$
 

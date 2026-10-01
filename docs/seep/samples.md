@@ -11,7 +11,7 @@ These problems feature standalone seepage analyses. For instructions on how to r
 
 ### 1. Sheetpile with Clay Blanket
 
-Built and run step by step in [SEEP-1](../tutorials/seep01_sheetpile.md).
+Built and run step by step in [Tutorial SEEP-1](../tutorials/seep01_sheetpile.md).
 
 Excel input file: [xslope_clay_blanket.xlsx](files/xslope_clay_blanket.xlsx)
 
@@ -25,7 +25,7 @@ Excel input file: [xslope_clay_blanket.xlsx](files/xslope_clay_blanket.xlsx)
 
 This is another saturated problem representing the excavation of a trench in a harbor supported by a parallel set of sheetpile walls. The sheetpiles pass through an upper silt layer down to a lower permeability silty clay layer.
 
-![sea_trench.png](images/sea_trench.png)
+![The sea trench: two sheetpile walls through the silt into the silty clay, the sea on both sides and the pumped trench between them](images/sea_trench_problem_sketch.png){width=1000}
 
 The properties of the soil layers are as follows:
 
@@ -48,13 +48,11 @@ Solution:
 
 The following diagram illustrates a simple earth dam with a clay core and a granular shell:
 
-![earth_dam1.png](images/earth_dam1.png)
+![The earth dam with a clay core, its pool and tailwater, and the conductivities of the two zones](images/earth_dam1_problem_sketch.png){width=1000}
 
 The dam is 22 m high and 110 m long at the base, with an 18 m pool upstream and 2 m of tailwater downstream.
 This problem requires an upstream head BC, a small downstream head BC, and a downstream exit face BC from the crest 
-of the dam down to the tailwater. The conductivities used in the input file are the sketch's: shell k1 = 46, k2 = 18; core k1 = 4.5, k2 = 1.8, all in m/yr. To build the input file, the following list of coordinates can be used:
-
-![earth_dam1_pts.png](images/earth_dam1_pts.png)
+of the dam down to the tailwater. The conductivities used in the input file are the sketch's: shell k1 = 46, k2 = 18; core k1 = 4.5, k2 = 1.8, all in m/yr. The vertex coordinates of the shell and core are in the input file below.
 
 In this case, the solution is partially saturated, so the kr0 and h0 parameters must be specified for each material. 
 The following Excel file contains a complete set of inputs for this problem:
@@ -88,7 +86,7 @@ The computed flow rate (≈37.8 m³/yr per m) is within 3% of the linear-front r
 
 ### 5. Johnson Reservoir {#johnson-reservoir}
 
-Built and run step by step in [SEEP-2](../tutorials/seep02_johnson_dam.md).
+Built and run step by step in [Tutorial SEEP-2](../tutorials/seep02_johnson_dam.md).
 
 Excel input file: [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx)
 
@@ -121,9 +119,9 @@ drawdown — is worked in [Problem 9](#9-johnson-reservoir-zoned-drawdown-transi
 
 This problem has the following cross-section:
 
-![earth_dam2.png](images/earth_dam2.png)
+![The earth dam with a clay core, a chimney filter and a blanket drain, and the conductivities of the three zones](images/earth_dam2_problem_sketch.png){width=1000}
 
-In this case, there is a single upstream head BC = 60ft and the entire backside of the dam is an exit face BC. 
+In this case, there is a single upstream head BC = 60 ft and the entire backside of the dam is an exit face BC. 
 
 The following Excel file contains the problem inputs:
 
@@ -139,7 +137,7 @@ The solution should look something like this:
 
 The following problem represents a levee underlain by a foundation with a grout curtain. 
 
-![levee.png](images/levee.png)
+![The levee on its foundation, the grout curtain under it, the pool and the tailwater](images/levee_problem_sketch.png){width=1000}
 
 The material properties of the soil layers are as follows:
 
@@ -149,11 +147,9 @@ The material properties of the soil layers are as follows:
 | Grout Curtain |    0.2     |    0.2     |    0       |   0.001 | -1 |
 |  Foundation   |     2      |     1      |    0       |   0.001 | -1 |
 
-The coordinate geometry is shown here (the foundation spans elevations 0 to 10, and the
-grout curtain extends the full foundation depth — the coordinates labeled along the bottom
-edge are at elevation 0):
+The coordinates of the zone vertices are shown here:
 
-![levee_coords.png](images/levee_coords.png)
+![The levee section with each zone vertex labeled by its (x, y) coordinates](images/levee_coords_sketch.png){width=1000}
 
 The following file illustrates how to prepare the inputs. Unlike the other
 samples, this one defines the geometry with the **`polygon` sheet** — each
@@ -181,13 +177,13 @@ Solution:
 
 ### 8. Earth Dam — Reservoir Drawdown (Transient)
 
-Built and run step by step in [SEEP-3](../tutorials/seep03_reservoir_drawdown.md).
+Built and run step by step in [Tutorial SEEP-3](../tutorials/seep03_reservoir_drawdown.md).
 
 [xslope_earth_dam_tseep.xlsx](files/xslope_earth_dam_tseep.xlsx)
 
 This copy sets `stage_1` (full pool, t = 0) and `stage_2` (end of drawdown,
 t = 47) — the two states a [rapid drawdown](../lem/rapid.md) analysis reads —
-where SEEP-3's copy leaves them blank.
+where Tutorial SEEP-3's copy leaves them blank.
 
 ![earth_dam_tseep_flownet.png](images/earth_dam_tseep_flownet.png){width=760px}
 

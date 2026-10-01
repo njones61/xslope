@@ -1,6 +1,6 @@
 ---
 title: "Tutorial SEEP-4 — Infiltration and Flux Boundaries"
-description: "Rain falling on a 12 m earth dam in XSLOPE — the specified-flux boundary that carries it, the projection that turns a vertical rain rate into the normal flux a boundary takes, the extent it covers and what happens where it meets a specified head, a run without rain read against a run with it on one pinned color scale, and a transient march in which the same boundaries are driven from a time series so the rain starts, holds and stops."
+description: "Rain falling on a 12 m earth dam in XSLOPE — the specified-flux boundary that carries it, the projection that turns a vertical rain rate into the normal flux a boundary takes, the extent it covers and what happens where it meets a specified head, a run without rain read against a run with it on one pinned color scale, and a transient run in which the same boundaries are driven from a time series so the rain starts, holds and stops."
 ---
 
 # Tutorial SEEP-4 — Infiltration and Flux Boundaries
@@ -22,20 +22,19 @@ falling on it at 1 × 10<sup>−8</sup> m/s, and nothing else changed — one in
 added, the run repeated, the two answers compared. Most of what we measure
 comes out of that comparison: where the water enters, where it leaves, how far the
 phreatic surface climbs, and the result that the drain passes 75% more water while
-the reservoir supplies a third less. We then sweep six rain rates, asking what the
-dam does when the weather changes, and close by letting the rain start and stop:
-the same three boundaries driven from a schedule rather than a number, marched
-through 600 days of storm and recovery.
+the reservoir supplies a third less. We then sweep six rain rates, and finally
+drive the same three boundaries from a schedule rather than a number, so the rain
+starts and stops, in a transient run over 600 days of storm and recovery.
 
 ![The dam, the reservoir, the toe drain, and the rain falling on the exposed surface](images/seep04_problem_sketch.png){width=1000}
 
 In [SEEP-2](seep02_johnson_dam.md) we built an unconfined dam from nothing, and
 [SEEP-1](seep01_sheetpile.md) covers what a seepage analysis computes; we repeat
-neither here. We start from a **starter file** that already carries the
+neither here. We start from a **starter file** that already contains the
 section and the soil, so the build here is only the boundary set — the reservoir,
 the drain, and the rain. (To skip the construction, download the completed file
 below and pick the page back up at [Building the mesh](#building-the-mesh). That
-file already carries the rain, so the dry-weather run in between is one to read
+file already has the rain, so the dry-weather run in between is one to read
 rather than to repeat — running it on the completed file returns the wet answer.)
 
 <div class="tut-glance" markdown>
@@ -61,13 +60,12 @@ is the file the build below starts from
 the same model with the reservoir, the drain and the three rain blocks filled in;
 open it to skip the construction and start at [Building the mesh](#building-the-mesh),
 then run it at [Running it again](#running-it-again) — the rain is already in it, so
-the dry-weather run is an account of where the comparison starts, not a step to
-carry out on this file
+the dry-weather run is described for reference and is not repeated on this file
 
 **Time-varying model** — [xslope_dam_infiltration_storm.xlsx](files/xslope_dam_infiltration_storm.xlsx),
 the same dam with its three rain blocks driven from a schedule rather than held at
 a rate, built in [Rain that comes and goes](#rain-that-comes-and-goes) at the end
-of the page; it ships with its mesh and its solved march beside it
+of the page; its mesh and its transient solution are in the same folder
 </div>
 </div>
 
@@ -86,20 +84,20 @@ the downstream slope.
 
 The embankment is one soil, `Dam fill`, with a saturated conductivity of
 1 × 10<sup>−7</sup> m/s in both directions. Above the phreatic surface the soil is
-unsaturated and conducts less than that, by a van Genuchten curve the material
-table carries.
+unsaturated and conducts less than that, following a van Genuchten curve given
+in the material table.
 
 The rain is a **vertical** Darcy velocity of 1 × 10<sup>−8</sup> m/s, a tenth of
 the soil's saturated conductivity, applied over the whole exposed surface: the
 upstream face above the waterline, the crest, and the downstream face down to the
-toe. Turning that one vertical number into the two numbers the boundary condition
-takes is the first thing the build has to get right, and we work it out in the
+toe. That vertical rate has to be converted into the two normal rates the
+boundary condition takes; we work this out in the
 [flux section](#adding-the-rain).
 
 The dam, the soil and the rain are all from a published verification problem, so
 both runs on this page have an answer to be checked against —
 [GW6 in the Rocscience groundwater corpus](../verification/rocscience_groundwater.md#gw6)
-carries the comparison.
+gives the comparison.
 
 ---
 
@@ -110,9 +108,9 @@ and open it with **File → Open…**. Then click the **Seepage** segment of the
 toolbar's mode strip (it reads LEM | Seepage | FEM), so the Inputs tree and the
 Run menu offer the seepage tables rather than the limit equilibrium ones.
 
-The file carries the section as one profile line with its maximum depth at
-elevation 0, and it carries the material. It carries no boundary conditions,
-which is what we build in the next two sections.
+The file contains the section as one profile line with its maximum depth at
+elevation 0, and the material. It has no boundary conditions; we build those in
+the next two sections.
 
 Its global parameters are already set: **Units** `SI` and **Time** `sec`, so the
 unit weight of water is 9.81 kN/m³, heads read in meters, conductivities and
@@ -173,7 +171,7 @@ points:
 Every node on that line is under water or at its surface, so holding the total
 head at 10 along it is exact.
 
-**Exit face — the toe drain.** Select the **Exit face** entry already waiting in
+**Exit face — the toe drain.** Select the **Exit face** entry already in
 the list. Its line runs along the base, over the 12 m the drain occupies. Enter
 or copy-paste the following points:
 
@@ -186,13 +184,13 @@ A drain is a place where water leaves the soil at atmospheric pressure, and the
 source problem states it as a boundary held at total head 0 over its whole length.
 An exit face says the same thing with one difference that matters here: it holds a
 node at atmospheric pressure only while water is actually leaving through it, and
-releases any node where the soil has gone unsaturated. That release is what gives
-the solution a free surface to find. Written instead as a specified head of 0, this
+releases any node where the soil has gone unsaturated. That release lets the
+solution find a free surface. Written instead as a specified head of 0, this
 model would have no exit face anywhere, and XSLOPE would solve it as a confined
 problem: saturated everywhere, with no phreatic surface in either run and none of
-the unsaturated behavior this dam is posed to show. The cost of
-the exit face is that how much of the drain actually runs becomes an output rather
-than something entered, and [the first run](#the-dry-weather-solution) reports it.
+the unsaturated behavior this dam is posed to show. With an exit face, the length of
+drain that runs becomes an output rather than an input;
+[the first run](#the-dry-weather-solution) reports it.
 
 Everything not named in the list is **no-flow**: the rock under the dam at
 elevation 0, the base upstream of the drain, and — for now — the whole exposed
@@ -207,10 +205,10 @@ Click **Run → Build Mesh…**
 
 Set **Element type** to **Linear triangles (tri3)**. Head is a scalar field, so
 there is nothing for a linear element to lock up on, and unlike a stability
-analysis a seepage run puts no restriction on element order. One plan does
-restrict it. A finite element stability analysis reading its pore pressures from
-this solution runs on this same mesh, and the FEM side requires quadratic
-elements, so for that workflow build the mesh as **Quadratic triangles (tri6)**
+analysis a seepage run puts no restriction on element order. If a finite element
+stability analysis will read its pore pressures from this solution, it runs on
+this same mesh, and the FEM side requires quadratic elements, so for that
+workflow build the mesh as **Quadratic triangles (tri6)**
 from the start. We stay with seepage here, so tri3 is sufficient.
 
 Untick **Auto-size from geometry**, which enables the **Target element size** box
@@ -222,7 +220,7 @@ The mesh comes out at **473 nodes and 833 triangles**:
 
 The blue squares up the submerged face are the specified-head nodes and the red
 circles along the base from x = 40 are the exit-face nodes — thirteen of them, the
-number the solver reports back when it runs.
+number the solver reports when it runs.
 
 
 ---
@@ -230,7 +228,7 @@ number the solver reports back when it runs.
 ## The dry-weather solution
 
 The rain is not in the model yet, so this first run is the dam in dry weather —
-the reference everything after it is read against. (If you downloaded the
+the reference for the runs that follow. (If you downloaded the
 completed file rather than building the boundaries, the rain is already in it:
 read this run's numbers rather than reproducing them, and resume at
 [Running it again](#running-it-again).)
@@ -258,8 +256,7 @@ than over part of it.
 
 The heavy black line is the phreatic surface. It leaves the upstream face at the
 waterline, elevation 10, crosses under the crest at about elevation 7.6, and comes
-down to the base at x = 40, the upstream end of the drain — which is the drain
-doing its job. From there the zero-pressure line is the drain itself: an active
+down to the base at x = 40, the upstream end of the drain. From there the zero-pressure line is the drain itself: an active
 exit-face node is held at atmospheric pressure, ψ = 0, and all thirteen stay
 active, so the drain runs at zero pressure head end to end. Water arrives all
 along it, but not evenly — the first meter passes over half the discharge, the
@@ -309,7 +306,7 @@ prescribed and the head is left to the solution. That is the right statement for
 infiltration, because the position of the water table under falling rain is
 exactly what is being solved for and so cannot be imposed.
 [The flux boundary](../seep/overview.md#specified-flux-boundary-conditions-neumann)
-carries the formulation. Three properties of it govern the build.
+gives the formulation. Three of its properties affect the build.
 
 ### A flux is a rate normal to the boundary
 
@@ -335,7 +332,8 @@ The crest is horizontal, θ = 0 and cos θ = 1, so there *q*<sub>n</sub> is the
 the waterline, the crest, and the downstream face — because the surface has three
 slopes.
 
-The projection is right if the water it delivers is the water that fell. A block
+The projection can be checked by comparing the water it delivers with the water
+that fell. A block
 of length *L* at a uniform *q* puts *qL* into the model, so:
 
 | block | from | to | length (m) | *q* (m/s) | *qL* (m³/s per m) | footprint (m) |
@@ -392,25 +390,24 @@ and `Exit face`. Flux 1 is selected in the shot — its rate in the value box
 (displayed shortened), its two points below — and the preview draws the selected
 boundary bold over its stretch of the upstream face, dimming the others.
 
-Those endpoints are the corners of the dam's own surface, and that is the habit
-to build: a boundary defined on the geometry is honored at its stated length on
-any mesh. The
+Those endpoints are the corners of the dam's own surface. A boundary defined on
+the geometry is applied at its stated length on any mesh. The
 [GW6 verification case](../verification/rocscience_groundwater.md#gw6) shows
-what the alternative costs — the source problem's model picks its rain extent
+the effect of the alternative — the source problem's model picks its rain extent
 off mesh edges and ends up applying about 4% less water than falls on the
 surface.
 
-### Where the rain meets the reservoir, the head wins
+### Where the rain meets the reservoir and the drain {#where-the-rain-meets-the-reservoir-the-head-wins}
 
 The rain covers the surface from the waterline at (20, 10) all the way to the
 toe at (52, 0), so it shares a node with the reservoir boundary at one end and
-with the exit face at the other. A node cannot serve both conditions, and the
-head wins: where a flux meets a **specified head**, the flux load on the shared
+with the exit face at the other. A node cannot take both conditions, and the
+head takes precedence: where a flux meets a **specified head**, the flux load on the shared
 node is discarded when the head is enforced, and where it meets a **draining
 exit face**, the same happens — a draining node is held at atmospheric pressure,
 so rain landing on it simply runs off. The discarding is complete, so overlap is
-not an error to be avoided: cover the surface the rain falls on and let the
-shared nodes sort themselves out. On this model about 2.6% of the offered rain
+not an error to be avoided: cover the surface the rain falls on, and the
+shared nodes are handled automatically. On this model about 2.6% of the offered rain
 lands on those two nodes and is discarded there.
 
 ### The finished inputs
@@ -460,9 +457,9 @@ touched the reservoir.
 
 ## Where the water comes from
 
-The discharge went up by three quarters, and the natural reading is that the rain
-was added to what the reservoir was already supplying. It was not. Each boundary
-reports the water crossing it, and the ledger says something else:
+The discharge went up by three quarters, but the rain did not simply add to what
+the reservoir was already supplying: the reservoir's inflow fell. The water
+crossing each boundary is:
 
 | | dry weather | with infiltration |
 | --- | :---: | :---: |
@@ -493,13 +490,13 @@ down.
 The rain on this page is one steady-state assumption: infiltration held at
 1 × 10<sup>−8</sup> m/s for long enough that the flow field has stopped changing.
 Design questions arrive as a range instead — a wetter season, the same dam in a
-different climate — and what settles the dam's answer is
-not the rain rate on its own but the rain rate against the soil's ability to carry
-it away. That ratio is **q/k**, the rain rate over the saturated conductivity.
+different climate — and the dam's response depends on the rain rate relative to
+the soil's ability to carry the water away. That ratio is **q/k**, the rain rate
+over the saturated conductivity.
 Here q = 1 × 10<sup>−8</sup> m/s and k = 1 × 10<sup>−7</sup> m/s, so
 **q/k = 0.1**: the soil can pass ten times the water landing on it.
 
-### Run it at twice the rain
+### Doubling the rain rate {#run-it-at-twice-the-rain}
 
 Click **Seep BC** in the Inputs dock and double all three flux values:
 
@@ -510,15 +507,15 @@ Click **Seep BC** in the Inputs dock and double all three flux values:
 | Flux 3 — downstream face | `8.94427191e-09` | `1.788854382e-08` |
 
 The three scale together because they are one vertical rain rate resolved onto
-three slopes: the faces stay at 2/√5 of the crest at every rate, which is what
-keeps the set standing for rain falling straight down. Click **OK**, then
+three slopes: the faces stay at 2/√5 of the crest at every rate, so the set still
+represents rain falling straight down. Click **OK**, then
 **Run → Run Seep…** and **Run**. (Work on a copy, or set the three values back
 afterwards.)
 
 The discharge comes out at **6.949 × 10<sup>−7</sup> m³/s per m**, against
-4.916 × 10<sup>−7</sup> at the rain the file carries, and the phreatic surface on
+4.916 × 10<sup>−7</sup> at the file's rain rate, and the phreatic surface on
 the crest centerline stands at **9.55 m**, up from 8.49 m. Doubling the rain
-bought the dam another meter of saturated height.
+raised the phreatic surface by about a meter.
 
 ### Six rates on one section
 
@@ -538,43 +535,42 @@ whole family on one section:
 
 All six runs are on the mesh we have been using, none of them takes more than
 the eight sweeps the dry run took — the two wettest close in six and five — and
-all thirteen drain nodes drain in every one of them, so nothing below is the
-drain switching on or off.
+all thirteen drain nodes drain in every one of them, so none of the differences
+below come from the drain switching on or off.
 
 **The water table rises faster than the rain does.** Each step of the sweep
 lifts the centerline surface more than the step before — the table above shows
 the climb. Why the rise accelerates is not something these six runs settle.
 
-**The discharge does not.** Q grows nearly linearly with the rain, and what
-drift there is runs the other way: the mound the rain builds stands higher at
+**The discharge grows nearly linearly with the rain.** What drift there is runs
+the other way: the mound the rain builds stands higher at
 every rate, so the reservoir supplies less and less — the same effect the water
 budget above measures at one rate — until by q/k = 0.4 the dam is pushing water
 back out into the reservoir.
 
-**Above q/k ≈ 0.26 the model stops being an answer.** A specified flux
-prescribes the rate water crosses the boundary whatever the head does, and soil
-that cannot conduct that much water away has no way to refuse it: the boundary
-pressure simply rises until it is positive — which in the field means the
+**Above q/k ≈ 0.26 the solution is not physically valid.** A specified flux
+prescribes the rate water crosses the boundary whatever the head does, and if the
+soil cannot conduct that much water away, the boundary pressure rises until it is
+positive — which in the field means the
 surface ponds and the boundary becomes a specified head, a switch this model
 does not make. At the top rate there is no phreatic surface anywhere in the
 dam — the section is saturated to its own surface from the upstream shoulder to
 the drain, which is why the figure draws that case dashed and lying on the
 dam's own profile rather than inside it.
 
-XSLOPE does not let that pass quietly. The run comes back with a warning:
+XSLOPE reports a warning on that run:
 
 > 23 specified-flux node(s) finished with positive pore pressure (max u = 14.11):
 > the specified inflow exceeds what the soil can accept there, so in reality the
 > surface would pond and the boundary would become a specified head. **This
 > solution is suspect.**
 
-A specified flux is a promise about water that the soil may not be able to keep.
-Below this dam's ceiling it is the right boundary for rain, and the five rates up
-to q/k = 0.2 all return real solutions. Above it, the boundary insists on putting
-in more water than the section can carry away, and what comes back is a number
-rather than a solution. In reality the excess would run off the surface, but a
-specified flux has no way to say so — it insists the water enters. Check q/k
-before trusting a rain boundary, and read what the solver says about the run.
+Below this dam's limit a specified flux is the right boundary for rain, and the
+five rates up to q/k = 0.2 all return valid solutions. Above it, the boundary puts
+in more water than the section can carry away, and the result is not a valid
+solution. In reality the excess would run off the surface, but a specified flux
+cannot represent runoff; it forces the water in. Check q/k before trusting a rain
+boundary, and read the solver's warnings for the run.
 
 ---
 
@@ -583,7 +579,7 @@ before trusting a rain boundary, and read what the solver says about the run.
 Every run so far has held the rain at one rate forever. That is what a **steady**
 solve means: the flow field it returns is the one the dam settles into if the
 weather never changes. Real rain starts and stops, and the questions that matter
-in between — how long the dam takes to feel a wet season, how high it gets before
+in between — how long the dam takes to respond to a wet season, how high it gets before
 the rain ends, how long it stays wet afterwards — are ones a steady solve has no
 way to answer. A **transient** run can: it marches the solution forward in time
 from a starting field, so the answer is a sequence of states rather than one.
@@ -597,14 +593,14 @@ a schedule.
 
 The finished model is
 [xslope_dam_infiltration_storm.xlsx](files/xslope_dam_infiltration_storm.xlsx),
-which ships with the mesh and the solved march beside it —
+which comes with its mesh and its transient solution in the same folder —
 `xslope_dam_infiltration_storm_mesh.json`,
 `xslope_dam_infiltration_storm_tseep.csv` and
 `xslope_dam_infiltration_storm_tseep_meta.json` — so opening it in the same folder
 gives you the frames without re-solving. The sections below build it from the file
 we already have.
 
-### Storage: what a transient run needs that a steady one does not
+### Storage properties {#storage-what-a-transient-run-needs-that-a-steady-one-does-not}
 
 A steady solve balances what comes in against what goes out. A transient one has a
 third term: the water the soil takes into or gives back out of storage as the head
@@ -617,7 +613,7 @@ per unit of head drop — the compressibility of the skeleton and the pore water
 has units of 1/length. **Specific yield** `Sy` is the drainable porosity: the water
 that leaves the pores *above* the water table as it falls, dimensionless, and for a
 van Genuchten material it doubles as the drainable water content θ<sub>s</sub> −
-θ<sub>r</sub>. [Storage](../seep/transient.md#storage) carries both in full, with
+θ<sub>r</sub>. [Storage](../seep/transient.md#storage) describes both in full, with
 tables of representative values.
 
 Click **Materials**, keep the **Show parameters for:** toggles on **Seepage**, and
@@ -640,13 +636,13 @@ at it — the same pattern [SEEP-3](seep03_reservoir_drawdown.md) uses for its
 falling pool, where a head boundary follows a series.
 
 For the time series defining how the flux changes over time, we need two
-series rather than one, because the three rain blocks do not carry one rate: the crest takes the vertical rain, and the two 2:1 faces take it
+series rather than one, because the three rain blocks do not have one rate: the crest takes the vertical rain, and the two 2:1 faces take it
 times cos θ = 2/√5 — the projection worked out in the flux section above. A
 single series driving all three would put the crest rate on the faces and take
 in 10% more water than fell on the dam. So the schedule is written twice —
 `storm` is the rain itself, `storm_face` the same curve scaled by 0.894427 —
-and the ratio between the two columns is the same ratio that stood between the
-three numbers before.
+and the ratio between the two columns is the same as the ratio between the
+constant rates entered before.
 
 With that settled, the series can be entered. Click **Transient** in the Inputs
 dock — the row reads `off` until the sheet has something on it. The editor is one form: the run controls on the right, the time
@@ -671,14 +667,14 @@ Leave **Stage 1 time (sec)**, **Stage 2 time (sec)**, **Stability time (sec)** a
 **Extra save times** empty — the stage fields flag the rapid-drawdown states a
 stability analysis reads, and this page stops at the seepage field. Click **OK**.
 
-**Why those times.** The times are in **seconds**, because this model's **Time** is
+**The schedule times.** The times are in **seconds**, because this model's **Time** is
 `sec` — the schedule has to be in whatever unit the conductivity is in. In days
 they read 0, 30, 60, 200 and 230, and the run lasts 600 days with a frame saved
 every 25:
 
-- **Thirty dry days first.** The transient run begins from the dry-weather field, and a
-  model already at its answer must sit still while nothing drives it. Frames over
-  these days are the check that it does.
+- **Thirty dry days first.** The transient run begins from the dry-weather field,
+  and a model that starts at its steady answer should not change while nothing
+  drives it; the frames over these days check that.
 - **A thirty-day ramp to the full rate**, then a **140-day hold** at
   1 × 10<sup>−8</sup> m/s — the rain the rest of this page uses. Between them the
   storm spans 170 days, and with the two ramps counted at their average the whole
@@ -694,7 +690,7 @@ meters.
 
 ### Binding the rain blocks to the schedule
 
-The schedule exists but nothing refers to it yet. Click **Seep BC** in the Inputs
+No boundary refers to the schedule yet. Click **Seep BC** in the Inputs
 dock and replace each of the three flux values with the name of the series that
 drives it:
 
@@ -714,21 +710,21 @@ top of this section calls it `xslope_dam_infiltration_storm.xlsx`.
 
 ### Running the transient analysis
 
-Click **Run → Run Seep…** The dialog now carries a **Run type** row it did not have
+Click **Run → Run Seep…** The dialog now has a **Run type** row it did not have
 before, because the file has a `tseep` sheet. Set it to **Transient
 (time-dependent)**, leave **Convergence tol** and **Max iterations** at their
 defaults, and click **Run**.
 
 The run reports **28 saved frames** — t = 0, the 24 times on the 25-day grid, and
 the three series breakpoints that do not fall on it — reached in **92 steps**. The
-step size is chosen from how fast the field is moving, so the count is itself a
-reading: the dam is barely changing for most of 600 days.
+step size is chosen from how fast the field is moving, so the low count shows
+that the dam changes slowly for most of the 600 days.
 
 ### Reading the frames
 
-A transient run lands in a **Seep · Transient** tab carrying every frame, with a
+A transient run opens in a **Seep · Transient** tab holding every frame, with a
 play bar under the plot; [SEEP-3](seep03_reservoir_drawdown.md#reading-the-frames)
-covers its controls. Two of the 28 frames carry the result.
+covers its controls. Two of the 28 frames are described below.
 
 ![Day 200: the last day of full-rate rain, the wettest the dam gets](images/seep04_studio_playbar_day200.png)
 
@@ -737,8 +733,8 @@ reads **Inflow 4.95 × 10<sup>−7</sup> / Outflow 4.87 × 10<sup>−7</sup> m³
 m** — two numbers where a steady solution reports one, because the difference is
 what the soil is still taking into storage. The drain's
 **4.87 × 10<sup>−7</sup>** is 99% of the
-**4.916 × 10<sup>−7</sup>** the steady rain run gave, so 170 days of rain gets this
-dam most of the way to the answer "steady rain" assumes. The phreatic surface
+**4.916 × 10<sup>−7</sup>** the steady rain run gave, so 170 days of rain brings
+this dam close to the steady-rain state. The phreatic surface
 stands essentially where the steady rain run put it, and the soil above it has
 taken water in: the pressure head on the crest centerline, −4.2 m in dry weather,
 has eased to **−2.8 m** — set the Display panel's **Variable** to **Pore
@@ -754,15 +750,15 @@ arriving, which is the mound the storm built draining into the toe drain. The
 phreatic surface has dropped visibly and the velocity vectors under the downstream
 face have swung toward the drain.
 
-Scrubbing the whole bar gives the shape of the response, and it is not the shape of
-the rain. The rain reaches full rate on day 60 and the drain is still climbing a
+Stepping through all the frames shows that the response does not follow the shape
+of the rain. The rain reaches full rate on day 60 and the drain is still climbing a
 hundred days after that; it stops climbing only because the rain does, so day 200
-is a breakpoint in the schedule rather than a limit the dam reached. The dam's own
-pace is in the rise instead: measured from the moment the rain starts on day 30,
+is a breakpoint in the schedule rather than a limit the dam reached. The dam's
+response time shows in the rise: measured from the moment the rain starts on day 30,
 the drain takes **102 days** to cover 90% of its climb. The fall is slower still —
 the rain stops on day 230, and two hundred days after that the drain is still 1.7%
-above its dry-weather discharge. **The dam lags the weather by months**, and the
-lag is asymmetric: the storm pushed the water table up over 170 days and gravity
+above its dry-weather discharge. The dam's response lags the rain by months, and
+the lag is asymmetric: the storm pushed the water table up over 170 days and gravity
 alone takes 370 to bring it back down.
 
 ### Checking the run
@@ -775,7 +771,7 @@ alone takes 370 to bring it back down.
   on the same mesh — the storm ends just before the dam finishes responding.
 - **The water balances.** What the dam stores at the peak matches the net
   inflow to within the Log's mass-balance closure for that frame. (The closure
-  printed for the last frames means nothing — by then both totals are near
+  printed for the last frames is not meaningful — by then both totals are near
   zero.)
 
 <!-- Transient regression: total head at three interior stations at the end of the storm's hold (day 200 = 1.728e7 sec), re-solved through the run_tests tseep_head path (tri3, target_size=1.0). Built by tools/build_seep04_transient.py, which asserts the same three values. -->
@@ -803,17 +799,17 @@ This tutorial covered:
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Seepage Analysis](../seep/overview.md#specified-flux-boundary-conditions-neumann)
-carries the flux formulation, the nodal loads it assembles into, and the rest of
+gives the flux formulation, the nodal loads it assembles into, and the rest of
 the boundary condition types, and
-[Transient Seepage](../seep/transient.md) carries the storage laws, the series
+[Transient Seepage](../seep/transient.md) gives the storage laws, the series
 semantics and the time stepping behind a transient run;
-[GW6](../verification/rocscience_groundwater.md#gw6) carries five published cases
+[GW6](../verification/rocscience_groundwater.md#gw6) lists five published cases
 for this dam, among them the dry dam solved here, the same dam under rain, and
 the same dam again with its drain replaced by a seepage face.
-[SEEP-2](seep02_johnson_dam.md) is where we build the unconfined steady problem
-and its seepage face from nothing, and
-[SEEP-3](seep03_reservoir_drawdown.md) drives a *head* boundary from a series
-instead of a flux, on a zoned dam whose core paces the whole response. In
+In [SEEP-2](seep02_johnson_dam.md) we build the unconfined steady problem
+and its seepage face from scratch, and in
+[SEEP-3](seep03_reservoir_drawdown.md) we drive a *head* boundary from a series
+instead of a flux, on a zoned dam whose core controls the response. In
 [FEM-1](fem01_strength_reduction.md) we mesh a slope for stability
 instead of seepage and find its factor of safety by reducing the soil's
 strength until it fails.

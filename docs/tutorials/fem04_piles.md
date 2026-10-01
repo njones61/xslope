@@ -58,7 +58,7 @@ carries.
 <p><span class="tg-pill">piles</span><span class="tg-pill">Ito &amp; Matsui</span><span class="tg-pill">pile spacing</span><span class="tg-pill">head and tip fixity</span><span class="tg-pill">beam elements</span><span class="tg-pill">smeared stiffness</span><span class="tg-pill">plane strain</span><span class="tg-pill">sheet pile wall</span><span class="tg-pill">continuous member</span><span class="tg-pill">strength reduction</span><span class="tg-pill">quadratic triangles</span><span class="tg-pill">1D element size</span><span class="tg-pill">shear strain</span><span class="tg-pill">moment and shear profiles</span></p>
 <div class="tgm-model" markdown>
 **Pile row model** — [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx), the
-completed model from [LEM-12](lem12_piles.md). It already carries both engines'
+completed model from [LEM-12](lem12_piles.md). It already has both engines'
 inputs, so we enter nothing in the first half
 
 **Bare slope** — [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx),
@@ -67,7 +67,7 @@ halves measure against, and build the wall on it
 
 **Wall completed model** — [xslope_pile_wall.xlsx](files/xslope_pile_wall.xlsx),
 the same file with the wall row entered; open it to skip to
-[the wall's run](#re-meshing-and-running-again). Neither wall file carries a
+[the wall's run](#re-meshing-and-running-again). Neither wall file has a
 mesh, so both are meshed on the page
 
 Each strength reduction run below takes from well under a minute to a few
@@ -86,7 +86,7 @@ the base, the lower at 5 ft from the toe and the upper at 10 ft. Each shaft is a
 reinforced concrete section with 46,000 lb of shear capacity and 60,000 lb·ft of
 moment capacity.
 
-The sketch also carries what the finite element run reads and the limit
+The sketch also shows what the finite element run reads and the limit
 equilibrium run does not: the clay's elastic properties, E = 2.0 × 10<sup>6</sup> psf
 and ν = 0.3, and the shafts' own modulus, E = 5.184 × 10<sup>8</sup> psf. Unlike
 the starter files in [FEM-1](fem01_strength_reduction.md) and
@@ -142,9 +142,9 @@ against these two numbers.
 With the bare slope's two numbers in hand, we put the first member in: the two
 rows of drilled shafts from the sketch above, already in the model we built in
 [LEM-12](lem12_piles.md). We run that model through both engines, compare the two
-answers, sweep the spacing in each, and then follow the finite element answer
-down to what decides it — how the shafts are held at their ends, and how much
-moment their sections can carry.
+answers, sweep the spacing in each, and then examine what controls the finite
+element answer — how the shafts are held at their ends, and how much moment
+their sections can carry.
 
 ### Opening the model and reading the pile rows
 
@@ -156,7 +156,7 @@ happens.
 
 The Inputs plot draws the section, the two pile rows as green bars running from
 the face down to the hatched maximum-depth line at elevation −10, and the dashed
-red starting circle the file carries for the search.
+red starting circle the file has for the search.
 
 Open **Piles** in the **Inputs** dock and press **Table view**. Leave both
 **Show parameters for:** toggles ticked, because this model is the case where
@@ -166,8 +166,8 @@ both bands matter at once:
 
 The columns are colored by which engine reads them. Red is limit equilibrium
 only: `H`, the stated pile force, and `Appl`, how that force enters the
-equations. `H` is blank on both rows, and that blank is what brings Ito & Matsui
-in: with no force stated, the limit equilibrium engine computes one from `D`,
+equations. `H` is blank on both rows, so Ito & Matsui is used: with no force
+stated, the limit equilibrium engine computes one from `D`,
 `S` and the soil around the pile; enter a number and that number is used
 instead. Blue is finite element only: `E`, `I`, `Area`, and `Head` and `Tip`,
 which say whether each end of the member is free to rotate. The black columns
@@ -181,7 +181,8 @@ I = πD⁴/64 and Area = πD²/4, and then divides *EA* and *EI* by the spacing.
 That derivation is only right for a solid circular shaft. A pipe pile, an
 H-pile or a hollow drilled shaft has its own I and Area, and those are computed
 for the section and entered in the two cells; a value in either one overrides
-the derivation from `D`. Hovering `S` says what each engine does with it:
+the derivation from `D`. The tooltip on `S` describes what each engine does
+with it:
 
 > Center-to-center pile spacing. In the LEM, spacing is physics: it sets the
 > arching between piles (Ito & Matsui) and makes Vcap/Mcap per-pile. In the FEM,
@@ -198,9 +199,8 @@ later section. Click **Cancel**.
 
 ### The limit equilibrium answer
 
-We run the limit equilibrium analysis first because it is the reference the
-finite element run is read against, and because the file is already complete for
-it.
+We run the limit equilibrium analysis first because it is the reference for the
+finite element run, and because the file is already complete for it.
 
 Click **Run → Run LEM…**, set **Method** to `Spencer` and **Analysis** to
 `Auto search`, and leave the slice count at 40. We compare against Spencer
@@ -222,7 +222,7 @@ supply. That calculation is worked through in
 
 ### The finite element answer
 
-The same file, the same rows, the other engine. Switch the mode strip to
+Next we run the same file through the other engine. Switch the mode strip to
 **FEM**. **Run → Run FEM…** stays disabled until a mesh exists, so build one
 first with **Run → Build Mesh…**
 
@@ -253,7 +253,7 @@ Click **Run → Run FEM…**
 ![Run FEM on the meshed pile model](images/fem04_studio_run_fem_piles.png)
 
 **Model checks** finds no problems, and **Run** is enabled. One note sits under
-that line: the two pile rows carry a diameter with no `Area` or `I`, so the
+that line: the two pile rows have a diameter with no `Area` or `I`, so the
 engine is deriving the solid circular section — the derivation described above,
 reported rather than assumed.
 
@@ -280,7 +280,7 @@ a row, because in plane strain there is nothing to pass through: each row is a
 continuous obstruction over the full length of the slope. The soil between the
 toe and the upper row shears down to the base and carries both rows with it,
 each rotating about its toe, and the mass behind the upper row shears past its
-head. The shading on the piles says the same thing: the largest shear on each
+head. The shading on the piles shows the same: the largest shear on each
 shaft is at its tip, which the rigid base holds in place while the soil above
 drags the shaft — the shear there is the reaction at that pinned toe, and the
 shaft is free to rotate about it.
@@ -324,9 +324,9 @@ reaction.
 Open **Piles**, set `Tip` to `fixed` on both rows, and **OK**. The mesh survives
 a fixity change, as it survived the spacing change. Run the same bracket again.
 
-**FS = 1.410**. Holding both toes is worth 0.047, and what keeps it from being
-worth more is the shafts' own capacity: six of the 18 beam elements now stand at
-their moment capacity, none at their shear capacity.
+**FS = 1.410**. Holding both toes adds 0.047, and the shafts' own capacity
+limits the gain: six of the 18 beam elements now stand at their moment capacity,
+none at their shear capacity.
 
 ![The pile rows with both tips fixed, at the captured mechanism: a compact band of shear strain around and below the two socketed toes](images/fem04_fem_shear_piles_fixed.png){width=1000}
 
@@ -361,8 +361,8 @@ Set `Tip` back to `pinned` on both rows before going on.
 
 ### What decides the finite element answer
 
-Three more runs on the same mesh, each changing one thing on both rows, complete
-the picture:
+Three more runs on the same mesh, each changing one thing on both rows, show what
+controls the answer:
 
 | Change | FS |
 | --- | :---: |
@@ -400,10 +400,10 @@ The tip-fixed rows of the last section, swept the same way, do not hold still �
 1.543, 1.410 and 1.238, the upper line on the plot. Spacing reaches the finite
 element model as the divisor on M<sub>cap</sub> as well as on the stiffness, so
 the wider the shafts are set the less moment the smeared row can carry per foot
-of slope, and the sooner its sections hinge. At 12 ft the tip restraint has
-stopped paying: the row is weaker than the same row free to turn on its toes.
+of slope, and the sooner its sections hinge. At 12 ft the tip restraint no
+longer helps: the row is weaker than the same row free to turn on its toes.
 
-The pinned-tip line is not the model ignoring the spacing column. Over this sweep the
+The flat pinned-tip line does not mean the model ignores the spacing. Over this sweep the
 smeared bending stiffness *EI*/S falls fourfold, and what the shafts carry moves
 with it. Each row below is read at that spacing's captured mechanism:
 
@@ -422,12 +422,12 @@ each shaft is carrying the whole 60,000 lb·ft it has. Every quantity a designer
 would check responds to
 spacing. The factor of safety follows only once the capacity binds.
 
-### Which answer is right
+### Comparing the two answers {#which-answer-is-right}
 
 Neither engine is wrong; they answer different questions about the shafts.
 
 The limit equilibrium force assumes each shaft develops its full moment
-capacity at the failure surface — it has no way to say otherwise. The finite
+capacity at the failure surface; the method does not compute otherwise. The finite
 element run computes how much of that capacity the toe restraint actually lets
 the shaft develop. At the 6 ft spacing the model was built with, a shaft that
 can turn on its toe develops 48% of it and the run answers 1.363; socketing the
@@ -436,7 +436,7 @@ between 1.36 and 1.41 is a question about the shaft — bearing on the rock, or
 socketed into it — and it is one cell in the file. Both answers stay well under
 Spencer's 1.842.
 
-Spacing is where the engines part company for good. The limit equilibrium
+The two engines respond differently to spacing. The limit equilibrium
 answer falls with spacing because its force is a capacity divided by a widening
 spacing. The finite element answer falls only where that widening thins the
 row's moment capacity per foot of slope; nothing in it responds to the gap
@@ -444,7 +444,7 @@ between the shafts, because a plane-strain wall has no gap for the soil to arch
 across. Ito & Matsui is the only model on this page of what happens in that gap,
 and it matters most at the wide end of the sweep.
 
-### The one problem with a three-dimensional answer
+### A benchmark with a three-dimensional answer {#the-one-problem-with-a-three-dimensional-answer}
 
 Neither engine gives a three-dimensional answer, and the direction of the
 plane-strain error is only known where a three-dimensional reference exists. One
@@ -469,19 +469,18 @@ two Bishop searches that follow are of
 [vp106a.xlsx](../verification/files/rocscience/vp106a.xlsx) and
 [vp106c.xlsx](../verification/files/rocscience/vp106c.xlsx).
 
-The unpiled row agrees to 0.4%, which is what makes the other two readable. With
+The unpiled row agrees to 0.4%, so the other two rows can be compared. With
 the row in place the plane-strain model credits it ×1.389, where the
 three-dimensional model credits ×1.193. On the same slope a Bishop search reads
 1.143 with no pile and 1.451 with it, a credit of ×1.269. Both two-dimensional
 routes sit above the three-dimensional answer — the limit equilibrium one by
-less — and neither recovers it. What this benchmark settles is the direction of
-the plane-strain error, not which of the two routes to trust.
+less — and neither recovers it. This benchmark establishes the direction of the
+plane-strain error, not which of the two routes to trust.
 
-So the reason to take a discrete row's factor of safety from the limit
-equilibrium engine is not that its number is larger or smaller. It is that Ito &
-Matsui is a theory *of* the three-dimensional mechanism, while the beam model is
-a two-dimensional substitute for it. The finite element run on a discrete row
-still tells you what the shafts are carrying, and — as the tip runs show — under
+A discrete row's factor of safety is taken from the limit equilibrium engine
+because Ito & Matsui is a theory *of* the three-dimensional mechanism, while the
+beam model is a two-dimensional substitute for it. The finite element run on a
+discrete row still shows what the shafts are carrying, and — as the tip runs show — under
 what end condition they could carry it.
 
 ---
@@ -525,8 +524,7 @@ The wall goes into the bare slope run [at the top of the page](#the-slope-on-its
 reopen [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx) with
 **File → Open…** if another file is open.
 
-The wall goes in as one row of the piles table, and which cells it fills is what
-this step is about. Open **Piles** in the **Inputs** dock, press **Table
+The wall goes in as one row of the piles table. Open **Piles** in the **Inputs** dock, press **Table
 view**, and click **Add row**. The new row opens with its **Label** reading
 `Pile`; type `sheet pile wall` over it, which is the name the results panels
 use.
@@ -565,7 +563,7 @@ Click **Run → Run FEM…**
 
 ![Run FEM on the meshed wall model](images/fem04_studio_run_fem_wall.png)
 
-**Model checks** finds no problems, and carries no note this time: the wall
+**Model checks** finds no problems, and shows no note this time: the wall
 states its own `I` and `Area`, so nothing is derived. The bracket is
 already `1.00` to `2.00`. Click
 **Run**.
@@ -591,7 +589,7 @@ the numbers below are read at.
 
 ![Lateral displacement, shear, moment and soil reaction down the wall: a cantilever fixed at the base](images/fem04_wall_profiles_fixed.png){width=1000}
 
-Four profiles, all plotted against depth below the pile head, which is at
+There are four profiles, all plotted against depth below the pile head, which is at
 elevation 10 — so a depth of 14.00 ft on these axes is elevation −4.00.
 
 The **bending moment** is zero at the head, which is free, and largest at the
@@ -615,8 +613,8 @@ The extra movement takes the toe the last 9% to its capacity: the moment there
 reaches the whole 90,600 lb·ft/ft, one beam element has yielded in bending, and
 the title now reads *at capacity*. The shear grows with it, from 5,969 to
 7,124 lb/ft, and its peak moves from 13 ft down to 19 ft, the last of the ten
-elements. A wall that carries 91% of its section at the answer and the whole of
-it at the collapse the run captured is one to check the section of.
+elements. With 91% of the section's capacity used at the factor of safety, and
+all of it at the captured collapse, the section should be checked.
 
 ### A finer beam
 
@@ -638,7 +636,7 @@ nodes. Run the same bracket: it takes noticeably longer than the run above.
 **FS = 1.676**, and the peak moment 74,546 lb·ft/ft
 against 90,600. Both moved: the answer came down 0.047, and the toe moment that
 stood at 91% of capacity on ten beam elements stands at 82% on forty. The
-profiles say where the rest of the run time went:
+profiles show the effect of the finer beam:
 
 ![The same profiles on 40 beam elements](images/fem04_wall_profiles_refined.png){width=1000}
 
@@ -684,7 +682,7 @@ the capacity sets how much of it the shaft actually carries.
 
 This tutorial covered:
 
-- What a pile row is to each engine: one computed force at the crossing in the
+- How each engine models a pile row: one computed force at the crossing in the
   limit equilibrium method, a chain of beam elements in the finite element
   method.
 - Why a plane-strain model turns a discrete row into a continuous wall.
@@ -697,9 +695,9 @@ This tutorial covered:
   for it that no limit equilibrium analysis can: moment, shear, deflection and
   soil reaction down the member.
 
-**Where to go next:** [Piles and concrete piers in FEM](../fem/piles.md) carries
+**Where to go next:** [Piles and concrete piers in FEM](../fem/piles.md) gives
 the beam formulation, the assembly and the applicability rule in full, and
-[stabilizing piles in LEM](../lem/piles.md) carries the Ito & Matsui theory and
+[stabilizing piles in LEM](../lem/piles.md) gives the Ito & Matsui theory and
 the same rule from the other side; in [LEM-12](lem12_piles.md) the pile row is
 analyzed on its own. For a sheet pile wall checked against a published analysis,
 see

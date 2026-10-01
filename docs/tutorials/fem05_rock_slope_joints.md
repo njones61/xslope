@@ -5,8 +5,8 @@ description: "A 12 m rock face cut by a bedding plane and a release joint, solve
 
 # Tutorial FEM-5 — A Rock Slope on Its Joints
 
-In a rock slope the strength that decides the answer is usually not the rock's.
-Intact rock is strong; the bedding planes, the joints and the faults that cut
+In a rock slope the strength that controls stability is usually that of the
+discontinuities rather than of the rock. Intact rock is strong; the bedding planes, the joints and the faults that cut
 through it are not, and a rock slope nearly always fails by moving along them.
 This tutorial shows how to put those surfaces into a finite element stability
 run as **joint lines** — lines the mesh is split along, with an interface element
@@ -16,8 +16,7 @@ gives when the joints are the only thing it can weaken.
 We do it twice on the same face, a 12 m rock cut at 60°. **Part 1** takes the
 slope cut by two joints — a bedding plane dipping 35° out of the face and a
 vertical release joint 2 m behind the crest — where the mechanism is a single
-slab sliding out and the factor of safety can be checked by hand on the back of
-an envelope. **Part 2** takes the same slope cut by a whole set of them,
+slab sliding out and the factor of safety can be checked by hand. **Part 2** takes the same slope cut by a whole set of them,
 generated from a dip and a spacing rather than typed one line at a time, where
 the rock breaks into columns that tip instead of sliding.
 
@@ -28,7 +27,7 @@ Strength reduction itself, the mesh and the convergence controls are covered in
 second way to model a rock slope, in which the rock mass gets a strength of its
 own and no discontinuities are drawn at all; that is
 [LEM-13](lem13_rock_slope.md), and it answers a different question. Here the rock
-is inert and the surfaces carry everything.
+is elastic and all of the strength is in the joints.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -51,8 +50,8 @@ the page starts from
 part 1's slab on its two joint lines,
 [xslope_rock_toppling.xlsx](files/xslope_rock_toppling.xlsx), part 2's generated
 column set, and [xslope_rock_voronoi.xlsx](files/xslope_rock_voronoi.xlsx), the
-same zone as a Voronoi block mass. The toppling model ships with its mesh and its
-solved strength reduction beside it, so it can be opened and read without running
+same zone as a Voronoi block mass. The toppling model comes with its mesh and its
+solved strength reduction in the same folder, so it can be opened and read without running
 anything
 </div>
 </div>
@@ -63,7 +62,7 @@ anything
 
 The first pass is the simplest jointed slope there is: one slab, sitting on a
 bedding plane it can slide along, with a release joint behind it that lets it
-go. It is small enough to check by hand. The run has to
+separate. It is small enough to check by hand. The run has to
 reproduce a number we can work out on paper before the method is trusted on
 anything larger.
 
@@ -148,8 +147,8 @@ the joint lines in their own style, distinct from profile lines and reinforcemen
 
 ### Why the rock is elastic
 
-The rock carries the **elastic** strength option, and that turns this run into a
-test of the joints. A strength reduction divides every strength it can
+The rock has the **elastic** strength option, so this run tests the joints
+alone. A strength reduction divides every strength it can
 find by the trial factor; an elastic material has none, so the only things
 weakening as the run climbs are the joints' cohesion and friction angle. The
 factor of safety that comes out is a factor on the joints alone, which is what
@@ -201,10 +200,10 @@ growing slip, a little on each iteration, so a jointed model needs tens of
 thousands of iterations where a slope without joints needs hundreds, and a trial
 that runs out of them is recorded as not standing. Leave **Failure criterion**
 on **Hybrid** and **Accelerate convergence** ticked, which is how the dialog
-opens for a model that carries joints.
+opens for a model that has joints.
 
 Press **Run**. The search takes about **two minutes** on an ordinary desktop —
-nearer three on an install that does not carry the
+nearer three on an install that does not include the
 [compiled kernel](../fem/overview.md#fast-kernel) — and reports
 
 <!-- test: file=files/xslope_rock_joints.xlsx, type=fem_ssrm, expected_fs=1.199, element_type=tri6, target_size=1.5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-5-slab-ssrm -->
@@ -261,7 +260,7 @@ offers is that normal force times tan φ, so
 
 >>FS = (*W* cos β tan φ) / (*W* sin β) = tan φ / tan β
 
-The weight cancels. Nothing about the size or the shape of the slab survives —
+The weight cancels. The size and the shape of the slab drop out —
 which is why the release joint's position does not change the answer, and why the
 slope could be 12 m high or 120 m and read the same. With φ = 40° on the bedding
 plane and a dip of β = 35°,
@@ -273,8 +272,9 @@ against the run's **1.199**.
 The hand check uses only the bedding plane's friction angle. The release
 joint's does not appear, and the joint slip figure shows why: the release joint
 has opened, and an open joint carries no normal force, so it has no friction to
-offer whatever its φ. The model agrees. Change the release joint's `phi` from
-40° to 25° and run again: the factor of safety comes back **1.199**, unchanged.
+offer whatever its φ. Changing the release joint's `phi` from 40° to 25° and
+running again confirms this: the factor of safety comes back **1.199**,
+unchanged.
 
 ---
 
@@ -294,8 +294,8 @@ with a generated set of joints, so that it becomes a stack of columns instead.
 
 ![The Part 2 problem: the same 12 m face at 60°, a base plane dipping 30° from 9 m behind the crest to the toe, and above it a joint region filled by a set of columns dipping 110° at 1.5 m spacing](images/fem05_problem_sketch_topple.png){width=800}
 
-Two inputs make a set. The first says *where* in the section the set exists,
-and there are three ways to say it:
+Two inputs make a set. The first is *where* in the section the set exists,
+which can be given three ways:
 
 - **Nothing.** Leave the region blank and the set fills the whole section.
 - **A material**, or several. The set fills the zones that carry it — a bedding
@@ -323,13 +323,13 @@ ground surface to (9, 12) above the tip.
 | 9.000 | 12.000 |
 
 The second input to build a joint network is the **Build network…** dialog,
-which says *what* the set is. Open the joints editor from the Inputs tree under
+which defines *what* the set is. Open the joints editor from the Inputs tree under
 **Joints**, as in Part 1, and press the **Build network…** button beside its
 list of rows.
 
 ![The Build network dialog describing the column set](images/fem05_studio_build_network.png){width=840}
 
-**Name** is the set's name, and it matters more than it looks. Keep it short:
+**Name** is the set's name. Keep it short:
 `col`. Every row the dialog writes is named from it — `col-01`, `col-02`, and
 so on, in the order the traces come out — and that name follows the rows onto
 the Inputs plot, the results panels, the 1D details view and the report, so a
@@ -345,11 +345,11 @@ orientation. This set is a parallel one.
 **Dip** is the orientation, measured anticlockwise from horizontal, so a dip
 between 0 and 90 leans out of the face and a dip between 90 and 180 leans back
 into it. **110°** here is a set standing 70° from horizontal and leaning back
-into the slope, which is what makes the rock above the base plane a stack of
+into the slope, so the rock above the base plane forms a stack of
 columns rather than a pile of slabs.
 
 **Spacing** is the perpendicular distance between one trace and the next,
-1.5 m. **Offset** says where the traces sit: with an offset of 0, one trace of
+1.5 m. **Offset** sets where the traces sit: with an offset of 0, one trace of
 the set passes through the origin (0, 0) and the rest stand at multiples of the
 spacing either side of it; the offset shifts that whole pattern along the set's
 own normal by the distance given. 1.25 m here moves the traces to where they
@@ -406,8 +406,8 @@ Read the deformed-block figure first. The columns are separate bodies and they
 move as bodies, but they do not slide down the base plane the way Part 1's slab
 slid down its bedding plane. Each column rotates
 forward about its own downslope corner, opening the joint behind it and closing
-the joint in front. That is **block toppling**, and it is the mechanism the
-method was built for: every bit of the movement is taken up on the contacts, and
+the joint in front. That is **block toppling**. Every bit of the movement is
+taken up on the contacts, and
 the factor of safety is the factor by which the contacts have to be weakened
 before the stack starts to go over.
 
@@ -425,14 +425,14 @@ opened along the stretch under the lowest column and between the column feet,
 where each column's base has lifted off it, and it is slipping where the feet
 still bear — 8.4 mm under the lowest column, the largest slip in the model,
 falling to 2 mm under the fourth — with only a faint slide, under 0.2 mm, along
-its upper third behind the last column. Nothing on the plot says the stack is
-sliding away as one body; everything says it is going over.
+its upper third behind the last column. The plot shows no sign of the stack
+sliding away as one body; the contact states show the columns toppling.
 
 ---
 
-### What a network costs
+### Solution time for a joint network {#what-a-network-costs}
 
-A joint network is cheap to describe and not cheap to solve. Every trace splits the mesh,
+A joint network is quick to describe but can be slow to solve. Every trace splits the mesh,
 every split copies the nodes along it, and every pair of copies carries an
 interface element that has to reach an equilibrium of its own. Here is the same
 region at three spacings, meshed at the same 1.5 m target size:
@@ -444,8 +444,8 @@ region at three spacings, meshed at the same 1.5 m target size:
 | 0.75 m | 11 | 1,001 | 70 |
 
 The node count barely moves, because the region is a small part of a 26 m
-section. The interface count is what grows, and it is the interfaces that set
-the cost: a joint reaches equilibrium by growing slip a little at a time, so the
+section. The interface count grows, and the interfaces set the solution
+time: a joint reaches equilibrium by growing slip a little at a time, so the
 iterations a trial needs go up with them. On the shipped model at 1.5 m the
 trials that stand settle in a few hundred iterations, while the two that fail
 nearest the answer run 19,081 and 33,401 before their movement runs away — and
@@ -455,11 +455,11 @@ So start coarse. Describe the set at a spacing two or three times what the rock
 really has, get the mechanism and the factor of safety, and only then refine —
 and check that the answer has stopped moving before trusting the fine one.
 
-The `Voronoi` generator sits at the far end of that trade. It fills a region with
-a tessellated block mass at no preferred orientation, which is the right picture
-of a blocky rock mass with no dominant joint set. Over this slope's toppling
+The `Voronoi` generator produces still more interfaces. It fills a region with
+a tessellated block mass at no preferred orientation, which represents a blocky
+rock mass with no dominant joint set. Over this slope's toppling
 zone, at a block size of 2 m (and a seed of 7 — a tessellation is random, and the
-seed is what makes it the same one twice), it writes **50 joint lines** — about
+seed makes it repeatable), it writes **50 joint lines** — about
 fifteen cells — where the parallel set wrote five. The base plane is typed in as
 before. The completed model is
 [xslope_rock_voronoi.xlsx](files/xslope_rock_voronoi.xlsx).
@@ -484,14 +484,13 @@ kind:
 
 ![The deformed Voronoi blocks: the mass slides out along the base plane as a broken slab rather than toppling](images/fem05_fem_blocks_voronoi.png){width=900}
 
-The base plane carries the slide again, slipping along its whole length and
+The base plane takes the sliding again, slipping along its whole length and
 most at the toe, but the mass above it does not topple. With no set of columns
 to rotate, the blocks slide out along the base plane as one broken slab: a chain
 of walls from the plane's upper tip up to the crest slips as the mass shears off
 the rock behind it, the walls nearest the face open as the front blocks pull
-ahead, and the walls inside the mass stay closed. A blocky mass with no dominant
-set fails as a slide on whatever surface bounds it below, which is what the
-tessellation was built to show.
+ahead, and the walls inside the mass stay closed. Here a blocky mass with no
+dominant set fails as a slide on the surface that bounds it below.
 
 ---
 
@@ -533,7 +532,7 @@ element program such as UDEC, in which blocks separate, rotate through large
 angles and make new contacts as they go, or a rockfall program that follows
 each block down the slope.
 
-[Joints and Interface Elements](../fem/joints.md) carries the formulation, the
+[Joints and Interface Elements](../fem/joints.md) gives the formulation, the
 full input list and the rest of the reading.
 
 ---
@@ -545,7 +544,7 @@ This tutorial covered:
 - Discontinuities entered as joint lines on the joints worksheet, with their
   endpoints set by the geometry of the mechanism rather than chosen.
 - Elastic rock, which leaves the strength reduction nothing but the joints to
-  weaken, and what giving the rock a strength instead would buy and cost.
+  weaken, and what giving the rock a strength instead would change.
 - The settings a jointed run needs: the Hybrid failure criterion, an iteration
   limit large enough for the joints to reach equilibrium, and the accelerated
   solver the dialog turns on for them.
@@ -557,7 +556,7 @@ This tutorial covered:
   needed.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
-[Joints and Interface Elements](../fem/joints.md) carries the element, the split
+[Joints and Interface Elements](../fem/joints.md) describes the element, the split
 mesh and every column of the joints worksheet, and
 [Worksheet: joints](../usage/input_template.md#worksheet-joints) documents the
 inputs with the rest of the template. In

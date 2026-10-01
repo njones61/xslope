@@ -17,11 +17,11 @@ on what shape, is something the run reports rather than something we supply.
 The example is a 50 ft embankment on a rigid base with a 2:1 face — one soil, no
 water, no loads — the simplest slope the method can be shown on. We solve it twice. First
 with **Spencer's method**, on its own search, and that answer is the reference
-everything after it is read against. Then we mesh the same model, run it by
+for the rest of the page. Then we mesh the same model, run it by
 **strength reduction**, and put the two numbers side by side. In between come the
 three things a finite element stability run needs that a limit equilibrium run
-does not: two elastic properties, a mesh, and a set of convergence controls that
-decide whether the answer we are given is the answer the model has.
+does not: two elastic properties, a mesh, and the convergence controls of the
+search.
 
 ![The embankment, its soil, and the elastic properties added later on this page](images/fem01_problem_sketch.png){width=1000}
 
@@ -30,7 +30,7 @@ nothing, covering the geometry, the material and the circular search, and mesh
 building and element order are covered in
 [SEEP-1](seep01_sheetpile.md#building-the-mesh); neither is repeated here. We
 start from a **starter file** that already
-carries the section, the soil strength and one starting circle, so the only
+contains the section, the soil strength and one starting circle, so the only
 inputs we add are the ones the finite element side needs.
 
 <div class="tut-glance" markdown>
@@ -56,7 +56,7 @@ properties and no mesh settings; this is the file the page starts from
 the same model with E and ν filled in and the element type and target size
 declared; open it to skip [the elastic properties](#youngs-modulus-and-poissons-ratio) —
 its Build Mesh dialog opens with auto-sizing already off at 3.5 ft, and its Run
-FEM dialog opens with one warning rather than two errors. Neither file carries a
+FEM dialog opens with one warning rather than two errors. Neither file has a
 mesh, so the meshing step below is done on either one
 </div>
 </div>
@@ -65,8 +65,7 @@ mesh, so the meshing step below is done on either one
 
 ## What strength reduction does
 
-The method asks the slope the same question over and over, with the soil made
-weaker each time. At a trial reduction factor *F*, both Mohr-Coulomb strength
+The method solves the slope repeatedly, with the soil made weaker each time. At a trial reduction factor *F*, both Mohr-Coulomb strength
 parameters are divided by it:
 
 >>*c*<sub>r</sub> = *c* / *F* &nbsp;&nbsp;&nbsp; tan φ<sub>r</sub> = tan φ / *F*
@@ -94,10 +93,10 @@ search over surfaces.
 Failure here is **the solver failing to find equilibrium**, not a surface
 reaching a limit state, so how long each trial is allowed to iterate is part
 of the answer. Because nothing about a surface was assumed, the mechanism comes
-out of the solution: the band of soil that is straining is wherever the model
-put it.
+out of the solution: the band of soil that strains is located by the
+solution.
 [Shear strength reduction](../fem/overview.md#shear-strength-reduction-method-ssrm)
-carries the formulation, the four failure criteria and the viscoplastic
+gives the formulation, the four failure criteria and the viscoplastic
 iteration underneath all of it.
 
 ---
@@ -110,10 +109,10 @@ one soil throughout, Mohr-Coulomb, with the unit weight, cohesion and friction
 angle shown above. There is no water in the model and nothing on the crest, so
 the only load is the soil's own weight.
 
-E and ν are on the sketch because the finished model carries them, but they are
-not in the starter file and the limit equilibrium run below does not want them.
+E and ν are on the sketch because the finished model has them, but they are
+not in the starter file and the limit equilibrium run below does not use them.
 We add them [further down](#youngs-modulus-and-poissons-ratio), at the point
-where the finite element run refuses to start without them.
+where the finite element run requires them.
 
 The section, the soil and the answer are
 [Griffiths & Lane's (1999) Example 1](../verification/ssrm.md#verification-griffiths1),
@@ -132,7 +131,7 @@ Its global parameters are already set: **Units** `imperial`, so lengths read in
 feet, unit weights in pcf, and stresses, strengths and stiffnesses in psf. Those
 fields are covered in [SEEP-1](seep01_sheetpile.md#1-global-parameters).
 
-The Inputs plot shows what the file carries:
+The Inputs plot shows what the file contains:
 
 ![The starter file: one profile line, the rigid base, and one starting circle](images/fem01_inputs.png){width=1000}
 
@@ -153,13 +152,13 @@ Click **Run → Run LEM…**
 ![Run LEM on the starter file](images/fem01_studio_run_lem.png)
 
 The dialog opens on **Spencer**, **Auto search** and 40 slices, which is what
-this run wants, so there is nothing to change. We compare against Spencer later
+this run needs, so there is nothing to change. We compare against Spencer later
 because it satisfies both force and moment equilibrium, which makes it the
 closest limit equilibrium statement of what a finite element run solves.
 
 The **Model checks** column reads **No problems found for this run.** The file
 has no Young's modulus and no Poisson's ratio, and limit equilibrium does not
-care. It reads only strength, geometry and weight. Click
+use them: it reads only strength, geometry and weight. Click
 **Run**.
 
 ![Spencer's critical circle](images/fem01_lem_solution.png){width=1000}
@@ -169,12 +168,12 @@ care. It reads only strength, geometry and weight. Click
 at x = 158.5, just short of the toe. The search evaluated 77 candidate circles
 and took a few seconds. Bishop's simplified method (1.378) and
 Morgenstern-Price (1.375) settle on the **same circle**, within a quarter of a
-percent of Spencer — one mechanism, found three ways.
+percent of Spencer.
 
 <!-- test: file=files/xslope_ssrm_embankment_start.xlsx, type=circular_search, num_slices=40, fs_spencer=1.376, fs_bishop=1.378, fs_mprice=1.375, tolerance=0.005 -->
 
-That number is our target. Everything below is a second, independent route to
-it.
+The finite element run below reaches its answer independently and is compared
+with this number.
 
 ---
 
@@ -197,14 +196,14 @@ reporting a factor of safety that is too high. Measured on this embankment, tri3
 reads **+21%** high and quad4 **+11%**, while tri6, quad8 and quad9 all land
 within 1% of the reference —
 [element type and volumetric locking](../fem/overview.md#element-type-selection-and-volumetric-locking)
-carries the comparison. XSLOPE defaults to tri6 and prints a boxed warning if a
+gives the comparison. XSLOPE defaults to tri6 and prints a boxed warning if a
 run starts on a linear mesh anyway.
 
 Untick **Auto-size from geometry**, which enables the **Target element size**
 box below it, and set that box to `3.5` — the size the verification page's own
 element-type comparison meshes this model at. Auto-sizing instead divides the
 section width by the size divisions, 160 ft over 100, for a 1.6 ft element, and
-the mesh that follows carries 10,313 nodes against 2,286 at 3.5 ft. The *F* = 1
+the mesh that follows has 10,313 nodes against 2,286 at 3.5 ft. The *F* = 1
 trial on it takes **1.7 s against 0.3 s**, and every trial in the run pays that
 multiple, for detail this mechanism does not need. Leave the rest of the dialog
 alone and click **Build**.
@@ -227,10 +226,10 @@ Which of the two conditions the sides take is a choice, made on the Run FEM
 dialog rather than here: **Rollers (vertical movement free)** is the default and
 what every file that declares nothing gets, and **Fixed (both components
 clamped)** clamps them instead, which is what RS2 does on its side boundaries.
-On this model the choice is inert — both settings return the same factor of
+On this model the choice has no effect — both settings return the same factor of
 safety on the same bracket, trial for trial — because the mechanism is nowhere
-near the left boundary and the extra restraint has nothing to bite on. On a
-domain truncated close to the slope it would not be inert, and fixing the sides
+near the left boundary and the extra restraint has nothing to act on. On a
+domain truncated close to the slope it would matter, and fixing the sides
 adds shear restraint the real ground does not have.
 [What XSLOPE assigns automatically](../fem/overview.md#what-xslope-assigns-automatically)
 states the rules the mesh was marked up by.
@@ -246,9 +245,8 @@ The mesh exists, so **Run → Run FEM…** is available. Click it.
 **Model checks — 2 errors · 1 warning**, and the **Run** button is disabled. The
 two errors name the missing elastic properties: the finite element engine needs
 a positive Young's modulus for every material it meshes, and a Poisson's ratio
-of zero is not a soil. This is the difference between the two analyses: the same
-file that limit equilibrium called clean is one the finite element side will not
-start on. A limit equilibrium method balances forces on a body it has already
+of zero is not a soil. The same file that passed the limit equilibrium checks
+cannot start a finite element run. A limit equilibrium method balances forces on a body it has already
 decided the shape of. A finite element method has to compute the displacement
 field first and get the stresses from it, and there is no displacement field
 without a stiffness.
@@ -257,8 +255,8 @@ Click **Cancel**, then **Materials** in the Inputs dock. On **Table view**, set
 the **Show parameters for:** toggles to **FEM** alone.
 
 Both elastic columns read **`0`**. Nothing was typed there — the cells are
-blank, and a blank numeric cell loads as zero, which is what the run gate
-reported back. Enter the two values, in the columns headed `E (psf)` and `n`
+blank, and a blank numeric cell loads as zero, which is what the model checks
+reported. Enter the two values, in the columns headed `E (psf)` and `n`
 (the Poisson's ratio column is labeled with a plain `n`):
 
 | E (psf) | n |
@@ -274,17 +272,17 @@ run reads alongside `t_cut`, `E` and `n`. `γsat` and `t_cut` stay blank. Click
 ### Where E comes from, and what it changes
 
 E = 2,088,500 psf is Griffiths and Lane's own nominal value, 1 × 10<sup>5</sup>
-kPa converted, and the paper says outright that it picked it — and ν = 0.3 with
-it — because the problem gave it nothing better: *"in the absence of meaningful
+kPa converted, and the paper states that it chose it — and ν = 0.3 with
+it — because no measured values were available: *"in the absence of meaningful
 data for E′ and ν′, they can be given nominal values, e.g. E′ = 10<sup>5</sup>
 kN/m<sup>2</sup> and ν′ = 0.3."* Neither is a measurement of this soil and
-neither comes from a soil classification. When a real problem gives you nothing
-better either,
+neither comes from a soil classification. When a real problem has no measured
+values either,
 [typical elastic parameters](../fem/overview.md#typical-elastic-parameters)
 tabulates ranges by soil type in both kPa and psf.
 
-What a nominal stiffness costs, on this model and for the factor of safety, is
-almost nothing. The same mesh and the same bracket are run at a tenth of the
+On this model, a nominal stiffness has almost no effect on the factor of safety.
+The same mesh and the same bracket are run at a tenth of the
 file's modulus, at it, and at ten times it, all three at the default iteration
 budget:
 
@@ -302,17 +300,17 @@ all three moduli. **The displacements scale exactly as 1/E**: ten times the
 stiffness, a tenth of the movement, to four significant figures, in every field
 the run reports.
 
-That is all E does here. It sets the scale of the deformation
-picture and it has no vote in the stability answer, because the answer turns on
-whether an equilibrium state exists, not on how far the slope had to move to
-reach it. A rough E is therefore fine when a factor of safety is what you want.
+On this model, E sets the scale of the deformation and does not affect the
+stability answer, because the answer depends on whether an equilibrium state
+exists, not on how far the slope had to move to reach it. A rough E is therefore fine when a factor of safety is what you want.
 A real one starts to matter the moment a displacement is read as a prediction of
 ground movement.
 
 ν is not in the same category. Setting it to 0 — the value a blank cell loads
 as — moved the reference model's factor of safety by a third, which is why the
-run gate raises it as an error rather than a warning. 0.3 is the paper's nominal
-value too, but unlike E it is not inert, so a real problem needs a real one.
+model checks raise it as an error rather than a warning. 0.3 is the paper's nominal
+value too, but unlike E it affects the factor of safety, so a real problem needs a
+real one.
 
 ---
 
@@ -334,7 +332,7 @@ start at 0.
 [Tensile strength in the SSRM](../fem/overview.md#tensile-strength-in-ssrm)
 works through the cap and its effects.
 
-The rest of the dialog opens on the defaults this run wants. **Analysis** is
+The rest of the dialog opens on the defaults this run needs. **Analysis** is
 **SSRM (find FS)**. **F min (SSRM)** and **F max (SSRM)** are 1.00 and 2.00, the
 ends of the bracket to search. **Tolerance (SSRM)** is 0.0100, **Max iterations
 per trial** is 12000 and **Iteration ceiling** is 50000, all three of which the
@@ -352,8 +350,7 @@ Leave everything as it stands and click **Run**.
 
 ### How the search finds the answer
 
-It is not a scan across a range of *F*, and it is not quite a plain bisection
-either. It is **two checks and then a bisection**. Before halving anything, the search
+The search makes **two checks and then a bisection**. Before halving anything, the search
 has to know that the bracket it was given actually contains the transition, so
 it solves at both ends: *F* min has to converge, and *F* max has to fail. (If
 either check comes back the wrong way the search widens that end and tries
@@ -361,7 +358,7 @@ again, so a bracket that misses is repaired rather than fatal.) With the bracket
 validated, every step after that solves the midpoint, and the result moves one end in: a converged trial raises the lower end, a failed trial lowers the upper
 one.
 
-That is what the Log reports, trial by trial:
+The Log reports each trial:
 
 | Trial | *F* | Result | Iterations | Bracket after it |
 | --- | :---: | --- | :---: | :---: |
@@ -376,39 +373,38 @@ That is what the Log reports, trial by trial:
 | 7 | 1.3672 | converged | 393 | [1.3672, 1.3750] |
 
 **FS = 1.3711**, the midpoint of the final bracket [1.3672, 1.3750], reached in
-nine solves. Seven bisection steps is not luck: each one halves the bracket, so
+nine solves. The seven bisection steps follow from the tolerance: each one halves the bracket, so
 from a starting width of 1.0 it takes seven halvings to get under the 0.01
 tolerance, and seven is what it took.
 
 <!-- test: file=files/xslope_ssrm_embankment.xlsx, type=fem_ssrm, expected_fs=1.3711, element_type=tri6, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-1-ssrm, f_stand=1.3671875, f_fail=1.375, check=edges -->
 
-**The iteration column is where the physics is.** Trials well below the critical
-factor settle almost immediately — 56 iterations at *F* = 1.00, 124 at 1.25.
+**The iteration count rises toward the critical factor.** Trials well below the
+critical factor settle almost immediately — 56 iterations at *F* = 1.00, 124 at 1.25.
 Nearer the transition the slope has to redistribute stress through more and more
 yielded soil before it can balance, and the count climbs: 304 at 1.3125, 316 at
-1.3438, 328 at 1.3594 and **393** at 1.3672, the highest trial that made it. Past
-the transition the count stops meaning anything, because there is nothing to
+1.3438, 328 at 1.3594 and **393** at 1.3672, the highest trial that converged. Past
+the transition the count has no meaning, because there is nothing to
 converge to — the trial at 1.3750 was still moving when it had spent its whole
-12,000-iteration budget, and that is the one the search recorded as failed. Down
-that column the method's definition of failure stops being an abstraction: the
-slope does not snap at some *F*, it takes longer to find equilibrium and then
-there is no equilibrium to find.
+12,000-iteration budget, and that is the one the search recorded as failed. The
+column shows the method's definition of failure: the slope does not fail suddenly
+at some *F*; equilibrium takes longer to reach as *F* rises, and above the critical
+factor there is none.
 
 ---
 
 ## The two convergence controls
 
-Two fields on that dialog decide how hard the search works, and they are easy to
-mix up: both look like knobs for how carefully the run is done. They are not the
-same kind of thing.
+Two fields on that dialog control how much work the search does, and they are
+easy to confuse. They control different things.
 
-### Tolerance is the width of the bracket
+### Tolerance (SSRM) {#tolerance-is-the-width-of-the-bracket}
 
 **Tolerance (SSRM)** is the stopping width of the bisection: how narrow
 [*F* min, *F* max] has to get before the search quits and reports the midpoint.
 It is not a solver convergence tolerance — the per-trial displacement and force
-tests live in the engine and are not on this dialog. Tightening it buys
-resolution on the answer and costs one more trial per halving:
+tests live in the engine and are not on this dialog. Tightening it gives a more
+precise answer at the cost of one more trial per halving:
 
 | Tolerance | FS | Final bracket | Trials |
 | :---: | :---: | :---: | :---: |
@@ -424,7 +420,7 @@ setting, where the search tries 1.3711 for the first time and finds no
 equilibrium there. The default is a sensible place to leave it: the last halving
 moves the answer 0.002.
 
-### Max iterations per trial decides how long a near-critical trial may work
+### Max iterations per trial {#max-iterations-per-trial-decides-how-long-a-near-critical-trial-may-work}
 
 **Max iterations per trial** is the viscoplastic iteration budget for each trial
 *F*, and it opens at **12,000**. It is a budget rather than a ceiling. A trial
@@ -433,7 +429,7 @@ budget's worth, and another, up to the
 **Iteration ceiling** on the same dialog, which opens at 50,000. Only a trial
 whose displacements are growing stops at its budget and is recorded as failed.
 
-That is what the third bisection step above is showing. The trial at
+The third bisection step above shows this. The trial at
 *F* = 1.3750 spent a full **12,000** iterations with its displacements still
 growing, and that is the one the search recorded as failed; every trial that
 settles at all settles inside four hundred.
@@ -442,14 +438,14 @@ Because the budget extends itself, it does not decide the answer. Run the same
 model with it set to 3,000 and the search returns **the same 1.3711** from the
 same bracket: the trial at 1.3750 is extended three times instead of running
 inside one budget, and it stops at the same 12,000 iterations either way.
-The budget sets how coarsely the work is granted, not whether a slow trial is
-allowed to finish.
+The budget sets the size of each grant of iterations; it does not decide whether
+a slow trial is allowed to finish.
 
 The one result the ceiling can leave open is **inconclusive**: a trial that
 reaches 50,000 with its leftover force still falling has neither settled nor run
 away. The search does not count it as a failure: the inconclusive trial becomes the
 bracket's undecided upper edge, the factor of safety is the bracket's midpoint
-as usual, and the log says so, with the advice to raise the ceiling if that
+as usual, and the log reports it, with the advice to raise the ceiling if that
 trial has to be decided. No trial on this model reaches it.
 
 ---
@@ -476,8 +472,8 @@ Both define the factor of safety as the ratio by which the available strength
 exceeds what is needed for equilibrium, and on a homogeneous slope with a single
 clean rotational mechanism there is not much room for them to disagree: the
 finite element run finds the same band of soil that Spencer's critical circle
-traces, so the two are weighing nearly the same material. Where they part
-company is what each one is willing to assume. Spencer imposes a circular
+traces, so the two are weighing nearly the same material. They differ in what
+each one assumes. Spencer imposes a circular
 surface, divides the mass above it into slices and needs an assumption about the
 forces between them to close the equations. Strength reduction imposes nothing —
 no surface, no slices, no interslice assumption — but in exchange it needs a
@@ -485,8 +481,8 @@ mesh, a stiffness and an iteration budget, each of which is a modeling decision
 of its own, as the element type and the tolerance sweep above both measured. On a
 slope like this one the limit equilibrium assumptions cost almost nothing, which
 is why the numbers agree. On a slope with a weak seam, a wall, or a mechanism
-that is not a circle, they cost more, and that is where a run like this one
-earns the extra minute it takes.
+that is not a circle, they matter more, and a strength reduction run, which makes
+none of them, is the better check there.
 
 ---
 
@@ -509,12 +505,12 @@ the body of the slope, to a hot spot at the toe between x = 120 and x = 150,
 where the strain reaches 0.672.
 
 Nothing about that shape was entered. There was no circle and no surface in this
-run; the band is where the soil chose to shear, and it emerges in the same place
-Spencer's search put its critical circle — leaving the crest near x = 50 and
+run; the band is where the soil sheared in the solution, and it lies in the same
+place Spencer's search put its critical circle — leaving the crest near x = 50 and
 running out along the toe. That is the same agreement the factor of safety
 showed, drawn instead of tabulated. On a layered slope, or one with a
-weak seam, this is the panel that shows a mechanism a circular search would
-never have found.
+weak seam, this panel can show a mechanism that a circular search would
+miss.
 
 ### Deformed mesh
 
@@ -533,8 +529,8 @@ default 15: here 15% of 50 ft is 7.5 ft, the largest viscoplastic displacement
 is 8.09 ft, already past it, and Auto lands on **1.0×** — this collapse has
 developed far enough to draw at true scale. Type a number into **Scale ×** to pin the exaggeration
 instead, which is how two figures are compared at one setting; Auto size dims while an explicit value holds. The box's spin arrows
-redraw the view at every step, and that turns the control into something better
-than a setting: start at Auto and hold the up arrow, and the mesh deforms a
+redraw the view at every step, so the control can also animate the failure:
+start at Auto and hold the up arrow, and the mesh deforms a
 step at a time — the crest dropping and the toe bulging in what amounts to an
 animation of the slope failing. The next section shows why Auto exists — the same 15% asks for 7.5× on the converged state, because the
 two states differ eightfold in how far the slope moved.
@@ -546,22 +542,22 @@ two states differ eightfold in how far the slope moved.
 The vectors are the direction the same field moved in, drawn at the corner
 nodes, with arrows below half the maximum hidden so the figure stays readable.
 They point down and outward at about 45° at the crest, swing through the body of
-the slope, and come out nearly horizontal at the toe. That is a rotational collapse
-and nothing else — soil dropping at the back, moving out at the front, turning
-about a center somewhere above the face. What makes it read that cleanly is that
+the slope, and come out nearly horizontal at the toe. That is a rotational
+collapse — soil dropping at the back, moving out at the front, turning
+about a center somewhere above the face. The pattern is clear because
 the field drawn is the viscoplastic part, total displacement minus the elastic
 response, so what is left is the mechanism rather than the settlement the slope
 had under its own weight before anything yielded.
 
-### What failure actually looked like
+### The converged and failed states {#what-failure-actually-looked-like}
 
-The run kept two fields, and putting them side by side is where the method's
-definition of failure becomes concrete. We switch **Field state** to **Last
+The run kept two fields, and comparing them shows what the method means by
+failure. We switch **Field state** to **Last
 converged** to see the other one. The panel that comes up is as fully colored as
 the one before it, because Studio scales each field state to its own range. The
 number to read is the color bar beside it: it tops out around **0.32** instead
-of 0.67, about half. That range, not the colors, is what says the converged state
-has strained along the same band without running away on it.
+of 0.67, about half. The range shows that the converged state has strained along
+the same band without running away on it.
 
 | | Last converged trial | Captured failed state |
 | --- | --- | --- |
@@ -581,8 +577,8 @@ crest has moved 0.999 ft, about 18 times its own elastic response — but it
 iteration settles, and there is an equilibrium state to report. At *F* = 1.58
 there is none: 522 elements yield, the movement passes a hundred and forty
 times the elastic response, and it is still growing when the iteration budget
-runs out. Nothing broke in the model. It simply never stopped moving, and that
-is what the method means by failure.
+runs out. The model does not break; it keeps moving, which is what the method
+defines as failure.
 
 That second field is captured deliberately. Right at the critical factor the
 collapse develops too slowly to draw, so once the bracket resolves the run
@@ -600,9 +596,8 @@ The band is already there. The strain concentrates along the same crest-to-toe
 path the failed state develops, hot spot at the base near the toe and all — but
 the color bar tops out near 0.32 where the failed state's reached 0.67.
 Below the critical factor the embankment strains along the eventual surface and
-stops; past it, the same band runs away. The transition the
-bisection spent nine solves locating is the transition between these two
-pictures.
+stops; past it, the same band runs away. The bisection's nine solves locate the
+transition between these two states.
 
 ---
 
@@ -621,23 +616,23 @@ This tutorial covered:
   the mesh is held by.
 - The bracket the search validates and bisects, and the iteration count climbing
   from 56 to 393 as the trials approach the critical factor.
-- Two controls that look alike and are not: the tolerance that sets the
-  bracket's stopping width, and the per-trial iteration budget, which is where
-  the automatic extension starts rather than where a slow trial dies.
+- Two controls that are easy to confuse: the tolerance that sets the
+  bracket's stopping width, and the per-trial iteration budget, which sets where
+  the automatic extension starts rather than stopping a slow trial.
 - Reading the mechanism out of shear strain, a deformed mesh and displacement
   vectors, and the converged state against the failed one on a single color
   scale.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
-[Finite Element Analysis](../fem/overview.md) carries the formulation, the
+[Finite Element Analysis](../fem/overview.md) gives the formulation, the
 viscoplastic iteration, the four failure criteria, K0 initial stress, exclusion
 zones and the rest of the plot types;
 [the SSRM benchmarks](../verification/ssrm.md#verification-griffiths1) run this
 embankment and five more Griffiths & Lane problems against their published
 answers. In [LEM-1](lem01_simple_embankment.md) the same kind of slope is solved
-by limit equilibrium from nothing, and in
+by limit equilibrium from scratch, and in
 [SEEP-1](seep01_sheetpile.md#building-the-mesh) mesh generation and element order
 are worked through on a problem where that choice is a trade rather than a
 requirement. In [FEM-2](fem02_reinforcement.md) we take the method to a
-reinforced slope, where the bars carry a stiffness of their own and the two
-engines' answers begin to diverge — and we measure why.
+reinforced slope, where the bars have a stiffness of their own and the two
+engines' answers differ, and we measure why.

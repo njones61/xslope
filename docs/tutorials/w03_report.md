@@ -5,8 +5,8 @@ description: "A solved model turned into a Word calculation package in XSLOPE St
 
 # Tutorial W-3 — Generating the Analysis Report
 
-An analysis that stays on the canvas is not yet a deliverable. **File → Generate
-Report…** writes one: a Word document with a title page, a table of contents,
+**File → Generate Report…** turns a solved analysis into a deliverable: a Word
+document with a title page, a table of contents,
 running heads and footers, numbered figures and tables, and a section for every
 engine that was run — down to the equation each stability method evaluated and
 the converged numbers in it. Nothing in it is a screenshot. The plots are drawn
@@ -15,7 +15,7 @@ same DataFrame the solver produced.
 
 We generate two reports on one model. The first documents Bishop and Spencer on
 the page layout XSLOPE ships. The second goes out on a firm's letterhead, built
-on a Word template this page ships.
+on a Word template this page provides.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -48,7 +48,7 @@ script, which [Analysis Report](../studio/reports.md#from-python) covers.
 [xslope_johnson_res_solved.xlsx](files/xslope_johnson_res_solved.xlsx) holds the
 Johnson Reservoir dam of [COMBO-1](combo01_seepage_stability.md) — an 80 ft
 zoned embankment with a shell, a keyed clay core and a foundation, under 60 ft of
-water. Eight companion files sit beside it: `..._mesh.json` carries the mesh all
+water. Eight companion files sit beside it: `..._mesh.json` holds the mesh all
 three analyses share, `..._seep.csv` the steady head and pore pressure at every
 node, and six `..._fem_*` files the strength reduction solution and the mechanism
 it failed on. Download the workbook and its companions into one folder, then open
@@ -57,13 +57,13 @@ the workbook with **File → Open…**.
 Studio reads those companions on open, so the seepage and finite element
 solutions are attached before anything is run. A report **documents** an
 attached seepage or finite element solution; it never re-solves either, which
-is why this file ships solved — the strength reduction run behind it is the
-kind of solve no report should spend again. Limit equilibrium is the one
+is why this file is provided solved — the strength reduction run behind it
+takes too long to repeat for a report. Limit equilibrium is the one
 engine a report runs itself: the slice computations are fast, so any method
 ticked without a result is solved on the fly — which is what lets several
 methods go into one report.
 
-No companion file carries a limit equilibrium solution, and none is needed —
+No companion file holds a limit equilibrium solution, and none is needed —
 the report will run whatever methods we tick. Still, a quick run confirms the
 model arrived intact. Switch the mode strip to **LEM** (`Ctrl+1`) and click
 **Run → Run LEM…**. Leave **Method** on **Spencer**, **Analysis** on
@@ -106,9 +106,9 @@ submittal needing ruled signature lines gets them from that box.
 
 **Contents.** One checkbox per section, opening on that section's own default. A
 parent turned off dims its whole branch. Leave the tree alone; its defaults
-document every analysis this model carries.
+document every analysis this model contains.
 
-The dialog is composed. Click **Generate**.
+The dialog is complete. Click **Generate**.
 
 Generating this report takes about twenty seconds. The progress bar names each
 figure as it is drawn, and **Cancel** stops the build. When the figures are done,
@@ -119,12 +119,12 @@ its contents page just lists the headings without numbers.
 
 ---
 
-## What the document carries
+## What the document contains {#what-the-document-carries}
 
 The report runs to 28 pages and 24 figures:
 
-(The linked copies below carry their figures at reduced resolution to keep the
-download small; a report you generate yourself carries them at full
+(The linked copies below have their figures at reduced resolution to keep the
+download small; a report you generate yourself has them at full
 resolution.)
 [w03_report.docx](files/w03_report.docx). Its sections follow the analyses, with
 seepage ahead of the one stability section that consumes its answer. Both methods
@@ -142,7 +142,7 @@ records that each searched for a surface of its own.
 <!-- test: file=files/xslope_johnson_res_solved.xlsx, type=circular_search, num_slices=40, fs_bishop=1.231, fs_spencer=1.257, tolerance=0.005 -->
 
 The seepage section states the conductivities and the mesh it was solved on, then
-the four fields the solution carries: the flow net, pore pressure, velocity
+the four fields the solution contains: the flow net, pore pressure, velocity
 magnitude with the vectors over it, and hydraulic gradient.
 
 ![The seepage results page: the computed flow through the section, the flow net, the pore pressure field and the velocity magnitude](images/w03_page_seep.png){width=620}
@@ -168,7 +168,7 @@ sums, 485408 and 394283, and prints the 1.231 they give.
 - **Open the document.** Its contents page lists the sections with a page number
   against each; headings without them mean the finishing step did not run, and
   Word rebuilds them with F9.
-- **Section 4 carries both methods** — §4.5 Bishop at 1.231 and §4.6 Spencer at
+- **Section 4 contains both methods** — §4.5 Bishop at 1.231 and §4.6 Spencer at
   1.257, with §4.4 *Factors of Safety* comparing them. A method missing means its
   box was never ticked.
 - **The seepage and finite element sections state the attached solutions'
@@ -244,7 +244,7 @@ report on any model opens on the same letterhead. The 21-page result downloads a
 - **The firm's name is in the head of page 2 and every page after it**,
   including the landscape slice table. A letterhead that reaches the contents page
   and stops was put in a paragraph rather than a table.
-- **The footer carries the firm's line above *page N of M*.** Both print, because
+- **The footer shows the firm's line above *page N of M*.** Both print, because
   the report's own paragraph was left where it was.
 - **The title page reads ACME Geotechnical**, from the Organization field rather
   than from the template — which is what lets one template serve every project.
@@ -266,6 +266,5 @@ This tutorial covered:
   outside the paragraphs the report deletes.
 
 **Where to go next:** [Analysis Report](../studio/reports.md) documents every
-section, every content option and the script route;
-[COMBO-1](combo01_seepage_stability.md) builds and runs the three analyses this
-page reports on.
+section, every content option and the script route; the three analyses this
+page reports on are built and run in [COMBO-1](combo01_seepage_stability.md).

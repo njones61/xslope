@@ -12,14 +12,14 @@ a single file, in the order a real analysis runs them — seepage first, because
 its answer is what the other two need.
 
 A seepage analysis produces a pore pressure at every node of a mesh. Both
-stability engines want exactly that, and neither one re-enters it: the limit
+stability engines need exactly that, and neither one re-enters it: the limit
 equilibrium search reads the field at every slice base, the strength reduction
 reads it inside every element, and both read it off the same mesh the seepage
 run was solved on. No file is exported, no value is retyped, and nothing about
 the water is stated twice.
 
 We work on the Johnson Reservoir dam, already built. In
-[SEEP-2](seep02_johnson_dam.md) we construct this model from nothing and work
+[SEEP-2](seep02_johnson_dam.md) we construct this model from scratch and work
 the seepage physics through in detail; here we open the finished workbook and
 spend the page on the three runs and the one column that connects them.
 
@@ -31,7 +31,7 @@ spend the page on the three runs and the one column that connects them.
 <div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Learn how one model carries three analyses: how to mesh once
+**Objectives** — Learn how one model supports three analyses: how to mesh once
 for all of them, how a seepage solution reaches a stability run, what each
 material's pore-pressure option decides, and what keeps the three results
 consistent with the inputs they came from.
@@ -40,7 +40,7 @@ consistent with the inputs they came from.
 <div class="tgm-model" markdown>
 **Model** — [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx), the
 completed Johnson Reservoir dam, built in [SEEP-2](seep02_johnson_dam.md) and
-opened here as it stands. It carries no mesh and no solution, so we make all
+opened here as it stands. It has no mesh and no solution, so we make all
 three runs below from scratch
 </div>
 </div>
@@ -56,9 +56,9 @@ downstream, with a clay **core** through the middle of it that is continued
 downward as a **cutoff key** 40 ft into the foundation. The reservoir stands at
 elevation 160 and the tailwater at elevation 100.
 
-The three zones carry both problems' properties on one materials table. Their
-conductivities are what the seepage run reads — the shell at 1 ft/day, the core a
-thousand times tighter at 0.001, the foundation between them at 0.1 — and their
+The materials table holds the properties of the three zones for both problems.
+Their conductivities are what the seepage run reads — the shell at 1 ft/day, the
+core a thousand times lower at 0.001, the foundation between them at 0.1 — and their
 strengths and stiffnesses are what the two stability runs read: the shell at
 c = 100 psf and φ = 35°, the core at 400 psf and 18°, the foundation at 100 psf
 and 27°, with Young's modulus E and Poisson's ratio ν beside them for the finite
@@ -68,7 +68,7 @@ element run. The geometry and the boundary conditions are covered in full in
 We open the file with **File → Open…**. The toolbar's mode strip reads
 LEM | Seepage | FEM, and we make the three runs below in that strip's three
 positions, in the order Seepage, LEM, FEM. Switch it to **Seepage** and the
-Inputs plot draws what the file carries for that mode:
+Inputs plot draws what the file contains for that mode:
 
 ![The model as the file carries it](images/combo01_inputs.png){width=1000}
 
@@ -84,10 +84,10 @@ materials table, and they are never entered a second time.
 
 ## The seepage run
 
-The seepage analysis comes first because the other two read its answer. Three
-steps: we build the mesh every engine will share, solve the steady flow through
-the dam on it, and see where the solution lands so the stability runs can find
-it.
+The seepage analysis comes first because the other two read its answer. It takes
+three steps: we build the mesh every engine will share, solve the steady flow
+through the dam on it, and see where the solution is stored so the stability runs
+can find it.
 
 ### One mesh for all three analyses
 
@@ -95,8 +95,8 @@ Switch the mode strip to **Seepage** (`Ctrl+2`) and click **Run → Build Mesh�
 
 ![Build Mesh, at its own defaults](images/combo01_studio_build_mesh.png)
 
-Leave every control as it is and click **Build**. Two of the defaults matter
-enough to name:
+Leave every control as it is and click **Build**. Two of the defaults are
+important here:
 
 **Element type** is **Quadratic triangles (tri6)**. On a seepage run alone the
 element order is a trade — head is a scalar field, and a linear mesh solves it
@@ -133,11 +133,11 @@ seepage dialog. Click **Run → Run Seep…**
 
 ![Run Seepage, at its defaults](images/combo01_studio_run_seep.png)
 
-The **Model checks** panel carries the preflight report for this run, and on this
+The **Model checks** panel shows the preflight report for this run, and on this
 model it reports **No problems found for this run.** Leave **Convergence tol** at
 `0.0001` and **Max iterations** at `400`, and click **Run**. The unconfined
 iteration settles in **23 sweeps**, and the run is over almost as soon as it
-starts. The Log pane's closing lines carry the last sweep and the convergence it
+starts. The Log pane's closing lines show the last sweep and the convergence it
 reached:
 
 ```text
@@ -151,8 +151,8 @@ Flow closure check: inflow = 6.480843e-01, outflow = 6.480843e-01, error = 1.239
 **The total discharge is 1.948 ft³/day per ft** — per foot of dam measured along
 its axis, the convention every quantity a two-dimensional analysis reports
 carries. (In [SEEP-2](seep02_johnson_dam.md#running-the-analysis) the same model
-on a linear mesh at 6.25 ft gives 1.9546; the 0.3% between the two is the mesh,
-not the physics.) The head runs from 100.000 ft to 160.000 ft, the two boundary
+on a linear mesh at 6.25 ft gives 1.9546; the 0.3% difference comes from the
+mesh.) The head runs from 100.000 ft to 160.000 ft, the two boundary
 values and nothing outside them, and the heavy black line is the **phreatic
 surface** — the locus of points where the pore pressure passes through zero,
 which is drawn from the solved field rather than entered.
@@ -166,7 +166,7 @@ is written beside the workbook as `xslope_johnson_res_mesh.json` and
 
 ---
 
-## The column that connects the modes
+## The pore-pressure option (u column) {#the-column-that-connects-the-modes}
 
 With a seepage solution in hand, we next make sure the stability runs use it.
 Neither the Run LEM nor the Run FEM dialog has a control for that; the
@@ -187,29 +187,29 @@ model, so a section can mix them:
 | `seep` | The finite element seepage solution |
 | `ru` | A pore-pressure ratio applied to the vertical total stress |
 
-**All three of this dam's materials read `seep`**, which is what sends the field
-solved above to every slice base and into every element. It is a stability input,
-not a seepage one: it says what the two stability engines do with a field the
+All three of this dam's materials are set to `seep`, so the field solved above
+is applied at every slice base and in every element. It is a stability input,
+not a seepage one: it sets what the two stability engines do with a field the
 seepage run produced, and it has no effect on the seepage run itself.
 
-Leaving a material on anything else costs a measurable amount, because the
-seepage run computes the same field either way and says nothing about who reads
-it. With all three materials set to `none` instead, on this same mesh and this
-same solved field, the Spencer search below returns **FS = 1.618** against the
-1.257 it returns at `seep` — 28.7% higher, on a shallower circle the search
-prefers once the water is gone. The seepage analysis still ran, converged and
+Leaving a material on anything else changes the answer measurably, and the
+seepage run computes the same field either way without reporting whether any
+material uses it. With all three materials set to `none` instead, on this same
+mesh and this same solved field, the Spencer search below returns **FS = 1.618**
+against the 1.257 it returns at `seep` — 28.7% higher, on a shallower circle that
+becomes critical once the water is removed. The seepage analysis still ran, converged and
 reported its discharge; the stability run never read it, and every slice base
 took zero pore pressure.
 
 The model checks catch the omission both ways. A material set to `seep` on a
-model that carries no solved field is an **error** that blocks the run — *"takes
+model that has no solved field is an **error** that blocks the run — *"takes
 pore pressure from a seepage solution (u = seep), but this model carries no
 pore-pressure field"* — so the sequence cannot be run backwards. A solved field
 that no material reads raises a **warning** — *"This model carries a solved
 seepage field, but no material takes its pore pressure from it"* — and the run
 is allowed, because a total stress analysis on a wet section is a legitimate
 thing to ask for. Setting the column is the modeler's decision; the warning
-makes sure it was a decision.
+ensures it is made deliberately.
 
 <!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, u_option=none, num_slices=40, expected_fs=1.618, tolerance=0.005 -->
 
@@ -227,9 +227,9 @@ statement of what the strength reduction run solves, so it is the method we
 compare the two engines on. Leave **Analysis** on **Auto search** and **Number
 of slices** at 40, and click **Run**.
 
-The checks column reads **No problems found for this run**, which is itself the
-handover working: the three materials read `u = seep`, and the field they need is
-in the model because the seepage run put it there.
+The checks column reads **No problems found for this run**. The three materials
+use `u = seep`, and the field they need is in the model because the seepage run
+produced it.
 
 The Log pane follows the search. Its last two refinement steps and its closing
 lines read:
@@ -252,7 +252,7 @@ at elevation 77.3, and comes out on the foundation surface at x = 597.9, about
 48 ft beyond the downstream toe. The search evaluated 71 candidate circles over
 the 12 refinement steps the log counts.
 
-The seepage solution shows up twice on this figure. The thin gray contours
+The seepage solution appears twice on this figure. The thin gray contours
 behind the section are the solved total head, and the pale blue band under the
 failure surface is the **pore pressure on each slice base**, interpolated from
 that field: read off the slice table's `u` column it runs from 0 to 2,002 psf
@@ -276,7 +276,7 @@ immediately.
 **Model checks** reports **No problems found for this run**, and **Run** is
 enabled.
 
-The dialog opens on the defaults this run wants. **Analysis** is **SSRM
+The dialog opens on the defaults this run needs. **Analysis** is **SSRM
 (find FS)**, the strength reduction: it divides both Mohr-Coulomb strength
 parameters by a trial factor *F*, solves the whole slope for equilibrium under
 its own weight, and reports the largest *F* the slope still stands at.
@@ -290,8 +290,8 @@ solve and the search before it.
 ![Shear strain at failure](images/combo01_fem_shear.png){width=1000}
 
 **Strength reduction gives FS = 1.246**. The shear strain field above is the
-mechanism the run found, and nothing about a surface was assumed to find it: the
-band of straining soil is wherever the model put it.
+mechanism the run found. No surface was assumed; the band of straining soil is
+located by the solution.
 
 The band starts at the upstream face just below the crest, curves down through
 the core and the downstream shell into the foundation, and comes out beyond the
@@ -303,23 +303,23 @@ prescribed.
 The pore pressures reached this run the same way they reached the search: off the
 materials' `u` column, interpolated from the same mesh nodes into each element, where they reduce the effective mean stress and with it the strength available.
 The Run FEM dialog has no water control of its own, and the mesh underneath it
-was never rebuilt — the run read the seepage answer because the materials say
-to, not because anything was pointed at it.
+was never rebuilt — the run used the seepage answer because the materials' `u`
+column specifies it.
 
 ---
 
-## What integration means here
+## How the three analyses stay consistent {#what-integration-means-here}
 
 One definition produced three results. The geometry was entered once, the
 materials once and the reservoir level once, and the mesh built once; the
 seepage run turned that into a head field, and both stability engines read the
 pore pressures out of it without a single input being restated.
 
-What keeps the three consistent is that a result is derived from the inputs it
+The three stay consistent because each result is derived from the inputs it
 was computed on, and Studio drops it when those inputs change. Editing any input
 clears a stale LEM solution, and editing the **geometry** — a profile line, the
 maximum depth, the endpoints of a reinforcement or pile row — also clears the
-**mesh**, so the seepage and finite element modes re-gate on a fresh **Build
+**mesh**, so the seepage and finite element modes require a fresh **Build
 Mesh** and the seepage solution has to be re-run before either stability engine
 will read it again. [Stale results and the mesh](../studio/editing.md#stale-results-and-the-mesh)
 states the rule in full. The practical effect is that the three answers on this
@@ -349,8 +349,8 @@ This tutorial covered:
 - Results go stale when the inputs they depend on change.
 
 **Where to go next:** [Seepage and Slope Stability](../seep/seep_slope.md)
-carries the interpolation, the negative-pressure treatment and the element-type
-requirement in full. [SEEP-2](seep02_johnson_dam.md) is where we build this dam
-and work its seepage physics; [FEM-1](fem01_strength_reduction.md) is where strength
-reduction and the Run FEM dialog's controls are covered. The
+gives the interpolation, the negative-pressure treatment and the element-type
+requirement in full. In [SEEP-2](seep02_johnson_dam.md) we build this dam
+and work its seepage physics; strength reduction and the Run FEM dialog's
+controls are covered in [FEM-1](fem01_strength_reduction.md). The
 [tutorials index](index.md) lists the series.

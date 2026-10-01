@@ -5,7 +5,7 @@ description: "Studio's built-in assistant put through eight conversations on one
 
 # Tutorial W-1 — The AI Assistant
 
-Studio carries an assistant that does the work the rest of this series does by
+Studio includes an assistant that does the work the rest of this series does by
 hand. It can build a model from a drawing or from a description in words, edit
 any part of one, run every analysis XSLOPE offers, sweep a parameter, answer a
 question out of the built-in documentation, and write the analysis report — all
@@ -148,7 +148,7 @@ about the mechanism or the finding is right.
 All five build the model correctly and get the 1.244 that LEM-3 publishes for
 this slope; they part ways on the harder requests, and Opus 5 is the only one
 that gets every number right. Its one explanation miss is a single wrong
-sentence in the broken-file session, quoted and taken apart under
+sentence in the broken-file session, quoted and corrected under
 [A broken file](#a-broken-file). Z.ai
 publishes no price for GLM-5V-Turbo; its cost here is at the rate a reseller
 lists for it.
@@ -180,11 +180,10 @@ page says so at that point.
 
 ## Building a model from a drawing
 
-One of the most powerful uses of the assistant is building a model straight
-from a drawing. We paste the problem drawing from the top of the
+The assistant can build a model straight from a drawing. We paste the problem drawing from the top of the
 [LEM-3 tutorial page](lem03_layered_slope.md) into an empty project and ask for
 the model it describes, naming the two zones and the extents the drawing does not
-carry.
+show.
 
 Start from **File → New**. Open the LEM-3 page in your browser, right-click the
 drawing at the top of it and choose **Copy image**; back in Studio, click in the
@@ -208,10 +207,10 @@ The two admissibility warnings above the plot are not the assistant's doing.
 They would appear however this section was built — by hand, from the
 spreadsheet, or here — because they are the crest tension of a φ = 0 slope with
 no tension crack, normal and common for undrained slopes. LEM-3's own solution
-carries the same two, and [LEM-3](lem03_layered_slope.md#the-search-result)
+shows the same two, and [LEM-3](lem03_layered_slope.md#the-search-result)
 shows the tension crack that clears them without changing the critical surface.
 
-The dock itself carries the whole exchange:
+The dock itself shows the whole exchange:
 
 ![The whole build conversation in the dock: the attached drawing, the snippet that builds the model, the three generated starting circles, the clean model checks, the searched Spencer run, and the closing summary of geometry, materials and result](images/w1_build_from_image_1.png){width=560}
 
@@ -293,8 +292,8 @@ submerged ground comes from the piezometric line itself. The third turn drops th
 foundation to 250 psf: **FS = 1.418**, and now the critical surface bottoms at
 **elevation −10** and exits past the toe. At 250 psf the foundation is the
 weakest material in the section, so the search drives the surface down to
-`max_depth` — the mechanism switch [LEM-3](lem03_layered_slope.md) makes its
-point out of.
+`max_depth` — the same change of mechanism demonstrated in
+[LEM-3](lem03_layered_slope.md).
 
 One workbook was saved per turn —
 [w1_modify_after_1.xlsx](files/w1_modify_after_1.xlsx),
@@ -316,7 +315,7 @@ in [w1_modify_transcript.md](files/w1_modify_transcript.md).
   with anything.
 - **Materials editor, second workbook.** `u = piezo`, with the saturated unit
   weights beside the total ones — the water explicit and the weights total, which
-  is how XSLOPE wants a submerged section stated.
+  is how a submerged section is entered in XSLOPE.
 
 ---
 
@@ -361,7 +360,7 @@ own summary. On the weakest foundation the search raises an **unsolved trials**
 warning: Spencer finds no admissible solution on a share of the circles it tries,
 and some of those rank below the minimum it does report. The assistant called its
 own answer for that step possibly optimistic on the strength of it, and a rerun
-bears that out: the table above carries the 0.627 a fresh search settles on, on a
+bears that out: the table above gives the 0.627 a fresh search settles on, on a
 different circle, rather than the 0.640 the transcript prints. The warning fades
 up the column — the 500-psf step and everything above it is clean — which is why
 the plateau at 1.244 is the part of this table to trust and the bottom row is the
@@ -428,9 +427,9 @@ identical to the original. The transcript is
 ## Stiffnesses and a strength reduction run
 
 For many problems, we may need assistance in selecting elastic properties:
-limit equilibrium needs no stiffnesses, the finite element engine will not
-start without them, and measured values are rarely on hand. In our next prompt,
-we ask what these two soils should carry, have the assistant enter them, and
+limit equilibrium needs no stiffnesses, the finite element engine requires
+them, and measured values are rarely on hand. In our next prompt,
+we ask what these two soils should have, have the assistant enter them, and
 then run the strength reduction analysis beside a limit equilibrium analysis
 with Spencer's method.
 
@@ -465,7 +464,7 @@ bracket [1.2656, 1.2734], and 1.270 is its midpoint. It puts the gap between the
 two answers down to the two analyses looking for different surfaces — the search
 is confined to circles and to Spencer's assumed interslice inclination, while
 the finite element run develops whatever shear band the stress field produces.
-Both runs drew themselves into the dock along the way: the critical circle, then
+Both runs' plots appeared in the dock along the way: the critical circle, then
 the deformed mesh, the shear strain band and the displacement vectors at
 failure.
 
@@ -481,12 +480,12 @@ The session saved
   strengths untouched.
 - **Read 1.270 as a bracket.** The bisection stops once the bracket is narrower
   than the tolerance it was given, 0.01. [1.2656, 1.2734] is 0.008 wide, so the
-  answer is pinned to about ±0.3%; a tighter tolerance buys a narrower one at
+  answer is pinned to about ±0.3%; a tighter tolerance gives a narrower one at
   the price of another trial or two.
 - **The mesh came from defaults.** The run reports a tri6 mesh at target size
   1.2 — 8,849 nodes — and this model declares neither an element type nor a mesh
-  size. Rebuilding at another size is how to find out what the answer owes to
-  it.
+  size. Rebuilding at another size shows how much the answer depends on the
+  mesh.
 
 ---
 
@@ -529,7 +528,7 @@ same".
 <!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=single_circle, circle_index=0, num_slices=40, fs_oms=1.2471, fs_bishop=1.2471, fs_janbu=1.3215, fs_corps=1.3631, fs_lowe=1.2988, fs_spencer=1.2471, fs_mprice=1.2471, tolerance=0.005 -->
 
 The reason it gives is the right one: at φ = 0 the base resistance is c·ΔL, which
-carries no normal force, so moment equilibrium about the center is the same
+has no normal-force term, so moment equilibrium about the center is the same
 equation for all four moment methods. The force-only methods resolve along an
 assumed interslice inclination, which reaches the answer directly, and they
 spread from 1.2988 to 1.3631.
@@ -566,7 +565,7 @@ copy of the slope with three transcription errors written into it, give the
 assistant the tutorial's own inputs, and ask it to check the file against them.
 Nothing says where the faults are or how many there are.
 
-That copy, [w1_diagnose_start.xlsx](files/w1_diagnose_start.xlsx), carries three
+That copy, [w1_diagnose_start.xlsx](files/w1_diagnose_start.xlsx), has three
 faults typed into LEM-3's model: the material rows **swapped**, so the strong clay
 sits in the fill and the weak clay in the foundation; the embankment's unit weight
 **13 pcf** instead of 130; and the maximum depth **−100** instead of −10, putting a
@@ -652,10 +651,10 @@ The first turn returns **FS = 1.244** — [LEM-3](lem03_layered_slope.md)'s
 published answer, on its published circle — and reads the lowest point as sitting
 well above the rigid base, so the floor is not controlling the answer. The
 second
-turn generates the document and answers in a sentence. The report carries six
+turn generates the document and answers in a sentence. The report contains six
 figures and three tables across its Traceability, Project Definition and Limit
-Equilibrium Analysis sections — a short version of the full report
-[W-3](w03_report.md) builds, where the model carries all three engines and the
+Equilibrium Analysis sections — a short version of the full report built in
+[W-3](w03_report.md), where the model includes all three engines and the
 dialog's options are walked through. The session saved
 [w1_report_after.docx](files/w1_report_after.docx); the transcript is
 [w1_report_transcript.md](files/w1_report_transcript.md).
@@ -666,7 +665,7 @@ dialog's options are walked through. The session saved
   1.244 on the critical surface of Figure 4" — the run made in the first turn,
   not a second analysis the report performed for itself.
 - **Read the traceability page.** It names the input file and its SHA-256 digest,
-  so the document says which model it was written from.
+  so the document identifies the model it was written from.
 - **Read what it says about water and loads.** No groundwater, no external water,
   no distributed loads — this section as built.
 
@@ -691,7 +690,7 @@ twice.
 | Claude Haiku 4.5 | \$0.53 | 2 of 8 | 3 of 8 |
 | GLM-5V-Turbo | ~\$0.24 | 5 of 8 | 4 of 8 |
 
-Three things did most of the damage. The 2 ft band along the face is a thin zone
+Most of the errors had three causes. The 2 ft band along the face is a thin zone
 read off a drawing, and a model that missed it gave the whole embankment one
 strength. Moving the crest break for a flatter face left the surcharge behind on
 the old geometry. And in the diagnosis, several models measured the effect of a
@@ -710,13 +709,13 @@ This tutorial covered:
   and strength — with every factor of safety reproducing from the saved workbook.
 - Two sweeps, a strength reduction run, two questions answered without touching
   the model, a diagnosis that fixed all three planted faults, and a report
-  carrying the run it names.
+  documenting the run it names.
 - Checking what came back: reload the workbook and re-run the search, and read
   the critical surface and not only the factor of safety — the diagnosis puts a
   right factor of safety on a surface it places 10 ft too low.
 
 **Where to go next:** The [AI Assistant reference](../studio/assistant.md)
 documents the helpers the assistant calls, the checks that run after every edit,
-and what each provider can do. [LEM-3](lem03_layered_slope.md) builds this same
-slope by hand three ways, and [LEM-8](lem08_reinforced_slope.md) builds the
-reinforced slope the comparison above runs on.
+and what each provider can do. In [LEM-3](lem03_layered_slope.md) this same
+slope is built by hand three ways, and in [LEM-8](lem08_reinforced_slope.md) we
+build the reinforced slope the comparison above runs on.

@@ -99,14 +99,14 @@ Download
 and open it with **File → Open…**, leaving the mode strip (LEM | Seepage | FEM) on
 **LEM**.
 
-Three companion files carry the seepage work and travel with the workbook:
+Three companion files hold the seepage results and accompany the workbook:
 `xslope_earth_dam_fs_time_start_mesh.json` holds the mesh,
 `xslope_earth_dam_fs_time_start_tseep.csv` the head and pore pressure at every
 node of every saved frame, and `xslope_earth_dam_fs_time_start_tseep_meta.json`
 the ledger naming the frames. Studio finds them in the same folder as the workbook and reads them
 on open, so the mesh and the seepage solution are already loaded.
 
-[xslope_earth_dam_fs_time.xlsx](files/xslope_earth_dam_fs_time.xlsx) carries the
+[xslope_earth_dam_fs_time.xlsx](files/xslope_earth_dam_fs_time.xlsx) has the
 same dam with the strengths already on it, and its own copies of the three
 companions; open that one to skip the typing below.
 
@@ -114,7 +114,7 @@ companions; open that one to skip the typing below.
 
 Every pore pressure the runs below read comes from the seepage engine, and the
 file arrives with those fields solved, so the first thing to do with it is look
-at what it carries. Switch the mode strip to **Seepage** (`Ctrl+2`) and click the
+at what it contains. Switch the mode strip to **Seepage** (`Ctrl+2`) and click the
 **Seep · Transient** tab. The play bar steps through **nineteen** instants —
 t = 0, 2, 5, 10, 15, 20, 25, 30, 35, 40, 47, 55, 65, 80, 100, 130, 180, 240 and
 300 — and every run below reads one of them.
@@ -123,7 +123,7 @@ t = 0, 2, 5, 10, 15, 20, 25, 30, 35, 40, 47, 55, 65, 80, 100, 130, 180, 240 and
 
 The schedule is uneven on purpose: five-day frames through the fall, which ends
 on day 47, and widening steps after, because the answer moves fastest while the
-pool is dropping. Only a saved frame can carry a point of the curve, so the
+pool is dropping. Only a saved frame can give a point of the curve, so the
 schedule is a modeling decision taken before the stability question is asked.
 
 Those fields were solved on **614 nodes and 1,089 triangles**, linear triangles
@@ -132,11 +132,11 @@ auto-sized at 64 divisions across the 110 m section, a target element size of
 [that mesh in SEEP-3](seep03_reservoir_drawdown.md#building-the-mesh), solve
 [the full-pool state the transient run starts from](seep03_reservoir_drawdown.md#the-steady-solution-at-full-pool)
 and [lower the pool on it](seep03_reservoir_drawdown.md#running-the-transient-seepage-analysis);
-the file downloaded above arrives past all three.
+the file downloaded above already includes all three.
 
 ### Entering the soil properties
 
-In the starter file the strength band carries nothing to analyze with: the
+In the starter file the strength band is empty: the
 saturated unit weight γsat is blank on both zones, and the unit weight γ, the
 cohesion c′ and the friction angle φ′ sit at 0 with the pore-pressure option u
 on `none`. The seepage analysis never needed any of them. We enter the five
@@ -167,7 +167,7 @@ lighter as the pool drains it.
 base needs a pore pressure to form an effective normal stress from.
 
 **We set `u` to `seep` on both rows.** That column decides where a slice base
-gets its pore pressure, and `seep` sends it to a solved seepage field;
+gets its pore pressure, and `seep` takes it from a solved seepage field;
 [COMBO-1](combo01_seepage_stability.md#the-column-that-connects-the-modes) covers
 its four values. With a transient solution loaded, `seep` means one frame of it,
 chosen at the run rather than here.
@@ -177,14 +177,14 @@ Click **OK**.
 ### Starting circles
 
 With the strengths in, the last input a search needs is somewhere to start
-from. Click **Circles**. The file carries two, one on each face of the dam:
+from. Click **Circles**. The file has two, one on each face of the dam:
 
 | Xo | Yo | Option | Depth |
 | :---: | :---: | --- | :---: |
 | 7 | 56 | `Depth` | 0 |
 | 103 | 59 | `Depth` | 0 |
 
-The file carries one starting circle for each face, because the critical face
+The file has one starting circle for each face, because the critical face
 changes with the pool: a drawdown weakens the upstream slope, while a full
 reservoir loads it and leaves the downstream side weaker. Each circle is drawn
 deep — center beyond the heel or the toe, **Depth** = 0 so the bottom of the
@@ -215,8 +215,8 @@ search on embankment slides; the Run LEM dialog offers the same limit as
 **Ignore surficial (skin) failures**.
 
 The entry and exit ranges are left blank on purpose. Filling them would confine
-the trace to one slope, and which slope governs at a given instant is what we
-are measuring.
+the trace to one slope, and we are measuring which slope governs at a given
+instant.
 
 ![Two starting circles and the one search limit the file sets](images/combo03_studio_circles.png)
 
@@ -248,7 +248,7 @@ this page; **Analysis** opens on **Auto search**, which finds the run its own
 critical circle, and **Number of slices** on 40.
 Leave all three as they are, with **Grid search** unticked.
 
-Because the file carries a transient seepage solution, the dialog shows a
+Because the file has a transient seepage solution, the dialog shows a
 **Seepage time** group. It picks which time step this run reads its pore
 pressures from, and offers three ways to choose: **Saved frame** (one of the
 nineteen saved time steps), **Frame shown in the results viewer** (whatever the
@@ -264,7 +264,7 @@ unticked (ticked, it stores the chosen time in the file for later runs):
 
 ![Run LEM with the Seepage time group set to the first saved frame](images/combo03_studio_run_lem.png)
 
-**Model checks** finds no problem and carries one note, which restates the
+**Model checks** finds no problem and shows one note, which restates the
 dependency:
 
 > Pore pressures come from the transient seepage solution, at t = 0 day. That
@@ -301,7 +301,7 @@ load is why the upstream face is not critical here. Under the failure surface th
 pale blue band is the pore pressure on each slice base and the green hatched band
 above it the effective normal stress.
 
-Now we will ask the same question a few days into the fall, at t = 5 — the pool
+Next we will run the same analysis a few days into the fall, at t = 5 — the pool
 has just started down. Reopen **Run → Run LEM…**, set **Saved frame** to
 `t = 5 day` and click **Run**:
 
@@ -315,10 +315,10 @@ Critical FS = 1.513
 Sliding mass = 6,237.1 kN/m over 60.20 m of failure surface
 ```
 
-**1.513, and the circle has crossed to the other side of the dam** — center
-(5.20, 65.90) against the full-pool run's (103.00, 56.79). Three days of fall
-have taken the pool from elevation 18 to 16.93, and that one meter of water is
-enough to hand the answer to the upstream slope: the reservoir load that held it
+**The factor of safety is 1.513, and the circle has moved to the other side of
+the dam** — center (5.20, 65.90) against the full-pool run's (103.00, 56.79).
+Three days of fall have taken the pool from elevation 18 to 16.93, and that one
+meter of water is enough to make the upstream slope critical: the reservoir load that held it
 down is coming off, while the pore pressures inside it have barely begun to
 drain.
 
@@ -345,13 +345,13 @@ picker the other three modes use is gone, because nothing is substituted — eve
 point solves *this* model against a different instant's pore pressures. In its
 place is a **Saved frames** list holding the nineteen the run stored, all
 ticked, and unticking samples a long one. **Rapid drawdown at each time** is
-grayed out, because neither zone on this dam carries the $d$ / $\psi$ pair that
+grayed out, because neither zone on this dam has the $d$ / $\psi$ pair that
 analysis reads; Part 2 runs it on a dam that does. Leave **Grid search (auto-seed
 the circular search)** off, and leave **Re-search the critical surface at each
 step** ticked, because the mechanism moves.
 
 Click **Run**. Nineteen searches report to the Log as one table, a row per
-instant carrying the factor of safety and the circle it was found on:
+instant giving the factor of safety and the circle it was found on:
 
 ```text
 Factor of safety vs time (lem): 19 instant(s) of the transient solution, spencer, re-searching at each…
@@ -371,7 +371,7 @@ the pool schedule drawn faintly behind.
 
 **Day 0 and day 5 repeat the two single runs, at 1.5311 and 1.5134** — the
 sweep reads the same minimum slip depth and searches from the same two circles as
-the dialog runs. An instant that produces no result comes back as a row carrying
+the dialog runs. An instant that produces no result comes back as a row with
 its reason rather than as a gap in the curve.
 
 <!-- test: file=files/xslope_earth_dam_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, expected_first=1.5311, critical_time=35, min_fs=1.3312, tolerance=0.005, benchmark=COMBO-3-drained -->
@@ -382,7 +382,7 @@ Every circle above bottoms at, or within a tenth of a meter of, the rock at
 elevation 0. The **face** column is read off the center: the crest runs from
 x = 51 to x = 59, so a center left of it is an upstream mechanism and a center
 right of it a downstream one. The curve below colors each point by that column,
-shades the days the pool is falling, and carries the full-pool 1.531 across as a
+shades the days the pool is falling, and draws the full-pool 1.531 across as a
 dashed reference.
 
 ![The factor of safety at every saved instant, over the pool that drives it](images/combo03_curve.png){width=1000}
@@ -436,18 +436,18 @@ The face column does not move with the factor of safety.
 **At full pool the downstream face governs, at 1.5311**, because 18 m of water
 press the upstream slope into the dam.
 
-**From the first frame of the drawdown the upstream face governs, and it holds
-the answer for two thirds of the run.** By day 5 the pool has dropped about a
+**From the first frame of the drawdown the upstream face governs, and it keeps
+governing for two thirds of the run.** By day 5 the pool has dropped about a
 meter and the critical circle is already at (5.20, 65.90) at 1.5134; it stays
 upstream through the fall, the minimum and the recovery, down to 1.3312 on day 35
 and back to 1.5187 on day 80.
 
-**At day 100 the downstream face takes it back**, at 1.5482, and keeps it to the
+**At day 100 the downstream face governs again**, at 1.5482, and keeps it to the
 end, once the upstream slope has climbed past a downstream mechanism that has
 barely moved all run.
 
 So the reported curve is two mechanisms in sequence, not one surface moving, and
-the figure marks each point by the face it came out on. The handover falls
+the figure marks each point by the face it came out on. The change falls
 between day 80 and day 100, where the two cross at about 1.55. A run given one
 starting circle on one face would draw a smooth curve through one mechanism and
 miss the other.
@@ -499,10 +499,10 @@ pressures from the seepage solution at that step. That is right when the soil
 drains as fast as the pool drops. Over a short drawdown period, a low-permeability
 zone does not, and undrained strengths govern instead. For that case the drawdown
 should be analyzed as a rapid drawdown, with the three-stage Duncan, Wright and
-Wong procedure of [COMBO-2](combo02_rapid_drawdown.md). The Part 1 model carries
+Wong procedure of [COMBO-2](combo02_rapid_drawdown.md). The Part 1 model has
 no $d$ / $\psi$ pair, so it cannot be used for that.
 
-The Johnson Reservoir dam from COMBO-2 can. Its core carries a $K_c = 1$
+The Johnson Reservoir dam from COMBO-2 can. Its core has a $K_c = 1$
 envelope, and in COMBO-2 we ran the three-stage procedure on it three times, once
 per statement of where the water is, reading 1.181, 1.195 and 1.016 — the last
 from a transient run, stage 1 at t = 0 and stage 2 at t = 50. Here we will run it
@@ -532,13 +532,13 @@ view draws that mesh behind the zones.
 
 ![The Johnson Reservoir dam as the shipped file opens, the mesh behind it](images/combo03_rapid_inputs.png){width=1000}
 
-### What the file carries
+### What the file contains {#what-the-file-carries}
 
 Nothing on this dam has to be built, so before running anything we go through
-what came with it. Five things the file carries decide what the sweep can do.
+what came with it. Five things in the file determine what the sweep can do.
 
 **The undrained envelope.** Click **Materials** and set the **Show parameters
-for:** toggles to **LEM** alone. Only the core carries a $K_c = 1$ envelope —
+for:** toggles to **LEM** alone. Only the core has a $K_c = 1$ envelope —
 $d = 250$ psf and $\psi = 14°$, under its drained $c' = 400$ psf and
 $\phi' = 18°$ — and blanks on the shell and the foundation declare them
 free-draining through the drawdown.
@@ -559,7 +559,7 @@ from a solved seepage field. In COMBO-2 we deleted the file's two piezometric
 lines when we replaced them, which is why the figure above draws a water surface
 and a derived load and no piezometric line.
 
-**One starting circle, on the upstream face.** Click **Circles**: the file carries
+**One starting circle, on the upstream face.** Click **Circles**: the file has
 a single one, center (275, 235) with a radius of 160 ft, tangent at elevation 75.
 Every search below starts from it. One circle is enough here because which face
 governs is not in question — lowering the pool takes the water off the upstream
@@ -616,13 +616,13 @@ a drawdown's critical surface is not the drained one and moves as the field does
 Every point searches from the starting circle described above.
 
 The **Model checks** panel repeats COMBO-2's one warning: two of the three
-materials carry no $d$ / $\psi$ and keep their drained strength through the
-drawdown. Boundary set 2 raises nothing, because
+materials have no $d$ / $\psi$ and keep their drained strength through the
+drawdown. Boundary set 2 raises no warning, because
 [we cleared it in COMBO-2](combo02_rapid_drawdown.md#clearing-boundary-set-2)
 before that run; a transient run solves boundary set 1 only.
 
 Click **Run**. Each of the twenty instants is a drawdown searched in full, so the
-table lands when the last search finishes:
+table appears when the last search finishes:
 
 ```text
 Rapid drawdown vs time (lem): 20 instant(s) of the transient solution, spencer, re-searching at each…
@@ -658,11 +658,11 @@ uses:
 
 ![The rapid drawdown factor of safety at every saved instant, over the pool schedule that drives it](images/combo03_rapid_curve.png){width=1000}
 
-One curve is drawn, carrying the rapid drawdown factor of safety at each instant,
+One curve is drawn, showing the rapid drawdown factor of safety at each instant,
 the lower of stages 2 and 3; the three stages are in the table below, where the
 governing one is named per row. Behind it, on the right axis, runs the pool
 schedule, with the forty-five days it falls over shaded and the pre-drawdown
-1.456 carried across as a dashed full-pool reference. The lowest instant is
+1.456 drawn across as a dashed full-pool reference. The lowest instant is
 ringed and labeled, and the red guide marks FS = 1. Each point is colored by the stage that governs it —
 orange where stage 2's undrained strength gave the lower factor of safety, green
 where stage 3's drained strength did — so the three drained instants at the
@@ -706,8 +706,8 @@ the same starting circle — so the curve passes through that answer.
 and 60 read 3 in the **governs** column, by a single ten-thousandth on day 45, two
 on day 60 and six on day 50 — 1.0279 / 1.0278, 1.0163 / 1.0157, 1.0524 / 1.0522.
 Every other row reads `not required`, meaning no core slice came out weaker
-drained than undrained. The margins are thin because the handover falls at
-$d = 223$ psf, 27 psf under the 250 psf this core carries.
+drained than undrained. The margins are thin because the governing stage changes
+at $d = 223$ psf, 27 psf under the 250 psf this core has.
 
 **Day 5 costs 0.05 with no drawdown in it.** The pool holds at elevation 160
 until day 5, so stage 2's water is stage 1's water. The reported
@@ -744,7 +744,7 @@ circle. The circle moves from row to row, so the stage 1 value on it moves too.
 We can run the same twenty-one frames at drained strengths. Open
 **Run → Parametric…** again, untick **Rapid drawdown at each time**, keep every
 other field, and click **Run**; **Re-search the critical surface at each step**
-comes back live and stays ticked.
+becomes active again and stays ticked.
 
 Each point now solves the section once rather than three times, and takes about
 half as long for it — 8 seconds an instant against 17 on the machine these runs
@@ -871,13 +871,14 @@ In this tutorial we covered:
 - Reading the curve: on Part 1's dam the minimum falls mid-drawdown, before the
   pool stops moving, and the governing face changes as the pool falls.
 - Repeating the sweep as a rapid drawdown at each time step, for a dam whose core
-  carries an undrained envelope.
+  has an undrained envelope.
 - Comparing the two curves: the rapid drawdown curve governs through the fall and
   just after it, the drained curve the long-term condition.
 
-**Where to go next:** [SEEP-3](seep03_reservoir_drawdown.md) builds Part 1's
-transient seepage model, and [COMBO-2](combo02_rapid_drawdown.md) builds Part 2's
-and runs the three-stage procedure at one instant.
+**Where to go next:** Part 1's transient seepage model is built in
+[SEEP-3](seep03_reservoir_drawdown.md), and Part 2's in
+[COMBO-2](combo02_rapid_drawdown.md), where the three-stage procedure is run at
+one instant.
 [Factor of safety versus time](../parametric/sensitivity.md#factor-of-safety-versus-time)
 covers the sweep mode, [Transient seepage](../seep/transient.md) the formulation,
 and [Rapid drawdown analysis](../lem/rapid.md) the three-stage procedure. The

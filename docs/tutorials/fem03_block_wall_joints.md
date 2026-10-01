@@ -1,6 +1,6 @@
 ---
 title: "Tutorial FEM-3 — A Block Wall on Slip Joints"
-description: "A 3.6 m segmental block wall modeled the way it is built — as a stack of separate blocks on slip joints under the base, behind the back face and between every course — run alone and then with three geogrid layers tied into the facing, and then the question every geosynthetic model has to answer: is the sheet a bar the soil is bonded to, or a surface the soil slides on?"
+description: "A 3.6 m segmental block wall modeled the way it is built — as a stack of separate blocks on slip joints under the base, behind the back face and between every course — run alone and then with three geogrid layers tied into the facing, and then whether a geosynthetic sheet should be modeled as a bar bonded to the soil or as a surface the soil slides on."
 ---
 
 # Tutorial FEM-3 — A Block Wall on Slip Joints
@@ -72,12 +72,11 @@ The wall stands **3.6 m** high in **six 0.6 m courses** of modular block
 fill behind it and a 2:1 backfill slope rising 2 m above the crest. The section
 is 24 m wide.
 
-Four materials. Three are ordinary Mohr-Coulomb soils, the foundation, the
-reinforced fill and the retained fill. The fourth is the block, and it is
+There are four materials. Three are ordinary Mohr-Coulomb soils, the foundation,
+the reinforced fill and the retained fill. The fourth is the block, and it is
 declared **elastic**: a concrete unit is far stronger than anything around it,
 and declaring it elastic means the strength reduction has nothing in the block
-to weaken, which is the truth of the problem. The wall's strength is the
-strength of its contacts, not of its blocks.
+to weaken. The wall's strength comes from its contacts.
 
 | material | γ (kN/m³) | c′ (kPa) | φ′ (°) | E (MPa) | ν |
 | --- | :---: | :---: | :---: | :---: | :---: |
@@ -123,7 +122,7 @@ themselves, and it is the baseline the geogrid is measured against in Part 2.
 ### Entering the wall's contacts
 
 Open [xslope_block_wall_start.xlsx](files/xslope_block_wall_start.xlsx) with
-**File → Open…**. It carries the section, the four materials and the six block
+**File → Open…**. It contains the section, the four materials and the six block
 polygons, and an empty joints worksheet. Units are metric.
 
 ![The starter file: the block courses, the two fill zones and the foundation, with no joints entered](images/fem03_inputs_start.png){width=1000}
@@ -161,15 +160,15 @@ and a block-on-granular-fill contact are both cohesionless.
 What the columns mean, in the order they appear on the editor:
 
 - **Label** names the line. The model checks, the results panels and the report
-  use it whenever they have something to say about a joint, so a name that
-  identifies the contact pays for itself the first time a check fires.
+  use it whenever they report on a joint, so a name that identifies the contact
+  makes those messages easy to follow.
 - **x1, y1, x2, y2** are the two endpoints. A joint line is straight; a contact
   that turns a corner is entered as two lines meeting at the corner.
 - **c** and **phi** are the strength of the surface, in the same units as a
   soil's cohesion and friction angle. `phi` is required.
 - **c_res** and **phi_res** are the strength the surface keeps after it has
   slipped once, for a rough joint that shears off its surface roughness and does
-  not rebuild it. Blank means no drop: the peak strength carries throughout,
+  not rebuild it. Blank means no drop: the peak strength applies throughout,
   which is the ordinary case for a manufactured block face.
 - **dil** is the dilation angle, how far a rough surface rides up on itself as it
   slides. Blank is zero.
@@ -225,30 +224,29 @@ settles over tens of thousands of iterations where a model without joints settle
 over hundreds. A trial that hits the limit before it has settled is counted as
 not standing, and the factor of safety then comes out low, because the limit
 stopped the trial before the wall had finished moving. The model checks in the
-column beside the dialog say so while the limit is left lower. Raising it costs
-very little, because a trial that has settled stops there and does not use the
-rest. This is the one habit a jointed model asks of you: a trial cut off early
-is not a failed trial, and when the closing summary says the factor of safety
-depends on the iteration limit, or reports it as "at least", the answer is a
-higher limit and the patience to let the run finish.
+column beside the dialog report this while the limit is left lower. Raising it
+costs very little, because a trial that has settled stops there and does not use
+the rest. A trial cut off early is not a failed trial: when the closing summary
+says the factor of safety depends on the iteration limit, or reports it as
+"at least", raise the limit and let the run finish.
 
 **Accelerate convergence — leave it ticked.** It is on for any model that
-carries a joint. Once the joints have settled into their states the solver
+has a joint. Once the joints have settled into their states the solver
 takes longer steps, which brings a jointed trial to rest in a fraction of the
-iterations, and the closing summary says when it was on.
+iterations, and the closing summary reports when it was on.
 
 **Failure criterion — leave it on Hybrid.** The dialog opens on Hybrid for any
-model that carries a joint, because a near-critical trial on a jointed model
+model that has a joint, because a near-critical trial on a jointed model
 often neither settles nor runs away: the joints go on slipping by a fixed
 amount each pass while the wall itself stops moving, which is a wall standing
 still behind contacts that never quite balance. Hybrid reads the slip and the
 movement together and reports that as standing. The other criteria read only
 whether the solver reached equilibrium, and on this wall they report every
-near-critical trial as a failure — the search then walks its lower bound down to
+near-critical trial as a failure — the search then moves its lower bound down to
 the floor and gives no factor of safety at all.
 
 Press **Run**. The search takes about **seven minutes** on an ordinary desktop —
-nearer twelve on an install that does not carry the
+nearer twelve on an install that does not include the
 [compiled kernel](../fem/overview.md#fast-kernel) — and reports
 
 <!-- test: file=files/xslope_block_wall.xlsx, type=fem_ssrm, expected_fs=1.137, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-blocks-ssrm -->
@@ -280,8 +278,8 @@ two open ends, and the shear stress sits on the Coulomb limit at each of them,
 so the dashed limit line lies under the solid one. The bottom panel is the slip
 itself, growing from the base of the column to 70 mm just below the top.
 Reading each of the seven contacts the same way gives the count of slipping
-stations and the largest slip on each, and the one doing the work is the back
-face:
+stations and the largest slip on each, and the back face has by far the most
+slip:
 
 | contact | spans slipping | largest slip |
 | --- | :---: | :---: |
@@ -290,16 +288,16 @@ face:
 | course-01 | 5 of 9 | under 0.01 mm |
 | course-02 to course-05 | none | — |
 
-**The wall failed on its back face.** The block column has slid down past the
+The wall failed on its back face. The block column has slid down past the
 fill along its own back, five times as far as it has slid forward on its base,
 and the top four course joints have not moved on each other at all — the four
-upper courses are travelling as one piece. Modeling the contacts separately is what
-makes that visible. A wall meshed as a single solid can only bend, and would have
-had nothing to say about which of its seven surfaces was carrying the failure.
+upper courses are traveling as one piece. Modeling the contacts separately makes
+that visible; a wall meshed as a single solid can only bend, and would not show
+which of its seven surfaces was failing.
 
 ![Viscoplastic shear strain at the critical factor](images/fem03_fem_shear_failure.png){width=1000}
 
-The shear strain shows where the soil is working. The reinforced fill behind the
+The shear strain shows where the soil is straining. The reinforced fill behind the
 blocks is straining along a surface that runs up from the heel of the wall, which
 is the mass the facing has to hold back.
 
@@ -325,7 +323,7 @@ The Log says the same in words at the end of every strength reduction run:
 > moved the slope 92% as far as the one before), so the trial was counted as
 > sliding.
 
-Read this summary on every run. Part 2 is a run where it says something
+Read this summary on every run. Part 2 is a run where it reports something
 different.
 
 A factor of safety of 1.137 is well below what a retaining wall needs. These
@@ -349,7 +347,7 @@ fill, about 1.4 times the wall height.
 
 Open the editor, switch it to **Table view**, and on the **Show parameters for**
 row untick **LEM** and tick **FEM**. That hides the columns the limit equilibrium
-methods use and nothing else reads, so the table carries only what this run
+methods use and nothing else reads, so the table shows only what this run
 needs. Then enter the three rows below, or paste them into the worksheet.
 
 | Label | x1 | y1 | x2 | y2 |
@@ -422,7 +420,7 @@ the mesh with **Run → Build Mesh…** at the same settings as Part 1, tri6 at
 
 The mesh grows to **2,139 nodes, 927 elements and 90 joint elements on 10 jointed
 lines**. Each jointed sheet adds a jointed line of its own, and it splits the
-mesh twice over — the sheet has soil above it and soil below it, so it carries
+mesh twice over — the sheet has soil above it and soil below it, so it has
 two interfaces, one against each.
 
 ![The mesh with the three geogrid layers in place: ten jointed lines, the seven wall contacts and the three sheets](images/fem03_mesh_grid.png){width=1000}
@@ -436,7 +434,8 @@ because the search climbs higher, and reports
 
 >>**FS ≥ 1.56**
 
-Not a number this time but a bound, and the Log says why:
+This time the result is a bound rather than a number, and the Log gives the
+reason:
 
 > No failure was found up to F = 1.5703. The slope came to rest at every
 > strength tried up to F = 1.5625, moving further each time; at that strength
@@ -446,24 +445,24 @@ Not a number this time but a bound, and the Log says why:
 > raise Max iterations per trial.
 
 The wall came to rest at every strength the search confirmed, and at the next
-strength up it was still creeping when the iteration limit arrived. The run does
-not know whether that trial would have come to rest, so it reports the last
-strength it is sure of.
+strength up it was still creeping when the iteration limit arrived. Because the
+run cannot determine whether that trial would have come to rest, it reports the
+last strength at which the wall was confirmed to stand.
 
 You can tell in Studio that a run ended this way. The results view is titled
-with the bound, **FS ≥ 1.56**, instead of a number, the Log carries the
+with the bound, **FS ≥ 1.56**, instead of a number, the Log shows the
 paragraph above, and the results toolbar shows a button that is not there after
 an ordinary run, **Continue with a higher limit…**, beside **1D Details…**.
 Leave it alone for now. If you stop here you have a complete set of results,
 and the next section reads them. The section after that presses the button.
 
-### If you stop here
+### Results at the default iteration limit {#if-you-stop-here}
 
 Here is the Displacement vs F plot from this run:
 
 ![Displacement against strength reduction factor with the geogrid in place: the wall comes to rest at 1.0, 1.5 and 1.5625, the trials just above were still slowing when the limit came, and only at 2.0 did the movement fail to slow](images/fem03_ssrm_curve_grid.png){width=800}
 
-Nothing on it is a wall giving way. Every filled point is a strength at which
+None of the points shows the wall giving way. Every filled point is a strength at which
 the wall came to rest, and the movement grows with each one: 2 cm at 1.0, 6 cm
 at 1.5, 8 cm at 1.56. The open points above 1.56 are trials that were still
 creeping, more slowly all the time, when the limit came. The panels show what
@@ -471,7 +470,7 @@ the wall is doing at the last trial, the undecided one at 1.5703.
 
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=855}
 
-This panel has no element grid: the blocks panel drops it once a model carries
+This panel has no element grid: the blocks panel drops it once a model has
 more than eight jointed lines (the wall alone had seven; the sheets make ten),
 and **Element edges** in the display panel puts it back. Otherwise it is drawn
 as in Part 1: the block column 12 times deformed, the undeformed outline dashed
@@ -482,7 +481,7 @@ of its interface: gray where the soil grips the sheet, green over the short
 lengths where it has slid, at the facing on all three and near the far end of
 the top sheet.
 
-The joint slip puts numbers on what the layers do. With the soil at 64% of its
+The joint slip shows the effect of the layers. With the soil at 64% of its
 strength (F = 1.5625), the back face has slid **40 mm** and the base **10 mm**,
 and the wall is at rest. Without the layers, the wall had slid 70 mm and 13 mm
 with the soil still at 88% of its strength (F = 1.133), and the next step down
@@ -492,13 +491,13 @@ more than half as far.
 
 ![Viscoplastic shear strain at the critical factor with the geogrid in place](images/fem03_fem_shear_grid_failure.png){width=1000}
 
-The shear strain panel says the same thing about the soil. Part 1's band ran up
+The shear strain panel shows the same for the soil. Part 1's band ran up
 from the heel of the wall through the reinforced fill with strains near 0.05;
 here the band is in the same place but faint, and the scale tops out near 0.04.
-The three layers have not moved the surface the fill wants to fail on. They have
-held the mass behind the facing together so that less of it is straining. The
-bars themselves show dark on the reinforcement force scale: they carry little
-tension, which the next panel makes exact.
+The three layers have not moved the surface along which the fill tends to fail.
+They have held the mass behind the facing together so that less of it is
+straining. The bars themselves show dark on the reinforcement force scale: they
+carry little tension, as the next panel shows in detail.
 
 **1D Details…** draws what one layer is doing along its length. Here is the
 middle one:
@@ -531,7 +530,7 @@ sheet slides through the soil, and by the time the wall gives way the sheets
 are being dragged out of it, which is something a bonded bar cannot do. Part 3
 is about models where jointing the sheet changes the answer from the start.
 
-### If you let it run
+### Results with a higher iteration limit {#if-you-let-it-run}
 
 The search stopped at 1.56 because it ran out of iterations. To go further,
 press **Continue with a higher limit…** on the results toolbar and enter
@@ -562,7 +561,7 @@ The wall comes to rest at every strength tried up to F = 1.9922, and its
 movement grows the whole way: 6 cm at 1.5, 13 cm at 1.75, 19 cm at 1.875 and
 30 cm at 1.9922, a twelfth of the wall's height. At 2.0 the movement runs away.
 
-So the wall does fail in the end, and what gives out is the geogrid. At
+The wall does fail in the end, when the geogrid reaches its capacity. At
 F = 1.9922, the last strength at which the wall came to rest, the top layer is
 carrying 98.6% of its 40 kN/m capacity. The middle layer is at 72% and the
 bottom layer at 57%. By then the block column has slid 80 mm down its back
@@ -583,8 +582,8 @@ because the two faces of the interface meet at one node there and the limit is
 taken from the soil's pressure on the sheet instead. Everywhere else the two
 panels use the same stress.
 
-One more step in strength and the top layer has nothing left to give, and the
-wall goes. This is the failed state at 2.0, drawn to scale, with no
+One step further in strength, the top layer has no capacity left and the wall
+fails. This is the failed state at 2.0, drawn to scale, with no
 exaggeration:
 
 ![The wall at 2.0, drawn at true scale: the block column pushed out and sunk into the foundation, the fill behind it collapsed, and the geogrid layers dragged out with it](images/fem03_fem_blocks_grid_long_failure.png){width=848}
@@ -623,7 +622,7 @@ it. Once you have that number, draw it across the Displacement vs F plot; the
 strength where the resting points cross that line is the factor of safety on
 that criterion. At 1% of the height,
 3.6 cm, the crossing lies between 1.0 and 1.5; at 2%, 7 cm, just under 1.56.
-For this wall the movement decides the answer.
+For this wall the allowable movement governs the answer.
 
 When modeling a wall like this, you may wish to report the movement along with
 the factor of safety. The default run found a wall standing at F = 1.56 with
@@ -664,9 +663,9 @@ A sheet is entered one of two ways:
   woven geotextile on sand whose interface friction is well below the soil's
   own, or the fill of Part 2 running out over the sheets of a block-faced wall.
 
-Which is right depends on where the failure surface wants to go: **across** the
-sheet, or **along** it. Getting it wrong in the second case is not a small
-error. Two versions of the embankment show both halves of that, one at a time.
+Which is right depends on where the failure surface runs: **across** the
+sheet, or **along** it. In the second case the wrong choice gives a large error.
+Two versions of the embankment show the two cases, one at a time.
 The embankment is 5 m high on 2:1 slopes with a 12 m crest, on a 4 m foundation,
 with one 32 m sheet under it. Each version is built twice with the `Joint` cell
 as the only difference, and each is run at the settings this page has used
@@ -717,9 +716,9 @@ the clay under both shoulders and comes up outside the
 toes, while the fill above rides on it almost intact. The sheet lies across
 that mechanism and is stretched by it, to its full 100 kN/m over the middle of
 its length in both runs. Very little soil moves along it: 8 of its 55 spans
-slip in the jointed run, near the ends. A sheet loaded across a failure is
-what a bonded bar models, and the slip surface adds nothing here because
-nothing slides on it.
+slip in the jointed run, near the ends. A bonded bar models a sheet loaded
+across a failure, and the slip surface adds nothing here because nothing slides
+on it.
 
 ### A smooth geomembrane liner on a firm foundation
 
@@ -773,17 +772,17 @@ tension, dark blue along its whole length on the force scale. The fill slides
 over it rather than gripping it, so the membrane's own strength never comes
 into play and a stronger one would not help. A fill on a smooth membrane
 behaves this way, and it gives way at a far lower strength than the slope
-faces do: 1.285 against 2.167, forty percent less. The bonded model never saw it, and reported the slope far
-safer than it is.
+faces do: 1.285 against 2.167, forty percent less. The bonded model cannot
+represent this mechanism, and reports the slope as far safer than it is.
 
-### The rule
+### Choosing between a bonded bar and a slip surface {#the-rule}
 
 | model | interface δ | as a bonded bar | as a slip surface |
 | --- | :---: | :---: | :---: |
 | base geotextile on soft clay | 20° | 1.566 | 1.566 |
 | smooth geomembrane liner | 10° | 2.167 | 1.285 |
 
-Between them the two pairs bracket the rule. Where the failure does not run
+The two pairs show the rule. Where the failure does not run
 along the sheet, a bonded bar is adequate and cheaper — the jointed model
 triples the nodes along the line and adds two interface elements per station for
 an answer it already had. Where the failure can run along the sheet, only the
@@ -791,7 +790,7 @@ jointed model can find it, and the bonded one overstates the slope. When in
 doubt, run it both ways: that is two runs on one file with one cell changed, and
 if they agree the question is settled.
 
-### What the model checks say before anything is run
+### Model checks on the bonded liner {#what-the-model-checks-say-before-anything-is-run}
 
 The model checks catch the wrong choice before anything is run. Open the
 bonded liner file, the one with `Joint` blank, and the checks column beside the
@@ -837,15 +836,15 @@ This tutorial covered:
   and the closing summary tell a wall that fails from one that keeps moving.
 - That a trial cut off early is not a failed trial: a jointed model settles
   slowly, and when the summary says the factor of safety depends on the limit
-  or reports it as "at least", the answer is a higher limit and patience.
+  or reports it as "at least", raise the limit and let the run finish.
 - The wall standing on its own blocks against the same wall with three geogrid
   layers tied into the facing.
-- The question every geosynthetic model has to answer — does the surface cut
-  across the sheet or run along it — measured both ways on two small models.
+- Whether a failure surface cuts across a geosynthetic sheet or runs along it,
+  and how each case is modeled, measured both ways on two small models.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
-[Joints and Interface Elements](../fem/joints.md) carries the element and the
-split mesh, [Soil Reinforcement](../fem/reinforcement.md) carries the bar, the
+[Joints and Interface Elements](../fem/joints.md) describes the element and the
+split mesh, [Soil Reinforcement](../fem/reinforcement.md) describes the bar, the
 interface and the ties, and
 [Worksheet: joints](../usage/input_template.md#worksheet-joints) documents the
 inputs with the rest of the template. In

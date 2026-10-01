@@ -9,8 +9,8 @@ An XSLOPE model is an Excel workbook. Three things write that workbook — you, 
 spreadsheet; XSLOPE Studio's editors; and Studio's AI assistant — and they produce
 the same model, so a file one of them starts, another can finish.
 
-Every tutorial in this suite is therefore written three times, once per path. What
-follows is the machinery all three share.
+Every tutorial in this suite is therefore written three times, once per path. The
+sections below describe what all three share.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -27,7 +27,7 @@ collects beside its workbook, and how to send a whole project to somebody else.
 
 ---
 
-## One model, three ways in
+## The three ways to build a model {#one-model-three-ways-in}
 
 | Path | You work in | Reach for it when |
 | --- | --- | --- |
@@ -35,7 +35,7 @@ collects beside its workbook, and how to send a whole project to somebody else.
 | **Studio's editors** | forms and tables, beside a redrawing section | you are drawing geometry, or auditing a model |
 | **The AI assistant** | a chat box, inside Studio | you have a sketch or a description to start from |
 
-The three are entry points, not commitments. The assistant builds into the project
+You can move between the three at any point. The assistant builds into the project
 Studio has open, Studio saves that project as an ordinary `.xlsx`, and the `.xlsx`
 opens in Excel — so a model started in chat can be finished by hand, and a
 spreadsheet built by hand can be handed to the assistant to extend.
@@ -51,12 +51,11 @@ seepage boundaries — and a `main` sheet of global options that apply to all of
 ![The template's main worksheet, and the worksheets the workbook carries](images/t0_template_main.png)
 
 Download it here: [input_template.xlsx](../inputs/input_template.xlsx). Save a copy
-under a name of your own before you fill anything in — the template is a blank to
-work from, not a file to work in.
+under a name of your own before you fill anything in.
 
 Most models use a handful of the sheets and leave the rest empty. A blank cell means
 *unset*, which is not the same as zero: a material with no cohesion entered and one
-with `c = 0` are different models, and only the second one is claiming anything.
+with `c = 0` are different models, and only the second one states a cohesion of zero.
 The same goes for the run options on `main` — a blank **LEM method** means *use the
 default*, chosen when you run.
 
@@ -74,7 +73,7 @@ opens its editor.
 
 ![Studio on a model, with the Inputs tree, the section and the Assistant dock](images/t0_studio_window.png)
 
-Three behaviors to know before your first build:
+The editors work as follows:
 
 - **The canvas is always current.** An edit is validated, applied to the model and
   redrawn immediately, so a mistyped vertex shows up as a wrong-looking section
@@ -110,7 +109,7 @@ machine. The provider library ships in the packaged app; a `pip` install needs t
 `ai` extra — see
 [Getting the assistant](../studio/assistant.md#getting-the-assistant).
 
-What matters for building models is where its work lands:
+The assistant's edits are handled as follows:
 
 - It **edits the open project**, not a file. Its changes appear on the canvas
   immediately, exactly as if you had typed them into the editors.
@@ -121,14 +120,13 @@ What matters for building models is where its work lands:
   snippet that only reads the model leaves no step at all.
 - **Nothing is saved until you use Save As.** The assistant writes no file.
 
-An assistant draft is a draft. Read what it built against what you gave it, and
-correct it in the same conversation — in [LEM-1](lem01_simple_embankment.md) we
-walk that audit on a real model, and the checking is most of what that path
-teaches.
+Check what the assistant built against what you gave it, and correct it in the
+same conversation. In [LEM-1](lem01_simple_embankment.md) we walk through that
+check on a real model.
 
 ---
 
-## Nothing is saved until Save As
+## Saving a project {#nothing-is-saved-until-save-as}
 
 **Save As** writes a new `.xlsx` through the bundled blank template, which is what
 turns an in-memory project — however it was built — into a file. **Save** writes back
@@ -137,8 +135,8 @@ to the same file afterwards, and on a project that has never been saved it route
 project exists only in Studio: closing it, or opening something else, prompts you to
 save, discard or cancel.
 
-That workbook is the model. Everything an analysis *produces* is written beside it,
-in files named after it:
+The workbook holds the model. Everything an analysis *produces* is written beside
+it, in files named after it:
 
 | File | Written by |
 | --- | --- |
@@ -159,16 +157,16 @@ sidecars.
 
 A **project package** is a `.xslz` file: a plain zip holding the workbook and all of
 its sidecars, and nothing else. It exists so a project can be emailed or archived as
-one file, with everything in it guaranteed to agree — a project sent as loose
-attachments can arrive with a workbook from Tuesday and a mesh from Monday.
+one file, with the workbook and its sidecars kept together as one set; a project
+sent as loose attachments can arrive with a mesh older than its workbook.
 
 **File → Export Project Package…** opens a save dialog with `{base}.xslz` filled in
-beside the current project; where it actually goes is yours to choose. The package
+beside the current project; you can choose another location. The package
 is built from the files **on disk**, so Studio offers to save first whenever the
 session is holding something that has not been written out — unsaved edits, or a
 mesh or a solution whose sidecar does not exist yet.
 
-A package is transport, not a place to work. **File → Open** accepts `.xslz`
+Studio does not work inside a package. **File → Open** accepts `.xslz`
 alongside `.xlsx`, and opening one unpacks it to loose files first. The dialog shows
 where they will go — a folder named for the package, beside it — and **Change…**
 picks somewhere else:
@@ -178,8 +176,8 @@ picks somewhere else:
 Studio then opens the extracted workbook through its ordinary open path, so
 everything afterwards refers to that loose workbook rather than to the package.
 
-If the folder is already there it may hold edits of your own, so the dialog asks
-rather than guessing:
+If the folder is already there it may hold edits of your own, so the dialog
+offers two choices:
 
 ![The same dialog when the destination already exists](images/t0_unpack_exists.png)
 
@@ -194,10 +192,9 @@ and it is published as the workbook alone:
 
 ---
 
-## Your first real build
+## The first tutorial {#your-first-real-build}
 
 In [**Tutorial LEM-1 — Simple Embankment**](lem01_simple_embankment.md) we build
 the smallest complete XSLOPE model down all three of these paths, search it for a
-critical failure surface, and read what the result says about the model. Pick one
-path; the other two are there when you want to see what the same model looks like
-from the other side.
+critical failure surface, and examine the result. Pick one path; the other two
+show the same model built another way.

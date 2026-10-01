@@ -1,15 +1,15 @@
 ---
 title: "Tutorial SEEP-1 — Confined Seepage Under a Sheetpile"
-description: "Build a confined seepage model in XSLOPE from scratch — with the AI assistant, in the Excel template, or in Studio — mesh it, solve it for the discharge under a sheetpile wall, read the flow net it draws, and find out how much of the answer is mesh, on a problem where the sequence never settles."
+description: "Build a confined seepage model in XSLOPE from scratch — with the AI assistant, in the Excel template, or in Studio — mesh it, solve it for the discharge under a sheetpile wall, read the flow net it draws, and measure how the discharge changes as the mesh is refined."
 ---
 
 # Tutorial SEEP-1 — Confined Seepage Under a Sheetpile
 
-Here we build a two-dimensional groundwater flow analysis from nothing and carry
-it through to a discharge you can defend. We work through what a seepage model
+Here we build a two-dimensional groundwater flow analysis from scratch and solve
+it for the discharge. We work through what a seepage model
 is made of, the difference between a confined and an unconfined problem, the three
-boundary condition types a flow region can carry and why choosing them is the
-part of the job that decides the answer, how a finite element mesh is built and how
+boundary condition types a flow region can have and why the choice of boundary
+conditions controls the answer, how a finite element mesh is built and how
 fine it has to be, and how to read the **flow net** — the grid of head contours and
 flow lines the solution is drawn as, and the form a seepage answer was given in
 long before there were finite elements.
@@ -59,7 +59,7 @@ it with the requirement that water is neither created nor destroyed gives the
 governing equation XSLOPE solves. Once the head field is known, the pore pressure
 at every node, the velocity and hydraulic gradient at every node, and the **total
 discharge** through the section all follow from it by arithmetic. The
-[Seepage Analysis](../seep/overview.md#governing-equations) page carries the
+[Seepage Analysis](../seep/overview.md#governing-equations) page gives the
 equations and the finite element formulation in full.
 
 ### Confined and unconfined problems
@@ -104,14 +104,13 @@ This problem is confined and never activates an exit face; in
 [SEEP-2](seep02_johnson_dam.md) we build a model around one and state its
 condition in full.
 
-There is one further possibility, and it is entered nowhere: an edge with **no
-boundary condition on it is a no-flow boundary**. That is the default rather than
-an omission the solver puts up with, and it is a real physical statement — bedrock,
+An edge with **no boundary condition on it is a no-flow boundary**, and nothing
+is entered for it. This default represents a real physical condition — bedrock,
 an impervious liner, a cutoff wall, a line of symmetry, and the far ends of a
 section drawn wide enough that nothing crosses them. Every edge of a flow region
-carries one of the three types above or nothing at all. Two of the three features
-that make this problem what it is, the clay blanket and the sheetpile wall
-itself, are no-flow boundaries that nobody enters anything for.
+has one of the three types above or nothing at all. In this problem the clay
+blanket and the sheetpile wall are both no-flow boundaries, and neither needs an
+entry.
 
 Assessing and assigning the boundary conditions is the most important part of
 building a seepage model. A conductivity that is wrong by a factor of two moves
@@ -137,7 +136,7 @@ has `k1` = `k2`, which makes `alpha` irrelevant; it is entered here as 0.
 `mat` and `name` are the worksheet's first two columns, and the four after
 them are the first four of its seepage band, in the band's order; the seven
 band columns beyond `unsat` belong to the unsaturated and transient models
-this problem does not use. The row carries no strength properties: this
+this problem does not use. The row has no strength properties: this
 model is analyzed for flow only.
 
 | mat | name | k1 | k2 | alpha | unsat |
@@ -145,7 +144,7 @@ model is analyzed for flow only.
 | 1 | `soil` | 30 | 30 | 0 | `lf` |
 
 **Geometry** — Profile Line 1, on material 1 (`soil`), one vertex per row, with
-Maximum depth = `0`. The drawing carries the dimensions the line follows — the
+Maximum depth = `0`. The drawing shows the dimensions the line follows — the
 ground surface at elevation 10, the wall reaching down to elevation 7, and the
 two base corners the maximum depth supplies. It draws the wall as a single
 vertical line; the table gives that line a width, three vertices at 29.9, 30 and
@@ -180,21 +179,21 @@ a material: as a slit in the flow region that water cannot cross.
 
 The upstream head of 13 m is the ground at elevation 10 with 3 m of water on it.
 It stops at x = 20, not at the wall, and the 10 m of ground surface between x = 20
-and the wall carries nothing. **That gap is the clay blanket.** An impervious
-blanket is modeled by the absence of a boundary condition, because a boundary with
-nothing on it is a no-flow boundary. It is also what the problem is about: the
-blanket forces the water to enter the ground 10 m further upstream than the wall,
-which lengthens every flow path under it. The downstream head of 10 m is the
+and the wall has no boundary condition. That gap models the clay blanket: an
+impervious blanket is modeled by the absence of a boundary condition, because a
+boundary with nothing on it is a no-flow boundary. The blanket forces the water to
+enter the ground 10 m further upstream than the wall, which lengthens every flow
+path under it. The downstream head of 10 m is the
 tailwater standing at ground level, applied from the far side of the sheetpile slot
 out to the end of the section.
 
 The remaining boundaries — the base at elevation 0 and the two vertical ends —
-carry nothing and are therefore no-flow. The base is the rock the silt sits on.
+have no boundary condition and are therefore no-flow. The base is the rock the silt sits on.
 Treating the ends as no-flow is a judgment call: the section is drawn far
 enough either side of the wall that the flow has become horizontal by the
 time it reaches them, so nothing crosses.
 
-These tables carry the entire model, and each is laid out exactly as its
+These tables contain the entire model, and each is laid out exactly as its
 destination is — the template's worksheets and Studio's editors, same
 columns in the same order. Select a table's block of values, copy, and
 paste it straight into the sheet or editor rather than retyping it.
@@ -208,9 +207,9 @@ pick one and skip the other two.
 
 1. **[Build it with the AI assistant](#a-building-it-with-the-ai-assistant)** —
    hand Studio's assistant the drawing (or a paragraph describing the section) and
-   let it build the model, then check its work. The fastest path by a wide margin.
+   let it build the model, then check its work. This is the fastest path.
 2. **[Build the Excel input file](#b-building-the-excel-file)** — fill in the
-   template worksheet by worksheet. The next-fastest path, and the one that shows
+   template worksheet by worksheet. This is the next-fastest path, and it shows
    you exactly what the file contains.
 3. **[Build it in Studio](#c-building-the-problem-in-studio)** — enter the data
    through Studio's editors, watching the section redraw as you go.
@@ -229,7 +228,7 @@ provider and credentials. That setup is a one-time job, described in
 
 ### Give it the problem
 
-The drawing at the top of this page carries the geometry, the conductivity and the
+The drawing at the top of this page shows the geometry, the conductivity and the
 two water levels.
 
 1. Right-click the problem figure at the top of this page and choose **Copy image**.
@@ -251,13 +250,13 @@ saved until you use **Save As**.
 
 ### Check its work
 
-This is the part that teaches. Read what it built against the section it was
+Check what it built against the section it was
 given, and correct it in the same conversation — plain sentences work, and each
 correction is undoable.
 
-- **The blanket is a gap, not a material.** Check this first, because it is the
-  judgment the drawing leaves to you and the likeliest miss: a drawing that colors
-  the blanket in invites a second material. If a low-conductivity layer was added
+- **The blanket is a gap in the boundary condition, with no material of its own.**
+  Check this first: the drawing shows the blanket as a colored layer, so the
+  assistant may add it as a second material. If a low-conductivity layer was added
   over x = 20 to 30, say: *"The clay blanket is impervious — remove that material
   and model it by leaving the ground surface from x = 20 to x = 30 with no
   boundary condition."*
@@ -298,7 +297,7 @@ This sheet needs exactly three edits:
    declaration states what the numbers you type already mean, and drives the
    unit labels on the plots.
 2. Set `main!D9` **Time** to `yr`, the base this model's conductivity is
-   stated in. On a seepage model this field is load-bearing: it is what puts
+   stated in. On a seepage model this field puts
    `m/yr` on the material form and `m³/yr per m` on the flow net's title.
    Left blank, the arithmetic is unchanged but the results carry no unit
    labels.
@@ -356,7 +355,7 @@ as though it were not there.
 
 ### 4. The `seep bc` worksheet
 
-This sheet carries an exit-face polyline and up to five head or flux blocks. This
+This sheet holds an exit-face polyline and up to five head or flux blocks. This
 problem uses two of the head blocks and no exit face.
 
 1. Head/Flux BC #1 — the type cell `E3` = `head`, the value cell `F3` = `13`, and
@@ -366,12 +365,12 @@ problem uses two of the head blocks and no exit face.
 
 ![The finished seep bc worksheet](images/seep01_sheet_seep_bc.png)
 
-Leave the **Exit Face** columns empty. That is what makes this a confined problem,
-and it is a decision, not a blank: an exit face here would send the solver looking
-for a phreatic surface in a domain that is saturated throughout.
+Leave the **Exit Face** columns empty. With no exit face the problem is confined;
+an exit face here would send the solver looking for a phreatic surface in a domain
+that is saturated throughout.
 
-Leave the ground surface between x = 20 and x = 29.9 out of both blocks. That gap
-is the clay blanket, and the no-flow default is what models it.
+Leave the ground surface between x = 20 and x = 29.9 out of both blocks. The
+no-flow default on that stretch models the clay blanket.
 
 Save the file, and continue at [Building the mesh](#building-the-mesh) — open the
 file in Studio and mesh it there.
@@ -384,7 +383,7 @@ Start with **File → New**, an empty project, and switch the toolbar's **Mode**
 selector to **Seepage** (or press `Ctrl+2`). The mode decides which analysis the
 run buttons start — **Run Seep…** rather than **Run LEM…** — and puts **Build
 Mesh…** beside it, which only the finite element workflows need. The **Inputs**
-tree is the same in every mode, **Seep BC** included, because one file carries the
+tree is the same in every mode, **Seep BC** included, because one file holds the
 inputs for all three analyses. Work down the tree in the order the model depends
 on: settings, then the material, then the geometry, then the boundary conditions.
 
@@ -393,8 +392,8 @@ on: settings, then the material, then the geometry, then the boundary conditions
 Click **Global parameters** and set **Units** to `SI`. The unit weight of water
 fills itself with `9.81`.
 
-Then set **Time** to `yr`. This field is inert on a limit equilibrium model and
-load-bearing here: it is what makes the material form label its conductivity boxes
+Then set **Time** to `yr`. This field has no effect on a limit equilibrium model;
+here it makes the material form label its conductivity boxes
 `k1 (m/yr)` and the solution title read `m³/yr per m`. XSLOPE never converts, so
 the declaration states what the conductivity you are about to type already means.
 
@@ -426,8 +425,8 @@ Press **Add row**, and fill it:
 
 ![The materials editor with the Seepage columns showing](images/seep01_studio_materials.png)
 
-The unit suffix in the column headers is the **Time** declaration from the previous
-step showing up. If those headers read `k1` with no unit, go back and set it.
+The unit suffix in the column headers comes from the **Time** setting in the
+previous step. If those headers read `k1` with no unit, go back and set it.
 
 ### 3. Profile lines
 
@@ -472,11 +471,11 @@ Press **Add head**, and fill the upstream boundary:
 Press **Add head** again for the downstream boundary — **Type:** `head`,
 **Head value (m):** `10`, points `30.1, 10` and `50, 10`.
 
-Leave the **Exit face** entry in the list with no points. That is the choice that
-makes this a confined problem.
+Leave the **Exit face** entry in the list with no points. With no exit face the
+problem is confined.
 
-Leave the ground between x = 20 and x = 29.9 out of both blocks. It is the clay
-blanket, and the no-flow default is what models it.
+Leave the ground between x = 20 and x = 29.9 out of both blocks. The no-flow
+default on that stretch models the clay blanket.
 
 Click **OK**, and continue below.
 
@@ -496,7 +495,7 @@ boundary, and the light line above it at elevation 13, with the inverted triangl
 is the water level that head stands for. Downstream the two coincide: the tailwater
 is at ground level, so the light water line at elevation 10 lies directly on the
 dashed boundary from x = 30.1 to x = 50 and hides it. The stretch of ground between
-the two carries neither, which is the blanket. The hatched line at elevation 0 is
+the two has neither, which is the blanket. The hatched line at elevation 0 is
 the maximum depth, and the spike at x = 30 is the sheetpile.
 
 Click **Build Mesh…**.
@@ -569,12 +568,12 @@ it at `0.0001`, and leave **Max iterations** at `400`; both belong to the
 unconfined iteration we work through in SEEP-2.
 
 The **Model checks** column beside the controls reads *No problems found for this
-run*. Read it rather than clicking past: a conductivity of zero, a
+run*. Check it before clicking **Run**: a conductivity of zero, a
 boundary set that drives no flow, or a mesh built against a different material
-table each produce a finished-looking number, and this column says so before the
-solve rather than after.
+table each produce a finished-looking number, and this column lists such problems
+before the solve.
 
-Click **Run**. The Log pane says which path the solver took:
+Click **Run**. The Log pane reports which path the solver took:
 
 ```text
 Solving CONFINED seep problem...
@@ -604,12 +603,12 @@ Untick it again — the wash is good for seeing the field at a glance, but the
 flow net is what we read here. Every change in the panel re-draws the
 solution already in hand; nothing is re-solved.
 
-The second option decides what the picture can be read for: **set Contour levels
-to 10**, which opens at `20`. It fixes how many lines of both families get
-drawn, and the arrival view shows what 20 does on this problem — the lines crowd
-together near the wall, where the head changes fastest. Ten is what makes them
-countable — [Reading the flow net](#reading-the-flow-net) below is the reason,
-and every seepage figure from here on is drawn at it.
+The second option is **Contour levels**: **set it to 10**; it opens at `20`. It
+fixes how many lines of both families are drawn, and the arrival view shows what
+20 does on this problem — the lines crowd together near the wall, where the head
+changes fastest. At 10 the lines can be counted, for the reason given in
+[Reading the flow net](#reading-the-flow-net) below, and every seepage figure from
+here on is drawn at 10.
 
 ![The seepage solution](images/seep01_solution.png){width=1000}
 
@@ -631,7 +630,7 @@ and lowest boundary head. Pore pressure runs from **0 to 126.8 kPa**, the larger
 (0, 0), the base under the upstream pool. It never goes negative, and the two
 numbers above are why: the lowest head anywhere is 10 m and the highest elevation
 anywhere is also 10 m, so the pressure head *h* − *z* cannot be less than zero
-anywhere in the section. That is what being confined looks like in the output.
+anywhere in the section.
 
 ---
 
@@ -677,21 +676,20 @@ levels are evenly spaced. *N<sub>f</sub>* is whatever the physics returns,
 $$ N_f = \frac{q \, N_d}{k \, \Delta h} = \frac{40.111 \times 9}{30 \times 3} = 4.011 $$
 
 and nothing obliges it to come out whole. On this problem, nine drops happen to
-land it within 0.3% of exactly four — and that near-whole pair is what lets the
-conventional hand calculation run on the picture's counts. Reading 4 and 9 off
-the screen gives
+land it within 0.3% of exactly four, so the conventional hand calculation can be
+made with the counts on the picture. Reading 4 and 9 off the screen gives
 
 $$ q = 30 \times 3 \times \frac{4}{9} = 40.0 \text{ m³/yr per m} $$
 
 against the finite element answer of 40.111, and the 0.3% between them is the
 rounding above and nothing else.
 
-That is what the contour count was for. Left at the panel's default of 20 levels,
+The contour count was set to 10 for this reason. Left at the panel's default of 20 levels,
 the same solution gives *N<sub>f</sub>* = 8.47 against 19 drops — nowhere near
 whole — and reading the rounded 8 channels off that picture gives
 30 × 3 × 8/19 = 37.9, 5.5% under the answer it was drawn from. A net can be
 counted only when the channel count lands close to a whole number, and on this
-problem 10 levels is what does it.
+problem 10 levels gives that.
 
 A flow net drawn by hand on graph paper is a legitimate solution to a confined
 seepage problem and was the standard one for decades; what the finite element solve
@@ -708,13 +706,13 @@ head or on the conductivity, which is what we measure in the
 
 ## Reading the gradient field
 
-The gradient field says where the flow is working hardest, and it is the field a
-seepage failure is read from. The **hydraulic gradient** is the rate at which
+The gradient field shows where the head falls fastest, and seepage failures are
+assessed from it. The **hydraulic gradient** is the rate at which
 head falls with distance, and where flow exits the ground at a gradient
 approaching the critical value — about 1.0 for most soils — the seepage force
 starts lifting the soil grains. The backward-eroding channel that starts is
 **piping**, the classic failure of sheetpile-supported excavations, and the
-gradient plot is where the danger shows.
+gradient plot shows where it can start.
 
 To draw it, make three changes in the **Display** panel: set **Variable** to
 `Hydraulic gradient magnitude`, tick **Filled contours** back on — the gradient
@@ -725,9 +723,9 @@ reads as a filled field, not a flow net — and untick **Flow lines**:
 The gradient is largest where the equipotentials of the head plot crowded
 together. It is smallest across the two
 ends: over the outer 5 m at each, the largest gradient anywhere is 0.015 upstream
-and 0.022 downstream, and the head varies by 0.09 m and 0.14 m. That is the check
-on the earlier judgment that the section was drawn wide enough — almost nothing is
-moving out there, which is what the no-flow ends assume.
+and 0.022 downstream, and the head varies by 0.09 m and 0.14 m. This confirms
+that the section was drawn wide enough: almost no water moves near the ends, which
+is what the no-flow ends assume.
 
 The two peaks are at the sheetpile toe at (30, 7), where the whole flow has to turn
 around the end of the wall, and at (20, 10), the upstream edge of the clay blanket,
@@ -752,8 +750,8 @@ we measure what the two of them do to the answer.
 ## How fine the mesh has to be {#how-fine-the-mesh-has-to-be}
 
 A finite element answer is an answer for the mesh it was computed on, and the only
-way to find out how much of it is mesh is to solve the same model again on a finer
-one. Rebuild the mesh at a range of element sizes — untick **Auto-size from
+way to measure how much the mesh affects it is to solve the same model again on a
+finer one. Rebuild the mesh at a range of element sizes — untick **Auto-size from
 geometry** and type each size into **Target element size** — and run each one:
 
 | Target size (m) | Nodes | Triangles | q (m³/yr per m) |
@@ -772,24 +770,24 @@ crowding of the equipotentials at the two singular points, so it under-states ho
 much the flow has to squeeze around the wall, and over-states how much gets
 through.
 
-The sequence also does not settle on a value, and it will not. The
-gradient at each of those two points is genuinely infinite in the exact solution,
-so each halving of the element size resolves a bit more of a peak that has no top,
-and the discharge keeps creeping down. In practice the refinement stops where the
+The sequence also does not converge to a value. The
+gradient at each of those two points is infinite in the exact solution, so each
+halving of the element size resolves more of an unbounded peak, and the discharge
+keeps decreasing slowly. In practice the refinement stops where the
 change stops mattering: going from 0.25 m to 0.125 m nearly quadrupled the node
 count and moved the discharge by 0.4%.
 
 At the default meshing convention of the section width divided by 120 — an element
 size of about 0.42 m — the discharge is **39.983**, and it lands between the 0.5 m
-and 0.25 m rows exactly where the sequence says it should. A seepage discharge is
-only meaningful together with the mesh it was computed on.
+and 0.25 m rows, where the sequence places it. A seepage discharge should
+therefore be reported with the mesh it was computed on.
 
 <!-- test: file=../seep/files/xslope_clay_blanket.xlsx, type=seep, expected_flowrate=39.983, tolerance=0.05 -->
 <!-- Element-type coverage (saturated/confined): solve with tri3, tri6, quad4, quad8, quad9. -->
 <!-- test: file=../seep/files/xslope_clay_blanket.xlsx, type=seep_elements, expected_flowrate=39.983, tolerance=0.05, target_size=1.5 -->
 
 The element type moves the answer the same way, and more cheaply. The quadratic
-types (`tri6`, `quad8`, `quad9`) carry extra nodes at the element midsides and let
+types (`tri6`, `quad8`, `quad9`) have extra nodes at the element midsides and let
 the head vary quadratically across the element; `quad4` is the linear
 quadrilateral, the four-cornered counterpart of tri3. Meshing the same section at
 a 1 m target size with each of the five element types gives:
@@ -808,8 +806,8 @@ for the quads — because a quadratic element can bend its head field across its
 where a linear one has to stair-step it. Quadratic triangles at 1 m
 reach 39.866 on 2,551 nodes, which is a better answer than linear triangles at
 0.5 m reach on 2,490 — the same size of system, spent on element order instead of
-element count. On a model that will also carry a finite element stability
-analysis, quadratic elements are free — there they are required, not preferred:
+element count. On a model that will also be used for a finite element stability
+analysis, quadratic elements are required:
 linear triangles and quads become artificially stiff under the incompressible
 plastic flow of a Mohr-Coulomb collapse and return a factor of safety that is too
 high, by 21% for tri3 and 11% for quad4 on the benchmark under
@@ -821,7 +819,8 @@ high, by 21% for tri3 and 11% for quad4 on the benchmark under
 
 Halving the element size everywhere is a blunt way to resolve two singular points.
 The gradient plot showed that almost all of the section is flowing gently and that
-the work is concentrated in two small neighborhoods, so the mesh should be too.
+the high gradients are concentrated in two small regions, so the refinement can be
+concentrated there too.
 
 Open **Build Mesh…** again, leave the element type and the size divisions where
 they are, tick **Refine near features**, and raise **Refinement factor** from its
@@ -855,13 +854,13 @@ one has **297**. The toe is a node on both meshes; its nearest neighbor moves fr
 **0.500 m away to 0.048 m**, and the count of nodes within half a meter of it goes
 from 1 — the toe itself — to 114. The whole mesh grew from 2,490 nodes to 2,753 —
 11% — because everything more than a couple of meters from the toe is untouched.
-The blanket edge is untouched. The detector reads the geometry — notch tips,
-embedded lines, thin zones, material interfaces — and the blanket edge is
-geometrically nothing: a flat stretch of ground whose singularity exists only in
-the boundary-condition table, which the detector never reads. The gradient there
-says the refinement never reached it — the largest within half a meter of
-(20, 10) reads 0.4297 on the uniform mesh and 0.4295 on the refined one — and
-whether that omission costs anything is answered by the discharge below.
+The refinement does not reach the blanket edge. The detector works from the
+geometry — notch tips, embedded lines, thin zones, material interfaces — and the
+blanket edge is a flat stretch of ground whose singularity comes only from the
+boundary conditions, which the detector does not use. The largest gradient within
+half a meter of (20, 10) is 0.4297 on the uniform mesh and 0.4295 on the refined
+one. The discharge comparison below shows that leaving the blanket edge unrefined
+has almost no effect.
 
 Run it again:
 
@@ -869,21 +868,21 @@ Run it again:
 
 **39.775 m³/yr per m**, against 40.111 on the uniform mesh of nearly the same size.
 The uniform mesh needs to be built at 0.25 m — **9,607 nodes** — to reach 39.786,
-which is the same answer to three figures. That comparison also answers for the
+which is the same answer to three figures. The comparison also covers the
 unrefined blanket edge: the 0.25 m mesh refines it along with everything else, the
 feature-refined mesh leaves it at 0.5 m, and the two discharges differ by 0.03% —
 the toe sits in the throat the whole flow passes through, and it carries
-essentially all of the discharge's mesh error. The refinement bought a 3.5× smaller
-system for it, and on a problem where the solve is fast that is a convenience; on a
+essentially all of the discharge's mesh error. The refinement reaches that answer
+with a 3.5× smaller system, and on a problem where the solve is fast that is a convenience; on a
 large model, or on the finite element stability analysis that would run on the same
 mesh afterward, it is a large saving in solve time.
 
 The local gradient shows what the refinement is actually resolving. The largest
 gradient within half a meter of the toe reads **0.325** on the uniform mesh and
-**1.068** on the refined one. That is not a better estimate of a real number
-converging — it is a mesh resolving more of a peak that has no top, and it will
-keep climbing at every refinement. That is the reason to judge convergence on the
-discharge rather than on the gradient at the toe: the discharge is an integral
+**1.068** on the refined one. This is not a converging estimate: the exact
+gradient at the toe is infinite, and the computed value will keep climbing at
+every refinement. Convergence is therefore judged on the discharge rather than on
+the gradient at the toe: the discharge is an integral
 of the flow field over a boundary and converges, while a point value at a
 singularity does not converge to anything.
 
@@ -891,7 +890,7 @@ singularity does not converge to anything.
 
 ## Discharge against conductivity {#discharge-against-conductivity}
 
-The last question this model can answer cheaply is what the discharge does when
+The last step measures how the discharge changes when
 the soil's hydraulic conductivity changes — the input a site investigation is
 least sure about, and often by an order of magnitude.
 
@@ -909,7 +908,7 @@ dialog in one control at a time:
   seepage solution is an input to this run;
   [COMBO-3](combo03_fs_vs_time.md) is the tutorial that runs it.
 - **Convergence tol** = `0.0001`, the same solver control the Run Seepage dialog
-  carries and with the same meaning: every step of the sweep is one of those
+  has and with the same meaning: every step of the sweep is one of those
   runs.
 - **Material / BC** = `soil`. The list holds one entry per material, plus
   **Boundary heads** for sweeping a specified head instead of a soil property.
@@ -958,7 +957,7 @@ Checking the claim in Studio needs no sweep at all: set both conductivities to
 `300` in **Materials** and re-run, and on the same mesh the discharge comes back
 exactly ten times the k = 30 value — 401.11 against this section's 40.111.
 
-That is not a numerical coincidence, and the head field says why. Comparing the
+This is not a numerical coincidence, as the head field shows. Comparing the
 solved head at every node against the first of the ten runs, the largest difference
 anywhere is 3 × 10⁻¹³ m — machine rounding on a 3 m head drop. **Scaling an
 isotropic conductivity does not change the head field at all.** For a homogeneous
@@ -970,7 +969,7 @@ factor of 4/9 the flow net was read off is fixed, and
 
 $$ q = k \, \Delta h \, \frac{N_f}{N_d} $$
 
-does all of it: the discharge is proportional to *k*, proportional to the head
+accounts for the whole result: the discharge is proportional to *k*, proportional to the head
 drop across the section, and otherwise a matter of geometry. The head drop behaves
 the same way and for the same reason — moving the upstream head from 11 m to 15 m,
 a drop of 1 m to 5 m, gives q/Δh = 13.370461 at every one of them.
@@ -982,7 +981,7 @@ The head field, and everything read off it — the flow net, the pore pressures
 that a stability analysis would take from this solution, the gradient at the
 sheetpile toe — is **independent of the conductivity** on a problem like this one.
 The moment a second material appears, that stops being true and only the ratio of
-the conductivities matters; it is one soil that makes *k* cancel completely.
+the conductivities matters. With one soil, *k* cancels completely.
 
 ---
 
@@ -1001,8 +1000,8 @@ This tutorial covered:
   count land near a whole number — and reading the discharge back off it by
   counting lines.
 - A discharge that keeps falling with refinement, because the section's two
-  singular points never resolve — and what element type and local refinement
-  buy against that.
+  singular points never resolve — and how element type and local refinement
+  reduce that error.
 - A discharge exactly proportional to an isotropic conductivity, and not
   proportional when one principal value moves alone.
 
@@ -1010,7 +1009,7 @@ This tutorial covered:
 seepage tutorial — an unconfined problem on a zoned dam, where the water table
 is part of the answer and the unsaturated conductivity model we left at its
 default here starts doing work. The [tutorials index](index.md) lists the series.
-[Seepage Analysis](../seep/overview.md) carries the governing equations, the
+[Seepage Analysis](../seep/overview.md) gives the governing equations, the
 boundary-condition types in full, and the flow-net rule the channel count follows;
 [Seepage and Slope Stability](../seep/seep_slope.md) is how a solved
 head field becomes the pore pressure on a slice base, and where the requirement for

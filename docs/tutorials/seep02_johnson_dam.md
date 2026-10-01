@@ -13,23 +13,23 @@ phreatic surface is arrived at and how much water moves above it, the three
 unsaturated conductivity models XSLOPE offers and how much each one changes the
 answer, the base material a flow net drawn on a zoned section has to be scaled
 to, and what the iteration does when the conductivity curve is steep enough to
-give it trouble.
+slow its convergence.
 
 The example is the Johnson Reservoir dam: a 750 ft section with an 80 ft
 embankment on a 100 ft foundation, a sand shell over a clay core keyed 40 ft into
-the foundation, and 60 ft of water behind it. It is a better vehicle for these
-questions than a one-soil section, because a zoned dam is where the base material
-stops being obvious and where the conductivities are far enough apart that the
-choices show up in the numbers.
+the foundation, and 60 ft of water behind it. A zoned dam suits these topics
+better than a one-soil section: the choice of base material is no longer obvious,
+and the conductivities are far enough apart that the modeling choices change the
+numbers.
 
 ![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
 
 In [Tutorial SEEP-1](seep01_sheetpile.md) we built a one-soil model three
 different ways and solved a confined problem on it. Here we build this dam too —
-in Studio, once — because the two things a zoned dam adds to the inputs are
-better done than read about: a **stack of profile lines** that carves one section
+in Studio, once — because a zoned dam adds two inputs that are easier to learn
+by building them: a **stack of profile lines** that divides one section
 into three materials, and a **boundary set** with the exit face an unconfined
-problem turns on. (To skip the construction and go straight to the analysis,
+problem requires. (To skip the construction and go straight to the analysis,
 download the completed file below and pick the page back up at
 [Building the mesh](#building-the-mesh).)
 
@@ -41,7 +41,7 @@ download the completed file below and pick the page back up at
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to model unconfined seepage: how to give a zoned dam
 the boundary set the problem needs, how the phreatic surface and the seepage
-face are found, what the three unsaturated conductivity models are each worth,
+face are found, how much the three unsaturated conductivity models differ,
 and how to scale a flow net on a zoned section.
 </div>
 <p><span class="tg-pill">three materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">unconfined flow</span><span class="tg-pill">seepage face</span><span class="tg-pill">phreatic surface</span><span class="tg-pill">unsaturated models</span><span class="tg-pill">relative conductivity</span><span class="tg-pill">flow net base material</span><span class="tg-pill">convergence</span><span class="tg-pill">underseepage</span></p>
@@ -67,10 +67,10 @@ down this page.
 
 The reservoir stands at elevation 160, which is 60 ft of water over the foundation
 surface and 20 ft of freeboard below the crest. The tailwater stands at ground
-level, elevation 100. The three zones carry the problem's whole character in
-their conductivities — the shell at 1 ft/day, the core a thousand times tighter
-at 0.001, the foundation between them at 0.1 — and every result on this page
-traces back to those ratios rather than to their absolute size.
+level, elevation 100. The three zones differ in their conductivities — the shell
+at 1 ft/day, the core a thousand times lower at 0.001, the foundation between them
+at 0.1 — and every result on this page depends on those ratios rather than on
+their absolute size.
 
 ---
 
@@ -80,7 +80,7 @@ A seepage analysis solves for the total head *h* at every point of the ground, a
 everything else — pore pressure, velocity, hydraulic gradient, total discharge —
 follows from that field by arithmetic. In [SEEP-1](seep01_sheetpile.md) we work
 through what total head is and where the governing equation comes from, and the
-[Seepage Analysis](../seep/overview.md#governing-equations) page carries the
+[Seepage Analysis](../seep/overview.md#governing-equations) page gives the
 equations in full.
 
 What separates an unconfined problem from a confined one is the shape of the
@@ -131,10 +131,9 @@ water.
 is submerged, and releases to seep any node left standing above the water. On a
 steady problem the choice changes nothing: the pool never moves, so a polyline
 drawn under the water stays under it and the two types produce the same solution.
-The distinction is live only on a **transient** run, where a falling pool leaves
-nodes standing above the water — the
-[Transient Seepage](../seep/transient.md) page is where the reservoir type does
-its real work.
+The distinction matters only on a **transient** run, where a falling pool leaves
+nodes standing above the water; the
+[Transient Seepage](../seep/transient.md) page covers the reservoir type.
 
 **Specified flux** (`flux`) prescribes the rate at which water crosses the
 boundary rather than the head on it. It is the boundary to use when the known
@@ -147,8 +146,7 @@ drawn wide enough that nothing crosses them.
 
 ### The seepage face
 
-The fourth kind is the one an unconfined problem needs, and the one this dam turns
-on. An **exit face** — a *seepage face* in the older literature — is a boundary
+The fourth type is the one an unconfined problem needs. An **exit face** — a *seepage face* in the older literature — is a boundary
 where water may discharge to the atmosphere. A downstream dam slope, an excavation
 wall and a cut that seeps are the standard cases.
 
@@ -172,7 +170,7 @@ pressure climbs back to zero and the sweep is no longer pushing water into it.
 The sweep repeats until the set stops changing,
 which is one of the three conditions the run has to satisfy before it reports an
 answer. [Exit face (seepage face)](../seep/overview.md#exit-face-seepage-face)
-carries the full statement, including how the set is tracked per element edge
+gives the full statement, including how the set is tracked per element edge
 rather than per node on a quadratic mesh.
 
 An exit face is entered as a single polyline on the
@@ -322,7 +320,7 @@ lines, paste each table into the points grid, or **Add row** and type it.
 
 The polyline runs along the foundation surface from the upstream end of the
 section to the embankment toe, then up the upstream face to elevation 160 — the
-vertex the shell line carried for exactly this purpose. Everything on that
+vertex the shell line includes for this purpose. Everything on that
 polyline is under water, so holding it at a head of 160 is exact.
 
 **Head 2 — the tailwater.** Press **Add head** again, with **Head value (ft):**
@@ -334,8 +332,8 @@ out to the end of the section:
 | 550 | 100 |
 | 750 | 100 |
 
-**Exit face.** Select the **Exit face** entry — it is already in the list,
-waiting for points — and enter its two:
+**Exit face.** Select the **Exit face** entry — it is already in the list, with
+no points — and enter its two:
 
 | x | y |
 | :---: | :---: |
@@ -344,7 +342,7 @@ waiting for points — and enter its two:
 
 ![The exit face on the downstream slope](images/seep02_studio_seep_bc.png)
 
-The exit face carries points and no value, and it covers the whole downstream
+The exit face has points and no value, and it covers the whole downstream
 slope from the crest at (380, 180) to the toe at (550, 100). Drawing it over the
 entire slope rather than over the part expected to be wet is the correct habit:
 the active set finds the discharge point, and a face drawn short enough to stop
@@ -396,8 +394,8 @@ a stand-alone seepage run: head is a scalar field, so there is nothing for a
 linear element to lock up on.
 
 Leave **Auto-size from geometry** ticked. It takes the element size from the width
-of the section rather than from a number typed in feet, which is what makes the
-next field the one to set.
+of the section rather than from a number typed in feet, so the next field sets
+the size.
 
 Set **Size divisions** to `120`. The section is 750 ft wide, so the element size
 becomes 750/120 = 6.25 ft. The grayed **Target element size** box does not follow
@@ -407,7 +405,7 @@ the one the Log states.
 
 Leave every other control at its default — each one is explained in
 [Building the mesh](seep01_sheetpile.md#building-the-mesh) in SEEP-1, and none of
-them does work on this model.
+them affects this model.
 
 Click **Build**. The mesh comes out at **2,913 nodes and 5,543 triangles**, with
 the boundary nodes marked on it:
@@ -430,7 +428,7 @@ Click **Run Seep…**:
 ![The Run Seepage dialog](images/seep02_studio_run_seep.png)
 
 **Convergence tol** is the head-change tolerance the unconfined iteration is
-tested against, and unlike on the confined problem in SEEP-1 it is live here.
+tested against, and unlike on the confined problem in SEEP-1 it applies here.
 Leave it at `0.0001` for now — we measure what changing it does in a later
 section.
 
@@ -449,16 +447,16 @@ Starting unsaturated flow iteration...
 Convergence tolerance: 1.800000e-02
 ```
 
-The 31 exit-face nodes are what make this problem unconfined. The tolerance
+The 31 exit-face nodes make this problem unconfined. The tolerance
 printed on the last line is not the 0.0001 that was typed: it is scaled by the
 model's head scale — the larger of the height of the domain, 180 ft here, and the
 range of the specified heads — to 0.0001 × 180 = 0.018 ft. That 0.018 ft is
 compared against the head change itself: the largest change in head at any node
 between sweeps, in feet. Both sides of the test are lengths measured across the
 model, so neither depends on where the elevation datum is put — this dam is held
-to the same 0.018 ft whether its base is drawn at elevation 0 or at 1000. Asking
-for the tolerance as a fraction of the model's own scale rather than as a length
-is what lets one default work on a 10 m sheetpile section and on a 180 ft dam.
+to the same 0.018 ft whether its base is drawn at elevation 0 or at 1000.
+Because the tolerance is a fraction of the model's own scale rather than a length,
+one default works on a 10 m sheetpile section and on a 180 ft dam.
 
 The run finishes in **47 iterations**. In the **Display** panel, tick
 **Filled contours** — useful on a zoned section, where the wash shows the
@@ -481,8 +479,8 @@ The head ranges from **100.000 ft to 160.000 ft**, which is the two boundary val
 and nothing outside them, because a region with no sources or sinks inside it can
 have no interior maximum or minimum of head.
 
-The pore pressure runs from **−2,577.9 psf to 9,971.1 psf**. The negative end is
-the difference from SEEP-1: a confined solution cannot produce a pore pressure
+The pore pressure runs from **−2,577.9 psf to 9,971.1 psf**. The negative end
+differs from SEEP-1: a confined solution cannot produce a pore pressure
 below zero anywhere, and here the whole upper part of the downstream half of the
 dam stands above the phreatic surface and is in suction. The largest suction is
 **41.31 ft** — a pressure head of −41.31 ft — at (401.9, 169.7), on the downstream
@@ -498,9 +496,8 @@ down through the downstream shell to meet the downstream slope near the toe.
 
 ## Where the water goes
 
-The flow net says where the water goes, and on a zoned section the answer is not
-the one the drawing suggests. Three measurements taken off the solved field make
-it concrete.
+Three measurements taken from the solved field show how the flow divides between
+the zones.
 
 **The core carries the head drop.** At elevation 110 the core runs from x = 326 to
 x = 414, so reading the solved head at x = 315 and x = 425 straddles it with about
@@ -532,10 +529,10 @@ surface, in the downstream shell where the unsaturated zone is thickest:
 
 Each of those section integrals reproduces the reported total discharge only to
 within 6% — x = 400 comes out 0.1% low, x = 450 3.0% low, x = 500 5.8% high — so
-the shares beside them are good to a few points rather than to the tenth. Read
-that way, somewhere between about a twentieth and a tenth of the flow crossing the
-downstream shell travels through unsaturated soil. That is small, and it is not
-zero, which is what gives the choice of unsaturated model something to act on.
+the shares beside them are good to a few points rather than to the tenth. Between
+about a twentieth and a tenth of the flow crossing the downstream shell travels
+through unsaturated soil. The share is small but not zero, so the choice of
+unsaturated model can affect the discharge.
 
 The pore-pressure field shows the same result as a field rather than as numbers.
 In the **Display** panel, set **Variable** to `Pore pressure`:
@@ -553,7 +550,7 @@ The phreatic surface is not an object the solver tracks. It is the ψ = 0 contou
 the solved pressure-head field, drawn afterward by the plotting routine on any
 solution whose pore pressure goes negative somewhere.
 
-What the solver iterates on is the two things that make the problem nonlinear.
+The solver iterates on the two things that make the problem nonlinear.
 Each sweep recomputes the pressure head from the current head field, evaluates
 *k<sub>r</sub>*(ψ) at each element's integration points and scales that element's
 saturated stiffness by the average, solves the resulting linear system, and updates
@@ -576,7 +573,7 @@ on the solution plot are flow lines, contours of a stream function
 computed by a companion solve on the same mesh. Water flows along a flow line and
 never across one, so the strip between two adjacent flow lines is a **flow
 channel** carrying a fixed share of the discharge.
-[SEEP-1](seep01_sheetpile.md#reading-the-flow-net) is where flow nets are read.
+Reading a flow net is covered in [SEEP-1](seep01_sheetpile.md#reading-the-flow-net).
 
 How many flow lines get drawn is not a matter of taste. A flow net reads correctly
 only when its cells come out as curvilinear squares, and for such a net
@@ -590,13 +587,13 @@ head-contour count requested through **levels**, so it computes the
 *N<sub>f</sub>* + 1 stream-function levels — one more line than channels, and
 never fewer than two.
 
-That leaves one thing to supply — the *k*. On the single-soil problem in SEEP-1
-there was only one candidate and the choice was inert. On a zoned section there are
+The remaining input is the *k*. On the single-soil problem in SEEP-1 there was
+only one candidate and the choice made no difference. On a zoned section there are
 three, they differ by three orders of magnitude, and the answer changes by three
 orders of magnitude with them. The choice is the Display panel's **Base
 material** selector — one entry per material, opening on the zone XSLOPE picks
-for the solution and following that pick until you choose by hand — and this
-dam is where it matters. Try all three. With 20 contour levels, so 19 head
+for the solution and following that pick until you choose by hand — and on this
+dam it matters. Try all three. With 20 contour levels, so 19 head
 drops of 3.158 ft each, and a 60 ft head drop:
 
 | base_mat | Zone | k (ft/day) | N<sub>f</sub> = q·N<sub>d</sub>/(k·Δh) | φ contour levels requested |
@@ -612,7 +609,7 @@ falls to its floor of two levels, both of them on the extreme values of the stre
 function; the top panel has no flow lines in it at all. Scaled to the core, it asks for 619 channels,
 and nearly the whole section fills with solid blue, with only the core coarse
 enough to show individual lines. Only the foundation gives a
-net that can be read, and the reason is arithmetic rather than aesthetic: 90% of
+net that can be read, for an arithmetic reason: 90% of
 the discharge crosses the foundation, so the foundation is the zone the identity
 above is nearly true of, and a net drawn in a zone that carries almost none of the
 flow has to be either impossibly coarse or impossibly fine to satisfy it.
@@ -623,7 +620,7 @@ readable one, which for a net of *N<sub>d</sub>* drops is about
 *N<sub>d</sub>*/2 channels. On this model that is the foundation, which is what
 the sample figure and every flow net on this page are drawn with.
 
-Reading the drawn net back is a check on all of it. The bottom panel has 6 flow
+Reading the drawn net back checks the result. The bottom panel has 6 flow
 channels and 19 head drops in the foundation, so
 
 $$ q = 0.1 \times 60 \times \frac{6}{19} = 1.895 \text{ ft³/day per ft} $$
@@ -658,8 +655,8 @@ linear front does not read them.
 *k<sub>r</sub>* at 1 in the saturated soil, falls linearly to a floor value
 *kr<sub>0</sub>* as the pressure head reaches *h<sub>0</sub>*, and stays at that
 floor beyond it. It takes two parameters, needs no special functions, and gives a
-transition across the phreatic surface that a solver finds easy. It carries no soil physics —
-it is a shape chosen to be well-behaved — and the
+transition across the phreatic surface that a solver finds easy. It is not based
+on soil physics — it is a shape chosen to be well-behaved — and the
 [seepage overview](../seep/overview.md#linear-front-lf) recommends it for slope
 stability work, where suction is conservatively neglected in the strength anyway
 and the shape of the curve has little influence on the result.
@@ -667,7 +664,7 @@ and the shape of the curve has little influence on the result.
 **van Genuchten** (`vg`) is the standard model of unsaturated soil mechanics, a
 retention curve of parameters α and *n* passed through Mualem's conductivity
 relation. Its parameters are measurable and tabulated: the
-[overview](../seep/overview.md#van-genuchten-model) carries the
+[overview](../seep/overview.md#van-genuchten-model) lists the
 Carsel & Parrish (1988) table by USDA soil texture, the same dataset HYDRUS and
 most unsaturated-flow codes use. Choose it when the soils are characterized, when
 an unsaturated result has to be defensible, or when the model is being compared
@@ -687,13 +684,13 @@ The van Genuchten and Gardner models share one pair of input columns, `vg_a` and
 ### Parameters for these three soils
 
 Running the three models against each other means giving each of them parameters
-for the same soil, and each model gets those parameters a different way — one of
-the three does not get them from the soil at all.
+for the same soil, and the parameters for each model come from a different source;
+the linear front's do not come from the soil at all.
 
 The linear front's were entered in the build: *kr<sub>0</sub>* = 0.01 at
 *h<sub>0</sub>* = −1 ft, the same pair on all three materials. That pair is a
-numerical shape rather than a measurement of any of these soils, and the section
-after the comparison turns that difference into the explanation for the gap.
+numerical shape rather than a measurement of any of these soils, and its floor of
+0.01 accounts for most of the difference in discharge measured below.
 
 The van Genuchten parameters come from the Carsel & Parrish table, each material
 matched to the nearest texture by saturated conductivity — sandy clay loam for the
@@ -710,8 +707,8 @@ of this one.
 
 The Gardner parameters have no table to read off, so each material's pair is a
 least-squares fit to that same material's van Genuchten curve, in
-log *k<sub>r</sub>* over suctions from 0.01 to 100 ft. Fitting them that way is
-what makes the three-way comparison a comparison of models rather than of soils.
+log *k<sub>r</sub>* over suctions from 0.01 to 100 ft. Fitting them that way
+means the three-way comparison compares models rather than soils.
 
 | Material | k (ft/day) | Texture | vg `a` (1/ft) | vg `n` | gard `a` | gard `n` | RMS misfit |
 | --- | :---: | --- | :---: | :---: | :---: | :---: | :---: |
@@ -728,9 +725,9 @@ suction of *a*<sup>−1/*n*</sup>, so a large *a* means a curve that starts drop
 immediately.
 
 Drawn against each other on this dam's own soils and parameters, with both axes
-logarithmic, the curves differ by log cycles over a suction range spanning log
-cycles of its own, and the linear front's straight line reads as the cliff a
-solver sees:
+logarithmic, the curves differ by several log cycles over a suction range that
+itself spans several log cycles, and the linear front's straight line appears as
+a steep drop on the log axes:
 
 ![The three relative-conductivity curves per material](images/seep02_kr_models.png){width=1000}
 
@@ -740,7 +737,7 @@ Gardner against 0.17 for van Genuchten at a hundredth of a foot of suction, four
 tenths of a log cycle. They cross near a tenth of a foot, and Gardner runs the
 lower of the two from there out to about ten feet. Averaged over the whole
 suction range that parting is the 0.252 in the table above, the worst of the
-three fits. The linear front lies with none of them.
+three fits. The linear front follows neither of them.
 Between zero and one foot of suction it stays much wetter: at half a
 foot it is halfway down its straight line, at
 *k<sub>r</sub>* = 0.01 + 0.99 × 0.5 = 0.505, an order of magnitude above the other
@@ -795,7 +792,7 @@ collection design, a reservoir loss estimate, a comparison against a measured
 tailwater flow — a 4.6% spread matters, and the model whose parameters can be
 defended from measurements is the one to use.
 
-The 4.6% gap itself is the floor's doing. The linear front holds *k<sub>r</sub>* at its
+The 4.6% gap comes from the floor. The linear front holds *k<sub>r</sub>* at its
 floor of 0.01 through the deep unsaturated zone, far above the conductivity the
 other two models leave there — and rerunning it with *kr<sub>0</sub>* lowered to
 10<sup>−4</sup>, which the other two are already below by five feet of suction,
@@ -803,8 +800,8 @@ brings its discharge to 1.8707, against van Genuchten's 1.8641 and Gardner's
 1.8654: 93% of the gap closes on that one parameter. The curve's shape barely matters by
 comparison — sweeping *h<sub>0</sub>* twentyfold moves the discharge by the same
 4.6% — because on a dam whose unsaturated zone stands tens of feet above the
-water inside it, what the curve does in its first foot of suction is beside the
-point, and where it bottoms out is most of the answer.
+water inside it, what the curve does in its first foot of suction has little
+effect, and its floor value controls most of the result.
 
 ---
 
@@ -813,8 +810,7 @@ point, and where it bottoms out is most of the answer.
 Pushing the floor down cost iterations as well as discharge: the runs at
 *kr<sub>0</sub>* = 3×10<sup>−4</sup> and 10<sup>−4</sup> took 103 and 83 sweeps
 against the shipped model's 47, and are the only two in the sweep on which the
-solver dropped its step to a hundredth of each new solve. That cost is what stands
-between a plausible set of unsaturated parameters and a run that finishes.
+solver dropped its step to a hundredth of each new solve.
 
 ### The three conditions
 
@@ -823,8 +819,8 @@ An unconfined run stops when all three of these hold at once, and reports
 
 **Head change.** The largest change in head at any node between sweeps, below the
 tolerance from the **Run Seepage** dialog scaled by the model's head scale — 0.018 ft
-here. Both sides of the test are lengths, so the gate does not move with the elevation
-datum. This measures whether the head field has stopped moving.
+here. Both sides of the test are lengths, so the test does not change with the
+elevation datum. This measures whether the head field has stopped moving.
 
 **Flow closure.** Water in equals water out at every node, to within 0.1% of
 the total inflow.
@@ -847,12 +843,12 @@ A thousandfold tightening moves the discharge in the seventh figure and costs el
 extra sweeps. The reason is the flow-closure condition: whichever head tolerance is
 asked for, the run does not stop until the conductivity field has stopped lagging
 the head field to within 0.1% of the inflow, and by then the head has stopped
-moving anyway. The dialog's tolerance, in other words, is not where convergence
-is won or lost — leave it at its default. Whether a run finishes is decided by
-the steepness of the conductivity curve, and the next section shows a curve so
-steep the run never converges.
+moving anyway. Leave the dialog's tolerance at its default. Whether a run
+finishes depends on the steepness of the conductivity curve; the next section
+shows a curve steep enough that the run does not converge within the default
+iteration limit.
 
-### The run that does not finish
+### A run that does not converge {#the-run-that-does-not-finish}
 
 An example of potentially problematic input is a more extreme linear front:
 the floor lowered from 0.01 to 10<sup>−4</sup>, and reached at 10 ft of suction
@@ -871,7 +867,7 @@ WARNING: seepage solution did not converge — flowrate is unreliable (solution[
 Nothing is wrong with the model — this combination of parameters simply needs
 more iterations than the default allows. A steep conductivity curve converges
 slowly: each sweep computes conductivities from heads and heads from
-conductivities, and the steeper the curve, the harder the two chase each other.
+conductivities, and the steeper the curve, the more sweeps the two take to agree.
 Set **Max iterations** on the **Run Seepage** dialog to `1000` and the same run
 converges, in **900 iterations**, at *q* = **1.9755**.
 
@@ -883,19 +879,17 @@ which on a stability model is the usual case.
 
 ---
 
-## Giving the seepage face something to do
+## Raising the core's conductivity {#giving-the-seepage-face-something-to-do}
 
-The seepage face has been quiet on every run so far: one of its 31 nodes active,
-at (544.5, 102.58), 2.6 ft above the downstream toe. That is a correct answer and a
-poor demonstration, because it makes the exit face look like a boundary condition
-that does very little. The reason it is quiet is the core. The core drops the
+On every run so far only one of the exit face's 31 nodes has been active, at
+(544.5, 102.58), 2.6 ft above the downstream toe. The reason is the core. The core drops the
 head to within about 13 ft of the tailwater, so the phreatic surface in the
 downstream shell runs low — elevation 113.3 at the downstream edge of the core,
 103.7 at x = 540 — and stays well under the slope above it, meeting the face 2.6 ft
 above the toe. Everything higher up the slope is dry.
 
 Raising the core's conductivity is two cells on one row — **k1** and **k2** on
-material 2 — and it makes the face work. Everything else, including the exit-face
+material 2 — and it raises the discharge point up the face. Everything else, including the exit-face
 polyline itself, stays exactly as it was:
 
 | Core k (ft/day) | q (ft³/day per ft) | Exit-face nodes wet | Highest wet node | Iterations |
@@ -913,27 +907,27 @@ more conductive than the foundation around it. The discharge is **5.3 times** wh
 the intact core allows, and the water
 comes out **20.6 ft above the toe** instead of 2.6 ft above it, over 8 of the 31
 nodes. Nothing about the boundary condition was changed to produce that. The active
-set found a different discharge point because the head field gave it one, which is
+set found a different discharge point because the head field changed, which is
 the property that separates an exit face from the other three boundary types: it is
 the only one whose extent is an output.
 
 The discharge point matters beyond the seepage analysis. Water emerging partway up
 a downstream slope carries a seepage force out of the face and saturates the soil
 above the toe, which is the condition that drives shallow downstream instability and
-the reason a real dam of this kind carries a filter or a toe drain.
+the reason a real dam of this kind has a filter or a toe drain.
 [Sample Problem 5](../seep/samples.md#5-earth-dam-with-core-and-filter) is a dam
-that carries one.
+with one.
 
 ---
 
 ## From this head field to a stability analysis
 
 A pore pressure at every node of the mesh is what a stability analysis needs, and
-the completed file is set up to hand it over: all three materials carry `seep` in the **u** column
-of the material table's LEM band — three cells a builder adds the same way — so every slice base and every element reads the solved field rather than a piezometric
-line.
+the completed file is set up to pass it on: all three materials have `seep` in the
+**u** column of the material table's LEM band, so every slice base and every element
+reads the solved field rather than a piezometric line.
 
-The handover is by file. A solved run writes `xslope_johnson_res_mesh.json` and
+The pore pressures are passed by file. A solved run writes `xslope_johnson_res_mesh.json` and
 `xslope_johnson_res_seep.csv` beside the workbook, and loading the workbook again
 for a stability run picks both up by name — the run above already wrote that pair
 beside your own file. The [sample page](../seep/samples.md#johnson-reservoir)'s
@@ -942,7 +936,7 @@ copy of this model ships with a pair for the same reason.
 The one thing that has to be decided before the seepage run, rather than after, is
 the element type. A finite element stability analysis requires quadratic elements,
 so a mesh built at `tri3` for a fast seepage solve has to be rebuilt at `tri6`
-before it can carry one. That is why the sample page's shipped mesh is quadratic —
+before it can be used for one. That is why the sample page's shipped mesh is quadratic —
 3,362 nodes and 1,605 `tri6` elements — and it returns 1.9554 ft³/day per ft
 against the 1.9546 of the linear tri3 mesh built above.
 
@@ -974,9 +968,9 @@ This tutorial covered:
 
 **Where to go next:** [Tutorial SEEP-3](seep03_reservoir_drawdown.md) is the
 next seepage tutorial — a reservoir drawn down through a cored dam, where the
-boundaries move and the answer depends on when you look. The
+boundary heads change with time and the answer depends on the time. The
 [tutorials index](index.md) lists the series.
-[Seepage Analysis](../seep/overview.md) carries the governing equations, all three
+[Seepage Analysis](../seep/overview.md) gives the governing equations, all three
 unsaturated models with their parameter tables, and the convergence conditions in
 full; [Sample Problem 4](../seep/samples.md#johnson-reservoir) catalogs this model
 and reports its cross-check against the USACE SEEP2D program on a mesh identical to
@@ -985,4 +979,4 @@ the one it exported to SEEP2D;
 limit equilibrium search and a finite element strength reduction on the same file;
 and [Sample Problem 8](../seep/samples.md#8-johnson-reservoir-zoned-drawdown-transient)
 is this same dam solved through a 45-day reservoir drawdown.
-[SEEP-1](seep01_sheetpile.md) is where we build a seepage model from nothing.
+In [SEEP-1](seep01_sheetpile.md) we build a seepage model from scratch.

@@ -194,6 +194,13 @@ GROUPS = {
                         corpus='docs/fem/files',
                         builders=lambda m: list(m.BUILDERS),
                         slow=False),
+    # The limit-equilibrium samples built as variants of another shipped sample
+    # (problem 16's rapid-drawdown dam is problem 8's dam read from its own
+    # workbook). They only WRITE files -- no solve.
+    'lem_samples': dict(module='benchmarks.build_lem_samples', outattr='OUT',
+                        corpus='docs/lem/files',
+                        builders=lambda m: list(m.BUILDERS),
+                        slow=False),
     # The worked design-manual problems of docs/verification/published.md: the
     # FHWA MSE wall examples.  They only WRITE files -- no solve -- so they are
     # cheap.  build_fhwa_e1 exposes one builder, build_fhwa_e3_e7 a BUILDERS

@@ -565,8 +565,9 @@ The deformed panel draws the mesh at its displaced position over a dashed
 outline of where it started. The reinforced block has slid out over the toe and
 settled at the crest, and the six layers — red where they started gray — are
 stretched and rotated with it, hinging where the shear band crosses them. The
-title's **Scale = 1.0x** is the exaggeration, which the panel picks so the
-collapse reads at this figure size. **Scale ×** and **Auto size** on
+title's **Scale** is the exaggeration, which the panel picks so the
+largest displacement is the Auto size percentage of the mesh height; it can
+be below 1 where the collapse is already larger than that. **Scale ×** and **Auto size** on
 the Display panel control that multiplier.
 
 ![Displacement vectors at failure](images/fem02_displacement_vectors_pr.png){width=1000}

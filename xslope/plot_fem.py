@@ -206,6 +206,17 @@ _DEFORM_MAX_FRACTION = 0.04
 _DEFORM_NEGLIGIBLE_FRACTION = 1e-8
 
 
+def format_deform_scale(scale):
+    """The multiplier as the plot title and the report print it: whole numbers
+    from 10 up, one decimal from 1 to 10, two significant digits below 1."""
+    scale = float(scale)
+    if round(scale, 1) >= 10:
+        return f"{scale:.0f}"
+    if scale >= 1:
+        return f"{scale:.1f}"
+    return f"{scale:.2g}"
+
+
 def deformation_scale(fem_data, field, deform_percent=15):
     """The exaggeration the deformed-mesh panel is drawn at.
 
@@ -219,6 +230,10 @@ def deformation_scale(fem_data, field, deform_percent=15):
     ``field`` is the solve_fem field the panel renders (the at-failure snapshot
     where one is being drawn), and the scale is measured on its viscoplastic
     displacement where the elastic part is known, matching plot_deformed_mesh.
+
+    The multiplier is not floored at 1: a field that has already moved further
+    than ``deform_percent`` of the mesh height (an at-failure field) gets a
+    multiplier below 1, so the percentage still sets the drawn size.
     """
     nodes = fem_data["nodes"]
     max_disp = float(np.max(displacement_magnitude(fem_data, field)))
@@ -233,8 +248,8 @@ def deformation_scale(fem_data, field, deform_percent=15):
     # tall one, and a mechanism of a few microns cannot be exaggerated into a
     # shape that is no longer the slope.
     extent = _section_extent(fem_data)
-    return max(1.0, min(mesh_height * deform_percent / 100,
-                        extent * _DEFORM_MAX_FRACTION) / max_disp)
+    return min(mesh_height * deform_percent / 100,
+               extent * _DEFORM_MAX_FRACTION) / max_disp
 
 
 def _section_extent(fem_data):
@@ -2110,8 +2125,7 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
         # measured, when what the field holds is residue.
         base = f'{disp_label} below drawing resolution (undeformed)'
     else:
-        scale_str = (f'{deform_scale:.0f}' if deform_scale >= 10
-                     else f'{deform_scale:.1f}')
+        scale_str = format_deform_scale(deform_scale)
         base = f'{disp_label} (Scale = {scale_str}x)'
     # The at-failure field is the UNCONVERGED state, solved a margin beyond critical to
     # develop the mechanism; _fs_title(at_failure=...) leads with FS — "at Failure"

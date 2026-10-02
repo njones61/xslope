@@ -570,7 +570,7 @@ class FemResultsDisplayPanel(QWidget):
         for key, label in (("k", "Black"), ("blue", "Blue")):
             self.deformed_color.addItem(label, key)
         self.deformed_color.setToolTip("Color of the deformed mesh grid.")
-        self.deform_scale = _dspin(0.0, 100000.0, 0.0, 1.0, decimals=1)
+        self.deform_scale = _dspin(0.0, 100000.0, 0.0, 1.0, decimals=3)
         self.deform_scale.setSpecialValueText("Auto")   # shown at the minimum (0)
         self.deform_scale.setToolTip(
             "Displacement exaggeration — the multiplier the plot title prints. "

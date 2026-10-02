@@ -8702,9 +8702,12 @@ def _deformation_exaggeration(scale, stated=None):
     states that landed on the same one say it once.
     """
     scale = _num(scale)
-    if not scale or scale <= 1.0:
+    if not scale:
         return ""
-    shown = f"{scale:.0f}" if scale >= 10 else f"{scale:.1f}"
+    from .plot_fem import format_deform_scale
+    shown = format_deform_scale(scale)
+    if shown == "1.0":
+        return ""
     if stated is not None:
         if shown in stated:
             return ""

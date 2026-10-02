@@ -14023,7 +14023,8 @@ def test_fem_result_figures_carry_no_title():
         fails.append(f"the fixture is drawn at {scale}x, so the exaggeration "
                      f"sentence proves nothing")
     else:
-        shown = f"{scale:.0f}" if scale >= 10 else f"{scale:.1f}"
+        from xslope.plot_fem import format_deform_scale
+        shown = format_deform_scale(scale)
         said = " ".join(_prose(converged))
         if f"{shown} times the computed displacement" not in said:
             fails.append(f"the deformed grid is drawn at {shown}x and the "
@@ -14306,10 +14307,11 @@ def test_each_state_is_drawn_at_its_own_scale():
     for state, scale in own.items():
         # A grid drawn at true scale is not exaggerated and says nothing; one
         # that is has to name its multiplier.
-        if scale <= 1.0:
+        from xslope.plot_fem import format_deform_scale
+        shown = format_deform_scale(scale)
+        if shown == "1.0":
             continue
         stated += 1
-        shown = f"{scale:.0f}" if scale >= 10 else f"{scale:.1f}"
         if f"drawn at {shown} times" not in said:
             fails.append(f"the {state} exaggeration ({shown}) is not stated")
     if not stated:

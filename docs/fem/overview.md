@@ -1698,7 +1698,7 @@ Common options:
 - `show_original` — the original-mesh reference on the deformation panel: `'outline'` (default),
   `'mesh'` for the full light grid, or `False`.
 - `deform_scale` / `deform_percent` — an explicit exaggeration factor, or the target deformation as
-  a percentage of mesh height when the factor is auto-sized (default 15).
+  a percentage of mesh height when the factor is auto-sized (default 15). The auto factor has no floor: a field that has already moved further than that percentage is drawn at a factor below 1.
 - `deformed_color` — color of the deformed grid (default black).
 - `show_mesh` — mesh lines where the mesh *is* the content: the deformation panel's grid and the
   vector panel's edge context. It does **not** overlay edges on the filled-contour panels; that is

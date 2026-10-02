@@ -107,7 +107,8 @@ The Johnson Reservoir zoned earth dam (permeable shell, low-permeability core,
 foundation; reservoir at el. 160 ft, tailwater at el. 100 ft) was exported to a
 SEEP2D input file — the **exact same tri3 mesh topology, boundary conditions,
 and material parameters** — and solved with the original USACE/WES SEEP2D
-Fortran program. Identical-mesh comparison over all 2,913 nodes:
+Fortran program (Tracy, USACE Waterways Experiment Station). The export is made by
+`benchmarks/run_seep2d_compare.py`. Identical-mesh comparison over all 2,913 nodes:
 
 | Quantity | XSLOPE | SEEP2D | Note |
 |---|---|---|---|

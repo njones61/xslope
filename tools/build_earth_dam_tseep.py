@@ -1,5 +1,5 @@
-"""Build the transient (reservoir-drawdown) seepage SAMPLE workbooks for
-``docs/seep/samples.md``.
+"""Build the transient (reservoir-drawdown) seepage workbooks for
+``docs/seep/samples.md`` and the transient-head rows on Tutorial SEEP-3.
 
 Two worked transient samples share this one deterministic builder — each is the
 transient variant of an existing *steady* sample, built from that committed base
@@ -17,7 +17,7 @@ template with ``save_slope_data_to_xlsx``.
 
   ``johnson``    -> docs/seep/files/xslope_johnson_res_tseep.xlsx
       Transient variant of the zoned Johnson Reservoir dam of
-      [Problem 4](../seep/samples.md#johnson-reservoir) (``xslope_johnson_res.xlsx``):
+      [Tutorial SEEP-2](../tutorials/seep02_johnson_dam.md) (``xslope_johnson_res.xlsx``):
       shell over a low-permeability clay core carried down into the foundation.
       The zones are the story here — the core drains far slower than the shells,
       so it holds an elevated interior head long after the shells have emptied.
@@ -128,7 +128,7 @@ SAMPLES = {
             stage_2=47.0,
         ),
     ),
-    # Zoned Johnson Reservoir dam (Problem 4).  Base k is already in ft/day (its
+    # Zoned Johnson Reservoir dam (Tutorial SEEP-2).  Base k is already in ft/day (its
     # steady discharge IS the 1.958 SEEP2D benchmark), so k is reused verbatim and
     # only storage is added.  The reservoir is drawn from full pool (el 160) to the
     # tailwater datum (el 100) over 45 days; the low-k core paces the relaxation, so

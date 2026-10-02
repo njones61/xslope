@@ -45,7 +45,7 @@ face are found, how much the three unsaturated conductivity models differ,
 and how to scale a flow net on a zoned section.
 </div>
 <p><span class="tg-pill">three materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">unconfined flow</span><span class="tg-pill">seepage face</span><span class="tg-pill">phreatic surface</span><span class="tg-pill">unsaturated models</span><span class="tg-pill">relative conductivity</span><span class="tg-pill">flow net base material</span><span class="tg-pill">convergence</span><span class="tg-pill">underseepage</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx), the same model as [Seepage Sample Problem 4](../seep/samples.md#johnson-reservoir); open it to skip the construction and start at [Building the mesh](#building-the-mesh)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx); open it to skip the construction and start at [Building the mesh](#building-the-mesh)</div>
 </div>
 
 ---
@@ -383,8 +383,8 @@ Save the model with **File → Save** under any name; the completed file calls i
 ## Building the mesh
 
 However the model was arrived at, it has no mesh yet. Build the one this page
-runs on — the linear element type and the element size the
-[sample page](../seep/samples.md#johnson-reservoir) catalogs its discharge at.
+runs on — the linear element type and the element size of the
+[SEEP2D cross-check](../verification/seep.md#verification-seep2d-johnson) on the verification page.
 Click **Build Mesh…**:
 
 ![The Build Mesh dialog](images/seep02_studio_build_mesh.png)
@@ -469,8 +469,8 @@ through what that control does and why the other two choices fail here:
 
 **The total discharge is 1.9546 ft³/day per ft** — per foot of dam measured along
 its axis, the convention every quantity a two-dimensional analysis reports carries.
-The [sample page](../seep/samples.md#johnson-reservoir) cross-checks this same
-mesh against the USACE SEEP2D program, which solves the identical topology and
+The [SEEP2D cross-check](../verification/seep.md#verification-seep2d-johnson) on the verification page solves this same
+mesh with the USACE SEEP2D program, on the identical topology, and SEEP2D
 returns 1.9544.
 
 <!-- test: file=files/xslope_johnson_res.xlsx, type=seep, element_type=tri3, size_divisions=120, expected_flowrate=1.9546, tolerance=0.005 -->
@@ -915,7 +915,7 @@ The discharge point matters beyond the seepage analysis. Water emerging partway 
 a downstream slope carries a seepage force out of the face and saturates the soil
 above the toe, which is the condition that drives shallow downstream instability and
 the reason a real dam of this kind has a filter or a toe drain.
-[Sample Problem 5](../seep/samples.md#5-earth-dam-with-core-and-filter) is a dam
+[Sample Problem 4](../seep/samples.md#4-earth-dam-with-core-and-filter) is a dam
 with one.
 
 ---
@@ -930,13 +930,13 @@ reads the solved field rather than a piezometric line.
 The pore pressures are passed by file. A solved run writes `xslope_johnson_res_mesh.json` and
 `xslope_johnson_res_seep.csv` beside the workbook, and loading the workbook again
 for a stability run picks both up by name — the run above already wrote that pair
-beside your own file. The [sample page](../seep/samples.md#johnson-reservoir)'s
-copy of this model ships with a pair for the same reason.
+beside your own file. The copy of this model used on the
+[Seepage and Slope Stability](../seep/seep_slope.md) page ships with a pair for the same reason.
 
 The one thing that has to be decided before the seepage run, rather than after, is
 the element type. A finite element stability analysis requires quadratic elements,
 so a mesh built at `tri3` for a fast seepage solve has to be rebuilt at `tri6`
-before it can be used for one. That is why the sample page's shipped mesh is quadratic —
+before it can be used for one. That is why that copy's shipped mesh is quadratic —
 3,362 nodes and 1,605 `tri6` elements — and it returns 1.9554 ft³/day per ft
 against the 1.9546 of the linear tri3 mesh built above.
 
@@ -972,11 +972,10 @@ boundary heads change with time and the answer depends on the time. The
 [tutorials index](index.md) lists the series.
 [Seepage Analysis](../seep/overview.md) gives the governing equations, all three
 unsaturated models with their parameter tables, and the convergence conditions in
-full; [Sample Problem 4](../seep/samples.md#johnson-reservoir) catalogs this model
-and reports its cross-check against the USACE SEEP2D program on a mesh identical to
-the one it exported to SEEP2D;
+full; the [seepage verification page](../verification/seep.md#verification-seep2d-johnson) reports this model's
+cross-check against the USACE SEEP2D program on an identical mesh;
 [Seepage and Slope Stability](../seep/seep_slope.md) takes this head field into a
 limit equilibrium search and a finite element strength reduction on the same file;
-and [Sample Problem 8](../seep/samples.md#8-johnson-reservoir-zoned-drawdown-transient)
+and [Sample Problem 6](../seep/samples.md#6-johnson-reservoir-zoned-drawdown-transient)
 is this same dam solved through a 45-day reservoir drawdown.
 In [SEEP-1](seep01_sheetpile.md) we build a seepage model from scratch.

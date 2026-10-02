@@ -771,9 +771,7 @@ This tutorial covered:
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Transient Seepage](../seep/transient.md) gives the formulation, the storage
 tables, the time-stepping scheme and the boundary types in full;
-[Sample Problem 7](../seep/samples.md#7-earth-dam-reservoir-drawdown-transient)
-is this dam with the stage times filled in, and
-[Sample Problem 8](../seep/samples.md#8-johnson-reservoir-zoned-drawdown-transient)
+[Sample Problem 6](../seep/samples.md#6-johnson-reservoir-zoned-drawdown-transient)
 is the larger Johnson Reservoir dam from SEEP-2, taken through a drawdown of its
 own. [Rapid Drawdown Analysis](../lem/rapid.md) is where the stage times left
 blank here are used, taking a transient solution like this one into a stability
@@ -781,3 +779,8 @@ analysis. In [SEEP-2](seep02_johnson_dam.md) we build the unconfined steady
 problem and its seepage face from scratch, and in
 [SEEP-4](seep04_dam_infiltration.md) we add rain to a dam through the third
 boundary type, a specified flux.
+
+<!-- Transient regression on the same dam with the stage times set (xslope_earth_dam_tseep.xlsx): total head sampled at interior stations at three saved times (early drawdown / end of drawdown / quasi-equilibrium), re-solved through the run_tests tseep_head path (tri3, target_size=2.0). -->
+<!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=15, points=30:6:13.647;40:8:13.970;55:5:10.776, tolerance=0.05 -->
+<!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=47, points=30:6:6.355;40:8:7.014;55:5:7.272, tolerance=0.05 -->
+<!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=360, points=30:6:2.011;40:8:2.012;55:5:2.027, tolerance=0.05 -->

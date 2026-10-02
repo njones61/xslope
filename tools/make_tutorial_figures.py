@@ -2480,7 +2480,7 @@ def seep01_plots():
 # --------------------------------------------------------------------------- #
 # SEEP-2 — Unconfined Seepage Through a Zoned Dam (open and explore)
 #
-# The Johnson Reservoir dam of docs/seep/samples.md #4, meshed and solved exactly
+# The Johnson Reservoir dam (the copy docs/verification/seep.md checks against SEEP2D), meshed and solved exactly
 # as run_tests.py::run_seep_test solves it — tri3 at the ground-surface width over
 # 120 — so the discharge this page quotes is the discharge that page's lock and the
 # SEEP2D cross-check were recorded from.
@@ -3240,7 +3240,7 @@ def seep02_plots():
 # SEEP-3 — Transient Seepage: Reservoir Drawdown Through a Cored Earth Dam
 #
 # The first page on which the answer is a sequence rather than a field. The model is
-# the cored earth dam of docs/seep/samples.md #7, in the tutorial's own sidecar-free
+# the cored earth dam of docs/seep/files/xslope_earth_dam_tseep.xlsx, in the tutorial's own sidecar-free
 # copy: a granular shell around a compacted clay core, a full pool at el 18 held
 # against the upstream face, a tailwater at el 2, and a reservoir drawn down to the
 # tailwater over 45 days.

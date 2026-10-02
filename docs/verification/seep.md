@@ -100,7 +100,7 @@ Princeton University Press.
 
 ### 🟢 SEEP2D cross-check — Johnson Reservoir (established code) {#verification-seep2d-johnson}
 
-Sample write-up: [seepage samples — Johnson Reservoir](../seep/samples.md#johnson-reservoir).
+Worked example: [Tutorial SEEP-2](../tutorials/seep02_johnson_dam.md).
 Input file: [xslope_johnson_res.xlsx](../seep/files/xslope_johnson_res.xlsx).
 
 The Johnson Reservoir zoned earth dam (permeable shell, low-permeability core,
@@ -114,12 +114,16 @@ Fortran program. Identical-mesh comparison over all 2,913 nodes:
 | Total discharge q (ft³/day per ft) | 1.9546 | 1.9544 (+0.0%) | |
 | Nodal heads | RMS Δh = 0.037 ft | — | 0.1% of a 60-ft head range |
 
+To three decimals, the XSLOPE discharge is 1.955 ft³/day per ft.
+
 The largest local head difference (0.56 ft) occurs adjacent to the free surface,
 where the two codes' unsaturated relative-permeability treatments differ in
 detail. Both codes release the free surface from the downstream face at the same
 elevation, el. 102.58.
 
 ![Johnson Reservoir: inputs and SEEP2D cross-check solution](images/johnson_res.png)
+
+<!-- test: file=../seep/files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.955, tolerance=0.05, benchmark=SEEP-2 -->
 
 **Van Genuchten discharge vs SEEP2D.** On problems with van Genuchten conductivity, XSLOPE's total
 discharge reads 3.5–4.7% below SEEP2D's self-reported flow (gw009a

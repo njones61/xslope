@@ -72,38 +72,7 @@ The computed flow rate (≈37.8 m³/yr per m) is within 3% of the linear-front r
 
 <!-- test: file=files/xslope_earth_dam1_vg.xlsx, type=seep, expected_flowrate=37.848, tolerance=0.05 -->
 
-### 4. Johnson Reservoir {#johnson-reservoir}
-
-Built and run step by step in [Tutorial SEEP-2](../tutorials/seep02_johnson_dam.md).
-
-Excel input file: [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx)
-
-![johnson_res_solution.png](images/johnson_res_solution.png){width=1200px}
-
-**SEEP2D cross-check.** This problem is also a verification
-benchmark against an established code: it was exported to a SEEP2D input file
-with the **exact same tri3 mesh topology, boundary conditions, and material
-parameters** (`benchmarks/run_seep2d_compare.py`) and solved with the original
-USACE/WES SEEP2D Fortran program (Tracy, USACE Waterways Experiment Station).
-Identical-mesh comparison over all 2,913 nodes:
-
-| Quantity | XSLOPE | SEEP2D | Diff |
-|---|---|---|---|
-| Total discharge q (ft³/day per ft) | 1.9546 | 1.9544 | +0.01% |
-| Nodal heads | RMS Δh = 0.037 ft | (60-ft head range) | 0.06% |
-
-The largest local head difference (0.56 ft) occurs adjacent to the free surface,
-where the two codes' unsaturated relative-permeability treatments differ in
-detail. Both codes release the free surface from the downstream face at the same
-elevation, el. 102.58. See the
-[Verification](../verification/seep.md) page.
-
-<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.955, tolerance=0.05, benchmark=SEEP-2 -->
-
-A **transient drawdown** variant of this dam, with the same zones followed through a 45-day reservoir
-drawdown, is worked in [Problem 8](#8-johnson-reservoir-zoned-drawdown-transient) below.
-
-### 5. Earth Dam with Core and Filter
+### 4. Earth Dam with Core and Filter
 
 This problem has the following cross-section:
 
@@ -121,7 +90,7 @@ The solution should look something like this:
 
 <!-- test: file=files/xslope_earth_dam2.xlsx, type=seep, max_iter=1000, expected_flowrate=1.282, tolerance=0.05 -->
 
-### 6. Levee with Grouted Foundation
+### 5. Levee with Grouted Foundation
 
 The following problem represents a levee underlain by a foundation with a grout curtain. 
 
@@ -163,29 +132,12 @@ Solution:
 
 <!-- test: file=files/xslope_levee_poly.xlsx, type=seep, expected_flowrate=1.430, tolerance=0.05 -->
 
-### 7. Earth Dam — Reservoir Drawdown (Transient)
+### 6. Johnson Reservoir — Zoned Drawdown (Transient)
 
-Built and run step by step in [Tutorial SEEP-3](../tutorials/seep03_reservoir_drawdown.md).
-
-[xslope_earth_dam_tseep.xlsx](files/xslope_earth_dam_tseep.xlsx)
-
-This copy sets `stage_1` (full pool, t = 0) and `stage_2` (end of drawdown,
-t = 47), the two states a [rapid drawdown](../lem/rapid.md) analysis reads.
-The copy used in Tutorial SEEP-3 leaves them blank.
-
-![earth_dam_tseep_flownet.png](images/earth_dam_tseep_flownet.png){width=760px}
-
-<!-- Transient regression: total head sampled at interior stations at three saved times (early drawdown / end of drawdown / quasi-equilibrium), re-solved through the run_tests tseep_head path (tri3, target_size=2.0). -->
-<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=15, points=30:6:13.647;40:8:13.970;55:5:10.776, tolerance=0.05 -->
-<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=47, points=30:6:6.355;40:8:7.014;55:5:7.272, tolerance=0.05 -->
-<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=360, points=30:6:2.011;40:8:2.012;55:5:2.027, tolerance=0.05 -->
-
-### 8. Johnson Reservoir — Zoned Drawdown (Transient)
-
-This is the **transient** companion to the [Johnson Reservoir dam](#johnson-reservoir) of Problem 4 —
+This is the **transient** companion to the Johnson Reservoir dam built in [Tutorial SEEP-2](../tutorials/seep02_johnson_dam.md):
 the same zoned cross-section (a granular shell over a low-permeability clay core carried down into the
 foundation) with its upstream reservoir **drawn down** and the pore-pressure field followed through
-time. Like the dam of [Problem 7](#7-earth-dam-reservoir-drawdown-transient), this one has
+time. Like the cored dam drawn down in [Tutorial SEEP-3](../tutorials/seep03_reservoir_drawdown.md), this one has
 **zones of contrasting permeability**, which make rapid drawdown more hazardous in an embankment,
 and it also has a foundation zone that the core extends into. The full transient formulation (storage, the theta time-stepper, the boundary types,
 and the coupling to [rapid drawdown](../lem/rapid.md)) is described on the
@@ -204,12 +156,12 @@ The transient model adds two things to the steady Johnson model:
   [head types](transient.md#head-types-head-and-reservoir)) bound to a `pool` series: the pool is
   held at full pool (el 160) briefly, drawn down to the tailwater datum (el 100) over **45 days**,
   then held. The run lasts **1000 days** because the low-permeability core drains slowly, so the
-  field takes far longer to settle than the dam of the previous problem did (by the end the boundary outflow has
+  field takes far longer to settle than the dam of Tutorial SEEP-3 did (by the end the boundary outflow has
   decayed to under 1% of its drawdown peak). Twelve frames are saved, and the `stage_1` (full pool,
   t = 0) / `stage_2` (end of drawdown, t = 50) pair marks the critical rapid-drawdown states.
 
-The conductivities in the base file are **already in ft/day** (the steady Johnson model's discharge
-is the 1.955 ft³/day per ft SEEP2D benchmark of Problem 4), so they need no conversion and already
+The conductivities of the steady Johnson model are **already in ft/day** (its discharge of
+1.955 ft³/day per ft is the one [checked against SEEP2D](../verification/seep.md#verification-seep2d-johnson)), so they need no conversion and already
 use days as the time unit: shell `k = 1.0`, core `k = 0.001`, foundation `k = 0.1` ft/day. Only the
 storage columns and the `tseep` sheet are new.
 

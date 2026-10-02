@@ -1524,8 +1524,8 @@ def test_the_search_counts_trial_surfaces_not_grid_centers():
     # read the tally's `attempted`, so the two can never again disagree.
     tally = UnsolvedTrials("spencer")
     for i in range(3):
-        tally.record(float(i), 1.0, 0.0, True, None)
-    tally.record(9.0, 1.0, 0.0, False, None, "no admissible solution")
+        tally.record(float(i), 1.0, 0.0, True)
+    tally.record(9.0, 1.0, 0.0, False, "no admissible solution")
     if f"of {tally.attempted} trial surfaces" not in tally.sentence():
         fails.append(f"the console line no longer quotes the count the report "
                      f"prints: {tally.sentence()!r}")

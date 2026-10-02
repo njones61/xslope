@@ -140,7 +140,10 @@ class SolutionView(QWidget):
     The solvers return ``results['warnings']`` — Duncan & Wright admissibility
     notes on an already-accepted solution (base tension on cohesionless slices,
     interslice tension, thrust line outside the slices; see
-    ``solve._admissibility_warnings``). They reach the Log pane via the stdout tee,
+    ``solve._admissibility_warnings``) — and ``search.run_lem_analysis`` adds the
+    crest-tension note (``search.crest_tension_note``), which can suggest a
+    tension crack. A single-surface run prints them to the Log pane via the
+    stdout tee (a search prints only the crest-tension note),
     but a Studio user reading only the plot would take an inadmissible FS as a
     clean success. This strip surfaces them beside the solution: hidden when the
     list is empty, otherwise one amber line per note. It refreshes from the fresh

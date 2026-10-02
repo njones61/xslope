@@ -2842,11 +2842,6 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
         if terms is None:
             return False
         n, F_m, Rr = terms
-        # F_m is the moment factor of safety of this surface, and at phi = 0 it is
-        # Bishop's answer term for term (m_alpha = cos a, so sum c dx / m_alpha is
-        # sum c dl). Recorded for the same reason the Bishop restart below records
-        # its own: a search ranking the surfaces it could not solve reads it here.
-        slice_df.attrs['moment_fs'] = float(F_m)
         lo = float(np.max(alpha)) - np.pi / 2
         hi = float(np.min(alpha)) + np.pi / 2
         if not (hi > lo):
@@ -2990,11 +2985,6 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
             success_bishop, result_bishop = bishop(slice_df)
             if success_bishop:
                 F0_bishop = result_bishop['FS']
-                # Recorded on the table, not just used as a starting guess: this
-                # is the MOMENT factor of safety of this surface, and a search
-                # that has to rank the surfaces its method could not solve reads
-                # it here rather than solving Bishop a second time.
-                slice_df.attrs['moment_fs'] = float(F0_bishop)
                 if debug_level >= 1:
                     print(f"Retrying with Bishop FS = {F0_bishop:.3f} as initial guess")
                 theta_tries = [theta0_rad, -theta0_rad, 0.0, np.radians(15), np.radians(-15)]
@@ -3033,7 +3023,6 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
             sb, rb = bishop(slice_df)
             if sb:
                 F_starts.insert(0, rb['FS'])
-                slice_df.attrs['moment_fs'] = float(rb['FS'])
         except Exception:
             pass
 

@@ -391,6 +391,12 @@ problem being solved. A deep-seated case like the Talbingo dam
 ([VP5](../verification/rocscience.md#vp5)) shows this pattern while its
 factor of safety matches the moment methods and the published values.
 
+When the slices at the crest end of the reported surface are in base tension and have
+cohesion, the run adds one more note, for every method: "Tension on the base of N
+slices near the crest. Consider adding a tension crack." The second sentence is left
+out when the model already has a crack. [Tension at the crest](search.md#tension-at-the-crest)
+gives the rule.
+
 Base tension on a cohesionless slice indicates a more serious problem: that slice has
 no strength at all under the solution. See the VP30 discussion in the
 [verification corpus](../verification/rocscience.md#vp30) for a worked case where the

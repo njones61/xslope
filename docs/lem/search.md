@@ -146,25 +146,41 @@ The circular search additionally returns a `circle_cache` containing every circl
 
 ### Trial Surfaces the Method Could Not Solve
 
-A trial surface can be geometrically admissible and still have no solution by the selected method. Every method assumes something about the interslice forces, and each assumption has surfaces it cannot satisfy: Spencer's single interslice inclination gives a two-equation system with no root in the range of inclinations that keep each slice's base normal pointing the right way, and Morgenstern-Price finds no crossing of its force and moment factors of safety anywhere in the λ range it searches. Such a trial is scored the same as one rejected on geometry and dropped from the ranking, so if it sits below the reported minimum, the reported minimum is the minimum of what the method could solve rather than of the model.
+A trial surface can be geometrically admissible and still have no solution by the selected method. Every method assumes something about the interslice forces, and each assumption has surfaces it cannot satisfy. Such a trial is scored the same as one rejected on geometry and dropped from the ranking, so the reported minimum is the minimum of the surfaces the method could solve.
 
-The circular search reports these trials. When the method could not solve one or more admissible trials, the search prints one line. This line is from Spencer on the embankment of [Tutorial LEM-1](../tutorials/lem01_simple_embankment.md), where the material is undrained (φ = 0) and the whole region around the critical circle is affected:
+The circular search counts these trials. When the method could not solve one or more admissible trials, the search prints one line giving the count and the reason. This line is from Spencer on the embankment of [Tutorial LEM-1](../tutorials/lem01_simple_embankment.md), where the material is undrained (φ = 0):
 
 ```
-[⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (56 admit no
-admissible solution); 26 of them rank lower than the reported minimum by the moment
-measure.
+[⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (on 56, no
+interslice force inclination satisfies both force and moment equilibrium)
 ```
 
-The ranking is by the moment factor of safety on both sides — the unsolved trials against the reported minimum's own moment answer — so the comparison is between like quantities. Pass a dictionary as `unsolved_out=` to receive the same counts (`attempted`, `unsolved`, `no_admissible_solution`, `not_converged`, `inadmissible`, `unclassified`, `lower_by_moment`, and the moment factor of safety of each unsolved trial); `run_lem_analysis` carries them on `search["unsolved"]`, which is `None` for a non-circular search, whose scoring does not separate a solver failure from a geometric rejection. A search in which the method solved every admissible trial prints nothing extra.
+A search in which the method solved every admissible trial prints nothing extra. Pass a dictionary as `unsolved_out=` to receive the same counts (`attempted`, `unsolved`, `no_admissible_solution`, `not_converged`, `inadmissible`, `unclassified`, and the printed `sentence`); `run_lem_analysis` carries them on `search["unsolved"]`, which is `None` for a non-circular search, whose scoring does not separate a solver failure from a geometric rejection.
 
-The breakdown in parentheses appears only for methods whose failure messages XSLOPE classifies: Spencer (three messages) and Morgenstern-Price (two). For other methods the line gives the count and the ranking without a breakdown.
+The reasons in parentheses are of three kinds.
 
-The three phrases in the breakdown are the three ways a trial can go unsolved. *Admit no admissible solution* is a surface on which the method's assumption cannot be satisfied at all. *Failed to converge* is an iteration that did not reach a root that may well exist. *Solved only with an inadmissible stress state* is a root the method found and then rejected on one of the measures its page describes, such as base tension on more than half the slices. Interslice tension does not cause a trial to be rejected; it is [reported instead](overview.md#interslice-tension).
+- **No solution.** The method's equations have no acceptable solution on the surface. Spencer prints "no interslice force inclination satisfies both force and moment equilibrium": no single inclination within the allowable range closes both equations. Roots can exist outside that range, but there they reverse the normal force on the base of some slices, so they are not considered. Morgenstern-Price prints "no value of λ from -1.5 to 1.5 satisfies both force and moment equilibrium": its force and moment factors of safety do not cross anywhere in that range of the interslice force scale factor λ. The Corps of Engineers and Lowe & Karafiath methods print "no factor of safety gives a physically reasonable solution to force equilibrium": either no factor of safety from 0.05 to 10 closes force equilibrium, or every one that does fails the tests listed on the [force-equilibrium method page](force_eq.md).
+- **Failed to converge.** The iteration did not reach a solution that may well exist.
+- **Solution rejected as physically unreasonable.** The method found a solution and rejected it. For Spencer's method a solution is rejected if any of three tests fails:
+    1. More than half of the slice bases are in tension (negative effective normal force).
+    2. The interslice force inclination lies outside its allowable range. The range is the one in which every slice keeps a positive base normal force; it corresponds to an inclination between the slope of the ground surface and the slope of the slip surface.
+    3. An interslice force is larger than the total load on the sliding mass: its weight plus the distributed loads, line loads, seismic force and tension-crack water force applied to it.
 
-The phrase "admits no admissible solution" has a narrow meaning. Spencer's equations are singular where a slice's m<sub>α</sub> changes sign, and beyond that band roots often do exist, but at interslice inclinations that reverse a base normal, which is not a physically possible state. The message therefore does not state that the surface has no solution at all.
+    A solution with a factor of safety of zero or less is also rejected. Morgenstern-Price applies the first test only. The Ordinary Method of Slices, Bishop's method and the Janbu method apply the first test, and Bishop's and Janbu's methods also reject a solution in which m<sub>α</sub> falls below 0.05 on any slice.
 
-When unsolved trials rank below the reported minimum, the reported answer is limited by the method rather than by the search. Two changes can help. Another method's assumption may be satisfiable where this one's is not, so running a second method shows how much of the model the first method's answer covers. A surface that has no root because of an unsupported back scarp becomes solvable once the model includes the tension crack that the scarp implies, since the crack removes the slices whose cohesion the assumption cannot balance.
+The breakdown appears only when XSLOPE has classified every failure message the method returned. Otherwise the line gives the count alone. Interslice tension does not cause a trial to be rejected; it is [reported instead](overview.md#interslice-tension).
+
+Two changes can help when many trials go unsolved. Another method's assumption may be satisfiable where this one's is not, so running a second method shows how much of the model the first method's answer covers. A surface with no solution because the soil near the crest is in tension becomes solvable once the model includes a tension crack, since the crack removes the slices whose cohesion the assumption cannot balance.
+
+### Tension at the Crest
+
+When the reported solution has tension on the base of the slices at the crest end of the surface, XSLOPE adds a note to the solution's warnings. The crest end is the end of the slip surface where it meets the higher ground. Counting from that end, the note counts the slices that are in base tension (negative effective normal force) and have cohesion, and stops at the first slice that is not. If the model has no tension crack, the note suggests one:
+
+```
+Tension on the base of 3 slices near the crest. Consider adding a tension crack.
+```
+
+If the model already has a tension crack, the note gives the first sentence only. Tension elsewhere on the surface, and tension on cohesionless slices, is reported by the method's own notes without the suggestion. The note appears with the other warnings: in the run output, in the amber strip in Studio, in the report and in the assistant's account of the run. It does not change the factor of safety or which surface is reported. [Tutorial LEM-1](../tutorials/lem01_simple_embankment.md#the-fix-is-in-the-ground-not-the-settings) shows the remedy.
 
 ## Visualization of Search Results
 

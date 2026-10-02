@@ -327,9 +327,10 @@ lowest point is at elevation 0.000: the critical surface is tangent to the
 contact, running along the top of the foundation without entering it. Every one
 of the 40 slice bases carries c = 400 psf, the fill's strength.
 
-The solution has two admissibility warnings — interslice tension (a most
-tensile −1436 lb/ft against a largest compression of 7382) and a line of thrust
-outside the slice on 15% of the boundaries. This is the crest tension of a φ = 0
+The solution has three admissibility warnings — interslice tension (a most
+tensile −1436 lb/ft against a largest compression of 7382), a line of thrust
+outside the slice on 15% of the boundaries, and tension on the base of 2 slices
+near the crest. This is the crest tension of a φ = 0
 slope, which is diagnosed and fixed with a tension crack in
 [Tutorial LEM-1](lem01_simple_embankment.md); adding one here at z<sub>c</sub> = 2c/γ = 6.15 ft gives a clean solution at
 **FS = 1.175**, on a circle still tangent to the contact. It changes nothing

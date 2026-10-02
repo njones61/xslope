@@ -868,7 +868,8 @@ class PythonKernel:
             # A converging search writes a dozen progress lines the model would
             # have to read back as tokens, and only the last of them is the answer,
             # so a SEARCH runs muted. What the search reports about ITSELF —
-            # unsolved trials, admissibility notes — is kept below, because those
+            # unsolved trials, admissibility notes (the crest-tension advice
+            # among them) — is kept below, because those
             # are findings about the model. A single solve prints little and what
             # it prints is the solver's, so it is left alone.
             muted = (contextlib.redirect_stdout(_io.StringIO()) if search

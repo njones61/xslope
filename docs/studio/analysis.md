@@ -137,9 +137,10 @@ The result depends on the analysis type:
 ![LEM Solution view](images/analysis_lem_solution.png)
 
 When the accepted solution carries admissibility defects — base tension on a
-cohesionless slice, interslice tension, or a line of thrust that leaves the
-slices — an amber strip across the top of the **LEM · Solution** view lists
-them, so an inadmissible FS is never mistaken for a clean success:
+cohesionless slice, interslice tension, a line of thrust that leaves the
+slices, or [tension on the base of the slices at the crest](../lem/search.md#tension-at-the-crest)
+— an amber strip across the top of the **LEM · Solution** view lists them, so an
+inadmissible FS is never mistaken for a clean success:
 
 ![LEM Solution with admissibility warnings](images/analysis_solution_warnings.png)
 

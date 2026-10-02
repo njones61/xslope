@@ -1523,6 +1523,17 @@ Method notes:
   & Wright) on an already-accepted solution and put its notes in `results['warnings']` — e.g.
   interslice tension, or a thrust line outside the slice. It never changes FS or acceptance, but
   **report it**: it is the difference between a converged number and a physically admissible one.
+- A circular search prints `[⚠️ unsolved trials] ...` when the method could not solve some trial
+  surfaces, with the count and the reason (e.g. Spencer: "on 56, no interslice force inclination
+  satisfies both force and moment equilibrium"; "failed to converge"; "solution rejected as
+  physically unreasonable"). The counts are on `search["unsolved"]` from `run_lem_analysis`.
+  Report the line: the minimum is the minimum of the surfaces the method could solve.
+- `run_lem_analysis` (and so `run_lem`) adds a crest-tension note to `results['warnings']` when
+  the slices at the crest end of the reported surface have cohesion and base tension: "Tension on
+  the base of N slices near the crest. Consider adding a tension crack." (first sentence only when
+  the model already has a crack). When you call `circular_search` directly, get the same note
+  with `xslope.search.crest_tension_note(fs_cache[0]['slices'], slope_data)`. If it suggests a
+  crack, tell the user and offer to add one (z_c = 2c/γ is the usual starting depth).
 
 **Reporting the critical surface:** `fs_cache[0]` from a search is a flat dict with keys
 `FS`, `Xo`, `Yo`, `Depth` (tangent elevation), plus `slices`, `failure_surface`,

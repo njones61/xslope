@@ -69,10 +69,17 @@ WHAT IS CHECKED
   Spencer refuses a root for lying outside its admissible band of interslice
   inclinations while Morgenstern-Price refuses on base tension by extent, so
   "anomalous base tension" would misreport either as the other;
-* the line the docs quote, against the line the search prints, byte for byte;
-* four mutations: the silent skip restored, a classifier that calls the refused
-  circle an iteration failure, a verdict that claims absolute insolubility, and
-  the old catch-all that folded unmapped messages into "not_converged".
+* the line the docs quote, against the line the search prints, byte for byte,
+  and each class in the owner's approved words, with no ranking of the
+  unsolved trials against the reported minimum;
+* the crest-tension advice: printed and carried in the warnings on the
+  uncracked tutorial model, absent with its 8 ft crack, silent for tension away
+  from the crest and on cohesionless slices, the suggestion dropped where the
+  model already has a crack, and the same on both facings;
+* five mutations: the silent skip restored, a classifier that calls the refused
+  circle an iteration failure, a verdict that claims absolute insolubility, the
+  old catch-all that folded unmapped messages into "not_converged", and advice
+  that ignores the crack the model already has.
 
 Run directly:  PYTHONPATH=. python3 test/spencer_disclosure_check.py
 """
@@ -205,6 +212,22 @@ MECHANISM_CLAIM = "anomalous base tension"
 
 #: The page that quotes the disclosure line, and the fenced block it quotes it in.
 DOCS_PAGE = os.path.join(REPO, 'docs', 'lem', 'search.md')
+
+#: The no-solution phrases the disclosure line prints, as the owner approved
+#: Spencer's (2026-10-01) and as each other method's condition reads.
+SPENCER_NO_SOLUTION = ("no interslice force inclination satisfies both force "
+                       "and moment equilibrium")
+MP_NO_SOLUTION = ("no value of λ from -1.5 to 1.5 satisfies both force and "
+                  "moment equilibrium")
+REJECTED = "solution rejected as physically unreasonable"
+
+#: The ranking the line used to carry. Removed; none of it may come back.
+RANKING_WORDS = ("rank lower", "moment measure", "ranking could not be measured")
+
+#: The crest-tension note on the tutorial embankment's uncracked Spencer answer,
+#: whose last three slices (at the crest) are in base tension.
+CREST_NOTE = ("Tension on the base of 3 slices near the crest. "
+              "Consider adding a tension crack.")
 
 
 def leg_closed_form_is_the_shipped_residual():
@@ -423,29 +446,6 @@ def leg_general_case_is_measured_not_assumed():
     return fails
 
 
-def leg_moment_fs_is_recorded_and_exact():
-    """The moment factor of safety the ranking uses is Bishop's, to rounding."""
-    fails = []
-    for label, spec in (('refused', CRITICAL), ('solvable', SOLVABLE)):
-        df = _slices(MODEL, spec)
-        solve.spencer(df)
-        got = df.attrs.get('moment_fs')
-        ok_b, res_b = solve.bishop(df.copy())
-        if not ok_b:
-            fails.append(f"{label}: Bishop could not solve it, so there is nothing "
-                         f"to compare the recorded moment FS with")
-            continue
-        if got is None:
-            fails.append(f"{label}: spencer recorded no moment_fs for the search to read")
-            continue
-        rel = abs(got - res_b['FS']) / res_b['FS']
-        if rel > 1e-9:
-            fails.append(f"{label}: recorded moment FS {got:.10f} differs from "
-                         f"Bishop's {res_b['FS']:.10f} ({rel:.1e})")
-        print(f"  moment FS    {label:<10} recorded {got:.10f}  Bishop {res_b['FS']:.10f}")
-    return fails
-
-
 def _search(model, method='spencer'):
     sd = load_slope_data(model)
     out = {}
@@ -475,20 +475,18 @@ def leg_search_discloses():
     if not out['no_admissible_solution']:
         fails.append("none of the unsolved trials was classified as admitting no "
                      "admissible solution, though that is this model's class")
-    if out['reported_moment_fs'] is None:
-        fails.append("no moment measure on the reported minimum, so nothing could "
-                     "be ranked against it")
-    elif not out['lower_by_moment']:
-        fails.append("no unsolved trial ranks below the reported minimum, though "
-                     "the refused region contains it")
     line = [l for l in text.splitlines() if 'could not solve' in l]
     if len(line) != 1:
         fails.append(f"expected exactly one disclosure line, found {len(line)}")
     else:
         for want in ('Spencer could not solve', 'trial surfaces',
-                     'rank lower than the reported minimum by the moment measure'):
+                     f"(on {out['no_admissible_solution']}, {SPENCER_NO_SOLUTION})"):
             if want not in line[0]:
                 fails.append(f"the disclosure line does not say {want!r}: {line[0]}")
+        for gone in RANKING_WORDS:
+            if gone in line[0]:
+                fails.append(f"the disclosure line still ranks the unsolved trials "
+                             f"({gone!r}): {line[0]}")
         for claim in ABSOLUTE_CLAIMS:
             if claim in line[0]:
                 fails.append(f"the disclosure line claims {claim!r}: {line[0]}")
@@ -539,6 +537,9 @@ def leg_breakdown_only_from_read_messages():
         fails.append(f"expected one M-P disclosure line, found {len(line)}")
     elif 'failed to converge' in line[0]:
         fails.append(f"the M-P line reports convergence failures: {line[0]}")
+    elif MP_NO_SOLUTION not in line[0] or SPENCER_NO_SOLUTION in line[0]:
+        fails.append(f"the M-P line does not give M-P's own no-solution phrase "
+                     f"({MP_NO_SOLUTION!r}): {line[0]}")
     elif MECHANISM_CLAIM in line[0]:
         fails.append(f"the M-P line names Spencer's guard ({MECHANISM_CLAIM!r}) for "
                      f"refusals that tripped M-P's interslice-tension guard: {line[0]}")
@@ -564,7 +565,7 @@ def leg_breakdown_only_from_read_messages():
 
     # An unmapped message must leave the taxonomy off the line entirely.
     tally = xsearch.UnsolvedTrials('bishop')
-    tally.record(1.0, 2.0, 3.0, False, None, "Some solver said something new.")
+    tally.record(1.0, 2.0, 3.0, False, "Some solver said something new.")
     if tally.unclassified != 1:
         fails.append("an unmapped message was folded into a class instead of "
                      "being counted as unclassified")
@@ -634,6 +635,113 @@ def leg_clean_search_is_silent():
     return fails
 
 
+def leg_phrases_read_as_approved():
+    """Each class prints its approved words, and nothing ranks the trials."""
+    fails = []
+    tally = xsearch.UnsolvedTrials('spencer')
+    tally.record(0.0, 1.0, 0.0, True)
+    tally.record(1.0, 1.0, 0.0, False, solve.SPENCER_NO_ADMISSIBLE_SOLUTION + ": x.")
+    tally.record(2.0, 1.0, 0.0, False, solve.SPENCER_NO_CONVERGENCE)
+    tally.record(3.0, 1.0, 0.0, False, solve.SPENCER_INADMISSIBLE + "; rejected x")
+    want = (f"Spencer could not solve 3 of 4 trial surfaces (on 1, "
+            f"{SPENCER_NO_SOLUTION}; 1 failed to converge; on 1, {REJECTED})")
+    if tally.sentence() != want:
+        fails.append(f"the three classes read\n      {tally.sentence()}\n"
+                     f"      expected\n      {want}")
+    else:
+        print(f"  phrases      {tally.sentence()}")
+    gone = [k for k in ('lower_by_moment', 'reported_moment_fs', 'unsolved_moment_fs')
+            if k in tally.as_dict()]
+    if gone:
+        fails.append(f"the counts still carry the removed ranking: {gone}")
+    return fails
+
+
+def _crest_run(tcrack):
+    """The tutorial embankment's Spencer search, the way Studio runs it."""
+    sd = load_slope_data(MODEL)
+    sd['tcrack_depth'] = tcrack
+    sd['tcrack_water'] = 0.0
+    bundle, text = _quiet(xsearch.run_lem_analysis, sd, 'spencer',
+                          analysis='auto_search', surface='circular',
+                          num_slices=NUM_SLICES)
+    return sd, bundle, text
+
+
+def leg_crest_tension_note():
+    """The tension-crack advice: where it appears and where it must not.
+
+    It appears on the uncracked tutorial embankment, whose reported Spencer circle
+    has three crest slices in base tension, in the warnings and on the console,
+    and changes no factor of safety. It is absent on the same model with the
+    8 ft crack. On the solved slice table it stays silent for tension away from
+    the crest and for cohesionless crest slices, drops the suggestion when the
+    model already has a crack, and reads the same on the mirrored slope.
+    """
+    fails = []
+    sd, bundle, text = _crest_run(0.0)
+    warns = bundle['results'].get('warnings') or []
+    if CREST_NOTE not in warns:
+        fails.append(f"the uncracked tutorial model's warnings lack the advice: {warns}")
+    if f"[⚠️ crest tension] {CREST_NOTE}" not in text:
+        fails.append("the advice was not printed with the run")
+    fs_plain = _search(MODEL)[0][0]['FS']
+    if bundle['results']['FS'] != fs_plain:
+        fails.append(f"the run with the advice reports FS {bundle['results']['FS']!r}, "
+                     f"the search alone {fs_plain!r}")
+    else:
+        print(f"  crest note   uncracked: {CREST_NOTE!r}, FS {fs_plain:.6f} unchanged")
+
+    _sd8, bundle8, text8 = _crest_run(8.0)
+    notes8 = [w for w in bundle8['results'].get('warnings') or [] if 'crest' in w]
+    if notes8 or 'crest tension' in text8:
+        fails.append(f"the 8 ft crack still gets a crest note: {notes8}")
+    else:
+        print(f"  crest note   8 ft crack: none (FS {bundle8['results']['FS']:.4f})")
+
+    df = bundle['slice_df']
+    note = xsearch.crest_tension_note
+    away = df.copy()
+    away['n_eff'] = np.flip(df['n_eff'].values)      # the tension at the toe end
+    if note(away, sd) is not None:
+        fails.append(f"tension at the toe drew the crest note: {note(away, sd)}")
+    middle = df.copy()
+    n = middle['n_eff'].values.copy()
+    n = np.abs(n)
+    n[18:21] = -500.0                                 # tension mid-surface only
+    middle['n_eff'] = n
+    if note(middle, sd) is not None:
+        fails.append(f"tension mid-surface drew the crest note: {note(middle, sd)}")
+    sandy = df.copy()
+    c = sandy['c'].values.copy()
+    c[-3:] = 0.0
+    sandy['c'] = c
+    if note(sandy, sd) is not None:
+        fails.append(f"cohesionless crest slices drew the crest note: {note(sandy, sd)}")
+    cracked = note(df, dict(sd, tcrack_depth=8.0))
+    if cracked != CREST_NOTE.split(' Consider')[0]:
+        fails.append(f"with a crack already in the model the note reads {cracked!r}")
+    one = df.copy()
+    n1 = np.abs(one['n_eff'].values.copy())
+    n1[-1] = -100.0
+    one['n_eff'] = n1
+    if note(one, sd) != ("Tension on the base of 1 slice near the crest. "
+                         "Consider adding a tension crack."):
+        fails.append(f"one slice reads {note(one, sd)!r}")
+
+    md, mspec = _mirror(MODEL)
+    left = _slices(MODEL, CRITICAL)
+    right = _slices(md, mspec(CRITICAL))
+    solve.bishop(left)
+    solve.bishop(right)
+    nl, nr = note(left, sd), note(right, md)
+    if nl is None or nl != nr:
+        fails.append(f"the mirror reads differently: left {nl!r}, right {nr!r}")
+    else:
+        print(f"  crest note   both facings on Bishop's circle: {nl!r}")
+    return fails
+
+
 def _mutation(label, patch, restore, leg, fails):
     patch()
     try:
@@ -682,6 +790,14 @@ def leg_mutations():
               lambda: setattr(solve, 'spencer', original_spencer),
               leg_band_case_does_not_overclaim, fails)
 
+    # 5. The advice ignores the crack the model already has.
+    original_note = xsearch.crest_tension_note
+    _mutation("advice despite a crack",
+              lambda: setattr(xsearch, 'crest_tension_note',
+                              lambda df, sd: original_note(df, dict(sd, tcrack_depth=0))),
+              lambda: setattr(xsearch, 'crest_tension_note', original_note),
+              leg_crest_tension_note, fails)
+
     # 4. The old catch-all: every unmapped message becomes a convergence failure.
     _mutation("catch-all class",
               lambda: setattr(solve, 'failure_kind',
@@ -698,10 +814,11 @@ LEGS = [
     ("the early refusal is inert under the full cascade", leg_early_refusal_is_inert),
     ("both facings agree", leg_both_facings_agree),
     ("the general case is measured", leg_general_case_is_measured_not_assumed),
-    ("the moment factor of safety is recorded", leg_moment_fs_is_recorded_and_exact),
     ("the search discloses what it could not solve", leg_search_discloses),
     ("the breakdown comes only from read messages", leg_breakdown_only_from_read_messages),
+    ("the phrases read as approved", leg_phrases_read_as_approved),
     ("the docs quote the line that is printed", leg_docs_quote_matches_the_shipped_line),
+    ("the crest-tension advice", leg_crest_tension_note),
     ("a clean search stays silent", leg_clean_search_is_silent),
     ("mutations", leg_mutations),
 ]

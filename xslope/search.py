@@ -53,31 +53,49 @@ _METHOD_LABEL = {
     "mprice": "Morgenstern-Price",
 }
 
+#: What "no admissible solution" means, method by method, in the words the
+#: disclosure line prints. Each phrase is read off the test that raises the
+#: class for that method (:data:`solve._FAILURE_KINDS`):
+#:
+#: * Spencer — the existence tests and the residual floor: no constant
+#:   inclination inside the band that keeps every base normal pointing into the
+#:   mass closes both force and moment equilibrium.
+#: * Morgenstern-Price — ``MPRICE_NO_CROSSING``: the force and moment factors of
+#:   safety do not cross anywhere in the lambda range the solver scans,
+#:   -1.5 to 1.5.
+#: * Corps of Engineers and Lowe & Karafiath — ``FORCE_EQ_NO_ROOT`` (no factor of
+#:   safety from 0.05 to 10 closes the force polygon) and
+#:   ``FORCE_EQ_NO_ADMISSIBLE_ROOT`` (it closes only with forces the root screen
+#:   refuses). The one phrase covers both.
+#:
+#: The simplified methods raise no class of this kind. A method missing here
+#: falls back to the neutral phrase.
+_NO_SOLUTION_PHRASE = {
+    "spencer": ("no interslice force inclination satisfies both force and "
+                "moment equilibrium"),
+    "mprice": ("no value of λ from -1.5 to 1.5 satisfies both force and "
+               "moment equilibrium"),
+    "corps": ("no factor of safety gives a physically reasonable solution to "
+              "force equilibrium"),
+    "lowe": ("no factor of safety gives a physically reasonable solution to "
+             "force equilibrium"),
+}
+_NO_SOLUTION_DEFAULT = "the method's equations have no acceptable solution"
+
 
 def _method_label(method_name):
     return _METHOD_LABEL.get(str(method_name).lower(), str(method_name).capitalize())
 
 
 class UnsolvedTrials:
-    """The trial surfaces a search's method could not solve, kept and reported.
+    """The trial surfaces a search's method could not solve, counted and reported.
 
     A search scores an inadmissible trial and an UNSOLVABLE one the same way —
-    ``fs_fail``, dropped, gone — and the two are not the same fact. A trial
-    rejected on geometry was never a candidate. A trial the solver could not
-    answer on WAS a candidate: the search looked at it, got no number, and moved
-    on, and if it was the lowest surface in the model the reported minimum is the
-    minimum of what the method could solve, not of the model. That is the
-    honest-search hole this closes: the counts are collected here and disclosed
-    on the search's own output, so the reported minimum is never quoted as global
-    while surfaces that outrank it went unanswered.
-
-    The ranking is by the MOMENT factor of safety, both sides — the unsolved
-    trials against the reported minimum's own moment answer, never against the
-    reported factor of safety, which is a different method's number and cannot
-    order surfaces beside Bishop's. It is free where the method already computed
-    it (Spencer's Bishop-seeded restart records it, and at phi = 0 its existence
-    test knows it in closed form); otherwise it is one Bishop solve per unsolved
-    trial, and those are a minority of the sweep.
+    ``fs_fail``, dropped — and the two are not the same fact. A trial rejected on
+    geometry was never a candidate. A trial the solver could not answer on WAS a
+    candidate: the search looked at it, got no number, and moved on. The counts
+    are collected here and printed on the search's own output, so the reported
+    minimum is read as the minimum of what the method could solve.
 
     The REASONS are only reported where they have been read off the code that
     emits them (:func:`solve.failure_kind`). Anything else is counted as
@@ -97,16 +115,13 @@ class UnsolvedTrials:
         self.not_converged = 0         # of those, the ones the iteration failed on
         self.inadmissible = 0          # of those, a root found and refused
         self.unclassified = 0          # of those, whose message is not mapped
-        self.moment_fs = []            # moment factor of safety of each unsolved trial
-        self.reported_moment_fs = None
-        self.lower_by_moment = 0
         self._seen = set()
 
     @staticmethod
     def _key(x, y, d):
         return (round(float(x), 9), round(float(y), 9), round(float(d), 9))
 
-    def record(self, x, y, d, solved, df_slices, message=None):
+    def record(self, x, y, d, solved, message=None):
         """Log one trial surface the solver was given. Repeats are ignored."""
         key = self._key(x, y, d)
         if key in self._seen:
@@ -118,76 +133,41 @@ class UnsolvedTrials:
         self.unsolved += 1
         kind = solve.failure_kind(message) or 'unclassified'
         setattr(self, kind, getattr(self, kind) + 1)
-        fs = self._moment_fs(df_slices)
-        if fs is not None:
-            self.moment_fs.append(fs)
-
-    @staticmethod
-    def _moment_fs(df_slices):
-        """This surface's moment factor of safety, reused where it was recorded.
-
-        ``solve.spencer`` writes ``moment_fs`` onto the slice table whenever it
-        has computed one — its Bishop-seeded restart, and the phi = 0 existence
-        test, which knows it in closed form. Absent that, Bishop is solved here,
-        ON A COPY: Bishop writes its own effective normal into ``n_eff``, and the
-        table this may be handed is the REPORTED one, whose ``n_eff`` belongs to
-        the method that solved it and is printed and plotted as that method's.
-        """
-        if df_slices is None:
-            return None
-        fs = df_slices.attrs.get('moment_fs')
-        if fs is not None and np.isfinite(fs) and fs > 0:
-            return float(fs)
-        try:
-            ok, res = solve.bishop(df_slices.copy())
-        except Exception:
-            return None
-        if ok and np.isfinite(res.get('FS', np.nan)) and res['FS'] > 0:
-            return float(res['FS'])
-        return None
-
-    def finish(self, critical_df):
-        """Rank the unsolved trials against the reported minimum. Idempotent."""
-        if not self.unsolved or not self.moment_fs:
-            return
-        self.reported_moment_fs = self._moment_fs(critical_df)
-        if self.reported_moment_fs is None:
-            self.lower_by_moment = 0
-            return
-        self.lower_by_moment = sum(1 for f in self.moment_fs
-                                   if f < self.reported_moment_fs)
 
     def sentence(self):
         """The disclosure line, or '' when every trial surface was solved.
 
+        The line gives the count and, in parentheses, the reason for each class.
         The breakdown appears only when EVERY unsolved trial's message is one
         this package has read the meaning of (:func:`solve.failure_kind`). A
-        method whose messages are unmapped gets the count and the ranking and no
-        taxonomy at all, because a taxonomy assembled from a default is a
-        fabrication: the fallback that used to exist reported Morgenstern-Price's
-        "no F_f/F_m crossing" — a no-root fact — as an iteration failing to
-        converge, 58 times, on a model where nothing failed to converge.
+        method whose messages are unmapped gets the count alone, because a
+        taxonomy assembled from a default is a fabrication: the fallback that
+        used to exist reported Morgenstern-Price's "no F_f/F_m crossing" — a
+        no-root fact — as an iteration failing to converge.
+
+        The refusal phrase names no single test, because each method refuses on
+        its own: Spencer on its interslice inclination band, its interslice force
+        bound and base tension by extent; Morgenstern-Price and the simplified
+        methods on base tension by extent; the force-equilibrium methods on their
+        root screen.
         """
         if not self.unsolved:
             return ""
         what = _method_label(self.method)
-        # The third phrase names no mechanism on purpose. Each method's
-        # admissibility guard trips on its own quantity — Spencer's on base
-        # tension beyond what cohesion can carry, Morgenstern-Price's and the
-        # force-equilibrium methods' on base tension by extent (more than half
-        # the slices) — so naming one method's guard would misreport the other's.
-        parts = [(self.no_admissible_solution, "admit no admissible solution"),
-                 (self.not_converged, "failed to converge"),
-                 (self.inadmissible, "solved only with an inadmissible stress state")]
-        breakdown = ", ".join(f"{n} {t}" for n, t in parts if n)
+        no_solution = _NO_SOLUTION_PHRASE.get(self.method, _NO_SOLUTION_DEFAULT)
+        parts = []
+        if self.no_admissible_solution:
+            parts.append(f"on {self.no_admissible_solution}, {no_solution}")
+        if self.not_converged:
+            parts.append(f"{self.not_converged} failed to converge")
+        if self.inadmissible:
+            parts.append(f"on {self.inadmissible}, solution rejected as "
+                         f"physically unreasonable")
         line = (f"{what} could not solve {self.unsolved} of {self.attempted} "
                 f"trial surfaces")
-        if not self.unclassified and breakdown:
-            line += f" ({breakdown})"
-        if self.reported_moment_fs is None:
-            return line + "; their ranking could not be measured."
-        return (f"{line}; {self.lower_by_moment} of them rank lower than the "
-                f"reported minimum by the moment measure.")
+        if not self.unclassified and parts:
+            line += f" ({'; '.join(parts)})"
+        return line
 
     def as_dict(self):
         """The counts, for a caller that prints them somewhere else."""
@@ -198,9 +178,6 @@ class UnsolvedTrials:
                 "not_converged": self.not_converged,
                 "inadmissible": self.inadmissible,
                 "unclassified": self.unclassified,
-                "lower_by_moment": self.lower_by_moment,
-                "reported_moment_fs": self.reported_moment_fs,
-                "unsolved_moment_fs": list(self.moment_fs),
                 "sentence": self.sentence()}
 
 
@@ -509,7 +486,7 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                     ok, solver_result = solver(df_slices)
                 if tally is not None:
                     tally.record(circle['Xo'], circle['Yo'], circle['Depth'],
-                                 ok, df_slices, None if ok else solver_result)
+                                 ok, None if ok else solver_result)
                 if not ok:
                     continue
                 FS = solver_result['FS']
@@ -740,9 +717,8 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     circle_cache = []  # Store ALL circles tested for plotting
     tally = UnsolvedTrials(method_name)
 
-    def _report_unsolved(critical_df):
-        """Close the tally, disclose it, and hand the counts to the caller."""
-        tally.finish(critical_df)
+    def _report_unsolved():
+        """Disclose the tally and hand the counts to the caller."""
         if tally.unsolved:
             print(f"[⚠️ unsolved trials] {tally.sentence()}")
         if unsolved_out is not None:
@@ -796,7 +772,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
             tally=tally)
         circles = circles + list(slope_data.get('circles') or [])
         if not circles:
-            _report_unsolved(None)
+            _report_unsolved()
             return [], False, [], circle_cache
     else:
         circles = slope_data['circles']
@@ -877,7 +853,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
                         # admissible and the solver returned no answer on it. It
                         # still scores fs_fail — the search is unchanged — but it
                         # is counted, and disclosed at the end.
-                        tally.record(x, y, d, solver_success, df_slices,
+                        tally.record(x, y, d, solver_success,
                                      None if solver_success else solver_result)
                         FS = solver_result['FS'] if solver_success else fs_fail
                         if solver_success and _base_tension_too_extensive(df_slices):
@@ -1102,7 +1078,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
             best_fs, converged = fs_i, conv_i
 
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
-    _report_unsolved(sorted_fs_cache[0].get('slices') if sorted_fs_cache else None)
+    _report_unsolved()
     return sorted_fs_cache, converged, search_path, circle_cache
 
 def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30, max_base_angle=65.0, cancel_check=None, min_slip_depth=None):
@@ -1516,6 +1492,75 @@ def _sliding_mass_line(slice_df, slope_data):
             f"of failure surface").replace("  ", " ")
 
 
+def crest_tension_note(slice_df, slope_data):
+    """The note on base tension at the crest end of a solved surface, or None.
+
+    A cohesive soil solved with no tension crack can put the slices at the top of
+    the slip surface in base tension: the solution holds the top of the sliding
+    mass to the soil behind it. Soil cracks there instead, and a tension crack in
+    the model is the remedy. The note is attached here rather than in the solver
+    because the solver does not know whether the model already has a crack.
+
+    The rule, applied to the solved slice table:
+
+    * The crest end is the end of the slip surface where it meets the higher
+      ground (the top of the first slice's left side against the top of the last
+      slice's right side).
+    * Counted from that end, the slices whose effective base normal is negative
+      and whose soil has cohesion form the run. The run stops at the first slice
+      that is in compression or cohesionless. No run, no note.
+    * With no tension crack in the model (``tcrack_depth`` zero or absent) the
+      note is "Tension on the base of N slices near the crest. Consider adding a
+      tension crack." With a crack it is the first sentence alone: the tension is
+      reported and no remedy is suggested.
+
+    Tension elsewhere on the surface, and tension on cohesionless slices, is left
+    to the solver's own notes. The note never changes a factor of safety,
+    acceptance, or which surface is reported.
+    """
+    try:
+        n_eff = np.asarray(slice_df["n_eff"].values, dtype=float)
+        c = np.asarray(solve._c_eff(slice_df), dtype=float)
+        y_left = float(slice_df["y_lt"].values[0])
+        y_right = float(slice_df["y_rt"].values[-1])
+    except Exception:
+        return None
+    if n_eff.size == 0:
+        return None
+    order = range(n_eff.size - 1, -1, -1) if y_right > y_left else range(n_eff.size)
+    run = 0
+    for i in order:
+        if np.isfinite(n_eff[i]) and n_eff[i] < 0 and c[i] > 1e-9:
+            run += 1
+        else:
+            break
+    if not run:
+        return None
+    slices = "slice" if run == 1 else "slices"
+    note = f"Tension on the base of {run} {slices} near the crest."
+    try:
+        crack = float(slope_data.get("tcrack_depth") or 0.0)
+    except (TypeError, ValueError):
+        crack = 0.0
+    if crack > 0:
+        return note
+    return note + " Consider adding a tension crack."
+
+
+def _attach_crest_tension_note(results, slice_df, slope_data):
+    """Add :func:`crest_tension_note` to the solution's warnings; return it.
+
+    The note goes on a new list rather than onto the solver's own list object.
+    Returns the note, or None when there is none, for the caller to print.
+    """
+    if not isinstance(results, dict) or slice_df is None:
+        return None
+    note = crest_tension_note(slice_df, slope_data)
+    if note:
+        results["warnings"] = list(results.get("warnings") or []) + [note]
+    return note
+
+
 def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circular",
                      num_slices=40, rapid=False, composite=False, grid_seed=False,
                      diagnostic=False, cancel_check=None, fs_tol=None, tol=None,
@@ -1552,9 +1597,9 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
         "options"}`` — the bundle the report, the plots and Studio's result views
         all read. ``search`` is None for a single-surface run and a dict
         describing the search otherwise — including ``unsolved``, the count of
-        trial surfaces the method could not answer on and how they rank against
-        the reported minimum (:class:`UnsolvedTrials`; None on the non-circular
-        branch, which does not yet distinguish them). ``results`` is None where
+        trial surfaces the method could not answer on and the reason for each
+        (:class:`UnsolvedTrials`; None on the non-circular branch, which does not
+        yet distinguish them). ``results`` is None where
         the solver returned no solution on a surface that was otherwise built, with the
         solver's reason on ``failure``: the method ran and did not converge,
         which is an answer about the model rather than a run that never happened.
@@ -1634,6 +1679,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
         results = critical.get("solver_result")
         if not isinstance(results, dict):
             raise AnalysisError("Search found no surface with a valid solution.")
+        crest_note = _attach_crest_tension_note(results, critical.get("slices"),
+                                                slope_data)
         if announce:
             tail = "" if converged else "  (search did not fully converge)"
             print(f"Critical FS = {results.get('FS'):.3f}{tail}")
@@ -1649,6 +1696,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
                 print(mass)
             for line in _pile_report_lines(critical.get("slices"), slope_data):
                 print(line)
+            if crest_note:
+                print(f"[⚠️ crest tension] {crest_note}")
         return {"slice_df": critical.get("slices"),
                 "failure_surface": critical.get("failure_surface"),
                 "results": results, "search": search, "method": method,
@@ -1688,6 +1737,7 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
     bundle = {"slice_df": slice_df, "failure_surface": failure_surface,
               "results": results if isinstance(results, dict) else None,
               "search": None, "method": method, "options": made_under}
+    crest_note = _attach_crest_tension_note(bundle["results"], slice_df, slope_data)
     if bundle["results"] is not None and announce:
         print(f"FS = {bundle['results'].get('FS'):.3f}")
         mass = _sliding_mass_line(slice_df, slope_data)
@@ -1695,6 +1745,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
             print(mass)
         for line in _pile_report_lines(slice_df, slope_data):
             print(line)
+        if crest_note:
+            print(f"[⚠️ crest tension] {crest_note}")
     if bundle["results"] is None:
         # The surface was built and the method was given it: it ran, and it did
         # not converge. The bundle keeps the surface so that answer can be

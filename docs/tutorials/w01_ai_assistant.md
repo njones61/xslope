@@ -357,11 +357,10 @@ safety at 1.244. The transcript is
 
 The 200-psf step is the one to treat with care, and the assistant said so in its
 own summary. On the weakest foundation the search raises an **unsolved trials**
-warning: Spencer finds no admissible solution on a share of the circles it tries,
-and some of those rank below the minimum it does report. The assistant called its
-own answer for that step possibly optimistic on the strength of it, and a rerun
-bears that out: the table above gives the 0.627 a fresh search settles on, on a
-different circle, rather than the 0.640 the transcript prints. The warning fades
+warning: Spencer could not solve a share of the circles it tried. The assistant
+called its own answer for that step possibly optimistic on the strength of it,
+and a rerun bears that out: the table above gives the 0.627 a fresh search
+settles on, on a different circle, rather than the 0.640 the transcript prints. The warning fades
 up the column — the 500-psf step and everything above it is clean — which is why
 the plateau at 1.244 is the part of this table to trust and the bottom row is the
 part to re-run.

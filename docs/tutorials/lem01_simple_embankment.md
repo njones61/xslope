@@ -363,17 +363,20 @@ Spencer's answer on that circle:
 ![Spencer's critical surface](images/lem01_solution_search.png){width=1000}
 
 **FS = 1.276**. The solution also has an amber strip across the top listing
-*admissibility warnings*: interslice tension, and a line of thrust outside the
-slices on about half the boundaries. These warnings mean the solution requires the
-soil near the crest to carry tension, which soil cannot do.
+*admissibility warnings*: interslice tension, a line of thrust outside the
+slices on about half the boundaries, and tension on the base of 3 slices near
+the crest. These warnings mean the solution requires the soil near the crest to
+carry tension, which soil cannot do.
 
 ### Comparing with Bishop's method {#reading-the-anomaly}
 
 Now we run the same search with **Method** = `Bishop's Simplified`. Bishop satisfies
 moment equilibrium only, and for a φ = 0 soil that has a useful consequence: on any
 one circle, every moment-equilibrium method — Bishop, Spencer, Morgenstern-Price —
-computes exactly the same factor of safety. Any difference between their searches
-comes from which circles each method was able to solve.
+computes exactly the same factor of safety. This is true only when φ = 0. With
+friction, the methods give different values on the same circle. So here, any
+difference between their searches comes from which circles each method was able
+to solve.
 
 ![Bishop's critical surface](images/lem01_solution_bishop.png){width=1000}
 
@@ -384,29 +387,26 @@ the surface: the last few slices' base-stress bars are drawn in red, meaning the
 computed normal stress on the base is negative. The solution needs the top of the
 slope to hold itself together in tension.
 
-That tension is why the two searches disagree. On the circles nearest the true
-minimum, Spencer's stricter equilibrium — force *and* moment, with one interslice
-force inclination — has no solution at all: no inclination can balance slices that
-are being pulled apart. The search can only report the best circle it could solve,
-which is how a method that agrees with Bishop circle-for-circle came back with a
-higher number.
-
-The Spencer run output reports how many circles were left unsolved:
+Because φ = 0 here, Spencer would also give 1.215 on Bishop's circle. It reports
+1.276 because it could not solve that circle. The run output shows this:
 
 ```text
-[⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (56 admit no admissible solution); 26 of them rank lower than the reported minimum by the moment measure.
+[⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (on 56, no interslice force inclination satisfies both force and moment equilibrium)
+Critical FS = 1.276
+Sliding mass = 60,436.2 lb/ft over 50.80 ft of failure surface
+[⚠️ crest tension] Tension on the base of 3 slices near the crest. Consider adding a tension crack.
 ```
 
 Spencer's method could not solve 56 of the 211 circles. Spencer has to satisfy both
 force and moment equilibrium, and on those circles the tension near the crest is so
-large that no solution satisfies both. Bishop's method satisfies moment equilibrium
-only, so it still returns a value. On 26 of those circles its value is below 1.276,
-and its critical circle, at 1.215, is one of them.
+large that no solution satisfies both. The last line of the output gives the remedy:
+a tension crack.
 
-Neither number is right. Both solutions put the clay near the crest in tension: the
-top of the sliding mass hangs on the soil behind it. Real soil cannot carry tension.
-It cracks. So both factors of safety count on strength that is not there. The
-warnings, the red bars and the unsolved circles all come from that tension.
+Neither Spencer's 1.276 nor Bishop's 1.215 is right. Both solutions put the clay
+near the crest in tension: the top of the sliding mass hangs on the soil behind
+it. Real soil cannot carry tension. It cracks. So both factors of safety count on
+strength that is not there. The warnings, the red bars and the unsolved circles
+all come from that tension.
 
 ### Adding a tension crack {#the-fix-is-in-the-ground-not-the-settings}
 

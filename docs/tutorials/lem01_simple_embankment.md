@@ -392,14 +392,14 @@ Because φ = 0 here, Spencer would also give 1.215 on Bishop's circle. It report
 
 ```text
 [⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (on 56, no interslice force inclination satisfies both force and moment equilibrium)
+[⚠️ crest tension] Tension on the base of 3 slices near the crest. Consider adding a tension crack.
 Critical FS = 1.276
 Sliding mass = 60,436.2 lb/ft over 50.80 ft of failure surface
-[⚠️ crest tension] Tension on the base of 3 slices near the crest. Consider adding a tension crack.
 ```
 
 Spencer's method could not solve 56 of the 211 circles. Spencer has to satisfy both
 force and moment equilibrium, and on those circles the tension near the crest is so
-large that no solution satisfies both. The last line of the output gives the remedy:
+large that no solution satisfies both. The second line of the output gives the remedy:
 a tension crack.
 
 Neither Spencer's 1.276 nor Bishop's 1.215 is right. Both solutions put the clay

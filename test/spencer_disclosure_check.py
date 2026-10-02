@@ -76,10 +76,14 @@ WHAT IS CHECKED
   uncracked tutorial model, absent with its 8 ft crack, silent for tension away
   from the crest and on cohesionless slices, the suggestion dropped where the
   model already has a crack, and the same on both facings;
-* five mutations: the silent skip restored, a classifier that calls the refused
+* the advice's threshold at each edge: 2 slices at just over half the cohesion
+  fire, just under does not, 1 slice does not, a sliver is passed over, and a
+  reinforcement force beside the run silences it;
+* nine mutations: the silent skip restored, a classifier that calls the refused
   circle an iteration failure, a verdict that claims absolute insolubility, the
-  old catch-all that folded unmapped messages into "not_converged", and advice
-  that ignores the crack the model already has.
+  old catch-all that folded unmapped messages into "not_converged", advice that
+  ignores the crack the model already has, and each of the advice's four
+  conditions removed.
 
 Run directly:  PYTHONPATH=. python3 test/spencer_disclosure_check.py
 """
@@ -721,13 +725,6 @@ def leg_crest_tension_note():
     cracked = note(df, dict(sd, tcrack_depth=8.0))
     if cracked != CREST_NOTE.split(' Consider')[0]:
         fails.append(f"with a crack already in the model the note reads {cracked!r}")
-    one = df.copy()
-    n1 = np.abs(one['n_eff'].values.copy())
-    n1[-1] = -100.0
-    one['n_eff'] = n1
-    if note(one, sd) != ("Tension on the base of 1 slice near the crest. "
-                         "Consider adding a tension crack."):
-        fails.append(f"one slice reads {note(one, sd)!r}")
 
     md, mspec = _mirror(MODEL)
     left = _slices(MODEL, CRITICAL)
@@ -739,6 +736,79 @@ def leg_crest_tension_note():
         fails.append(f"the mirror reads differently: left {nl!r}, right {nr!r}")
     else:
         print(f"  crest note   both facings on Bishop's circle: {nl!r}")
+    return fails
+
+
+def _crest_table():
+    """A slice table built for the threshold tests: the tutorial embankment's
+    refused critical circle, sliced and solved by Bishop, with its base normals
+    then set by hand. Every slice starts in compression; each case puts tension
+    where it needs it."""
+    df = _slices(MODEL, CRITICAL)
+    solve.bishop(df)
+    df = df.copy()
+    df['n_eff'] = np.abs(df['n_eff'].values) + 1.0
+    return df
+
+
+def _tension(df, slices, ratio):
+    """Base tension on ``slices`` at ``ratio`` times each one's cohesion."""
+    n = df['n_eff'].values.copy()
+    for i in slices:
+        n[i] = -ratio * df['c'].values[i] * df['dl'].values[i]
+    out = df.copy()
+    out['n_eff'] = n
+    return out
+
+
+def leg_crest_tension_threshold():
+    """The note's threshold, measured at each edge.
+
+    The crest of CRITICAL is the last slice. Two slices at 0.6 c fire; one slice
+    does not, two at 0.49 c do not; a sliver at the crest end is passed over and
+    does not make up the count; a reinforcement force on the slice next to the run
+    silences it.
+    """
+    fails = []
+    note = xsearch.crest_tension_note
+    sd = {'tcrack_depth': 0.0}
+    df = _crest_table()
+    n = len(df)
+    crest = [n - 1, n - 2]
+    want = ("Tension on the base of 2 slices near the crest. "
+            "Consider adding a tension crack.")
+
+    def expect(label, table, wanted):
+        got = note(table, sd)
+        if got != wanted:
+            fails.append(f"{label}: {got!r}, expected {wanted!r}")
+        else:
+            print(f"  threshold    {label:<34} {'fires' if got else 'silent'}")
+
+    expect("2 slices at 0.51 c", _tension(df, crest, 0.51), want)
+    expect("2 slices at 0.49 c", _tension(df, crest, 0.49), None)
+    expect("1 slice at 2 c", _tension(df, [n - 1], 2.0), None)
+    sliver = _tension(df, crest, 0.8)
+    dl = sliver['dl'].values.copy()
+    dl[n - 1] = 0.004 * dl.sum()               # under 0.5% of the surface length
+    sliver['dl'] = dl
+    sliver = _tension(sliver, [n - 1], 0.8)    # its tension at the new length
+    expect("a sliver and 1 slice", sliver, None)
+    deep = _tension(df, [n - 1, n - 2, n - 3], 0.8)
+    deep['dl'] = dl
+    deep = _tension(deep, [n - 1], 0.8)
+    expect("a sliver and 2 slices", deep, want)
+    beside = _tension(df, crest, 0.8)
+    p = beside['p'].values.astype(float).copy()
+    p[n - 3] = 500.0                           # reinforcement on the next slice in
+    beside['p'] = p
+    expect("reinforcement beside the run", beside, None)
+    cracked = note(_tension(df, crest, 0.8), {'tcrack_depth': 2.0})
+    if cracked != want.split(' Consider')[0]:
+        fails.append(f"with a crack, a run over the threshold reads {cracked!r}")
+    below = note(_tension(df, crest, 0.3), {'tcrack_depth': 2.0})
+    if below is not None:
+        fails.append(f"with a crack, a run under the threshold still prints {below!r}")
     return fails
 
 
@@ -798,6 +868,21 @@ def leg_mutations():
               lambda: setattr(xsearch, 'crest_tension_note', original_note),
               leg_crest_tension_note, fails)
 
+    # 6-8. Each threshold of the crest note removed in turn.
+    for label, name, value in (("no slice-count threshold", 'CREST_TENSION_MIN_SLICES', 1),
+                               ("no tension threshold", 'CREST_TENSION_MIN_RATIO', 0.0),
+                               ("slivers counted", 'CREST_SLIVER_FRAC', 0.0)):
+        was = getattr(xsearch, name)
+        _mutation(label,
+                  lambda name=name, value=value: setattr(xsearch, name, value),
+                  lambda name=name, was=was: setattr(xsearch, name, was),
+                  leg_crest_tension_threshold, fails)
+    was_cols = xsearch._SUPPORT_COLUMNS
+    _mutation("reinforcement ignored",
+              lambda: setattr(xsearch, '_SUPPORT_COLUMNS', ()),
+              lambda: setattr(xsearch, '_SUPPORT_COLUMNS', was_cols),
+              leg_crest_tension_threshold, fails)
+
     # 4. The old catch-all: every unmapped message becomes a convergence failure.
     _mutation("catch-all class",
               lambda: setattr(solve, 'failure_kind',
@@ -819,6 +904,7 @@ LEGS = [
     ("the phrases read as approved", leg_phrases_read_as_approved),
     ("the docs quote the line that is printed", leg_docs_quote_matches_the_shipped_line),
     ("the crest-tension advice", leg_crest_tension_note),
+    ("the crest-tension threshold", leg_crest_tension_threshold),
     ("a clean search stays silent", leg_clean_search_is_silent),
     ("mutations", leg_mutations),
 ]

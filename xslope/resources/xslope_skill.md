@@ -1529,9 +1529,10 @@ Method notes:
   physically unreasonable"). The counts are on `search["unsolved"]` from `run_lem_analysis`.
   Report the line: the minimum is the minimum of the surfaces the method could solve.
 - `run_lem_analysis` (and so `run_lem`) adds a crest-tension note to `results['warnings']` when
-  the slices at the crest end of the reported surface have cohesion and base tension: "Tension on
+  at least 2 slices at the crest end of the reported surface have cohesion and base tension, the
+  worst of them at least half its cohesion, with no reinforcement or pile beside them: "Tension on
   the base of N slices near the crest. Consider adding a tension crack." (first sentence only when
-  the model already has a crack). When you call `circular_search` directly, get the same note
+  the model already has a crack). The run prints its warnings before the factor of safety. When you call `circular_search` directly, get the same note
   with `xslope.search.crest_tension_note(fs_cache[0]['slices'], slope_data)`. If it suggests a
   crack, tell the user and offer to add one (z_c = 2c/γ is the usual starting depth).
 

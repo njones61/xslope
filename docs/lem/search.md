@@ -174,13 +174,19 @@ Two changes can help when many trials go unsolved. Another method's assumption m
 
 ### Tension at the Crest
 
-When the reported solution has tension on the base of the slices at the crest end of the surface, XSLOPE adds a note to the solution's warnings. The crest end is the end of the slip surface where it meets the higher ground. Counting from that end, the note counts the slices that are in base tension (negative effective normal force) and have cohesion, and stops at the first slice that is not. If the model has no tension crack, the note suggests one:
+When the reported solution has substantial tension on the base of the slices at the crest end of the surface, XSLOPE adds a note to the solution's warnings. If the model has no tension crack, the note suggests one:
 
 ```
 Tension on the base of 3 slices near the crest. Consider adding a tension crack.
 ```
 
-If the model already has a tension crack, the note gives the first sentence only. Tension elsewhere on the surface, and tension on cohesionless slices, is reported by the method's own notes without the suggestion. The note appears with the other warnings: in the run output, in the amber strip in Studio, in the report and in the assistant's account of the run. It does not change the factor of safety or which surface is reported. [Tutorial LEM-1](../tutorials/lem01_simple_embankment.md#the-fix-is-in-the-ground-not-the-settings) shows the remedy.
+The crest end is the end of the slip surface where it meets the higher ground. Counting from that end, the run is the slices that are in base tension (negative effective normal force) and have cohesion; it stops at the first slice that is not. The note appears only when all of the following hold:
+
+- The run has at least 2 slices.
+- The worst base tension in the run, as a stress (effective normal force divided by base length), is at least half the cohesion of that slice.
+- No reinforcement line or pile acts on a slice of the run or on the slice next to it.
+
+Slices whose base is shorter than 0.5% of the length of the slip surface are passed over in the count. If the model already has a tension crack and the run meets these conditions, the note gives the first sentence only. Smaller tension at the crest, tension elsewhere on the surface, and tension on cohesionless slices draw no note of this kind; the method's own notes report base tension on cohesionless slices. The note appears with the other warnings: in the run output, where the warnings print before the factor of safety, in the amber strip in Studio, in the report and in the assistant's account of the run. It does not change the factor of safety or which surface is reported. [Tutorial LEM-1](../tutorials/lem01_simple_embankment.md#the-fix-is-in-the-ground-not-the-settings) shows the remedy.
 
 ## Visualization of Search Results
 

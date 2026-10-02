@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
+import io
 import time
 
 import numpy as np
@@ -1492,6 +1494,26 @@ def _sliding_mass_line(slice_df, slope_data):
             f"of failure surface").replace("  ", " ")
 
 
+#: The crest-tension note is given only for a run of at least this many slices
+#: in base tension.
+CREST_TENSION_MIN_SLICES = 2
+
+#: ...and only where the worst base tension in the run, as a stress (effective
+#: base normal force over base length), is at least this fraction of that
+#: slice's cohesion.
+CREST_TENSION_MIN_RATIO = 0.5
+
+#: A slice whose base is shorter than this fraction of the whole slip surface is
+#: a sliver and is passed over: it neither counts toward the run nor ends it.
+CREST_SLIVER_FRAC = 0.005
+
+#: Per-slice columns that carry a reinforcement or pile force. A run in which any
+#: of these is non-zero on a run slice or on the slice next to the run is tension
+#: beside reinforcement, and gets no note.
+_SUPPORT_COLUMNS = ('p', 'p_pt', 'pa_cx', 'pa_cy', 'pp_cx', 'pp_cy',
+                    'h_pile', 'h_pile_pas')
+
+
 def crest_tension_note(slice_df, slope_data):
     """The note on base tension at the crest end of a solved surface, or None.
 
@@ -1506,9 +1528,17 @@ def crest_tension_note(slice_df, slope_data):
     * The crest end is the end of the slip surface where it meets the higher
       ground (the top of the first slice's left side against the top of the last
       slice's right side).
-    * Counted from that end, the slices whose effective base normal is negative
-      and whose soil has cohesion form the run. The run stops at the first slice
-      that is in compression or cohesionless. No run, no note.
+    * Slivers are passed over: a slice whose base is shorter than
+      ``CREST_SLIVER_FRAC`` (0.5%) of the slip surface's length.
+    * Counted from the crest end, the slices whose effective base normal is
+      negative and whose soil has cohesion form the run. The run stops at the
+      first slice that is in compression or cohesionless.
+    * The note is given only when the run has at least
+      ``CREST_TENSION_MIN_SLICES`` (2) slices, and the worst base tension in it,
+      as a stress (effective normal force over base length), is at least
+      ``CREST_TENSION_MIN_RATIO`` (half) of that slice's cohesion.
+    * No note where a reinforcement line or pile acts on a slice of the run or
+      on the slice next to it: that tension is beside the support.
     * With no tension crack in the model (``tcrack_depth`` zero or absent) the
       note is "Tension on the base of N slices near the crest. Consider adding a
       tension crack." With a crack it is the first sentence alone: the tension is
@@ -1521,23 +1551,39 @@ def crest_tension_note(slice_df, slope_data):
     try:
         n_eff = np.asarray(slice_df["n_eff"].values, dtype=float)
         c = np.asarray(solve._c_eff(slice_df), dtype=float)
+        dl = np.asarray(slice_df["dl"].values, dtype=float)
         y_left = float(slice_df["y_lt"].values[0])
         y_right = float(slice_df["y_rt"].values[-1])
     except Exception:
         return None
     if n_eff.size == 0:
         return None
-    order = range(n_eff.size - 1, -1, -1) if y_right > y_left else range(n_eff.size)
-    run = 0
-    for i in order:
-        if np.isfinite(n_eff[i]) and n_eff[i] < 0 and c[i] > 1e-9:
-            run += 1
-        else:
-            break
-    if not run:
+    length = float(np.nansum(dl))
+    if not length > 0:
         return None
-    slices = "slice" if run == 1 else "slices"
-    note = f"Tension on the base of {run} {slices} near the crest."
+    order = range(n_eff.size - 1, -1, -1) if y_right > y_left else range(n_eff.size)
+    run, inner = [], None
+    for i in order:
+        if not dl[i] >= CREST_SLIVER_FRAC * length:
+            continue                     # a sliver: passed over
+        if np.isfinite(n_eff[i]) and n_eff[i] < 0 and c[i] > 1e-9:
+            run.append(i)
+        else:
+            inner = i                    # the slice that ends the run
+            break
+    if len(run) < CREST_TENSION_MIN_SLICES:
+        return None
+    stress = n_eff[run] / dl[run]
+    worst = run[int(np.argmin(stress))]
+    if -float(n_eff[worst] / dl[worst]) < CREST_TENSION_MIN_RATIO * c[worst]:
+        return None
+    beside = run + ([inner] if inner is not None else [])
+    for col in _SUPPORT_COLUMNS:
+        if col in slice_df.columns:
+            vals = np.asarray(slice_df[col].values, dtype=float)[beside]
+            if np.any(np.abs(np.nan_to_num(vals)) > 0):
+                return None
+    note = f"Tension on the base of {len(run)} slices near the crest."
     try:
         crack = float(slope_data.get("tcrack_depth") or 0.0)
     except (TypeError, ValueError):
@@ -1681,6 +1727,11 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
             raise AnalysisError("Search found no surface with a valid solution.")
         crest_note = _attach_crest_tension_note(results, critical.get("slices"),
                                                 slope_data)
+        # The run's warnings print before its results: the search has already
+        # printed its unsolved-trials line, and the crest note follows it, so the
+        # factor of safety and the sliding mass are the last lines of the run.
+        if announce and crest_note:
+            print(f"[⚠️ crest tension] {crest_note}")
         if announce:
             tail = "" if converged else "  (search did not fully converge)"
             print(f"Critical FS = {results.get('FS'):.3f}{tail}")
@@ -1696,8 +1747,6 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
                 print(mass)
             for line in _pile_report_lines(critical.get("slices"), slope_data):
                 print(line)
-            if crest_note:
-                print(f"[⚠️ crest tension] {crest_note}")
         return {"slice_df": critical.get("slices"),
                 "failure_surface": critical.get("failure_surface"),
                 "results": results, "search": search, "method": method,
@@ -1733,11 +1782,27 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
     slice_df, failure_surface = out
     if announce:
         print(f"Generated {len(slice_df)} slices; solving…")
-    results = solve.solve_selected(method, slice_df, rapid=rapid)
+    # The solver prints its factor of safety and then its admissibility
+    # warnings. Its lines are held and printed below with the warnings first
+    # (the crest note, then the solver's own), so the results close the run.
+    held = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(held):
+            results = solve.solve_selected(method, slice_df, rapid=rapid)
+    except BaseException:
+        print(held.getvalue(), end="")   # nothing the solver printed is lost
+        raise
+    solver_lines = held.getvalue().splitlines()
+    solver_warnings = [l for l in solver_lines if "admissibility warning:" in l]
+    solver_rest = [l for l in solver_lines if "admissibility warning:" not in l]
     bundle = {"slice_df": slice_df, "failure_surface": failure_surface,
               "results": results if isinstance(results, dict) else None,
               "search": None, "method": method, "options": made_under}
     crest_note = _attach_crest_tension_note(bundle["results"], slice_df, slope_data)
+    if announce and crest_note:
+        print(f"[⚠️ crest tension] {crest_note}")
+    for line in solver_warnings + solver_rest:
+        print(line)
     if bundle["results"] is not None and announce:
         print(f"FS = {bundle['results'].get('FS'):.3f}")
         mass = _sliding_mass_line(slice_df, slope_data)
@@ -1745,8 +1810,6 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
             print(mass)
         for line in _pile_report_lines(slice_df, slope_data):
             print(line)
-        if crest_note:
-            print(f"[⚠️ crest tension] {crest_note}")
     if bundle["results"] is None:
         # The surface was built and the method was given it: it ran, and it did
         # not converge. The bundle keeps the surface so that answer can be

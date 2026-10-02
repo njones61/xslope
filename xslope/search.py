@@ -1507,11 +1507,23 @@ CREST_TENSION_MIN_RATIO = 0.5
 #: a sliver and is passed over: it neither counts toward the run nor ends it.
 CREST_SLIVER_FRAC = 0.005
 
-#: Per-slice columns that carry a reinforcement or pile force. A run in which any
-#: of these is non-zero on a run slice or on the slice next to the run is tension
-#: beside reinforcement, and gets no note.
+#: Per-slice columns that carry a reinforcement or pile force. If any of these is
+#: non-zero on any slice of the surface, no note is given: the program cannot tell
+#: whether the support is what puts the crest in tension.
 _SUPPORT_COLUMNS = ('p', 'p_pt', 'pa_cx', 'pa_cy', 'pp_cx', 'pp_cy',
                     'h_pile', 'h_pile_pas')
+
+
+def _suction_on(slice_df, rows):
+    """Whether any of these slices carries matric-suction strength.
+
+    ``c_suction`` is the apparent cohesion generate_slices writes for the opt-in
+    phi_b option; it is 0.0 on every slice of a model without the option.
+    """
+    if "c_suction" not in slice_df.columns:
+        return False
+    suction = np.nan_to_num(np.asarray(slice_df["c_suction"].values, dtype=float))
+    return bool(np.any(suction[rows] > 0))
 
 
 def crest_tension_note(slice_df, slope_data):
@@ -1537,8 +1549,13 @@ def crest_tension_note(slice_df, slope_data):
       ``CREST_TENSION_MIN_SLICES`` (2) slices, and the worst base tension in it,
       as a stress (effective normal force over base length), is at least
       ``CREST_TENSION_MIN_RATIO`` (half) of that slice's cohesion.
-    * No note where a reinforcement line or pile acts on a slice of the run or
-      on the slice next to it: that tension is beside the support.
+    * No note at all when a reinforcement or pile force acts anywhere on the
+      slip surface: whether the support causes the crest tension cannot be told
+      from the solution, so the note does not guess.
+    * No note when any slice of the run carries matric-suction strength (a
+      non-zero ``c_suction``, written only where the opt-in phi_b option is on
+      and the base is in suction): a model run with suction strength on is not
+      told to add a crack.
     * With no tension crack in the model (``tcrack_depth`` zero or absent) the
       note is "Tension on the base of N slices near the crest. Consider adding a
       tension crack." With a crack it is the first sentence alone: the tension is
@@ -1562,27 +1579,27 @@ def crest_tension_note(slice_df, slope_data):
     if not length > 0:
         return None
     order = range(n_eff.size - 1, -1, -1) if y_right > y_left else range(n_eff.size)
-    run, inner = [], None
+    for col in _SUPPORT_COLUMNS:
+        if col in slice_df.columns:
+            vals = np.asarray(slice_df[col].values, dtype=float)
+            if np.any(np.abs(np.nan_to_num(vals)) > 0):
+                return None
+    run = []
     for i in order:
         if not dl[i] >= CREST_SLIVER_FRAC * length:
             continue                     # a sliver: passed over
         if np.isfinite(n_eff[i]) and n_eff[i] < 0 and c[i] > 1e-9:
             run.append(i)
         else:
-            inner = i                    # the slice that ends the run
             break
     if len(run) < CREST_TENSION_MIN_SLICES:
+        return None
+    if _suction_on(slice_df, run):
         return None
     stress = n_eff[run] / dl[run]
     worst = run[int(np.argmin(stress))]
     if -float(n_eff[worst] / dl[worst]) < CREST_TENSION_MIN_RATIO * c[worst]:
         return None
-    beside = run + ([inner] if inner is not None else [])
-    for col in _SUPPORT_COLUMNS:
-        if col in slice_df.columns:
-            vals = np.asarray(slice_df[col].values, dtype=float)[beside]
-            if np.any(np.abs(np.nan_to_num(vals)) > 0):
-                return None
     note = f"Tension on the base of {len(run)} slices near the crest."
     try:
         crack = float(slope_data.get("tcrack_depth") or 0.0)

@@ -184,7 +184,8 @@ The crest end is the end of the slip surface where it meets the higher ground. C
 
 - The run has at least 2 slices.
 - The worst base tension in the run, as a stress (effective normal force divided by base length), is at least half the cohesion of that slice.
-- No reinforcement line or pile acts on a slice of the run or on the slice next to it.
+- No reinforcement or pile force acts on the slip surface.
+- No slice in the run has suction strength switched on (a φ<sup>b</sup> value for its soil, with the base in suction).
 
 Slices whose base is shorter than 0.5% of the length of the slip surface are passed over in the count. If the model already has a tension crack and the run meets these conditions, the note gives the first sentence only. Smaller tension at the crest, tension elsewhere on the surface, and tension on cohesionless slices draw no note of this kind; the method's own notes report base tension on cohesionless slices. The note appears with the other warnings: in the run output, where the warnings print before the factor of safety, in the amber strip in Studio, in the report and in the assistant's account of the run. It does not change the factor of safety or which surface is reported. [Tutorial LEM-1](../tutorials/lem01_simple_embankment.md#the-fix-is-in-the-ground-not-the-settings) shows the remedy.
 

@@ -394,9 +394,10 @@ factor of safety matches the moment methods and the published values.
 When at least 2 slices at the crest end of the reported surface are in base tension,
 have cohesion, and the worst of them carries a tension of at least half its cohesion,
 the run adds one more note, for every method: "Tension on the base of N slices near
-the crest. Consider adding a tension crack." There is no note where reinforcement or
-a pile acts beside those slices, and the second sentence is left out when the model
-already has a crack. [Tension at the crest](search.md#tension-at-the-crest) gives the
+the crest. Consider adding a tension crack." The note is not shown when a
+reinforcement or pile force acts on the slip surface, or when suction strength is
+switched on for the soil on those slices, and the second sentence is left out when
+the model already has a crack. [Tension at the crest](search.md#tension-at-the-crest) gives the
 full rule.
 
 Base tension on a cohesionless slice indicates a more serious problem: that slice has

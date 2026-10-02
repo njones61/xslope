@@ -4454,7 +4454,7 @@
       "model": "docs/seep/files/xslope_earth_dam2.xlsx",
       "references": [
         {
-          "anchor": "5-earth-dam-with-core-and-filter",
+          "anchor": "4-earth-dam-with-core-and-filter",
           "checks": [
             "seep"
           ],
@@ -4462,8 +4462,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "5. Earth Dam with Core and Filter",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#5-earth-dam-with-core-and-filter"
+          "title": "4. Earth Dam with Core and Filter",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#4-earth-dam-with-core-and-filter"
         }
       ],
       "topics": [
@@ -4519,16 +4519,16 @@
       "model": "docs/seep/files/xslope_earth_dam_tseep.xlsx",
       "references": [
         {
-          "anchor": "7-earth-dam-reservoir-drawdown-transient",
+          "anchor": "conclusion",
           "checks": [
             "tseep_head"
           ],
-          "level": 3,
-          "page": "seep/samples/",
-          "resolution": "input-link",
-          "source_md": "docs/seep/samples.md",
-          "title": "7. Earth Dam — Reservoir Drawdown (Transient)",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#7-earth-dam-reservoir-drawdown-transient"
+          "level": 2,
+          "page": "tutorials/seep03_reservoir_drawdown/",
+          "resolution": "nearest-heading",
+          "source_md": "docs/tutorials/seep03_reservoir_drawdown.md",
+          "title": "Conclusion",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/seep03_reservoir_drawdown/#conclusion"
         }
       ],
       "topics": [
@@ -4586,18 +4586,6 @@
       "model": "docs/seep/files/xslope_johnson_res.xlsx",
       "references": [
         {
-          "anchor": "johnson-reservoir",
-          "checks": [
-            "SEEP-2"
-          ],
-          "level": 3,
-          "page": "seep/samples/",
-          "resolution": "input-link",
-          "source_md": "docs/seep/samples.md",
-          "title": "4. Johnson Reservoir",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#johnson-reservoir"
-        },
-        {
           "anchor": "worked-example",
           "checks": [
             "circular_search",
@@ -4609,6 +4597,18 @@
           "source_md": "docs/seep/seep_slope.md",
           "title": "Worked example",
           "url": "https://xslope.readthedocs.io/en/latest/seep/seep_slope/#worked-example"
+        },
+        {
+          "anchor": "verification-seep2d-johnson",
+          "checks": [
+            "SEEP-2"
+          ],
+          "level": 3,
+          "page": "verification/seep/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/seep.md",
+          "title": "SEEP2D cross-check — Johnson Reservoir (established code)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/seep/#verification-seep2d-johnson"
         }
       ],
       "topics": [
@@ -4667,7 +4667,7 @@
       "model": "docs/seep/files/xslope_johnson_res_tseep.xlsx",
       "references": [
         {
-          "anchor": "8-johnson-reservoir-zoned-drawdown-transient",
+          "anchor": "6-johnson-reservoir-zoned-drawdown-transient",
           "checks": [
             "tseep_head"
           ],
@@ -4675,8 +4675,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "8. Johnson Reservoir — Zoned Drawdown (Transient)",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#8-johnson-reservoir-zoned-drawdown-transient"
+          "title": "6. Johnson Reservoir — Zoned Drawdown (Transient)",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#6-johnson-reservoir-zoned-drawdown-transient"
         }
       ],
       "topics": [
@@ -4734,7 +4734,7 @@
       "model": "docs/seep/files/xslope_levee_poly.xlsx",
       "references": [
         {
-          "anchor": "6-levee-with-grouted-foundation",
+          "anchor": "5-levee-with-grouted-foundation",
           "checks": [
             "seep"
           ],
@@ -4742,8 +4742,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "6. Levee with Grouted Foundation",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#6-levee-with-grouted-foundation"
+          "title": "5. Levee with Grouted Foundation",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#5-levee-with-grouted-foundation"
         }
       ],
       "topics": [

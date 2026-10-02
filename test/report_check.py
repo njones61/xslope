@@ -14221,7 +14221,7 @@ def test_each_state_is_drawn_at_its_own_scale():
     """Drawn at two states, each state's panels are scaled to its OWN field.
 
     A strength reduction run drawn at both states carries a mechanism whose
-    strains and displacements are orders above the standing section's. Pinned to
+    strains and displacements can be far above the standing section's. Pinned to
     the pair, the last converged trial's strain panel is one flat colour under a
     colorbar it never reaches, its deformed grid is drawn at the collapse's
     exaggeration and shows no deformation at all, and its arrows are dust — three
@@ -14231,8 +14231,8 @@ def test_each_state_is_drawn_at_its_own_scale():
     exaggeration each grid was drawn at.
 
     The measurement is on the CALL the plotter was made with and on the artists
-    that call produced: the converged state's strain panel must resolve its own
-    field, which on this model is a small fraction of the failure field's.
+    that call produced: each state's strain panel is drawn to its own field's
+    peak, so two fields with different peaks get different colour limits.
     """
     fails = []
     import numpy as np
@@ -14319,8 +14319,8 @@ def test_each_state_is_drawn_at_its_own_scale():
                      "is untested on this fixture")
 
     # The consequence, measured on the drawn artists: the converged strain panel
-    # resolves its OWN field. Pinned to the pair it spanned the failure field,
-    # which on this model is orders larger — one flat colour.
+    # resolves its OWN field. Pinned to the pair it would span the larger
+    # field's range instead.
     import matplotlib.figure as mplfig
 
     def strain_top(state, **kw):
@@ -14342,18 +14342,36 @@ def test_each_state_is_drawn_at_its_own_scale():
     if None in peaks.values():
         fails.append("the strain field could not be read; the colour range "
                      "check has no oracle")
-    elif not peaks["failure"] > 5.0 * peaks["converged"]:
-        fails.append(f"the two states' strains are of a size ({peaks}); a "
-                     f"pinned colorbar would have been readable anyway")
     else:
-        own_top = strain_top("converged")
-        pinned_top = strain_top("converged", vmin=0.0, vmax=peaks["failure"])
-        if own_top is None or pinned_top is None:
+        # The only precondition: the two peaks are distinguishable. The stored
+        # fields are read back from CSV at ~1e-6 relative precision and the
+        # panel averages them to nodes, so a 2% gap is far outside the
+        # comparison's noise and a smaller one would not tell "own range" from
+        # "shared range" apart.
+        gap = abs(peaks["failure"] - peaks["converged"]) / max(peaks.values())
+        tops = {s: strain_top(s) for s in fields}
+        if gap < 0.02:
+            fails.append(f"the two states' strain peaks {peaks} are not "
+                         f"distinguishable, so the own-range check has no "
+                         f"oracle")
+        elif None in tops.values():
             fails.append("the strain panel drew nothing to measure")
-        elif not own_top < 0.5 * pinned_top:
-            fails.append(f"the converged strain panel is drawn to {own_top}, no "
-                         f"smaller than the pair-pinned {pinned_top} — its own "
-                         f"structure is still not resolved")
+        else:
+            # Each panel's colour limit comes from its own field: it sits at
+            # that field's peak (the panel averages to nodes, so at or a little
+            # under it, never above and never far below)...
+            for s in fields:
+                if not 0.5 * peaks[s] <= tops[s] <= 1.0001 * peaks[s]:
+                    fails.append(f"the {s} strain panel is drawn to {tops[s]}, "
+                                 f"not to its own field's peak {peaks[s]}")
+            # ...so the two limits differ exactly as the two peaks do. One
+            # range shared by the pair would make them equal.
+            if (tops["failure"] > tops["converged"]) != \
+                    (peaks["failure"] > peaks["converged"]) or \
+                    abs(tops["failure"] - tops["converged"]) < 1e-9:
+                fails.append(f"the two strain panels' limits {tops} do not "
+                             f"follow the two fields' peaks {peaks}: one "
+                             f"range is shared")
 
     # And a run drawn at ONE state is unchanged: its panels scale themselves and
     # its grid is drawn at its own field's exaggeration.

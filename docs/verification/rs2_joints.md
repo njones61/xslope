@@ -793,13 +793,22 @@ The joint inclinations are the model's: the manual's table prints 59°, where it
 An 80 × 70 m section with a 60 m face at 71.6°, tessellated into Voronoi blocks over the whole of it.
 The rock is Mohr-Coulomb (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 1,000 kPa, φ = 35°, no tensile
 capacity) and every block wall is a joint at c = 500 kPa, φ = 20° with the corpus's standard
-stiffness pair. The source paper asks how the failure of a slope in blocky rock changes with the
-scale of its blocks.
+stiffness pair. The source is Hammah, Yacoub & Curran (2009), whose third example is a rock mass
+of Voronoi blocks. The paper holds the block size fixed and follows how the failure changes as the
+slope gets higher, from 10 m to 120 m.
 
-The tessellation was generated in UDEC and imported, with no block size, density or seed
-published for it; the model file holds it as 523 joint boundaries, 1,177 segments, the only
-statement of the network there is, and they are transcribed verbatim. Their mean block width, 2.895 m, is this
-row's mesh size, standing in for the joint spacing every other row meshes at.
+The vendor's model departs from that paper in two ways. Its network is coarser: 525 blocks over
+the 4,400 m² section, 0.119 blocks per square meter, where the paper's network has 0.2, so the
+vendor's mean block is 8.4 m² against the paper's 5 m². And its rock friction is 35°, where the
+paper's is 30°. The tessellation was generated in UDEC and imported; the model file holds it as
+523 joint boundaries, 1,177 segments, and they are transcribed verbatim. Their mean block width,
+2.895 m, is this row's mesh size, standing in for the joint spacing every other row meshes at.
+
+The referee is UDEC's 2.46. That is the vendor's own UDEC run on the vendor's network, and the only
+value computed on this network with these inputs. The paper ran only its own finite element
+program, on its finer network with 30° rock. At this 60 m height it gives 1.5 with the joints open
+where they reach the slope surfaces and 1.6 with them closed. Those two values belong to a
+different problem and do not score this row.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
@@ -809,14 +818,15 @@ The slope stands at 2.512, but the search does not close above it: the trial at 
 million iterations, stopped moving, and never balanced its forces, so the row prints its standing
 factor as a lower bound and does not confirm a value. The search takes about six hours, the longest
 run here. The figure shows the mass failing on a surface picked through the block walls rather than
-along any one plane it contains, which is the observation the source paper is about.
+along any one plane it contains. The paper reports the same of its own Voronoi example: every
+failure mechanism it found had a curved overall shape.
 
-Separating the block size from this particular tessellation, the paper's own question, takes a
-second network of the same blocks drawn another way. The one `xslope.joints.voronoi` draws at that
-block size stops in the mesher: the generator keeps a trace down to a thousandth of the section
-diagonal, 0.106 m here, and a trace that short is pulled onto its own junction, where the line it
-leaves has no length left. Three seeds and two block sizes stop the same way, so this row is scored
-on the vendor's own tessellation alone.
+`xslope.joints.voronoi` draws a network of this kind at any block size. On the section as the manual
+states it, an 80 × 70 m block with the face cut from it, the networks it draws mesh. This file's
+outline also keeps a vertex wherever the vendor's joints meet the boundary. A generated joint that
+ends within a fraction of a millimeter of one of those vertices leaves a sliver of boundary that
+the mesher cannot split along. A second network therefore belongs on the clean section, not on this
+file's outline. This row is scored on the vendor's own tessellation.
 
 **Input file:** [rj020.xlsx](files/rocscience/joints/rj020.xlsx).
 

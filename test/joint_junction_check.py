@@ -46,6 +46,8 @@ already worked.
   m. L, the tip 1e-7 off the through line's end   2, and the mesh is fixture c's
   l. a tip on an existing vertex             2, nothing snapped
   n. a joint ending on a zone edge AT a twelve-decimal vertex of it
+  o. two joints ending 0.1 m apart on the outer boundary   one corner, 3 wedges,
+     no element of aspect above 20 or below 1% of the target element's area
 
 No 2D element in any of them may name one node twice. A collapsed element is what
 a pair of geometry points a rounding apart becomes once the mesher has merged
@@ -999,6 +1001,73 @@ def _leg_row_iii(failures, results):
                    f"{weight:.0f} kN/m block")
 
 
+def _leg_boundary_ends(failures, results):
+    """o. Two joints ending 0.1 m apart on the outer boundary end at one point.
+
+    The geometry of RJ-3's left boundary at a smaller scale: two jointed lines
+    reach the boundary of a 40 x 20 block 0.1 m apart and cross 0.15 m inside
+    it. Left as stated, the sliver of rock between the two lines and the
+    boundary meshes as a 0.0075 m2 element (0.07% of a target element), and the
+    elements around it reach an aspect ratio of 19. At a target size of 5 the mesher's end snap distance is
+    a twentieth of that, 0.25, so the two ends are one corner: the second line's
+    end moves onto the first's, the boundary vertex it was given is taken out
+    again, and the mesh around the corner is ordinary. Pinned: the moved end, no
+    node left at the old end, no element of aspect above 20 or below 1% of the
+    target element's area, and the corner split into its three wedges.
+    """
+    ring = [(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)]
+    a = [(0.0, 10.0), (24.0, 18.0)]
+    b = [(0.0, 10.1), (24.0, 2.0)]
+    target = 5.0
+    a_target = math.sqrt(3.0) / 4.0 * target ** 2
+    for et in ('tri3', 'tri6'):
+        lines = [list(a), list(b)]
+        # the line ends become polygon vertices first, which is what
+        # get_material_polygons does for a real model
+        rings = add_intersection_points_to_polygons([list(ring)], lines)
+        tag = f"o. two ends 0.1 apart on the boundary / {et}"
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                mesh = build_mesh_from_polygons(
+                    [{'coords': rings[0], 'mat_id': 0}], target, et,
+                    lines=lines, joint_lines=[0, 1])
+        except Exception as exc:
+            failures.append(f"{tag}: does not mesh: {exc}")
+            continue
+        if tuple(lines[1][0]) != (0.0, 10.0) or tuple(lines[0][0]) != (0.0, 10.0):
+            failures.append(f"{tag}: the two boundary ends are {lines[0][0]} and "
+                            f"{lines[1][0]}, not one point at (0, 10)")
+        nodes = np.asarray(mesh['nodes'], dtype=float)
+        if len(_at(nodes, (0.0, 10.1))):
+            failures.append(f"{tag}: a node is left at the moved end (0, 10.1)")
+        els = np.asarray(mesh['elements'], dtype=int)[:, :3]
+        P = nodes[els][:, :, :2]
+        A = 0.5 * np.abs((P[:, 1, 0] - P[:, 0, 0]) * (P[:, 2, 1] - P[:, 0, 1])
+                         - (P[:, 2, 0] - P[:, 0, 0]) * (P[:, 1, 1] - P[:, 0, 1]))
+        L = np.stack([np.hypot(*(P[:, i] - P[:, j]).T)
+                      for i, j in ((0, 1), (1, 2), (2, 0))], 1)
+        asp = L.max(1) ** 2 / (2.0 * np.maximum(A, 1e-300))
+        for k, why in ((int(np.argmax(asp)), asp.max() > 20.0),
+                       (int(np.argmin(A)), A.min() < 0.01 * a_target)):
+            if why:
+                failures.append(f"{tag}: element {k} at "
+                                f"({P[k, :, 0].mean():.2f}, {P[k, :, 1].mean():.2f})"
+                                f" has aspect {asp[k]:.1f} and area {A[k]:.4f} "
+                                f"(limits 20 and {0.01 * a_target:.3f})")
+        _no_collapsed(mesh, tag, failures)
+        _check_pairs(mesh, tag, failures, lines)
+        # three wedges at the corner: above the upper line, between the two, and
+        # below the lower one; the boundary's own directions bound the outer two.
+        # Each jointed line keeps its own bar node there.
+        rays = [math.atan2(8.0, 24.0), math.atan2(-8.1, 24.0),
+                0.5 * math.pi, 1.5 * math.pi]
+        _check_junction(mesh, (0.0, 10.0), rays, 3, 2, tag, failures)
+        results.append(f"o. two ends 0.1 apart on the boundary {et}: one corner "
+                       f"at (0, 10), worst aspect {asp.max():.1f}, smallest "
+                       f"element {A.min():.2f} m2, "
+                       f"{len(mesh['elements_joint'])} joint elements")
+
+
 def run_mesh_legs():
     """The mesh fixtures and the refusals, without the rows that solve.
 
@@ -1011,6 +1080,7 @@ def run_mesh_legs():
     _leg_zone_vertex(failures, results)
     _leg_material_boundary(failures, results)
     _leg_refusals(failures, results)
+    _leg_boundary_ends(failures, results)
     print(f"Joint junction check, mesh legs ({time.time() - t0:.0f} s):")
     for line in results:
         print("  " + line)
@@ -1026,6 +1096,7 @@ def run():
     _leg_zone_vertex(failures, results)
     _leg_material_boundary(failures, results)
     _leg_refusals(failures, results)
+    _leg_boundary_ends(failures, results)
     _leg_row_i(failures, results)
     _leg_row_ii(failures, results)
     _leg_row_iii(failures, results)

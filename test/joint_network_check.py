@@ -44,6 +44,15 @@ Legs:
      traces on the band's own edges, where the section's boundary drops them; a
      set confined to a polygon of Type ``joints`` resolves the same by the
      region's name and by its number.
+  11. **A wall reaching the face.** A generated wall that ends on the slope face
+     gives the boundary exactly one vertex there, and the mesh splits along it.
+     Two walls the generator produced on RJ-20's section are the cases: the
+     rounded crossing used to be inserted twice, microns apart, or inserted where
+     it slid along an edge earlier crossings had bent, with the end beside it.
+  12. **Short walls merged.** ``voronoi(..., short_walls="merge")`` collapses a
+     wall shorter than a tenth of the block size instead of dropping it: no short
+     wall, no junction inside the region met by fewer than three walls, no
+     crossing, and the default network unchanged.
 
 Run directly:  PYTHONPATH=. python3 test/joint_network_check.py
 """
@@ -682,6 +691,170 @@ def _leg_band_and_region(failures, results):
                    f"resolve to the same {len(by_name)} traces, and an unknown "
                    f"name is refused with the model's regions listed")
 
+
+# --------------------------------------------------------------------------
+# 11 — a generated wall reaching the face: one vertex, and the mesh splits
+# --------------------------------------------------------------------------
+
+#: Three cell walls the Voronoi generator produced on RJ-20's section, each ending
+#: on the slope face, with a stretch of that face. The first two (block size
+#: 2.236 m, seed 21) run back from the face at about 2 degrees and at an ordinary
+#: angle; the face edge is the FIRST edge of each ring, as it is in the section's
+#: own outline, so the edge the insertion creates is visited next. The third
+#: (2.08 m, seed 24) meets, at 3.6 degrees, a face its neighbours have already
+#: given rounded vertices.
+_FACE_CASES = (
+    ("2 degrees to the face (on the vendor's outline)",
+     [(26.264996, 58.794987), (25.08812, 55.264362), (29.0, 55.264362),
+      (29.0, 58.794987)],
+     [(26.013566627856065, 58.04069952449223),
+      (25.77300118348954, 57.21115865128934)]),
+    ("an ordinary angle (on the outline as stated in the manual)",
+     [(20.0, 40.0), (14.0, 22.0), (22.0, 22.0), (22.0, 40.0)],
+     [(16.783156501547793, 30.34946950464338),
+      (17.02279238426506, 30.02397507993575)]),
+    # The face as it stands once two neighbouring walls (block size 2.08 m,
+    # seed 24, rows 138 and 2152) have put their own crossings in, rounded to
+    # six decimals and so up to 1e-6 off the true face; the third wall meets
+    # that slightly bent edge at 3.6 degrees.
+    ("3.6 degrees to a face its neighbours' rounded crossings have bent",
+     [(30.0, 70.0), (15.944037, 27.832109), (14.677007, 24.031018),
+      (10.0, 10.0), (40.0, 10.0), (40.0, 70.0)],
+     [(15.806742028833334, 27.4202260865),
+      (15.396540746761813, 25.871746203732013)]),
+)
+
+
+def _leg_face_crossing(failures, results):
+    """Leg 11: a joint ending on the boundary gives the boundary ONE vertex there.
+
+    The mesher puts every point where a line meets a polygon edge into that
+    polygon, rounded to six decimals. The rounded point sits a little off the
+    line, so the edge it creates — the inserted point to the next vertex — meets
+    the line again a rounding away, and before the fix that second crossing went
+    in too: two boundary vertices microns apart (5e-6 m on the first case, 1e-6 m
+    on the second). The sliver between them meshed as a collapsed element and the
+    split refused the line: in the whole generated networks as an edge 'carried
+    by 1 two-dimensional element' (first case) and 'by 4' (second), and in these
+    small rings as 'carried by 1' for both.
+
+    The third case is the same pair of vertices reached another way. The face's
+    vertices are themselves earlier crossings, each rounded up to 7e-7 off the
+    face, so the edge between two of them is a hair off the true face; a wall
+    meeting it at 3.6 degrees crosses it 1e-5 from its own end. That crossing
+    went in, then the mesher inserted the wall's own end beside it, and the
+    split refused the line as 'carried by 1'. Now a line end that lies on the
+    edge being split, to within the rounding, is the crossing. All three are
+    walls the Voronoi generator actually produced on RJ-20's section; all are
+    meshed and split here.
+    """
+    from xslope.mesh import (add_intersection_points_to_polygons,
+                             build_mesh_from_polygons)
+    n_ok = 0
+    for name, ring, line in _FACE_CASES:
+        out = add_intersection_points_to_polygons([list(ring)], [line])[0]
+        added = len(out) - len(ring)
+        if added != 1:
+            failures.append(f"face crossing, {name}: the wall's end gave the "
+                            f"boundary {added} vertices, expected 1")
+            continue
+        # and the vertex it gave is the wall's own end, to the six-decimal
+        # rounding every inserted crossing carries
+        end = line[0]
+        gap = min(math.hypot(v[0] - end[0], v[1] - end[1]) for v in out)
+        if gap > 1e-6:
+            failures.append(f"face crossing, {name}: the vertex nearest the "
+                            f"wall's end is {gap:.2g} from it, not the end")
+            continue
+        # Meshed on the ring as the insertion left it, which is what
+        # get_material_polygons hands the mesher.
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                mesh = build_mesh_from_polygons(
+                    [{'coords': out, 'mat_id': 0}], target_size=1.0,
+                    element_type='tri6', lines=[list(line)],
+                    element_size_1d=1.0, joint_lines={0: {'bar': False}})
+        except Exception as exc:
+            failures.append(f"face crossing, {name}: the wall does not mesh and "
+                            f"split: {exc}")
+            continue
+        ej = mesh.get('elements_joint')
+        if ej is None or len(ej) == 0:
+            failures.append(f"face crossing, {name}: meshed but no joint element")
+            continue
+        n_ok += 1
+    results.append(f"face crossing  {n_ok} of {len(_FACE_CASES)} generated walls "
+                   f"ending on the slope face give it one vertex and mesh and "
+                   f"split")
+
+
+
+# --------------------------------------------------------------------------
+# 12 — short walls merged rather than dropped (a non-default option)
+# --------------------------------------------------------------------------
+
+def _leg_voronoi_merge(failures, results):
+    """Leg 12: ``voronoi(..., short_walls="merge")``.
+
+    By default a cell wall shorter than a tenth of the block size is dropped,
+    and the two cells either side stay joined through the gap it leaves -- two
+    walls meeting at an L, a junction of degree two, where a tessellation's own
+    junctions have three. Merging collapses the short wall instead. Read on the
+    box at 1 m, seeds 11 and 12: no wall shorter than the threshold, no wall end
+    inside the box met by fewer than three walls, no two walls crossing except at
+    a shared end, and the default network unchanged by the option existing.
+    """
+    from collections import Counter
+    for seed in (11, 12):
+        sd = _model()
+        drop = voronoi(sd, 1.0, seed=seed, label='v', props={'phi': 25.0})
+        again = voronoi(sd, 1.0, seed=seed, label='v', props={'phi': 25.0},
+                        short_walls='drop')
+        if drop != again:
+            failures.append(f"merge seed {seed}: short_walls='drop' is not the "
+                            f"default network")
+        rows = voronoi(sd, 1.0, seed=seed, label='v', props={'phi': 25.0},
+                       short_walls='merge')
+        lines = [_line(r) for r in rows]
+        short = [l.length for l in lines if l.length < 0.1 - 1e-9]
+        if short:
+            failures.append(f"merge seed {seed}: {len(short)} walls shorter than "
+                            f"the 0.1 threshold remain")
+        deg = Counter()
+        for r in rows:
+            for p in ((r['x1'], r['y1']), (r['x2'], r['y2'])):
+                deg[(round(p[0], 9), round(p[1], 9))] += 1
+        inner = [n for (x, y), n in deg.items()
+                 if 1e-7 < x < 20.0 - 1e-7 and 1e-7 < y < 10.0 - 1e-7]
+        low = [n for n in inner if n < 3]
+        if low:
+            failures.append(f"merge seed {seed}: {len(low)} wall ends inside the "
+                            f"box are met by fewer than three walls (a welded "
+                            f"pair or a dangling wall)")
+        n_drop_low = sum(1 for (x, y), n in Counter(
+            (round(q[0], 9), round(q[1], 9)) for r in drop
+            for q in ((r['x1'], r['y1']), (r['x2'], r['y2']))).items()
+            if 1e-7 < x < 20.0 - 1e-7 and 1e-7 < y < 10.0 - 1e-7 and n < 3)
+        cross = 0
+        for i in range(len(lines)):
+            for j in range(i + 1, len(lines)):
+                x = lines[i].intersection(lines[j])
+                if x.is_empty:
+                    continue
+                ends = {(round(c[0], 9), round(c[1], 9)) for c in
+                        (lines[i].coords[0], lines[i].coords[-1],
+                         lines[j].coords[0], lines[j].coords[-1])}
+                if x.geom_type != 'Point' or (round(x.x, 9), round(x.y, 9)) not in ends:
+                    cross += 1
+        if cross:
+            failures.append(f"merge seed {seed}: {cross} pairs of walls cross "
+                            f"away from a shared end")
+        results.append(f"voronoi merge  block 1.0 m seed {seed}: {len(rows)} walls "
+                       f"(dropped: {len(drop)}, with {n_drop_low} wall ends inside "
+                       f"the box met by fewer than three); merged: none short, "
+                       f"none under three, no crossings")
+
+
 def run():
     """Returns a list of failure strings (empty = pass)."""
     import time
@@ -697,6 +870,8 @@ def run():
     _leg_names(failures, results)
     _leg_grouping(failures, results)
     _leg_band_and_region(failures, results)
+    _leg_face_crossing(failures, results)
+    _leg_voronoi_merge(failures, results)
     print(f"Joint network generator check ({time.time() - t0:.0f} s):")
     for line in results:
         print("  " + line)

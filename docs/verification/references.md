@@ -169,6 +169,11 @@ Engineers).
 - Hammah, R.E., Yacoub, T.E. & Corkum, B.C. (2005b). The shear strength
   reduction method for the generalized Hoek-Brown criterion. In *Proc. 40th U.S.
   Symposium on Rock Mechanics (Alaska Rocks 2005)*, ARMA/USRMS 05-810.
+- Hammah, R.E., Yacoub, T.E. & Curran, J.H. (2009). Variation of failure
+  mechanisms of slopes in jointed rock masses with changing scale. In *Proc. 3rd
+  Canada–US Rock Mechanics Symposium*, Toronto, paper 3956. *(The source of the
+  Voronoi slope, [RJ-20](rs2_joints.md#rj-20): its Example III, at 0.2 blocks
+  per square meter and rock friction 30°.)*
 - Harr, M.E. (1962). *Groundwater and Seepage*. McGraw-Hill, New York.
   (Reprinted by Dover, 1990; cited in the groundwater corpus as "Harr 1990".)
 - Hassan, A.M. & Wolff, T.F. (1999). Search algorithm for minimum reliability

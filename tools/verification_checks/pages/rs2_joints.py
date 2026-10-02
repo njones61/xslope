@@ -35,6 +35,9 @@ CONFIG = PageConfig(
         ('2.512', 'unconfirmed'),
         ('2.512', 'The slope stands at 2.512'),
         ('2.531', 'the trial at 2.531'),
+        # RJ-20's block density: blocks per square meter of the vendor's network
+        # (525 blocks over 4,400 m2), not a factor of safety.
+        ('0.119', 'blocks per square meter'),
         # RJ-3 on the chapter's printed list (rj003_chapter, RJ-3c) stands at 1.027
         # and its search does not close above it (the trial at 1.047 is
         # undecided; 1.125 fails): trials in the committed run record

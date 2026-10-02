@@ -1649,6 +1649,11 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     # so both curves are split there and gmsh gives the junction one node.
     _joint_opts = _normalize_joint_lines(joint_lines, len(lines) if lines else 0)
     if _joint_opts:
+        # Jointed lines ending a few centimeters apart on the outer boundary end
+        # at one point there, so no sliver of rock is left between them and the
+        # boundary. See _merge_boundary_joint_ends.
+        _merge_boundary_joint_ends(lines, _joint_opts, polygon_coords,
+                                   target_size, debug=debug)
         _validate_joint_lines(lines, _joint_opts, point_constraints, polygon_coords)
         _insert_joint_junction_points(lines, _joint_opts, debug=debug)
 
@@ -3185,6 +3190,156 @@ def _snap_joint_line_ends(lines, opts, tol, debug=False):
                 print(f"  Joint line {li + 1} end ({p[0]:g}, {p[1]:g}) snapped "
                       f"{d:.3g} onto the jointed line it stops on")
         lines[li] = line
+    return n_moved
+
+
+#: How far apart, as a fraction of the target element size, two jointed-line ends
+#: on the section's outer boundary may stand and still be read as one corner. The
+#: same fraction as the mesher's existing end snap (a line end within a twentieth
+#: of an element of a polygon point is moved onto it).
+_BOUNDARY_END_MERGE_FRAC = 0.05
+
+
+def _merge_boundary_joint_ends(lines, opts, polygon_coords, target_size,
+                               debug=False):
+    """Make two jointed lines that end close together on the outer boundary end
+    at ONE point there.
+
+    Two joints that reach the section's outer boundary a few centimeters apart
+    leave a sliver of boundary between their ends, and where they also cross
+    just inside it, a sliver triangle of rock between the two lines and the
+    boundary. No element of the target size fits in either. The mesher fills
+    them with needle elements — an aspect ratio of 91 and an area of 0.017 m² on
+    RJ-3's left boundary — and with rock that can yield those elements flow in
+    place and hold a strength-reduction trial out of balance for as long as it
+    runs. The geometry is the measurement's tolerance, not the rock's: at the
+    element size the model is meshed at, the two joints daylight at the same
+    place.
+
+    So jointed-line ends on the outer boundary that stand within
+    ``_BOUNDARY_END_MERGE_FRAC`` x ``target_size`` of one another (the distance
+    within which the mesher already moves a line end onto a polygon point)
+    become one point: the end of the lowest-numbered line among them, so which
+    of them moves does not depend on the order they are visited in. Ends a
+    chain of such gaps connects are one group. The line that moves turns about
+    its other end by the angle the gap subtends from there; on RJ-3 that is
+    0.32 m on a 574 m line, 0.03 degrees.
+
+    Only ends on the OUTER boundary are merged. Ends on an interior material
+    boundary, or anywhere inside, are left as stated; ends a millionth of the
+    section apart are already one point and :func:`_snap_joint_line_ends` keeps
+    them so.
+
+    A moved end leaves behind the boundary vertex the polygons were given for it
+    (``get_material_polygons`` inserts every line end that lies on a polygon
+    edge). That vertex is taken out again where it lies on the straight boundary
+    between its neighbours and no other line ends or turns there, so the outline
+    keeps its shape and loses the sliver. A vertex at a real corner of the
+    outline is kept.
+
+    In place, on ``lines`` and ``polygon_coords``. Returns the number of ends moved.
+    """
+    idx = sorted(opts)
+    if len(idx) < 2 or not polygon_coords or not (target_size and target_size > 0):
+        return 0
+    from shapely.geometry import Polygon as _Poly, Point as _Pt
+    from shapely.ops import unary_union as _union
+
+    merge = _BOUNDARY_END_MERGE_FRAC * float(target_size)
+    tol = _joint_line_tol(lines, polygon_coords)
+    rings = []
+    for coords in polygon_coords:
+        pts = remove_duplicate_endpoint(list(coords))
+        if len(pts) >= 3:
+            rings.append(_Poly(pts).buffer(0))
+    if not rings:
+        return 0
+    dom = _union(rings)
+    outer = _union([g.exterior for g in getattr(dom, 'geoms', [dom])])
+
+    ends = []
+    for li in idx:
+        line = lines[li]
+        if not line or len(line) < 2:
+            continue
+        for e in (0, len(line) - 1):
+            p = (float(line[e][0]), float(line[e][1]))
+            if outer.distance(_Pt(p)) <= tol:
+                ends.append((li, e, p))
+    if len(ends) < 2:
+        return 0
+
+    home = list(range(len(ends)))
+
+    def _find(k):
+        while home[k] != k:
+            home[k] = home[home[k]]
+            k = home[k]
+        return k
+
+    for a in range(len(ends)):
+        for b in range(a + 1, len(ends)):
+            if ends[a][0] == ends[b][0]:
+                continue                     # a line's own two ends
+            pa, pb = ends[a][2], ends[b][2]
+            if math.hypot(pa[0] - pb[0], pa[1] - pb[1]) < merge:
+                ra, rb = _find(a), _find(b)
+                if ra != rb:
+                    home[max(ra, rb)] = min(ra, rb)
+
+    groups = defaultdict(list)
+    for k in range(len(ends)):
+        groups[_find(k)].append(k)
+
+    moved_from = []
+    n_moved = 0
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        # the end of the lowest-numbered line (then its first end) is the corner
+        keep = min(members, key=lambda k: (ends[k][0], ends[k][1]))
+        q = ends[keep][2]
+        for k in members:
+            li, e, p = ends[k]
+            if math.hypot(q[0] - p[0], q[1] - p[1]) <= tol:
+                continue                     # already the same point
+            pts = [tuple(map(float, v[:2])) for v in lines[li]]
+            pts[e] = q
+            lines[li] = pts
+            moved_from.append(p)
+            n_moved += 1
+            if debug:
+                print(f"  Joint line {li + 1} end ({p[0]:g}, {p[1]:g}) on the outer "
+                      f"boundary moved {math.hypot(q[0] - p[0], q[1] - p[1]):.3g} onto "
+                      f"line {ends[keep][0] + 1}'s end ({q[0]:g}, {q[1]:g})")
+    if not n_moved:
+        return 0
+
+    # The boundary vertices the moved ends leave behind.
+    vtol = max(tol, 2.0 * _XPT_VERTEX_TOL)
+    still_used = [tuple(map(float, v[:2])) for line in lines if line for v in line]
+    for p in moved_from:
+        if any(math.hypot(p[0] - v[0], p[1] - v[1]) <= vtol for v in still_used):
+            continue
+        for i, coords in enumerate(polygon_coords):
+            ring = list(coords)
+            closed = len(ring) > 1 and tuple(ring[0]) == tuple(ring[-1])
+            body = ring[:-1] if closed else ring
+            n = len(body)
+            out = []
+            for k, v in enumerate(body):
+                if n > 3 and math.hypot(v[0] - p[0], v[1] - p[1]) <= vtol:
+                    a, c = body[k - 1], body[(k + 1) % n]
+                    ux, uy = c[0] - a[0], c[1] - a[1]
+                    L = math.hypot(ux, uy)
+                    off = abs(ux * (v[1] - a[1]) - uy * (v[0] - a[0])) / L if L else 0.0
+                    if off <= vtol:
+                        continue             # on the straight boundary: drop it
+                out.append(v)
+            if len(out) != n:
+                if closed:
+                    out.append(out[0])
+                polygon_coords[i] = out
     return n_moved
 
 
@@ -5889,11 +6044,25 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
             # Check intersection with each polygon
             for poly_idx, poly in enumerate(updated_polygons):
                 poly_coords = poly.get("coords", []) if isinstance(poly, dict) else poly
+                # The points this segment has put into this polygon so far. An edge
+                # that starts or ends at one of them was CREATED by that insertion,
+                # and the segment meets it only at that point. Intersected again it
+                # comes back a rounding away -- the inserted point is the crossing
+                # rounded to six decimals, so it sits a little off the line, and at a
+                # shallow crossing the re-intersection slides along the edge by
+                # several times that -- and the polygon gains a second vertex
+                # microns from the first. The sliver between the two meshes as a
+                # collapsed element, which leaves a jointed line's edge carried by
+                # one element or by four.
+                fresh = set()
                 # Check each edge of this polygon
                 for j in range(len(poly_coords)):
                     poly_edge_start = poly_coords[j]
                     poly_edge_end = poly_coords[(j + 1) % len(poly_coords)]
-                    
+                    if fresh and (tuple(poly_edge_start) in fresh
+                                  or tuple(poly_edge_end) in fresh):
+                        continue
+
                     # Find intersection point if it exists
                     intersection = line_segment_intersection(
                         line_seg_start, line_seg_end,
@@ -5903,7 +6072,42 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
                     if intersection:
                         if debug:
                             print(f"Found intersection {intersection} between line {line_idx} segment {i} and polygon {poly_idx} edge {j}")
-                        
+
+                        # A segment that ENDS on this edge crosses it at that end.
+                        # The computed crossing can land well away from the end:
+                        # the edge's own vertices are earlier crossings rounded to
+                        # six decimals, up to 7e-7 off the boundary they lie on,
+                        # and a line meeting the edge at a few degrees slides that
+                        # along the edge by 1/sin of the angle -- 9e-6 m for a
+                        # Voronoi wall meeting RJ-20's face at 3.6 degrees. The
+                        # line's own end is then inserted too (see
+                        # _insert_constraint_line_points), two vertices microns
+                        # apart with the line passing through both, and a piece of
+                        # the line lies on the boundary. Where the end lies on
+                        # this edge -- within the two vertices' rounding -- the end
+                        # IS the crossing, and it is what goes in, rounded the same
+                        # way. A crossing within the vertex tolerance of the end is
+                        # left exactly as computed.
+                        ex0, ey0 = poly_edge_start
+                        ex1, ey1 = poly_edge_end
+                        edx, edy = ex1 - ex0, ey1 - ey0
+                        eL2 = edx * edx + edy * edy
+                        for end in (line_seg_start, line_seg_end):
+                            if eL2 <= 0.0:
+                                break
+                            if (abs(end[0] - intersection[0]) < _XPT_VERTEX_TOL
+                                    and abs(end[1] - intersection[1]) < _XPT_VERTEX_TOL):
+                                break
+                            te = ((end[0] - ex0) * edx + (end[1] - ey0) * edy) / eL2
+                            if not (0.0 < te < 1.0):
+                                continue
+                            off = math.hypot(end[0] - (ex0 + te * edx),
+                                             end[1] - (ey0 + te * edy))
+                            if off <= 2.0 * _XPT_VERTEX_TOL:
+                                intersection = (round(float(end[0]), 6),
+                                                round(float(end[1]), 6))
+                                break
+
                         # Check if intersection point is already a vertex of this
                         # polygon. The tolerance is the ROUNDING the intersection
                         # itself carries: line_segment_intersection returns its
@@ -5929,7 +6133,8 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
                                 updated_polygons[poly_idx]["coords"].insert(insert_idx, intersection)
                             else:
                                 updated_polygons[poly_idx].insert(insert_idx, intersection)
-                            
+                            fresh.add(tuple(intersection))
+
                             if debug:
                                 print(f"Added intersection point {intersection} to polygon {poly_idx} at position {insert_idx}")
     

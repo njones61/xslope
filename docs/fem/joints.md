@@ -347,6 +347,16 @@ slope is failing on its joints. If the slip has stopped growing and the movement
 the slope is standing. [The joint verdict](overview.md#the-joint-verdict) and
 [the trend reading](overview.md#creep-trend) on the overview page give the thresholds.
 
+A contact can also cycle. Where a joint with cohesion but no tensile strength holds a contact at
+zero normal stress, the contact switches every few iterations between closed, carrying shear, and
+open, carrying nothing, while the rest of the slope stays still. No exact balance exists under the
+joint law at such a contact, so the forces never balance there. A trial that reaches the hard
+iteration ceiling with only one to four contacts cycling and no net movement is counted as
+standing, and the log and the closing summary say so: "stands: the only movement is 3
+contacts cycling (period 8 iterations), no net movement; force balance not met", with each
+contact named by its line and location. [The joint verdict](overview.md#the-joint-verdict) gives
+the thresholds.
+
 The standing classification applies only under the default `hybrid`
 [failure criterion](overview.md#ssrm-failure-criteria), which is the right choice for a jointed
 model. The `non_convergence` criterion is the classical rule of Griffiths and Lane, where any

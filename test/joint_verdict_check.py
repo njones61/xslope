@@ -538,6 +538,206 @@ def check_ambiguous_at_ceiling():
           fem.ssrm_undecided_top(run('iteration_cap')) is None)
 
 
+def _leaning_block(P, hp, c_wall=10.0, phi_wall=20.0, kn=1e6, ks=1e6, W=100.0):
+    """A rigid block (ux, uy, rotation about (0, 1)) on a strong two-pair base joint
+    from x = -1 to 1, leaning on a cohesive, no-tension two-pair wall joint at
+    x = 1 (y 0.25 to 1.75), loaded by its weight W at (0, 1) and a push P toward
+    the wall at height hp. Returns ``(jd, T, K, f)``: T maps the block onto the
+    joint pairs' side-a degrees of freedom (side b is fixed), and K is the joints'
+    full elastic block on the block plus a weak spring that keeps it regular."""
+    import numpy as np
+    import xslope.joint as J
+
+    def elem(p0, p1):
+        p0, p1 = np.asarray(p0, float), np.asarray(p1, float)
+        L = np.hypot(*(p1 - p0))
+        t = (p1 - p0) / L
+        return dict(xy=np.array([p0, p1, 0.5 * (p0 + p1)]), t=t,
+                    n=np.array([-t[1], t[0]]), w=np.array([0.5, 0.5, 0.0]) * L)
+    E = [elem((-1, 0), (1, 0)), elem((1, 0.25), (1, 1.75))]
+    jd = {"n": 2, "dof": np.arange(24).reshape(2, 12),
+          "tx": np.array([e["t"][0] for e in E]), "ty": np.array([e["t"][1] for e in E]),
+          "nx": np.array([e["n"][0] for e in E]), "ny": np.array([e["n"][1] for e in E]),
+          "kn": np.array([kn, kn]), "ks": np.array([ks, ks]), "tcut": np.zeros(2),
+          "tip": np.zeros((2, 3), bool), "w": np.array([e["w"] for e in E]),
+          "cj": np.array([1e4, c_wall]),
+          "tanphi": np.tan(np.radians([45.0, phi_wall])),
+          "jred": np.array([False, True])}
+    T = np.zeros((24, 3))
+    for ei, e in enumerate(E):
+        for p in range(3):
+            x, y = e["xy"][p]
+            T[12 * ei + 2 * p] = (1.0, 0.0, -(y - 1.0))
+            T[12 * ei + 2 * p + 1] = (0.0, 1.0, x)
+    Ke = J._joint_element_stiffness(jd["w"], jd["tx"], jd["ty"], jd["nx"],
+                                    jd["ny"], jd["kn"], jd["ks"])
+    Kn = np.zeros((24, 24))
+    for ei in range(2):
+        Kn[np.ix_(jd["dof"][ei], jd["dof"][ei])] += Ke[ei]
+    K = T.T @ Kn @ T + np.eye(3) * 1e-3 * kn
+    return jd, T, K, np.array([P, -W, -P * (hp - 1.0)])
+
+
+def _leaning_block_run(case, sweeps=3000):
+    """The solver's own initial-stiffness loop on the leaning block:
+    ``u = K^-1 (f + T^T L(u))`` with L from joint_vp_sweep, every sweep fed to the
+    solve's contact-cycle ring (fem._ContactCycle) as the solve feeds it. Returns
+    the state codes, the upper wall pair's shear, the final field, the residual of
+    the joints' own tractions at it (the law the Newton check reads) and the
+    cycle reading at the end, against the block's elastic displacement."""
+    import numpy as np
+    import xslope.joint as J
+    jd, T, K, f = _leaning_block(*case)
+    cj, tp = J.joint_reduced_strength(jd, 1.0)
+    slip = np.zeros((2, 3)); opn = np.zeros((2, 3), bool)
+    sp = np.zeros((2, 3), bool)
+    Kinv = np.linalg.inv(K)
+    u = Kinv @ f
+    u_el = float(np.abs(T @ u).max())
+    cyc = fem._ContactCycle()
+    codes, ts = [], []
+    for _ in range(sweeps):
+        loads = np.zeros(24)
+        _, st = J.joint_vp_sweep(jd, T @ u, loads, cj, tp, slip, opn,
+                                 slip_state=sp)
+        code = st["slipping"].astype(np.int8) + 2 * st["open"]
+        codes.append(code)
+        ts.append(float(st["ts"][1, 1]))
+        cyc.step(code, T @ u)
+        u = Kinv @ (f + T.T @ loads)
+    f_int, _, st = J.joint_internal_force(jd, T @ u, cj, tp, slip_p=slip,
+                                          open_prev=opn)
+    fn = np.zeros(24)
+    for ei in range(2):
+        fn[jd["dof"][ei]] += f_int[ei]
+    resid = f - T.T @ fn - 1e-3 * jd["kn"][0] * u
+    codes = np.array(codes)
+    return dict(codes=codes, ts=np.array(ts), u=u, st=st,
+                late=int((codes[-300:][1:] != codes[-300:][:-1]).sum()),
+                resid=float(np.abs(resid).max()), cycle=cyc.reading(u_el))
+
+
+def check_leaning_block():
+    """The open/close chatter of a cohesive, no-tension contact sitting at zero
+    normal stress, on a leaning block, and the contact-cycle reading of it."""
+    import numpy as np
+    print("\n9. the open/close chatter on a leaning block")
+    W = 100.0
+    chatter = [(5.0, 1.5), (5.0, 1.9), (10.0, 0.5)]
+    quiet = [(10.0, 1.0), (20.0, 1.5), (50.0, 1.0), (5.0, 0.5)]
+    for case in chatter:
+        run = _leaning_block_run(case)
+        tag = f"P={case[0]:g}, hp={case[1]:g}"
+        # The mechanism: closed at (almost) zero normal stress the upper wall pair
+        # carries its cohesion; one sweep later it is open and carries nothing.
+        ts = np.abs(run["ts"][-6:])
+        check(f"[{tag}] the upper wall pair flips between carrying its cohesion "
+              "(c = 10) and carrying nothing, every few sweeps",
+              run["late"] > 50 and ts.max() > 0.95 * 10.0 and ts.min() == 0.0,
+              f"{run['late']} state changes in the last 300 sweeps, |shear| "
+              f"{ts.min():.2f} .. {ts.max():.2f}")
+        check(f"[{tag}] ...and the block never balances under the joint law",
+              run["resid"] > 1e-3 * W, f"residual {run['resid']:.3g}")
+        r = run["cycle"]
+        check(f"[{tag}] ...the contact-cycle reading stands it: one contact (the "
+              "upper wall pair) cycling, no net movement",
+              r is not None and r["fires"] and r["n_flip"] == 1
+              and r["contacts"] == [4] and r["drift"] <= 1e-12, f"{r}")
+    for case in quiet:
+        run = _leaning_block_run(case)
+        tag = f"P={case[0]:g}, hp={case[1]:g}"
+        r = run["cycle"]
+        check(f"[{tag}] a contact that does not chatter: no state change late, "
+              "and no contact cycling for the reading to stand",
+              run["late"] == 0 and r is not None and r["n_flip"] == 0
+              and not r["fires"], f"{r}")
+
+
+def check_contact_cycle():
+    """The contact-cycle reading (fem.JOINT_CYCLE_ON) on synthetic sweeps, and
+    the words its verdict is stated in."""
+    import numpy as np
+    print("\n10. a trial whose only movement is a contact cycle")
+    check("the contact-cycle reading is on by default", fem.JOINT_CYCLE_ON is True)
+    check("its thresholds are the measured ones: period <= 64 over 256 sweeps, "
+          "1 to 4 contacts, 5e-8 elastic displacements per sweep",
+          (fem._CYCLE_PMAX, fem._CYCLE_WINDOW, fem._CYCLE_MAX_FLIPS,
+           fem._CYCLE_DRIFT) == (64, 256, 4, 5e-8))
+    n, ndof, uel = 300, 40, 1e-3
+    base_u = np.linspace(0.0, 2e-3, ndof)
+
+    def feed(period, flipping, drift_per_sweep, sweeps=None):
+        cyc = fem._ContactCycle()
+        sweeps = sweeps or (fem._CYCLE_WINDOW + fem._CYCLE_PMAX + 10)
+        for t in range(sweeps):
+            code = np.zeros(n, np.int8)
+            if period > 1:
+                code[:flipping] = 2 if (t % period) == 0 else 0
+            u = base_u + drift_per_sweep * t + 1e-12 * np.sin(2 * np.pi * t / max(period, 1))
+            cyc.step(code, u)
+        return cyc.reading(uel)
+
+    r = feed(8, 1, 0.0)
+    check("one contact cycling with period 8 and no drift: the trial stands",
+          r is not None and r["period"] == 8 and r["fires"], f"{r}")
+    r = feed(8, 1, 1e-8 * uel)
+    check("...and with a drift far below the bound (1e-8 elastic per sweep) it stands",
+          r is not None and r["fires"])
+    r = feed(8, 1, 1e-5 * uel)
+    check("the same cycle while the field creeps 1e-5 elastic per sweep: it does not",
+          r is not None and not r["fires"], f"drift {r and r['drift']:.2e}")
+    r = feed(8, 1, 5.4e-7 * uel)
+    check("the same cycle at RJ-5's failing edge's slowest creep (5.4e-7 elastic per "
+          "sweep): it does not", r is not None and not r["fires"])
+    r = feed(8, 1, 5.0e-9 * uel)
+    check("...and at the stuck RJ-20 trial's (5.0e-9 per sweep): it stands",
+          r is not None and r["fires"])
+    r = feed(1, 0, 1e-5 * uel)
+    check("a steady state set with a creeping field (a failing trial): it does not",
+          r is not None and not r["fires"] and r["n_flip"] == 0)
+    r = feed(8, fem._CYCLE_MAX_FLIPS + 1, 0.0)
+    check("more contacts cycling than the bound allows: it does not",
+          r is not None and not r["fires"])
+    cyc = fem._ContactCycle()
+    rng = np.random.default_rng(0)
+    for t in range(fem._CYCLE_WINDOW + fem._CYCLE_PMAX + 10):
+        code = np.zeros(n, np.int8)
+        code[rng.integers(0, n)] = 1
+        cyc.step(code, base_u)
+    check("states that do not repeat exactly: no reading", cyc.reading(uel) is None)
+
+    # The verdict's words: the log line, the closing summary and the report all
+    # read them off the one stop reading.
+    rd = {"rule": "contact_cycle", "period": 8, "n_contacts": 3, "drift": 4.1e-8,
+          "contacts": [{"line": 993, "x": 24.34, "y": 42.17},
+                       {"line": 730, "x": 39.9, "y": 47.2},
+                       {"line": 729, "x": 40.6, "y": 46.3}],
+          "iteration": 1000000}
+    clause = ("the only movement is 3 contacts cycling (period 8 iterations), no "
+              "net movement; force balance not met")
+    check("the verdict's words", fem.contact_cycle_clause(rd) == clause,
+          fem.contact_cycle_clause(rd))
+    sol = {"converged": False, "verdict": "JOINT_SETTLED",
+           "exit_reason": "joint_settled", "stop_reading": rd, "u_ratio": 2.87}
+    note = fem._verdict_note_base(sol, hybrid=True)
+    check("the run log's trial line: STANDS, the clause, the contacts named",
+          note.startswith("STANDS: " + clause + " -> counted STABLE")
+          and "line 993 at (24.34, 42.17)" in note, note)
+    note = fem._verdict_note_base(sol, hybrid=False)
+    check("...under a criterion that reads convergence alone it is counted failed",
+          note.startswith("Did NOT converge: " + clause + " -> counted FAILED"), note)
+    trial = dict(sol, F=2.53125, iterations=1000000)
+    said = fem._standing_edge_sentence(2.53125, trial, [trial], "iterations")
+    check("the closing summary's standing-edge sentence states it",
+          said.startswith("At F = 2.5312 the slope stands: " + clause + ".")
+          and "line 729 at (40.60, 46.30)" in said, said)
+    from xslope import report
+    rec = {"final_interval": [2.53125, 2.6875],
+           "trials": [dict(trial, stable=True)]}
+    check("the report states the standing edge's verdict in the same words",
+          report._standing_edge_cycled(rec) == said, report._standing_edge_cycled(rec))
+
+
 def main():
     print("=" * 72)
     print("Joint verdict checks")
@@ -550,6 +750,8 @@ def main():
     check_restick_band()
     check_finisher_reading()
     check_ambiguous_at_ceiling()
+    check_leaning_block()
+    check_contact_cycle()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"FAILED ({len(FAILURES)}): " + ", ".join(FAILURES))

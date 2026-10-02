@@ -9111,6 +9111,9 @@ def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
                  f"which the slope came to rest. The trial above it, at "
                  f"F = {float(interval[1]):.4f}, ended undecided, so the search "
                  f"found no failure up to that strength.")
+    cycled = _standing_edge_cycled(record)
+    if cycled is not None:
+        said += " " + cycled
     limited = _failing_edge_on_budget(record)
     if limited is not None:
         F, iterations = limited
@@ -9119,6 +9122,23 @@ def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
                  f"slowly. The factor of safety depends on the iteration limit "
                  f"here.")
     return Prose(said, links=links), figure
+
+
+def _standing_edge_cycled(record):
+    """The contact-cycle verdict of the standing bracket edge, as the sentence
+    :func:`xslope.fem.contact_cycle_sentence` gives it, when that trial stood on
+    the contact-cycle reading (see ``xslope.fem.JOINT_CYCLE_ON``); else ``None``.
+    The run log and :func:`xslope.fem.ssrm_run_summary` give the same words."""
+    interval = record.get("final_interval")
+    if not interval:
+        return None
+    from .fem import _edge_trial, _stop_reading, contact_cycle_sentence
+    trial = _edge_trial([t for t in (record.get("trials") or [])
+                         if isinstance(t, dict)], float(interval[0]), True)
+    reading = None if trial is None else _stop_reading(trial, "contact_cycle")
+    if reading is None:
+        return None
+    return contact_cycle_sentence(reading, float(trial["F"]))
 
 
 def _failing_edge_on_budget(record):

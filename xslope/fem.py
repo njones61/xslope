@@ -694,6 +694,9 @@ def _standing_edge_sentence(F, trial, trials, count, unit=""):
     if trial.get("converged") or trial.get("verdict") == "CONVERGED":
         return (f"At F = {F:.4f} the slope reached equilibrium in {n:,} "
                 f"{count}.")
+    cycled = _stop_reading(trial, "contact_cycle")
+    if cycled is not None:
+        return contact_cycle_sentence(cycled, F)
     settled = _stop_reading(trial, "joint_settled")
     if settled is not None:
         return (f"At F = {F:.4f} the joint slip and the displacements had stopped "
@@ -793,6 +796,10 @@ def _failing_edge_sentences(F, trial, count, unit):
                 f"over the last {last:,} {count}")
 
     hit = f"{did_not} the trial hit the {n:,}-{one} limit"
+    cycled = _stop_reading(trial, "contact_cycle")
+    if cycled is not None:
+        return (f"{hit}; {contact_cycle_clause(cycled)}. This run's failure "
+                f"criterion counts that as failed. {_SSRM_SET_BY_LIMIT}")
     if verdict == "FAILED":
         ev = _numbers()
         return (f"{hit} while still moving fast" + (f" — {ev}" if ev else "")
@@ -903,7 +910,9 @@ def ssrm_run_summary(result, fem_data=None):
     whether its rate slowed (sliding on the joints), the displacement reached as
     a multiple of the elastic value (running away), the displacement against the
     limit, the out-of-balance force's fall (the iteration ceiling), the slip's
-    growth while the joints settled (counted as standing), and the trend of the
+    growth while the joints settled (counted as standing), the contacts that
+    were cycling with no net movement at the iteration ceiling (counted as
+    standing, force balance not met), and the trend of the
     movement at the iteration limit: slowing, with the corrector's balanced state
     found from where the trial was or from the estimated resting state (counted
     as standing); slowing, with the corrector unable to find
@@ -5302,6 +5311,76 @@ _JOINT_SETTLED_GROWTH = 1e-4      # elastic displacements gained over the window
 # and at 0.97 and 0.9996 by 50 000. So a settled verdict is given only where the
 # limit cycle's mean is flat, and a trial that can still converge is left to.
 _JOINT_SETTLED_OOB_FLAT = 0.85    # last quarter's joint residual / the quarter before
+# CONTACT CYCLE: a trial whose only movement is a few contacts switching between
+# open and closed. Under the joint law a cohesive, no-tension contact whose
+# equilibrium sits at zero normal stress has no state that satisfies the law:
+# closed, it carries its cohesion and the faces part; open, it carries nothing
+# and the faces touch. Held in either state, the rest of the model balances and
+# the contact breaks the law (RJ-20's corner contact: 1.4 kPa of tension held
+# closed, 0.21 um of overlap held open), so no exact balance exists and the
+# iteration repeats a fixed cycle of contact states for ever while the rest of
+# the model stands still. The reading is made ONLY at the hard iteration
+# ceiling, where the trial would otherwise end undecided. The trial stands
+# (JOINT_SETTLED, stop reading 'contact_cycle', the cycling contacts named) when
+# the whole contact-state set repeats exactly with a period p of at most
+# _CYCLE_PMAX sweeps over the last _CYCLE_WINDOW sweeps, between 1 and
+# _CYCLE_MAX_FLIPS contacts change state within a period, and the field returns
+# to itself after every period over the last _CYCLE_PMAX sweeps to within
+# p x _CYCLE_DRIFT elastic displacements. The force balance is NOT met and the
+# verdict says so. No tagged row's edge trial reaches the ceiling, so no tagged
+# answer depends on it (r48_contact_chatter.md, A4-A6).
+JOINT_CYCLE_ON = True
+# Longest period read: RJ-20's stuck trial cycles at 8 sweeps, RJ-5's line-51 contacts at 2 to 63.
+_CYCLE_PMAX = 64
+# Sweeps the state set must repeat over: four of the longest periods.
+_CYCLE_WINDOW = 256
+# Most contacts cycling: RJ-20's stuck trial has 3; RJ-5's failing edge cycles 1 to 4.
+_CYCLE_MAX_FLIPS = 4
+# Mean movement per sweep across the cycle, in elastic displacements: RJ-20's stuck trial moves 5.0e-9 and RJ-5's failing edge, which must never stand, 5.4e-7; 5e-8 sits about 10x from each.
+_CYCLE_DRIFT = 5e-8
+
+
+class _ContactCycle:
+    """Ring of the last sweeps' contact-state hashes, codes and fields."""
+
+    def __init__(self):
+        import zlib
+        self._crc = zlib.crc32
+        self.h = collections.deque(maxlen=_CYCLE_WINDOW + _CYCLE_PMAX + 1)
+        self.codes = collections.deque(maxlen=_CYCLE_PMAX + 1)
+        self.us = collections.deque(maxlen=_CYCLE_PMAX + 1)
+
+    def step(self, code, u):
+        code = np.ascontiguousarray(code, dtype=np.int8).ravel()
+        self.h.append(self._crc(code.tobytes()))
+        self.codes.append(code.copy())
+        self.us.append(np.array(u, copy=True))
+
+    def reading(self, u_elastic_scale):
+        """The cycle reading, or None when the states do not repeat exactly."""
+        if len(self.h) < self.h.maxlen or not u_elastic_scale > 0.0:
+            return None
+        H = list(self.h)
+        period = None
+        for p in range(1, _CYCLE_PMAX + 1):
+            if all(H[-k] == H[-k - p] for k in range(1, _CYCLE_WINDOW + 1)):
+                period = p
+                break
+        if period is None:
+            return None
+        C = np.array(list(self.codes)[-(period + 1):])
+        flips = np.flatnonzero((C[1:] != C[:-1]).any(axis=0))
+        U = list(self.us)
+        drift = max(float(np.max(np.abs(U[-1 - k] - U[-1 - k - period])))
+                    for k in range(0, len(U) - period))
+        return {"period": int(period), "n_flip": int(flips.size),
+                "contacts": [int(i) for i in flips[:_CYCLE_MAX_FLIPS + 1]],
+                "drift": drift / float(u_elastic_scale),
+                "fires": bool(1 <= flips.size <= _CYCLE_MAX_FLIPS
+                              and drift / float(u_elastic_scale)
+                              <= period * _CYCLE_DRIFT)}
+
+
 # MOVING: the slip is still taking a real share of itself every window, its rate
 # is not decaying AT ALL, and the field is gaining with it.
 #
@@ -5680,6 +5759,34 @@ def creep_sentence(rd, F, unit=""):
     if rule == 'not_slowing':
         return f"At F = {F:.4f}, {_creep_sliding_clause(rd)}."
     return ""
+
+
+def contact_cycle_clause(rd):
+    """The contact-cycle verdict (see JOINT_CYCLE_ON) as the words after
+    "stands: ", from its stop reading: "the only movement is 3 contacts cycling
+    (period 8 iterations), no net movement; force balance not met"."""
+    n = int(rd.get("n_contacts") or 0)
+    p = int(rd.get("period") or 0)
+    return (f"the only movement is {n} contact{'' if n == 1 else 's'} cycling "
+            f"(period {p} iteration{'' if p == 1 else 's'}), no net movement; "
+            f"force balance not met")
+
+
+def contact_cycle_where(rd):
+    """Where the cycling contacts of a contact-cycle reading are: "line 993 at
+    (24.34, 42.17) and line 730 at (39.90, 47.20)", or "" where none is named."""
+    at = [f"line {int(c['line'])} at ({float(c['x']):.2f}, {float(c['y']):.2f})"
+          for c in (rd.get("contacts") or [])]
+    if len(at) < 2:
+        return "".join(at)
+    return ", ".join(at[:-1]) + " and " + at[-1]
+
+
+def contact_cycle_sentence(rd, F):
+    """The contact-cycle verdict for one trial, in two sentences."""
+    where = contact_cycle_where(rd)
+    return (f"At F = {F:.4f} the slope stands: {contact_cycle_clause(rd)}."
+            + (f" The cycling contacts are on {where}." if where else ""))
 
 
 # Iterations without a >1% improvement on the best out-of-balance value seen after
@@ -7031,7 +7138,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             - verdict (str): 'CONVERGED' | 'FAILED' | 'STABLE_STUCK' | 'AMBIGUOUS' |
               'JOINT_SETTLED' (jointed models only: the interface, the displacement
               field and the soil have all settled and the slope stands, though the
-              force tolerance was never met - see `joint_verdict`)
+              force tolerance was never met - see `joint_verdict`; or, at the
+              hard iteration ceiling, the only movement left is a few contacts
+              cycling between open and closed with no net movement - see
+              JOINT_CYCLE_ON, whose stop_reading 'contact_cycle' names them and
+              carries the verdict as its 'note')
             - u_ratio (float or None): max|u| / max|u|_elastic at the end of the solve
             - u_growth (float or None): elastic displacements gained over the trailing
               window of the iteration history (the growth signal)
@@ -7040,7 +7151,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               'yield_gate' (it settled in force outside the yield surface and the
               corrector refused, leaving the trial undecided) | 'not_slowing'
               (the trend reading: the movement did not slow, FAILED; see
-              `creep_trend`) | 'joint_settled' (`joint_verdict`) | 'steady_slip'
+              `creep_trend`) | 'joint_settled' (`joint_verdict`, or the
+              contact-cycle reading at the ceiling) | 'steady_slip'
               (a record made before the trend reading replaced it)
             - diverging_iteration (int or None): iteration at which the early-failure
               rule fired, and diverging_signal (str or None) which of its two tests
@@ -8054,6 +8166,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # branch so that a model with no joint reaches the same two names.
     joint_relief_load = None
     joint_relief_on = False
+    # The contact-cycle reading's ring (see JOINT_CYCLE_ON); None when off.
+    _cyc = _ContactCycle() if (JOINT_CYCLE_ON and has_joints) else None
     if has_joints:
         joint_cj_r, joint_tanphi_r = joint_reduced_strength(joint_data, F)
         joint_slip = np.zeros((joint_data["n"], 3))
@@ -8809,6 +8923,34 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                               f"displacements); continuing to {budget:,} "
                               f"(ceiling {ceiling:,})")
                 else:
+                    _cyc_r = (_cyc.reading(u_elastic_scale)
+                              if (_cyc is not None and budget >= ceiling
+                                  and not guard_on) else None)
+                    if _cyc_r is not None and _cyc_r["fires"]:
+                        # Fix C (see JOINT_CYCLE_ON): the only motion left is a
+                        # cycle of a few contacts with the field returning to
+                        # itself every period; the trial stands.
+                        converged = False
+                        exit_reason = 'joint_settled'
+                        _cc = [divmod(int(i), 3) for i in _cyc_r["contacts"]]
+                        stop_reading = dict(
+                            rule='contact_cycle', period=_cyc_r["period"],
+                            n_contacts=_cyc_r["n_flip"],
+                            drift=_cyc_r["drift"],
+                            contacts=[{"line": int(joint_data["line_id"][e]),
+                                       "x": float(fem_data["nodes"][
+                                           joint_data["conn"][e, q]][0]),
+                                       "y": float(fem_data["nodes"][
+                                           joint_data["conn"][e, q]][1])}
+                                      for e, q in _cc],
+                            iteration=int(total_iterations + iteration))
+                        stop_reading['note'] = (
+                            "stands: " + contact_cycle_clause(stop_reading))
+                        if debug_level >= 1:
+                            print(f"  Iteration ceiling {ceiling:,} reached: "
+                                  + contact_cycle_sentence(stop_reading, F))
+                        iteration -= 1
+                        break
                     if (budget >= ceiling
                             and _still_progressing(oob_hist, disp_hist,
                                                    u_elastic_scale, mesh_height,
@@ -9375,6 +9517,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 if joint_n_changed:
                     joint_sweeps_changed += 1
                 joint_code_prev = _jcode
+                if _cyc is not None:
+                    _cyc.step(_jcode, u)
                 if _PROF_ON:
                     _prof_add("vp_joint", _tp)
                 if tie_data is not None:
@@ -15193,6 +15337,12 @@ def _verdict_note_base(sol, hybrid=True):
     # What the bisection did with a verdict the criterion in force may not read.
     counted = ("counted STABLE" if hybrid else
                "counted FAILED (this run's criterion reads convergence alone)")
+    cyc = sol.get("stop_reading") or {}
+    if v == 'JOINT_SETTLED' and cyc.get("rule") == 'contact_cycle':
+        where = contact_cycle_where(cyc)
+        head = "STANDS" if hybrid else "Did NOT converge"
+        return (f"{head}: {contact_cycle_clause(cyc)} -> {counted}{ur_txt}"
+                + (f"; cycling: {where}" if where else ""))
     if v == 'JOINT_SETTLED':
         return ("Did NOT meet the force tolerance, but the joints, the "
                 f"displacements and the soil have all settled -> {counted}"

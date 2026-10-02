@@ -842,6 +842,7 @@ there, and the displacement gained over the window in the trial's own elastic di
 |---|---|---|---|
 | In the last tenth of the budget, or at the limit: the [trend reading](#creep-trend) finds the slip gaining ≥ 2% of itself over the window at a rate **not decaying at all** (the last half-window's rate at least 0.9 of the half before), or max&#124;u&#124; moving at a pace that does not slow, **and** max&#124;u&#124; gaining ≥ 0.02 elastic displacements | `not_slowing` | `FAILED` | Failed — the slope is moving on its joints |
 | The slip gains ≤ 0.01% of itself, max&#124;u&#124; gains ≤ 10⁻⁴ elastic displacements, the residual on the nodes carrying *no* joint is under `force_tol` across the window, **and** the joint residual has stopped falling (its window mean at least 0.85 of the previous window's) | `joint_settled` | `JOINT_SETTLED` | **Not** failed: the slope is standing, and the bracket moves up |
+| At the hard iteration ceiling only: the whole set of contact states repeats exactly with a period of at most 64 iterations over the last 256, 1 to 4 contacts change state within a period, **and** the field returns to itself after every period to within 5×10⁻⁸ elastic displacements per iteration | `joint_settled` (stop reading `contact_cycle`) | `JOINT_SETTLED` | **Not** failed: the slope stands, force balance not met, and the cycling contacts are named |
 | Anything else | unchanged | unchanged | The [hybrid classifier's](#2-hybrid-hybrid-default) verdict stands |
 
 Both tests apply only to a trial that would otherwise spend its whole budget, and only on a
@@ -875,6 +876,20 @@ A `JOINT_SETTLED` trial is **not** a converged trial: it never met the force tol
 `converged` stays `False`. It establishes what the bisection needs, that the slope stands at that
 strength, with the interface, the displacement field and the soil all at rest. The per-trial record
 carries the verdict and its `exit_reason` like any other, so both tests are recorded.
+
+**A contact cycle.** A joint with cohesion and no tensile strength can hold a contact whose balance
+sits at zero normal stress. Closed, it carries shear up to its cohesion and the faces part; open, it
+carries nothing and the faces touch again. No exact balance exists under the joint law at such a
+contact: held closed, the rest of the slope balances with the contact in tension, and held open, it
+balances with the faces overlapping. The iteration then repeats the same few contact states without
+end while the rest of the slope stays still, and the force tolerance is never met. At the hard
+iteration ceiling, where such a trial would otherwise end undecided, the last iterations are tested
+as in the table above, and the trial stands. The trial line in the log, the closing summary and the
+report state it as "stands: the only movement is 3 contacts cycling (period 8 iterations), no net
+movement; force balance not met", and name each cycling contact by its line and location. The
+movement bound, 5×10⁻⁸ elastic displacements per iteration, sits a factor of ten above the
+measured stuck trial (5×10⁻⁹) and a factor of ten below the slowest failing trial whose contacts
+were also cycling (5.4×10⁻⁷).
 
 ### Finishing a trial with the Newton corrector
 

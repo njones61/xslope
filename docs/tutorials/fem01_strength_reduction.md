@@ -525,8 +525,8 @@ because at true scale their movement would be invisible. **Scale ×** is the
 multiplier itself — the number the plot prints in its own title — and its
 default reads **Auto**. On Auto, the multiplier is whatever draws the field's
 largest displacement at the **Auto size** percentage of the mesh height,
-default 15: here 15% of 50 ft is 7.5 ft, the largest viscoplastic displacement
-is 8.09 ft, already past it, so Auto lands just below 1 — this collapse has
+default 15: here 15% of 50 ft is 7.5 ft, the captured viscoplastic displacement
+is already past that target, so Auto lands below 1 — this collapse has
 developed past the target, and the title prints the multiplier it used. Type a number into **Scale ×** to pin the exaggeration
 instead, which is how two figures are compared at one setting; Auto size dims while an explicit value holds. The box's spin arrows
 redraw the view at every step, so the control can also animate the failure:

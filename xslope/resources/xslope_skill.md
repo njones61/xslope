@@ -2178,7 +2178,7 @@ results = solve_selected("spencer", slice_df, rapid=True)
    your summary which extents are stated and which are search room, so the extension reads as
    this rule rather than as a misreading of the problem.
 
-6. **For seepage-only problems**, you do NOT need circles, piezo, or non-circ sheets. Only fill main, mat (with k1, k2, kr0, h0), profile (or polygon), and seep bc. **For FEM-only problems**, also add one nominal starting circle — the loader requires a surface definition unless seepage BCs or a pre-built mesh are present.
+6. **For seepage-only problems**, you do NOT need circles, piezo, or non-circ sheets. Only fill main, mat (with k1, k2 and any unsaturated parameters required by the selected model), profile (or polygon), and seep bc. **For FEM-only problems**, no starting circle or other failure surface is required. Do not add a placeholder circle.
 
 7. **For LEM-only problems**, you do NOT need seep bc or seepage material properties. Only fill main, mat (with strength properties), profile, circles (or non-circ), and optionally piezo, dloads, reinforce, piles.
 
@@ -2207,7 +2207,7 @@ results = solve_selected("spencer", slice_df, rapid=True)
 
 10. **Always validate** by plotting inputs before running analysis. If geometry looks wrong, fix the template first.
 
-11. **Seepage material properties**: For fully saturated problems, the unsaturated parameters are ignored but must still have placeholder values. For partially saturated (unconfined) problems, set the `unsat` model per material: `unsat="lf"` (linear front — the default and recommended model) with typical kr0=0.001 to 0.01 and h0=-1; `unsat="vg"` (van Genuchten) with vg_a (α, 1/length), vg_n, and vg_l (the Mualem pore-connectivity exponent of kr = Se^l·[1 − (1 − Se^(1/m))^m]², 0.5 unless the conductivity curve was fitted); or `unsat="gard"` (Gardner power form, kr = 1/(1 + a·ψⁿ)) reusing the same vg_a/vg_n pair. Use "vg" or "gard" only when those properties are specifically wanted.
+11. **Seepage material properties**: For confined problems with no exit-face boundaries, the unsaturated parameters are ignored and can be left blank; no placeholder values are required. For unconfined problems with exit-face boundaries, set the `unsat` model per material and supply valid parameters: `unsat="lf"` (linear front — the default and recommended model) requires kr0 > 0 and h0 < 0, with typical kr0=0.001 to 0.01 and h0=-1; `unsat="vg"` (van Genuchten) requires vg_a > 0 (α, 1/length) and vg_n > 1, with optional vg_l (the Mualem pore-connectivity exponent of kr = Se^l·[1 − (1 − Se^(1/m))^m]², 0.5 unless the conductivity curve was fitted); or `unsat="gard"` (Gardner power form, kr = 1/(1 + a·ψⁿ)) requiring vg_a > 0 and vg_n > 0. Use "vg" or "gard" only when those properties are specifically wanted.
 
 12. **Internal no-flow barriers (sheetpiles, cutoff walls)** have no dedicated input. Model a thin wall as a narrow notch in the profile line (or polygon boundary) that follows the wall: down one face, across the tip, back up the other face, with a small gap (~0.1-0.5 length units) between the two faces so the mesh has a physical crack — both crack faces become natural no-flow boundaries. End any specified-head BC at the wall (never span across it).
 

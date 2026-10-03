@@ -711,7 +711,7 @@ at its most-worked point against the 800 the envelope allows, all six lines are
 held at their bond limits once the residual is in play, and the
 force in every layer tapers away from the shear band instead of standing at its
 envelope value everywhere. Prescribing the maximum available force at one point
-gives the higher factor of safety of the two, by 1.8% on this slope.
+gives a factor of safety 1.3% higher than the elastic–perfectly plastic FEM result on this slope.
 
 The mechanisms differ in the same direction. Spencer's circle had to be a
 circle, and the most critical circle available cuts out through the crest at

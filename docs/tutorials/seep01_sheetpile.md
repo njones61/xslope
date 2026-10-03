@@ -945,7 +945,7 @@ Scale **both** principal conductivities together and the answer is exactly
 proportional. The dialog sweeps one property at a time, so the blue series was
 made outside it, by writing a short Python function that sets k₂ equal to k₁ at
 each step and handing it to the same sweep routine the dialog drives
-([Sweeping anything else](../parametric/sensitivity.md#sweeping-anything-else-modify)
+([Sweeping other quantities: `modify=`](../parametric/sensitivity.md#sweeping-anything-else-modify)
 shows how). Writing that function is beyond the scope of this tutorial — and it
 is exactly the kind of task to hand the
 [AI assistant](#a-building-it-with-the-ai-assistant): ask it to sweep both

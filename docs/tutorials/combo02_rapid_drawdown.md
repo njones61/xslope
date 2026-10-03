@@ -132,8 +132,8 @@ stages 2 and 3 both need the pore pressures of the drawn-down state. That comes
 to three additions to the input file:
 
 **$d$ and $\psi$** on the materials table — the $K_c = 1$ envelope, on every
-material that does not drain during the drawdown. Both or neither: one alone
-reverts silently to drained.
+material that does not drain during the drawdown. Enter both or neither: the
+run checks reject an incomplete pair; leaving both blank treats the material as free-draining.
 
 **A second water state** — Piezometric Line 2, a second seepage solution, or a
 transient frame; the pore pressures stages 2 and 3 read.

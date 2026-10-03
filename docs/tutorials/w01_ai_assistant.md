@@ -203,11 +203,12 @@ gives.
 
 ![Studio after the build: the solved model on the LEM · Solution tab, with the conversation in the Assistant dock on the right](images/w1_build_from_image_window.png){width=1000}
 
-The two admissibility warnings above the plot are not the assistant's doing.
+The three admissibility warnings are not the assistant's doing.
 They would appear however this section was built — by hand, from the
-spreadsheet, or here — because they are the crest tension of a φ = 0 slope with
+spreadsheet, or here — because they report interslice tension, thrust-line excursion
+and tension on slice bases near the crest of a φ = 0 slope with
 no tension crack, normal and common for undrained slopes. LEM-3's own solution
-shows the same two, and [LEM-3](lem03_layered_slope.md#the-search-result)
+shows the same three, and [LEM-3](lem03_layered_slope.md#the-search-result)
 shows the tension crack that clears them without changing the critical surface.
 
 The dock itself shows the whole exchange:

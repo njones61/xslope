@@ -185,6 +185,37 @@ INPUT_BEFORE = re.compile(
     r"tolerance|grid|target (?:element )?size|element size|convergence)\b"
     r"(?:[^.]|\.(?=\d)){0,60}$", re.I)
 
+# Janbu's f0 is a multiplier, not a factor of safety. Match its label,
+# not a particular value: a changed correction factor is still not an FS.
+CORRECTION_BEFORE = re.compile(
+    r"(?:correction factor(?:\s+f[₀0])?|\bf[₀0])\s*[=:]\s*$", re.I)
+
+
+def _run_locks(locks, heading, introduction):
+    """Keep locks for the explicitly described surface/run family.
+
+    One workbook may supply both a searched answer and a specified-surface
+    answer. A method name alone does not make those the same run. An explicit
+    family without a matching tag remains unguarded, not exempt from scanning.
+    """
+    text = heading + " " + introduction
+    if re.search(r"non[- ]circular search", text, re.I):
+        types = {"noncircular_search"}
+    elif re.search(r"circular search", text, re.I):
+        types = {"circular_search"}
+    elif re.search(r"\bsearch (?:itself|found|reached|returns|returned)\b",
+                   text, re.I):
+        types = {"circular_search", "noncircular_search"}
+    elif re.search(r"single[- ](?:surface|circle)|(?:specified|fixed) surface|no search",
+                   text, re.I):
+        types = {"single_circle", "single_noncirc"}
+    else:
+        return locks
+    lem_types = {"single_circle", "single_noncirc", "circular_search",
+                 "noncircular_search"}
+    return [lock for lock in locks if lock.type in types or
+            lock.type not in lem_types]
+
 #: A console line reporting an INTERMEDIATE search iteration.  The factor of
 #: safety on it is a step on the way to the answer, not the answer.
 ITERATION_LINE = re.compile(r"iteration\s*\d|^\s*Iteration\s", re.I)
@@ -218,7 +249,7 @@ def _candidate(line, token, start, end):
         return False
     after = line[end:end + 12]
     before = line[max(0, start - 80):start]
-    if INPUT_BEFORE.search(before):
+    if INPUT_BEFORE.search(before) or CORRECTION_BEFORE.search(before):
         return False
     before = before[-24:]
     if UNIT_AFTER.match(after) or LABEL_BEFORE.search(before):
@@ -284,7 +315,7 @@ def _tables(lines, sec):
     return out
 
 
-def _classify(token, context, locks):
+def _classify(token, context, locks, uncorrected=False):
     """(verdict, the lock the finding names) for one attributed number.
 
     A number is GUARDED by any lock in scope it restates, named or not: the
@@ -298,6 +329,11 @@ def _classify(token, context, locks):
     the same method, so treating it as an identity would make every other
     reading on the page disagree with it.
     """
+    # A raw, uncorrected answer cannot restate a corrected method lock.
+    # Only a tag explicitly identifying the uncorrected result can guard it.
+    if uncorrected:
+        locks = [l for l in locks if "uncorrected" in l.key or
+                 any("uncorrected" in slot for slot in l.slots)]
     named = [l for l in locks if not l.series and _names(l.slots, context)]
     hit = next((l for l in (named or locks) if _agrees(token, l)), None)
     if hit is None and named:
@@ -326,11 +362,20 @@ def scan(path, by_file=None, repo=None):
         return findings, files
     for sec in sections(lines):
         body = "\n".join(lines[sec[0]:sec[1]])
+        # Read the run description before its first figure/results, not later
+        # comparisons to another run in the same section.
+        introduction = body.split("![", 1)[0].split("\n\n", 2)
+        introduction = "\n\n".join(introduction[:2])
+        scoped_locks = _run_locks(locks, sec[2], introduction)
         # What quantity the section's numbers ARE is said by the tags on the
         # files it names; a section that names no file inherits the page's.
         named_here = {f for f in files if f in body}
         own = {kv.get("type", "") for i in range(sec[0], sec[1])
                if (kv := _tag_kv(lines[i]))}
+        # A section explicitly tagging several families contains comparisons,
+        # not one run whose introductory description applies to every table.
+        if len(own) > 1:
+            scoped_locks = locks
         stypes = own or {l.type for l in locks
                          if l.file in named_here} or types
         if stypes and stypes <= SEEP_ONLY:
@@ -358,7 +403,7 @@ def scan(path, by_file=None, repo=None):
                         continue
                     if not _candidate(line, tok, m.start(1), m.end(1)):
                         continue
-                    verdict, lock = _classify(tok, line.lower(), locks)
+                    verdict, lock = _classify(tok, line.lower(), scoped_locks)
                     findings.append(Finding(i + 1, tok, verdict,
                                             "console log", lock))
                 continue
@@ -384,7 +429,8 @@ def scan(path, by_file=None, repo=None):
                         if any(x <= s and e <= y
                                for x, y in qspans.get(i, ())):
                             continue
-                        verdict, lock = _classify(tok, ctx, locks)
+                        verdict, lock = _classify(tok, ctx, scoped_locks,
+                                                  "uncorrected" in ctx)
                         findings.append(Finding(i + 1, tok, verdict,
                                                 ctx.strip() or "(table cell)",
                                                 lock))
@@ -412,7 +458,30 @@ def scan(path, by_file=None, repo=None):
                 if any(x <= m.start() and m.end() <= y
                        for x, y in qspans.get(i, ())):
                     continue
-                verdict, lock = _classify(tok, sentence.lower(), locks)
+                # A correction qualifier may follow the value ("1.4 without
+                # it") rather than precede it. Do not inherit it onto the next
+                # method's answer in the same sentence.
+                after = masked[m.end():]
+                uncorrected = bool(re.match(
+                    r"\s*(?:\*\*)?\s*(?:uncorrected\b|without\s+"
+                    r"(?:(?:the|its|Janbu\S*)\s+)?correction\b)", after, re.I)
+                    or (re.match(r"\s*(?:\*\*)?\s*without\b", after, re.I)
+                        and re.search(r"correction factor|\bf[₀0]\s*[=:]",
+                                      sentence, re.I))
+                    or re.search(r"uncorrected\s+(?:Janbu\S*\s+)?$",
+                                 sentence[:-len(tok)], re.I))
+                # Include a following method name ("FS = ... with Janbu"),
+                # but stop at the next clause rather than borrowing its method.
+                suffix = re.split(r"[,;]|(?<!\d)\.(?!\d)", after, maxsplit=1)[0]
+                suffix = FS_SHAPED.split(suffix, maxsplit=1)[0]
+                context = (sentence + suffix).lower()
+                # A comparison may explicitly name a different run for this
+                # value, even in a section about a fixed surface or a circle.
+                local_locks = _run_locks(locks, "", context)
+                if local_locks is locks:
+                    local_locks = scoped_locks
+                verdict, lock = _classify(tok, context, local_locks,
+                                          uncorrected)
                 findings.append(Finding(i + 1, tok, verdict,
                                         "prose", lock))
             sentence += masked[pos:]

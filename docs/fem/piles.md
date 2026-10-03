@@ -54,7 +54,7 @@ pile-stabilized slope with a three-dimensional strength reduction finite element
 individual piles with slip interfaces, and XSLOPE's SSRM is run on the same slope at a spacing of three
 diameters in [the VP106 diagnostic](../verification/rocscience.md#vp106-fem). With no pile the two agree to
 0.4%, so the differences with the pile row in place come from the pile. With the row in place the
-two-dimensional model gives values 8.2% high with a free head and 9.4% high with the head rotation restrained: it
+two-dimensional model gives values 8.2% high with a free head and 9.9% high with the head rotation restrained: it
 credits the row with multiplying the unreinforced factor of safety by 1.296 where the three-dimensional
 model credits 1.193. Limit equilibrium with the Ito & Matsui force credits the same row 1.269 — above the
 three-dimensional value by 0.076 where the beam is above it by 0.103, the 0.027 between them small beside

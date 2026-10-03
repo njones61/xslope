@@ -144,7 +144,7 @@ solver follows the methodology of
 stability analysis by finite elements" (*Géotechnique* 49(3), 387–403): a
 plane-strain elasto-plastic (Mohr–Coulomb) formulation solved by viscoplastic
 **strength reduction**, with the factor of safety located by the
-**non-convergence criterion**. The verification set reproduces **all six** of the
+**hybrid failure criterion**, combining non-convergence and displacement evidence. The verification set reproduces **all six** of the
 paper's worked examples:
 
 - [Example 1 — homogeneous slope](../verification/ssrm.md#verification-griffiths1)

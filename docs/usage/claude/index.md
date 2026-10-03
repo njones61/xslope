@@ -78,7 +78,7 @@ every stage. The skill uses the same code patterns as `main_lem.py`, `main_seep.
 
 ## Installation
 
-The skill is a single markdown file (`.claude/commands/xslope.md`) that Claude Code automatically discovers
+The skill entry point is `.claude/skills/xslope/SKILL.md`, which loads `docs/usage/claude/xslope.md`. Claude Code automatically discovers it
 and makes available as a `/xslope` slash command.
 
 ### Option 1: Clone the repo (recommended)
@@ -101,11 +101,20 @@ project directory:
 
 1. Download the skill file: [xslope.md](xslope.md)
 
-2. Place it in your project's `.claude/commands/` directory:
+2. Place it in your project's `.claude/skills/xslope/` directory as `SKILL.md`:
 
 ```bash
-mkdir -p .claude/commands
-cp ~/Downloads/xslope.md .claude/commands/xslope.md
+mkdir -p .claude/skills/xslope
+cp ~/Downloads/xslope.md .claude/skills/xslope/SKILL.md
+```
+
+Add this frontmatter above the first heading in `SKILL.md`:
+
+```yaml
+---
+name: xslope
+description: XSLOPE Analysis Skill
+---
 ```
 
 3. Copy the blank input template from the xslope repository. The skill expects it at

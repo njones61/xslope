@@ -485,3 +485,39 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+/* Every table wraps its cells. The readthedocs theme sets white-space: nowrap on
+   every table cell and lets a content-sized table run past the content column, so a
+   table with a few sentences in it overflows the page instead of wrapping. The
+   browser's own table layout then balances the column widths against their content
+   (long prose columns wide, numeric columns narrow) within the column's width. The
+   corpus-summary and tut-summary rules above keep their declared widths. */
+.rst-content table.docutils,
+.wy-table-responsive table {
+  max-width: 100%;
+}
+.rst-content table.docutils td,
+.rst-content table.docutils th,
+.wy-table-responsive table td,
+.wy-table-responsive table th {
+  white-space: normal !important;
+  overflow-wrap: break-word;
+  vertical-align: top;
+}
+
+/* Printing: the content column and its tables fit the sheet, and the eight-column
+   corpus summary reads a little smaller so it fits a letter or A4 page in portrait. */
+@media print {
+  .wy-nav-content-wrap, .wy-nav-content, .rst-content {
+    width: auto !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important;
+  }
+  .rst-content table.docutils, .corpus-summary table, .wy-table-responsive table {
+    width: 100% !important; max-width: 100% !important;
+  }
+  .rst-content .corpus-summary.match8 table td,
+  .rst-content .corpus-summary.match8 table th,
+  .rst-content .corpus-summary.match8 table.docutils td,
+  .rst-content .corpus-summary.match8 table.docutils th {
+    font-size: 80%; padding: 4px 5px;
+  }
+}

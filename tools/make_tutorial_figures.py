@@ -30,6 +30,10 @@ Studio's dialog captures are a separate producer, because they need Qt:
 Run:  PYTHONPATH=. python3 tools/make_tutorial_figures.py            # everything
       PYTHONPATH=. python3 tools/make_tutorial_figures.py sheets     # one group
       PYTHONPATH=. python3 tools/make_tutorial_figures.py lem01      # by name
+      PYTHONPATH=. python3 tools/make_tutorial_figures.py --capture-only fem01_plots fem02_plots
+
+Capture-only redraws FEM result panels from stored trial records, without a
+bracket or limit-equilibrium search. Cases without a record are left untouched.
 """
 
 from __future__ import annotations
@@ -7229,6 +7233,169 @@ def fem05_blocks_grid_pair():
             fs=result_t["FS"], block_grid=False, color_blocks=True)
 
 
+# Capture-only cases name the page's own tag, not the older full-run constants.
+# The tag supplies the mesh/model options; the record supplies the search's
+# verdicts, criterion and iteration budget. No record is created by this path.
+_CAPTURE_CASES = {
+    "fem01_plots": [
+        ("fem01_strength_reduction.md", "FEM-1-ssrm", [
+            ("fem01_shear_strain.png", "shear_strain", "failure"),
+            ("fem01_deformed.png", "deformation", "failure"),
+            ("fem01_displacement_vectors.png", "displace_vector", "failure"),
+            ("fem01_shear_strain_converged.png", "shear_strain", "converged"),
+        ], []),
+    ],
+    "fem02_plots": [
+        ("fem02_reinforcement.md", "FEM-2-ssrm", [
+            ("fem02_shear_strain_pr.png", "shear_strain", "failure"),
+            ("fem02_deformed_pr.png", "deformation", "failure"),
+            ("fem02_displacement_vectors_pr.png", "displace_vector", "failure"),
+        ], [("fem02_bar_profile_pr.png", "reinforcement", FEM02_PROFILE_LINE,
+             "converged")]),
+    ],
+    "fem04_piles": [
+        ("fem04_piles.md", "FEM-4-piles-ssrm", [
+            ("fem04_fem_shear_piles.png", "shear_strain", "failure"),
+        ], []),
+    ],
+    "fem04_wall": [
+        ("fem04_piles.md", "FEM-4-bare-ssrm", [
+            ("fem04_fem_shear_bare.png", "shear_strain", "failure"),
+        ], []),
+        ("fem04_piles.md", "FEM-4-wall-ssrm", [
+            ("fem04_wall_shear_fixed.png", "shear_strain", "failure"),
+        ], [("fem04_wall_profiles_fixed.png", "pile", 0, "converged"),
+            ("fem04_wall_profiles_fixed_failure.png", "pile", 0, "failure")]),
+    ],
+    "fem05_plots": [
+        ("fem05_rock_slope_joints.md", "FEM-5-slab-ssrm", [
+            ("fem05_joint_slip.png", "shear_strain", "failure"),
+            ("fem05_fem_blocks.png", "deformation", "failure"),
+        ], []),
+        ("fem05_rock_slope_joints.md", "FEM-5-topple-ssrm", [
+            ("fem05_joint_slip_topple.png", "shear_strain", "failure"),
+            ("fem05_fem_blocks_topple.png", "deformation", "failure"),
+        ], []),
+        ("fem05_rock_slope_joints.md", "FEM-5-voronoi-ssrm", [
+            ("fem05_joint_slip_voronoi.png", "shear_strain", "failure"),
+            ("fem05_fem_blocks_voronoi.png", "deformation", "failure"),
+        ], []),
+    ],
+    "fem05_blocks_grid": [
+        ("fem05_rock_slope_joints.md", "FEM-5-topple-ssrm", [
+            ("fem05_fem_blocks_topple.png", "deformation", "failure"),
+            ("fem05_fem_blocks_topple_colored.png", "blocks_colored", "failure"),
+        ], []),
+    ],
+}
+_CAPTURE_UNRECORDED = {
+    "fem02_plots": "elastic-perfectly-plastic run",
+    "fem04_piles": "head-fixed comparison",
+    "fem04_wall": "refined 0.5 ft wall comparison",
+}
+_CAPTURE_BUDGETS = {
+    "fem01_strength_reduction.md": FEM01_MAX_ITERATIONS,
+    "fem02_reinforcement.md": FEM02_MAX_ITERATIONS,
+    "fem04_piles.md": FEM04_MAX_ITERATIONS,
+    "fem05_rock_slope_joints.md": FEM05_MAX_ITERATIONS,
+}
+
+
+def _capture_recorded_case(page, benchmark, panels, profiles):
+    """Redraw one tagged case. Never search or write a model, mesh or sidecar."""
+    import json
+    import time
+
+    import run_tests as RT
+    import xslope.fem as fem
+    from xslope.plot_fem import plot_fem_results
+
+    md = os.path.join(REPO_ROOT, "docs", "tutorials", page)
+    tags = [tag for tag in RT.parse_test_tags(md)
+            if tag.get("type") == "fem_ssrm" and tag.get("benchmark") == benchmark]
+    if len(tags) != 1:
+        raise RuntimeError(f"{benchmark}: expected one page tag, found {len(tags)}")
+    tag = tags[0]
+    stem = os.path.splitext(tag["file"])[0]
+    candidates = [os.path.join(os.path.dirname(stem), "trial_records",
+                               os.path.basename(stem) + "_fem_meta_" +
+                               benchmark.lower() + ".json"),
+                  stem + "_fem_meta.json"]
+    record_path = next((path for path in candidates if os.path.isfile(path)), None)
+    if record_path is None:
+        print(f"   {benchmark}: no stored trial record; figures left untouched")
+        return False
+    with open(record_path) as fh:
+        record = json.load(fh)
+    if record.get("benchmark", benchmark).lower() != benchmark.lower():
+        raise RuntimeError(f"{benchmark}: stored record belongs to another benchmark")
+    if (record.get("file") and
+            os.path.basename(record["file"]) != os.path.basename(tag["file"])):
+        raise RuntimeError(f"{benchmark}: stored record belongs to another workbook")
+    if abs(float(record["FS"]) - float(tag["expected_fs"])) > float(tag["tolerance"]):
+        raise RuntimeError(f"{benchmark}: stored factor of safety disagrees with page tag")
+    # Check the record before building the mesh or starting any solver work.
+    for key in ("final_interval", "trials", "failure_criterion", "max_iter"):
+        if key not in record:
+            raise RuntimeError(f"{benchmark}: stored record has no {key}")
+    t0 = time.time()
+    with contextlib.redirect_stdout(io.StringIO()):
+        fem_data, kwargs, f_min, f_max, tolerance = RT.build_fem_ssrm_case(tag)
+    kwargs.update(failure_criterion=record["failure_criterion"],
+                  max_iterations=int(record["max_iter"]),
+                  # Trial-record budgets describe the search, not the later
+                  # picture. Keep the full figure producer's capture budget.
+                  capture_max_iterations=record.get("capture_max_iterations",
+                                                     _CAPTURE_BUDGETS[page]),
+                  F_min=record.get("F_min", f_min),
+                  F_max=record.get("F_max", f_max),
+                  tolerance=record.get("tolerance", tolerance),
+                  debug_level=0, capture_failure_state=True)
+    with RT._force_fast_kernel(fem, False):
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = fem.capture_failure_from_record(fem_data, record, **kwargs)
+    last, failure = result["last_solution"], result.get("failure_solution")
+    if failure is None or result.get("capture_failed"):
+        raise RuntimeError(f"{benchmark}: no usable at-failure capture; figures left untouched")
+    for filename, kind, state in panels:
+        extra = {}
+        if kind == "blocks_colored":
+            kind = "deformation"
+            extra = dict(block_grid=False, color_blocks=True)
+        capture(filename, plot_fem_results, fem_data, last, plot_type=kind,
+                fs=result["FS"], failure_solution=failure, field_state=state, **extra)
+    if profiles:
+        from xslope import fem_details
+        from xslope.plot_fem_details import plot_pile_detail, plot_reinforcement_detail
+        model = load_slope_data(tag["file"])
+        for filename, kind, line, state in profiles:
+            fn = (fem_details.pile_profile if kind == "pile"
+                  else fem_details.reinforcement_profile)
+            profile = fn(fem_data, last, line, slope_data=model,
+                         field_state=state, failure_solution=failure)
+            capture(filename, plot_pile_detail if kind == "pile"
+                    else plot_reinforcement_detail, profile)
+    print(f"   {benchmark}: {fem.capture_report(result)} ({time.time() - t0:.0f}s)")
+    print(f"   record      {os.path.relpath(record_path, REPO_ROOT)} (unchanged)")
+    for edge in result.get("edges_resolved", []):
+        print(f"   re-solved   {edge}")
+    return True
+
+
+def capture_only(name):
+    """Redraw only recorded FEM cases in a group; missing cases never search."""
+    cases = _CAPTURE_CASES.get(name)
+    if cases is None:
+        print(f"   {name}: no stored trial records for this group; figures left untouched")
+        return False
+    if name in _CAPTURE_UNRECORDED:
+        print(f"   {_CAPTURE_UNRECORDED[name]}: no stored trial record; figures left untouched")
+    drawn = False
+    for case in cases:
+        drawn = _capture_recorded_case(*case) or drawn
+    return drawn
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -7284,7 +7451,24 @@ GROUPS = {
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    capturing = "--capture-only" in argv
     os.makedirs(OUT_DIR, exist_ok=True)
+    if capturing:
+        argv.remove("--capture-only")
+        names = [name for name in GROUPS if name.startswith("fem") and
+                 (not argv or any(arg in name for arg in argv))]
+        if not names:
+            print(f"no FEM figure group matching {argv}")
+            return 1
+        failed = 0
+        for name in names:
+            print(f"== {name} (capture only)")
+            try:
+                capture_only(name)
+            except Exception as exc:
+                print(f"   {name}: {exc}; no search attempted")
+                failed += 1
+        return 1 if failed else 0
     names = [n for n in GROUPS
              if not argv or any(a in n for a in argv)]
     if not names:

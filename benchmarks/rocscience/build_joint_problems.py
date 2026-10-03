@@ -26,13 +26,13 @@ Problems 3, 4, 5 and 7, the Lorig & Varona examples, carry a second file each.
 Their source (Wyllie & Mah 2004, ch. 10) prints one property list for the
 section, with joints that have no cohesion where the vendor's files carry
 100 kPa, and a rock that can yield where the files for problems 3 and 5 hold it
-elastic. The chapter does not say the list was used unchanged in its toppling
-runs, and as printed it reproduces neither the chapter's answers nor its
-mechanism here, so each row is posed on the vendor's file (``rj003.xlsx`` …) and
-the printed list is kept beside it with the suffix ``_chapter``
-(``rj003_chapter.xlsx`` …). Geometry, stiffnesses and restraints are the
-vendor's in both. Problem 6 states its own joint cohesion, 100 kPa, and has one
-file.
+elastic. Each row (``rj003.xlsx`` …) is posed on the vendor's file with the
+joints as the chapter lists them, friction only (owner's ruling 2026-10-02,
+Q36 a): the UDEC answers the rows are scored against come from the chapter,
+whose joints carry no cohesion. The printed list in full, with the yielding
+rock, is kept beside it with the suffix ``_chapter`` (``rj003_chapter.xlsx`` …).
+Geometry, stiffnesses and restraints are the vendor's in both. Problem 6 states
+its own joint cohesion, 100 kPa, and has one file.
 
 **Units.** The vendor models are Metric MPa with unit weight in MN/m^3. These
 files are written in metric kPa / kN/m^3, which is the unit system the rest of the
@@ -189,8 +189,8 @@ LV_RING = [(0.0, 0.0), (700.0, 0.0), (700.0, 140.0), (560.0, 140.0),
 
 #: The joint the vendor's models for problems 3 to 7 carry: c = 0.1 MPa,
 #: phi = 40 degrees. Problem 6 is the one example in the source chapter (Wyllie
-#: & Mah 2004, ch. 10, Lorig & Varona) that states this cohesion itself;
-#: problems 3, 4, 5 and 7 carry it because the vendor's files do.
+#: & Mah 2004, ch. 10, Lorig & Varona) that states this cohesion itself, and
+#: the only one that carries it; problems 3, 4, 5 and 7 carry LV_JOINT_FRICTION.
 LV_JOINT = {'c': 100.0, 'phi': 40.0, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
 
 #: The joint the source chapter's property list gives the 260 m / 55 degree
@@ -199,6 +199,15 @@ LV_JOINT = {'c': 100.0, 'phi': 40.0, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
 #: "cohesionless". The ``_chapter`` files of problems 3, 4, 5 and 7 carry it;
 #: the stiffness pair is the vendor's, which the chapter does not state.
 LV_JOINT_BOOK = {'c': 0.0, 'phi': 40.0, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
+
+#: The joint the scored files of problems 3, 4, 5 and 7 carry: the vendor's joint
+#: (phi 40 degrees, t_cut 0, the vendor's stiffness pair) with its 100 kPa of
+#: cohesion set to zero. Owner's ruling 2026-10-02 (Q36 a): the referee for these
+#: rows is UDEC as the source chapter reports it, and the chapter's joints are
+#: friction only; RS2's own numbers in the manual were computed with the vendor's
+#: 100 kPa, so they are shown beside the rows and are not like for like. The rock
+#: stays the vendor's (elastic on problems 3 and 5).
+LV_JOINT_FRICTION = dict(LV_JOINT, c=0.0)
 
 #: The rock mass of the same list: 2660 kg/m^3 (26.1 kN/m^3), c = 675 kPa,
 #: phi = 43 degrees, no tension, bulk 6.3 GPa and shear 3.6 GPa, which is
@@ -509,14 +518,15 @@ def rj003():
     same pair measured the other way round the half circle.
 
     The rock is ELASTIC, so only the joints can fail. gamma = 26.0946 kN/m^3,
-    E = 9.072 GPa, nu = 0.26. The joints carry c = 100 kPa and phi = 40 degrees.
+    E = 9.072 GPa, nu = 0.26. The joints carry phi = 40 degrees and no cohesion
+    (LV_JOINT_FRICTION; the vendor's file gives them c = 100 kPa).
     Referee: UDEC 1.13. RS2 reports 1.12 without joint improvement and 1.09
     with it.
     """
     return _rj003('rj003.xlsx',
                   _rock('Rock', 26.0946, LV_ROCK_E, LV_ROCK_NU, 0.0, 0.0,
                         option='elastic'),
-                  LV_JOINT)
+                  LV_JOINT_FRICTION)
 
 
 def rj003_chapter():
@@ -557,10 +567,11 @@ def rj004():
     The rock is Mohr-Coulomb and carries a tensile cutoff of zero, which is what
     lets a column break in flexure: gamma = 26.1 kN/m^3, E = 9.072 GPa,
     nu = 0.26, c = 675 kPa, phi = 43 degrees, T = 0. The joints carry
-    c = 100 kPa and phi = 40 degrees. Referee: UDEC 1.3. RS2 reports 1.19
+    phi = 40 degrees and no cohesion (LV_JOINT_FRICTION; the vendor's file gives
+    them c = 100 kPa). Referee: UDEC 1.3. RS2 reports 1.19
     without joint improvement and 1.27 with it.
     """
-    return _rj004('rj004.xlsx', LV_JOINT)
+    return _rj004('rj004.xlsx', LV_JOINT_FRICTION)
 
 
 def rj004_chapter():
@@ -594,14 +605,15 @@ def rj005():
     and a horizontal set at 40 m spacing through (0, 400).
 
     The rock is ELASTIC. gamma = 26.1 kN/m^3, E = 9.072 GPa, nu = 0.26. The
-    joints carry c = 100 kPa and phi = 40 degrees. Referee: UDEC 1.7. RS2
+    joints carry phi = 40 degrees and no cohesion (LV_JOINT_FRICTION; the
+    vendor's file gives them c = 100 kPa). Referee: UDEC 1.7. RS2
     reports 1.65 without joint improvement and 1.86 with it — the widest
     "joint improvement" spread in the manual.
     """
     return _rj005('rj005.xlsx',
                   _rock('Rock', 26.1, LV_ROCK_E, LV_ROCK_NU, 0.0, 0.0,
                         option='elastic'),
-                  LV_JOINT)
+                  LV_JOINT_FRICTION)
 
 
 def rj005_chapter():
@@ -662,13 +674,14 @@ def rj007():
     -70 degrees at 20 m spacing through the origin. The joints now dip out of
     the face STEEPER than the 55 degree face, so none of them daylights: a slab
     cannot slide out along one without shearing rock, and the slope stands
-    higher than problem 6's. The joints carry c = 100 kPa and phi = 40 degrees.
+    higher than problem 6's. The joints carry phi = 40 degrees and no cohesion
+    (LV_JOINT_FRICTION; the vendor's file gives them c = 100 kPa).
 
     Referee: UDEC 1.5. RS2 reports 1.57 without joint improvement and 1.59 with
     it. The manual's own table prints the slope angle as 5 degrees; the figure
     and the model are the same 55 degrees problem 6 uses.
     """
-    return _rj007('rj007.xlsx', LV_JOINT)
+    return _rj007('rj007.xlsx', LV_JOINT_FRICTION)
 
 
 def rj007_chapter():

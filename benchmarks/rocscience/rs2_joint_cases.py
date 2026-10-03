@@ -31,14 +31,6 @@ EXTRA_CASES = [
     # forces, so the page reports a lower bound.
     {**_JOINT, 'file': 'files/rocscience/joints/rj003_chapter.xlsx',
      'target_size': '12.0', 'benchmark': 'RJ-3c'},
-    # Problem 20's Voronoi mass. Corpus size is the mean BLOCK width measured on
-    # the vendor's own traces, this row's stand-in for a joint spacing. The rest
-    # of the termination family — the four problem-1 cases and problems 9 and 11
-    # to 14 — have locked and carry tags of their own, so they are not listed
-    # here: `registered` would ignore a duplicate entry anyway, and `--audit`
-    # names one that is left behind.
-    {**_JOINT, 'file': 'files/rocscience/joints/rj020.xlsx',
-     'target_size': '2.895', 'benchmark': 'RJ-20'},
 ]
 
 #: Rows measured by a SWEEP rather than by a bracket. Problem 16 is scored in the

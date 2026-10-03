@@ -5336,7 +5336,9 @@ _CYCLE_PMAX = 64
 _CYCLE_WINDOW = 256
 # Most contacts cycling: RJ-20's stuck trial has 3; RJ-5's failing edge cycles 1 to 4.
 _CYCLE_MAX_FLIPS = 4
-# Mean movement per sweep across the cycle, in elastic displacements: RJ-20's stuck trial moves 5.0e-9 and RJ-5's failing edge, which must never stand, 5.4e-7; 5e-8 sits about 10x from each.
+# Mean movement per sweep across the cycle, in elastic displacements: RJ-20's standing trial at
+# 2.531 moves 5.0e-9 when continued from its stuck state and 4.1e-8 in a fresh run; RJ-5's failing
+# edge, which must never stand, moves 5.4e-7. 5e-8 sits 13x below the failing edge.
 _CYCLE_DRIFT = 5e-8
 
 

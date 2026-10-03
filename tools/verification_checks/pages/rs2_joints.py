@@ -29,12 +29,6 @@ CONFIG = PageConfig(
         # Goodman & Bray recursion; the page recomputes it as 0.7734.
         ('0.76', 'against the 0.76 Alejano'),
         ('0.76', 'their Goodman & Bray 0.76,'),
-        # RJ-20 stands at 2.512 and its search does not close above it: the
-        # value is the standing edge in the committed run record (rj020_fem_meta),
-        # shown as a lower bound by ruling, never tagged.
-        ('2.512', 'unconfirmed'),
-        ('2.512', 'The slope stands at 2.512'),
-        ('2.531', 'the trial at 2.531'),
         # RJ-20's block density: blocks per square meter of the vendor's network
         # (525 blocks over 4,400 m2), not a factor of safety.
         ('0.119', 'blocks per square meter'),
@@ -42,15 +36,19 @@ CONFIG = PageConfig(
         # and its search does not close above it (the trial at 1.047 is
         # undecided; 1.125 fails): trials in the committed run record
         # (rj003_chapter_fem_meta), shown as a lower bound by ruling, never tagged.
+        # (Its failing trial, 1.125, is also RJ-3's tagged failing edge, so it
+        # needs no allowance.)
         ('1.027', 'unconfirmed*, at least 1.027'),
-        ('1.125', 'and fails at 1.125'),
         ('1.047', 'the trial at 1.047'),
-        # The joint-cohesion-removed readings of problems 3 and 5 (problem 7's
-        # equals its tagged chapter-list value): scratch runs
-        # of the vendor's files with every joint's c set to zero, kept in the
-        # private reports (r44_data/zero_cohesion), shown by ruling, never tagged.
-        ('1.115', "everything else as the vendor's file: 1.115"),
-        ('1.799', "everything else as the vendor's file: 1.799"),
+        # Problems 3, 4, 5 and 7 are scored with the joints friction only
+        # (ruling 2026-10-02, Q36 a). XSLOPE on the vendor's files as given, with
+        # the joints' 100 kPa of cohesion, is shown beside each row: the values
+        # are the rows' earlier records (rj00X_fem_meta before the re-pose),
+        # shown by ruling, never tagged.
+        ('1.232', "with the joints at c = 100 kPa: 1.232"),
+        ('1.311', "with the joints at c = 100 kPa: 1.311"),
+        ('1.564', "with the joints at c = 100 kPa: 1.564"),
+        ('1.857', "with the joints at c = 100 kPa: 1.857"),
     ],
 
     abs_bounds=[

@@ -31,10 +31,12 @@ shared [References](references.md) page.
   Lorig & Varona's chapter in Wyllie & Mah (2004), the source of problems 3 to 7, prints one
   property list for their 260 m section, with joints that carry no cohesion (the vendor's files
   give them 100 kPa) and a rock that can yield (the vendor's files hold it elastic on problems 3
-  and 5); it does not say the list was used unchanged in its toppling runs, and as printed the
-  list reproduces the chapter's answer only on problem 7, and on problem 5 neither its answer nor
-  its toppling mechanism, so problems 3, 4, 5 and 7 are posed on the vendor's file and each row
-  shows the other readings beside it.
+  and 5). Problems 3, 4, 5 and 7 take their joints from that list, friction only, because the UDEC
+  results they are scored against come from the chapter; RS2's numbers were computed with the
+  100 kPa, so they are shown beside each row but are not like for like. The rock is the vendor's:
+  the chapter does not say its list was used unchanged in the toppling runs, and with the yielding
+  rock problem 5 reproduces neither the chapter's answer nor its toppling mechanism. Each row also
+  shows XSLOPE on the vendor's file as given and on the chapter's full list.
 - **Referee.** Where a closed-form rigid-block limit equilibrium exists for a problem it is the
   referee, recomputed from the inputs the model carries: Goodman & Bray's column analysis on
   problems 1 and 2, Alejano's plowing equation on problems 11 to 14, the sliding block with its tensile bridge on
@@ -58,9 +60,10 @@ shared [References](references.md) page.
 - **Search.** The factor of safety is found by bisection on the bracket [a, b] between the highest
   factor at which the slope stands and the lowest at which it fails. A jointed model takes tens of
   thousands of iterations to settle, so every row allows 250,000 per trial, and a trial that is
-  still slowing at that limit is allowed to run on, up to a million. A search that closes on a
-  trial that stops moving without its forces ever balancing reports the bracket without confirming
-  a value. See [running a jointed
+  still slowing at that limit is allowed to run on, up to a million. A trial that reaches the
+  million with no movement left except a few contacts repeating the same cycle stands, and the
+  page says so where it decides a bracket; a trial that stops moving without balancing its forces
+  and without such a cycle reports the bracket without confirming a value. See [running a jointed
   model](../fem/joints.md#running-a-jointed-model).
 
 <!--
@@ -98,11 +101,11 @@ joint model whose output is a stress-displacement curve.
 | [1c](#rj-1c) | 🟢 | Goodman & Bray block toppling, case 1c | SSRM 1.037 vs Goodman & Bray 1.0185 (+1.8%) | 1.01 vs 1.0185 (−0.8%) | UDEC 1.01 (+2.7%) | 1.01 / 0.99 | |
 | [1d](#rj-1d) | 🟢 | Goodman & Bray block toppling, case 1d | SSRM 1.252 vs Goodman & Bray 1.2308 (+1.7%) | 1.19 vs 1.2308 (−3.3%) | UDEC 1.22 (+2.6%) | 1.19 / 1.16 | |
 | [2](#rj-2) | 🟢 | Alejano & Alonso block toppling | SSRM 0.783 vs Goodman & Bray 0.7734 (+1.2%) | 0.86 vs 0.7734 (+11.2%) | UDEC 0.87 (−10.0%) | 0.86 / 0.82 | All three programs stand above the closed form, this one by a percent and the other two by a tenth; the manual states no UDEC settings for this model. |
-| [3](#rj-3) | 🔴 | Lorig & Varona forward block toppling | SSRM 1.232 vs UDEC 1.13 (+9.0%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | Posed on the vendor's file; the source chapter's printed property list is shown beside the row. |
-| [4](#rj-4) | 🟢 | Lorig & Varona flexural toppling | SSRM 1.311 vs UDEC 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | — | 1.19 / 1.27 | Posed on the vendor's file; the source chapter's printed property list is shown beside the row. |
-| [5](#rj-5) | 🔴 | Lorig & Varona backward block toppling | SSRM 1.857 vs UDEC 1.7 (+9.2%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | The vendor's two settings disagree with each other by the widest margin in the manual; XSLOPE lands on the one with its convergence aid on. |
+| [3](#rj-3) | 🟢 | Lorig & Varona forward block toppling | SSRM 1.115 vs UDEC 1.13 (−1.3%) | 1.12 vs 1.13 (−0.9%) | — | 1.12 / 1.09 | Joints friction only, as the source chapter lists them. XSLOPE on the vendor's file as given, joints at c = 100 kPa: 1.232. RS2's two numbers were computed with the 100 kPa. |
+| [4](#rj-4) | 🟡 | Lorig & Varona flexural toppling | SSRM 1.232 vs UDEC 1.3 (−5.2%) | 1.19 vs 1.3 (−8.5%) | — | 1.19 / 1.27 | Joints friction only, as the source chapter lists them. XSLOPE on the vendor's file as given, joints at c = 100 kPa: 1.311. RS2's two numbers were computed with the 100 kPa. |
+| [5](#rj-5) | 🟡 | Lorig & Varona backward block toppling | SSRM 1.799 vs UDEC 1.7 (+5.8%) | 1.65 vs 1.7 (−2.9%) | — | 1.65 / 1.86 | Joints friction only, as the source chapter lists them. XSLOPE on the vendor's file as given, joints at c = 100 kPa: 1.857. RS2's two numbers were computed with the 100 kPa. |
 | [6](#rj-6) | 🟢 | Plane failure, daylighting | SSRM 1.271 vs UDEC 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | — | 1.25 / 1.31 | |
-| [7](#rj-7) | 🟡 | Plane failure, non-daylighting | SSRM 1.564 vs UDEC 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | — | 1.57 / 1.59 | Both finite element codes land above the referee, on the same side and within half a point of each other. |
+| [7](#rj-7) | 🟢 | Plane failure, non-daylighting | SSRM 1.486 vs UDEC 1.5 (−0.9%) | 1.57 vs 1.5 (+4.7%) | — | 1.57 / 1.59 | Joints friction only, as the source chapter lists them. XSLOPE on the vendor's file as given, joints at c = 100 kPa: 1.564. RS2's two numbers were computed with the 100 kPa. |
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | 0.75 vs 0.76 (−1.3%) | — | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.037 vs UDEC 1.03 (+0.7%) | 1.01 vs 1.03 (−1.9%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
 | [10](#rj-10) | 🟢 | Bilinear slab failure, example 1b | SSRM 1.037 vs UDEC 1.03 (+0.7%) | 0.92 vs 1.03 (−10.7%) | LE (Alejano) 0.43–1.45 | 0.92 / 1.08 | |
@@ -115,7 +118,7 @@ joint model whose output is a stress-displacement curve.
 | [17](#rj-17) | 🟡 | Step-path, en-echelon joints | SSRM 1.213 vs UDEC 1.29 (−6.0%) | 1.24 vs 1.29 (−3.9%) | — | 1.24 / 1.2 | No closed form: three rock bridges decide the factor, and both finite element codes read them below the distinct-element run, 2.1 points apart. |
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | 1.01 vs 1.01 (0.0%) | — | 1.01 / 1.0 | |
 | [19](#rj-19) | 🟢 | Bi-planar step-path failure | SSRM 1.623 vs rigid-block limit equilibrium 1.5914 (+2.0%) | 1.5 vs 1.5914 (−5.7%) | UDEC 1.46 (+11.2%) | 1.5 / 1.41 | One block sliding on the basal joint, held by friction and by the rock bridge in tension; its statics, with the tensile cap reduced with the trial factor as the vendor reduces it, is the referee, and both vendor numbers sit below it. |
-| [20](#rj-20) | <span class="nodata">⊘</span> | Hammah & Yacoub Voronoi slope | SSRM at least 2.512 vs UDEC 2.46 | 2.21 vs 2.46 (−10.2%) | — | 2.21 / 2.37 | *unconfirmed* — the slope stands at 2.512, but the trial above it ran a million iterations, stopped moving, and never balanced its forces, so the search does not close. |
+| [20](#rj-20) | 🟡 | Hammah & Yacoub Voronoi slope | SSRM 2.541 vs UDEC 2.46 (+3.3%) | 2.21 vs 2.46 (−10.2%) | — | 2.21 / 2.37 | At the standing edge the section stops moving, while three contacts inside it keep opening and closing in a repeating cycle; with no net movement the trial counts as standing. |
 | 21 | <span class="nodata">⊘</span> | Shallow excavation, jointed tunnel | UDEC 8.16 | 8.27 vs 8.16 (+1.3%) | — | 8.27 / 8.5 | *not supported* — the second stage of the vendor model excavates a 2 m opening and the strength reduction runs on the excavated state, which carries the stress the first stage left behind; staged excavation is outside a slope program's scope. |
 | 22 | <span class="nodata">⊘</span> | Joint model: hyperbolic softening | — | — | — | — | *not supported* — the problem exercises RS2's hyperbolic displacement- and work-softening joint law, which XSLOPE's interface element does not have; it reports no factor of safety. |
 | 23 | <span class="nodata">⊘</span> | Joint model: residual strength and dilation | — | — | — | — | *no reference value* — a shear test on one joint that reports no factor of safety. Its six vendor models all carry `include_dilation: no`, so the manual's dilation comparison never exercised dilation; XSLOPE's dilation and its peak and residual strengths are checked against their closed forms in `test/joint_element_check.py`. |
@@ -270,14 +273,17 @@ stiffness returns this row's bracket unchanged.
 
 ![RJ-2: Alejano & Alonso block toppling (rj002) — FEM inputs, mesh, joint slip at the critical SRF and the section deformed 17×. The rock carries no strain of its own because it cannot yield, so every movement in the section is on a joint: slip gathers where the basal joint reaches the toe of the face, the columns standing on it open along their upper halves, and the deformed section shows them rotating out over the face while the rock below the basal joint stays put](images/RJ-2.png)
 
-### 🔴 RJ-3: Lorig & Varona forward block toppling (rj003) {#rj-3}
+### 🟢 RJ-3: Lorig & Varona forward block toppling (rj003) {#rj-3}
 
 Problems 3 to 6 are the toppling and plane-failure examples of Lorig & Varona (2004). The 260 m
 section at 55° that problems 3 to 7 share, cut by two sets: columns at 70° at 20 m
 spacing and a cross set at −20° at 30 m, both through the origin. The manual states the pair as
 "70 and 160" degrees, which is the same two planes measured the other way round the half circle.
 The rock is elastic, the vendor file setting its plasticity to none, so only the joints can fail;
-γ = 26.0946 kN/m³, E = 9072 MPa, ν = 0.26. The joints carry c = 100 kPa and φ = 40°.
+γ = 26.0946 kN/m³, E = 9072 MPa, ν = 0.26. The joints carry φ = 40° and no cohesion, as the
+source chapter lists them; the vendor's file gives them c = 100 kPa. The UDEC result comes from
+the chapter, whose joints are friction only. RS2's two numbers were computed with the vendor's
+100 kPa, so they are shown beside the row but are not like for like.
 
 The manual's tables for problems 3 to 7 state only the slope geometry, the joint friction angle and
 the rock's tensile strength, where the models of problems 4, 6 and 7 carry a rock strength of
@@ -285,76 +291,86 @@ c = 675 kPa and φ = 43° and all five carry a joint cohesion of 100 kPa.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| **1.232** | 1.13 (+9.0%) | 1.12 vs 1.13 (−0.9%) | 1.12 / 1.09 |
+| **1.115** | 1.13 (−1.3%) | 1.12 vs 1.13 (−0.9%) | 1.12 / 1.09 |
 
-<!-- test: file=files/rocscience/joints/rj003.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-3, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj003.xlsx, type=fem_ssrm, expected_fs=1.115, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-3, f_stand=1.10546875, f_fail=1.125, check=edges, tier=gate -->
 
-- With the joint cohesion removed and everything else as the vendor's file: 1.115, against UDEC's 1.13 (−1.3%).
+- The vendor's file as given, with the joints at c = 100 kPa: 1.232, against UDEC's 1.13 (+9.0%).
 - On the chapter's printed list (joints friction only, a rock that can yield): *unconfirmed*, at least 1.027 against UDEC's 1.13: the slope stands at 1.027 and fails at 1.125, and the trial at 1.047 stopped moving without balancing its forces.
 
-The slope stands at the lower end of the bracket, where the joints come to rest after several
-hundred thousand iterations, and runs away at the upper end. The search takes about four hours.
-The factor stands above UDEC and above the vendor's default. The vendor's own two solution
-schemes give 1.12 and 1.09 for this problem, so the vendor's answer moves with how it is solved;
+The slope comes to rest at the lower end of the bracket after about 125,000 iterations. At the
+upper end it is still moving without slowing after 475,000 iterations, and the trial is counted as
+sliding. The search takes about two and a half hours. The factor sits just below UDEC. The
+vendor's own two solution schemes give 1.12 and 1.09 for this problem with its 100 kPa joints, so
+the vendor's answer moves with how it is solved;
 this is one of the three problems the vendor reruns under its `Improve Joint Convergence` option,
 described under [Methodology](#methodology).
 
-Every input class matches the vendor model, including the side restraint the vendor clamps in both
-directions.
+Apart from the joint cohesion, every input class matches the vendor model, including the side
+restraint the vendor clamps in both directions.
 
 **Input file:** [rj003.xlsx](files/rocscience/joints/rj003.xlsx).
 
-![RJ-3: Lorig & Varona forward block toppling (rj003) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own, so the whole mechanism is on the two sets: the steep 70° joints slip behind the crest while the −20° cross joints open along it, and the deformed section shows the blocks between them rotating forward over the face](images/RJ-3.png)
+![RJ-3: Lorig & Varona forward block toppling (rj003) — FEM inputs, mesh, joint slip and the deformed section. The rock is elastic and carries no strain of its own, so the whole mechanism is on the two sets: slip runs along one −20° cross joint from the toe back under the crest, and the steep 70° joints above it slip, most strongly near the face, so the columns resting on that cross joint lean forward over the face. The two right-hand panels are the last standing trial of the bracket, F = 1.105, the state below the factor rather than past it, and the deformed section is drawn at 52 times scale. The capture past the factor is not drawn: it was stopped in its first iteration, before the section had moved at all](images/RJ-3.png)
 
-### 🟢 RJ-4: Lorig & Varona flexural toppling (rj004) {#rj-4}
+### 🟡 RJ-4: Lorig & Varona flexural toppling (rj004) {#rj-4}
 
 The same section cut by one set of columns at 70° at 20 m spacing — problem 3's first set without
 its cross joints, so the columns bend rather than topple as blocks. Here the rock is Mohr-Coulomb
 and carries a tensile cutoff of zero, which is what lets a column break in flexure: γ = 26.1 kN/m³,
-E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°.
+E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°. The joints carry φ = 40° and no cohesion, as the
+source chapter lists them; the vendor's file gives them c = 100 kPa. The UDEC result comes from
+the chapter, whose joints are friction only. RS2's two numbers were computed with the vendor's
+100 kPa, so they are shown beside the row but are not like for like.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| **1.311** | 1.3 (+0.8%) | 1.19 vs 1.3 (−8.5%) | 1.19 / 1.27 |
+| **1.232** | 1.3 (−5.2%) | 1.19 vs 1.3 (−8.5%) | 1.19 / 1.27 |
 
-<!-- test: file=files/rocscience/joints/rj004.xlsx, type=fem_ssrm, expected_fs=1.311, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4, f_stand=1.30078125, f_fail=1.3203125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj004.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
 
-- With the joint cohesion removed and everything else as the vendor's file: not run.
-- On the chapter's printed list (joints friction only, a rock that can yield): 1.232, against UDEC's 1.3 (−5.2%).
+- The vendor's file as given, with the joints at c = 100 kPa: 1.311, against UDEC's 1.3 (+0.8%).
+- On the chapter's printed list (joints friction only, a rock that can yield): 1.232, against UDEC's 1.3 (−5.2%). For this problem the vendor's rock is the chapter's, so this is the row's own model.
 
 <!-- test: file=files/rocscience/joints/rj004_chapter.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4c, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
 
-Every transcribed input class matches the vendor model, including the side restraint.
+Apart from the joint cohesion, every transcribed input class matches the vendor model, including
+the side restraint.
 
 **Input file:** [rj004.xlsx](files/rocscience/joints/rj004.xlsx).
 
-![RJ-4: Lorig & Varona flexural toppling (rj004) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. Here the rock can yield, and it does: a band of shear strain climbs from the toe across the columns, and drawn without exaggeration the columns are bent through that band rather than rotated about it, which is what separates flexural toppling from the block toppling of problem 3](images/RJ-4.png)
+![RJ-4: Lorig & Varona flexural toppling (rj004) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. Here the rock can yield, and it does: a band of shear strain climbs from the toe across the columns to behind the crest, the joints slip through that band, and the columns are bent through it rather than rotated about it, which is what separates flexural toppling from the block toppling of problem 3](images/RJ-4.png)
 
-### 🔴 RJ-5: Lorig & Varona backward block toppling (rj005) {#rj-5}
+### 🟡 RJ-5: Lorig & Varona backward block toppling (rj005) {#rj-5}
 
 The shared 260 m section cut by two sets: one at −55° at 10 m spacing through the toe, dipping out
 of the face so the blocks lean back rather than forward, and a horizontal set at 40 m spacing. The
-rock is elastic, its plasticity set to none in the vendor file: γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26; the joints carry
-c = 100 kPa and φ = 40°.
+rock is elastic, its plasticity set to none in the vendor file: γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26. The joints carry
+φ = 40° and no cohesion, as the source chapter lists them; the vendor's file gives them
+c = 100 kPa. The UDEC result comes from the chapter, whose joints are friction only. RS2's two
+numbers were computed with the vendor's 100 kPa, so they are shown beside the row but are not like
+for like.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| **1.857** | 1.7 (+9.2%) | 1.65 vs 1.7 (−2.9%) | 1.65 / 1.86 |
+| **1.799** | 1.7 (+5.8%) | 1.65 vs 1.7 (−2.9%) | 1.65 / 1.86 |
 
-<!-- test: file=files/rocscience/joints/rj005.xlsx, type=fem_ssrm, expected_fs=1.857, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5, f_stand=1.84765625, f_fail=1.8671875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj005.xlsx, type=fem_ssrm, expected_fs=1.799, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5, f_stand=1.7890625, f_fail=1.80859375, check=edges, tier=gate -->
 
-- With the joint cohesion removed and everything else as the vendor's file: 1.799, against UDEC's 1.7 (+5.8%).
+- The vendor's file as given, with the joints at c = 100 kPa: 1.857, against UDEC's 1.7 (+9.2%).
 - On the chapter's printed list (joints friction only, a rock that can yield): 1.096, against UDEC's 1.7 (−35.5%). The slabs slide down the face-parallel joints and the rock at the toe yields beneath them, instead of the blocks toppling back into the slope.
 
 <!-- test: file=files/rocscience/joints/rj005_chapter.xlsx, type=fem_ssrm, expected_fs=1.096, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5c, f_stand=1.0859375, f_fail=1.10546875, check=edges, tier=gate -->
 
-This row is the corpus's slowest to settle: the trial at the standing edge balances only after
-most of a million iterations, and the search takes about thirteen hours. The factor stands above UDEC and above the
-vendor's default, and on the vendor's own second number: its two solution schemes give 1.65 and
-1.86 on this model, the widest spread in the manual, and the vendor needed its 
+The slope comes to rest at the lower end of the bracket within a few hundred iterations. At the
+upper end it is still moving at the same rate after 450,000 iterations, and the trial is counted
+as sliding. The search takes about five and a half hours. The factor stands above UDEC and above
+the vendor's default. The vendor's two solution schemes give 1.65 and 1.86 on this model with its
+100 kPa joints, the widest spread in the manual, and the vendor needed its
 `Improve Joint Convergence` option to rerun the problem at all.
 
-Every transcribed input class matches the vendor model, including the side restraint.
+Apart from the joint cohesion, every transcribed input class matches the vendor model, including
+the side restraint.
 
 **Input file:** [rj005.xlsx](files/rocscience/joints/rj005.xlsx).
 
@@ -381,31 +397,34 @@ Every transcribed input class matches the vendor model, including the side restr
 
 ![RJ-6: plane failure with daylighting discontinuities (rj006) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. Slip runs the full length of every joint that reaches the face, over a wedge bounded below by the joint through the toe, and the rock between them carries only a faint strain: the slabs slide out along the joints rather than breaking through anything](images/RJ-6.png)
 
-### 🟡 RJ-7: Plane failure with non-daylighting discontinuities (rj007) {#rj-7}
+### 🟢 RJ-7: Plane failure with non-daylighting discontinuities (rj007) {#rj-7}
 
 The same section and the same rock as problem 6, cut by one set at −70° at 20 m spacing through
 the origin. The joints now dip out of the face more steeply than the 55° face itself, so none of
 them daylights: a slab cannot slide out along one without shearing rock, and the slope stands
-higher than problem 6's.
+higher than problem 6's. The joints carry φ = 40° and no cohesion, as the source chapter lists
+them; its text calls these planes "cohesionless", and the vendor's file gives them c = 100 kPa.
+The UDEC result comes from the chapter. RS2's two numbers were computed with the vendor's
+100 kPa, so they are shown beside the row but are not like for like.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| **1.564** | 1.5 (+4.3%) | 1.57 vs 1.5 (+4.7%) | 1.57 / 1.59 |
+| **1.486** | 1.5 (−0.9%) | 1.57 vs 1.5 (+4.7%) | 1.57 / 1.59 |
 
-<!-- test: file=files/rocscience/joints/rj007.xlsx, type=fem_ssrm, expected_fs=1.564, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7, f_stand=1.5546875, f_fail=1.57421875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj007.xlsx, type=fem_ssrm, expected_fs=1.486, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7, f_stand=1.4765625, f_fail=1.49609375, check=edges, tier=gate -->
 
-- With the joint cohesion removed and everything else as the vendor's file: 1.486, against UDEC's 1.5 (−0.9%).
-- On the chapter's printed list (joints friction only, a rock that can yield): 1.486, against UDEC's 1.5 (−0.9%).
+- The vendor's file as given, with the joints at c = 100 kPa: 1.564, against UDEC's 1.5 (+4.3%).
+- On the chapter's printed list (joints friction only, a rock that can yield): 1.486, against UDEC's 1.5 (−0.9%). For this problem the vendor's rock is the chapter's, so this is the row's own model.
 
 <!-- test: file=files/rocscience/joints/rj007_chapter.xlsx, type=fem_ssrm, expected_fs=1.486, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7c, f_stand=1.4765625, f_fail=1.49609375, check=edges, tier=gate -->
 
-Every transcribed input class matches the vendor model, including the side restraint. The manual's
-own table for this problem prints the slope angle as 5°; the figure and the model are the same 55°
+Apart from the joint cohesion, every transcribed input class matches the vendor model, including
+the side restraint. The manual's own table for this problem prints the slope angle as 5°; the figure and the model are the same 55°
 slope problem 6 uses.
 
 **Input file:** [rj007.xlsx](files/rocscience/joints/rj007.xlsx).
 
-![RJ-7: plane failure with non-daylighting discontinuities (rj007) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. No joint reaches the face at a shallower angle than the face itself, so the failure cannot slide out along one: a strong band of shear strain cuts across the steep joints from the toe, and the mass above it moves out over rock it has had to break](images/RJ-7.png)
+![RJ-7: plane failure with non-daylighting discontinuities (rj007) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. No joint reaches the face at a shallower angle than the face itself, so the failure cannot slide out along one: a strong band of shear strain cuts across the steep joints from the toe, the joints above it slip, and the mass above it moves out over rock it has had to break](images/RJ-7.png)
 
 ### 🟢 RJ-8: Flexural toppling in a base friction model (rj008) {#rj-8}
 
@@ -788,7 +807,7 @@ The joint inclinations are the model's: the manual's table prints 59°, where it
 
 ---
 
-### ⊘ RJ-20: Hammah & Yacoub Voronoi slope (rj020) {#rj-20}
+### 🟡 RJ-20: Hammah & Yacoub Voronoi slope (rj020) {#rj-20}
 
 An 80 × 70 m section with a 60 m face at 71.6°, tessellated into Voronoi blocks over the whole of it.
 The rock is Mohr-Coulomb (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 1,000 kPa, φ = 35°, no tensile
@@ -812,12 +831,16 @@ different problem and do not score this row.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
-| at least 2.512 *unconfirmed* | 2.46 | 2.21 vs 2.46 (−10.2%) | 2.21 / 2.37 |
+| **2.541** | 2.46 (+3.3%) | 2.21 vs 2.46 (−10.2%) | 2.21 / 2.37 |
 
-The slope stands at 2.512, but the search does not close above it: the trial at 2.531 ran a
-million iterations, stopped moving, and never balanced its forces, so the row prints its standing
-factor as a lower bound and does not confirm a value. The search takes about six hours, the longest
-run here. The figure shows the mass failing on a surface picked through the block walls rather than
+<!-- test: file=files/rocscience/joints/rj020.xlsx, type=fem_ssrm, expected_fs=2.541, element_type=tri6, target_size=2.895, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-20, f_stand=2.53125, f_fail=2.55078125, check=edges, tier=gate -->
+
+The slope stands at the lower end of the bracket and slides at the upper end. At the lower end the
+section stops moving, but three contacts inside the sliding mass keep opening and closing in a
+cycle that repeats every eight iterations, so the forces never balance exactly; after a million
+iterations with no net movement over the cycle, the trial counts as standing. At the upper end the
+section is still moving at nearly the same rate after 225,000 iterations, and the trial counts as
+sliding. The search takes nearly five hours. The figure shows the mass failing on a surface picked through the block walls rather than
 along any one plane it contains. The paper reports the same of its own Voronoi example: every
 failure mechanism it found had a curved overall shape.
 
@@ -830,4 +853,4 @@ file's outline. This row is scored on the vendor's own tessellation.
 
 **Input file:** [rj020.xlsx](files/rocscience/joints/rj020.xlsx).
 
-![RJ-20: Hammah & Yacoub Voronoi slope (rj020) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The slip runs from the toe up through the block walls on a curved path to the crest, taking whichever wall of each block lies nearest that line, and the rock carries almost no strain except a patch at the toe where the path turns: the mass fails on a surface picked out of the tessellation rather than along any one joint in it](images/RJ-20.png)
+![RJ-20: Hammah & Yacoub Voronoi slope (rj020) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The slip runs from the toe up through the block walls on a curved path toward the crest, where the walls behind the crest open, taking whichever wall of each block lies nearest that line, and the rock carries almost no strain except a patch at the toe where the path turns: the mass fails on a surface picked out of the tessellation rather than along any one joint in it](images/RJ-20.png)

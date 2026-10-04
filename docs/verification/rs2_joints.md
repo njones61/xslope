@@ -151,8 +151,9 @@ referee within a rounding of the value the manual prints for it.
 method: where the thrust between two columns acts. They place each thrust at the top corner of
 the contact. In the solved state the two columns lean together and the contact face stays closed
 only over its upper quarter to half, so the resultant acts a tenth to a sixth of the face height
-below the corner. With those heights read from the solved state, and nothing else changed, the
-same recursion gives **1.0279**, the bottom of this row's bracket. The method's other three
+below the corner. With those heights read from the solved state, and nothing else changed,
+Goodman & Bray's block-by-block limit equilibrium analysis, in which the force needed to hold
+each block is carried down to the block below it, gives **1.0279**, the bottom of this row's bracket. The method's other three
 assumptions are met exactly by the solution: every block balances in force and moment on the
 interface stresses alone, every closed side contact is at its friction limit, and the base
 reaction of every toppling block acts at its downslope corner.
@@ -175,13 +176,13 @@ joints stand where case a's needs 38°. It enters the model as a line load on th
 the upper-left corner of the lowest block, (−2.5, 4.330). It cannot be placed at the toe itself,
 which is the end of the basal joint, where a load has no defined side to act on.
 
-For limit equilibrium, the closed-form recursion on this case needs a horizontal toe force of
+For limit equilibrium, the block-by-block analysis on this case needs a horizontal toe force of
 2,012.86 kN/m, against the 2,013 kN the manual states: a difference of 0.007% on a stack weighing
 83,500 kN/m.
 
 The thrust heights differ from case a's. The toe force pushes the two lowest columns back into
 their own step risers, which carries their thrusts far down the contact faces. With this case's
-own measured heights, the recursion gives **1.0078**, the bottom of this row's bracket.
+own measured heights, the block-by-block analysis gives **1.0078**, the bottom of this row's bracket.
 
 | XSLOPE SSRM | Goodman & Bray referee | RS2 vs referee | UDEC | RS2 without / with improvement |
 |---|---|---|---|---|
@@ -208,7 +209,7 @@ is what the closed form's own pair of answers for cases a and c says as well —
 
 <!-- test: file=files/rocscience/joints/rj001c.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1c, tier=gate, f_stand=1.02734375, f_fail=1.046875, check=edges -->
 
-Given the thrust heights read off the solved state at the block width of 10 m, the recursion
+Given the thrust heights read off the solved state at the block width of 10 m, the block-by-block analysis
 returns **1.0469**, the bottom of that mesh's bracket — case a's mechanism and case a's
 assumption, half a degree of friction further on.
 
@@ -221,9 +222,9 @@ assumption, half a degree of friction further on.
 Case c's joint friction angle with case b's 2013 kN force: the same stack, stabilized. It is the
 strongest of the four, and the closed form and UDEC agree that it is.
 
-Given the thrust heights read off this case's solved state, the recursion returns **1.2422**,
+Given the thrust heights read off this case's solved state, the block-by-block analysis returns **1.2422**,
 the bottom of this row's bracket. Across all four cases XSLOPE stands above the closed form and
-RS2 below it, with UDEC between them, and on each of the four the recursion lands on the row's own
+RS2 below it, with UDEC between them, and on each of the four the block-by-block analysis lands on the row's own
 bottom of the row's own bracket once the thrust is put where the solution puts it rather than at
 the corner of the contact.
 

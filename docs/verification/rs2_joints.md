@@ -826,12 +826,13 @@ is dimensioned at 56° and 28°, and the joint endpoints in the model give 56.3�
 
 ### 🟡 RJ-20: Hammah & Yacoub Voronoi slope (rj020) {#rj-20}
 
-An 80 × 70 m section with a 60 m face at 71.6°, tessellated into Voronoi blocks over the whole of it.
-The rock is Mohr-Coulomb (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 1,000 kPa, φ = 35°, no tensile
-capacity) and every block wall is a joint at c = 500 kPa, φ = 20° with the corpus's standard
-stiffness pair. The source is Hammah, Yacoub & Curran (2009), whose third example is a rock mass
-of Voronoi blocks. The paper holds the block size fixed and follows how the failure changes as the
-slope gets higher, from 10 m to 120 m.
+Problem 20 comes from Hammah, Yacoub & Curran (2009), whose third example is a rock mass of
+Voronoi blocks: polygonal blocks of random shape and size, with every block wall a joint. The
+paper holds the block size fixed and follows how the failure changes as the slope gets higher,
+from 10 m to 120 m. The vendor's model is one of those slopes: an 80 × 70 m section with a 60 m
+face at 71.6°, tessellated into Voronoi blocks over the whole of it. The rock is Mohr-Coulomb
+(γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 1,000 kPa, φ = 35°, no tensile capacity), and every block
+wall is a joint with c = 500 kPa, φ = 20° and the corpus's standard stiffness pair.
 
 The vendor's model departs from that paper in two ways. Its network is coarser: 525 blocks over
 the 4,400 m² section, 0.119 blocks per square meter, where the paper's network has 0.2, so the

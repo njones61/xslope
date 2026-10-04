@@ -5,8 +5,6 @@ description: "Finite element slope stability in XSLOPE: the shear strength reduc
 
 # Finite Element Method for Slope Stability Analysis
 
-## Introduction
-
 The finite element method (FEM) removes the central assumption of limit equilibrium analysis: that
 the engineer already knows the shape and location of the failure surface. Instead of imposing a
 surface and checking equilibrium on it, the FEM solves the stress-strain problem over the whole
@@ -27,6 +25,9 @@ single trial or an SSRM search (with cancel), and view deformation and shear-str
 [Studio → Running Analyses](../studio/analysis.md#finite-element-fem).
 
 ## Governing equations
+
+The stress field must balance the applied loads, while the material law relates stress to strain
+and sets the strength beyond which plastic deformation occurs.
 
 ### Equilibrium
 
@@ -162,46 +163,10 @@ there lies above the true envelope and inflates the factor of safety.
     value of 1.15. The derived constants ($m_b$ = 0.0672, $s$ = 2.605e-5, $a$ = 0.6192) reproduce the paper's
     Table 1 exactly.
 
-### Matric suction (apparent cohesion above the water table)
-
-By default the solver clamps pore pressure to $u = \max(0, u)$ at every Gauss point before the yield
-check, so the negative pore pressures above the water table add no strength. Where matric suction is
-a first-order effect — an unsaturated cut slope, for instance — a per-material unsaturated friction
-angle $\phi^b$ turns that credit on, using the same Fredlund extended Mohr-Coulomb criterion the
-[limit-equilibrium solver uses](../lem/overview.md#matric-suction-apparent-cohesion-above-the-water-table):
-
->>$\tau_f = c' + (\sigma_n - u_a)\tan\phi' + (u_a - u_w)\tan\phi^b$
-
-With pore-air pressure $u_a = 0$ the last term becomes an **apparent cohesion**
-
->>$c_{suction} = \min(s,\; s_{cap})\,\tan\phi^b, \qquad s = \max(0,\; -u_w)$
-
-added to $c'$ in the yield function, where $s$ is the suction at the Gauss point and $s_{cap}$ an
-optional ceiling. The effective-normal-stress term keeps the ordinary clamped $u \ge 0$, so only the
-cohesive intercept picks up the extra strength; below the water table $s = 0$ and the term vanishes.
-
-The suction is drawn from the material's own pore-pressure source and is credited only for the
-effective-stress strength options (`mc`, `pow`, `hb`) with a signed source — `u = piezo` or
-`u = seep`, the only ones carrying negative pressure above the water table. It is inert for `cp` and
-`elastic` materials and for the `none` and `ru` sources, exactly as in the limit-equilibrium solver.
-
-In an SSRM solve the apparent cohesion is reduced by the trial factor alongside $c'$ and
-$\tan\phi'$, $c_{suction,\,r} = \min(s, s_{cap})\tan\phi^b / F$, so the credit scales as $1/F$ and
-enters the reduced envelope on the same footing as the effective cohesion. That distinguishes it
-from the [tension cutoff](solver.md#tensile-strength-in-ssrm), which caps a stress.
-
-$\phi^b$ is blank for every material unless set, so the credit is **off by default**. It is
-controlled by the `phi_b` and `s_cap` columns on the
-[mat worksheet](../usage/input_template.md#worksheet-mat) and read automatically by `solve_fem()` and
-`solve_ssrm()`; their `suction_phi_b` / `suction_cap` arguments override the file.
-
-!!! warning "Cap the suction on a piezometric source"
-    A piezometric line's hydrostatic head grows negative without bound above the line, so the higher a Gauss point
-    sits above it the larger the (unphysical) suction and the larger the credited apparent cohesion. **Always set
-    `s_cap`** when using `phi_b` with `u = piezo`. With `u = seep` the finite-element seepage field is self-bounded
-    by the unsaturated-flow physics, so a cap there is a useful backstop rather than a hard requirement.
-
 ## Finite element formulation
+
+The continuum equations are solved on a mesh by interpolating displacement within each element
+and assembling the element stiffnesses into a system of nodal equations.
 
 ### Discretization
 
@@ -256,6 +221,9 @@ whose solution gives the nodal displacements, and from them the strains and stre
 yield check.
 
 ## Boundary conditions
+
+The assembled equations need displacement restraints to prevent rigid-body motion and boundary
+loads to represent the forces acting on the model.
 
 ### Displacement boundary conditions
 
@@ -413,6 +381,46 @@ and the stresses computed from the displacement solution are **effective stresse
 Physically the added load term converts the body force in submerged soil to its buoyant weight (plus
 seepage forces wherever $u$ is not hydrostatic), so all three effective stress components below a
 flooded boundary come out compressive and level flooded ground sits elastically at rest.
+
+### Matric suction (apparent cohesion above the water table)
+
+The signed pore-pressure field also supplies matric suction above the water table.
+By default the solver clamps pore pressure to $u = \max(0, u)$ at every Gauss point before the yield
+check, so the negative pore pressures above the water table add no strength. Where matric suction is
+a first-order effect — an unsaturated cut slope, for instance — a per-material unsaturated friction
+angle $\phi^b$ turns that credit on, using the same Fredlund extended Mohr-Coulomb criterion the
+[limit-equilibrium solver uses](../lem/overview.md#matric-suction-apparent-cohesion-above-the-water-table):
+
+>>$\tau_f = c' + (\sigma_n - u_a)\tan\phi' + (u_a - u_w)\tan\phi^b$
+
+With pore-air pressure $u_a = 0$ the last term becomes an **apparent cohesion**
+
+>>$c_{suction} = \min(s,\; s_{cap})\,\tan\phi^b, \qquad s = \max(0,\; -u_w)$
+
+added to $c'$ in the yield function, where $s$ is the suction at the Gauss point and $s_{cap}$ an
+optional ceiling. The effective-normal-stress term keeps the ordinary clamped $u \ge 0$, so only the
+cohesive intercept picks up the extra strength; below the water table $s = 0$ and the term vanishes.
+
+The suction is drawn from the material's own pore-pressure source and is credited only for the
+effective-stress strength options (`mc`, `pow`, `hb`) with a signed source — `u = piezo` or
+`u = seep`, the only ones carrying negative pressure above the water table. It is inert for `cp` and
+`elastic` materials and for the `none` and `ru` sources, exactly as in the limit-equilibrium solver.
+
+In an SSRM solve the apparent cohesion is reduced by the trial factor alongside $c'$ and
+$\tan\phi'$, $c_{suction,\,r} = \min(s, s_{cap})\tan\phi^b / F$, so the credit scales as $1/F$ and
+enters the reduced envelope on the same footing as the effective cohesion. That distinguishes it
+from the [tension cutoff](solver.md#tensile-strength-in-ssrm), which caps a stress.
+
+$\phi^b$ is blank for every material unless set, so the credit is **off by default**. It is
+controlled by the `phi_b` and `s_cap` columns on the
+[mat worksheet](../usage/input_template.md#worksheet-mat) and read automatically by `solve_fem()` and
+`solve_ssrm()`; their `suction_phi_b` / `suction_cap` arguments override the file.
+
+!!! warning "Cap the suction on a piezometric source"
+    A piezometric line's hydrostatic head grows negative without bound above the line, so the higher a Gauss point
+    sits above it the larger the (unphysical) suction and the larger the credited apparent cohesion. **Always set
+    `s_cap`** when using `phi_b` with `u = piezo`. With `u = seep` the finite-element seepage field is self-bounded
+    by the unsaturated-flow physics, so a cap there is a useful backstop rather than a hard requirement.
 
 ## K0 initial stress
 
@@ -772,6 +780,9 @@ a captured mechanism simply omits those rows.
 
 ### Mesh file contents
 
+The mesh file records nodal coordinates, connectivity and material assignments for the 2D domain
+and any 1D structural elements.
+
 | Field | Description |
 |-------|-------------|
 | `nodes` | Node coordinates. |
@@ -784,6 +795,8 @@ a captured mechanism simply omits those rows.
 
 ### Nodal results columns
 
+The nodal results locate each node and give its total and viscoplastic displacement.
+
 | Column | Description |
 |--------|-------------|
 | `node_id` | 1-based node number. |
@@ -792,6 +805,8 @@ a captured mechanism simply omits those rows.
 | `u_x_vp`, `u_y_vp`, `u_mag_vp` | Viscoplastic displacement (total minus elastic) components and magnitude. |
 
 ### Element results columns
+
+The element results describe the stress, strain and yield state within the 2D domain.
 
 | Column | Description |
 |--------|-------------|
@@ -807,6 +822,8 @@ a captured mechanism simply omits those rows.
 | `yield_function` | Mohr-Coulomb yield function for the final stress state. |
 
 ### Reinforcement results columns
+
+For reinforcement, the results pair each element's axial force with its capacity and softening state.
 
 | Column | Description |
 |--------|-------------|
@@ -825,6 +842,9 @@ $T_{max}$ plateau, are what the line's reported state is built from — *within 
 [The state of a line](reinforcement.md#the-state-of-a-line).
 
 ### Pile results columns
+
+For piles, the results include axial and lateral forces, bending moments and the capacity flags
+and plastic rotations that describe yielding.
 
 | Column | Description |
 |--------|-------------|

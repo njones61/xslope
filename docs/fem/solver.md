@@ -5,9 +5,15 @@ description: "Finite element trial settings, viscoplastic iteration, convergence
 
 # Solver
 
+The solver takes the mesh, materials, loads and initial stress defined in the
+[Overview](overview.md) and iterates a trial at a specified strength reduction factor until
+the trial is decided or its stopping rules leave it undecided. A search over trial factors
+locates the factor of safety. The run settings control both the individual trials and the search.
+
 ## Run settings
 
-In [XSLOPE Studio](../studio/analysis.md#finite-element-fem), build a mesh and choose
+Choose a single trial to test a specified factor, or an SSRM search to locate the stability
+boundary. In [XSLOPE Studio](../studio/analysis.md#finite-element-fem), build a mesh and choose
 **Run FEM…** for a single strength-reduction trial or an SSRM search.
 
 ![Run FEM dialog](../studio/images/analysis_run_fem_dialog.png){width=818}
@@ -53,7 +59,8 @@ the fixed base, side edges and loads, including the added restraint of fixed sid
 
 ## Elastic-plastic behavior: the viscoplastic algorithm {#elastic-plastic-behavior-viscoplastic-algorithm}
 
-The **viscoplastic algorithm** of
+At a fixed trial factor, the solver reduces the material strengths and seeks equilibrium
+under the applied loads. The **viscoplastic algorithm** of
 [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387) and Smith & Griffiths (2004)
 returns stress a Gauss point cannot carry as a body load built from accumulated viscoplastic
 strains. The elastic stiffness matrix is assembled and factorized **once**, then reused by
@@ -643,79 +650,14 @@ element forces — everything `plot_fem_results()` and `export_fem_solution()` n
 the [yield reading](#the-yield-check) (`max_yield_violation`, `n_yield_above_1pct`,
 `max_yield_at`, `yield_flagged`) and, where a corrector decided the trial, the `corrector` record.
 
-## Shear strength reduction method (SSRM)
+## SSRM failure criteria
 
-The SSRM (Matsui & San, 1992; Griffiths & Lane, 1999) reduces soil strength until the
-finite element system can no longer find equilibrium under the applied loads, without assuming
-a failure surface. The reduction factor at that transition is the factor of safety, consistent
-with the limit-equilibrium definition.
+The convergence tests and displacement history supply the evidence for deciding a trial.
+Four criteria are selectable through the `failure_criterion` argument of `solve_ssrm()`;
+the first three use trial verdicts in a bisection, while the fourth reads the displacement
+curve from a sweep of trial factors.
 
-### Methodology
-
-Each trial divides both strength components by the trial factor,
-
->>$c_r = \dfrac{c}{F}$<br>
-$\tan \phi_r = \dfrac{\tan \phi}{F}$
-
-reducing $\tan\phi$ rather than $\phi$ so the scheme stays well behaved as the friction angle
-approaches zero. As $F$ rises, more Gauss points yield, displacements grow, and at some point the
-viscoplastic iteration stops reaching equilibrium at all. `solve_ssrm()` brackets that transition
-and bisects it.
-
-![fem_ov_ssrm_sweep.png](images/fem_ov_ssrm_sweep.png){width=760}
-
-The sweep above is the [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1)
-sample file solved at fixed strength reduction factors on a deliberately coarse mesh: trials below
-the critical factor settle to equilibrium with small viscoplastic displacement, trials above it
-never settle and their displacement runs away. The bisection locates that transition — here 1.36 on
-this illustration mesh, against the paper's 1.4 and the finer meshes used for the verification
-benchmark. The displacement of a failing trial depends on the iteration budget it was given, which is
-why the bisection uses the trial's *verdict* rather than the displacement magnitude.
-
-### In-situ equilibration
-
-Under a **slope** the same field is not an equilibrium. There is no soil column beside the face to
-balance the lateral stress there, so a substantial share of the weight is left out of balance and
-has to redistribute — about a quarter of it on Griffiths & Lane Example 1.
-
-That redistribution is part of **establishing the in-situ state** rather than of strength reduction,
-and the SSRM runs the two as separate steps. A $K_0$ analysis begins with one
-**full-strength equilibration solve**: the $K_0$ field settles against the real geometry at
-unreduced strength, and every bisection trial then starts from the resulting stress state, with a
-zero displacement datum, and reduces strength from there. On a jointed model the state carried
-into each trial includes every joint's slip history — how far each pair has slid, whether it stands
-open, and its residual and dilation state — so a joint that slid while the slope settled starts
-the trial where the settling left it, not pushed back onto its limit as if it had never moved. The
-equilibration is solved once and shared by all trials, and its outcome is returned in
-`result['k0_equilibration']`.
-
-If the two steps were run together, every trial would repeat the in-situ redistribution against soil
-already weakened by $F$ and charge the displacement and plastic strain it produces to the trial.
-On Example 1 at $K_0 = 1$, $F = 1.2$, that gives about three times the displacement the strength
-reduction actually causes.
-
-Displacements are reported relative to the equilibrated state, because the in-situ travel is an
-artifact of imposing a stress field the geometry does not hold in equilibrium, not motion of the
-slope. Stresses and structural forces — bar tensions, pile end forces — are functions of the
-absolute displacement and are unaffected by where its zero is put.
-
-A single `solve_fem()` call at full strength *is* an equilibration solve. At a reduced $F$ a single
-call does both at once, which is the sequencing the SSRM avoids; use `solve_ssrm()` when the two
-must be kept apart. If the equilibration does not come back stable, the slope does not stand at full
-strength with that initial stress ($FS < 1$): XSLOPE warns, and the bisection proceeds without a
-carried in-situ state and finds the sub-unity factor of safety.
-
-For a non-converged trial, note that the displacement scale the
-[hybrid criterion](#ssrm-failure-criteria) measures against is the elastic response to the
-**applied** load, which is the same quantity with or without $K_0$. What $K_0$ changes is the zero —
-a trial's displacement is counted from the equilibrated in-situ state, so it carries only the
-movement the strength reduction causes.
-
-### SSRM failure criteria
-
-Four criteria are selectable through the `failure_criterion` argument of `solve_ssrm()`.
-
-#### 1. Non-convergence (`"non_convergence"`)
+### 1. Non-convergence (`"non_convergence"`)
 
 The classical Griffiths & Lane (1999) approach: bisection on whether the viscoplastic iteration
 converges. In XSLOPE "converges" means **true equilibrium** — both the CHECON displacement test and
@@ -732,7 +674,7 @@ Validated against Griffiths & Lane Example 1 (FS ≈ 1.40 vs published 1.4), the
 without free surface (≈ 2.4–2.5 vs published ~2.4), and the geogrid-reinforced slope (≈ 1.65 vs the
 limit-equilibrium Spencer value 1.59 on the same model).
 
-#### 2. Hybrid (`"hybrid"`, default) {#2-hybrid-hybrid-default}
+### 2. Hybrid (`"hybrid"`, default) {#2-hybrid-hybrid-default}
 
 The same bisection, with one addition: **a trial that fails to reach equilibrium must also show
 displacement evidence of failure before the bisection counts it as a failed slope.**
@@ -801,13 +743,13 @@ inconclusive the hybrid defers rather than overriding.
 Pass `failure_criterion="non_convergence"` for the classical Griffiths & Lane verdict; it remains
 fully supported, and every criterion returns the same per-trial records.
 
-#### 3. Displacement limit (`"displacement_limit"`)
+### 3. Displacement limit (`"displacement_limit"`)
 
 Bisection on whether the maximum viscoplastic displacement exceeds `max_disp_factor` of the mesh
 height within the iteration budget. A simple physical backstop, but its verdict is coupled to the
 budget for any state that creeps slowly rather than racing.
 
-#### 4. Displacement catastrophe (`"displacement_increase"`)
+### 4. Displacement catastrophe (`"displacement_increase"`)
 
 Sweeps $F$, locates the sharpest upturn of displacement versus $F$ (the evidence Griffiths & Lane
 present as their Figs 2 and 18), and refines around it; related to the average-residual-displacement
@@ -818,7 +760,10 @@ lowest and highest $F$ becomes the measurement point and the curve is re-read th
 the measurement on the mechanism rather than on any localized background deformation that grows at
 *all* $F$. A specific point can be supplied through `char_point=(x, y)`.
 
-#### Choosing a criterion
+### Choosing a criterion
+
+Use the hybrid criterion for the stability search unless the analysis calls for a published
+non-convergence convention or a displacement curve as its evidence.
 
 | Problem class | Criterion | Why |
 |---|---|---|
@@ -830,7 +775,81 @@ FEM-SSRM and limit equilibrium are different formulations, and some difference i
 of safety is expected; running both — as the verification suite does — is the strongest consistency
 check available.
 
+## Shear strength reduction method (SSRM)
+
+With a criterion chosen, successive trials locate the stability boundary. The SSRM
+(Matsui & San, 1992; Griffiths & Lane, 1999) reduces soil strength until the
+finite element system can no longer find equilibrium under the applied loads, without assuming
+a failure surface. The reduction factor at that transition is the factor of safety, consistent
+with the limit-equilibrium definition.
+
+### Methodology
+
+Each trial divides both strength components by the trial factor,
+
+>>$c_r = \dfrac{c}{F}$<br>
+$\tan \phi_r = \dfrac{\tan \phi}{F}$
+
+reducing $\tan\phi$ rather than $\phi$ so the scheme stays well behaved as the friction angle
+approaches zero. As $F$ rises, more Gauss points yield, displacements grow, and at some point the
+viscoplastic iteration stops reaching equilibrium at all. `solve_ssrm()` brackets that transition
+and bisects it.
+
+![fem_ov_ssrm_sweep.png](images/fem_ov_ssrm_sweep.png){width=760}
+
+The sweep above is the [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1)
+sample file solved at fixed strength reduction factors on a deliberately coarse mesh: trials below
+the critical factor settle to equilibrium with small viscoplastic displacement, trials above it
+never settle and their displacement runs away. The bisection locates that transition — here 1.36 on
+this illustration mesh, against the paper's 1.4 and the finer meshes used for the verification
+benchmark. The displacement of a failing trial depends on the iteration budget it was given, which is
+why the bisection uses the trial's *verdict* rather than the displacement magnitude.
+
+### In-situ equilibration
+
+Before reducing strength, a search with $K_0$ initialization must establish an equilibrated
+in-situ state. The [at-rest stress field](overview.md#k0-initial-stress) is not an equilibrium
+under a **slope**. There is no soil column beside the face to
+balance the lateral stress there, so a substantial share of the weight is left out of balance and
+has to redistribute — about a quarter of it on Griffiths & Lane Example 1.
+
+That redistribution is part of **establishing the in-situ state** rather than of strength reduction,
+and the SSRM runs the two as separate steps. A $K_0$ analysis begins with one
+**full-strength equilibration solve**: the $K_0$ field settles against the real geometry at
+unreduced strength, and every bisection trial then starts from the resulting stress state, with a
+zero displacement datum, and reduces strength from there. On a jointed model the state carried
+into each trial includes every joint's slip history — how far each pair has slid, whether it stands
+open, and its residual and dilation state — so a joint that slid while the slope settled starts
+the trial where the settling left it, not pushed back onto its limit as if it had never moved. The
+equilibration is solved once and shared by all trials, and its outcome is returned in
+`result['k0_equilibration']`.
+
+If the two steps were run together, every trial would repeat the in-situ redistribution against soil
+already weakened by $F$ and charge the displacement and plastic strain it produces to the trial.
+On Example 1 at $K_0 = 1$, $F = 1.2$, that gives about three times the displacement the strength
+reduction actually causes.
+
+Displacements are reported relative to the equilibrated state, because the in-situ travel is an
+artifact of imposing a stress field the geometry does not hold in equilibrium, not motion of the
+slope. Stresses and structural forces — bar tensions, pile end forces — are functions of the
+absolute displacement and are unaffected by where its zero is put.
+
+A single `solve_fem()` call at full strength *is* an equilibration solve. At a reduced $F$ a single
+call does both at once, which is the sequencing the SSRM avoids; use `solve_ssrm()` when the two
+must be kept apart. If the equilibration does not come back stable, the slope does not stand at full
+strength with that initial stress ($FS < 1$): XSLOPE warns, and the bisection proceeds without a
+carried in-situ state and finds the sub-unity factor of safety.
+
+For a non-converged trial, note that the displacement scale the
+[hybrid criterion](#ssrm-failure-criteria) measures against is the elastic response to the
+**applied** load, which is the same quantity with or without $K_0$. What $K_0$ changes is the zero —
+a trial's displacement is counted from the equilibrated in-situ state, so it carries only the
+movement the strength reduction causes.
+
 ### The `solve_ssrm()` function
+
+`solve_ssrm()` manages the initial equilibration, the search over trial factors and the optional
+failure-state capture, using the selected criterion to interpret the trial results.
 
 ```python
 from xslope.fem import solve_ssrm
@@ -978,7 +997,8 @@ give identical factors of safety on the same mesh, and the conforming mesh's own
 
 ### Tensile strength in the SSRM {#tensile-strength-in-ssrm}
 
-Mohr-Coulomb is not a compression-only criterion. Extended into the tensile quadrant, the straight
+The reduced region also needs a tensile-strength rule: reducing cohesion and friction alone
+does not make the material compression-only. Mohr-Coulomb is not a compression-only criterion. Extended into the tensile quadrant, the straight
 envelope closes on an apex at
 
 >>$\sigma'_t = -\dfrac{c}{\tan\phi}$

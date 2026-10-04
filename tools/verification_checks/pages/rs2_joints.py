@@ -20,7 +20,7 @@ CONFIG = PageConfig(
         ('0.1798', 'The stack stands at k'),
         ('0.1814', 'The stack stands at k'),
         ('0.25', 'fails at every one above'),
-        ('1.016', 'scaled by 1.016 and then by 0.5'),
+        ('1.016', 'every unit weight scaled by 1.016 and then by'),
         # problem 2: the 0.76 is what Alejano & Alonso PRINT for their own
         # Goodman & Bray recursion; the page recomputes it as 0.7734.
         ('0.76', 'against the 0.76 Alejano'),

@@ -676,17 +676,6 @@ RS2's 1.28 sit just above it; the closed form and Alejano's own UDEC run, 1.6, s
 
 <!-- test: file=files/rocscience/joints/rj015.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-15, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate -->
 
-**Alejano's equations evaluate one fixed mechanism, and every program free to search for its own
-failure surface finds a weaker one.** In Eqs. (9)–(10) a wedge is driven out through a single slab,
-and the break-out surface always crosses exactly one 2 m bed. Their factor rises with the bed
-thickness, so the thinnest break-out the formula allows also gives the lowest factor it can report.
-XSLOPE's strength reduction at 1.271, RS2's at 1.28 and the Slide2 search at 1.25 have no such
-restriction, and they sit inside 2.4% of one another, far below the closed form. Both finite
-element programs differ from the closed form by the same amount and in the same direction, so the
-gap comes from what the formula is able to consider, not from either program. The searched
-limit-equilibrium answer is therefore the referee, as the rigid-block ceiling is on
-[problem 11](#rj-11).
-
 The rock's 1000 kPa
 tensile cap is above the apex of its Mohr-Coulomb envelope and never controls.
 
@@ -700,15 +689,20 @@ Problem 16 is a laboratory test rather than a slope. Fourteen columns of 9 cm bl
 into a 63.4° staircase on a plate, and the plate is tilted until the stack topples; the problem
 reports the tilt angle at which that happens. The blocks are elastic (E = 350 MPa, ν = 0.2,
 γ = 28 kN/m³) on an effectively rigid plate, and the joints have no cohesion, φ = 38°, and the
-corpus's softest stiffness pair, the same as problem 15's. In the vendor's files the 0° model sits on rollers, while the
-nine tilted models fix every exterior node in both directions and converge to a tolerance a
-hundred times tighter. The plate carries no body force in any of the ten.
+corpus's softest stiffness pair, the same as problem 15's. In the vendor's files, the untilted model rests on rollers at its sides, while the nine tilted
+models fix every boundary node in both directions and use a convergence tolerance a hundred times
+tighter. The plate is weightless in all ten files.
 
-The vendor tilts the model itself, with one file per degree of tilt. XSLOPE keeps the model level
-and turns the load instead. A tilt θ is represented by a horizontal seismic coefficient k = tan θ
-acting toward the face, and k is raised, with the strengths unreduced (F = 1), until the stack no
-longer stands. The mesh size is the block size, 0.09 m, following the corpus's rule of meshing at
-the joint spacing.
+The vendor represents the tilt by rotating the model, one file per degree. XSLOPE keeps the model
+level and tilts the body force instead: a tilt θ is represented by a horizontal seismic coefficient
+k = tan θ toward the face, so the resultant body force acts at θ from the model's vertical, as
+gravity does on the tilted table. Its magnitude is larger by 1/cos θ, 1.6% at 10.2°, which does not
+change the result here: the joints have friction only and the blocks cannot yield, so the tilt at
+which the stack can no longer stand depends on the direction of the body force and not on its size.
+Re-solving the standing and failing coefficients with every unit weight scaled by 1.016 and then by
+0.5 leaves both results unchanged. k is raised, with the strengths unreduced (F = 1), until the
+stack no longer stands, and the tilt reported is arctan k. The mesh size is the block size, 0.09 m,
+following the corpus's rule of meshing at the joint spacing.
 
 | XSLOPE tilt | UDEC referee | RS2 vs referee | Experiment | Goodman & Bray, plate tilted | RS2 without / with improvement |
 |---|---|---|---|---|---|
@@ -721,14 +715,6 @@ stands at every coefficient tried below that and fails at every one above, throu
 test for this row re-solves both coefficients at full strength. When the solver is left to iterate with
 no rule deciding whether a trial stands or fails, the result is the same: the stack comes to rest
 at every tilt up to 9.9° and moves at a steady rate from 10.2° on.
-
-**A seismic coefficient is not exactly a rotation, but on this model the difference has no
-measurable effect.** Tilting the model by θ turns the body force through θ and leaves its magnitude
-at γ. A coefficient k = tan θ turns it through the same angle and also multiplies its magnitude by
-1/cos θ, which is 1.6% more at 10.2°. With zero joint cohesion and no block able to yield, the
-state depends on the direction of the body force and not on its size. Re-solving the standing and
-failing coefficients with every unit weight scaled by 1.016 and then by 0.5 leaves both results
-unchanged.
 
 Goodman & Bray's column analysis, with the plate tilted, puts the toppling tilt of these rigid
 columns at 7.6°. It allows no contact pressure below a column's corner, so it is a lower bound, and

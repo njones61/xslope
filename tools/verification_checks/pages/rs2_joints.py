@@ -21,10 +21,6 @@ CONFIG = PageConfig(
         ('0.1814', 'The stack stands at k'),
         ('0.25', 'fails at every one above'),
         ('1.016', 'scaled by 1.016 and then by 0.5'),
-        # the plowing methodology bullet: Alejano's Eq. (7) and the rigid-block
-        # ceiling on problem 11 are referee values, not XSLOPE results
-        ('1.76', 'exceeds the ceiling (1.76 against'),
-        ('1.21', '1.21), so the ceiling is the referee there'),
         # problem 2: the 0.76 is what Alejano & Alonso PRINT for their own
         # Goodman & Bray recursion; the page recomputes it as 0.7734.
         ('0.76', 'against the 0.76 Alejano'),

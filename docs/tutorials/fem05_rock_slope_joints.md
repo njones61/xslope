@@ -204,7 +204,7 @@ opens for a model that has joints.
 
 Press **Run**. The search takes about **two minutes** on an ordinary desktop —
 nearer three on an install that does not include the
-[compiled kernel](../fem/overview.md#fast-kernel) — and reports
+[compiled kernel](../fem/solver.md#fast-kernel) — and reports
 
 <!-- test: file=files/xslope_rock_joints.xlsx, type=fem_ssrm, expected_fs=1.199, element_type=tri6, target_size=1.5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-5-slab-ssrm -->
 

@@ -291,9 +291,9 @@ Plaxis' — so the factor of safety is the factor by which the whole envelope, s
 RS2 model imported with `xslope.rs2.read_fez` (or Studio's
 [File → Import RS2](../studio/analysis.md#geostudio-slopew-import-and-export)) brings its caps across
 automatically. See
-[Tensile Strength in SSRM](../fem/overview.md#tensile-strength-in-ssrm) for the mechanics and a worked case.
+[Tensile Strength in SSRM](../fem/solver.md#tensile-strength-in-ssrm) for the mechanics and a worked case.
 
-See [Tension cutoff](../fem/overview.md#elastic-plastic-behavior-viscoplastic-algorithm) in the FEM overview for
+See [Tension cutoff](../fem/solver.md#elastic-plastic-behavior-viscoplastic-algorithm) on the Solver page for
 how the FEM applies the cutoff during the viscoplastic solve.
 
 **Pore Pressure Options** (column labeled **u**):
@@ -526,7 +526,7 @@ stay within the domain polygon, which can therefore represent an irregular bedro
 ### SSR zones {#ssr-zones}
 
 A polygon whose **Type** begins with `ssr` is not a material zone at all. It is an **SSR zone** — an
-analysis overlay that tells the finite-element [strength reduction method](../fem/overview.md#ssr-exclusion-zones)
+analysis overlay that tells the finite-element [strength reduction method](../fem/solver.md#ssr-exclusion-zones)
 which part of the model to weaken.
 
 | Type | Meaning |
@@ -564,7 +564,7 @@ model and a competing one elsewhere would otherwise take over — a stiff founda
 forces the failure up into the fill above it. This is RS2's "SSR Search Area" and "SSR Exclusion Area",
 and both senses are drawn directly: mark the region you want reduced `ssr reduce`, or mark the region you
 want held `ssr hold`. Both forms, and when each is the natural one to use, are covered under
-[SSR search areas and exclusion zones](../fem/overview.md#ssr-exclusion-zones).
+[SSR search areas and exclusion zones](../fem/solver.md#ssr-exclusion-zones).
 
 A zone drawn on the polygon sheet applies to every run of the model. A search-area polygon passed
 explicitly to a run takes precedence over the file's zones (XSLOPE warns when both are present, rather

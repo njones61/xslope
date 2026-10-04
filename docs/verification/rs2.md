@@ -31,7 +31,7 @@ the shared [References](references.md) page.
   an elastic twin) is carried in the file, or the row says why it is not.
 - **Deep mechanisms.** Where the published mechanism is deeper than the unconstrained one, the row
 reports both, the deep value under the [`min_slip_depth`
-filter](../fem/overview.md#surficial-skin-failures-and-the-minimum-slip-depth-filter).
+filter](../fem/solver.md#surficial-skin-failures-and-the-minimum-slip-depth-filter).
 - **Limit-equilibrium rows.** A few rows are verified by limit equilibrium because their published
   target is an LEM quantity: a critical seismic coefficient ([#68](#rs2-68)), an LEM-versus-SRM
   column ([#61](#rs2-61)), a multi-method table or limit-analysis bound ([#51](#p4-vp51),
@@ -1184,7 +1184,7 @@ prices a uniformly saturated infinite slope, where the band the model finds is f
 only between the daylight and the toe, so it is shown beside and does not set the dot. RS2 reports
 the other mechanism, a surface from the crest down through the clay core and out along the
 foundation contact under the downstream shell. Excluding anything shallower than 30 ft with
-[`min_slip_depth`](../fem/overview.md#surficial-skin-failures-and-the-minimum-slip-depth-filter)
+[`min_slip_depth`](../fem/solver.md#surficial-skin-failures-and-the-minimum-slip-depth-filter)
 returns that band, at **1.521**, −0.6% on RS2's 1.53:
 
 | `min_slip_depth` (ft) | off | 15 | 20 | 30 | 50 | 80 |

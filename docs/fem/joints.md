@@ -344,8 +344,8 @@ and holding as the ground around it settles, so a small imbalance remains howeve
 goes on. A jointed trial that neither converges nor runs away is therefore judged by what the
 slope is doing. If the joints are still slipping at a steady rate and the slope keeps moving, the
 slope is failing on its joints. If the slip has stopped growing and the movement has stopped,
-the slope is standing. [The joint verdict](overview.md#the-joint-verdict) and
-[the trend reading](overview.md#creep-trend) on the overview page give the thresholds.
+the slope is standing. [The joint verdict](solver.md#the-joint-verdict) and
+[the trend reading](solver.md#creep-trend) on the Solver page give the thresholds.
 
 A contact can also cycle. Where a joint with cohesion but no tensile strength holds a contact at
 zero normal stress, the contact switches every few iterations between closed, carrying shear, and
@@ -354,11 +354,11 @@ joint law at such a contact, so the forces never balance there. A trial that rea
 iteration ceiling with only one to four contacts cycling and no net movement is counted as
 standing, and the log and the closing summary say so: "stands: the only movement is 3
 contacts cycling (period 8 iterations), no net movement; force balance not met", with each
-contact named by its line and location. [The joint verdict](overview.md#the-joint-verdict) gives
+contact named by its line and location. [The joint verdict](solver.md#the-joint-verdict) gives
 the thresholds.
 
 The standing classification applies only under the default `hybrid`
-[failure criterion](overview.md#ssrm-failure-criteria), which is the right choice for a jointed
+[failure criterion](solver.md#ssrm-failure-criteria), which is the right choice for a jointed
 model. The `non_convergence` criterion is the classical rule of Griffiths and Lane, where any
 trial that has not converged by the iteration limit counts as failed; it is kept for
 reproducing published results obtained that way. On a jointed model it counts a standing slope
@@ -366,7 +366,7 @@ as failed, so do not use it there.
 
 While a trial is slowing down, the run periodically takes a shortcut: from the state the trial
 has reached, it solves directly for a state in which the forces balance (the
-[Newton corrector](overview.md#finishing-a-trial-with-the-newton-corrector)). If it finds one,
+[Newton corrector](solver.md#finishing-a-trial-with-the-newton-corrector)). If it finds one,
 the trial ends as standing; for jointed models, the ordinary iteration first continues from that
 state for a few hundred iterations to confirm that the slope stays put. If the shortcut finds
 nothing, the ordinary iteration carries on and the trial is judged by its movement as above.

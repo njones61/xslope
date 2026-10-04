@@ -29,7 +29,7 @@ The analysis uses the same **Taylor Series Probability Method (TSPM)**:
 The analysis runs $1 + 2N$ SSRM solves (one at the most-likely values plus a
 $F^+$/$F^-$ pair for each of the $N$ uncertain parameters), all on a **single
 shared mesh** — only the material-to-element mapping is rebuilt per perturbation.
-The [auto-expanding SSRM bracket](../fem/overview.md) makes this practical:
+The [auto-expanding SSRM bracket](../fem/solver.md#the-solve_ssrm-function) makes this practical:
 each perturbation shifts the factor of safety, and the bracket adjusts itself so a
 fixed `F_min`/`F_max` does not have to bracket every perturbed case in advance.
 
@@ -53,7 +53,7 @@ proportionally larger change in $\beta$, enough to flip the last shown digit of 
 reliability between two bracket choices.
 
 To remove that entirely, `reliability_fem` runs each SSRM on a **fixed global grid**
-(`grid = tolerance`, default 0.001; see [`solve_ssrm`](../fem/overview.md)). Instead of
+(`grid = tolerance`, default 0.001; see [`solve_ssrm`](../fem/solver.md#the-solve_ssrm-function)). Instead of
 halving your bracket, it locates the single global grid cell that straddles the
 failure threshold — a property of the slope and mesh rather than of the bracket — so *every*
 starting bracket lands in the same cell. The result is **identical to every decimal

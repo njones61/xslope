@@ -6260,7 +6260,7 @@ def _vp_gate_armed(iteration, last_progress_iter, disp_hist, u_elastic_scale):
     untouched; the displacement cap, the runaway rule, the budget and the ceiling are
     untouched; and a trial whose loop really has stopped — flat residual, still field,
     inadmissible stress — still reaches the gate, still gets its corrector attempt, and
-    is still FAILED on a refusal.
+    is undecided on a refusal; the bisection handles it on its uncertainty path.
     """
     if (iteration - last_progress_iter) <= _NO_PROGRESS_WINDOW:
         return False

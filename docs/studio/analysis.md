@@ -118,7 +118,7 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
   auto-search. On a cohesionless face the critical surface is an infinitely shallow
   skin slide, and without the filter the search finds it instead of the deep-seated
   mechanism a design wants; see [surficial failures and the minimum-slip-depth
-  filter](../fem/overview.md#surficial-skin-failures-and-the-minimum-slip-depth-filter)
+  filter](../fem/solver.md#surficial-skin-failures-and-the-minimum-slip-depth-filter)
   for how to choose the depth.
 - **Search tolerances** (`fs_tol`, `tol`, `max_iter`) — enabled for the
   search-driven analyses.
@@ -626,35 +626,14 @@ saved trigger the same rerun as a free-entry seepage time.
 
 ## Finite element (FEM)
 
-In **FEM** mode, **Run FEM…** offers a **single trial** or an **SSRM** run (the
-Shear Strength Reduction Method), with `F` (or `F_min`/`F_max`), a tolerance, and
-the failure criterion.
+In **FEM** mode, choose **Run FEM…** after building a mesh. The
+[Solver run-settings table](../fem/solver.md#run-settings) maps every dialog option
+to its Excel input, API argument and explanation.
 
-![Run FEM dialog](images/analysis_run_fem_dialog.png)
-
-**Max iterations per trial** (12000) is the point at which a trial that has not converged
-is classified by the trend of its movement. Movement dying away at a steady rate is handed to the
-Newton corrector, from where the trial is and then from where the movement is heading;
-a balanced state it finds (and, on a jointed model, the hold test confirms) counts as
-standing. Movement that does not slow is counted as sliding. Movement still dying away
-that the corrector cannot finish, or with no clear trend, is given another
-Max iterations' worth, up to the **Iteration ceiling** (50000); at the ceiling a trial
-whose out-of-balance force is still falling is *inconclusive* — neither settled nor
-failed — and the run reports this in the Log rather than counting it as a failure. When
-that trial is still the top of the final bracket, the run found no failure, so the
-answer reads "FS ≥" the highest strength the slope came to rest at: no trial above it
-was shown to fail. The closing summary quotes the
-measurement that decided each end of the bracket. Raise the ceiling, or loosen the SSRM
-tolerance, when a trial is inconclusive, and raise Max iterations per trial when the
-summary states that the factor of safety depends on the iteration limit.
-
-**Accelerate convergence** is checked by default when the model has a joint. Each
-iteration's step is lengthened where the last two iterations show the solution still
-heading the same way, so a slowly settling jointed trial reaches the same balanced state
-in fewer iterations; a step that would change whether a joint is open or slipping is taken
-at the ordinary length, and the longer steps wait until the trial's corrector checkpoints
-(300, 1,000 and 3,000 iterations) have been reached. The Log's opening lines for a run show
-whether acceleration was on. Uncheck it to run the ordinary iteration.
+The closing summary quotes the measurement that decided each end of the bracket.
+Raise the ceiling, or loosen the SSRM tolerance, when a trial is inconclusive, and
+raise **Max iterations per trial** when the summary states that the factor of safety
+depends on the iteration limit.
 
 The [model checks](#model-checks-before-a-run) in the dialog's second column are the
 finite-element ones: a blank Poisson's ratio (which is read as 0.0 and changed the
@@ -664,14 +643,10 @@ cohesive material with no tensile cap, which leaves it the tension its own envel
 allows — up to the Mohr-Coulomb apex c/tan φ — and raises the factor of safety with
 nothing else on screen to show it.
 
-**Reduce the tensile cap with F (Tension SRF)** decides whether each material's
-tensile cutoff is divided by the trial factor along with *c* and tan φ, or held at the
-value entered. It is offered only where some material declares a cutoff above zero. A
-blank cutoff leaves the envelope's own apex, which is the same at every trial factor,
-and a cutoff of 0 is still 0 however it is divided, so on
-a model whose materials are each blank or 0 the setting has nothing to reduce and the
-checkbox is dimmed, with the reason in its tooltip. It is also dimmed for a single
-trial, which has no bracket to reduce anything over.
+**Tension SRF** is dimmed for a single trial and for a model whose tensile cutoffs
+are all blank or 0; the tooltip gives the reason. It is offered only where a material
+declares a positive cutoff. The [tensile-strength section](../fem/solver.md#tensile-strength-in-ssrm)
+explains the reduction and the invariant apex.
 
 When the seismic coefficient is nonzero the checks also carry a note about what its
 **sign** means here, because it does not mean the same thing in both engines. The
@@ -682,16 +657,8 @@ factor of safety can legitimately come out *above* the static one for the face t
 shaking stabilizes. The limit-equilibrium engine reads the same cell as a magnitude
 and orients it itself, and its own dialog notes this.
 
-**Side BC** chooses what holds the left and right edges of the model. **Rollers** —
-the default, and the setting for any model that does not state one — fixes the
-horizontal component and leaves the vertical free, so the truncated ground can still
-settle under its own weight. **Fixed** clamps both components, which is what RS2 does
-on its side boundaries. Fixed matches the vendor's setting rather than improving the model: it
-adds shear restraint the real ground does not have, and stiffens a domain truncated
-close to the slope. The setting is part of how the model is restrained rather than
-part of the strength reduction, so it applies to a single trial and an SSRM alike. Like
-the other run options it is seeded from the open file (`main!D22`) and remembered for
-the session, but a choice made here is not written back into the file.
+Run options, including **Side BC**, are seeded from the open file and remembered
+for the session; a dialog choice is not written back into the file.
 
 When the model carries a transient seepage solution the dialog also carries the
 **Seepage time** group, which names the instant the pore pressures are read from —
@@ -703,29 +670,16 @@ material zone in the model, checked (included) by default:
 
 ![SSR exclusions dialog](images/analysis_ssr_exclude_dialog.png)
 
-Unchecking a zone holds it at full strength through every trial factor instead of
-dividing its c and tan(φ) like the rest of the model — RS2's per-material *Apply_SSR*
-flag / SSR Exclusion Area. The mechanism is pushed up and out of an excluded zone, which
-is useful for keeping a non-participating zone (a stiff foundation, say) from carrying
-the failure, and for reproducing a vendor analysis that constrains the mechanism the same
-way — see [SSR Exclusion Zones](../fem/overview.md#ssr-exclusion-zones) for the
-engineering rationale and a worked comparison against RS2. The button and the summary
-label next to it are available only for the SSRM analysis; the choice is a run option, not a model
-property, so it lives with the rest of the dialog's settings (remembered for the session
-to prefill the next run) rather than being saved into the input file.
+Unchecking a zone excludes it from strength reduction; see
+[SSR search areas and exclusion zones](../fem/solver.md#ssr-exclusion-zones) for
+the engineering rationale and worked RS2 comparison. The button and summary label
+are available only for SSRM. The selection is remembered for the session, not saved
+into the input file.
 
-An SSRM run also offers **failure-state capture**. Once the factor-of-safety
-bracket resolves, **Capture failure-state mechanism** (on by default) re-solves
-once just beyond the critical factor with the displacement cap off, so the
-unconverged field develops the actual collapse *mechanism* the deformation and
-displacement-vector figures render — rather than the diffuse settlement of the last
-converged trial. The re-solve stops once the section has moved 20% of the model
-height, well after the mechanism has formed, and keeps the last state short of that
-distance; otherwise it runs to its iteration ceiling. **Capture margin** sets how far
-beyond critical that snapshot is solved (a fraction of FS), and an optional **capture
-iteration budget** overrides the automatic ceiling. Turning capture off skips the
-extra solve; the factor of safety and the bracket are unaffected either way. The controls are available
-only for the SSRM analysis, since a single trial has no bracket to capture beyond.
+The **Capture failure-state mechanism**, **Capture margin** and optional capture
+iteration-budget controls are also available only for SSRM. The
+[capture settings](../fem/solver.md#the-solve_ssrm-function) describe the extra solve;
+turning it off leaves the factor of safety and bracket unchanged.
 
 The run produces **FEM · Data** (mesh + boundary conditions + reinforcement) and
 **FEM · Results** (deformation, shear strain, displacement vectors, and displacement

@@ -95,7 +95,7 @@ reaching a limit state, so how long each trial is allowed to iterate is part
 of the answer. Because nothing about a surface was assumed, the mechanism comes
 out of the solution: the band of soil that strains is located by the
 solution.
-[Shear strength reduction](../fem/overview.md#shear-strength-reduction-method-ssrm)
+[Shear strength reduction](../fem/solver.md#shear-strength-reduction-method-ssrm)
 gives the formulation, the four failure criteria and the viscoplastic
 iteration underneath all of it.
 
@@ -329,7 +329,7 @@ and Lane's example has no cutoff, this model reproduces it, so here the warning
 is expected and the run proceeds as posed. For your own models, enter a
 `t_cut`, or `0` for a soil that carries no tension; new materials in Studio
 start at 0.
-[Tensile strength in the SSRM](../fem/overview.md#tensile-strength-in-ssrm)
+[Tensile strength in the SSRM](../fem/solver.md#tensile-strength-in-ssrm)
 works through the cap and its effects.
 
 The rest of the dialog opens on the defaults this run needs. **Analysis** is
@@ -342,7 +342,7 @@ equilibrium has failed. The list offers three others, among them **Hybrid**,
 which weighs the displacements alongside the convergence test; on this
 model the two agree on every trial, including the marginal one, and return the
 same factor of safety.
-[SSRM failure criteria](../fem/overview.md#ssrm-failure-criteria) compares all
+[SSRM failure criteria](../fem/solver.md#ssrm-failure-criteria) compares all
 four. **K0 initial stress** is off, so the model is brought to its initial state
 by turning gravity on rather than by an at-rest stress ratio.
 

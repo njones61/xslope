@@ -14,7 +14,7 @@ are on the shared [References](references.md) page.
 - **Solver.** The Smith & Griffiths 4-component plane-strain Mohr-Coulomb viscoplastic
   formulation. The factor of safety is found by bisection on the hybrid failure criterion, the
   default: a trial fails when the viscoplastic iteration cannot reach equilibrium *and* the
-  displacement field shows genuine growth (see [FEM Overview](../fem/overview.md)).
+  displacement field shows genuine growth (see [Solver](../fem/solver.md#2-hybrid-hybrid-default)).
 - **Water.** Pore pressures enter through the effective-stress formulation, and reservoir loads
   are applied as consistent boundary tractions.
 - **Elastic constants.** Every Griffiths & Lane example carries the paper's nominal values,
@@ -461,7 +461,7 @@ With the reservoir full the downstream slope is the weaker side: the shear band 
 crest to the downstream toe, the surface the paper and XSLOPE's own Spencer analysis also find.
 The full-reservoir case runs on tri6 elements because the submerged upstream skin carries small
 persistent stresses near the yield surface, and the quad8 element's reduced-integration hourglass
-mode is susceptible to such forcing (see the [FEM Overview](../fem/overview.md) discussion of
+mode is susceptible to such forcing (see the [Solver](../fem/solver.md#creep-trend) discussion of
 submerged boundaries).
 
 **Input files:**

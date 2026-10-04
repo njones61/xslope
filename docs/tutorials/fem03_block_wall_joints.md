@@ -247,7 +247,7 @@ the floor and gives no factor of safety at all.
 
 Press **Run**. The search takes about **seven minutes** on an ordinary desktop —
 nearer twelve on an install that does not include the
-[compiled kernel](../fem/overview.md#fast-kernel) — and reports
+[compiled kernel](../fem/solver.md#fast-kernel) — and reports
 
 <!-- test: file=files/xslope_block_wall.xlsx, type=fem_ssrm, expected_fs=1.137, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-blocks-ssrm -->
 

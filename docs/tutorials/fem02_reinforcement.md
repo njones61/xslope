@@ -321,7 +321,7 @@ FEM-1.
 The third finite element column, `t_cut`, already reads 0 on both rows and needs
 nothing entered. It caps the tension a soil may carry, and 0 caps it at none,
 which suits a fill of this kind.
-[Tensile strength in the SSRM](../fem/overview.md#tensile-strength-in-ssrm)
+[Tensile strength in the SSRM](../fem/solver.md#tensile-strength-in-ssrm)
 covers what the cap does to a strength reduction run and when a material takes a
 value above zero. Click **OK**.
 

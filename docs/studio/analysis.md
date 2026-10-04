@@ -626,7 +626,11 @@ saved trigger the same rerun as a free-entry seepage time.
 
 ## Finite element (FEM)
 
-Build a mesh in **FEM** mode, then choose **Run FEM…** for a single trial or an SSRM search for the factor of safety.
+Build a mesh in **FEM** mode, then choose **Run FEM…**. The Run FEM dialog sets up either a
+single trial at a strength reduction factor you choose, or an SSRM search for the factor of
+safety. Its options are listed below; the [Solver page](../fem/solver.md#run-settings) shows the
+dialog and explains each option, with the Excel cell and the `solve_fem()` / `solve_ssrm()`
+argument that set it.
 
 - **Analysis** — single trial or SSRM search.
 - **F (single)** — the trial's strength reduction factor.
@@ -645,7 +649,7 @@ Build a mesh in **FEM** mode, then choose **Run FEM…** for a single trial or a
 - **Set capture iteration budget / Capture max iterations** — override the automatic capture budget (SSRM only).
 - **Seepage time** — select the transient pore-pressure instant, when a solution is loaded; see [Seepage time](#seepage-time).
 
-The [Solver settings table](../fem/solver.md#run-settings) gives the inputs, API settings and explanations. Options start from the open file and are remembered for the session, not written back to the file.
+Options start from the open file and are remembered for the session, not written back to the file.
 
 Check the **Model checks** column for missing Poisson's ratio, zero modulus, undefined mesh materials and missing tensile caps; resolve errors before running (see [Model checks](#model-checks-before-a-run)). The seismic note explains the entered sign: **+k** pushes right and **−k** left; see [Seismic forces](../fem/overview.md#seismic-forces).
 

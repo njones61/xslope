@@ -18,57 +18,48 @@ shared [References](references.md) page.
 ## Methodology
 
 - **Models.** Geometry, materials, joint properties, restraints and loads come from the vendor's
-  own `.fez` files rather than the manual's tables, which carry errata the models do not; each
-  row states where its model departs from the manual. The vendor models are in MPa and MN/m³;
-  these files use kPa and kN/m³.
+  `.fez` files, not the manual's tables, which carry errata; each row notes where its model departs
+  from the manual. The vendor's MPa and MN/m³ are converted to kPa and kN/m³.
 - **Transcription.** In transcribing the vendor's files to XSLOPE models, the following
   decisions were made:
-    - *Strength after failure.* No problem from 1 to 21 states a residual joint strength or a
-      dilation angle, and where a material lists residual values they equal the peak. Joints and
-      rock therefore keep their full strength after they fail.
-    - *Two vendor settings not carried over.* Every vendor file reduces a slipping joint's
-      stiffness a hundredfold (`joint_stiffness_factor: 0.01`). XSLOPE has the same option, but
-      the corpus runs without it: on the reinforced walls and embankments of the
-      [RS2 corpus](rs2.md) it moves the bracket by one to four steps. Every vendor file also
-      divides the rock's tensile cap by the trial factor; the corpus does that only on
-      [problem 19](#rj-19), the one problem where the cap decides the answer.
-    - *Joint strength on problems 3 to 7.* These come from Lorig & Varona's chapter in Wyllie &
-      Mah (2004), which prints one property list for its 260 m section: joints with friction only,
-      and a rock that can yield. The vendor's files give the joints 100 kPa of cohesion and, on
-      problems 3 and 5, hold the rock elastic. Problems 3, 4, 5 and 7 are posed with the chapter's
-      joints, friction only, because the UDEC results they are scored against come from the
-      chapter. The rock is the vendor's: the chapter does not say its list was used unchanged in
-      the toppling runs, and with the yielding rock problem 5 reproduces neither the chapter's
-      answer nor its mechanism. RS2's numbers were computed with the 100 kPa, so they are shown
-      beside each row but are not like for like. Each of these rows also shows XSLOPE on the
-      vendor's file as given and on the chapter's full list.
-- **Referee.** Where a closed-form rigid-block limit equilibrium exists for a problem it is the
-  referee, recomputed from the inputs the model carries: Goodman & Bray's column analysis on
-  problems 1 and 2, Alejano's plowing equation on problems 11 to 14, the sliding block with its tensile bridge on
-  problem 19, and, on problem 15, the vendor's Slide2 limit-equilibrium search, since Alejano's
-  footwall equations price a mechanism the slope does not take. Where none exists the referee is the one the manual names, UDEC in every such case.
-  Each row shows the recomputed value beside the one its source prints.
-- **Rigid-block bound.** Each plowing problem is two rigid blocks. The highest reduction factor at
-  which some set of joint forces, each inside its friction cone, can still hold both blocks in
-  place is a ceiling on any rigid-block answer: above it the blocks must move. Alejano's Eq. (7)
-  assumes one particular mechanism, so it may sit below that ceiling but not above it. On problems
-  12, 13 and 14 it sits on or below the ceiling and is the referee; on problem 11 it gives 1.76
-  against a ceiling of 1.21, so the ceiling is the referee there.
+    - *Strength after failure.* No problem states a residual joint strength or dilation angle, and
+      listed material residuals equal the peak, so joints and rock keep their full strength after
+      failure.
+    - *Two vendor settings not carried over.* Every file reduces a slipping joint's stiffness a
+      hundredfold (`joint_stiffness_factor: 0.01`) and divides the rock's tensile cap by the trial
+      factor. The corpus does neither: the stiffness reduction moves brackets by one to four steps
+      on the [RS2 corpus](rs2.md)'s walls and embankments, and the cap governs only on
+      [problem 19](#rj-19), where it is applied.
+    - *Joint strength on problems 3 to 7.* Their source, Lorig & Varona's chapter in Wyllie & Mah
+      (2004), gives the joints friction only; the vendor's files add 100 kPa of cohesion. Problems
+      3, 4, 5 and 7 use the chapter's joints because the UDEC results they are scored against come
+      from the chapter. The rock stays as the vendor has it, elastic on 3 and 5, because with the
+      chapter's yielding rock problem 5 reproduces neither the chapter's answer nor its mechanism.
+      RS2's numbers used the 100 kPa and are shown beside each row for comparison only. Each row
+      also shows XSLOPE on the vendor's file as given and on the chapter's full list.
+- **Referee.** A closed-form rigid-block solution, recomputed from the model's own inputs, is the
+  referee where one exists: Goodman & Bray's column analysis on problems 1 and 2, Alejano's plowing
+  equation on 11 to 14, the sliding block with its tensile bridge on 19 and, on 15, the vendor's
+  Slide2 search, since Alejano's footwall equations describe a mechanism the slope does not take.
+  Otherwise the referee is the one the manual names, UDEC in every case. Each row shows the
+  recomputed value beside the printed one.
+- **Rigid-block bound.** On the plowing problems, the highest reduction factor at which any
+  admissible set of joint forces can hold both rigid blocks in place is a ceiling on any
+  rigid-block answer. Alejano's Eq. (7) assumes one mechanism and sits on or below that ceiling on
+  problems 12 to 14, where it is the referee; on problem 11 it exceeds the ceiling (1.76 against
+  1.21), so the ceiling is the referee there.
 - **RS2's two factors.** The manual reports each problem with and without the vendor's
   `Improve Joint Convergence` option. The run without it is the vendor's default and the same
-  method as XSLOPE's, a strength reduction on a continuum with interfaces, so it is the yardstick.
-  Both are recorded in every row; their spread is the width of the vendor's own answer.
-- **Mesh.** Every row is meshed at a single size, its joint spacing: one element across the rock
-  between one discontinuity and the next. Problem 1's four cases are meshed at 5 m, half their 10 m
-  block width. A row mentions refinement only where a finer mesh changes its factor, and on this
-  page none does.
-- **Search.** The factor of safety is found by bisection on the bracket [a, b] between the highest
-  factor at which the slope stands and the lowest at which it fails. A jointed model takes tens of
-  thousands of iterations to settle, so every row allows 250,000 per trial, and a trial that is
-  still slowing at that limit is allowed to run on, up to a million. A trial that reaches the
-  million with no movement left except a few contacts repeating the same cycle stands, and the
-  page says so where it decides a bracket; a trial that stops moving without balancing its forces
-  and without such a cycle reports the bracket without confirming a value. See [running a jointed
+  method as XSLOPE's, so it is the yardstick; both are recorded, and their spread is the width of
+  the vendor's own answer.
+- **Mesh.** Every row is meshed at its joint spacing, one element across the rock between
+  discontinuities; problem 1's cases at 5 m, half their 10 m block width. No row on this page
+  changes its factor with a finer mesh.
+- **Search.** Bisection on the bracket between the highest factor at which the slope stands and
+  the lowest at which it fails. Each trial is allowed 250,000 iterations, and up to a million if
+  it is still slowing. A trial that reaches the million with no movement left except a few
+  contacts repeating the same cycle stands; one that stops moving without balancing its forces and
+  without such a cycle leaves the bracket unconfirmed. See [running a jointed
   model](../fem/joints.md#running-a-jointed-model).
 
 <!--

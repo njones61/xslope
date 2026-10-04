@@ -279,18 +279,17 @@ note on rigid blocks for problems 9 to 14.
 
 ### 🟢 RJ-3: Lorig & Varona forward block toppling (rj003) {#rj-3}
 
-Problems 3 to 7 are the toppling and plane-failure examples of Lorig & Varona (2004), and share
-one section: a 260 m high slope at 55°. Problem 3 cuts it with two joint sets, both passing through
-the origin: columns at 70°, 20 m apart, and a cross set at −20°, 30 m apart. The manual gives the
-pair as "70 and 160" degrees, which describes the same two planes with the second angle measured
-from the other end of the half circle.
+Problems 3 to 7 are the toppling and plane-failure examples of Lorig & Varona (2004), and share one
+section: a 260 m high slope at 55°. Problem 3 cuts it with two joint sets, both passing through the
+origin: columns at 70°, 20 m apart, and a cross set at −20°, 30 m apart. The manual gives the pair
+as "70 and 160" degrees, which describes the same two planes with the second angle measured from
+the other end of the half circle. The rock is elastic, as the vendor's file has it (plasticity set
+to none; γ = 26.0946 kN/m³, E = 9072 MPa, ν = 0.26), so only the joints can fail.
 
-The model this row is scored on is the vendor's file with one change. The rock is elastic, as the
-vendor's file has it (plasticity set to none; γ = 26.0946 kN/m³, E = 9072 MPa, ν = 0.26), so only
-the joints can fail. The joints have φ = 40° and no cohesion, as the source chapter lists them; the
-vendor's file gives them c = 100 kPa, and that is the one change. The UDEC result the row is scored
-against comes from the chapter, whose joints have friction only. RS2's two factors were computed
-with the vendor's 100 kPa, so they are shown beside the row but are not like for like.
+This row uses the vendor's file with one change: the joints have no cohesion, as the source chapter
+lists them (φ = 40°), where the vendor's file gives them c = 100 kPa. The UDEC result the row is
+scored against comes from the chapter, whose joints have friction only. RS2's two factors were
+computed with the 100 kPa, so they are shown beside the row but are not like for like.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
@@ -313,16 +312,16 @@ Two other readings of the same problem were run for comparison:
 
 ### 🟡 RJ-4: Lorig & Varona flexural toppling (rj004) {#rj-4}
 
-Problem 4 uses the same section, cut by one joint set: columns at 70°, 20 m apart. This is
-problem 3's first set without its cross joints, so the columns bend rather than topple as blocks.
+Problem 4 uses the same section, cut by one joint set: columns at 70°, 20 m apart. This is problem
+3's first set without its cross joints. With no cross joints there are no blocks to topple, so the
+columns can fail only by bending. For that the rock must be able to break, so the vendor's file
+gives problem 4 a Mohr-Coulomb rock with no tensile strength (c = 675 kPa, φ = 43°, γ = 26.1 kN/m³,
+E = 9072 MPa, ν = 0.26); problem 3's rock is elastic.
 
-The model this row is scored on is the vendor's file with one change. The rock can yield, as the
-vendor's file has it: Mohr-Coulomb with a tensile cutoff of zero, which lets a column break in
-bending (γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°). The joints have φ = 40° and
-no cohesion, as the source chapter lists them; the vendor's file gives them c = 100 kPa, and that is
-the one change. The UDEC result the row is scored against comes from the chapter, whose joints have
-friction only. RS2's two factors were computed with the vendor's 100 kPa, so they are shown beside
-the row but are not like for like.
+This row uses the vendor's file with one change: the joints have no cohesion, as the source chapter
+lists them (φ = 40°), where the vendor's file gives them c = 100 kPa. The UDEC result the row is
+scored against comes from the chapter, whose joints have friction only. RS2's two factors were
+computed with the 100 kPa, so they are shown beside the row but are not like for like.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
@@ -348,14 +347,13 @@ Two other readings of the same problem were run for comparison:
 
 Problem 5 uses the same section, cut by two joint sets. The first is at −55°, 10 m apart, passing
 through the toe and dipping out of the face, so the blocks lean back into the slope rather than
-forward. The second is horizontal, 40 m apart.
+forward. The second is horizontal, 40 m apart. The rock is elastic, as the vendor's file has it
+(plasticity set to none; γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26), so only the joints can fail.
 
-The model this row is scored on is the vendor's file with one change. The rock is elastic, as the
-vendor's file has it (plasticity set to none; γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26), so only the
-joints can fail. The joints have φ = 40° and no cohesion, as the source chapter lists them; the
-vendor's file gives them c = 100 kPa, and that is the one change. The UDEC result the row is scored
-against comes from the chapter, whose joints have friction only. RS2's two factors were computed
-with the vendor's 100 kPa, so they are shown beside the row but are not like for like.
+This row uses the vendor's file with one change: the joints have no cohesion, as the source chapter
+lists them (φ = 40°), where the vendor's file gives them c = 100 kPa. The UDEC result the row is
+scored against comes from the chapter, whose joints have friction only. RS2's two factors were
+computed with the 100 kPa, so they are shown beside the row but are not like for like.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
@@ -405,15 +403,14 @@ XSLOPE's factor matches UDEC's and lies between RS2's two factors, 1.25 and 1.31
 Problem 7 uses the same section as problem 6, cut by one joint set at −70°, 20 m apart, passing
 through the origin. The joints now dip out of the face more steeply than the 55° face itself, so
 none of them daylights. A slab cannot slide out along one without shearing through rock, and the
-factor of safety is higher than problem 6's.
+factor of safety is higher than problem 6's. The chapter's text calls these joints "cohesionless".
+The rock is problem 6's, as the vendor's file has it: Mohr-Coulomb with no tensile capacity (γ =
+26.1 kN/m³, E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°).
 
-The model this row is scored on is the vendor's file with one change. The rock can yield, as the
-vendor's file has it, and is problem 6's: Mohr-Coulomb with no tensile capacity (γ = 26.1 kN/m³,
-E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°). The joints have φ = 40° and no cohesion, as the
-source chapter lists them, and its text calls these planes "cohesionless"; the vendor's file gives
-them c = 100 kPa, and that is the one change. The UDEC result the row is scored against comes from
-the chapter, whose joints have friction only. RS2's two factors were computed with the vendor's
-100 kPa, so they are shown beside the row but are not like for like.
+This row uses the vendor's file with one change: the joints have no cohesion, as the source chapter
+lists them (φ = 40°), where the vendor's file gives them c = 100 kPa. The UDEC result the row is
+scored against comes from the chapter, whose joints have friction only. RS2's two factors were
+computed with the 100 kPa, so they are shown beside the row but are not like for like.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|

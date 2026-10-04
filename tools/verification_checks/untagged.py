@@ -61,7 +61,7 @@ FS_LO, FS_HI = Decimal("0.10"), Decimal("10")
 #: What a number is NOT a factor of safety when it is followed by: a unit, a
 #: dimension, a scale.  Matched against the text immediately after the token.
 UNIT_AFTER = re.compile(
-    r"^(?:\s*[-–]\s*\d+(?:\.\d+)?)?\s*(?:%|°|″|'|\"|:|/|×|x\b|m\b|mm\b|cm\b|m²|m³|ft\b|ft²|ft³|in\b|s\b|"
+    r"^(?:\s*[-–]\s*\d+(?:\.\d+)?)?\s*(?:%|°|″|'|\"|:|/|×|x\b|m\b|mm\b|cm\b|m²|m³|ft\b|ft²|ft³|in\b(?!\s+(?:XSLOPE|the|this|that|its|a|an|each|every|both|all|which)\b)|s\b|"
     r"kPa|MPa|psf|psi|pcf|ksi|kN|kNm|lb|kip|H\b|D\b|g\b|degrees?\b|"
     r"times\b|per\b|elements?\b|nodes?\b)")
 

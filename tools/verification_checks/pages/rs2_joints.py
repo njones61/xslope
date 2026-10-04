@@ -43,12 +43,12 @@ CONFIG = PageConfig(
         ('1.047', 'trial between them at 1.047'),
         # Problems 3, 4, 5 and 7 are scored with the joints friction only
         # (ruling 2026-10-02, Q36 a). XSLOPE on the vendor's files as given, with
-        # the joints' 100 kPa of cohesion, is shown beside each row: the values
-        # are the rows' earlier records (rj00X_fem_meta before the re-pose),
-        # shown by ruling, never tagged.
-        ('1.311', "with the joints at c = 100 kPa: 1.311"),
-        ('1.564', "with the joints at c = 100 kPa: 1.564"),
-        ('1.857', "with the joints at c = 100 kPa: 1.857"),
+        # the joints' 100 kPa of cohesion, is shown beside each row by ruling,
+        # never tagged.
+        ('1.232', "the factor of safety is 1.232"),
+        ('1.311', "the factor of safety is 1.311"),
+        ('1.564', "the factor of safety is 1.564"),
+        ('1.857', "the factor of safety is 1.857"),
     ],
 
     abs_bounds=[

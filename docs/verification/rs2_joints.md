@@ -300,8 +300,8 @@ with the vendor's 100 kPa, so they are shown beside the row but are not like for
 
 Two other readings of the same problem were run for comparison:
 
-- On the vendor's file as given, with the joints at c = 100 kPa, the factor of safety is 1.232 in
-  XSLOPE, against UDEC's 1.13 (+9.0%).
+- On the vendor's file as given, with the joints at c = 100 kPa, the factor of safety is 1.232
+  in XSLOPE, against UDEC's 1.13 (+9.0%).
 - On the chapter's full printed list (joints friction only, and a rock that can yield, c = 675 kPa,
   φ = 43°), XSLOPE gives no settled value: the slope stands at 1.027 and fails at 1.125, and the
   trial between them at 1.047 stopped moving without balancing its forces, so the result is
@@ -315,11 +315,14 @@ Two other readings of the same problem were run for comparison:
 
 Problem 4 uses the same section, cut by one joint set: columns at 70°, 20 m apart. This is
 problem 3's first set without its cross joints, so the columns bend rather than topple as blocks.
-Here the rock is Mohr-Coulomb with a tensile cutoff of zero, which lets a column break in bending:
-γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°. The joints have φ = 40° and no
-cohesion, as the source chapter lists them; the vendor's file gives them c = 100 kPa. The UDEC
-result comes from the chapter, whose joints have friction only. RS2's two factors were computed
-with the vendor's 100 kPa, so they are shown beside the row but are not like for like.
+
+The model this row is scored on is the vendor's file with one change. The rock can yield, as the
+vendor's file has it: Mohr-Coulomb with a tensile cutoff of zero, which lets a column break in
+bending (γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°). The joints have φ = 40° and
+no cohesion, as the source chapter lists them; the vendor's file gives them c = 100 kPa, and that is
+the one change. The UDEC result the row is scored against comes from the chapter, whose joints have
+friction only. RS2's two factors were computed with the vendor's 100 kPa, so they are shown beside
+the row but are not like for like.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
@@ -327,8 +330,13 @@ with the vendor's 100 kPa, so they are shown beside the row but are not like for
 
 <!-- test: file=files/rocscience/joints/rj004.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
 
-- XSLOPE on the vendor's file as given, with the joints at c = 100 kPa: 1.311, against UDEC's 1.3 (+0.8%).
-- XSLOPE on the chapter's printed list (joints friction only, a rock that can yield): 1.232, against UDEC's 1.3 (−5.2%). On this problem the vendor's rock is already the chapter's, so this model is the same as the row's own.
+Two other readings of the same problem were run for comparison:
+
+- On the vendor's file as given, with the joints at c = 100 kPa, the factor of safety is 1.311
+  in XSLOPE, against UDEC's 1.3 (+0.8%).
+- On the chapter's full printed list (joints friction only, and a rock that can yield, c = 675 kPa,
+  φ = 43°), the model is the same as this row's, because the vendor's rock already has the chapter's
+  properties; the factor of safety is the row's own 1.232 in XSLOPE, against UDEC's 1.3 (−5.2%).
 
 <!-- test: file=files/rocscience/joints/rj004_chapter.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4c, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
 
@@ -338,12 +346,15 @@ with the vendor's 100 kPa, so they are shown beside the row but are not like for
 
 ### 🟡 RJ-5: Lorig & Varona backward block toppling (rj005) {#rj-5}
 
-Problem 5 uses the shared 260 m section, cut by two joint sets. The first is at −55°, 10 m apart,
-passing through the toe and dipping out of the face, so the blocks lean back into the slope rather
-than forward. The second is horizontal, 40 m apart. The rock is elastic, its plasticity set to
-none in the vendor's file: γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26. The joints have φ = 40° and no
-cohesion, as the source chapter lists them; the vendor's file gives them c = 100 kPa. The UDEC
-result comes from the chapter, whose joints have friction only. RS2's two factors were computed
+Problem 5 uses the same section, cut by two joint sets. The first is at −55°, 10 m apart, passing
+through the toe and dipping out of the face, so the blocks lean back into the slope rather than
+forward. The second is horizontal, 40 m apart.
+
+The model this row is scored on is the vendor's file with one change. The rock is elastic, as the
+vendor's file has it (plasticity set to none; γ = 26.1 kN/m³, E = 9072 MPa, ν = 0.26), so only the
+joints can fail. The joints have φ = 40° and no cohesion, as the source chapter lists them; the
+vendor's file gives them c = 100 kPa, and that is the one change. The UDEC result the row is scored
+against comes from the chapter, whose joints have friction only. RS2's two factors were computed
 with the vendor's 100 kPa, so they are shown beside the row but are not like for like.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
@@ -352,16 +363,18 @@ with the vendor's 100 kPa, so they are shown beside the row but are not like for
 
 <!-- test: file=files/rocscience/joints/rj005.xlsx, type=fem_ssrm, expected_fs=1.799, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5, f_stand=1.7890625, f_fail=1.80859375, check=edges, tier=gate -->
 
-- XSLOPE on the vendor's file as given, with the joints at c = 100 kPa: 1.857, against UDEC's 1.7 (+9.2%).
-- XSLOPE on the chapter's printed list (joints friction only, a rock that can yield): 1.096, against UDEC's 1.7 (−35.5%). With the chapter's yielding rock, the slabs slide down the joints parallel to the face and the rock at the toe yields beneath them, instead of the blocks toppling back into the slope.
+Two other readings of the same problem were run for comparison:
+
+- On the vendor's file as given, with the joints at c = 100 kPa, the factor of safety is 1.857
+  in XSLOPE, against UDEC's 1.7 (+9.2%).
+- On the chapter's full printed list (joints friction only, and a rock that can yield, c = 675 kPa,
+  φ = 43°), the factor of safety is 1.096 in XSLOPE, against UDEC's 1.7 (−35.5%).
 
 <!-- test: file=files/rocscience/joints/rj005_chapter.xlsx, type=fem_ssrm, expected_fs=1.096, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5c, f_stand=1.0859375, f_fail=1.10546875, check=edges, tier=gate -->
 
-On this row's model the slope comes to rest at the lower end of the bracket within a few hundred
-iterations. At the upper end the slope is still slowing at 250,000 iterations, so the trial is
-allowed to run on; by 450,000 iterations it is moving at the same rate, so that trial fails. The whole search takes about five and a half hours. This row's factor is above UDEC's
-and above RS2's default factor, the one without `Improve Joint Convergence`. RS2's two factors for
-this problem, with its 100 kPa joints, are 1.65 and 1.86.
+With the chapter's yielding rock the mechanism changes: the slabs slide down the joints parallel to
+the face and the rock at the toe yields beneath them, instead of the blocks toppling back into the
+slope.
 
 **Input file:** [rj005.xlsx](files/rocscience/joints/rj005.xlsx).
 
@@ -389,14 +402,18 @@ XSLOPE's factor matches UDEC's and lies between RS2's two factors, 1.25 and 1.31
 
 ### 🟢 RJ-7: Plane failure with non-daylighting discontinuities (rj007) {#rj-7}
 
-Problem 7 uses the same section and the same rock as problem 6, cut by one joint set at −70°,
-20 m apart, passing through the origin. The joints now dip out of the face more steeply than the
-55° face itself, so none of them daylights. A slab cannot slide out along one without shearing
-through rock, and the factor of safety is higher than problem 6's. The joints have φ = 40° and no
-cohesion, as the source chapter lists them, and its text calls these planes "cohesionless"; the
-vendor's file gives them c = 100 kPa. The UDEC result comes from the chapter. RS2's two factors
-were computed with the vendor's 100 kPa, so they are shown beside the row but are not like for
-like.
+Problem 7 uses the same section as problem 6, cut by one joint set at −70°, 20 m apart, passing
+through the origin. The joints now dip out of the face more steeply than the 55° face itself, so
+none of them daylights. A slab cannot slide out along one without shearing through rock, and the
+factor of safety is higher than problem 6's.
+
+The model this row is scored on is the vendor's file with one change. The rock can yield, as the
+vendor's file has it, and is problem 6's: Mohr-Coulomb with no tensile capacity (γ = 26.1 kN/m³,
+E = 9072 MPa, ν = 0.26, c = 675 kPa, φ = 43°). The joints have φ = 40° and no cohesion, as the
+source chapter lists them, and its text calls these planes "cohesionless"; the vendor's file gives
+them c = 100 kPa, and that is the one change. The UDEC result the row is scored against comes from
+the chapter, whose joints have friction only. RS2's two factors were computed with the vendor's
+100 kPa, so they are shown beside the row but are not like for like.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
@@ -404,13 +421,18 @@ like.
 
 <!-- test: file=files/rocscience/joints/rj007.xlsx, type=fem_ssrm, expected_fs=1.486, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7, f_stand=1.4765625, f_fail=1.49609375, check=edges, tier=gate -->
 
-- XSLOPE on the vendor's file as given, with the joints at c = 100 kPa: 1.564, against UDEC's 1.5 (+4.3%).
-- XSLOPE on the chapter's printed list (joints friction only, a rock that can yield): 1.486, against UDEC's 1.5 (−0.9%). On this problem the vendor's rock is already the chapter's, so this model is the same as the row's own.
+Two other readings of the same problem were run for comparison:
+
+- On the vendor's file as given, with the joints at c = 100 kPa, the factor of safety is 1.564
+  in XSLOPE, against UDEC's 1.5 (+4.3%).
+- On the chapter's full printed list (joints friction only, and a rock that can yield, c = 675 kPa,
+  φ = 43°), the model is the same as this row's, because the vendor's rock already has the chapter's
+  properties; the factor of safety is the row's own 1.486 in XSLOPE, against UDEC's 1.5 (−0.9%).
 
 <!-- test: file=files/rocscience/joints/rj007_chapter.xlsx, type=fem_ssrm, expected_fs=1.486, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7c, f_stand=1.4765625, f_fail=1.49609375, check=edges, tier=gate -->
 
-The manual's table for this problem prints the slope angle as 5°;
-its figure and the vendor's model both have the same 55° slope as problem 6.
+The manual's table for this problem prints the slope angle as 5°; its figure and the vendor's
+model both have the same 55° slope as problem 6.
 
 **Input file:** [rj007.xlsx](files/rocscience/joints/rj007.xlsx).
 

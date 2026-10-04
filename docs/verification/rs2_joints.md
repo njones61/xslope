@@ -541,15 +541,13 @@ end exactly on the bedding plane they are meant to meet; see [where a joint ends
 
 <!-- test: file=files/rocscience/joints/rj011.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-11, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
 
-**On this problem Alejano's Eq. (7) gives a factor that no rigid-block mechanism can reach.** The
-mechanism cuts out two blocks, the slab and the toe block below it. Above a reduction factor of
-1.2148, no set of contact forces that stays within the friction limit on every joint can hold
-those two blocks in place, however the forces are distributed. Eq. (7) returns 1.7582, about half
-a unit of factor of safety above that, so it cannot score this row, and the rigid-block bound is
-the referee instead. XSLOPE gives 1.213, RS2 1.22 and the paper's own UDEC run 1.21: the three
-programs are inside 0.8% of one another, and all three are on the bound. [Problem 15](#rj-15) has
-the same pattern, a closed form well above the programs, on a problem where no rigid-block bound is
-available.
+The closed form for this problem, Alejano's Eq. (7), gives 1.7582. That cannot be right for this
+model. The mechanism has two rigid blocks, the slab and the toe block below it, and above a
+reduction factor of 1.2148 no set of joint forces that stays within the friction limit on every
+joint can hold the two in place, however the forces are shared between the joints. So 1.2148 is
+the highest factor any rigid-block analysis can give, and it is the referee for this row instead of
+Eq. (7). XSLOPE gives 1.213, RS2 1.22 and the paper's own UDEC run 1.21: the three differ by 0.01 at
+most, and all three sit on that bound.
 
 **Input file:** [rj011.xlsx](files/rocscience/joints/rj011.xlsx).
 

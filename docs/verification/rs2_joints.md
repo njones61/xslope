@@ -452,12 +452,11 @@ and φ = 39°, and their normal stiffness, 1.5 × 10<sup>7</sup> kPa/m, is below
 
 <!-- test: file=files/rocscience/joints/rj008.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-8, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
 
-The trials on this row come to rest faster than on any other row on this page. By comparison, the
-[geotextile wall rows](rs2.md#rs2-48) of the RS2 corpus, which use the same joint element, reach
-their iteration limit on five trials across their eight rows.
+The trials on this row come to rest faster than on any other row on this page.
 
-The rock's 75 kPa tensile strength is above the tensile strength that its own c and φ already
-allow, at the apex of its Mohr-Coulomb envelope, so the tensile cap never controls.
+The vendor's file also sets a tensile strength of 75 kPa for the rock. With c = 60 kPa and φ = 39°
+the Mohr-Coulomb rock already fails in tension at 74 kPa (c / tan φ), so the 75 kPa limit never
+comes into play.
 
 **Input file:** [rj008.xlsx](files/rocscience/joints/rj008.xlsx).
 

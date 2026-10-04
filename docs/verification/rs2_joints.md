@@ -209,9 +209,10 @@ is what the closed form's own pair of answers for cases a and c says as well —
 
 <!-- test: file=files/rocscience/joints/rj001c.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1c, tier=gate, f_stand=1.02734375, f_fail=1.046875, check=edges -->
 
-Given the thrust heights read off the solved state at the block width of 10 m, the block-by-block analysis
-returns **1.0469**, the bottom of that mesh's bracket — case a's mechanism and case a's
-assumption, half a degree of friction further on.
+Re-running Goodman & Bray's analysis with the thrust heights taken from XSLOPE's solved state at
+the 10 m block width, instead of the top-corner assumption, gives **1.0469**, the lower edge of
+that mesh's bracket. This case has case a's mechanism, half a degree of friction further on, and
+the same single assumption accounts for the difference.
 
 **Input file:** [rj001c.xlsx](files/rocscience/joints/rj001c.xlsx).
 
@@ -222,11 +223,11 @@ assumption, half a degree of friction further on.
 Case c's joint friction angle with case b's 2013 kN force: the same stack, stabilized. It is the
 strongest of the four, and the closed form and UDEC agree that it is.
 
-Given the thrust heights read off this case's solved state, the block-by-block analysis returns **1.2422**,
-the bottom of this row's bracket. Across all four cases XSLOPE stands above the closed form and
-RS2 below it, with UDEC between them, and on each of the four the block-by-block analysis lands on the row's own
-bottom of the row's own bracket once the thrust is put where the solution puts it rather than at
-the corner of the contact.
+Re-running Goodman & Bray's analysis with the thrust heights taken from XSLOPE's solved state,
+instead of the top-corner assumption, gives **1.2422**, the lower edge of XSLOPE's own bracket.
+Across all four cases XSLOPE stands above the closed form and RS2 below it, with UDEC between
+them, and on each of the four the difference between XSLOPE and the closed form comes entirely
+from where the thrust acts.
 
 | XSLOPE SSRM | Goodman & Bray referee | RS2 vs referee | UDEC | RS2 without / with improvement |
 |---|---|---|---|---|

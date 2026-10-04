@@ -730,11 +730,15 @@ weight, so the plate is given the 27 kN/m³ stated in its row of the vendor's ma
 
 ### 🟡 RJ-17: Step-path failure, en-echelon joints (rj017) {#rj-17}
 
-Problem 17 uses [problem 18](#rj-18)'s section and Mohr-Coulomb rock (c = 25 kPa, φ = 25°, no
-tensile capacity), cut by three joints at 36.1° that stop short of one another instead of running
-through, with problem 18's joint strength, c = 1 kPa and φ = 35°. The intact rock between the end
-of one joint and the start of the next is a rock bridge. A step-path failure has to break through
-the bridges, and they are why this slope stands where problem 18, with continuous joints, fails.
+Problem 17 is a 45 × 20 m section of one Mohr-Coulomb rock (γ = 19.62 kN/m³, E = 20 GPa, ν = 0.3,
+c = 25 kPa, φ = 25°, no tensile capacity) with a slope face rising from (17, 8.2) to (26.9, 20). It
+is cut by three parallel joints at 36.1°, 0.883 m apart, that stop short of one another instead of
+running through from the face to the crest. The joints have c = 1 kPa, φ = 35°,
+k<sub>n</sub> = 10<sup>8</sup> kPa/m and k<sub>s</sub> = 10<sup>7</sup> kPa/m, and their strength
+is reduced together with the rock's in the strength reduction. The intact rock between the end of
+one joint and the start of the next is a rock bridge. A step-path failure has to break through the
+bridges, and they are why this slope stands where [problem 18](#rj-18), with the same joints run
+through continuously, fails.
 
 In the vendor's model the strength reduction applies only inside the SSR search area, a rectangle
 drawn on the manual's figure but absent from its tables. Outside it RS2 holds every element linear
@@ -767,12 +771,10 @@ of its search gives the same result as the rectangle's, so its bracket is identi
 
 ### 🟢 RJ-18: Step-path failure, continuous joints (rj018) {#rj-18}
 
-Problem 18 is a 45 × 20 m section of one Mohr-Coulomb rock (γ = 19.62 kN/m³, E = 20 GPa, ν = 0.3,
-c = 25 kPa, φ = 25°, no tensile capacity) with a slope face rising from (17, 8.2) to (26.9, 20).
-Three parallel joints at 36.1° run from the face to the crest, 0.883 m apart measured perpendicular
-to the joints. The joints have c = 1 kPa, φ = 35°, k<sub>n</sub> = 10<sup>8</sup> kPa/m and
-k<sub>s</sub> = 10<sup>7</sup> kPa/m, and their strength is reduced together with the rock's in the
-strength reduction.
+Problem 18 is [problem 17](#rj-17)'s section and rock, with the same three joints at 36.1° run
+continuously from the face to the crest, so there are no rock bridges. The joints have the same
+strength and stiffness as problem 17's, reduced together with the rock's in the strength
+reduction.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|

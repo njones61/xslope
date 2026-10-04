@@ -183,54 +183,7 @@ EXTRA_CASES = [
 # This is a claim about the page, not a way to empty the audit, so it is enforced
 # both ways: an entry naming a row that is not registered, or a row that HAS a PNG,
 # is reported as a DEAD exemption and fails the audit exactly like a missing figure.
-EXPECTED_NO_FIGURE = {
-    # RS2-40's FE-seepage case under the depth filter: the filtered run reads one cell
-    # of its own bracket above the unconstrained one and selects the same mechanism,
-    # which RS2-40-seep.png already draws (values per the page tags).
-    'RS2-40-seep-d30': 'same mechanism as the unconstrained run in RS2-40-seep.png; the depth filter has no skin to remove',
-
-    # RS2-64 — C3 and C5 are the second and third short-term Original slopes. All
-    # three lock unconstrained on a simple convex profile and fail by the same deep
-    # rotation; C1 is figured.
-    'RS2-64c': 'same unconstrained deep rotation as C1 (RS2-64a.png); only the profile differs',
-    'RS2-64e': 'same unconstrained deep rotation as C1 (RS2-64a.png); only the profile differs',
-
-    # RS2-66 filter-off — the face skin is surface-parallel and does not depend on
-    # the soft-band thickness (the values are the page's tags, not repeated here).
-    # Both ends of the family are figured.
-    'RS2-66b': 'depth-independent face skin (values per the page tags); figured at both ends (RS2-66a.png, RS2-66e.png)',
-    'RS2-66c': 'depth-independent face skin (values per the page tags); figured at both ends (RS2-66a.png, RS2-66e.png)',
-    'RS2-66d': 'depth-independent face skin (values per the page tags); figured at both ends (RS2-66a.png, RS2-66e.png)',
-
-    # RS2-66 filtered — one deep basal squeeze through the soft band, figured at the
-    # thinnest band where it separates furthest from the skin.
-    'RS2-66b-deep': 'same deep basal squeeze as RS2-66a-deep.png, through a thicker soft band',
-    'RS2-66c-deep': 'same deep basal squeeze as RS2-66a-deep.png, through a thicker soft band',
-    'RS2-66d-deep': 'same deep basal squeeze as RS2-66a-deep.png, through a thicker soft band',
-    'RS2-66e-deep': 'at h1 = 10 m the filtered run selects the same mechanism as the unfiltered one (values per the page tags) — RS2-66e.png IS this run',
-
-    # RS2-67 — six drawdown stages of one dam, two mechanisms between them: the
-    # unconstrained downstream face, and the upstream face when RS2's Search Area
-    # confines reduction to it. One of each is figured.
-    'RS2-67a': 'same downstream-face mechanism as RS2-67b.png, with no pore-pressure field',
-    'RS2-67c': 'same unconstrained downstream-face mechanism as RS2-67b.png, at the 90 h field',
-    'RS2-67e': 'same unconstrained downstream-face mechanism as RS2-67b.png, at the drained limit',
-    'RS2-67f': 'same Search-Area-confined upstream mechanism as RS2-67d.png, at the drained limit',
-
-    # RS2-24 — each case is locked at two meshes. The coarser one selects the same
-    # deep-seated mechanism through the soft clay (values per the page tags); the
-    # finer mesh is what the figure draws.
-    'RS2-24a-m2.0': 'same mechanism as RS2-24a.png, one mesh step coarser',
-    'RS2-24b-m2.0': 'same mechanism as RS2-24b.png, one mesh step coarser',
-
-    # RS2 Part IV VP102 — the drawdown mechanism is one downstream-face wedge at every
-    # frame of a monotone sequence. One frame of each case is figured: the mid-sequence
-    # phi_b = 0 baseline frame, and the phi_b = 37 frame that sets the dot.
-    'RS2-P4-VP102-t-60-c2': 'same downstream-face wedge as RS2-P4-VP102-t-300-c2.png, at an earlier frame',
-    'RS2-P4-VP102-t-1500-c2': 'same downstream-face wedge as RS2-P4-VP102-t-300-c2.png, at a later frame',
-    'RS2-P4-VP102-t-60-c3': 'same downstream-face wedge as RS2-P4-VP102-t-1500-c3.png, at an earlier frame',
-    'RS2-P4-VP102-t-300-c3': 'same downstream-face wedge as RS2-P4-VP102-t-1500-c3.png, at an earlier frame',
-}
+EXPECTED_NO_FIGURE = {}
 
 
 # Sidecar stem overrides. ``make_figure`` writes the exported field next to the case

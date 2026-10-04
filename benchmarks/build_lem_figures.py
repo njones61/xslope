@@ -82,28 +82,9 @@ OTHER_OWNERS = {"hassiotis_inputs", "hassiotis_results",
 #: the weak-layer model. It was sample section 7's search figure until that
 #: section shrank to its solution and table; docs/lem/search.md shows it as the
 #: illustration of plot_noncircular_search_results().
-#:
-#: mult_min_degenerate is section 13's first figure — the degenerate near-planar
-#: sliver that section warns about. It is not the run behind that section's tag,
-#: which solves the deep foundation circle the file carries, so it is drawn here
-#: instead: the same search LEM-10 draws for the same model
-#: (docs/tutorials/images/lem10_search_shallow.png), seeded with the generated
-#: embankment circles — the starting circles tangent to the top of the
-#: foundation. That seed is what collapses onto the sliver at FS = 1.299, the
-#: "FS ~ 1.30" the section's caption names. A search seeded with the deep circle
-#: on the file's own circles sheet no longer reaches the sliver at all.
-#:
-#: prob_submerged_reliability is section 15's figure: the Taylor-series run its
-#: first test tag locks (Spencer, searched), drawn with the F_MLV surface the
-#: page's summary table is read off.
 EXTRA_FIGURES = [
     dict(name="noncircular_search_results", xlsx="files/xslope_noncircular.xlsx",
          kind="search_results", ttype="noncircular_search"),
-    dict(name="mult_min_degenerate", xlsx="files/xslope_mult_min_KEY.xlsx",
-         kind="search_results", ttype="circular_search",
-         circles="generated_embankment"),
-    dict(name="prob_submerged_reliability",
-         xlsx="files/xslope_prob_submerged_KEY.xlsx", kind="reliability"),
 ]
 
 

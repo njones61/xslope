@@ -40,6 +40,8 @@ are defined on.
     PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py               # every model
     PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py noncircular   # one
     PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py --meshes-only # mesh only
+    PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py --geometry-only noncircular
+        # redraw inputs and mesh from the committed companion, without a solve
     PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py --capture-only reinforce
         # rewrite only the at-failure files, from the model's stored search
         # record: the standing trial and the picture are solved, the search is not
@@ -179,6 +181,41 @@ RESULTS_FIGURE = {
 #: The resolution docs/fem results figures are written at, as
 #: ``benchmarks/make_griffiths_figures.py`` writes its own.
 FIGURE_DPI = 200
+
+
+GEOMETRY_FIGURES = {
+    "noncircular": ("non_circ_inputs.png", "non_circ_mesh.png"),
+}
+
+
+def draw_geometry(name):
+    """Draw the model and its committed mesh; never remesh, solve or export data."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from xslope.plot import plot_inputs
+    from xslope.plot_fem import plot_fem_data
+
+    path = os.path.join(REPO_ROOT, "docs", "fem", "files", TAGGED[name])
+    slope_data = load_slope_data(path)
+    mesh = slope_data.get("mesh")
+    if mesh is None:
+        raise RuntimeError(f"{name}: no committed mesh companion to draw")
+    fem_data = _quiet(build_fem_data, slope_data, mesh)
+    out = os.path.join(REPO_ROOT, "docs", "fem", "images")
+    plots = (
+        (plot_inputs, slope_data,
+         {"mode": "fem", "show_mesh": True, "frame": "content"}),
+        (plot_fem_data, fem_data, {}),
+    )
+    for filename, (plot, data, kwargs) in zip(GEOMETRY_FIGURES[name], plots):
+        try:
+            _quiet(plot, data, fig=plt.figure(figsize=(12, 7)), **kwargs)
+            plt.gcf().savefig(os.path.join(out, filename), dpi=FIGURE_DPI,
+                             bbox_inches="tight")
+        finally:
+            plt.close("all")
+        print(f"{name}: wrote {filename} ({len(mesh['elements'])} elements)")
 
 
 def _draw_results(name, fem_data, field, failure, fs):
@@ -338,6 +375,8 @@ def build_tagged(name):
                  "max_iter": int(tag["max_iter"]),
                  "expected_fs": expected},
     })
+    if name in GEOMETRY_FIGURES:
+        draw_geometry(name)
     _draw_results(name, fem_data, result["last_solution"],
                   result.get("failure_solution"), expected)
     print(f"{name}: FS = {fs:.4f} (tag {expected:.3f}), "
@@ -421,6 +460,12 @@ def build_mesh_only(name):
 def main(argv):
     wanted = [a for a in argv if not a.startswith("-")]
     meshes_only = "--meshes-only" in argv
+    if "--geometry-only" in argv:
+        if any(name not in GEOMETRY_FIGURES for name in wanted):
+            raise ValueError("--geometry-only accepts: " + ", ".join(GEOMETRY_FIGURES))
+        for name in wanted or GEOMETRY_FIGURES:
+            draw_geometry(name)
+        return 0
     if "--capture-only" in argv:
         failed = 0
         for name in list(TAGGED) + list(UNTAGGED) + list(COMMITTED_MESH):

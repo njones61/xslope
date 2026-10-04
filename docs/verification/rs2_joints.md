@@ -147,15 +147,15 @@ referee within a rounding of the value the manual prints for it.
 
 <!-- test: file=files/rocscience/joints/rj001a.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1a, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
 
-**The excess over the closed form is one assumption, and it is where the thrust between two columns
-acts.** Goodman & Bray hand each column-to-column thrust to the top corner of its contact. A contact
-cannot do that: the two columns lean together, the face stays closed only over its upper quarter to
-half, so the resultant stands a tenth to a sixth of the face
-below the corner. Given those heights read off the solved state, and nothing else changed, the same
-recursion returns **1.0279**, the bottom of this row's own bracket. The closed form's other three
-assumptions the solution obeys exactly: every block balances in force and in moment on the
-interface stresses alone, every closed side pair is at its friction limit, and the base reaction of
-every toppling block sits on its downslope corner.
+**XSLOPE's 1.018 sits 1.8% above the closed form because of one assumption in Goodman & Bray's
+method: where the thrust between two columns acts. They place each thrust at the top corner of
+the contact. In the solved state the two columns lean together and the contact face stays closed
+only over its upper quarter to half, so the resultant acts a tenth to a sixth of the face height
+below the corner. With those heights read from the solved state, and nothing else changed, the
+same recursion gives 1.0279, the bottom of this row's bracket. The method's other three
+assumptions are met exactly by the solution: every block balances in force and moment on the
+interface stresses alone, every closed side contact is at its friction limit, and the base
+reaction of every toppling block acts at its downslope corner.
 
 The manual's figure labels the side boundaries as rollers, but the model clamps them and the
 restraints follow the model. The 0.5 kN toe force, negligible against the lowest block's weight,

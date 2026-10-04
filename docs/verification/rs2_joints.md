@@ -437,18 +437,14 @@ model both have the same 55° slope as problem 6.
 
 ### 🟢 RJ-8: Flexural toppling in a base friction model (rj008) {#rj-8}
 
-Problem 8 is Pritchard & Savigny's base-friction table model, scaled up a hundred times. It has a
-30.5 m face at 78° and twelve columns at −60°, 5.08 m apart, standing on a horizontal basal joint
-and closed at the back by a vertical joint. The three highest columns end on that back joint, as in
-the vendor's model. The vendor's
-file holds the column joints only inside the block that the basal and back joints bound. Generated
-across the whole section instead, the same set would be sixteen column joints. Three of them
-would lie entirely in the rock in front of the toe, below the level of the basal joint, where the
-model has no columns, and three more would run on past the back joint at x = 68.4 into the strip
-the vendor leaves uncut. The rock is Mohr-Coulomb (γ = 25.506 kN/m³,
-E = 22.771 GPa, ν = 0.139, c = 60 kPa, φ = 39°). The joints have no cohesion, φ = 39°, and a
-normal stiffness below the standard pair's: k<sub>n</sub> = 1.5 × 10<sup>7</sup> kPa/m, against
-the usual 10<sup>8</sup>. Only problems 15 and 16 have softer joints.
+Problem 8 is Pritchard & Savigny's base-friction table model, scaled up a hundred times: a
+30.5 m face at 78°, with twelve rock columns formed by joints at −60°, 5.08 m apart. The columns
+stand on a horizontal basal joint and are closed off at the back by a vertical joint; the three
+tallest columns end against that back joint. The column joints exist only inside the block bounded
+by the basal and back joints, as in the vendor's model. The rock is Mohr-Coulomb
+(γ = 25.506 kN/m³, E = 22.771 GPa, ν = 0.139, c = 60 kPa, φ = 39°). The joints have no cohesion
+and φ = 39°, and their normal stiffness, 1.5 × 10<sup>7</sup> kPa/m, is below the corpus's standard
+10<sup>8</sup>; only problems 15 and 16 have softer joints.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|

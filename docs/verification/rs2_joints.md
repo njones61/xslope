@@ -127,14 +127,14 @@ joint model whose output is a stress-displacement curve.
 
 ### 🟢 RJ-1a: Goodman & Bray block toppling, case a (rj001a) {#rj-1a}
 
-Goodman & Bray's own toppling example, the section all four of problem 1's cases share: sixteen
-rock columns 10 m wide and 4 to 40 m tall on a base that steps up at 30°, their sides at 120°,
-normal to that base, and their tops cut off by a 56.6° face. The rock is elastic (γ = 25 kN/m³,
-E = 20 GPa, ν = 0.3), so every mechanism the model has is a joint one, the idealization the closed
-form makes. The joints are the shared edges of the column
-outlines (see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint))
-and carry no cohesion, φ = 38.15°, the angle this case is posed at, and the corpus's standard
-stiffness pair.
+Problem 1 is Goodman & Bray's toppling example, and all four of its cases share one section:
+sixteen rock columns, 10 m wide and 4 to 40 m tall, standing on a base that rises at 30°. The
+column sides are normal to the base, and the tops are cut off by a 56.6° slope face. The rock is
+elastic (γ = 25 kN/m³, E = 20 GPa, ν = 0.3), so the model can only fail on its joints, which is
+the assumption the closed-form solution makes. The joints are the column boundaries (see
+[where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint)). They have
+no cohesion, a friction angle of 38.15°, which is the value this case is posed at, and the
+corpus's standard stiffness pair.
 
 The referee is Goodman & Bray's iterative column analysis, recomputed on this section. It
 reproduces the method's published mode pattern and requires a horizontal toe force of 0.36 kN/m

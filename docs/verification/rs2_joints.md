@@ -279,20 +279,18 @@ note on rigid blocks for problems 9 to 14.
 
 ### 🟢 RJ-3: Lorig & Varona forward block toppling (rj003) {#rj-3}
 
-Problems 3 to 7 are the toppling and plane-failure examples of Lorig & Varona (2004). Problems 3
-to 7 share one section, a 260 m high slope at 55°. Problem 3 cuts it with two joint sets, both passing
-through the origin: columns at 70°, 20 m apart, and a cross set at −20°, 30 m apart. The manual
-gives the pair as "70 and 160" degrees, which describes the same two planes with the second angle
-measured from the other end of the half circle. The rock is elastic, its plasticity set to none in
-the vendor's file, so only the joints can fail; γ = 26.0946 kN/m³, E = 9072 MPa, ν = 0.26. The
-joints have φ = 40° and no cohesion, as the source chapter lists them; the vendor's file gives
-them c = 100 kPa. The UDEC result comes from the chapter, whose joints have friction only. RS2's
-two factors were computed with the vendor's 100 kPa, so they are shown beside the row but are not
-like for like.
+Problems 3 to 7 are the toppling and plane-failure examples of Lorig & Varona (2004), and share
+one section: a 260 m high slope at 55°. Problem 3 cuts it with two joint sets, both passing through
+the origin: columns at 70°, 20 m apart, and a cross set at −20°, 30 m apart. The manual gives the
+pair as "70 and 160" degrees, which describes the same two planes with the second angle measured
+from the other end of the half circle.
 
-For problems 3 to 7 the manual's tables state only the slope geometry, the joint friction angle
-and the rock's tensile strength. The vendor's models carry more: a rock strength of c = 675 kPa
-and φ = 43° on problems 4, 6 and 7, and a joint cohesion of 100 kPa on all five.
+The model this row is scored on is the vendor's file with one change. The rock is elastic, as the
+vendor's file has it (plasticity set to none; γ = 26.0946 kN/m³, E = 9072 MPa, ν = 0.26), so only
+the joints can fail. The joints have φ = 40° and no cohesion, as the source chapter lists them; the
+vendor's file gives them c = 100 kPa, and that is the one change. The UDEC result the row is scored
+against comes from the chapter, whose joints have friction only. RS2's two factors were computed
+with the vendor's 100 kPa, so they are shown beside the row but are not like for like.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
@@ -300,17 +298,14 @@ and φ = 43° on problems 4, 6 and 7, and a joint cohesion of 100 kPa on all fiv
 
 <!-- test: file=files/rocscience/joints/rj003.xlsx, type=fem_ssrm, expected_fs=1.115, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-3, f_stand=1.10546875, f_fail=1.125, check=edges, tier=gate -->
 
-- XSLOPE on the vendor's file as given, with the joints at c = 100 kPa: 1.232, against UDEC's 1.13 (+9.0%).
-- XSLOPE on the chapter's printed list (joints friction only, a rock that can yield): *unconfirmed*, at least 1.027 against UDEC's 1.13. The slope stands at 1.027 and fails at 1.125. Between them, the trial at 1.047 stopped moving without balancing its forces, so it neither stands nor fails, and the bracket cannot be narrowed.
+Two other readings of the same problem were run for comparison:
 
-On this row's model the slope comes to rest at the lower end of the bracket after about 125,000
-iterations. At the upper end the slope is still slowing at 250,000 iterations, so the
-trial is allowed to run on; by 475,000 iterations it has stopped slowing, moving about the same
-distance in each block of 25,000 iterations, so that trial fails. The whole search takes about two and a half hours. XSLOPE's factor is just
-below UDEC's. RS2's two factors for this problem, with its 100 kPa joints, are 1.12 and 1.09, so
-the vendor's own answer changes with the way the problem is solved. The manual reports this
-problem, like every other, both with and without the vendor's `Improve Joint Convergence` option,
-described under [Methodology](#methodology).
+- On the vendor's file as given, with the joints at c = 100 kPa, the factor of safety is 1.232 in
+  XSLOPE, against UDEC's 1.13 (+9.0%).
+- On the chapter's full printed list (joints friction only, and a rock that can yield, c = 675 kPa,
+  φ = 43°), XSLOPE gives no settled value: the slope stands at 1.027 and fails at 1.125, and the
+  trial between them at 1.047 stopped moving without balancing its forces, so the result is
+  *unconfirmed*, at least 1.027 against UDEC's 1.13.
 
 **Input file:** [rj003.xlsx](files/rocscience/joints/rj003.xlsx).
 

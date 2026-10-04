@@ -39,13 +39,13 @@ CONFIG = PageConfig(
         # (Its failing trial, 1.125, is also RJ-3's tagged failing edge, so it
         # needs no allowance.)
         ('1.027', 'unconfirmed*, at least 1.027'),
-        ('1.047', 'the trial at 1.047'),
+        ('1.027', 'the slope stands at 1.027 and fails'),
+        ('1.047', 'trial between them at 1.047'),
         # Problems 3, 4, 5 and 7 are scored with the joints friction only
         # (ruling 2026-10-02, Q36 a). XSLOPE on the vendor's files as given, with
         # the joints' 100 kPa of cohesion, is shown beside each row: the values
         # are the rows' earlier records (rj00X_fem_meta before the re-pose),
         # shown by ruling, never tagged.
-        ('1.232', "with the joints at c = 100 kPa: 1.232"),
         ('1.311', "with the joints at c = 100 kPa: 1.311"),
         ('1.564', "with the joints at c = 100 kPa: 1.564"),
         ('1.857', "with the joints at c = 100 kPa: 1.857"),

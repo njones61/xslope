@@ -21,22 +21,27 @@ shared [References](references.md) page.
   own `.fez` files rather than the manual's tables, which carry errata the models do not; each
   row states where its model departs from the manual. The vendor models are in MPa and MN/m³;
   these files use kPa and kN/m³.
-- **Transcription.** No problem from 1 to 21 states a joint residual strength or a dilation angle,
-  and material residual values, where they appear, equal the peak. Every vendor file drops a
-  slipping joint's stiffness a hundredfold (`joint_stiffness_factor: 0.01`); XSLOPE has the same
-  relief at the same factor, and the corpus runs without it because on the reinforced walls and
-  embankments of the [RS2 corpus](rs2.md) it moves brackets by one to four steps of the search.
-  Every vendor file also divides the rock's tensile cap by the trial factor, which the corpus does
-  only on [problem 19](#rj-19), the one problem where the cap governs the answer.
-  Lorig & Varona's chapter in Wyllie & Mah (2004), the source of problems 3 to 7, prints one
-  property list for their 260 m section, with joints that carry no cohesion (the vendor's files
-  give them 100 kPa) and a rock that can yield (the vendor's files hold it elastic on problems 3
-  and 5). Problems 3, 4, 5 and 7 take their joints from that list, friction only, because the UDEC
-  results they are scored against come from the chapter; RS2's numbers were computed with the
-  100 kPa, so they are shown beside each row but are not like for like. The rock is the vendor's:
-  the chapter does not say its list was used unchanged in the toppling runs, and with the yielding
-  rock problem 5 reproduces neither the chapter's answer nor its toppling mechanism. Each row also
-  shows XSLOPE on the vendor's file as given and on the chapter's full list.
+- **Transcription.** In transcribing the vendor's files to XSLOPE models, the following
+  decisions were made:
+    - *Strength after failure.* No problem from 1 to 21 states a residual joint strength or a
+      dilation angle, and where a material lists residual values they equal the peak. Joints and
+      rock therefore keep their full strength after they fail.
+    - *Two vendor settings not carried over.* Every vendor file reduces a slipping joint's
+      stiffness a hundredfold (`joint_stiffness_factor: 0.01`). XSLOPE has the same option, but
+      the corpus runs without it: on the reinforced walls and embankments of the
+      [RS2 corpus](rs2.md) it moves the bracket by one to four steps. Every vendor file also
+      divides the rock's tensile cap by the trial factor; the corpus does that only on
+      [problem 19](#rj-19), the one problem where the cap decides the answer.
+    - *Joint strength on problems 3 to 7.* These come from Lorig & Varona's chapter in Wyllie &
+      Mah (2004), which prints one property list for its 260 m section: joints with friction only,
+      and a rock that can yield. The vendor's files give the joints 100 kPa of cohesion and, on
+      problems 3 and 5, hold the rock elastic. Problems 3, 4, 5 and 7 are posed with the chapter's
+      joints, friction only, because the UDEC results they are scored against come from the
+      chapter. The rock is the vendor's: the chapter does not say its list was used unchanged in
+      the toppling runs, and with the yielding rock problem 5 reproduces neither the chapter's
+      answer nor its mechanism. RS2's numbers were computed with the 100 kPa, so they are shown
+      beside each row but are not like for like. Each of these rows also shows XSLOPE on the
+      vendor's file as given and on the chapter's full list.
 - **Referee.** Where a closed-form rigid-block limit equilibrium exists for a problem it is the
   referee, recomputed from the inputs the model carries: Goodman & Bray's column analysis on
   problems 1 and 2, Alejano's plowing equation on problems 11 to 14, the sliding block with its tensile bridge on

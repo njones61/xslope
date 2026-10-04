@@ -626,164 +626,80 @@ saved trigger the same rerun as a free-entry seepage time.
 
 ## Finite element (FEM)
 
-In **FEM** mode, choose **Run FEM…** after building a mesh. The
-[Solver run-settings table](../fem/solver.md#run-settings) maps every dialog option
-to its Excel input, API argument and explanation.
+Build a mesh in **FEM** mode, then choose **Run FEM…** for a single trial or an SSRM search for the factor of safety.
 
-The closing summary quotes the measurement that decided each end of the bracket.
-Raise the ceiling, or loosen the SSRM tolerance, when a trial is inconclusive, and
-raise **Max iterations per trial** when the summary states that the factor of safety
-depends on the iteration limit.
+- **Analysis** — single trial or SSRM search.
+- **F (single)** — the trial's strength reduction factor.
+- **F min / F max (SSRM)** — the starting search bracket.
+- **Tolerance (SSRM)** — the final bracket width.
+- **Max iterations per trial** — the trial's iteration limit.
+- **Iteration ceiling** — the upper limit on trial extensions.
+- **Accelerate convergence** — enable accelerated iteration steps.
+- **Side BC** — Rollers or Fixed side restraints.
+- **K0 initial stress / K0** — enable at-rest initialization and set its coefficient.
+- **Reduce the tensile cap with F (Tension SRF)** — reduce positive tensile caps; dimmed for single trials or no positive cap (tooltip gives the reason).
+- **Failure criterion** — the rule used to classify trials.
+- **Ignore surficial (skin) failures / Min slip depth** — enable the depth filter and set its depth.
+- **SSR exclusions…** — select material zones kept at full strength (SSRM only).
+- **Capture failure-state mechanism / Capture margin** — capture a mechanism above the reported factor (SSRM only).
+- **Set capture iteration budget / Capture max iterations** — override the automatic capture budget (SSRM only).
+- **Seepage time** — select the transient pore-pressure instant, when a solution is loaded; see [Seepage time](#seepage-time).
 
-The [model checks](#model-checks-before-a-run) in the dialog's second column are the
-finite-element ones: a blank Poisson's ratio (which is read as 0.0 and changed the
-strength-reduction factor of safety by a third on a reference model), a modulus of
-zero, a mesh that references a material the table does not define, and — above — a
-cohesive material with no tensile cap, which leaves it the tension its own envelope
-allows — up to the Mohr-Coulomb apex c/tan φ — and raises the factor of safety with
-nothing else on screen to show it.
+The [Solver settings table](../fem/solver.md#run-settings) gives the inputs, API settings and explanations. Options start from the open file and are remembered for the session, not written back to the file.
 
-**Tension SRF** is dimmed for a single trial and for a model whose tensile cutoffs
-are all blank or 0; the tooltip gives the reason. It is offered only where a material
-declares a positive cutoff. The [tensile-strength section](../fem/solver.md#tensile-strength-in-ssrm)
-explains the reduction and the invariant apex.
+Check the **Model checks** column for missing Poisson's ratio, zero modulus, undefined mesh materials and missing tensile caps; resolve errors before running (see [Model checks](#model-checks-before-a-run)). The seismic note explains the entered sign: **+k** pushes right and **−k** left; see [Seismic forces](../fem/overview.md#seismic-forces).
 
-When the seismic coefficient is nonzero the checks also carry a note about what its
-**sign** means here, because it does not mean the same thing in both engines. The
-finite-element engine reads `main!D13` as a vector: `+k` pushes in `+x` and `−k` in
-`−x`, and since both faces of an embankment are analyzed at once, choosing the
-direction is a modeling decision the engine does not make — a pseudo-static
-factor of safety can legitimately come out *above* the static one for the face the
-shaking stabilizes. The limit-equilibrium engine reads the same cell as a magnitude
-and orients it itself, and its own dialog notes this.
-
-Run options, including **Side BC**, are seeded from the open file and remembered
-for the session; a dialog choice is not written back into the file.
-
-When the model carries a transient seepage solution the dialog also carries the
-**Seepage time** group, which names the instant the pore pressures are read from —
-the same control the Run LEM dialog uses, described under
-[Seepage time](#seepage-time).
-
-For an SSRM run, the **SSR exclusions…** button opens a checkbox picker — one row per
-material zone in the model, checked (included) by default:
+**SSR exclusions…** opens the picker below; uncheck a material zone to hold it at full strength. The button and selection summary appear only for SSRM, and the selection is remembered for the session, not saved; see [SSR exclusions](../fem/solver.md#ssr-exclusion-zones).
 
 ![SSR exclusions dialog](images/analysis_ssr_exclude_dialog.png)
 
-Unchecking a zone excludes it from strength reduction; see
-[SSR search areas and exclusion zones](../fem/solver.md#ssr-exclusion-zones) for
-the engineering rationale and worked RS2 comparison. The button and summary label
-are available only for SSRM. The selection is remembered for the session, not saved
-into the input file.
+During a run, follow progress and the Log or press **Cancel**. The closing summary gives the factor of safety, bracket, evidence at both ends and wall time; if it reports an inconclusive trial, raise the ceiling or loosen SSRM tolerance, and if it reports iteration-limit dependence, raise **Max iterations per trial**.
 
-The **Capture failure-state mechanism**, **Capture margin** and optional capture
-iteration-budget controls are also available only for SSRM. The
-[capture settings](../fem/solver.md#the-solve_ssrm-function) describe the extra solve;
-turning it off leaves the factor of safety and bracket unchanged.
+**Continue with a higher limit…** appears for an SSRM run made in this session when the iteration limit stopped the top trial still settling or slowing. Choose a new limit (initially five times the old one); progress, Cancel and the Log continue, results are replaced and the Run dialog keeps the new limit (see [Continuation](../fem/solver.md#creep-trend)). For sweeps, use [Parametric study](#sweeps-in-fem-and-seepage-mode).
 
-The run produces **FEM · Data** (mesh + boundary conditions + reinforcement) and
-**FEM · Results** (deformation, shear strain, displacement vectors, and displacement
-vs F). An SSRM run reports the factor of safety and can be **cancelled** mid-run. It
-ends with a closing summary in the Log: the factor of safety and its bracket, what
-happened at each end of the bracket, and the wall time. When the trial at the top of
-the bracket hit the iteration limit while the slope was still moving slowly, the
-summary states that the factor of safety depends on the iteration limit, and that raising
-**Max iterations per trial** may change it. A trial ended by any other rule is
-reported with the numbers that ended it, such as how much the joint slip grew over
-the last stretch of iterations.
-
-When the iteration limit is what stopped the trial at the top of the bracket (the
-answer reads "FS ≥" because that trial was still settling, or the trial was counted
-failed while still slowing), the FEM · Results toolbar shows **Continue with a
-higher limit…**. It asks for a new **Max iterations per trial** (five times the limit
-the run stopped at, to start) and continues the run from where its trials stopped:
-the search follows the path a fresh run at the new limit would, reusing the trials
-already decided and finishing the ones the limit cut short. The continuation
-runs like any other run, with the same Cancel, the progress bar and the Log carrying
-on, and its results replace the previous ones when it ends; the Run FEM dialog keeps
-the new value for the next run. The button is there only for a run made in this
-session: the trials' end states are held in memory and are not saved with the
-results.
-
-The solution is
-exported alongside the model so it can be restored on the next Open without
-re-solving — including the at-failure mechanism snapshot (a second CSV pair) and,
-for a model with reinforcement or piles, the per-element structural results
-(`{stem}_fem_reinf.csv` / `{stem}_fem_piles.csv`), so a reloaded solution redraws
-the reinforcement-force and pile-shear plots without solving again.
+The run opens **FEM · Data** (mesh, boundary conditions and reinforcement) and **FEM · Results**. Results, captured mechanisms and reinforcement/pile profiles are saved beside the model and restored on Open without re-solving; see [Exported files](../fem/overview.md#exported-files).
 
 ![FEM Data view](images/analysis_fem_data.png)
 
 ![FEM Results view](images/analysis_fem_results.png)
 
-The FEM · Results [Display panel](#display-options-per-view) carries the controls
-that shape these plots. When SSRM captured an at-failure mechanism, a **Field
-state** switch chooses which field every panel renders — **At failure** (the
-default: the developed collapse mechanism) or **Last converged** (the sub-critical
-converged solution) — and it applies to the deformation, shear-strain, and
-displacement-vector plots alike, so they always show the same state. The
-deformation plot adds its own controls: the **Original mesh** reference (dashed
-outline, full grid, or off), the **Deformed color** of the displaced grid, and
-the exaggeration pair — **Scale ×**, the displacement multiplier the plot title
-prints, whose **Auto** default picks whatever draws the largest displacement at
-the **Auto size** percent of the mesh height; entering an explicit Scale ×
-dims Auto size until the box returns to Auto. The displacement-vector plot can **color arrows by magnitude** (with
-a colorbar) instead of solid black.
+The Results [Display panel](#display-options-per-view) redraws the saved solution without solving again; controls that do not apply to the selected plot are dimmed.
 
-**Displacement vs F** plots the maximum displacement of every trial the strength
-reduction run solved against its factor. Filled markers are trials in which the
-slope reached equilibrium, joined by a line. Open markers are trials that were
-stopped before it did, drawn where they were when they were stopped, with no line
-through them. The factor of safety is a dashed line over the shaded final bracket. It is drawn from the run's own record of
-its trials, so the section controls (element edges, field state, the deformation
-and vector controls, the member and joint overlays) are dimmed for it. A single
-solve, or a solution saved before trials recorded their displacement, shows a
-one-line note in place of the plot. How to read the curve is set out in
-[Displacement vs F](../fem/overview.md#displacement-vs-f).
+| Control | What it does |
+|---|---|
+| Title | Show or hide the plot title. |
+| Plot type | Choose Deformed mesh, Viscoplastic shear strain, Displacement vectors or Displacement vs F. |
+| Color ramp | Choose the shear-strain colors. |
+| Field state | Choose At failure (default when captured) or Last converged for deformation, shear strain and vectors. |
+| Original mesh | Draw the undeformed reference as a dashed Outline, Full mesh or Off. |
+| Deformed color | Choose Black or Blue for the displaced grid. |
+| Scale × | Set the displacement multiplier printed in the title, or Auto. |
+| Auto size | Set Auto's largest displacement as a percent of mesh height; dimmed while Scale × is explicit. |
+| Element edges | Toggle the grid; on jointed deformation plots it defaults off above eight jointed lines. |
+| Reinforcement | Toggle the structural-member overlay. |
+| Show joints | Draw joints colored by slip; remembered separately for deformation and shear strain, on by default. |
+| Joint width (pt) | Set the joint-face line weight on the deformation plot. |
+| Color by block | Give each block its own tint instead of a material tint; available with Show joints on a jointed deformation plot. |
+| Element numbers | Label elements. |
+| Boundary edges | Outline the domain in black on the vector plot. |
+| Node dots | Mark vector-plot nodes. |
+| Auto-scale vectors | Enlarge arrows for visibility while retaining relative magnitudes, or draw at true scale. |
+| Vector cutoff | Hide arrows below the selected fraction of maximum displacement. |
+| Color by magnitude | Color arrows by displacement magnitude with a colorbar, instead of solid black. |
 
-The displacement-vector plot draws the arrow field on every model, jointed or not. On a jointed model the deformation
-plot draws the scaled deformed mesh as the blocks the joints cut the section into — each under a faint tint, its joint faces green, the deformed outside of the mesh a dark line
-against the dashed undeformed outline: a jointed slope fails by blocks moving as bodies on their joints, and an arrow
-field sampled at nodes misses the parting and sliding that make up the mechanism. On a network of more than eight
-jointed lines the element edges come off so the blocks can be seen; that sets the **Element edges** box for the
-result, and the box overrides it either way. Where the displacements are too small to draw the
-mesh is shown undeformed and the title states this. A **Show joints** switch, set separately for the deformation plot
-and the shear strain plot and on for both by default on a jointed model, draws the two faces of every joint on
-that deformed mesh, each where the deformation has put it and colored by how far the faces have slid on a green
-ramp, gray where the joint is closed, two thin lines with a white gap where it has opened, with a slip colorbar
-and a key placed in a corner the section does not reach; **Joint width** sets the weight of those faces
-in points, closed and slipping alike, since a thin face disappears on a wide section. **Color by block** sets the fill of the blocks: off
-(the default), one tint per material; on, each block under its own tint so the bodies can be told apart. With
-**Show joints** on, the shear strain plot of a jointed model draws every joint colored by its slip, with the slip
-colorbar and a key naming the closed, slipping and opened states: over the strain field on a model whose soil can
-yield, and on its own panel, titled *Joint slip*, on a model whose only strength is its joints. There each joint is a
-thin line, a gray hairline where closed, and a jointed reinforcement sheet is drawn as its two faces, one on each side
-of the bar.
+**Displacement vs F** shows the run's trials, with filled markers for equilibrium, open markers for stopped trials, and the factor of safety over the shaded bracket; section controls are dimmed. A single trial or older results without displacement records show a note instead; see [Displacement vs F](../fem/overview.md#displacement-vs-f).
 
-The FEM · Results toolbar also carries **1D Details…**, which opens a non-modal panel
-listing every reinforcement line and pile in the model with a utilization badge, and
-plotting the selected member's profiles along its own length: mobilized axial force
-against its capacity envelope for a reinforcement line, and lateral displacement,
-shear, moment, and mobilized soil reaction against depth for a pile. Under the list is
-a map of the section with the selected member picked out and named, so each listed member
-can be located on the slope; it is the same drawing the report prints above its member
-details. Its own **Field
-state** control switches those profiles between the at-failure mechanism and the last
-converged solution, exactly as the one on the results view does. **Export** in that
-panel writes the current view as a PNG and its plotted series as a CSV, both named for
-the field state they were taken at. The button is
-dimmed, with a tooltip giving the reason, for a model that carries neither reinforcement lines
-nor piles. See [FEM Reinforcement](../fem/reinforcement.md#inspecting-the-results) and
-[FEM Piles](../fem/piles.md#inspecting-the-results) for what the profiles show.
+On a jointed model the deformation plot draws the blocks and their joints colored by slip. **Show joints**, **Joint width** and **Color by block** shape that drawing; see [What the results show](../fem/joints.md#what-the-results-show).
 
-Each reinforcement row also carries the state the line is in — *within capacity*, *near
-capacity*, *pullout*, *yielded*, *softened*, *ruptured* or *inactive* — and so does the
-line under the plot, with its meaning in the tooltip. Two lines both standing at 100% are
-told apart by that word and not by the badge: *pullout* is an end slipping at what its
-embedment can develop, *yielded* is the middle of the line at its full tensile capacity.
-The states are defined in [The state of a
-line](../fem/reinforcement.md#the-state-of-a-line), and they are the words
-`print_reinforcement_summary()` prints and a generated report writes.
+**1D Details…** opens a non-modal member panel:
+
+- Lists reinforcement lines and piles with utilization badges, plus a section map locating the selected member.
+- Plots reinforcement axial force against capacity and pile lateral displacement, shear, moment and soil reaction along the member.
+- **Field state** switches between the captured mechanism and last converged solution.
+- **Export** writes the current view as PNG and its series as CSV, named for the field state.
+- The button is dimmed when there are no reinforcement lines or piles; its tooltip gives the reason.
+
+Reinforcement rows and the plot label show *within capacity*, *near capacity*, *pullout*, *yielded*, *softened*, *ruptured* or *inactive*, with the meaning in the tooltip; see [The state of a line](../fem/reinforcement.md#the-state-of-a-line). Profile interpretation is on [FEM Reinforcement](../fem/reinforcement.md#inspecting-the-results) and [FEM Piles](../fem/piles.md#inspecting-the-results).
 
 ---
 

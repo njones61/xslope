@@ -12,9 +12,9 @@ locates the factor of safety. The run settings control both the individual trial
 
 ## Run settings
 
-Choose a single trial to test a specified factor, or an SSRM search to locate the stability
-boundary. In [XSLOPE Studio](../studio/analysis.md#finite-element-fem), build a mesh and choose
-**Run FEM…** for a single strength-reduction trial or an SSRM search.
+In [XSLOPE Studio](../studio/analysis.md#finite-element-fem), build a mesh and choose
+**Run FEM…**; the dialog runs either a single trial at a factor you set or an SSRM search for
+the factor of safety.
 
 ![Run FEM dialog](../studio/images/analysis_run_fem_dialog.png){width=818}
 

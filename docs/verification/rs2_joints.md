@@ -464,19 +464,20 @@ comes into play.
 
 ### 🟢 RJ-9: Alejano et al. bilinear slab failure, example 1a (rj009) {#rj-9}
 
-Problem 9 is example 1a of Alejano et al.: a 50 m slope at 50°, cut by bedding joints dipping
-**out of the face** at −50°, 3 m apart, with φ = 30°. A two-segment release trace at the toe, a
-short joint with φ = 40°, undercuts the lowest slab. The model therefore has two joint strengths,
-and the manual's geometry table lists them in the reverse order from its RS2 legend. On all six of
-problems 9 to 14 the bedding and the short release traces at the toe have different friction
-angles, so a single quoted joint friction angle for these problems is incomplete. The rock is
-elastic with E = 2 × 10⁸ MPa, γ = 25 kN/m³ and ν = 0.3; the very high stiffness is the manual's
-way of making the rock act as rigid blocks.
+Problem 9 is example 1a of Alejano et al.: a 50 m slope at 50°, cut by bedding joints 3 m apart
+that dip into the excavation at the same 50° as the face. Because the bedding is parallel to the
+face, no bedding plane daylights, and a slab cannot slide out along one on its own. At the toe, a
+short two-segment joint called the release trace cuts under the lowest slab and lets it out. The
+two joints have different strengths: the bedding has φ = 30° and the release trace φ = 40°. The
+manual's geometry table lists the two in the reverse order from its RS2 legend, and its summary
+table gives only one friction angle per problem, although each of problems 9 to 14 has two. The
+rock is elastic and very stiff (E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3), which is the manual's way
+of making the rock act as rigid blocks.
 
-The face and the bedding dip at the same angle, so no slab can slide out along a single plane. The
-mechanism is the bilinear one the problem is named for: sliding on a basal plane combined with
-sliding along the release trace that the face undercuts. The release trace ends exactly on the
-bedding plane it is meant to meet; see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
+The failure is the bilinear mechanism the problem is named for: the slab slides down its bedding
+plane and out along the release trace at the toe. The release trace ends exactly on the bedding
+plane it is meant to meet; see [where a joint ends on
+another](../fem/joints.md#where-a-joint-ends-on-another-joint).
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | LE (Alejano) | RS2 without / with improvement |
 |---|---|---|---|---|

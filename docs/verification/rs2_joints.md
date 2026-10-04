@@ -834,18 +834,19 @@ face at 71.6°, tessellated into Voronoi blocks over the whole of it. The rock i
 (γ = 27 kN/m³, E = 20 GPa, ν = 0.3, c = 1,000 kPa, φ = 35°, no tensile capacity), and every block
 wall is a joint with c = 500 kPa, φ = 20° and the corpus's standard stiffness pair.
 
-The vendor's model departs from that paper in two ways. Its network is coarser: 525 blocks over
-the 4,400 m² section, 0.119 blocks per square meter, where the paper's network has 0.2, so the
-vendor's mean block is 8.4 m² against the paper's 5 m². And its rock friction is 35°, where the
-paper's is 30°. The tessellation was generated in UDEC and imported; the model file holds it as
-523 joint boundaries, 1,177 segments, and they are transcribed verbatim. Their mean block width,
-2.895 m, is this row's mesh size, standing in for the joint spacing every other row meshes at.
+The vendor's model departs from the paper in two ways. Its block network is coarser: 525 blocks
+over the 4,400 m² section, or 0.119 blocks per square meter, against the paper's 0.2, so the
+vendor's blocks average 8.4 m² against the paper's 5 m². And its rock friction is 35° where the
+paper's is 30°. The vendor generated the block network in UDEC and imported it into the RS2 model,
+which stores it as 523 joint boundaries made of 1,177 segments; XSLOPE's model carries those
+segments exactly as the vendor's file has them. Their mean block width, 2.895 m, is this row's
+mesh size, since the row has no single joint spacing to mesh at.
 
-The referee is UDEC's 2.46. That is the vendor's own UDEC run on the vendor's network, and the only
+The referee is the vendor's own UDEC run on this same network, 2.46; it is the only published
 value computed on this network with these inputs. The paper ran only its own finite element
-program, on its finer network with 30° rock. At this 60 m height it gives 1.5 with the joints open
-where they reach the slope surfaces and 1.6 with them closed. Those two values belong to a
-different problem and do not score this row.
+program, on its finer network with the 30° rock, and at this 60 m height it gives 1.5 with the
+joints open where they reach the slope surfaces and 1.6 with them closed. Those two values
+describe a different model, so they are not used to score this row.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|

@@ -135,7 +135,8 @@ elastic (γ = 25 kN/m³, E = 20 GPa, ν = 0.3), so the model can only fail on it
 the assumption the closed-form solution makes. The joints are the column boundaries (see
 [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint)). They have
 no cohesion, a friction angle of 38.15°, which is the value this case is posed at, and the
-corpus's standard stiffness pair.
+corpus's standard stiffness pair, a normal stiffness k<sub>n</sub> = 10<sup>8</sup> kPa/m and a shear
+stiffness k<sub>s</sub> = 10<sup>7</sup> kPa/m.
 
 The referee is Goodman & Bray's iterative column analysis, recomputed on this section. It
 reproduces the method's published mode pattern and requires a horizontal toe force of 0.36 kN/m
@@ -166,7 +167,7 @@ to the block corner at (−2.5, 4.330), so their "with improvement" factors are 
 
 **Input file:** [rj001a.xlsx](files/rocscience/joints/rj001a.xlsx).
 
-![RJ-1a: Goodman & Bray block toppling, case a (rj001a) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own, so the whole figure is the joints: slip runs up every column contact and along the stepped base, brightest on the columns at mid-slope, and the deformed section shows the stack rotating forward over the face column by column while the toe column slides out along its own stretch of base](images/RJ-1a.png)
+![RJ-1a: Goodman & Bray block toppling, case a (rj001a) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF (strength reduction factor), and the deformed section. The rock is elastic and carries no strain of its own, so the whole figure is the joints: slip runs up every column contact and along the stepped base, brightest on the columns at mid-slope, and the deformed section shows the stack rotating forward over the face column by column while the toe column slides out along its own stretch of base](images/RJ-1a.png)
 
 ### 🟢 RJ-1b: Goodman & Bray block toppling, case b (rj001b) {#rj-1b}
 
@@ -265,9 +266,10 @@ same method on the same problem.
 **RS2 and UDEC give nearly the same factor, and both are above the closed form.** Alejano & Alonso publish
 their own UDEC run at 0.87 beside their Goodman & Bray 0.76, and RS2's two factors are 0.86 and
 0.82. All three programs give factors above the recomputed closed form: XSLOPE by 1.2% and the
-other two by about a tenth. Neither RS2's nor UDEC's result can be examined further on this
-problem, because the manual says nothing about the settings of its UDEC model: no block rounding,
-no deformability and no stiffness. The only statement of that kind anywhere in the manual is its
+other two by about a tenth. RS2's model is available from the vendor, and this row's model
+is transcribed from it. UDEC's result cannot be examined further on this problem, because the
+manual says nothing about the settings of its UDEC model: no block rounding, no deformability and
+no stiffness. The only statement of that kind anywhere in the manual is its
 note on rigid blocks for problems 9 to 14.
 
 The joints at 64° and 30° add up to 311.4 m of total length, the same as in the vendor's model.
@@ -282,8 +284,8 @@ hundredfold reduction of a slipping joint's stiffness turned on (see
 
 ### 🟢 RJ-3: Lorig & Varona forward block toppling (rj003) {#rj-3}
 
-Problems 3 to 6 are the toppling and plane-failure examples of Lorig & Varona (2004). Problems 3
-to 7 share one 260 m section with a 55° slope. Problem 3 cuts it with two joint sets, both passing
+Problems 3 to 7 are the toppling and plane-failure examples of Lorig & Varona (2004). Problems 3
+to 7 share one section, a 260 m high slope at 55°. Problem 3 cuts it with two joint sets, both passing
 through the origin: columns at 70°, 20 m apart, and a cross set at −20°, 30 m apart. The manual
 gives the pair as "70 and 160" degrees, which describes the same two planes with the second angle
 measured from the other end of the half circle. The rock is elastic, its plasticity set to none in
@@ -307,12 +309,13 @@ and φ = 43° on problems 4, 6 and 7, and a joint cohesion of 100 kPa on all fiv
 - XSLOPE on the chapter's printed list (joints friction only, a rock that can yield): *unconfirmed*, at least 1.027 against UDEC's 1.13. The slope stands at 1.027 and fails at 1.125. Between them, the trial at 1.047 stopped moving without balancing its forces, so it neither stands nor fails, and the bracket cannot be narrowed.
 
 On this row's model the slope comes to rest at the lower end of the bracket after about 125,000
-iterations. At the upper end it is still moving, without slowing, after 475,000 iterations, so
-that trial fails. The whole search takes about two and a half hours. XSLOPE's factor is just
+iterations. At the upper end the slope is still slowing at 250,000 iterations, so the
+trial is allowed to run on; by 475,000 iterations it has stopped slowing, moving about the same
+distance in each block of 25,000 iterations, so that trial fails. The whole search takes about two and a half hours. XSLOPE's factor is just
 below UDEC's. RS2's two factors for this problem, with its 100 kPa joints, are 1.12 and 1.09, so
-the vendor's own answer changes with the way the problem is solved. This is one of the three
-problems the vendor reruns with its `Improve Joint Convergence` option, described under
-[Methodology](#methodology).
+the vendor's own answer changes with the way the problem is solved. The manual reports this
+problem, like every other, both with and without the vendor's `Improve Joint Convergence` option,
+described under [Methodology](#methodology).
 
 Apart from the joint cohesion, every input class matches the vendor's model, including the side
 boundaries, which the vendor fixes in both directions.
@@ -371,11 +374,10 @@ with the vendor's 100 kPa, so they are shown beside the row but are not like for
 <!-- test: file=files/rocscience/joints/rj005_chapter.xlsx, type=fem_ssrm, expected_fs=1.096, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5c, f_stand=1.0859375, f_fail=1.10546875, check=edges, tier=gate -->
 
 On this row's model the slope comes to rest at the lower end of the bracket within a few hundred
-iterations. At the upper end it is still moving at the same rate after 450,000 iterations, so that
-trial fails. The whole search takes about five and a half hours. This row's factor is above UDEC's
+iterations. At the upper end the slope is still slowing at 250,000 iterations, so the trial is
+allowed to run on; by 450,000 iterations it is moving at the same rate, so that trial fails. The whole search takes about five and a half hours. This row's factor is above UDEC's
 and above RS2's default factor, the one without `Improve Joint Convergence`. RS2's two factors for
-this problem, with its 100 kPa joints, are 1.65 and 1.86, the widest spread in the manual, and the
-vendor needed its `Improve Joint Convergence` option to rerun the problem at all.
+this problem, with its 100 kPa joints, are 1.65 and 1.86.
 
 Apart from the joint cohesion, every input class transcribed from the vendor's file matches it,
 including the side restraint.
@@ -443,12 +445,13 @@ Problem 8 is Pritchard & Savigny's base-friction table model, scaled up a hundre
 and closed at the back by a vertical joint. The three highest columns end on that back joint, as in
 the vendor's model, and the total joint length matches the vendor's to the millimeter. The vendor's
 file holds the column joints only inside the block that the basal and back joints bound. Generated
-across the whole section instead, the same set would be sixteen chains of joint segments: three of
-them below the plane that the model has no columns under, and three more running on past x = 68.4
-into the strip the vendor leaves uncut. The rock is Mohr-Coulomb (γ = 25.506 kN/m³,
-E = 22.771 GPa, ν = 0.139, c = 60 kPa, φ = 39°). The joints have no cohesion, φ = 39°, and the
-second-softest normal stiffness in the corpus: k<sub>n</sub> = 1.5 × 10<sup>7</sup> kPa/m,
-against the corpus's usual 10<sup>8</sup>.
+across the whole section instead, the same set would be sixteen column joints. Three of them
+would lie entirely in the rock in front of the toe, below the level of the basal joint, where the
+model has no columns, and three more would run on past the back joint at x = 68.4 into the strip
+the vendor leaves uncut. The rock is Mohr-Coulomb (γ = 25.506 kN/m³,
+E = 22.771 GPa, ν = 0.139, c = 60 kPa, φ = 39°). The joints have no cohesion, φ = 39°, and a
+normal stiffness below the standard pair's: k<sub>n</sub> = 1.5 × 10<sup>7</sup> kPa/m, against
+the usual 10<sup>8</sup>. Only problems 15 and 16 have softer joints.
 
 | XSLOPE SSRM | UDEC referee | RS2 vs referee | RS2 without / with improvement |
 |---|---|---|---|
@@ -473,7 +476,7 @@ Problem 9 is example 1a of Alejano et al.: a 50 m slope at 50°, cut by bedding 
 **out of the face** at −50°, 3 m apart, with φ = 30°. A two-segment release trace at the toe, a
 short joint with φ = 40°, undercuts the lowest slab. The model therefore has two joint strengths,
 and the manual's geometry table lists them in the reverse order from its RS2 legend. On all six of
-problems 9 to 14 the bedding and the short release traces near the crest have different friction
+problems 9 to 14 the bedding and the short release traces at the toe have different friction
 angles, so a single quoted joint friction angle for these problems is incomplete. The rock is
 elastic with E = 2 × 10⁸ MPa, γ = 25 kN/m³ and ν = 0.3; the very high stiffness is the manual's
 way of making the rock act as rigid blocks.
@@ -490,7 +493,8 @@ bedding plane it is meant to meet; see [where a joint ends on another](../fem/jo
 <!-- test: file=files/rocscience/joints/rj009.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-9, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
 
 RS2's two factors, 1.01 without the `Improve Joint Convergence` option and 1.09 with it, lie on
-either side of XSLOPE's factor, which is true of only three other problems in this corpus.
+either side of XSLOPE's factor, as they do on six other problems in this corpus: 3, 4, 5, 6, 10
+and 17.
 
 Alejano's paper gives its limit equilibrium for this problem as a range rather than a single
 value: 0.40 to 1.45, as the manual prints it. The range is shown beside the referee and does not
@@ -499,7 +503,7 @@ verifies RS2 against the UDEC run, which is this row's referee.
 
 **Input file:** [rj009.xlsx](files/rocscience/joints/rj009.xlsx).
 
-![RJ-9: Alejano et al. bilinear slab failure, example 1a (rj009) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it moves: the release trace under the crest carries the brightest slip, a bedding plane below the toe carries the rest, and the deformed section shows the slab between them sliding out over the bench](images/RJ-9.png)
+![RJ-9: Alejano et al. bilinear slab failure, example 1a (rj009) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it moves: the release trace near the toe carries the brightest slip, the bedding plane that starts at the crest and passes below the toe carries the rest, and the deformed section shows the slab between them sliding out over the bench](images/RJ-9.png)
 
 ### 🟢 RJ-10: Alejano et al. bilinear slab failure, example 1b (rj010) {#rj-10}
 
@@ -519,8 +523,8 @@ see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-anoth
 <!-- test: file=files/rocscience/joints/rj010.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-10, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
 
 RS2's two factors, 0.92 without the `Improve Joint Convergence` option and 1.08 with it, lie on
-either side of XSLOPE's 1.037, as they do on [problem 9](#rj-9), [problem 5](#rj-5) and
-[problem 6](#rj-6) and on no other problem here. Alejano's limit equilibrium is again a range
+either side of XSLOPE's 1.037, as they do on problems [3](#rj-3), [4](#rj-4), [5](#rj-5),
+[6](#rj-6), [9](#rj-9) and [17](#rj-17) and on no other problem here. Alejano's limit equilibrium is again a range
 rather than a single value, 0.43 to 1.45, shown beside the referee and not scoring the row.
 
 **Input file:** [rj010.xlsx](files/rocscience/joints/rj010.xlsx).
@@ -640,7 +644,7 @@ example, below the rigid-block bound for its two blocks. It is the referee.
 
 **The 1.00 the paper prints for this example does not follow from the inputs it prints.** Every
 input that Eq. (7) uses matches the vendor's model; the toe block's base, for example, matches to
-five figures, 3.589 m against the 3.588 m printed. On those inputs the equation returns 1.2034. For
+three figures, 3.589 m against the 3.588 m printed. On those inputs the equation returns 1.2034. For
 it to return 1.00, the toe block's base would have to be 6.08 m, which is a different problem. The
 manual's other value, UDEC's 0.9, comes from the rounding of block corners in the UDEC model, by
 the paper's own account: with the rounding radius reduced, the paper reports 0.9994 for the same
@@ -658,8 +662,8 @@ fixes in both directions.
 Problem 15 is a 40 m footwall slope at 40° whose bedding dips in the same direction at the same
 angle, 2 m apart. The slabs therefore lie parallel to the face, and a failure has to break through
 rock at the toe to get out. This is the one problem in the Alejano family whose rock can yield:
-Mohr-Coulomb, c = 200 kPa, φ = 35°, γ = 28 kN/m³, E = 1 GPa, ν = 0.3. The joints are the corpus's
-softest, k<sub>n</sub> = 5 × 10<sup>6</sup> kPa/m and k<sub>s</sub> = 5 × 10<sup>5</sup> kPa/m,
+Mohr-Coulomb, c = 200 kPa, φ = 35°, γ = 28 kN/m³, E = 1 GPa, ν = 0.3. The joints share the corpus's
+softest stiffness pair with problem 16, k<sub>n</sub> = 5 × 10<sup>6</sup> kPa/m and k<sub>s</sub> = 5 × 10<sup>5</sup> kPa/m,
 twenty times below the corpus's standard pair, with no cohesion and φ = 25°.
 
 The manual's table prints the slope height as 25 m. The vendor's section rises 40 m, from the toe
@@ -702,7 +706,7 @@ Problem 16 is a laboratory test rather than a slope. Fourteen columns of 9 cm bl
 into a 63.4° staircase on a plate, and the plate is tilted until the stack topples; the problem
 reports the tilt angle at which that happens. The blocks are elastic (E = 350 MPa, ν = 0.2,
 γ = 28 kN/m³) on an effectively rigid plate, and the joints have no cohesion, φ = 38°, and the
-corpus's softest stiffness pair. In the vendor's files the 0° model sits on rollers, while the
+corpus's softest stiffness pair, the same as problem 15's. In the vendor's files the 0° model sits on rollers, while the
 nine tilted models fix every exterior node in both directions and converge to a tolerance a
 hundred times tighter. The plate carries no body force in any of the ten.
 

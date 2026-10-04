@@ -152,13 +152,13 @@ method: where the thrust between two columns acts. They place each thrust at the
 the contact. In the solved state the two columns lean together and the contact face stays closed
 only over its upper quarter to half, so the resultant acts a tenth to a sixth of the face height
 below the corner. With those heights read from the solved state, and nothing else changed, the
-same recursion gives 1.0279, the bottom of this row's bracket. The method's other three
+same recursion gives **1.0279**, the bottom of this row's bracket. The method's other three
 assumptions are met exactly by the solution: every block balances in force and moment on the
 interface stresses alone, every closed side contact is at its friction limit, and the base
 reaction of every toppling block acts at its downslope corner.
 
-The manual's figure labels the side boundaries as rollers, but the model clamps them and the
-restraints follow the model. The 0.5 kN toe force, negligible against the lowest block's weight,
+The manual's figure shows the side boundaries as rollers, but in the vendor's model they are
+fixed. XSLOPE uses the vendor's model, so its sides are fixed too. The 0.5 kN toe force, negligible against the lowest block's weight,
 is not carried; the vendor's reruns of all four cases move the force from the toe at (−0.5, 0.866)
 to the block corner at (−2.5, 4.330), so their "with improvement" factors are a different load case.
 
@@ -168,18 +168,20 @@ to the block corner at (−2.5, 4.330), so their "with improvement" factors are 
 
 ### 🟢 RJ-1b: Goodman & Bray block toppling, case b (rj001b) {#rj-1b}
 
-Case a's section and rock with the joints at φ = 33.0239°, the lowest of the four, held up by the
-2013 kN horizontal force the case is posed with — about twice the lowest column's own weight, and
-what lets a stack on 33° joints stand where case a's needs 38°. It enters as a line load on the
-`lloads` sheet, at the upper-left block corner, (−2.5, 4.330): the toe is the end of the basal
-joint, where a load has no defined side to act on.
+Case b uses case a's section and rock, with the joints at φ = 33.0239°, the lowest friction of
+the four cases. The stack stands only because of the 2013 kN horizontal force the case is posed
+with. That force is about twice the weight of the lowest column, and it is what lets a stack on 33°
+joints stand where case a's needs 38°. It enters the model as a line load on the lloads sheet at
+the upper-left corner of the lowest block, (−2.5, 4.330). It cannot be placed at the toe itself,
+which is the end of the basal joint, where a load has no defined side to act on.
 
-On this case the recursion requires a horizontal toe force of 2,012.86 kN/m for limit equilibrium,
-against the 2,013 kN the manual states — 0.007% on a stack weighing 83,500 kN/m.
+For limit equilibrium, the closed-form recursion on this case needs a horizontal toe force of
+2,012.86 kN/m, against the 2,013 kN the manual states: a difference of 0.007% on a stack weighing
+83,500 kN/m.
 
-The thrust heights here are not case a's. The toe force pushes the two lowest columns back into
-their own step risers and carries those two thrusts far down their faces, and given this case's own
-measured heights the recursion returns **1.0078**, the bottom of this row's bracket.
+The thrust heights differ from case a's. The toe force pushes the two lowest columns back into
+their own step risers, which carries their thrusts far down the contact faces. With this case's
+own measured heights, the recursion gives **1.0078**, the bottom of this row's bracket.
 
 | XSLOPE SSRM | Goodman & Bray referee | RS2 vs referee | UDEC | RS2 without / with improvement |
 |---|---|---|---|---|

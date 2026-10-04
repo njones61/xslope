@@ -854,13 +854,13 @@ describe a different model, so they are not used to score this row.
 
 <!-- test: file=files/rocscience/joints/rj020.xlsx, type=fem_ssrm, expected_fs=2.541, element_type=tri6, target_size=2.895, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-20, f_stand=2.53125, f_fail=2.55078125, check=edges, tier=gate -->
 
-The slope stands at the lower end of the bracket and fails at the upper end. At the lower end the
-section stops moving, but three contacts inside the sliding mass keep opening and closing in a
-cycle that repeats every eight iterations, so the forces never balance exactly; after a million
-iterations with no net movement over the cycle, the trial counts as standing. At the upper end the
-section is still moving at nearly the same rate after 225,000 iterations, so that trial fails. The
-whole search takes nearly five hours. The figure shows the mass failing on a surface picked through the block walls rather than
-along any one plane it contains. The paper reports the same of its own Voronoi example: every
+The search closed on the bracket 2.531 to 2.551. The trial at 2.531 ran to the limit of one
+million iterations: the section had stopped moving, but three contacts kept opening and closing
+every eight iterations, so the forces never balanced exactly. Under the rule given in the
+[Methodology](#methodology), a trial in that state counts as standing. The trial at 2.551 was
+still moving at nearly the same rate after 225,000 iterations, so it fails. The search took nearly
+five hours. In the figure the failure surface runs through the block walls as a curved path rather
+than along any single plane; the paper reports the same for its Voronoi example, where every
 failure mechanism it found had a curved overall shape.
 
 XSLOPE's `xslope.joints.voronoi` generates a Voronoi joint network of this kind at any block size.

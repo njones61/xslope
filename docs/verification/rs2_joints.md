@@ -220,8 +220,9 @@ the same single assumption accounts for the difference.
 
 ### 🟢 RJ-1d: Goodman & Bray block toppling, case d (rj001d) {#rj-1d}
 
-Case c's joint friction angle with case b's 2013 kN force: the same stack, stabilized. It is the
-strongest of the four, and the closed form and UDEC agree that it is.
+Case d combines case c's joint friction angle with case b's 2013 kN horizontal force at the toe,
+so the same stack is held by both. It is the strongest of the four, based on the closed form and
+UDEC solutions.
 
 Re-running Goodman & Bray's analysis with the thrust heights taken from XSLOPE's solved state,
 instead of the top-corner assumption, gives **1.2422**, the lower edge of XSLOPE's own bracket.

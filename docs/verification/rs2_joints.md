@@ -537,7 +537,8 @@ The "Rigid-block ceiling" column is the highest factor of safety any rigid-block
 for this problem. The mechanism has two rigid blocks, the slab and the toe block below it. For any
 reduction factor you can ask whether some set of joint forces, each within its friction limit, could
 hold both blocks in place; above 1.2148 here, none can. A closed-form answer that assumes one
-particular mechanism can sit below that ceiling but never above it. Alejano's Eq. (7) gives 1.7582
+particular mechanism can sit below that ceiling or on it, as on problem 13 where the two agree
+to three figures, but not above it. Alejano's Eq. (7) gives 1.7582
 here, above the ceiling, so it cannot be right for this model, and the ceiling is the referee
 instead. XSLOPE gives 1.213, RS2 1.22 and the paper's own UDEC run 1.21: the three differ by 0.01 at
 most, and all three sit on that ceiling.

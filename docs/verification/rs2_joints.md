@@ -655,15 +655,20 @@ Mohr-Coulomb, c = 200 kPa, φ = 35°, γ = 28 kN/m³, E = 1 GPa, ν = 0.3. The j
 softest stiffness pair with problem 16, k<sub>n</sub> = 5 × 10<sup>6</sup> kPa/m and k<sub>s</sub> = 5 × 10<sup>5</sup> kPa/m,
 twenty times below the corpus's standard pair, with no cohesion and φ = 25°.
 
-The manual's table prints the slope height as 25 m. The vendor's section rises 40 m, from the toe
-at (0, 0) to the crest at (−47.6701, 40), which is the height the source paper states, and XSLOPE
-builds the vendor's section.
+Table 15.1 of the RS2 Joint Verification Manual gives the slope height as 25 m. The vendor's own
+model is 40 m high, from the toe at (0, 0) to the crest at (−47.6701, 40), which is also the height
+the source paper states (a 40 m slope dipping 40°). XSLOPE builds the vendor's 40 m section; the
+25 m in the table is an error.
 
-Alejano's limit equilibrium for the footwall, Eqs. (9)–(10), recomputed on the vendor file's inputs
-at the optimum the paper states (a break-out surface inclined 14° to the bedding and emerging at
-55°), gives **1.7985**, against the value the paper prints, which is in the table below. Minimized
-over its own two angles, it settles within half a degree of that optimum. The referee is the
-limit-equilibrium search by Slide2, Rocscience's own slope program, at 1.25.
+The closed form for this problem is Alejano's footwall limit equilibrium, Eqs. (9)–(10). It assumes
+the slope fails by breaking out through one bed along a surface at a fixed angle to the bedding.
+Recomputed on the vendor file's inputs at the optimum the paper states (a break-out surface
+inclined 14° to the bedding and emerging at 55°), it gives **1.7985**, and minimized over its own
+two angles it settles within half a degree of that optimum; the paper prints 1.72. The slope does
+not fail that way: a limit-equilibrium search that is free to choose its surface, and both finite
+element programs, find a lower factor on a different surface. The referee is therefore the
+manual's Slide2 limit-equilibrium search, 1.25, which assumes no mechanism. XSLOPE's 1.271 and
+RS2's 1.28 sit just above it; the closed form and Alejano's own UDEC run, 1.6, sit well above.
 
 | XSLOPE SSRM | Slide2 LE search referee | RS2 vs referee | Alejano Eqs. (9)–(10) | UDEC-SSRT (Alejano) | RS2 without / with improvement |
 |---|---|---|---|---|---|

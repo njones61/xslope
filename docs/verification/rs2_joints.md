@@ -863,13 +863,8 @@ five hours. In the figure the failure surface runs through the block walls as a 
 than along any single plane; the paper reports the same for its Voronoi example, where every
 failure mechanism it found had a curved overall shape.
 
-XSLOPE's `xslope.joints.voronoi` generates a Voronoi joint network of this kind at any block size.
-Networks it generates on the section as the manual states it, an 80 × 70 m block with the face cut
-from it, can be meshed. This file's outline is different: it also has a vertex wherever one of the
-vendor's joints meets the boundary. A generated joint that ends within a fraction of a millimeter
-of one of those vertices leaves a sliver of boundary that the mesher cannot split along. A generated
-network should therefore be placed on the plain section as the manual states it, not on this file's
-outline. This row is scored on the vendor's own tessellation.
+XSLOPE can generate a Voronoi joint network of this kind at any block size (see
+[joints](../fem/joints.md)); this row uses the vendor's own network.
 
 **Input file:** [rj020.xlsx](files/rocscience/joints/rj020.xlsx).
 

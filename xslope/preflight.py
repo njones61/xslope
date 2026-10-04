@@ -1883,6 +1883,15 @@ def _geometry_material_missing(ctx):
                f"{where}.")
 
 
+@rule("geometry.bottom_elevation_missing", ERROR, ("*",),
+      "Profile-line models require a numeric bottom elevation.")
+def _bottom_elevation_missing(ctx):
+    if ctx.sd.get("profile_lines") and not _finite(ctx.sd.get("max_depth")):
+        return ("This profile-line model has no numeric bottom elevation. "
+                "Enter the bottom elevation (Max depth) "
+                "in Profile lines; profile sheet cell B2.")
+
+
 @rule("geometry.profile_line_too_short", ERROR, ("*",),
       "A profile line needs at least two points to bound a zone.")
 def _profile_line_short(ctx):

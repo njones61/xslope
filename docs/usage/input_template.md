@@ -447,6 +447,8 @@ bottom of the slope is defined by the Max Depth parameter **[L]** (an elevation)
 horizontal base to the problem. During a limit equilibrium analysis using an automated search algorithm, the failure 
 surface is not allowed to go below this depth. Thus, it can be thought of as a bedrock surface.
 
+The bottom elevation in cell B2 is required for profile-line models.
+
 Each profile line also has an optional **Size** cell — a target finite-element size **[L]** for
 the material zone that line builds, used only when a mesh is generated. Leave it blank and the
 zone meshes at the global target size; set it and elements inside that zone are driven down to

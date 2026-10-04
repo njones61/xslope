@@ -1588,6 +1588,9 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         # Move to next profile line (skip 3 columns: A->D, D->G, etc.)
         col += 3
 
+    if profile_lines and pd.isna(max_depth):
+        raise ValueError("The profile sheet has no bottom elevation (cell B2).")
+
     # Ground surface, domain polygon, and tensile-crack line are built from the
     # unified polygon representation after materials are parsed — see below.
 
@@ -3010,6 +3013,12 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     # upgrades older files to the current template format. The trade-off is that
     # user-added custom formulas/formatting in the destination are not preserved.
     # Callers may pass an explicit `template` (e.g. Save As from a chosen file).
+    if slope_data.get('profile_lines'):
+        md = slope_data.get('max_depth')
+        if md is None or pd.isna(md):
+            raise ValueError(
+                "Profile-line models require a bottom elevation "
+                "(max_depth; profile sheet cell B2).")
     if template is None:
         template = default_template_path()
     # An automatic-water model states its reservoir as the water definition plus the
@@ -3315,7 +3324,7 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
         _prof_coord_row = 9 if _dest_version >= 21 else 8
         prof = {}
         md = slope_data.get('max_depth')
-        prof['B2'] = _f(md) if md is not None else 0.0
+        prof['B2'] = _f(md)
         for n, line in enumerate(profile_lines):              # n is 0-based
             x_col = 1 + n * 3                                  # A, D, G, ...
             y_col = x_col + 1

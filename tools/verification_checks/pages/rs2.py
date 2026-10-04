@@ -33,6 +33,8 @@ CONFIG = PageConfig(
     # Published values quoted in prose beside the row's own lock: RS2's native
     # shallow rebuild of problem 43 is a different model's number.
     untagged_allow=[
+        # VP51 is an LEM row; the vendor catalog's RS2 SSRM value is quoted, not scored.
+        ('1.22', 'the RS2 SSRM value of 1.22 in the catalog'),
         ('1.19', 'The 1.19 published for this problem'),
         # the geotextile wall rows that print the factor their search found
         # without confirming it (RS2-49, 51, 52, 53, 54)

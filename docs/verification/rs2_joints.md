@@ -19,7 +19,8 @@ shared [References](references.md) page.
 
 - **Models.** Geometry, materials, joint properties, restraints and loads come from the vendor's
   `.fez` files, not the manual's tables, which carry errata; each row notes where its model departs
-  from the manual. The vendor's MPa and MN/m³ are converted to kPa and kN/m³.
+  from the manual. Every row's geometry, materials, joint network, restraints and loads match the
+  vendor's model unless the row's notes say otherwise. The vendor's MPa and MN/m³ are converted to kPa and kN/m³.
 - **Transcription.** In transcribing the vendor's files to XSLOPE models, the following
   decisions were made:
     - *Strength after failure.* No problem states a residual joint strength or dilation angle, and
@@ -29,7 +30,8 @@ shared [References](references.md) page.
       hundredfold (`joint_stiffness_factor: 0.01`) and divides the rock's tensile cap by the trial
       factor, the factor that each run of the strength reduction divides the strengths by. The corpus does neither: the stiffness reduction moves brackets by one to four steps
       on the [RS2 corpus](rs2.md)'s walls and embankments, and the cap governs only on
-      [problem 19](#rj-19), where it is applied.
+      [problem 19](#rj-19), where it is applied. Turned on, the stiffness reduction leaves the bracket
+      unchanged on every row of this page it has been run on: problems 1, 2, 8 to 15 and 17 to 19.
     - *Joint strength on problems 3 to 7.* Their source, Lorig & Varona's chapter in Wyllie & Mah
       (2004), gives the joints friction only; the vendor's files add 100 kPa of cohesion. Problems
       3, 4, 5 and 7 use the chapter's joints because the UDEC results they are scored against come
@@ -192,8 +194,7 @@ own measured heights, the block-by-block analysis gives **1.0078**, the bottom o
 
 <!-- test: file=files/rocscience/joints/rj001b.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1b, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
 
-Every input class matches the vendor model, including the side restraint and the force's magnitude
-and direction.
+The force's magnitude and direction match the vendor's model.
 
 **Input file:** [rj001b.xlsx](files/rocscience/joints/rj001b.xlsx).
 
@@ -238,7 +239,7 @@ from where the thrust acts.
 
 <!-- test: file=files/rocscience/joints/rj001d.xlsx, type=fem_ssrm, expected_fs=1.252, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1d, tier=gate, f_stand=1.2421875, f_fail=1.26171875, check=edges -->
 
-Every input class matches the vendor model, the force reaching the same point case b's does.
+The force reaches the same point case b's does.
 
 **Input file:** [rj001d.xlsx](files/rocscience/joints/rj001d.xlsx).
 
@@ -271,12 +272,6 @@ is transcribed from it. UDEC's result cannot be examined further on this problem
 manual says nothing about the settings of its UDEC model: no block rounding, no deformability and
 no stiffness. The only statement of that kind anywhere in the manual is its
 note on rigid blocks for problems 9 to 14.
-
-The joints at 64° and 30° add up to 311.4 m of total length, the same as in the vendor's model.
-Every other input class (geometry, materials, restraints and loads) also matches the vendor's
-model, including the side boundaries, which are fixed in both directions. Run with the vendor's
-hundredfold reduction of a slipping joint's stiffness turned on (see
-[Methodology](#methodology)), XSLOPE gives the same bracket on this row.
 
 **Input file:** [rj002.xlsx](files/rocscience/joints/rj002.xlsx).
 
@@ -317,9 +312,6 @@ the vendor's own answer changes with the way the problem is solved. The manual r
 problem, like every other, both with and without the vendor's `Improve Joint Convergence` option,
 described under [Methodology](#methodology).
 
-Apart from the joint cohesion, every input class matches the vendor's model, including the side
-boundaries, which the vendor fixes in both directions.
-
 **Input file:** [rj003.xlsx](files/rocscience/joints/rj003.xlsx).
 
 ![RJ-3: Lorig & Varona forward block toppling (rj003) — FEM inputs, mesh, joint slip and the deformed section. The rock is elastic and carries no strain of its own, so the whole mechanism is on the two sets: slip runs along one −20° cross joint from the toe back under the crest, and the steep 70° joints above it slip, most strongly near the face, so the columns resting on that cross joint lean forward over the face. The two right-hand panels show the last trial at which the slope stands, F = 1.105, which is the state just below the factor of safety rather than past it, and the deformed section is drawn at 52 times scale. The run past the factor of safety that these panels usually show is not drawn: it was stopped in its first iteration, before the section had moved at all](images/RJ-3.png)
@@ -344,9 +336,6 @@ with the vendor's 100 kPa, so they are shown beside the row but are not like for
 - XSLOPE on the chapter's printed list (joints friction only, a rock that can yield): 1.232, against UDEC's 1.3 (−5.2%). On this problem the vendor's rock is already the chapter's, so this model is the same as the row's own.
 
 <!-- test: file=files/rocscience/joints/rj004_chapter.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4c, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
-
-Apart from the joint cohesion, every input class transcribed from the vendor's file matches it,
-including the side restraint.
 
 **Input file:** [rj004.xlsx](files/rocscience/joints/rj004.xlsx).
 
@@ -379,9 +368,6 @@ allowed to run on; by 450,000 iterations it is moving at the same rate, so that 
 and above RS2's default factor, the one without `Improve Joint Convergence`. RS2's two factors for
 this problem, with its 100 kPa joints, are 1.65 and 1.86.
 
-Apart from the joint cohesion, every input class transcribed from the vendor's file matches it,
-including the side restraint.
-
 **Input file:** [rj005.xlsx](files/rocscience/joints/rj005.xlsx).
 
 ![RJ-5: Lorig & Varona backward block toppling (rj005) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The rock is elastic and carries no strain of its own; slip runs along the −55° joints in the wedge behind the face while the horizontal bedding opens, and the deformed section shows the slabs stepping out over one another down the face, each leaning back into the slope as it goes](images/RJ-5.png)
@@ -401,8 +387,6 @@ capacity).
 <!-- test: file=files/rocscience/joints/rj006.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-6, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate -->
 
 XSLOPE's factor matches UDEC's and lies between RS2's two factors, 1.25 and 1.31.
-
-Every input class transcribed from the vendor's file matches it, including the side restraint.
 
 **Input file:** [rj006.xlsx](files/rocscience/joints/rj006.xlsx).
 
@@ -430,8 +414,7 @@ like.
 
 <!-- test: file=files/rocscience/joints/rj007_chapter.xlsx, type=fem_ssrm, expected_fs=1.486, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7c, f_stand=1.4765625, f_fail=1.49609375, check=edges, tier=gate -->
 
-Apart from the joint cohesion, every input class transcribed from the vendor's file matches it,
-including the side restraint. The manual's table for this problem prints the slope angle as 5°;
+The manual's table for this problem prints the slope angle as 5°;
 its figure and the vendor's model both have the same 55° slope as problem 6.
 
 **Input file:** [rj007.xlsx](files/rocscience/joints/rj007.xlsx).
@@ -443,7 +426,7 @@ its figure and the vendor's model both have the same 55° slope as problem 6.
 Problem 8 is Pritchard & Savigny's base-friction table model, scaled up a hundred times. It has a
 30.5 m face at 78° and twelve columns at −60°, 5.08 m apart, standing on a horizontal basal joint
 and closed at the back by a vertical joint. The three highest columns end on that back joint, as in
-the vendor's model, and the total joint length matches the vendor's to the millimeter. The vendor's
+the vendor's model. The vendor's
 file holds the column joints only inside the block that the basal and back joints bound. Generated
 across the whole section instead, the same set would be sixteen column joints. Three of them
 would lie entirely in the rock in front of the toe, below the level of the basal joint, where the
@@ -558,9 +541,6 @@ programs are inside 0.8% of one another, and all three are on the bound. [Proble
 the same pattern, a closed form well above the programs, on a problem where no rigid-block bound is
 available.
 
-Every input class matches the vendor's model, including the release traces' endpoints and the side
-boundaries, which the vendor fixes in both directions.
-
 **Input file:** [rj011.xlsx](files/rocscience/joints/rj011.xlsx).
 
 ![RJ-11: Alejano et al. plowing sliding slab failure (rj011) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. One bedding plane from the crest to the toe carries almost all of the slip, and at its foot the two release traces cut out a small wedge: the deformed section shows that wedge lifted and rotated out over the bench while the slab above it slides down the plane, which is the plowing mechanism the paper names. The wedge is driven out and up by the slab above it, and at the panel's exaggeration a movement of centimeters draws as meters, so the block appears to leave the slope](images/RJ-11.png)
@@ -619,9 +599,6 @@ three figures here.
 
 <!-- test: file=files/rocscience/joints/rj013.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-13, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
 
-Every input class matches the vendor's model, including the release traces' endpoints and the side
-boundaries, which the vendor fixes in both directions.
-
 **Input file:** [rj013.xlsx](files/rocscience/joints/rj013.xlsx).
 
 ![RJ-13: Alejano et al. plowing sliding slab, example 4 (rj013) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section. The bedding set runs the whole section and almost none of it carries slip: one bedding plane from the crest down to the toe does, and the two release traces at its foot cut out the toe block, which the deformed section shows lifted and pushed out over the bench while the slab above it slides down the plane](images/RJ-13.png)
@@ -649,9 +626,6 @@ it to return 1.00, the toe block's base would have to be 6.08 m, which is a diff
 manual's other value, UDEC's 0.9, comes from the rounding of block corners in the UDEC model, by
 the paper's own account: with the rounding radius reduced, the paper reports 0.9994 for the same
 model.
-
-Every input class matches the vendor's model, including the side boundaries, which the vendor
-fixes in both directions.
 
 **Input file:** [rj014.xlsx](files/rocscience/joints/rj014.xlsx).
 
@@ -693,7 +667,7 @@ gap comes from what the formula is able to consider, not from either program. Th
 limit-equilibrium answer is therefore the referee, as the rigid-block bound is on
 [problem 11](#rj-11).
 
-Every input class matches the vendor's model, including the side restraint. The rock's 1000 kPa
+The rock's 1000 kPa
 tensile cap is above the apex of its Mohr-Coulomb envelope and never controls.
 
 **Input file:** [rj015.xlsx](files/rocscience/joints/rj015.xlsx).

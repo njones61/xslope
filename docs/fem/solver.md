@@ -351,11 +351,8 @@ The force-equilibrium half is Dawson, Roth & Drescher's; Griffiths & Lane's own 
 the displacement test plus an iteration ceiling, which
 [does not separate creep from equilibrium](#convergence-criterion).
 
-The [SSRM-1 verification row](../verification/ssrm.md#verification-griffiths1) gives
-FS = 1.372 on quad8 elements at target size 3.5 and 16,000 iterations per
-trial, against Griffiths & Lane's published 1.4. Their [Example 6 before filling](../verification/ssrm.md#verification-griffiths6)
-gives 2.422 on quad8 elements at target size 2 and 16,000 iterations per trial, against the
-published 2.4.
+This is the criterion Griffiths & Lane's published results were obtained with, and XSLOPE
+reproduces them under it; see the [SSRM verification page](../verification/ssrm.md).
 
 ### 2. Hybrid (`"hybrid"`, default) {#2-hybrid-hybrid-default}
 

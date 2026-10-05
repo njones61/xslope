@@ -155,8 +155,8 @@ The normal stress at which the tangent is taken differs between the two. The pow
 gently, and the center of the in-plane Mohr circle, $s' = -(\sigma_x + \sigma_y)/2$ (compression
 positive), serves. Hoek-Brown bends sharply, and the tangent is taken at the normal stress on the
 failure plane, $\sigma_n = s'\cos^2\phi - c\sin\phi\cos\phi$, computed from the previous iteration's
-reduced tangent. That is the point where the Mohr circle touches its tangent line, and the same
-normal stress the LEM uses at a slice base.
+reduced tangent. The Mohr circle touches its tangent line at this normal stress, which is also
+the normal stress the LEM uses at a slice base.
 
 Strength reduction divides $c_i$ and $\tan\phi_i$ by $F$ after the tangent is taken. The curve's own
 constants are never divided: $\sigma_{ci}/F$ would be a different envelope, because of the exponent

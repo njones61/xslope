@@ -264,65 +264,69 @@ def figure_refine_features():
 
 
 def figure_structural_coupling():
-    """FEM-2 reinforcement and FEM-4 wall, with an illustrative 0.5 ft line size.
+    """FEM-2 whole mesh and two-layer detail; no solve or companion writes.
 
-    Reuse the tutorial mesh builders and this module's material mesh renderer.
-    Only the in-memory line size changes; no workbook or companion is written.
-    Check that every three-node member is a complete quadratic soil edge.
+    Use the program's mesh plot, retaining its title, labels and legend. Only
+    the viewing window and member stroke weight change for this illustration.
     """
-    from tools.make_tutorial_figures import (
-        FEM02_DONE, _fem02_mesh, _fem04_mesh)
+    from PIL import Image
+    from tools.make_tutorial_figures import FEM02_DONE, _fem02_mesh
+    from xslope.plot import plot_mesh
 
+    data = _quiet(load_slope_data, FEM02_DONE)
+    data.update(target_size=5.0, element_size_1d=2.5)
+    mesh = _quiet(_fem02_mesh, data)
+    edges = {tuple(sorted(int(row[i]) for i in inds))
+             for row in mesh["elements"]
+             for inds in ((0, 1, 3), (1, 2, 4), (2, 0, 5))}
+    members = np.asarray(mesh["elements_1d"], dtype=int)
+    assert all(int(t) == 3 for t in mesh["element_types_1d"])
+    assert all(tuple(sorted(row)) in edges for row in members)
+    print(f"FEM-2: {_stats(mesh)}, {len(members)} member edges; "
+          "all member nodes and edges shared with soil")
+
+    x0, x1, y0, y1 = _extent(mesh)
+    pad = PAD_FRAC * max(x1 - x0, y1 - y0)
+    windows = ((x0-pad, x1+pad, y0-pad, y1+pad), (12, 28, 6, 14))
     panels = []
-    for title, path, builder in (
-            ("FEM-2: reinforced slope", FEM02_DONE,
-             lambda data: _fem02_mesh(data)),
-            ("FEM-4: pile wall", os.path.join(
-                _root(), "docs/tutorials/files/xslope_pile_wall.xlsx"),
-             lambda data: _fem04_mesh(data, element_size_1d=0.5))):
-        data = _quiet(load_slope_data, path)
-        data["element_size_1d"] = 0.5
-        mesh = _quiet(builder, data)
-        edges = {tuple(sorted(int(row[i]) for i in inds))
-                 for row in mesh["elements"]
-                 for inds in ((0, 1, 3), (1, 2, 4), (2, 0, 5))}
-        members = np.asarray(mesh["elements_1d"], dtype=int)
-        assert all(int(t) == 3 for t in mesh["element_types_1d"])
-        assert all(tuple(sorted(row)) in edges for row in members)
-        names = [m.get("name") or f"Material {i + 1}"
-                 for i, m in enumerate(data["materials"])]
-        panels.append((title, mesh, members, names))
-        print(f"{title}: {_stats(mesh)}, {len(members)} member edges; "
-              "all member nodes and edges shared with soil")
-
-    axes_w = FIG_W_IN * 0.45
-    heights, windows = [], []
-    for _, mesh, _, _ in panels:
-        x0, x1, y0, y1 = _extent(mesh)
-        pad = PAD_FRAC * max(x1 - x0, y1 - y0)
-        windows.append((x0 - pad, x1 + pad, y0 - pad, y1 + pad))
-        heights.append(axes_w * (y1 - y0 + 2 * pad) / (x1 - x0 + 2 * pad))
-    chrome = TITLE_H_IN + CAPTION_H_IN + LEGEND_H_IN + 0.35
-    fig_h = max(heights) + chrome
-    fig = plt.figure(figsize=(FIG_W_IN, fig_h), dpi=DPI)
-    for i, (title, mesh, members, names) in enumerate(panels):
-        bottom = (LEGEND_H_IN + CAPTION_H_IN + 0.2) / fig_h
-        ax = fig.add_axes((0.03 + i * 0.5, bottom, 0.45, heights[i] / fig_h))
-        handles = _draw(ax, mesh, names, window=windows[i], lw=72 / DPI)
-        xy = mesh["nodes"]
-        ax.add_collection(LineCollection(xy[members[:, :2]], colors="black",
-                                        linewidths=1.3, zorder=6))
-        member_nodes = np.unique(members)
-        ax.scatter(xy[member_nodes, 0], xy[member_nodes, 1], s=3,
-                   color="black", zorder=7)
-        ax.set_title(title, fontsize=11, fontweight="bold", pad=6)
-        fig.text(0.255 + i * 0.5, bottom - 0.16 / fig_h,
-                 _stats(mesh), ha="center", fontsize=8.5)
-        fig.legend(handles=handles, loc="lower center", ncol=1, frameon=False,
-                   fontsize=8, bbox_to_anchor=(0.255 + i * 0.5, 0.025))
-    fig.text(0.5, 0.01, "tri6 · soil target 2 ft · 1D element size 0.5 ft "
-             "(illustration meshes)", ha="center", fontsize=8)
-    _save(fig, "fem_structural_meshes.png")
+    for window in windows:
+        height = FIG_W_IN * (window[3]-window[2]) / (window[1]-window[0]) + 1.1
+        fig = plot_mesh(mesh, materials=data["materials"],
+                        figsize=(FIG_W_IN, height))
+        ax = fig.axes[0]
+        title = ax.get_title()
+        labels = [t.get_text() for t in ax.get_legend().get_texts()]
+        # The owner requested thin red members, with dots on soil corners and
+        # midsides. Do not replace or rewrite any program-produced annotation.
+        for line in ax.lines:
+            if line.get_color() == "red":
+                line.set_linewidth(72 / DPI)
+                line.set_zorder(3)
+            elif line.get_marker() == ".":
+                line.set_zorder(4)
+        ax.set_xlim(window[:2])
+        ax.set_ylim(window[2:])
+        ax.set_aspect("equal", adjustable="box")
+        assert ax.get_title() == title
+        assert [t.get_text() for t in ax.get_legend().get_texts()] == labels
+        print(title, labels, "window", window)
+        buffer = io.BytesIO()
+        fig.savefig(buffer, dpi=DPI, bbox_inches="tight", facecolor="white")
+        plt.close(fig)
+        buffer.seek(0)
+        panels.append(Image.open(buffer).convert("RGB"))
+    gap = 16
+    combined = Image.new("RGB", (max(p.width for p in panels),
+                                  sum(p.height for p in panels)+gap), "white")
+    y = 0
+    for panel in panels:
+        x = (combined.width-panel.width)//2
+        combined.paste(panel, (x, y))
+        assert combined.crop((x, y, x+panel.width, y+panel.height)).tobytes() == panel.tobytes()
+        y += panel.height + gap
+    path = os.path.join(_root(), IMAGES, "fem_structural_meshes.png")
+    combined.save(path)
+    print("wrote", path)
 
 
 def main():

@@ -654,16 +654,14 @@ nodes both come back at that size and grow back to the target away from them, an
 discretized finely without a finer mesh across the whole section. It only ever refines: a value at
 or above the target size cannot coarsen the lines and is ignored.
 
-In these meshes of the [FEM-2 reinforced slope](../tutorials/fem02_reinforcement.md) and the
-[FEM-4 pile wall](../tutorials/fem04_piles.md), the black members follow soil-element edges and
-every member node is a soil node. The smaller elements form a graded band around each line:
-these illustration meshes use a 1D element size of 0.5 ft with a soil target size of 2 ft, rather
-than changing the size across the whole section. Both panels have equal aspect; the two sections
-are drawn at different scales.
+The [FEM-2 reinforced slope](../tutorials/fem02_reinforcement.md) below is meshed for this
+illustration at a soil target size of 5 ft and a 1D element size of 2.5 ft. The upper panel shows
+the whole mesh; the lower panel enlarges two reinforcement layers. Both have equal aspect.
 
-![Reinforcement and wall edges sharing soil nodes in locally refined meshes](images/fem_structural_meshes.png){width=1000}
+![FEM-2 whole mesh and two reinforcement layers sharing soil nodes](images/fem_structural_meshes.png){width=1000}
 
-The fine elements follow each member; the surrounding soil grades back to the larger target size.
+The thin red members follow soil-element edges; their nodes sit on soil corners and midsides.
+A few rows of smaller elements follow each layer, grading back to the larger soil target size.
 
 The [Solver](solver.md) page describes how one trial at a reduced strength is
 iterated and decided, how the search over $F$ finds the factor of safety, and the

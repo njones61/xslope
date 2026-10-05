@@ -415,11 +415,14 @@ physics, and a cap there is a backstop.
 
 ## K0 initial stress
 
-In-situ stress is the stress the ground carries before the analysis; the mesh, strengths and loads
-alone do not specify its lateral component. Deformation is computed from changes in that state.
-XSLOPE offers two conventions: gravity turn-on builds stress from self weight; at-rest initialization
-sets the lateral effective stress to $K_0$ times the vertical effective stress, where $K_0$ is the
-at-rest earth-pressure coefficient.
+Before any strength is reduced, the ground already carries stress from its own weight, and the
+analysis computes deformation from changes to that state. The vertical stress is fixed by the
+overburden, but the lateral stress is not: the same slope, with the same strengths and loads, can
+have been left by its history with a little lateral stress or a lot, and nothing in the mesh
+specifies which. XSLOPE offers the two conventions in general use for setting it. Gravity turn-on
+starts from zero stress and switches on self weight, letting the elastic solution decide the
+lateral stress. At-rest initialization sets the lateral effective stress directly as $K_0$ times
+the vertical effective stress, where $K_0$ is the at-rest earth-pressure coefficient.
 
 To use at-rest initialization, enter $K_0$ in the **K0 initial stress (FEM)** cell on the main sheet,
 pass `k0=` to `solve_fem()` / `solve_ssrm()`, or check **K0 initial stress** in Studio's Run FEM dialog

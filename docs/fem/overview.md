@@ -727,19 +727,15 @@ the out-of-balance force fell before the iteration ceiling.
 
 ## Exported files
 
-Analysis outputs are written to files sharing the input file stem. The mesh file is written when a
-new mesh is generated; the CSVs are written by
-
-```python
-export_fem_solution(fem_data, solution, output_stem)
-```
-
-When an SSRM run has captured the at-failure mechanism, that snapshot is persisted alongside the
-converged solution as a second CSV pair plus a small metadata file, so a reloaded solution can
-re-render the deformation and vector panels from the failure mechanism. Structural results are
-written as their own engineer-readable CSVs when the model carries the corresponding elements —
-these double as results tables for reading and let a reloaded solution re-render the reinforcement
-force and pile shear colorbars without re-solving.
+A solve is expensive, so its results are saved to disk: the stresses, strains and displacements
+at every node and element, the captured failure mechanism, and the forces in any reinforcement or
+piles. From these files a solution can be reloaded and re-plotted, read into a report or a
+spreadsheet, or checked against another program, without solving again. Every output file takes
+the input file's name as its stem. The mesh is written when it is generated; the results are
+written after a solve by `export_fem_solution(fem_data, solution, output_stem)`, as a pair of
+CSVs holding the nodal and element results. An SSRM run that captured its failure mechanism
+writes a second pair for that snapshot, with a small metadata file; a model with reinforcement or
+piles writes a further CSV for each. The files are:
 
 | File | Description |
 |------|-------------|

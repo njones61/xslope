@@ -820,7 +820,7 @@ build it once with the two commands below, after which it is used automatically.
 `fast_kernel=False` on `solve_fem()` forces the Python version; the default, `"auto"`,
 uses the compiled one whenever it is present.
 
-To build it locally, with Cython installed:
+To build it locally, with a C compiler available:
 
 ```bash
 pip install Cython

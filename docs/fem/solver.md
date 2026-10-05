@@ -69,7 +69,8 @@ Each trial divides both strength components by the trial factor,
 $\tan \phi_r = \dfrac{\tan \phi}{F}$
 
 reducing $\tan\phi$ rather than $\phi$ so the scheme stays well behaved as the friction angle
-approaches zero. As $F$ rises, more Gauss points yield, displacements grow, and at some point the
+approaches zero. As $F$ rises, more Gauss points — integration points inside each element where
+stress is evaluated — yield, displacements grow, and at some point the
 [viscoplastic iteration](#elastic-plastic-behavior-viscoplastic-algorithm)
 stops reaching equilibrium at all. `solve_ssrm()` brackets that transition
 and bisects it.
@@ -112,8 +113,7 @@ why the bisection uses the trial's verdict (standing, failed or undecided; see
 At a fixed trial factor, the solver reduces the material strengths and seeks equilibrium
 under the applied loads. The **viscoplastic algorithm** of
 [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387) and Smith & Griffiths (2004)
-returns stress a Gauss point cannot carry — a Gauss point is an integration point inside an
-element where stress is evaluated — as a body load built from accumulated viscoplastic
+returns stress a Gauss point cannot carry as a body load built from accumulated viscoplastic
 strains. The elastic stiffness matrix is assembled and factorized **once**, then reused by
 back-substitution for every iteration of every strength reduction trial.
 
@@ -795,6 +795,18 @@ that mixes them accelerates its Mohr-Coulomb groups and leaves the rest unchange
 
 ## References
 
+Dawson, E.M., Roth, W.H., & Drescher, A. (1999). Slope stability analysis by strength reduction. *Géotechnique*, 49(6), 835-840.
+
+Griffiths, D.V., & Lane, P.A. (1999). Slope stability analysis by finite elements. *Géotechnique*, 49(3), 387-403.
+
 Irons, B. M., and Tuck, R. C. (1969). [A version of the Aitken accelerator for computer
 iteration](https://doi.org/10.1002/nme.1620010306). *International Journal for Numerical
 Methods in Engineering*, 1(3), 275–277.
+
+Matsui, T., & San, K.C. (1992). Finite element slope stability analysis by shear strength reduction technique. *Soils and Foundations*, 32(1), 59-70.
+
+Smith, I.M., & Griffiths, D.V. (2004). *Programming the Finite Element Method* (4th ed.). John Wiley & Sons.
+
+Sun, W., Wang, G., & Zhang, L. (2021). [Slope stability analysis by strength reduction method
+based on average residual displacement increment criterion](https://doi.org/10.1007/s10064-021-02237-y).
+*Bulletin of Engineering Geology and the Environment*, 80, 4367–4378.

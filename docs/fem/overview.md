@@ -718,12 +718,21 @@ trial in which the slope reached equilibrium, and the line joins only those. An 
 trial that was stopped before it reached equilibrium. It is drawn at the point where it was
 stopped, while the slope was still moving, with no line through it. The key says how it was
 stopped: **stopped at the iteration limit, still moving**, **displacements ran away**, or **past
-the [displacement limit](solver.md#3-displacement-limit-displacement_limit)**. The reported factor of safety is the dashed vertical line, and the final
-bracket is shaded behind it. The same plot is available alone as
+the [displacement limit](solver.md#3-displacement-limit-displacement_limit)**. The reported factor of safety is the dashed vertical line, and the
+[final bracket](solver.md#methodology) is shaded behind it. The same plot is available alone as
 `xslope.plot_fem.plot_ssrm_curve(ax, record)`.
 
-**Interpreting the plot.** Both curves below rise to a knee. What distinguishes the runs is the
-verdict at the top of the final bracket: in the normal run, the open diamond marks a trial whose
+The comparison below uses the same [FEM-1 embankment](../tutorials/fem01_strength_reduction.md)
+and tri6 mesh at target size 3.5 ft in both panels. On the left, the tutorial's 4,000-iteration
+budget gives the knee and a failed upper edge. On the right, Max iterations per trial and the
+iteration ceiling are deliberately set to 100: the low trials stand, but the final upper trial
+is still slowing when the limit stops it.
+
+![FEM-1 displacement curves at normal and deliberately short iteration budgets](images/fem_budget_comparison.png){width=1000}
+
+**Interpreting the plot.** Both curves rise to a knee, the point where displacement turns sharply
+upward. What distinguishes the runs is the [verdict](solver.md#methodology) at the top of the
+[final bracket](solver.md#methodology): in the normal run, the open diamond marks a trial whose
 movement did not slow, counted as sliding, and the factor of safety is the bracket midpoint.
 In the short-budget run, the open pentagon marks a trial still slowing when the limit stopped it,
 left undecided. No failure was shown at that final upper edge, so the result is a lower bound,
@@ -732,28 +741,18 @@ than judging the curve's shape alone; filled circles mark trials that reached eq
 both runs. Raise Max iterations per trial to decide the unresolved top, or
 [continue with a higher limit](solver.md#creep-trend) from where its trials stopped.
 
-The comparison below uses the same [FEM-1 embankment](../tutorials/fem01_strength_reduction.md)
-and tri6 mesh at target size 3.5 ft in both panels. On the left, the tutorial's 4,000-iteration
-budget gives the knee and a failed upper edge. On the right, Max iterations per trial and the
-iteration ceiling are deliberately set to 100: the low trials stand, but the final upper trial
-is still slowing when the limit stops it. Both curves have a knee; the right panel is not an
-example of a smooth climb without one. The markers and verdict distinguish a demonstrated
-failure from an unresolved trial, not the curve's shape alone.
-
-![FEM-1 displacement curves at normal and deliberately short iteration budgets](images/fem_budget_comparison.png){width=1000}
-
 The left run reports FS = 1.371. The right run's closing log reports "The factor of safety is
 at least 1.36": the standing edge is $F = 1.3671875$, while the final top at $F = 1.375$ is
-undecided after 100 ordinary iterations. The plot prints the bound to three decimals, FS ≥ 1.367.
-The Newton corrector remains on in both runs; its additional iterations are counted in a
-standing trial's total even when the ordinary-iteration allowance is only 100.
+undecided after 100 ordinary iterations. The log rounds the bound down to two decimals;
+the plot prints it to three decimals, FS ≥ 1.367.
 
 The run's closing summary gives the same information in words. It is printed as the last lines of
 every strength reduction run and returned as `result['summary']`. It reports what happened at each
 end of the bracket. When the trial at the top hit the iteration limit, the summary states whether it was
 still moving fast (*the slope was failing; more iterations would only have let it move further*)
 or still moving slowly (*the factor of safety depends on the iteration limit here*). Both quote
-the largest displacement, its multiple of the elastic value and how much it grew over the last
+the largest displacement, [its multiple of the elastic value](solver.md#2-hybrid-hybrid-default),
+and how much it grew over the last
 quarter of the trial's iterations. A trial ended by any other rule is reported with the reading
 that ended it: how much the joint slip grew and whether its rate slowed, the displacement reached
 as a multiple of the elastic value, the displacement against the displacement limit, or how far
@@ -874,22 +873,12 @@ and plastic rotations that describe yielding.
 
 ## References
 
-Dawson, E.M., Roth, W.H., & Drescher, A. (1999). Slope stability analysis by strength reduction. *Géotechnique*, 49(6), 835-840.
-
 Duncan, J.M. (1996). State-of-the-art: Limit equilibrium and finite element analysis of slopes. *Journal of Geotechnical Engineering*, 122(7), 577-596.
-
-Duncan, J.M., & Wright, S.G. (2005). *Soil Strength and Slope Stability*. John Wiley & Sons.
-
-Dyson, A.P., & Tolooiyan, A. (2018). Comparative approaches to probabilistic finite element methods for slope stability analysis. *Innovative Infrastructure Solutions*, 3(1), 1-11.
 
 Griffiths, D.V., & Lane, P.A. (1999). Slope stability analysis by finite elements. *Géotechnique*, 49(3), 387-403.
 
-Itasca Consulting Group. (2019). *FLAC — Fast Lagrangian Analysis of Continua, Version 8.1, User's Guide*. Itasca Consulting Group, Inc., Minneapolis, Minnesota.
-
-Matsui, T., & San, K.C. (1992). Finite element slope stability analysis by shear strength reduction technique. *Soils and Foundations*, 32(1), 59-70.
+Hammah, R.E., Yacoub, T.E., Corkum, B., & Curran, J.H. (2005). *The shear strength reduction method
+for the generalized Hoek-Brown criterion*. Proc. 40th U.S. Symposium on Rock Mechanics
+(ARMA/USRMS), Paper 05-810.
 
 Smith, I.M., & Griffiths, D.V. (2004). *Programming the Finite Element Method* (4th ed.). John Wiley & Sons.
-
-Sun, G., Lin, S., Jiang, W., & Yang, Y. (2021). A simplified solution for determining the factor of safety of a slope reinforced with piles based on the shear strength reduction method. *Bulletin of Engineering Geology and the Environment*, 80, 7719-7730.
-
-Zheng, H., Liu, D.F., & Li, C.G. (2005). Slope stability analysis based on elasto‐plastic finite element method. *International Journal for Numerical Methods in Engineering*, 64(14), 1871-1888.

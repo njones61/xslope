@@ -221,6 +221,12 @@ yield check.
 The assembled equations need displacement restraints to prevent rigid-body motion and boundary
 loads to represent the forces acting on the model.
 
+The section below shows the restraints and surface loads, with the water table drawn separately.
+
+![FEM boundary restraints, surface loads and water table](images/fem_boundary_conditions.png){width=800px}
+
+The red arrows are applied loads; the water table supplies pore pressures, not a boundary traction.
+
 ### Displacement boundary conditions
 
 **Fixed supports** ($u = v = 0$) represent rigid bedrock or a boundary deep enough that its movement

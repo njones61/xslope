@@ -254,14 +254,6 @@ A state the corrector returns ends the trial as standing only when it passes thr
 >- **Displacement** — the translational movement below a tenth of the model height, read on the deep
 >  degrees of freedom wherever a [`min_slip_depth`](#surficial-skin-failures-and-the-minimum-slip-depth-filter) filter is in force.
 
-On a jointed model a fourth check follows, the **hold test**: the viscoplastic iteration is restarted
-from the certified state, with its joint history, and the certificate stands only if that iteration
-classifies the state as standing within 3,000 more iterations having moved it by no more than a hundredth
-of an elastic displacement (the purely elastic response to the same loads, which every solve
-computes). A Newton equilibrium on a set of contacts can be a saddle — a state the
-iteration leaves as soon as it is allowed to — and the hold test separates it from a state the slope
-remains in. Models without joints never run it.
-
 **When the corrector does not certify a state.** Where any of the checks fails, or the Newton solve does not
 converge, the attempt is recorded and control returns to the viscoplastic loop with nothing about
 its state changed — the corrector works on a copy of the displacement field and of every plastic
@@ -334,7 +326,7 @@ the viscoplastic loop alone, or a cold-start Newton solve; `fem_solver` on `solv
 >  described under [the convergence, corrector and yield checks](#convergence-criterion).<br>
 >- **`'viscoplastic'`** — that loop on its own: no corrector, no yield check. A trial ends
 >  on the [iteration-limit rules](#creep-trend) and on nothing else.<br>
->- **`'newton'`** — a cold-start Newton-Raphson solve; it is accepted but cannot bracket the rock-joint benchmarks described below.
+>- **`'newton'`** — a cold-start Newton-Raphson solve, with [restrictions for jointed models](joints.md#solver-settings-for-joints).
 
 Setting `XSLOPE_FEM_SOLVER` selects the driver for a whole process. When the environment rather than
 a call argument selects a non-default driver, one warning line is printed, because a shell variable
@@ -385,13 +377,6 @@ instrumentation costs nothing measurable and no extra solves are needed.
 | Beyond elastic scale **and** growing (or the trial passed the [displacement limit](#3-displacement-limit-displacement_limit), `max_disp_factor`) | `FAILED` | Failed — same as non-convergence |
 | At elastic scale **and** frozen | `STABLE_STUCK` | **Not** failed: the bracket moves up |
 | One signal without the other, or too little history | `AMBIGUOUS` | Failed — non-convergence's verdict stands |
-
-On a model with joints these two signals are not enough, because the quantity that separates a
-settled jointed slope from one sliding on its joints is the **slip**, which the displacement field
-does not report: a rock slope gaining 0.4 elastic displacements of movement every 25,000 iterations
-is classified `AMBIGUOUS` here because its max&#124;u&#124; has not yet passed 1.5× an elastic
-response set by loading stiff rock. Such a trial is classified from the interface instead — see
-[the joint verdict](#the-joint-verdict).
 
 Requiring *both* signals in each direction keeps this conservative: the hybrid overrides only
 where the evidence is unambiguous, and every trial's verdict, $u_{ratio}$ and growth come back in
@@ -461,8 +446,8 @@ check available.
 ## Trials that reach the iteration limit {#creep-trend}
 
 A trial that reaches `max_iterations`
-without converging is classified by the trend of its movement over the second half of its iterations,
-split into five equal blocks: how far the maximum nodal displacement, max&#124;u&#124;, moved in
+without converging is classified by the trend of its movement over five equal blocks spanning
+nominally half the original **Max iterations per trial** allowance: how far the maximum nodal displacement, max&#124;u&#124;, moved in
 each block, measured in [elastic displacements](#2-hybrid-hybrid-default),
 and the ratio of each block's movement to the one before. The ratio is a ratio of movements, not a count of iterations, so
 two runs that cover the same ground at different paces are classified the same way.
@@ -471,8 +456,8 @@ Each trial's record carries an `exit_reason` and a verdict (`FAILED`, `STABLE_ST
 
 | Trend over the window | What happens |
 |---|---|
-| **Dying away**: every block moved forward, none moved more than the one before, and the movement shrinks at a steady ratio below 0.9 a block | The [Newton corrector](#finishing-a-trial-with-the-newton-corrector) is asked for the balanced state from where the trial is. A state the corrector certifies (force, yield and, on a jointed model, the [hold test](#finishing-a-trial-with-the-newton-corrector)) stands, and the trial record notes the reading and the corrector's result. Where the corrector does not certify a state, the trial runs on: see the extension rule after this table |
-| **Holding steady or growing**: the window moved at least 0.02 elastic displacements at a ratio of 0.9 or more a block; on a jointed model, see [the joint verdict](#the-joint-verdict) | `exit_reason = 'not_slowing'`, `FAILED`: the slope is sliding |
+| **Dying away**: every block moved forward, none moved more than the one before, and the movement shrinks at a steady ratio below 0.9 a block | The [Newton corrector](#finishing-a-trial-with-the-newton-corrector) is asked for the balanced state from where the trial is. A state the corrector certifies (force, yield and, on a jointed model, the [hold test](joints.md#finishing-a-slow-jointed-trial)) stands, and the trial record notes the reading and the corrector's result. Where the corrector does not certify a state, the trial runs on: see the extension rule after this table |
+| **Holding steady or growing**: the window moved at least 0.02 elastic displacements at a ratio of 0.9 or more a block; on a jointed model, see [the joint verdict](joints.md#the-joint-verdict) | `exit_reason = 'not_slowing'`, `FAILED`: the slope is sliding |
 | **Still** (under $10^{-4}$ elastic displacements over the window) or **unclear** | The [hybrid classifier](#2-hybrid-hybrid-default) decides, as for any trial stopped at the limit |
 
 Below `max_iterations_ceiling` (default 50000) a movement still dying away, or not yet clear, is given
@@ -553,144 +538,12 @@ In an SSRM search, the **displacement limit** (`max_disp_factor`) is disabled un
 `non_convergence`) because its yardstick is the height of the *mesh*, not of the *slope*, so it loosens as a
 model is given a deeper foundation. The force-equilibrium test has no such dependence.
 
-## A jointed model {#jointed-model-solver-policy}
+## Jointed models
 
-A trial on a model with [interface (joint) elements](reinforcement.md#joints-without-reinforcement)
-costs tens or hundreds of thousands of iterations where an unjointed one costs hundreds. The
-slowness comes from the iteration: the loop factorizes the elastic stiffness once and returns
-everything the material cannot carry as a body load, so its error contracts by the ratio of the
-stiffness the assembly holds to the stiffness the material has — and a pair at its Mohr-Coulomb
-limit carries a traction pinned at that limit, so its tangential stiffness is zero while the matrix
-still holds the full $k_s$. Where slipping and open pairs are all that holds a block up,
-the contraction factor is within a ten-thousandth of one: measured at 0.99947 on one rock-toppling
-trial at the edge of the final bracket, which is 13,000 iterations to take
-the error down by a factor of a thousand. A failing trial is slow because both residuals go flat within a few hundred
-iterations and the block then slides at a few billionths of an elastic displacement per iteration until it
-has moved the eight that the runaway rule reads.
-
-On a jointed model, `'auto'` passes the state to the corrector as on any other model. The
-interface's consistent tangent carries the friction cross term
-$\partial t_s/\partial\Delta_n = \pm k_n\tan\phi_j$ — non-symmetric, and only the Newton path's
-general factorization ever sees it — and the corrector's interface law is seeded with the iteration's
-own accumulated slip, dilational opening, residual branch and opening history rather than with a
-pristine interface. The two of those that a Newton step can *grow* — a pair that reaches its limit
-during the step moves onto its residual branch, and one that slides further rides further up its
-asperities — are advanced by the step's own return map, so what the corrector solves is the problem
-it was seeded with. It certifies on the same three checks it applies anywhere, followed by the
-[hold test](#finishing-a-trial-with-the-newton-corrector) that every jointed model gets: one
-rock-toppling bracket edge that the plain loop takes 185,381 iterations to converge is certified at 300
-iterations, at a force residual of $3\times10^{-11}$ with no Gauss point outside its surface, and that
-model's whole bracket closes at the same place as with the plain loop, at a thirteenth of the
-wall-clock time.
-
-`joint_newton=False` on `solve_fem()` and `solve_ssrm()` runs the viscoplastic loop alone on a
-jointed model, deciding the trial on the [iteration-limit rules](#creep-trend) and on
-[the joint verdict](#the-joint-verdict); `fem.JOINT_NEWTON_ON = False` does the same for a whole
-process, and `fem_solver='viscoplastic'` turns the corrector off on every model.
-
-A second switch, **off by default**, addresses the failing side of the bracket, which the corrector cannot help
-because it has no equilibrium to certify:
-
->- **`joint_tangent='slip'`** — the interface relief. The shear stiffness of every slipping pair,
->  and both stiffnesses of every open one, are taken out of the assembled free matrix down to
->  `joint_tangent_factor` (default 0.01) of their elastic value, and the matrix is refactorized
->  whenever the slipping and open set moves. The traction limit, the slip return and the state a
->  trial converges to are untouched. The relief runs as a **predictor** — until its state settles or
->  its own iteration budget runs out — and then switches off and passes the trial to the plain loop,
->  which decides it on its own trace, because every level and rate in the [iteration-limit rules](#creep-trend) is
->  calibrated on that trace. It cuts one benchmark's 196,201-iteration failing edge to 20,991, but it
->  also moves a bracket that the corrector reproduces exactly, so it is an option rather than the
->  default. Inert on a model with no joint.
-
-`fem_solver='newton'` on a jointed model runs from a cold start with no accumulated slip behind it,
-and on the rock-joint benchmarks it diverges on trials the viscoplastic loop converges. A divergence
-there is reported as a failed trial, not as an error, but the Newton driver cannot bracket those
-models.
-
-**Acceleration on jointed models.** On a model with joints the iteration is accelerated by default (`accelerate=None`; pass
-`accelerate=False` for the ordinary iteration, `True` to accelerate a model without joints).
-From the trial's last [corrector checkpoint](#finishing-a-trial-with-the-newton-corrector) on, each iteration's step is multiplied by a factor
-between 1 and 50 read from the last two steps (Irons and Tuck's extrapolation), with the plastic strains and
-the joint slip scaled with it; a step that would change a joint pair's open or slipping state,
-move it onto its residual branch or add dilation is taken at the ordinary length. The balanced state is
-the ordinary iteration's; what changes is how many iterations reach it. Over the 32 jointed
-verification rows the answers are the same, and the whole set runs about a fifth faster. The
-[K0 in-situ solve](#in-situ-equilibration) and the
-[hold test](#finishing-a-trial-with-the-newton-corrector) always run the ordinary iteration, and the Log's opening
-lines for a run show whether acceleration was on.
-
-### The joint verdict {#the-joint-verdict}
-
-On a model with [interface (joint) elements](reinforcement.md#joints-without-reinforcement) the
-force-equilibrium test above is measured almost entirely on the joints. The residual is the
-increment of the viscoplastic body load, and on a jointed model that increment is the shear traction
-the interface could not hold on the last iteration: measured on a jointed rock slope whose soil residual
-had fallen to $3\times10^{-8}$, the same solve's joint residual was $3\times10^{-2}$ — six orders of
-magnitude apart on one mesh, in one solve.
-
-That matters because the joint residual has a mode of its own. A pair sitting at its slip limit
-alternates between slipping and sticking as the stresses around it change, and the resulting
-oscillation in the body load is **not** the period-2 flicker `oob_window` was built to cancel: its
-period is tens of iterations, so the ten-iteration average passes it straight through. On a settled jointed
-slope the joint residual therefore oscillates in a band with a **flat mean** — between
-$1.2\times10^{-2}$ and $4.7\times10^{-2}$ on that slope, its mean constant to 0.04% over the last
-half of the solve — and no iteration budget brings it under any tolerance. Such a trial reaches its
-ceiling with nothing wrong with the slope and nothing left for the solver to do.
-
-A jointed trial that neither converges nor fails is therefore classified from the **interface**
-rather than from the displacement field, over the trailing half of its iteration history, in two ratios that carry no
-length, stiffness or mesh size: the slip gained over the window as a fraction of the slip already
-there, and the displacement gained over the window in the trial's own elastic displacements.
-
-| Evidence | `exit_reason` | Verdict | Effect on the bisection |
-|---|---|---|---|
-| In the last tenth of the budget, or at the limit: the [trend reading](#creep-trend) finds the slip gaining ≥ 2% of itself over the window at a rate **not decaying at all** (the last half-window's rate at least 0.9 of the half before), or max&#124;u&#124; moving at a pace that does not slow, **and** max&#124;u&#124; gaining ≥ 0.02 elastic displacements | `not_slowing` | `FAILED` | Failed — the slope is moving on its joints |
-| The slip gains ≤ 0.01% of itself, max&#124;u&#124; gains ≤ 10⁻⁴ elastic displacements, the residual on the nodes carrying *no* joint is under `force_tol` across the window, **and** the joint residual has stopped falling (its window mean at least 0.85 of the previous window's) | `joint_settled` | `JOINT_SETTLED` | **Not** failed: the slope is standing, and the bracket moves up |
-| At the hard iteration ceiling only: the whole set of contact states repeats exactly with a period of at most 64 iterations over the last 256, 1 to 4 contacts change state within a period, **and** the field returns to itself after every period to within 5×10⁻⁸ elastic displacements per iteration | `joint_settled` (stop reading `contact_cycle`) | `JOINT_SETTLED` | **Not** failed: the slope stands, force balance not met, and the cycling contacts are named |
-| Anything else | unchanged | unchanged | The [hybrid classifier's](#2-hybrid-hybrid-default) verdict stands |
-
-These rules apply only to a jointed trial that would otherwise spend its whole budget; a trial
-that converges or is already failing, and every model without a joint, never reach them.
-
-**Timing of the sliding test.** The sliding test is applied only in the last tenth of the budget,
-because there is no early reading that separates a jointed mechanism from a jointed trial that
-converges late. One bracket-edge trial that reaches force equilibrium at 185,381 iterations has, at
-50,000 iterations, gained 30% of its slip and 1.76 elastic displacements of movement with an
-*accelerating* slip rate, and sits at 4.3 times its elastic response — every reading a runaway
-produces. It then settles. The test therefore waits until a trial that could still converge would
-have done so, and at the limit it replaces an [`AMBIGUOUS`](#2-hybrid-hybrid-default) classification based on a displacement
-ratio with a measurement of the joint slip.
-
-**Rate threshold.** The rate test uses 0.9. A trial that converges after 203,000 iterations and one
-that never converges had gained 16.2% and 18.7% of their slip, and 0.375 and 0.488 elastic
-displacements, read at 25,000 iterations — indistinguishable. They are separated only by the rate, which
-falls away steadily on the one that finishes (0.64 at 25,000 iterations, 0.44 at 100,000, 0.21 at
-200,000) and does not change at all on a real mechanism (1.0002). A creep that is only slowing is
-left to the displacement classifier, which already classifies it as failed.
-
-**Joint residual test.** The settled classification also requires the joint residual to have
-stopped falling. Without that condition, one trial was classified as settled nine thousand iterations
-before it converged: the slip, the displacement field and the soil were already at rest, and only
-the joint residual was still falling, by 35% per window.
-
-**A contact cycle.** A joint with cohesion and no tensile strength can hold a contact whose balance
-sits at zero normal stress. Closed, it carries shear up to its cohesion and the faces part; open, it
-carries nothing and the faces touch again. No exact balance exists under the joint law at such a
-contact: held closed, the rest of the slope balances with the contact in tension, and held open, it
-balances with the faces overlapping. The iteration then repeats the same few contact states without
-end while the rest of the slope stays still, and the force tolerance is never met. At the hard
-iteration ceiling, where such a trial would otherwise end undecided, the last iterations are tested
-as in the table above, and the trial stands. The trial line in the log, the closing summary and the
-report state it as "stands: the only movement is 3 contacts cycling (period 8 iterations), no net
-movement; force balance not met", and name each cycling contact by its line and location. The
-movement bound, 5×10⁻⁸ elastic displacements per iteration, sits a factor of ten above the
-measured stuck trial (5×10⁻⁹) and a factor of ten below the slowest failing trial whose contacts
-were also cycling (5.4×10⁻⁷).
-
-A `JOINT_SETTLED` trial is **not** a converged trial: it never met the force tolerance and
-`converged` stays `False`. It establishes what the bisection needs, that the slope stands at that
-strength, with the interface, the displacement field and the soil all at rest. The per-trial record
-carries the verdict and its `exit_reason` like any other, so the joint verdicts are recorded.
+A model with joints is judged from interface slip and contact states as well as force balance;
+a trial can stand even when its joint forces do not meet the tolerance. The
+[jointed-trial account](joints.md#jointed-model-solver-policy) gives that rule, the
+[hold test](joints.md#finishing-a-slow-jointed-trial), the solver settings and acceleration.
 
 ## Equilibration and running the solver
 

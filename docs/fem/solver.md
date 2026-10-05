@@ -805,26 +805,19 @@ XSLOPE gives 0.769 with the vendor's caps against RS2's 0.81.
 
 ## Fast kernel
 
-The cost of an SSRM run is dominated by the per–Gauss-point constitutive update, evaluated for every
-Gauss point on every iteration of every trial. XSLOPE ships a **compiled kernel** that runs this
-update in C (via Cython) instead of NumPy, which shortens a typical Mohr-Coulomb SSRM solve by
-roughly a third to a half.
+Most of the time in a strength-reduction run goes into one small calculation, the stress update
+at each Gauss point, repeated for every Gauss point on every iteration of every trial. XSLOPE has
+two versions of it: one in Python (NumPy), which every installation has, and a compiled one in C,
+which shortens a typical Mohr-Coulomb search by a third to a half.
+The two give identical answers; every factor of safety in the verification suite is computed
+with the Python version, and the compiled one reproduces it exactly.
 
-It is **used automatically when it is available**: the `fast_kernel` argument of `solve_fem()`
-defaults to `"auto"`, meaning the compiled kernel if it is built and the NumPy path if it is not.
-`solve_ssrm()` has no such argument; its trials inherit the same automatic choice. The installer
-builds compile the kernel; a `pip install` gets a pure-Python wheel and therefore the NumPy path.
-
-The pure-NumPy path is the reference implementation: every factor of safety in the verification
-suite is computed with it, and the compiled kernel reproduces it bit-for-bit. `fast_kernel=False`
-forces the NumPy path. `fast_kernel=True` *requires* the kernel but warns
-and falls back to NumPy if it has not been built.
-
-The kernel handles the standard Mohr-Coulomb path, including the Rankine tension cutoff and the
-matric-suction term; it takes the $K_0$ in-situ stress as an input, so at-rest runs accelerate like
-other Mohr-Coulomb runs. Curved-envelope materials (power-curve and
-Hoek-Brown) and all 1D reinforcement and pile work stay on the NumPy path automatically — a model
-that mixes them accelerates its Mohr-Coulomb groups and leaves the rest unchanged.
+Which one you have depends on how XSLOPE was installed. The Studio installers for Mac and Windows
+include the compiled version, and it is used without any setting.
+Installing with `pip` gives the Python version only; to get the compiled one as well,
+build it once with the two commands below, after which it is used automatically.
+`fast_kernel=False` on `solve_fem()` forces the Python version; the default, `"auto"`,
+uses the compiled one whenever it is present.
 
 To build it locally, with Cython installed:
 
@@ -835,6 +828,12 @@ python setup_kernel.py build_ext --inplace
 
 This compiles `xslope/_fem_kernel` next to its `.pyx` source; only the `.pyx` is tracked in the
 repository. Once built, the default `"auto"` setting picks it up with no code change.
+
+The kernel handles the standard Mohr-Coulomb path, including the Rankine tension cutoff and the
+matric-suction term; it takes the $K_0$ in-situ stress as an input, so at-rest runs accelerate like
+other Mohr-Coulomb runs. Curved-envelope materials (power-curve and
+Hoek-Brown) and all 1D reinforcement and pile work stay on the NumPy path automatically — a model
+that mixes them accelerates its Mohr-Coulomb groups and leaves the rest unchanged.
 
 ## References
 

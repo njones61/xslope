@@ -172,12 +172,12 @@ toward the surface in a different direction.
 Stress is carried in the 4-component plane-strain form of Smith & Griffiths (their nst = 4), with
 $\sigma_z$ explicit so the algorithm can relax it through plastic $\varepsilon_z$.
 
-The **pseudo-time step** $\Delta t$ is a numerical parameter, not physical time, taken from Smith &
-Griffiths' Program 6.1 as $\Delta t = 4(1+\nu)/(3E)$. The alternative Mohr-Coulomb stability bound
-$4(1+\nu)(1-2\nu)/[E(1-2\nu+\sin^2\phi)]$ drives a sustained limit cycle at Gauss points
-in mild effective tension beneath reservoir loading; the smaller value is in the stable regime. The
-per-iteration displacement increment scales with $\Delta t$, so the convergence tolerance and the
-failure criterion are calibrated jointly with it — see the warning on `dt_scale` below.
+The **pseudo-time step** $\Delta t$ sets how much plastic strain is accumulated in one iteration.
+It is a numerical parameter, not a time; XSLOPE uses $\Delta t = 4(1+\nu)/(3E)$, the value in
+Smith & Griffiths' Program 6.1, which keeps the iteration stable where a stress state sits in
+slight effective tension. Because the displacement change per iteration scales with $\Delta t$,
+the convergence tolerance and the failure criteria are calibrated to this value;
+[`dt_scale`](#the-solve_fem-function) changes it and should be left at 1.
 
 A **tension cutoff** runs as a second viscoplastic yield surface through the same mechanism; because
 it mainly affects SSRM results rather than ordinary stress analyses, it is described under

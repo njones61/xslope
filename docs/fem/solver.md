@@ -455,8 +455,9 @@ only if it is not certified standing is the trial cut short (`early_failure=Fals
 The separate flat-residual test — a gain of one elastic displacement over 2,000 iterations —
 is disabled by `_EARLY_FAIL_TREND_TEST = False`.
 
-**Inconclusive at the ceiling.** A trial still progressing whose mean residual over the last 500
-iterations is at least 1% below the preceding 500, or whose displacement verdict at the hard
+**Inconclusive at the ceiling.** A trial still progressing whose mean residual over the last
+window is at least 1% below the preceding window (nominally 500 iterations each, shortened to
+a quarter of a small budget, with a minimum of 20), or whose displacement verdict at the hard
 ceiling is `AMBIGUOUS`, is left undecided if the corrector cannot certify standing.
 The bisection does not count it as failed and continues below it.
 If it is still the top of the final bracket, the result is FS ≥ the standing bottom
@@ -529,7 +530,7 @@ Sliding needs the movement limit and either the ground-rate limit or both slip l
 |---|---|---|
 | Slip gain | At most 0.01% of accumulated slip | At least 2% of accumulated slip, for the slip route |
 | Ground movement | At most $10^{-4}$ elastic displacements | At least 0.02 elastic displacements |
-| Movement rate | No separate rate test | Ground block-rate ratio at least 0.9 with every block moving forward, or slip-rate ratio at least 0.9 |
+| Movement rate | No separate rate test | Geometric-mean ground block-rate ratio at least 0.9 with every block moving forward, or slip-rate ratio at least 0.9 |
 | Soil force imbalance | Every sample no greater than `force_tol` | Not required |
 | Joint force imbalance trend | Mean in second half of the window / mean in first half at least 0.85 | Not required |
 | Timing | After 5,000 iterations | Before-limit decisions: at least 25,000 iterations and the last tenth of the current allowance; also read at the limit |

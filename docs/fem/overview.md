@@ -188,10 +188,8 @@ XSLOPE supports linear and quadratic triangles and quadrilaterals:
 
 ![element_types.png](images/element_types.png){width=600px}
 
-Quadratic elements are required for reliable factors of safety — linear triangles and bilinear
-quads lock volumetrically and read high (see
-[Element type and volumetric locking](#element-type-selection-and-volumetric-locking)). Mesh
-construction is covered in [Mesh Generation](mesh.md).
+[Mesh Generation](mesh.md) covers mesh construction and
+[element choice for FEM analyses](mesh.md#element-choice-for-fem-analyses).
 
 ### Stiffness and assembly
 
@@ -530,19 +528,14 @@ than its gravity-turn-on result, so gravity turn-on is the conservative choice f
 
 ## Element type and volumetric locking {#element-type-selection-and-volumetric-locking}
 
-The element type controls whether plastic flow at failure can be represented; low-order elements
-lock and overestimate the factor of safety. 3-node linear triangles (tri3) and
-4-node bilinear quadrilaterals (quad4) suffer from **volumetric locking**, and they overestimate the
-factor of safety because of it — by 21% and 11% on the benchmark below, in the unconservative
-direction. Quadratic elements — tri6, quad8 and quad9 — are required practice for any finite element
-or strength-reduction run.
-
 Plastic deformation under Mohr-Coulomb with a non-associated flow rule ($\psi = 0$) is nearly
 incompressible: the material shears without changing volume. Low-order elements have too few degrees
 of freedom to satisfy that constraint and represent the displacement field at the same time, so they
 respond too stiffly, resist plastic deformation more than they should, and require a larger strength
-reduction before failure develops. Constant-strain triangles, with one integration point and 6 DOFs,
-are the worst affected; bilinear quads are better but still significantly locked.
+reduction before failure develops, overestimating the factor of safety in the unconservative
+direction. This is **volumetric locking**. Constant-strain 3-node triangles (tri3), with one
+integration point and 6 DOFs, are the worst affected; bilinear 4-node quads (quad4) are better
+but still significantly locked.
 
 Quadratic elements — tri6, quad8 and quad9 — have enough degrees of freedom to represent
 incompressible plastic deformation without artificial stiffness. The following are SSRM results for
@@ -550,25 +543,16 @@ the Griffiths & Lane (1999) Example 1 benchmark (homogeneous slope, $c/\gamma H 
 $\phi = 20°$, slope angle 26.57°) at a target mesh size of 5, against an expected FS of about 1.40
 (Griffiths & Lane report 1.4 by FEM; Spencer's method gives 1.376):
 
-| Element Type | Nodes per Element | SSRM Factor of Safety | Error vs. Reference | Recommendation |
-|:---:|:---:|:---:|:---:|:---|
-| tri3 | 3 | 1.70 | +21% | Do not use — severe locking |
-| quad4 | 4 | 1.56 | +11% | Do not use — significant locking |
-| **tri6** | **6** | **1.41** | **< 1%** | **Recommended** |
-| **quad8** | **8** | **1.41** | **< 1%** | **Recommended** |
-| **quad9** | **9** | **1.41** | **< 1%** | **Recommended** |
+| Element Type | Nodes per Element | SSRM Factor of Safety | Error vs. Reference |
+|:---:|:---:|:---:|:---:|
+| tri3 | 3 | 1.70 | +21% |
+| quad4 | 4 | 1.56 | +11% |
+| **tri6** | **6** | **1.41** | **< 1%** |
+| **quad8** | **8** | **1.41** | **< 1%** |
+| **quad9** | **9** | **1.41** | **< 1%** |
 
-`build_mesh_from_polygons()` defaults to `tri6`, so a quadratic mesh is what a FEM run gets unless something else is asked for
-explicitly (on the call or on the main sheet); `tri3` is the lighter explicit choice, typical of
-seepage meshes. The model checks warn before a FEM or SSRM solve starts on a linear mesh.
-
-quad8 with 2×2 reduced integration is the Griffiths & Lane combination and avoids locking while
-giving accurate stress fields; tri6 conforms better to complex geometry where quads would distort,
-and is preferred for submerged problems, where quad8's reduced integration allows an hourglass mode;
-quad9 with full 3×3 integration is correct too, at the cost of the extra Gauss points and center
-node. tri3 and quad4 remain useful for seepage, for elastic stress distributions and for qualitative
-work — never for a factor of safety. [Element types](mesh.md#element-types) on the mesh page carries
-the full list and how each is built.
+[Element choice for FEM analyses](mesh.md#element-choice-for-fem-analyses) covers which type
+to use for each analysis; [Element types](mesh.md#element-types) lists how each is built.
 
 ## Seismic forces
 

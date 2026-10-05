@@ -72,13 +72,6 @@ solution variable linearly across the element; the quadratic types, `tri6`, `qua
 `quad9`, add midside nodes and carry it quadratically, which resolves a curving field
 with far fewer elements.
 
-`build_mesh_from_polygons()` defaults to `tri6`, and Studio's *Build mesh* dialog opens
-on it. A quadratic mesh is therefore what a run gets whenever nothing states otherwise —
-including a model whose `main!D18` is left blank. `tri3` is the explicit lighter choice,
-typical of seepage meshes, where the solve is cheaper and nothing is lost. It is never
-the right choice for a factor of safety; see
-[Element choice for FEM analyses](#element-choice-for-fem-analyses) below.
-
 ![Element types and local node numbering](images/mesh_element_nodes.png)
 
 Node ordering is the same for every type: corner nodes first, counterclockwise, then the
@@ -107,35 +100,34 @@ as many elements. Triangles fit an irregular boundary with less distortion and n
 to fill a corner; quadrilaterals give a more regular element layout wherever the shape
 allows.
 
-For a finite-element stress analysis the choice that matters more is linear against
-quadratic — see the next section. Between the two shapes, `tri6` conforms better to
-irregular geometry, and `quad8` or `quad9` give the more regular element layout wherever
-the section is block-like.
-
 A quadrilateral mesh is quad-*dominant* rather than pure: a small fraction of elements,
 usually well under one percent, stays triangular where no pairing exists. XSLOPE carries
 mixed meshes end to end, so those triangles are cosmetic.
 
 ### Element choice for FEM analyses {#element-choice-for-fem-analyses}
 
-**Do not use linear elements with the FEM or SSRM solver.** `tri3` and `quad4` suffer
-[volumetric locking](overview.md#element-type-selection-and-volumetric-locking): plastic
-flow under Mohr-Coulomb is nearly incompressible, and a linear element has too few degrees
-of freedom to shear at constant volume and represent the displacement field at the same
-time. It responds too stiffly, resists the developing failure mechanism, and needs a
-larger strength reduction before it collapses — so the factor of safety comes back **too
-high, in the unconservative direction**. On the Griffiths & Lane Example 1 benchmark, at a
-target size of 5 against a reference of about 1.40, `tri3` returns 1.70 (+21%) and `quad4`
-returns 1.56 (+11%), while `tri6`, `quad8` and `quad9` all return 1.41 (under 1%).
+Use `tri6`, `quad8` or `quad9` for FEM stability analyses and strength-reduction factors of
+safety. The Overview explains [volumetric locking and the benchmark
+results](overview.md#element-type-selection-and-volumetric-locking).
 
-Use `tri6`, `quad8` or `quad9` for any finite element or strength-reduction run. The model
-checks warn before a FEM or SSRM solve starts on a linear mesh; it is a warning rather than
-an error, because a run that demonstrates the locking is a legitimate use of a linear mesh.
+`build_mesh_from_polygons()` defaults to `tri6`, and Studio's *Build mesh* dialog opens
+on it. A blank `main!D18` therefore gives a quadratic mesh unless a different type is
+requested on the call; an explicit type on the call or main sheet overrides the default.
 
-`tri3` remains the right choice for **seepage**. The seepage field is scalar, no
-incompressibility constraint exists, nothing can lock, and the smaller system solves
-faster. Linear triangles are also fine for an elastic stress distribution or for
-qualitative work — never for a factor of safety.
+- `tri6` conforms to complex geometry where quads would distort and is preferred for
+  submerged problems, where `quad8`'s reduced integration allows an hourglass mode.
+- `quad8` with 2×2 reduced integration is the Griffiths & Lane combination; it avoids
+  locking and gives accurate stress fields. It gives a regular layout in block-like sections.
+- `quad9` with full 3×3 integration is also suitable for a block-like section, at the cost
+  of extra Gauss points and a center node.
+
+`tri3` is the lighter choice for seepage: the field is scalar, so the plastic
+incompressibility constraint does not apply, and the smaller system solves faster.
+`quad4` is also useful for seepage. Both linear types can be used for elastic stress
+distributions and qualitative work — never for a factor of safety.
+
+The model checks warn before a FEM or SSRM solve starts on a linear mesh. This is a
+warning rather than an error, so a run demonstrating locking can use linear elements.
 
 ## Quadrilateral meshing styles
 

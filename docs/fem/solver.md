@@ -78,6 +78,13 @@ the interval until it reaches the requested tolerance. A trial that ends neither
 [Trials that reach the iteration limit](#creep-trend)) is not counted as a failure:
 the bisection continues below it.
 
+In the bracket below, L is the standing lower edge and H is the upper edge.
+
+![SSRM bracket updates and final factor reporting](images/ssrm_bracket_search.png){width=800px}
+
+The arrows show which edge changes; an undecided H leaves FS as a lower bound rather than a
+midpoint estimate.
+
 The starting bracket is `F_min` = 1.0 and `F_max` = 2.0. If the slope fails at `F_min` or
 stands at `F_max`, the bracket **auto-expands** in steps of `f_adjust` (0.25) until it is
 valid, bounded by `f_min_floor` (0.1), `f_max_ceiling` (10.0) and `max_expand` (20 steps each

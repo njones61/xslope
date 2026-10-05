@@ -552,8 +552,11 @@ and the [iteration-limit rules](#creep-trend).
 
 ## Equilibration and running the solver
 
-A strength-reduction search first establishes the initial state, then runs individual trials
-through `solve_fem()` and manages the search through `solve_ssrm()`.
+The sections above describe one trial and how it is decided. A search is a sequence of such
+trials: it begins by establishing the stress state every trial starts from, then runs the trials
+through `solve_fem()` while `solve_ssrm()` manages the bracket, decides when to stop, and finally
+captures the failure mechanism for the figures. This section covers each of those steps and the
+two functions' arguments.
 
 ### In-situ equilibration
 

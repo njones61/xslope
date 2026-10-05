@@ -471,9 +471,8 @@ for each convention:
 
 The illustration is a uniform, dry level-ground column; the profiles show compression magnitudes.
 
-The vertical profiles are identical. The shown at-rest profiles give larger horizontal compression
-than the gravity-turn-on profile; the shaded band shows how the gravity result changes with
-Poisson's ratio.
+Normally consolidated soil lies below the vertical-stress line, overconsolidated soil may lie
+above it, and at $K_0 = 1$ the two coincide.
 
 On level ground with no horizontal variation, a fixed base and horizontally restrained sides,
 the $K_0$ field balances self weight for any $K_0$: the integral satisfies vertical equilibrium,

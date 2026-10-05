@@ -289,9 +289,7 @@ def fig_k0_initial():
             ax.plot(0.3 / 0.7 * sv, z, color=C_ACCENT2, linewidth=1.4,
                     linestyle=(0, (6, 3)), label=r"$|\sigma'_h|,\ \nu=0.3$")
         else:
-            # K0=1 coincides with the vertical profile: blue dashes leave the
-            # black vertical-stress line visible between them.
-            for k0, style in ((1.0, (0, (5, 3))), (1.5, "solid")):
+            for k0, style in ((0.5, (0, (5, 3))), (1.5, "solid")):
                 ax.plot(k0 * sv, z, color=C_ACCENT, linewidth=1.1, linestyle=style,
                         label=rf"$|\sigma'_h|,\ K_0={k0:.1f}$")
         ax.set_xlim(0, 400)
@@ -309,10 +307,6 @@ def fig_k0_initial():
     fig.text(0.31, 0.105, r"Gravity band: $\nu=0.2$–$0.4$",
              ha="center", fontsize=7.4, color=C_INK)
     fig.text(0.31, 0.075, r"Shown line: $\nu=0.3$",
-             ha="center", fontsize=7.4, color=C_INK)
-    fig.text(0.79, 0.105, "$K_0=1.0$: compacted fill, RS2",
-             ha="center", fontsize=7.4, color=C_INK)
-    fig.text(0.79, 0.075, "$K_0=1.5$: overconsolidated clay",
              ha="center", fontsize=7.4, color=C_INK)
     fig.text(0.55, 0.025, r"$\gamma=19$ kN/m$^3$; both vertical profiles are the same.",
              ha="center", fontsize=7.5, color=C_INK)

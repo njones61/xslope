@@ -15,7 +15,7 @@ that develops is an output rather than an input.
 XSLOPE's implementation is the viscoplastic elastic-perfectly-plastic algorithm of Griffiths &
 Lane (1999) and Smith & Griffiths (2004). The factor of safety comes from the
 [shear strength reduction method (SSRM)](solver.md#shear-strength-reduction-method-ssrm): the selected
-soil and joint shear strengths, cohesion and $\tan\phi$, are divided by a trial factor $F$, the
+soil and joint shear strengths, cohesion $c$ and the tangent of friction angle $\phi$, are divided by a trial factor $F$, the
 slope is solved at that reduced strength, and $F$ is raised until the slope can no longer come to
 equilibrium. The $F$ at which it stops standing is the factor of safety, the same quantity limit
 equilibrium defines as the ratio of available to mobilized strength; see the [Solver](solver.md) page. Material properties,
@@ -41,22 +41,23 @@ and sets the strength beyond which plastic deformation occurs.
 
 ### Equilibrium
 
-In two dimensions, static equilibrium of a continuum requires
+Let $x$ and $y$ be the horizontal and vertical coordinates, $\sigma_x$ and $\sigma_y$ the normal
+stresses on planes perpendicular to those axes, $\tau_{xy}$ the shear stress on those planes,
+and $b_x$ and $b_y$ the body forces per unit volume. In two dimensions, static equilibrium requires
 
 >>$\dfrac{\partial \sigma_x}{\partial x} + \dfrac{\partial \tau_{xy}}{\partial y} + b_x = 0$
 
 >>$\dfrac{\partial \tau_{xy}}{\partial x} + \dfrac{\partial \sigma_y}{\partial y} + b_y = 0$
 
-where $\sigma_x$ and $\sigma_y$ are the normal stresses on planes perpendicular to the $x$ and $y$
-axes, $\tau_{xy}$ is the shear stress on those planes, and $b_x$ and $b_y$ are the body forces per
-unit volume. Under gravity alone $b_x = 0$ and $b_y = -\gamma$, with $\gamma$ the unit weight; a
+With unit weight $\gamma$, gravity alone gives $b_x = 0$ and $b_y = -\gamma$; a
 pseudo-static [seismic](#seismic-forces) term adds a horizontal component when one is applied.
 Stresses are tension-positive throughout the solver, so the compressive stress of self weight is
 negative.
 
 ### Elastic stress-strain
 
-Below yield the material is linear elastic: the stress vector $\{\sigma\} = (\sigma_x, \sigma_y,
+Write the normal strains as $\varepsilon_x$ and $\varepsilon_y$, and engineering shear strain as
+$\gamma_{xy}$. Below yield the material is linear elastic: the stress vector $\{\sigma\} = (\sigma_x, \sigma_y,
 \tau_{xy})$ is related to the strain vector $\{\varepsilon\} = (\varepsilon_x, \varepsilon_y,
 \gamma_{xy})$ by $\{\sigma\} = [D_e]\{\varepsilon\}$, where $[D_e]$ is the plane-strain
 constitutive matrix
@@ -93,8 +94,9 @@ matter. Undrained moduli, which differ, follow it.
 Enter $E$ in kPa with metric inputs and psf with English inputs, consistent with the unit weights
 and cohesions.
 
-For **undrained** conditions, $E_u$ is measured directly by UU triaxial or unconfined compression tests,
-or estimated from $E_u = (150-1500)\,S_u$ — the low end for soft clays, the high end for stiff ones.
+For **undrained** conditions, the modulus $E_u$ is measured directly by UU triaxial or unconfined
+compression tests. With undrained shear strength $S_u$, it can also be estimated from
+$E_u = (150-1500)\,S_u$ — the low end for soft clays, the high end for stiff ones.
 Laboratory moduli generally exceed field values because of sample disturbance.
 
 How precisely $E$ must be known depends on the question. Under the SSRM the factor of safety is
@@ -105,19 +107,20 @@ prediction is itself a deliverable.
 ### Mohr-Coulomb failure criterion
 
 Elastic behavior holds only up to a limit, and for soils that limit is set by the Mohr-Coulomb
-criterion: on any plane through a point, the shear stress the soil can carry is
+criterion. On a plane with normal stress $\sigma$ and pore-water pressure $u_w$, the effective
+normal stress is $\sigma' = \sigma - u_w$. With cohesion $c$ and friction angle $\phi$, the
+shear strength $\tau_f$ is
 
 >>$\tau_f = c + \sigma' \tan \phi = c + (\sigma - u_w) \tan \phi$
 
-where $c$ is the cohesion, $\phi$ the friction angle, $\sigma$ the normal stress on the plane and
-$\sigma' = \sigma - u_w$ the effective normal stress, with $u_w$ the pore-water pressure.
 Here normal stresses are plotted compression-positive, the opposite sign to the solver's
 components defined under [Equilibrium](#equilibrium). Plotted against $\sigma'$, the strength is a
 straight line, the failure envelope, and a stress state is at failure when its Mohr circle touches it:
 
 ![mc_envelope.png](images/mc_envelope.png){width=800px}
 
-In principal effective stresses the criterion becomes the yield function
+With $\sigma_1'$ the largest and $\sigma_3'$ the smallest compression-positive principal
+effective stresses, the criterion becomes the yield function $f$:
 
 >>$f(\sigma_1', \sigma_3') = \dfrac{\sigma_1' - \sigma_3'}{2} - \left(\dfrac{\sigma_1' + \sigma_3'}{2} \sin \phi + c \cos \phi\right)$
 
@@ -133,7 +136,7 @@ for the different pairs of principal stresses.
 
 The solver evaluates $f$ at every Gauss point, an integration point inside an element where stress
 is computed; the form it uses is given on the
-[Solver](solver.md#elastic-plastic-behavior-viscoplastic-algorithm) page.
+[Solver](solver.md#viscoplastic-iteration-process) page.
 
 Mohr-Coulomb is the usual choice, but it is one of five strength options a material can carry on
 the **mat** sheet. The FEM accepts `mc`, the criterion above; `cp`, an undrained strength that
@@ -146,7 +149,8 @@ for each are on the [mat worksheet](../usage/input_template.md#worksheet-mat) pa
 ### Curved failure envelopes
 
 Two of the five options, the power curve (`pow`) and the generalized Hoek-Brown criterion (`hb`),
-give a strength envelope that curves in $\tau$–$\sigma'$ space instead of the straight line above;
+give an envelope of shear strength $\tau$ against effective normal stress $\sigma'$ that curves
+instead of following the straight line above;
 both are defined on the [LEM overview](../lem/overview.md#hoek-brown-strength). The FEM has no
 separate yield function for them. At every Gauss point, on every iteration, it draws the tangent
 to the curve at that point's current normal stress and applies the Mohr-Coulomb formulation with
@@ -176,7 +180,8 @@ and assembling the element stiffnesses into a system of nodal equations.
 ### Discretization
 
 The domain is divided into triangular or quadrilateral elements. Within each element the
-displacement at any point, $\mathbf{u} = (u, v)$, is interpolated from the displacements of the
+displacement at any point, $\mathbf{u} = (u, v)$ with horizontal component $u$ and vertical
+component $v$, is interpolated from the displacements of the
 element's nodes, $\{u_e\}$, through the element's shape functions $[N]$:
 $\mathbf{u} = [N]\{u_e\}$. The shape functions are polynomials in the element's local coordinates,
 linear for a three-node triangle or four-node quadrilateral and quadratic for the six-, eight-
@@ -188,8 +193,9 @@ A typical slope mesh is shown below.
 
 The elements cover the section and share nodes along their edges.
 
-XSLOPE supports linear and quadratic triangles and quadrilaterals. The red markers below
-show the nodes added between corners in the quadratic forms, alongside the 2- and 3-node line elements.
+XSLOPE supports linear and quadratic triangles and quadrilaterals. The figure shows every element
+type with its local node numbers; the quadratic forms add midside nodes (and a center node for
+quad9), alongside the 2- and 3-node line elements.
 
 ![Soil and line elements with local node indices](images/all_element_nodes.png){width=1500px}
 
@@ -201,14 +207,17 @@ all three of that edge's nodes.
 
 ### Stiffness and assembly
 
-Each element's stiffness follows from virtual work,
+Let $[B]$ be the strain-displacement matrix, which gives the strains
+$(\varepsilon_x, \varepsilon_y, \gamma_{xy})$ from the nodal displacements by
+$\{\varepsilon\} = [B]\{u_e\}$. The elastic matrix $[D_e]$ is defined under
+[Elastic stress-strain](#elastic-stress-strain), $A_e$ is the element's area and $dA$ an area
+increment. Superscript $T$ denotes transpose. Each element's stiffness $[K_e]$ follows from virtual work:
 
 >>$[K_e] = \int_{A_e} [B]^T [D_e] [B] \, dA$
 
-where $[B]$ is the strain-displacement matrix, which gives the strains $(\varepsilon_x,
-\varepsilon_y, \gamma_{xy})$ from the nodal displacements by $\{\varepsilon\} = [B]\{u_e\}$,
-$[D_e]$ is the elastic matrix of the previous section and the integral is over the element's area
-$A_e$. For a linear triangle $[B]$ is constant over the element,
+For a linear triangle of area $A$, $[B]$ is constant. The nodal coordinates are $(x_i, y_i)$,
+where $i$ numbers the three nodes; set $b_1 = y_2 - y_3$ and $c_1 = x_3 - x_2$, and use
+cyclic permutations for $b_2$, $b_3$, $c_2$ and $c_3$. Then
 
 >>$[B] = \dfrac{1}{2A} \begin{bmatrix}
 b_1 & 0 & b_2 & 0 & b_3 & 0 \\
@@ -216,16 +225,15 @@ b_1 & 0 & b_2 & 0 & b_3 & 0 \\
 c_1 & b_1 & c_2 & b_2 & c_3 & b_3
 \end{bmatrix}$
 
-with $b_i$ and $c_i$ the differences of the nodal coordinates ($b_1 = y_2 - y_3$,
-$c_1 = x_3 - x_2$, and cyclically) and $A$ the triangle's area; for higher-order elements $[B]$
-varies over the element and the integral is evaluated numerically at Gauss points. The element
-matrices are assembled by shared nodes into the global system
+For higher-order elements $[B]$ varies over the element and the integral is evaluated numerically
+at Gauss points. Assemble the element matrices by shared nodes into the global stiffness $[K]$.
+With $\{U\}$ holding every nodal displacement and $\{F\}$ the nodal forces from body forces,
+surface loads and the viscoplastic body loads of the
+[iteration](solver.md#viscoplastic-iteration-process), the global system is
 
 >>$[K] \{U\} = \{F\}$
 
-where $\{U\}$ holds every nodal displacement in the mesh and $\{F\}$ the nodal forces from body
-forces, surface loads and, as the iteration proceeds, the viscoplastic body loads. Its solution
-gives the nodal displacements, and from them the strains and stresses used in the yield check.
+Its solution gives the nodal displacements, and from them the strains and stresses used in the yield check.
 
 ## Boundary conditions
 
@@ -300,14 +308,16 @@ so the two engines always apply the same water. Because it is a load rather than
 strength reduction does not change it: the derived reservoir is constant at every trial factor. See
 [Automatic water loads](../usage/preflight.md#automatic-water-loads).
 
-For the FEM the loads are converted to nodal forces by **consistent** edge integration of the shape
-functions, $F_i = \int N_i\, p\, d\Gamma$, where $p$ is the pressure and $\Gamma$ the loaded edge.
+For the FEM, let $N_i$ be the shape function for edge node $i$, $p$ the pressure and $\Gamma$
+the loaded edge, with length increment $d\Gamma$. The loads become nodal forces $F_i$ by
+**consistent** integration: $F_i = \int N_i\, p\, d\Gamma$.
 For a linear intensity variation from $q_1$ to $q_2$ over
 a length $L$ this gives
 
 >>$F_1 = \frac{L}{6}(2q_1 + q_2) \qquad F_2 = \frac{L}{6}(q_1 + 2q_2)$
 
 and on a quadratic edge under uniform pressure the 1/6–2/3–1/6 corner–midside–corner split.
+
 **Direction.** A load block's **Direction** column chooses how the traction is oriented: `normal`
 (the default) applies it perpendicular
 to the surface, resolved into components from the local surface angle $\beta$; `vertical` applies
@@ -315,11 +325,19 @@ the same magnitude straight down, which is what a gravity surcharge on an inclin
 normal form would give it a horizontal thrust of $\tan\beta$ times the surcharge that the load does
 not have. A model may mix the two. Derived water loads always act normal to the surface.
 
+The drawing compares the equivalent nodal forces and the two surface-load directions:
+
+![Consistent nodal forces and normal versus vertical surface loading](images/fem_surface_loads.png){width=1000}
+
+On the left, the varying pressure produces two nodal forces, while a uniform pressure on a
+quadratic edge puts two thirds of the force at the midside node. On the right, the same
+pressure magnitude acts either normal to the inclined crest or vertically downward.
+
 The pressure is directed into the soil regardless of the order in which the load line's points
 were entered.
 
-**Body forces.** Self weight enters as $b_y = -\gamma$, integrated to nodal forces element by
-element,
+**Body forces.** With the body-force vector $\{b\} = (b_x, b_y)$, self weight enters as
+$b_y = -\gamma$. Its nodal load vector $\{F\}_b$ is summed over elements $e$:
 
 >>$\{F\}_b = \sum_{e} \int_{A_e} [N]^T \{b\} \, dA$
 
@@ -385,6 +403,11 @@ source for all the materials that have one: `none` may be mixed with it (a dry l
 `piezo` soil), but `piezo`, `ru` and `seep` cannot be combined, and the build refuses a model that
 does.
 
+In the table, $\gamma_w$ is water's unit weight, $y_{piezo}$ and $y_{gp}$ are the piezometric
+line and Gauss-point elevations, $r_u$ is the pore-pressure ratio, and $\sigma_v$ is the
+compression-positive weight of the soil column above the point. The seepage value $u_{w,i}$
+belongs to node $i$, with interpolation weight $N_i$.
+
 | `u` | Source | Pore pressure at a Gauss point |
 |:----|:-------|:-------------------------------|
 | `none` | none | $u_w = 0$; the yield check is a total-stress check |
@@ -394,8 +417,8 @@ does.
 
 All four are evaluated **once**, at `build_fem_data()` time, at every Gauss point.
 
-For `ru`, $\sigma_v$ is the weight of the soil column directly above the point, as in the
-definition of $r_u = u/(\gamma z)$, with distributed loads and crack water excluded.
+For `ru`, distributed loads and crack water are excluded from $\sigma_v$. In a uniform soil,
+with depth below ground written $z$ here, the ratio is $r_u = u_w/(\gamma z)$.
 The usual `ru` model has no water table and is
 weighed moist throughout.
 
@@ -405,7 +428,9 @@ every node and Gauss point; the build stops at any point the line does not cover
 **How pore pressure enters the equilibrium.** Equilibrium is written in total stress, with
 $\sigma = \sigma' - u_w m$ and $m = [1, 1, 0, 1]^T$ for the four components
 $(\sigma_x, \sigma_y, \tau_{xy}, \sigma_z)$, and the pore-pressure term is moved to the
-load side:
+load side. Here $F_{ext}$ is the external load vector $\{F\}$ of body forces and surface loads,
+and $dV$ is the differential volume per unit out-of-plane width. In this four-component notation,
+$B$ has an extra zero row for the total out-of-plane strain:
 
 >>$\int B^T \sigma'\, dV = F_{ext} + \int B^T m\, u_w\, dV$
 
@@ -423,13 +448,15 @@ since suction is lost when the soil wets up.
 
 Where suction is a real part of the strength, an unsaturated cut slope for instance, a material
 can take credit for it through an unsaturated friction angle $\phi^b$, the parameter of Fredlund's
-extended Mohr-Coulomb criterion (normal stress here is compression-positive):
+extended Mohr-Coulomb criterion. Write $c'$ and $\phi'$ for effective-stress cohesion and
+friction angle, $\sigma_n$ for the compression-positive normal stress on the plane, and $u_a$
+for pore-air pressure. Then
 
 >>$\tau_f = c' + (\sigma_n - u_a)\tan\phi' + (u_a - u_w)\tan\phi^b$
 
-With the pore-air pressure $u_a$ taken as zero, the last term is an added cohesion,
-$c_{suction} = \min(s, s_{cap})\tan\phi^b$, where $s = \max(0, -u_w)$ is the suction at the point
-and $s_{cap}$ is an optional ceiling on it. The frictional term keeps the clamped pore pressure,
+With $u_a$ taken as zero, define suction $s = \max(0, -u_w)$ and its optional ceiling $s_{cap}$.
+The last term is an added cohesion, $c_{suction} = \min(s, s_{cap})\tan\phi^b$.
+The frictional term keeps the clamped pore pressure,
 so only the cohesion gains. Below the water table $s = 0$ and the credit vanishes. Under strength
 reduction $c_{suction}$ is divided by $F$ along with $c'$ and $\tan\phi'$.
 
@@ -465,13 +492,15 @@ and enter a value. Leave the cell blank, omit `k0=`, and keep the checkbox unche
 Under gravity turn-on, with zero lateral strain and elastic conditions, the horizontal effective
 stress is fixed by Poisson's ratio $\nu$:
 
+Write the horizontal and vertical effective stresses as $\sigma'_h$ and $\sigma'_v$. Then
+
 >>$\sigma'_h = \dfrac{\nu}{1-\nu}\,\sigma'_v$
 
 At $\nu = 0.3$ the coefficient is approximately 0.43, equal to the normally consolidated value from
 [Jaky's formula](#choosing-a-value) at $\phi' \approx 35^\circ$, but it does not represent the
 locked-in stress of compacted fill or overconsolidated clay. At-rest initialization instead specifies
 that stress history through $K_0$, building the effective stress at each Gauss point from the
-weight of the soil column above it:
+weight of the soil column above it, with $\sigma'_z$ the out-of-plane effective stress:
 
 >>$\sigma'_v = -\!\!\int \gamma\,dy \;+\; u_w \qquad
   \sigma'_h = \sigma'_z = K_0\,\sigma'_v \qquad \tau_{xy} = 0$
@@ -481,12 +510,12 @@ pore-water pressure. The out-of-plane stress is therefore $K_0\sigma'_v$ rather
 than the plane-strain elastic value $\nu(\sigma'_x+\sigma'_y)$.
 
 The initial-stress method (Smith & Griffiths, 2004) adds the prescribed field $\{\sigma_0\}$ to
-the stress from deformation:
+the stress from deformation. Here $[D]$ is the four-component elastic stiffness, $[B]$ has the
+extra zero out-of-plane row, and $\{\varepsilon^{vp}\}$ is the accumulated viscoplastic strain:
 
 >>$\{\sigma\} = \{\sigma_0\} + [D]\big([B]\{U\} - \{\varepsilon^{vp}\}\big)$
 
-Here $[D]$ is the elastic stiffness, $[B]$ converts nodal displacements $\{U\}$ to strain, and
-$\{\varepsilon^{vp}\}$ is the viscoplastic strain. Substitution into equilibrium,
+Substitution into equilibrium,
 $\int [B]^T\{\sigma\}\,dV = \{F_{ext}\}$, gives
 
 >>$[K]\{U\} = \{F_{ext}\} - \int [B]^T\{\sigma_0\}\,dV + \int [B]^T[D]\{\varepsilon^{vp}\}\,dV$
@@ -513,7 +542,8 @@ horizontal stress is the same everywhere along a row, so nothing is out of balan
 has nothing to do: it converges on the first iteration with no displacement. Under a slope the
 field is not in equilibrium, because the soil beside the face is missing and nothing balances
 the horizontal stress the face would have carried. XSLOPE therefore begins an at-rest analysis
-with [one solve at full strength](solver.md#in-situ-equilibration), in which the imbalance
+with one solve at full strength (its result and warning are on the
+[Solver](solver.md#in-situ-equilibration)), in which the imbalance
 redistributes and the slope settles into a stable state. Every strength-reduction trial starts
 from that state, and displacements are measured from it, so a trial's displacement is the
 movement caused by the reduction in strength and not by the initial stress. Surface loads are
@@ -521,12 +551,13 @@ applied in that same solve; they are not part of the overburden.
 
 ### Choosing a value
 
-The usual $K_0$ estimates for retaining-wall and settlement calculations apply:
+The usual $K_0$ estimates for retaining-wall and settlement calculations apply, with OCR the
+overconsolidation ratio:
 
 - Normally consolidated soil: Jaky's $K_0 = 1 - \sin\phi'$, roughly 0.4–0.5 for sands and
   0.5–0.7 for soft clays, decreasing as the friction angle rises.
-- Overconsolidated soil: $K_0 \approx (1 - \sin\phi')\,\mathrm{OCR}^{\sin\phi'}$, where OCR is
-  the overconsolidation ratio. Light overconsolidation gives 0.7–1.0; heavily overconsolidated
+- Overconsolidated soil: $K_0 \approx (1 - \sin\phi')\,\mathrm{OCR}^{\sin\phi'}$.
+  Light overconsolidation gives 0.7–1.0; heavily overconsolidated
   clay exceeds 1.0 and can approach the passive limit.
 - Compacted fill: the compaction plant overconsolidates it, so $K_0 = 1$ or above is normal.
 - Unknown history: run both conventions and report [their factor-of-safety range](#what-to-expect).
@@ -558,7 +589,7 @@ than its gravity-turn-on result, so gravity turn-on is the conservative choice f
 
 ## Element type and volumetric locking {#element-type-selection-and-volumetric-locking}
 
-The element types were introduced above as a matter of discretization, but for a plasticity
+The element types were introduced under [Discretization](#discretization), but for a plasticity
 analysis the choice between linear and quadratic elements decides whether the answer is right.
 Under Mohr-Coulomb with dilation angle $\psi = 0$, plastic flow causes no volume change.
 A linear element has too few degrees
@@ -570,7 +601,7 @@ affected; the four-node quadrilateral (quad4) is better but still locked.
 
 Quadratic elements — tri6, quad8 and quad9 — have enough degrees of freedom to represent
 incompressible plastic deformation without artificial stiffness. The following are SSRM results for
-the Griffiths & Lane (1999) Example 1 benchmark (homogeneous slope, $c/\gamma H = 0.05$,
+the Griffiths & Lane (1999) Example 1 benchmark, with slope height $H$ (homogeneous slope, $c/\gamma H = 0.05$,
 $\phi = 20°$, slope angle 26.57°) at a target mesh size of 5, against an expected FS of about 1.40
 (Griffiths & Lane report 1.4 by FEM; Spencer's method gives 1.376):
 
@@ -595,6 +626,9 @@ reinforcement and piles share nodes with the surrounding soil elements and parti
 iteration through body-force corrections; [jointed sheets](reinforcement.md#two-ways-to-represent-a-sheet)
 couple to the soil through interfaces instead.
 
+For a member of length $L$, $A$ is its cross-sectional area and $I$ its second moment of area;
+$E$ is the member's Young's modulus, not the soil's.
+
 - **[Soil Reinforcement](reinforcement.md)**: geotextiles, soil nails and ground anchors as
   tension-only truss elements with axial stiffness $EA/L$, on every node of the soil edge they lie
   on — including the failure modes (perfectly
@@ -605,7 +639,7 @@ couple to the soil through interfaces instead.
   Pile nodes carry a rotational DOF as well as their two translations; other nodes carry only the
   translations. See the [mixed DOF system](piles.md#mixed-dof-system).
 
-Structural properties are **not reduced** during strength reduction; only soil $c$ and $\tan\varphi$
+Structural properties are **not reduced** during strength reduction; only soil $c$ and $\tan\phi$
 are. The factor of safety is therefore the margin in the soil strength, given the structural
 elements as designed.
 
@@ -631,8 +665,8 @@ are drawn at different scales.
 
 The fine elements follow each member; the surrounding soil grades back to the larger target size.
 
-With the model defined, the [Solver](solver.md) page takes over: how one trial at a reduced
-strength is iterated and decided, how the search over $F$ finds the factor of safety, and the
+The [Solver](solver.md) page describes how one trial at a reduced strength is
+iterated and decided, how the search over $F$ finds the factor of safety, and the
 settings that control both.
 
 ## Visualization of results
@@ -657,6 +691,9 @@ the mechanism:
 
 ![Slope with a weak clay layer](../tutorials/images/lem05_problem_sketch.png){width=1000}
 
+The sand fill rests on a sand foundation over a thin soft-clay layer and dense sand;
+the dashed limit-equilibrium surface runs along the clay layer.
+
 The SSRM results below show the deformed mesh, the concentration of shear strain in the clay layer,
 and the displacement vectors showing lateral sliding along it.
 
@@ -680,7 +717,7 @@ Common options:
 - `show_mesh` — mesh lines where the mesh *is* the content: the deformation panel's grid and the
   vector panel's edge context. It does **not** overlay edges on the filled-contour panels; that is
   `mesh_on_fields` (default `False`), kept separate because element edges muddy a filled field.
-- `color_by_magnitude` / `vector_cmap` — color the displacement arrows by $|u|$ with a colorbar
+- `color_by_magnitude` / `vector_cmap` — color the displacement arrows by $|\mathbf{u}|$ with a colorbar
   instead of the default solid black.
 - `cmap`, `cbar_shrink` — the shear-strain color ramp and the colorbar length.
 - `show_reinforcement` (default `True`), `label_elements`, `figsize` (default `(12, 8)`),
@@ -780,12 +817,12 @@ piles writes a further CSV for each. The files are:
 | `*_fem_failure_piles.csv` | At-failure pile results, same columns as `*_fem_piles.csv`. |
 | `*_fem_failure_meta.json` | Scalar metadata for the at-failure snapshot, including its trial strength reduction factor. |
 
+Each is written only when the corresponding data exists, so a model without reinforcement, piles or
+a captured mechanism simply omits those rows.
+
 **Output units.** XSLOPE never converts units; when the model declares a unit system (the **Units**
 selector on the main sheet) it labels the result colorbars and writes a `# units:` header into the
 exported CSVs with that system's units, and leaves an undeclared model's output unchanged.
-
-Each is written only when the corresponding data exists, so a model without reinforcement, piles or
-a captured mechanism simply omits those rows.
 
 ### Mesh file contents
 
@@ -833,6 +870,7 @@ The element results describe the stress, strain and yield state within the 2D do
 ### Reinforcement results columns
 
 For reinforcement, the results pair each element's axial force with its capacity and softening state.
+The line's peak tensile capacity is $T_{max}$ and its entered residual capacity is $T_{res}$.
 
 | Column | Description |
 |--------|-------------|

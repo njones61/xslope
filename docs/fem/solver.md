@@ -23,7 +23,8 @@ of `solve_fem()` or `solve_ssrm()` that sets the same thing; a dash means there 
 arguments that apply only to a search belong to `solve_ssrm()`. The table is a map of this page:
 each setting links to the section that explains what it controls and how to choose it, and the
 sections follow from the strength reduction method itself through a single trial, the rules
-that decide it, the search, the options that shape the mechanism, the tensile cap and the
+that decide it, trials at the iteration limit, jointed models, the search,
+the options that shape the mechanism, the tensile cap and the
 compiled kernel.
 
 ![Run FEM dialog](../studio/images/analysis_run_fem_dialog.png){width=818}
@@ -63,7 +64,8 @@ standing to failure and narrows that bracket by bisection.
 
 ### Methodology
 
-Each trial divides both strength components by the trial factor,
+With full-strength cohesion $c$ and friction angle $\phi$, each trial divides both strength
+components by $F$. Write the reduced cohesion and friction angle as $c_r$ and $\phi_r$:
 
 >>$c_r = \dfrac{c}{F}$<br>
 $\tan \phi_r = \dfrac{\tan \phi}{F}$
@@ -117,8 +119,9 @@ returns stress a Gauss point cannot carry as a body load built from accumulated 
 strains. The elastic stiffness matrix is assembled and factorized **once**, then reused by
 back-substitution for every iteration of every strength reduction trial.
 
-The yield function $f$ defined on the [Overview](overview.md#mohr-coulomb-failure-criterion)
-describes the surface below in stress space.
+The yield function $f$ measures a stress state's position relative to the surface. The figure
+shows the yield surface defined on the
+[Overview](overview.md#mohr-coulomb-failure-criterion).
 
 ![Mohr-Coulomb yield surface in principal-stress space](images/yield_surface.png)
 
@@ -127,10 +130,7 @@ measures how far outside it is (the value of $f$), and turns that excess into pl
 brings the stress back toward the surface at the next solve. The direction of the plastic strain
 comes from a second function, the plastic potential $Q$; XSLOPE takes the dilation angle $\psi$ as zero,
 so $Q$ is the Mohr-Coulomb function with $\phi$ set to zero and the plastic flow is pure shear with no
-change of volume. The accumulated plastic strain is written $\varepsilon^{vp}$. The stress state's position
-relative to the surface is measured through three invariants, which do not depend on the axes:
-the mean stress $\sigma_m$, the deviatoric stress $\bar{\sigma}$ (a measure of the shear) and the Lode
-angle $\theta$ (which of the surface's six faces the state is nearest).
+change of volume. The accumulated plastic strain is written $\varepsilon^{vp}$.
 
 The loop below runs at every trial factor: solve, compute stresses, check yield, accumulate
 viscoplastic strain, update the body load.
@@ -141,9 +141,28 @@ Each pass round the loop is one iteration.
 
 ### The iteration {#viscoplastic-iteration-process}
 
+The stress state's position relative to the surface is measured through three invariants, which
+do not depend on the axes: the mean stress $\sigma_m$, the deviatoric stress $\bar{\sigma}$
+(a measure of the shear) and the Lode angle $\theta$ (which of the surface's six faces the state is nearest).
+
 Stress is carried with four components
-$(\sigma_x, \sigma_y, \tau_{xy}, \sigma_z)$, and $[D_e^4]$ is the corresponding $4\times4$
-elastic matrix. At each Gauss point it does the following:
+$(\sigma_x, \sigma_y, \tau_{xy}, \sigma_z)$: the normal stresses along horizontal $x$, vertical $y$
+and out-of-plane $z$, and the in-plane shear stress $\tau_{xy}$. Write the stress vector as
+$\{\sigma\}$, total strain as $\{\varepsilon\}$ and elastic strain as $\{\varepsilon^{el}\}$;
+their $z$ components carry superscripts $vp$ and $el$ for viscoplastic and elastic strain.
+$[D_e^4]$ is the corresponding $4\times4$
+elastic matrix. In these components $[B]$ is the strain-displacement matrix (with a zero row
+for the total out-of-plane strain), and $\{u_e\}$ holds the element's nodal displacements;
+see [Stiffness and assembly](overview.md#stiffness-and-assembly).
+With cohesion $c$ and friction angle $\phi$ at the trial's reduced strength, the tension-positive
+invariant form of the yield function is
+
+>>$f = \sigma_m\sin\phi + \bar{\sigma}\left(\dfrac{\cos\theta}{\sqrt{3}} - \dfrac{\sin\theta\sin\phi}{3}\right) - c\cos\phi$
+
+The nodal load vector is $\{F\}$; element contributions are summed over $e$, with area
+increment $dA$. Write the numerical pseudo-time step as $\Delta t$.
+
+At each Gauss point, each iteration does the following:
 
 >- Total in-plane strains come from the current displacements, $\{\varepsilon\} = [B]\{u_e\}$, and
 >  the **elastic** strains are $\{\varepsilon\} - \{\varepsilon^{vp}\}$, with
@@ -154,11 +173,11 @@ elastic matrix. At each Gauss point it does the following:
 >  invariant form.<br>
 >- Where $f > 0$, a viscoplastic strain increment
 >  $\Delta\varepsilon^{vp} = f \cdot \partial Q/\partial\sigma \cdot \Delta t$ is accumulated, where
->  $\Delta t$ is the pseudo-time step, a numerical parameter defined below.
+>  $\partial Q/\partial\sigma$ is the flow direction, the derivative with respect to stress.
 >  Close to the corners of the surface, where the flow direction is not defined, the direction
 >  is held at the corner value.<br>
 >- The accumulated strains form the body-load correction
->  $\{F\} \mathrel{+}= \sum_{e} \int [B]^T [D_e] \{\varepsilon^{vp}\} \, dA$, and the system is
+>  $\{F\} \mathrel{+}= \sum_{e} \int [B]^T [D_e^4] \{\varepsilon^{vp}\} \, dA$, and the system is
 >  re-solved with the existing factorization.
 
 The figure shows a Mohr-Coulomb shear return in a two-dimensional principal-stress section.
@@ -169,11 +188,12 @@ The plastic strain flows along $\partial Q/\partial\sigma$, while the stress is 
 toward the surface in a different direction.
 
 The **pseudo-time step** $\Delta t$ sets how much plastic strain is accumulated in one iteration.
-It is a numerical parameter, not a time; XSLOPE uses $\Delta t = 4(1+\nu)/(3E)$, the value in
+With Young's modulus $E$ and Poisson's ratio $\nu$, it is a numerical parameter, not a time;
+XSLOPE uses $\Delta t = 4(1+\nu)/(3E)$, the value in
 Smith & Griffiths' Program 6.1, which keeps the iteration stable where a stress state sits in
 slight effective tension. Because the displacement change per iteration scales with $\Delta t$,
 the convergence tolerance and the failure criteria are calibrated to this value;
-[`dt_scale`](#the-solve_fem-function) changes it and should be left at 1.
+[`dt_scale`](#the-solve_ssrm-function), accepted by both solve functions, changes it and should be left at 1.
 
 A **tension cutoff** runs as a second viscoplastic yield surface through the same mechanism; because
 it mainly affects SSRM results rather than ordinary stress analyses, it is described under
@@ -195,11 +215,17 @@ A trial has converged when both tests pass:
 1. **Displacement settled** — the displacement convergence test (Smith & Griffiths, 2004): the largest displacement change
    between iterations, divided by the largest current displacement, is below a tolerance:
 
+   Here $U_i^{(k)}$ is displacement component $i$ at iteration $k$, and $\text{tol}$ the
+   displacement tolerance.
+
 >>$\dfrac{\max_i |U_i^{(k+1)} - U_i^{(k)}|}{\max_i |U_i^{(k+1)}|} < \text{tol}$
 
 2. **Force equilibrium** — the criterion of
    [Dawson, Roth & Drescher (1999)](https://doi.org/10.1680/geot.1999.49.6.835): the out-of-balance
    force at every node, measured against that node's own weight, is below a tolerance:
+
+   Write that force residual as $\mathbf{r}_i$, the gravitational nodal force as
+   $\mathbf{f}^{grav}_i$ and the normalized tolerance as $\text{force\_tol}$, with $i$ the node index.
 
 >>$\displaystyle\max_i \dfrac{|\,\mathbf{r}_i\,|}{|\,\mathbf{f}^{\,grav}_i\,|} < \text{force\_tol}$
 
@@ -214,7 +240,8 @@ can stall on a slope standing still; the [hybrid criterion](#2-hybrid-hybrid-def
 The defaults are $\text{tol} = 10^{-3}$ for displacement and $\texttt{force\_tol} = 10^{-3}$
 for force equilibrium, with a budget of `max_iterations` = 12000 per trial. A few thousand
 iterations is normal well below failure, but the count climbs steeply near the critical factor
-and with mesh refinement: the same reinforced slope reaches equilibrium at $F = 1.25$ in
+and with mesh refinement: the [FEM-2 reinforced slope](../tutorials/fem02_reinforcement.md)
+reaches equilibrium at $F = 1.25$ in
 5,054 iterations at 2.5 ft element size and 16,242 at 1 ft.
 
 A single solve at $F = 1$ is a useful check on a submerged model: flooded ground at working
@@ -270,7 +297,8 @@ viscoplastic state keeps a small violation.
 check — arms only when both readings show that
 the loop has stopped changing: the residual has reached a **no-progress plateau** — 1500 iterations without
 improving the lowest out-of-balance value by more than 1% — **and** the trailing
-displacements have stopped growing, as measured by the hybrid criterion's growth test.
+displacements have stopped growing, as measured by the
+[hybrid criterion's growth test](#2-hybrid-hybrid-default).
 Until then, a corrector refusal leaves the trial running through its checkpoints,
 the [runaway rule](#creep-trend) and budget, and the yield reading is taken again on the next state.
 Once the gate is armed, the corrector makes a final attempt. If it does not certify
@@ -299,7 +327,7 @@ left from an earlier session otherwise changes every factor of safety in a run w
 
 ## SSRM failure criteria
 
-The previous section describes the evidence a trial produces: whether its displacements and
+The [trial checks](#convergence-criterion) describe the evidence a trial produces: whether its displacements and
 forces settled, whether the corrector could certify a balanced state, whether the stresses are
 admissible. A failure criterion is the rule that turns that evidence into the trial's verdict,
 standing, failed or undecided, which the search then uses to move its bracket. XSLOPE offers
@@ -332,7 +360,8 @@ the slope stands. The hybrid criterion, the default, asks a second question befo
 failure: does the displacement field show the slope failing? Two signals answer it, both
 measured against the trial's elastic displacement (the displacement the same model would have if
 nothing yielded, which every solve computes): the scale of the displacement at the end of the
-trial, $u_{ratio} = \max|u| / \max|u|_{elastic}$, and its growth over the last quarter of the
+trial, with $u$ the translational displacement vector and subscript $elastic$ denoting the
+elastic solve: $u_{ratio} = \max|u| / \max|u|_{elastic}$, and its growth over the last quarter of the
 iteration history.
 
 | Evidence | Verdict | Effect on the bisection |
@@ -356,7 +385,7 @@ on those models the non-converged trials carry displacement evidence of failure.
 |---|---|---|---|
 | [Griffiths & Lane Example 1, SSRM-1: quad8, target size 3.5, 16,000 iterations per trial](../verification/ssrm.md#verification-griffiths1) | 1.372 | 1.372 | Every non-converged trial is beyond elastic scale and still growing, so both criteria give the same verdict. |
 | [Rocscience RS2-62c](../verification/rs2.md#rs2-62) | 0.769 | 0.769 | The $F = 0.775$ trial is at elastic scale ($u_{ratio} = 1.23$) but still moving (growth 0.22). Its `AMBIGUOUS` verdict retains the non-convergence fallback. |
-| [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | With the vendor's zero [tensile cap](#tensile-strength-in-ssrm) ($T = 0$), the stationary trials prevent non-convergence from finding a bracket before the [auto-bracket](#methodology) reaches its floor. The hybrid brackets the same model. |
+| [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | With the vendor's zero [tensile cap](#tensile-strength-in-ssrm), the stationary trials prevent non-convergence from finding a bracket before the [auto-bracket](#methodology) reaches its floor. The hybrid brackets the same model. |
 
 Pass `failure_criterion="non_convergence"` for the classical verdict; every criterion
 returns the same per-trial records.
@@ -430,7 +459,8 @@ Finished trials on the search path are reused and unfinished ones resume from wh
 Continuation is not offered when the top trial ended on the yield check, and is not possible
 for a run read back from files, because the continuation states are held only in memory.
 
-The no-progress plateau and its residual ratio are recorded but never end a trial.
+The no-progress plateau is recorded but never ends a trial on its own;
+it only arms the [yield gate](#the-yield-check) when the trailing displacements have also stopped growing.
 
 ## Jointed models {#jointed-models}
 
@@ -448,7 +478,8 @@ judge one that neither converges nor runs away.
 #### Slipping or standing
 
 A trial counts as sliding when the ground keeps moving without appreciable slowing, or it
-keeps moving while joint slip continues without slowing. The before-limit check waits until late
+keeps moving while joint slip continues without slowing. The check made before the iteration
+limit (see [Limits](#jointed-numerical-limits)) waits until late
 in the allowance, because a slow trial can initially look like a sliding one.
 A trial counts as standing when the joints and ground have stopped moving, the soil or rock away
 from the joints is in balance, and the leftover force on the joints has stopped falling.
@@ -522,7 +553,8 @@ captures the failure mechanism for the figures.
 
 ### In-situ equilibration
 
-The full-strength equilibration described on the [Overview](overview.md#k0-initial-stress)
+The at-rest earth-pressure coefficient $K_0$ sets the initial lateral effective stress as a
+fraction of the vertical effective stress. The full-strength equilibration described on the [Overview](overview.md#k0-initial-stress)
 is returned as `result['k0_equilibration']`. If the slope does not stand at full strength with
 that initial stress, XSLOPE warns and searches from the initial stress itself; the factor of
 safety it finds is below 1.
@@ -571,8 +603,8 @@ Its principal arguments:
 >  [SSRM failure criteria](#ssrm-failure-criteria).<br>
 >- **`max_disp_factor`** (default 0.1, `None` to disable): displacement backstop as a fraction of
 >  mesh height; see [the displacement limit](#3-displacement-limit-displacement_limit).<br>
->- **`early_exit`** (default `True`): watch the residual for the no-progress plateau described
->  above and report it.<br>
+>- **`early_exit`** (default `True`): watch the residual for the
+>  [no-progress plateau](#the-yield-check) and report it.<br>
 >- **`fem_solver`** (default `'auto'`): the per-trial driver — see
 >  [Choosing the driver](#choosing-the-driver).<br>
 >- **`k0`**, **`min_slip_depth`**, **`tension_cutoff`**, **`elastic_mask`**,
@@ -713,7 +745,8 @@ as well. RS2's Apply SSR flag and SSR Search Area do the same; see the
 ## Tensile strength in the SSRM {#tensile-strength-in-ssrm}
 
 The Mohr-Coulomb envelope is a straight line fitted to compression tests. Drawn out toward the
-left, into the region where the normal stress is tension, it meets the $\sigma'$ axis at
+left, into the region where the normal stress is tension, it uses compression-positive effective
+normal stress $\sigma'$ and meets that axis at the tensile intercept
 $\sigma'_t = -c/\tan\phi$, and that is the tension the line implies the soil can carry before
 it fails: an implicit tensile strength of $c/\tan\phi$.
 It is an artifact of the straight line, not a measured property; real soil cracks at a small
@@ -722,12 +755,12 @@ so the implied tensile strength is unbounded.
 
 This matters in a strength-reduction search because dividing $c$ and $\tan\phi$ by the same $F$
 leaves $c/\tan\phi$ unchanged: the tensile strength a material has at $F = 1$ it still has at
-$F = 3$ (left panel below). Where the failure mechanism has to open a tension zone to form,
+$F = 2$ (left panel below). Where the failure mechanism has to open a tension zone to form,
 at a steep crest, a vertical face or the head of a scarp, that unreduced tension holds the cut
 shut, the model reaches a true equilibrium at strengths the real slope would never survive,
 and the factor of safety comes out too high, with nothing in the failure criterion to show it.
 
-The left panel shows the original and reduced lines meeting at the same zero-shear point.
+With stated tensile strength $T$, the left panel shows the original and reduced lines meeting at the same zero-shear point.
 The right truncates them at a stated cap: the solid cut stays at $-T$, while the dashed cut
 moves to $-T/F$ when Tension SRF is on.
 

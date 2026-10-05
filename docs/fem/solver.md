@@ -708,12 +708,12 @@ Turning `capture_failure_state` off changes neither the factor of safety, the br
 
 The pair below reloads the saved fields of the [W-3 report tutorial's reservoir embankment](../tutorials/w03_report.md).
 The upper panel is the last converged field; the lower is the captured field above FS.
-Both use the same shear-strain color range, equal aspect and identical section limits.
+Each is the standard deformation plot, with its own automatically chosen exaggeration.
 
-![Last converged and captured at-failure shear strain on one shared color scale](images/fem_capture_comparison.png){width=1000}
+![Last converged and captured at-failure deformation from the saved W-3 fields](images/fem_capture_comparison.png){width=1000}
 
-The captured field shows a developed shear band, rather than the smaller strains in the
-converged field; a color represents the same strain in both panels.
+The captured field shows the developed mechanism. Read each panel's scale in its title:
+the two deformation exaggerations differ, so their drawn movements are not on a common scale.
 
 ## Steering the mechanism
 

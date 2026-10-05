@@ -312,10 +312,12 @@ def fig_ssrm_sweep():
 
 def fig_capture_comparison():
     """Reload Tutorial W-3's saved standing and failure fields; never solve."""
+    from io import BytesIO
     import json
+    from PIL import Image
     from xslope.fileio import load_slope_data
     from xslope.fem import build_fem_data, import_fem_solution
-    from xslope.plot_fem import plot_shear_strain_contours, shared_panel_scales
+    from xslope.plot_fem import plot_fem_results
 
     stem = os.path.join(HERE, "..", "docs", "tutorials", "files",
                         "xslope_johnson_res_solved")
@@ -327,34 +329,32 @@ def fig_capture_comparison():
         raise ValueError("The committed tutorial must hold both distinct field states")
     with open(stem + "_fem_meta.json") as stream:
         meta = json.load(stream)
-    scales = shared_panel_scales(fem_data, [standing, failure])
-    if scales["vmin"] is None or scales["vmax"] is None:
-        raise ValueError("Both fields must carry a non-flat shear-strain range")
-    bounds = np.array(fem_data["nodes"])
-    low, high = bounds.min(axis=0), bounds.max(axis=0)
-    pad = 0.035 * max(high - low)
-    width = 7.65
-    height = width * (high[1] - low[1] + 2 * pad) / (high[0] - low[0] + 2 * pad)
-    fig_h = 2 * height + 1.15
-    fig = plt.figure(figsize=(9.5, fig_h))
-    for i, (field, title) in enumerate((
-            (standing, f"Last converged: F = {meta['final_interval'][0]:.4f}"),
-            (failure, f"Captured mechanism: F = {failure['F']:.4f}"))):
-        bottom = 0.4 + (1 - i) * (height + 0.45)
-        ax = fig.add_axes((0.085, bottom / fig_h, width / 9.5, height / fig_h))
-        plot_shear_strain_contours(ax, fem_data, field, show_mesh=False,
-                                  show_reinforcement=False, cbar_shrink=1.0,
-                                  vmin=scales["vmin"], vmax=scales["vmax"])
-        ax.set_xlim(low[0] - pad, high[0] + pad)
-        ax.set_ylim(low[1] - pad, high[1] + pad)
-        ax.set_aspect("equal")
-        ax.set_title(title, fontsize=11)
-        ax.set_xlabel("x (ft)")
-        ax.set_ylabel("y (ft)")
-    print(f"Saved pair: {len(bounds)} nodes, {len(fem_data['elements'])} elements; "
-          f"shared shear-strain range {scales['vmin']} to {scales['vmax']}; "
-          "no solve", flush=True)
-    _finish(fig, "fem_capture_comparison.png")
+    panels = []
+    for state in ("converged", "failure"):
+        fig, ax = plot_fem_results(
+            fem_data, standing, plot_type="deformation", field_state=state,
+            failure_solution=failure, fs=meta["FS"], ssrm_record=meta)
+        print(f"{state}: {ax.get_title()}", flush=True)
+        buffer = BytesIO()
+        fig.savefig(buffer, dpi=200, bbox_inches="tight", facecolor="white")
+        plt.close(fig)
+        buffer.seek(0)
+        panels.append(Image.open(buffer).convert("RGB"))
+
+    # Preserve each standard render pixel for pixel. Only add white padding
+    # and a separator; never replace titles, legends or automatic scales.
+    gap = 16
+    combined = Image.new("RGB", (max(p.width for p in panels),
+                                  sum(p.height for p in panels) + gap), "white")
+    y = 0
+    for panel in panels:
+        x = (combined.width - panel.width) // 2
+        combined.paste(panel, (x, y))
+        assert combined.crop((x, y, x + panel.width, y + panel.height)).tobytes() == panel.tobytes()
+        y += panel.height + gap
+    path = os.path.abspath(os.path.join(OUT, "fem_capture_comparison.png"))
+    combined.save(path)
+    print("wrote", path, "from saved W-3 fields; no solve", flush=True)
 
 
 def fig_budget_comparison():

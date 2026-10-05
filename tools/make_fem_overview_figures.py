@@ -314,10 +314,9 @@ def fig_ssrm_sweep():
 def fig_capture_comparison():
     """Reload Tutorial W-3's saved standing and failure fields; never solve."""
     from io import BytesIO
-    import json
     from PIL import Image
     from xslope.fileio import load_slope_data
-    from xslope.fem import build_fem_data, import_fem_solution
+    from xslope.fem import build_fem_data, import_fem_solution, import_fem_meta
     from xslope.plot_fem import plot_fem_results
 
     stem = os.path.join(HERE, "..", "docs", "tutorials", "files",
@@ -328,8 +327,13 @@ def fig_capture_comparison():
     failure = standing.get("failure_solution")
     if not standing.get("converged") or not failure or failure.get("converged"):
         raise ValueError("The committed tutorial must hold both distinct field states")
-    with open(stem + "_fem_meta.json") as stream:
-        meta = json.load(stream)
+    meta = import_fem_meta(stem)
+    if not meta or meta.get("F") is None:
+        raise ValueError("The saved SSRM record must identify the converged trial factor")
+    # Match Studio's saved-result reload: CSV import restores the field, while
+    # the run record supplies its trial factor. Without F the program's title
+    # formatter cannot name the last-converged F alongside the supplied FS.
+    standing = {**standing, "F": meta["F"]}
     panels = []
     for state in ("converged", "failure"):
         fig, ax = plot_fem_results(

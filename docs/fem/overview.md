@@ -341,9 +341,14 @@ water table and $\gamma$ over the part above it.
 
 ## Pore pressures {#pore-pressure-options}
 
-Pore pressures reduce effective stress and therefore available strength. Each material names its
-source in the **u** column of the **mat** sheet, and one model may use only one source — mixing
-`piezo` and `seep` across materials is refused.
+Soil strength depends on the effective stress, the part of the total stress carried by the soil
+skeleton. In the solver's tension-positive convention, $\sigma' = \sigma + u_w$, where $u_w$ is
+the pore-water pressure: a positive $u_w$ moves the effective stress toward tension and lowers the
+strength the Mohr-Coulomb criterion allows. The solver therefore needs $u_w$ at every Gauss point.
+Each material names where it comes from in the **u** column of the **mat** sheet. A model uses one
+source for all the materials that have one: `none` may be mixed with it (a dry layer above a
+`piezo` soil), but `piezo`, `ru` and `seep` cannot be combined, and the build refuses a model that
+does.
 
 | `u` | Source | Pore pressure at a Gauss point |
 |:----|:-------|:-------------------------------|

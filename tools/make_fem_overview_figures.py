@@ -333,14 +333,15 @@ def fig_capture_comparison():
     bounds = np.array(fem_data["nodes"])
     low, high = bounds.min(axis=0), bounds.max(axis=0)
     pad = 0.035 * max(high - low)
-    width = 4.65
+    width = 7.65
     height = width * (high[1] - low[1] + 2 * pad) / (high[0] - low[0] + 2 * pad)
-    fig_h = height + 1.0
-    fig = plt.figure(figsize=(12, fig_h))
+    fig_h = 2 * height + 1.15
+    fig = plt.figure(figsize=(9.5, fig_h))
     for i, (field, title) in enumerate((
             (standing, f"Last converged: F = {meta['final_interval'][0]:.4f}"),
             (failure, f"Captured mechanism: F = {failure['F']:.4f}"))):
-        ax = fig.add_axes((0.045 + i * 0.5, 0.55 / fig_h, width / 12, height / fig_h))
+        bottom = 0.4 + (1 - i) * (height + 0.45)
+        ax = fig.add_axes((0.085, bottom / fig_h, width / 9.5, height / fig_h))
         plot_shear_strain_contours(ax, fem_data, field, show_mesh=False,
                                   show_reinforcement=False, cbar_shrink=1.0,
                                   vmin=scales["vmin"], vmax=scales["vmax"])

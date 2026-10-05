@@ -702,10 +702,10 @@ Turning `capture_failure_state` off changes neither the factor of safety, the br
 `last_solution`.
 
 The pair below reloads the saved fields of the [W-3 report tutorial's reservoir embankment](../tutorials/w03_report.md).
-The left is the last converged field; the right is the captured field above FS.
+The upper panel is the last converged field; the lower is the captured field above FS.
 Both use the same shear-strain color range, equal aspect and identical section limits.
 
-![Last converged and captured at-failure shear strain on one shared color scale](images/fem_capture_comparison.png){width=1200}
+![Last converged and captured at-failure shear strain on one shared color scale](images/fem_capture_comparison.png){width=1593}
 
 The captured field shows a developed shear band, rather than the smaller strains in the
 converged field; a color represents the same strain in both panels.

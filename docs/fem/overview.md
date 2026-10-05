@@ -368,14 +368,8 @@ material zones, which is the definition the LEM slicer uses (Bishop & Morgenster
 loads and crack water are excluded, and the column is weighed $\gamma_{sat}$ below the water table
 and $\gamma$ above it — moist throughout on the usual `ru` model, which carries no water table.
 
-A piezometric line assigns pore pressure only over its own horizontal extent, exactly as in the
-[LEM](../lem/overview.md#pore-pressures); nothing is extrapolated past either end. Because the FEM
-samples the line at every node and Gauss point, the whole mesh must lie within that extent — a point
-outside stops the build with an error naming the point, its x-coordinate and the line's extent. A
-line that deliberately stops short (a reservoir on one side of a dam only) is modeled by carrying
-it on at an elevation below the mesh, which states that the ground beyond is dry. The build also
-stops when a material has `u = piezo` and the file defines no piezometric line; a material with no
-water takes `u = none`.
+A piezometric line must extend across the whole mesh, because pore pressure is read from it at
+every node and Gauss point; the build stops at any point the line does not cover.
 
 **How pore pressure enters the equilibrium.** The total-stress statement
 $\int B^T (\sigma' - u_w\,m)\,dV = F_{ext}$, $m = [1, 1, 0, 1]^T$, is

@@ -119,6 +119,23 @@ returns stress a Gauss point cannot carry as a body load built from accumulated 
 strains. The elastic stiffness matrix is assembled and factorized **once**, then reused by
 back-substitution for every iteration of every strength reduction trial.
 
+The yield function $f$ defined on the [Overview](overview.md#mohr-coulomb-failure-criterion)
+describes a surface in stress space, drawn below: for a stress state inside it, $f < 0$ and the
+soil is elastic; on it, $f = 0$ and the soil is at failure; outside it, $f > 0$ and the state is one
+the soil cannot carry.
+
+![Mohr-Coulomb yield surface in principal-stress space](images/yield_surface.png)
+
+The viscoplastic algorithm lets a Gauss point's stress go outside the surface for one iteration,
+measures how far outside it is (the value of $f$), and turns that excess into plastic strain, which
+brings the stress back toward the surface at the next solve. The direction of the plastic strain
+comes from a second function, the plastic potential $Q$; XSLOPE takes the dilation angle $\psi$ as zero,
+so $Q$ is the Mohr-Coulomb function with $\phi$ set to zero and the plastic flow is pure shear with no
+change of volume. The accumulated plastic strain is written $\varepsilon^{vp}$. The stress state's position
+relative to the surface is measured through three invariants, which do not depend on the axes:
+the mean stress $\sigma_m$, the deviatoric stress $\bar{\sigma}$ (a measure of the shear) and the Lode
+angle $\theta$ (which of the surface's six faces the state is nearest).
+
 The loop below runs at every trial factor: solve, compute stresses, check yield, accumulate
 viscoplastic strain, update the body load.
 
@@ -133,13 +150,14 @@ At each Gauss point on each iteration:
 >  $\varepsilon_z^{el} = -\varepsilon_z^{vp}$ (total $\varepsilon_z = 0$). Using the elastic strain
 >  rather than the total strain accounts for the stress relief already taken by plastic flow.<br>
 >- The stress $\{\sigma\} = [D_e^{4}]\{\varepsilon^{el}\}$ is reduced to the invariants
->  $\sigma_m$, $\bar{\sigma} = \sqrt{3J_2}$ and $\theta$, and the yield function is evaluated in
+>  $\sigma_m$, $\bar{\sigma}$ and $\theta$, and the yield function is evaluated in
 >  invariant form.<br>
 >- Where $f > 0$, a viscoplastic strain increment
->  $\Delta\varepsilon^{vp} = f \cdot \partial Q/\partial\sigma \cdot \Delta t$ (the pseudo-time step, below) is accumulated, using
+>  $\Delta\varepsilon^{vp} = f \cdot \partial Q/\partial\sigma \cdot \Delta t$ is accumulated, where
+>  $\Delta t$ is the pseudo-time step, a numerical parameter defined below, using
 >  the non-associated plastic potential with dilation angle $\psi = 0$ (no plastic volume change).
->  Within about 0.7° of the Lode-angle corners ($|\sin\theta| > 0.49$) the $\theta$-dependence is
->  frozen at the corner value, keeping the flow direction finite where $\tan 3\theta$ becomes infinite.<br>
+>  Close to the corners of the surface, where the flow direction is not defined, the direction
+>  is held at the corner value.<br>
 >- The accumulated strains form the body-load correction
 >  $\{F\} \mathrel{+}= \sum_{e} \int [B]^T [D_e] \{\varepsilon^{vp}\} \, dA$, and the system is
 >  re-solved with the existing factorization.

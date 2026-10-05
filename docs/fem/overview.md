@@ -469,10 +469,13 @@ for each convention:
 
 ![fem_ov_k0_initial.png](images/fem_ov_k0_initial.png){width=700}
 
-The illustration is a uniform, dry level-ground column; the profiles show compression magnitudes.
-
-Normally consolidated soil lies below the vertical-stress line, overconsolidated soil may lie
-above it, and at $K_0 = 1$ the two coincide.
+Both panels are for a dry, uniform soil under level ground, $\gamma = 19$ kN/m³, with stresses
+plotted as compression. The vertical stress is the same under either convention. Under gravity
+turn-on the horizontal stress follows from Poisson's ratio alone, $\nu/(1-\nu)$ of the vertical,
+about half of it at $\nu = 0.3$, and the shaded band shows its range for $\nu$ between 0.2 and
+0.4. Under at-rest initialization it is whatever $K_0$ specifies: normally consolidated soil lies
+below the vertical-stress line, overconsolidated soil may lie above it, and at $K_0 = 1$ the two
+coincide.
 
 On level ground with no horizontal variation, a fixed base and horizontally restrained sides,
 the $K_0$ field balances self weight for any $K_0$: the integral satisfies vertical equilibrium,

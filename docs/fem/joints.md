@@ -330,70 +330,11 @@ a million; the tutorial shows both runs.
 
 ### How a trial is decided {#how-a-trial-is-decided}
 
-Every strength-reduction trial ends standing, sliding or undecided. A jointed trial needs extra
-rules because a contact at its limit can keep flickering between slipping and gripping, or between
-open and closed, after the slope has come to rest. A trial that converges needs no extra reading;
-the rules judge one that neither converges nor runs away.
-
-Almost all of the leftover force can sit on the joints. On one rock slope the force reading was
-a million times larger on the joints than in the rock, and it stayed at that size however long
-the trial ran. More iterations do not remove an imbalance of that kind.
-
-Use the default `hybrid` [failure criterion](solver.md#ssrm-failure-criteria) for a jointed model:
-it accepts a trial shown to be standing even when the force tolerance is not met. The
-`non_convergence` criterion requires convergence and counts an otherwise settled jointed trial
-as failed, except where the solver leaves the trial undecided; it is kept for reproducing
-published results obtained that way.
-
-#### Slipping or standing
-
-A trial counts as sliding when the ground and the joints keep moving without appreciable slowing
-over the last part of the run. The check waits until late in the run: a slow trial can look like
-a sliding one for tens of thousands of iterations. A trial whose movement is still slowing
-is given more iterations, up to the limit set for the run.
-
-A trial counts as standing when, over the second half of its run, the joints have stopped
-slipping, the ground has stopped moving, the rock or soil away from the joints is in balance,
-and the leftover force on the joints has stopped falling. If it is still falling, the trial may
-yet converge outright, so it runs on.
-
-A standing trial raises the lower end of the search for the factor of safety, and a sliding one
-lowers the upper end. A trial that neither test decides is judged the same way as a trial
-without joints; see [Trials that reach the iteration limit](solver.md#creep-trend).
-
-#### Contacts that cycle
-
-Where a joint has cohesion but no tensile strength, a contact at zero normal stress can keep
-switching between closed, carrying shear, and open, carrying nothing. Held closed, it would
-need tension to balance; held open, the faces would have to overlap. Neither is allowed by the
-joint law, so the contact keeps cycling while the rest of the slope stays still.
-
-Such a trial counts as standing only if it reaches the **Iteration ceiling** (the most iterations
-any trial may be given) with a few contacts repeating the same short cycle exactly and the rest
-of the slope not moving. The Log and report name the contacts and note that force balance was
-not met: "stands: the only movement is 3 contacts cycling (period 8 iterations), no net movement;
-force balance not met".
-
-#### Finishing a slow jointed trial {#finishing-a-slow-jointed-trial}
-
-The ordinary iteration treats a slipping joint as if it were still stiff, so it closes in on
-the balanced state very slowly; on one toppling trial it took 13,000 iterations to cut the error
-a thousandfold.
-
-While a trial is slowing down, the run periodically takes a shortcut: from the state already
-reached, the [Newton corrector](solver.md#finishing-a-trial-with-the-newton-corrector) solves
-directly for a balanced state, keeping the joint's slip and opening history. The ordinary
-iteration then continues from that state to confirm that the slope stays put (the hold test).
-If the shortcut or hold test finds nothing acceptable, the ordinary iteration carries on unchanged.
-
-The shortcut is on by default; `joint_newton=False` turns it off.
-
-Jointed trials are sped up by default; the answer is unchanged. The Log's opening lines show
-whether acceleration was on.
-
-The [jointed-model reference](solver.md#jointed-models) on the Solver page gives the numerical
-limits, windows, recorded results and the solver options (`fem_solver`, `joint_tangent`,
-`accelerate`) behind these rules.
+A jointed trial is decided by extra rules, because a contact at its limit can keep flickering
+between slipping and gripping, or open and closed, after the slope has come to rest.
+For a standing trial that did not meet force balance, the Log reports, for example,
+"stands: the only movement is 3 contacts cycling (period 8 iterations), no net movement;
+force balance not met". The [Solver page](solver.md#jointed-models) gives the rules.
 
 ### What the results show
 

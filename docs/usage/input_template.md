@@ -171,6 +171,9 @@ The sheet is wide, so it is shown here in three views, each re-showing the **mat
 - **t_cut** — **[F/L²]**: tensile-strength cutoff — see below.
 - **E** — **[F/L²]**: Young's modulus (FEM only).
 - **ν** — **[–]**: Poisson's ratio, dimensionless (FEM only).
+
+Building the FEM data requires $E > 0$ and $0 \le \nu < 0.5$ for every material; a missing
+property or an out-of-range value stops the build rather than being defaulted.
 - **u**: pore pressure option (a selector, not a numeric value)
 - **$r_u$** — **[–]**: pore pressure ratio, dimensionless (u = `ru`) — see below.
 - **phi_b** ($\phi^b$) — **[deg]**: Fredlund unsaturated (matric-suction) friction angle — see

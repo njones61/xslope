@@ -49,8 +49,10 @@ negative.
 
 ### Elastic stress-strain
 
-Below yield the material is linear elastic, $\{\sigma\} = [D_e]\{\varepsilon\}$, with the
-plane-strain constitutive matrix
+Below yield the material is linear elastic: the stress vector $\{\sigma\} = (\sigma_x, \sigma_y,
+\tau_{xy})$ is related to the strain vector $\{\varepsilon\} = (\varepsilon_x, \varepsilon_y,
+\gamma_{xy})$ by $\{\sigma\} = [D_e]\{\varepsilon\}$, where $[D_e]$ is the plane-strain
+constitutive matrix
 
 >>$[D_e] = \dfrac{E}{(1+\nu)(1-2\nu)} \begin{bmatrix}
 1-\nu & \nu & 0 \\
@@ -58,8 +60,9 @@ plane-strain constitutive matrix
 0 & 0 & \dfrac{1-2\nu}{2}
 \end{bmatrix}$
 
-$E$ and $\nu$ are required for every material; $E$ must be positive and $\nu$ in $[0, 0.5)$, and a
-missing or out-of-range value stops the build rather than being defaulted.
+$E$ is Young's modulus and $\nu$ is Poisson's ratio, both required for every material. Plane strain
+means the out-of-plane strain $\varepsilon_z$ is zero, so the out-of-plane stress
+$\sigma_z = \nu(\sigma_x + \sigma_y)$ is carried without being an unknown.
 
 #### Typical elastic parameters
 

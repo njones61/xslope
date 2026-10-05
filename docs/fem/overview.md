@@ -13,10 +13,13 @@ slope domain and lets the failure mechanism emerge where the soil actually runs 
 that develops is an output rather than an input.
 
 XSLOPE's implementation is the viscoplastic elastic-perfectly-plastic algorithm of Griffiths &
-Lane (1999) and Smith & Griffiths (2004), with the factor of safety obtained by the shear strength
-reduction method (SSRM). Material properties, geometry, water and loads come from the same Excel
+Lane (1999) and Smith & Griffiths (2004), with the factor of safety obtained by the
+[shear strength reduction method (SSRM)](solver.md#shear-strength-reduction-method-ssrm). Material properties, geometry, water and loads come from the same Excel
 input file the limit-equilibrium solvers read, with Young's modulus $E$ and Poisson's ratio $\nu$
 added on the **mat** sheet.
+
+A strength reduction run returns the deformed mesh, the shear-strain field and the displacement
+vectors of the failure mechanism:
 
 ![plot_fem_results.png](images/plot_fem_results.png){width=800}
 
@@ -93,6 +96,8 @@ Shear strength on any plane is
 
 >>$\tau_f = c + \sigma' \tan \phi = c + (\sigma - u) \tan \phi$
 
+The envelope is a straight line in $\tau$–$\sigma′$ space, tangent to every Mohr circle at failure:
+
 ![mc_envelope.png](images/mc_envelope.png){width=800px}
 
 In principal effective stresses the criterion becomes the yield function
@@ -101,6 +106,8 @@ In principal effective stresses the criterion becomes the yield function
 
 with $f < 0$ elastic, $f = 0$ on the yield surface and $f > 0$ inadmissible — a state the
 viscoplastic algorithm returns to the surface.
+
+In principal-stress space the yield function is the surface below:
 
 ![yield_surface.png](images/yield_surface.png)
 
@@ -118,7 +125,7 @@ zero-strength soil.
 
 **Elastic-only materials.** A material whose **option** is `elastic` is never checked against the
 yield criterion — $[D_e]$ is its complete stress-strain law at every strength reduction factor, and
-only $\gamma$/$\gamma_{sat}$, $E$ and $\nu$ are meaningful for it. This mirrors RS2's "Plasticity
+only $\gamma$/$\gamma_{sat}$, $E$ and $\nu$ are meaningful for it. This mirrors the commercial code Rocscience RS2's "Plasticity
 Specifications: None". `solve_fem()` and `solve_ssrm()` take the affected names through
 `elastic_materials`, taken from the **option** column when left unset; a
 [polygon-addressed twin](solver.md#ssr-exclusion-zones) names the same treatment by outline. See
@@ -173,6 +180,8 @@ and assembling the element stiffnesses into a system of nodal equations.
 The domain is divided into triangular or quadrilateral elements, each carrying shape functions that
 interpolate displacement from its nodal values, $u = [N]\{u_e\}$.
 
+A typical slope mesh is shown below.
+
 ![sample_mesh.png](images/sample_mesh.png)
 
 XSLOPE supports linear and quadratic triangles and quadrilaterals:
@@ -183,18 +192,6 @@ Quadratic elements are required for reliable factors of safety — linear triang
 quads lock volumetrically and read high (see
 [Element type and volumetric locking](#element-type-selection-and-volumetric-locking)). Mesh
 construction is covered in [Mesh Generation](mesh.md).
-
-Reinforcement and pile lines are embedded in the same mesh, so their 1D elements are edges of the
-soil elements around them and every 1D node is a soil node. That coupling makes their discretization
-a mesh question rather than a per-member one: refining a member means refining the soil it transfers
-its load to. A line enters the mesh as its two endpoints, subdivided at the 1D element size — its
-capacity, and the law behind it, are read by the solver and never decide the discretization. The
-**1D element size** on the main sheet sets it — the element size
-along those lines, blank to mesh them at the global target size like everything else. A stated size
-is applied as a graded band around the lines, so the structural elements and the soil sharing their
-nodes both come back at that size and grow back to the target away from them, and a member can be
-discretized finely without a finer mesh across the whole section. It only ever refines: a value at
-or above the target size cannot coarsen the lines and is ignored.
 
 ### Stiffness and assembly
 
@@ -237,11 +234,14 @@ $v$ free represents ground continuing beyond the model with the same geometry an
 **Free boundaries** — the ground surface and slope face — carry zero traction except where a load is
 applied.
 
-### Distributed loads
+Prescribed displacements are imposed on the assembled system by direct modification of the
+constrained rows; applied forces enter $\{F\}$ directly and leave $[K]$ unchanged.
 
-Force boundary conditions in XSLOPE come from the **dloads** sheets: line loads given as a sequence
-of coordinates with load intensities (force per unit length), shared with the limit-equilibrium
-solvers, which convert them to a resultant on each slice.
+### Loads {#distributed-loads}
+
+Distributed loads are line loads along the ground surface, given as coordinates with intensities
+(force per unit length) on the **dloads** sheet and shared with the limit-equilibrium solvers,
+which convert them to a resultant on each slice.
 
 Hydrostatic pressure on a submerged face need not be entered at all. With the main sheet's **Water
 loads** selector on `auto`, the ponded-water load is derived from the model's own water definition
@@ -301,12 +301,9 @@ from it still locates the water table. A model that declares $\gamma_{sat}$ but 
 elevation to split at, and is weighed $\gamma$ throughout.
 
 Two other quantities are weighed from the same split: the vertical overburden integral behind the
-[K0 initial stress](#k0-initial-stress) and the soil column the `ru`
-pore-pressure option reads. Both are integrated $\gamma_{sat}$ over the part of the column below the
+[K0 initial stress](#k0-initial-stress) and the soil column the [`ru`
+pore-pressure option](#pore-pressure-options) reads. Both are integrated $\gamma_{sat}$ over the part of the column below the
 water table and $\gamma$ over the part above it.
-
-Prescribed displacements are imposed on the assembled system by direct modification of the
-constrained rows; applied forces enter $\{F\}$ directly and leave $[K]$ unchanged.
 
 ### What XSLOPE assigns automatically
 
@@ -428,7 +425,7 @@ A finite element analysis computes deformation from a **change** in stress, so b
 has to be told what stress the ground was already in. That in-situ state is not implied by the mesh:
 the same geometry, strengths and loads are consistent with many lateral stress states, and the one
 chosen fixes the confinement every element starts with — which, in a frictional material, is very
-nearly the same thing as fixing its strength. XSLOPE offers both conventions in general use.
+nearly the same thing as fixing its strength. XSLOPE offers the two conventions in general use, gravity turn-on and at-rest initialization.
 
 **Gravity turn-on** is the default and the Griffiths & Lane convention: the model starts from **zero
 stress** and self weight is switched on in a single step. The lateral stress that results is not a
@@ -445,6 +442,8 @@ $K_0 = 1$ and beyond.
 stiffness: the vertical stress is the weight of the soil column above the point, the lateral stress
 is $K_0$ times it, and $K_0$ is a modeling input carrying the soil's stress history.
 
+The figure compares the initial stress of the two conventions on the same slope:
+
 ![fem_ov_k0_initial.png](images/fem_ov_k0_initial.png){width=700}
 
 The choice matters most for a **part of the model whose strength depends on confinement** — the
@@ -455,10 +454,7 @@ strength. It matters least for a homogeneous cohesive embankment.
 
 ### Formulation
 
-Leave the **K0 initial stress** cell on the main sheet blank — the default — and the run is the
-gravity turn-on. Enter a value (or pass `k0=` to `solve_fem()` / `solve_ssrm()`, or tick **K0
-initial stress** in Studio's Run FEM dialog) and the initial stress at every Gauss point is built
-from the overburden instead:
+At-rest initialization builds the initial stress at every Gauss point from the overburden:
 
 >>$\sigma'_v = -\!\!\int \gamma\,dz \;+\; u \qquad
   \sigma'_h = \sigma'_z = K_0\,\sigma'_v \qquad \tau_{xy} = 0$
@@ -515,7 +511,7 @@ used for a retaining-wall or settlement calculation:
 
 **Vendor conventions.** RS2 writes an explicit initial field stress into the model file with
 $\sigma_x = \sigma_y = \sigma_z$ and $K_x = K_z = 1$ — an isotropic at-rest state — and does so
-uniformly across the verification corpus. **Set $K_0 = 1$ whenever the target is an RS2 SSR
+across Rocscience's published verification models. **Set $K_0 = 1$ whenever the target is an RS2 SSR
 number.** Plaxis takes the other convention: its $K_0$ procedure defaults to Jaky's
 $1 - \sin\phi'$ per material. XSLOPE's own default — gravity turn-on — matches Griffiths & Lane and
 the academic literature built on it.
@@ -526,12 +522,7 @@ a checkbox and a value. Blank everywhere means the gravity turn-on.
 
 ### What to expect
 
-$K_0$ initialization is **off by default**. Every SSRM row on the
-[RS2 corpus page](../verification/rs2.md) runs with it, because RS2 authors its verification
-models at $K_x = K_z = 1$; the rest of the verification suite is computed without it. It is a
-modeling choice.
-
-How much it changes is a property of the model, and the controlling factor is **cohesion**. Raising
+How much $K_0$ changes the factor of safety is a property of the model, and the controlling factor is **cohesion**. Raising
 the confinement raises the initial deviatoric demand as well as the frictional capacity, so a slope
 whose strength is mostly cohesive changes little; a slope whose envelope passes near the origin
 takes almost all of its strength from confinement:
@@ -582,11 +573,7 @@ $\phi = 20°$, slope angle 26.57°) at a target mesh size of 5, against an expec
 | **quad8** | **8** | **1.41** | **< 1%** | **Recommended** |
 | **quad9** | **9** | **1.41** | **< 1%** | **Recommended** |
 
-The three quadratic types converge on the same answer; the low-order ones give values 11–21% high,
-which is unconservative.
-
-In practice: **use tri6, quad8 or quad9 for any factor of safety.** `build_mesh_from_polygons()`
-defaults to `tri6`, so a quadratic mesh is what a FEM run gets unless something else is asked for
+`build_mesh_from_polygons()` defaults to `tri6`, so a quadratic mesh is what a FEM run gets unless something else is asked for
 explicitly (on the call or on the main sheet); `tri3` is the lighter explicit choice, typical of
 seepage meshes. The model checks warn before a FEM or SSRM solve starts on a linear mesh.
 
@@ -639,9 +626,21 @@ Structural properties are **not reduced** during strength reduction; only soil $
 are. The factor of safety is therefore the margin in the soil strength, given the structural
 elements as designed.
 
+Reinforcement and pile lines are embedded in the same mesh, so their 1D elements are edges of the
+soil elements around them and every 1D node is a soil node. That coupling makes their discretization
+a mesh question rather than a per-member one: refining a member means refining the soil it transfers
+its load to. A line enters the mesh as its two endpoints, subdivided at the 1D element size — its
+capacity, and the law behind it, are read by the solver and never decide the discretization. The
+**1D element size** on the main sheet sets it, blank to mesh them at the global target size like everything else. A stated size
+is applied as a graded band around the lines, so the structural elements and the soil sharing their
+nodes both come back at that size and grow back to the target away from them, and a member can be
+discretized finely without a finer mesh across the whole section. It only ever refines: a value at
+or above the target size cannot coarsen the lines and is ignored.
+
 ## Visualization of results
 
-`plot_fem_results()` renders one or more panels, stacked vertically, selected by `plot_type`:
+Results are drawn as panels of the deformed mesh, strain and stress fields, displacement vectors
+and the displacement-vs-F curve; `plot_fem_results()` stacks the ones named in `plot_type`:
 
 | Plot Type | Description |
 |-----------|-------------|
@@ -660,10 +659,10 @@ the mechanism:
 
 ![Slope with a weak clay layer](../tutorials/images/lem05_problem_sketch.png){width=1000}
 
-![non_circ_results.png](images/non_circ_results.png){width=1000}
+The SSRM results below show the deformed mesh, the concentration of shear strain in the clay layer,
+and the displacement vectors showing lateral sliding along it.
 
-The figure shows the deformed mesh, the concentration of shear strain in the clay layer, and the
-displacement vectors showing lateral sliding along it.
+![non_circ_results.png](images/non_circ_results.png){width=1000}
 
 Common options:
 
@@ -716,7 +715,7 @@ trial in which the slope reached equilibrium, and the line joins only those. An 
 trial that was stopped before it reached equilibrium. It is drawn at the point where it was
 stopped, while the slope was still moving, with no line through it. The key says how it was
 stopped: **stopped at the iteration limit, still moving**, **displacements ran away**, or **past
-the displacement limit**. The reported factor of safety is the dashed vertical line, and the final
+the [displacement limit](solver.md#3-displacement-limit-displacement_limit)**. The reported factor of safety is the dashed vertical line, and the final
 bracket is shaded behind it. The same plot is available alone as
 `xslope.plot_fem.plot_ssrm_curve(ax, record)`. Below is the embankment from
 [FEM-1](../tutorials/fem01_strength_reduction.md) at that page's settings:

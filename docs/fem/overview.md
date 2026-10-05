@@ -711,10 +711,7 @@ stopped, while the slope was still moving, with no line through it. The key says
 stopped: **stopped at the iteration limit, still moving**, **displacements ran away**, or **past
 the [displacement limit](solver.md#3-displacement-limit-displacement_limit)**. The reported factor of safety is the dashed vertical line, and the final
 bracket is shaded behind it. The same plot is available alone as
-`xslope.plot_fem.plot_ssrm_curve(ax, record)`. Below is the embankment from
-[FEM-1](../tutorials/fem01_strength_reduction.md) at that page's settings:
-
-![fem01_ssrm_curve.png](images/fem01_ssrm_curve.png){width=800}
+`xslope.plot_fem.plot_ssrm_curve(ax, record)`.
 
 **Interpreting the plot.** A flat run of displacements that turns up in a sharp knee is a strength limit. The
 slope reached equilibrium at every factor below the knee and could not above it, and the factor of
@@ -726,6 +723,22 @@ iterations per trial may change it. A run whose top trial ended undecided found 
 dashed line sits at the highest strength the slope came to rest at and the key reads "FS ≥": no
 trial above that strength was shown to fail. Where the iteration limit stopped the trial at the
 top, the run can be [continued with a higher limit](solver.md#creep-trend) from where its trials stopped.
+
+The comparison below uses the same [FEM-1 embankment](../tutorials/fem01_strength_reduction.md)
+and tri6 mesh at target size 3.5 ft in both panels. On the left, the tutorial's 4,000-iteration
+budget gives the knee and a failed upper edge. On the right, Max iterations per trial and the
+iteration ceiling are deliberately set to 100: the low trials stand, but the final upper trial
+is still slowing when the limit stops it. Both curves have a knee; the right panel is not an
+example of a smooth climb without one. The markers and verdict distinguish a demonstrated
+failure from an unresolved trial, not the curve's shape alone.
+
+![FEM-1 displacement curves at normal and deliberately short iteration budgets](images/fem_budget_comparison.png){width=1000}
+
+The left run reports FS = 1.371. The right run's closing log reports "The factor of safety is
+at least 1.36": the standing edge is $F = 1.3671875$, while the final top at $F = 1.375$ is
+undecided after 100 ordinary iterations. The plot prints the bound to three decimals, FS ≥ 1.367.
+The Newton corrector remains on in both runs; its additional iterations are counted in a
+standing trial's total even when the ordinary-iteration allowance is only 100.
 
 The run's closing summary gives the same information in words. It is printed as the last lines of
 every strength reduction run and returned as `result['summary']`. It reports what happened at each

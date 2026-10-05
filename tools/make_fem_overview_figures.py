@@ -377,8 +377,64 @@ def fig_ssrm_sweep():
     _finish(fig, "fem_ov_ssrm_sweep.png")
 
 
+def fig_budget_comparison():
+    """One FEM-1 model, normal and deliberately short per-trial budgets.
+
+    Launch through the machine gate. No workbook, mesh or solution export is
+    written. Refuse the illustration if the short search is not limited by its
+    iteration allowance; never substitute a verdict or invent a lower bound.
+    """
+    from xslope.fileio import load_slope_data
+    from xslope.fem import build_fem_data, solve_ssrm, ssrm_fs_text
+    from xslope.mesh import build_mesh_from_polygons, get_material_polygons
+    from xslope.plot_fem import plot_ssrm_curve
+
+    model = load_slope_data(os.path.join(
+        HERE, "..", "docs", "tutorials", "files", "xslope_ssrm_embankment.xlsx"))
+    mesh = build_mesh_from_polygons(get_material_polygons(model),
+                                    target_size=3.5, element_type="tri6")
+    fem_data = build_fem_data(model, mesh)
+    options = dict(F_min=1.0, F_max=2.0, tolerance=0.01,
+                   failure_criterion="hybrid", capture_failure_state=False)
+    short = solve_ssrm(fem_data, max_iterations=100,
+                       max_iterations_ceiling=100, **options)
+    print("SHORT-BUDGET TRIALS", flush=True)
+    for trial in short.get("trials", []):
+        print({key: trial.get(key) for key in (
+            "F", "stable", "verdict", "exit_reason", "iterations",
+            "max_displacement", "u_ratio", "growth", "creep_reading")}, flush=True)
+    interval = short.get("final_interval")
+    top = next((trial for trial in reversed(short.get("trials", []))
+                if interval and abs(trial["F"] - interval[1]) < 1e-12), {})
+    reading = top.get("creep_reading") or {}
+    admissible = (short.get("fs_is_lower_bound") or
+                  (not top.get("stable") and top.get("exit_reason") == "iteration_cap"
+                   and reading.get("trend") == "dying"))
+    if short.get("FS") is None or not admissible:
+        print("NO FIGURE: short budget did not produce the requested "
+              "undecided top or failed-while-slowing top.", flush=True)
+        return
+    normal = solve_ssrm(fem_data, max_iterations=4000, **options)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5.8))
+    for ax, result, title in zip(axes, (normal, short), (
+            "FEM-1: 4,000 iterations per trial", "FEM-1: 100 iterations per trial")):
+        plot_ssrm_curve(ax, result, fem_data=fem_data, show_title=False)
+        ax.set_title(title, fontsize=11)
+        ax.tick_params(labelsize=9)
+    fig.subplots_adjust(left=0.07, right=0.98, top=0.91, bottom=0.39, wspace=0.30)
+    fig.text(0.5, 0.015, "Right: deliberately short budget and 100-iteration ceiling; "
+             + ssrm_fs_text(short["FS"], bool(short.get("fs_is_lower_bound"))),
+             ha="center", fontsize=9)
+    _finish(fig, "fem_budget_comparison.png")
+
+
 if __name__ == "__main__":
-    fig_viscoplastic_loop()
-    fig_tension_cutoff()
-    fig_k0_initial()
-    fig_ssrm_sweep()
+    if sys.argv[1:] == ["budget-comparison"]:
+        fig_budget_comparison()
+    elif sys.argv[1:]:
+        raise SystemExit("usage: make_fem_overview_figures.py [budget-comparison]")
+    else:
+        fig_viscoplastic_loop()
+        fig_tension_cutoff()
+        fig_k0_initial()
+        fig_ssrm_sweep()

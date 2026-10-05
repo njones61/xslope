@@ -705,131 +705,44 @@ which is what the reliability and sensitivity analyses do, since they never draw
 
 ## Steering the mechanism
 
-Steering the mechanism by **depth** is one of two ways to keep a competing failure out of the
-answer; the other is to steer it by **region**, which is what
-[SSR search areas and exclusion zones](#ssr-exclusion-zones) do. Use the depth filter when the
-mechanism to exclude is defined by how shallow it is (a face-parallel skin, which no zone boundary
-separates from the deep surface because both run through the same material); use a zone when it
-belongs to an identifiable part of the model (a stiff foundation, a shell, a bench).
+A strength reduction finds the weakest mechanism anywhere in the model, and that is not always
+the one the analysis is about: a thin, face-parallel skin can fail at a factor below the deep
+surface the engineer is designing against, or a mechanism can form in a stiff foundation that
+cannot in reality fail. Two tools keep such a mechanism out of the answer. The depth filter is
+for a mechanism defined by how shallow it is; exclusion zones are for one that belongs to an
+identifiable part of the model, a foundation, a shell, a bench.
 
 ### Surficial (skin) failures and the minimum-slip-depth filter
 
-On a purely frictional face ($c = 0$) the critical mechanism is a shallow slide running parallel to
-the slope, with $FS = \tan\phi / \tan\beta$ — a result *independent of depth*, so the shallowest
-surface governs. The per-node force-equilibrium criterion detects this "skin" faithfully, and
-because it is the true global minimum the reported factor of safety can sit well below a deeper,
-more conventional mechanism, and below published values that report the deeper one. This is
-physically correct but often not the engineering question; it occurs mainly on the steep frictional
-faces of embankment dams.
+A skin failure is a shallow slide running parallel to a frictional face. `min_slip_depth`
+leaves nodes shallower than the stated depth out of the force and displacement readings, so a
+mechanism entirely above that depth does not count as failure of the deeper slope.
+Depth is measured vertically below the ground surface, in model length units.
+The filter does not change strength: the shallow soil still yields. It is off by default;
+set `min_slip_depth=` on the solve or **Min slip depth** in Studio.
 
-The optional **`min_slip_depth`** parameter — on `solve_fem()`/`solve_ssrm()` and on the LEM
-searches, **off by default** — excludes any failure shallower than the given depth below the ground
-surface. In the FEM it acts on the **failure verdict**, not on the strength: nodes shallower than
-the cutoff are left out of the per-node out-of-balance maximum, so a shallow skin alone can no
-longer cause the slope to be classified as failing, while a deep-seated mechanism still trips the
-criterion through its deep nodes. The filter applies to both tests a trial is decided on: the
-[corrector](#finishing-a-trial-with-the-newton-corrector) measures its displacement bound on the
-same deep degrees of freedom, so a skin that is sliding while the mass beneath it stands cannot
-cause an otherwise admissible state to be rejected either. Nothing is held at full strength and no
-element is masked — the skin still yields, but it no longer decides the classification. It is a
-**run option rather than a file setting**:
-pass `min_slip_depth=` to a solve or to a `circular_search()` / `noncircular_search()` call, or set
-**Min slip depth** in Studio's Run FEM dialog. A depth greater than the depth of the mesh is
-rejected.
-
-**Choosing a value.** Sweep the depth and look for a flat run of factors of safety. As the depth increases, the factor of safety
-holds at the surficial-skin value while the cutoff is still inside the failing band, rises as the
-cutoff clears the band, then **flattens onto a level**: the deep-seated factor of safety. Any
-depth on the flat part returns the same FS, so the choice is robust. Run a handful of depths (say
-5, 10, 15, 20, 25% of the slope height) and read the trend:
-
->- Still rising → the cutoff is inside the surficial band; go deeper.<br>
->- Flat → that value is the deep-seated FS. Report it.<br>
->- Still climbing at a large fraction of the slope height → you are past the real mechanism and are
->  excluding genuine failure; back off to where it leveled off.
-
-A large gap between the filter-off value and the level means a surficial skin was governing the
-unfiltered result; a small gap means the deep mechanism already governs and the filter can stay off.
-On a low fill over soft ground the level can sit deep as a fraction of height — the embankment on
-soft ground of [RS2-66](../verification/rs2.md#rs2-66), on a 4 m soft band, is on its level at a
-4 m cutoff on a 10 m fill (1.131 under a 4, 6 or 8 m cutoff alike), while the 162 m Talbingo dam
-of [RS2-4](../verification/rs2.md#rs2-4) is already on its level by 10 m (its 1.67
-downstream-bench skin against a 1.82–1.83 level held flat from 10 m out to 30 m). The same
-model on a 2 m band has no level there — 4 m returns 1.131, and 6 or 8 m return 1.206, a
-different and higher value. The level has to be found on each model.
-Set the same `min_slip_depth` in the LEM search and the SSRM run so both report the same mechanism.
+To choose a depth, run a sweep with the filter at increasing depths and take the depth at which
+the factor of safety stops changing. If it keeps rising without a level, the filter may be
+excluding the deeper mechanism as well.
+For example, the [RS2-66c deep-mechanism row](../verification/rs2.md#rs2-66) uses a 4 m filter
+and reports FS = 1.094 on tri6 elements at target size 3 m with $K_0 = 1$.
 
 ### SSR search areas and exclusion zones {#ssr-exclusion-zones}
 
-XSLOPE, like RS2 and Plaxis, names where the reduction applies, in one of two forms.
+A material exclusion holds the named materials at full strength while the rest are reduced;
+set `ssr_exclude=` to their exact names, or choose them with Studio's **SSR exclusions…**
+picker. A search polygon does the opposite: reduction applies only inside it, with the rest
+held at full strength; pass its vertices as `ssr_zone=`.
 
->- An **exclusion area** names the part of the model held at **full strength** — everything else is
->  reduced. Use it when the competing mechanism is the one you can point at: "not through the
->  foundation", "not through the downstream shell".<br>
->- A **search area** names the part that **is** reduced — everything else is held at full strength.
->  Use it when the mechanism of interest is the one you can point at: a corridor around a proposed
->  slip surface, one face of an embankment, a single tier of a wall.
-
-Both constrain the answer, so the factor of safety they return is conditional on the constraint —
-run the unconstrained case as well.
-
-**By material name.** `ssr_exclude` takes a list of material names. At every trial factor, every
-zone *not* named has its $c$ and $\tan\phi$ divided by $F$ as usual, but a named zone keeps its full
-strength and the developing shear band is forced up and out of it. This reproduces RS2's
-per-material **Apply_SSR** flag, presented in its interface as an "SSR Exclusion Area".
-
-```python
-result = solve_ssrm(fem_data, F_min=1.2, F_max=1.5, tolerance=0.02,
-                    ssr_exclude=["Foundation lower"])
-```
-
-Names must match a material's `name` exactly; an unknown name raises `ValueError` rather than
-silently reducing nothing. [RS2-P4-VP67](../verification/rs2.md#p4-vp67) works through the
-constrained/unconstrained pair on a USACE end-of-construction embankment: an unconstrained SSRM of
-1.076 on a deep foundation mechanism, against 1.303 with the foundation's lower zone excluded,
-on the same toe-circle family RS2 reports at 1.33 under its own exclusion area. In Studio
-this is the **SSR exclusions…** button in the Run FEM dialog.
-
-**By polygon, on the input file.** A zone is drawn where the rest of the model is drawn: a row on
-the [**polygon** sheet](../usage/input_template.md#ssr-zones) whose **Type** is one of three words.
-
-| Type | Meaning |
-|:-----|:--------|
-| **`ssr reduce`** | **Search area** — reduce **only inside**. |
-| **`ssr hold`** | **Exclusion, full strength** — never reduced inside, but can still yield. |
-| **`ssr elastic`** | **Exclusion, elastic** — linear elastic inside, cannot yield at all. |
-
-Several zones combine by one rule: **the reduced region is the union of the `ssr reduce` zones,
-minus the union of the `ssr hold` and `ssr elastic` zones**, defaulting to the whole model when no
-search area is drawn. Exclusions therefore always carve out — of a search area they sit inside, or
-of the model as a whole — and an interior hole in a search area is drawn by putting an `ssr hold`
-(or `ssr elastic`) polygon on top of it.
-
-These rows are **analysis overlays, not geometry**. They are never meshed, never become material
-regions and never generate slices; they may overlap one another and cross material boundaries
-freely. Membership is decided element by element, by where each element's centroid falls, so a zone
-can be added to a finished model without disturbing it — the mesh, the material assignment and the
-factor of safety are unchanged unless the zone actually constrains something. The limit-equilibrium
-solvers ignore the rows entirely.
-
-**By polygon, at the run.** `solve_ssrm()` also takes an explicit **`ssr_zone`** polygon (a vertex
-list) — the programmatic primitive, and what RS2's "SSR Search Area" maps onto when a vendor model
-is imported. It has **one sense only, reduce inside**, and it takes precedence over the file's own
-zones with a warning when both are present rather than quietly intersecting them. It classifies
-elements by the same centroid test, so the same polygon written into the file and passed as the
-argument give identical answers.
-
-A vendor **exclusion** polygon passed through `ssr_zone` must therefore be converted to its
-**complement within the model outline**; passing it as-drawn reduces exactly the wrong region.
-[RS2-4](../verification/rs2.md#rs2-4) is the worked case: RS2 holds the whole downstream benched
-shell of the Talbingo dam at full strength, and reproducing that answer through the argument means
-passing the complementary ring — everything upstream of the shell — as the search area.
-
-The choice between the two depends on the shape of the region. If it **is** a material zone,
-`ssr_exclude` names it directly and the mesh follows the zone boundary exactly. If it cuts across
-the materials, it has to be a polygon. On [RS2-64b](../verification/rs2.md#rs2-64) the two paths
-give identical factors of safety on the same mesh, and the conforming mesh's own answer sits about
-6% below the non-conforming one — the difference is the discretization, not the masking.
+The [polygon sheet's SSR zones](../usage/input_template.md#ssr-zones) provide the file settings:
+`ssr reduce` defines a search area, `ssr hold` holds an area at full strength,
+and `ssr elastic` keeps an area elastic. The reduced region is the union of search areas
+minus the exclusions, or the whole model minus exclusions when no search area is defined.
+Membership uses each element's centroid; these overlays do not change the mesh.
+A run's `ssr_zone` takes precedence over file zones with a warning.
+The returned factor of safety is conditional on these constraints; run the unconstrained case
+as well. RS2's Apply SSR flag and SSR Search Area do the same; see the
+[RS2 verification page](../verification/rs2.md).
 
 ## Tensile strength in the SSRM {#tensile-strength-in-ssrm}
 

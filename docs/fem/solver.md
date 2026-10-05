@@ -85,7 +85,7 @@ the bisection continues below it.
 
 In the bracket below, L is the standing lower edge and H is the upper edge.
 
-![SSRM bracket updates and final factor reporting](images/ssrm_bracket_search.png){width=800px}
+![SSRM bracket updates and final factor reporting](images/ssrm_bracket_search.png){width=680px}
 
 The arrows show which edge changes; an undecided H leaves FS as a lower bound rather than a
 midpoint estimate.
@@ -182,7 +182,7 @@ At each Gauss point, each iteration does the following:
 
 The figure shows a Mohr-Coulomb shear return in a two-dimensional principal-stress section.
 
-![Viscoplastic strain direction and successive stress return](images/viscoplastic_return.png){width=800px}
+![Viscoplastic strain direction and successive stress return](images/viscoplastic_return.png){width=680px}
 
 The plastic strain flows along $\partial Q/\partial\sigma$, while the stress is carried back
 toward the surface in a different direction.
@@ -208,7 +208,15 @@ decides the trial.
 
 ![Outer checks and outcomes of one strength-reduction trial](images/ssrm_trial_verdict.png){width=800px}
 
-The return arrows keep $F$ fixed; the three outcome branches end this trial.
+At the top, the strengths are reduced by the trial's factor F. The trial then iterates at that
+F; after each pass the movement, the forces and the yield state are read and the stopping rules
+applied. While no rule is met the iteration continues, and a trial that has spent its budget but
+is still slowing is given more iterations, up to the ceiling; both return arrows keep F fixed.
+A trial leaves the loop by one of three branches: standing, when the forces balance and the
+movement has stopped, or the corrector finds a balanced state; failed, when the movement runs
+away or keeps going to the end of the budget; undecided, when the limit comes while the trial is
+still slowing or its movement cannot be read, or when the forces balance but the stresses sit
+outside the yield envelope.
 
 A trial has converged when both tests pass:
 
@@ -402,24 +410,30 @@ For a standalone `solve_fem()` trial, the default backstop remains active even w
 criterion; passing it counts as failure without needing the elastic-displacement yardstick.
 This iteration backstop is separate from the Newton corrector's final-state displacement check.
 
-### 4. Displacement catastrophe (`"displacement_increase"`)
+### 4. Displacement increase (`"displacement_increase"`)
 
-Sweeps $F$, locates the sharpest upturn of displacement versus $F$ (the evidence Griffiths & Lane
-present as their Figs 2 and 18), and refines around it; related to the average-residual-displacement
-criterion of [Sun, Wang & Zhang (2021)](https://doi.org/10.1007/s10064-021-02237-y), and like it
-reads a **characteristic point** rather than the global maximum. The point is selected
-automatically — after the coarse sweep, the node whose plastic displacement grew fastest between the
-lowest and highest $F$ becomes the measurement point and the curve is re-read there — which keeps
-the measurement on the mechanism rather than on any localized background deformation that grows at
-*all* $F$. A specific point can be supplied through `char_point=(x, y)`.
+This criterion does not judge trials one at a time. It solves the slope at a sweep of trial
+factors, plots the displacement at a chosen point against $F$, and takes the factor of safety where
+that curve turns sharply upward, the evidence Griffiths & Lane present in their Figs 2 and 18. The
+point is chosen automatically: after a coarse sweep, the node whose plastic displacement grew most
+between the lowest and highest $F$ becomes the measurement point, so the curve is read on the
+mechanism rather than on background deformation that grows at every $F$; the sweep is then refined
+around the upturn. A point can be given instead with `char_point=(x, y)`. The approach is related
+to the average-residual-displacement criterion of
+[Sun et al. (2021)](https://doi.org/10.1007/s10064-021-02237-y).
 
 ### Choosing a criterion
 
-| Problem class | Criterion | Why |
-|---|---|---|
-| All slope problems, including submerged boundaries and reservoir loading | `hybrid` (default) | Bisection on true equilibrium; a non-converged trial must show displacement evidence before it counts as failed |
-| Reproducing the classical Griffiths & Lane (1999) verdict, or a published result obtained that way | `non_convergence` | The same bisection without the displacement-evidence test. |
-| Evidence and reporting | `displacement_increase` | Produces the displacement-vs-$F$ curve; read the upturn at the automatically selected characteristic point |
+The four are not alternatives of equal standing. The default is the one to use for an analysis;
+the others exist to reproduce a published result obtained their way, or to produce a particular
+kind of evidence:
+
+| Criterion | Use it when |
+|---|---|
+| `hybrid` (default) | Any analysis, including submerged slopes and reservoir loading. A non-converged trial counts as failed only when its displacements show the slope failing. |
+| `non_convergence` | Reproducing Griffiths & Lane's verdict, or a published result obtained with it: a trial that has not converged at the limit is failed. |
+| `displacement_limit` | Reproducing a result that used a displacement cap: a trial is failed when its displacement passes `max_disp_factor` of the mesh height. Its verdict depends on the iteration budget. |
+| `displacement_increase` | The displacement-against-F curve is wanted as the evidence: a sweep of trial factors read at its sharpest upturn, rather than a bisection. |
 
 ## Trials that reach the iteration limit {#creep-trend}
 
@@ -515,14 +529,14 @@ leaves the continuing iteration unchanged. The shortcut is on by default.
 
 ### Limits {#jointed-numerical-limits}
 
-The table gives the numerical limits behind the readings in
-[Slipping or standing](#slipping-or-standing).
+The standing and sliding tests of [Slipping or standing](#slipping-or-standing) are made on five
+measured quantities: the slip gained along the joints, the ground movement, its rate, the force
+imbalance in the soil and the force imbalance on the joints. The standing test reads them over
+the second half of the run; the sliding test over the [five-block window](#creep-trend) described
+earlier. A trial counts as sliding when the movement limit is met together with either the
+ground-rate limit or both slip limits. The table gives each quantity's limit for each test:
 
-The standing readings use the trailing half of sampled history; the sliding reading uses the
-[five-block movement window](#creep-trend), with slip rate compared between its two halves.
-Sliding needs the movement limit and either the ground-rate limit or both slip limits.
-
-| Reading | Standing limit | Sliding limit |
+| Quantity | Standing limit | Sliding limit |
 |---|---|---|
 | Slip gain | At most 0.01% of accumulated slip | At least 2% of accumulated slip, for the slip route |
 | Ground movement | At most $10^{-4}$ elastic displacements | At least 0.02 elastic displacements |
@@ -696,7 +710,7 @@ The pair below reloads the saved fields of the [W-3 report tutorial's reservoir 
 The upper panel is the last converged field; the lower is the captured field above FS.
 Both use the same shear-strain color range, equal aspect and identical section limits.
 
-![Last converged and captured at-failure shear strain on one shared color scale](images/fem_capture_comparison.png){width=1593}
+![Last converged and captured at-failure shear strain on one shared color scale](images/fem_capture_comparison.png){width=760}
 
 The captured field shows a developed shear band, rather than the smaller strains in the
 converged field; a color represents the same strain in both panels.

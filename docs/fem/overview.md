@@ -40,9 +40,12 @@ In two dimensions, static equilibrium of a continuum requires
 
 >>$\dfrac{\partial \tau_{xy}}{\partial x} + \dfrac{\partial \sigma_y}{\partial y} + b_y = 0$
 
-where $\sigma_x$, $\sigma_y$ and $\tau_{xy}$ are the stress components and $b_x$, $b_y$ are body
-forces — gravity, $b_x = 0$ and $b_y = -\gamma$, plus the pseudo-static
-[seismic](#seismic-forces) term when one is applied.
+where $\sigma_x$ and $\sigma_y$ are the normal stresses on planes perpendicular to the $x$ and $y$
+axes, $\tau_{xy}$ is the shear stress on those planes, and $b_x$ and $b_y$ are the body forces per
+unit volume. Under gravity alone $b_x = 0$ and $b_y = -\gamma$, with $\gamma$ the unit weight; a
+pseudo-static [seismic](#seismic-forces) term adds a horizontal component when one is applied.
+Stresses are tension-positive throughout the solver, so the compressive stress of self weight is
+negative.
 
 ### Elastic stress-strain
 

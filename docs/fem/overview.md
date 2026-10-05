@@ -94,9 +94,9 @@ prediction is itself a deliverable.
 
 Shear strength on any plane is
 
->>$\tau_f = c + \sigma' \tan \phi = c + (\sigma - u) \tan \phi$
+>>$\tau_f = c + \sigma' \tan \phi = c + (\sigma - u_w) \tan \phi$
 
-The envelope is a straight line in $\tau$–$\sigma′$ space, tangent to every Mohr circle at failure:
+$u_w$ is pore-water pressure. The envelope is a straight line in $\tau$–$\sigma′$ space, tangent to every Mohr circle at failure:
 
 ![mc_envelope.png](images/mc_envelope.png){width=800px}
 
@@ -292,7 +292,7 @@ the weight it really has, part saturated and part moist, rather than one comprom
 whole element. Leave $\gamma_{sat}$ blank and the soil weighs $\gamma$ everywhere.
 
 The water table itself is a property of the **problem**, not of any material: there is one per model,
-and it is read from the seepage solution's $u = 0$ contour when the model carries one and from the
+and it is read from the seepage solution's $u_w = 0$ contour when the model carries one and from the
 piezometric line otherwise. That is the same surface, chosen the same way, that the
 [LEM slicer](../lem/overview.md) splits slice weights at. It is independent of each material's
 pore-pressure option, so a total-stress material (`u = none`) standing below the water table still
@@ -343,10 +343,10 @@ source in the **u** column of the **mat** sheet, and one model may use only one 
 
 | `u` | Source | Pore pressure at a Gauss point |
 |:----|:-------|:-------------------------------|
-| `none` | none | $u = 0$; the yield check is a total-stress check |
-| `piezo` | piezometric line | $u = \gamma_w (z_{piezo} - y_{gp})$ from the line elevation above the point |
-| `ru` | pore-pressure ratio | $u = r_u\,\sigma_v$, with $\sigma_v$ the weight of the soil column above the point |
-| `seep` | seepage solution | $u = \sum N_i u_i$ interpolated from the seepage analysis' nodal values |
+| `none` | none | $u_w = 0$; the yield check is a total-stress check |
+| `piezo` | piezometric line | $u_w = \gamma_w (y_{piezo} - y_{gp})$ from the line elevation above the point |
+| `ru` | pore-pressure ratio | $u_w = r_u\,\sigma_v$, with $\sigma_v$ the weight of the soil column above the point |
+| `seep` | seepage solution | $u_w = \sum N_i u_{w,i}$ interpolated from the seepage analysis' nodal values |
 
 All four are evaluated **once**, at `build_fem_data()` time, at every Gauss point — the physical
 coordinates come from the shape functions, $x_{gp} = \sum N_i x_i$ — so the viscoplastic loop does
@@ -369,20 +369,20 @@ stops when a material has `u = piezo` and the file defines no piezometric line; 
 water takes `u = none`.
 
 **How pore pressure enters the equilibrium.** The total-stress statement
-$\int B^T (\sigma' - u\,m)\,dV = F_{ext}$, $m = [1, 1, 0, 1]^T$, is
+$\int B^T (\sigma' - u_w\,m)\,dV = F_{ext}$, $m = [1, 1, 0, 1]^T$, is
 rearranged so the pore-pressure term joins the load vector,
 
->>$\int B^T \sigma'\, dV = F_{ext} + \int B^T m\, u\, dV$
+>>$\int B^T \sigma'\, dV = F_{ext} + \int B^T m\, u_w\, dV$
 
 and the stresses computed from the displacement solution are **effective stresses directly**.
 Physically the added load term converts the body force in submerged soil to its buoyant weight (plus
-seepage forces wherever $u$ is not hydrostatic), so all three effective stress components below a
+seepage forces wherever $u_w$ is not hydrostatic), so all three effective stress components below a
 flooded boundary come out compressive and level flooded ground sits elastically at rest.
 
 ### Matric suction (apparent cohesion above the water table)
 
 The signed pore-pressure field also supplies matric suction above the water table.
-By default the solver clamps pore pressure to $u = \max(0, u)$ at every Gauss point before the yield
+By default the solver clamps pore pressure to $u_w = \max(0, u_w)$ at every Gauss point before the yield
 check, so the negative pore pressures above the water table add no strength. Where matric suction is
 a first-order effect — an unsaturated cut slope, for instance — a per-material unsaturated friction
 angle $\phi^b$ turns that credit on, using the same Fredlund extended Mohr-Coulomb criterion the
@@ -395,7 +395,7 @@ With pore-air pressure $u_a = 0$ the last term becomes an **apparent cohesion**
 >>$c_{suction} = \min(s,\; s_{cap})\,\tan\phi^b, \qquad s = \max(0,\; -u_w)$
 
 added to $c'$ in the yield function, where $s$ is the suction at the Gauss point and $s_{cap}$ an
-optional ceiling. The effective-normal-stress term keeps the ordinary clamped $u \ge 0$, so only the
+optional ceiling. The effective-normal-stress term keeps the ordinary clamped $u_w \ge 0$, so only the
 cohesive intercept picks up the extra strength; below the water table $s = 0$ and the term vanishes.
 
 The suction is drawn from the material's own pore-pressure source and is credited only for the
@@ -423,9 +423,13 @@ controlled by the `phi_b` and `s_cap` columns on the
 
 In-situ stress is the stress the ground carries before the analysis; the mesh, strengths and loads
 alone do not specify its lateral component. Deformation is computed from changes in that state.
-XSLOPE offers gravity turn-on and at-rest initialization.
-Leave the **K0 initial stress (FEM)** main-sheet cell blank for gravity turn-on; enter a value,
-pass `k0=` to `solve_fem()` / `solve_ssrm()`, or enable Studio's Run FEM checkbox and value for at-rest initialization.
+XSLOPE offers two conventions: gravity turn-on builds stress from self weight; at-rest initialization
+sets the lateral effective stress to $K_0$ times the vertical effective stress, where $K_0$ is the
+at-rest earth-pressure coefficient.
+
+To use at-rest initialization, enter $K_0$ in the **K0 initial stress (FEM)** cell on the main sheet,
+pass `k0=` to `solve_fem()` / `solve_ssrm()`, or check **K0 initial stress** in Studio's Run FEM dialog
+and enter a value. Leave the cell blank, omit `k0=`, and keep the checkbox unchecked for gravity turn-on.
 
 ### The two conventions
 
@@ -434,40 +438,56 @@ with zero lateral strain, the horizontal effective stress is fixed by Poisson's 
 
 >>$\sigma'_h = \dfrac{\nu}{1-\nu}\,\sigma'_v$
 
-At $\nu = 0.3$ this coincides with Jaky's $K_0 = 1 - \sin\phi' \approx 0.43$ for normally
-consolidated sand, but it does not represent the locked-in stress of compacted fill or overconsolidated clay.
-At-rest initialization instead specifies that stress history through $K_0$, building the effective
-stress at each Gauss point (an integration point inside an element) from the weight of the soil column above it:
+At $\nu = 0.3$ the coefficient is approximately 0.43, equal to the normally consolidated value from
+[Jaky's formula](#choosing-a-value) at $\phi' \approx 35^\circ$, but it does not represent the
+locked-in stress of compacted fill or overconsolidated clay. At-rest initialization instead specifies
+that stress history through $K_0$, building the effective stress at each Gauss point (an integration
+point inside an element) from the weight of the soil column above it:
 
->>$\sigma'_v = -\!\!\int \gamma\,dz \;+\; u \qquad
+>>$\sigma'_v = -\!\!\int \gamma\,dy \;+\; u_w \qquad
   \sigma'_h = \sigma'_z = K_0\,\sigma'_v \qquad \tau_{xy} = 0$
 
-Stresses are tension-positive and $u$ is pore pressure. The vertical ray through the material zones
-is weighed with $\gamma_{sat}$ below the water table and $\gamma$ above, as in the `ru` pore-pressure
-option. The horizontal stress is prescribed both in-plane and out-of-plane: the latter is $K_0\sigma'_v$,
-not the plane-strain elastic value $\nu(\sigma_x+\sigma_y)$.
-Overburden is soil only; reservoir, distributed and footing loads enter as boundary forces during equilibration.
+Stresses are tension-positive; $x$ is horizontal, $y$ vertical and $z$ out-of-plane, and $u_w$ is
+pore-water pressure. The soil column above each Gauss point is weighed with the saturated unit weight
+$\gamma_{sat}$ below the water table and the moist unit weight $\gamma$ above, as in the
+[`ru` option](#pore-pressure-options). The out-of-plane stress is therefore $K_0\sigma'_v$ rather
+than the plane-strain elastic value $\nu(\sigma'_x+\sigma'_y)$.
 
-The initial-stress method adds the prescribed field $\{\sigma_0\}$ to the stress from deformation:
+The initial-stress method (Smith & Griffiths, 2004) adds the prescribed field $\{\sigma_0\}$ to
+the stress from deformation:
 
->>$\{\sigma\} = \{\sigma_0\} + [D]\big([B]\{u\} - \{\varepsilon^{vp}\}\big)$
+>>$\{\sigma\} = \{\sigma_0\} + [D]\big([B]\{U\} - \{\varepsilon^{vp}\}\big)$
 
-Here $[D]$ is the elastic stiffness, $[B]$ converts nodal displacements $\{u\}$ to strain, and
+Here $[D]$ is the elastic stiffness, $[B]$ converts nodal displacements $\{U\}$ to strain, and
 $\{\varepsilon^{vp}\}$ is the viscoplastic strain. Substitution into equilibrium,
 $\int [B]^T\{\sigma\}\,dV = \{F_{ext}\}$, gives
 
->>$[K]\{u\} = \{F_{ext}\} - \int [B]^T\{\sigma_0\}\,dV + \int [B]^T[D]\{\varepsilon^{vp}\}\,dV$
+>>$[K]\{U\} = \{F_{ext}\} - \int [B]^T\{\sigma_0\}\,dV + \int [B]^T[D]\{\varepsilon^{vp}\}\,dV$
 
-The solver still iterates to equilibrium under body forces; the initial field adds a load term
-and an addend at the yield check. The figure compares both conventions on the same slope:
+The prescribed field therefore enters twice: as the load term $-\int [B]^T\{\sigma_0\}\,dV$,
+and as part of the stress the yield check tests.
+
+The figure compares initial lateral effective stress with depth in a level-ground soil column:
 
 ![fem_ov_k0_initial.png](images/fem_ov_k0_initial.png){width=700}
+
+The solid at-rest profiles give larger horizontal compression than the dashed gravity-turn-on
+profile; the shaded band shows how the gravity result changes with Poisson's ratio.
 
 On level ground with no horizontal variation, a fixed base and horizontally restrained sides,
 the $K_0$ field balances self weight for any $K_0$: the integral satisfies vertical equilibrium,
 and $\sigma_h$ has no horizontal gradient. If the field lies inside the soil's yield envelope and
 there are no additional surface loads, the solver converges on the first iteration, leaves the mesh
-undisplaced to machine precision and yields nowhere. XSLOPE's test suite checks this closed-form case.
+undisplaced to machine precision and yields nowhere.
+
+Under a slope there is no soil column beside the face to balance the lateral stress, so the field
+is not in equilibrium. With $K_0$ set, `solve_ssrm()` first runs one
+[equilibration solve](solver.md#in-situ-equilibration) at full strength to redistribute that imbalance
+before reducing strength. If it establishes a stable state, every trial starts from that state,
+and displacements are counted from it.
+
+Surface loads (reservoir, distributed, footing) are not part of the overburden. They are applied
+as boundary forces in that equilibration solve.
 
 ### Choosing a value
 
@@ -481,18 +501,21 @@ The usual $K_0$ estimates for retaining-wall and settlement calculations apply:
 - Compacted fill: the compaction plant overconsolidates it, so $K_0 = 1$ or above is normal.
 - Unknown history: run both conventions and report [their factor-of-safety range](#what-to-expect).
 
-RS2's published verification models prescribe $\sigma_x = \sigma_y = \sigma_z$ and $K_x = K_z = 1$,
-an isotropic at-rest state; set $K_0 = 1$ to compare with their SSR results. Plaxis defaults to
-Jaky's $1 - \sin\phi'$ per material. XSLOPE's gravity-turn-on default follows Griffiths & Lane
-and the academic literature using that convention.
+[RS2's published verification models](../verification/rs2.md) prescribe
+$\sigma_x = \sigma_y = \sigma_z$ and lateral coefficients of 1 in both horizontal directions,
+an isotropic at-rest state; set $K_0 = 1$ to compare with their SSRM results. Plaxis defaults to
+Jaky's value per material. Gravity turn-on, XSLOPE's default, is the convention of
+[Griffiths & Lane (1999)](../verification/ssrm.md) and most published SSRM benchmarks.
 
 ### What to expect
 
-The sensitivity depends on cohesion: higher confinement raises both initial deviatoric demand
-and frictional capacity, so a homogeneous cohesive embankment changes little, whereas the thin,
-tall reinforced-soil block of a geosynthetic wall or a near-cohesionless soil depends mainly on confinement.
+How much the factor of safety moves with $K_0$ depends on how much of the strength is frictional.
+A larger $K_0$ raises the confining stress and with it the frictional strength, but cohesion does not
+depend on confinement: a homogeneous cohesive embankment changes little, whereas the thin, tall
+reinforced-soil block of a geosynthetic wall or a near-cohesionless soil depends mainly on confinement.
+The table gives the SSRM factor of safety of six models under each convention:
 
-| Model | Gravity turn-on | $K_0 = 1$ | Change |
+| Model | FS, gravity turn-on | FS, $K_0 = 1$ | Change |
 |---|---|---|---|
 | [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) — homogeneous embankment | 1.372 | 1.378 | +0.5% |
 | [RS2-31](../verification/rs2.md#rs2-31) Mohr-Coulomb member, $c' = 11.6$ kPa | 1.529 | 1.529 | 0.0% |
@@ -501,16 +524,14 @@ tall reinforced-soil block of a geosynthetic wall or a near-cohesionless soil de
 | [RS2-48](../verification/rs2.md#rs2-48) multi-tier geosynthetic wall | 0.956 | 0.994 | +3.9% |
 | [RS2-4](../verification/rs2.md#rs2-4) Talbingo dam, under RS2's own exclusion area | 1.869 | 1.894 | +1.3% |
 
-RS2-31 compares the same slope under three strength models: real cohesion gives no change, while
-the envelope through the origin gives the largest; every measured at-rest result is higher,
-making the lower-confinement gravity turn-on the conservative choice for these models.
-
-The [in-situ equilibration step](solver.md#in-situ-equilibration) establishes the full-strength
-state before SSRM trials and defines their displacement datum.
+In RS2-31 the change grows as cohesion falls: 0.0% at $c' = 11.6$ kPa, 4.0% at 0.39 kPa
+and 5.6% for the power curve through the origin. Each $K_0 = 1$ result is equal to or higher
+than its gravity-turn-on result, so gravity turn-on is the conservative choice for these models.
 
 ## Element type and volumetric locking {#element-type-selection-and-volumetric-locking}
 
-**Linear elements are not to be used with the FEM/SSRM solver.** 3-node linear triangles (tri3) and
+The element type controls whether plastic flow at failure can be represented; low-order elements
+lock and overestimate the factor of safety. 3-node linear triangles (tri3) and
 4-node bilinear quadrilaterals (quad4) suffer from **volumetric locking**, and they overestimate the
 factor of safety because of it — by 21% and 11% on the benchmark below, in the unconservative
 direction. Quadratic elements — tri6, quad8 and quad9 — are required practice for any finite element

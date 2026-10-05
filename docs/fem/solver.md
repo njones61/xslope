@@ -1051,10 +1051,13 @@ apex is at infinity and the implicit tensile strength is unbounded. That number 
 fitting a straight line to compression tests and extrapolating backwards, not a measured property:
 real soil cracks at a small fraction of it, and often at zero.
 
-The left panel below shows the apex unchanged by strength reduction; the right panel shows
-the cap divided by $F$.
+The left panel below shows the apex unchanged by strength reduction. The right panel compares a
+stated cap with Tension SRF off ($-T$) and on ($-T/F$).
 
 ![fem_ov_tension_cutoff.png](images/fem_ov_tension_cutoff.png){width=900}
+
+Both settings reduce the shear envelope; only Tension SRF on moves the stated positive cap
+toward zero.
 
 In an ordinary stress analysis this rarely surfaces, because under the effective-stress formulation
 a slope at working strength is in compression nearly everywhere. It surfaces in the **SSRM**, and it

@@ -200,9 +200,9 @@ def fig_tension_cutoff():
             ax.axvline(-cap, color=C_GREEN, linewidth=1.8)
             ax.axvline(-cap / F, color=C_GREEN, linewidth=1.4, linestyle=(0, (4, 3)))
             ax.fill_between([apex, -cap], 0, 46, color="#e6e9ec", alpha=0.9, zorder=0)
-            ax.text(-cap + 1.5, 40.5, "$-T$", fontsize=9, color=C_GREEN,
+            ax.text(-cap + 1.5, 40.5, "Tension SRF off: $-T$", fontsize=9, color=C_GREEN,
                     ha="left", va="center")
-            ax.text(-cap / F + 1.5, 35.5, "$-T/F$", fontsize=9, color=C_GREEN,
+            ax.text(-cap / F + 1.5, 44, "Tension SRF on: $-T/F$", fontsize=9, color=C_GREEN,
                     ha="left", va="center")
             ax.text((apex - cap) / 2 - 1, 40, "removed by the\nRankine cap",
                     fontsize=9, color=C_INK, ha="center", va="center")

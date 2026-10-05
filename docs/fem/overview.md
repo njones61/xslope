@@ -18,8 +18,7 @@ Lane (1999) and Smith & Griffiths (2004). The factor of safety comes from the
 soil and joint shear strengths, cohesion and $\tan\phi$, are divided by a trial factor $F$, the
 slope is solved at that reduced strength, and $F$ is raised until the slope can no longer come to
 equilibrium. The $F$ at which it stops standing is the factor of safety, the same quantity limit
-equilibrium defines as the ratio of available to mobilized strength. The [Solver](solver.md) page
-describes the trials, how each is decided and how the search over $F$ runs. Material properties,
+equilibrium defines as the ratio of available to mobilized strength; see the [Solver](solver.md) page. Material properties,
 geometry, water and loads come from the same Excel input file the limit-equilibrium solvers read,
 with Young's modulus $E$ and Poisson's ratio $\nu$ added on the **mat** sheet.
 
@@ -27,6 +26,9 @@ A strength reduction run returns the deformed mesh, the shear-strain field and t
 vectors of the failure mechanism:
 
 ![plot_fem_results.png](images/plot_fem_results.png){width=800}
+
+Shear strain concentrates along the band where the slope slides; the vectors show the block
+moving out of the face.
 
 The same analysis runs point-and-click in [XSLOPE Studio](../studio/index.md): build a mesh, run a
 single trial or an SSRM search (with cancel), and view deformation and shear-strain results. See
@@ -126,9 +128,13 @@ In principal-stress space the yield function is the surface below:
 
 ![yield_surface.png](images/yield_surface.png)
 
-The solver evaluates $f$ at every Gauss point in the invariant form used by Smith & Griffiths
-(mean stress $\sigma_m$, deviatoric stress $\bar{\sigma}$ and Lode angle $\theta$), which avoids
-solving an eigenvalue problem per point:
+The six-sided cone bounds the stresses the soil can carry; its faces are the shear limits
+for the different pairs of principal stresses.
+
+The solver evaluates $f$ at every Gauss point — an integration point inside an element where
+stress is evaluated — in the invariant form used by Smith & Griffiths, which avoids solving
+an eigenvalue problem per point. The [Solver](solver.md#elastic-plastic-behavior-viscoplastic-algorithm)
+defines the invariants:
 
 >>$f = \sigma_m\sin\phi + \bar{\sigma}\left(\dfrac{\cos\theta}{\sqrt{3}} - \dfrac{\sin\theta\sin\phi}{3}\right) - c\cos\phi$
 
@@ -136,7 +142,7 @@ Mohr-Coulomb is the usual choice, but it is one of five strength options a mater
 the **mat** sheet. The FEM accepts `mc`, the criterion above; `cp`, an undrained strength that
 increases with depth from a reference elevation, assigned to each element at its centroid; `pow`
 and `hb`, the curved envelopes described next; and `elastic`, for a material that is never checked
-against a yield criterion and so stays elastic at every strength reduction factor (RS2's
+against a yield criterion and so stays elastic at every strength reduction factor (Rocscience RS2's
 "Plasticity: None"). Any other option is refused rather than run as zero-strength soil. The inputs
 for each are on the [mat worksheet](../usage/input_template.md#worksheet-mat) page.
 
@@ -154,13 +160,13 @@ point sits on the true curve at its own normal stress.
 The normal stress at which the tangent is taken differs between the two. The power curve bends
 gently, and the center of the in-plane Mohr circle, $s' = -(\sigma_x + \sigma_y)/2$ (compression
 positive), serves. Hoek-Brown bends sharply, and the tangent is taken at the normal stress on the
-failure plane, $\sigma_n = s'\cos^2\phi - c\sin\phi\cos\phi$, computed from the previous iteration's
+failure plane, $\sigma_n = s'\cos^2\phi_i - c_i\sin\phi_i\cos\phi_i$, computed from the previous iteration's
 reduced tangent. The Mohr circle touches its tangent line at this normal stress, which is also
 the normal stress the LEM uses at a slice base.
 
 Strength reduction divides $c_i$ and $\tan\phi_i$ by $F$ after the tangent is taken. The curve's own
-constants are never divided: $\sigma_{ci}/F$ would be a different envelope, because of the exponent
-$a$, and would give a wrong factor of safety.
+constants are never divided: dividing the intact strength $\sigma_{ci}$ by $F$ would be a different
+envelope, because of the Hoek-Brown exponent $a$, and would give a wrong factor of safety.
 
 The Hoek-Brown implementation is verified against Example 1 of Hammah, Yacoub, Corkum & Curran
 (2005); see the [verification page](../verification/ssrm.md#hoek-brown).
@@ -183,10 +189,15 @@ A typical slope mesh is shown below.
 
 ![sample_mesh.png](images/sample_mesh.png)
 
+The elements cover the section and share nodes along their edges.
+
 XSLOPE supports linear and quadratic triangles and quadrilaterals. The red markers below
 show the nodes added between corners in the quadratic forms, alongside the 2- and 3-node line elements.
 
 ![Soil and line elements with local node indices](images/all_element_nodes.png){width=1500px}
+
+Quadratic line elements also have a midside node, so a member on a quadratic soil edge shares
+all three of that edge's nodes.
 
 [Mesh Generation](mesh.md) covers mesh construction and
 [element choice for FEM analyses](mesh.md#element-choice-for-fem-analyses).
@@ -224,19 +235,17 @@ gives the nodal displacements, and from them the strains and stresses used in th
 The assembled equations describe a body that can translate and rotate freely; before they can be
 solved, the model has to be held in place, and the forces acting on it have to be applied. Both
 are done at the boundary. For a slope the base is fixed, and the sides, where the real ground
-continues beyond the model, are held either on rollers (free to settle, restrained horizontally)
-or fixed in both directions, as the user chooses with the Side BC setting. Loads act on the
+continues beyond the model, are held on rollers or fixed, as described below. Loads act on the
 ground surface: distributed loads from the **dloads** sheet, line loads from the **lloads** sheet
 (a concentrated force at a point on the surface, such as a strip footing or an anchor head), and
 the weight of ponded water on a submerged face. The water table is not a boundary condition of
 this kind; it enters through the pore pressures, which reduce the effective stress inside the
-soil. The section below shows each of these on a simple slope:
-
-Each is described below.
+soil. The figure shows each of these on a simple slope:
 
 ![FEM boundary restraints, surface loads and water table](images/fem_boundary_conditions.png){width=800px}
 
 The red arrows are applied loads; the water table supplies pore pressures, not a boundary traction.
+Each is described in the subsections that follow.
 
 ### Displacement boundary conditions
 
@@ -270,6 +279,9 @@ arrows for the 240 psf surcharge on the crest, and reinforcement elements in red
 
 ![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
+The base cannot move; the side rollers permit vertical settlement while restraining horizontal
+movement, and the surcharge acts only on the loaded crest.
+
 ### Loads {#distributed-loads}
 
 Surface loads become nodal forces; body forces use the moist and saturated soil weights, with the
@@ -288,21 +300,19 @@ Hydrostatic pressure on a submerged face need not be entered at all. With the ma
 loads** selector on `auto`, the ponded-water load is derived from the model's own water definition
 and applied here as tractions — from the *same* derivation the limit-equilibrium slice forces use,
 so the two engines always apply the same water. Because it is a load rather than a strength,
-strength reduction does not change it: the derived reservoir is constant across an SSRM bracket. See
+strength reduction does not change it: the derived reservoir is constant at every trial factor. See
 [Automatic water loads](../usage/preflight.md#automatic-water-loads).
 
 For the FEM the loads are converted to nodal forces by **consistent** edge integration of the shape
-functions, $f_i = \int N_i\, p\, d\Gamma$. For a linear intensity variation from $q_1$ to $q_2$ over
+functions, $F_i = \int N_i\, p\, d\Gamma$, where $p$ is the pressure and $\Gamma$ the loaded edge.
+For a linear intensity variation from $q_1$ to $q_2$ over
 a length $L$ this gives
 
 >>$F_1 = \frac{L}{6}(2q_1 + q_2) \qquad F_2 = \frac{L}{6}(q_1 + 2q_2)$
 
 and on a quadratic edge under uniform pressure the 1/6–2/3–1/6 corner–midside–corner split.
-Tributary-length lumping is not used, because on quadratic edges it produces spurious near-surface
-stress oscillation.
-
 **Direction.** A load block's **Direction** column chooses how the traction is oriented: `normal`
-(the default, and what every file written before template version 21 means) applies it perpendicular
+(the default) applies it perpendicular
 to the surface, resolved into components from the local surface angle $\beta$; `vertical` applies
 the same magnitude straight down, which is what a gravity surcharge on an inclined crest is — the
 normal form would give it a horizontal thrust of $\tan\beta$ times the surcharge that the load does
@@ -357,22 +367,19 @@ does.
 | `ru` | pore-pressure ratio | $u_w = r_u\,\sigma_v$, with $\sigma_v$ the weight of the soil column above the point |
 | `seep` | seepage solution | $u_w = \sum N_i u_{w,i}$ interpolated from the seepage analysis' nodal values |
 
-All four are evaluated **once**, at `build_fem_data()` time, at every Gauss point — the physical
-coordinates come from the shape functions, $x_{gp} = \sum N_i x_i$ — so the viscoplastic loop does
-no interpolation. Negative values are clamped to zero for the yield check; the raw signed field is
-retained so the optional [matric-suction](#matric-suction-apparent-cohesion-above-the-water-table)
-credit can use it.
+All four are evaluated **once**, at `build_fem_data()` time, at every Gauss point.
 
 For `ru`, $\sigma_v$ is the weight of the soil column directly above the point, as in the
-definition of $r_u = u/(\gamma z)$: $\gamma_{sat}$ below the water table and $\gamma$ above it, with
-distributed loads and crack water excluded. The usual `ru` model has no water table and is
+definition of $r_u = u/(\gamma z)$, with distributed loads and crack water excluded.
+The usual `ru` model has no water table and is
 weighed moist throughout.
 
 A piezometric line must extend across the whole mesh, because pore pressure is read from it at
 every node and Gauss point; the build stops at any point the line does not cover.
 
 **How pore pressure enters the equilibrium.** Equilibrium is written in total stress, with
-$\sigma = \sigma' - u_w m$ and $m = [1, 1, 0, 1]^T$, and the pore-pressure term is moved to the
+$\sigma = \sigma' - u_w m$ and $m = [1, 1, 0, 1]^T$ for the four components
+$(\sigma_x, \sigma_y, \tau_{xy}, \sigma_z)$, and the pore-pressure term is moved to the
 load side:
 
 >>$\int B^T \sigma'\, dV = F_{ext} + \int B^T m\, u_w\, dV$
@@ -430,24 +437,22 @@ and enter a value. Leave the cell blank, omit `k0=`, and keep the checkbox unche
 
 ### The two conventions
 
-Gravity turn-on starts from zero stress and applies self weight in one step. Under elastic conditions
-with zero lateral strain, the horizontal effective stress is fixed by Poisson's ratio $\nu$:
+Under gravity turn-on, with zero lateral strain and elastic conditions, the horizontal effective
+stress is fixed by Poisson's ratio $\nu$:
 
 >>$\sigma'_h = \dfrac{\nu}{1-\nu}\,\sigma'_v$
 
 At $\nu = 0.3$ the coefficient is approximately 0.43, equal to the normally consolidated value from
 [Jaky's formula](#choosing-a-value) at $\phi' \approx 35^\circ$, but it does not represent the
 locked-in stress of compacted fill or overconsolidated clay. At-rest initialization instead specifies
-that stress history through $K_0$, building the effective stress at each Gauss point (an integration
-point inside an element) from the weight of the soil column above it:
+that stress history through $K_0$, building the effective stress at each Gauss point from the
+weight of the soil column above it:
 
 >>$\sigma'_v = -\!\!\int \gamma\,dy \;+\; u_w \qquad
   \sigma'_h = \sigma'_z = K_0\,\sigma'_v \qquad \tau_{xy} = 0$
 
 Stresses are tension-positive; $x$ is horizontal, $y$ vertical and $z$ out-of-plane, and $u_w$ is
-pore-water pressure. The soil column above each Gauss point is weighed with the saturated unit weight
-$\gamma_{sat}$ below the water table and the moist unit weight $\gamma$ above, as in the
-[`ru` option](#pore-pressure-options). The out-of-plane stress is therefore $K_0\sigma'_v$ rather
+pore-water pressure. The out-of-plane stress is therefore $K_0\sigma'_v$ rather
 than the plane-strain elastic value $\nu(\sigma'_x+\sigma'_y)$.
 
 The initial-stress method (Smith & Griffiths, 2004) adds the prescribed field $\{\sigma_0\}$ to
@@ -530,7 +535,8 @@ than its gravity-turn-on result, so gravity turn-on is the conservative choice f
 
 The element types were introduced above as a matter of discretization, but for a plasticity
 analysis the choice between linear and quadratic elements decides whether the answer is right.
-Plastic deformation under Mohr-Coulomb with a non-associated flow rule ($\psi = 0$) is nearly
+Plastic deformation under Mohr-Coulomb with dilation angle $\psi = 0$, so plastic flow causes
+no volume change, is nearly
 incompressible: the material shears without changing volume. A linear element has too few degrees
 of freedom to keep its volume and take the shape the failure mechanism needs at the same time,
 so it resists plastic deformation more than the soil does, more strength has to be removed before
@@ -558,10 +564,6 @@ analysis, where the unknown is a scalar head and nothing can lock. The
 [mesh page](mesh.md#element-choice-for-fem-analyses) covers the choice among the three quadratic
 types and how the midside nodes are added.
 
-With the model defined, the [Solver](solver.md) page takes over: how one trial at a reduced
-strength is iterated and decided, how the search over $F$ finds the factor of safety, and the
-settings that control both.
-
 ## Seismic forces
 
 Seismic loading uses the pseudo-static method in both the limit-equilibrium and finite element
@@ -579,7 +581,7 @@ horizontal equilibrium equation gains the corresponding term:
 **Sign of $k$ in the FEM.** The driving direction is the one that promotes sliding:
 negative $x$ for a left-facing slope, positive $x$ for a right-facing one. The limit-equilibrium
 solvers work out which from the location and geometry of the failure surface and use the magnitude
-of $k$ only. The finite element solver has no failure surface to read, and analyses both faces of a
+of $k$ only. The finite element solver has no failure surface to read, and analyzes both faces of a
 dam or levee at once, so it uses the **signed** value exactly as entered: enter $k$ negative to
 drive a left-facing slope and positive to drive a right-facing one.
 
@@ -631,6 +633,12 @@ are drawn at different scales.
 
 ![Reinforcement and wall edges sharing soil nodes in locally refined meshes](images/fem_structural_meshes.png){width=1000}
 
+The fine elements follow each member; the surrounding soil grades back to the larger target size.
+
+With the model defined, the [Solver](solver.md) page takes over: how one trial at a reduced
+strength is iterated and decided, how the search over $F$ finds the factor of safety, and the
+settings that control both.
+
 ## Visualization of results
 
 Results are drawn as panels of the deformed mesh, strain and stress fields, displacement vectors
@@ -658,15 +666,16 @@ and the displacement vectors showing lateral sliding along it.
 
 ![non_circ_results.png](images/non_circ_results.png){width=1000}
 
+The shear band follows the weak layer, and the vectors show the ground above it sliding outward.
+
 Common options:
 
 - `fs` — the SSRM factor of safety. When it differs at display rounding from the $F$ the field was
   rendered at, the titles name both.
 - `failure_solution` — the at-failure field captured by `solve_ssrm()`
   (`result['failure_solution']`). Supplied, it is what the panels draw.
-- `field_state` — which field EVERY panel renders when `failure_solution` is given: `'failure'`
-  (default) or `'converged'`, so a multi-panel figure never mixes states. (`strain_state` is a
-  backward-compatible alias.)
+- `field_state` — which field every panel renders when `failure_solution` is given: `'failure'`
+  (default) or `'converged'`, so a multi-panel figure never mixes states.
 - `show_original` — the original-mesh reference on the deformation panel: `'outline'` (default),
   `'mesh'` for the full light grid, or `False`.
 - `deform_scale` / `deform_percent` — an explicit exaggeration factor, or the target deformation as

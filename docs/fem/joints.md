@@ -386,12 +386,13 @@ directly for a balanced state, keeping the joint's slip and opening history. The
 iteration then continues from that state to confirm that the slope stays put (the hold test).
 If the shortcut or hold test finds nothing acceptable, the ordinary iteration carries on unchanged.
 
-The shortcut is on by default; `joint_newton=False` turns it off. Two further options are
-described on the [Solver page](solver.md#jointed-model-solver-policy). Jointed trials are sped
-up by default; the answer is unchanged. The Log's opening lines show whether acceleration was on.
+The shortcut is on by default; `joint_newton=False` turns it off.
 
-The [jointed-model reference](solver.md#jointed-models) gives the numerical limits, windows,
-recorded results and solver options behind these rules.
+Jointed trials are sped up by default; the answer is unchanged. The Log's opening lines show
+whether acceleration was on.
+
+The [jointed-model reference](solver.md#jointed-models) on the Solver page gives the numerical
+limits, windows, recorded results and the two further solver options behind these rules.
 
 ### What the results show
 

@@ -592,12 +592,12 @@ Turning `capture_failure_state` off changes neither the factor of safety, the br
 
 The pair below reloads the saved fields of the [W-3 report tutorial's reservoir embankment](../tutorials/w03_report.md).
 The upper panel is the last converged field; the lower is the captured field above FS.
-Each is the standard deformation plot, with its own automatically chosen exaggeration.
+Each is the standard deformation plot, with the deformation scale set to 1.0× for both fields.
 
 ![Last converged and captured at-failure deformation from the saved W-3 fields](images/fem_capture_comparison.png){width=1086}
 
-The captured field shows the developed mechanism. Read each panel's scale in its title:
-the two deformation exaggerations differ, so their drawn movements are not on a common scale.
+The captured field shows the developed mechanism. Both panels use the same scale,
+so their drawn movements can be compared directly.
 
 ## Steering the mechanism
 

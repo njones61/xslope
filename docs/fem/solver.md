@@ -233,9 +233,9 @@ A trial has converged when both tests pass:
    force at every node, measured against that node's own weight, is below a tolerance:
 
    Write that force residual as $\mathbf{r}_i$, the gravitational nodal force as
-   $\mathbf{f}^{grav}_i$ and the normalized tolerance as $\text{force\_tol}$, with $i$ the node index.
+   $\mathbf{f}^{grav}_i$ and the normalized tolerance as $\tau_f$ (`force_tol`), with $i$ the node index.
 
->>$\displaystyle\max_i \dfrac{|\,\mathbf{r}_i\,|}{|\,\mathbf{f}^{\,grav}_i\,|} < \text{force\_tol}$
+>>$\displaystyle\max_i \dfrac{|\,\mathbf{r}_i\,|}{|\,\mathbf{f}^{\,grav}_i\,|} < \tau_f$
 
 The force residual is the change in the viscoplastic body load from one iteration to the next,
 averaged over ten iterations (the default for `oob_window`) to remove a known two-iteration
@@ -245,7 +245,7 @@ enlarging the model does not dilute it.
 The displacement test alone can pass on a slope creeping toward failure, and the force test alone
 can stall on a slope standing still; the [hybrid criterion](#2-hybrid-hybrid-default) handles both.
 
-The defaults are $\text{tol} = 10^{-3}$ for displacement and $\texttt{force\_tol} = 10^{-3}$
+The defaults are $\text{tol} = 10^{-3}$ for displacement and $\tau_f = 10^{-3}$
 for force equilibrium, with a budget of `max_iterations` = 12000 per trial. A few thousand
 iterations is normal well below failure, but the count climbs steeply near the critical factor
 and with mesh refinement: the [FEM-2 reinforced slope](../tutorials/fem02_reinforcement.md)
@@ -577,7 +577,8 @@ safety it finds is below 1.
 
 The capture is an extra solve for the developed collapse mechanism, rather than the
 near-critical settlement of the last converged trial. It runs at
-$F = \mathrm{FS}(1+\texttt{capture\_margin})$, no lower than the failed bracket edge,
+$F = \mathrm{FS}\,(1 + m)$, where $m$ is the capture margin (`capture_margin`, default 0.15),
+no lower than the failed bracket edge,
 because right at the critical factor the collapse develops too slowly to be visible.
 
 It runs with the corrector, displacement backstop and early exit off, with a generous iteration

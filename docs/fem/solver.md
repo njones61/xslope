@@ -710,7 +710,7 @@ The pair below reloads the saved fields of the [W-3 report tutorial's reservoir 
 The upper panel is the last converged field; the lower is the captured field above FS.
 Both use the same shear-strain color range, equal aspect and identical section limits.
 
-![Last converged and captured at-failure shear strain on one shared color scale](images/fem_capture_comparison.png){width=760}
+![Last converged and captured at-failure shear strain on one shared color scale](images/fem_capture_comparison.png){width=1000}
 
 The captured field shows a developed shear band, rather than the smaller strains in the
 converged field; a color represents the same strain in both panels.
@@ -778,7 +778,7 @@ With stated tensile strength $T$, the left panel shows the original and reduced 
 The right truncates them at a stated cap: the solid cut stays at $-T$, while the dashed cut
 moves to $-T/F$ when Tension SRF is on.
 
-![Unchanged implicit tensile strength and a stated cap with Tension SRF off or on](images/fem_ov_tension_cutoff.png){width=1200}
+![Unchanged implicit tensile strength and a stated cap with Tension SRF off or on](images/fem_ov_tension_cutoff.png){width=1160}
 
 Both settings reduce the shear envelope; only Tension SRF on moves the stated positive cap
 toward zero. The shading marks tension allowed without a cap on the left, and removed by

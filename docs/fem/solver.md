@@ -137,6 +137,13 @@ At each Gauss point on each iteration:
 >  $\{F\} \mathrel{+}= \sum_{e} \int [B]^T [D_e] \{\varepsilon^{vp}\} \, dA$, and the system is
 >  re-solved with the existing factorization.
 
+The figure shows a Mohr-Coulomb shear return in a two-dimensional principal-stress section.
+
+![Viscoplastic strain direction and successive stress return](images/viscoplastic_return.png){width=800px}
+
+The plastic strain flows along $\partial Q/\partial\sigma$, while the stress is carried back
+toward the surface in a different direction.
+
 Stress is carried in the 4-component plane-strain form of Smith & Griffiths (their nst = 4), with
 $\sigma_z$ explicit so the algorithm can relax it through plastic $\varepsilon_z$.
 

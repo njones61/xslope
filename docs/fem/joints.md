@@ -392,7 +392,8 @@ Jointed trials are sped up by default; the answer is unchanged. The Log's openin
 whether acceleration was on.
 
 The [jointed-model reference](solver.md#jointed-models) on the Solver page gives the numerical
-limits, windows, recorded results and the two further solver options behind these rules.
+limits, windows, recorded results and the solver options (`fem_solver`, `joint_tangent`,
+`accelerate`) behind these rules.
 
 ### What the results show
 

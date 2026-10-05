@@ -72,15 +72,19 @@ solution variable linearly across the element; the quadratic types, `tri6`, `qua
 `quad9`, add midside nodes and carry it quadratically, which resolves a curving field
 with far fewer elements.
 
-Use the local indices below to read the node order in the mesh arrays.
-
-![Soil, bar and beam elements with local node indices](images/all_element_nodes.png){width=1500px}
-
-Node ordering is the same for every type: corner nodes first, counterclockwise, then the
+For the soil types, node ordering is corner nodes first, counterclockwise, then the
 midside nodes in edge order (0–1, 1–2, and so on), then — for `quad9` alone — the center
 node. Counterclockwise corners give a positive Jacobian everywhere, which the element
 integration relies on. Each row of `elements` holds the nodes in that order, and the
 matching entry of `element_types` says how many of the nine slots are used.
+
+Use the local indices below to read the node order in the mesh arrays.
+
+![Soil, bar and beam elements with local node indices](images/all_element_nodes.png){width=1500px}
+
+Quadratic types are made by adding nodes to the linear type in the last column; see
+[Quadratic elements](#quadratic-elements). Serendipity (`quad8`) uses corner and edge
+nodes; Lagrange (`quad9`) adds a center node.
 
 | Type | Nodes | Variation within the element | Built from |
 | --- | --- | --- | --- |
@@ -104,7 +108,7 @@ allows.
 
 A quadrilateral mesh is quad-*dominant* rather than pure: a small fraction of elements,
 usually well under one percent, stays triangular where no pairing exists. XSLOPE carries
-mixed meshes end to end, so those triangles are cosmetic.
+mixed meshes end to end, so those triangles solve like any other element.
 
 ### Element choice for FEM analyses {#element-choice-for-fem-analyses}
 
@@ -113,20 +117,22 @@ safety. The Overview explains [volumetric locking and the benchmark
 results](overview.md#element-type-selection-and-volumetric-locking).
 
 `build_mesh_from_polygons()` defaults to `tri6`, and Studio's *Build mesh* dialog opens
-on it. A blank `main!D18` therefore gives a quadratic mesh unless a different type is
-requested on the call; an explicit type on the call or main sheet overrides the default.
+on it. A blank **Element type** cell (`main!D18`) gives `tri6`.
+An explicit type on the call or main sheet overrides the default.
 
 - `tri6` conforms to complex geometry where quads would distort and is preferred for
-  submerged problems, where `quad8`'s reduced integration allows an hourglass mode.
-- `quad8` with 2×2 reduced integration is the Griffiths & Lane combination; it avoids
+  submerged problems, where `quad8`'s reduced integration allows an hourglass mode —
+  a zero-energy deformation pattern that 2×2 integration cannot resist.
+- `quad8` with 2×2 reduced integration is the element and integration Griffiths & Lane
+  (1999) used for their SSRM benchmarks; it avoids
   locking and gives accurate stress fields. It gives a regular layout in block-like sections.
 - `quad9` with full 3×3 integration is also suitable for a block-like section, at the cost
   of extra Gauss points and a center node.
 
-`tri3` is the lighter choice for seepage: the field is scalar, so the plastic
-incompressibility constraint does not apply, and the smaller system solves faster.
-`quad4` is also useful for seepage. Both linear types can be used for elastic stress
-distributions and qualitative work — never for a factor of safety.
+`tri3` and `quad4` suit seepage, where locking does not arise
+([why](overview.md#element-type-selection-and-volumetric-locking)). `tri3` is the lighter
+choice, with a smaller system that solves faster. Both linear types can be used for elastic
+stress distributions and qualitative work. Neither should be used for a factor of safety.
 
 The model checks warn before a FEM or SSRM solve starts on a linear mesh. This is a
 warning rather than an error, so a run demonstrating locking can use linear elements.

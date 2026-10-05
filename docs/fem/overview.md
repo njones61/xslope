@@ -529,12 +529,14 @@ than its gravity-turn-on result, so gravity turn-on is the conservative choice f
 
 ## Element type and volumetric locking {#element-type-selection-and-volumetric-locking}
 
+The element type sets whether the mesh can deform plastically without locking.
+
 Plastic deformation under Mohr-Coulomb with a non-associated flow rule ($\psi = 0$) is nearly
 incompressible: the material shears without changing volume. Low-order elements have too few degrees
 of freedom to satisfy that constraint and represent the displacement field at the same time, so they
 respond too stiffly, resist plastic deformation more than they should, and require a larger strength
-reduction before failure develops, overestimating the factor of safety in the unconservative
-direction. This is **volumetric locking**. Constant-strain 3-node triangles (tri3), with one
+reduction before failure develops, overestimating the factor of safety.
+This is **volumetric locking**. Constant-strain 3-node triangles (tri3), with one
 integration point and 6 DOFs, are the worst affected; bilinear 4-node quads (quad4) are better
 but still significantly locked.
 
@@ -553,7 +555,8 @@ $\phi = 20°$, slope angle 26.57°) at a target mesh size of 5, against an expec
 | **quad9** | **9** | **1.41** | **< 1%** |
 
 [Element choice for FEM analyses](mesh.md#element-choice-for-fem-analyses) covers which type
-to use for each analysis; [Element types](mesh.md#element-types) lists how each is built.
+to use for each analysis. [Element types](mesh.md#element-types) gives each type's nodes and
+numbering; [Quadratic elements](mesh.md#quadratic-elements) describes how the midside nodes are added.
 
 ## Seismic forces
 

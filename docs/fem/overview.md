@@ -371,16 +371,15 @@ weighed moist throughout.
 A piezometric line must extend across the whole mesh, because pore pressure is read from it at
 every node and Gauss point; the build stops at any point the line does not cover.
 
-**How pore pressure enters the equilibrium.** The total-stress statement
-$\int B^T (\sigma' - u_w\,m)\,dV = F_{ext}$, $m = [1, 1, 0, 1]^T$, is
-rearranged so the pore-pressure term joins the load vector,
+**How pore pressure enters the equilibrium.** Equilibrium is written in total stress, with
+$\sigma = \sigma' - u_w m$ and $m = [1, 1, 0, 1]^T$, and the pore-pressure term is moved to the
+load side:
 
 >>$\int B^T \sigma'\, dV = F_{ext} + \int B^T m\, u_w\, dV$
 
-and the stresses computed from the displacement solution are **effective stresses directly**.
-Physically the added load term converts the body force in submerged soil to its buoyant weight (plus
-seepage forces wherever $u_w$ is not hydrostatic), so all three effective stress components below a
-flooded boundary come out compressive and level flooded ground sits elastically at rest.
+The soil is weighed at its full unit weight and the pore pressure acts as a load, so the stresses
+the solution returns are effective stresses. When the pore pressures come from a seepage analysis,
+the same load term carries the seepage forces.
 
 ### Matric suction (apparent cohesion above the water table)
 

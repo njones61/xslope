@@ -778,64 +778,30 @@ Both settings reduce the shear envelope; only Tension SRF on moves the stated po
 toward zero. The shading marks tension allowed without a cap on the left, and removed by
 the cap on the right.
 
-**The cap.** The mat sheet's **t_cut** column sets a per-material tensile strength $T$, applied as a
-**Rankine cutoff** $F_t = \sigma_1' - T$ that caps the major (most-tensile) principal effective
-stress — a second viscoplastic yield surface driven by the same damped mechanism as the
-Mohr-Coulomb surface, the two combined by Koiter's rule where both are active. It layers on top of
-the shear envelope and never alters it. `t_cut = 0` means the material carries no tension at all; a
-positive value caps the major principal stress there. The column is read automatically by
-`solve_fem()` and `solve_ssrm()`; a script can override it per element with `tension_cap_by_elem`,
-per material with `tension_cutoff_by_material`, or globally with the `tension_cutoff` flag, which is
-simply the $T = 0$ case applied everywhere.
+**The cap.** The mat sheet's `t_cut` column gives a material a tensile strength $T$.
+The solver caps the most tensile principal effective stress at $T$ as a second yield surface
+alongside Mohr-Coulomb's, leaving the shear envelope unchanged.
+`t_cut = 0` means no tension; a blank cell means the envelope's own limit, $c/\tan\phi$
+(unbounded for $\phi=0$), enforced as a cap so a state pulled into tension has a way back to
+an admissible one. A cohesionless material carries no tension either way; power-curve and
+Hoek-Brown materials keep the tensile strength of their own envelopes.
+Overrides are `tension_cap_by_elem` on `solve_fem()`, `tension_cutoff_by_material`
+on `solve_ssrm()`, and `tension_cutoff` for a global zero cap.
 
-**Blank cutoff.** Where the cell is blank the material's own envelope decides how much tension it
-carries, and XSLOPE enforces the envelope's limit: every Mohr-Coulomb element runs a Rankine cap at
-its own apex $c/\tan\phi$, the most tension the Mohr-Coulomb envelope allows. The working cap is the smaller of the two, so a stated $T$ below the apex governs and the
-apex governs where nothing is stated. It takes no state away from the shear envelope — every state
-it can act on is one Mohr-Coulomb already forbids — and what it adds is a **return path**. The
-$\psi = 0$ flow is purely deviatoric: it can shrink a stress circle but cannot move the circle's
-center, so a Gauss point pulled to mean tension is inadmissible with no direction of flow that
-returns it, and the iteration cannot settle. The Rankine flow is volumetric at the biaxial apex and
-supplies exactly that return.
+**Reducing the cap with $F$.** With Tension SRF on (the default), a stated positive cap is divided
+by $F$ along with $c$ and $\tan\phi$; off, it stays at its entered value through the search.
+The setting changes nothing without a positive cap: $c/\tan\phi$ stays unchanged and zero
+divided by $F$ is zero. It matches RS2's tension-SRF switch.
+Set it with the **Tension SRF** cell on the main sheet, `tension_srf`, or the dialog checkbox,
+which is dimmed where it has nothing to act on.
 
-A **cohesionless** material carries no tension whether its cell is blank or
-`0`: its apex sits at the origin, so the two entries describe the same admissible set and give the
-same answer. At $\phi = 0$ only a stated $T$ bounds the tension. Power-curve and Hoek-Brown elements are
-left to their own envelopes, which carry a tensile strength of their own.
-
-**Reducing the cap with $F$.** `tension_srf` decides whether the cap shrinks with the trial factor.
-With `tension_srf=True` (**the default**) the solver divides it, $T_r = T/F$, exactly as it divides
-$c$ and $\tan\phi$, so the reported factor of safety is the factor by which the *whole* envelope,
-shear and tensile, is reduced (right panel above). With `tension_srf=False` the cap is held at its
-authored value through the whole bisection. This is RS2's `tensilestrength_SRF` switch, and matching
-it matters when the target is an RS2 answer: on a tension-controlled mechanism the two settings do
-not converge to the same factor of safety. The default is on because it only ever acts *where a cap
-exists and is positive* — a model with no `t_cut` and no global cutoff has no $T$ to reduce, so
-every cap-less run (including all the Griffiths & Lane verification examples) is identical either way, and a
-cutoff of $T = 0$ is left where it is for the same reason, since $0/F$ is $0$ at every trial factor.
-The apex cap is never divided either: $(c/F)/(\tan\phi/F) = c/\tan\phi$ is the same number at every
-trial factor, which is the invariance the left panel above shows. The switch is reachable three
-ways: the `tension_srf` keyword, the **Tension SRF** cell on the main sheet, and the matching
-checkbox in Studio's Run FEM dialog, which is dimmed for a single trial and on any model with no positive cap.
-
-**Which convention to run.** XSLOPE's default is *the envelope's own limit* — the Griffiths & Lane
-convention, since those analyses state no separate tensile strength and a plain Mohr-Coulomb
-material allows tension up to its apex and no further. Every
-[Griffiths & Lane verification example](../verification/ssrm.md) in the verification suite is locked under
-it. RS2 and Plaxis cap tension as a matter of course, writing an explicit per-material tensile
-strength into the model (in Rocscience's own published verification models it is almost always
-$T = c$, well below the apex). Neither convention is wrong, but they are not interchangeable, and
-the difference is largest exactly where the mechanism is tension-controlled. **When comparing
-against RS2 or Plaxis, set `t_cut` from the vendor model rather than leaving it blank**, and match
-the vendor's tension-SRF switch. XSLOPE's RS2 reader does the first half automatically:
-`xslope.rs2.read_fez` maps each material's tensile strength onto `t_cut`.
-
-[RS2-62](../verification/rs2.md#rs2-62) — Cheng, Lansivaara & Wei's three-layer slope with a soft
-band — is a benchmark where the tension cap controls the answer. Its vendor model caps the three materials at
-$T$ = 20 / 0 / 10 kPa and reduces them with the SRF. Run uncapped, the cap soil's implicit
-$c/\tan\phi \approx 28$ kPa holds the crest entry cut shut and the model equilibrates to
-$F \ge 1.3$; run with the vendor caps and the tension SRF, the band mechanism mobilizes as limit
-equilibrium predicts and the factor of safety is 0.769, against RS2's 0.81 and Plaxis' 0.82.
+**Which convention.** XSLOPE's default, a blank cell and the envelope's own limit, is
+Griffiths & Lane's convention, and every [Griffiths & Lane verification example](../verification/ssrm.md)
+is locked under it. RS2 and Plaxis state a tensile strength; Rocscience's verification models
+usually use $T=c$. The conventions are not interchangeable where tension controls the mechanism:
+set `t_cut` from the vendor model (`xslope.rs2.read_fez` does this) and match its tension-SRF
+switch. On [RS2-62](../verification/rs2.md#rs2-62), where the cap controls the mechanism,
+XSLOPE gives 0.769 with the vendor's caps against RS2's 0.81.
 
 ## Fast kernel
 

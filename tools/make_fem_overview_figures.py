@@ -377,6 +377,52 @@ def fig_ssrm_sweep():
     _finish(fig, "fem_ov_ssrm_sweep.png")
 
 
+def fig_capture_comparison():
+    """Reload Tutorial W-3's saved standing and failure fields; never solve."""
+    import json
+    from xslope.fileio import load_slope_data
+    from xslope.fem import build_fem_data, import_fem_solution
+    from xslope.plot_fem import plot_shear_strain_contours, shared_panel_scales
+
+    stem = os.path.join(HERE, "..", "docs", "tutorials", "files",
+                        "xslope_johnson_res_solved")
+    data = load_slope_data(stem + ".xlsx")
+    fem_data = build_fem_data(data)
+    standing = import_fem_solution(fem_data, stem)
+    failure = standing.get("failure_solution")
+    if not standing.get("converged") or not failure or failure.get("converged"):
+        raise ValueError("The committed tutorial must hold both distinct field states")
+    with open(stem + "_fem_meta.json") as stream:
+        meta = json.load(stream)
+    scales = shared_panel_scales(fem_data, [standing, failure])
+    if scales["vmin"] is None or scales["vmax"] is None:
+        raise ValueError("Both fields must carry a non-flat shear-strain range")
+    bounds = np.array(fem_data["nodes"])
+    low, high = bounds.min(axis=0), bounds.max(axis=0)
+    pad = 0.035 * max(high - low)
+    width = 4.65
+    height = width * (high[1] - low[1] + 2 * pad) / (high[0] - low[0] + 2 * pad)
+    fig_h = height + 1.0
+    fig = plt.figure(figsize=(12, fig_h))
+    for i, (field, title) in enumerate((
+            (standing, f"Last converged: F = {meta['final_interval'][0]:.4f}"),
+            (failure, f"Captured mechanism: F = {failure['F']:.4f}"))):
+        ax = fig.add_axes((0.045 + i * 0.5, 0.55 / fig_h, width / 12, height / fig_h))
+        plot_shear_strain_contours(ax, fem_data, field, show_mesh=False,
+                                  show_reinforcement=False, cbar_shrink=1.0,
+                                  vmin=scales["vmin"], vmax=scales["vmax"])
+        ax.set_xlim(low[0] - pad, high[0] + pad)
+        ax.set_ylim(low[1] - pad, high[1] + pad)
+        ax.set_aspect("equal")
+        ax.set_title(title, fontsize=11)
+        ax.set_xlabel("x (ft)")
+        ax.set_ylabel("y (ft)")
+    print(f"Saved pair: {len(bounds)} nodes, {len(fem_data['elements'])} elements; "
+          f"shared shear-strain range {scales['vmin']} to {scales['vmax']}; "
+          "no solve", flush=True)
+    _finish(fig, "fem_capture_comparison.png")
+
+
 def fig_budget_comparison():
     """One FEM-1 model, normal and deliberately short per-trial budgets.
 
@@ -431,8 +477,11 @@ def fig_budget_comparison():
 if __name__ == "__main__":
     if sys.argv[1:] == ["budget-comparison"]:
         fig_budget_comparison()
+    elif sys.argv[1:] == ["capture-comparison"]:
+        fig_capture_comparison()
     elif sys.argv[1:]:
-        raise SystemExit("usage: make_fem_overview_figures.py [budget-comparison]")
+        raise SystemExit("usage: make_fem_overview_figures.py "
+                         "[budget-comparison|capture-comparison]")
     else:
         fig_viscoplastic_loop()
         fig_tension_cutoff()

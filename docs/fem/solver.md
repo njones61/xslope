@@ -678,30 +678,37 @@ Its principal arguments:
 >  **[`elastic_materials`](overview.md#mohr-coulomb-failure-criterion)**,
 >  **[`suction_phi_b` / `suction_cap`](overview.md#matric-suction-apparent-cohesion-above-the-water-table)**: follow the linked model and run settings.<br>
 >- **`n_sweep`** (10): coarse sweep points for the `"displacement_increase"` criterion.<br>
->- **`capture_failure_state`** (`True`) and **`capture_margin`** (0.15): after the bracket resolves,
->  take one extra solve at $F = \text{FS}\times(1 + \text{capture\_margin})$; see below.
+>- **`capture_failure_state` (`True`): [capture the mechanism](#capturing-the-failure-mechanism) after the search.<br>
+>- **`capture_margin` (0.15): [strength margin](#capturing-the-failure-mechanism) above FS for the capture.<br>
+>- **`capture_max_iterations` (`None`): override the [automatic capture budget](#capturing-the-failure-mechanism).
 
-The result dictionary carries `FS`, the last converged solution (`last_solution`), `final_interval`,
-the per-trial records (`trials`), and — with the capture on — `failure_solution`. Passing
-`last_solution` to `plot_fem_results()` shows the near-critical converged state; passing
-`failure_solution` shows the developed collapse mechanism.
+The result dictionary carries `FS`, the last converged solution (`last_solution`),
+`final_interval`, the per-trial records (`trials`), and, with capture on, `failure_solution`.
 
-The capture runs the viscoplastic loop with the corrector off: a certified equilibrium would
-replace the mechanism the figure shows. It runs with the displacement backstop and early exit off and a generous ceiling — so the unconverged field develops the
-**at-failure mechanism** (the rotational collapse: crest settlement, toe heave). Right at the
-critical factor the collapse develops too slowly to become visible in a finite number of
-iterations, hence the margin. The capture stops once the section has moved 20% of the mesh
-height, and keeps the last state short of that distance. Past critical the slide moves at a
-steady rate, so without the limit the size of the drawn displacement would be set by the
-iteration ceiling alone; the shear band forms long before the section has moved that far. A
-capture that reaches its ceiling first is kept as it stands. A slope beyond critical never
-passes through equilibrium, and a reinforcement element drops to its residual only on an
-equilibrium state, so the capture solve starts from the softened reinforcement state of the
-trial at the top (failed end) of the final bracket: a layer that dropped to its residual there
-is shown at that residual in the at-failure field (`failed_edge_softened` in the
-result). The field is returned as `failure_solution` and changes nothing
-else, so turning it off leaves the factor of safety, the bracket and `last_solution` untouched —
-which is what the reliability and sensitivity analyses do, since they never draw the field.
+### Capturing the failure mechanism
+
+The capture is an extra solve for the developed collapse mechanism, rather than the
+near-critical settlement of the last converged trial. It runs at
+$F = \mathrm{FS}(1+\texttt{capture\_margin})$, no lower than the failed bracket edge,
+because right at the critical factor the collapse develops too slowly to be visible.
+
+It runs with the corrector, displacement backstop and early exit off, with a generous iteration
+ceiling, starting from the softened reinforcement state of the failed edge.
+It stops at 20% of the mesh height or its ceiling; a numerical-growth guard can stop it sooner,
+keeping the last usable field.
+
+The field is returned as `failure_solution` for the figures.
+Turning `capture_failure_state` off changes neither the factor of safety, the bracket nor
+`last_solution`.
+
+The pair below reloads the saved fields of the [W-3 report tutorial's reservoir embankment](../tutorials/w03_report.md).
+The left is the last converged field; the right is the captured field above FS.
+Both use the same shear-strain color range, equal aspect and identical section limits.
+
+![Last converged and captured at-failure shear strain on one shared color scale](images/fem_capture_comparison.png){width=1200}
+
+The captured field shows a developed shear band, rather than the smaller strains in the
+converged field; a color represents the same strain in both panels.
 
 ## Steering the mechanism
 

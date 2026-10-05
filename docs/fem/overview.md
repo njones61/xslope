@@ -755,29 +755,25 @@ the [displacement limit](solver.md#3-displacement-limit-displacement_limit)**. T
 [final bracket](solver.md#methodology) is shaded behind it. The same plot is available alone as
 `xslope.plot_fem.plot_ssrm_curve(ax, record)`.
 
-The comparison below uses the same [FEM-1 embankment](../tutorials/fem01_strength_reduction.md)
-and tri6 mesh at target size 3.5 ft in both panels. On the left, the tutorial's 4,000-iteration
-budget gives the knee and a failed upper edge. On the right, Max iterations per trial and the
-iteration ceiling are deliberately set to 100: the low trials stand, but the final upper trial
-is still slowing when the limit stops it.
+The left panel is the original [FEM-1 embankment](../tutorials/fem01_strength_reduction.md)
+curve. The right panel reloads the saved [RS2-16 layered slope with a weak seam and water table](../verification/rs2.md#rs2-16)
+record at a soil target size of 3 m. Each keeps the program's title, marker key, units and scale.
 
-![FEM-1 displacement curves at normal and deliberately short iteration budgets](images/fem_budget_comparison.png){width=1000}
+![Left: FEM-1 embankment; right: RS2-16 weak-seam slope, from saved results](images/fem_budget_comparison.png){width=1000}
 
-**Interpreting the plot.** Both curves rise to a knee, the point where displacement turns sharply
-upward. What distinguishes the runs is the [verdict](solver.md#methodology) at the top of the
-[final bracket](solver.md#methodology): in the normal run, the open diamond marks a trial whose
-movement did not slow, counted as sliding, and the factor of safety is the bracket midpoint.
-In the short-budget run, the open pentagon marks a trial still slowing when the limit stopped it,
-left undecided. No failure was shown at that final upper edge, so the result is a lower bound,
-"FS ≥" the highest factor at which the slope stood. Look for these two verdict markers rather
-than judging the curve's shape alone; filled circles mark trials that reached equilibrium in
-both runs. Raise Max iterations per trial to decide the unresolved top, or
-[continue with a higher limit](solver.md#creep-trend) from where its trials stopped.
+**Interpreting the plot.** FEM-1's standing trials rise sharply near the final bracket. RS2-16's
+standing trials climb more gradually: their displacements are 0.388, 0.499 and 0.522 m at
+$F = 0.8$, 0.95 and 0.96875, without a sharp knee in that recorded branch. Its final upper trial
+at $F = 0.9875$ reaches 1.767 m after 16,000 iterations and ends `not_slowing`, counted as sliding;
+the saved factor of safety is 0.978. The open diamond is its position when the limit stopped it,
+not a final displacement on the standing curve.
 
-The left run reports FS = 1.371. The right run's closing log reports "The factor of safety is
-at least 1.36": the standing edge is $F = 1.3671875$, while the final top at $F = 1.375$ is
-undecided after 100 ordinary iterations. The log rounds the bound down to two decimals;
-the plot prints it to three decimals, FS ≥ 1.367.
+Read the [verdict](solver.md#methodology) as well as the shape. When a slope keeps moving without
+a clear knee, check the dependence on the iteration limit by raising Max iterations per trial
+or [continuing with a higher limit](solver.md#creep-trend) from where its trials stopped. A top
+trial still slowing at the ceiling remains undecided and leaves a lower bound, "FS ≥", rather
+than a confirmed failure edge. A steady-climb curve alone does not establish how far that bound
+or the reported factor would move under a longer run.
 
 The run's closing summary gives the same information in words. It is printed as the last lines of
 every strength reduction run and returned as `result['summary']`. It reports what happened at each

@@ -358,54 +358,43 @@ def fig_capture_comparison():
 
 
 def fig_budget_comparison():
-    """One FEM-1 model, normal and deliberately short per-trial budgets.
-
-    Launch through the machine gate. No workbook, mesh or solution export is
-    written. Refuse the illustration if the short search is not limited by its
-    iteration allowance; never substitute a verdict or invent a lower bound.
-    """
+    """Original FEM-1 curve beside RS2-16's saved creeping history; no solve."""
+    from io import BytesIO
+    import json
+    from PIL import Image
     from xslope.fileio import load_slope_data
-    from xslope.fem import build_fem_data, solve_ssrm, ssrm_fs_text
-    from xslope.mesh import build_mesh_from_polygons, get_material_polygons
     from xslope.plot_fem import plot_ssrm_curve
 
-    model = load_slope_data(os.path.join(
-        HERE, "..", "docs", "tutorials", "files", "xslope_ssrm_embankment.xlsx"))
-    mesh = build_mesh_from_polygons(get_material_polygons(model),
-                                    target_size=3.5, element_type="tri6")
-    fem_data = build_fem_data(model, mesh)
-    options = dict(F_min=1.0, F_max=2.0, tolerance=0.01,
-                   failure_criterion="hybrid", capture_failure_state=False)
-    short = solve_ssrm(fem_data, max_iterations=100,
-                       max_iterations_ceiling=100, **options)
-    print("SHORT-BUDGET TRIALS", flush=True)
-    for trial in short.get("trials", []):
-        print({key: trial.get(key) for key in (
-            "F", "stable", "verdict", "exit_reason", "iterations",
-            "max_displacement", "u_ratio", "growth", "creep_reading")}, flush=True)
-    interval = short.get("final_interval")
-    top = next((trial for trial in reversed(short.get("trials", []))
-                if interval and abs(trial["F"] - interval[1]) < 1e-12), {})
-    reading = top.get("creep_reading") or {}
-    admissible = (short.get("fs_is_lower_bound") or
-                  (not top.get("stable") and top.get("exit_reason") == "iteration_cap"
-                   and reading.get("trend") == "dying"))
-    if short.get("FS") is None or not admissible:
-        print("NO FIGURE: short budget did not produce the requested "
-              "undecided top or failed-while-slowing top.", flush=True)
-        return
-    normal = solve_ssrm(fem_data, max_iterations=4000, **options)
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5.8))
-    for ax, result, title in zip(axes, (normal, short), (
-            "FEM-1: 4,000 iterations per trial", "FEM-1: 100 iterations per trial")):
-        plot_ssrm_curve(ax, result, fem_data=fem_data, show_title=False)
-        ax.set_title(title, fontsize=11)
-        ax.tick_params(labelsize=9)
-    fig.subplots_adjust(left=0.07, right=0.98, top=0.91, bottom=0.39, wspace=0.30)
-    fig.text(0.5, 0.015, "Right: deliberately short budget and 100-iteration ceiling; "
-             + ssrm_fs_text(short["FS"], bool(short.get("fs_is_lower_bound"))),
-             ha="center", fontsize=9)
-    _finish(fig, "fem_budget_comparison.png")
+    stem = os.path.join(HERE, "..", "docs", "verification", "files",
+                        "rocscience", "vp020")
+    model = load_slope_data(stem + ".xlsx")
+    with open(stem + "_fem_meta.json") as stream:
+        record = json.load(stream)
+    fig, ax = plt.subplots(figsize=(9, 5))
+    plot_ssrm_curve(ax, record, fem_data=model)
+    fig.tight_layout()
+    print("RS2-16:", ax.get_title(), ax.get_ylabel(),
+          [t.get_text() for t in ax.get_legend().get_texts()], flush=True)
+    buffer = BytesIO()
+    fig.savefig(buffer, dpi=150, facecolor="white")
+    plt.close(fig)
+    buffer.seek(0)
+    # The original FEM-1 plot is already committed. Its old trial sidecar
+    # lacks displacements; preserve the original program render rather than
+    # inventing a record, rerunning a search or rewriting its annotations.
+    panels = [Image.open(os.path.join(OUT, "fem01_ssrm_curve.png")).convert("RGB"),
+              Image.open(buffer).convert("RGB")]
+    gap = 16
+    combined = Image.new("RGB", (sum(p.width for p in panels)+gap,
+                                  max(p.height for p in panels)), "white")
+    x = 0
+    for panel in panels:
+        combined.paste(panel, (x, 0))
+        assert combined.crop((x, 0, x+panel.width, panel.height)).tobytes() == panel.tobytes()
+        x += panel.width + gap
+    path = os.path.abspath(os.path.join(OUT, "fem_budget_comparison.png"))
+    combined.save(path)
+    print("wrote", path, "from committed plots/records; no solve", flush=True)
 
 
 if __name__ == "__main__":

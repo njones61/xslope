@@ -172,8 +172,12 @@ and assembling the element stiffnesses into a system of nodal equations.
 
 ### Discretization
 
-The domain is divided into triangular or quadrilateral elements, each carrying shape functions that
-interpolate displacement from its nodal values, $u = [N]\{u_e\}$.
+The domain is divided into triangular or quadrilateral elements. Within each element the
+displacement at any point, $\mathbf{u} = (u, v)$, is interpolated from the displacements of the
+element's nodes, $\{u_e\}$, through the element's shape functions $[N]$:
+$\mathbf{u} = [N]\{u_e\}$. The shape functions are polynomials in the element's local coordinates,
+linear for a three-node triangle or four-node quadrilateral and quadratic for the six-, eight-
+and nine-node forms, and each takes the value 1 at its own node and 0 at the others.
 
 A typical slope mesh is shown below.
 
@@ -193,8 +197,10 @@ Each element's stiffness follows from virtual work,
 
 >>$[K_e] = \int_{A_e} [B]^T [D_e] [B] \, dA$
 
-where the strain-displacement matrix $[B]$ maps nodal displacements to strains. For a linear
-triangle it is constant over the element,
+where $[B]$ is the strain-displacement matrix, which gives the strains $(\varepsilon_x,
+\varepsilon_y, \gamma_{xy})$ from the nodal displacements by $\{\varepsilon\} = [B]\{u_e\}$,
+$[D_e]$ is the elastic matrix of the previous section and the integral is over the element's area
+$A_e$. For a linear triangle $[B]$ is constant over the element,
 
 >>$[B] = \dfrac{1}{2A} \begin{bmatrix}
 b_1 & 0 & b_2 & 0 & b_3 & 0 \\
@@ -202,14 +208,16 @@ b_1 & 0 & b_2 & 0 & b_3 & 0 \\
 c_1 & b_1 & c_2 & b_2 & c_3 & b_3
 \end{bmatrix}$
 
-with $b_i$, $c_i$ geometric constants and $A$ the triangle area; higher-order elements integrate
-$[B]$ at Gauss points. Element contributions are assembled by node connectivity into the sparse
-global system
+with $b_i$ and $c_i$ the differences of the nodal coordinates ($b_1 = y_2 - y_3$,
+$c_1 = x_3 - x_2$, and cyclically) and $A$ the triangle's area; for higher-order elements $[B]$
+varies over the element and the integral is evaluated numerically at Gauss points. The element
+matrices are assembled by shared nodes into the global system
 
 >>$[K] \{U\} = \{F\}$
 
-whose solution gives the nodal displacements, and from them the strains and stresses used in the
-yield check.
+where $\{U\}$ holds every nodal displacement in the mesh and $\{F\}$ the nodal forces from body
+forces, surface loads and, as the iteration proceeds, the viscoplastic body loads. Its solution
+gives the nodal displacements, and from them the strains and stresses used in the yield check.
 
 ## Boundary conditions
 

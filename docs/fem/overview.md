@@ -528,16 +528,15 @@ than its gravity-turn-on result, so gravity turn-on is the conservative choice f
 
 ## Element type and volumetric locking {#element-type-selection-and-volumetric-locking}
 
-The element type sets whether the mesh can deform plastically without locking.
-
+The element types were introduced above as a matter of discretization, but for a plasticity
+analysis the choice between linear and quadratic elements decides whether the answer is right.
 Plastic deformation under Mohr-Coulomb with a non-associated flow rule ($\psi = 0$) is nearly
-incompressible: the material shears without changing volume. Low-order elements have too few degrees
-of freedom to satisfy that constraint and represent the displacement field at the same time, so they
-respond too stiffly, resist plastic deformation more than they should, and require a larger strength
-reduction before failure develops, overestimating the factor of safety.
-This is **volumetric locking**. Constant-strain 3-node triangles (tri3), with one
-integration point and 6 DOFs, are the worst affected; bilinear 4-node quads (quad4) are better
-but still significantly locked.
+incompressible: the material shears without changing volume. A linear element has too few degrees
+of freedom to keep its volume and take the shape the failure mechanism needs at the same time,
+so it resists plastic deformation more than the soil does, more strength has to be removed before
+the slope fails, and the factor of safety comes out too high. This is **volumetric locking**. The
+three-node triangle (tri3), with one integration point and six degrees of freedom, is the worst
+affected; the four-node quadrilateral (quad4) is better but still locked.
 
 Quadratic elements — tri6, quad8 and quad9 — have enough degrees of freedom to represent
 incompressible plastic deformation without artificial stiffness. The following are SSRM results for
@@ -553,9 +552,11 @@ $\phi = 20°$, slope angle 26.57°) at a target mesh size of 5, against an expec
 | **quad8** | **8** | **1.41** | **< 1%** |
 | **quad9** | **9** | **1.41** | **< 1%** |
 
-[Element choice for FEM analyses](mesh.md#element-choice-for-fem-analyses) covers which type
-to use for each analysis. [Element types](mesh.md#element-types) gives each type's nodes and
-numbering; [Quadratic elements](mesh.md#quadratic-elements) describes how the midside nodes are added.
+Use quadratic elements for every stress analysis, whether a single trial or a strength-reduction
+search; tri6 is the default. Linear elements lock, and the only place for them is a seepage
+analysis, where the unknown is a scalar head and nothing can lock. The
+[mesh page](mesh.md#element-choice-for-fem-analyses) covers the choice among the three quadratic
+types and how the midside nodes are added.
 
 ## Seismic forces
 

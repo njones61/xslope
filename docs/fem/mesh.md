@@ -112,8 +112,9 @@ mixed meshes end to end, so those triangles solve like any other element.
 
 ### Element choice for FEM analyses {#element-choice-for-fem-analyses}
 
-Use `tri6`, `quad8` or `quad9` for FEM stability analyses and strength-reduction factors of
-safety. The Overview explains [volumetric locking and the benchmark
+Use quadratic elements (`tri6`, `quad8` or `quad9`) for every stress analysis, whether a single
+trial or a strength-reduction search; `tri6` is the default. Linear elements are for seepage only.
+The Overview explains [volumetric locking and the benchmark
 results](overview.md#element-type-selection-and-volumetric-locking).
 
 `build_mesh_from_polygons()` defaults to `tri6`, and Studio's *Build mesh* dialog opens
@@ -131,11 +132,9 @@ An explicit type on the call or main sheet overrides the default.
 
 `tri3` and `quad4` suit seepage, where locking does not arise
 ([why](overview.md#element-type-selection-and-volumetric-locking)). `tri3` is the lighter
-choice, with a smaller system that solves faster. Both linear types can be used for elastic
-stress distributions and qualitative work. Neither should be used for a factor of safety.
+choice, with a smaller system that solves faster.
 
-The model checks warn before a FEM or SSRM solve starts on a linear mesh. This is a
-warning rather than an error, so a run demonstrating locking can use linear elements.
+The model checks issue a warning, not an error, before a FEM or SSRM solve starts on a linear mesh.
 
 ## Quadrilateral meshing styles
 

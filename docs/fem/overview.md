@@ -97,11 +97,16 @@ prediction is itself a deliverable.
 
 ### Mohr-Coulomb failure criterion
 
-Shear strength on any plane is
+Elastic behavior holds only up to a limit, and for soils that limit is set by the Mohr-Coulomb
+criterion: on any plane through a point, the shear stress the soil can carry is
 
 >>$\tau_f = c + \sigma' \tan \phi = c + (\sigma - u_w) \tan \phi$
 
-$u_w$ is pore-water pressure. The envelope is a straight line in $\tau$–$\sigma′$ space, tangent to every Mohr circle at failure:
+where $c$ is the cohesion, $\phi$ the friction angle, $\sigma$ the normal stress on the plane and
+$\sigma' = \sigma - u_w$ the effective normal stress, with $u_w$ the pore-water pressure.
+Here normal stresses are plotted compression-positive, the opposite sign to the solver's
+components defined under [Equilibrium](#equilibrium). Plotted against $\sigma'$, the strength is a
+straight line, the failure envelope, and a stress state is at failure when its Mohr circle touches it:
 
 ![mc_envelope.png](images/mc_envelope.png){width=800px}
 

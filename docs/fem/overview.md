@@ -660,7 +660,7 @@ The [FEM-2 reinforced slope](../tutorials/fem02_reinforcement.md) below is meshe
 illustration at a soil target size of 5 ft and a 1D element size of 2.5 ft. The upper panel shows
 the whole mesh; the lower panel enlarges two reinforcement layers. Both have equal aspect.
 
-![FEM-2 whole mesh and two reinforcement layers sharing soil nodes](images/fem_structural_meshes.png){width=1000}
+![FEM-2 whole mesh and two reinforcement layers sharing soil nodes](images/fem_structural_meshes.png){width=800}
 
 The red members follow soil-element edges; their nodes sit on soil corners and midsides.
 A few rows of smaller elements follow each layer, grading back to the larger soil target size.
@@ -750,7 +750,7 @@ factor $F$. It is also available as `xslope.plot_fem.plot_ssrm_curve(ax, record)
 
 The [FEM-1 embankment](../tutorials/fem01_strength_reduction.md) gives the curve below:
 
-![FEM-1 embankment displacement curve](images/fem01_ssrm_curve.png){width=1350}
+![FEM-1 embankment displacement curve](images/fem01_ssrm_curve.png){width=800}
 
 Each filled point is a trial in which the slope came to rest, and its displacement grows as the
 strength is reduced. The open markers to the right of the shaded band are the trials the slope
@@ -763,7 +763,7 @@ example shows.
 The [RS2-16 layered slope with a weak seam and water table](../verification/rs2.md#rs2-16)
 gives the second example, drawn from its saved record:
 
-![RS2-16 weak-seam slope displacement curve from its saved 3 m mesh record](images/rs2_16_ssrm_curve.png){width=1350}
+![RS2-16 weak-seam slope displacement curve from its saved 3 m mesh record](images/rs2_16_ssrm_curve.png){width=800}
 
 The standing displacements grow steadily as the strength is reduced, without a sharp rise.
 The top trial was still moving at the iteration limit and was counted as failing.

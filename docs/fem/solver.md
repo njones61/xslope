@@ -58,11 +58,8 @@ instant used for pore pressures.
 
 ## Shear strength reduction method (SSRM)
 
-The SSRM
-(Matsui & San, 1992; Griffiths & Lane, 1999) reduces soil strength until the
-finite element system can no longer find equilibrium under the applied loads, without assuming
-a failure surface. The reduction factor at that transition is the factor of safety, consistent
-with the limit-equilibrium definition.
+The SSRM (Matsui & San, 1992; Griffiths & Lane, 1999) brackets the transition from
+standing to failure and narrows that bracket by bisection.
 
 ### Methodology
 
@@ -73,7 +70,7 @@ $\tan \phi_r = \dfrac{\tan \phi}{F}$
 
 reducing $\tan\phi$ rather than $\phi$ so the scheme stays well behaved as the friction angle
 approaches zero. As $F$ rises, more Gauss points yield, displacements grow, and at some point the
-[viscoplastic iteration](#elastic-plastic-behavior-viscoplastic-algorithm) (described next)
+[viscoplastic iteration](#elastic-plastic-behavior-viscoplastic-algorithm)
 stops reaching equilibrium at all. `solve_ssrm()` brackets that transition
 and bisects it.
 
@@ -115,14 +112,13 @@ why the bisection uses the trial's verdict (standing, failed or undecided; see
 At a fixed trial factor, the solver reduces the material strengths and seeks equilibrium
 under the applied loads. The **viscoplastic algorithm** of
 [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387) and Smith & Griffiths (2004)
-returns stress a Gauss point cannot carry as a body load built from accumulated viscoplastic
+returns stress a Gauss point cannot carry — a Gauss point is an integration point inside an
+element where stress is evaluated — as a body load built from accumulated viscoplastic
 strains. The elastic stiffness matrix is assembled and factorized **once**, then reused by
 back-substitution for every iteration of every strength reduction trial.
 
 The yield function $f$ defined on the [Overview](overview.md#mohr-coulomb-failure-criterion)
-describes a surface in stress space, drawn below: for a stress state inside it, $f < 0$ and the
-soil is elastic; on it, $f = 0$ and the soil is at failure; outside it, $f > 0$ and the state is one
-the soil cannot carry.
+describes the surface below in stress space.
 
 ![Mohr-Coulomb yield surface in principal-stress space](images/yield_surface.png)
 
@@ -143,7 +139,9 @@ viscoplastic strain, update the body load.
 
 ### The iteration {#viscoplastic-iteration-process}
 
-At each Gauss point on each iteration:
+Each pass round the loop is one iteration. Stress is carried with four components
+$(\sigma_x, \sigma_y, \tau_{xy}, \sigma_z)$, and $[D_e^4]$ is the corresponding $4\times4$
+elastic matrix. At each Gauss point it does the following:
 
 >- Total in-plane strains come from the current displacements, $\{\varepsilon\} = [B]\{u_e\}$, and
 >  the **elastic** strains are $\{\varepsilon\} - \{\varepsilon^{vp}\}$, with
@@ -154,8 +152,7 @@ At each Gauss point on each iteration:
 >  invariant form.<br>
 >- Where $f > 0$, a viscoplastic strain increment
 >  $\Delta\varepsilon^{vp} = f \cdot \partial Q/\partial\sigma \cdot \Delta t$ is accumulated, where
->  $\Delta t$ is the pseudo-time step, a numerical parameter defined below, using
->  the non-associated plastic potential with dilation angle $\psi = 0$ (no plastic volume change).
+>  $\Delta t$ is the pseudo-time step, a numerical parameter defined below.
 >  Close to the corners of the surface, where the flow direction is not defined, the direction
 >  is held at the corner value.<br>
 >- The accumulated strains form the body-load correction
@@ -168,9 +165,6 @@ The figure shows a Mohr-Coulomb shear return in a two-dimensional principal-stre
 
 The plastic strain flows along $\partial Q/\partial\sigma$, while the stress is carried back
 toward the surface in a different direction.
-
-Stress is carried in the 4-component plane-strain form of Smith & Griffiths (their nst = 4), with
-$\sigma_z$ explicit so the algorithm can relax it through plastic $\varepsilon_z$.
 
 The **pseudo-time step** $\Delta t$ sets how much plastic strain is accumulated in one iteration.
 It is a numerical parameter, not a time; XSLOPE uses $\Delta t = 4(1+\nu)/(3E)$, the value in
@@ -185,8 +179,7 @@ it mainly affects SSRM results rather than ordinary stress analyses, it is descr
 
 ## Deciding a trial: convergence, corrector and yield check {#convergence-criterion}
 
-A trial ends standing, failed or undecided. Three mechanisms decide it: the convergence tests,
-the Newton corrector for slow trials, and the yield check.
+A trial ends standing (it reached equilibrium), failed, or undecided.
 
 The inner iteration updates stresses and loads; the outer loop below reads its results and
 decides the trial.
@@ -195,7 +188,9 @@ decides the trial.
 
 The return arrows keep $F$ fixed; the three outcome branches end this trial.
 
-1. **Displacement settled** — Smith & Griffiths' CHECON test: the largest displacement change
+A trial has converged when both tests pass:
+
+1. **Displacement settled** — the displacement convergence test (Smith & Griffiths, 2004): the largest displacement change
    between iterations, divided by the largest current displacement, is below a tolerance:
 
 >>$\dfrac{\max_i |U_i^{(k+1)} - U_i^{(k)}|}{\max_i |U_i^{(k+1)}|} < \text{tol}$
@@ -211,18 +206,14 @@ averaged over ten iterations (the default for `oob_window`) to remove a known tw
 oscillation. Because the residual is measured node by node against that node's own weight,
 enlarging the model does not dilute it.
 
-The displacement test alone can pass on a slope creeping toward failure. The force test alone
-can stall above its tolerance on a slope that is standing still, which is why the
-[hybrid criterion](#2-hybrid-hybrid-default), the default, also reads the displacement field
-directly.
+The displacement test alone can pass on a slope creeping toward failure, and the force test alone
+can stall on a slope standing still; the [hybrid criterion](#2-hybrid-hybrid-default) handles both.
 
 The defaults are $\text{tol} = 10^{-3}$ for displacement and $\texttt{force\_tol} = 10^{-3}$
 for force equilibrium, with a budget of `max_iterations` = 12000 per trial. A few thousand
 iterations is normal well below failure, but the count climbs steeply near the critical factor
 and with mesh refinement: the same reinforced slope reaches equilibrium at $F = 1.25$ in
-5,054 iterations at 2.5 ft element size and 16,242 at 1 ft. These tests use the
-[pseudo-time step](#elastic-plastic-behavior-viscoplastic-algorithm) described above; changing
-`dt_scale` changes their calibration.
+5,054 iterations at 2.5 ft element size and 16,242 at 1 ft.
 
 A single solve at $F = 1$ is a useful check on a submerged model: flooded ground at working
 strength should settle quickly with an almost elastic strain field; if it does not, check
@@ -259,29 +250,18 @@ to its next checkpoint or to its own exit exactly as it would have. The correcto
 a trial that the [iteration-limit rules](#creep-trend) would have ended into one certified as standing, but it cannot make
 a trial fail.
 
-A trial the corrector decides carries a record of how, under `corrector`: which checkpoint produced
-the certified state, how many viscoplastic passes seeded it, the corrector's iterations and force
-evaluations, the three readings against their limits, and every attempt made along the way.
-`iterations` counts the seed's passes plus the corrector's, so a trial is charged for all the work
-that produced it.
-
 ### The yield check
 
 Every solved field carries an admissibility reading taken in invariant form: the largest
-Mohr-Coulomb violation as a fraction of the local strength (`max_yield_violation`), the count of
-Gauss points more than 1% of their strength outside the surface (`n_yield_above_1pct`), the same
+Mohr-Coulomb violation as a fraction of the local strength, the count of
+Gauss points more than 1% of their strength outside the surface, the same
 pair for the [Rankine tension surface](#tensile-strength-in-ssrm), and where in the mesh the worst violation sits
-(`max_yield_at`). It is one pass over the Gauss points and costs no solve.
+and its location. It is one pass over the Gauss points and costs no solve.
 
-The strength scale the violation is divided by, $c\cos\phi + |\sigma_m|\sin\phi$, carries an
-**absolute floor** of $10^{-4}$ of the model's own overburden scale — the largest unit weight in the
-model, $\gamma_{sat}$ included, times the mesh height, so the floor is in the model's stress units
-whatever they are. The floor matters
-because both terms of that scale vanish together in a cohesionless material near a free surface. A
-Gauss point there can carry a fraction of a millipascal of numerical residue over a strength scale
-of a few tens of micropascals and read as several times its own strength outside the surface, which
-is a statement about the denominator rather than about the slope. The floor is orders of magnitude
-below any stress that carries a mechanism, so it leaves a real violation exactly where it was.
+The violation is divided by the local strength, $c\cos\phi + |\sigma_m|\sin\phi$, with a floor of
+$10^{-4}$ times the largest unit weight in the model times the mesh height. Without the floor,
+a cohesionless point at a free surface, where both terms vanish, would show numerical noise as
+a large violation.
 
 A viscoplastic state that satisfies both convergence conditions but
 sits more than $10^{-2}$ of the local strength outside the yield surface does not end the trial: it
@@ -289,14 +269,9 @@ is handed to the corrector, and where the corrector certifies an admissible fiel
 on that. The force test cannot see this on its own, because the viscoplastic scheme is in force
 balance at every iteration and yield is what it relaxes.
 
-The threshold is looser than the corrector's $10^{-6}$ because the two states are reached in
-different ways. A Newton state solves the equations the reading is taken from and measures $10^{-8}$
-or better. A viscoplastic state approaches the surface from outside along the relaxation and stops
-when the *displacement* increment settles, so what is left of its yield violation is set by a
-displacement tolerance and not by a yield one; holding it to the corrector's figure would reject
-most of the verification states, which have simply not finished relaxing. $10^{-2}$ is where that
-residual ends and unrelaxed yield begins, and it is also the fraction the reported Gauss-point count
-is taken against, so the check and the reported count are consistent.
+The limit is looser than the corrector's $10^{-6}$ because the viscoplastic loop stops on a
+displacement tolerance while still approaching the surface from outside, so a converged
+viscoplastic state keeps a small violation.
 
 **When the yield check ends a trial.** The yield gate — the rule that ends a trial on the yield
 check — arms only when both readings show that
@@ -306,11 +281,11 @@ displacements have stopped growing, as measured by the hybrid criterion's growth
 Until then, a corrector refusal leaves the trial running through its checkpoints,
 the [runaway rule](#creep-trend) and budget, and the yield reading is taken again on the next state.
 Once the gate is armed, the corrector makes a final attempt. If it does not certify
-an admissible state, the trial ends with `exit_reason = 'yield_gate'` and remains
-**undecided**: the bisection continues below it, as for an [inconclusive trial](#creep-trend).
+an admissible state, the trial ends on the yield check and remains **undecided**:
+the bisection continues below it, as for an [inconclusive trial](#creep-trend).
 A state that passes the check ends the trial as it otherwise would.
 
-When a state fails the check, look first at the material at `max_yield_at`; see
+When a state fails the check, look first at the material at the worst violation; see
 [Tensile strength in the SSRM](#tensile-strength-in-ssrm).
 
 ### Choosing the driver
@@ -343,7 +318,7 @@ shape of the displacement-against-$F$ curve from a sweep.
 ### 1. Non-convergence (`"non_convergence"`)
 
 The classical Griffiths & Lane (1999) approach: bisection on whether the viscoplastic iteration
-converges. In XSLOPE "converges" means **true equilibrium** — both the CHECON displacement test and
+converges. In XSLOPE "converges" means **true equilibrium** — both the displacement convergence test (Smith & Griffiths, 2004) and
 the force-equilibrium test — so the bisection brackets the genuine boundary between states that
 reach static equilibrium and states that creep indefinitely.
 
@@ -351,8 +326,8 @@ The force-equilibrium half is Dawson, Roth & Drescher's; Griffiths & Lane's own 
 the displacement test plus an iteration ceiling, which
 [does not separate creep from equilibrium](#convergence-criterion).
 
-This is the criterion Griffiths & Lane's published results were obtained with, and XSLOPE
-reproduces them under it; see the [SSRM verification page](../verification/ssrm.md).
+Under this criterion XSLOPE reproduces Griffiths & Lane's published results; see the
+[SSRM verification page](../verification/ssrm.md).
 
 ### 2. Hybrid (`"hybrid"`, default) {#2-hybrid-hybrid-default}
 
@@ -372,10 +347,6 @@ iteration history.
 | Beyond elastic scale **and** growing (or the trial passed the [displacement limit](#3-displacement-limit-displacement_limit), `max_disp_factor`) | `FAILED` | Failed — same as non-convergence |
 | At elastic scale **and** frozen | `STABLE_STUCK` | **Not** failed: the bracket moves up |
 | One signal without the other, or too little history | `AMBIGUOUS` | Failed fallback, unless the trial has an [undecided exit](#creep-trend) or stops at the [yield gate](#the-yield-check) |
-
-A trial beyond elastic scale and still growing is failed; one at elastic scale and no longer
-moving is standing even though its forces never quite balanced; one showing a single signal
-falls back to the non-convergence verdict unless it ended undecided.
 
 The thresholds are $u_{ratio} \le 1.25$ for "at elastic scale", $u_{ratio} \ge 1.5$ for "beyond
 it", and growth greater than 0.02 elastic displacements for "still moving". Stable-but-stuck
@@ -427,10 +398,6 @@ the measurement on the mechanism rather than on any localized background deforma
 | Reproducing the classical Griffiths & Lane (1999) verdict, or a published result obtained that way | `non_convergence` | The same bisection without the displacement-evidence test. |
 | Evidence and reporting | `displacement_increase` | Produces the displacement-vs-$F$ curve; read the upturn at the automatically selected characteristic point |
 
-FEM-SSRM and limit equilibrium are different formulations, and some difference in computed factors
-of safety is expected; running both — as the verification suite does — is the strongest consistency
-check available.
-
 ## Trials that reach the iteration limit {#creep-trend}
 
 At the iteration limit, the trend of movement over the last part of the run decides the trial.
@@ -452,8 +419,6 @@ at $F = 1.34375$ was certified at 11,200 iterations.
 **Runaway rule.** A trial at 15 times its elastic displacement and still gaining at least 0.02
 elastic displacements over the last doubling of the iteration count triggers a corrector attempt;
 only if it is not certified standing is the trial cut short (`early_failure=False` turns this off).
-The separate flat-residual test — a gain of one elastic displacement over 2,000 iterations —
-is disabled by `_EARLY_FAIL_TREND_TEST = False`.
 
 **Inconclusive at the ceiling.** A trial still progressing whose mean residual over the last
 window is at least 1% below the preceding window (nominally 500 iterations each, shortened to
@@ -461,17 +426,15 @@ a quarter of a small budget, with a minimum of 20), or whose displacement verdic
 ceiling is `AMBIGUOUS`, is left undecided if the corrector cannot certify standing.
 The bisection does not count it as failed and continues below it.
 If it is still the top of the final bracket, the result is FS ≥ the standing bottom
-(`fs_is_lower_bound = True`); raise the ceiling or the per-trial budget to go further.
+; raise the ceiling or the per-trial budget to go further.
 
 **Continuing a run.** Use `solve_ssrm(fem_data, resume=result, max_iterations=N)` or
 **Continue with a higher limit…** in Studio.
-Finished trials on the search path are reused and unfinished ones resume from where they stopped,
-with `resumed_from` recording their earlier iteration count.
+Finished trials on the search path are reused and unfinished ones resume from where they stopped.
 Continuation is not offered when the top trial ended on the yield check, and is not possible
 for a run read back from files, because the continuation states are held only in memory.
 
-The no-progress plateau is recorded (`plateau_iteration`, `plateau_ratio`) but never
-ends a trial.
+The no-progress plateau and its residual ratio are recorded but never end a trial.
 
 ## Jointed models {#jointed-models}
 
@@ -555,8 +518,7 @@ and the [iteration-limit rules](#creep-trend).
 The sections above describe one trial and how it is decided. A search is a sequence of such
 trials: it begins by establishing the stress state every trial starts from, then runs the trials
 through `solve_fem()` while `solve_ssrm()` manages the bracket, decides when to stop, and finally
-captures the failure mechanism for the figures. This section covers each of those steps and the
-two functions' arguments.
+captures the failure mechanism for the figures.
 
 ### In-situ equilibration
 
@@ -601,7 +563,7 @@ Its principal arguments:
 >- **`F`** (default 1.0): strength reduction factor, applied as $c_r = c/F$ and
 >  $\tan\phi_r = \tan\phi/F$.<br>
 >- **`max_iterations`** (default 12000) and **`tolerance`** (default $10^{-3}$): the iteration budget
->  and the CHECON displacement tolerance.<br>
+>  and the displacement convergence tolerance (Smith & Griffiths, 2004).<br>
 >- **`max_iterations_ceiling`** (default 50000): hard stop on the extension a trial still dying
 >  away, or with no clear trend, is given at `max_iterations` (see the
 >  [trend reading](#creep-trend)). Reaching it with the
@@ -816,7 +778,7 @@ with the Python version, and the compiled one reproduces it exactly.
 Which one you have depends on how XSLOPE was installed. The Studio installers for Mac and Windows
 include the compiled version, and it is used without any setting.
 Installing with `pip` gives the Python version only; to get the compiled one as well,
-build it once with the two commands below, after which it is used automatically.
+build it once with the two commands below.
 `fast_kernel=False` on `solve_fem()` forces the Python version; the default, `"auto"`,
 uses the compiled one whenever it is present.
 
@@ -828,7 +790,7 @@ python setup_kernel.py build_ext --inplace
 ```
 
 This compiles `xslope/_fem_kernel` next to its `.pyx` source; only the `.pyx` is tracked in the
-repository. Once built, the default `"auto"` setting picks it up with no code change.
+repository.
 
 The kernel handles the standard Mohr-Coulomb path, including the Rankine tension cutoff and the
 matric-suction term; it takes the $K_0$ in-situ stress as an input, so at-rest runs accelerate like

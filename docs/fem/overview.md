@@ -769,8 +769,9 @@ record at a soil target size of 3 m. Its standing trials climb more gradually: t
 are 0.388, 0.499 and 0.522 m at
 $F = 0.8$, 0.95 and 0.96875, without a sharp knee in that recorded branch. Its final upper trial
 at $F = 0.9875$ reaches 1.767 m after 16,000 iterations and ends `not_slowing`, counted as sliding;
-the saved factor of safety is 0.978. The open diamond is its position when the limit stopped it,
-not a final displacement on the standing curve. This record reports a midpoint factor, not a
+the saved factor of safety is 0.978. An open marker is drawn where the trial was when it was
+stopped; because that trial never came to rest, the line through the standing trials does not
+pass through it. This record reports a midpoint factor, not a
 lower bound: its upper trial was counted as failed, rather than left undecided.
 
 ![RS2-16 weak-seam slope displacement curve from its saved 3 m mesh record](images/rs2_16_ssrm_curve.png){width=1350}

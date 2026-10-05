@@ -501,11 +501,9 @@ The usual $K_0$ estimates for retaining-wall and settlement calculations apply:
 - Compacted fill: the compaction plant overconsolidates it, so $K_0 = 1$ or above is normal.
 - Unknown history: run both conventions and report [their factor-of-safety range](#what-to-expect).
 
-[RS2's published verification models](../verification/rs2.md) prescribe
-$\sigma_x = \sigma_y = \sigma_z$ and lateral coefficients of 1 in both horizontal directions,
-an isotropic at-rest state; set $K_0 = 1$ to compare with their SSRM results. Plaxis defaults to
-Jaky's value per material. Gravity turn-on, XSLOPE's default, is the convention of
-[Griffiths & Lane (1999)](../verification/ssrm.md) and most published SSRM benchmarks.
+Published results carry their own convention: Griffiths & Lane (1999) and most SSRM benchmarks
+use gravity turn-on, XSLOPE's default; [Rocscience's RS2 verification models](../verification/rs2.md)
+use an isotropic at-rest state, so set $K_0 = 1$ to compare with their results.
 
 ### What to expect
 

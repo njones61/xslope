@@ -331,10 +331,14 @@ left from an earlier session otherwise changes every factor of safety in a run w
 
 ## SSRM failure criteria
 
-Each SSRM trial is counted as standing, failed or undecided by a failure criterion; four are selectable
-through the `failure_criterion` argument of `solve_ssrm()`;
-the first three use trial verdicts in a bisection, while the fourth reads the displacement
-curve from a sweep of trial factors.
+The previous section describes the evidence a trial produces: whether its displacements and
+forces settled, whether the corrector could certify a balanced state, whether the stresses are
+admissible. A failure criterion is the rule that turns that evidence into the trial's verdict,
+standing, failed or undecided, which the search then uses to move its bracket. XSLOPE offers
+four, chosen by the `failure_criterion` argument of `solve_ssrm()`. The default, hybrid, is the
+one to use; the others exist to reproduce published results that used them. The first three give
+each trial a verdict for the bisection; the fourth does not judge trials at all but reads the
+shape of the displacement-against-$F$ curve from a sweep.
 
 ### 1. Non-convergence (`"non_convergence"`)
 
@@ -426,9 +430,6 @@ the measurement on the mechanism rather than on any localized background deforma
 *all* $F$. A specific point can be supplied through `char_point=(x, y)`.
 
 ### Choosing a criterion
-
-Use the hybrid criterion for the stability search unless the analysis calls for a published
-non-convergence convention or a displacement curve as its evidence.
 
 | Problem class | Criterion | Why |
 |---|---|---|

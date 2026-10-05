@@ -579,6 +579,13 @@ of $k$ only. The finite element solver has no failure surface to read, and analy
 dam or levee at once, so it uses the **signed** value exactly as entered: enter $k$ negative to
 drive a left-facing slope and positive to drive a right-facing one.
 
+The mirrored slopes below show the horizontal seismic body force in each driving direction:
+
+![Signed seismic body forces driving left- and right-facing slopes](images/fem_seismic_direction.png){width=800px}
+
+A negative $k$ drives the left-facing slope to the left; a positive $k$ drives the right-facing
+slope to the right. The arrows act through the soil mass, not as loads on its surface.
+
 ## Structural elements
 
 XSLOPE supports two kinds of one-dimensional structural element embedded in the 2D soil mesh. Bonded

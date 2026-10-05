@@ -383,43 +383,35 @@ the same load term carries the seepage forces.
 
 ### Matric suction (apparent cohesion above the water table)
 
-The signed pore-pressure field also supplies matric suction above the water table.
-By default the solver clamps pore pressure to $u_w = \max(0, u_w)$ at every Gauss point before the yield
-check, so the negative pore pressures above the water table add no strength. Where matric suction is
-a first-order effect — an unsaturated cut slope, for instance — a per-material unsaturated friction
-angle $\phi^b$ turns that credit on, using the same Fredlund extended Mohr-Coulomb criterion the
-[limit-equilibrium solver uses](../lem/overview.md#matric-suction-apparent-cohesion-above-the-water-table):
+Above the water table the pore pressure is negative: the water in the pores is in suction, and
+suction pulls the grains together and adds strength. By default XSLOPE gives no credit for it:
+the pore pressure used in the yield check is clamped at zero, $u_w = \max(0, u_w)$, so soil above
+the water table is treated as if it had no pore pressure at all. This is the conservative choice,
+since suction is lost when the soil wets up.
+
+Where suction is a real part of the strength, an unsaturated cut slope for instance, a material
+can take credit for it through an unsaturated friction angle $\phi^b$, the parameter of Fredlund's
+extended Mohr-Coulomb criterion (normal stress here is compression-positive):
 
 >>$\tau_f = c' + (\sigma_n - u_a)\tan\phi' + (u_a - u_w)\tan\phi^b$
 
-With pore-air pressure $u_a = 0$ the last term becomes an **apparent cohesion**
+With the pore-air pressure $u_a$ taken as zero, the last term is an added cohesion,
+$c_{suction} = \min(s, s_{cap})\tan\phi^b$, where $s = \max(0, -u_w)$ is the suction at the point
+and $s_{cap}$ is an optional ceiling on it. The frictional term keeps the clamped pore pressure,
+so only the cohesion gains. Below the water table $s = 0$ and the credit vanishes. Under strength
+reduction $c_{suction}$ is divided by $F$ along with $c'$ and $\tan\phi'$.
 
->>$c_{suction} = \min(s,\; s_{cap})\,\tan\phi^b, \qquad s = \max(0,\; -u_w)$
+The credit needs a pore-pressure source that is negative above the water table, so it works with
+`u = piezo` or `u = seep` on an effective-stress material (`mc`, `pow`, `hb`) and does nothing for
+`none`, `ru`, `cp` or `elastic`, as in the
+[LEM](../lem/overview.md#matric-suction-apparent-cohesion-above-the-water-table).
+$\phi^b$ and $s_{cap}$ are the `phi_b` and `s_cap` columns of the
+[mat worksheet](../usage/input_template.md#worksheet-mat); `solve_fem()` and `solve_ssrm()`
+read them from the file, and their `suction_phi_b` and `suction_cap` arguments override it.
 
-added to $c'$ in the yield function, where $s$ is the suction at the Gauss point and $s_{cap}$ an
-optional ceiling. The effective-normal-stress term keeps the ordinary clamped $u_w \ge 0$, so only the
-cohesive intercept picks up the extra strength; below the water table $s = 0$ and the term vanishes.
-
-The suction is drawn from the material's own pore-pressure source and is credited only for the
-effective-stress strength options (`mc`, `pow`, `hb`) with a signed source — `u = piezo` or
-`u = seep`, the only ones carrying negative pressure above the water table. It is inert for `cp` and
-`elastic` materials and for the `none` and `ru` sources, exactly as in the limit-equilibrium solver.
-
-In an SSRM solve the apparent cohesion is reduced by the trial factor alongside $c'$ and
-$\tan\phi'$, $c_{suction,\,r} = \min(s, s_{cap})\tan\phi^b / F$, so the credit scales as $1/F$ and
-enters the reduced envelope on the same footing as the effective cohesion. That distinguishes it
-from the [tension cutoff](solver.md#tensile-strength-in-ssrm), which caps a stress.
-
-$\phi^b$ is blank for every material unless set, so the credit is **off by default**. It is
-controlled by the `phi_b` and `s_cap` columns on the
-[mat worksheet](../usage/input_template.md#worksheet-mat) and read automatically by `solve_fem()` and
-`solve_ssrm()`; their `suction_phi_b` / `suction_cap` arguments override the file.
-
-!!! warning "Cap the suction on a piezometric source"
-    A piezometric line's hydrostatic head grows negative without bound above the line, so the higher a Gauss point
-    sits above it the larger the (unphysical) suction and the larger the credited apparent cohesion. **Always set
-    `s_cap`** when using `phi_b` with `u = piezo`. With `u = seep` the finite-element seepage field is self-bounded
-    by the unsaturated-flow physics, so a cap there is a useful backstop rather than a hard requirement.
+A piezometric line gives a suction that grows without limit with height above the line, so with
+`u = piezo` always set `s_cap`. A seepage solution's suction is bounded by the unsaturated-flow
+physics, and a cap there is a backstop.
 
 ## K0 initial stress
 

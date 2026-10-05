@@ -363,10 +363,10 @@ no interpolation. Negative values are clamped to zero for the yield check; the r
 retained so the optional [matric-suction](#matric-suction-apparent-cohesion-above-the-water-table)
 credit can use it.
 
-The `ru` overburden is the soil column only, integrated by intersecting a vertical ray with the
-material zones, which is the definition the LEM slicer uses (Bishop & Morgenstern): distributed
-loads and crack water are excluded, and the column is weighed $\gamma_{sat}$ below the water table
-and $\gamma$ above it — moist throughout on the usual `ru` model, which carries no water table.
+For `ru`, $\sigma_v$ is the weight of the soil column directly above the point, as in the
+definition of $r_u = u/(\gamma z)$: $\gamma_{sat}$ below the water table and $\gamma$ above it, with
+distributed loads and crack water excluded. The usual `ru` model has no water table and is
+weighed moist throughout.
 
 A piezometric line must extend across the whole mesh, because pore pressure is read from it at
 every node and Gauss point; the build stops at any point the line does not cover.

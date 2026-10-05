@@ -405,6 +405,9 @@ Bisection on whether the maximum viscoplastic displacement exceeds `max_disp_fac
 height within the iteration budget. A simple physical backstop, but its verdict is coupled to the
 budget for any state that creeps slowly rather than racing.
 
+In an SSRM search, `max_disp_factor` is disabled under `hybrid` and `non_convergence`: it measures
+movement against the mesh height, so a deeper foundation would loosen the limit.
+
 ### 4. Displacement catastrophe (`"displacement_increase"`)
 
 Sweeps $F$, locates the sharpest upturn of displacement versus $F$ (the evidence Griffiths & Lane
@@ -430,101 +433,44 @@ check available.
 
 ## Trials that reach the iteration limit {#creep-trend}
 
-A trial that reaches `max_iterations`
-without converging is classified by the trend of its movement over five equal blocks spanning
-nominally half the original **Max iterations per trial** allowance: how far the maximum nodal displacement, max&#124;u&#124;, moved in
-each block, measured in [elastic displacements](#2-hybrid-hybrid-default),
-and the ratio of each block's movement to the one before. The ratio is a ratio of movements, not a count of iterations, so
-two runs that cover the same ground at different paces are classified the same way.
-Each trial's record carries an `exit_reason` and a verdict (`FAILED`, `STABLE_STUCK`,
-`AMBIGUOUS`; see the [hybrid criterion](#2-hybrid-hybrid-default)).
+At the iteration limit, the trend of movement over the last part of the run decides the trial.
+The window is five equal blocks spanning nominally half the original Max iterations per trial
+allowance; movement is measured in [elastic displacements](#2-hybrid-hybrid-default).
 
-| Trend over the window | What happens |
+| Trend | What happens |
 |---|---|
-| **Dying away**: every block moved forward, none moved more than the one before, and the movement shrinks at a steady ratio below 0.9 a block | The [Newton corrector](#finishing-a-trial-with-the-newton-corrector) is asked for the balanced state from where the trial is. A state the corrector certifies (force, yield and, on a jointed model, the [hold test](#joint-corrector-and-hold-test)) stands, and the trial record notes the reading and the corrector's result. Where the corrector does not certify a state, the trial runs on: see the extension rule after this table |
-| **Holding steady or growing**: the window moved at least 0.02 elastic displacements at a ratio of 0.9 or more a block; on a jointed model, see [the joint verdict](#the-joint-verdict) | `exit_reason = 'not_slowing'`, `FAILED`: the slope is sliding |
-| **Still** (under $10^{-4}$ elastic displacements over the window) or **unclear** | The [hybrid classifier](#2-hybrid-hybrid-default) decides, as for any trial stopped at the limit |
+| Dying away: every block moves forward, none more than its predecessor, with a rate ratio below 0.9 | The [Newton corrector](#finishing-a-trial-with-the-newton-corrector) is asked to finish the trial; a certified state stands. |
+| Holding steady or growing: at least 0.02 elastic displacements over the window, rate ratio at least 0.9 | `exit_reason = 'not_slowing'`, `FAILED`, unless the corrector certifies standing. |
+| Still: under $10^{-4}$ elastic displacements, or unclear | The hybrid classifier and the ceiling rules below decide it. |
 
-Below `max_iterations_ceiling` (default 50000) a movement still dying away, or not yet clear, is given
-another `max_iterations` worth and read again at the new limit; a trial holding steady, growing or
-still stops at the limit. The dying-away reading, with its corrector attempt, is also taken at every
-block end once the window is full (and, on a jointed model, past 5,000 iterations), so a creeping
-trial can be certified before its limit.
+Below `max_iterations_ceiling` (default 50000), a trial still dying away or unclear gets
+another `max_iterations` worth and is read again. The reading is also taken at each block
+end once the window is full (after 5,000 iterations on a jointed model), so a creeping trial can
+be certified before its limit; [Griffiths & Lane Example 2](../verification/ssrm.md#verification-griffiths2)
+at $F = 1.34375$ was certified at 11,200 iterations.
 
-Whether a trial dying away is certified depends on how close to rest it has come. On the
-[Griffiths and Lane Example 2 slope](../verification/ssrm.md#verification-griffiths2) at
-$F = 1.34375$ no state is certified at the 300, 1,000 or 3,000 checkpoints or at the block ends
-before 11,200 iterations; at 11,200, with each block of 1,600 iterations moving the slope about 0.71
-times as far as the one before, the corrector certifies the state at 1.85 times the elastic
-displacement and the trial stands. On [RS2-28a](../verification/rs2.md#rs2-28) at $F = 1.7$ the
-movement does not die away: at the 16,000-iteration limit the slope has moved 13 times the elastic
-displacement, each block still moving it 96% as far as the one before, no state along the way is
-certified, and the trial is counted as sliding.
+**Runaway rule.** A trial at 15 times its elastic displacement and still gaining at least 0.02
+elastic displacements over the last doubling of the iteration count triggers a corrector attempt;
+only if it is not certified standing is the trial cut short (`early_failure=False` turns this off).
+The separate flat-residual test — a gain of one elastic displacement over 2,000 iterations —
+is disabled by `_EARLY_FAIL_TREND_TEST = False`.
 
-During the iteration, the solver records the no-progress plateau
-([defined above](#the-yield-check)) as `plateau_iteration` and `plateau_ratio` and does not stop the solve; the convergence tests,
-movement rules, [yield gate](#the-yield-check) and iteration limits still apply. A plateau describes the residual and does not show whether the slope fails,
-for two reasons: the residual is **not monotone** — a reinforced slope
-whose out-of-balance sits at twice `force_tol` around iteration 9,500 climbs back an order of
-magnitude and then converges at 16,242 — and the iterations a trial needs **grow with mesh
-refinement** while a fixed window does not, so on that model a 1500-iteration window was 30% of the
-required work at 2.5 ft element size and 9% at 1 ft. Stopping on the plateau would report those
-trials as failed, and the bisection would close on the false failure, biasing the factor of safety
-low by 18% on the finest mesh. The cost of letting trials run is borne by trials that do fail: they spend
-the whole budget unless the rule below closes them sooner, which is why `max_iterations` should be
-set to what the model needs rather than left to absorb hopeless trials.
+**Inconclusive at the ceiling.** A trial still progressing whose mean residual over the last 500
+iterations is at least 1% below the preceding 500, or whose displacement verdict at the hard
+ceiling is `AMBIGUOUS`, is left undecided if the corrector cannot certify standing.
+The bisection does not count it as failed and continues below it.
+If it is still the top of the final bracket, the result is FS ≥ the standing bottom
+(`fs_is_lower_bound = True`); raise the ceiling or the per-trial budget to go further.
 
-**Runaway rule.** A trial whose movement is clearly running away is declared failed early — max|u| past 8 times
-that trial's own elastic displacement and still growing, or the out-of-balance flat over the last
-2000 iterations while the field gains a whole elastic displacement — and stops there with
-`exit_reason = 'diverging'` instead of spending the rest of its budget (`early_failure=False` turns
-it off; the [at-failure capture solve](#the-solve_ssrm-function) does not use this rule, and ends instead at the distance limit
-described under `capture_failure_state` below or at its own budget). Both thresholds are measured in
-the trial's own elastic response, and both sit far outside the range occupied by trials that go on
-to reach equilibrium — which near the critical factor grow past five times elastic with a flat
-residual — so the rule catches only gross runaways. With the default [`fem_solver='auto'`](#choosing-the-driver) the runaway signal
-triggers a [corrector](#finishing-a-trial-with-the-newton-corrector) attempt before it ends
-anything: a displacement ratio taken on an iterate is weaker evidence than an equilibrium the
-corrector can certify, so the rule applies only where that attempt fails.
+**Continuing a run.** Use `solve_ssrm(fem_data, resume=result, max_iterations=N)` or
+**Continue with a higher limit…** in Studio.
+Finished trials on the search path are reused and unfinished ones resume from where they stopped,
+with `resumed_from` recording their earlier iteration count.
+Continuation is not offered when the top trial ended on the yield check, and is not possible
+for a run read back from files, because the continuation states are held only in memory.
 
-**Inconclusive trials.** A trial that reaches `max_iterations_ceiling` still dying away or with no
-clear trend, and with its out-of-balance still falling (the mean over the last 500 iterations at
-least 1% below the mean over the 500 before), is neither settled nor failed, and it is reported as `exit_reason = 'inconclusive'`. The
-same exit is used at the hard ceiling when the displacement classifier returns `AMBIGUOUS`,
-whether or not the residual is still falling. Below the hard ceiling, an `AMBIGUOUS` reading
-retains the failed fallback when no stopping rule grants an extension. The
-[Newton corrector](#finishing-a-trial-with-the-newton-corrector) is applied to such trials, since a
-trial still improving at the ceiling is the kind a locally quadratic iteration can finish; with the
-default [`fem_solver='auto'`](#choosing-the-driver) an inconclusive trial is therefore rare, and remains only where the corrector also
-cannot certify a state.
-
-The bisection does not count it as a failure, because doing so would bias the factor of safety low. It continues below
-the inconclusive $F$. `inconclusive` lists such trials and `note` names the last of them in a sentence,
-which is also printed to the log. When an inconclusive trial is still the top of the final bracket,
-the search found no failure, so it reports the factor of safety as at least the bracket's bottom,
-the highest strength the slope was confirmed to stand at (`fs_is_lower_bound = True`), because a
-midpoint would assume a failure that no trial showed. Raise the ceiling or Max iterations per trial to
-go further.
-
-**Continuing a run with a higher limit.** Where the iteration limit is what stopped the trial at
-the top of the final bracket (undecided at the limit, or counted failed while still slowing), the
-run can be continued from where its trials stopped:
-`solve_ssrm(fem_data, resume=result, max_iterations=N)`, or **Continue with a higher limit…** in Studio. The search walks the path a
-fresh search at the new limit walks, from the original bracket. A trial on it the earlier run
-decided is reused; one the earlier run left unfinished goes on from the iteration it stopped at,
-with its displacements, plastic strains, joint state and every history the stopping rules above read,
-and reaches the state a trial run straight through at the new limit reaches; any other trial is
-solved as usual. A trial the path never reaches keeps its earlier record. `trials` holds each
-trial once, a continued one with `resumed_from`, `result['resumed']` lists the trials reused,
-continued and solved afresh, and the closing summary names the F the run was continued from and
-the new limit, with the wall time of both parts together. Continuation is not offered for a top trial that ended on the yield
-check, since a higher limit does not change that result. The trials' end states are held in memory for the session the run was made in
-(`result['resumable']`) and are never saved, so a run read back from its files cannot be
-continued.
-
-In an SSRM search, the **displacement limit** (`max_disp_factor`) is disabled under the equilibrium-based criteria (`hybrid`,
-`non_convergence`) because its yardstick is the height of the *mesh*, not of the *slope*, so it loosens as a
-model is given a deeper foundation. The force-equilibrium test has no such dependence.
+The no-progress plateau is recorded (`plateau_iteration`, `plateau_ratio`) but never
+ends a trial.
 
 ## Jointed models {#jointed-models}
 

@@ -356,19 +356,16 @@ reproduces them under it; see the [SSRM verification page](../verification/ssrm.
 
 ### 2. Hybrid (`"hybrid"`, default) {#2-hybrid-hybrid-default}
 
-The same bisection, with one addition: **a trial that fails to reach equilibrium must also show
-displacement evidence of failure before the bisection counts it as a failed slope.**
-
-Two signals are read from the trial's own iteration history, both measured against its **elastic
-displacement** — the purely elastic response to the same loads, which every solve already computes:
-
->- **Scale.** $u_{ratio} = \max|u| / \max|u|_{elastic}$ at the end of the solve, which shows whether
->  the field is beyond elastic scale.<br>
->- **Growth.** The gain in $\max|u|$ over the last quarter of the history, in elastic displacements,
->  which shows whether it is still moving.
-
-`max|u|` is sampled every 10 iterations from the value the CHECON test already computes, so the
-instrumentation costs nothing measurable and no extra solves are needed.
+Under non-convergence, a trial that has not reached equilibrium by the end of its budget counts
+as failed. That is not always right. The force test can stall just above its tolerance on a slope
+that has stopped moving, because a few Gauss points resting on the yield surface keep the
+residual from decaying all the way to zero, and such a trial would be counted as failed although
+the slope stands. The hybrid criterion, the default, asks a second question before it accepts a
+failure: does the displacement field show the slope failing? Two signals answer it, both
+measured against the trial's elastic displacement (the displacement the same model would have if
+nothing yielded, which every solve computes): the scale of the displacement at the end of the
+trial, $u_{ratio} = \max|u| / \max|u|_{elastic}$, and its growth over the last quarter of the
+iteration history.
 
 | Evidence | Verdict | Effect on the bisection |
 |---|---|---|
@@ -376,38 +373,31 @@ instrumentation costs nothing measurable and no extra solves are needed.
 | At elastic scale **and** frozen | `STABLE_STUCK` | **Not** failed: the bracket moves up |
 | One signal without the other, or too little history | `AMBIGUOUS` | Failed fallback, unless the trial has an [undecided exit](#creep-trend) or stops at the [yield gate](#the-yield-check) |
 
-Requiring *both* signals in each direction keeps this conservative: the hybrid overrides only
-where the evidence is unambiguous, and every trial's verdict, $u_{ratio}$ and growth come back in
-`result['trials']`, so an override is never silent.
+A trial beyond elastic scale and still growing is failed; one at elastic scale and no longer
+moving is standing even though its forces never quite balanced; one showing a single signal
+falls back to the non-convergence verdict unless it ended undecided.
 
-**Full-budget history.** Both signals are calibrated on solves that ran to
-their iteration ceiling. A slow runaway takes far longer to become visible in the displacement field
-than a residual plateau takes to appear, so a truncated history can look frozen while the slope is
-accelerating.
+The thresholds are $u_{ratio} \le 1.25$ for "at elastic scale", $u_{ratio} \ge 1.5$ for "beyond
+it", and growth greater than 0.02 elastic displacements for "still moving". Stable-but-stuck
+trials sit at 1.0–1.1 times elastic and stay there whether the budget is 10,000 iterations or
+80,000; failing trials reach 4–21 times elastic and keep growing. Every trial's verdict,
+$u_{ratio}$ and growth are returned in `result['trials']`. If the elastic displacement is
+smaller than $10^{-6}$ of the model height, the verdict is `AMBIGUOUS` rather than a ratio
+against rounding noise, except that passing the displacement limit remains evidence of failure
+without that yardstick.
 
-**Calibration.** The thresholds are $u_{ratio} \le 1.25$ for "at elastic scale", $u_{ratio} \ge 1.5$
-for "beyond it", and a growth of 0.02 elastic displacements over the trailing window for "still
-moving". They come from measured behavior: stable-but-stuck trials sit at **1.0–1.1×** elastic and
-are frozen there whether the budget is 10,000 iterations or 80,000, while genuinely failing trials
-reach **4–21×** and are still growing when the budget runs out. Both signals are ratios, so when the
-elastic displacement comes back smaller than $10^{-6}$ of the model height — a level model whose
-initial stress is already in equilibrium — the verdict is `AMBIGUOUS` rather than a ratio taken
-against rounding noise. The only verdict that does not depend on the elastic displacement is a
-trial stopped by the displacement limit, which is an absolute fraction of mesh height and is evidence in its own right.
-
-**Why it is the default.** All 103 FEM benchmarks were solved under both criteria on the same mesh
-with the same options. No row comes back **lower** under the hybrid, and all but a few come back
-identical to the last digit, because on a healthy model every non-converged trial carries real
-displacement evidence and the extra test gives the same result as non-convergence.
+All 103 FEM benchmarks were solved under both criteria on the same mesh with the same options.
+No row returns a lower factor under the hybrid, and almost all are identical to the last digit:
+on those models the non-converged trials carry displacement evidence of failure.
 
 | Case | Non-convergence | Hybrid | What the hybrid changes |
 |---|---|---|---|
-| [Griffiths & Lane Example 1, SSRM-1: quad8, target size 3.5, 16,000 iterations per trial](../verification/ssrm.md#verification-griffiths1) | 1.372 | 1.372 | Nothing — the majority case. Every non-converged trial is beyond elastic scale and still growing, so the displacement test gives the same result as non-convergence on every trial |
-| [RS2-62c](../verification/rs2.md#rs2-62) | 0.769 | 0.769 | Nothing, by the other route: the $F = 0.775$ trial that sets the bracket spends its whole budget still at elastic scale ($u_{ratio} = 1.23$) but still moving (growth 0.22), one signal without the other, so its verdict is `AMBIGUOUS` and non-convergence's failed verdict stands |
-| [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | The hybrid gives a result where non-convergence gives none. Under the vendor's zero [tensile cap](#tensile-strength-in-ssrm) ($T = 0$) the trials are stationary rather than collapsing, so non-convergence has no failure side to bisect: it drives the [auto-bracket](#methodology) to its floor and returns no factor of safety, while the hybrid brackets the same model |
+| [Griffiths & Lane Example 1, SSRM-1: quad8, target size 3.5, 16,000 iterations per trial](../verification/ssrm.md#verification-griffiths1) | 1.372 | 1.372 | Every non-converged trial is beyond elastic scale and still growing, so both criteria give the same verdict. |
+| [RS2-62c](../verification/rs2.md#rs2-62) | 0.769 | 0.769 | The $F = 0.775$ trial is at elastic scale ($u_{ratio} = 1.23$) but still moving (growth 0.22). Its `AMBIGUOUS` verdict retains the non-convergence fallback. |
+| [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | With the vendor's zero [tensile cap](#tensile-strength-in-ssrm) ($T = 0$), the stationary trials prevent non-convergence from finding a bracket before the [auto-bracket](#methodology) reaches its floor. The hybrid brackets the same model. |
 
-Pass `failure_criterion="non_convergence"` for the classical Griffiths & Lane verdict; it remains
-fully supported, and every criterion returns the same per-trial records.
+Pass `failure_criterion="non_convergence"` for the classical verdict; every criterion
+returns the same per-trial records.
 
 ### 3. Displacement limit (`"displacement_limit"`)
 

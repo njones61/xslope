@@ -232,26 +232,48 @@ the weight of ponded water on a submerged face. The water table is not a boundar
 this kind; it enters through the pore pressures, which reduce the effective stress inside the
 soil. The section below shows each of these on a simple slope:
 
+Each is described below.
+
 ![FEM boundary restraints, surface loads and water table](images/fem_boundary_conditions.png){width=800px}
 
 The red arrows are applied loads; the water table supplies pore pressures, not a boundary traction.
 
 ### Displacement boundary conditions
 
-**Fixed supports** ($u = v = 0$) represent rigid bedrock or a boundary deep enough that its movement
-does not matter. The model should extend at least one slope height below the toe, and preferably to
-a stiff layer.
+<span id="what-xslope-assigns-automatically"></span>
 
-**Roller supports** prevent movement in one direction only. On vertical side boundaries $u = 0$ with
-$v$ free represents ground continuing beyond the model with the same geometry and loading.
+`build_fem_data()` derives every displacement boundary condition from the mesh geometry, with
+nothing specified by hand. All nodes start free. **Fixed supports** ($u = v = 0$) hold the base,
+the boundary that is neither ground surface nor a side edge, along its whole length, undulating
+or not. On a flat-bottomed domain these are the nodes at the minimum $y$.
 
-**Free boundaries** — the ground surface and slope face — carry zero traction except where a load is
-applied.
+The sides are found as the boundary edges reaching the extreme $x$, so a slightly off-plumb
+truncation is still restrained along its whole face. The main sheet's **Side BC** cell chooses
+**roller supports** ($u = 0$, $v$ free), the default, or fixed supports in both directions.
+Rollers let ground continuing beyond the model settle under its own weight; fixed sides match
+RS2's setting, but add shear restraint and stiffen a domain truncated close to the slope. Corner
+nodes where a side meets the base keep the fixed condition either way. **Free boundaries**, the
+ground surface and slope face, carry zero traction except where loads are applied; a loaded node
+retains any displacement constraint it already carries.
+
+A base fixed too close to the slope constrains the mechanism and raises the factor of safety by
+several percent, so the model should extend below the toe, to a stiff layer where there is one and
+otherwise by about a slope height, and the flat ground beyond the toe and crest should run about
+twice the slope height so the mechanism can form freely.
 
 Prescribed displacements are imposed on the assembled system by direct modification of the
 constrained rows; applied forces enter $\{F\}$ directly and leave $[K]$ unchanged.
 
+The figure below shows the result for the reinforced slope built in [FEM-2](../tutorials/fem02_reinforcement.md):
+fixed supports (triangles) along the base, x-rollers (circles) on the sides, a free ground surface,
+arrows for the 240 psf surcharge on the crest, and reinforcement elements in red.
+
+![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
+
 ### Loads {#distributed-loads}
+
+Surface loads become nodal forces; body forces use the moist and saturated soil weights, with the
+water table setting where each weight applies.
 
 Distributed loads are a pressure along a stretch of the ground surface, given as coordinates with
 intensities on the **dloads** sheet and shared with the limit-equilibrium solvers, which convert
@@ -275,11 +297,9 @@ a length $L$ this gives
 
 >>$F_1 = \frac{L}{6}(2q_1 + q_2) \qquad F_2 = \frac{L}{6}(q_1 + 2q_2)$
 
-and on a quadratic edge under uniform pressure the 1/6–2/3–1/6 corner–midside–corner split. Simple
-tributary-length lumping is *not* used: on quadratic edges it misallocates corner and midside
-forces, leaving a chain of self-equilibrated nodal couples of order $pL/6$ that appears as spurious
-near-surface stress oscillation — strong enough to falsely yield the skin elements under a large
-applied pressure such as reservoir loading.
+and on a quadratic edge under uniform pressure the 1/6–2/3–1/6 corner–midside–corner split.
+Tributary-length lumping is not used, because on quadratic edges it produces spurious near-surface
+stress oscillation.
 
 **Direction.** A load block's **Direction** column chooses how the traction is oriented: `normal`
 (the default, and what every file written before template version 21 means) applies it perpendicular
@@ -288,14 +308,8 @@ the same magnitude straight down, which is what a gravity surcharge on an inclin
 normal form would give it a horizontal thrust of $\tan\beta$ times the surcharge that the load does
 not have. A model may mix the two. Derived water loads always act normal to the surface.
 
-**Load direction into the slope.** The mesh, not the order in which the load line's points were
-entered, decides which way is into the slope. For each loaded edge the material lies on one side — the centroid of the element that
-owns the edge — and the pressure is directed at it; where an edge is shared by elements on both
-sides the contributions cancel and the load acts along the tangent-normal as usual. The same rule
-applies node-by-node on the tributary-lumping fallback used when a load line does not follow
-complete element edges. A load line authored right-to-left therefore assembles the same nodal forces
-as the same line authored left-to-right, and a pool against a downstream face is not pushed the
-wrong way.
+The pressure is directed into the soil regardless of the order in which the load line's points
+were entered.
 
 **Body forces.** Self weight enters as $b_y = -\gamma$, integrated to nodal forces element by
 element,
@@ -324,35 +338,6 @@ Two other quantities are weighed from the same split: the vertical overburden in
 pore-pressure option](#pore-pressure-options) reads. Both are integrated $\gamma_{sat}$ over the part of the column below the
 water table and $\gamma$ over the part above it.
 
-### What XSLOPE assigns automatically
-
-`build_fem_data()` derives every displacement boundary condition from the mesh geometry — nothing is
-specified by hand:
-
-1. **All nodes start free**, the natural zero-traction condition.
-
-2. **Fixed supports at the base.** The base is the part of the domain boundary that is neither
-   ground surface nor a side edge, so an undulating or stepped bedrock base is fixed along its whole
-   length; on a flat-bottomed domain this is exactly the set of nodes at the minimum $y$.
-
-3. **Side restraint on the left and right.** A side is the boundary edge that reaches the extreme
-   $x$-coordinate, not only the nodes standing exactly at it, so a far-field truncation digitized
-   slightly off plumb is still a side and the whole face is restrained. The main sheet's **Side BC**
-   cell chooses what the restraint is: `rollers` (the default, and every file that does not declare
-   it) gives $u = 0$ with $v$ free, so truncated ground can still settle under its own weight;
-   `fixed` clamps both components, which is what RS2 does on its side boundaries. Fixing the sides
-   matches the vendor's setting rather than improving the model — it adds shear restraint the real ground
-   does not have and stiffens a domain truncated close to the slope. Corner nodes where a side meets
-   the base keep the fixed condition either way.
-
-4. **Force boundary conditions** from the distributed loads, integrated edge by edge as above. Where
-   a loaded node also carries a displacement constraint, both are kept.
-
-The figure below shows the result for the reinforced slope built in [FEM-2](../tutorials/fem02_reinforcement.md):
-fixed supports (triangles) along the base, x-rollers (circles) on the sides, a free ground surface,
-arrows for the 240 psf surcharge on the crest, and reinforcement elements in red.
-
-![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
 ## Pore pressures {#pore-pressure-options}
 

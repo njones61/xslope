@@ -1,9 +1,6 @@
 """Regenerate the mesh-generation figures for docs/fem/mesh.md.
 
-Four figures, each answering one question the page asks the reader to decide:
-
-  mesh_element_nodes.png   What the five element types are, and where their
-                           nodes sit — the local numbering the mesh arrays use.
+Three figures, each answering one question the page asks the reader to decide:
   mesh_tri_vs_quad.png     What the element-type choice looks like on a real
                            section: the same layered slope as tri3 and quad4.
   mesh_zone_size.png       What a per-zone Size does: a thin weak layer that the
@@ -171,64 +168,6 @@ def _stats(mesh):
 
 
 # --------------------------------------------------------------------------
-# 1. element types and local node numbering
-# --------------------------------------------------------------------------
-
-TRI = np.array([(0.0, 0.0), (1.0, 0.0), (0.5, 0.88)])
-QUAD = np.array([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
-
-
-def _element_schematic(kind):
-    """Corner outline plus the node coordinates in xslope's local order.
-
-    Corners come first, counterclockwise; then the midside nodes in edge order
-    (0-1, 1-2, ...); then, for quad9, the center. This is the order the mesh
-    ``elements`` array stores, so the labels are the array columns."""
-    base = TRI if kind.startswith("tri") else QUAD
-    nodes = [tuple(p) for p in base]
-    if kind in ("tri6", "quad8", "quad9"):
-        n = len(base)
-        nodes += [tuple((base[i] + base[(i + 1) % n]) / 2) for i in range(n)]
-    if kind == "quad9":
-        nodes.append(tuple(base.mean(axis=0)))
-    return base, np.array(nodes)
-
-
-def figure_element_nodes():
-    kinds = [("tri3", "3-node triangle"), ("tri6", "6-node triangle"),
-             ("quad4", "4-node quadrilateral"), ("quad8", "8-node quadrilateral"),
-             ("quad9", "9-node quadrilateral")]
-    fig_w, panel_h = 10.0, 1.95
-    fig = plt.figure(figsize=(fig_w, panel_h + 0.55), dpi=DPI)
-    for i, (kind, title) in enumerate(kinds):
-        ax = fig.add_axes((i / len(kinds) + 0.012, 0.10,
-                           1 / len(kinds) - 0.024, panel_h / (panel_h + 0.55) * 0.86))
-        outline, nodes = _element_schematic(kind)
-        ring = np.vstack([outline, outline[:1]])
-        ax.fill(ring[:, 0], ring[:, 1], color="#cfe3ee", alpha=0.85, zorder=0)
-        ax.plot(ring[:, 0], ring[:, 1], color="0.2", lw=1.4, zorder=1)
-        ax.scatter(nodes[:, 0], nodes[:, 1], s=42, color="#c0392b", zorder=3)
-        center = nodes[:len(outline)].mean(axis=0)
-        for n, (x, y) in enumerate(nodes):
-            # Push each label away from the element center so it never sits on
-            # an edge; the center node of quad9 has nowhere to go but up.
-            d = np.array([x, y]) - center
-            if np.hypot(*d) < 1e-9:
-                off = np.array([0.0, 0.16])
-            else:
-                off = 0.20 * d / np.hypot(*d)
-            ax.annotate(str(n), (x + off[0], y + off[1]), ha="center", va="center",
-                        fontsize=9.5, fontweight="bold", color="#7b241c")
-        ax.set_title(f"{kind}\n{title}", fontsize=9.5, fontweight="bold", pad=4,
-                     linespacing=1.35)
-        ax.set_aspect("equal", adjustable="box")
-        ax.set_xlim(-0.34, 1.34)
-        ax.set_ylim(-0.30, 1.38)
-        ax.axis("off")
-    _save(fig, "mesh_element_nodes.png")
-
-
-# --------------------------------------------------------------------------
 # 2. triangles vs quadrilaterals on the same section
 # --------------------------------------------------------------------------
 
@@ -324,7 +263,6 @@ def figure_refine_features():
 
 
 def main():
-    figure_element_nodes()
     figure_tri_vs_quad()
     figure_zone_size()
     figure_refine_features()

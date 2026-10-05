@@ -184,9 +184,10 @@ A typical slope mesh is shown below.
 
 ![sample_mesh.png](images/sample_mesh.png)
 
-XSLOPE supports linear and quadratic triangles and quadrilaterals:
+XSLOPE supports linear and quadratic triangles and quadrilaterals. The red markers below
+show the nodes added between corners in the quadratic forms, alongside the embedded bars and beams.
 
-![element_types.png](images/element_types.png){width=600px}
+![Soil, bar and beam elements with local node indices](images/all_element_nodes.png){width=1500px}
 
 [Mesh Generation](mesh.md) covers mesh construction and
 [element choice for FEM analyses](mesh.md#element-choice-for-fem-analyses).

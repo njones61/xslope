@@ -72,7 +72,9 @@ solution variable linearly across the element; the quadratic types, `tri6`, `qua
 `quad9`, add midside nodes and carry it quadratically, which resolves a curving field
 with far fewer elements.
 
-![Element types and local node numbering](images/mesh_element_nodes.png)
+Use the local indices below to read the node order in the mesh arrays.
+
+![Soil, bar and beam elements with local node indices](images/all_element_nodes.png){width=1500px}
 
 Node ordering is the same for every type: corner nodes first, counterclockwise, then the
 midside nodes in edge order (0–1, 1–2, and so on), then — for `quad9` alone — the center

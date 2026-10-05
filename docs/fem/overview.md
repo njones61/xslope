@@ -137,42 +137,28 @@ for each are on the [mat worksheet](../usage/input_template.md#worksheet-mat) pa
 
 ### Curved failure envelopes
 
-Two strength options are not straight lines in $\tau$–$\sigma'_n$ space: the power curve (`pow`) and
-the generalized Hoek-Brown criterion (`hb`), both described in the
-[LEM overview](../lem/overview.md#hoek-brown-strength). The FEM carries no separate yield function
-for either. It uses the Mohr-Coulomb formulation and **re-linearizes the curve into an instantaneous
-tangent $(c_i, \phi_i)$ at every Gauss point on every viscoplastic iteration**, using that
-iteration's own stress state. Because the algorithm is already iterating the stress field to
-convergence, the tangent converges with it: at equilibrium every yielding Gauss point sits on the
-true curved envelope at its own normal stress.
+Two of the five options, the power curve (`pow`) and the generalized Hoek-Brown criterion (`hb`),
+give a strength envelope that curves in $\tau$–$\sigma'$ space instead of the straight line above;
+both are defined on the [LEM overview](../lem/overview.md#hoek-brown-strength). The FEM has no
+separate yield function for them. At every Gauss point, on every iteration, it draws the tangent
+to the curve at that point's current normal stress and applies the Mohr-Coulomb formulation with
+the tangent's own cohesion and friction angle, $c_i$ and $\phi_i$. As the iteration converges the
+stress at each point settles, the tangent settles with it, and at equilibrium every yielding
+point sits on the true curve at its own normal stress.
 
-**Linearization point.** The power curve uses the in-plane Mohr-circle center,
-$s' = -(\sigma_x + \sigma_y)/2$ (compression-positive) — mild enough curvature that the center is a
-stable, fully vectorizable choice. Hoek-Brown is far more sharply curved and uses the normal stress
-on the **failure plane**,
+The normal stress at which the tangent is taken differs between the two. The power curve bends
+gently, and the center of the in-plane Mohr circle, $s' = -(\sigma_x + \sigma_y)/2$ (compression
+positive), serves. Hoek-Brown bends sharply, and the tangent is taken at the normal stress on the
+failure plane, $\sigma_n = s'\cos^2\phi - c\sin\phi\cos\phi$, computed from the previous iteration's
+reduced tangent. That is the point where the Mohr circle touches its tangent line, and the same
+normal stress the LEM uses at a slice base.
 
-$$\sigma_n = s'\cos^2\phi - c\,\sin\phi\,\cos\phi$$
+Strength reduction divides $c_i$ and $\tan\phi_i$ by $F$ after the tangent is taken. The curve's own
+constants are never divided: $\sigma_{ci}/F$ would be a different envelope, because of the exponent
+$a$, and would give a wrong factor of safety.
 
-evaluated from the previous iteration's *reduced* tangent. That is exactly where a Mohr circle
-touches its tangent line, so it closes as a fixed point inside the viscoplastic loop at no extra
-cost, and it is the same abscissa the LEM uses (the slice-base normal stress).
-
-Strength reduction divides the *instantaneous* cohesion and $\tan\phi_i$ by $F$, once per iteration,
-after the tangent is computed. The curve's own constants are never reduced — $\sigma_{ci}/F$ is a
-different envelope entirely because of the exponent $a$, and would give the wrong factor of safety.
-For the same reason the minor principal stress $\sigma'_3$ is not used as the abscissa: Balmer's
-$\sigma'_3 \rightarrow$ tangency mapping is derived for the **unreduced** envelope, so under
-reduction it gives an out-of-date point, and because the Hoek-Brown envelope is concave a tangent taken
-there lies above the true envelope and inflates the factor of safety.
-
-!!! note "Verification"
-    The Hoek-Brown implementation is verified end-to-end against Example 1 of Hammah, R.E., Yacoub, T.E.,
-    Corkum, B., & Curran, J.H. (2005), *The shear strength reduction method for the generalized Hoek-Brown
-    criterion*, Proc. 40th U.S. Symposium on Rock Mechanics (ARMA/USRMS), Paper 05-810 — a 10 m, 45° slope in
-    a weak rock mass ($\sigma_{ci}$ = 30 MPa, GSI = 5, $m_i$ = 2, $D$ = 0). XSLOPE returns Spencer **1.152**
-    and Bishop **1.150** against the paper's 1.152 and 1.153, and SSRM **1.166** against its published SSRM
-    value of 1.15. The derived constants ($m_b$ = 0.0672, $s$ = 2.605e-5, $a$ = 0.6192) reproduce the paper's
-    Table 1 exactly.
+The Hoek-Brown implementation is verified against Example 1 of Hammah, Yacoub, Corkum & Curran
+(2005); see the [verification page](../verification/ssrm.md#hoek-brown).
 
 ## Finite element formulation
 

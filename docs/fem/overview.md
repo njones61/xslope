@@ -13,10 +13,15 @@ slope domain and lets the failure mechanism emerge where the soil actually runs 
 that develops is an output rather than an input.
 
 XSLOPE's implementation is the viscoplastic elastic-perfectly-plastic algorithm of Griffiths &
-Lane (1999) and Smith & Griffiths (2004), with the factor of safety obtained by the
-[shear strength reduction method (SSRM)](solver.md#shear-strength-reduction-method-ssrm). Material properties, geometry, water and loads come from the same Excel
-input file the limit-equilibrium solvers read, with Young's modulus $E$ and Poisson's ratio $\nu$
-added on the **mat** sheet.
+Lane (1999) and Smith & Griffiths (2004). The factor of safety comes from the
+[shear strength reduction method (SSRM)](solver.md#shear-strength-reduction-method-ssrm): the selected
+soil and joint shear strengths, cohesion and $\tan\phi$, are divided by a trial factor $F$, the
+slope is solved at that reduced strength, and $F$ is raised until the slope can no longer come to
+equilibrium. The $F$ at which it stops standing is the factor of safety, the same quantity limit
+equilibrium defines as the ratio of available to mobilized strength. The [Solver](solver.md) page
+describes the trials, how each is decided and how the search over $F$ runs. Material properties,
+geometry, water and loads come from the same Excel input file the limit-equilibrium solvers read,
+with Young's modulus $E$ and Poisson's ratio $\nu$ added on the **mat** sheet.
 
 A strength reduction run returns the deformed mesh, the shear-strain field and the displacement
 vectors of the failure mechanism:

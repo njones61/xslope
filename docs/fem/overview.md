@@ -558,6 +558,10 @@ analysis, where the unknown is a scalar head and nothing can lock. The
 [mesh page](mesh.md#element-choice-for-fem-analyses) covers the choice among the three quadratic
 types and how the midside nodes are added.
 
+With the model defined, the [Solver](solver.md) page takes over: how one trial at a reduced
+strength is iterated and decided, how the search over $F$ finds the factor of safety, and the
+settings that control both.
+
 ## Seismic forces
 
 Seismic loading uses the pseudo-static method in both the limit-equilibrium and finite element

@@ -139,13 +139,11 @@ def _fs_title(base, F, fs=None, at_failure=False, lower=False, undecided=False):
     """Result-panel title that keeps the SSRM factor of safety and the rendered
     viscoplastic state unambiguous.
 
-    Normal (converged) panels are rendered at the LAST CONVERGED strength-reduction
-    factor (``solution['F']``); the reported factor of safety is the SSRM bracket
-    midpoint (``result['FS']``), which is half a bisection step above it. Factors are
-    printed to three decimals, the convention every LEM result uses, so the two
-    differ whenever the bracket is wider than 0.001 and the title then names both;
-    it keeps the simple ``F = X.XXX`` form only when they agree at that precision
-    (or just ``base`` when no F is available).
+    Normal SSRM panels draw the last-converged field. When ``fs`` is supplied,
+    they read "<base> at Last Converged (Scale = Nx)  FS = X.XXX", with the
+    state before any scale and the factor of safety once, to three decimals.
+    The field's trial factor ``F`` is not printed alongside it. Without ``fs``,
+    standalone trial panels retain "F = X.XXX" (or just ``base`` without F).
 
     ``at_failure`` marks a panel rendering the UNCONVERGED at-failure field (captured
     a margin beyond critical). It leads with the factor of safety and stops there —
@@ -163,11 +161,14 @@ def _fs_title(base, F, fs=None, at_failure=False, lower=False, undecided=False):
         return f"{base}{state}  {ssrm_fs_text(fs, True)}"
     if at_failure and fs is not None:
         return f"{base}  FS = {fs:.3f}"
+    if fs is not None:
+        first, newline, rest = base.partition("\n")
+        label, scale, suffix = first.partition(" (Scale =")
+        first = f"{label} at Last Converged{scale}{suffix}"
+        return f"{first}{newline}{rest}  FS = {fs:.3f}"
     if F is None:
         return base
-    if fs is None or f"{fs:.3f}" == f"{F:.3f}":
-        return f"{base}  F = {F:.3f}"
-    return f"{base}  FS = {fs:.3f} (last converged F = {F:.3f})"
+    return f"{base}  F = {F:.3f}"
 
 
 #: What the viscoplastic maximum shear strain field is called — the name the
@@ -1005,10 +1006,10 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         save_png: Save figure to PNG file
         dpi: Resolution for saved PNG
         fs: Optional SSRM factor of safety (the bracket-midpoint result['FS']). When
-            given and it differs at display rounding from the last-converged F the
-            field was rendered at (solution['F']), the panel titles name both — e.g.
-            "FS = 0.455 (last converged F = 0.445)". When omitted or equal
-            at three decimals, titles keep the simple "F = X.XXX" form.
+            given, converged panel titles read "at Last Converged … FS = X.XXX"
+            and at-failure titles retain "at Failure … FS = X.XXX". The trial
+            factor is not printed alongside FS. When omitted, standalone trial
+            titles retain "F = X.XXX".
         fs_is_lower_bound: True for a run that found no failure
             (``result['fs_is_lower_bound']``): ``fs`` is then the lower bound it
             confirmed, every title reads "FS ≥ X", and ``failure_solution`` is
@@ -1029,8 +1030,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             at-failure (unconverged) field, titled "...at Failure  FS = X". 'converged'
             renders every panel from the last-converged ``solution`` instead — the
             deformation panel gets its own auto-scale exaggeration on that field, and
-            every panel keeps the established dual-title convention ("FS = X (rendered
-            at last converged F = Y)"). With no ``failure_solution``, both selections
+            panels carrying FS read "at Last Converged … FS = X.XXX".
+            With no ``failure_solution``, both selections
             are identical (there's only one field to render) — automatic fallback.
         strain_state: Pre-generalization alias for ``field_state`` (it originally
             governed only the filled-contour panels, before the deformation and

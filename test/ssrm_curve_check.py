@@ -629,6 +629,40 @@ def check_lower_bound():
           titles[("converged", "shear_strain")])
 
 
+def check_panel_titles():
+    """Title formatting only: synthetic factors, no mesh or solver run."""
+    from xslope.plot_fem import _fs_title
+
+    print("\nSSRM panel titles")
+    base = "Viscoplastic Deformation (Scale = 1x)"
+    want = "Viscoplastic Deformation at Last Converged (Scale = 1x)  FS = 1.246"
+    for F in (1.2421875, 1.24609375, None):
+        check(f"converged FS title with F={F}",
+              _fs_title(base, F, 1.24609375) == want)
+    check("an unscaled converged panel names its state",
+          _fs_title("Viscoplastic shear strain", 1.242, 1.246)
+          == "Viscoplastic shear strain at Last Converged  FS = 1.246")
+    check("a fallback clause stays on its second line",
+          _fs_title(base + "\ncapture unavailable", 1.242, 1.246)
+          == want.removesuffix("  FS = 1.246")
+          + "\ncapture unavailable  FS = 1.246")
+    check("the at-failure title is unchanged",
+          _fs_title("Viscoplastic Deformation at Failure (Scale = 1x)",
+                    1.433, 1.246, at_failure=True)
+          == "Viscoplastic Deformation at Failure (Scale = 1x)  FS = 1.246")
+    check("the lower-bound converged title is unchanged",
+          _fs_title(base, 1.5625, 1.5625, lower=True)
+          == base + "  FS ≥ 1.56")
+    check("the undecided lower-bound title is unchanged",
+          _fs_title(base, 1.5703, 1.5625, at_failure=True,
+                    lower=True, undecided=True)
+          == base + "  Last trial (undecided)  FS ≥ 1.56")
+    check("a standalone trial retains F",
+          _fs_title(base, 1.2421875) == base + "  F = 1.242")
+    check("a standalone panel without F retains its base",
+          _fs_title(base, None) == base)
+
+
 # ===================== 6. the tag reader =====================
 
 def check_tag_reader():
@@ -686,7 +720,7 @@ def run():
     run_tests.py's module checks call."""
     del FAILURES[:]
     for fn in (check_trial_record, check_round_trip, check_plot, check_summary,
-               check_lower_bound, check_tag_reader):
+               check_lower_bound, check_panel_titles, check_tag_reader):
         try:
             fn()
         except Exception as exc:                              # noqa: BLE001

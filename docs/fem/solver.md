@@ -376,7 +376,7 @@ instrumentation costs nothing measurable and no extra solves are needed.
 |---|---|---|
 | Beyond elastic scale **and** growing (or the trial passed the [displacement limit](#3-displacement-limit-displacement_limit), `max_disp_factor`) | `FAILED` | Failed — same as non-convergence |
 | At elastic scale **and** frozen | `STABLE_STUCK` | **Not** failed: the bracket moves up |
-| One signal without the other, or too little history | `AMBIGUOUS` | Failed — non-convergence's verdict stands |
+| One signal without the other, or too little history | `AMBIGUOUS` | Failed fallback, unless the trial has an [undecided exit](#creep-trend) or stops at the [yield gate](#the-yield-check) |
 
 Requiring *both* signals in each direction keeps this conservative: the hybrid overrides only
 where the evidence is unambiguous, and every trial's verdict, $u_{ratio}$ and growth come back in
@@ -505,6 +505,9 @@ corrector can certify, so the rule applies only where that attempt fails.
 **Inconclusive trials.** A trial that reaches `max_iterations_ceiling` still dying away or with no
 clear trend, and with its out-of-balance still falling (the mean over the last 500 iterations at
 least 1% below the mean over the 500 before), is neither settled nor failed, and it is reported as `exit_reason = 'inconclusive'`. The
+same exit is used at the hard ceiling when the displacement classifier returns `AMBIGUOUS`,
+whether or not the residual is still falling. Below the hard ceiling, an `AMBIGUOUS` reading
+retains the failed fallback when no stopping rule grants an extension. The
 [Newton corrector](#finishing-a-trial-with-the-newton-corrector) is applied to such trials, since a
 trial still improving at the ceiling is the kind a locally quadratic iteration can finish; with the
 default [`fem_solver='auto'`](#choosing-the-driver) an inconclusive trial is therefore rare, and remains only where the corrector also

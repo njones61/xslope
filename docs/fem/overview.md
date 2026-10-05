@@ -349,6 +349,34 @@ pore-pressure option](#pore-pressure-options) reads. Both are integrated $\gamma
 water table and $\gamma$ over the part above it.
 
 
+## Seismic forces
+
+Seismic loading uses the pseudo-static method in both the limit-equilibrium and finite element
+solvers: a constant horizontal acceleration, expressed as a fraction $k$ of gravity, applied to the
+whole soil mass as an additional body force,
+
+>>$b_{x,seismic} = k \gamma, \qquad b_{y,seismic} = 0$
+
+integrated to nodal forces exactly as self weight is,
+$\{F\}_{seismic} = \sum_e \int_{A_e} [N]^T \{b\}_{seismic} \, dA$, and added to the load vector. The
+horizontal equilibrium equation gains the corresponding term:
+
+>>$\dfrac{\partial \sigma_x}{\partial x} + \dfrac{\partial \tau_{xy}}{\partial y} + k\gamma = 0$
+
+**Sign of $k$ in the FEM.** The driving direction is the one that promotes sliding:
+negative $x$ for a left-facing slope, positive $x$ for a right-facing one. The limit-equilibrium
+solvers work out which from the location and geometry of the failure surface and use the magnitude
+of $k$ only. The finite element solver has no failure surface to read, and analyzes both faces of a
+dam or levee at once, so it uses the **signed** value exactly as entered: enter $k$ negative to
+drive a left-facing slope and positive to drive a right-facing one.
+
+The mirrored slopes below show the horizontal seismic body force in each driving direction:
+
+![Signed seismic body forces driving left- and right-facing slopes](images/fem_seismic_direction.png){width=800px}
+
+A negative $k$ drives the left-facing slope to the left; a positive $k$ drives the right-facing
+slope to the right. The arrows act through the soil mass, not as loads on its surface.
+
 ## Pore pressures {#pore-pressure-options}
 
 Soil strength depends on the effective stress, the part of the total stress carried by the soil
@@ -563,34 +591,6 @@ search; tri6 is the default. Linear elements lock, and the only place for them i
 analysis, where the unknown is a scalar head and nothing can lock. The
 [mesh page](mesh.md#element-choice-for-fem-analyses) covers the choice among the three quadratic
 types and how the midside nodes are added.
-
-## Seismic forces
-
-Seismic loading uses the pseudo-static method in both the limit-equilibrium and finite element
-solvers: a constant horizontal acceleration, expressed as a fraction $k$ of gravity, applied to the
-whole soil mass as an additional body force,
-
->>$b_{x,seismic} = k \gamma, \qquad b_{y,seismic} = 0$
-
-integrated to nodal forces exactly as self weight is,
-$\{F\}_{seismic} = \sum_e \int_{A_e} [N]^T \{b\}_{seismic} \, dA$, and added to the load vector. The
-horizontal equilibrium equation gains the corresponding term:
-
->>$\dfrac{\partial \sigma_x}{\partial x} + \dfrac{\partial \tau_{xy}}{\partial y} + k\gamma = 0$
-
-**Sign of $k$ in the FEM.** The driving direction is the one that promotes sliding:
-negative $x$ for a left-facing slope, positive $x$ for a right-facing one. The limit-equilibrium
-solvers work out which from the location and geometry of the failure surface and use the magnitude
-of $k$ only. The finite element solver has no failure surface to read, and analyzes both faces of a
-dam or levee at once, so it uses the **signed** value exactly as entered: enter $k$ negative to
-drive a left-facing slope and positive to drive a right-facing one.
-
-The mirrored slopes below show the horizontal seismic body force in each driving direction:
-
-![Signed seismic body forces driving left- and right-facing slopes](images/fem_seismic_direction.png){width=800px}
-
-A negative $k$ drives the left-facing slope to the left; a positive $k$ drives the right-facing
-slope to the right. The arrows act through the soil mass, not as loads on its surface.
 
 ## Structural elements
 

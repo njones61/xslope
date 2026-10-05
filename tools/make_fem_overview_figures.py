@@ -357,42 +357,81 @@ def fig_capture_comparison():
     print("wrote", path, "from saved W-3 fields; no solve", flush=True)
 
 
+def run_fem1_curve():
+    """Figure-only FEM-1 search at RS2-16's tolerance; launch through the gate."""
+    import json
+    from xslope.fileio import load_slope_data
+    from xslope.fem import build_fem_data, solve_ssrm
+    from tools.make_tutorial_figures import (
+        FEM01_DONE, FEM01_CRITERION, FEM01_F_MIN, FEM01_F_MAX,
+        FEM01_MAX_ITERATIONS, _fem01_mesh)
+
+    with open(os.path.join(HERE, "..", "docs", "verification", "files",
+                           "rocscience", "vp020_fem_meta.json")) as stream:
+        tolerance = json.load(stream)["tolerance"]
+    model = load_slope_data(FEM01_DONE)
+    fem_data = build_fem_data(model, _fem01_mesh(model))
+    result = solve_ssrm(
+        fem_data, F_min=FEM01_F_MIN, F_max=FEM01_F_MAX, tolerance=tolerance,
+        max_iterations=FEM01_MAX_ITERATIONS, failure_criterion=FEM01_CRITERION,
+        capture_failure_state=False, debug_level=1)
+    record = {key: result.get(key) for key in (
+        "FS", "final_interval", "interval_width", "trials", "fs_is_lower_bound", "summary")}
+    record.update(benchmark="FEM-1-overview-tol-0.02", analysis="ssrm",
+                  file="docs/tutorials/files/xslope_ssrm_embankment.xlsx",
+                  tolerance=tolerance, F_min=FEM01_F_MIN, F_max=FEM01_F_MAX,
+                  max_iter=FEM01_MAX_ITERATIONS, failure_criterion=FEM01_CRITERION,
+                  target_size=model["target_size"], element_type=model["element_type"],
+                  unit_system=model.get("unit_system"), figure_only=True)
+    path = os.path.join(OUT, "fem01_ssrm_curve_fem_meta.json")
+    with open(path, "w") as stream:
+        json.dump(record, stream, indent=2,
+                  default=lambda value: value.tolist() if isinstance(value, np.ndarray)
+                  else value.item() if isinstance(value, np.generic) else str(value))
+        stream.write("\n")
+    print("wrote figure-only record", path, flush=True)
+    fig_displacement_curves()
+
+
 def fig_displacement_curves():
-    """Keep the original FEM-1 PNG and render a separate saved RS2-16 curve."""
+    """Replay the figure-only FEM-1 record and the committed RS2-16 record."""
     import json
     from xslope.fileio import load_slope_data
     from xslope.plot_fem import plot_ssrm_curve
 
-    stem = os.path.join(HERE, "..", "docs", "verification", "files",
-                        "rocscience", "vp020")
-    model = load_slope_data(stem + ".xlsx")
-    with open(stem + "_fem_meta.json") as stream:
-        record = json.load(stream)
-    fig, ax = plt.subplots(figsize=(9, 5))
-    plot_ssrm_curve(ax, record, fem_data=model)
-    fig.tight_layout()
-    print("RS2-16:", ax.get_title(), ax.get_ylabel(),
-          [t.get_text() for t in ax.get_legend().get_texts()], flush=True)
-    path = os.path.abspath(os.path.join(OUT, "rs2_16_ssrm_curve.png"))
-    fig.savefig(path, dpi=150, facecolor="white")
-    plt.close(fig)
-    # The original FEM-1 plot is already committed. Its old trial sidecar
-    # lacks displacements; preserve the original program render rather than
-    # inventing a record, rerunning a search or rewriting its annotations.
-    if not os.path.isfile(os.path.join(OUT, "fem01_ssrm_curve.png")):
-        raise FileNotFoundError("The original committed FEM-1 render is required")
-    print("kept original fem01_ssrm_curve.png; wrote", path,
-          "from committed RS2-16 record; no solve", flush=True)
+    models = (
+        ("FEM-1", os.path.join(HERE, "..", "docs", "tutorials", "files",
+                               "xslope_ssrm_embankment.xlsx"),
+         os.path.join(OUT, "fem01_ssrm_curve_fem_meta.json"), "fem01_ssrm_curve.png"),
+        ("RS2-16", os.path.join(HERE, "..", "docs", "verification", "files",
+                                 "rocscience", "vp020.xlsx"),
+         os.path.join(HERE, "..", "docs", "verification", "files", "rocscience",
+                      "vp020_fem_meta.json"), "rs2_16_ssrm_curve.png"))
+    for name, model_path, record_path, filename in models:
+        model = load_slope_data(model_path)
+        with open(record_path) as stream:
+            record = json.load(stream)
+        fig, ax = plt.subplots(figsize=(9, 5))
+        plot_ssrm_curve(ax, record, fem_data=model)
+        fig.tight_layout()
+        print(name, ax.get_title(), ax.get_ylabel(),
+              [t.get_text() for t in ax.get_legend().get_texts()], flush=True)
+        path = os.path.abspath(os.path.join(OUT, filename))
+        fig.savefig(path, dpi=150, facecolor="white")
+        plt.close(fig)
+        print("wrote", path, "from saved record; no solve", flush=True)
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["displacement-curves"]:
+    if sys.argv[1:] == ["run-fem1-curve"]:
+        run_fem1_curve()
+    elif sys.argv[1:] == ["displacement-curves"]:
         fig_displacement_curves()
     elif sys.argv[1:] == ["capture-comparison"]:
         fig_capture_comparison()
     elif sys.argv[1:]:
         raise SystemExit("usage: make_fem_overview_figures.py "
-                         "[displacement-curves|capture-comparison]")
+                         "[run-fem1-curve|displacement-curves|capture-comparison]")
     else:
         fig_viscoplastic_loop()
         fig_k0_initial()

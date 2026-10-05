@@ -755,9 +755,12 @@ the [displacement limit](solver.md#3-displacement-limit-displacement_limit)**. T
 [final bracket](solver.md#methodology) is shaded behind it. The same plot is available alone as
 `xslope.plot_fem.plot_ssrm_curve(ax, record)`.
 
-The original [FEM-1 embankment](../tutorials/fem01_strength_reduction.md) curve below shows a sharp
-rise of the standing trials near the final bracket. Its open markers show trials that stopped
-while still moving, at the iteration limit or after their displacements ran away.
+The [FEM-1 embankment](../tutorials/fem01_strength_reduction.md) curve below uses a soil target size
+of 3.5 ft. Its standing displacements stay small before turning upward near the final bracket:
+the last standing trial reaches 0.125 ft at $F = 1.359375$. The open markers show trials that
+stopped while still moving, at the iteration limit or after their displacements ran away.
+The upturn remains at the shared tolerance used for these plots: the last segment of the
+standing curve is about twelve times steeper than the preceding segment.
 
 ![FEM-1 embankment displacement curve](images/fem01_ssrm_curve.png){width=1350}
 
@@ -772,9 +775,11 @@ lower bound: its upper trial was counted as failed, rather than left undecided.
 
 ![RS2-16 weak-seam slope displacement curve from its saved 3 m mesh record](images/rs2_16_ssrm_curve.png){width=1350}
 
-FEM-1 was run at a tolerance of 0.01, RS2-16 at 0.02. The shaded band is each run's final bracket,
+Both curves were run at an SSRM tolerance of 0.02. The shaded band is each run's final bracket,
 not the tolerance itself: bisection stops when its width is below that tolerance. FEM-1's bracket
-is $[1.3671875,\,1.375]$, width 0.0078125; RS2-16's is $[0.96875,\,0.9875]$, width 0.01875.
+is $[1.359375,\,1.375]$, width 0.015625; RS2-16's is $[0.96875,\,0.9875]$, width 0.01875.
+Their starting brackets differ, $[1,\,2]$ and $[0.8,\,1.4]$, so successive halvings need not give
+identical final widths even at the same stopping tolerance.
 The displayed $F$ ranges also differ, about 1–2 and 0.8–1.4, so RS2-16's band occupies a larger
 fraction of its axis. Neither bracket has an undecided upper edge.
 

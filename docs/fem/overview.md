@@ -421,111 +421,76 @@ controlled by the `phi_b` and `s_cap` columns on the
 
 ## K0 initial stress
 
-A finite element analysis computes deformation from a **change** in stress, so before it can run it
-has to be told what stress the ground was already in. That in-situ state is not implied by the mesh:
-the same geometry, strengths and loads are consistent with many lateral stress states, and the one
-chosen fixes the confinement every element starts with — which, in a frictional material, is very
-nearly the same thing as fixing its strength. XSLOPE offers the two conventions in general use, gravity turn-on and at-rest initialization.
+In-situ stress is the stress the ground carries before the analysis; the mesh, strengths and loads
+alone do not specify its lateral component. Deformation is computed from changes in that state.
+XSLOPE offers gravity turn-on and at-rest initialization.
+Leave the **K0 initial stress (FEM)** main-sheet cell blank for gravity turn-on; enter a value,
+pass `k0=` to `solve_fem()` / `solve_ssrm()`, or enable Studio's Run FEM checkbox and value for at-rest initialization.
 
-**Gravity turn-on** is the default and the Griffiths & Lane convention: the model starts from **zero
-stress** and self weight is switched on in a single step. The lateral stress that results is not a
-soil property at all — solving the elastic problem under a body force with zero lateral strain gives
+### The two conventions
+
+Gravity turn-on starts from zero stress and applies self weight in one step. Under elastic conditions
+with zero lateral strain, the horizontal effective stress is fixed by Poisson's ratio $\nu$:
 
 >>$\sigma'_h = \dfrac{\nu}{1-\nu}\,\sigma'_v$
 
-so the model's at-rest coefficient is fixed by **Poisson's ratio**. Normally consolidated sand does
-sit near Jaky's $K_0 = 1 - \sin\phi' \approx 0.43$, so at $\nu = 0.3$ the gravity turn-on often
-gives a reasonable lateral stress by coincidence. Compacted fill and overconsolidated clay do not: they carry locked-in lateral stress at
-$K_0 = 1$ and beyond.
-
-**At-rest initialization** states the in-situ stress directly instead of inferring it from the
-stiffness: the vertical stress is the weight of the soil column above the point, the lateral stress
-is $K_0$ times it, and $K_0$ is a modeling input carrying the soil's stress history.
-
-The figure compares the initial stress of the two conventions on the same slope:
-
-![fem_ov_k0_initial.png](images/fem_ov_k0_initial.png){width=700}
-
-The choice matters most for a **part of the model whose strength depends on confinement** — the
-reinforced-soil block of a geosynthetic wall being the clearest case, and any near-cohesionless
-material a close second, since with $c'$ near zero the confinement is essentially the whole of the
-strength. It matters least for a homogeneous cohesive embankment.
-[What to expect](#what-to-expect) quantifies both ends.
-
-### Formulation
-
-At-rest initialization builds the initial stress at every Gauss point from the overburden:
+At $\nu = 0.3$ this coincides with Jaky's $K_0 = 1 - \sin\phi' \approx 0.43$ for normally
+consolidated sand, but it does not represent the locked-in stress of compacted fill or overconsolidated clay.
+At-rest initialization instead specifies that stress history through $K_0$, building the effective
+stress at each Gauss point (an integration point inside an element) from the weight of the soil column above it:
 
 >>$\sigma'_v = -\!\!\int \gamma\,dz \;+\; u \qquad
   \sigma'_h = \sigma'_z = K_0\,\sigma'_v \qquad \tau_{xy} = 0$
 
-(tension-positive, effective; the vertical integral is the weight of the soil column directly above
-the point, obtained by intersecting a vertical ray with the material zones and weighing it
-$\gamma_{sat}$ below the water table and $\gamma$ above — the same definition the `ru` pore-pressure
-option uses). $\sigma_h$ is set both **in-plane and out-of-plane**: the
-out-of-plane stress is no longer $\nu(\sigma_x+\sigma_y)$ but the same $K_0\sigma'_v$, so the state
-is at rest rather than plane-strain elastic.
+Stresses are tension-positive and $u$ is pore pressure. The vertical ray through the material zones
+is weighed with $\gamma_{sat}$ below the water table and $\gamma$ above, as in the `ru` pore-pressure
+option. The horizontal stress is prescribed both in-plane and out-of-plane: the latter is $K_0\sigma'_v$,
+not the plane-strain elastic value $\nu(\sigma_x+\sigma_y)$.
+Overburden is soil only; reservoir, distributed and footing loads enter as boundary forces during equilibration.
 
-The state is carried by the classical **initial-stress method**. Writing
+The initial-stress method adds the prescribed field $\{\sigma_0\}$ to the stress from deformation:
 
 >>$\{\sigma\} = \{\sigma_0\} + [D]\big([B]\{u\} - \{\varepsilon^{vp}\}\big)$
 
-and substituting into $\int [B]^T\{\sigma\}\,dV = \{F_{ext}\}$ gives
+Here $[D]$ is the elastic stiffness, $[B]$ converts nodal displacements $\{u\}$ to strain, and
+$\{\varepsilon^{vp}\}$ is the viscoplastic strain. Substitution into equilibrium,
+$\int [B]^T\{\sigma\}\,dV = \{F_{ext}\}$, gives
 
 >>$[K]\{u\} = \{F_{ext}\} - \int [B]^T\{\sigma_0\}\,dV + \int [B]^T[D]\{\varepsilon^{vp}\}\,dV$
 
-so the only changes are one extra load term and one extra addend at the yield check. The solver
-still **iterates to equilibrium under the body forces**; it simply starts from the $K_0$ state
-rather than from nothing.
+The solver still iterates to equilibrium under body forces; the initial field adds a load term
+and an addend at the yield check. The figure compares both conventions on the same slope:
 
-Under this definition:
+![fem_ov_k0_initial.png](images/fem_ov_k0_initial.png){width=700}
 
-- The overburden is **soil only**. Surface tractions — a reservoir load, a distributed load, a
-  footing — are not in-situ stress and are applied as boundary forces during the equilibrium
-  iteration, where a load applied after the in-situ state belongs.
-- The compiled [fast kernel](solver.md#fast-kernel) takes the in-situ stress as an input, so a $K_0$ run
-  accelerates like any other Mohr-Coulomb run.
-
-On **level ground** the $K_0$ field is an exact equilibrium for any $K_0$ whatsoever: vertical
-equilibrium contains only $\sigma_v(z)$, which the overburden integral satisfies by construction,
-and horizontal equilibrium contains only the lateral variation of $\sigma_h$, which vanishes when
-nothing varies horizontally. Under flat ground the solution therefore has nothing to redistribute:
-it converges on the first iteration, leaves the mesh undisplaced to machine precision and yields
-nowhere. This is the one configuration with a closed-form answer, and XSLOPE's test suite checks it.
+On level ground with no horizontal variation, a fixed base and horizontally restrained sides,
+the $K_0$ field balances self weight for any $K_0$: the integral satisfies vertical equilibrium,
+and $\sigma_h$ has no horizontal gradient. If the field lies inside the soil's yield envelope and
+there are no additional surface loads, the solver converges on the first iteration, leaves the mesh
+undisplaced to machine precision and yields nowhere. XSLOPE's test suite checks this closed-form case.
 
 ### Choosing a value
 
-$K_0$ is a property of the soil's **stress history**, and the usual estimates are the ones already
-used for a retaining-wall or settlement calculation:
+The usual $K_0$ estimates for retaining-wall and settlement calculations apply:
 
->- **Normally consolidated** soil sits at Jaky's $K_0 = 1 - \sin\phi'$ — roughly 0.4 to
->  0.5 for sands and 0.5 to 0.7 for soft clays, falling as the friction angle rises.<br>
->- **Overconsolidated** soil carries more, commonly estimated as
->  $K_0 \approx (1 - \sin\phi')\,\mathrm{OCR}^{\sin\phi'}$. A lightly overconsolidated deposit
->  reaches 0.7 to 1.0; a heavily overconsolidated clay passes 1.0 and can approach the passive limit.<br>
->- **Compacted fill** is overconsolidated by the compaction plant itself — $K_0 = 1$ or above is
->  normal, and this is exactly the case of a reinforced-soil block, where the confinement decides the
->  frictional strength of a thin, tall zone.<br>
->- If the stress history is genuinely unknown, run it **both ways** and report the range. The
->  gravity turn-on is the lower-confinement, lower-factor-of-safety end.
+- Normally consolidated soil: Jaky's $K_0 = 1 - \sin\phi'$, roughly 0.4–0.5 for sands and
+  0.5–0.7 for soft clays, decreasing as the friction angle rises.
+- Overconsolidated soil: $K_0 \approx (1 - \sin\phi')\,\mathrm{OCR}^{\sin\phi'}$, where OCR is
+  the overconsolidation ratio. Light overconsolidation gives 0.7–1.0; heavily overconsolidated
+  clay exceeds 1.0 and can approach the passive limit.
+- Compacted fill: the compaction plant overconsolidates it, so $K_0 = 1$ or above is normal.
+- Unknown history: run both conventions and report [their factor-of-safety range](#what-to-expect).
 
-**Vendor conventions.** RS2 writes an explicit initial field stress into the model file with
-$\sigma_x = \sigma_y = \sigma_z$ and $K_x = K_z = 1$ — an isotropic at-rest state — and does so
-across Rocscience's published verification models. **Set $K_0 = 1$ whenever the target is an RS2 SSR
-number.** Plaxis takes the other convention: its $K_0$ procedure defaults to Jaky's
-$1 - \sin\phi'$ per material. XSLOPE's own default — gravity turn-on — matches Griffiths & Lane and
-the academic literature built on it.
-
-**How it is set.** The **K0 initial stress (FEM)** cell on the main sheet carries it with the model;
-`k0=` on `solve_fem()` / `solve_ssrm()` sets it from a script; Studio's Run FEM dialog exposes it as
-a checkbox and a value. Blank everywhere means the gravity turn-on.
+RS2's published verification models prescribe $\sigma_x = \sigma_y = \sigma_z$ and $K_x = K_z = 1$,
+an isotropic at-rest state; set $K_0 = 1$ to compare with their SSR results. Plaxis defaults to
+Jaky's $1 - \sin\phi'$ per material. XSLOPE's gravity-turn-on default follows Griffiths & Lane
+and the academic literature using that convention.
 
 ### What to expect
 
-How much $K_0$ changes the factor of safety is a property of the model, and the controlling factor is **cohesion**. Raising
-the confinement raises the initial deviatoric demand as well as the frictional capacity, so a slope
-whose strength is mostly cohesive changes little; a slope whose envelope passes near the origin
-takes almost all of its strength from confinement:
+The sensitivity depends on cohesion: higher confinement raises both initial deviatoric demand
+and frictional capacity, so a homogeneous cohesive embankment changes little, whereas the thin,
+tall reinforced-soil block of a geosynthetic wall or a near-cohesionless soil depends mainly on confinement.
 
 | Model | Gravity turn-on | $K_0 = 1$ | Change |
 |---|---|---|---|
@@ -536,13 +501,12 @@ takes almost all of its strength from confinement:
 | [RS2-48](../verification/rs2.md#rs2-48) multi-tier geosynthetic wall | 0.956 | 0.994 | +3.9% |
 | [RS2-4](../verification/rs2.md#rs2-4) Talbingo dam, under RS2's own exclusion area | 1.869 | 1.894 | +1.3% |
 
-The three members of RS2-31 show the pattern most clearly, being the same slope under
-three strength models: the one with real cohesion does not move at all, and the one whose envelope
-passes through the origin moves the most. In every model measured the at-rest state gives the
-*higher* factor of safety, so the default gravity turn-on is the conservative side of the choice.
+RS2-31 compares the same slope under three strength models: real cohesion gives no change, while
+the envelope through the origin gives the largest; every measured at-rest result is higher,
+making the lower-confinement gravity turn-on the conservative choice for these models.
 
-The [in-situ equilibration step](solver.md#in-situ-equilibration) establishes the
-full-strength state before SSRM trials and defines their displacement datum.
+The [in-situ equilibration step](solver.md#in-situ-equilibration) establishes the full-strength
+state before SSRM trials and defines their displacement datum.
 
 ## Element type and volumetric locking {#element-type-selection-and-volumetric-locking}
 

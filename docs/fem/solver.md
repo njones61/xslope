@@ -1102,8 +1102,9 @@ suite is computed with it, and the compiled kernel reproduces it bit-for-bit. `f
 forces the NumPy path. `fast_kernel=True` *requires* the kernel but warns
 and falls back to NumPy if it has not been built.
 
-The kernel handles the standard Mohr-Coulomb path, including the Rankine tension cutoff, the
-matric-suction term and the $K_0$ in-situ stress. Curved-envelope materials (power-curve and
+The kernel handles the standard Mohr-Coulomb path, including the Rankine tension cutoff and the
+matric-suction term; it takes the $K_0$ in-situ stress as an input, so at-rest runs accelerate like
+other Mohr-Coulomb runs. Curved-envelope materials (power-curve and
 Hoek-Brown) and all 1D reinforcement and pile work stay on the NumPy path automatically — a model
 that mixes them accelerates its Mohr-Coulomb groups and leaves the rest unchanged.
 

@@ -477,20 +477,17 @@ about half of it at $\nu = 0.3$, and the shaded band shows its range for $\nu$ b
 below the vertical-stress line, overconsolidated soil may lie above it, and at $K_0 = 1$ the two
 coincide.
 
-On level ground with no horizontal variation, a fixed base and horizontally restrained sides,
-the $K_0$ field balances self weight for any $K_0$: the integral satisfies vertical equilibrium,
-and $\sigma_h$ has no horizontal gradient. If the field lies inside the soil's yield envelope and
-there are no additional surface loads, the solver converges on the first iteration, leaves the mesh
-undisplaced to machine precision and yields nowhere.
-
-Under a slope there is no soil column beside the face to balance the lateral stress, so the field
-is not in equilibrium. With $K_0$ set, `solve_ssrm()` first runs one
-[equilibration solve](solver.md#in-situ-equilibration) at full strength to redistribute that imbalance
-before reducing strength. If it establishes a stable state, every trial starts from that state,
-and displacements are counted from it.
-
-Surface loads (reservoir, distributed, footing) are not part of the overburden. They are applied
-as boundary forces in that equilibration solve.
+An at-rest field is in equilibrium under level ground with no additional loads, provided it lies
+inside the soil's yield envelope. There, the vertical stress balances the weight above it and the
+horizontal stress is the same everywhere along a row, so nothing is out of balance and the solver
+has nothing to do: it converges on the first iteration with no displacement. Under a slope the
+field is not in equilibrium, because the soil beside the face is missing and nothing balances
+the horizontal stress the face would have carried. XSLOPE therefore begins an at-rest analysis
+with [one solve at full strength](solver.md#in-situ-equilibration), in which the imbalance
+redistributes and the slope settles into a stable state. Every strength-reduction trial starts
+from that state, and displacements are measured from it, so a trial's displacement is the
+movement caused by the reduction in strength and not by the initial stress. Surface loads are
+applied in that same solve; they are not part of the overburden.
 
 ### Choosing a value
 

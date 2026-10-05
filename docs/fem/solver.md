@@ -560,44 +560,13 @@ two functions' arguments.
 
 ### In-situ equilibration
 
-Before reducing strength, a search with $K_0$ initialization must establish an equilibrated
-in-situ state. The [at-rest stress field](overview.md#k0-initial-stress) is not an equilibrium
-under a **slope**. There is no soil column beside the face to
-balance the lateral stress there, so a substantial share of the weight is left out of balance and
-has to redistribute — about a quarter of it on Griffiths & Lane Example 1.
-
-That redistribution is part of **establishing the in-situ state** rather than of strength reduction,
-and the SSRM runs the two as separate steps. A $K_0$ analysis begins with one
-**full-strength equilibration solve**: the $K_0$ field settles against the real geometry at
-unreduced strength, and every bisection trial then starts from the resulting stress state, with a
-zero displacement datum, and reduces strength from there. On a jointed model the state carried
-into each trial includes every joint's slip history — how far each pair has slid, whether it stands
-open, and its residual and dilation state — so a joint that slid while the slope settled starts
-the trial where the settling left it, not pushed back onto its limit as if it had never moved. The
-equilibration is solved once and shared by all trials, and its outcome is returned in
-`result['k0_equilibration']`.
-
-If the two steps were run together, every trial would repeat the in-situ redistribution against soil
-already weakened by $F$ and charge the displacement and plastic strain it produces to the trial.
-On Example 1 at $K_0 = 1$, $F = 1.2$, that gives about three times the displacement the strength
-reduction actually causes.
-
-Displacements are reported relative to the equilibrated state, because the in-situ travel is an
-artifact of imposing a stress field the geometry does not hold in equilibrium, not motion of the
-slope. Stresses and structural forces — bar tensions, pile end forces — are functions of the
-absolute displacement and are unaffected by where its zero is put.
-
-A single `solve_fem()` call at full strength *is* an equilibration solve. At a reduced $F$ a single
-call does both at once, which is the sequencing the SSRM avoids; use `solve_ssrm()` when the two
-must be kept apart. If the equilibration does not come back stable, the slope does not stand at full
-strength with that initial stress ($FS < 1$): XSLOPE warns, and the bisection proceeds without a
-carried in-situ state and finds the sub-unity factor of safety.
-
-For a non-converged trial, note that the displacement scale the
-[hybrid criterion](#ssrm-failure-criteria) measures against is the elastic response to the
-**applied** load, which is the same quantity with or without $K_0$. What $K_0$ changes is the zero —
-a trial's displacement is counted from the equilibrated in-situ state, so it carries only the
-movement the strength reduction causes.
+A search using [at-rest initial stress](overview.md#k0-initial-stress) runs one full-strength
+equilibration before reducing strength. Its state, including each joint's slip and opening
+history, is carried into every trial, and displacements are measured from that state.
+The equilibration result is returned as `result['k0_equilibration']`.
+If it does not come back stable, the slope does not stand at full strength with that initial
+stress: XSLOPE warns, and the search proceeds without a carried state to find the sub-unity
+factor of safety.
 
 ### The `solve_fem()` function
 

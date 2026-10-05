@@ -790,6 +790,7 @@ on `solve_ssrm()`, and `tension_cutoff` for a global zero cap.
 
 **Reducing the cap with $F$.** With Tension SRF on (the default), a stated positive cap is divided
 by $F$ along with $c$ and $\tan\phi$; off, it stays at its entered value through the search.
+With it on, the factor of safety reduces the whole stated envelope, shear and tensile.
 The setting changes nothing without a positive cap: $c/\tan\phi$ stays unchanged and zero
 divided by $F$ is zero. It matches RS2's tension-SRF switch.
 Set it with the **Tension SRF** cell on the main sheet, `tension_srf`, or the dialog checkbox,

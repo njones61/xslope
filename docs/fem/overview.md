@@ -760,14 +760,6 @@ and the factor of safety is its midpoint. On this slope the displacement rises s
 before the band; that is common, but a slope can also creep steadily toward failure, as the next
 example shows.
 
-The [RS2-16 layered slope with a weak seam and water table](../verification/rs2.md#rs2-16)
-gives the second example, drawn from its saved record:
-
-![RS2-16 weak-seam slope displacement curve from its saved 3 m mesh record](images/rs2_16_ssrm_curve.png){width=800}
-
-The standing displacements grow steadily as the strength is reduced, without a sharp rise.
-The top trial was still moving at the iteration limit and was counted as failing.
-
 A top trial still slowing when the iteration limit comes is left undecided, and the plot reports
 "FS ≥" the last standing trial because no failure was shown. Raise the iteration limit with the
 [Continue option](solver.md#creep-trend) to decide it.

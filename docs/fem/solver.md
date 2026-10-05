@@ -95,11 +95,13 @@ sample at fixed factors on a deliberately coarse tri6 mesh with target element s
 
 ![fem_ov_ssrm_sweep.png](images/fem_ov_ssrm_sweep.png){width=760}
 
-Trials below the critical factor settle to equilibrium with small viscoplastic displacement, trials above it
-never settle and their displacement runs away. The bisection locates that transition — here 1.36 on
+Trials below the critical factor reach equilibrium; trials above it are still moving when stopped.
+The bisection brackets the change in verdict — here 1.41 on
 this illustration mesh (4,000 iterations per trial, fixed factor grid 0.025), against the paper's
 1.4. The [SSRM-1 verification row](../verification/ssrm.md#verification-griffiths1) instead uses
-quad8 elements at target size 3.5 and 16,000 iterations per trial. The displacement of a failing trial depends on the iteration budget it was given, which is
+quad8 elements at target size 3.5 and 16,000 iterations per trial. The converged point at $F = 1.40$
+lies above the stopped point at $F = 1.45$: the latter is not an equilibrium displacement.
+The displacement of a failing trial depends on the iteration budget it was given, which is
 why the bisection uses the trial's verdict (standing, failed or undecided; see
 [SSRM failure criteria](#ssrm-failure-criteria)) rather than the displacement magnitude.
 

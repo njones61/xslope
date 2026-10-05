@@ -73,7 +73,7 @@ $\sigma_z = \nu(\sigma_x + \sigma_y)$ is carried without being an unknown.
 
 #### Typical elastic parameters
 
-The table gives typical drained ranges, to be refined by site-specific testing where deformations
+The table gives typical **drained** ranges, to be refined by site-specific testing where deformations
 matter. Undrained moduli, which differ, follow it.
 
 | Soil Type | Young's Modulus $E$ [kPa] | Young's Modulus $E$ [psf] | Poisson's Ratio $\nu$ | Notes |
@@ -93,7 +93,7 @@ matter. Undrained moduli, which differ, follow it.
 Enter $E$ in kPa with metric inputs and psf with English inputs, consistent with the unit weights
 and cohesions.
 
-For undrained conditions, $E_u$ is measured directly by UU triaxial or unconfined compression tests,
+For **undrained** conditions, $E_u$ is measured directly by UU triaxial or unconfined compression tests,
 or estimated from $E_u = (150-1500)\,S_u$ — the low end for soft clays, the high end for stiff ones.
 Laboratory moduli generally exceed field values because of sample disturbance.
 
@@ -131,12 +131,9 @@ In principal-stress space the yield function is the surface below:
 The six-sided cone bounds the stresses the soil can carry; its faces are the shear limits
 for the different pairs of principal stresses.
 
-The solver evaluates $f$ at every Gauss point — an integration point inside an element where
-stress is evaluated — in the invariant form used by Smith & Griffiths, which avoids solving
-an eigenvalue problem per point. The [Solver](solver.md#elastic-plastic-behavior-viscoplastic-algorithm)
-defines the invariants:
-
->>$f = \sigma_m\sin\phi + \bar{\sigma}\left(\dfrac{\cos\theta}{\sqrt{3}} - \dfrac{\sin\theta\sin\phi}{3}\right) - c\cos\phi$
+The solver evaluates $f$ at every Gauss point, an integration point inside an element where stress
+is computed; the form it uses is given on the
+[Solver](solver.md#elastic-plastic-behavior-viscoplastic-algorithm) page.
 
 Mohr-Coulomb is the usual choice, but it is one of five strength options a material can carry on
 the **mat** sheet. The FEM accepts `mc`, the criterion above; `cp`, an undrained strength that

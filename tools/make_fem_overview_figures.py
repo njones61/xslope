@@ -331,14 +331,14 @@ def fig_capture_comparison():
     if not meta or meta.get("F") is None:
         raise ValueError("The saved SSRM record must identify the converged trial factor")
     # Match Studio's saved-result reload: CSV import restores the field, while
-    # the run record supplies its trial factor. Without F the program's title
-    # formatter cannot name the last-converged F alongside the supplied FS.
+    # the run record supplies its trial factor independently of the reported FS.
     standing = {**standing, "F": meta["F"]}
     panels = []
     for state in ("converged", "failure"):
         fig, ax = plot_fem_results(
             fem_data, standing, plot_type="deformation", field_state=state,
-            failure_solution=failure, fs=meta["FS"], ssrm_record=meta)
+            failure_solution=failure, fs=meta["FS"], ssrm_record=meta,
+            deform_scale=1.0)
         print(f"{state}: {ax.get_title()}", flush=True)
         buffer = BytesIO()
         fig.savefig(buffer, dpi=200, bbox_inches="tight", facecolor="white")
@@ -347,7 +347,7 @@ def fig_capture_comparison():
         panels.append(Image.open(buffer).convert("RGB"))
 
     # Preserve each standard render pixel for pixel. Only add white padding
-    # and a separator; never replace titles, legends or automatic scales.
+    # and a separator; never replace titles, legends or the selected 1x scale.
     gap = 16
     combined = Image.new("RGB", (max(p.width for p in panels),
                                   sum(p.height for p in panels) + gap), "white")

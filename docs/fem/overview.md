@@ -745,65 +745,32 @@ plot_fem_results(fem_data, solution, plot_type='shear_strain')
 
 ### Displacement vs F
 
-Every strength reduction trial records the largest displacement it reached, and the `ssrm_curve`
-panel plots those displacements against the trials' factors, sorted by $F$. A filled marker is a
-trial in which the slope reached equilibrium, and the line joins only those. An open marker is a
-trial that was stopped before it reached equilibrium. It is drawn at the point where it was
-stopped, while the slope was still moving, with no line through it. The key says how it was
-stopped: **stopped at the iteration limit, still moving**, **displacements ran away**, or **past
-the [displacement limit](solver.md#3-displacement-limit-displacement_limit)**. The reported factor of safety is the dashed vertical line, and the
-[final bracket](solver.md#methodology) is shaded behind it. The same plot is available alone as
-`xslope.plot_fem.plot_ssrm_curve(ax, record)`.
+The `ssrm_curve` panel plots each trial's largest displacement against its strength reduction
+factor $F$. It is also available as `xslope.plot_fem.plot_ssrm_curve(ax, record)`.
 
-The [FEM-1 embankment](../tutorials/fem01_strength_reduction.md) curve below uses a soil target size
-of 3.5 ft. Its standing displacements stay small before turning upward near the final bracket:
-the last standing trial reaches 0.125 ft at $F = 1.359375$. The open markers show trials that
-stopped while still moving, at the iteration limit or after their displacements ran away.
-The upturn remains at the shared tolerance used for these plots: the last segment of the
-standing curve is about twelve times steeper than the preceding segment.
+The [FEM-1 embankment](../tutorials/fem01_strength_reduction.md) gives the curve below:
 
 ![FEM-1 embankment displacement curve](images/fem01_ssrm_curve.png){width=1350}
 
-The next curve reloads the saved [RS2-16 layered slope with a weak seam and water table](../verification/rs2.md#rs2-16)
-record at a soil target size of 3 m. Its standing trials climb more gradually: their displacements
-are 0.388, 0.499 and 0.522 m at
-$F = 0.8$, 0.95 and 0.96875, without a sharp knee in that recorded branch. Its final upper trial
-at $F = 0.9875$ reaches 1.767 m after 16,000 iterations and ends `not_slowing`, counted as sliding;
-the saved factor of safety is 0.978. An open marker is drawn where the trial was when it was
-stopped; because that trial never came to rest, the line through the standing trials does not
-pass through it. This record reports a midpoint factor, not a
-lower bound: its upper trial was counted as failed, rather than left undecided.
+Each filled point is a trial in which the slope came to rest, and its displacement grows as the
+strength is reduced. The open markers to the right of the shaded band are the trials the slope
+could not stand, drawn where each was when it was stopped, and the one nearest the band sets its
+top. The band is the final bracket between the last standing trial and the first failed one,
+and the factor of safety is its midpoint. On this slope the displacement rises sharply just
+before the band; that is common, but a slope can also creep steadily toward failure, as the next
+example shows.
+
+The [RS2-16 layered slope with a weak seam and water table](../verification/rs2.md#rs2-16)
+gives the second example, drawn from its saved record:
 
 ![RS2-16 weak-seam slope displacement curve from its saved 3 m mesh record](images/rs2_16_ssrm_curve.png){width=1350}
 
-Both curves were run at an SSRM tolerance of 0.02. The shaded band is each run's final bracket,
-not the tolerance itself: bisection stops when its width is below that tolerance. FEM-1's bracket
-is $[1.359375,\,1.375]$, width 0.015625; RS2-16's is $[0.96875,\,0.9875]$, width 0.01875.
-Their starting brackets differ, $[1,\,2]$ and $[0.8,\,1.4]$, so successive halvings need not give
-identical final widths even at the same stopping tolerance.
-The displayed $F$ ranges also differ, about 1–2 and 0.8–1.4, so RS2-16's band occupies a larger
-fraction of its axis. Neither bracket has an undecided upper edge.
+The standing displacements grow steadily as the strength is reduced, without a sharp rise.
+The top trial was still moving at the iteration limit and was counted as failing.
 
-A trial stopped at the iteration limit while still moving is not a solution. The program judges
-it from its movement: moving at a steady or growing rate, it counts as the slope failing; still
-slowing, it is left undecided, and when it is the top of the bracket the result is reported only
-as a lower bound. The displacement plotted for it is where it had got to when it was stopped.
-
-Read the [verdict](solver.md#methodology) as well as the shape. To decide an unresolved upper trial,
-raise Max iterations per trial or [continue with a higher limit](solver.md#creep-trend) from where
-its iterations stopped.
-
-The run's closing summary gives the same information in words. It is printed as the last lines of
-every strength reduction run and returned as `result['summary']`. It reports what happened at each
-end of the bracket. When the trial at the top hit the iteration limit, the summary states whether it was
-still moving fast (*the slope was failing; more iterations would only have let it move further*)
-or still moving slowly (*the factor of safety depends on the iteration limit here*). Both quote
-the largest displacement, [its multiple of the elastic value](solver.md#2-hybrid-hybrid-default),
-and how much it grew over the last
-quarter of the trial's iterations. A trial ended by any other rule is reported with the reading
-that ended it: how much the joint slip grew and whether its rate slowed, the displacement reached
-as a multiple of the elastic value, the displacement against the displacement limit, or how far
-the out-of-balance force fell before the iteration ceiling.
+A top trial still slowing when the iteration limit comes is left undecided, and the plot reports
+"FS ≥" the last standing trial because no failure was shown. Raise the iteration limit with the
+[Continue option](solver.md#creep-trend) to decide it.
 
 ## Exported files
 

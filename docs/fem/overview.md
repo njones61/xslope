@@ -221,10 +221,16 @@ gives the nodal displacements, and from them the strains and stresses used in th
 
 ## Boundary conditions
 
-The assembled equations need displacement restraints to prevent rigid-body motion and boundary
-loads to represent the forces acting on the model.
-
-The section below shows the restraints and surface loads, with the water table drawn separately.
+The assembled equations describe a body that can translate and rotate freely; before they can be
+solved, the model has to be held in place, and the forces acting on it have to be applied. Both
+are done at the boundary. For a slope the base is fixed, and the sides, where the real ground
+continues beyond the model, are held either on rollers (free to settle, restrained horizontally)
+or fixed in both directions, as the user chooses with the Side BC setting. Loads act on the
+ground surface: distributed loads from the **dloads** sheet, line loads from the **lloads** sheet
+(a concentrated force at a point on the surface, such as a strip footing or an anchor head), and
+the weight of ponded water on a submerged face. The water table is not a boundary condition of
+this kind; it enters through the pore pressures, which reduce the effective stress inside the
+soil. The section below shows each of these on a simple slope:
 
 ![FEM boundary restraints, surface loads and water table](images/fem_boundary_conditions.png){width=800px}
 
@@ -247,9 +253,14 @@ constrained rows; applied forces enter $\{F\}$ directly and leave $[K]$ unchange
 
 ### Loads {#distributed-loads}
 
-Distributed loads are line loads along the ground surface, given as coordinates with intensities
-(force per unit length) on the **dloads** sheet and shared with the limit-equilibrium solvers,
-which convert them to a resultant on each slice.
+Distributed loads are a pressure along a stretch of the ground surface, given as coordinates with
+intensities on the **dloads** sheet and shared with the limit-equilibrium solvers, which convert
+them to a resultant on each slice.
+
+Line loads on the [lloads worksheet](../usage/input_template.md#worksheet-lloads) give a point on the
+surface, a force magnitude per unit out-of-plane width, and a direction. The FEM applies each as
+a concentrated force at the nearest mesh node; point constraints can put a node exactly at the
+load point, and the build warns if the nearest node is too far away.
 
 Hydrostatic pressure on a submerged face need not be entered at all. With the main sheet's **Water
 loads** selector on `auto`, the ponded-water load is derived from the model's own water definition

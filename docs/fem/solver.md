@@ -753,34 +753,30 @@ as well. RS2's Apply SSR flag and SSR Search Area do the same; see the
 
 ## Tensile strength in the SSRM {#tensile-strength-in-ssrm}
 
-A Mohr-Coulomb material carries tension unless a cap is stated. Extended into the tensile
-quadrant, the straight envelope closes on an apex at
+The Mohr-Coulomb envelope is a straight line fitted to compression tests. Drawn out toward the
+left, into the region where the normal stress is tension, it meets the $\sigma'$ axis at
+$\sigma'_t = -c/\tan\phi$, and that is the tension the line implies the soil can carry before
+it fails: an implicit tensile strength of $c/\tan\phi$.
+It is an artifact of the straight line, not a measured property; real soil cracks at a small
+fraction of it, often at zero. For $\phi = 0$ the line is horizontal and never meets the axis,
+so the implied tensile strength is unbounded.
 
->>$\sigma'_t = -\dfrac{c}{\tan\phi}$
+This matters in a strength-reduction search because dividing $c$ and $\tan\phi$ by the same $F$
+leaves $c/\tan\phi$ unchanged: the tensile strength a material has at $F = 1$ it still has at
+$F = 3$ (left panel below). Where the failure mechanism has to open a tension zone to form,
+at a steep crest, a vertical face or the head of a scarp, that unreduced tension holds the cut
+shut, the model reaches a true equilibrium at strengths the real slope would never survive,
+and the factor of safety comes out too high, with nothing in the failure criterion to show it.
 
-so a Mohr-Coulomb material given no further treatment carries an **implicit tensile strength** of
-$c/\tan\phi$. For $\phi = 0$ — an undrained `cp` material, or `mc` entered with $\phi = 0$ — the
-apex is at infinity and the implicit tensile strength is unbounded. That number is an artifact of
-fitting a straight line to compression tests and extrapolating backwards, not a measured property:
-real soil cracks at a small fraction of it, and often at zero.
+The left panel shows the original and reduced lines meeting at the same zero-shear point.
+The right truncates them at a stated cap: the solid cut stays at $-T$, while the dashed cut
+moves to $-T/F$ when Tension SRF is on.
 
-The left panel below shows the apex unchanged by strength reduction. The right panel compares a
-stated cap with Tension SRF off ($-T$) and on ($-T/F$).
-
-![fem_ov_tension_cutoff.png](images/fem_ov_tension_cutoff.png){width=900}
+![Unchanged implicit tensile strength and a stated cap with Tension SRF off or on](images/fem_ov_tension_cutoff.png){width=1200}
 
 Both settings reduce the shear envelope; only Tension SRF on moves the stated positive cap
-toward zero.
-
-In an ordinary stress analysis this rarely surfaces, because under the effective-stress formulation
-a slope at working strength is in compression nearly everywhere. It surfaces in the **SSRM**, and it
-surfaces asymmetrically: reducing strength divides $c$ and $\tan\phi$ by the same factor, so the
-apex $c/\tan\phi$ is *invariant under reduction* — the tensile strength a material has at $F = 1$ it
-still has at $F = 3$ (left panel above). Where the mechanism has to open a tension zone to develop —
-a steep entry cut at a crest, a vertical face, the head of a scarp — that capacity acts as a
-structural member holding the cut shut, and the model reaches *genuine* equilibrium at strength
-reductions the real slope would never survive. Nothing in the failure criterion flags it: the states
-are converged, force-balanced and budget-independent, and the factor of safety is too high.
+toward zero. The shading marks tension allowed without a cap on the left, and removed by
+the cap on the right.
 
 **The cap.** The mat sheet's **t_cut** column sets a per-material tensile strength $T$, applied as a
 **Rankine cutoff** $F_t = \sigma_1' - T$ that caps the major (most-tensile) principal effective

@@ -1,15 +1,11 @@
 """Render the illustration figures for docs/fem/overview.md.
 
-Four figures land in docs/fem/images/ with the fem_ov_ prefix:
+Three figures land in docs/fem/images/ with the fem_ov_ prefix:
 
   fem_ov_viscoplastic_loop.png  Flow diagram of the viscoplastic algorithm: one
                                 factorization, the per-Gauss-point yield check, the
                                 body-load correction, and the two convergence tests
                                 with the hybrid verdict that follows them.
-  fem_ov_tension_cutoff.png     The Mohr-Coulomb envelope in the tensile quadrant —
-                                the implicit apex at c/tan(phi), its invariance under
-                                strength reduction, and the Rankine cap t_cut that
-                                removes it.
   fem_ov_k0_initial.png         Initial lateral effective stress with depth: the
                                 gravity turn-on's nu/(1-nu) coefficient against
                                 stated K0 values.
@@ -18,8 +14,11 @@ Four figures land in docs/fem/images/ with the fem_ov_ prefix:
                                 against F, marked by whether the trial reached
                                 equilibrium, with the bisection's factor of safety.
 
-The first three are closed-form schematics. The fourth runs the solver on the
+The first two are closed-form schematics. The third runs the solver on the
 committed sample docs/fem/files/xslope_griffiths1.xlsx (about a minute).
+
+The tension-cutoff schematic is exported from the private repo's
+drawings/docs/fem/tension_cutoff/ source; this script never overwrites it.
 
 Run from the repo root:  python tools/make_fem_overview_figures.py
 """
@@ -155,72 +154,6 @@ def fig_viscoplastic_loop():
 
 
 # ===========================================================================
-# Figure 2 — the tensile quadrant: apex, reduction, Rankine cap
-# ===========================================================================
-
-def fig_tension_cutoff():
-    c, phi = 20.0, 35.0                 # kPa, degrees
-    F = 2.0
-    tanphi = np.tan(np.radians(phi))
-    apex = -c / tanphi                  # sigma' at tau = 0  (about -28.6 kPa)
-    t_cut = 5.0                         # a stated tensile strength, kPa
-
-    fig, axes = plt.subplots(1, 2, figsize=(11.0, 4.3), sharey=True)
-
-    for ax, cap in zip(axes, (None, t_cut)):
-        s = np.linspace(-40, 60, 400)
-        env = c + s * tanphi
-        env_r = c / F + s * (tanphi / F)
-
-        ax.plot(s[env >= 0], env[env >= 0], color=C_ACCENT, linewidth=2.0)
-        ax.plot(s[env_r >= 0], env_r[env_r >= 0], color=C_ACCENT2, linewidth=2.0,
-                linestyle=(0, (6, 3)))
-        ax.axhline(0, color=C_MUTED, linewidth=0.9)
-        ax.axvline(0, color=C_MUTED, linewidth=0.9)
-
-        ax.plot([apex], [0], marker="o", markersize=7, color=C_INK, zorder=5)
-        ax.annotate("apex  $\\sigma'_t = -c/\\tan\\phi$\nunmoved by $F$",
-                    xy=(apex, 0.4), xytext=(apex + 3, 13),
-                    fontsize=9, color=C_INK, ha="left",
-                    arrowprops=dict(arrowstyle="->", color=C_INK, linewidth=1.0))
-
-        ax.text(26, 34, "$\\tau = c + \\sigma'\\tan\\phi$",
-                color=C_ACCENT, fontsize=9.5, ha="left", va="top", zorder=6)
-        ax.text(44, 19.5, "reduced by $F$",
-                color=C_ACCENT2, fontsize=9.5, ha="left", va="top", zorder=6)
-
-        if cap is None:
-            ax.fill_between([apex, 0], 0, 46, color="#f3d9d4", alpha=0.75, zorder=0)
-            ax.text((apex) / 2, 40, "tension carried\nby the criterion alone",
-                    fontsize=9, color=C_RED, ha="center", va="center")
-            ax.set_title("No cutoff — the Griffiths & Lane convention",
-                         fontsize=10.5, color=C_INK)
-        else:
-            # tension is negative on this axis, so a tensile strength T sits at -T
-            ax.axvline(-cap, color=C_GREEN, linewidth=1.8)
-            ax.axvline(-cap / F, color=C_GREEN, linewidth=1.4, linestyle=(0, (4, 3)))
-            ax.fill_between([apex, -cap], 0, 46, color="#e6e9ec", alpha=0.9, zorder=0)
-            ax.text(-cap + 1.5, 40.5, "Tension SRF off: $-T$", fontsize=9, color=C_GREEN,
-                    ha="left", va="center")
-            ax.text(-cap / F + 1.5, 44, "Tension SRF on: $-T/F$", fontsize=9, color=C_GREEN,
-                    ha="left", va="center")
-            ax.text((apex - cap) / 2 - 1, 40, "removed by the\nRankine cap",
-                    fontsize=9, color=C_INK, ha="center", va="center")
-            ax.set_title("With a stated tensile strength (mat!t_cut)",
-                         fontsize=10.5, color=C_INK)
-
-        ax.set_xlim(-40, 60)
-        ax.set_ylim(0, 46)
-        ax.set_xlabel("effective normal stress $\\sigma'$   (tension negative)", fontsize=9.5)
-        _tidy(ax)
-
-    axes[0].set_ylabel("shear stress $\\tau$", fontsize=9.5)
-    fig.text(0.5, -0.03,
-             "c = 20 kPa, $\\phi$ = 35°, strength reduced by F = 2",
-             ha="center", fontsize=9, color=C_MUTED)
-    fig.tight_layout()
-    _finish(fig, "fem_ov_tension_cutoff.png")
-
 
 # ===========================================================================
 # Figure 3 — initial lateral stress: gravity turn-on vs stated K0
@@ -484,6 +417,5 @@ if __name__ == "__main__":
                          "[budget-comparison|capture-comparison]")
     else:
         fig_viscoplastic_loop()
-        fig_tension_cutoff()
         fig_k0_initial()
         fig_ssrm_sweep()

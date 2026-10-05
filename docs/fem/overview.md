@@ -66,7 +66,8 @@ $\sigma_z = \nu(\sigma_x + \sigma_y)$ is carried without being an unknown.
 
 #### Typical elastic parameters
 
-Typical **drained** ranges, to be refined by site-specific testing where deformations matter:
+The table gives typical drained ranges, to be refined by site-specific testing where deformations
+matter. Undrained moduli, which differ, follow it.
 
 | Soil Type | Young's Modulus $E$ [kPa] | Young's Modulus $E$ [psf] | Poisson's Ratio $\nu$ | Notes |
 |-----------|:-------------------------:|:-------------------------:|:--------------------:|-----------------|

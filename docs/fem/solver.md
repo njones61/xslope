@@ -678,9 +678,9 @@ Its principal arguments:
 >  **[`elastic_materials`](overview.md#mohr-coulomb-failure-criterion)**,
 >  **[`suction_phi_b` / `suction_cap`](overview.md#matric-suction-apparent-cohesion-above-the-water-table)**: follow the linked model and run settings.<br>
 >- **`n_sweep`** (10): coarse sweep points for the `"displacement_increase"` criterion.<br>
->- **`capture_failure_state` (`True`): [capture the mechanism](#capturing-the-failure-mechanism) after the search.<br>
->- **`capture_margin` (0.15): [strength margin](#capturing-the-failure-mechanism) above FS for the capture.<br>
->- **`capture_max_iterations` (`None`): override the [automatic capture budget](#capturing-the-failure-mechanism).
+>- **`capture_failure_state`** (`True`): [capture the mechanism](#capturing-the-failure-mechanism) after the search.<br>
+>- **`capture_margin`** (0.15): [strength margin](#capturing-the-failure-mechanism) above FS for the capture.<br>
+>- **`capture_max_iterations`** (`None`): override the [automatic capture budget](#capturing-the-failure-mechanism).
 
 The result dictionary carries `FS`, the last converged solution (`last_solution`),
 `final_interval`, the per-trial records (`trials`), and, with capture on, `failure_solution`.

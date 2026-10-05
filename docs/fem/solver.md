@@ -22,9 +22,9 @@ them in the dialog's order and gives, for each, the cell on the Excel main sheet
 of `solve_fem()` or `solve_ssrm()` that sets the same thing; a dash means there is none, and
 arguments that apply only to a search belong to `solve_ssrm()`. The table is a map of this page:
 each setting links to the section that explains what it controls and how to choose it, and the
-sections follow in the order the solver uses them, from the strength reduction method itself
-through a single trial, the rules that decide it, the search, and the options that shape the
-mechanism.
+sections follow from the strength reduction method itself through a single trial, the rules
+that decide it, the search, the options that shape the mechanism, the tensile cap and the
+compiled kernel.
 
 ![Run FEM dialog](../studio/images/analysis_run_fem_dialog.png){width=818}
 
@@ -37,7 +37,7 @@ mechanism.
 | Tolerance (SSRM) | — | `solve_ssrm(tolerance=)` | [Final bracket width](#the-solve_ssrm-function), default 0.01; not the displacement convergence tolerance. |
 | Max iterations per trial | — | `max_iterations=` (both functions) | [Trial budget](#creep-trend), default 12000. |
 | Iteration ceiling | — | `max_iterations_ceiling=` (both functions) | [Hard limit on budget extensions](#creep-trend), default 50000. |
-| Accelerate convergence | — | `accelerate=` (both functions) | [Lengthen admissible iteration steps](#jointed-model-acceleration); `False` runs the ordinary iteration. |
+| Accelerate convergence | — | `accelerate=` (both functions) | [Lengthen admissible iteration steps](#jointed-model-acceleration) (Irons & Tuck, 1969); `False` runs the ordinary iteration. |
 | Side BC | `main!D23` | `build_fem_data()` reads `slope_data['side_bc']`; no solve argument | [Side restraint](overview.md#what-xslope-assigns-automatically), rollers by default. |
 | K0 initial stress | `main!D16` (blank disables) | `k0=` (both functions) | [At-rest initialization and equilibration](#in-situ-equilibration), off when unspecified. |
 | K0 | `main!D16` | `k0=` (both functions) | [At-rest lateral stress coefficient](#in-situ-equilibration); the dialog value starts at 1.0 when enabled. |
@@ -221,42 +221,33 @@ whether the loads and the boundary pore pressures disagree.
 
 ### Finishing a trial with the Newton corrector
 
-The viscoplastic iteration approaches equilibrium from outside the yield surface, and its
-convergence rate is linear, so a trial near the critical strength can spend tens of thousands of
-iterations still improving and still undecided. XSLOPE runs a second, locally quadratic iteration on
-top of it. The viscoplastic loop drives the solve and builds the plastic history; at a short series
-of checkpoints — 300, 1,000 and 3,000 viscoplastic passes — at every block end where the
-[trend reading](#creep-trend) finds the movement dying away, and again wherever one of the [iteration-limit rules](#creep-trend) would end the trial, the current displacement field and plastic strains are handed to a
-single bounded Newton-Raphson solve at full gravity and this trial's reduced strengths. That solve
-uses the consistent tangent of the Mohr-Coulomb return map, and from a starting state that has
-already followed the load path it reaches equilibrium in tens of iterations where the viscoplastic loop needs
-thousands.
+At set points in the iteration (after 300, 1,000 and 3,000 iterations, whenever the
+[movement trend](#creep-trend) is read as dying away, and whenever the
+[iteration-limit rules](#creep-trend) would end the trial), the solver tries to finish the trial
+with a Newton-Raphson solve started from the current displacements and plastic strains.
+From that starting point Newton-Raphson reaches equilibrium in tens of iterations where the
+viscoplastic loop needs thousands.
 
 A state the corrector returns ends the trial as standing only when it passes three checks:
 
->- **Force equilibrium** — the per-node Dawson measure described above, below `force_tol`, read on
->  the true residual at full gravity.<br>
+>- **Force equilibrium** — the per-node out-of-balance force is below `force_tol`.<br>
 >- **Yield** — the largest Mohr-Coulomb violation anywhere in the mesh, as a fraction of the local
 >  strength, at or below $10^{-6}$. A field can be in force balance and still carry stress the
 >  material cannot hold.<br>
->- **Displacement** — the translational movement below a tenth of the model height, read on the deep
->  degrees of freedom wherever a [`min_slip_depth`](#surficial-skin-failures-and-the-minimum-slip-depth-filter) filter is in force.
+>- **Displacement** — the largest translational displacement is no greater than a tenth of the
+>  model height by default, ignoring nodes above the
+>  [minimum slip depth](#surficial-skin-failures-and-the-minimum-slip-depth-filter) when that filter is set.
 
-**When the corrector does not certify a state.** Where any of the checks fails, or the Newton solve does not
-converge, the attempt is recorded and control returns to the viscoplastic loop with nothing about
-its state changed — the corrector works on a copy of the displacement field and of every plastic
-strain, so an attempt that fails leaves the continuing iteration unchanged. The loop then runs on
-to its next checkpoint or to its own exit exactly as it would have. The corrector can therefore turn
-a trial that the [iteration-limit rules](#creep-trend) would have ended into one certified as standing, but it cannot make
-a trial fail.
+If any check fails, or the Newton solve does not converge, the viscoplastic loop continues from
+where it was, unaffected by the attempt.
 
 ### The yield check
 
 Every solved field carries an admissibility reading taken in invariant form: the largest
 Mohr-Coulomb violation as a fraction of the local strength, the count of
 Gauss points more than 1% of their strength outside the surface, the same
-pair for the [Rankine tension surface](#tensile-strength-in-ssrm), and where in the mesh the worst violation sits
-and its location. It is one pass over the Gauss points and costs no solve.
+pair for the [Rankine tension surface](#tensile-strength-in-ssrm), and the location of the worst
+violation. It is one pass over the Gauss points and costs no solve.
 
 The violation is divided by the local strength, $c\cos\phi + |\sigma_m|\sin\phi$, with a floor of
 $10^{-4}$ times the largest unit weight in the model times the mesh height. Without the floor,
@@ -344,7 +335,7 @@ iteration history.
 
 | Evidence | Verdict | Effect on the bisection |
 |---|---|---|
-| Beyond elastic scale **and** growing (or the trial passed the [displacement limit](#3-displacement-limit-displacement_limit), `max_disp_factor`) | `FAILED` | Failed — same as non-convergence |
+| Beyond elastic scale **and** growing | `FAILED` | Failed — same as non-convergence |
 | At elastic scale **and** frozen | `STABLE_STUCK` | **Not** failed: the bracket moves up |
 | One signal without the other, or too little history | `AMBIGUOUS` | Failed fallback, unless the trial has an [undecided exit](#creep-trend) or stops at the [yield gate](#the-yield-check) |
 
@@ -352,10 +343,8 @@ The thresholds are $u_{ratio} \le 1.25$ for "at elastic scale", $u_{ratio} \ge 1
 it", and growth greater than 0.02 elastic displacements for "still moving". Stable-but-stuck
 trials sit at 1.0–1.1 times elastic and stay there whether the budget is 10,000 iterations or
 80,000; failing trials reach 4–21 times elastic and keep growing. Every trial's verdict,
-$u_{ratio}$ and growth are returned in `result['trials']`. If the elastic displacement is
-smaller than $10^{-6}$ of the model height, the verdict is `AMBIGUOUS` rather than a ratio
-against rounding noise, except that passing the displacement limit remains evidence of failure
-without that yardstick.
+$u_{ratio}$ and growth are recorded. If the elastic displacement is smaller than $10^{-6}$ of
+the model height, the verdict is `AMBIGUOUS` rather than a ratio against rounding noise.
 
 All 103 FEM benchmarks were solved under both criteria on the same mesh with the same options.
 No row returns a lower factor under the hybrid, and almost all are identical to the last digit:
@@ -364,7 +353,7 @@ on those models the non-converged trials carry displacement evidence of failure.
 | Case | Non-convergence | Hybrid | What the hybrid changes |
 |---|---|---|---|
 | [Griffiths & Lane Example 1, SSRM-1: quad8, target size 3.5, 16,000 iterations per trial](../verification/ssrm.md#verification-griffiths1) | 1.372 | 1.372 | Every non-converged trial is beyond elastic scale and still growing, so both criteria give the same verdict. |
-| [RS2-62c](../verification/rs2.md#rs2-62) | 0.769 | 0.769 | The $F = 0.775$ trial is at elastic scale ($u_{ratio} = 1.23$) but still moving (growth 0.22). Its `AMBIGUOUS` verdict retains the non-convergence fallback. |
+| [Rocscience RS2-62c](../verification/rs2.md#rs2-62) | 0.769 | 0.769 | The $F = 0.775$ trial is at elastic scale ($u_{ratio} = 1.23$) but still moving (growth 0.22). Its `AMBIGUOUS` verdict retains the non-convergence fallback. |
 | [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | With the vendor's zero [tensile cap](#tensile-strength-in-ssrm) ($T = 0$), the stationary trials prevent non-convergence from finding a bracket before the [auto-bracket](#methodology) reaches its floor. The hybrid brackets the same model. |
 
 Pass `failure_criterion="non_convergence"` for the classical verdict; every criterion
@@ -373,11 +362,14 @@ returns the same per-trial records.
 ### 3. Displacement limit (`"displacement_limit"`)
 
 Bisection on whether the maximum viscoplastic displacement exceeds `max_disp_factor` of the mesh
-height within the iteration budget. A simple physical backstop, but its verdict is coupled to the
-budget for any state that creeps slowly rather than racing.
+height within the iteration budget. Its verdict depends on the iteration budget for a slope
+that creeps slowly.
 
 In an SSRM search, `max_disp_factor` is disabled under `hybrid` and `non_convergence`: it measures
 movement against the mesh height, so a deeper foundation would loosen the limit.
+For a standalone `solve_fem()` trial, the default backstop remains active even with the hybrid
+criterion; passing it counts as failure without needing the elastic-displacement yardstick.
+This iteration backstop is separate from the Newton corrector's final-state displacement check.
 
 ### 4. Displacement catastrophe (`"displacement_increase"`)
 
@@ -403,12 +395,14 @@ the measurement on the mechanism rather than on any localized background deforma
 At the iteration limit, the trend of movement over the last part of the run decides the trial.
 The window is five equal blocks spanning nominally half the original Max iterations per trial
 allowance; movement is measured in [elastic displacements](#2-hybrid-hybrid-default).
+Each block is one fifth of that window. The rate ratio is the geometric mean of each block's
+movement divided by the previous block's.
 
 | Trend | What happens |
 |---|---|
 | Dying away: every block moves forward, none more than its predecessor, with a rate ratio below 0.9 | The [Newton corrector](#finishing-a-trial-with-the-newton-corrector) is asked to finish the trial; a certified state stands. |
-| Holding steady or growing: at least 0.02 elastic displacements over the window, rate ratio at least 0.9 | `exit_reason = 'not_slowing'`, `FAILED`, unless the corrector certifies standing. |
-| Still: under $10^{-4}$ elastic displacements, or unclear | The hybrid classifier and the ceiling rules below decide it. |
+| Holding steady or growing: at least 0.02 elastic displacements over the window, rate ratio at least 0.9 | Failed unless the corrector certifies standing. |
+| Still: under $10^{-4}$ elastic displacements, or unclear | The hybrid criterion and the ceiling rules below decide it. |
 
 Below `max_iterations_ceiling` (default 50000), a trial still dying away or unclear gets
 another `max_iterations` worth and is read again. The reading is also taken at each block
@@ -420,13 +414,13 @@ at $F = 1.34375$ was certified at 11,200 iterations.
 elastic displacements over the last doubling of the iteration count triggers a corrector attempt;
 only if it is not certified standing is the trial cut short (`early_failure=False` turns this off).
 
-**Inconclusive at the ceiling.** A trial still progressing whose mean residual over the last
-window is at least 1% below the preceding window (nominally 500 iterations each, shortened to
-a quarter of a small budget, with a minimum of 20), or whose displacement verdict at the hard
-ceiling is `AMBIGUOUS`, is left undecided if the corrector cannot certify standing.
+**Inconclusive at the ceiling.** A trial is still progressing if its mean out-of-balance force
+over the last 500 iterations is more than 1% below that of the 500 before (a quarter of the
+budget for small budgets, minimum 20). At the ceiling, such a trial, or one whose hybrid
+verdict is `AMBIGUOUS`, is left undecided unless the corrector certifies it standing.
 The bisection does not count it as failed and continues below it.
-If it is still the top of the final bracket, the result is FS ≥ the standing bottom
-; raise the ceiling or the per-trial budget to go further.
+If it is still the top of the final bracket, the result is FS ≥ the standing bottom;
+raise the ceiling or the per-trial budget to go further.
 
 **Continuing a run.** Use `solve_ssrm(fem_data, resume=result, max_iterations=N)` or
 **Continue with a higher limit…** in Studio.
@@ -462,6 +456,10 @@ Under the default `hybrid` criterion, standing raises the search's lower edge an
 lowers its upper edge. `non_convergence` requires convergence instead of accepting a standing
 trial whose force tolerance was not met; undecided trials remain undecided under either criterion.
 
+A standing trial is recorded as standing without convergence (force tolerance not met);
+a sliding one as failed; one neither test decides goes to the hybrid criterion and the
+[iteration-limit rules](#creep-trend).
+
 #### Contacts that cycle
 
 A cohesive contact with no tensile strength at zero normal stress can cycle between closed,
@@ -480,10 +478,12 @@ The [Newton corrector](#finishing-a-trial-with-the-newton-corrector) seeks a bal
 the current slip and opening history; the ordinary iteration then continues from it for a hold
 test, up to 3,000 iterations with no more than 0.01 elastic displacements of movement.
 Only a state that also passes the standing reading is accepted; a refused corrector or hold test
-leaves the continuing iteration unchanged. The shortcut is on by default; `joint_newton=False`
-turns it off.
+leaves the continuing iteration unchanged. The shortcut is on by default.
 
 ### Limits {#jointed-numerical-limits}
+
+The table gives the numerical limits behind the readings in
+[Slipping or standing](#slipping-or-standing).
 
 The standing readings use the trailing half of sampled history; the sliding reading uses the
 [five-block movement window](#creep-trend), with slip rate compared between its two halves.
@@ -502,16 +502,14 @@ Sliding needs the movement limit and either the ground-rate limit or both slip l
 
 <span id="jointed-model-acceleration"></span>
 
+These settings change how a jointed trial is iterated, not the rules that decide it:
+
 | Setting | Default | What it does |
 |---|---|---|
 | `joint_newton` | On | Enables the corrector and hold test on joints; `False` turns the shortcut off. |
 | `fem_solver` | `'auto'` | Ordinary iteration with corrector; `'viscoplastic'` disables it; `'newton'` starts Newton cold, without accumulated slip. |
 | `joint_tangent`; `joint_tangent_factor` | Off; 0.01 | `'slip'` enables optional relief of slipping/open interfaces, scaling their stiffness by the factor; the ordinary iteration decides the trial. |
 | `accelerate` | `None`: on for joints | Steps are lengthened by extrapolation, up to 50 times, while the solution keeps heading the same way; the answer is unchanged; `False` turns it off. |
-
-A standing trial is recorded as `JOINT_SETTLED` with `converged = False` (force tolerance
-not met); a sliding one as `FAILED`; one neither test decides goes to the hybrid classifier
-and the [iteration-limit rules](#creep-trend).
 
 ## Equilibration and running the solver
 
@@ -522,13 +520,10 @@ captures the failure mechanism for the figures.
 
 ### In-situ equilibration
 
-A search using [at-rest initial stress](overview.md#k0-initial-stress) runs one full-strength
-equilibration before reducing strength. Its state, including each joint's slip and opening
-history, is carried into every trial, and displacements are measured from that state.
-The equilibration result is returned as `result['k0_equilibration']`.
-If it does not come back stable, the slope does not stand at full strength with that initial
-stress: XSLOPE warns, and the search proceeds without a carried state to find the sub-unity
-factor of safety.
+The full-strength equilibration described on the [Overview](overview.md#k0-initial-stress)
+is returned as `result['k0_equilibration']`. If the slope does not stand at full strength with
+that initial stress, XSLOPE warns and searches from the initial stress itself; the factor of
+safety it finds is below 1.
 
 ### The `solve_fem()` function
 
@@ -573,7 +568,7 @@ Its principal arguments:
 >- **`failure_criterion`** (default `"hybrid"`): how a non-converged trial is judged — see
 >  [SSRM failure criteria](#ssrm-failure-criteria).<br>
 >- **`max_disp_factor`** (default 0.1, `None` to disable): displacement backstop as a fraction of
->  mesh height; see [why equilibrium-based SSRM trials disable it](#creep-trend).<br>
+>  mesh height; see [the displacement limit](#3-displacement-limit-displacement_limit).<br>
 >- **`early_exit`** (default `True`): watch the residual for the no-progress plateau described
 >  above and report it.<br>
 >- **`fem_solver`** (default `'auto'`): the per-trial driver — see
@@ -627,7 +622,7 @@ Its principal arguments:
 >  ($10^{-3}$), **`max_iterations`** (12000), **`max_iterations_ceiling`** (50000): passed to each
 >  trial.<br>
 >- **`max_disp_factor`** (0.1): the displacement-limit fraction. It is what the
->  `"displacement_limit"` criterion bisects on; see [the equilibrium-based criteria](#creep-trend).<br>
+>  `"displacement_limit"` criterion bisects on; see [the displacement limit](#3-displacement-limit-displacement_limit).<br>
 >- **`dt_scale`** (1.0): multiplier on the viscoplastic pseudo-time step. **Do not lower it to make
 >  a model converge** — it shrinks the residual without making the slope any more stable, and can push
 >  a failing state under an absolute `force_tol`.<br>

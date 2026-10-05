@@ -137,9 +137,11 @@ viscoplastic strain, update the body load.
 
 ![fem_ov_viscoplastic_loop.png](images/fem_ov_viscoplastic_loop.png){width=700}
 
+Each pass round the loop is one iteration.
+
 ### The iteration {#viscoplastic-iteration-process}
 
-Each pass round the loop is one iteration. Stress is carried with four components
+Stress is carried with four components
 $(\sigma_x, \sigma_y, \tau_{xy}, \sigma_z)$, and $[D_e^4]$ is the corresponding $4\times4$
 elastic matrix. At each Gauss point it does the following:
 
@@ -230,7 +232,7 @@ viscoplastic loop needs thousands.
 
 A state the corrector returns ends the trial as standing only when it passes three checks:
 
->- **Force equilibrium** — the per-node out-of-balance force is below `force_tol`.<br>
+>- **Force equilibrium** — the per-node normalized out-of-balance force measure is below `force_tol`.<br>
 >- **Yield** — the largest Mohr-Coulomb violation anywhere in the mesh, as a fraction of the local
 >  strength, at or below $10^{-6}$. A field can be in force balance and still carry stress the
 >  material cannot hold.<br>
@@ -562,7 +564,7 @@ Its principal arguments:
 >- **`max_iterations_ceiling`** (default 50000): hard stop on the extension a trial still dying
 >  away, or with no clear trend, is given at `max_iterations` (see the
 >  [trend reading](#creep-trend)). Reaching it with the
->  out-of-balance still falling gives `exit_reason = 'inconclusive'`.<br>
+>  out-of-balance still falling leaves the trial inconclusive.<br>
 >- **`force_tol`** (default $10^{-3}$): the per-node force-equilibrium tolerance; with `oob_window`
 >  (default 10) the averaging width that cancels the yield-surface limit cycle.<br>
 >- **`failure_criterion`** (default `"hybrid"`): how a non-converged trial is judged — see

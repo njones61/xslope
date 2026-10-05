@@ -17,9 +17,14 @@ from a script with `solve_fem()` and `solve_ssrm()`, or from the input file.
 
 ## Run settings
 
-The Run FEM dialog below holds every run setting. The table lists each control in the dialog's
-order, with the Excel cell and function argument that set the same thing; **—** means there is
-none, and SSRM-only arguments belong to `solve_ssrm()`.
+In Studio the settings are made in the Run FEM dialog, shown below. The table that follows lists
+them in the dialog's order and gives, for each, the cell on the Excel main sheet and the argument
+of `solve_fem()` or `solve_ssrm()` that sets the same thing; a dash means there is none, and
+arguments that apply only to a search belong to `solve_ssrm()`. The table is a map of this page:
+each setting links to the section that explains what it controls and how to choose it, and the
+sections follow in the order the solver uses them, from the strength reduction method itself
+through a single trial, the rules that decide it, the search, and the options that shape the
+mechanism.
 
 ![Run FEM dialog](../studio/images/analysis_run_fem_dialog.png){width=818}
 

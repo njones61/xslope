@@ -237,45 +237,86 @@ def _label_along(ax, k, gamma, depth, text, color, fontsize=9.0):
 
 
 def fig_k0_initial():
-    gamma = 19.0          # kN/m3
+    gamma = 19.0          # kN/m3: same uniform dry column as the previous figure
     z = np.linspace(0, 12, 200)
     sv = gamma * z
 
-    fig, ax = plt.subplots(figsize=(7.6, 5.2))
+    fig = plt.figure(figsize=(4.9, 6.1))
+    gs = fig.add_gridspec(2, 2, height_ratios=(1.1, 2.0),
+                          left=0.12, right=0.98, bottom=0.19, top=0.91,
+                          wspace=0.36, hspace=0.24)
 
-    # The gravity turn-on's coefficient is nu/(1-nu): a band, not a value, because
-    # nu is chosen for reasons of its own.
-    k_lo, k_hi = 0.2 / 0.8, 0.4 / 0.6
-    ax.fill_betweenx(z, k_lo * sv, k_hi * sv, color="#f7e6dc", zorder=0)
-    ax.plot(0.3 / 0.7 * sv, z, color=C_ACCENT2, linewidth=1.8, linestyle=(0, (6, 3)))
-    for k0 in (1.0, 1.5):
-        ax.plot(k0 * sv, z, color=C_ACCENT, linewidth=2.0)
+    def element(ax, title, relation, color):
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis("off")
+        ax.set_title(title, fontsize=8.3, color=C_INK, pad=9)
+        ax.add_patch(plt.Rectangle((0.1, 0.02), 0.8, 0.88,
+                                   facecolor="#e5d2ad", alpha=0.3, edgecolor="none"))
+        ax.plot([0.1, 0.9], [0.9, 0.9], color=C_INK, linewidth=0.9)
+        ax.add_patch(plt.Rectangle((0.39, 0.34), 0.26, 0.24,
+                                   facecolor="white", edgecolor=C_INK, linewidth=0.9))
+        for tail, tip in (((0.52, 0.77), (0.52, 0.59)),
+                          ((0.52, 0.14), (0.52, 0.33))):
+            ax.annotate("", xy=tip, xytext=tail,
+                        arrowprops=dict(arrowstyle="-|>", color=C_INK, linewidth=0.9))
+        for tail, tip in (((0.17, 0.46), (0.38, 0.46)),
+                          ((0.87, 0.46), (0.66, 0.46))):
+            ax.annotate("", xy=tip, xytext=tail,
+                        arrowprops=dict(arrowstyle="-|>", color=color, linewidth=0.9))
+        ax.text(0.52, 0.81, r"$\sigma'_v$ from overburden",
+                fontsize=7.5, ha="center", color=C_INK)
+        ax.text(0.84, 0.53, r"$\sigma'_h$", fontsize=8, ha="center", color=color)
+        ax.annotate("", xy=(0.1, 0.46), xytext=(0.1, 0.9),
+                    arrowprops=dict(arrowstyle="<->", color=C_INK, linewidth=0.7))
+        ax.text(0.045, 0.66, "$z$", fontsize=8, ha="right", color=C_INK)
+        ax.text(0.52, -0.03, relation, fontsize=8.3, ha="center", color=color)
 
-    ax.set_xlim(0, 400)
-    ax.set_ylim(12, 0)
-    ax.set_xlabel("initial lateral effective stress $\\sigma'_h$   (kPa)", fontsize=9.5)
-    ax.set_ylabel("depth below level ground   (m)", fontsize=9.5)
-    _tidy(ax)
+    element(fig.add_subplot(gs[0, 0]),
+            "Gravity turn-on\nElastic, zero lateral strain",
+            r"$\sigma'_h=\frac{\nu}{1-\nu}\,\sigma'_v$", C_ACCENT2)
+    element(fig.add_subplot(gs[0, 1]),
+            "At-rest initialization\nSpecified $K_0$",
+            r"$\sigma'_h=K_0\,\sigma'_v$", C_ACCENT)
 
-    _label_along(ax, 0.3 / 0.7, gamma, 6.6,
-                 "gravity turn-on,  $\\nu$ = 0.3", C_ACCENT2)
-    _label_along(ax, k_hi, gamma, 3.4, "$\\nu$ = 0.4", C_ACCENT2, fontsize=8.5)
-    _label_along(ax, k_lo, gamma, 10.6, "$\\nu$ = 0.2", C_ACCENT2, fontsize=8.5)
-    _label_along(ax, 1.0, gamma, 7.6,
-                 "$K_0$ = 1.0   compacted fill, RS2", C_ACCENT)
-    _label_along(ax, 1.5, gamma, 6.4,
-                 "$K_0$ = 1.5   overconsolidated clay", C_ACCENT)
+    for column in (0, 1):
+        ax = fig.add_subplot(gs[1, column])
+        ax.plot(sv, z, color=C_INK, linewidth=1.5, label=r"$|\sigma'_v|$")
+        if column == 0:
+            k_lo, k_hi = 0.2 / 0.8, 0.4 / 0.6
+            ax.fill_betweenx(z, k_lo * sv, k_hi * sv, color="#f7e6dc", zorder=0,
+                             label=r"$\nu=0.2$–$0.4$")
+            ax.plot(0.3 / 0.7 * sv, z, color=C_ACCENT2, linewidth=1.4,
+                    linestyle=(0, (6, 3)), label=r"$|\sigma'_h|,\ \nu=0.3$")
+        else:
+            # K0=1 coincides with the vertical profile: blue dashes leave the
+            # black vertical-stress line visible between them.
+            for k0, style in ((1.0, (0, (5, 3))), (1.5, "solid")):
+                ax.plot(k0 * sv, z, color=C_ACCENT, linewidth=1.1, linestyle=style,
+                        label=rf"$|\sigma'_h|,\ K_0={k0:.1f}$")
+        ax.set_xlim(0, 400)
+        ax.set_ylim(12, 0)
+        ax.set_xticks((0, 200, 400))
+        ax.set_yticks((0, 4, 8, 12))
+        ax.set_xlabel("Stress magnitude (kPa)", fontsize=7.5)
+        if column == 0:
+            ax.set_ylabel("Depth below level ground (m)", fontsize=7.5)
+        _tidy(ax)
+        ax.tick_params(labelsize=7.2)
+        ax.legend(loc="upper right", fontsize=6.8, framealpha=1, edgecolor=C_GRID,
+                  borderpad=0.4, handlelength=1.5, labelspacing=0.45)
 
-    ax.text(0.985, 0.965,
-            "solid: at-rest initialization — $\\sigma'_h = K_0\\sigma'_v$, stated with the soil\n"
-            "dashed band: gravity turn-on — $\\sigma'_h$ follows from Poisson's ratio",
-            transform=ax.transAxes, fontsize=9.0, color=C_INK, va="top", ha="right",
-            bbox=dict(boxstyle="round,pad=0.45", facecolor="white",
-                      edgecolor=C_GRID))
-
-    fig.tight_layout()
+    fig.text(0.31, 0.105, r"Gravity band: $\nu=0.2$–$0.4$",
+             ha="center", fontsize=7.4, color=C_INK)
+    fig.text(0.31, 0.075, r"Shown line: $\nu=0.3$",
+             ha="center", fontsize=7.4, color=C_INK)
+    fig.text(0.79, 0.105, "$K_0=1.0$: compacted fill, RS2",
+             ha="center", fontsize=7.4, color=C_INK)
+    fig.text(0.79, 0.075, "$K_0=1.5$: overconsolidated clay",
+             ha="center", fontsize=7.4, color=C_INK)
+    fig.text(0.55, 0.025, r"$\gamma=19$ kN/m$^3$; both vertical profiles are the same.",
+             ha="center", fontsize=7.5, color=C_INK)
     _finish(fig, "fem_ov_k0_initial.png")
-
 
 # ===========================================================================
 # Figure 4 — strength-reduction sweep on the Griffiths & Lane Example 1 sample

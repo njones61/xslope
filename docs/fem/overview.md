@@ -472,12 +472,16 @@ $\int [B]^T\{\sigma\}\,dV = \{F_{ext}\}$, gives
 The prescribed field therefore enters twice: as the load term $-\int [B]^T\{\sigma_0\}\,dV$,
 and as part of the stress the yield check tests.
 
-The figure compares initial lateral effective stress with depth in a level-ground soil column:
+The figure pairs an element at depth with the vertical and horizontal effective-stress profiles
+for each convention:
 
 ![fem_ov_k0_initial.png](images/fem_ov_k0_initial.png){width=700}
 
-The solid at-rest profiles give larger horizontal compression than the dashed gravity-turn-on
-profile; the shaded band shows how the gravity result changes with Poisson's ratio.
+The illustration is a uniform, dry level-ground column; the profiles show compression magnitudes.
+
+The vertical profiles are identical. The shown at-rest profiles give larger horizontal compression
+than the gravity-turn-on profile; the shaded band shows how the gravity result changes with
+Poisson's ratio.
 
 On level ground with no horizontal variation, a fixed base and horizontally restrained sides,
 the $K_0$ field balances self weight for any $K_0$: the integral satisfies vertical equilibrium,

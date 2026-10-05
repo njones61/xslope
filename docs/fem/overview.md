@@ -563,9 +563,8 @@ than its gravity-turn-on result, so gravity turn-on is the conservative choice f
 
 The element types were introduced above as a matter of discretization, but for a plasticity
 analysis the choice between linear and quadratic elements decides whether the answer is right.
-Plastic deformation under Mohr-Coulomb with dilation angle $\psi = 0$, so plastic flow causes
-no volume change, is nearly
-incompressible: the material shears without changing volume. A linear element has too few degrees
+Under Mohr-Coulomb with dilation angle $\psi = 0$, plastic flow causes no volume change.
+A linear element has too few degrees
 of freedom to keep its volume and take the shape the failure mechanism needs at the same time,
 so it resists plastic deformation more than the soil does, more strength has to be removed before
 the slope fails, and the factor of safety comes out too high. This is **volumetric locking**. The

@@ -627,7 +627,7 @@ saved trigger the same rerun as a free-entry seepage time.
 ## Finite element (FEM)
 
 Build a mesh in **FEM** mode, then choose **Run FEM…**. The Run FEM dialog sets up either a
-single trial at a strength reduction factor you choose, or an SSRM search for the factor of
+single trial at a strength reduction factor you choose, or a shear strength reduction (SSRM) search for the factor of
 safety. Its options are listed below; the [Solver page](../fem/solver.md#run-settings) shows the
 dialog and explains each option, with the Excel cell and the `solve_fem()` / `solve_ssrm()`
 argument that set it.
@@ -651,23 +651,29 @@ argument that set it.
 
 Options start from the open file and are remembered for the session, not written back to the file.
 
-Check the **Model checks** column for missing Poisson's ratio, zero modulus, undefined mesh materials and missing tensile caps; resolve errors before running (see [Model checks](#model-checks-before-a-run)). The seismic note explains the entered sign: **+k** pushes right and **−k** left; see [Seismic forces](../fem/overview.md#seismic-forces).
+Check the **Model checks** column for missing Poisson's ratio, zero modulus, undefined mesh materials and missing tensile caps; resolve errors before running (see [Model checks](#model-checks-before-a-run)).
 
-**SSR exclusions…** opens the picker below; uncheck a material zone to hold it at full strength. The button and selection summary appear only for SSRM, and the selection is remembered for the session, not saved; see [SSR exclusions](../fem/solver.md#ssr-exclusion-zones).
+The seismic note in the dialog explains the entered sign: **+k** pushes right and **−k** left; see [Seismic forces](../fem/overview.md#seismic-forces).
+
+**SSR exclusions…** opens the picker below; uncheck a material zone to hold it at full strength. The button and selection summary appear only for SSRM, and the selection is not saved; see [SSR exclusions](../fem/solver.md#ssr-exclusion-zones).
 
 ![SSR exclusions dialog](images/analysis_ssr_exclude_dialog.png)
 
-During a run, follow progress and the Log or press **Cancel**. The closing summary gives the factor of safety, bracket, evidence at both ends and wall time; if it reports an inconclusive trial, raise the ceiling or loosen SSRM tolerance, and if it reports iteration-limit dependence, raise **Max iterations per trial**.
+During a run, follow progress and the Log or press **Cancel**. The closing summary gives the factor of safety, bracket, evidence at both ends and wall time; if it reports an [inconclusive trial](../fem/solver.md#creep-trend), raise the ceiling or loosen SSRM tolerance, and if it reports that the factor of safety depends on the iteration limit, raise **Max iterations per trial**.
 
-**Continue with a higher limit…** appears for an SSRM run made in this session when the iteration limit stopped the top trial still settling or slowing. Choose a new limit (initially five times the old one); progress, Cancel and the Log continue, results are replaced and the Run dialog keeps the new limit (see [Continuation](../fem/solver.md#creep-trend)). For sweeps, use [Parametric study](#sweeps-in-fem-and-seepage-mode).
+**Continue with a higher limit…** appears for an SSRM run made in this session when the top trial ended undecided at the iteration limit, or was counted failed while still slowing. Choose a new limit (initially five times the old one); progress, Cancel and the Log continue, results are replaced and the Run dialog keeps the new limit (see [Continuation](../fem/solver.md#creep-trend)). For sweeps, use [Parametric study](#sweeps-in-fem-and-seepage-mode).
 
-The run opens **FEM · Data** (mesh, boundary conditions and reinforcement) and **FEM · Results**. Results, captured mechanisms and reinforcement/pile profiles are saved beside the model and restored on Open without re-solving; see [Exported files](../fem/overview.md#exported-files).
+The run opens **FEM · Data** (mesh, boundary conditions and reinforcement) and **FEM · Results**, shown below.
 
 ![FEM Data view](images/analysis_fem_data.png)
 
+The FEM · Results view displays the solved field and its plot controls:
+
 ![FEM Results view](images/analysis_fem_results.png)
 
-The Results [Display panel](#display-options-per-view) redraws the saved solution without solving again; controls that do not apply to the selected plot are dimmed.
+Results, captured mechanisms and reinforcement/pile profiles are saved beside the model and restored on Open without re-solving; see [Exported files](../fem/overview.md#exported-files).
+
+The Results [Display panel](#display-options-per-view) redraws the saved solution without solving again, using the controls below; controls that do not apply to the selected plot are dimmed.
 
 | Control | What it does |
 |---|---|

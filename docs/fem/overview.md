@@ -713,16 +713,15 @@ the [displacement limit](solver.md#3-displacement-limit-displacement_limit)**. T
 bracket is shaded behind it. The same plot is available alone as
 `xslope.plot_fem.plot_ssrm_curve(ax, record)`.
 
-**Interpreting the plot.** A flat run of displacements that turns up in a sharp knee is a strength limit. The
-slope reached equilibrium at every factor below the knee and could not above it, and the factor of
-safety sits at the knee. The trial above the knee was still moving fast when it was stopped. A
-steady climb with no knee is a different result. The slope kept moving at every strength the
-search tried, and the trial at the top of the bracket was still moving slowly when the iteration
-limit stopped it. The factor of safety then depends on the iteration limit, and raising Max
-iterations per trial may change it. A run whose top trial ended undecided found no failure, so the
-dashed line sits at the highest strength the slope came to rest at and the key reads "FS ≥": no
-trial above that strength was shown to fail. Where the iteration limit stopped the trial at the
-top, the run can be [continued with a higher limit](solver.md#creep-trend) from where its trials stopped.
+**Interpreting the plot.** Both curves below rise to a knee. What distinguishes the runs is the
+verdict at the top of the final bracket: in the normal run, the open diamond marks a trial whose
+movement did not slow, counted as sliding, and the factor of safety is the bracket midpoint.
+In the short-budget run, the open pentagon marks a trial still slowing when the limit stopped it,
+left undecided. No failure was shown at that final upper edge, so the result is a lower bound,
+"FS ≥" the highest factor at which the slope stood. Look for these two verdict markers rather
+than judging the curve's shape alone; filled circles mark trials that reached equilibrium in
+both runs. Raise Max iterations per trial to decide the unresolved top, or
+[continue with a higher limit](solver.md#creep-trend) from where its trials stopped.
 
 The comparison below uses the same [FEM-1 embankment](../tutorials/fem01_strength_reduction.md)
 and tri6 mesh at target size 3.5 ft in both panels. On the left, the tutorial's 4,000-iteration

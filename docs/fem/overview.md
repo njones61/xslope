@@ -622,6 +622,15 @@ nodes both come back at that size and grow back to the target away from them, an
 discretized finely without a finer mesh across the whole section. It only ever refines: a value at
 or above the target size cannot coarsen the lines and is ignored.
 
+In these meshes of the [FEM-2 reinforced slope](../tutorials/fem02_reinforcement.md) and the
+[FEM-4 pile wall](../tutorials/fem04_piles.md), the black members follow soil-element edges and
+every member node is a soil node. The smaller elements form a graded band around each line:
+these illustration meshes use a 1D element size of 0.5 ft with a soil target size of 2 ft, rather
+than changing the size across the whole section. Both panels have equal aspect; the two sections
+are drawn at different scales.
+
+![Reinforcement and wall edges sharing soil nodes in locally refined meshes](images/fem_structural_meshes.png){width=1000}
+
 ## Visualization of results
 
 Results are drawn as panels of the deformed mesh, strain and stress fields, displacement vectors

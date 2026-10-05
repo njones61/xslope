@@ -19,6 +19,7 @@ Run from the repo root:
 import contextlib
 import io
 import os
+import sys
 
 import matplotlib
 matplotlib.use("Agg")
@@ -262,7 +263,74 @@ def figure_refine_features():
     print(f"   target element size {target:.3f}")
 
 
+def figure_structural_coupling():
+    """FEM-2 reinforcement and FEM-4 wall, with an illustrative 0.5 ft line size.
+
+    Reuse the tutorial mesh builders and this module's material mesh renderer.
+    Only the in-memory line size changes; no workbook or companion is written.
+    Check that every three-node member is a complete quadratic soil edge.
+    """
+    from tools.make_tutorial_figures import (
+        FEM02_DONE, _fem02_mesh, _fem04_mesh)
+
+    panels = []
+    for title, path, builder in (
+            ("FEM-2: reinforced slope", FEM02_DONE,
+             lambda data: _fem02_mesh(data)),
+            ("FEM-4: pile wall", os.path.join(
+                _root(), "docs/tutorials/files/xslope_pile_wall.xlsx"),
+             lambda data: _fem04_mesh(data, element_size_1d=0.5))):
+        data = _quiet(load_slope_data, path)
+        data["element_size_1d"] = 0.5
+        mesh = _quiet(builder, data)
+        edges = {tuple(sorted(int(row[i]) for i in inds))
+                 for row in mesh["elements"]
+                 for inds in ((0, 1, 3), (1, 2, 4), (2, 0, 5))}
+        members = np.asarray(mesh["elements_1d"], dtype=int)
+        assert all(int(t) == 3 for t in mesh["element_types_1d"])
+        assert all(tuple(sorted(row)) in edges for row in members)
+        names = [m.get("name") or f"Material {i + 1}"
+                 for i, m in enumerate(data["materials"])]
+        panels.append((title, mesh, members, names))
+        print(f"{title}: {_stats(mesh)}, {len(members)} member edges; "
+              "all member nodes and edges shared with soil")
+
+    axes_w = FIG_W_IN * 0.45
+    heights, windows = [], []
+    for _, mesh, _, _ in panels:
+        x0, x1, y0, y1 = _extent(mesh)
+        pad = PAD_FRAC * max(x1 - x0, y1 - y0)
+        windows.append((x0 - pad, x1 + pad, y0 - pad, y1 + pad))
+        heights.append(axes_w * (y1 - y0 + 2 * pad) / (x1 - x0 + 2 * pad))
+    chrome = TITLE_H_IN + CAPTION_H_IN + LEGEND_H_IN + 0.35
+    fig_h = max(heights) + chrome
+    fig = plt.figure(figsize=(FIG_W_IN, fig_h), dpi=DPI)
+    for i, (title, mesh, members, names) in enumerate(panels):
+        bottom = (LEGEND_H_IN + CAPTION_H_IN + 0.2) / fig_h
+        ax = fig.add_axes((0.03 + i * 0.5, bottom, 0.45, heights[i] / fig_h))
+        handles = _draw(ax, mesh, names, window=windows[i], lw=72 / DPI)
+        xy = mesh["nodes"]
+        ax.add_collection(LineCollection(xy[members[:, :2]], colors="black",
+                                        linewidths=1.3, zorder=6))
+        member_nodes = np.unique(members)
+        ax.scatter(xy[member_nodes, 0], xy[member_nodes, 1], s=3,
+                   color="black", zorder=7)
+        ax.set_title(title, fontsize=11, fontweight="bold", pad=6)
+        fig.text(0.255 + i * 0.5, bottom - 0.16 / fig_h,
+                 _stats(mesh), ha="center", fontsize=8.5)
+        fig.legend(handles=handles, loc="lower center", ncol=1, frameon=False,
+                   fontsize=8, bbox_to_anchor=(0.255 + i * 0.5, 0.025))
+    fig.text(0.5, 0.01, "tri6 · soil target 2 ft · 1D element size 0.5 ft "
+             "(illustration meshes)", ha="center", fontsize=8)
+    _save(fig, "fem_structural_meshes.png")
+
+
 def main():
+    if sys.argv[1:] == ["structural"]:
+        figure_structural_coupling()
+        return
+    if sys.argv[1:]:
+        raise SystemExit("usage: make_mesh_figures.py [structural]")
     figure_tri_vs_quad()
     figure_zone_size()
     figure_refine_features()

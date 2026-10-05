@@ -557,8 +557,7 @@ between $1.2\times10^{-2}$ and $4.7\times10^{-2}$, with its mean changing only 0
 last half of the solve. More iterations do not remove an imbalance of that kind.
 
 The interface reading uses accumulated plastic slip and the maximum nodal displacement.
-Movement is measured in [elastic displacements](#2-hybrid-hybrid-default), the
-movement the same model would make if nothing yielded or slipped. Slip is measured
+Movement is measured in [elastic displacements](#2-hybrid-hybrid-default). Slip is measured
 against the total slip already accumulated, so neither reading depends on the units, stiffness
 or mesh size.
 

@@ -15,19 +15,19 @@ This approach is particularly effective for modeling geosynthetic reinforcement,
 The truss elements can only carry tension loads up to a specified tensile strength limit $T_{max}$, beyond which
 they either yield plastically to a residual strength $T_{res}$, or fail completely. The inability to carry compression loads
 accurately
-reflects the behavior of flexible reinforcement materials like geotextiles and ensures that the reinforcement cannot resist compressive buckling. The truss elements are oriented along the centerline of the physical reinforcement and connected to the surrounding soil elements through shared nodes. This connection ensures that the reinforcement participates in the overall deformation pattern of the slope while contributing its tensile resistance to improve stability.
+reflects the behavior of flexible reinforcement materials like geotextiles and ensures that the reinforcement cannot resist compressive buckling. Bonded truss elements are oriented along the centerline of the physical reinforcement and connected to the surrounding soil elements through shared nodes. This connection ensures that the reinforcement participates in the overall deformation pattern of the slope while contributing its tensile resistance to improve stability.
 
 Truss elements are incorporated into the XSLOPE finite element mesh by passing the geometry of the reinforcement
 lines from the input template to the mesh generation process. The reinforcement lines are discretized into multiple
 truss elements based on the specified mesh density (target_size), or on the **1D element size** on the main sheet
 where a model states one — the element size along the reinforcement and pile lines, which refines the truss elements
-and the soil sharing their nodes together. The 1D elements are fully integrated with the 2D
+and the soil sharing their nodes together. Bonded 1D elements are fully integrated with the 2D
 elements - each 1D element corresponds to the edge of two adjacent 2D elements and both the 1D and 2D elements share
 the same nodes. The 1D elements have their own set of material properties corresponding to the properties of the
 corresponding reinforcement lines input by the user and include $T_{max}$, $T_{res}$, $E$, and cross-sectional area
 $A$.
 
-Each truss element stands on every node of the 2D element edge it lies on. On a linear mesh that is the edge's two
+Each bonded truss element stands on every node of the 2D element edge it lies on. On a linear mesh that is the edge's two
 end nodes and the element is a 2-node bar. On a quadratic mesh (tri6, quad8, quad9) the edge also carries a midside
 node, and the truss element is a 3-node bar carrying that node too.
 
@@ -183,18 +183,13 @@ This matrix is factored once (via sparse LU decomposition) and reused for all vi
 >>$\delta = (u_{x,j} - u_{x,i})\cos\psi + (u_{y,j} - u_{y,i})\sin\psi$
 >>$T = \dfrac{AE}{L} \cdot \delta$
 
-2. Determine whether a correction is needed:
->>- If $T < 0$ (compression): set $\Delta T = -T$ (cancel the compressive force entirely)
->>- If $T > T_{allow}$ and the element has not previously failed: mark the element as failed and set $\Delta T = T_{res} - T$
->>- If $T > T_{res}$ and the element has previously failed: set $\Delta T = T_{res} - T$
->>- Otherwise: no correction ($\Delta T = 0$)
+2. Apply the body-force correction defined under [Force Behavior and Failure Modes](#force-behavior-and-failure-modes).
+   It joins the soil viscoplastic strain correction ($[B]^T [D] \{\varepsilon_{vp}\}$) in the load vector, and the
+   factored stiffness matrix solves the corrected system.
 
-3. Convert the axial force correction to equivalent nodal forces and add to the load vector:
->>$\{F\}_{correction} = \Delta T \begin{Bmatrix} -\cos\psi \\ -\sin\psi \\ \cos\psi \\ \sin\psi \end{Bmatrix}$
-
-These corrections are added to the same load vector that receives the soil viscoplastic strain corrections ($[B]^T [D] \{\varepsilon_{vp}\}$). The factored stiffness matrix then solves the corrected system, and the process repeats until convergence.
-
-**Failure irreversibility:** Once an element is marked as failed (having exceeded $T_{allow}$), it remains failed for all subsequent iterations within that analysis. Its effective capacity permanently drops from $T_{allow}$ to the residual assigned to it. This models the irreversible nature of material yielding.
+3. At equilibrium, apply the [peak-residual softening check](#force-behavior-and-failure-modes) and re-solve where
+   that check drops a bar's capacity. A capacity exceedance can set a reporting flag; it does not by itself
+   change the working cap.
 
 ## Strength Reduction and Reinforcement
 
@@ -526,7 +521,8 @@ line unless that line sets `Jred = No`. The stiffnesses $k_n$ and $k_s$, the tie
 are not reduced, exactly as the bar's properties are not.
 
 A jointed model reaches equilibrium by growing slip, so it takes tens of thousands of viscoplastic sweeps where a
-bonded one takes hundreds, and a trial that runs out of them is undecided rather than failed. What that costs, what
+bonded one takes hundreds. The [Solver's stopping rules](solver.md#jointed-models) decide whether a trial stands,
+fails or remains undecided, not the budget alone. What that costs, what
 budget to allow and how such a trial is classified are under [running a jointed model](joints.md#running-a-jointed-model).
 
 ## Joints Without Reinforcement

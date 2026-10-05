@@ -408,7 +408,7 @@ form, along with the count of each kind.
 
 The lines are embedded in the 2D mesh rather than meshed separately: gmsh is required to
 place element edges along each polyline, and the 1D elements are then extracted from those
-edges. Every 1D node is therefore a node of the surrounding 2D mesh, and load transfers
+edges. For bonded reinforcement and piles, every 1D node is a node of the surrounding 2D mesh, and load transfers
 between the reinforcement and the soil through these shared nodes. A line that runs along the domain
 boundary — on the base at `max_depth`, or along the ground surface — or that extends
 outside the section cannot be embedded; it is rejected before meshing starts, with a

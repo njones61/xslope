@@ -7,7 +7,7 @@ description: "Finite element trial settings, viscoplastic iteration, convergence
 
 XSLOPE's finite element solver computes the factor of safety of a slope by the shear strength
 reduction method (SSRM). Starting from the model the [Overview](overview.md) describes (mesh, materials,
-loads, boundary conditions and initial stress), it divides every material's strength by a trial
+loads, boundary conditions and initial stress), it reduces the selected soil and joint shear strengths by a trial
 factor F and iterates the model until the slope either comes to rest or shows that it cannot. A
 search over F brackets the value at which the slope stops standing; that value is the factor of
 safety. A single trial at a chosen F can also be run on its own, to see the stresses and
@@ -346,7 +346,7 @@ the viscoplastic loop alone, or a cold-start Newton solve; `fem_solver` on `solv
 >- **`'auto'`** (the default) — the viscoplastic loop with the corrector and the yield check
 >  described under [the convergence, corrector and yield checks](#convergence-criterion).<br>
 >- **`'viscoplastic'`** — that loop on its own: no corrector, no yield check. A trial ends
->  on the [iteration-limit rules](#creep-trend) and on nothing else.<br>
+>  on ordinary convergence or the [iteration-limit rules](#creep-trend).<br>
 >- **`'newton'`** — a cold-start Newton-Raphson solve, with [restrictions for jointed models](#jointed-model-solver-policy).
 
 Setting `XSLOPE_FEM_SOLVER` selects the driver for a whole process. When the environment rather than

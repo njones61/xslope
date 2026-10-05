@@ -591,9 +591,10 @@ drive a left-facing slope and positive to drive a right-facing one.
 
 ## Structural elements
 
-XSLOPE supports two kinds of one-dimensional structural element embedded in the 2D soil mesh. Both
-share nodes with the surrounding soil elements and participate in the viscoplastic iteration through
-body-force corrections.
+XSLOPE supports two kinds of one-dimensional structural element embedded in the 2D soil mesh. Bonded
+reinforcement and piles share nodes with the surrounding soil elements and participate in the viscoplastic
+iteration through body-force corrections; [jointed sheets](reinforcement.md#two-ways-to-represent-a-sheet)
+couple to the soil through interfaces instead.
 
 - **[Soil Reinforcement](reinforcement.md)**: geotextiles, soil nails and ground anchors as
   tension-only truss elements with axial stiffness $EA/L$, on every node of the soil edge they lie
@@ -602,14 +603,14 @@ body-force corrections.
 
 - **[Piles and Concrete Piers](piles.md)**: beam elements carrying both axial stiffness ($EA/L$) and
   lateral bending stiffness ($12EI/L^3$), and — unlike reinforcement — both tension and compression.
-  Rotational DOFs are eliminated by static condensation to stay compatible with the 2-DOF-per-node
-  soil mesh.
+  Pile nodes carry a rotational DOF as well as their two translations; other nodes carry only the
+  translations. See the [mixed DOF system](piles.md#mixed-dof-system).
 
 Structural properties are **not reduced** during strength reduction; only soil $c$ and $\tan\varphi$
 are. The factor of safety is therefore the margin in the soil strength, given the structural
 elements as designed.
 
-Reinforcement and pile lines are embedded in the same mesh, so their 1D elements are edges of the
+Bonded reinforcement and pile lines are embedded in the same mesh, so their 1D elements are edges of the
 soil elements around them and every 1D node is a soil node. That coupling makes their discretization
 a mesh question rather than a per-member one: refining a member means refining the soil it transfers
 its load to. A line enters the mesh as its two endpoints, subdivided at the 1D element size — its

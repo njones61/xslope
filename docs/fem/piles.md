@@ -132,7 +132,8 @@ This approach avoids adding unnecessary rotational DOFs to the thousands of soil
 
 ### Coordinate Transformation
 
-The local stiffness matrix is transformed to global coordinates using a 6×6 rotation matrix:
+The local stiffness matrix is transformed to global coordinates using a rotation matrix — 6×6 for a
+two-node beam, 9×9 for a three-node beam:
 
 >$\mathbf{K}_{\text{global}} = \mathbf{T}^T \, \mathbf{K}_{\text{local}} \, \mathbf{T}$
 
@@ -146,7 +147,9 @@ The global stiffness matrix combines contributions from all element types:
 
 >$[\mathbf{K}]_{\text{global}} = \sum_{\text{soil}} [\mathbf{K}_e]_{\text{soil}} + \sum_{\text{truss}} [\mathbf{K}_e]_{\text{truss}} + \sum_{\text{beam}} [\mathbf{K}_e]_{\text{beam}}$
 
-The total DOF count is $2 \times n_{\text{soil nodes}} + 3 \times n_{\text{pile nodes}}$, typically only a few DOFs more than the pure 2-DOF system. The global matrix is factored once (via sparse LU decomposition) and reused for all viscoplastic iterations.
+The total DOF count is $2 \times n_{\text{all nodes}} + n_{\text{pile nodes}}$: every node has two
+translations, and each pile node has one extra rotation. Pile nodes are included in the all-node count.
+The global matrix is factored once (via sparse LU decomposition) and reused for all viscoplastic iterations.
 
 
 ## Mesh Generation
@@ -164,7 +167,9 @@ For details on the mesh generation process and 1D element extraction, see [Mesh 
 
 ## Force and Moment Computation
 
-At each viscoplastic iteration, the forces and moments in each beam element are computed from the 6-DOF nodal displacements. The global displacements are transformed to local coordinates using the rotation matrix $\mathbf{T}$, then:
+At each viscoplastic iteration, the forces and moments in each beam element are computed from its nodal
+displacements — 6 DOFs on a two-node beam, 9 on a three-node beam. The global displacements are transformed
+to local coordinates using the rotation matrix $\mathbf{T}$, then:
 
 >**Axial force**: $T = \dfrac{EA}{L} (u_2 - u_1)$
 

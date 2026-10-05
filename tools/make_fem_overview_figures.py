@@ -357,11 +357,9 @@ def fig_capture_comparison():
     print("wrote", path, "from saved W-3 fields; no solve", flush=True)
 
 
-def fig_budget_comparison():
-    """Original FEM-1 curve beside RS2-16's saved creeping history; no solve."""
-    from io import BytesIO
+def fig_displacement_curves():
+    """Keep the original FEM-1 PNG and render a separate saved RS2-16 curve."""
     import json
-    from PIL import Image
     from xslope.fileio import load_slope_data
     from xslope.plot_fem import plot_ssrm_curve
 
@@ -375,36 +373,26 @@ def fig_budget_comparison():
     fig.tight_layout()
     print("RS2-16:", ax.get_title(), ax.get_ylabel(),
           [t.get_text() for t in ax.get_legend().get_texts()], flush=True)
-    buffer = BytesIO()
-    fig.savefig(buffer, dpi=150, facecolor="white")
+    path = os.path.abspath(os.path.join(OUT, "rs2_16_ssrm_curve.png"))
+    fig.savefig(path, dpi=150, facecolor="white")
     plt.close(fig)
-    buffer.seek(0)
     # The original FEM-1 plot is already committed. Its old trial sidecar
     # lacks displacements; preserve the original program render rather than
     # inventing a record, rerunning a search or rewriting its annotations.
-    panels = [Image.open(os.path.join(OUT, "fem01_ssrm_curve.png")).convert("RGB"),
-              Image.open(buffer).convert("RGB")]
-    gap = 16
-    combined = Image.new("RGB", (sum(p.width for p in panels)+gap,
-                                  max(p.height for p in panels)), "white")
-    x = 0
-    for panel in panels:
-        combined.paste(panel, (x, 0))
-        assert combined.crop((x, 0, x+panel.width, panel.height)).tobytes() == panel.tobytes()
-        x += panel.width + gap
-    path = os.path.abspath(os.path.join(OUT, "fem_budget_comparison.png"))
-    combined.save(path)
-    print("wrote", path, "from committed plots/records; no solve", flush=True)
+    if not os.path.isfile(os.path.join(OUT, "fem01_ssrm_curve.png")):
+        raise FileNotFoundError("The original committed FEM-1 render is required")
+    print("kept original fem01_ssrm_curve.png; wrote", path,
+          "from committed RS2-16 record; no solve", flush=True)
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["budget-comparison"]:
-        fig_budget_comparison()
+    if sys.argv[1:] == ["displacement-curves"]:
+        fig_displacement_curves()
     elif sys.argv[1:] == ["capture-comparison"]:
         fig_capture_comparison()
     elif sys.argv[1:]:
         raise SystemExit("usage: make_fem_overview_figures.py "
-                         "[budget-comparison|capture-comparison]")
+                         "[displacement-curves|capture-comparison]")
     else:
         fig_viscoplastic_loop()
         fig_k0_initial()

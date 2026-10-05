@@ -755,18 +755,28 @@ the [displacement limit](solver.md#3-displacement-limit-displacement_limit)**. T
 [final bracket](solver.md#methodology) is shaded behind it. The same plot is available alone as
 `xslope.plot_fem.plot_ssrm_curve(ax, record)`.
 
-The left panel is the original [FEM-1 embankment](../tutorials/fem01_strength_reduction.md)
-curve. The right panel reloads the saved [RS2-16 layered slope with a weak seam and water table](../verification/rs2.md#rs2-16)
-record at a soil target size of 3 m. Each keeps the program's title, marker key, units and scale.
+The original [FEM-1 embankment](../tutorials/fem01_strength_reduction.md) curve below shows a sharp
+rise of the standing trials near the final bracket. Its open markers show trials that stopped
+while still moving, at the iteration limit or after their displacements ran away.
 
-![Left: FEM-1 embankment; right: RS2-16 weak-seam slope, from saved results](images/fem_budget_comparison.png){width=1000}
+![FEM-1 embankment displacement curve](images/fem01_ssrm_curve.png){width=1350}
 
-**Interpreting the plot.** FEM-1's standing trials rise sharply near the final bracket. RS2-16's
-standing trials climb more gradually: their displacements are 0.388, 0.499 and 0.522 m at
+The next curve reloads the saved [RS2-16 layered slope with a weak seam and water table](../verification/rs2.md#rs2-16)
+record at a soil target size of 3 m. Its standing trials climb more gradually: their displacements
+are 0.388, 0.499 and 0.522 m at
 $F = 0.8$, 0.95 and 0.96875, without a sharp knee in that recorded branch. Its final upper trial
 at $F = 0.9875$ reaches 1.767 m after 16,000 iterations and ends `not_slowing`, counted as sliding;
 the saved factor of safety is 0.978. The open diamond is its position when the limit stopped it,
-not a final displacement on the standing curve.
+not a final displacement on the standing curve. This record reports a midpoint factor, not a
+lower bound: its upper trial was counted as failed, rather than left undecided.
+
+![RS2-16 weak-seam slope displacement curve from its saved 3 m mesh record](images/rs2_16_ssrm_curve.png){width=1350}
+
+FEM-1 was run at a tolerance of 0.01, RS2-16 at 0.02. The shaded band is each run's final bracket,
+not the tolerance itself: bisection stops when its width is below that tolerance. FEM-1's bracket
+is $[1.3671875,\,1.375]$, width 0.0078125; RS2-16's is $[0.96875,\,0.9875]$, width 0.01875.
+The displayed $F$ ranges also differ, about 1–2 and 0.8–1.4, so RS2-16's band occupies a larger
+fraction of its axis. Neither bracket has an undecided upper edge.
 
 Read the [verdict](solver.md#methodology) as well as the shape. When a slope keeps moving without
 a clear knee, check the dependence on the iteration limit by raising Max iterations per trial

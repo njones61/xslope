@@ -127,19 +127,13 @@ solving an eigenvalue problem per point:
 
 >>$f = \sigma_m\sin\phi + \bar{\sigma}\left(\dfrac{\cos\theta}{\sqrt{3}} - \dfrac{\sin\theta\sin\phi}{3}\right) - c\cos\phi$
 
-**Strength options.** The FEM reads five of the **mat** sheet's strength options: `mc`
-(Mohr-Coulomb), `cp` (undrained strength at a reference elevation increasing at a rate `cp` with
-depth, assigned per element from the element centroid, $\phi = 0$), `pow` and `hb` (the curved
-envelopes below), and `elastic`. Any other option is refused rather than silently run as
-zero-strength soil.
-
-**Elastic-only materials.** A material whose **option** is `elastic` is never checked against the
-yield criterion — $[D_e]$ is its complete stress-strain law at every strength reduction factor, and
-only $\gamma$/$\gamma_{sat}$, $E$ and $\nu$ are meaningful for it. This mirrors the commercial code Rocscience RS2's "Plasticity
-Specifications: None". `solve_fem()` and `solve_ssrm()` take the affected names through
-`elastic_materials`, taken from the **option** column when left unset; a
-[polygon-addressed twin](solver.md#ssr-exclusion-zones) names the same treatment by outline. See
-[Worksheet: mat](../usage/input_template.md#worksheet-mat).
+Mohr-Coulomb is the usual choice, but it is one of five strength options a material can carry on
+the **mat** sheet. The FEM accepts `mc`, the criterion above; `cp`, an undrained strength that
+increases with depth from a reference elevation, assigned to each element at its centroid; `pow`
+and `hb`, the curved envelopes described next; and `elastic`, for a material that is never checked
+against a yield criterion and so stays elastic at every strength reduction factor (RS2's
+"Plasticity: None"). Any other option is refused rather than run as zero-strength soil. The inputs
+for each are on the [mat worksheet](../usage/input_template.md#worksheet-mat) page.
 
 ### Curved failure envelopes
 

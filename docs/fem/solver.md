@@ -841,6 +841,9 @@ Its principal arguments:
 >  [tensile strength](#tensile-strength-in-ssrm),
 >  [elastic-only materials](overview.md#mohr-coulomb-failure-criterion) and
 >  [matric suction](overview.md#matric-suction-apparent-cohesion-above-the-water-table); all default to off or to what the input file declares.<br>
+>- **`elastic_materials`**: material names to keep elastic at every trial factor, taken from the
+>  **option** column when left unset; `solve_ssrm()` accepts the same names. A
+>  [polygon-addressed twin](#ssr-exclusion-zones) names the same treatment by outline.<br>
 >- **`debug_level`** (default 0): 0 silent, 1 summary, 2 per-iteration.
 
 The returned dictionary carries `converged` and `stable`, the verdict metadata (`verdict`,

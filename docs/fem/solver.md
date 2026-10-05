@@ -662,7 +662,7 @@ With stated tensile strength $T$, the left panel shows the original and reduced 
 The right truncates them at a stated cap: the solid cut stays at $-T$, while the dashed cut
 moves to $-T/F$ when Tension SRF is on.
 
-![Unchanged implicit tensile strength and a stated cap with Tension SRF off or on](images/fem_ov_tension_cutoff.png){width=800}
+![Unchanged implicit tensile strength and a stated cap with Tension SRF off or on](images/fem_ov_tension_cutoff.png){width=920}
 
 Both settings reduce the shear envelope; only Tension SRF on moves the stated positive cap
 toward zero. The shading marks tension allowed without a cap on the left, and removed by

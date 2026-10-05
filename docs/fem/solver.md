@@ -5,20 +5,24 @@ description: "Finite element trial settings, viscoplastic iteration, convergence
 
 # Solver
 
-The solver takes the mesh, materials, loads and initial stress defined in the
-[Overview](overview.md) and iterates a trial at a specified strength reduction factor until
-the trial is decided or its stopping rules leave it undecided. A search over trial factors
-locates the factor of safety. The run settings control both the individual trials and the search.
+XSLOPE's finite element solver computes the factor of safety of a slope by the shear strength
+reduction method. Starting from the model the [Overview](overview.md) describes (mesh, materials,
+loads, boundary conditions and initial stress), it divides every material's strength by a trial
+factor F and iterates the model until the slope either comes to rest or shows that it cannot. A
+search over F brackets the value at which the slope stops standing; that value is the factor of
+safety. A single trial at a chosen F can also be run on its own, to see the stresses and
+deformations at that strength. The iteration, the rules that decide a trial, the search and the
+solve that draws the failure mechanism each have settings, whether the solver is run from Studio,
+from a script with `solve_fem()` and `solve_ssrm()`, or from the input file.
 
 ## Run settings
 
-In [XSLOPE Studio](../studio/analysis.md#finite-element-fem), build a mesh and choose
-**Run FEM…**; the dialog runs either a single trial at a factor you set or an SSRM search for
-the factor of safety.
+The settings are listed here as the Run FEM dialog presents them, with the Excel cell and the
+function argument that set the same thing.
 
 ![Run FEM dialog](../studio/images/analysis_run_fem_dialog.png){width=818}
 
-The table maps each dialog control to its input and API setting. **—** means no Excel
+**—** means no Excel
 cell or no argument on that function; SSRM-only arguments belong to `solve_ssrm()`.
 
 | Dialog control | Excel input | API setting | Meaning |

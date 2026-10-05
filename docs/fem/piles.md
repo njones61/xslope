@@ -105,9 +105,10 @@ On a quadratic soil mesh (tri6, quad8, quad9) the edge a beam element lies on ca
 two corners, and the beam element stands on all three. It then has 9 DOFs — $u_x$, $u_y$ and $\theta$ at every one of
 its nodes — and its local stiffness is 9×9.
 
-Compare the beam's end nodes with its extra midpoint node in the three-node form below.
+The 2- and 3-node line elements below carry two translations and a rotation at each node when
+used as pile beams. Compare the end nodes with the extra midpoint node in the three-node form.
 
-![Soil, bar and beam elements with local node indices](images/all_element_nodes.png){width=1500px}
+![Soil and line elements with local node indices](images/all_element_nodes.png){width=1500px}
 
 That node ties the pile to the soil in the middle of each element. The soil's displacement along a
 quadratic edge is a parabola through all three nodes, so a beam attached at the corners alone leaves the edge free to

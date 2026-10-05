@@ -31,9 +31,10 @@ Each bonded truss element stands on every node of the 2D element edge it lies on
 end nodes and the element is a 2-node bar. On a quadratic mesh (tri6, quad8, quad9) the edge also carries a midside
 node, and the truss element is a 3-node bar carrying that node too.
 
-The three-node bar below places node 2 between its two end nodes.
+The 2- and 3-node line elements below carry two translations at each node when used as
+reinforcement bars, with axial stiffness only. The three-node form places node 2 between its ends.
 
-![Soil, bar and beam elements with local node indices](images/all_element_nodes.png){width=1500px}
+![Soil and line elements with local node indices](images/all_element_nodes.png){width=1500px}
 
 The midside node ties the bar to the soil in the middle of the edge. The soil's displacement along a quadratic
 edge is a parabola through all three nodes, so a bar attached at the corners alone leaves the edge free to bow away

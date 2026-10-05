@@ -784,12 +784,14 @@ identical final widths even at the same stopping tolerance.
 The displayed $F$ ranges also differ, about 1–2 and 0.8–1.4, so RS2-16's band occupies a larger
 fraction of its axis. Neither bracket has an undecided upper edge.
 
-Read the [verdict](solver.md#methodology) as well as the shape. When a slope keeps moving without
-a clear knee, check the dependence on the iteration limit by raising Max iterations per trial
-or [continuing with a higher limit](solver.md#creep-trend) from where its trials stopped. A top
-trial still slowing at the ceiling remains undecided and leaves a lower bound, "FS ≥", rather
-than a confirmed failure edge. A steady-climb curve alone does not establish how far that bound
-or the reported factor would move under a longer run.
+A trial stopped at the iteration limit while still moving is not a solution. The program judges
+it from its movement: moving at a steady or growing rate, it counts as the slope failing; still
+slowing, it is left undecided, and when it is the top of the bracket the result is reported only
+as a lower bound. The displacement plotted for it is where it had got to when it was stopped.
+
+Read the [verdict](solver.md#methodology) as well as the shape. To decide an unresolved upper trial,
+raise Max iterations per trial or [continue with a higher limit](solver.md#creep-trend) from where
+its iterations stopped.
 
 The run's closing summary gives the same information in words. It is printed as the last lines of
 every strength reduction run and returned as `result['summary']`. It reports what happened at each

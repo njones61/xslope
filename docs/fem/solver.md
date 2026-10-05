@@ -594,7 +594,7 @@ The pair below reloads the saved fields of the [W-3 report tutorial's reservoir 
 The upper panel is the last converged field; the lower is the captured field above FS.
 Each is the standard deformation plot, with its own automatically chosen exaggeration.
 
-![Last converged and captured at-failure deformation from the saved W-3 fields](images/fem_capture_comparison.png){width=800}
+![Last converged and captured at-failure deformation from the saved W-3 fields](images/fem_capture_comparison.png){width=1086}
 
 The captured field shows the developed mechanism. Read each panel's scale in its title:
 the two deformation exaggerations differ, so their drawn movements are not on a common scale.

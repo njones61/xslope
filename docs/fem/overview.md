@@ -84,9 +84,7 @@ matter. Undrained moduli, which differ, follow it.
 | **Soft Rock** | 1,000,000 - 10,000,000 | 20,880,000 - 208,800,000 | 0.15 - 0.30 | Weathered or fractured rock |
 
 Enter $E$ in kPa with metric inputs and psf with English inputs, consistent with the unit weights
-and cohesions. XSLOPE never converts units; when the model declares a unit system (the **Units**
-selector on the main sheet) it labels the result colorbars and writes a `# units:` header into the
-exported CSVs with that system's units, and leaves an undeclared model's output unchanged.
+and cohesions.
 
 For undrained conditions, $E_u$ is measured directly by UU triaxial or unconfined compression tests,
 or estimated from $E_u = (150-1500)\,S_u$ — the low end for soft clays, the high end for stiff ones.
@@ -764,6 +762,10 @@ force and pile shear colorbars without re-solving.
 | `*_fem_failure_reinf.csv` | At-failure reinforcement results, same columns as `*_fem_reinf.csv`. |
 | `*_fem_failure_piles.csv` | At-failure pile results, same columns as `*_fem_piles.csv`. |
 | `*_fem_failure_meta.json` | Scalar metadata for the at-failure snapshot, including its trial strength reduction factor. |
+
+**Output units.** XSLOPE never converts units; when the model declares a unit system (the **Units**
+selector on the main sheet) it labels the result colorbars and writes a `# units:` header into the
+exported CSVs with that system's units, and leaves an undeclared model's output unchanged.
 
 Each is written only when the corresponding data exists, so a model without reinforcement, piles or
 a captured mechanism simply omits those rows.

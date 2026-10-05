@@ -662,7 +662,7 @@ the whole mesh; the lower panel enlarges two reinforcement layers. Both have equ
 
 ![FEM-2 whole mesh and two reinforcement layers sharing soil nodes](images/fem_structural_meshes.png){width=1000}
 
-The thin red members follow soil-element edges; their nodes sit on soil corners and midsides.
+The red members follow soil-element edges; their nodes sit on soil corners and midsides.
 A few rows of smaller elements follow each layer, grading back to the larger soil target size.
 
 The [Solver](solver.md) page describes how one trial at a reduced strength is

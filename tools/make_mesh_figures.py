@@ -266,8 +266,8 @@ def figure_refine_features():
 def figure_structural_coupling():
     """FEM-2 whole mesh and two-layer detail; no solve or companion writes.
 
-    Use the program's mesh plot, retaining its title, labels and legend. Only
-    the viewing window and member stroke weight change for this illustration.
+    Use the program's mesh plot, retaining its default drawing, title, labels
+    and legend. Only the viewing window changes for this illustration.
     """
     from PIL import Image
     from tools.make_tutorial_figures import FEM02_DONE, _fem02_mesh
@@ -296,14 +296,6 @@ def figure_structural_coupling():
         ax = fig.axes[0]
         title = ax.get_title()
         labels = [t.get_text() for t in ax.get_legend().get_texts()]
-        # The owner requested thin red members, with dots on soil corners and
-        # midsides. Do not replace or rewrite any program-produced annotation.
-        for line in ax.lines:
-            if line.get_color() == "red":
-                line.set_linewidth(72 / DPI)
-                line.set_zorder(3)
-            elif line.get_marker() == ".":
-                line.set_zorder(4)
         ax.set_xlim(window[:2])
         ax.set_ylim(window[2:])
         ax.set_aspect("equal", adjustable="box")

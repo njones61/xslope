@@ -185,9 +185,8 @@ it mainly affects SSRM results rather than ordinary stress analyses, it is descr
 
 ## Deciding a trial: convergence, corrector and yield check {#convergence-criterion}
 
-A trial stands when the iteration reaches equilibrium. XSLOPE tests for that with two
-simultaneous conditions, finishes slow trials with a Newton corrector, and rejects states
-outside the yield surface.
+A trial ends standing, failed or undecided. Three mechanisms decide it: the convergence tests,
+the Newton corrector for slow trials, and the yield check.
 
 The inner iteration updates stresses and loads; the outer loop below reads its results and
 decides the trial.
@@ -196,86 +195,38 @@ decides the trial.
 
 The return arrows keep $F$ fixed; the three outcome branches end this trial.
 
-1. **Displacement settled** — Smith & Griffiths' CHECON test, the maximum-norm relative change
-   between iterations:
+1. **Displacement settled** — Smith & Griffiths' CHECON test: the largest displacement change
+   between iterations, divided by the largest current displacement, is below a tolerance:
 
 >>$\dfrac{\max_i |U_i^{(k+1)} - U_i^{(k)}|}{\max_i |U_i^{(k+1)}|} < \text{tol}$
 
 2. **Force equilibrium** — the criterion of
-   [Dawson, Roth & Drescher (1999)](https://doi.org/10.1680/geot.1999.49.6.835): every node's
-   out-of-balance force, normalized by the gravitational body force acting on *that* node, below a
-   tolerance:
+   [Dawson, Roth & Drescher (1999)](https://doi.org/10.1680/geot.1999.49.6.835): the out-of-balance
+   force at every node, measured against that node's own weight, is below a tolerance:
 
 >>$\displaystyle\max_i \dfrac{|\,\mathbf{r}_i\,|}{|\,\mathbf{f}^{\,grav}_i\,|} < \text{force\_tol}$
 
-The displacement test alone does not prove equilibrium: a slope past its critical strength
-reduction factor can creep slowly enough that the per-iteration change drops below the
-tolerance while the slope is failing.
+The force residual is the change in the viscoplastic body load from one iteration to the next,
+averaged over ten iterations (the default for `oob_window`) to remove a known two-iteration
+oscillation. Because the residual is measured node by node against that node's own weight,
+enlarging the model does not dilute it.
 
-Because this is an initial-stress scheme, each solve satisfies
-$\int B^T D(Bu - \varepsilon^{vp})\,dV = F_{ext}$ *exactly* using the previous iteration's plastic
-strains. What is still out of balance is therefore the amount by which the viscoplastic body load is
-**still changing**. When plastic flow ceases that increment decays to zero; when the slope is
-failing, flow never ceases and the increment levels off at a non-zero value that feeds displacement
-indefinitely.
+The displacement test alone can pass on a slope creeping toward failure. The force test alone
+can stall above its tolerance on a slope that is standing still, which is why the
+[hybrid criterion](#2-hybrid-hybrid-default), the default, also reads the displacement field
+directly.
 
-The converse does **not** hold: a residual that levels off above the tolerance is not by itself
-evidence of failure.
-A slope can stand perfectly still while the residual stalls above an absolute threshold it never
-reaches. The size of the gap between the two regimes is problem-dependent — several orders of
-magnitude on a Hoek-Brown slope, about two on the Griffiths & Lane benchmark, and on a Mohr-Coulomb
-slope with a non-associated flow rule it can close entirely. The
-[hybrid criterion](#2-hybrid-hybrid-default), the default, checks the displacement field
-directly in that case.
+The defaults are $\text{tol} = 10^{-3}$ for displacement and $\texttt{force\_tol} = 10^{-3}$
+for force equilibrium, with a budget of `max_iterations` = 12000 per trial. A few thousand
+iterations is normal well below failure, but the count climbs steeply near the critical factor
+and with mesh refinement: the same reinforced slope reaches equilibrium at $F = 1.25$ in
+5,054 iterations at 2.5 ft element size and 16,242 at 1 ft. These tests use the
+[pseudo-time step](#elastic-plastic-behavior-viscoplastic-algorithm) described above; changing
+`dt_scale` changes their calibration.
 
-The test is **local**: the increment is non-zero only at nodes
-adjacent to Gauss points that are still flowing, so material that merely sits in equilibrium — a
-deeper foundation, a longer runout — contributes exactly zero and cannot shift the maximum. A global
-norm ratio measures the mechanism against the weight of the entire mesh and offers no such
-protection: enlarging the domain changes the denominator without changing the slope. The denominator is
-a **lumped** tributary weight, $\sum_e \gamma_e A_e / n_e$ over the elements touching the node, not
-the consistent nodal gravity load — the consistent load is exactly zero at a
-[tri6](overview.md#element-type-selection-and-volumetric-locking) corner node and
-slightly negative at a [quad8](overview.md#element-type-selection-and-volumetric-locking) corner, which would make the ratio there meaningless.
-
-The absolute tolerance is sensitive to the yield-surface limit cycle, the iteration count,
-the element size and the timestep scale:
-
->- **The yield-surface limit cycle.** A *one-iteration* increment does not
->  decay on a settled slope: Gauss points resting exactly on the yield surface flip their flow
->  direction on alternate iterations, producing a clean **period-2** oscillation in the viscoplastic
->  body load whose amplitude is proportional to $\Delta t$. Damping the timestep shrinks it but never
->  removes it, so with a one-iteration window a stable slope is reported as failing forever.
->  Averaging the increment over `oob_window` iterations (default 10) cancels the mode exactly while
->  leaving genuine plastic drift untouched. The verdict is insensitive to the width — 10, 50 and 200
->  agree on the same $F$ at the same iteration.<br>
->- **Iteration count.** The test demands *actual* force equilibrium rather than a decayed rate, and
->  displacements settle long before the per-node maximum does. Budget roughly **3× the iterations** a
->  rate-based criterion needs; a ceiling set too low silently truncates a converging solve and reports
->  it as failure, biasing FS **low**.<br>
->- **Element size.** The ratio scales roughly as $1/h$ — the numerator is an internal-force residual
->  ($\sim\sigma h$), the denominator a body force ($\sim\gamma h^2$). A coarser mesh narrows the margin.<br>
->- **Timestep scale.** The residual is the *increment* of the viscoplastic body load and is
->  proportional to $\Delta t$. Shrinking `dt_scale` shrinks the residual without making the slope any
->  more stable, so a failing state can be driven under an absolute `force_tol` and reported as
->  converged. Leave `dt_scale` at 1.0, and never lower it to make a model converge.
-
-**Defaults and budgets.** $\text{tol} = 10^{-3}$ (displacement) and
-$\texttt{force\_tol} = 10^{-3}$ (force equilibrium, Dawson's published value), with a budget of
-`max_iterations` = 12000 iterations per trial. 1500–4000 iterations is normal well below failure —
-consistent with Griffiths & Lane's reported 792 just below their Example 1 failure point — but the
-count climbs steeply as a trial approaches the critical factor and as the mesh is refined: the same
-reinforced slope reaches equilibrium at $F = 1.25$ in 5,054 iterations at 2.5 ft element size and
-16,242 at 1 ft.
-
-**Submerged boundaries** converge like any other problem under the effective-stress formulation
-combined with consistent boundary-load integration: the submerged soil carries its buoyant weight,
-the flooded surface skin is in compression, and sub-critical trials reach true equilibrium (the G&L
-Example 6 dam at $F = 1$ settles in a handful of iterations). A useful check on any submerged model
-is a single solve at $F = 1$: flooded ground at working strength must settle quickly with an
-essentially elastic strain field, and if it does not, suspect the inputs — loads inconsistent with
-boundary pore pressures — rather than the solver knobs. Use tri6 rather than quad8 here; see
-[Element type](overview.md#element-type-selection-and-volumetric-locking).
+A single solve at $F = 1$ is a useful check on a submerged model: flooded ground at working
+strength should settle quickly with an almost elastic strain field; if it does not, check
+whether the loads and the boundary pore pressures disagree.
 
 ### Finishing a trial with the Newton corrector
 

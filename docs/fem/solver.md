@@ -150,6 +150,13 @@ A trial stands when the iteration reaches equilibrium. XSLOPE tests for that wit
 simultaneous conditions, finishes slow trials with a Newton corrector, and rejects states
 outside the yield surface.
 
+The inner iteration updates stresses and loads; the outer loop below reads its results and
+decides the trial.
+
+![Outer checks and outcomes of one strength-reduction trial](images/ssrm_trial_verdict.png){width=800px}
+
+The return arrows keep $F$ fixed; the three outcome branches end this trial.
+
 1. **Displacement settled** — Smith & Griffiths' CHECON test, the maximum-norm relative change
    between iterations:
 

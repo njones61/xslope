@@ -561,9 +561,9 @@ These settings change how a jointed trial is iterated, not the rules that decide
 ## Equilibration and running the solver
 
 The sections above describe one trial and how it is decided. A search is a sequence of such
-trials: it begins by establishing the stress state every trial starts from, then runs the trials
-through `solve_fem()` while `solve_ssrm()` manages the bracket, decides when to stop, and finally
-captures the failure mechanism for the figures.
+trials: it begins by establishing the stress state every trial starts from, then runs and decides
+the trials, narrows the bracket until the stopping condition is met, and finally captures the
+failure mechanism for the figures.
 
 ### In-situ equilibration
 
@@ -572,123 +572,6 @@ fraction of the vertical effective stress. The full-strength equilibration descr
 is returned as `result['k0_equilibration']`. If the slope does not stand at full strength with
 that initial stress, XSLOPE warns and searches from the initial stress itself; the factor of
 safety it finds is below 1.
-
-### The `solve_fem()` function
-
-`solve_fem()` takes a FEM data dictionary from `build_fem_data()` and an optional strength reduction
-factor, assembles and factors the stiffness once, and runs the viscoplastic loop to convergence or
-to its iteration budget:
-
-```python
-from xslope.fileio import load_slope_data
-from xslope.mesh import build_mesh_from_polygons, get_material_polygons
-from xslope.fem import build_fem_data, solve_fem
-
-slope_data = load_slope_data("docs/fem/files/xslope_griffiths1.xlsx")
-
-# quadratic elements are required for a trustworthy factor of safety
-mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
-                                target_size=6, element_type='tri6')
-
-fem_data = build_fem_data(slope_data, mesh)
-solution = solve_fem(fem_data, F=1.0, debug_level=1)
-
-if solution['converged']:
-    print(f"Converged in {solution['iterations']} iterations")
-    print(f"Max displacement: {solution['max_displacement']:.6f}")
-else:
-    print(f"No equilibrium after {solution['iterations']} iterations "
-          f"({solution['exit_reason']}, verdict {solution['verdict']})")
-```
-
-Its principal arguments:
-
->- **`F`** (default 1.0): strength reduction factor, applied as $c_r = c/F$ and
->  $\tan\phi_r = \tan\phi/F$.<br>
->- **`max_iterations`** (default 12000) and **`tolerance`** (default $10^{-3}$): the iteration budget
->  and the displacement convergence tolerance (Smith & Griffiths, 2004).<br>
->- **`max_iterations_ceiling`** (default 50000): hard stop on the extension a trial still dying
->  away, or with no clear trend, is given at `max_iterations` (see the
->  [trend reading](#creep-trend)). Reaching it with the
->  out-of-balance still falling leaves the trial inconclusive.<br>
->- **`force_tol`** (default $10^{-3}$): the per-node force-equilibrium tolerance; with `oob_window`
->  (default 10) the averaging width that cancels the yield-surface limit cycle.<br>
->- **`failure_criterion`** (default `"hybrid"`): how a non-converged trial is judged — see
->  [SSRM failure criteria](#ssrm-failure-criteria).<br>
->- **`max_disp_factor`** (default 0.1, `None` to disable): displacement backstop as a fraction of
->  mesh height; see [the displacement limit](#3-displacement-limit-displacement_limit).<br>
->- **`early_exit`** (default `True`): watch the residual for the
->  [no-progress plateau](#the-yield-check) and report it.<br>
->- **`fem_solver`** (default `'auto'`): the per-trial driver — see
->  [Choosing the driver](#choosing-the-driver).<br>
->- **`k0`**, **`min_slip_depth`**, **`tension_cutoff`**, **`elastic_mask`**,
->  **`suction_phi_b`** / **`suction_cap`**: see [in-situ equilibration](#in-situ-equilibration),
->  the [depth filter](#surficial-skin-failures-and-the-minimum-slip-depth-filter),
->  [tensile strength](#tensile-strength-in-ssrm),
->  [elastic-only materials](overview.md#mohr-coulomb-failure-criterion) and
->  [matric suction](overview.md#matric-suction-apparent-cohesion-above-the-water-table); all default to off or to what the input file declares.<br>
->- **`elastic_materials`**: material names to keep elastic at every trial factor, taken from the
->  **option** column when left unset; `solve_ssrm()` accepts the same names. A
->  [polygon-addressed twin](#ssr-exclusion-zones) names the same treatment by outline.<br>
->- **`debug_level`** (default 0): 0 silent, 1 summary, 2 per-iteration.
-
-The returned dictionary carries `converged` and `stable`, the verdict metadata (`verdict`,
-[`u_ratio`](#2-hybrid-hybrid-default), `u_growth`, `exit_reason`), `iterations`, the nodal `displacements` and
-`displacements_elastic`, element `stresses` and `strains`, `plastic_elements`, and the 1D structural
-element forces — everything `plot_fem_results()` and `export_fem_solution()` need. It also carries
-the [yield reading](#the-yield-check) (`max_yield_violation`, `n_yield_above_1pct`,
-`max_yield_at`, `yield_flagged`) and, where a corrector decided the trial, the `corrector` record.
-
-### The `solve_ssrm()` function
-
-`solve_ssrm()` manages the initial equilibration, the search over trial factors and the optional
-failure-state capture, using the selected criterion to interpret the trial results.
-
-```python
-from xslope.fem import solve_ssrm
-
-result = solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=1)
-
-if result['converged']:
-    print(f"Factor of Safety: {result['FS']:.2f}")
-    print(f"Final interval: {result['final_interval']}")
-```
-
-Its principal arguments:
-
->- **`F_min`** (1.0) and **`F_max`** (2.0): the [starting bracket and its automatic expansion](#methodology).<br>
->- **`tolerance`** (0.01): the bisection stops when the bracket is narrower than this. The reported
->  FS is the bracket midpoint (± tolerance/2), or the bracket's bottom as a lower bound
->  (`fs_is_lower_bound`) when the top is an undecided trial; the bracket is returned in
->  `final_interval`.<br>
->- **`grid`** (`None`): bisect over a **fixed global grid** of this step instead of halving the
->  supplied bracket. Because the failure threshold sits between two fixed grid points — a property of
->  the slope and mesh, not of the bracket — every starting bracket then converges to the same cell and
->  the reported FS is independent of the bracket, at the same $\log_2$ cost. Used by the
->  [reliability analysis](../reliability/fem.md) for reproducible results.<br>
->- **`failure_criterion`** (`"hybrid"`), **`convergence_tol`** ($10^{-3}$), **`force_tol`**
->  ($10^{-3}$), **`max_iterations`** (12000), **`max_iterations_ceiling`** (50000): passed to each
->  trial.<br>
->- **`max_disp_factor`** (0.1): the displacement-limit fraction. It is what the
->  `"displacement_limit"` criterion bisects on; see [the displacement limit](#3-displacement-limit-displacement_limit).<br>
->- **`dt_scale`** (1.0): multiplier on the viscoplastic pseudo-time step. **Do not lower it to make
->  a model converge** — it shrinks the residual without making the slope any more stable, and can push
->  a failing state under an absolute `force_tol`.<br>
->- **`fem_solver`** (`'auto'`): the per-trial driver, passed to every trial — see
->  [Choosing the driver](#choosing-the-driver).<br>
->- **[`k0`](#in-situ-equilibration)**,
->  **[`min_slip_depth`](#surficial-skin-failures-and-the-minimum-slip-depth-filter)**,
->  **[`ssr_exclude` / `ssr_zone`](#ssr-exclusion-zones)**,
->  **[`tension_cutoff_by_material` / `tension_srf`](#tensile-strength-in-ssrm)**,
->  **[`elastic_materials`](overview.md#mohr-coulomb-failure-criterion)**,
->  **[`suction_phi_b` / `suction_cap`](overview.md#matric-suction-apparent-cohesion-above-the-water-table)**: follow the linked model and run settings.<br>
->- **`n_sweep`** (10): coarse sweep points for the `"displacement_increase"` criterion.<br>
->- **`capture_failure_state`** (`True`): [capture the mechanism](#capturing-the-failure-mechanism) after the search.<br>
->- **`capture_margin`** (0.15): [strength margin](#capturing-the-failure-mechanism) above FS for the capture.<br>
->- **`capture_max_iterations`** (`None`): override the [automatic capture budget](#capturing-the-failure-mechanism).
-
-The result dictionary carries `FS`, the last converged solution (`last_solution`),
-`final_interval`, the per-trial records (`trials`), and, with capture on, `failure_solution`.
 
 ### Capturing the failure mechanism
 
@@ -841,6 +724,128 @@ matric-suction term; it takes the $K_0$ in-situ stress as an input, so at-rest r
 other Mohr-Coulomb runs. Curved-envelope materials (power-curve and
 Hoek-Brown) and all 1D reinforcement and pile work stay on the NumPy path automatically — a model
 that mixes them accelerates its Mohr-Coulomb groups and leaves the rest unchanged.
+
+## Running from a script
+
+Both functions take the model from `build_fem_data()`; their arguments mirror the settings table
+at the top of the page, and the sections above explain each.
+
+### The `solve_fem()` function
+
+`solve_fem()` takes a FEM data dictionary from `build_fem_data()` and an optional strength reduction
+factor, assembles and factors the stiffness once, and runs the viscoplastic loop to convergence or
+to its iteration budget:
+
+```python
+from xslope.fileio import load_slope_data
+from xslope.mesh import build_mesh_from_polygons, get_material_polygons
+from xslope.fem import build_fem_data, solve_fem
+
+slope_data = load_slope_data("docs/fem/files/xslope_griffiths1.xlsx")
+
+# quadratic elements are required for a trustworthy factor of safety
+mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
+                                target_size=6, element_type='tri6')
+
+fem_data = build_fem_data(slope_data, mesh)
+solution = solve_fem(fem_data, F=1.0, debug_level=1)
+
+if solution['converged']:
+    print(f"Converged in {solution['iterations']} iterations")
+    print(f"Max displacement: {solution['max_displacement']:.6f}")
+else:
+    print(f"No equilibrium after {solution['iterations']} iterations "
+          f"({solution['exit_reason']}, verdict {solution['verdict']})")
+```
+
+Its principal arguments:
+
+>- **`F`** (default 1.0): strength reduction factor, applied as $c_r = c/F$ and
+>  $\tan\phi_r = \tan\phi/F$.<br>
+>- **`max_iterations`** (default 12000) and **`tolerance`** (default $10^{-3}$): the iteration budget
+>  and the displacement convergence tolerance (Smith & Griffiths, 2004).<br>
+>- **`max_iterations_ceiling`** (default 50000): hard stop on the extension a trial still dying
+>  away, or with no clear trend, is given at `max_iterations` (see the
+>  [trend reading](#creep-trend)). Reaching it with the
+>  out-of-balance still falling leaves the trial inconclusive.<br>
+>- **`force_tol`** (default $10^{-3}$): the per-node force-equilibrium tolerance; with `oob_window`
+>  (default 10) the averaging width that cancels the yield-surface limit cycle.<br>
+>- **`failure_criterion`** (default `"hybrid"`): how a non-converged trial is judged — see
+>  [SSRM failure criteria](#ssrm-failure-criteria).<br>
+>- **`max_disp_factor`** (default 0.1, `None` to disable): displacement backstop as a fraction of
+>  mesh height; see [the displacement limit](#3-displacement-limit-displacement_limit).<br>
+>- **`early_exit`** (default `True`): watch the residual for the
+>  [no-progress plateau](#the-yield-check) and report it.<br>
+>- **`fem_solver`** (default `'auto'`): the per-trial driver — see
+>  [Choosing the driver](#choosing-the-driver).<br>
+>- **`k0`**, **`min_slip_depth`**, **`tension_cutoff`**, **`elastic_mask`**,
+>  **`suction_phi_b`** / **`suction_cap`**: see [in-situ equilibration](#in-situ-equilibration),
+>  the [depth filter](#surficial-skin-failures-and-the-minimum-slip-depth-filter),
+>  [tensile strength](#tensile-strength-in-ssrm),
+>  [elastic-only materials](overview.md#mohr-coulomb-failure-criterion) and
+>  [matric suction](overview.md#matric-suction-apparent-cohesion-above-the-water-table); all default to off or to what the input file declares.<br>
+>- **`elastic_materials`**: material names to keep elastic at every trial factor, taken from the
+>  **option** column when left unset; `solve_ssrm()` accepts the same names. A
+>  [polygon-addressed twin](#ssr-exclusion-zones) names the same treatment by outline.<br>
+>- **`debug_level`** (default 0): 0 silent, 1 summary, 2 per-iteration.
+
+The returned dictionary carries `converged` and `stable`, the verdict metadata (`verdict`,
+[`u_ratio`](#2-hybrid-hybrid-default), `u_growth`, `exit_reason`), `iterations`, the nodal `displacements` and
+`displacements_elastic`, element `stresses` and `strains`, `plastic_elements`, and the 1D structural
+element forces — everything `plot_fem_results()` and `export_fem_solution()` need. It also carries
+the [yield reading](#the-yield-check) (`max_yield_violation`, `n_yield_above_1pct`,
+`max_yield_at`, `yield_flagged`) and, where a corrector decided the trial, the `corrector` record.
+
+### The `solve_ssrm()` function
+
+`solve_ssrm()` manages the initial equilibration, the search over trial factors and the optional
+failure-state capture, using the selected criterion to interpret the trial results.
+
+```python
+from xslope.fem import solve_ssrm
+
+result = solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=1)
+
+if result['converged']:
+    print(f"Factor of Safety: {result['FS']:.2f}")
+    print(f"Final interval: {result['final_interval']}")
+```
+
+Its principal arguments:
+
+>- **`F_min`** (1.0) and **`F_max`** (2.0): the [starting bracket and its automatic expansion](#methodology).<br>
+>- **`tolerance`** (0.01): the bisection stops when the bracket is narrower than this. The reported
+>  FS is the bracket midpoint (± tolerance/2), or the bracket's bottom as a lower bound
+>  (`fs_is_lower_bound`) when the top is an undecided trial; the bracket is returned in
+>  `final_interval`.<br>
+>- **`grid`** (`None`): bisect over a **fixed global grid** of this step instead of halving the
+>  supplied bracket. Because the failure threshold sits between two fixed grid points — a property of
+>  the slope and mesh, not of the bracket — every starting bracket then converges to the same cell and
+>  the reported FS is independent of the bracket, at the same $\log_2$ cost. Used by the
+>  [reliability analysis](../reliability/fem.md) for reproducible results.<br>
+>- **`failure_criterion`** (`"hybrid"`), **`convergence_tol`** ($10^{-3}$), **`force_tol`**
+>  ($10^{-3}$), **`max_iterations`** (12000), **`max_iterations_ceiling`** (50000): passed to each
+>  trial.<br>
+>- **`max_disp_factor`** (0.1): the displacement-limit fraction. It is what the
+>  `"displacement_limit"` criterion bisects on; see [the displacement limit](#3-displacement-limit-displacement_limit).<br>
+>- **`dt_scale`** (1.0): multiplier on the viscoplastic pseudo-time step. **Do not lower it to make
+>  a model converge** — it shrinks the residual without making the slope any more stable, and can push
+>  a failing state under an absolute `force_tol`.<br>
+>- **`fem_solver`** (`'auto'`): the per-trial driver, passed to every trial — see
+>  [Choosing the driver](#choosing-the-driver).<br>
+>- **[`k0`](#in-situ-equilibration)**,
+>  **[`min_slip_depth`](#surficial-skin-failures-and-the-minimum-slip-depth-filter)**,
+>  **[`ssr_exclude` / `ssr_zone`](#ssr-exclusion-zones)**,
+>  **[`tension_cutoff_by_material` / `tension_srf`](#tensile-strength-in-ssrm)**,
+>  **[`elastic_materials`](overview.md#mohr-coulomb-failure-criterion)**,
+>  **[`suction_phi_b` / `suction_cap`](overview.md#matric-suction-apparent-cohesion-above-the-water-table)**: follow the linked model and run settings.<br>
+>- **`n_sweep`** (10): coarse sweep points for the `"displacement_increase"` criterion.<br>
+>- **`capture_failure_state`** (`True`): [capture the mechanism](#capturing-the-failure-mechanism) after the search.<br>
+>- **`capture_margin`** (0.15): [strength margin](#capturing-the-failure-mechanism) above FS for the capture.<br>
+>- **`capture_max_iterations`** (`None`): override the [automatic capture budget](#capturing-the-failure-mechanism).
+
+The result dictionary carries `FS`, the last converged solution (`last_solution`),
+`final_interval`, the per-trial records (`trials`), and, with capture on, `failure_solution`.
 
 ## References
 

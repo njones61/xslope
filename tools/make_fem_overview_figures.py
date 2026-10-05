@@ -37,6 +37,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "docs", "fem", "images")
 SAMPLE = os.path.join(HERE, "..", "docs", "fem", "files", "xslope_griffiths1.xlsx")
+FEM01_CURVE_TOLERANCE = 0.02  # Overview figure only; tutorial tolerance is unchanged.
 
 # ---- shared palette -------------------------------------------------------
 C_INK = "#1f2933"
@@ -358,7 +359,7 @@ def fig_capture_comparison():
 
 
 def run_fem1_curve():
-    """Figure-only FEM-1 search at RS2-16's tolerance; launch through the gate."""
+    """Figure-only FEM-1 search at the wider tolerance; launch through the gate."""
     import json
     from xslope.fileio import load_slope_data
     from xslope.fem import build_fem_data, solve_ssrm
@@ -366,9 +367,7 @@ def run_fem1_curve():
         FEM01_DONE, FEM01_CRITERION, FEM01_F_MIN, FEM01_F_MAX,
         FEM01_MAX_ITERATIONS, _fem01_mesh)
 
-    with open(os.path.join(HERE, "..", "docs", "verification", "files",
-                           "rocscience", "vp020_fem_meta.json")) as stream:
-        tolerance = json.load(stream)["tolerance"]
+    tolerance = FEM01_CURVE_TOLERANCE
     model = load_slope_data(FEM01_DONE)
     fem_data = build_fem_data(model, _fem01_mesh(model))
     result = solve_ssrm(
@@ -394,32 +393,24 @@ def run_fem1_curve():
 
 
 def fig_displacement_curves():
-    """Replay the figure-only FEM-1 record and the committed RS2-16 record."""
+    """Replay only the figure-only FEM-1 record, without a new solve."""
     import json
     from xslope.fileio import load_slope_data
     from xslope.plot_fem import plot_ssrm_curve
 
-    models = (
-        ("FEM-1", os.path.join(HERE, "..", "docs", "tutorials", "files",
-                               "xslope_ssrm_embankment.xlsx"),
-         os.path.join(OUT, "fem01_ssrm_curve_fem_meta.json"), "fem01_ssrm_curve.png"),
-        ("RS2-16", os.path.join(HERE, "..", "docs", "verification", "files",
-                                 "rocscience", "vp020.xlsx"),
-         os.path.join(HERE, "..", "docs", "verification", "files", "rocscience",
-                      "vp020_fem_meta.json"), "rs2_16_ssrm_curve.png"))
-    for name, model_path, record_path, filename in models:
-        model = load_slope_data(model_path)
-        with open(record_path) as stream:
-            record = json.load(stream)
-        fig, ax = plt.subplots(figsize=(9, 5))
-        plot_ssrm_curve(ax, record, fem_data=model)
-        fig.tight_layout()
-        print(name, ax.get_title(), ax.get_ylabel(),
-              [t.get_text() for t in ax.get_legend().get_texts()], flush=True)
-        path = os.path.abspath(os.path.join(OUT, filename))
-        fig.savefig(path, dpi=150, facecolor="white")
-        plt.close(fig)
-        print("wrote", path, "from saved record; no solve", flush=True)
+    model = load_slope_data(os.path.join(HERE, "..", "docs", "tutorials", "files",
+                                        "xslope_ssrm_embankment.xlsx"))
+    with open(os.path.join(OUT, "fem01_ssrm_curve_fem_meta.json")) as stream:
+        record = json.load(stream)
+    fig, ax = plt.subplots(figsize=(9, 5))
+    plot_ssrm_curve(ax, record, fem_data=model)
+    fig.tight_layout()
+    print("FEM-1", ax.get_title(), ax.get_ylabel(),
+          [t.get_text() for t in ax.get_legend().get_texts()], flush=True)
+    path = os.path.abspath(os.path.join(OUT, "fem01_ssrm_curve.png"))
+    fig.savefig(path, dpi=150, facecolor="white")
+    plt.close(fig)
+    print("wrote", path, "from saved record; no solve", flush=True)
 
 
 if __name__ == "__main__":

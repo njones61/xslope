@@ -143,6 +143,9 @@ Compare the end nodes with the shared midpoint on the quadratic soil edge.
 
 Every beam node carries two translations and a rotation; the soil shares the translations, not the rotation.
 
+Stress analyses should use quadratic soil meshes. A beam on a tri6, quad8, or quad9 soil edge always carries its two
+ends and the shared midpoint; the two-node beam is not used on those edges.
+
 ### Coordinate Transformation
 
 The local stiffness matrix is transformed to global coordinates using a rotation matrix — 6×6 for a

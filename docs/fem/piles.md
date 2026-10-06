@@ -241,6 +241,12 @@ Each end of a pile carries its own boundary condition. The **Head** column in th
 | **unrotated** | free | held | a cap beam tying the heads together | rarely meaningful; offered so the two lists match |
 | **fixed** | held | held | cap beam and anchors | socketed into rock |
 
+The four choices below act on the same three nodal degrees of freedom at either end.
+
+![Free, pinned, unrotated and fixed pile end restraints](images/pile_end_restraints.png){width=880px}
+
+Pinned holds both translations but allows rotation; unrotated holds rotation while allowing both translations.
+
 These are the four pile head conditions of Cai & Ugai (2000), by their names. A held rotation constrains the rotation degree of freedom the pile node carries; held translations constrain its two displacement degrees of freedom; a free end leaves all three to the surrounding soil and the boundary conditions.
 
 Which tip condition is right depends on where the pile ends. A shaft that continues well below the slip surface is restrained by the soil it passes through, and leaving the tip free is correct. A shaft whose bottom node lands on a fixed boundary is already pinned by that boundary — its translations are held there but its rotation is not, so the pile swings about its toe — and `pinned` changes nothing; `fixed` is the socketed case. A shaft that ends on a hard stratum inside the mesh needs `pinned`, since the soil elements below it would otherwise let the tip move.

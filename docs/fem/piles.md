@@ -131,6 +131,12 @@ The 2D soil elements have 2 DOFs per node ($u_x$, $u_y$), while beam elements re
 
 This approach avoids adding unnecessary rotational DOFs to the thousands of soil-only nodes while giving pile nodes the rotation needed for proper bending behavior. Soil elements at pile nodes only access the translational DOFs ($u_x$, $u_y$); the rotational DOF ($\theta$) is used exclusively by the beam element stiffness.
 
+Compare the end nodes with the shared midpoint on the quadratic soil edge.
+
+![Translations and rotations of vertical two- and three-node pile beams](images/pile_beam_dofs.png){width=880px}
+
+The local axial direction runs down the pile, and the bending direction runs across it.
+
 ### Coordinate Transformation
 
 The local stiffness matrix is transformed to global coordinates using a rotation matrix — 6×6 for a

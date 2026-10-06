@@ -484,17 +484,12 @@ mesh is split along it, the sheet becomes a bar with its own nodes between an up
 interface carries the line's own `Adhesion` and `Delta` as a Mohr-Coulomb strength. The soil on the two sides can
 then slide on the sheet, and on each other, at that interface strength.
 
-```
-  bonded (the default)                joint (Joint = Yes)
+The comparison below shows which nodes the soil and sheet share in the two representations.
 
-   soil above                         soil above
-   ----o----o----o----   the bar      ----o----o----o----  upper face nodes
-       |    |    |       shares       ~~~~~~~~~~~~~~~~~~~  upper interface
-   ----o----o----o----   these        ====b====b====b====  bar nodes (their own)
-   soil below            nodes        ~~~~~~~~~~~~~~~~~~~  lower interface
-                                      ----o'---o'---o'---  lower face nodes
-                                      soil below           (all three at one point)
-```
+![Shared bonded nodes compared with coincident soil–bar–soil copies and two interfaces on a jointed sheet](images/reinf_bonded_jointed.png){width=896px}
+
+The bonded bar shares both translations with the soil; the jointed sheet has its own bar nodes, with an interface
+on each side allowing the soil to move relative to it.
 
 Every node on a jointed line exists three times at the same point — a copy for the soil above, a copy for the bar,
 a copy for the soil below — and two interface elements connect them at each station: the soil above against the

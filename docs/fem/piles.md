@@ -139,7 +139,7 @@ This approach avoids adding unnecessary rotational DOFs to the thousands of soil
 
 Compare the end nodes with the shared midpoint on the quadratic soil edge.
 
-![Translations and rotations of vertical two- and three-node pile beams](images/pile_beam_dofs.png){width=880px}
+![Translations and rotations of a vertical three-node pile beam](images/pile_beam_dofs.png){width=640px}
 
 Every beam node carries two translations and a rotation; the soil shares the translations, not the rotation.
 

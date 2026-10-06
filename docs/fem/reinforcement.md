@@ -62,6 +62,15 @@ bar's, in the node order $(i, j, m)$:
 
 where $A$ is the cross-sectional area, $E$ is the elastic modulus, and $L$ is the element length.
 
+The diagram below projects the end movements onto the bar axis to recover its elongation and center force.
+
+![End displacement projections and center force of a three-node reinforcement bar](images/reinf_axial_projection.png){width=667px}
+
+The difference $d_j-d_i$ gives the chord elongation, and multiplying it by $EA/L$ gives the elastic force at the element center.
+The midpoint displacement changes the quadratic bar's strain away from the center, but its contribution to strain is zero at the center.
+Stress analyses should use quadratic soil meshes; a bar on a tri6, quad8, or quad9 soil edge carries both ends and
+the shared midpoint, so the two-node bar is not used on those edges.
+
 **Coordinate Transformation:** The local stiffness matrix must be transformed to global coordinates using the transformation matrix $[R]$:
 
 >>$[K_e]_{global} = [R]^T [K_e]_{local} [R]$

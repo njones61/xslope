@@ -596,7 +596,7 @@ the standard deformation plot. In Studio the deformation scale is set for each p
 so that the movement fills the same part of the frame whatever its size; here both fields are
 drawn at the same scale, 1.0×, to show how much more the captured field moves.
 
-![Last converged and captured at-failure deformation from the saved W-3 fields](images/fem_capture_comparison.png){width=1000}
+![Last converged and captured at-failure deformation from the saved W-3 fields](images/fem_capture_comparison.png){width=800}
 
 The captured field shows the developed mechanism. Both panels use the same scale,
 so their drawn movements can be compared directly.

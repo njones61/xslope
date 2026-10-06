@@ -135,7 +135,7 @@ Compare the end nodes with the shared midpoint on the quadratic soil edge.
 
 ![Translations and rotations of vertical two- and three-node pile beams](images/pile_beam_dofs.png){width=880px}
 
-The local axial direction runs down the pile, and the bending direction runs across it.
+Every beam node carries two translations and a rotation; the soil shares the translations, not the rotation.
 
 ### Coordinate Transformation
 

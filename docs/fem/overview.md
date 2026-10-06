@@ -197,7 +197,7 @@ XSLOPE supports linear and quadratic triangles and quadrilaterals. The figure sh
 type with its local node numbers; the quadratic forms add midside nodes (and a center node for
 quad9), alongside the 2- and 3-node line elements.
 
-![Soil and line elements with local node indices](images/all_element_nodes.png){width=1500px}
+![Soil and line elements with local node indices](images/all_element_nodes.png){width=800}
 
 Quadratic line elements also have a midside node, so a member on a quadratic soil edge shares
 all three of that edge's nodes.

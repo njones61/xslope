@@ -34,7 +34,7 @@ node, and the truss element is a 3-node bar carrying that node too.
 The 2- and 3-node line elements below carry two translations at each node when used as
 reinforcement bars, with axial stiffness only. The three-node form places node 2 between its ends.
 
-![Soil and line elements with local node indices](images/all_element_nodes.png){width=1500px}
+![Soil and line elements with local node indices](images/all_element_nodes.png){width=800}
 
 The midside node ties the bar to the soil in the middle of the edge. The soil's displacement along a quadratic
 edge is a parabola through all three nodes, so a bar attached at the corners alone leaves the edge free to bow away

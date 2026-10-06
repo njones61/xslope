@@ -80,7 +80,7 @@ matching entry of `element_types` says how many of the nine slots are used.
 
 Use the local indices below to read the node order in the mesh arrays.
 
-![Soil and line elements with local node indices](images/all_element_nodes.png){width=1500px}
+![Soil and line elements with local node indices](images/all_element_nodes.png){width=800}
 
 Quadratic types are made by adding nodes to the linear type in the last column; see
 [Quadratic elements](#quadratic-elements). Serendipity (`quad8`) uses corner and edge

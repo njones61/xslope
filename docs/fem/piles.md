@@ -114,7 +114,7 @@ its nodes — and its local stiffness is 9×9.
 The 2- and 3-node line elements below carry two translations and a rotation at each node when
 used as pile beams. Compare the end nodes with the extra midpoint node in the three-node form.
 
-![Soil and line elements with local node indices](images/all_element_nodes.png){width=1500px}
+![Soil and line elements with local node indices](images/all_element_nodes.png){width=800}
 
 That node ties the pile to the soil in the middle of each element. The soil's displacement along a
 quadratic edge is a parabola through all three nodes, so a beam attached at the corners alone leaves the edge free to
@@ -196,6 +196,12 @@ The bending moment diagram along the pile varies from element to element. The ma
 ## Structural Capacity Checks
 
 Both capacities enter the solve the way soil yielding and a reinforcement bar's tension limit do: as a body-load correction. The viscoplastic scheme solves $\mathbf{K}\mathbf{u} = \mathbf{F} + \mathbf{c}$ with the member's **full elastic stiffness** in $\mathbf{K}$, so the internal force the converged state is in equilibrium with is $\mathbf{K}\mathbf{u} - \mathbf{c}$. The correction is therefore the part of the elastic action the member cannot carry — the action minus the capacity, not the other way round — and what is left in the member is the capacity itself. The actions XSLOPE reports for a pile are read off $\mathbf{K}\mathbf{u} - \mathbf{c}$, so they are the actions the equilibrium carries rather than elastic actions trimmed to the capacity afterwards.
+
+The hinge and shear checks are applied in the order shown below.
+
+![One plastic release at a shared pile node and the ordered capacity checks](images/pile_capacity_checks.png){width=880px}
+
+At a shared node, only one element end takes the plastic rotation; the shear check uses the released element without changing its capped end moments.
 
 ### Shear Capacity ($V_{\text{cap}}$)
 

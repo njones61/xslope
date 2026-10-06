@@ -49,6 +49,12 @@ That reproduces the row's average stiffness; it does not reproduce the arching, 
 does not reproduce the slip that develops on each pile's surface (see
 [Pile-Soil Interface and Load Transfer](#pile-soil-interface-and-load-transfer)).
 
+The wall section and pile-row plan below show what the spacing conversion represents.
+
+![Continuous wall in section and discrete pile row in plan](images/pile_row_plane_strain.png){width=880px}
+
+The row's center-to-center spacing $S$, not the pile diameter $D$, divides its axial and bending stiffnesses to give stiffness per unit wall width.
+
 Cai & Ugai (2000) give a measure of that idealization. They analyzed one
 pile-stabilized slope with a three-dimensional strength reduction finite element model that meshes the
 individual piles with slip interfaces, and XSLOPE's SSRM is run on the same slope at a spacing of three

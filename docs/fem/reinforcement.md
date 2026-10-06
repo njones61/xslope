@@ -264,6 +264,12 @@ Elements near a free end therefore have reduced capacity — zero at the end its
 
 The residual capacity is only assigned at all when the user has entered a $T_{res}$ for the line. Where post-peak behavior *is* switched on, two independent mechanisms can limit what an element retains, and the smaller of the two governs. Bond slip is perfectly plastic, so the embedment goes on developing $T_{allow}$ — the ramped envelope, end anchorage included — however far the bar is pulled. $T_{residual}$ is the rupture residual, a property of the reinforcement itself and not of its embedment. Beyond the ramps $T_{allow} = T_{max}$ and the element takes the user's residual strength; inside a ramp it takes whichever of the two is less.
 
+The diagram below pairs the constant-rate capacity envelope with the FEM element centers where it is sampled.
+
+![Bonded bar capacities sampled at FEM element centers, with unequal development lengths and overlapping ramps](images/reinf_element_capacities.png){width=768px}
+
+Each red center takes the smallest of the tensile limit and the capacities developed from both ends; when the ramps overlap below $T_{max}$, no element reaches the full tensile strength.
+
 ### Axial Stiffness (EA)
 
 The analysis depends only on the product $EA$ (the axial stiffness, sometimes called the tensile stiffness or $J$ in

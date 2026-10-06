@@ -313,8 +313,9 @@ def fig_ssrm_sweep():
 
 def fig_capture_comparison():
     """Reload Tutorial W-3's saved standing and failure fields; never solve."""
-    from io import BytesIO
+    import tempfile
     from PIL import Image
+    from tools.make_tutorial_figures import capture
     from xslope.fileio import load_slope_data
     from xslope.fem import build_fem_data, import_fem_solution, import_fem_meta
     from xslope.plot_fem import plot_fem_results
@@ -334,17 +335,18 @@ def fig_capture_comparison():
     # the run record supplies its trial factor independently of the reported FS.
     standing = {**standing, "F": meta["F"]}
     panels = []
-    for state in ("converged", "failure"):
-        fig, ax = plot_fem_results(
-            fem_data, standing, plot_type="deformation", field_state=state,
-            failure_solution=failure, fs=meta["FS"], ssrm_record=meta,
-            deform_scale=1.0)
-        print(f"{state}: {ax.get_title()}", flush=True)
-        buffer = BytesIO()
-        fig.savefig(buffer, dpi=200, bbox_inches="tight", facecolor="white")
-        plt.close(fig)
-        buffer.seek(0)
-        panels.append(Image.open(buffer).convert("RGB"))
+    with tempfile.TemporaryDirectory(prefix="xslope_capture_panels_") as tmp:
+        for state in ("converged", "failure"):
+            # Exactly the FEM-1/FEM-2 tutorial export path: its capture helper
+            # saves the plotter-owned, aspect-sized figure at 200 dpi, tight,
+            # with the shared fonts and no per-figure style or save overrides.
+            path = capture(
+                os.path.join(tmp, state + ".png"), plot_fem_results,
+                fem_data, standing, plot_type="deformation", field_state=state,
+                failure_solution=failure, fs=meta["FS"], ssrm_record=meta,
+                deform_scale=1.0)
+            with Image.open(path) as panel:
+                panels.append(panel.convert("RGB"))
 
     # Preserve each standard render pixel for pixel. Only add white padding
     # and a separator; never replace titles, legends or the selected 1x scale.
@@ -358,7 +360,7 @@ def fig_capture_comparison():
         assert combined.crop((x, y, x + panel.width, y + panel.height)).tobytes() == panel.tobytes()
         y += panel.height + gap
     path = os.path.abspath(os.path.join(OUT, "fem_capture_comparison.png"))
-    combined.save(path)
+    combined.save(path, dpi=(200, 200))
     print("wrote", path, "from saved W-3 fields; no solve", flush=True)
 
 

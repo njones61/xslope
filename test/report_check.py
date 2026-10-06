@@ -14554,6 +14554,80 @@ def test_the_displacement_curve_draws_the_trials():
     return fails
 
 
+def test_show_joints_defaults_follow_the_model():
+    """Studio and the plotter default to joints on only when the model has them.
+
+    Saved fields only: this display check never solves a trial.
+    """
+    fails = []
+    app = _app()
+    from studio.display_panels import FemResultsDisplayPanel
+    from matplotlib.collections import PolyCollection
+    from matplotlib.figure import Figure
+    from unittest.mock import patch
+    from types import SimpleNamespace
+    from studio.canvas import MplCanvas
+    import xslope.plot_fem as plotting
+
+    panel = FemResultsDisplayPanel()
+    deformation = panel.plot_type.findData("deformation")
+    strain = panel.plot_type.findData("shear_strain")
+    panel.plot_type.setCurrentIndex(deformation)
+    if panel.options()["show_joints"]:
+        fails.append("a new display panel defaults Show joints on without a model")
+    for jointed in (True, False, True):
+        panel.set_jointed(jointed)
+        for index in range(panel.plot_type.count()):
+            panel.plot_type.setCurrentIndex(index)
+            if panel.options()["show_joints"] is not jointed:
+                fails.append(f"Show joints does not follow jointed={jointed} "
+                             f"on plot {panel.options()['plot_type']}")
+    panel.plot_type.setCurrentIndex(deformation)
+    panel.show_joints.setChecked(False)
+    panel.plot_type.setCurrentIndex(strain)
+    panel.plot_type.setCurrentIndex(deformation)
+    if panel.options()["show_joints"]:
+        fails.append("switching plots loses the user's per-plot Show joints choice")
+
+    original = plotting.plot_deformed_mesh
+    for xlsx, expected in ((FEM_XLSX, False), (TOPPLING_XLSX, True)):
+        _data, bundle = _fem_bundle(xlsx)
+        for override in (None, not expected):
+            got = []
+
+            def spy(*args, **kwargs):
+                got.append(kwargs["joint_faces"])
+                return original(*args, **kwargs)
+
+            fig = Figure(figsize=(6, 4))
+            extra = {} if override is None else {"show_joints": override}
+            with patch.object(plotting, "plot_deformed_mesh", spy):
+                plotting.plot_fem_results(
+                    bundle["fem_data"], bundle["solution"],
+                    plot_type="deformation", fig=fig, **extra)
+            want = expected if override is None else override
+            if got != [want]:
+                fails.append(f"plotter joints={expected}, override={override}: {got}")
+            if override is None:
+                got.clear()
+                canvas = SimpleNamespace(_draw=lambda fn: fn(Figure(figsize=(6, 4))))
+                with patch.object(plotting, "plot_deformed_mesh", spy):
+                    MplCanvas.render_fem_results(
+                        canvas, bundle["fem_data"], bundle["solution"],
+                        {"plot_type": "deformation"})
+                if got != [expected]:
+                    fails.append(f"canvas omitted Show joints on joints={expected}: {got}")
+            if not expected and override is None:
+                if any(isinstance(c, PolyCollection) for c in fig.axes[0].collections):
+                    fails.append("an unjointed default deformation has material fill")
+                grid = [c for c in fig.axes[0].collections if c.get_label() == "Deformed"]
+                if not grid or tuple(grid[0].get_edgecolor()[0][:3]) != (0, 0, 0):
+                    fails.append("an unjointed default deformation grid is not black")
+    panel.deleteLater()
+    app.processEvents()
+    return fails
+
+
 def test_which_result_panels_draw_a_legend():
     """The deformation panel draws a legend only with Show joints off; the
     strain panel of a jointed model draws the joint key with Show joints on and
@@ -20409,6 +20483,8 @@ CHECKS = [
      test_fem_result_figures_carry_no_title),
     ("which result panels draw a legend",
      test_which_result_panels_draw_a_legend),
+    ("Show joints defaults follow the model",
+     test_show_joints_defaults_follow_the_model),
     ("the field state toggles", test_the_field_state_toggles),
     ("each state is drawn at its own scale",
      test_each_state_is_drawn_at_its_own_scale),
@@ -20606,6 +20682,7 @@ CHECKS = [
 _STUDIO_ONLY = {test_seep_panels_mirror_the_seep_view,
                 test_fem_panels_mirror_the_fem_view,
                 test_which_result_panels_draw_a_legend,
+                test_show_joints_defaults_follow_the_model,
                 test_the_run_record_survives_the_file,
                 test_dialog, test_dialog_settings, test_open_output,
                 test_report_runs_off_the_gui_thread, test_report_runner_progress,

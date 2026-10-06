@@ -626,8 +626,9 @@ class FemResultsDisplayPanel(QWidget):
         # plot (the joints over the blocks) and the shear strain plot (every
         # joint colored by slip, a jointed sheet as its two faces either side
         # of the bar) are set independently, both on by default on every
-        # jointed model. The box shows and edits the current plot's state.
-        self._joints_state = {"deformation": True, "shear_strain": True}
+        # jointed model and off otherwise. Until a model is supplied there are
+        # no joints. The box shows and edits the current plot's state.
+        self._joints_state = {"deformation": False, "shear_strain": False}
         self.show_joints = QCheckBox("Show joints")
         # The faces' weight on the deformation plot, in points: a thin trace
         # disappears on a wide section, a heavy one hides the blocks.
@@ -636,7 +637,7 @@ class FemResultsDisplayPanel(QWidget):
         self.joint_width.setToolTip(
             "Width of the joint faces drawn on the deformation plot, in points.")
         self.joint_width.valueChanged.connect(lambda *_: self.changed.emit())
-        self.show_joints.setChecked(self._joints_state.get(self._current_pt, True))
+        self.show_joints.setChecked(self._joints_state.get(self._current_pt, False))
         self.show_joints.setToolTip(
             "Set separately for the deformation plot and the shear strain plot; "
             "on by default for both on every jointed model.\n"
@@ -764,14 +765,14 @@ class FemResultsDisplayPanel(QWidget):
     def set_jointed(self, flag):
         """Tell the panel whether the result on screen is a jointed model, which
         is the only model the Color by block box applies to. Called once per
-        new result, which also puts Show joints back on for both plots (its
-        default on every jointed model); a user's per-plot setting survives
+        new result, which resets Show joints for both plots to whether the
+        model has joints; a user's per-plot setting survives
         view switches and re-renders and yields only to the next solve."""
         self._jointed = bool(flag)
         for k in self._joints_state:
-            self._joints_state[k] = True
+            self._joints_state[k] = self._jointed
         self.show_joints.blockSignals(True)
-        self.show_joints.setChecked(self._joints_state.get(self._current_pt, True))
+        self.show_joints.setChecked(self._joints_state.get(self._current_pt, self._jointed))
         self.show_joints.blockSignals(False)
         self._sync_enabled()
 
@@ -789,7 +790,7 @@ class FemResultsDisplayPanel(QWidget):
             if self._current_pt in self._joints_state:
                 self._joints_state[self._current_pt] = self.show_joints.isChecked()
             self.show_joints.blockSignals(True)
-            self.show_joints.setChecked(self._joints_state.get(new_pt, True))
+            self.show_joints.setChecked(self._joints_state.get(new_pt, self._jointed))
             self.show_joints.blockSignals(False)
             self._current_pt = new_pt
         self._sync_enabled()

@@ -937,7 +937,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                     mesh_on_fields=False, fs=None, failure_solution=None,
                     show_original='outline', deformed_color='k', deform_scale=None,
                     field_state=None, strain_state=None, color_by_magnitude=False, vector_cmap='viridis',
-                    vmin=None, vmax=None, vector_max=None, show_joints=True,
+                    vmin=None, vmax=None, vector_max=None, show_joints=None,
                     ssrm_record=None, fs_is_lower_bound=None):
     """
     Plot FEM results with various visualization options.
@@ -986,7 +986,10 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         show_reinforcement: Show reinforcement elements
         show_joints: Draw each interface (joint) element's state on the line it
             runs along — intact, slipping or open — with a colorbar for the
-            relative displacement. Inert on a model with no jointed line.
+            relative displacement. None (default) follows the model: on when
+            it has joints, off otherwise. With no joints, the default deformation
+            plot has black mesh lines and no material fill. An explicit boolean
+            retains the caller's display choice.
         figsize: Figure size (width, height)
         label_elements: Show element ID labels at centroids
         plot_nodes: For displace_vector, show dots at node locations
@@ -1060,6 +1063,9 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
     displacements = solution.get("displacements", np.zeros(2 * len(nodes)))
+
+    if show_joints is None:
+        show_joints = bool((fem_data.get("joint_data") or {}).get("n"))
 
     # Carry the SSRM factor of safety into the solution the panels see, so titles can
     # name BOTH it and the last-converged F the field was rendered at. Shallow copy:

@@ -332,7 +332,7 @@ class MplCanvas(QWidget):
             joint_linewidth=opts.get("joint_linewidth"),
             color_blocks=opts.get("color_blocks", False),
             show_reinforcement=opts.get("show_reinforcement", True),
-            show_joints=opts.get("show_joints", True),
+            show_joints=opts.get("show_joints"),
             label_elements=opts.get("label_elements", False),
             plot_boundary=opts.get("plot_boundary", True),
             plot_nodes=opts.get("plot_nodes", False),

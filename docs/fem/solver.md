@@ -591,8 +591,10 @@ Turning `capture_failure_state` off changes neither the factor of safety, the br
 `last_solution`.
 
 The pair below reloads the saved fields of the [W-3 report tutorial's reservoir embankment](../tutorials/w03_report.md).
-The upper panel is the last converged field; the lower is the captured field above FS.
-Each is the standard deformation plot, with the deformation scale set to 1.0× for both fields.
+The upper panel is the last converged field; the lower is the captured field above FS. Each is
+the standard deformation plot. In Studio the deformation scale is set for each plot on its own,
+so that the movement fills the same part of the frame whatever its size; here both fields are
+drawn at the same scale, 1.0×, to show how much more the captured field moves.
 
 ![Last converged and captured at-failure deformation from the saved W-3 fields](images/fem_capture_comparison.png){width=1000}
 

@@ -8,7 +8,7 @@ description: "How XSLOPE meshes a section for seepage and finite element analysi
 Seepage and finite-element analyses run on a mesh of triangles or quadrilaterals
 covering the section. Limit-equilibrium analysis does not need one. You build the mesh
 explicitly — in Studio with **Build Mesh**, or in a script with
-`build_mesh_from_polygons()` — and it is saved beside the model as `{stem}_mesh.json`,
+`build_mesh_from_polygons()` — and Studio saves it beside the model as `{stem}_mesh.json`,
 so one mesh serves every run until the geometry changes.
 
 Meshing happens in two stages. First the model's geometry becomes a set of closed
@@ -120,9 +120,7 @@ Use the local indices below to read the node order in the mesh arrays.
 
 ![Soil and line elements with local node indices](images/all_element_nodes.png){width=800}
 
-Quadratic types are made by adding nodes to the linear type in the last column; see
-[Quadratic elements](#quadratic-elements). Serendipity (`quad8`) uses corner and edge
-nodes; Lagrange (`quad9`) adds a center node.
+The indices are zero-based, and a line element numbers its two ends before its midpoint.
 
 | Type | Nodes | Variation within the element | Built from |
 | --- | --- | --- | --- |
@@ -131,6 +129,9 @@ nodes; Lagrange (`quad9`) adds a center node.
 | `quad4` | 4 | bilinear | — |
 | `quad8` | 8 | quadratic (serendipity) | `quad4` |
 | `quad9` | 9 | quadratic (Lagrange) | `quad4` |
+
+The last column gives the linear type each quadratic type is built from
+([Quadratic elements](#quadratic-elements)).
 
 ### Triangles or quadrilaterals
 
@@ -145,13 +146,14 @@ to fill a corner; quadrilaterals give a more regular element layout wherever the
 allows.
 
 A quadrilateral mesh is quad-*dominant* rather than pure: a small fraction of elements,
-usually well under one percent, stays triangular where no pairing exists. XSLOPE carries
+typically one or two percent, stays triangular where no pairing exists. XSLOPE carries
 mixed meshes end to end, so those triangles solve like any other element.
 
 ### Element choice for FEM analyses {#element-choice-for-fem-analyses}
 
-Use a quadratic type for every stress analysis;
-[volumetric locking](overview.md#element-type-selection-and-volumetric-locking) is why. The
+Use a quadratic type for every stress analysis: linear elements lock volumetrically and
+overstate the factor of safety
+([volumetric locking](overview.md#element-type-selection-and-volumetric-locking)). The
 choice among the three:
 
 - `tri6` conforms to complex geometry where quads would distort and is preferred for
@@ -212,9 +214,8 @@ same node spacing with no hanging nodes. Choose it when the section is built of 
 zones — a layered foundation, a cutoff or grout curtain, a rectangular core — where rows
 of aligned elements are useful.
 
-A zone the check declines is meshed by the free mesher, and the rest of the model is
-unaffected. The sweep is applied zone by zone, so a declined zone is meshed exactly as in
-the default style. The three sections below show the effect. Each is meshed with `quad4`
+A zone the check declines is meshed exactly as in the default style; the other zones are
+unaffected. The three sections below show the effect. Each is meshed with `quad4`
 elements at the same requested size in both panels, the section width divided by 100.
 AR95 is the 95th-percentile element aspect ratio — longest corner edge over shortest — so
 lower is better, and the last figure in each caption is the median delivered element size
@@ -262,10 +263,6 @@ refined: the requested size in the far field, and a graded band around each refi
 feature. Delivered node spacing along the geometry runs 0.75 to 1.00 times the requested
 size across the sample and verification sections; the shortfall is gmsh rounding a curve
 up to a whole number of divisions, which can only make an edge finer.
-
-Structured quadrilateral sweeps are the one exception: a swept
-zone's rows and columns are counted from the requested size and laid down as a grid, so
-the field governs the free zones around it rather than the sweep itself.
 
 ### A Size on one zone
 
@@ -331,7 +328,8 @@ The classes are:
   hydraulic conductivities differ by 100× or more, where a seepage solve must resolve a
   steep head gradient. This class is **opt-in**: it needs conductivities that only a
   seepage model carries, so select it explicitly and pass them,
-  `refine_features=['interfaces'], material_k={0: 1.67e-5, 1: 1.67e-7}`.
+  `refine_features=['interfaces'], material_k={0: 1.67e-5, 1: 1.67e-7}`, keyed by 0-based
+  material index (the first `mat` row is 0).
 
 `refine_factor=None`, the default, adds no band: the background size field is the
 requested size everywhere and the mesh is what it would be without the option. Refinement
@@ -348,8 +346,8 @@ within about 15 % of the request on either family.
 
 A thin zone is the one refinement case that is not an efficiency question. A soft seam
 one element thick cannot carry a shear band, so the model finds no mechanism through it
-and the analysis returns a factor of safety that is too high, with nothing in the output
-to show that the mesh was the reason. Because of this, Studio's
+and the analysis returns a factor of safety that is too high, with nothing in the factor of
+safety itself to show that the mesh was the reason. Because of this, Studio's
 **Build mesh** dialog carries a **Refine thin zones** checkbox that is **on by default**;
 it sizes every thin zone for about four element rows across its local width. A section
 with no thin zone is meshed exactly as it would be with the box clear, and the Log names
@@ -363,9 +361,8 @@ resolves is left alone even where its individual pieces would not be.
 
 The refinement factor plays no part: a thin zone's size is its own thickness over four,
 and the same at any factor. Two limits apply to that size. It is never coarser than the
-global target — a zone the mesh already resolves is dropped from the plan, so the option
-has no effect on a section with no thin zone. And it is never finer than one
-sixth of the global target.
+global target, so a zone the global size already resolves is not refined. And it is never
+finer than one sixth of the global target.
 
 The model checks report a zone that this one-sixth cap leaves under-resolved. They measure the mesh that
 was actually built and name any zone carrying fewer than three element rows, whatever the
@@ -374,14 +371,14 @@ safety nobody can explain. The two ways to give such a zone the size it needs ar
 **Size** on the zone, which is not capped, and a finer global target. A **Size** declared
 on the zone composes with the derived size by taking the smaller of the two.
 
-On the Griffiths soft-band section at a 3-unit target size, the band carries 1.6 element
-rows on a default triangular mesh and 1.2 on a quadrilateral one; with the option on both
-carry 4.0.
+On the Griffiths soft-band section
+([xslope_griffiths3_r0p2_thin.xlsx](files/xslope_griffiths3_r0p2_thin.xlsx)) at a 3-unit
+target size, the band carries 1.6 element rows on a triangular mesh with the box clear and
+1.2 on a quadrilateral one; with the option on both carry 4.0.
 
 From a script, pass `refine_features=['thin_zones']` together with any `refine_factor`
-above 1, which switches refinement on; its value does not change a thin zone's size. A
-`size` on the polygon dict, or a `size_regions` entry, is the manual equivalent for a zone
-you have measured yourself.
+above 1, which switches refinement on. A `size` on the polygon dict, or a `size_regions`
+entry, is the manual equivalent for a zone you have measured yourself.
 
 ## Reinforcement and pile lines
 
@@ -427,10 +424,9 @@ mesh = build_mesh_from_polygons(
 )
 ```
 
-The defaults are chosen for slope geometry — Frontal-Delaunay for triangles, and
-Frontal-Delaunay-for-quads with Blossom recombination for quadrilaterals, or simple
-recombination when the model has reinforcement, pile or joint lines — so this option is
-rarely needed.
+The defaults are those described under
+[Quadrilateral meshing styles](#quadrilateral-meshing-styles), so this option is rarely
+needed.
 
 ## Saving and reusing a mesh
 

@@ -590,6 +590,11 @@ tension across the surface, and the only interface question is pullout, which th
 It corresponds to the limit equilibrium treatment — a force where the surface crosses the line — so the two engines compare like for
 like.
 
+In the [FEM-2](../tutorials/fem02_reinforcement.md) reinforced slope the band of shear strain at failure cuts
+through all six layers, and each layer carries its tension across it:
+
+![The FEM-2 reinforced slope at failure: the shear band crosses every layer](../tutorials/images/fem02_shear_strain_epp.png){width=1000}
+
 **Surface along the layer.** A joint is appropriate where the surface can run along the layer: a reinforced
 embankment on soft clay sliding on
 its base geotextile, a wrapped-face or block-faced wall where the fill between the sheets moves relative to them
@@ -597,6 +602,12 @@ and each sheet anchors to a facing, a smooth geomembrane or liner whose interfac
 any long flat sheet under a sliding mass. The interface shear strength along the sheet governs, the two sides move
 differently, and a bonded bar cannot represent it: it reports the bars at their cap while the mesh decides the
 answer.
+
+In the liner model of [FEM-3](../tutorials/fem03_block_wall_joints.md#a-smooth-geomembrane-liner-on-a-firm-foundation),
+where the liner is the weakest thing in the section, two wedges of fill slide outward on it. The liner's faces are
+colored by how far they have slipped; the middle stays closed, and the slip grows toward each toe:
+
+![The FEM-3 liner model: two wedges of fill sliding out on a jointed liner](../tutorials/images/fem03_deform_liner_jointed.png){width=1000}
 
 Joints are off by default, because tripled nodes and a penalty stiffness add cost. On a wall or a base sheet,
 running both ways answers the question: a bonded answer that matches the jointed one shows that the mechanism

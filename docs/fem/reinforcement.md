@@ -103,7 +103,7 @@ The global stiffness matrix carries each bar's *full elastic* stiffness, so $K u
 elastic force. The capacity is imposed the same way plasticity is imposed on the soil — through a viscoplastic
 body load equal to the part of the elastic force the element **cannot** carry:
 
->>$f_{body} = (T - T_{true}) \cdot [-\cos\psi,\; -\sin\psi,\; +\cos\psi,\; +\sin\psi]$
+>>$f_{body} = (T - T_{true}) \cdot [-\cos\alpha,\; -\sin\alpha,\; +\cos\alpha,\; +\sin\alpha]$
 
 where $T_{true}$ is the force the bar can actually deliver: the elastic $T$ clipped into $[0, T_{cap}]$. Because
 equilibrium is solved as $K u - f_{body}$, this leaves exactly $T_{true}$ in the bar. (With the opposite sign the
@@ -190,7 +190,7 @@ This matrix is factored once (via sparse LU decomposition) and reused for all vi
 **Iteration procedure:** At each viscoplastic iteration, after solving for the updated displacement field $\{u\}$:
 
 1. For each 1D truss element, compute the axial force from the current displacements:
->>$\delta = (u_{x,j} - u_{x,i})\cos\psi + (u_{y,j} - u_{y,i})\sin\psi$
+>>$\delta = (u_{x,j} - u_{x,i})\cos\alpha + (u_{y,j} - u_{y,i})\sin\alpha$
 >>$T = \dfrac{AE}{L} \cdot \delta$
 
 2. Apply the body-force correction defined under [Force Behavior and Failure Modes](#force-behavior-and-failure-modes).

@@ -139,13 +139,6 @@ The **Dir** setting sets $\psi$:
 - **Axial** ($\psi$ = the inclination of the reinforcement line itself) — rigid supports such as soil nails,
   grouted tiebacks, and anchored bars carry their force along their own axis; the soil cannot reorient them.
 
-On the geogrid-reinforced slope of
-[Tutorial LEM-8](../tutorials/lem08_reinforced_slope.md#the-utexased-solution), UTEXASED's Example 5 reports
-FS = 1.646 by Spencer's method on a circle centered at (3.2, 42.0) with R = 43.4. XSLOPE's Spencer method gives
-1.646 on that same circle with either Dir setting; the two differ there by less than 0.1% because the geogrids
-cross that deep circle nearly parallel to the slip surface. XSLOPE's search finds a shallower circle at
-FS = 1.587. The two values are on different circles and do not indicate a difference in direction convention.
-
 The direction affects each solution method the same way the pile force does: the force is resolved into components
 normal and tangential to the slice base — $P\sin(\alpha - \psi)$ normal (zero for tangent) and
 $P\cos(\alpha - \psi)$ tangential — and for moment-based methods it contributes a moment about the circle center

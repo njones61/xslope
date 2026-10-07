@@ -350,8 +350,8 @@ an axial stiffness *EA* = **80,000 lb/ft**, which is a typical uniaxial geogrid.
 *EA* is what the run actually uses; the two columns are separate so that a
 discrete support — a nail or a tieback — can have a real modulus and a real
 cross-section with its spacing dividing the area.
-[Axial stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea) tabulates
-values by reinforcement type.
+[Initial state and EA selection](../fem/reinforcement.md#initial-state-and-ea-selection)
+tabulates values by reinforcement type.
 
 Leaving `Tres` blank makes every line elastic-perfectly-plastic, which is the
 first of the two runs. Click **OK** and save the model with **File → Save As…**

@@ -404,7 +404,7 @@ For load-bearing piles near slopes, the recommended approach in XSLOPE is:
 
 The distributed loads in XSLOPE handle the surcharge case, so load-bearing piles need no additional input.
 
-For a more complete treatment of load-bearing piles that avoids these bounding assumptions, see the [FEM pile-soil interface discussion](../fem/piles.md#pile-soil-interface-and-load-transfer).
+The finite element analysis does not remove these bounds: its pile is bonded to the soil with no shaft interface ([FEM piles](../fem/piles.md#pile-soil-interface-and-load-transfer)).
 
 
 ## Typical Parameter Values

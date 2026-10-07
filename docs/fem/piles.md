@@ -1,20 +1,11 @@
-# Pile Elements in Finite Element Analysis
+---
+title: "Piles in finite element analysis — XSLOPE"
+description: "Piles and concrete piers as embedded Euler-Bernoulli beam elements in XSLOPE's finite element analysis: formulation, structural capacities, end restraints, the bonded pile-soil interface and the results panel."
+---
 
-## Introduction
+# Piles and Concrete Piers in Finite Element Analysis
 
-In the finite element method, piles and concrete piers are modeled as **one-dimensional beam elements** embedded within the two-dimensional soil continuum. Unlike the limit equilibrium approach where the user provides a single force $H$ at the failure surface, the FEM approach models the pile as a structural member with distributed stiffness that naturally interacts with the surrounding soil through shared nodes. The pile's resistance to lateral soil movement emerges from the analysis itself — no pre-specified pile force is needed.
-
-This approach captures several behaviors that are difficult or impossible to model in LEM:
-
-- The pile's resistance is mobilized progressively as the soil deforms, rather than applied as a fixed force
-- Both axial (along the pile) and lateral (perpendicular to the pile) stiffness are modeled
-- The pile can carry both tension and compression (unlike flexible reinforcement, which is tension-only)
-- The bending stiffness of the pile ($EI$) naturally resists lateral soil movement
-- Bending moments are computed directly at each node along the pile
-- Structural capacity limits ($V_{\text{cap}}$, $M_{\text{cap}}$) are enforced during the analysis through plastic hinge formation
-- During SSRM strength reduction, the pile stiffness remains constant while soil strength is reduced, and the analysis reveals when the soil can no longer transfer load to the pile (failure)
-
-For background on the general finite element slope stability methodology in XSLOPE, see the [FEM Overview](overview.md). For the LEM treatment of piles, including force resolution, typical parameters, and the Ito & Matsui method, see [LEM Piles](../lem/piles.md).
+A pile or concrete pier is modeled as a chain of Euler-Bernoulli beam elements embedded in the soil mesh and sharing its nodes. No pile force is entered, as $H$ is in [limit equilibrium](../lem/piles.md): the beam carries axial force, shear and bending moment, in tension or compression, as the soil deforms around it, up to the structural capacities $V_{\text{cap}}$ and $M_{\text{cap}}$ where they are given.
 
 
 ## Applicability: Continuous Walls and Discrete Pile Rows
@@ -23,24 +14,10 @@ A two-dimensional beam element is a plane-strain member. It is continuous out of
 $EI$ are stiffnesses per meter of wall. That is an exact description of one kind of structure and an
 idealization of another, and the difference determines which of XSLOPE's two analyses suits a problem.
 
-**Continuous walls** — sheet pile walls, diaphragm walls, secant pile walls — *are* continuous out of
-plane, so the beam formulation represents them directly and the spacing $S$ is 1. This is the case the
-finite element path is verified on, at both levels:
-
-- The element itself is checked against closed-form beam theory with no soil present: simply supported
-  and cantilever deflections, moments, shears and support reactions, the axial $EA/L$ action, the
-  rotation into global coordinates at five orientations, the $1/S$ scaling and the circular-section
-  constants derived from a diameter. All reproduce to machine precision
-  (`test/beam_element_check.py`, against the closed forms of GeoStudio's SIGMA/W *Beams and Bars in a
-  Frame* verification).
-- The whole analysis — wall, soil, pore pressures and strength reduction together — is compared with
-  GeoStudio's SIGMA/W *slope stabilization with piles* example, where a sheet pile wall driven from a bench
-  through a weak clay band takes the slope from marginal stability to comfortably stable. Without the wall
-  the two programs agree, 1.020 against SIGMA/W's about 1.025, and XSLOPE recovers the wall's bending moment
-  and shear down its length with the published shape and turning point. With the wall in place it gives
-  1.647 against about 1.4 from SIGMA/W. See [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall),
-  which explains how the published factors are taken from the source and what separates the two results
-  once a stiff continuous member is in the section.
+**Continuous walls** — sheet pile, diaphragm and secant pile walls — are continuous out of plane, so the beam
+represents them directly, with $S = 1$. The element is checked against closed-form beam theory in
+`test/beam_element_check.py`, and a wall analysis is compared with GeoStudio's in
+[the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall).
 
 **Discrete pile rows** are not continuous out of plane. Soil arches onto the piles and, at wide enough
 spacing, moves between them, so the load a pile attracts is set by a three-dimensional mechanism. Dividing
@@ -55,28 +32,13 @@ The wall section and pile-row plan below show what the spacing conversion repres
 
 The row's center-to-center spacing $S$, not the pile diameter $D$, divides its axial and bending stiffnesses to give stiffness per unit wall width.
 
-Cai & Ugai (2000) give a measure of that idealization. They analyzed one
-pile-stabilized slope with a three-dimensional strength reduction finite element model that meshes the
-individual piles with slip interfaces, and XSLOPE's SSRM is run on the same slope at a spacing of three
-diameters in [the VP106 diagnostic](../verification/rocscience.md#vp106-fem). With no pile the two agree to
-0.4%, so the differences with the pile row in place come from the pile. With the row in place the
-two-dimensional model gives values 8.2% high with a free head and 9.9% high with the head rotation restrained: it
-credits the row with multiplying the unreinforced factor of safety by 1.296 where the three-dimensional
-model credits 1.193. Limit equilibrium with the Ito & Matsui force credits the same row 1.269 — above the
-three-dimensional value by 0.076 where the beam is above it by 0.103, the 0.027 between them small beside
-either gap. Neither two-dimensional analysis recovers the three-dimensional credit; against the only
-three-dimensional answer available, the plane-strain beam over-credits the row.
-
-**Choosing the analysis.** For a discrete pile row, the verified approach is limit equilibrium with the Ito &
-Matsui (1975) limit pressure, which is a theory *of* the three-dimensional mechanism rather than a
-two-dimensional substitute for it: XSLOPE computes it automatically from the pile diameter and spacing,
-and it is verified across four spacings against both Slide2 and the originating paper in
-[VP106](../verification/rocscience.md#vp106) and again in
-[VP54](../verification/rocscience.md#vp54). See
-[LEM vs. FEM Pile Modeling](../lem/piles.md#lem-vs-fem-pile-modeling), which states the same rule from the
-limit equilibrium side and gives the results of both engines on XSLOPE's own pile sample. The finite element
-analysis is the right one for a continuous wall; for a pile row it is best used as a study of stiffness and
-member forces, and its factor of safety includes the idealization above.
+On the one pile-stabilized slope with a published three-dimensional answer (Cai & Ugai, 2000), the
+plane-strain beam gives a factor of safety 8.2% above it with a free head and 9.9% above it with the head
+rotation restrained ([VP106 finite-element diagnostic](../verification/rocscience.md#vp106-fem)). For a
+discrete row, use limit equilibrium with the Ito & Matsui (1975) force, which models the three-dimensional
+mechanism; use the finite element analysis for a continuous wall, and for a pile row only as a study of
+stiffness and member forces. [LEM vs. FEM pile modeling](../lem/piles.md#lem-vs-fem-pile-modeling) sets out
+the choice and compares both engines on the pile sample.
 
 
 ## Comparison with Reinforcement (Truss) Elements
@@ -97,6 +59,8 @@ For details on the truss element formulation used for reinforcement, see [Soil R
 
 ## Beam Element Formulation
 
+A pile is a chain of Euler-Bernoulli beam elements with two translations and a rotation at each node.
+
 ### Euler-Bernoulli Beam Stiffness
 
 XSLOPE uses the standard Euler-Bernoulli beam element with 3 DOFs per node ($u_x$, $u_y$, $\theta$). On a linear soil mesh the element has two nodes, giving a 6×6 element stiffness matrix in local coordinates (beam axis along local $x$):
@@ -109,16 +73,14 @@ where $E$ is Young's modulus, $A$ is the cross-sectional area, $I$ is the moment
 
 On a quadratic soil mesh (tri6, quad8, quad9) the edge a beam element lies on carries a midside node as well as its
 two corners, and the beam element stands on all three. It then has 9 DOFs — $u_x$, $u_y$ and $\theta$ at every one of
-its nodes — and its local stiffness is 9×9.
+its nodes — and its local stiffness is 9×9 (see [Quadratic elements](mesh.md#quadratic-elements)).
 
 The 2- and 3-node line elements below carry two translations and a rotation at each node when
 used as pile beams. Compare the end nodes with the extra midpoint node in the three-node form.
 
 ![Soil and line elements with local node indices](images/all_element_nodes.png){width=800}
 
-That node ties the pile to the soil in the middle of each element. The soil's displacement along a
-quadratic edge is a parabola through all three nodes, so a beam attached at the corners alone leaves the edge free to
-bow away from it between them, and leaves the midside node free to move independently of the pile.
+The midpoint node ties the pile to the soil in the middle of each element.
 
 The deflection of the three-node element is the quintic that matches a value and a slope at all three of its nodes —
 six conditions on six coefficients. That keeps Euler-Bernoulli exactly: the bending block is
@@ -129,13 +91,11 @@ quadratic bar over the same three nodes. Bending and axial stay uncoupled, as on
 Unlike the two-node element, the three-node element gives the distributed load along its own length. A cubic
 deflection has a zero fourth derivative everywhere, so a chain of two-node elements can report the soil reaction only
 as the shear step between one element and the next; the quintic's fourth derivative is a genuine linear distribution
-along the element, and $EI$ times it is the reaction that element is carrying. A fourth derivative amplifies element-scale unevenness in the nodal loads, so each element's value is reported through a least-squares line fitted with its two neighbors, evaluated at its own depth — the reaction at the scale the mesh supports, with its shape and magnitude intact.
+along the element, and $EI$ times it is the reaction that element is carrying. Because a fourth derivative magnifies small unevenness in the nodal loads, each element's reaction is reported as the value, at its own depth, of a least-squares line through it and its two neighbors.
 
 ### Mixed DOF System
 
 The 2D soil elements have 2 DOFs per node ($u_x$, $u_y$), while beam elements require 3 DOFs per node ($u_x$, $u_y$, $\theta$). XSLOPE uses a **mixed DOF system**: nodes belonging to pile elements are assigned 3 DOFs, and all other nodes retain 2 DOFs. A DOF offset array maps each node index to its starting position in the global displacement vector.
-
-This approach avoids adding unnecessary rotational DOFs to the thousands of soil-only nodes while giving pile nodes the rotation needed for proper bending behavior. Soil elements at pile nodes only access the translational DOFs ($u_x$, $u_y$); the rotational DOF ($\theta$) is used exclusively by the beam element stiffness.
 
 Compare the end nodes with the shared midpoint on the quadratic soil edge.
 
@@ -143,64 +103,58 @@ Compare the end nodes with the shared midpoint on the quadratic soil edge.
 
 Every beam node carries two translations and a rotation; the soil shares the translations, not the rotation.
 
-Stress analyses should use quadratic soil meshes. A beam on a tri6, quad8, or quad9 soil edge always carries its two
-ends and the shared midpoint; the two-node beam is not used on those edges.
-
 ### Coordinate Transformation
 
 The local stiffness matrix is transformed to global coordinates using a rotation matrix — 6×6 for a
 two-node beam, 9×9 for a three-node beam:
 
->$\mathbf{K}_{\text{global}} = \mathbf{T}^T \, \mathbf{K}_{\text{local}} \, \mathbf{T}$
+>$\mathbf{K}_{\text{global}} = \mathbf{R}^T \, \mathbf{K}_{\text{local}} \, \mathbf{R}$
 
-where $\mathbf{T}$ is a block-diagonal rotation matrix with $\cos\theta$, $\sin\theta$ direction cosines for translational DOFs and identity for rotational DOFs — 6×6 on a two-node element, 9×9 on a three-node one.
+where $\mathbf{R}$ is a block-diagonal rotation matrix with $\cos\alpha$, $\sin\alpha$ the direction cosines of the pile axis for translational DOFs and identity for rotational DOFs — 6×6 on a two-node element, 9×9 on a three-node one.
 
-For a **vertical pile** ($\cos\theta = 0$, $\sin\theta = -1$), the axial stiffness $EA/L$ acts in the $y$-direction (vertical) and the lateral stiffness $12EI/L^3$ acts in the $x$-direction (horizontal) — exactly the behavior needed for resisting lateral slope movement.
+For a **vertical pile** ($\cos\alpha = 0$, $\sin\alpha = -1$), the axial stiffness $EA/L$ acts in the $y$-direction (vertical) and the lateral stiffness $12EI/L^3$ acts in the $x$-direction (horizontal) — exactly the behavior needed for resisting lateral slope movement.
 
 ### Assembly
 
+Each pile's $EA$ and $EI$ are divided by its center-to-center spacing $S$ before assembly, so the beam carries the
+row's stiffness per unit width of section; $V_{\text{cap}}$ and $M_{\text{cap}}$ are divided by $S$ the same way.
 The global stiffness matrix combines contributions from all element types:
 
 >$[\mathbf{K}]_{\text{global}} = \sum_{\text{soil}} [\mathbf{K}_e]_{\text{soil}} + \sum_{\text{truss}} [\mathbf{K}_e]_{\text{truss}} + \sum_{\text{beam}} [\mathbf{K}_e]_{\text{beam}}$
 
 The total DOF count is $2 \times n_{\text{all nodes}} + n_{\text{pile nodes}}$: every node has two
 translations, and each pile node has one extra rotation. Pile nodes are included in the all-node count.
-The global matrix is factored once (via sparse LU decomposition) and reused for all viscoplastic iterations.
 
 
 ## Mesh Generation
 
-Pile elements are integrated into the finite element mesh using the same approach as reinforcement elements. The pile line geometry — defined as two endpoints $(x_1, y_1)$ to $(x_2, y_2)$ in the `piles` sheet of the input template — is passed to the mesh generator as a constraint. The mesh generator ensures that element edges align along the pile line, so that 1D beam elements can be extracted from the edges of adjacent 2D soil elements.
-
-When a pile endpoint is within a small tolerance of a polygon boundary (e.g., the ground surface), it is automatically snapped to the nearest boundary point. This prevents near-zero-length elements that would otherwise arise from minor coordinate mismatches between the pile definition and the ground surface interpolation.
-
-Beam elements are spaced along the pile line at the global target element size unless the model states a **1D element
-size** on the main sheet, which sets the element size along the pile and reinforcement lines and refines the soil
-sharing their nodes with them.
-
-For details on the mesh generation process and 1D element extraction, see [Mesh Generation](mesh.md).
+A pile line is meshed like any constraint line: its two endpoints from the `piles` sheet are embedded in the mesh,
+element edges follow the line, and its beam elements are those edges
+([Reinforcement and pile lines](mesh.md#reinforcement-and-pile-lines)).
 
 
 ## Force and Moment Computation
 
 At each viscoplastic iteration, the forces and moments in each beam element are computed from its nodal
 displacements — 6 DOFs on a two-node beam, 9 on a three-node beam. The global displacements are transformed
-to local coordinates using the rotation matrix $\mathbf{T}$, then:
+to local coordinates using the rotation matrix $\mathbf{R}$. In local coordinates $u_1, u_2$ are the axial
+displacements of the element's end nodes, $v_1, v_2$ their transverse displacements and $\theta_1, \theta_2$
+their rotations:
 
 >**Axial force**: $T = \dfrac{EA}{L} (u_2 - u_1)$
 
->**Shear force**: $V = \dfrac{12EI}{L^3}(v_1 - v_2) + \dfrac{6EI}{L^2}(\theta_1 + \theta_2)$
+>**Shear force**: $V = \dfrac{12EI}{L^3}(v_1 - v_2) + \dfrac{6EI}{L^2}(\theta_1 + \theta_2)$ (two-node element; on a three-node element the shear is the quintic deflection's at the element center)
 
 >**Bending moments** at nodes 1 and 2: $M_1, M_2 = \mathbf{K}_{\text{local}}[\text{rows 2, 5}] \cdot \mathbf{u}_{\text{local}}$
 
-The bending moment diagram along the pile varies from element to element. The maximum moment typically occurs near the failure surface, where the transition from sliding to stable soil creates the largest lateral loading.
+The bending moment diagram along the pile varies from element to element.
 
 
 ## Structural Capacity Checks
 
-Both capacities enter the solve the way soil yielding and a reinforcement bar's tension limit do: as a body-load correction. The viscoplastic scheme solves $\mathbf{K}\mathbf{u} = \mathbf{F} + \mathbf{c}$ with the member's **full elastic stiffness** in $\mathbf{K}$, so the internal force the converged state is in equilibrium with is $\mathbf{K}\mathbf{u} - \mathbf{c}$. The correction is therefore the part of the elastic action the member cannot carry — the action minus the capacity, not the other way round — and what is left in the member is the capacity itself. The actions XSLOPE reports for a pile are read off $\mathbf{K}\mathbf{u} - \mathbf{c}$, so they are the actions the equilibrium carries rather than elastic actions trimmed to the capacity afterwards.
+Both capacities are imposed as a body-load correction, as soil yield and a bar's tension cap are. The stiffness matrix $\mathbf{K}$ keeps the member's full elastic stiffness; the correction $\mathbf{c}$ is the part of the elastic action above the capacity; the solver solves $\mathbf{K}\mathbf{u} = \mathbf{F} + \mathbf{c}$, so the member carries $\mathbf{K}\mathbf{u} - \mathbf{c}$, which is the capacity where the capacity is reached. The pile actions XSLOPE reports are $\mathbf{K}\mathbf{u} - \mathbf{c}$.
 
-The hinge and shear checks are applied in the order shown below.
+The figure shows one plastic release at a shared pile node and the order of the two checks.
 
 ![One plastic release at a shared pile node and the ordered capacity checks](images/pile_capacity_checks.png){width=880px}
 
@@ -212,25 +166,19 @@ When $V_{\text{cap}}$ is provided, the shear in each beam element is compared ag
 
 >$\Delta V = V - \text{sign}(V) \cdot V_{\text{cap}}/S$
 
-is applied on the shear's own internal-force pattern — $+1$ and $-1$ on the transverse rows of the element's two end nodes, rotated into global coordinates. The element then delivers exactly $V_{\text{cap}} / S$ and no more, and delivers less the tighter the capacity is drawn.
+is applied on the shear's own internal-force pattern — $+1$ and $-1$ on the transverse rows of the element's two end nodes, rotated into global coordinates. The element then delivers exactly $V_{\text{cap}} / S$ and no more.
 
 ### Moment Capacity ($M_{\text{cap}}$) — Plastic Hinge
 
-A moment capacity is a **release of rotational continuity**, not a moment applied at a node. Two beam elements meet at every interior node of a pile, and at equilibrium their end moments there are equal and opposite; a correction applied to the rotational degree of freedom the two elements *share* is equal and opposite too, cancels exactly, and enforces nothing at any capacity.
-
-A plastic hinge instead lets the element end rotate freely once its moment reaches $M_{\text{cap}} / S$. The element's elastic end rotation is the nodal rotation less a **plastic rotation** $p$, so the moment it delivers is
+A moment capacity is a plastic hinge. Once an element end's moment reaches $M_{\text{cap}}/S$, that end rotates by a plastic rotation $\mathbf{p}$ in addition to the nodal rotation, so the element delivers
 
 >$\mathbf{s} = \mathbf{K}_{\text{local}} (\mathbf{u}_{\text{local}} - \mathbf{p})$
 
-and the correction added to the load vector is the full element vector $\mathbf{K}_{\text{local}}\,\mathbf{p}$ — which, unlike a nodal moment, acts on the element's translational rows as well. Each end moment is linear in $\mathbf{p}$, so $\mathbf{p}$ follows from one small linear solve on the rotational block of $\mathbf{K}_{\text{local}}$ rather than being iterated to: the hinged ends are placed exactly on the capacity, and because releasing one end raises the moment at the other, the hinge set is grown until it is stable. The pile's moment diagram is then bounded by the equilibrium, the released shaft deflects further, and the factor of safety falls.
+and $\mathbf{K}_{\text{local}}\,\mathbf{p}$ is added to the load vector, on the element's translational rows as well as its rotational ones. $\mathbf{p}$ comes from one small linear solve on the rotational block of $\mathbf{K}_{\text{local}}$ that puts each hinged end exactly on the capacity. Releasing one end raises the moment at the other, so the set of hinged ends is grown until it is stable. At an interior node, where two element ends meet, only one end takes the plastic rotation; equilibrium at the node puts the other on the capacity with the opposite sign. The released shaft deflects further, and the factor of safety falls.
 
-A hinge is one release at one section, and every interior node of a pile carries two element ends on the same section. Exactly one of them takes the plastic rotation; the other stays elastic, and equilibrium at the node it shares puts it on the capacity too, with the opposite sign. Releasing both would leave the node's rotation seeing equal and opposite capacities whatever it did — no longer determined by the beam at all — and the iteration would drift along that direction without settling.
+### Yield reporting
 
-The plastic hinge approach is the standard method used in commercial geotechnical FEM software (PLAXIS, RS2, FLAC) for modeling pile structural failure.
-
-### Interaction
-
-Both checks are applied at each iteration, in that order: the hinge first, then the shear read off the released element. An element can yield in shear, in bending, or in both, and the plastic rotation at each end node is carried alongside the actions. The summary output reports which elements have yielded and by which mechanism.
+An element can yield in shear, in bending, or in both, and the plastic rotation at each end node is carried alongside the actions. The summary output reports which elements have yielded and by which mechanism.
 
 
 ## Head and Tip Fixity
@@ -250,7 +198,7 @@ The four choices below act on the same three nodal degrees of freedom at either 
 
 Pinned holds both translations but allows rotation; unrotated holds rotation while allowing both translations.
 
-These are the four pile head conditions of Cai & Ugai (2000), by their names. A held rotation constrains the rotation degree of freedom the pile node carries; held translations constrain its two displacement degrees of freedom; a free end leaves all three to the surrounding soil and the boundary conditions.
+Cai & Ugai (2000) define the same four conditions, calling pinned "hinged".
 
 Which tip condition is right depends on where the pile ends. A shaft that continues well below the slip surface is restrained by the soil it passes through, and leaving the tip free is correct. A shaft whose bottom node lands on a fixed boundary is already pinned by that boundary — its translations are held there but its rotation is not, so the pile swings about its toe — and `pinned` changes nothing; `fixed` is the socketed case. A shaft that ends on a hard stratum inside the mesh needs `pinned`, since the soil elements below it would otherwise let the tip move.
 
@@ -259,80 +207,29 @@ Neither column has any effect on LEM analysis.
 
 ## SSRM Treatment
 
-During the Shear Strength Reduction Method:
-
-- Pile material properties ($E$, $I$, $A$) and structural capacities ($V_{\text{cap}}$, $M_{\text{cap}}$) are **not reduced** — they remain constant throughout the SSRM bisection
-- Only soil strength parameters ($c$ and $\tan\varphi$) are reduced by the trial factor $F$
-- As soil strength is reduced, the soil deforms more around the pile; the pile's stiffness naturally resists this additional deformation
-- If structural capacity limits are provided, plastic hinges may form during the SSRM — the pile yields structurally before the soil fails around it, giving a lower (and more realistic) factor of safety
-- Convergence failure (slope collapse) occurs when the reduced soil strength can no longer transfer load to/from the piles effectively
-- The resulting factor of safety represents the margin of safety in the **soil** strength, given the pile reinforcement as-designed
-
-This treatment is consistent with how reinforcement elements are handled in the SSRM (see [Soil Reinforcement](reinforcement.md)) and follows standard practice in commercial geotechnical FEM software.
+Strength reduction leaves the pile's $E$, $I$, $A$, $V_{\text{cap}}$ and $M_{\text{cap}}$ unchanged, as it does every
+[structural property](overview.md#structural-elements). A plastic hinge that forms during the search lowers the
+factor of safety.
 
 
 ## Pile-Soil Interface and Load Transfer
 
-### Shared-Node Coupling {#shared-node-coupling-current-implementation}
+A pile's beam elements stand on the nodes of the soil element edges they lie on, the midside node included on a
+quadratic mesh, so pile and soil have the same displacement at every node. The interface is perfectly bonded: the
+shaft cannot slip, no limit is placed on the shear passed between pile and soil, and that force is limited only by
+the soil yielding and by the pile's $V_{\text{cap}}$ and $M_{\text{cap}}$. XSLOPE has no interface element along a
+pile shaft; [interface elements](joints.md) apply only to joint lines and jointed reinforcement lines.
 
-In XSLOPE, pile beam element nodes are the same nodes as the adjacent soil element nodes — every node of the 2D element edge the beam lies on, the midside node included on a quadratic mesh. The beam stiffness is assembled directly into the global stiffness matrix at the shared DOF indices, so the pile and soil have **identical displacements** at every node of every element the pile is built from. There is no relative slip between the pile shaft and the surrounding soil.
+**Passive (stabilizing) piles.** The soil pushes laterally on the pile, and the soil yielding around it limits the
+load. The bond overstates the pile's resistance, which makes the factor of safety unconservative;
+[Applicability](#applicability-continuous-walls-and-discrete-pile-rows) gives the measured effect on one pile row.
 
-This shared-node approach is equivalent to a **perfectly bonded interface** with infinite shear strength. When the soil deforms (e.g., during SSRM strength reduction), the pile resists through its $EI$ and $EA$ stiffness, and whatever force is needed to maintain displacement compatibility is transmitted at each node. There is no cap on the interface shear stress — the force transfer is limited only by the soil elements yielding (via the viscoplastic algorithm) or the pile reaching its structural capacity ($V_{\text{cap}}$, $M_{\text{cap}}$).
-
-**Limitations**: The shared-node coupling does not model skin friction. Real skin friction involves relative slip between the pile shaft and the soil, governed by an interface shear strength (adhesion + normal stress × friction). The shared-node approach has no mechanism for:
-
-- Shaft slip — the pile cannot move relative to the soil at any point
-- Progressive load transfer — in reality, skin friction mobilizes from the top down as the pile settles; with shared nodes, load distributes based on relative stiffness alone
-- Distinct end-bearing vs. skin-friction behavior — the load path depends entirely on the stiffness ratio between the beam $EA$ and the surrounding soil elements
-
-### Adequacy for Passive (Stabilizing) Piles
-
-For **passive stabilizing piles** in SSRM slope stability, the shared-node approach is standard and widely used in the literature (Griffiths & Lane 1999, Wei & Cheng 2009, Sun et al. 2021). In this application:
-
-- The soil is pushing **laterally** against the pile — the dominant interaction is lateral, not axial
-- The limiting mechanism is the **soil yielding** around the pile, not interface slip
-- The viscoplastic algorithm naturally limits the forces that the soil can transmit to the pile — when soil elements reach their Mohr-Coulomb yield surface, they redistribute stress
-- The shared-node coupling somewhat overestimates the pile-soil bond, but this makes the computed factor of safety slightly **unconservative** (more pile resistance than reality), and the effect is generally small for passive piles
-
-This is the same approach used by published SSRM implementations with beam elements and produces results consistent with commercial software for the passive pile case.
-
-### Limitation for Load-Bearing Piles
-
-For **load-bearing piles** carrying vertical structural loads (bridge abutments, building foundations near slopes), the shared-node approach has a more significant limitation. The vertical load at the pile head must transfer to the soil through a combination of shaft skin friction and tip end bearing. With shared nodes:
-
-- The load distributes to the soil based on the **relative stiffness** of the beam element vs. the surrounding soil elements at each node
-- This is a rough approximation of load transfer, but it is not governed by interface shear strength — the pile cannot slip through the soil regardless of how large the axial force becomes
-- There is no way to model bearing capacity failure of the pile (punch-through)
-- The depth distribution of load transfer depends on the mesh and element sizes rather than on soil-pile interface properties
-
-The practical consequence depends on the geometry. For a pile embedded through a shallow sliding mass into deep stable ground, the rigid bond tends to transfer more load to the soil **near the pile head** (where the stiffness mismatch is greatest) rather than allowing load to migrate to depth via skin friction. Whether this is conservative or unconservative for slope stability depends on where the failure surface develops relative to the load transfer zone, and cannot be determined a priori.
-
-### Commercial Software Approach
-
-Commercial geotechnical FEM packages (Plaxis 2D, RS2/Phase2, FLAC) address the interface limitation using **interface elements** along the pile shaft:
-
-- **Interface elements** are zero-thickness element pairs inserted between the structural element nodes and the soil nodes. They have separate nodes at the same coordinates, connected by a constitutive model — typically Mohr-Coulomb with a strength reduction factor $R_{\text{inter}}$:
-
->$c_{\text{inter}} = R_{\text{inter}} \cdot c_{\text{soil}}, \qquad \tan\phi_{\text{inter}} = R_{\text{inter}} \cdot \tan\phi_{\text{soil}}$
-
-- $R_{\text{inter}}$ typically ranges from 0.5 to 1.0 (concrete on soil $\approx$ 0.7, steel on soil $\approx$ 0.5)
-- The interface has a high **normal stiffness** $k_n$ (to prevent interpenetration) and a **shear stiffness** $k_s$ (governing pre-slip deformation)
-- When the interface shear stress reaches the interface strength, relative slip occurs — this is the mechanism that produces realistic skin friction behavior
-- In Plaxis 2D, interfaces are an explicit toggle on plate (beam) elements — without interfaces enabled, the behavior is the same shared-node coupling that XSLOPE uses
-
-XSLOPE does not model an interface along a pile shaft; its [interface elements](joints.md) apply to joint lines and reinforcement lines, not to piles.
-
-### Practical Guidance for Load-Bearing Piles in XSLOPE
-
-The recommended approach for load-bearing piles near slopes follows the same bounding strategy described in the [LEM piles documentation](../lem/piles.md#load-bearing-piles):
-
-1. **Model the pile as a passive beam element** to capture its lateral resistance to slope movement
-2. **Apply the structural load as a surface surcharge** via the `dloads` sheet — this is the conservative upper bound, placing the full load at the surface to maximize driving forces on any failure surface
-3. **Run both with and without the surcharge** to bracket the result when the pile tip is well below the anticipated failure surface (the lower-bound assumption being that the load bypasses the sliding mass entirely)
-
-The surface surcharge approach is conservative because it ignores the fact that some (or most) of the structural load reaches stable ground below the failure surface via end bearing and deep skin friction. For end-bearing piles in competent material with a shallow failure surface, the conservatism may be substantial. For friction piles in weak soil with a deep failure surface, the conservatism is smaller.
-
-This bounding approach avoids the need for explicit skin friction modeling and is consistent with standard LEM practice (FHWA, AASHTO). For cases where the difference between upper and lower bounds is unacceptably large, a commercial FEM package with interface elements (Plaxis, RS2) should be used to resolve the load transfer explicitly.
+**Load-bearing piles.** An axial load at the head reaches the soil in proportion to the stiffness of the beam and of
+the soil elements at each node, not through skin friction and end bearing. The pile cannot slip or punch through,
+and the depth at which the load is transferred depends on the mesh. For a pile near a slope that also carries a
+structural load, model the pile as a passive beam and bracket the load as described under
+[Load-bearing piles](../lem/piles.md#load-bearing-piles): once as a surcharge on the `dloads` sheet, once without
+it.
 
 
 ## Input Parameters
@@ -341,14 +238,14 @@ Pile properties for FEM analysis are specified in the `piles` sheet of the input
 
 | Column | Field | Description |
 |--------|-------|-------------|
-| C-F | $(x_1, y_1)$, $(x_2, y_2)$ | Pile geometry (top and tip coordinates) |
+| C-F | $(x_1, y_1)$, $(x_2, y_2)$ | Pile geometry; the higher end is the head |
 | I | $D$ | Pile diameter — used to compute $I$ and $A$ if not provided |
 | J | $S$ | Center-to-center spacing — scales $EI$ and $EA$ by $1/S$ for per-unit-width |
-| K | $E$ | Young's modulus of pile material |
-| L | $I$ | Moment of inertia of pile cross-section |
-| M | $Area$ | Cross-sectional area of pile cross-section |
-| N | $V_{\text{cap}}$ | Shear capacity per pile (force units). Blank = no limit. |
-| O | $M_{\text{cap}}$ | Moment capacity per pile (force × length units). Blank = no limit. |
+| K | $V_{\text{cap}}$ | Shear capacity per pile (force units). Blank = no limit. |
+| L | $M_{\text{cap}}$ | Moment capacity per pile (force × length units). Blank = no limit. |
+| M | $E$ | Young's modulus of pile material |
+| N | $I$ | Moment of inertia of pile cross-section |
+| O | $Area$ | Cross-sectional area of pile cross-section |
 | P | Head | Pile head (top node) restraint: **free** (default), **pinned**, **unrotated** or **fixed** |
 | Q | Tip | Pile tip (bottom node) restraint: **free** (default), **pinned**, **unrotated** or **fixed** — the same four as Head |
 
@@ -356,16 +253,13 @@ If $D$ is provided and $I$/$Area$ are omitted, a solid circular section is assum
 
 >$A = \dfrac{\pi D^2}{4}, \qquad I = \dfrac{\pi D^4}{64}$
 
-The LEM-specific columns ($H$, $\theta_p$) are not used for FEM analysis. See [LEM Piles](../lem/piles.md) for typical material property values and structural capacities.
+The LEM-specific columns, $H$ (G) and **Appl** (H), are not used by the finite element analysis. See [LEM Piles](../lem/piles.md) for typical material property values and structural capacities.
 
 ## Inspecting the Results
 
-The FEM results view colors pile elements by the shear they carry. To read one pile down its length, use the
-**1D Details…** button on that view's toolbar. It opens a panel listing every pile and reinforcement line in the
-model, each with a utilization badge, and draws the selected member's profiles beside the list. Piles whose rows
-share a label are numbered so they can be told apart. Under the list is a map of the section with the selected
-pile picked out, so each listed member can be located on the slope. The button is dimmed for a model with no piles and
-no reinforcement lines.
+The FEM results view colors pile elements by the shear they carry. The **1D Details…** panel, described under
+[Inspecting the results](reinforcement.md#inspecting-the-results) on the reinforcement page, draws a selected pile's
+profiles; piles whose rows share a label are numbered so they can be told apart.
 
 ![Pile detail for the lower pile of the piles sample](images/piles_fem_details.png){width=1000}
 
@@ -378,15 +272,16 @@ Four panels share one depth axis, pile head at the top:
 - **Moment** — the bending moment, assembled from the beam elements' end moments into a continuous profile, with
   the maximum marked and its depth annotated. The moment is zero at a free head and a free toe, which is a useful
   check on the profile.
-- **Soil reaction** — the lateral resistance the ground mobilizes per unit length of pile. On a quadratic mesh each
-  beam element reports its own, from the distributed load its deflected shape carries; on a linear mesh, where the
-  element's deflection is a cubic and carries none, it is the shear step between consecutive elements. The Ito & Matsui limiting resistance
+- **Soil reaction** — the lateral resistance the ground mobilizes per unit length of pile, computed as described
+  under [Three-node elements on a quadratic mesh](#three-node-elements-on-a-quadratic-mesh) (on a linear mesh, as
+  the shear step between consecutive elements). The Ito & Matsui limiting resistance
   $p(z) = (c A_1 + \gamma z A_2)/S$ is drawn dashed beside it, from the same coefficients the LEM uses for its
   passive-pile force (see [LEM Piles](../lem/piles.md)), and the peak fraction of that limit is stated in the
   panel. The limiting resistance grows with depth and is often far above anything mobilized, in which case the
   panel is scaled to the mobilized profile and the limit runs off the sides. For a pile far enough inside its
   working range that the envelope does not reach the panel at all, it is not drawn, that panel carries no legend,
-  and the note that states the peak fraction gives how far off the envelope is.
+  and the note that states the peak fraction gives how far off the envelope is. The envelope does not change with
+  the **Field state** setting.
 
 Capacity lines appear only where the model declares a capacity: $V_{\text{cap}}$ and $M_{\text{cap}}$ are inputs,
 and no substitute is computed from an assumed section — the pile inputs carry force capacities, not section
@@ -399,23 +294,11 @@ the soil moving past it, and its moment peaks where the displacement changes fas
 touches it; the crossing is shown on the shear-strain field figure. The title states which field the profiles
 were taken from: the mechanism an SSRM run captured, or the shear strain in a section that is standing.
 
-A **Field state** control at the foot of the panel selects which field the displacement, shear and moment profiles
-are read from — the at-failure mechanism an SSRM run captured, or the last converged solution — and is the same
-switch, with the same default, as the one on the results view. It is dimmed for a run that captured no mechanism,
-and the limiting-resistance envelope is the same in both states.
-
-**Export** writes the current view as a PNG and its plotted series as a CSV named from the model, the pile and the
-field state, with that state also recorded in the CSV's header.
-The panel is non-modal and reads the solution it was opened with, and works the same on a solution reloaded from
-its saved sidecar files as on a fresh solve.
-
 The screenshot above is a strength reduction run on the two pile rows built in
 [FEM-4](../tutorials/fem04_piles.md), shown at the mechanism it developed.
 
 ## References
 
-Griffiths, D.V., & Lane, P.A. (1999). Slope stability analysis by finite elements. *Geotechnique*, 49(3), 387-403.
+Cai, F., & Ugai, K. (2000). Numerical analysis of the stability of a slope reinforced with piles. *Soils and Foundations*, 40(1), 73-84. [doi:10.3208/sandf.40.73](https://doi.org/10.3208/sandf.40.73)
 
-Smith, I.M., & Griffiths, D.V. (2004). *Programming the Finite Element Method* (4th ed.). John Wiley & Sons.
-
-Sun, G., Lin, S., Jiang, W., & Yang, Y. (2021). A simplified solution for determining the factor of safety of a slope reinforced with piles based on the shear strength reduction method. *Bulletin of Engineering Geology and the Environment*, 80, 7719-7730.
+Ito, T., & Matsui, T. (1975). Methods to estimate lateral force acting on stabilizing piles. *Soils and Foundations*, 15(4), 43-59.

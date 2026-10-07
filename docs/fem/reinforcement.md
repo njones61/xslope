@@ -75,12 +75,12 @@ the shared midpoint, so the two-node bar is not used on those edges.
 
 >>$[K_e]_{global} = [R]^T [K_e]_{local} [R]$
 
-The transformation is built from $\psi$, the inclination of the reinforcement line to the horizontal — the same
+The transformation is built from $\alpha$, the inclination of the reinforcement line to the horizontal — the same
 angle the LEM formulation uses for the direction of an axial reinforcement force:
 
->>$[R] = \begin{bmatrix} \cos\psi & \sin\psi & 0 & 0 \\ 0 & 0 & \cos\psi & \sin\psi \end{bmatrix}$
+>>$[R] = \begin{bmatrix} \cos\alpha & \sin\alpha & 0 & 0 \\ 0 & 0 & \cos\alpha & \sin\alpha \end{bmatrix}$
 
-with one more row, $\begin{bmatrix} 0 & 0 & 0 & 0 & \cos\psi & \sin\psi \end{bmatrix}$, for the midside node of a
+with one more row, $\begin{bmatrix} 0 & 0 & 0 & 0 & \cos\alpha & \sin\alpha \end{bmatrix}$, for the midside node of a
 three-node bar.
 
 **Assembly Process:** The global stiffness matrix combines contributions from both 2D soil elements and 1D truss elements:

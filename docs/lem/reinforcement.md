@@ -1,13 +1,21 @@
 # Soil Reinforcement in LEM Slope Stability
 
-## Introduction
+Soil and rock carry compression and shear well but little or no tension. Reinforcement supplies the tension:
+members placed across the zone where a slip surface would form and anchored in the stable ground beyond it.
+Geosynthetic layers (geotextiles and geogrids) are built into a fill as it is placed, so a slope can stand steeper
+than the fill alone would; soil nails are drilled and grouted into a cut as it is excavated; tiebacks and
+end-anchored bars hold a wall, with a grouted bond length deep behind the slip surface. In each case the part of the
+member beyond the slip surface grips the stable ground, and the member pulls back on the sliding mass.
 
-Soil reinforcement — geosynthetics (geotextiles and geogrids), soil nails, grouted tiebacks, and end-anchored
-bars — stabilizes slopes by mobilizing **tensile force** across the failure surface. In the limit equilibrium
-framework, each reinforcement element is a straight line defined by its endpoint coordinates, and wherever a trial
-failure surface crosses a line, a tensile force is applied to the sliding mass at the crossing point.
+![Three kinds of reinforcement: geosynthetic layers in a fill, soil nails in a cut, tiebacks behind a wall](../fem/images/reinf_types.png){width=1000}
 
-Three questions determine how that force enters the analysis, and they are independent of one another:
+From left to right: geogrid layers in the [FEM-2](../tutorials/fem02_reinforcement.md) reinforced fill, soil nails in a
+nailed cut (Pockoski & Duncan), and tiebacks behind a soldier-pile wall
+([LEM-9](../tutorials/lem09_tieback_wall.md)), each with the critical slip surface its source reports.
+
+In a limit equilibrium analysis each reinforcement line is a straight line defined by its end points, and wherever a
+trial slip surface crosses a line, a tensile force is applied to the sliding mass at the crossing point. Three
+questions determine that force, and they are independent of one another:
 
 1. **How large is the force?** — governed by the *capacity envelope*: the tensile strength of the element, the
    frictional pullout development from each end, and any end anchorage (plates, connections, anchors).
@@ -19,6 +27,9 @@ Three questions determine how that force enters the analysis, and they are indep
 This decomposition follows the convention used by Slide2 and other commercial programs, which allows xslope
 results to be compared directly against them. The **Type** column in the input template is a *preset* over these
 settings — selecting a support type fills Dir and Appl with the appropriate defaults — not a separate mechanism.
+
+The finite element treatment, in which each reinforcement line is a row of bar elements in the mesh and carries the
+tension its stretch produces, is on the [FEM reinforcement](../fem/reinforcement.md) page.
 
 ## Capacity Envelope
 

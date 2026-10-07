@@ -5,16 +5,22 @@ description: "Geosynthetics, nails and anchors as tension-only bar elements in X
 
 # Soil Reinforcement in Finite Element Analysis
 
+Reinforcement supplies the tension that soil cannot carry: geosynthetic layers built into a fill, soil nails
+grouted into a cut, tiebacks holding a wall, each crossing the zone where a slip surface would form and anchored in
+the stable ground beyond it:
+
+![Three kinds of reinforcement: geosynthetic layers in a fill, soil nails in a cut, tiebacks behind a wall](images/reinf_types.png){width=1000}
+
+From left to right: geogrid layers in the [FEM-2](../tutorials/fem02_reinforcement.md) reinforced fill, soil nails in a
+nailed cut (Pockoski & Duncan), and tiebacks behind a soldier-pile wall
+([LEM-9](../tutorials/lem09_tieback_wall.md)), each with the critical slip surface its source reports.
+
 Geotextiles, geogrids, soil nails and ground anchors are modeled as one-dimensional truss (bar) elements embedded in
 the soil mesh. A bar has axial stiffness $EA/L$ — $E$ the reinforcement's modulus, $A$ its cross-sectional area per
 unit width, $L$ the element length — carries tension only, and is capped at a tensile capacity set by the line's
 strength and its embedment ([Force behavior and failure modes](#force-behavior-and-failure-modes)).
 
-Each reinforcement line is a row of bar elements whose nodes are nodes of the soil mesh:
-
-![Six reinforcement layers in a slope, each a line of bar elements on soil-mesh nodes](images/reinf_layers.png)
-
-A bonded bar shares the nodes of the soil element edge it lies on, so bar and soil move together
+Each reinforcement line is a row of bar elements whose nodes are nodes of the soil mesh. A bonded bar shares the nodes of the soil element edge it lies on, so bar and soil move together
 ([Reinforcement and pile lines](mesh.md#reinforcement-and-pile-lines)). On a linear mesh that is the edge's two
 corner nodes. On a quadratic mesh (tri6, quad8, quad9) the bar also takes the edge's midside node, which makes it a
 three-node bar ([Quadratic elements](mesh.md#quadratic-elements)). The 2- and 3-node line elements below carry two

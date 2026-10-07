@@ -49,6 +49,17 @@ bar types.
 The meshing algorithms used in XSLOPE, including the integration of 1D and 2D elements for problems involving soil
 reinforcement are documented in the [Mesh Generation](mesh.md) page.
 
+Because a bar carries force only along its own axis, the direction of a reinforcement force is fixed in the
+finite element analysis. In the limit equilibrium solvers it is chosen per line: tangent to the slip surface where
+the line crosses it (the default for a geosynthetic), or along the line (the default for nails, tiebacks and
+anchors). The figure compares the two on the [FEM-2](../tutorials/fem02_reinforcement.md) slope and its critical
+circle:
+
+![The direction of the reinforcement force in limit equilibrium and in the finite element analysis](images/reinf_force_direction.png){width=1000}
+
+On the left, the limit equilibrium force at each crossing acts tangent to the circle, and the axial alternative is
+drawn at the middle layer. On the right, each bar carries tension along its own length, from how much it stretches.
+
 ## Mathematical Formulation
 
 **Truss Element Stiffness Matrix:** Each 1D truss element contributes to the global stiffness matrix through its element stiffness matrix. On a linear mesh the element has two nodes $i$ and $j$, and its stiffness in local (axial) coordinates is:

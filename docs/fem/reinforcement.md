@@ -122,7 +122,7 @@ correction would make an overloaded bar carry $2T - T_{cap}$, so the bar would b
 overloaded, a reinforced slope could never be driven to failure, and the SSR factor would not depend on
 $T_{allow}$.)
 
-![reinf_bar_law.png](images/reinf_bar_law.png)
+![reinf_bar_law.png](images/reinf_bar_law.png){width=800}
 
 Which of the three post-peak branches a bar follows is decided entirely by the $T_{res}$ column of its
 reinforcement line.

@@ -23,13 +23,13 @@ strength and its embedment ([Force behavior and failure modes](#force-behavior-a
 Each reinforcement line is a row of bar elements whose nodes are nodes of the soil mesh. A bonded bar shares the nodes of the soil element edge it lies on, so bar and soil move together
 ([Reinforcement and pile lines](mesh.md#reinforcement-and-pile-lines)). On a linear mesh that is the edge's two
 corner nodes. On a quadratic mesh (tri6, quad8, quad9) the bar also takes the edge's midside node, which makes it a
-three-node bar ([Quadratic elements](mesh.md#quadratic-elements)). The 2- and 3-node line elements below carry two
-translations at each node when used as reinforcement bars, with axial stiffness only. The three-node form places
-node 2 between its ends.
+three-node bar ([Quadratic elements](mesh.md#quadratic-elements)), with two translations at each node and axial
+stiffness only:
 
-![Soil and line elements with local node indices](images/all_element_nodes.png){width=800}
+![A three-node bar on the edge shared by two six-node soil elements](images/reinf_bar_on_edge.png){width=430}
 
-The midside node ties the bar to the soil in the middle of the edge. A line is divided into elements at the mesh
+The bar's end nodes 0 and 1 are the edge's corners, and its node 2 is the edge's midside node, which ties the bar
+to the soil in the middle of the edge. A line is divided into elements at the mesh
 element size along it, the **1D element size** where the model states one, and every element takes the line's
 $T_{max}$, $T_{res}$, $E$ and $A$. A line can instead be a slip surface the soil slides on; see
 [Two ways to represent a sheet](#two-ways-to-represent-a-sheet).

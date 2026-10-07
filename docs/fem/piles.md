@@ -75,11 +75,6 @@ On a quadratic soil mesh (tri6, quad8, quad9) the edge a beam element lies on ca
 two corners, and the beam element stands on all three. It then has 9 DOFs — $u_x$, $u_y$ and $\theta$ at every one of
 its nodes — and its local stiffness is 9×9 (see [Quadratic elements](mesh.md#quadratic-elements)).
 
-The 2- and 3-node line elements below carry two translations and a rotation at each node when
-used as pile beams. Compare the end nodes with the extra midpoint node in the three-node form.
-
-![Soil and line elements with local node indices](images/all_element_nodes.png){width=800}
-
 The midpoint node ties the pile to the soil in the middle of each element.
 
 The deflection of the three-node element is the quintic that matches a value and a slope at all three of its nodes —

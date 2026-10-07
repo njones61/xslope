@@ -144,7 +144,7 @@ normal and tangential to the slice base — $P\sin(\alpha - \psi)$ normal (zero 
 $P\cos(\alpha - \psi)$ tangential — and for moment-based methods it contributes a moment about the circle center
 through its real moment arm at point $r$.
 
-![reinf_direction.png](images/reinf_direction.png)
+![The force direction for Dir = Tangent and Dir = Axial at a slice base](images/reinf_direction.png){width=874}
 
 Tangent reinforcement acts with its whole magnitude along the base and has no component across it. Axial
 reinforcement has a smaller component along the base, and the remainder presses the sliding mass onto the base,

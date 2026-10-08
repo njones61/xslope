@@ -339,7 +339,7 @@ reinforcement or runs **along** it.
 
 **Surface crossing the layers.** A bonded bar is appropriate where the surface crosses the layers: a circle through
 a geogrid slope, a nail wall. The soil on both sides of each layer moves together, the layer carries
-tension across the surface, and the only interface question is pullout, which the bar's capacity cap represents.
+tension across the surface.
 It corresponds to the limit equilibrium treatment — a force where the surface crosses the line — so the two engines compare like for
 like.
 
@@ -353,8 +353,7 @@ embankment on soft clay sliding on
 its base geotextile, a wrapped-face or block-faced wall where the fill between the sheets moves relative to them
 and each sheet anchors to a facing, a smooth geomembrane or liner whose interface friction is well below the soil's,
 any long flat sheet under a sliding mass. The interface shear strength along the sheet governs and the two sides move
-differently. A bonded bar cannot represent this: its elements sit at their capacity, and the factor of safety then
-depends on the mesh rather than on the interface strength.
+differently. A bonded bar cannot represent this: its elements sit at their capacity.
 
 In the liner model of [FEM-3](../tutorials/fem03_block_wall_joints.md#a-smooth-geomembrane-liner-on-a-firm-foundation),
 where the liner is the weakest thing in the section, two wedges of fill slide outward on it. The liner's faces are

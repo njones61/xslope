@@ -77,8 +77,8 @@ bearing on both faces:
 where $a$ is the soil–reinforcement adhesion (stress units), $\delta$ the interface friction angle (degrees), and
 $\sigma'_v(s)$ the **effective** vertical stress at the point $s$ along the line: the weight of the soil column
 standing above that point — every material zone it crosses at that material's unit weight, saturated below the
-water table where the material declares a $\gamma_{sat}$ — less the pore pressure the model declares there
-(piezometric line, $r_u$, or seepage field, in the same way as for a slice base).
+water table where the material declares a saturated unit weight $\gamma_{sat}$ — less the pore pressure the model declares there
+(piezometric line, pore pressure ratio $r_u$, or seepage field, in the same way as for a slice base).
 
 The envelope is then the same three-way minimum, with the ramps integrated rather than assumed linear:
 
@@ -92,7 +92,7 @@ either law.
 **FHWA pullout capacity.** The FHWA form $F^{*}\alpha\sigma'_v$ per unit area is this law with $a = 0$ and
 $\delta = \arctan(F^{*}\alpha)$. Written out, FHWA's nominal pullout resistance of a layer is
 $P_r = F^{*}\alpha\,\sigma'_v L_e C R_c$, where $F^{*}$ is the pullout resistance factor, $\alpha$ the scale-effect
-correction, $L_e$ the embedded length, $C = 2$ counts the two bearing faces of a sheet and $R_c$ is the
+correction (not the slice-base angle $\alpha$ of [Force Direction](#force-direction-dir)), $L_e$ the embedded length, $C = 2$ counts the two bearing faces of a sheet and $R_c$ is the
 fraction of the wall the reinforcement covers. For a continuous geosynthetic ($R_c = 1$) that is the integral
 above, term for term: the factor of two is already in $r(s)$, and the per-unit-width convention is what $R_c = 1$
 means. The entries for a geosynthetic, with typical values of $F^{*}$ and $\alpha$, are under

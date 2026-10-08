@@ -38,6 +38,14 @@ y = 10 to -10), on tri6 and quad8 meshes:
      lines clear of each other exactly as given, and returns no junction.
   C. THE REFUSAL — a mesh with a 1D element that is not an edge of the soil
      elements raises MeshInputError naming the line, and a sound mesh passes.
+  D. AN END A ROUNDING ERROR OFF A ZONE CORNER — a bar whose end is stated
+     1e-15 off a zone corner, and vp032a's geotextile (end x =
+     -1.1069999999999993 against the face corner -1.107): the end is snapped
+     onto the corner, so exactly one node stands there and it is on the bar,
+     and the mesh passes the soil-edge check. Without the snap gmsh is handed
+     two points 1e-15 apart and either cannot recover the edge between them
+     (the last bar element then cuts across the soil and the mesh is refused)
+     or leaves a second node beside the corner.
 
 Run directly:  PYTHONPATH=. python3 test/bonded_junction_check.py
 """
@@ -77,6 +85,16 @@ CASES = {
         [[(12.0, 8.0), (40.0, 2.0)], [(26.0, 5.0), (40.0, 12.0)], PILE],
         (26.0, 5.0), (0, 1)),
 }
+
+#: Leg D. A bar from inside the backfill to the toe corner (0, 0), its end
+#: stated 1e-15 off the corner, and the LAST point of the line: the order in
+#: which the line's own end, not the corner, survives when the two are merged
+#: into the line's point list.
+SNAP_LINE = [(20.0, -5.0), (1e-15, 0.0)]
+#: Leg D. Where it was found: vp032a's geotextile end, recomputed from the LEM
+#: point list, is x = -1.1069999999999993 against the face corner -1.107.
+VP032A = os.path.join(_REPO, "docs", "verification", "files", "rocscience",
+                      "vp032a.xlsx")
 
 _CORNERS = {3: 3, 6: 3, 4: 4, 8: 4, 9: 4}
 
@@ -210,10 +228,74 @@ def _leg_refusal(failures):
         failures.append("a 1D element across the soil elements was not refused")
 
 
+def _leg_snap(failures):
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import extract_constraint_line_geometry, get_material_polygons
+    with contextlib.redirect_stdout(io.StringIO()):
+        vp = load_slope_data(VP032A)
+    cases = (("a bar end 1e-15 off the toe corner", _wall(), [list(SNAP_LINE)]),
+             ("vp032a's geotextile end", vp,
+              extract_constraint_line_geometry(vp)[0]))
+    rows = []
+    for name, sd, lines in cases:
+        # The premise: the end is off a zone corner by more than nothing and by
+        # no more than the 1e-12 under which the snap used to leave it alone.
+        with contextlib.redirect_stdout(io.StringIO()):
+            polys = get_material_polygons(sd, reinf_lines=[list(ln) for ln in lines])
+        corners = np.array([p for poly in polys for p in poly["coords"]], dtype=float)
+        end = np.asarray(lines[0][-1], dtype=float)
+        dc = np.hypot(corners[:, 0] - end[0], corners[:, 1] - end[1])
+        corner = corners[int(np.argmin(dc))]
+        if not 0.0 < dc.min() <= 1e-12:
+            failures.append(f"{name}: the end is {dc.min():.3g} off the nearest "
+                            f"zone corner, not a rounding error off it")
+            continue
+        for et in ELEMENT_TYPES:
+            tag = f"{name} ({et})"
+            try:
+                mesh = _mesh(sd, lines, et)
+            except Exception as exc:
+                failures.append(f"{tag}: the mesher raised {type(exc).__name__}: "
+                                f"{str(exc)[:160]}")
+                continue
+            nodes = np.asarray(mesh["nodes"], dtype=float)
+            e1 = np.asarray(mesh["elements_1d"], dtype=int)
+            t1 = np.asarray(mesh["element_types_1d"], dtype=int)
+            m1 = np.asarray(mesh["element_materials_1d"], dtype=int)
+            bar = set()
+            for e, t in zip(e1[m1 == 1], t1[m1 == 1]):
+                bar.update(int(v) for v in e[:t])
+            # 1. the end was snapped onto the corner: one node there, on the bar
+            at = f"({corner[0]:g}, {corner[1]:g})"
+            d = np.hypot(nodes[:, 0] - corner[0], nodes[:, 1] - corner[1])
+            near = np.flatnonzero(d <= 1e-9)
+            on_bar = len(near) == 1 and int(near[0]) in bar
+            if len(near) != 1 or d[near[0]] != 0.0:
+                failures.append(f"{tag}: {len(near)} nodes within 1e-9 of the "
+                                f"corner {at}; the end was not snapped onto it")
+            elif not on_bar:
+                failures.append(f"{tag}: the node at the corner {at} is not on "
+                                f"the bar")
+            # 2. no 1D element off a soil edge (the mesher's own check passed
+            # if we got here; this states it independently)
+            edges = _soil_edges(mesh)
+            off = [e for e in e1 if (min(int(e[0]), int(e[1])),
+                                     max(int(e[0]), int(e[1]))) not in edges]
+            if off:
+                failures.append(f"{tag}: {len(off)} 1D element(s) lie off every "
+                                f"soil edge")
+            rows.append(f"{tag:46s} end {dc.min():.1e} off {at}: "
+                        f"{len(near)} node(s) within 1e-9 of it"
+                        f"{', on the bar' if on_bar else ''}; {len(e1)} 1D "
+                        f"elements, {len(off)} off a soil edge")
+    return rows
+
+
 LEGS = (
     ("A. four meetings share a node", _leg_meetings),
     ("B. lines that do not meet are not touched", _leg_untouched),
     ("C. a 1D element off the soil edges is refused", _leg_refusal),
+    ("D. an end a rounding error off a corner snaps", _leg_snap),
 )
 
 
@@ -243,7 +325,8 @@ def _cli():
             print(f"  - {f}")
         raise SystemExit(1)
     print("\nBonded lines that meet share a node, every 1D element lies along a "
-          "soil edge, and a mesh where one does not is refused.")
+          "soil edge, a mesh where one does not is refused, and a line end a "
+          "rounding error off a zone corner is snapped onto it.")
 
 
 if __name__ == "__main__":

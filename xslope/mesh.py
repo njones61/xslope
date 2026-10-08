@@ -1896,7 +1896,13 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                         continue
                     dists = np.sqrt((poly_pts_arr[:, 0] - px)**2 + (poly_pts_arr[:, 1] - py)**2)
                     j = np.argmin(dists)
-                    if dists[j] < snap_tol and dists[j] > 1e-12:
+                    # Any distance above zero snaps, however small. An end a
+                    # rounding error off a zone vertex (-1.1069999999999993
+                    # against -1.107) is otherwise handed to gmsh as a second
+                    # point beside the vertex, and gmsh either cannot recover
+                    # the edge between them (the last bar element then cuts
+                    # across the soil) or leaves a second node beside the vertex.
+                    if 0.0 < dists[j] < snap_tol:
                         if debug:
                             print(f"Snapped line {line_idx} endpoint ({px:.4f},{py:.4f}) "
                                   f"-> ({poly_pts_list[j][0]:.4f},{poly_pts_list[j][1]:.4f}) "

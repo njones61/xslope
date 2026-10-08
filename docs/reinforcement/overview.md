@@ -51,29 +51,30 @@ divided by `Spacing` in the same way.
 
 ## The Columns
 
-The sheet colors each header by the analysis that reads it: green for the LEM only, red for both, blue for the FEM
-only, and black for the geometry. In the Units column F is a force and L a length; elsewhere on this page F is
-the factor of safety.
+The Read by column carries the sheet's header colors, which show the analysis that reads each column. In the Units
+column F is a force and L a length; elsewhere on this page F is the factor of safety.
+
+<p class="rc-legend">Sheet header colors: <span class="rc rc-geom">geometry</span><span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Name | Units | Read by | Meaning |
 |---|---|---|---|---|
-| B | `Label` | — | both | name used in messages, plots and reports; optional |
-| C, D | `x1`, `y1` | L | both | end 1 |
-| E, F | `x2`, `y2` | L | both | end 2 |
-| G | `Type` | — | LEM | support preset that fills `Dir` and `Appl` ([Support Type Presets](../lem/reinforcement.md#support-type-presets)) |
-| H | `Dir` | — | LEM | direction of the force at a crossing: Tangent to the slip surface, or Axial along the line ([Force Direction](../lem/reinforcement.md#force-direction-dir)) |
-| I | `Appl` | — | LEM | Active: allowable capacities, not divided by the factor of safety; Passive: nominal capacities, divided by it ([Force Application](../lem/reinforcement.md#force-application-appl)) |
-| J | `Tmax` | F per member, or F/L | both | tensile capacity |
-| K, L | `Lp1`, `Lp2` | L | both | length over which friction develops `Tmax` from end 1 and from end 2; 0 makes the full `Tmax` available at that end |
-| M, N | `Adhesion`, `Delta` | F/L², degrees | both | interface adhesion and friction angle; filled together, they replace `Lp1` and `Lp2`, and filling only one is an input error ([Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden)) |
-| O, P | `Tend1`, `Tend2` | F per member, or F/L | both | capacity of a plate, connection or anchorage at end 1 and at end 2; 0 for none |
-| Q | `Spacing` | L | both | out-of-plane spacing of discrete members; blank for a sheet |
-| R | `Tres` | F per member, or F/L | FEM | tension the bar keeps after it ruptures: blank for no rupture (the bar holds its capacity), 0 for a brittle break, a value between for a bar that keeps that much ([Force Behavior and Failure Modes](../fem/reinforcement.md#force-behavior-and-failure-modes)) |
-| S | `E` | F/L² | FEM | elastic modulus of the member |
-| T | `Area` | L² per member, or L²/L | FEM | cross-sectional area; `E` × `Area` is the axial stiffness ([Axial Stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea)) |
-| U | `Joint` | `Yes` or blank | FEM | `Yes` makes the line a slip surface, with `Adhesion` and `Delta` as its interface strength ([Two Ways to Represent a Sheet](../fem/reinforcement.md#two-ways-to-represent-a-sheet)) |
-| V, W | `kn`, `ks` | F/L³ | FEM | normal and shear stiffness of a jointed line's interfaces; blank derives them from the adjacent soil ([Stiffness](../fem/joints.md#stiffness)) |
-| X | `Jred` | `Yes`, `No` or blank | FEM | blank or `Yes` reduces a jointed line's interface strength with the soil's in a strength reduction; `No` holds it at full strength |
+| B | `Label` | — | <span class="rc rc-geom">both</span> | name used in messages, plots and reports; optional |
+| C, D | `x1`, `y1` | L | <span class="rc rc-geom">both</span> | end 1 |
+| E, F | `x2`, `y2` | L | <span class="rc rc-geom">both</span> | end 2 |
+| G | `Type` | — | <span class="rc rc-lem">LEM</span> | support preset that fills `Dir` and `Appl` ([Support Type Presets](../lem/reinforcement.md#support-type-presets)) |
+| H | `Dir` | — | <span class="rc rc-lem">LEM</span> | direction of the force at a crossing: Tangent to the slip surface, or Axial along the line ([Force Direction](../lem/reinforcement.md#force-direction-dir)) |
+| I | `Appl` | — | <span class="rc rc-lem">LEM</span> | Active: allowable capacities, not divided by the factor of safety; Passive: nominal capacities, divided by it ([Force Application](../lem/reinforcement.md#force-application-appl)) |
+| J | `Tmax` | F per member, or F/L | <span class="rc rc-both">both</span> | tensile capacity |
+| K, L | `Lp1`, `Lp2` | L | <span class="rc rc-both">both</span> | length over which friction develops `Tmax` from end 1 and from end 2; 0 makes the full `Tmax` available at that end |
+| M, N | `Adhesion`, `Delta` | F/L², degrees | <span class="rc rc-both">both</span> | interface adhesion and friction angle; filled together, they replace `Lp1` and `Lp2`, and filling only one is an input error ([Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden)) |
+| O, P | `Tend1`, `Tend2` | F per member, or F/L | <span class="rc rc-both">both</span> | capacity of a plate, connection or anchorage at end 1 and at end 2; 0 for none |
+| Q | `Spacing` | L | <span class="rc rc-both">both</span> | out-of-plane spacing of discrete members; blank for a sheet |
+| R | `Tres` | F per member, or F/L | <span class="rc rc-fem">FEM</span> | tension the bar keeps after it ruptures: blank for no rupture (the bar holds its capacity), 0 for a brittle break, a value between for a bar that keeps that much ([Force Behavior and Failure Modes](../fem/reinforcement.md#force-behavior-and-failure-modes)) |
+| S | `E` | F/L² | <span class="rc rc-fem">FEM</span> | elastic modulus of the member |
+| T | `Area` | L² per member, or L²/L | <span class="rc rc-fem">FEM</span> | cross-sectional area; `E` × `Area` is the axial stiffness ([Axial Stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea)) |
+| U | `Joint` | `Yes` or blank | <span class="rc rc-fem">FEM</span> | `Yes` makes the line a slip surface, with `Adhesion` and `Delta` as its interface strength ([Two Ways to Represent a Sheet](../fem/reinforcement.md#two-ways-to-represent-a-sheet)) |
+| V, W | `kn`, `ks` | F/L³ | <span class="rc rc-fem">FEM</span> | normal and shear stiffness of a jointed line's interfaces; blank derives them from the adjacent soil ([Stiffness](../fem/joints.md#stiffness)) |
+| X | `Jred` | `Yes`, `No` or blank | <span class="rc rc-fem">FEM</span> | blank or `Yes` reduces a jointed line's interface strength with the soil's in a strength reduction; `No` holds it at full strength |
 
 ## Capacity Along a Line
 

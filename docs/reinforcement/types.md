@@ -28,18 +28,20 @@ End 1 is on the face of the slope and end 2 at the buried end, so the line is as
 The capacity is `Tend1` at the face (zero where the layer ends free) and zero at the buried end; it grows with
 the friction on both faces of the layer and is capped at `Tmax`.
 
+<p class="rc-legend">Sheet header colors: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
+
 | Column | Entry | Typical values |
 |---|---|---|
-| `Type` | `Geosynthetic`: Dir Tangent, Appl Active; set `Appl` to `Passive` to enter the nominal values instead | — |
-| `Tmax` | Appl Active: the nominal long-term strength `Tal` divided by the target factor of safety, `Tal` ÷ FS<sub>R</sub>. Appl Passive: `Tal`. | `Tal` = `Tult` ÷ RF, with `Tult` the ultimate tensile strength and RF the product of the creep, durability and installation-damage factors. In FHWA Example E1, `Tult` = 3,000, 6,000 and 9,000 lb/ft (43.8, 87.6 and 131.3 kN/m) gives `Tal` = 1,085, 2,169 and 3,525 lb/ft (15.8, 31.7 and 51.4 kN/m), with RF<sub>CR</sub> = 1.85, RF<sub>D</sub> = 1.15 and RF<sub>ID</sub> = 1.3, 1.3 and 1.2 (GEC 11 Table E1-7.3, p. E1-15). RF = 7 for preliminary design of routine structures in granular fill (p. 9-5). |
-| `Adhesion`, `Delta` | `Adhesion` = 0. Appl Active: `Delta` = arctan(F\*α ÷ FS<sub>PO</sub>), with FS<sub>PO</sub> the factor of safety against pullout (GEC 11 Eq. 9-9, p. 9-13). Appl Passive: `Delta` = arctan(F\*α). F\* is the pullout resistance factor and α the scale-effect correction. | F\* = 0.67 tan φ with α = 0.6, the most conservative defaults (GEC 11 p. E8-6); α = 0.6 to 0.8 for extensible reinforcement without pullout tests (p. B-2); F\* = 0.45 and α = 0.8 for the geogrids of Example E1 (p. E1-16); FS<sub>PO</sub> = 1.5 in granular soil and 2 in cohesive soil, and minimum embedment beyond the critical surface 3 ft (1 m) (p. 9-5) |
-| `Lp1`, `Lp2` | in place of `Adhesion` and `Delta`: `Tmax` ÷ the pullout resistance per unit length at each end; with Appl Active, the allowable pullout resistance (÷ FS<sub>PO</sub>) | — |
-| `Tend1` | Appl Active: the nominal long-term connection strength `Talc` divided by the factor of safety the design applies to the connection. Appl Passive: `Talc`. 0 where the layer ends free at the face. | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
-| `Tend2` | 0 | — |
-| `Spacing` | blank | — |
-| `E`, `Area` (FEM) | `E` × `Area` = the sheet's tensile stiffness per unit width ([Axial Stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea)) | — |
-| `Tres` (FEM) | blank | — |
-| `Joint` (FEM) | blank; `Yes` where the soil can slide along the sheet ([A sheet the soil slides along](#a-sheet-the-soil-slides-along)) | — |
+| <code class="rc rc-lem">Type</code> | `Geosynthetic`: Dir Tangent, Appl Active; set `Appl` to `Passive` to enter the nominal values instead | — |
+| <code class="rc rc-both">Tmax</code> | Appl Active: the nominal long-term strength `Tal` divided by the target factor of safety, `Tal` ÷ FS<sub>R</sub>. Appl Passive: `Tal`. | `Tal` = `Tult` ÷ RF, with `Tult` the ultimate tensile strength and RF the product of the creep, durability and installation-damage factors. In FHWA Example E1, `Tult` = 3,000, 6,000 and 9,000 lb/ft (43.8, 87.6 and 131.3 kN/m) gives `Tal` = 1,085, 2,169 and 3,525 lb/ft (15.8, 31.7 and 51.4 kN/m), with RF<sub>CR</sub> = 1.85, RF<sub>D</sub> = 1.15 and RF<sub>ID</sub> = 1.3, 1.3 and 1.2 (GEC 11 Table E1-7.3, p. E1-15). RF = 7 for preliminary design of routine structures in granular fill (p. 9-5). |
+| <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | `Adhesion` = 0. Appl Active: `Delta` = arctan(F\*α ÷ FS<sub>PO</sub>), with FS<sub>PO</sub> the factor of safety against pullout (GEC 11 Eq. 9-9, p. 9-13). Appl Passive: `Delta` = arctan(F\*α). F\* is the pullout resistance factor and α the scale-effect correction. | F\* = 0.67 tan φ with α = 0.6, the most conservative defaults (GEC 11 p. E8-6); α = 0.6 to 0.8 for extensible reinforcement without pullout tests (p. B-2); F\* = 0.45 and α = 0.8 for the geogrids of Example E1 (p. E1-16); FS<sub>PO</sub> = 1.5 in granular soil and 2 in cohesive soil, and minimum embedment beyond the critical surface 3 ft (1 m) (p. 9-5) |
+| <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | in place of `Adhesion` and `Delta`: `Tmax` ÷ the pullout resistance per unit length at each end; with Appl Active, the allowable pullout resistance (÷ FS<sub>PO</sub>) | — |
+| <code class="rc rc-both">Tend1</code> | Appl Active: the nominal long-term connection strength `Talc` divided by the factor of safety the design applies to the connection. Appl Passive: `Talc`. 0 where the layer ends free at the face. | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
+| <code class="rc rc-both">Tend2</code> | 0 | — |
+| <code class="rc rc-both">Spacing</code> | blank | — |
+| <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> (FEM) | `E` × `Area` = the sheet's tensile stiffness per unit width ([Axial Stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea)) | — |
+| <code class="rc rc-fem">Tres</code> (FEM) | blank | — |
+| <code class="rc rc-fem">Joint</code> (FEM) | blank; `Yes` where the soil can slide along the sheet ([A sheet the soil slides along](#a-sheet-the-soil-slides-along)) | — |
 
 The two `Tmax` entries are FHWA's two conventions (GEC 11, pp. 8-7 and 8-8): a program that adds the
 reinforcement force to the resisting moment takes `Tal` unreduced, and one that subtracts it from the driving
@@ -69,18 +71,20 @@ inclination to its tip, end 2.
 At end 1 the capacity starts at the head's `Tend1` and at end 2 at zero, and bond adds to each over `Lp1` and
 `Lp2` until the bar's `Tmax` caps it.
 
+<p class="rc-legend">Sheet header colors: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
+
 | Column | Entry | Typical values |
 |---|---|---|
-| `Type` | `Nail`: Dir Axial, Appl Passive, with the nominal values below; set `Appl` to `Active` to enter GEC 7's allowable values instead | — |
-| `Tmax` | nominal tensile resistance of the bar per nail, `At` × `fy`, the bar's cross-sectional area times its yield strength (GEC 7 Eq. 6.5, p. 163); with Appl Active, `At` × `fy` ÷ FS<sub>T</sub>, the factor of safety on bar tension | solid threaded bars #6 to #14: area 0.44 to 2.25 in² (284 to 1,452 mm²); yield load 26 to 135 kip (116 to 601 kN) in Grade 60 and 33 to 168 kip (147 to 747 kN) in Grade 75 (GEC 7 Tables A.1a and A.1b, p. 286); FS<sub>T</sub> = 1.8 for Grades 60 and 75 (Table 5.1, p. 108) |
-| `Lp1`, `Lp2` | `Tmax` ÷ `rPO` at both ends, with `rPO` = π × `qu` × `DDH` the nominal pullout resistance per unit length, from the bond strength `qu` and the drill-hole diameter `DDH` (GEC 7 Eq. 6.1, p. 161); with Appl Active, `Tmax` ÷ (`rPO` ÷ FS<sub>PO</sub>) | `rPO` = 2 to 20 kip/ft (30 to 290 kN/m) for small-diameter gravity-grouted holes, by soil type and density (GEC 7 Table 4.6, p. 86; GEC 4 Table 6, p. 71); `qu` = 3 to 70 psi (21 to 483 kPa) in soil, by soil type and drilling method (GEC 7 Tables 4.4a and 4.4b, pp. 84–85); FS<sub>PO</sub> = 2.0 (Table 5.1, p. 108) |
-| `Adhesion`, `Delta` | blank: GEC 7 states bond as a constant `qu` along the nail, so the development length applies; the `Adhesion` and `Delta` law is written for a sheet with soil on both faces | — |
-| `Tend1` | nail-head capacity: the smallest of the facing's resistances in flexure, in punching shear and in headed-stud tension (GEC 7 pp. 104–105); with Appl Active, each resistance divided by its own factor before the smallest is taken | nominal resistances: flexure 12 to 143 kip (53 to 636 kN) for the initial facing; punching shear 32 to 111 kip (142 to 494 kN) initial and 21 to 55 kip (93 to 245 kN) final; headed studs 28 to 146 kip (125 to 649 kN) (GEC 7 Tables 6.6 to 6.8, pp. 171–178); flexure and stud values for Grade 60 steel, × 1.24 for Grade 75; factors of safety 1.5 for flexure and punching shear, 2.0 for A307 and 1.7 for A325 headed studs (Table 5.1, p. 108) |
-| `Tend2` | 0 | — |
-| `Spacing` | horizontal nail spacing | 4 to 6 ft (1.22 to 1.83 m), routinely 5 ft (1.52 m) (GEC 7 p. 148) |
-| `E` (FEM) | modulus of the steel bar | 29,000 ksi (GEC 7 p. 250): 4.176 × 10⁹ psf, or about 2.0 × 10⁸ kPa (200 GPa) |
-| `Area` (FEM) | bar area per nail | as for `Tmax` |
-| `Tres`, `Joint` (FEM) | blank | — |
+| <code class="rc rc-lem">Type</code> | `Nail`: Dir Axial, Appl Passive, with the nominal values below; set `Appl` to `Active` to enter GEC 7's allowable values instead | — |
+| <code class="rc rc-both">Tmax</code> | nominal tensile resistance of the bar per nail, `At` × `fy`, the bar's cross-sectional area times its yield strength (GEC 7 Eq. 6.5, p. 163); with Appl Active, `At` × `fy` ÷ FS<sub>T</sub>, the factor of safety on bar tension | solid threaded bars #6 to #14: area 0.44 to 2.25 in² (284 to 1,452 mm²); yield load 26 to 135 kip (116 to 601 kN) in Grade 60 and 33 to 168 kip (147 to 747 kN) in Grade 75 (GEC 7 Tables A.1a and A.1b, p. 286); FS<sub>T</sub> = 1.8 for Grades 60 and 75 (Table 5.1, p. 108) |
+| <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | `Tmax` ÷ `rPO` at both ends, with `rPO` = π × `qu` × `DDH` the nominal pullout resistance per unit length, from the bond strength `qu` and the drill-hole diameter `DDH` (GEC 7 Eq. 6.1, p. 161); with Appl Active, `Tmax` ÷ (`rPO` ÷ FS<sub>PO</sub>) | `rPO` = 2 to 20 kip/ft (30 to 290 kN/m) for small-diameter gravity-grouted holes, by soil type and density (GEC 7 Table 4.6, p. 86; GEC 4 Table 6, p. 71); `qu` = 3 to 70 psi (21 to 483 kPa) in soil, by soil type and drilling method (GEC 7 Tables 4.4a and 4.4b, pp. 84–85); FS<sub>PO</sub> = 2.0 (Table 5.1, p. 108) |
+| <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | blank: GEC 7 states bond as a constant `qu` along the nail, so the development length applies; the `Adhesion` and `Delta` law is written for a sheet with soil on both faces | — |
+| <code class="rc rc-both">Tend1</code> | nail-head capacity: the smallest of the facing's resistances in flexure, in punching shear and in headed-stud tension (GEC 7 pp. 104–105); with Appl Active, each resistance divided by its own factor before the smallest is taken | nominal resistances: flexure 12 to 143 kip (53 to 636 kN) for the initial facing; punching shear 32 to 111 kip (142 to 494 kN) initial and 21 to 55 kip (93 to 245 kN) final; headed studs 28 to 146 kip (125 to 649 kN) (GEC 7 Tables 6.6 to 6.8, pp. 171–178); flexure and stud values for Grade 60 steel, × 1.24 for Grade 75; factors of safety 1.5 for flexure and punching shear, 2.0 for A307 and 1.7 for A325 headed studs (Table 5.1, p. 108) |
+| <code class="rc rc-both">Tend2</code> | 0 | — |
+| <code class="rc rc-both">Spacing</code> | horizontal nail spacing | 4 to 6 ft (1.22 to 1.83 m), routinely 5 ft (1.52 m) (GEC 7 p. 148) |
+| <code class="rc rc-fem">E</code> (FEM) | modulus of the steel bar | 29,000 ksi (GEC 7 p. 250): 4.176 × 10⁹ psf, or about 2.0 × 10⁸ kPa (200 GPa) |
+| <code class="rc rc-fem">Area</code> (FEM) | bar area per nail | as for `Tmax` |
+| <code class="rc rc-fem">Tres</code>, <code class="rc rc-fem">Joint</code> (FEM) | blank | — |
 
 In GEC 7's allowable stress design, which programs such as SNAILZ follow with an allowable bond stress (p. 117), the
 factor of safety on the soil is at least 1.5 (Table 5.1, p. 108). How the head connects to the facing in each
@@ -108,17 +112,19 @@ With `Lp1` = 0 the full `Tmax` is available from the anchor head to within `Lp2`
 `Lp2` the capacity falls linearly to zero, as in GEC 4's limit equilibrium treatment of an anchor (p. 100). Where
 the bond governs, as in the figure, `Lp2` is the bond length.
 
+<p class="rc-legend">Sheet header colors: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
+
 | Column | Entry | Typical values |
 |---|---|---|
-| `Type` | `Tieback`: Dir Axial, Appl Active | — |
-| `Tmax` | allowable anchor load per anchor: the smallest of the tendon's design load, the allowable capacity of the head's connection to the wall, and the bond length times the allowable load transfer per unit length | design load at most 0.6 × the tendon's specified minimum tensile strength (GEC 4 p. 77); design loads of 260 to 1,160 kN (58.5 to 260.8 kip) are typical (p. 70) |
-| `Lp1` | 0: the head holds the full `Tmax`, and the sleeved unbonded length adds no friction | — |
-| `Lp2` | `Tmax` ÷ the allowable load transfer per unit length, which is the ultimate load transfer ÷ 2.0 in soil or ÷ 3.0 in rock (GEC 4 pp. 71, 74): the bond length where the bond governs, shorter where the tendon or the head governs. A 580 kN anchor in medium dense sand (145 kN/m ultimate, 72.5 kN/m allowable) has `Lp2` = 580 ÷ 72.5 = 8.0 m. | ultimate load transfer of small-diameter gravity-grouted anchors: 30 to 290 kN/m (2 to 20 kip/ft) in soil (GEC 4 Table 6, p. 71; GEC 7 Table 4.6, p. 86) and 150 to 730 kN/m (10.3 to 50.0 kip/ft) in rock (GEC 4 Table 8, p. 74); bond lengths 4.5 to 12 m (14.8 to 39.4 ft) in soil and 3 to 10 m (9.8 to 32.8 ft) in rock (pp. 71, 74) |
-| `Tend1`, `Tend2`, `Adhesion`, `Delta` | blank: with `Lp1` = 0 the program does not read `Tend1`; for `Adhesion` and `Delta`, see grouted tiebacks under [Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden) | — |
-| `Spacing` | horizontal anchor spacing | on a soldier-beam wall the anchors connect to the soldier beams, directly or through wales (GEC 4 pp. 13–14); soldier beams are typically 1.5 to 3 m (4.9 to 9.8 ft) apart when driven and up to 3 m apart when drilled in (p. 76) |
-| `E` (FEM) | modulus of the tendon steel | 29,000 ksi for a bar tendon (GEC 7 p. 250); for strand, the manufacturer's value, which the Post-Tensioning Institute (PTI) allows to be reduced 3 to 5 percent for a long multistrand tendon when checking apparent free length (GEC 4 p. 151) |
-| `Area` (FEM) | tendon area per anchor | Grade 150 bars 26 to 64 mm (1 to 2½ in.): 548 to 3,348 mm² (0.85 to 5.19 in²), ultimate strength 568 to 3,461 kN (127.5 to 778.0 kip) (GEC 4 Table 9, p. 77); 15-mm strand: 140 mm² (0.217 in²) and 260.7 kN (58.6 kip) per strand (GEC 4 Table 10, p. 78) |
-| `Tres`, `Joint` (FEM) | blank | — |
+| <code class="rc rc-lem">Type</code> | `Tieback`: Dir Axial, Appl Active | — |
+| <code class="rc rc-both">Tmax</code> | allowable anchor load per anchor: the smallest of the tendon's design load, the allowable capacity of the head's connection to the wall, and the bond length times the allowable load transfer per unit length | design load at most 0.6 × the tendon's specified minimum tensile strength (GEC 4 p. 77); design loads of 260 to 1,160 kN (58.5 to 260.8 kip) are typical (p. 70) |
+| <code class="rc rc-both">Lp1</code> | 0: the head holds the full `Tmax`, and the sleeved unbonded length adds no friction | — |
+| <code class="rc rc-both">Lp2</code> | `Tmax` ÷ the allowable load transfer per unit length, which is the ultimate load transfer ÷ 2.0 in soil or ÷ 3.0 in rock (GEC 4 pp. 71, 74): the bond length where the bond governs, shorter where the tendon or the head governs. A 580 kN anchor in medium dense sand (145 kN/m ultimate, 72.5 kN/m allowable) has `Lp2` = 580 ÷ 72.5 = 8.0 m. | ultimate load transfer of small-diameter gravity-grouted anchors: 30 to 290 kN/m (2 to 20 kip/ft) in soil (GEC 4 Table 6, p. 71; GEC 7 Table 4.6, p. 86) and 150 to 730 kN/m (10.3 to 50.0 kip/ft) in rock (GEC 4 Table 8, p. 74); bond lengths 4.5 to 12 m (14.8 to 39.4 ft) in soil and 3 to 10 m (9.8 to 32.8 ft) in rock (pp. 71, 74) |
+| <code class="rc rc-both">Tend1</code>, <code class="rc rc-both">Tend2</code>, <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | blank: with `Lp1` = 0 the program does not read `Tend1`; for `Adhesion` and `Delta`, see grouted tiebacks under [Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden) | — |
+| <code class="rc rc-both">Spacing</code> | horizontal anchor spacing | on a soldier-beam wall the anchors connect to the soldier beams, directly or through wales (GEC 4 pp. 13–14); soldier beams are typically 1.5 to 3 m (4.9 to 9.8 ft) apart when driven and up to 3 m apart when drilled in (p. 76) |
+| <code class="rc rc-fem">E</code> (FEM) | modulus of the tendon steel | 29,000 ksi for a bar tendon (GEC 7 p. 250); for strand, the manufacturer's value, which the Post-Tensioning Institute (PTI) allows to be reduced 3 to 5 percent for a long multistrand tendon when checking apparent free length (GEC 4 p. 151) |
+| <code class="rc rc-fem">Area</code> (FEM) | tendon area per anchor | Grade 150 bars 26 to 64 mm (1 to 2½ in.): 548 to 3,348 mm² (0.85 to 5.19 in²), ultimate strength 568 to 3,461 kN (127.5 to 778.0 kip) (GEC 4 Table 9, p. 77); 15-mm strand: 140 mm² (0.217 in²) and 260.7 kN (58.6 kip) per strand (GEC 4 Table 10, p. 78) |
+| <code class="rc rc-fem">Tres</code>, <code class="rc rc-fem">Joint</code> (FEM) | blank | — |
 
 The unbonded length is at least 3 m (9.8 ft) for a bar tendon and 4.5 m (14.8 ft) for strand (GEC 4 p. 70), and
 the bond length starts at least one fifth of the wall height or 1.5 m (4.9 ft) behind the critical slip surface
@@ -154,15 +160,17 @@ End 1 is at the wall and end 2 at the deadman, with `Lp1` = 0 and `Lp2` = 0.
 
 The bar then delivers `Tmax` wherever a slip surface crosses it between its anchorages.
 
+<p class="rc-legend">Sheet header colors: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
+
 | Column | Entry | Typical values |
 |---|---|---|
-| `Type` | `Anchor`: Dir Axial, Appl Active | — |
-| `Tmax` | the smallest of the bar's allowable tension and the allowable capacities of its two anchorages | bar sizes and strengths as for a nail or a tieback bar (GEC 7 Tables A.1a and A.1b, p. 286; GEC 4 Table 9, p. 77). The tabulated strengths are nominal; divide by the factor of safety the design uses for the bar (GEC 7 uses 1.8 for Grade 60 and 75 nail bars, Table 5.1, p. 108). |
-| `Lp1`, `Lp2` | 0 | — |
-| `Tend1`, `Tend2`, `Adhesion`, `Delta` | blank | — |
-| `Spacing` | out-of-plane (horizontal) spacing of the bars | — |
-| `E`, `Area` (FEM) | steel modulus; bar area per bar | `E` = 29,000 ksi (GEC 7 p. 250) |
-| `Tres`, `Joint` (FEM) | blank | — |
+| <code class="rc rc-lem">Type</code> | `Anchor`: Dir Axial, Appl Active | — |
+| <code class="rc rc-both">Tmax</code> | the smallest of the bar's allowable tension and the allowable capacities of its two anchorages | bar sizes and strengths as for a nail or a tieback bar (GEC 7 Tables A.1a and A.1b, p. 286; GEC 4 Table 9, p. 77). The tabulated strengths are nominal; divide by the factor of safety the design uses for the bar (GEC 7 uses 1.8 for Grade 60 and 75 nail bars, Table 5.1, p. 108). |
+| <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | 0 | — |
+| <code class="rc rc-both">Tend1</code>, <code class="rc rc-both">Tend2</code>, <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | blank | — |
+| <code class="rc rc-both">Spacing</code> | out-of-plane (horizontal) spacing of the bars | — |
+| <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> (FEM) | steel modulus; bar area per bar | `E` = 29,000 ksi (GEC 7 p. 250) |
+| <code class="rc rc-fem">Tres</code>, <code class="rc rc-fem">Joint</code> (FEM) | blank | — |
 
 With both development lengths 0 the envelope does not read `Tend1` or `Tend2`: the shaft develops no friction
 between its anchorages, and their capacities enter through `Tmax`. A bar whose shaft also grips the soil is
@@ -278,15 +286,17 @@ The sheet runs along the base of the embankment from end 1 to end 2 with `Joint`
 The sheet's `Tmax`, `E`, `Area` and `Tres` are entered as for a [geosynthetic layer](#geosynthetic-layer); a jointed
 sheet differs in these columns:
 
+<p class="rc-legend">Sheet header colors: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
+
 | Column | Entry |
 |---|---|
-| `Joint` | `Yes` |
-| `Type`, `Appl` | `Geosynthetic`, with `Appl` set to `Passive` and nominal values throughout when the model also runs in the LEM. The LEM then divides the interface strength by F, as the FEM's strength reduction does; the FEM does not reduce the sheet's `Tmax` or its end ties, which the LEM divides with the rest, so the two analyses treat the sheet alike only where the interface governs. In a model run only in the FEM, `Appl` has no effect. |
-| `Adhesion`, `Delta` | both required: the cohesion and friction angle of the two interfaces, whose tension cutoff is zero |
-| `kn`, `ks` | blank: derived from the softer adjacent material over a notional thickness of one tenth of the element length ([Stiffness](../fem/joints.md#stiffness)) |
-| `Jred` | blank, so strength reduction weakens the interface along with the soil; `No` holds it at full strength |
-| `Tend1`, `Tend2` | a value above zero ties that end at that capacity; blank or 0 leaves the end free |
-| `Lp1`, `Lp2` | not read |
+| <code class="rc rc-fem">Joint</code> | `Yes` |
+| <code class="rc rc-lem">Type</code>, <code class="rc rc-lem">Appl</code> | `Geosynthetic`, with `Appl` set to `Passive` and nominal values throughout when the model also runs in the LEM. The LEM then divides the interface strength by F, as the FEM's strength reduction does; the FEM does not reduce the sheet's `Tmax` or its end ties, which the LEM divides with the rest, so the two analyses treat the sheet alike only where the interface governs. In a model run only in the FEM, `Appl` has no effect. |
+| <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | both required: the cohesion and friction angle of the two interfaces, whose tension cutoff is zero |
+| <code class="rc rc-fem">kn</code>, <code class="rc rc-fem">ks</code> | blank: derived from the softer adjacent material over a notional thickness of one tenth of the element length ([Stiffness](../fem/joints.md#stiffness)) |
+| <code class="rc rc-fem">Jred</code> | blank, so strength reduction weakens the interface along with the soil; `No` holds it at full strength |
+| <code class="rc rc-both">Tend1</code>, <code class="rc rc-both">Tend2</code> | a value above zero ties that end at that capacity; blank or 0 leaves the end free |
+| <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | not read |
 
 The model checks warn when a bonded sheet looks like a slip surface
 ([Signs that a joint is needed](../fem/reinforcement.md#what-says-a-joint-was-needed)).

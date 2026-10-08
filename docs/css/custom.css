@@ -521,3 +521,21 @@
     font-size: 80%; padding: 4px 5px;
   }
 }
+
+
+/* reinforce-sheet header colors from the input template: geometry black, LEM only green,
+   LEM and FEM red, FEM only blue (reinforcement Overview and Types tables) */
+.rc, .rst-content code.rc {
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 1px 6px;
+    white-space: nowrap;
+}
+span.rc { font-size: 88%; }
+.rc.rc-geom { background: #000000; }
+.rc.rc-lem  { background: #3B7D22; }
+.rc.rc-both { background: #C00000; }
+.rc.rc-fem  { background: #0432FF; }
+.rc-legend { margin-bottom: 0.6em; }
+.rc-legend .rc { margin-right: 4px; }

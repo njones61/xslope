@@ -63,7 +63,7 @@ is a force and L a length; elsewhere on this page F is the factor of safety.
 | E, F | <code class="rc rc-geom">x2</code>, <code class="rc rc-geom">y2</code> | L | end 2 |
 | G | <code class="rc rc-lem">Type</code> | — | support preset that fills `Dir` and `Appl` ([Support Type Presets](../lem/reinforcement.md#support-type-presets)) |
 | H | <code class="rc rc-lem">Dir</code> | — | direction of the force at a crossing: Tangent to the slip surface, or Axial along the line ([Force Direction](../lem/reinforcement.md#force-direction-dir)) |
-| I | <code class="rc rc-lem">Appl</code> | — | Active: allowable capacities, not divided by the factor of safety; Passive: nominal capacities, divided by it ([Force Application](../lem/reinforcement.md#force-application-appl)) |
+| I | <code class="rc rc-lem">Appl</code> | — | Active: allowable capacities, not divided by the factor of safety.<br>Passive: nominal capacities, divided by it.<br>([Force Application](../lem/reinforcement.md#force-application-appl)) |
 | J | <code class="rc rc-both">Tmax</code> | F per member, or F/L | tensile capacity |
 | K, L | <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | L | length over which friction develops `Tmax` from end 1 and from end 2; 0 makes the full `Tmax` available at that end |
 | M, N | <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | F/L², degrees | interface adhesion and friction angle; filled together, they replace `Lp1` and `Lp2`, and filling only one is an input error ([Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden)) |

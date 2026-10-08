@@ -143,7 +143,7 @@ POLYGON_TYPE_WORDS = {
 
 # === v12 reinforcement support-type presets (reinforce sheet, Type column) ===
 # type -> (dir, appl). The same table the sheet holds in its hidden lookup block
-# (reinforce!AB8:AD11), which its Dir and Appl formulas VLOOKUP: picking a Type
+# (reinforce!AH8:AJ11), which its Dir and Appl formulas VLOOKUP: picking a Type
 # fills both, and typing over either keeps what was typed until the Type is picked
 # again. Module level rather than local to the loader so the Studio's reinforcement
 # editor fills its Dir/Appl combos from THIS table instead of restating it -- the

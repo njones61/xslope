@@ -854,7 +854,7 @@ out on [Modeling Reinforcement](modeling_reinforcement.md).
 
 ![reinforce.png](images/reinforce.png)
 
-The template is formatted for up to 20 reinforcement lines (rows 3-22), but additional rows can be added to the 
+The template is formatted for up to 30 reinforcement lines (rows 3-32), but additional rows can be added to the 
 table as needed. Column headers are color-coded by analysis type: **green** = LEM only, **red** = LEM & FEM,
 **blue** = FEM only.
 

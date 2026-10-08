@@ -317,6 +317,7 @@ both ends are free, so the sheet can pull out at either end.
 | Column | Entry |
 |---|---|
 | `Joint` | `Yes` |
+| `Type`, `Appl` | `Geosynthetic`, with `Appl` set to `Passive` and nominal values throughout when the model also runs in the LEM: the FEM's strength reduction divides the interface strength by F, and Passive makes the LEM divide the same values by F, so one set of entries serves both runs. In a model run only in the FEM, `Appl` has no effect |
 | `Adhesion`, `Delta` | both required: the cohesion and friction angle of the two interfaces, whose tension cutoff is zero |
 | `kn`, `ks` | blank: derived from the softer adjacent material over a notional thickness of one tenth of the element length ([Stiffness](../fem/joints.md#stiffness)) |
 | `Jred` | blank, so strength reduction weakens the interface along with the soil; `No` holds it at full strength |

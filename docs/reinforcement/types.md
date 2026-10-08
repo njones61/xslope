@@ -337,12 +337,12 @@ its back face and the five course joints between its six blocks on the `joints` 
 ## References
 
 **GEC 4:** Sabatini, P.J., Pass, D.G., & Bachus, R.C. (1999). *Geotechnical Engineering Circular No. 4: Ground
-Anchors and Anchored Systems*. FHWA-IF-99-015. Federal Highway Administration, Washington, D.C.
+Anchors and Anchored Systems*. [FHWA-IF-99-015](https://www.fhwa.dot.gov/engineering/geotech/pubs/if99015.pdf). Federal Highway Administration, Washington, D.C.
 
 **GEC 7:** Lazarte, C.A., Robinson, H., Gómez, J.E., Baxter, A., Cadden, A., & Berg, R. (2015). *Geotechnical
-Engineering Circular No. 7: Soil Nail Walls Reference Manual*. FHWA-NHI-14-007. Federal Highway Administration,
+Engineering Circular No. 7: Soil Nail Walls Reference Manual*. [FHWA-NHI-14-007](https://www.fhwa.dot.gov/engineering/geotech/pubs/nhi14007.pdf). Federal Highway Administration,
 Washington, D.C.
 
 **GEC 11:** Berg, R.R., Christopher, B.R., & Samtani, N.C. (2009). *Design of Mechanically Stabilized Earth Walls
-and Reinforced Soil Slopes – Volume II*. FHWA-NHI-10-025 (Geotechnical Engineering Circular No. 11, Vol. II).
+and Reinforced Soil Slopes – Volume II*. [FHWA-NHI-10-025](https://www.fhwa.dot.gov/engineering/geotech/pubs/nhi10025/nhi10025.pdf) (Geotechnical Engineering Circular No. 11, Vol. II).
 Federal Highway Administration, Washington, D.C.

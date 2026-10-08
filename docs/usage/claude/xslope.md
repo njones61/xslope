@@ -1021,7 +1021,7 @@ divided by its own factor of safety. With `passive` they are all nominal and the
 them by F.
 
 Support-type recipes, end 1 at the face or wall (column-by-column entries with typical values
-from the FHWA manuals: `docs/usage/modeling_reinforcement.md`):
+from the FHWA manuals: `docs/reinforcement/types.md`):
 - geosynthetics -> `type='geosynthetic'` (tangent, active): `t_max` = long-term strength
   Tal ÷ its factor of safety; `tend1` = the facing connection's allowable strength, 0 where the
   layer ends free at the face; `tend2` = 0.

@@ -45,7 +45,6 @@ nav:
     - Installation: getting_started/install.md
     - Ways to Use XSLOPE: usage/index.md
     - Input Template: usage/input_template.md
-    - Modeling Reinforcement: usage/modeling_reinforcement.md
     - Project Packaging: usage/packaging.md
     - Preflight Input Checks: usage/preflight.md
     - Colab Notebooks: usage/notebooks.md
@@ -122,6 +121,9 @@ nav:
     - Piles and Concrete Piers: fem/piles.md
     - Mesh Generation: fem/mesh.md
     - Sample Problems: fem/samples.md
+  - Reinforcement:
+    - Overview: reinforcement/overview.md
+    - Reinforcement Types: reinforcement/types.md
   - Reliability:
     - Overview: reliability/index.md
     - Taylor Series (TSPM): reliability/taylor.md

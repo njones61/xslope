@@ -217,7 +217,7 @@ Their product *EA* is the axial stiffness.
 [Soil reinforcement in LEM](../lem/reinforcement.md) and
 [soil reinforcement in FEM](../fem/reinforcement.md) give the formulations
 and the four end conditions of the envelope;
-[Modeling Reinforcement](../usage/modeling_reinforcement.md) gives the entries
+[Reinforcement Types](../reinforcement/types.md) gives the entries
 for each kind of support.
 
 ---

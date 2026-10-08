@@ -7,12 +7,8 @@ description: "Geosynthetics, nails and anchors as tension-only bar elements in X
 
 Reinforcement supplies the tension that soil cannot carry: geosynthetic layers built into a fill, soil nails
 grouted into a cut, tiebacks holding a wall, each crossing the zone where a slip surface would form and anchored in
-the stable ground beyond it:
-
-![Three kinds of reinforcement: geosynthetic layers in a fill, soil nails in a cut, tiebacks behind a wall](images/reinf_types.png){width=1000}
-
-From left to right: geosynthetic layers in a reinforced fill, soil nails in a cut, and tiebacks behind a wall,
-each with a slip surface they cross.
+the stable ground beyond it. The [Reinforcement Overview](../reinforcement/overview.md) shows the three kinds and
+how a line is entered.
 
 Geotextiles, geogrids, soil nails and ground anchors are modeled as one-dimensional truss (bar) elements embedded in
 the soil mesh. A bar has axial stiffness $EA/L$ — $E$ the reinforcement's modulus, $A$ its cross-sectional area per
@@ -45,7 +41,7 @@ drawn at the middle layer. On the right, each bar carries tension along its own 
 
 What to enter for a particular support (a geosynthetic layer, a soil nail, a tieback or an end-anchored bar), and
 how to connect it to a wall or make it a joint, is set out column by column on
-[Modeling Reinforcement](../usage/modeling_reinforcement.md).
+[Reinforcement Types](../reinforcement/types.md).
 
 ## Mathematical Formulation
 
@@ -224,9 +220,9 @@ the resistance follows the effective overburden along the line and the pullout l
 
 The pullout length $L_p$ is the distance from each end of the reinforcement over which the full tensile strength
 is mobilized, $T_{max}$ divided by the pullout resistance per unit length at that end. The entries for a
-[geosynthetic layer](../usage/modeling_reinforcement.md#geosynthetic-layer), a
-[soil nail](../usage/modeling_reinforcement.md#soil-nail) and a
-[tieback](../usage/modeling_reinforcement.md#tieback-grouted-ground-anchor), with the pullout resistance per unit
+[geosynthetic layer](../reinforcement/types.md#geosynthetic-layer), a
+[soil nail](../reinforcement/types.md#soil-nail) and a
+[tieback](../reinforcement/types.md#tieback-grouted-ground-anchor), with the pullout resistance per unit
 length and typical values from the FHWA manuals, are on Modeling Reinforcement.
 
 ### Initial state and EA selection
@@ -236,7 +232,7 @@ the deformation of the gravity solve and of the strength reduction, not from con
 staged construction. A bar must therefore be stiff enough to mobilize its capacity at the small displacements of an
 incipient failure. The zero initial force matters most where the reinforcement is extensible and the wall tall, or
 where reinforcement forces at working load are wanted. The `E` and `Area` entries for each support are on
-[Modeling Reinforcement](../usage/modeling_reinforcement.md).
+[Reinforcement Types](../reinforcement/types.md).
 
 ## Strength Reduction and Reinforcement
 

@@ -6,12 +6,8 @@ Geosynthetic layers (geotextiles and geogrids) are built into a fill as it is pl
 than the fill alone would; soil nails are drilled and grouted into a cut as it is excavated; tiebacks hold a wall
 with a grouted bond length deep behind the slip surface, and end-anchored bars with a plate or deadman at each end.
 In each case the part of the
-member beyond the slip surface grips the stable ground, and the member pulls back on the sliding mass.
-
-![Three kinds of reinforcement: geosynthetic layers in a fill, soil nails in a cut, tiebacks behind a wall](../fem/images/reinf_types.png){width=1000}
-
-From left to right: geosynthetic layers in a reinforced fill, soil nails in a cut, and tiebacks behind a wall,
-each with a slip surface they cross.
+member beyond the slip surface grips the stable ground, and the member pulls back on the sliding mass. The
+[Reinforcement Overview](../reinforcement/overview.md) shows the three kinds and how a line is entered.
 
 In a limit equilibrium analysis each reinforcement line is a straight line defined by its end points, and wherever a
 trial slip surface crosses a line, a tensile force is applied to the sliding mass at the crossing point. Three
@@ -22,7 +18,7 @@ questions determine that force, and they are independent of one another:
 2. **In what direction does it act?** — governed by the **Dir** setting: tangent to the slip surface (flexible
    reinforcement) or along the reinforcement's own axis (rigid supports).
 3. **Is it factored by the safety factor?** — governed by the **Appl** setting: active (a known allowable force,
-   not divided by $F$) or passive (a nominal (unfactored) capacity that mobilizes with the soil, divided by $F$).
+   not divided by $F$) or passive (a nominal, unfactored capacity that mobilizes with the soil, divided by $F$).
 
 This decomposition follows the convention used by Slide2 and other commercial programs, which allows xslope
 results to be compared directly against them. The **Type** column in the input template is a *preset* over these
@@ -30,12 +26,15 @@ settings — selecting a support type fills Dir and Appl with the appropriate de
 
 What to enter for a particular support (a geosynthetic layer, a soil nail, a tieback or an end-anchored bar), and
 how to connect it to a wall or make it a joint, is set out column by column on
-[Modeling Reinforcement](../usage/modeling_reinforcement.md).
+[Reinforcement Types](../reinforcement/types.md).
 
 The finite element treatment, in which each reinforcement line is a row of bar elements in the mesh and carries the
 tension its stretch produces, is on the [FEM reinforcement](../fem/reinforcement.md) page.
 
 ## Capacity Envelope
+
+The tension a line can carry varies along it, set by its own strength in the middle and by its anchorage toward
+each end. The LEM takes the value where a trial slip surface crosses the line.
 
 ### Force magnitude at the crossing point
 
@@ -71,7 +70,7 @@ the envelope value at the crossing point, so a surface that clips a line near a 
 fraction of $T_{max}$.
 
 Typical end capacities for each support, from the FHWA manuals, are on
-[Modeling Reinforcement](../usage/modeling_reinforcement.md).
+[Reinforcement Types](../reinforcement/types.md).
 
 ### Pullout from the effective overburden
 
@@ -115,7 +114,7 @@ table; the entry is under
 length; the sleeved unbonded length transfers no load to the ground. Its envelope is the development-length law,
 with $L_{p1} = 0$ at the head and the ramp $L_{p2}$ at the bonded end, $T_{max}$ divided by the load transfer per
 unit length. The overburden law would accumulate resistance from the head along the unbonded length. The entries
-are under [Tieback](../usage/modeling_reinforcement.md#tieback-grouted-ground-anchor).
+are under [Tieback](../reinforcement/types.md#tieback-grouted-ground-anchor).
 
 ### Per-unit-width convention and spacing
 

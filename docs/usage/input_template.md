@@ -845,100 +845,18 @@ defined by two points with a normal force for each.
 
 ![sheet_reinforce.png](images/sheet_reinforce.png)
 
-The **reinforce** worksheet defines soil reinforcement elements such as soil nails, rock anchors, geosynthetic 
-reinforcement, or tiebacks. These elements provide additional resistance to sliding by mobilizing tensile forces 
-along the failure surface. Each reinforcement object is represented as a straight line defined by the XY coordinates of 
+The **reinforce** worksheet defines soil reinforcement elements such as soil nails, ground anchors, geosynthetic 
+reinforcement, or tiebacks. These elements provide additional resistance to sliding by mobilizing tensile force
+where the failure surface crosses them. Each reinforcement object is represented as a straight line defined by the XY coordinates of 
 the endpoints. Each line also has a set of properties that define the type of support, the strength of the
-reinforcement, and the anchorage at each end. What to enter for each kind of support, with typical values, is set
-out on [Modeling Reinforcement](modeling_reinforcement.md).
+reinforcement, and the anchorage at each end. The [Reinforcement Overview](../reinforcement/overview.md#the-columns)
+describes every column, and [Reinforcement Types](../reinforcement/types.md) gives the entries for each kind of
+support, with typical values.
 
 ![reinforce.png](images/reinforce.png)
 
-The template is formatted for up to 30 reinforcement lines (rows 3-32), but additional rows can be added to the 
-table as needed. Column headers are color-coded by analysis type: **green** = LEM only, **red** = LEM & FEM,
-**blue** = FEM only.
-
-Each reinforcement element is defined by:
-
-- **Geometry**:<br>
->>Label: Name used in error messages, summaries, and plots (optional)<br>
->>x1, y1 **[L]**: Start point coordinates <br>
->>x2, y2 **[L]**: End point coordinates<br>
-- **Support Type** (LEM only):<br>
->>Type: Support preset — selecting a Type fills Dir and Appl automatically: Geosynthetic (Tangent, Active),
-Nail (Axial, Passive), Tieback (Axial, Active), Anchor (Axial, Active). Leave blank for a generic tensile line.<br>
->>Dir: Force direction at the slip surface. **Tangent** = the force reorients tangent to the slip surface
-(correct for flexible reinforcement such as geosynthetics — the default). **Axial** = the force acts along the
-reinforcement's own axis (correct for rigid supports such as nails and tiebacks). Filled by Type; overtype to
-override.<br>
->>Appl: Force application. **Active** = the force is a known *allowable* force applied to the driving side and is
-NOT divided by the factor of safety (the default). **Passive** = the force is an *ultimate* capacity added to the
-resisting side and divided by FS, i.e. it mobilizes with the soil. Filled by Type; overtype to override.<br>
-- **Strength / Capacity Properties** (LEM &amp; FEM):<br>
->>Tmax — **[F] per element (÷ Spacing)** or **[F/L] per unit width** when Spacing is blank: Maximum tensile force that can be mobilized. Per unit width of slope; for discrete supports (nails,
-tiebacks) enter the per-element capacity and provide **Spacing**, and xslope divides for you.<br>
->>Lp1 **[L]**: Length over which friction develops Tmax from end 1; 0 is a fully anchored end<br>
->>Lp2 **[L]**: Length over which friction develops Tmax from end 2; 0 is a fully anchored end<br>
->>Adhesion **[F/L²]**: Soil-reinforcement interface adhesion. Leave blank to use Lp1/Lp2.<br>
->>Delta **[degrees]**: Soil-reinforcement interface friction angle. Leave blank to use Lp1/Lp2.<br>
->>Tend1 — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Anchorage/plate/connection capacity at end 1 (0 = friction only)<br>
->>Tend2 — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Anchorage/plate/connection capacity at end 2 (0 = friction only)<br>
->>Spacing **[L]**: Out-of-plane spacing for discrete supports. Leave blank (or 1) for geosynthetics, whose properties are
-already per unit width.<br>
-- **Stiffness / Residual** (FEM only):<br>
->>Tres — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Residual tensile force the reinforcement retains *after* it ruptures — its post-peak strength. **Leave it blank** for the
-usual elastic-perfectly-plastic bar, which simply holds its capacity once it yields; a blank is not the same as a
-zero. Entering **0** means brittle rupture: the element drops to carrying nothing at all. Anything in between models
-a bar that sheds part of its load and retains the rest. Near the ends the capacity envelope may develop less than
-`Tres`, and the element then retains only what the envelope gives it — bond slip is perfectly plastic and does not
-take a bar below the force its embedment can hold.<br>
->>E **[F/L²]**: Elastic modulus of reinforcement<br>
->>Area — **[L²] per element (÷ Spacing)** (or [L²/L] per unit width when Spacing is blank): Cross-sectional area<br>
-- **Interface (joint)** (FEM only):<br>
->>Joint: **Yes** makes the line a slip surface — the mesh splits along it and a pair of interface elements
-carries the sheet's grip on the soil, in place of the bond cap `Lp1`/`Lp2` set. Blank or **No** is the ordinary
-bonded bar. The interface's strength is that line's own `Adhesion` and `Delta`, which must both be filled.<br>
->>kn **[F/L³]**: Normal stiffness of the interface. Leave blank to derive it from the softer adjacent soil,
-$E_{adj}$ over a virtual thickness of 0.1 × the 1D element size.<br>
->>ks **[F/L³]**: Shear stiffness of the interface. Leave blank to derive it the same way, from $G_{adj}$.<br>
->>Jred: **No** holds the interface at full strength through a strength reduction. Blank or **Yes** reduces the
-interface's `Adhesion` and $\tan$`Delta` by the trial factor along with the soil's, which is the usual choice.<br>
-
-The available tensile force varies *along* the line: it is limited by the tendon's own capacity in the middle, and
-tapers off toward each end as there is progressively less bond length available to develop it. That capacity
-envelope is what `Tmax`, `Lp1`, `Lp2`, `Tend1` and `Tend2` describe between them, and it is the same in LEM and
-FEM. The envelope, the end-condition cases, and how to convert a bond strength into an `Lp`, are all set out in
-**[Soil Reinforcement in LEM](../lem/reinforcement.md#capacity-envelope)** — the figures there are the quickest way
-to see what a given combination of columns actually produces.
-
-`Adhesion` and `Delta` are the alternative to `Lp1`/`Lp2`: instead of a fixed development length they state the
-interface strength, and the pullout resistance then follows the effective overburden along the line —
-$2(a + \sigma'_v\tan\delta)$ per unit length, with $\sigma'_v$ the weight of the soil column above each point less
-the pore pressure the model declares there. Fill **both** to use it, in which case `Lp1` and `Lp2` are not read;
-leave **both** blank for the development-length law. Filling one and leaving the other blank is an input error. See
-[Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden).
-
-How the force is then *used* differs by analysis:
-
-- **LEM** applies the envelope force at the point where the line crosses the slip surface, in the direction set by
-  **Dir**, factored (or not) by **Appl**. `Tres`, `E` and `Area` are ignored. See
-  [Force Direction](../lem/reinforcement.md#force-direction-dir) and
-  [Force Application](../lem/reinforcement.md#force-application-appl).
-- **FEM** models the line as a 1D truss element with stiffness `E`·`Area`, so the force is an *output* of the
-  analysis rather than an input — the bar carries whatever the deforming soil pushes into it, capped by the
-  envelope, and dropping to `Tres` once it yields, or to the envelope value where that is the lower of the two.
-  **Dir** and **Appl** have no effect. See
-  [Soil Reinforcement in FEM](../fem/reinforcement.md#force-behavior-and-failure-modes).
-
-`Joint` changes what the FEM builds. A bonded line shares the soil's nodes, so the soil above it and the soil below
-it are one body; a jointed line is a slip surface, and the mesh is split along it into an upper face, the bar, and a
-lower face, with an interface element between each pair carrying the `Adhesion` and `Delta` as a Mohr-Coulomb
-strength. Use it where the failure surface can run **along** a sheet rather than across it — a base geotextile under
-an embankment, a wall whose fill slides on its sheets, a smooth liner. `Lp1` and `Lp2` are not read on a jointed
-line: the grip is what the interface elements integrate. The bar still yields at `Tmax` and softens to `Tres` where
-one is given. A non-blank `Tend1` / `Tend2` ties that end of the sheet to the soil or facing at the stated capacity;
-a blank end is free and can pull out. LEM ignores `Joint` and reads the line as a reinforcement force either way. See
-[Choosing a bonded bar or a joint](../fem/reinforcement.md#bonded-bar-or-joint).
+The template is formatted for up to 30 reinforcement lines (rows 3-32), but additional rows can be added to the
+table as needed.
 
 ---
 

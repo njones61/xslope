@@ -46,7 +46,7 @@ available force is the smallest of them:
 
 where:
 
-- $T_{max}$ = tensile capacity of the element (rupture limit)
+- $T_{max}$ = tensile capacity of the element: an allowable value with Appl Active, a nominal one with Appl Passive
 - $d_1$, $d_2$ = distances from the point to end 1 and end 2 of the line
 - $L_{p1}$, $L_{p2}$ = pullout lengths at each end — the distance over which interface friction develops the full
   tensile capacity
@@ -69,6 +69,9 @@ Special cases:
 The envelope for each of the four end conditions. The force available where a trial surface crosses the line is
 the envelope value at the crossing point, so a surface that clips a line near a free end mobilizes only a
 fraction of $T_{max}$.
+
+Typical end capacities for each support, from the FHWA manuals, are on
+[Modeling Reinforcement](../usage/modeling_reinforcement.md).
 
 ### Pullout from the effective overburden
 
@@ -204,19 +207,6 @@ Both engines use the same reinforcement lines, but the mechanics differ:
   therefore treat bond slip the same way; what $T_{res}$ adds in the FEM is rupture of the reinforcement itself.
   Dir and Appl have no meaning in the FEM.
   See [Soil Reinforcement in FEM](../fem/reinforcement.md).
-
-## Typical Anchorage Capacities
-
-Approximate ranges for the $T_{end}$ columns, for preliminary estimates only:
-
-| End condition | Typical capacity | Notes |
-|---|---|---|
-| Soil nail bearing plate | 50-150 kN (10-35 kip) per nail | plate punching or facing flexure governs |
-| Geosynthetic facing connection | 30-80% of $T_{max}$ | per connection test data (wrap-around, bodkin, panel) |
-| Tieback anchor head / connection | — | enters through $T_{max}$ with $L_{p1} = 0$ (see grouted tiebacks under [Pullout from the effective overburden](#pullout-from-the-effective-overburden)) |
-| Free (no plate) | 0 | the friction-only default |
-
-Capacities are per element; with a Spacing entry they are converted to per-unit-width automatically.
 
 ## References
 

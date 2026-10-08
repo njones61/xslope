@@ -238,13 +238,9 @@ $\phi_{interface}$ = interface friction angle (typically 0.8-1.0 times soil fric
 
 where the factor of 2 accounts for friction on both sides of the geotextile.
 
-These equations are a general guide that can be used to come up with reasonable estimates of Lp. Typical values are as follows:
-
-|Reinforcement Type | Pullout Length $L_p$ (m) | Notes |
-|-------------------|--------------------------|-------|
-| **Soil Nails** | 1.5 - 3.0 | Depends on soil conditions and nail diameter |
-| **Geotextiles** | 0.5 - 1.5 | Depends on normal stress and surface texture |
-| **Geogrid** | 1.0 - 2.0 | Depends on aperture size and bearing resistance |
+These equations are a general guide that can be used to come up with reasonable estimates of Lp. The entries
+for each support, with typical values from the FHWA manuals, are on
+[Modeling Reinforcement](../usage/modeling_reinforcement.md).
 
 ### Initial state and EA selection
 

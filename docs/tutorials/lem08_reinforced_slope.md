@@ -121,7 +121,7 @@ so as the mass moves the sheet deforms with it and pulls along the slip surface
 whatever its own inclination. *Axial* is a nail or a tieback, stiff enough to
 hold its own line. **Appl** is whether the force is divided by the factor of
 safety: *Active* is an allowable working load applied against the driving side,
-*Passive* an ultimate capacity that mobilizes with the soil.
+*Passive* a nominal capacity that mobilizes with the soil.
 [Soil Reinforcement in LEM](../lem/reinforcement.md) derives both. A line left
 with no Type at all is a generic tensile line, and behaves as *Tangent* and
 *Active* — the same physics, without saying what the reinforcement is.
@@ -146,7 +146,10 @@ defines this, with the same eight values on every line:
 | 800 | 4 | 4 |  |  | 0 | 0 | 1 |
 | 800 | 4 | 4 |  |  | 0 | 0 | 1 |
 
-**Tmax** is the rupture capacity, 800 lb/ft. **Lp1** and **Lp2** are the pullout
+**Tmax** is the tensile capacity, 800 lb/ft. Under *Active* it is an allowable
+force: the factor of safety divides only the soil's strength, so the 800 is the
+geogrid's long-term strength after any factor of safety the design applies to
+the geogrid itself. **Lp1** and **Lp2** are the pullout
 lengths at each end: the tension available rises from zero at an end to the full
 Tmax 4 ft in, so a crossing within 4 ft of either end mobilizes only its share.
 **Adhesion** and **Delta** are blank, which is what selects the development-length
@@ -515,8 +518,8 @@ crossings at the same x — and every one of those crossings already lies at lea
 8.4 ft from the nearer end of its line, twice the 4 ft it takes to develop Tmax.
 All five deliver the full 800 lb/ft before anything is lengthened. Adding length
 moves the back end further from crossings the back end never governed. On this
-section the reinforcement force is limited by rupture capacity, which length does
-not increase.
+section the reinforcement force is limited by the tensile capacity `Tmax`, which
+length does not increase.
 
 Short lines are limited in a different way. At 10 ft the critical surface passes *behind* the
 back ends of most of the layers:
@@ -540,7 +543,7 @@ returns **1.606**: the horizontal geogrids now pull along their own axis rather
 than along the slip surface, which gives less force along the slice bases but
 more normal force on them, and on a φ = 37° sand the added friction slightly
 outweighs the loss. Switching instead to `Passive`, so the same 800 lb/ft is treated
-as an ultimate capacity divided by the factor of safety, the search returns
+as a nominal capacity divided by the factor of safety, the search returns
 **1.453**. Neither is a correction to the other; they are two published
 conventions, which is why the type presets set them together and the reference
 page states which setting suits each support.
@@ -565,8 +568,8 @@ This tutorial covered:
 - The reinforced search against the unreinforced one: a different factor of
   safety and a different mechanism.
 - A length study finding where added embedment stops changing the factor of
-  safety — once every crossing clears its pullout ramp, rupture capacity
-  governs.
+  safety — once every crossing clears its pullout ramp, the tensile capacity
+  `Tmax` governs.
 
 **Where to go next:** in [LEM-9](lem09_tieback_wall.md) we build the other
 reinforced problem — a tieback wall, where the support is discrete and stiff

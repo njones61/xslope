@@ -980,11 +980,14 @@ slope_data['reinforcement_lines'] = [
      'E': 0, 'area': 0,    # Young's modulus / cross-section area (FEM)
      # v12 support-type fields (defaults shown = the classic generic line):
      'label': 'Line 1',
-     'type': '',            # '', 'geosynthetic', 'nail', 'tieback', 'anchor' (preset over dir/appl)
+     'type': '',            # '', 'geosynthetic', 'nail', 'tieback', 'anchor'. On the sheet a preset
+                            # that fills Dir/Appl; in a dict a label only — set 'dir'/'appl' yourself
      'dir': 'tangent',      # 'tangent' (flexible, force along slip surface) | 'axial' (rigid, along the line)
-     'appl': 'active',      # 'active' (allowable force, not /FS) | 'passive' (ultimate, /FS)
+     'appl': 'active',      # 'active': every capacity is allowable, not /FS | 'passive': every
+                            # capacity is nominal, all /FS
      'tend1': 0.0, 'tend2': 0.0,  # end anchorage/plate/connection capacity (per unit width)
-     'spacing': 1.0,        # out-of-plane spacing already divided out at load time
+     'spacing': 1.0,        # the loader divides t_max/t_res/tend/area by it; in a dict those are
+                            # already per unit width, but the adhesion/delta rate is still divided by it
      # v24 overburden-dependent pullout, the alternative to lp1/lp2. NaN = blank =
      # use the pullout lengths. Fill BOTH or neither (preflight refuses one of two).
      'adhesion': float('nan'),   # interface adhesion, stress units
@@ -1006,13 +1009,37 @@ The two pullout laws share one envelope. With `lp1`/`lp2` the capacity develops 
 `2*(adhesion + sigma'_v*tan(delta))` per unit length, integrated along the line — `sigma'_v`
 being the weight of the soil column above each point (gamma_sat below the water table where a
 material declares one) less the pore pressure that point's material declares. `lp1`/`lp2` are
-then not read. The FHWA form is `adhesion = 0`, `delta = atan(F* * alpha)`. Both engines apply
+then not read. The FHWA form is `adhesion = 0`, `delta = atan(F* * alpha)` for a nominal
+pullout resistance, `atan(F* * alpha / FS_PO)` for an allowable one. Both engines apply
 the same envelope, `xslope.fileio.reinforce_available_tension`. A `slope_data` you assemble in
 memory resolves the law on the way into either engine, so nothing extra has to be called.
 
-Support-type recipes: geosynthetics -> `type='geosynthetic'` (tangent, active); soil nails ->
-`type='nail'` (axial, passive, `tend1` = plate capacity at the face end); tiebacks ->
-`type='tieback'` (axial, active, `tend1` = connection capacity). Enter per-element capacities
+`appl` decides what every capacity on the line is. With `active` the LEM does not divide the
+line's force by F, so `t_max`, the pullout entry (`lp1`/`lp2` from an allowable load transfer,
+or `adhesion`/`delta`) and `tend1`/`tend2` are all allowable values, each the nominal capacity
+divided by its own factor of safety. With `passive` they are all nominal and the LEM divides
+them by F.
+
+Support-type recipes, end 1 at the face or wall (column-by-column entries with typical values
+from the FHWA manuals: `docs/usage/modeling_reinforcement.md`):
+- geosynthetics -> `type='geosynthetic'` (tangent, active): `t_max` = long-term strength
+  Tal ÷ its factor of safety; `tend1` = the facing connection's allowable strength, 0 where the
+  layer ends free at the face; `tend2` = 0.
+- soil nails -> `type='nail'` (axial, passive, nominal values): `t_max` = bar area × yield
+  strength per nail; `lp1` = `lp2` = `t_max` ÷ (π × bond strength × drill-hole diameter);
+  `tend1` = nail-head capacity, the smallest of the facing's flexure, punching-shear and
+  headed-stud resistances; `tend2` = 0; `adhesion`/`delta` blank.
+- tiebacks -> `type='tieback'` (axial, active): `t_max` = the smallest of the tendon's design
+  load, the allowable capacity of the head's connection to the wall, and the bond capacity
+  (allowable load transfer per unit length × bond length); `lp1` = 0; `lp2` = `t_max` ÷ the
+  allowable load transfer per unit length; `tend1`, `tend2`, `adhesion` and `delta` blank.
+  With `lp1` = 0 the envelope never reads `tend1`, so the head connection enters through
+  `t_max`.
+- end-anchored bars -> `type='anchor'` (axial, active): `t_max` = the smallest of the bar's
+  allowable tension and the allowable capacities of its two anchorages; `lp1` = `lp2` = 0;
+  `tend1`/`tend2` blank.
+
+In a dict, set `dir` and `appl` to the preset's pair as well. Enter per-element capacities
 plus `Spacing` in the template and the loader divides; in-memory dicts like the above are
 already per unit width.
 
@@ -1141,8 +1168,9 @@ which is what groups the rows of one network. A label of any other shape belongs
 line sits **AT the toe/base elevation** (e.g. y=0), then y = s, 2s, … upward; each line starts
 **on the slope face** at its elevation; **length = the labeled dimension measured from the
 face** (do not add the face offset — if the sketch shows "20 ft" of geogrid, the line is 20 ft
-long from where it meets the face, not 22). LEM uses only `t_max`; `t_res`/`E`/`area` matter for
-FEM.
+long from where it meets the face, not 22). The LEM reads `type` (on the sheet, the preset that
+fills `dir`/`appl`), `dir`, `appl`, `t_max`, `lp1`/`lp2` or `adhesion`/`delta`, `tend1`/`tend2`
+and `spacing`; `t_res`, `E`, `area`, `joint`, `kn`, `ks` and `jred` matter for FEM only.
 
 #### Piles (`pile_lines`)
 

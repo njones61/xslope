@@ -1436,6 +1436,61 @@ def run_design_test(test):
     return fs_cache[0]['FS'], None
 
 
+#: FEM rows that solve on the companion mesh shipped beside their workbook
+#: (``{base}_mesh.json``, which ``load_slope_data`` attaches as ``slope_data['mesh']``)
+#: instead of on a fresh mesh: (workbook name, element_type, target_size) -> the node
+#: count that companion must have. A fresh quad8 mesh of Griffiths & Lane Example 3
+#: at 3.5 comes back with 6880 or 6882 nodes from identical inputs, because gmsh's
+#: quadrilateral algorithm (Mesh.Algorithm 8) settles exact distance ties in its cross
+#: field in an order that changes from run to run. Both locks were cut on the
+#: 6880-node mesh, which is the one the companions carry. ``pinned_meshes`` guards
+#: every entry.
+PINNED_COMPANION_MESHES = {
+    ('xslope_griffiths3_r1.xlsx', 'quad8', 3.5): 6880,
+    ('xslope_griffiths3_r0p2.xlsx', 'quad8', 3.5): 6880,
+}
+
+
+def _pinned_companion_nodes(test):
+    """The node count a row's companion mesh must have when the row is pinned to it
+    (``PINNED_COMPANION_MESHES``), else None."""
+    try:
+        size = float(test.get('target_size'))
+    except (TypeError, ValueError):
+        return None
+    return PINNED_COMPANION_MESHES.get(
+        (Path(str(test.get('file', ''))).name,
+         str(test.get('element_type', 'tri6')), size))
+
+
+def run_pinned_meshes_test(test):
+    """Guard on ``PINNED_COMPANION_MESHES``: each pinned workbook's companion mesh
+    loads with the pinned node count, and a ``fem_ssrm`` tag on the pages still names
+    that workbook at that element type and size. A companion rewritten with another
+    mesh fails here, and so does a pin that no row reads. Solves nothing."""
+    from xslope.fileio import load_slope_data
+    rows = [t for md in sorted(Path(_repo('docs')).rglob('*.md'))
+            for t in parse_test_tags(md) if t.get('type') == 'fem_ssrm']
+    problems = []
+    for (name, etype, size), want in sorted(PINNED_COMPANION_MESHES.items()):
+        tags = [t for t in rows if _pinned_companion_nodes(t) is not None
+                and Path(str(t['file'])).name == name
+                and str(t.get('element_type', 'tri6')) == etype
+                and float(t['target_size']) == size]
+        if not tags:
+            problems.append(f"{name} ({etype}, {size:g}) is pinned but no fem_ssrm "
+                            f"tag names it")
+            continue
+        mesh = load_slope_data(tags[0]['file']).get('mesh')
+        found = None if mesh is None else len(mesh['nodes'])
+        if found != want:
+            problems.append(f"{name}: companion mesh has {found} nodes, pinned "
+                            f"{want}")
+    if problems:
+        return None, "; ".join(problems)
+    return 0.0, None
+
+
 def _fem_case_model(test):
     """The model and mesh an FEM test tag describes: ``(slope_data, mesh)``.
 
@@ -1466,7 +1521,15 @@ def _fem_case_model(test):
     # silently zeroes the pore pressures if the node count differs.
     uses_seep = any(str(m.get('u', '')).strip().lower() == 'seep'
                     for m in slope_data.get('materials', []))
-    if uses_seep and slope_data.get('mesh') is not None:
+    pinned = _pinned_companion_nodes(test)
+    if pinned is not None:
+        # A row pinned to its companion mesh solves on it (PINNED_COMPANION_MESHES).
+        mesh = slope_data.get('mesh')
+        found = None if mesh is None else len(mesh['nodes'])
+        if found != pinned:
+            raise ValueError(f"{Path(test['file']).name} is pinned to its companion "
+                             f"mesh ({pinned} nodes); the companion has {found}")
+    elif uses_seep and slope_data.get('mesh') is not None:
         mesh = slope_data['mesh']
     else:
         # Default mesh size scales with the domain (like the seepage path) rather
@@ -15550,6 +15613,8 @@ def _dispatch_test(test):
         return run_tag_k0_test(test)
     if test_type == 'lock_edges':
         return run_lock_edges_test(test)
+    if test_type == 'pinned_meshes':
+        return run_pinned_meshes_test(test)
     if test_type == 'gsat_pair':
         return run_gsat_pair_test(test)
     if test_type == 'axial_mirror':
@@ -15642,7 +15707,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'pinned_meshes', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -15869,6 +15934,13 @@ def main():
             tests.append({'type': 'lock_edges',
                           'file': 'check=edges tags vs their locks',
                           'method': '-', 'source': 'lock_edges'})
+        # The rows pinned to their companion mesh (PINNED_COMPANION_MESHES) still
+        # find it with the pinned node count. Its benchmark id rides with the
+        # pinned rows' own, so --benchmark SSRM-G3 runs the rows and this guard.
+        tests.append({'type': 'pinned_meshes',
+                      'file': 'pinned companion meshes vs PINNED_COMPANION_MESHES',
+                      'method': '-', 'source': 'pinned_meshes',
+                      'benchmark': 'SSRM-G3-mesh'})
         # The 1D details dialog: gating, envelope sharing, reload, export.
         tests.append({'type': 'fem_1d_details',
                       'file': 'FEM 1D solution details (Studio dialog)',

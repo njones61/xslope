@@ -1,13 +1,7 @@
 # Soil Reinforcement in LEM Slope Stability
 
-Soil and rock carry compression and shear well but little or no tension. Reinforcement supplies the tension:
-members placed across the zone where a slip surface would form and anchored in the stable ground beyond it.
-Geosynthetic layers (geotextiles and geogrids) are built into a fill as it is placed, so a slope can stand steeper
-than the fill alone would; soil nails are drilled and grouted into a cut as it is excavated; tiebacks hold a wall
-with a grouted bond length deep behind the slip surface, and end-anchored bars with a plate or deadman at each end.
-In each case the part of the
-member beyond the slip surface grips the stable ground, and the member pulls back on the sliding mass. The
-[Reinforcement Overview](overview.md) shows the three kinds and how a line is entered.
+Reinforcement supplies the tension soil cannot carry. The kinds of support and how a line is entered are on the
+[Reinforcement Overview](overview.md), and what to enter for each support on [Reinforcement Types](types.md).
 
 In a limit equilibrium analysis each reinforcement line is a straight line defined by its end points, and wherever a
 trial slip surface crosses a line, a tensile force is applied to the sliding mass at the crossing point. Three
@@ -22,14 +16,12 @@ questions determine that force, and they are independent of one another:
 
 This decomposition follows the convention used by Slide2 and other commercial programs, which allows xslope
 results to be compared directly against them. The **Type** column in the input template is a *preset* over these
-settings — selecting a support type fills Dir and Appl with the appropriate defaults — not a separate mechanism.
-
-What to enter for a particular support (a geosynthetic layer, a soil nail, a tieback or an end-anchored bar), and
-how to connect it to a wall or make it a joint, is set out column by column on
-[Reinforcement Types](types.md).
+settings ([Support Type Presets](#support-type-presets)).
 
 The finite element treatment, in which each reinforcement line is a row of bar elements in the mesh and carries the
-tension its stretch produces, is on the [FEM reinforcement](fem.md) page.
+tension its stretch produces, is on the [FEM reinforcement](fem.md) page. The LEM does not read $T_{res}$, the tension
+a bar keeps after rupture in the FEM: it computes no strains, so no line can load past its peak. The two analyses
+are compared under [LEM vs FEM](overview.md#lem-vs-fem).
 
 ## Capacity Envelope
 
@@ -99,16 +91,14 @@ either law.
 
 **FHWA pullout capacity.** The FHWA form $F^{*}\alpha\sigma'_v$ per unit area is this law with $a = 0$ and
 $\delta = \arctan(F^{*}\alpha)$. Written out, FHWA's nominal pullout resistance of a layer is
-$P_r = F^{*}\alpha\,\sigma'_v L_e C R_c$, where $C = 2$ counts the two bearing faces of a sheet and $R_c$ is the
+$P_r = F^{*}\alpha\,\sigma'_v L_e C R_c$, where $F^{*}$ is the pullout resistance factor, $\alpha$ the scale-effect
+correction, $L_e$ the embedded length, $C = 2$ counts the two bearing faces of a sheet and $R_c$ is the
 fraction of the wall the reinforcement covers. For a continuous geosynthetic ($R_c = 1$) that is the integral
 above, term for term: the factor of two is already in $r(s)$, and the per-unit-width convention is what $R_c = 1$
-means. In FHWA's Example E1 — a 20 ft geogrid-reinforced wall — the geogrids take $F^{*} = 0.45$ and
-$\alpha = 0.8$ from the manual's Table 3-6 ($\alpha$ is 0.8 for geogrids, 0.6 for geotextiles, 1.0 for metallic
-reinforcement), so the two columns are Adhesion = 0 and
-Delta = $\arctan(0.45 \times 0.8) = 19.80°$, and nothing else about the bond is entered. Reading the envelope
-where the design failure surface crosses each of that wall's eleven layers reproduces the manual's whole pullout
-table; the entry is under
-[published problems](../verification/published.md#fhwa-e1).
+means. The entries for a geosynthetic, with typical values of $F^{*}$ and $\alpha$, are under
+[Geosynthetic Layer](types.md#geosynthetic-layer). In FHWA's Example E1, a 20 ft geogrid-reinforced wall, reading
+the envelope where the design failure surface crosses each of the wall's eleven layers reproduces the manual's
+whole pullout table ([published problems](../verification/published.md#fhwa-e1)).
 
 **Grouted tiebacks with a bonded length.** A tieback develops pullout resistance only over its grouted bond
 length; the sleeved unbonded length transfers no load to the ground. Its envelope is the development-length law,
@@ -145,7 +135,7 @@ The **Dir** setting sets $\psi$:
 - **Axial** ($\psi$ = the inclination of the reinforcement line itself) — rigid supports such as soil nails,
   grouted tiebacks, and anchored bars carry their force along their own axis; the soil cannot reorient them.
 
-The direction affects each solution method the same way the pile force does: the force is resolved into components
+The direction affects each solution method the same way a [pile force](../lem/piles.md) does: the force is resolved into components
 normal and tangential to the slice base — $P\sin(\alpha - \psi)$ normal (zero for tangent) and
 $P\cos(\alpha - \psi)$ tangential — and for moment-based methods it contributes a moment about the circle center
 through its real moment arm at point $r$.
@@ -175,37 +165,20 @@ so the choice is set per line:
   force as the soil deforms (nails, geosynthetics in some formulations) and the entered capacity is unfactored.
 
 The distinction matters numerically: on the classic Duncan & Wright tieback example (their Fig. 6.34), the same
-9,000 lb/ft support gives FS = 1.51 active and FS = 1.32 passive. It also changes what you should enter in the
-$T_{max}$ column — an **allowable** force for active, a **nominal** (unfactored) force for passive.
+9,000 lb/ft support gives FS = 1.51 active and FS = 1.32 passive.
 
 ## Support Type Presets
 
 The **Type** column fills Dir and Appl automatically (either can be overridden by typing over the value):
 
-| Type | Dir | Appl | Typical use |
-|---|---|---|---|
-| Geosynthetic | Tangent | Active | geotextile / geogrid layers |
-| Nail | Axial | Passive | drilled and grouted soil nails |
-| Tieback | Axial | Active | pre-tensioned grouted anchors |
-| Anchor | Axial | Active | end-anchored bars |
+| Type | Dir | Appl |
+|---|---|---|
+| Geosynthetic | Tangent | Active |
+| Nail | Axial | Passive |
+| Tieback | Axial | Active |
+| Anchor | Axial | Active |
 
-Leave Type blank for a generic tensile line with the defaults (Tangent, Active). A micropile, pile or pier resists by
-shear and bending rather than tension and is entered on the [piles](../lem/piles.md) sheet.
-
-## LEM vs. FEM
-
-Both engines use the same reinforcement lines, but the mechanics differ:
-
-- **LEM** applies the capacity envelope value as a *prescribed* force at the crossing point, in the Dir direction,
-  factored per Appl. The residual strength $T_{res}$ is not used — LEM has no strain compatibility, so there is no
-  notion of an element loading past peak.
-- **FEM** models each line as tension-only truss elements whose force *emerges* from displacement compatibility;
-  the same capacity envelope caps each element's allowable force. An element that reaches it yields and holds that
-  force (elastic-perfectly-plastic) — unless $T_{res}$ has been filled in, in which case it drops to that residual
-  where the residual is the lower of the two, and holds the envelope value where the envelope is. Both engines
-  therefore treat bond slip the same way; what $T_{res}$ adds in the FEM is rupture of the reinforcement itself.
-  Dir and Appl have no meaning in the FEM.
-  See [Soil Reinforcement in FEM](fem.md).
+Leave Type blank for a generic tensile line with the defaults (Tangent, Active).
 
 ## References
 

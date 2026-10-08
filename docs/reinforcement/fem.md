@@ -5,10 +5,8 @@ description: "Geosynthetics, nails and anchors as tension-only bar elements in X
 
 # Soil Reinforcement in Finite Element Analysis
 
-Reinforcement supplies the tension that soil cannot carry: geosynthetic layers built into a fill, soil nails
-grouted into a cut, tiebacks holding a wall, each crossing the zone where a slip surface would form and anchored in
-the stable ground beyond it. The [Reinforcement Overview](overview.md) shows the three kinds and
-how a line is entered.
+Reinforcement supplies the tension soil cannot carry. The kinds of support and how a line is entered are on the
+[Reinforcement Overview](overview.md), and what to enter for each support on [Reinforcement Types](types.md).
 
 Geotextiles, geogrids, soil nails and ground anchors are modeled as one-dimensional truss (bar) elements embedded in
 the soil mesh. A bar has axial stiffness $EA/L$ — $E$ the reinforcement's modulus, $A$ its cross-sectional area per
@@ -28,20 +26,8 @@ to the soil in the middle of the edge. A line is divided into elements at the me
 **1D element size** where the model states one. A line can instead be a slip surface the soil slides on; see
 [Two ways to represent a sheet](#two-ways-to-represent-a-sheet).
 
-Because a bar carries force only along its own axis, the direction of a reinforcement force is fixed in the
-finite element analysis. In the limit equilibrium solvers it is chosen per line: tangent to the slip surface where
-the line crosses it (the default for a geosynthetic), or along the line (the default for nails, tiebacks and
-anchors). The figure compares the two on the [FEM-2](../tutorials/fem02_reinforcement.md) slope and its critical
-circle:
-
-![The direction of the reinforcement force in limit equilibrium and in the finite element analysis](../fem/images/reinf_force_direction.png){width=1000}
-
-On the left, the limit equilibrium force at each crossing acts tangent to the circle, and the axial alternative is
-drawn at the middle layer. On the right, each bar carries tension along its own length, from how much it stretches.
-
-What to enter for a particular support (a geosynthetic layer, a soil nail, a tieback or an end-anchored bar), and
-how to connect it to a wall or make it a joint, is set out column by column on
-[Reinforcement Types](types.md).
+Because a bar carries force only along its own axis, `Dir` and `Appl` are not read here; the force direction in the
+two analyses is compared under [LEM vs FEM](overview.md#lem-vs-fem).
 
 ## Mathematical Formulation
 
@@ -59,7 +45,7 @@ bar's, in the node order $(i, j, m)$:
 >>$[K_e]_{global} = [R]^T [K_e]_{local} [R]$
 
 The transformation is built from $\alpha$, the inclination of the reinforcement line to the horizontal — the same
-angle the LEM formulation uses for the direction of an axial reinforcement force. On a two-node bar it is
+angle [the LEM formulation](lem.md#force-direction-dir) uses for the direction of an axial reinforcement force. On a two-node bar it is
 
 >>$[R] = \begin{bmatrix} \cos\alpha & \sin\alpha & 0 & 0 \\ 0 & 0 & \cos\alpha & \sin\alpha \end{bmatrix}$
 
@@ -77,8 +63,6 @@ The forces and failure modes in 1D truss elements are analyzed in an iterative f
 has a maximum allowable tensile capacity $T_{allow}$, derived from the user-specified reinforcement parameters,
 and optionally a residual tensile capacity $T_{res}$. The axial force in each element is calculated as
 $T = (AE/L) \cdot \delta$, where $\delta$ is the element elongation.
-
-The diagram below projects the end movements onto the bar axis to recover its elongation and center force.
 
 ![End displacement projections and center force of a three-node reinforcement bar](../fem/images/reinf_axial_projection.png){width=667px}
 
@@ -134,38 +118,21 @@ Appropriate for brittle materials (some steel cables, fiber reinforcement).
 
 **Pullout Failure Model:**
 
-Toward each end of a line, the capacity is limited by the pullout resistance the embedment can develop. Under the
-development-length law the capacity rises linearly from the end anchorage $T_{end}$ (zero when blank) at the rate
-$T_{max}/L_p$, so with no anchorage it reaches $T_{max}$ at the pullout length $L_p$ from the end; an $L_p$ of 0
-makes that end fully anchored, with $T_{max}$ available at the end itself. The full envelope is under
-[Element capacities](#element-discretization-and-capacity-assignment).
+Toward each end of a line the capacity is limited by what the embedment can develop, under the
+[capacity envelope](lem.md#capacity-envelope) ([Element capacities](#element-discretization-and-capacity-assignment)).
 
 - Pullout is **perfectly plastic**. An element that reaches its embedment-limited capacity slips at that force and
   goes on carrying it: interface friction does not vanish once it has been overcome, so there is no drop to zero.
-  The LEM envelope makes the same assumption.<br>
+  The LEM envelope makes the same assumption.
 - Pullout spreads along a line as elements near the ends reach their capacity one after another and shed the
   balance of the demand into the interior.
 
 ## Reinforcement Line Input Parameters and Element Properties
 
-In the Excel input template used by XSLOPE, the user defines one reinforcement line per row of the table on the
-`reinforce` sheet. The table has no row limit: the template is formatted for 30 lines, and more may be added in the
-rows below them. The lines are read down to the first row whose x1 is blank. Each row of the table includes the
-following, in sheet order:
-
-| Column | Description |
-|---|---|
-| Label | optional name |
-| x1, y1 / x2, y2 | end 1 and end 2 of the line |
-| Type, Dir, Appl | limit equilibrium settings; not read by the FEM (see [Soil Reinforcement in LEM](lem.md)) |
-| Tmax | tensile strength, per element or per unit width |
-| Lp1, Lp2 | pullout length at end 1 and end 2; 0 = fully anchored |
-| Adhesion, Delta | interface adhesion and friction angle; filled together, they replace Lp1/Lp2 with the overburden law |
-| Tend1, Tend2 | end anchorage capacity; on a jointed line, a value above zero ties that end |
-| Spacing | spacing of discrete elements (nails, anchors, strips); Tmax, Tres, Tend and Area are divided by it; blank for a continuous sheet |
-| Tres | residual tension; blank = no post-peak drop, 0 = brittle rupture; FEM only |
-| E, Area | modulus and cross-sectional area |
-| Joint, kn, ks, Jred | slip-surface option and its interface stiffnesses and reduction switch ([Two ways to represent a sheet](#two-ways-to-represent-a-sheet)) |
+In the input template each reinforcement line is one row of the `reinforce` sheet. The table has no row limit: the
+template is formatted for 30 lines, and more may be added in the rows below them. The lines are read down to the
+first row whose x1 is blank. The columns are described under [The Columns](overview.md#the-columns); only the FEM
+reads `Tres`, `E`, `Area`, `Joint`, `kn`, `ks` and `Jred`.
 
 The units for E and Area need to be compatible with each other and with the other weight and length units used. For
 metric units, E should be in $kPa$ and Area should be in $m^2$. For English units, E should be in $psf$ and Area
@@ -184,17 +151,11 @@ crossing, evaluated by the same function, so the two engines always use the same
 >>
 >>where $r$ is the pullout resistance per unit length. Under the development-length law $r = T_{max}/L_p$ at each end, and the integrals are the linear ramps $T_{max}d_1/L_{p1}$ and $T_{max}d_2/L_{p2}$. Under the overburden-dependent law (Adhesion and Delta both filled) $r = 2(a + \sigma'_v\tan\delta)/S$, with $S$ the Spacing (1 when blank), varies along the line with the effective overburden, and $L_{p1}$/$L_{p2}$ are not read. Both laws, and the end anchorage capacities $T_{end}$, are set out in **[Soil Reinforcement in LEM](lem.md#capacity-envelope)**.
 
-Elements near a free end therefore have reduced capacity — zero at the end itself, unless an anchorage capacity
-$T_{end}$ is entered there or that end's $L_p$ is 0 — while elements far enough from both ends carry the full design
-strength.
-
 Where post-peak behavior is switched on, two independent mechanisms can limit what an element retains, and the
 smaller of the two governs. Bond slip is perfectly plastic, so the embedment goes on developing $T_{allow}$ — the
 ramped envelope, end anchorage included — however far the bar is pulled. The line's entered $T_{res}$ is the rupture
 residual, a property of the reinforcement itself and not of its embedment. Beyond the ramps $T_{allow} = T_{max}$
 and the element takes the user's residual strength; inside a ramp it takes whichever of the two is less.
-
-The diagram below pairs the development-length law with the FEM element centers where it is sampled.
 
 ![Bonded bar capacities sampled at FEM element centers, with unequal development lengths and overlapping ramps](../fem/images/reinf_element_capacities.png){width=768px}
 
@@ -212,24 +173,10 @@ $A$ the bar's cross-section. For a geosynthetic, a secant stiffness from its ten
 where $T_{ult}$ is the ultimate tensile strength and $\varepsilon_{ult}$ the strain at which it is reached. $T_{max}$ is
 not used here: with Appl Active it is an allowable value, well below $T_{ult}$.
 
-### Determining Reinforcement Line Pullout Lengths
-
-A separate pullout length (Lp) is used for each end since each end may be embedded in a separate soil with different
-shear resistance values. A line may instead state its interface strength through Adhesion and Delta, in which case
-the resistance follows the effective overburden along the line and the pullout lengths are not used.
-
-The pullout length $L_p$ is the distance from each end of the reinforcement over which the full tensile strength
-is mobilized, $T_{max}$ divided by the pullout resistance per unit length at that end. The entries for a
-[geosynthetic layer](types.md#geosynthetic-layer), a
-[soil nail](types.md#soil-nail) and a
-[tieback](types.md#tieback-grouted-ground-anchor), with the pullout resistance per unit
-length and typical values from the FHWA manuals, are on [Reinforcement Types](types.md).
-
 ### Initial state and EA selection
 
-The reinforcement is placed with the soil in its final geometry and starts at zero force. It gains tension only from
-the deformation of the gravity solve and of the strength reduction, not from construction in lifts; XSLOPE has no
-staged construction. A bar must therefore be stiff enough to mobilize its capacity at the small displacements of an
+A bar starts at zero force in the final geometry and gains tension only from the deformation of the gravity solve
+and of the strength reduction, not from construction in lifts; XSLOPE has no staged construction. A bar must be stiff enough to mobilize its capacity at the small displacements of an
 incipient failure. The zero initial force matters most where the reinforcement is extensible and the wall tall, or
 where reinforcement forces at working load are wanted. The `E` and `Area` entries for each support are on
 [Reinforcement Types](types.md).
@@ -250,8 +197,8 @@ in — and draws the selected member's profiles beside the list. Under the list 
 selected member picked out, so each listed member can be located on the slope. The button is dimmed for a model
 with no reinforcement lines and no piles.
 
-The screenshot below is a strength reduction run on the reinforced slope built in
-[FEM-2](../tutorials/fem02_reinforcement.md), shown at the mechanism it developed:
+A strength reduction run on the reinforced slope built in [FEM-2](../tutorials/fem02_reinforcement.md), shown at
+the mechanism it developed:
 
 ![Reinforcement detail for Line 4 of the reinforcement sample](../fem/images/reinforce_fem_details.png){width=1000}
 
@@ -326,8 +273,6 @@ then slide on the sheet, and on each other, at that interface strength. The inte
 their defaults are described under [The interface element](../fem/joints.md#the-interface-element); on a reinforcement line
 the tension cutoff is zero.
 
-The comparison below shows which nodes the soil and sheet share in the two representations.
-
 ![Shared bonded nodes compared with coincident soil–bar–soil copies and two interfaces on a jointed sheet](../fem/images/reinf_bonded_jointed.png){width=896px}
 
 Every node on a jointed line exists three times at the same point — a copy for the soil above, a copy for the bar,
@@ -364,8 +309,8 @@ $T_{max}$ and the end ties are not reduced. Iteration budgets, and how a jointed
 
 ## Joints Without Reinforcement {#joints-without-reinforcement}
 
-A slip surface with no member in it — a rock joint, a block contact, the back of a wall — goes on the **joints**
-worksheet and is described on [Joints and interface elements](../fem/joints.md). Its mesh split differs from a jointed
+A slip surface with no member in it goes on the **joints** worksheet ([Joints and interface
+elements](../fem/joints.md)). Its mesh split differs from a jointed
 sheet's: each station carries two coincident nodes and one interface, where a jointed sheet carries three nodes and
 two interfaces:
 

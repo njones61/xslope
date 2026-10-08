@@ -25,7 +25,13 @@ inches or millimeters (ksi, in², in⁴, mm²) is also given in model units, bui
 A row of drilled shafts, or piers, is installed through the sliding mass and into stable ground below it, at a
 spacing that lets the soil arch between them; the shafts act as shear dowels across the slip surface
 ([GEC 10][gec10] p. 12-59). A discrete row is analyzed with the LEM and the Ito & Matsui force
-([LEM vs FEM](overview.md#lem-vs-fem)).
+([LEM vs FEM](overview.md#lem-vs-fem)). The figure shows one shaft of a row in section.
+
+![A drilled shaft of diameter D through a slope, from its head at the ground surface, across the slip surface, to its tip in stable ground, with the force H at the crossing](images/pw_shaft.png){width=477}
+
+The pile line runs from the head to the tip, and `D` is the shaft's diameter. Where a trial slip surface crosses
+the shaft, the LEM applies `H`, pointing into the slope, against the movement of the sliding mass. The spacing `S` runs along the
+row, into the page, as in the plan under [LEM vs FEM](overview.md#lem-vs-fem).
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
@@ -47,14 +53,19 @@ spacing that lets the soil arch between them; the shafts act as shear dowels acr
 A micropile is a small drilled and grouted pile, typically less than 300 mm (12 in) in diameter, reinforced with a
 steel casing or bar ([micropile manual][mp] p. 1-4). To stabilize a slope, micropiles are installed in rows, often
 in pairs battered across the slip surface, with their heads tied together by a concrete cap beam at the ground
-surface (pp. 6-44, 6-54). Ito & Matsui applies to vertical piles only, so a battered micropile is entered with its
-`H`.
+surface (pp. 6-44, 6-54). Ito & Matsui applies to vertical piles only, so a battered micropile's `H` is entered,
+not computed. The figure shows one battered pair under its cap beam.
+
+![A pair of micropiles battered in opposite directions from a cap beam on a bench in a slope, each crossing the slip surface with its own force H perpendicular to it](images/pw_micropiles.png){width=519}
+
+Each leg is a pile line of its own, from its head in the cap beam to its tip in stable ground, with its own `H`
+perpendicular to the leg where the slip surface crosses it. `S` is the spacing between pairs along the row.
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Entry | Typical values |
 |---|---|---|
-| <code class="rc rc-lem">H</code> | the resistance per unit width: the force one micropile, or one pair, develops at the slip surface ÷ `S` | In the manual's slope example, 365 kN (82 kip) for the upslope leg and 450 kN (101 kip) for the downslope leg, against 650 kN/m (44.5 kip/ft) required (pp. 6-51, 6-52). |
+| <code class="rc rc-lem">H</code> | the resistance per unit width: the force one micropile develops at the slip surface ÷ `S`. Each leg of a pair is a line of its own, with its own `H`. | In the manual's slope example, 365 kN (82 kip) for the upslope leg and 450 kN (101 kip) for the downslope leg, against 650 kN/m (44.5 kip/ft) required (pp. 6-51, 6-52). |
 | <code class="rc rc-lem">Appl</code> | `Active` for an allowable `H`.<br>`Passive` for an ultimate `H`, such as the example's, which the LEM then divides by F. | — |
 | <code class="rc rc-both">D</code> | Blank: `H`, `I` and `Area` are entered, so the diameter is not read. | Grouted diameter typically less than 0.3 m (1 ft) (p. 1-4); 0.2 m (0.66 ft) in the manual's group example (p. 5-25). |
 | <code class="rc rc-both">S</code> | spacing along the row, between micropiles or between pairs | At least 0.76 m (2.5 ft) or 3 diameters, whichever is greater (p. 5-8); 1.25 m (4.1 ft) between pairs in the slope example (p. 6-52). |
@@ -72,7 +83,14 @@ The grout inside the casing is left out of `I` and `Area` here; the moment capac
 
 A sheet-pile wall is a line of interlocking steel sheets driven to form a continuous wall, cantilevered or held by
 tiebacks. It is continuous out of plane, so the FEM represents it directly, and it is entered per unit length of
-wall, with `S` = 1.
+wall, with `S` = 1. The figure shows a wall held by a tieback in section, and its sheets in plan.
+
+![A sheet-pile wall in section, retaining soil above an excavation, held by a tieback and embedded below the excavation's base, beside the interlocked Z-shaped sheets in plan](images/pw_sheet_pile.png){width=766}
+
+The pile line runs from the top of the wall to its tip, which lies below the excavation's base by the embedment.
+The tieback is a line on the `reinforce` sheet, connected as under
+[A tieback and a soldier-pile or sheet-pile wall](#a-tieback-and-a-soldier-pile-or-sheet-pile-wall). In plan the
+interlocked sheets form one continuous wall, so `I`, `Area` and `Mcap` are entered per unit length of it.
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
@@ -106,7 +124,15 @@ The manufacturer states these as 6.47 to 11.77 in² and 84.4 to 491 in⁴ per fo
 A soldier-pile wall is a row of steel beams, driven H-piles or pairs of channels or wide-flange beams set in
 concrete-filled drilled holes, with timber lagging spanning between them to hold the soil ([GEC 4][gec4] p. 13).
 The beams are discrete, but the lagging makes the wall continuous, so the wall is entered per beam with `S` the
-beam spacing. [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) builds one held by tiebacks.
+beam spacing. [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) builds one held by tiebacks. The figure shows
+the wall in plan and in section.
+
+![A soldier-pile wall in plan, steel beams at spacing S with timber lagging between them, and in section, the lagging down to the excavation's base and the beam embedded below it](images/pw_soldier_pile.png){width=658}
+
+In plan, the soldier piles, steel beams, stand at spacing `S`, and the lagging spans between them and holds the
+soil. In section,
+the lagging stops at the excavation's base, and the beam continues below it as the embedment. The pile line is one
+beam, and `I`, `Area` and `Mcap` are entered for one beam.
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
@@ -169,6 +195,11 @@ LEM a trial slip surface may run around it or along its base but not through it,
 the base represents sliding on it. In the FEM the wall needs a joint line under its base and one up its back face, so that it can slide and
 part from the soil.
 
+![A concrete gravity wall twice: for the LEM, a trial surface along its base and up through the backfill; for the FEM, a joint line under its base and one up its back face](images/pw_gravity_wall.png){width=758}
+
+On the left, the LEM's non-circular trial surface runs along the wall's base and up through the backfill behind it.
+On the right, the FEM's base joint and back-face joint.
+
 | Quantity | Entry | Typical values |
 |---|---|---|
 | Unit weight | γ of the concrete material | 150 lb/ft³ (23.6 kN/m³) for reinforced concrete ([GEC 4][gec4] p. A-13). |
@@ -180,6 +211,11 @@ part from the soil.
 ## Load-Bearing Piles Near a Slope
 
 Load-bearing piles carry structural loads (vertical forces from foundations) and transfer them to the subsurface through a combination of **skin friction** along the pile shaft and **end bearing** at the pile tip. The key question for slope stability is: does the structural load contribute to the driving forces on the failure surface?
+
+![A footing on a slope's crest on a pile, twice: in Case 1 the pile's tip is above the failure surface, in Case 2 the pile crosses it and its tip is in stable ground](images/pw_load_bearing.png){width=729}
+
+In Case 1 the pile ends inside the sliding mass, so the pile and its load move with it. In Case 2 the pile reaches
+stable ground below the failure surface.
 
 ### Case 1: Pile tip above the failure surface
 

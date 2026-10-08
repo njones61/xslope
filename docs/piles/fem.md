@@ -32,13 +32,8 @@ The wall section and pile-row plan below show what the spacing conversion repres
 
 The row's center-to-center spacing $S$, not the pile diameter $D$, divides its axial and bending stiffnesses to give stiffness per unit wall width.
 
-On the one pile-stabilized slope with a published three-dimensional answer (Cai & Ugai, 2000), the
-plane-strain beam gives a factor of safety 16.0% above it with a free head and 9.9% above it with the head
-rotation restrained ([VP106 finite-element diagnostic](../verification/rocscience.md#vp106-fem)). For a
-discrete row, use limit equilibrium with the Ito & Matsui (1975) force, which models the three-dimensional
-mechanism; use the finite element analysis for a continuous wall, and for a pile row only as a study of
-stiffness and member forces. [LEM vs. FEM pile modeling](lem.md#lem-vs-fem-pile-modeling) sets out
-the choice and compares both engines on the pile sample.
+Which analysis suits which member is set out under [LEM vs FEM](overview.md#lem-vs-fem), and the two are compared
+on the same slopes under [LEM vs. FEM Pile Modeling](lem.md#lem-vs-fem-pile-modeling).
 
 
 ## Comparison with Reinforcement (Truss) Elements
@@ -215,32 +210,19 @@ plane-strain smear.
 the soil elements at each node, not through skin friction and end bearing. The pile cannot slip or punch through,
 and the depth at which the load is transferred depends on the mesh. For a pile near a slope that also carries a
 structural load, model the pile as a passive beam and bracket the load as described under
-[Load-bearing piles](lem.md#load-bearing-piles): once as a surcharge on the `dloads` sheet, once without
+[Load-bearing piles](types.md#load-bearing-piles-near-a-slope): once as a surcharge on the `dloads` sheet, once without
 it.
 
 
 ## Input Parameters
 
-Pile properties for FEM analysis are specified in the `piles` sheet of the input template. The FEM-relevant columns are:
-
-| Column | Field | Description |
-|--------|-------|-------------|
-| C-F | $(x_1, y_1)$, $(x_2, y_2)$ | Pile geometry; the higher end is the head |
-| I | $D$ | Pile diameter — used to compute $I$ and $A$ if not provided |
-| J | $S$ | Center-to-center spacing — scales $EI$ and $EA$ by $1/S$ for per-unit-width |
-| K | $V_{\text{cap}}$ | Shear capacity per pile (force units). Blank = no limit. |
-| L | $M_{\text{cap}}$ | Moment capacity per pile (force × length units). Blank = no limit. |
-| M | $E$ | Young's modulus of pile material |
-| N | $I$ | Moment of inertia of pile cross-section |
-| O | $Area$ | Cross-sectional area of pile cross-section |
-| P | Head | Pile head (top node) restraint: **free** (default), **pinned**, **unrotated** or **fixed** |
-| Q | Tip | Pile tip (bottom node) restraint: **free** (default), **pinned**, **unrotated** or **fixed** — the same four as Head |
-
-If $D$ is provided and $I$/$Area$ are omitted, a solid circular section is assumed:
+The columns of the `piles` sheet are described under [The Columns](overview.md#the-columns): the FEM reads the
+geometry, `D`, `S`, `Vcap`, `Mcap`, `E`, `I`, `Area`, `Head` and `Tip`, and not `H` or `Appl`. If `D` is given
+and `I` or `Area` is blank, a solid circular section is assumed:
 
 >$A = \dfrac{\pi D^2}{4}, \qquad I = \dfrac{\pi D^4}{64}$
 
-Columns G and H, the pile force $H$ and **Appl**, are not used by the finite element analysis. See [LEM Piles](lem.md) for typical material property values and structural capacities.
+Typical values for each kind of pile and wall are on [Pile and Wall Types](types.md).
 
 ## Inspecting the Results
 

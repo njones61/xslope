@@ -943,39 +943,8 @@ The **piles** worksheet defines pile and concrete pier support elements that pro
 
 Each pile is represented as a straight line defined by its two endpoint coordinates, which may be entered in either order: the higher end is the head and the lower end the tip. The line geometry supports both vertical piles ($x_1 = x_2$) and battered (inclined) piles. The template is formatted for up to 20 piles, but additional rows can be added to the table as needed.
 
-Each pile is defined by:
-
-- **Geometry**:<br>
->>x1, y1 **[L]**: First end coordinates<br>
->>x2, y2 **[L]**: Second end coordinates (the higher of the two ends is the head)<br>
-- **LEM Properties**:<br>
->>H — **[F/L]** (per unit width of slope): Pile force magnitude. If the user has a row of piles at spacing $S$ with individual capacity $H_{\text{single}}$, input $H = H_{\text{single}} / S$.<br>
->>The force direction $\theta$ is not an input: it is computed as the direction perpendicular to the pile axis (0°, i.e. horizontal, for vertical piles), with its horizontal component against the movement of the sliding soil, so a battered pile takes its angle from the pile's inclination and the facing of each failure surface (see [Force Direction](../piles/lem.md#force-direction)). Files from template v22 and earlier may carry a $\theta$ ("qp") override column, which is still honored when present.<br>
->>Appl: Force application. **Active** = $H$ is a known *allowable* force, not divided by the factor of safety. **Passive** = $H$ is an *ultimate* capacity added to the resisting side and divided by FS. A blank cell is read as Active; files XSLOPE saves write the choice out explicitly. Has no effect on FEM analysis, where the pile resistance is computed rather than prescribed.<br>
-- **Pile Geometry**:<br>
->>D **[L]**: Pile diameter. Required for Ito & Matsui auto-computation of $H$. Also used by FEM to compute $I$ and $Area$ if those columns are left blank.<br>
->>S **[L]**: Center-to-center spacing. Required for Ito & Matsui auto-computation of $H$. Also required when structural capacity limits (V_cap, M_cap) are specified, since capacity is per-pile and must be compared against the per-pile force F = H &times; S. Recommended in general so that xslope can report per-pile forces in the summary output.<br>
-- **FEM Properties** (for FEM analysis):<br>
->>E **[F/L²]**: Young's modulus of pile material<br>
->>I — **[L⁴]** (single-pile section; xslope scales EI to per unit width by ÷ S): Moment of inertia. If omitted and D is provided, computed for a solid circular section as I = &pi;D<sup>4</sup>/64.<br>
->>Area — **[L²]** (single-pile section; xslope scales EA to per unit width by ÷ S): Cross-sectional area. If omitted and D is provided, computed for a solid circular section as A = &pi;D<sup>2</sup>/4.<br>
-- **Structural Capacity** (optional, LEM &amp; FEM):<br>
->>V_cap — **[F]** (per single pile; requires S so it can be checked against the per-pile force F = H &times; S): Shear capacity of the pile. This is the maximum lateral shear force that the pile cross-section can resist. If provided, the per-pile force $F_{\text{pile}}$ is capped at this value. Requires S to be specified.<br>
->>M_cap — **[F·L]** (per single pile; requires S): Moment capacity of the pile. This is the maximum bending moment the pile can resist. In LEM, the per-pile force is capped at $M_{\text{cap}} / L_m$, where $L_m$ is the moment arm from the pressure centroid to the failure surface. In FEM, a plastic hinge forms when the bending moment at any point along the pile reaches $M_{\text{cap}}$. Requires S to be specified.<br>
->>Head and Tip: the boundary condition at the top node and at the bottom node of the pile for FEM analysis, the same four settings at either end. **free** (default) = nothing held — the soil, or the model boundary the node sits on, decides; **pinned** = translations held, rotation free (tie-rods or anchors at a head; a tip bearing on a hard stratum inside the mesh); **unrotated** = rotation held, translations free (a cap beam tying the heads); **fixed** = translations and rotation held (cap beam and anchors at a head; a tip socketed into rock). Blank or omitted = free. Neither column has any effect on LEM analysis.<br>
-
-Both V_cap and M_cap are properties of a **single pile**, not per unit width. When either is specified, xslope computes the per-pile force $F_{\text{pile}} = H \times S$ and checks it against the structural limits. If the structural capacity governs, the pile force is reduced accordingly before entering the equilibrium equations. If both V_cap and M_cap are blank, the full soil-computed (or user-specified) force is used with no structural limit.
-
-During limit equilibrium analysis, xslope intersects each pile line with the failure surface to find the point where the pile force is applied. The force $H$ at angle $\theta$ is resolved into components normal and tangential to the slice base:
-
-- **Normal to base**: $H\sin(\alpha - \theta)$ — increases effective stress, boosting frictional resistance
-- **Tangential to base**: $H\cos(\alpha - \theta)$ — directly resists sliding
-
-For methods with moment equilibrium (OMS, Bishop), the pile force also contributes a resisting moment about the circle center. The pile must extend below the failure surface to be effective — if the failure surface does not intersect the pile line, the pile provides no resistance for that surface.
-
-When $H$ is left blank and $D$ and $S$ are provided, xslope auto-computes $H$ using the [Ito & Matsui (1975)](https://doi.org/10.3208/sandf1972.15.4_43) method for each trial failure surface. This auto-computation requires vertical piles ($x_1 = x_2$). For battered piles, $H$ must be specified directly.
-
-See the [LEM Piles](../piles/lem.md) section for detailed equation derivations and the [FEM Piles](../piles/fem.md) section for the beam element formulation used in finite element analysis.
+The [Piles and Walls Overview](../piles/overview.md#the-columns) describes every column, and
+[Pile and Wall Types](../piles/types.md) gives the entries for each kind of pile and wall, with typical values.
 
 ---
 

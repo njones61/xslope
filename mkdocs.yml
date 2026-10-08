@@ -129,6 +129,8 @@ nav:
     - Reinforcement in LEM: reinforcement/lem.md
     - Reinforcement in FEM: reinforcement/fem.md
   - Piles and Walls:
+    - Overview: piles/overview.md
+    - Pile and Wall Types: piles/types.md
     - Piles in LEM: piles/lem.md
     - Piles in FEM: piles/fem.md
   - Reliability:

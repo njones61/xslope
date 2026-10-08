@@ -1,21 +1,13 @@
 # Piles and Concrete Piers in LEM Slope Stability
 
-## Introduction
-
-Piles and concrete piers are rigid structural elements used to stabilize slopes by resisting lateral soil movement through shear and bending at the failure surface. Unlike flexible reinforcement (geotextiles, soil nails) which deforms with the soil and provides tension along its axis, piles act as passive structural inclusions that the sliding soil mass pushes against. The pile develops a lateral resisting force at the point where the failure surface intersects the pile, directly opposing the driving forces that cause slope instability.
-
-Pile stabilization is widely used in practice for:
-
-- Remediation of active landslides
-- Stabilization of slopes for new construction (roads, buildings, retaining structures)
-- Protection of existing infrastructure from slope movement
-- Increasing the factor of safety of marginally stable slopes
-
-A row of piles is installed through the sliding mass and embedded into stable ground below the failure surface. As the soil mass attempts to move, it pushes against the piles, which resist through their lateral stiffness and embedment in the stable zone.
-
-![Pile stabilization concept](../lem/images/pile_diagram.png){width=1000px}
+A pile resists a slide by shear and bending where the slip surface crosses it. The kinds of pile and wall, and how a
+pile line is entered, are on the [Piles and Walls Overview](overview.md), and what to enter for each, with typical
+values, on [Pile and Wall Types](types.md). In a limit equilibrium analysis the pile is one force on the sliding
+mass, at the point where a trial slip surface crosses it.
 
 ## Pile Force in Limit Equilibrium Analysis
+
+The pile force enters each slice's equilibrium through its magnitude, its direction and the point where it acts.
 
 ### Force Definition
 
@@ -320,23 +312,10 @@ force. The full per-slice accounting remains in the
 
 ## LEM vs. FEM Pile Modeling
 
-A pile row can be put into either of XSLOPE's engines, but the two engines represent the row differently, and the member's geometry out of plane determines which one applies.
+Which analysis suits which member is set out under [LEM vs FEM](overview.md#lem-vs-fem). The two are compared here
+on the slopes where both have been run.
 
-**How LEM models piles**: the pile contributes a single concentrated force $H$ at the point where the failure surface crosses it. With Ito & Matsui that force is computed from the diameter $D$ and the center-to-center spacing $S$ — a plasticity solution for soil squeezing *between* adjacent piles — then capped by $V_{\text{cap}}$ and $M_{\text{cap}}$, resolved onto the slice base, and carried into the equilibrium equations. Spacing is a direct input: change $S$ and the arching coefficients, the force per pile and the force per unit width of slope all change with it.
-
-**How FEM models piles**: the pile is meshed as a chain of Euler-Bernoulli beam elements sharing nodes with the soil continuum, and its $EA$ and $EI$ are divided by $S$ and smeared over a unit width of section (see [Assembly](fem.md#assembly)). Nothing is prescribed — the beam carries whatever the deforming soil pushes onto it, over its whole length rather than at one point — and the analysis returns the moment, shear, deflection and soil reaction down the member.
-
-**Plane strain and pile spacing**: a two-dimensional analysis is plane strain, so every member in it is continuous out of plane. There is no gap between piles for soil to move through. A discrete row modeled in the FEM is therefore a *wall* at $1/S$ of one pile's stiffness, and the mechanism has to pass over, under or around it. Spacing enters the finite element model exactly once, as that divisor, so the quantity that governs the real three-dimensional mechanism reaches the model only as a stiffness.
-
-### Which engine for which member
-
-| Member | Out of plane | Engine | What it gives |
-|---|---|---|---|
-| Sheet pile, diaphragm or secant wall | continuous | FEM, spacing $S$ = 1 | factor of safety, plus moment, shear, deflection and soil reaction down the member |
-| Contiguous or very closely spaced row | nearly continuous | FEM, with the smear stated | the same, with the gap unrepresented |
-| Discrete row at spacing | discrete | LEM with Ito & Matsui | factor of safety per spacing, force per row, capacity checks |
-
-For a **continuous member** the beam formulation is an exact description rather than an idealization, its $EA$ and $EI$ already are per unit width, and it returns internal actions that a limit equilibrium analysis cannot produce at all. It is compared with GeoStudio's SIGMA/W sheet pile wall example: XSLOPE gives 1.048 without the wall and 1.691 with it, against about 1.025 and 1.4 from SIGMA/W, a gap with the wall that is not yet resolved — see [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) and [Applicability](fem.md#applicability-continuous-walls-and-discrete-pile-rows) in the FEM pile documentation.
+For a **continuous member** the beam formulation is an exact description rather than an idealization, its $EA$ and $EI$ already are per unit width, and it returns internal actions that a limit equilibrium analysis cannot produce at all. It is compared with GeoStudio's SIGMA/W sheet pile wall example: XSLOPE gives 1.048 without the wall and 1.691 with it, against about 1.025 and 1.4 from SIGMA/W, a gap with the wall that remains — see [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) and [Applicability](fem.md#applicability-continuous-walls-and-discrete-pile-rows) in the FEM pile documentation.
 
 For a **discrete row** the limit equilibrium analysis models the actual mechanism, with the soil moving between the piles. The size of the difference is measured on the pile model of [Tutorial LEM-12](../tutorials/lem12_piles.md) and [FEM-4](../tutorials/fem04_piles.md) — a 1:1 slope in c = 200 psf, $\phi$ = 20° soil with two rows of 2 ft drilled shafts at 6 ft spacing — which is solved by both engines on the same section, soil and pile rows:
 
@@ -357,149 +336,10 @@ Neither of those is a three-dimensional answer, and the direction of the error i
 
 The unpiled case agrees to 0.4%, so the differences in the other two rows come from the pile. With the row in place the plane-strain model gives higher values: it credits the row with multiplying the unreinforced factor of safety by 1.389 where the three-dimensional model credits 1.193. On the same slope a Bishop search with the Ito & Matsui force gives 1.451 against the paper's own limit-equilibrium value of 1.37 and Slide2's 1.43, a credit of 1.269. Both two-dimensional credits stand above the three-dimensional one, the beam's by 0.196 and the limit-equilibrium search's by 0.076, so neither recovers it and the limit-equilibrium search lands nearer. This is the only benchmark with a published three-dimensional answer. Both comparisons are quantified in [VP106](../verification/rocscience.md#vp106) and [the VP106 finite-element diagnostic](../verification/rocscience.md#vp106-fem).
 
-**Practical implications**: take the factor of safety for a discrete pile row from the limit equilibrium analysis with Ito & Matsui, and read its finite element counterpart as a stiffness-and-force study rather than as a competing factor of safety. Do not repair the plane-strain smear by adjusting the pile stiffness or by imposing the Ito & Matsui limit pressure on the beam — the limit pressure is a theory of the very mechanism the two-dimensional model does not contain, and applying it there counts the same resistance twice. Where the member really is continuous, use the finite element analysis: it is the only one that reports the member's internal forces.
-
-
-## Stabilizing Piles vs. Load-Bearing Piles
-
-The discussion above focuses on **stabilizing piles** (also called passive piles) — piles installed specifically to resist lateral soil movement and improve slope stability. However, piles near slopes may also serve as **load-bearing piles** that carry structural loads (buildings, bridges, retaining walls) through the soil to deeper bearing strata. The treatment of these two cases in slope stability analysis is fundamentally different.
-
-### Stabilizing (Passive) Piles
-
-Stabilizing piles are the primary focus of the pile implementation in XSLOPE. These piles:
-
-- Are installed through the sliding mass and embedded in stable ground below the failure surface
-- Resist lateral soil movement through shear and bending
-- Provide a lateral force $H$ at the failure surface that is incorporated into the LEM equations as described above
-- Their own self-weight is typically negligible relative to the soil mass and is ignored
-
-### Load-Bearing Piles
-
-Load-bearing piles carry structural loads (vertical forces from foundations) and transfer them to the subsurface through a combination of **skin friction** along the pile shaft and **end bearing** at the pile tip. The key question for slope stability is: does the structural load contribute to the driving forces on the failure surface?
-
-#### Case 1: Pile tip above the failure surface
-
-If the pile tip is entirely within the sliding mass (a friction pile in weak soil, for example), the entire pile and its load are part of the sliding mass. The structural load **does** contribute to driving forces and should be included in the analysis. Standard practice is to apply the structural load as a **distributed surface surcharge** using the distributed loads (`dloads`) sheet in the XSLOPE input template. This is slightly conservative because it places all the weight at the surface rather than distributing it with depth through skin friction, but the conservatism is generally small and accepted in practice.
-
-#### Case 2: Pile tip below the failure surface
-
-This is the usual design intent for load-bearing piles near slopes — the pile is embedded in stable ground below the failure surface. The pile shaft necessarily passes **through** the sliding mass to reach that stable ground, and skin friction is mobilized along the full shaft length, both above and below the failure surface. The portion of the structural load transferred via skin friction **above** the failure surface loads the sliding mass; the remainder (skin friction below the failure surface plus end bearing) bypasses it.
-
-In principle, determining the split requires a load-transfer analysis (t-z curves or similar). In practice, this is rarely done in the context of slope stability because the complexity is not justified. Instead, two bounding assumptions are used:
-
-**Lower bound (omit the load)**: Assume the pile delivers all of its load to stable ground below the failure surface. The structural load is omitted entirely from the slope stability model. This is the approach recommended by FHWA, AASHTO, and used by commercial slope stability software (SLOPE/W, Slide2). It is appropriate when:
-
-- The pile is designed as an end-bearing pile in competent material (rock, dense sand) — most of the load genuinely reaches the tip
-- The skin friction above the failure surface is small relative to the total pile capacity (shallow failure surface relative to the pile length, or weak soil in the sliding mass)
-- The structural load is modest relative to the soil driving forces
-
-**Upper bound (full surcharge)**: Treat the full structural load as a surface surcharge, as in Case 1. This is conservative — it assumes all of the load enters the sliding mass, ignoring the load that bypasses via end bearing and deep skin friction. This approach is appropriate when:
-
-- A significant portion of the pile shaft is above the failure surface
-- The soil above the failure surface has high skin friction capacity (the pile sheds substantial load before reaching the failure surface)
-- The structural load is large relative to the soil driving forces, and the lower-bound assumption would meaningfully affect the computed factor of safety
-
-For most practical cases with end-bearing piles through a shallow sliding mass, the lower-bound (omit) approach is standard and the error is small. When in doubt, run both assumptions to bracket the answer.
-
-#### Summary
-
-For load-bearing piles near slopes, the recommended approach in XSLOPE is:
-
-1. If the pile tip is above the failure surface, apply the structural load as a distributed surface load on the `dloads` sheet
-2. If the pile tip is below the failure surface, omit the structural load from the slope stability model (lower bound). If the structural load is significant, also run with full surcharge (upper bound) to bracket the result.
-3. If the pile also provides lateral resistance to sliding, model that separately as a stabilizing pile force $H$
-
-The distributed loads in XSLOPE handle the surcharge case, so load-bearing piles need no additional input.
-
-The finite element analysis does not remove these bounds: its pile is bonded to the soil with no shaft interface ([FEM piles](fem.md#pile-soil-interface-and-load-transfer)).
-
-
-## Typical Parameter Values
-
-The following tables provide typical ranges of pile and pier parameters for use in slope stability analysis. These values are intended as guidance for filling in the `piles` sheet of the input template and for preliminary design estimates.
-
-### Pile Types and Typical Dimensions
-
-| Pile Type | Typical Diameter/Width | Typical Length | Notes |
-|-----------|----------------------|----------------|-------|
-| Steel H-pile | 200-400 mm (8-14 in) | 6-30 m (20-100 ft) | Wide-flange sections; high strength-to-weight ratio |
-| Steel pipe pile | 300-900 mm (12-36 in) | 6-40 m (20-130 ft) | Open-ended or closed-ended; often concrete-filled |
-| Precast concrete pile | 250-600 mm (10-24 in) | 6-25 m (20-80 ft) | Square or octagonal cross-section |
-| Drilled shaft (caisson) | 450-3000 mm (18-120 in) | 3-60 m (10-200 ft) | Cast-in-place; larger diameters common for slope stabilization |
-| Concrete pier | 600-1500 mm (24-60 in) | 3-15 m (10-50 ft) | Often used for slope stabilization; rectangular or circular |
-| Micropile | 150-300 mm (6-12 in) | 6-30 m (20-100 ft) | Drilled and grouted; used in tight access or existing structures |
-| Timber pile | 200-400 mm (8-16 in) | 6-20 m (20-65 ft) | Tapered; limited to lighter loads |
-
-### Typical Spacing
-
-| Application | Typical $S/D$ Ratio | Typical Spacing $S$ | Notes |
-|-------------|---------------------|---------------------|-------|
-| Slope stabilization | 3-6 | 1.5-6 m (5-20 ft) | Closer spacing = more arching between piles |
-| Retaining structures | 2-4 | 1-4 m (3-12 ft) | Often soldier piles with lagging |
-| Ito & Matsui applicability | 2-8 | -- | Theory assumes plastic flow between piles |
-
-### Typical Section Properties
-
-| Section | $A$ (Area) | $I$ (Moment of Inertia) |
-|---------|-----------|------------------------|
-| Solid circular, $D$ = 0.6 m (24 in) | 0.283 m$^2$ (452 in$^2$) | 6.36 x 10$^{-3}$ m$^4$ (16,286 in$^4$) |
-| Solid circular, $D$ = 0.9 m (36 in) | 0.636 m$^2$ (1,018 in$^2$) | 3.22 x 10$^{-2}$ m$^4$ (82,448 in$^4$) |
-| Solid circular, $D$ = 1.2 m (48 in) | 1.131 m$^2$ (1,810 in$^2$) | 1.02 x 10$^{-1}$ m$^4$ (260,576 in$^4$) |
-| HP 14x117 (steel H-pile) | 0.022 m$^2$ (34.4 in$^2$) | 4.43 x 10$^{-4}$ m$^4$ (1,063 in$^4$) |
-| HP 12x84 (steel H-pile) | 0.016 m$^2$ (24.6 in$^2$) | 2.18 x 10$^{-4}$ m$^4$ (524 in$^4$) |
-| Pipe pile, $D$ = 0.6 m, $t$ = 12 mm | 0.022 m$^2$ (34.6 in$^2$) | 9.7 x 10$^{-4}$ m$^4$ (2,330 in$^4$) |
-
-For solid circular sections: $A = \pi D^2 / 4$, $\quad I = \pi D^4 / 64$.
-
-### Material Properties
-
-| Material | $E$ (kPa) | $E$ (psf) | $\nu$ |
-|----------|-----------|-----------|-------|
-| Structural steel | 2.0 x 10$^8$ | 4.18 x 10$^9$ | 0.3 |
-| Reinforced concrete ($f'_c$ = 4000 psi) | 2.5 x 10$^7$ | 5.2 x 10$^8$ | 0.2 |
-| Reinforced concrete ($f'_c$ = 5000 psi) | 2.8 x 10$^7$ | 5.8 x 10$^8$ | 0.2 |
-| Reinforced concrete ($f'_c$ = 6000 psi) | 3.0 x 10$^7$ | 6.3 x 10$^8$ | 0.2 |
-| Timber (Douglas Fir) | 1.2 x 10$^7$ | 2.5 x 10$^8$ | 0.3 |
-
-Concrete modulus computed as $E_c = 57{,}000 \sqrt{f'_c}$ (psi) per ACI 318.
-
-### Typical Lateral Resistance $H$
-
-Lateral resistance depends heavily on soil conditions, pile geometry, and embedment depth. The following ranges are approximate for preliminary estimates only.
-
-| Soil Type | Pile Type | Typical $H$ per pile | Notes |
-|-----------|-----------|---------------------|-------|
-| Stiff clay ($c$ = 50-100 kPa) | Drilled shaft, $D$ = 0.9 m, $S$ = 3 m | 100-400 kN/m (7-27 kip/ft) | Per unit width = $H_{\text{pile}} / S$ |
-| Medium dense sand ($\phi$ = 30-35 deg) | Steel H-pile, $S$ = 2 m | 50-200 kN/m (3-14 kip/ft) | Depends on depth above failure surface |
-| Soft clay ($c$ = 15-30 kPa) | Concrete pier, $D$ = 1.2 m, $S$ = 3 m | 30-100 kN/m (2-7 kip/ft) | Lower bound; may govern over structural capacity |
-| Weathered rock | Drilled shaft, $D$ = 0.9 m, $S$ = 3 m | 200-800 kN/m (14-55 kip/ft) | High capacity but expensive installation |
-
-These values are for preliminary guidance only. Actual $H$ should be determined from Ito & Matsui theory, p-y analysis, or structural analysis of the pile.
-
-### Typical Structural Capacities
-
-The following table provides typical ranges of shear capacity ($V_{\text{cap}}$) and moment capacity ($M_{\text{cap}}$) for common pile types. These are ultimate capacities; appropriate factors of safety or resistance factors should be applied per the governing design code.
-
-| Pile Type | $V_{\text{cap}}$ (kN) | $V_{\text{cap}}$ (kip) | $M_{\text{cap}}$ (kN·m) | $M_{\text{cap}}$ (kip·ft) | Notes |
-|-----------|----------------------|----------------------|-------------------------|--------------------------|-------|
-| Steel H-pile, HP 12x84 | 600–900 | 135–200 | 400–700 | 300–520 | Weak-axis shear/bending; strong-axis values ~2x higher |
-| Steel H-pile, HP 14x117 | 900–1,300 | 200–290 | 700–1,200 | 520–880 | Weak-axis shear/bending |
-| Steel pipe pile, $D$ = 600 mm, $t$ = 12 mm | 800–1,200 | 180–270 | 500–900 | 370–660 | Unfilled; concrete-filled values ~2–3x higher |
-| Drilled shaft, $D$ = 0.6 m, $f'_c$ = 28 MPa | 300–500 | 65–110 | 200–500 | 150–370 | Depends on reinforcement ratio ($\rho$ = 1–3%) |
-| Drilled shaft, $D$ = 0.9 m, $f'_c$ = 28 MPa | 500–900 | 110–200 | 600–1,500 | 440–1,100 | Depends on reinforcement ratio ($\rho$ = 1–3%) |
-| Drilled shaft, $D$ = 1.2 m, $f'_c$ = 28 MPa | 800–1,400 | 180–310 | 1,200–3,500 | 880–2,600 | Depends on reinforcement ratio ($\rho$ = 1–3%) |
-| Concrete pier, 0.6 m × 0.6 m, $f'_c$ = 28 MPa | 250–400 | 55–90 | 150–400 | 110–300 | Rectangular section; depends on reinforcement |
-| Micropile, $D$ = 200 mm, steel casing | 200–400 | 45–90 | 50–150 | 35–110 | Governed by steel casing and grout bond |
-
-$V_{\text{cap}}$ for reinforced concrete is typically computed per ACI 318 as $V_c + V_s$ (concrete + stirrup contributions). $M_{\text{cap}}$ is the nominal moment capacity $M_n$ of the cross-section. For steel sections, $V_{\text{cap}} = 0.6 F_y A_w$ (web area) and $M_{\text{cap}} = F_y Z$ (plastic section modulus).
-
-
 ## References
 
 Ito, T., & Matsui, T. (1975). Methods to estimate lateral force acting on stabilizing piles. *Soils and Foundations*, 15(4), 43-59.
 
 Poulos, H.G. (1995). Design of reinforcing piles to increase slope stability. *Canadian Geotechnical Journal*, 32(5), 808-818.
-
-FHWA. (2009). *Design and Construction of Driven Pile Foundations*. Publication No. FHWA-NHI-05-042/043, Federal Highway Administration.
 
 Hassiotis, S., Chameau, J.L., & Gunaratne, M. (1997). Design method for stabilization of slopes with piles. *Journal of Geotechnical and Geoenvironmental Engineering*, 123(4), 314-323.

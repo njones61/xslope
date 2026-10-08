@@ -1,14 +1,15 @@
 ---
 title: "Reinforcement types — XSLOPE"
-description: "What to enter on the reinforce sheet for a geosynthetic layer, a soil nail, a tieback or an end-anchored bar, how to connect reinforcement to a wall or facing, and when to make a line a joint, with typical values from the FHWA manuals."
+description: "What to enter on the reinforce sheet for a geosynthetic layer, a soil nail, a tieback or an end-anchored bar, and when to make a line a joint, with typical values from the FHWA manuals."
 ---
 
 # Reinforcement Types
 
 A geosynthetic layer, a soil nail, a tieback and an end-anchored bar each enter the model as one line on the
 `reinforce` sheet, with the columns described on the [Reinforcement Overview](overview.md#the-columns), but each
-fills those columns its own way, and most connect to a wall or a facing. A sheet the soil can slide along is
-entered as a joint. End 1 is at the face or wall wherever a support has one, and F is the factor of safety.
+fills those columns its own way, and most connect to a wall or a facing, as under
+[Connecting Reinforcement to a Wall or Facing](../piles/types.md#connecting-reinforcement-to-a-wall-or-facing). A
+sheet the soil can slide along is entered as a joint. End 1 is at the face or wall wherever a support has one, and F is the factor of safety.
 
 Typical values come from three Federal Highway Administration (FHWA) manuals, Geotechnical Engineering Circulars 4
 (ground anchors), 7 (soil nail walls) and 11 (mechanically stabilized earth walls and reinforced soil slopes),
@@ -52,7 +53,7 @@ T<sub>al</sub> ÷ FS<sub>R</sub>, where FS<sub>R</sub> is the factor of safety t
 | <code class="rc rc-both">Tmax</code> | Appl Active: T<sub>al</sub> (see above) ÷ FS<sub>R</sub>.<br>Appl Passive: T<sub>al</sub>. | FS<sub>R</sub> at least 1.3 ([GEC 11][gec11] p. 9-24). RF = 7 for preliminary design in granular fill (p. 9-5); 2.6 to 2.8 for the geogrids of FHWA Example E1 (Table E1-7.3, p. E1-15). |
 | <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | `Adhesion` = 0: FHWA's pullout resistance has no adhesion term; it comes from the overburden alone.<br>Appl Active: `Delta` = arctan(F\* × α × R<sub>c</sub> ÷ FS<sub>PO</sub>).<br>Appl Passive: `Delta` = arctan(F\* × α × R<sub>c</sub>).<br>F\* is the pullout resistance factor, α the scale-effect correction, R<sub>c</sub> the coverage ratio (1 for a layer covering the full width) and FS<sub>PO</sub> the factor of safety against pullout ([GEC 11][gec11] Eq. 9-9, p. 9-13). | F\* = 0.67 tan φ with α = 0.6, the most conservative defaults ([GEC 11][gec11] p. E8-6); α = 0.6 to 0.8 for extensible reinforcement without pullout tests (p. B-2); F\* = 0.45 and α = 0.8 for the geogrids of Example E1 (p. E1-16); FS<sub>PO</sub> = 1.5 in granular soil and 2 in cohesive soil, and minimum embedment beyond the critical surface 3 ft (1 m) (p. 9-5) |
 | <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | Blank: `Adhesion` and `Delta` give the pullout.<br>To give it as development lengths instead, leave `Adhesion` and `Delta` blank and enter at each end<br>Appl Active: `Tmax` ÷ (P<sub>r</sub> ÷ FS<sub>PO</sub>).<br>Appl Passive: `Tmax` ÷ P<sub>r</sub>.<br>P<sub>r</sub> = 2 × F\* × α × R<sub>c</sub> × σ′<sub>v</sub> is the pullout resistance per unit length, with σ′<sub>v</sub> the vertical effective stress at the layer. | — |
-| <code class="rc rc-both">Tend1</code> | 0 where the layer ends free at the face. Where it is connected to facing blocks or panels, the connection's capacity:<br>Appl Active: T<sub>alc</sub>, the long-term strength of the connection (see [below](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face)), divided by the factor of safety the design applies to the connection.<br>Appl Passive: T<sub>alc</sub>.<br>For a wrapped face, the pullout resistance of the folded-back return (see [below](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face)). | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
+| <code class="rc rc-both">Tend1</code> | 0 where the layer ends free at the face. Where it is connected to facing blocks or panels, the connection's capacity:<br>Appl Active: T<sub>alc</sub>, the long-term strength of the connection (see [Connecting Reinforcement to a Wall](../piles/types.md#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face)), divided by the factor of safety the design applies to the connection.<br>Appl Passive: T<sub>alc</sub>.<br>For a wrapped face, the pullout resistance of the folded-back return (see [Connecting Reinforcement to a Wall](../piles/types.md#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face)). | see [A geosynthetic and facing blocks, panels or a wrapped face](../piles/types.md#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
 | <code class="rc rc-both">Tend2</code> | 0: the buried end has no anchorage, so the capacity there starts from zero | — |
 | <code class="rc rc-both">Spacing</code> | blank: a continuous sheet is entered per unit width of slope, so nothing is divided by a spacing | — |
 | <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> | `E` × `Area` = EA, the sheet's tensile stiffness per unit width ([Axial Stiffness (EA)](fem.md#axial-stiffness-ea)). Only the product matters, so `Area` = 1 with `E` = EA will do. | EA = T<sub>ult</sub> ÷ ε<sub>ult</sub>, from the manufacturer's tensile test: the ultimate strength over the strain at which it is reached |
@@ -103,7 +104,7 @@ At end 1 the capacity starts at the head's `Tend1` and at end 2 at zero, and bon
 
 In [GEC 7][gec7]'s allowable stress design, which programs such as SNAILZ follow with an allowable bond stress (p. 117), the
 factor of safety on the soil is at least 1.5 (Table 5.1, p. 108). How the head connects to the facing in each
-analysis is under [A soil nail and a shotcrete facing](#a-soil-nail-and-a-shotcrete-facing).
+analysis is under [A soil nail and a shotcrete facing](../piles/types.md#a-soil-nail-and-a-shotcrete-facing).
 
 [VP47](../verification/rocscience.md#vp47) enters this envelope: `Tmax` = 118 kN per nail, `Tend1` = 86 kN,
 `Lp1` = `Lp2` = 118 ÷ 15 = 7.87 m from a bond of 15 kN per meter, and `Spacing` = 1.5 m. The 4.9 m nails are
@@ -155,7 +156,7 @@ beyond end 2, and the FEM bar starts at zero force. In the FEM the unbonded leng
 length does. In a real anchor, that load transfer is what an apparent free length below [GEC 4][gec4]'s minimum may
 indicate in a load test, the apparent free length being the tendon length computed from the elastic movement at
 the test load (pp. 150–151). How the tendon reaches the wall is under
-[A tieback and a soldier-pile or sheet-pile wall](#a-tieback-and-a-soldier-pile-or-sheet-pile-wall).
+[A tieback and a soldier-pile or sheet-pile wall](../piles/types.md#a-tieback-and-a-soldier-pile-or-sheet-pile-wall).
 
 [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) builds a soldier-pile tieback wall, the model of
 [VP49](../verification/rocscience.md#vp49), with this envelope. It enters capacities per foot of wall (the
@@ -200,96 +201,6 @@ allowable friction in `Lp1` and `Lp2` ([Capacity Envelope](lem.md#capacity-envel
 FEM the shaft grips the soil along its whole length, and no plate or deadman is built into the mesh.
 
 No tutorial or verification model has an end-anchored bar.
-
-## Connecting Reinforcement to a Wall or Facing
-
-A support that bears on a wall or a facing is connected at end 1. The two analyses treat the connection
-differently: the LEM applies each member's force on its own, and the FEM connects a bar to another member only at
-a node the two share or, for a jointed sheet, through a tie at its end.
-
-### A tieback and a soldier-pile or sheet-pile wall
-
-The wall is entered on the `piles` sheet ([Piles and Concrete Piers in LEM](../piles/lem.md)) and each tieback on
-the `reinforce` sheet, with end 1 on the wall face. The wall's resistance is its shear force `H`, which [GEC 4][gec4]
-takes as the smaller of the wall's allowable shear capacity and the passive force the soil develops below the
-surface, divided by the soldier beam spacing ([GEC 4][gec4] p. 101). The `piles` sheet has its own `Appl`, read as on the
-`reinforce` sheet; [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) enters its stated `H` with Appl Active. The
-figure shows one tieback through a soldier-pile wall, with a trial surface that crosses both.
-
-![A tieback through a wall, with a trial surface from the excavation corner crossing its unbonded length, and the forces Tmax on the tendon and H on the wall](../usage/images/mr_connect_tieback_wall_lem.png){width=450}
-
-The trial surface starts at the corner of the excavation, where it passes through the pile line and the wall's
-`H` acts, and crosses the tieback on its unbonded length, where `Tmax` acts along the tendon.
-
-A trial surface that passes below the toe of the wall receives no force from the wall.
-
-In the FEM the wall is a row of beam elements
-([Piles and Concrete Piers in Finite Element Analysis](../piles/fem.md)) and a tieback is a row of bar elements.
-A bar that ends on a pile line, or crosses it, shares a node with the pile at that point, so the tieback pulls on
-the wall at that node. The figure shows one tieback whose end 1 lies on the pile line below the pile's head.
-
-![A tieback whose first node is a node of the wall's pile line below its head, with the bar's other nodes running back into the soil](../usage/images/mr_connect_tieback_wall_fem.png){width=447}
-
-End 1 of the tieback is a node of the pile, and the bar's other nodes run back into the soil.
-
-A bar that crosses a pile line, rather than ending on it, draws a note in the
-[model checks](../studio/analysis.md#model-checks-before-a-run) that the two are joined at the crossing; a bar
-meant to pass the pile unconnected ends short of it. A tieback entered as in
-[Tutorial LEM-9](../tutorials/lem09_tieback_wall.md), starting on the wall face at x = 0 with the pile line 0.5 ft
-behind it, crosses the pile line and is joined to it there in the FEM; in the LEM the offset has no effect.
-
-### A soil nail and a shotcrete facing
-
-A nail's head plate bears on the shotcrete facing at end 1. The LEM takes the facing into account in two ways:
-the head's capacity, in `Tend1`, and the facing's weight, entered as a vertical line load at the top of the face
-([Worksheet: lloads](../usage/input_template.md#worksheet-lloads)). On a vertical face the facing's weight acts along the
-face, so one vertical force at the top of the face gives the same force and moment as the weight spread down it,
-provided the slip surface exits at the toe; on a battered face it is approximate. The figure shows one nail head
-on a shotcrete facing.
-
-![A soil nail with its head on a shotcrete facing, and the facing's weight as a line load at the top of the face](../usage/images/mr_connect_nail_facing.png){width=466}
-
-End 1 is the nail head on the facing, where `Tend1` sets the capacity, and the facing's weight is a line load at
-the top of the face.
-
-[VP47](../verification/rocscience.md#vp47) and [VP48](../verification/rocscience.md#vp48) enter their facings
-this way, with line loads of 14.6 kN/m and 13.2 kN/m. The FEM has no facing member: a beam cannot be laid along
-the face, because the mesher rejects a line that runs along the ground surface
-([Reinforcement and pile lines](../fem/mesh.md#reinforcement-and-pile-lines)), so each nail head is a soil node on
-the face and `Tend1` only raises the capacity of the bar at that end.
-
-### A geosynthetic and facing blocks, panels or a wrapped face
-
-A layer connected to facing blocks or panels starts at the back of the facing, end 1. The figure shows one layer
-connected to a block facing.
-
-![A geosynthetic layer running from the back of a block facing, end 1, into the fill, end 2](../usage/images/mr_connect_geosynthetic_facing.png){width=455}
-
-End 1 is on the back of the block facing, where `Tend1` is the connection, and end 2 is in the fill.
-
-FHWA takes the long-term strength of the connection, per unit width of the layer, from connection tests on the
-facing unit and the geosynthetic:
-
->$T_{alc} = \dfrac{T_{ult} \times CR_{cr}}{RF_D}$
-
-where T<sub>ult</sub> is the layer's ultimate tensile strength, CR<sub>cr</sub> the fraction of it the connection
-keeps over the long term, measured in those tests, and RF<sub>D</sub> the reduction factor for chemical and
-biological degradation ([GEC 11][gec11] Eq. 4-41, p. B-13). T<sub>alc</sub> rises with the normal pressure on the
-connection: in Example E1 it runs
-from 533 lb/ft (7.8 kN/m) at the top layer to 2,550 lb/ft (37.2 kN/m) at the bottom, against T<sub>al</sub> = 1,085 and
-2,169 lb/ft (15.8 and 31.7 kN/m) for the two grades the wall uses, GG-I and GG-II (Table E1-7.3, p. E1-15;
-connection strengths Table E1-7.6, p. E1-18), so on eight of the wall's eleven layers the connection limits the
-force at the face.
-
-In the LEM, and in the FEM for a bonded layer, `Tend1` only raises the capacity at end 1
-([Capacity Envelope](lem.md#capacity-envelope)); a jointed layer's `Tend1` ties its end to the
-facing at end 1, up to that capacity ([Ends, ties and the bar](fem.md#ends-ties-and-the-bar)).
-In the block wall of [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md#part-2-the-same-wall-with-geogrid)
-the back face of the facing is a `joints`-sheet line, and a bonded line may not end on one, so all three layers
-are jointed, each tied to the blocks at `Tend1` = 40 kN/m. A wrapped face has no facing unit: the sheet is folded
-back over the face and buried under the next lift
-([When a Model Needs a Joint](../fem/joints.md#when-a-model-needs-a-joint)). Its line starts at the face, and
-`Tend1` is the pullout resistance of that folded-back return.
 
 ## Jointed Reinforcement and Joint Lines
 

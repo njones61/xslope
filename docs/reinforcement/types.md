@@ -50,7 +50,7 @@ T<sub>al</sub> ÷ FS<sub>R</sub>, where FS<sub>R</sub> is the factor of safety t
 | <code class="rc rc-both">Tmax</code> | Appl Active: T<sub>al</sub> (see above) ÷ FS<sub>R</sub>.<br>Appl Passive: T<sub>al</sub>. | FS<sub>R</sub> at least 1.3 ([GEC 11][gec11] p. 9-24). RF = 7 for preliminary design in granular fill (p. 9-5); 2.6 to 2.8 for the geogrids of FHWA Example E1 (Table E1-7.3, p. E1-15). |
 | <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | `Adhesion` = 0: FHWA's pullout resistance has no adhesion term; it comes from the overburden alone.<br>Appl Active: `Delta` = arctan(F\* × α × R<sub>c</sub> ÷ FS<sub>PO</sub>).<br>Appl Passive: `Delta` = arctan(F\* × α × R<sub>c</sub>).<br>F\* is the pullout resistance factor, α the scale-effect correction, R<sub>c</sub> the coverage ratio (1 for a layer covering the full width) and FS<sub>PO</sub> the factor of safety against pullout ([GEC 11][gec11] Eq. 9-9, p. 9-13). | F\* = 0.67 tan φ with α = 0.6, the most conservative defaults ([GEC 11][gec11] p. E8-6); α = 0.6 to 0.8 for extensible reinforcement without pullout tests (p. B-2); F\* = 0.45 and α = 0.8 for the geogrids of Example E1 (p. E1-16); FS<sub>PO</sub> = 1.5 in granular soil and 2 in cohesive soil, and minimum embedment beyond the critical surface 3 ft (1 m) (p. 9-5) |
 | <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | Blank: `Adhesion` and `Delta` give the pullout.<br>To give it as development lengths instead, leave `Adhesion` and `Delta` blank and enter at each end<br>Appl Active: `Tmax` ÷ (P<sub>r</sub> ÷ FS<sub>PO</sub>).<br>Appl Passive: `Tmax` ÷ P<sub>r</sub>.<br>P<sub>r</sub> = 2 × F\* × α × R<sub>c</sub> × σ′<sub>v</sub> is the pullout resistance per unit length, with σ′<sub>v</sub> the vertical effective stress at the layer. | — |
-| <code class="rc rc-both">Tend1</code> | Appl Active: the long-term connection strength T<sub>alc</sub> divided by the factor of safety the design applies to the connection.<br>Appl Passive: T<sub>alc</sub>.<br>0 where the layer ends free at the face. | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
+| <code class="rc rc-both">Tend1</code> | Appl Active: T<sub>alc</sub>, the long-term strength of the layer's connection to the facing (see [below](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face)), divided by the factor of safety the design applies to the connection.<br>Appl Passive: T<sub>alc</sub>.<br>0 where the layer ends free at the face. | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
 | <code class="rc rc-both">Tend2</code> | 0 | — |
 | <code class="rc rc-both">Spacing</code> | blank | — |
 | <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> | `E` × `Area` = the sheet's tensile stiffness per unit width ([Axial Stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea)) | — |
@@ -262,8 +262,15 @@ connected to a block facing.
 
 End 1 is on the back of the block facing, where `Tend1` is the connection, and end 2 is in the fill.
 
-FHWA takes the long-term connection strength T<sub>alc</sub> from connection tests on the facing unit and the geosynthetic
-([GEC 11][gec11] Eq. 4-41, p. B-13), and it rises with the normal pressure on the connection: in Example E1 it runs
+FHWA takes the long-term strength of the connection, per unit width of the layer, from connection tests on the
+facing unit and the geosynthetic:
+
+>$T_{alc} = \dfrac{T_{ult} \times CR_{cr}}{RF_D}$
+
+where T<sub>ult</sub> is the layer's ultimate tensile strength, CR<sub>cr</sub> the fraction of it the connection
+keeps over the long term, measured in those tests, and RF<sub>D</sub> the reduction factor for chemical and
+biological degradation ([GEC 11][gec11] Eq. 4-41, p. B-13). T<sub>alc</sub> rises with the normal pressure on the
+connection: in Example E1 it runs
 from 533 lb/ft (7.8 kN/m) at the top layer to 2,550 lb/ft (37.2 kN/m) at the bottom, against T<sub>al</sub> = 1,085 and
 2,169 lb/ft (15.8 and 31.7 kN/m) for the two grades the wall uses, GG-I and GG-II (Table E1-7.3, p. E1-15;
 connection strengths Table E1-7.6, p. E1-18), so on eight of the wall's eleven layers the connection limits the

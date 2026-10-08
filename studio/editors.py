@@ -6460,10 +6460,12 @@ def _pile_item_label(i, row):
 # and each tooltip names both readers.
 PILES_HELP = {
     "label": "Name used in error messages, summaries, and plots (optional).",
-    "x1": "Pile top X-coordinate.",
-    "y1": "Pile top Y-coordinate.",
-    "x2": "Pile tip (bottom) X-coordinate.",
-    "y2": "Pile tip (bottom) Y-coordinate.",
+    "x1": "X-coordinate of the first end. The ends may be entered in either order; "
+          "the higher end is the head and the lower end the tip.",
+    "y1": "Y-coordinate of the first end (the higher end is the head).",
+    "x2": "X-coordinate of the second end. The ends may be entered in either order; "
+          "the higher end is the head and the lower end the tip.",
+    "y2": "Y-coordinate of the second end (the higher end is the head).",
     "H": "Pile force per unit width of slope (force/length). Blank = auto-computed "
         "via Ito & Matsui from D and S (vertical piles only). LEM only; the FEM "
         "never reads a stated pile force.",

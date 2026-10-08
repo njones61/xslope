@@ -1023,16 +1023,16 @@ The **piles** worksheet defines pile and concrete pier support elements that pro
 
 ![Pile Example](images/pile_example.png){width=800px}
 
-Each pile is represented as a straight line defined by its top and bottom endpoint coordinates. The line geometry supports both vertical piles ($x_1 = x_2$) and battered (inclined) piles. The template is formatted for up to 20 piles, but additional rows can be added to the table as needed.
+Each pile is represented as a straight line defined by its two endpoint coordinates, which may be entered in either order: the higher end is the head and the lower end the tip. The line geometry supports both vertical piles ($x_1 = x_2$) and battered (inclined) piles. The template is formatted for up to 20 piles, but additional rows can be added to the table as needed.
 
 Each pile is defined by:
 
 - **Geometry**:<br>
->>x1, y1 **[L]**: Pile top coordinates<br>
->>x2, y2 **[L]**: Pile tip (bottom) coordinates<br>
+>>x1, y1 **[L]**: First end coordinates<br>
+>>x2, y2 **[L]**: Second end coordinates (the higher of the two ends is the head)<br>
 - **LEM Properties**:<br>
 >>H — **[F/L]** (per unit width of slope): Pile force magnitude. If the user has a row of piles at spacing $S$ with individual capacity $H_{\text{single}}$, input $H = H_{\text{single}} / S$.<br>
->>The force direction $\theta$ is not an input: it is computed as the direction perpendicular to the pile axis (0°, i.e. horizontal, for vertical piles). Files from template v22 and earlier may carry a $\theta$ ("qp") override column, which is still honored when present.<br>
+>>The force direction $\theta$ is not an input: it is computed as the direction perpendicular to the pile axis (0°, i.e. horizontal, for vertical piles), with its horizontal component against the movement of the sliding soil, so a battered pile takes its angle from the pile's inclination and the facing of each failure surface (see [Force Direction](../lem/piles.md#force-direction)). Files from template v22 and earlier may carry a $\theta$ ("qp") override column, which is still honored when present.<br>
 >>Appl: Force application. **Active** = $H$ is a known *allowable* force, not divided by the factor of safety. **Passive** = $H$ is an *ultimate* capacity added to the resisting side and divided by FS. A blank cell is read as Active; files XSLOPE saves write the choice out explicitly. Has no effect on FEM analysis, where the pile resistance is computed rather than prescribed.<br>
 - **Pile Geometry**:<br>
 >>D **[L]**: Pile diameter. Required for Ito & Matsui auto-computation of $H$. Also used by FEM to compute $I$ and $Area$ if those columns are left blank.<br>

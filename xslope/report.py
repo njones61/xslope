@@ -2592,6 +2592,27 @@ def _reinforcement_fields(slope_data):
     }
 
 
+def _pile_end(m, head):
+    """A pile's head (the higher end) or tip, whichever order it was entered in."""
+    first_is_head = (_num(m.get("y1")) or 0.0) >= (_num(m.get("y2")) or 0.0)
+    if first_is_head == head:
+        return _point(m, "x1", "y1")
+    return _point(m, "x2", "y2")
+
+
+def _pile_theta(m):
+    """The force angle: as stated or derived for a vertical pile; for a battered
+    pile the angle is the batter from vertical, ``±`` because its sign follows
+    the facing of each failure surface (``slice.pile_force_angle``)."""
+    if m.get("theta_p") is not None:
+        return _fmt(m.get("theta_p"), "{:g}")
+    x1, y1, x2, y2 = (_num(m.get(k)) for k in ("x1", "y1", "x2", "y2"))
+    if None in (x1, y1, x2, y2) or y1 == y2:
+        return ""
+    from math import atan2, degrees
+    return "±" + _fmt(abs(degrees(atan2(x2 - x1, abs(y1 - y2)))), "{:.1f}")
+
+
 def _pile_fields(slope_data):
     """Every pile property the report can print, by key."""
     unit = _unit_suffix(slope_data)
@@ -2616,12 +2637,12 @@ def _pile_fields(slope_data):
         mu = f" ({force}·{label['length']} per {label['length']})" if fu and lu else ""
     return {
         "label": ("label", "Label", lambda m: str(m.get("label") or ""), True),
-        "top": ("x1", "Top (x, y)", lambda m: _point(m, "x1", "y1"), True),
-        "bottom": ("x2", "Bottom (x, y)", lambda m: _point(m, "x2", "y2"), True),
+        "top": ("x1", "Top (x, y)", lambda m: _pile_end(m, head=True), True),
+        "bottom": ("x2", "Bottom (x, y)", lambda m: _pile_end(m, head=False), True),
         "H": ("H", f"H{fu}",
               lambda m: _fmt(m.get("H"), "{:g}") or "computed", True),
         "theta_p": ("theta_p", "θ (deg)",
-                    lambda m: _fmt(m.get("theta_p"), "{:g}"), True),
+                    _pile_theta, True),
         "D_pile": ("D_pile", f"D{lu}",
                    lambda m: _fmt(m.get("D_pile"), "{:g}"), True),
         "S": ("S", f"Spacing{lu}", lambda m: _fmt(m.get("S"), "{:g}"), True),

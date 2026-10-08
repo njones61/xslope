@@ -18,7 +18,7 @@ each with a slip surface they cross.
 
 XSLOPE models each of these, and an end-anchored bar held by a plate or deadman at each end, as a straight line
 with a tensile capacity. The limit equilibrium (LEM) and finite element (FEM) analyses read the same line but use
-it differently ([The LEM and the FEM](#the-lem-and-the-fem)). What to enter for each kind of support, with typical
+it differently ([LEM vs FEM](#lem-vs-fem)). What to enter for each kind of support, with typical
 values from the design manuals, is on [Reinforcement Types](types.md). A micropile, pile or pier resists by shear
 and bending rather than tension and is entered on the `piles` sheet instead ([LEM](../lem/piles.md),
 [FEM](../fem/piles.md)).
@@ -88,7 +88,7 @@ interface strength, and the pullout resistance then follows the effective overbu
 $2(a + \sigma'_v\tan\delta)$ per unit length from the sheet's two faces, with $a$ the adhesion, $\delta$ the
 friction angle and $\sigma'_v$ the vertical effective stress at each point.
 
-## The LEM and the FEM
+## LEM vs FEM
 
 The LEM applies the envelope's value at the point where a trial slip surface crosses the line, as a force on the
 sliding mass, in the direction `Dir` sets: tangent to the slip surface or along the line. The FEM builds the line into

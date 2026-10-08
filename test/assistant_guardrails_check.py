@@ -1187,16 +1187,23 @@ def check_every_finding_is_quoted_once():
 def check_two_faults_on_one_row():
     """Two different faults about one row are two findings.
 
-    vp047 states one pullout length per end, and both exceed the line: the same
+    vp047 with both of its development lengths typed with a minus sign: the same
     rule fires twice on one reinforcement line, once for Lp1 and once for Lp2. The
     messages differ only in a digit that belongs to a FIELD NAME, so blanking it
     with the values made the pair one finding — the second was never reported, and
     repairing the first left the model reading the survivor as unchanged text it
     had already been given. Digit-suffixed names run through the whole schema
     (x1/y1, x2/y2, lp1/lp2, k1/k2), so this is a class, not a case.
+
+    The pair is an ERROR, and an edit-answerable error is quoted in every block,
+    so the real path shows both quoted but cannot show the survivor collapsing.
+    That half is replayed on the same two findings as warnings, through
+    ChecksMemo itself.
     """
+    from dataclasses import replace
     from studio.ai import assistant as A
     from xslope.preflight import preflight
+    rule = "reinforce.pullout_negative"
     out = []
     deck = os.path.join(_REPO, "docs", "verification", "files", "rocscience",
                         "vp047.xlsx")
@@ -1205,14 +1212,16 @@ def check_two_faults_on_one_row():
     mw, asst = _session()
     mw.doc.load(deck)
     sd = mw.doc.slope_data
+    for line in sd["reinforcement_lines"]:
+        line["lp1"], line["lp2"] = -abs(line["lp1"]), -abs(line["lp2"])
     pair = [f for f in preflight(sd, "lem", A._checks_selection(sd)).findings
-            if f.rule_id == "reinforce.envelope_inconsistent"
+            if f.rule_id == rule
             and f.message.startswith("Reinforcement line 1 ")]
     if len(pair) != 2 or not ("Lp1 =" in pair[0].message
                               and "Lp2 =" in pair[1].message):
         mw.deleteLater()
-        return [f"vp047 no longer carries the Lp1/Lp2 pair on one row: "
-                f"{[f.message[:60] for f in pair]}"]
+        return [f"vp047 with negative development lengths no longer carries the "
+                f"Lp1/Lp2 pair on one row: {[f.message[:60] for f in pair]}"]
     # Precisely: the two share a _finding_key, because identity is the rule plus
     # the row and both are about row 1. What separates them is the occurrence
     # counter ChecksMemo.keys appends — which makes them two entries rather than
@@ -1224,8 +1233,20 @@ def check_two_faults_on_one_row():
     if len(set(A.ChecksMemo.keys(pair))) != 2:
         out.append("the two faults on one row are tracked as one entry")
 
+    # As warnings, which collapse once quoted: with both quoted and Lp1 repaired,
+    # the Lp2 survivor takes the entry the Lp1 fault held, and it must read as
+    # changed rather than as the Lp1 text already given.
+    warned = [replace(f, severity="warning") for f in pair]
+    memo = A.ChecksMemo()
+    keys, _fresh = memo.delta(warned)
+    memo.record(keys, warned, set(range(len(warned))))
+    keys, fresh = memo.delta(warned[1:])
+    if keys[0] not in fresh:
+        out.append("with Lp1 repaired, the Lp2 warning collapsed under the Lp1 "
+                   "text already given")
+
     # ... and through the real path: both quoted, and repairing Lp1 leaves the
-    # Lp2 fault quoted in full rather than filed under the text of Lp1.
+    # Lp2 fault standing alone and quoted in full.
     blk = _block(_run(asst, "slope_data['materials'][0]['gamma'] += 1.0\n"
                             "print('unit weight nudged')"))
     for f in pair:
@@ -1239,7 +1260,7 @@ print('first pullout length repaired on every line')
 """))
     left = [f for f in preflight(mw.doc.slope_data, "lem",
                                  A._checks_selection(mw.doc.slope_data)).findings
-            if f.rule_id == "reinforce.envelope_inconsistent"]
+            if f.rule_id == rule]
     if not left or any("Lp1 =" in f.message for f in left):
         out.append(f"the repair did not leave the Lp2 faults standing alone: "
                    f"{[f.message[:40] for f in left]}")

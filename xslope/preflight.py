@@ -5191,30 +5191,130 @@ def _reinf_pullout_lp_ignored(ctx):
             f"development lengths {_AT_REINF}."]
 
 
+#: Below this fraction of Tmax, the most a line's development-length envelope lets
+#: it carry anywhere along its length is negligible. A peak BELOW Tmax is not a
+#: fault: an Lp longer than the line is how a pullout-governed member is entered
+#: (vp047's nails, Lp = 7.87 on a 4.9 m nail, reach 62% of Tmax at the facing).
+#: A misplaced decimal or a length in the wrong unit lands an order of magnitude
+#: below a member like that: the same nails with Lp entered as 78.7 reach 6.2%.
+_ENVELOPE_NEGLIGIBLE = 0.10
+
+
+def _reinf_envelope_peak(r, L):
+    """``(peak, s)``: the most tension the development-length envelope lets line
+    ``r`` carry anywhere along its length ``L``, and where -- the distance from
+    end 1. The value is :func:`xslope.fileio.reinforce_available_tension`, the
+    envelope both engines apply, so this cannot drift from what runs. None when
+    the line has no usable Tmax or a blank Lp (other rules own those).
+
+    The capacity rises from end 1 and falls toward end 2, so it peaks where the
+    two ramps cross, or at an end when they never do. An Lp of 0 (or less) holds
+    Tmax from that end, which puts the peak at it.
+    """
+    from .fileio import reinforce_available_tension
+    tmax = _num(r.get("t_max"))
+    lp1, lp2 = _num(r.get("lp1")), _num(r.get("lp2"))
+    if tmax is None or tmax <= 0 or lp1 is None or lp2 is None:
+        return None
+    te1, te2 = _num(r.get("tend1")) or 0.0, _num(r.get("tend2")) or 0.0
+    if lp1 <= 0:
+        s = 0.0
+    elif lp2 <= 0:
+        s = L
+    else:
+        k1, k2 = tmax / lp1, tmax / lp2
+        s = min(L, max(0.0, (te2 + k2 * L - te1) / (k1 + k2)))
+    return reinforce_available_tension(s, L - s, tmax, lp1, lp2, te1, te2), s
+
+
+def _reinf_tres_above_tmax(r):
+    """``(Tres, Tmax)`` as entered on the sheet when Tres exceeds Tmax, else None.
+    The engines read per unit width and the sheet takes per element, so both are
+    multiplied back by the Spacing divisor."""
+    from .fileio import reinforce_spacing_divisor
+    tmax, tres = _num(r.get("t_max")), _num(r.get("t_res"))
+    if tmax is None or tres is None or tres <= tmax:
+        return None
+    div = reinforce_spacing_divisor(r.get("spacing"))
+    return tres * div, tmax * div
+
+
 @rule("reinforce.envelope_inconsistent", WARNING, ("lem", "fem"),
-      "Tres above Tmax, or a pullout length longer than the line itself.",
+      "Tres above Tmax on a finite element run, or development lengths that hold "
+      "the line under a tenth of Tmax along its whole length.",
       fields=("t_max", "t_res", "lp1", "lp2", "tend1", "tend2"))
 def _reinf_envelope(ctx):
+    from .fileio import reinforce_spacing_divisor
+    from .mesh import line_is_jointed
     out = []
     for i, r in enumerate(ctx.reinforcement):
-        tmax, tres = _num(r.get("t_max")), _num(r.get("t_res"))
-        if tmax is not None and tres is not None and tres > tmax:
-            out.append(f"{ctx.reinf_label(i)} has Tres = {tres:g}, above Tmax = "
-                       f"{tmax:g}, so the residual capacity is above the peak the "
-                       f"bar is supposed to drop from {_AT_REINF}.")
+        # Reported as entered: the engines read per unit width, the sheet takes
+        # per element.
+        div = reinforce_spacing_divisor(r.get("spacing"))
+        tmax = _num(r.get("t_max"))
+        # Tres is a finite element input. On a limit-equilibrium run the same
+        # entry is reinforce.tres_above_tmax_on_lem, an INFO (owner ruling
+        # 2026-08-14: a FEM-only input is not a defect of the LEM run).
+        bad = _reinf_tres_above_tmax(r) if "fem" in ctx.analyses else None
+        if bad is not None:
+            tres_e, tmax_e = bad
+            out.append(f"{ctx.reinf_label(i)} has Tres = {tres_e:g}, above "
+                       f"Tmax = {tmax_e:g}. Tres is what the bar keeps after it "
+                       f"ruptures, so it cannot exceed the capacity it ruptures at: "
+                       f"the finite element solve never softens this line, exactly "
+                       f"as with Tres blank {_AT_REINF}.")
+        if _num(r.get("adhesion")) is not None and _num(r.get("delta")) is not None:
+            continue          # the overburden law does not read Lp1/Lp2
+        if "lem" not in ctx.analyses and line_is_jointed(r):
+            continue          # the interface carries a jointed line, not the Lp ramps
         L = _reinf_line_length(r)
         if L is None or L <= 0:
             continue
-        for key, col in (("lp1", "Lp1"), ("lp2", "Lp2")):
-            v = _num(r.get(key))
-            if v is not None and v > L:
-                out.append(
-                    f"{ctx.reinf_label(i)} has {col} = {v:g}, longer than the line "
-                    f"itself ({L:.4g}), so the pullout envelope never reaches Tmax "
-                    f"anywhere along it. A misplaced decimal here silently "
-                    f"annihilates the reinforcement while the line stays on the "
-                    f"drawing {_AT_REINF}.")
+        got = _reinf_envelope_peak(r, L)
+        if got is None or got[0] >= _ENVELOPE_NEGLIGIBLE * tmax:
+            continue
+        peak, s = got
+        tol = 1e-9 * L
+        where = ("at end 1" if s <= tol else "at end 2" if s >= L - tol
+                 else f"{s:.3g} from end 1")
+        builds = ("starts at each end's Tend and builds up"
+                  if (_num(r.get("tend1")) or _num(r.get("tend2")))
+                  else "builds up from each end")
+        out.append(
+            f"{ctx.reinf_label(i)} can carry at most {peak * div:.3g} anywhere "
+            f"along its length, {100.0 * peak / tmax:.2g}% of its Tmax = "
+            f"{tmax * div:g}, and reaches that {where}. Its capacity {builds} "
+            f"at Tmax/Lp per unit length, and with Lp1 = "
+            f"{_num(r.get('lp1')):g} and Lp2 = {_num(r.get('lp2')):g} on a line "
+            f"{L:.4g} long it never builds further. A development length longer "
+            f"than the line is how a pullout-governed member is entered, but at "
+            f"this level the line adds almost nothing to the run: check Lp1 and "
+            f"Lp2 for a misplaced decimal or a length in the wrong unit "
+            f"{_AT_REINF}.")
     return out
+
+
+# INFO, not WARNING: Tres is a finite element input, and on an LEM run a FEM-only
+# input is not a defect of the analysis being run (owner ruling 2026-08-14, the
+# same split as reinforce.fem_incomplete / reinforce.fem_incomplete_on_lem). A
+# finite element run of the file reports it as reinforce.envelope_inconsistent.
+@rule("reinforce.tres_above_tmax_on_lem", INFO, ("lem",),
+      "Tres above Tmax: the LEM does not read Tres, and the FEM never softens the line.",
+      fields=("t_max", "t_res"))
+def _reinf_tres_above_tmax_lem(ctx):
+    bad = [(i, got) for i, r in enumerate(ctx.reinforcement)
+           for got in (_reinf_tres_above_tmax(r),) if got is not None]
+    if not bad:
+        return None
+    i, (tres_e, tmax_e) = bad[0]
+    more = (f", and {len(bad) - 1} other line(s) the same way" if len(bad) > 1
+            else "")
+    return (f"{ctx.reinf_label(i)} has Tres = {tres_e:g}, above Tmax = "
+            f"{tmax_e:g}{more}. This limit-equilibrium run does not read Tres, so "
+            f"its answer is unaffected. A finite element run of the same file "
+            f"never softens the line, exactly as with Tres blank: Tres is what the "
+            f"bar keeps after it ruptures, so it cannot exceed the capacity it "
+            f"ruptures at {_AT_REINF}.")
 
 
 @rule("reinforce.no_surface_engagement", WARNING, ("lem",),

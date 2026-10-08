@@ -6390,10 +6390,27 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', lp1=-2.0),
          expect='read as FULLY ANCHORED'),
+    # A development length a hundred times too long (Lp = 4 entered as 400 on a
+    # 20-long line) holds the line to 2.5% of Tmax. The control is the entry the
+    # rule must NOT question: each Lp longer than the line, which is how a
+    # pullout-governed member is entered (a third of Tmax here, vp047's nails 62%).
     dict(rule='reinforce.envelope_inconsistent', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel',
-         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', lp1=500.0),
-         expect='longer than the line itself'),
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                      lp1=400.0, lp2=400.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                     lp1=30.0, lp2=30.0),
+         expect='adds almost nothing to the run'),
+    # Tres above Tmax: a warning on a finite element run, which reads Tres, and an
+    # INFO on a limit-equilibrium run, which does not.
+    dict(rule='reinforce.envelope_inconsistent', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_res=900.0),
+         expect='never softens this line'),
+    dict(rule='reinforce.tres_above_tmax_on_lem', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_res=900.0),
+         expect='does not read Tres'),
     dict(rule='reinforce.no_surface_engagement', base=PREFLIGHT_BASE_REINF_FEM,
          mode='dict',
          mutation=lambda sd: _pf_move(sd, 'reinforcement_lines', dx=1.0e5),

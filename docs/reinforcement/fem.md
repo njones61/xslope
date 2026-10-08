@@ -223,7 +223,7 @@ is mobilized, $T_{max}$ divided by the pullout resistance per unit length at tha
 [geosynthetic layer](types.md#geosynthetic-layer), a
 [soil nail](types.md#soil-nail) and a
 [tieback](types.md#tieback-grouted-ground-anchor), with the pullout resistance per unit
-length and typical values from the FHWA manuals, are on Modeling Reinforcement.
+length and typical values from the FHWA manuals, are on [Reinforcement Types](types.md).
 
 ### Initial state and EA selection
 

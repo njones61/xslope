@@ -28,6 +28,13 @@ End 1 is on the face of the slope and end 2 at the buried end, so the line is as
 The capacity is `Tend1` at the face (zero where the layer ends free) and zero at the buried end; it grows with
 the friction on both faces of the layer and is capped at `Tmax`.
 
+`Tmax` comes from the sheet's long-term strength `Tal`: its ultimate tensile strength `Tult` from the
+manufacturer's tests, divided by a reduction factor RF for the strength it loses over its design life to creep,
+degradation and damage during installation. FS<sub>R</sub> is the factor of safety the slope is designed for.
+FHWA enters `Tal` one of two ways, depending on whether the analysis divides the reinforcement force by the factor
+of safety (GEC 11, pp. 8-7 and 8-8). With Appl Passive the LEM does, so `Tmax` is `Tal`; with Appl Active it does
+not, so `Tmax` is `Tal` ÷ FS<sub>R</sub>.
+
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Entry | Typical values |
@@ -35,7 +42,7 @@ the friction on both faces of the layer and is capped at `Tmax`.
 | <code class="rc rc-lem">Type</code> | `Geosynthetic` | — |
 | <code class="rc rc-lem">Dir</code> | `Tangent`, set automatically by `Type`: the force acts tangent to the slip surface where it crosses the layer | — |
 | <code class="rc rc-lem">Appl</code> | `Active`, set automatically by `Type`: the `Tmax`, pullout (`Adhesion` and `Delta`, or `Lp1` and `Lp2`) and `Tend1` entries in the rows below are allowable values, which the LEM does not divide by F. To use nominal values in those rows instead, change it to `Passive`. | — |
-| <code class="rc rc-both">Tmax</code> | Appl Active: `Tal` ÷ FS<sub>R</sub>. Appl Passive: `Tal`. `Tal` is the sheet's long-term strength, `Tult` ÷ RF: its ultimate tensile strength `Tult` reduced for the strength it loses over its design life, with RF the product of the reduction factors for creep, durability and installation damage. FS<sub>R</sub> is the factor of safety the slope is designed for. | FS<sub>R</sub> at least 1.3 (GEC 11 p. 9-24). RF = 7 for preliminary design of routine structures in granular fill (p. 9-5). In FHWA Example E1, `Tult` = 3,000, 6,000 and 9,000 lb/ft (43.8, 87.6 and 131.3 kN/m) gives `Tal` = 1,085, 2,169 and 3,525 lb/ft (15.8, 31.7 and 51.4 kN/m), with RF<sub>CR</sub> = 1.85, RF<sub>D</sub> = 1.15 and RF<sub>ID</sub> = 1.3, 1.3 and 1.2 (GEC 11 Table E1-7.3, p. E1-15). |
+| <code class="rc rc-both">Tmax</code> | Appl Active: `Tal` ÷ FS<sub>R</sub>. Appl Passive: `Tal`. | FS<sub>R</sub> at least 1.3 (GEC 11 p. 9-24). RF = 7 for preliminary design in granular fill (p. 9-5); 2.6 to 2.8 for the geogrids of FHWA Example E1 (Table E1-7.3, p. E1-15). |
 | <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | `Adhesion` = 0. Appl Active: `Delta` = arctan(F\*α ÷ FS<sub>PO</sub>), with FS<sub>PO</sub> the factor of safety against pullout (GEC 11 Eq. 9-9, p. 9-13). Appl Passive: `Delta` = arctan(F\*α). F\* is the pullout resistance factor and α the scale-effect correction. | F\* = 0.67 tan φ with α = 0.6, the most conservative defaults (GEC 11 p. E8-6); α = 0.6 to 0.8 for extensible reinforcement without pullout tests (p. B-2); F\* = 0.45 and α = 0.8 for the geogrids of Example E1 (p. E1-16); FS<sub>PO</sub> = 1.5 in granular soil and 2 in cohesive soil, and minimum embedment beyond the critical surface 3 ft (1 m) (p. 9-5) |
 | <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | in place of `Adhesion` and `Delta`: `Tmax` ÷ the pullout resistance per unit length at each end; with Appl Active, the allowable pullout resistance (÷ FS<sub>PO</sub>) | — |
 | <code class="rc rc-both">Tend1</code> | Appl Active: the nominal long-term connection strength `Talc` divided by the factor of safety the design applies to the connection. Appl Passive: `Talc`. 0 where the layer ends free at the face. | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
@@ -45,11 +52,7 @@ the friction on both faces of the layer and is capped at `Tmax`.
 | <code class="rc rc-fem">Tres</code> | blank | — |
 | <code class="rc rc-fem">Joint</code> | blank; `Yes` where the soil can slide along the sheet ([A sheet the soil slides along](#a-sheet-the-soil-slides-along)) | — |
 
-The two `Tmax` entries are FHWA's two conventions (GEC 11, pp. 8-7 and 8-8): a program that adds the
-reinforcement force to the resisting moment takes `Tal` unreduced, and one that subtracts it from the driving
-moment takes `Tal` ÷ FS<sub>R</sub>.
-
-The `Geosynthetic` preset's tangent direction is the one FHWA gives for continuous sheets (p. 8-6).
+The `Geosynthetic` preset's tangent direction is the one FHWA gives for continuous sheets (GEC 11 p. 8-6).
 
 [Tutorial LEM-8](../tutorials/lem08_reinforced_slope.md) builds a slope reinforced with six geogrid layers for
 limit equilibrium, and [Tutorial FEM-2](../tutorials/fem02_reinforcement.md) runs it by finite elements with

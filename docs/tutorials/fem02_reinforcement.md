@@ -215,9 +215,10 @@ the reinforcement's elastic modulus `E` and its cross-sectional area `Area`.
 Their product *EA* is the axial stiffness.
 
 [Soil reinforcement in LEM](../lem/reinforcement.md) and
-[soil reinforcement in FEM](../fem/reinforcement.md) give the formulations,
-the four end conditions of the envelope, and typical values by reinforcement
-type.
+[soil reinforcement in FEM](../fem/reinforcement.md) give the formulations
+and the four end conditions of the envelope;
+[Modeling Reinforcement](../usage/modeling_reinforcement.md) gives the entries
+for each kind of support.
 
 ---
 
@@ -346,12 +347,10 @@ Fill `E (psf)` and `Area` on all six rows, and leave `Tres` empty:
 | 800000 | 0.1 |
 
 An elastic modulus of 800,000 psf and an area of 0.1 ft² per foot of wall give
-an axial stiffness *EA* = **80,000 lb/ft**, which is a typical uniaxial geogrid.
+an axial stiffness *EA* = **80,000 lb/ft**.
 *EA* is what the run actually uses; the two columns are separate so that a
 discrete support — a nail or a tieback — can have a real modulus and a real
 cross-section with its spacing dividing the area.
-[Initial state and EA selection](../fem/reinforcement.md#initial-state-and-ea-selection)
-tabulates values by reinforcement type.
 
 Leaving `Tres` blank makes every line elastic-perfectly-plastic, which is the
 first of the two runs. Click **OK** and save the model with **File → Save As…**

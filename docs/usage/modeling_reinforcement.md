@@ -90,7 +90,7 @@ with the friction on both faces of the layer, and is capped at `Tmax`.
 | `Tend1` | Appl Active: the nominal long-term connection strength `Talc` divided by the factor of safety the design applies to the connection. Appl Passive: `Talc`. 0 where the layer ends free at the face. | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
 | `Tend2` | 0 | — |
 | `Spacing` | blank | — |
-| `E`, `Area` (FEM) | `E` × `Area` = the sheet's tensile stiffness per unit width | see [Initial state and EA selection](../fem/reinforcement.md#initial-state-and-ea-selection) |
+| `E`, `Area` (FEM) | `E` × `Area` = the sheet's tensile stiffness per unit width ([Axial Stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea)) | — |
 | `Tres` (FEM) | blank | — |
 | `Joint` (FEM) | blank; `Yes` where the soil can slide along the sheet ([A sheet the soil slides along](#a-sheet-the-soil-slides-along)) | — |
 

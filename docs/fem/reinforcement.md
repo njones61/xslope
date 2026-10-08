@@ -118,8 +118,7 @@ A blank $T_{res}$ means *no post-peak drop* — it does **not** mean zero.
 **Peak-Residual Model:**
 
 Entering a value for $T_{res}$ turns on post-peak behavior: an element that yields drops from $T_{allow}$ to its
-residual capacity. Appropriate for ductile materials where the published capacity is a peak rather than a plateau;
-typical residual ratios for geosynthetics are $T_{res}/T_{allow} = 0.3-0.7$.
+residual capacity. Appropriate for ductile materials where the published capacity is a peak rather than a plateau.
 
 The drop is applied only to a converged equilibrium state: the solver converges with the bars capped at
 $T_{allow}$, drops to $T_{res}$ every bar whose demand exceeded its capacity, and re-solves, repeating until the set
@@ -209,11 +208,13 @@ Each red center takes the smallest of the tensile limit and the capacities devel
 
 The analysis depends only on the product $EA$ (the axial stiffness, sometimes called the tensile stiffness or $J$
 in geosynthetic specifications), not on $E$ and $A$ independently. The axial stiffness controls how much the
-reinforcement must elongate before mobilizing its tensile capacity:
+reinforcement must elongate before mobilizing its tensile capacity. For a steel bar, $E$ is the steel's modulus and
+$A$ the bar's cross-section. For a geosynthetic, a secant stiffness from its tensile test serves:
 
->>$EA = \dfrac{T_{max}}{\varepsilon_{rupture}}$
+>>$EA = \dfrac{T_{ult}}{\varepsilon_{ult}}$
 
-where $\varepsilon_{rupture}$ is the strain at which the reinforcement reaches its ultimate tensile strength.
+where $T_{ult}$ is the ultimate tensile strength and $\varepsilon_{ult}$ the strain at which it is reached. $T_{max}$ is
+not used here: with Appl Active it is an allowable value, well below $T_{ult}$.
 
 ### Determining Reinforcement Line Pullout Lengths
 
@@ -221,45 +222,21 @@ A separate pullout length (Lp) is used for each end since each end may be embedd
 shear resistance values. A line may instead state its interface strength through Adhesion and Delta, in which case
 the resistance follows the effective overburden along the line and the pullout lengths are not used.
 
-The pullout length $L_p$ represents the distance from each end of the reinforcement over which the full tensile strength is mobilized. Pullout length can be estimated as follows:
-
-**For Soil Nails:**
->>$L_p = \dfrac{T_{max}}{\lambda \pi D \sigma_n' \tan \phi_{interface}}$
-
-where:<br>
->>$T_{max}$ = design tensile capacity of the nail<br>
-$\lambda$ = surface roughness factor (0.5-1.0 for grouted nails)<br>
-$D$ = effective nail diameter <br>
-$\sigma_n'$ = average effective normal stress along the nail<br>
-$\phi_{interface}$ = interface friction angle (typically 0.8-1.0 times soil friction angle)
-
-**For Geotextiles:**
->>$L_p = \dfrac{T_{max}}{2 \lambda \sigma_n' \tan \phi_{interface}}$
-
-where the factor of 2 accounts for friction on both sides of the geotextile.
-
-These equations are a general guide that can be used to come up with reasonable estimates of Lp. The entries
-for each support, with typical values from the FHWA manuals, are on
-[Modeling Reinforcement](../usage/modeling_reinforcement.md).
+The pullout length $L_p$ is the distance from each end of the reinforcement over which the full tensile strength
+is mobilized, $T_{max}$ divided by the pullout resistance per unit length at that end. The entries for a
+[geosynthetic layer](../usage/modeling_reinforcement.md#geosynthetic-layer), a
+[soil nail](../usage/modeling_reinforcement.md#soil-nail) and a
+[tieback](../usage/modeling_reinforcement.md#tieback-grouted-ground-anchor), with the pullout resistance per unit
+length and typical values from the FHWA manuals, are on Modeling Reinforcement.
 
 ### Initial state and EA selection
 
 The reinforcement is placed with the soil in its final geometry and starts at zero force. It gains tension only from
 the deformation of the gravity solve and of the strength reduction, not from construction in lifts; XSLOPE has no
 staged construction. A bar must therefore be stiff enough to mobilize its capacity at the small displacements of an
-incipient failure. Below about $EA = 50\,T_{max}$ the reinforcement may add little to the factor of safety, and above
-about $100$–$200\,T_{max}$ further stiffness changes it little. The zero initial force matters most where the
-reinforcement is extensible and the wall tall, or where reinforcement forces at working load are wanted.
-
-Recommended values of $EA$ by reinforcement type:
-
-| Reinforcement Type | Recommended $EA/T_{max}$ | Strain at $T_{max}$ implied by $EA$ | Notes |
-|---|---|---|---|
-| **Woven geotextiles** | $50$–$100$ | 1–2% | Use stiffer end for SSRM |
-| **HDPE geogrids** | $50$–$100$ | 1–2% | Uniaxial, reinforcement grade |
-| **PET geogrids** | $100$–$200$ | 0.5–1% | Higher stiffness than HDPE at same strength |
-| **Steel strips** | $500$–$2{,}000$ | 0.05–0.2% | Very stiff, minimal elongation |
-| **Soil nails (grouted)** | $1{,}000$–$5{,}000$ | 0.02–0.1% | Based on steel bar + grout composite |
+incipient failure. The zero initial force matters most where the reinforcement is extensible and the wall tall, or
+where reinforcement forces at working load are wanted. The `E` and `Area` entries for each support are on
+[Modeling Reinforcement](../usage/modeling_reinforcement.md).
 
 ## Strength Reduction and Reinforcement
 

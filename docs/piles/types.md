@@ -25,13 +25,13 @@ inches or millimeters (ksi, in², in⁴, mm²) is also given in model units, bui
 A row of drilled shafts, or piers, is installed through the sliding mass and into stable ground below it, at a
 spacing that lets the soil arch between them; the shafts act as shear dowels across the slip surface
 ([GEC 10][gec10] p. 12-59). A discrete row is analyzed with the LEM and the Ito & Matsui force
-([LEM vs FEM](overview.md#lem-vs-fem)). The figure shows one shaft of a row in section.
+([LEM vs FEM](overview.md#lem-vs-fem)). The figure shows one shaft of a row in section, and the row in plan.
 
-![A drilled shaft of diameter D through a slope, from its head at the ground surface, across the slip surface, to its tip in stable ground, with the force H at the crossing](images/pw_shaft.png){width=477}
+![In section, a drilled shaft through a slope, from its head at the ground surface, across the slip surface, to its tip in stable ground, with the force H at the crossing; in plan, a row of shafts of diameter D at spacing S](images/pw_shaft.png){width=842}
 
-The pile line runs from the head to the tip, and `D` is the shaft's diameter. Where a trial slip surface crosses
-the shaft, the LEM applies `H`, pointing into the slope, against the movement of the sliding mass. The spacing `S` runs along the
-row, into the page, as in the plan under [LEM vs FEM](overview.md#lem-vs-fem).
+In section, the pile line runs from the head to the tip, and where a trial slip surface crosses the shaft, the LEM
+applies `H`, pointing into the slope, against the movement of the sliding mass. In plan, the shafts of diameter `D`
+stand in a row across the slope at spacing `S`, center to center, and the sliding mass moves past them.
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
@@ -54,12 +54,13 @@ A micropile is a small drilled and grouted pile, typically less than 300 mm (12 
 steel casing or bar ([micropile manual][mp] p. 1-4). To stabilize a slope, micropiles are installed in rows, often
 in pairs battered across the slip surface, with their heads tied together by a concrete cap beam at the ground
 surface (pp. 6-44, 6-54). Ito & Matsui applies to vertical piles only, so a battered micropile's `H` is entered,
-not computed. The figure shows one battered pair under its cap beam.
+not computed. The figure shows one battered pair under its cap beam in section, and three pairs in plan.
 
-![A pair of micropiles battered in opposite directions from a cap beam on a bench in a slope, each crossing the slip surface with its own force H perpendicular to it](images/pw_micropiles.png){width=519}
+![In section, a pair of micropiles battered in opposite directions from a cap beam on a bench in a slope, each crossing the slip surface with its own force H perpendicular to it; in plan, three pairs along the cap beam at spacing S](images/pw_micropiles.png){width=801}
 
-Each leg is a pile line of its own, from its head in the cap beam to its tip in stable ground, with its own `H`
-perpendicular to the leg where the slip surface crosses it. `S` is the spacing between pairs along the row.
+In section, each leg is a pile line of its own, from its head in the cap beam to its tip in stable ground, with its
+own `H` perpendicular to the leg where the slip surface crosses it. In plan, the pairs stand along the cap beam at
+spacing `S`, and each pair's legs run upslope and downslope from it below the ground.
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
@@ -125,14 +126,13 @@ A soldier-pile wall is a row of steel beams, driven H-piles or pairs of channels
 concrete-filled drilled holes, with timber lagging spanning between them to hold the soil ([GEC 4][gec4] p. 13).
 The beams are discrete, but the lagging makes the wall continuous, so the wall is entered per beam with `S` the
 beam spacing. [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) builds one held by tiebacks. The figure shows
-the wall in plan and in section.
+the wall in section and in plan.
 
-![A soldier-pile wall in plan, steel beams at spacing S with timber lagging between them, and in section, the lagging down to the excavation's base and the beam embedded below it](images/pw_soldier_pile.png){width=658}
+![A soldier-pile wall in section, the lagging down to the excavation's base and the beam embedded below it, and in plan, steel beams at spacing S with timber lagging between them](images/pw_soldier_pile.png){width=658}
 
-In plan, the soldier piles, steel beams, stand at spacing `S`, and the lagging spans between them and holds the
-soil. In section,
-the lagging stops at the excavation's base, and the beam continues below it as the embedment. The pile line is one
-beam, and `I`, `Area` and `Mcap` are entered for one beam.
+In section, the lagging stops at the excavation's base, and the beam continues below it as the embedment. In plan,
+the soldier piles, steel beams, stand at spacing `S`, and the lagging spans between them and holds the soil. The
+pile line is one beam, and `I`, `Area` and `Mcap` are entered for one beam.
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 

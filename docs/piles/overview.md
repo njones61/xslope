@@ -11,10 +11,11 @@ piles, and they push back where the slip surface crosses them. A sheet-pile or s
 its full height and often holds tiebacks. A segmental block wall or a concrete gravity wall is a mass of its own,
 which stands by its weight and its grip on the ground beneath it.
 
-![A row of piles through a sliding mass, each pushing back on it with a force H where the failure surface crosses the pile](../lem/images/pile_diagram.png){width=1000px}
+![Three kinds of pile and wall: two rows of drilled shafts in a slope, a sheet-pile wall in a slope, and a segmental block wall with joint lines and geogrid](images/piles_walls_types.png){width=1000}
 
-Each pile pushes back on the sliding mass with a force $H$ at the point where the failure surface crosses it,
-against the direction the mass moves.
+From left to right: two rows of drilled shafts stabilizing a slope ([Tutorial LEM-12](../tutorials/lem12_piles.md)), a
+sheet-pile wall on a bench in a slope ([the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall)), and a
+segmental block wall with its joint lines and geogrid ([Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md)).
 
 XSLOPE's limit equilibrium (LEM) and finite element (FEM) analyses take these in two ways. A pile, a micropile, a pier, or a sheet-pile or soldier-pile wall is a straight line
 on the `piles` sheet. A block wall or a gravity wall is drawn as polygons of its own material, with joint lines where
@@ -73,7 +74,14 @@ The LEM applies one force, `H`, at the point where a trial slip surface crosses 
 and against the movement of the sliding mass. `H` is entered, or computed by Ito & Matsui from the soil squeezing
 between neighboring piles, and capped by `Vcap` and `Mcap`. The FEM builds the pile into the mesh as a chain of beam
 elements that share the soil's nodes. No force is prescribed: the beam carries whatever the deforming soil pushes
-onto it, along its whole length, and the analysis returns the moment, shear and deflection down the member.
+onto it, along its whole length, and the analysis returns the moment, shear and deflection down the member. The
+figure compares the two on the [LEM-12](../tutorials/lem12_piles.md) slope and its critical circle:
+
+![The pile force in limit equilibrium, one force H at each pile's crossing of the slip surface, and in the finite element analysis, the soil's pressure along the whole pile](images/pile_lem_fem.png){width=1000}
+
+On the left, the LEM applies one force $H$ at each pile's crossing of the circle. On the right, the FEM's beam takes
+the soil's pressure along its whole length: the sliding mass pushes it downslope above the slip surface, and the
+stable ground holds it below.
 
 A two-dimensional analysis is plane strain, so every member in it is continuous out of plane. A continuous wall is
 exactly that, but a row of separate piles is not: dividing a pile's EI and EA by `S` makes the row a wall of the

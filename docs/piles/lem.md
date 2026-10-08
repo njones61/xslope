@@ -3,7 +3,12 @@
 A pile resists a slide by shear and bending where the slip surface crosses it. The kinds of pile and wall, and how a
 pile line is entered, are on the [Piles and Walls Overview](overview.md), and what to enter for each, with typical
 values, on [Pile and Wall Types](types.md). In a limit equilibrium analysis the pile is one force on the sliding
-mass, at the point where a trial slip surface crosses it.
+mass, at the point where a trial slip surface crosses it:
+
+![A row of piles through a sliding mass, each pushing back on it with a force H where the failure surface crosses the pile](../lem/images/pile_diagram.png){width=1000px}
+
+Each pile pushes back on the sliding mass with a force $H$ at the point where the failure surface crosses it,
+against the direction the mass moves.
 
 ## Pile Force in Limit Equilibrium Analysis
 

@@ -28,12 +28,17 @@ End 1 is on the face of the slope and end 2 at the buried end, so the line is as
 The capacity is `Tend1` at the face (zero where the layer ends free) and zero at the buried end; it grows with
 the friction on both faces of the layer and is capped at `Tmax`.
 
-`Tmax` comes from the sheet's long-term strength `Tal`: its ultimate tensile strength `Tult` from the
-manufacturer's tests, divided by a reduction factor RF for the strength it loses over its design life to creep,
-degradation and damage during installation. FS<sub>R</sub> is the factor of safety the slope is designed for.
-FHWA enters `Tal` one of two ways, depending on whether the analysis divides the reinforcement force by the factor
-of safety (GEC 11, pp. 8-7 and 8-8). With Appl Passive the LEM does, so `Tmax` is `Tal`; with Appl Active it does
-not, so `Tmax` is `Tal` ÷ FS<sub>R</sub>.
+`Tmax` is worked out from the sheet's long-term strength T<sub>al</sub>. That is its ultimate tensile strength
+T<sub>ult</sub>, from the manufacturer's tensile tests, divided by a reduction factor RF for the strength the sheet
+loses over its design life:
+
+>$T_{al} = \dfrac{T_{ult}}{RF}, \qquad RF = RF_{ID} \times RF_{CR} \times RF_{D}$
+
+where RF<sub>ID</sub> allows for damage during installation, RF<sub>CR</sub> for creep under sustained load and
+RF<sub>D</sub> for chemical and biological degradation (GEC 11 p. 9-5). With Appl Passive the LEM divides the
+reinforcement force by the factor of safety, so `Tmax` = T<sub>al</sub>. With Appl Active it does not, so `Tmax` =
+T<sub>al</sub> ÷ FS<sub>R</sub>, where FS<sub>R</sub> is the factor of safety the slope is designed for
+(GEC 11 pp. 8-7 and 8-8).
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
@@ -42,10 +47,10 @@ not, so `Tmax` is `Tal` ÷ FS<sub>R</sub>.
 | <code class="rc rc-lem">Type</code> | `Geosynthetic` | — |
 | <code class="rc rc-lem">Dir</code> | `Tangent`, set automatically by `Type`: the force acts tangent to the slip surface where it crosses the layer | — |
 | <code class="rc rc-lem">Appl</code> | `Active`, set automatically by `Type`: the `Tmax`, pullout (`Adhesion` and `Delta`, or `Lp1` and `Lp2`) and `Tend1` entries in the rows below are allowable values, which the LEM does not divide by F. To use nominal values in those rows instead, change it to `Passive`. | — |
-| <code class="rc rc-both">Tmax</code> | Appl Active: `Tal` ÷ FS<sub>R</sub>. Appl Passive: `Tal`. | FS<sub>R</sub> at least 1.3 (GEC 11 p. 9-24). RF = 7 for preliminary design in granular fill (p. 9-5); 2.6 to 2.8 for the geogrids of FHWA Example E1 (Table E1-7.3, p. E1-15). |
+| <code class="rc rc-both">Tmax</code> | Appl Active: T<sub>al</sub> ÷ FS<sub>R</sub>. Appl Passive: T<sub>al</sub>. | FS<sub>R</sub> at least 1.3 (GEC 11 p. 9-24). RF = 7 for preliminary design in granular fill (p. 9-5); 2.6 to 2.8 for the geogrids of FHWA Example E1 (Table E1-7.3, p. E1-15). |
 | <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | `Adhesion` = 0. Appl Active: `Delta` = arctan(F\*α ÷ FS<sub>PO</sub>), with FS<sub>PO</sub> the factor of safety against pullout (GEC 11 Eq. 9-9, p. 9-13). Appl Passive: `Delta` = arctan(F\*α). F\* is the pullout resistance factor and α the scale-effect correction. | F\* = 0.67 tan φ with α = 0.6, the most conservative defaults (GEC 11 p. E8-6); α = 0.6 to 0.8 for extensible reinforcement without pullout tests (p. B-2); F\* = 0.45 and α = 0.8 for the geogrids of Example E1 (p. E1-16); FS<sub>PO</sub> = 1.5 in granular soil and 2 in cohesive soil, and minimum embedment beyond the critical surface 3 ft (1 m) (p. 9-5) |
 | <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | in place of `Adhesion` and `Delta`: `Tmax` ÷ the pullout resistance per unit length at each end; with Appl Active, the allowable pullout resistance (÷ FS<sub>PO</sub>) | — |
-| <code class="rc rc-both">Tend1</code> | Appl Active: the nominal long-term connection strength `Talc` divided by the factor of safety the design applies to the connection. Appl Passive: `Talc`. 0 where the layer ends free at the face. | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
+| <code class="rc rc-both">Tend1</code> | Appl Active: the long-term connection strength T<sub>alc</sub> divided by the factor of safety the design applies to the connection. Appl Passive: T<sub>alc</sub>. 0 where the layer ends free at the face. | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
 | <code class="rc rc-both">Tend2</code> | 0 | — |
 | <code class="rc rc-both">Spacing</code> | blank | — |
 | <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> | `E` × `Area` = the sheet's tensile stiffness per unit width ([Axial Stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea)) | — |
@@ -257,9 +262,9 @@ connected to a block facing.
 
 End 1 is on the back of the block facing, where `Tend1` is the connection, and end 2 is in the fill.
 
-FHWA takes the long-term connection strength `Talc` from connection tests on the facing unit and the geosynthetic
+FHWA takes the long-term connection strength T<sub>alc</sub> from connection tests on the facing unit and the geosynthetic
 (GEC 11 Eq. 4-41, p. B-13), and it rises with the normal pressure on the connection: in Example E1 it runs
-from 533 lb/ft (7.8 kN/m) at the top layer to 2,550 lb/ft (37.2 kN/m) at the bottom, against `Tal` = 1,085 and
+from 533 lb/ft (7.8 kN/m) at the top layer to 2,550 lb/ft (37.2 kN/m) at the bottom, against T<sub>al</sub> = 1,085 and
 2,169 lb/ft (15.8 and 31.7 kN/m) for the two grades the wall uses, GG-I and GG-II (Table E1-7.3, p. E1-15;
 connection strengths Table E1-7.6, p. E1-18), so on eight of the wall's eleven layers the connection limits the
 force at the face.

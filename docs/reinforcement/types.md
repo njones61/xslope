@@ -53,8 +53,8 @@ T<sub>al</sub> ÷ FS<sub>R</sub>, where FS<sub>R</sub> is the factor of safety t
 | <code class="rc rc-both">Tend1</code> | 0 where the layer ends free at the face. Where it is connected to facing blocks or panels, the connection's capacity:<br>Appl Active: T<sub>alc</sub>, the long-term strength of the connection (see [below](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face)), divided by the factor of safety the design applies to the connection.<br>Appl Passive: T<sub>alc</sub>.<br>For a wrapped face, the pullout resistance of the folded-back return (see [below](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face)). | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
 | <code class="rc rc-both">Tend2</code> | 0 | — |
 | <code class="rc rc-both">Spacing</code> | blank | — |
-| <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> | `E` × `Area` = the sheet's tensile stiffness per unit width ([Axial Stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea)) | — |
-| <code class="rc rc-fem">Tres</code> | blank | — |
+| <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> | `E` × `Area` = EA, the sheet's tensile stiffness per unit width ([Axial Stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea)). Only the product matters, so `Area` = 1 with `E` = EA will do. | EA = T<sub>ult</sub> ÷ ε<sub>ult</sub>, from the manufacturer's tensile test: the ultimate strength over the strain at which it is reached |
+| <code class="rc rc-fem">Tres</code> | blank: once the sheet reaches `Tmax` it holds it. `Tmax` is well below the sheet's ultimate strength, so a sheet at `Tmax` has not broken. Enter 0 only to model a sheet that breaks ([Force Behavior and Failure Modes](../fem/reinforcement.md#force-behavior-and-failure-modes)). | — |
 | <code class="rc rc-fem">Joint</code> | blank; `Yes` where the soil can slide along the sheet ([A sheet the soil slides along](#a-sheet-the-soil-slides-along)) | — |
 
 The `Geosynthetic` preset's tangent direction is the one FHWA gives for continuous sheets ([GEC 11][gec11] p. 8-6).
@@ -96,7 +96,8 @@ At end 1 the capacity starts at the head's `Tend1` and at end 2 at zero, and bon
 | <code class="rc rc-both">Spacing</code> | horizontal nail spacing | 4 to 6 ft (1.22 to 1.83 m), routinely 5 ft (1.52 m) ([GEC 7][gec7] p. 148) |
 | <code class="rc rc-fem">E</code> | modulus of the steel bar | 29,000 ksi ([GEC 7][gec7] p. 250): 4.176 × 10⁹ psf, or about 2.0 × 10⁸ kPa (200 GPa) |
 | <code class="rc rc-fem">Area</code> | bar area per nail | as for `Tmax` |
-| <code class="rc rc-fem">Tres</code>, <code class="rc rc-fem">Joint</code> | blank | — |
+| <code class="rc rc-fem">Tres</code> | blank: once the bar reaches `Tmax` it holds it, as yielding steel does ([Force Behavior and Failure Modes](../fem/reinforcement.md#force-behavior-and-failure-modes)) | — |
+| <code class="rc rc-fem">Joint</code> | blank: the bar is bonded to the soil along its length | — |
 
 In [GEC 7][gec7]'s allowable stress design, which programs such as SNAILZ follow with an allowable bond stress (p. 117), the
 factor of safety on the soil is at least 1.5 (Table 5.1, p. 108). How the head connects to the facing in each
@@ -138,7 +139,8 @@ the bond governs, as in the figure, `Lp2` is the bond length.
 | <code class="rc rc-both">Spacing</code> | horizontal anchor spacing | on a soldier-beam wall the anchors connect to the soldier beams, directly or through wales ([GEC 4][gec4] pp. 13–14); soldier beams are typically 1.5 to 3 m (4.9 to 9.8 ft) apart when driven and up to 3 m apart when drilled in (p. 76) |
 | <code class="rc rc-fem">E</code> | modulus of the tendon steel | 29,000 ksi for a bar tendon ([GEC 7][gec7] p. 250); for strand, the manufacturer's value, which the Post-Tensioning Institute (PTI) allows to be reduced 3 to 5 percent for a long multistrand tendon when checking apparent free length ([GEC 4][gec4] p. 151) |
 | <code class="rc rc-fem">Area</code> | tendon area per anchor | Grade 150 bars 26 to 64 mm (1 to 2½ in.): 548 to 3,348 mm² (0.85 to 5.19 in²), ultimate strength 568 to 3,461 kN (127.5 to 778.0 kip) ([GEC 4][gec4] Table 9, p. 77); 15-mm strand: 140 mm² (0.217 in²) and 260.7 kN (58.6 kip) per strand ([GEC 4][gec4] Table 10, p. 78) |
-| <code class="rc rc-fem">Tres</code>, <code class="rc rc-fem">Joint</code> | blank | — |
+| <code class="rc rc-fem">Tres</code> | blank: once the bar reaches `Tmax` it holds it, as yielding steel does ([Force Behavior and Failure Modes](../fem/reinforcement.md#force-behavior-and-failure-modes)) | — |
+| <code class="rc rc-fem">Joint</code> | blank: the bar is bonded to the soil along its length | — |
 
 The unbonded length is at least 3 m (9.8 ft) for a bar tendon and 4.5 m (14.8 ft) for strand ([GEC 4][gec4] p. 70), and
 the bond length starts at least one fifth of the wall height or 1.5 m (4.9 ft) behind the critical slip surface
@@ -186,7 +188,8 @@ The bar then delivers `Tmax` wherever a slip surface crosses it between its anch
 | <code class="rc rc-both">Tend1</code>, <code class="rc rc-both">Tend2</code>, <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | blank | — |
 | <code class="rc rc-both">Spacing</code> | out-of-plane (horizontal) spacing of the bars | — |
 | <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> | steel modulus; bar area per bar | `E` = 29,000 ksi ([GEC 7][gec7] p. 250) |
-| <code class="rc rc-fem">Tres</code>, <code class="rc rc-fem">Joint</code> | blank | — |
+| <code class="rc rc-fem">Tres</code> | blank: once the bar reaches `Tmax` it holds it, as yielding steel does ([Force Behavior and Failure Modes](../fem/reinforcement.md#force-behavior-and-failure-modes)) | — |
+| <code class="rc rc-fem">Joint</code> | blank: the bar is bonded to the soil along its length | — |
 
 With both development lengths 0 the envelope does not read `Tend1` or `Tend2`: the shaft develops no friction
 between its anchorages, and their capacities enter through `Tmax`. A bar whose shaft also grips the soil is

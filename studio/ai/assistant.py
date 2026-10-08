@@ -233,7 +233,8 @@ the canvas re-renders automatically.
    'kn'/'ks' blank = derived from the adjacent soil; 'jred'='No' holds the
    interface at full strength in the SSR. Right where the surface runs ALONG the
    sheet — a base geotextile, a wall whose fill slides on its sheets — and wrong
-   where it cuts across. 'lp1'/'lp2'/'t_res' are not read there. LEM ignores it.)
+   where it cuts across. 'lp1'/'lp2' are not read there; 't_max'/'t_res' still
+   govern the bar. LEM ignores it.)
   # EDIT THIS one; reinforce_lines (capitalized X/Y/T/Tres) is derived from it.
 - joint_lines[i]: {'label','x1','y1','x2','y2','c','phi','c_res','phi_res','dil',
   't_cut','kn','ks','jred'}

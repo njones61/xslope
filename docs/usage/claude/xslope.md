@@ -1021,9 +1021,10 @@ the material: does the slip surface CUT the reinforcement or run ALONG it? A bon
 where the surface crosses the layers (a circle through a geogrid slope, a nail wall, a pile
 row) — it corresponds to the LEM treatment. A joint is right where the surface can run along
 the layer: a base geotextile under an embankment on soft clay, a wrapped-face or block-faced
-wall whose fill slides on its sheets, a smooth liner. On a jointed line `lp1`/`lp2` and `t_res`
-are not read (the grip is the interface traction), a blank `tend1`/`tend2` leaves that end free
-to pull out, and a filled one ties it at that capacity. LEM ignores `joint` entirely. Preflight
+wall whose fill slides on its sheets, a smooth liner. On a jointed line `lp1`/`lp2` are not
+read (the grip is the interface traction); the bar still yields at `t_max` and softens to `t_res`
+where one is given. A blank `tend1`/`tend2` leaves that end free to pull out, and a filled one
+ties it at that capacity. LEM ignores `joint` entirely. Preflight
 reports the geometry that indicates a bonded line should have been a joint. See
 `docs/fem/reinforcement.md`, "Choosing a Bonded Bar or a Joint".
 

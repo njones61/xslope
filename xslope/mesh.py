@@ -1510,7 +1510,12 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                       and the smaller system solves faster.
                       None is accepted and resolves to the default, so a model whose
                       main!D18 is blank meshes with tri6.
-        lines        : Optional list of lines, each defined by list of (x, y) tuples for 1D elements
+        lines        : Optional list of lines, each defined by list of (x, y) tuples for 1D elements.
+                      Every 1D element lies along an edge of the 2D mesh and stands on
+                      its nodes; a mesh in which one does not is refused with a
+                      MeshInputError naming the line. Lines that meet — a bar crossing
+                      a pile, a bar ending partway along another line, two bars
+                      crossing — share a node at the meeting point.
         debug        : Enable debug output
         mesh_params  : Optional dictionary of GMSH meshing parameters to override defaults
         element_size_1d : Optional element size along the constraint (reinforcement /
@@ -1656,6 +1661,15 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                                    target_size, debug=debug)
         _validate_joint_lines(lines, _joint_opts, point_constraints, polygon_coords)
         _insert_joint_junction_points(lines, _joint_opts, debug=debug)
+
+    # Bonded lines that meet — a bar ending on or crossing a pile, two bars
+    # crossing — get the meeting point as a vertex of both, so the two members
+    # share a node there. A line that meets no other is left untouched. See
+    # _insert_bonded_junction_points.
+    _bonded_junctions = set()
+    if lines:
+        _bonded_junctions = _insert_bonded_junction_points(
+            lines, _joint_opts, polygon_coords, debug=debug)
 
     # Point constraints (e.g. line-load application points): insert each point as
     # a vertex into every polygon edge that contains it, so gmsh places a node
@@ -1875,6 +1889,11 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                             f"mesh until it spans more than a twentieth of an element.")
                 for i in [0, len(snapped) - 1]:  # snap endpoints only
                     px, py = snapped[i]
+                    # An end standing on another bonded line's interior is the
+                    # junction of the two members and stays there: moving it to a
+                    # nearby zone corner would take it off the other line.
+                    if (float(px), float(py)) in _bonded_junctions:
+                        continue
                     dists = np.sqrt((poly_pts_arr[:, 0] - px)**2 + (poly_pts_arr[:, 1] - py)**2)
                     j = np.argmin(dists)
                     if dists[j] < snap_tol and dists[j] > 1e-12:
@@ -2633,6 +2652,12 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     # the mesh -- gmsh's own quadratic elements, the linear-to-quadratic
     # conversion above, or the OCC-fragment fallback.
     attach_1d_midside_nodes(mesh, debug=debug)
+
+    # Every 1D element must lie along an edge of the 2D mesh; one that cuts across
+    # the soil elements is refused, naming the line. Before the joint split, which
+    # gives a jointed line's bar nodes of its own.
+    if lines is not None:
+        _check_1d_elements_on_soil_edges(mesh)
 
     # Jointed lines are split last, on the finished mesh: the bar elements must
     # already carry the midside node of their 2D edge before that edge is torn
@@ -3443,6 +3468,238 @@ def _insert_joint_junction_points(lines, opts, tol=1e-9, debug=False):
                       f"constraint line {li + 1}")
         lines[li] = line
     return n_inserted
+
+
+def _insert_bonded_junction_points(lines, opts=None, polygon_coords=None,
+                                   debug=False):
+    """Give every meeting point of two BONDED constraint lines a vertex on both.
+
+    A bonded line — a reinforcement line not flagged as a joint, or a pile —
+    stands on the soil's nodes, and where two of them meet they must stand on
+    one node there too: a bar ending partway down a pile, a bar crossing a
+    pile, two grids crossing, a T. gmsh puts a node where the geometry carries
+    a point, and the mesher keys its points by coordinate, so the meeting point
+    has to be a vertex of BOTH lines, with the same coordinates in each. Where
+    it is not, the two curves pass through a point neither carries, gmsh can
+    honor only one of them there, and the other comes back with an element
+    that cuts across the soil elements or skips the soil node at the bar's
+    end — joined to the other member nowhere.
+
+    Three steps, the bonded counterpart of :func:`_snap_joint_line_ends` and
+    :func:`_insert_joint_junction_points`:
+
+    * **ends that stand together.** A line end within ``tol`` of another line's
+      end takes the coordinates of the end on the lower-numbered line.
+    * **an end on another line's interior.** An end within ``tol`` of another
+      line, but not on it, moves to the foot of the perpendicular on that line.
+      The through line keeps its geometry; the end moves by at most ``tol``.
+    * **the meeting points.** Every crossing, and every end standing on another
+      line, becomes a vertex of both lines, in order along each. A meeting
+      point within ``tol`` of a vertex a line or zone already carries takes
+      that vertex's coordinates, so one place is one point.
+
+    ``tol`` is one part in a million of the model's span
+    (:func:`_joint_line_tol`). Lines named in ``opts`` are jointed and are left
+    alone: :func:`_validate_joint_lines` refuses a bonded line that meets one,
+    and :func:`_insert_joint_junction_points` handles two that meet. Two bonded
+    lines lying on one another over a stretch are left as they are.
+
+    In place, on ``lines``; a line that meets no other bonded line is not
+    touched. Returns the meeting points that lie in the INTERIOR of at least
+    one line, as ``(x, y)`` tuples: an end standing there must not be moved
+    off it later (see the end snap in :func:`build_mesh_from_polygons`).
+    """
+    if not lines:
+        return set()
+    from shapely.geometry import LineString as _LS, Point as _Pt
+
+    def _d(p, q):
+        return math.hypot(p[0] - q[0], p[1] - q[1])
+
+    opts = opts or {}
+    pts = {}
+    for li, line in enumerate(lines):
+        if li in opts or line is None or len(line) < 2:
+            continue
+        pl = [(float(q[0]), float(q[1])) for q in line]
+        if _d(pl[0], pl[-1]) > 0.0:
+            pts[li] = pl
+    idx = sorted(pts)
+    if len(idx) < 2:
+        return set()
+    tol = _joint_line_tol(lines, polygon_coords)
+
+    def _pairs():
+        g = {li: _LS(pts[li]) for li in idx}
+        out = [(a, b) for k, a in enumerate(idx) for b in idx[k + 1:]
+               if g[a].distance(g[b]) <= tol]
+        return g, out
+
+    geoms, pairs = _pairs()
+    if not pairs:
+        return set()
+    changed = set()
+
+    # 1. the corners: an end within tol of a lower-numbered line's end is that end
+    for k, li in enumerate(idx):
+        for end in (0, -1):
+            p = pts[li][end]
+            for lj in idx[:k]:
+                hit = next((q for q in (pts[lj][0], pts[lj][-1])
+                            if q != p and _d(p, q) <= tol), None)
+                if hit is not None:
+                    pts[li][end] = hit
+                    changed.add(li)
+                    if debug:
+                        print(f"  Bonded line {li + 1} end ({p[0]:g}, {p[1]:g}) "
+                              f"moved {_d(p, hit):.3g} onto the end of line {lj + 1}")
+                    break
+
+    # 2. the terminations: an end just off another line's interior moves onto it.
+    #    An end already ON a line, or at one of its vertices, stays where it is.
+    geoms, pairs = _pairs()
+    for li in idx:
+        for end in (0, -1):
+            p = pts[li][end]
+            P = _Pt(p)
+            best = None
+            for lj in idx:
+                if lj == li:
+                    continue
+                d = geoms[lj].distance(P)
+                if d > tol:
+                    continue
+                if d == 0.0 or any(_d(p, v) <= tol for v in pts[lj]):
+                    best = None
+                    break
+                foot = geoms[lj].interpolate(geoms[lj].project(P))
+                if best is None or d < best[0]:
+                    best = (d, (float(foot.x), float(foot.y)), lj)
+            if best is not None:
+                pts[li][end] = best[1]
+                changed.add(li)
+                if debug:
+                    print(f"  Bonded line {li + 1} end ({p[0]:g}, {p[1]:g}) moved "
+                          f"{best[0]:.3g} onto line {best[2] + 1}")
+
+    # 3. the meeting points, each one coordinate pair shared by both lines.
+    geoms, pairs = _pairs()
+    anchors = [v for li in idx for v in pts[li]]
+    zone_pts = [(float(x), float(y)) for coords in (polygon_coords or [])
+                for (x, y) in coords]
+
+    def _canon(p):
+        for q in anchors:
+            if _d(p, q) <= tol:
+                return q
+        for q in zone_pts:
+            if _d(p, q) <= tol:
+                anchors.append(q)
+                return q
+        anchors.append(p)
+        return p
+
+    adds = defaultdict(list)
+    for a, b in pairs:
+        ga, gb = geoms[a], geoms[b]
+        shared = ga.intersection(gb)
+        if shared.length > tol:
+            continue                       # lying on one another: not a junction
+        cands = [(float(g.x), float(g.y))
+                 for g in getattr(shared, "geoms", [shared])
+                 if g.geom_type == "Point" and not g.is_empty]
+        for lk, ll in ((a, b), (b, a)):
+            for p in (pts[lk][0], pts[lk][-1]):
+                if geoms[ll].distance(_Pt(p)) <= tol:
+                    cands.append(p)
+        for p in cands:
+            p = _canon(p)
+            adds[a].append(p)
+            adds[b].append(p)
+
+    n_inserted = 0
+    for li in idx:
+        line = pts[li]
+        for p in adds.get(li, ()):
+            if any(_d(p, q) <= tol for q in line):
+                continue                   # already a vertex of this line
+            k = min(range(len(line) - 1),
+                    key=lambda s: _LS([line[s], line[s + 1]]).distance(_Pt(p)))
+            line.insert(k + 1, p)
+            n_inserted += 1
+            changed.add(li)
+            if debug:
+                print(f"  Bonded junction ({p[0]:g}, {p[1]:g}) inserted into "
+                      f"constraint line {li + 1}")
+    for li in changed:
+        lines[li] = pts[li]
+
+    interior = set()
+    for li in idx:
+        for p in pts[li][1:-1]:
+            if any(p in adds.get(lj, ()) for lj in idx):
+                interior.add(p)
+    return interior
+
+
+def _check_1d_elements_on_soil_edges(mesh):
+    """Refuse a mesh in which a 1D element is not an edge of the 2D mesh.
+
+    Every bar and beam element is laid along an edge of the soil elements
+    around it and stands on that edge's nodes, which is how the member and the
+    soil are joined along their whole length. An element that is not an edge —
+    a chord gmsh drew across the soil elements where it could not fit the
+    soil mesh to the line — is joined to the soil at its two end nodes only,
+    gets no midside node on a quadratic mesh, and carries load across soil it
+    does not touch. Nothing downstream can tell such a mesh from a sound one,
+    so it is refused here, naming the line and the place.
+
+    Read-only. Run before the joint split, which gives a jointed line's bar a
+    node set of its own that no 2D element shares.
+    """
+    e1d = mesh.get("elements_1d")
+    if e1d is None or len(e1d) == 0:
+        return
+    elements = np.asarray(mesh.get("elements"), dtype=np.int64)
+    types = np.asarray(mesh.get("element_types"), dtype=int)
+    n_nodes = len(mesh["nodes"])
+    keys = []
+    for et in np.unique(types):
+        n = _CORNERS_BY_TYPE.get(int(et))
+        if not n:
+            continue
+        corners = elements[types == et][:, :n]
+        for k in range(n):
+            a, b = corners[:, k], corners[:, (k + 1) % n]
+            keys.append(np.minimum(a, b) * n_nodes + np.maximum(a, b))
+    if not keys:
+        return
+    edge_keys = np.unique(np.concatenate(keys))
+    e1d = np.asarray(e1d, dtype=np.int64)
+    a, b = e1d[:, 0], e1d[:, 1]
+    off = ~np.isin(np.minimum(a, b) * n_nodes + np.maximum(a, b), edge_keys)
+    if not off.any():
+        return
+    mats = mesh.get("element_materials_1d")
+    mats = (np.asarray(mats, dtype=int) if mats is not None
+            else np.ones(len(e1d), dtype=int))
+    nodes = np.asarray(mesh["nodes"])
+    parts = []
+    for line_id in sorted(set(int(m) for m in mats[off])):
+        on_line = mats == line_id
+        bad = np.flatnonzero(off & on_line)
+        p, q = nodes[a[bad[0]]], nodes[b[bad[0]]]
+        parts.append(f"line {line_id}, {len(bad)} of its {int(on_line.sum())} "
+                     f"elements, the first from ({p[0]:.6g}, {p[1]:.6g}) to "
+                     f"({q[0]:.6g}, {q[1]:.6g})")
+    raise MeshInputError(
+        "The soil mesh does not follow every constraint line (numbered "
+        "reinforcement lines first, then piles, then joints-sheet lines): "
+        + "; ".join(parts) + ". Each of those elements cuts across the soil "
+        "elements instead of lying along their edges, so the member would be "
+        "joined to the soil only at the element's two ends. gmsh could not fit "
+        "the soil mesh to the line at that place; look there for a line end on, "
+        "or very near, a zone corner or another line.")
 
 
 def _element_corner_edges(elements, element_types, ei):

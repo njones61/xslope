@@ -243,9 +243,15 @@ def _leg_preflight(failures, cache):
         if rid in fired:
             failures.append(f"{rid} fires on the fixture, which earns none of "
                             f"them: {fired[rid].message[:100]}")
-    if "joint.bond_inputs_ignored" not in fired:
-        failures.append("the sample's jointed lines carry Lp1/Lp2 and a Tres, "
-                        "and nothing said they are not read")
+    got = fired.get("joint.bond_inputs_ignored")
+    if got is None:
+        failures.append("the sample's jointed lines carry Lp1/Lp2, and nothing "
+                        "said they are not read")
+    elif "fills Lp1 and Lp2," not in got.message:
+        # Tres IS read on a jointed line (the bar softens to it), so the INFO
+        # names the development lengths and nothing else as unread.
+        failures.append(f"the INFO does not name exactly Lp1 and Lp2 as the "
+                        f"unread inputs: {got.message[:120]}")
 
     # The refusal: a jointed line with no interface strength, named.
     blank = _model()

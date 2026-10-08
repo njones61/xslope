@@ -5960,8 +5960,8 @@ def _joint_signal_wall(ctx):
 # ---- the info: what a jointed line stops reading ---------------------------
 
 @rule("joint.bond_inputs_ignored", INFO, ("fem",),
-      "A jointed line's pullout comes from the interface. Lp and Tres are not read.",
-      fields=("lp1", "lp2", "t_res"))
+      "A jointed line's pullout comes from the interface. Lp1 and Lp2 are not read.",
+      fields=("lp1", "lp2"))
 def _joint_bond_inputs(ctx):
     rows = []
     for i, r, _seg in _joint_lines(ctx):
@@ -5970,21 +5970,19 @@ def _joint_bond_inputs(ctx):
             cols.append("Lp1")
         if _num(r.get("lp2")):
             cols.append("Lp2")
-        tres = _num(r.get("t_res"))
-        if tres is not None:
-            cols.append("Tres")
         if cols:
             rows.append((i, cols))
     for i, cols in rows:
         yield (f"{ctx.reinf_label(i)} sets Joint = Yes and fills "
-               f"{', '.join(cols)}, which the finite element engine does not "
+               f"{' and '.join(cols)}, which the finite element engine does not "
                f"read on a jointed line. The sheet's grip on the soil is the "
                f"traction the interface elements integrate along it, so the "
                f"bond-slip cap the development lengths build is not applied — "
-               f"it would count the same grip twice — and the bar's only limit "
-               f"is its own rupture strength Tmax. The limit-equilibrium engine "
-               f"ignores Joint entirely and reads them as it always did "
-               f"{_AT_REINF}.")
+               f"it would count the same grip twice. The bar keeps its own "
+               f"limits: it yields at its rupture strength Tmax and, where Tres "
+               f"is stated, softens to it. The limit-equilibrium engine ignores "
+               f"Joint entirely and reads {' and '.join(cols)} on this line as "
+               f"on any other {_AT_REINF}.")
 
 
 # ---- the joint-network regions (polygon sheet, Type 'joints') ---------------
@@ -6218,6 +6216,65 @@ def _structural_modulus_band(ctx):
                    f"structural range of about {lo:g} to {hi:g} {unit} for this "
                    f"model's declared units {_AT_PILES}.")
     return out
+
+
+@rule("structural.members_cross", INFO, ("fem",),
+      "Two bonded members that cross share a mesh node there, so the FEM joins them.")
+def _structural_members_cross(ctx):
+    """A bonded reinforcement line or pile CROSSING another one.
+
+    The mesher gives two bonded lines that meet one node at the meeting point
+    (mesh._insert_bonded_junction_points), so in the finite element model the two
+    members are joined there. Where one only ENDS on the other — a tieback
+    finishing at the wall, a T — that is what the drawing means. Where they cross,
+    it may not be: a tieback passing between soldier piles is not fixed to them.
+    Jointed lines are not members here: one meeting a bonded line is refused by
+    joint.crosses_constraint_line.
+    """
+    from shapely.geometry import LineString, Point
+    from .mesh import _joint_line_tol, line_is_jointed
+
+    members = []
+    for i, r in enumerate(ctx.reinforcement):
+        seg = _joint_seg(r)
+        if seg is not None and not line_is_jointed(r):
+            members.append((ctx.reinf_label(i), seg, _AT_REINF))
+    for i, p in enumerate(ctx.piles):
+        seg = _joint_seg(p) if isinstance(p, dict) else None
+        if seg is not None:
+            members.append((ctx.pile_label(i), seg, _AT_PILES))
+    if len(members) < 2:
+        return
+
+    # The mesher's own tolerance over the same geometry, so a crossing this rule
+    # reports is one the mesher joins.
+    polys = []
+    for p in (ctx.sd.get("polygons") or []):
+        poly = p.get("polygon") if isinstance(p, dict) else None
+        if poly is not None and not poly.is_empty:
+            polys.append([tuple(c) for c in poly.exterior.coords])
+    tol = _joint_line_tol([list(s) for _l, s, _a in members], polys)
+
+    for a in range(len(members)):
+        la, sa, at_a = members[a]
+        ga = LineString(list(sa))
+        for b in range(a + 1, len(members)):
+            lb, sb, _at_b = members[b]
+            gb = LineString(list(sb))
+            if ga.distance(gb) > tol:
+                continue
+            # An end standing on the other line is a T or a corner, not a crossing.
+            if (any(gb.distance(Point(q)) <= tol for q in sa)
+                    or any(ga.distance(Point(q)) <= tol for q in sb)):
+                continue
+            shared = ga.intersection(gb)
+            if shared.geom_type != "Point":
+                continue
+            yield (f"{la} crosses {lb} at ({shared.x:.4g}, {shared.y:.4g}). The "
+                   f"finite element mesh gives the two lines one node there, so "
+                   f"the two members are joined at the crossing and move together "
+                   f"at that point. If they pass each other without a connection, "
+                   f"end one short of the other or move it clear {at_a}.")
 
 
 # ===========================================================================

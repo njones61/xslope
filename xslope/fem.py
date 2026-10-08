@@ -3008,8 +3008,9 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     # On a JOINTED line the taper is not applied at all. The mesh
                     # is split along the line and the sheet's grip on the soil is
                     # the interface traction the joint elements integrate, so the
-                    # bar's only limit is its own rupture strength Tmax; Lp1 and
-                    # Lp2 are not read there.
+                    # bar yields at its own rupture strength Tmax; Lp1 and Lp2 are
+                    # not read there. Tres IS read: the residual below applies on
+                    # a jointed line as on a bonded one.
                     if (line_id + 1) in _jointed_lines:
                         t_allow = t_max
                     else:
@@ -3318,16 +3319,17 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     # Identify the pile end nodes and their rotation restraints for boundary
     # conditions. The head is the top node (highest y) of each pile line and the
     # tip is the bottom node (lowest y). Each end carries its own restraint --
-    # 'Head' and 'Tip' in the piles sheet -- and 'fixed' constrains that node's
-    # ROTATION degree of freedom only; the translations stay with the boundary
-    # conditions and the surrounding soil. ``fixity`` is read as the head for a
-    # slope_data dict built before the two ends were separated.
+    # 'Head' and 'Tip' in the piles sheet: 'free' holds nothing, 'pinned' holds
+    # the node's two translations, 'unrotated' its rotation, and 'fixed' all
+    # three. A translation left free stays with the boundary conditions and the
+    # surrounding soil. ``fixity`` is read as the head for a slope_data dict
+    # that carries no separate head and tip.
     pile_head_nodes = []
     pile_head_fixed = []     # rotation held ('Head' = unrotated or fixed)
     pile_head_pinned = []    # translations held ('Head' = pinned or fixed)
     pile_tip_nodes = []
-    pile_tip_fixed = []      # rotation restrained ('Tip' = fixed)
-    pile_tip_pinned = []     # translations restrained ('Tip' = pinned or fixed)
+    pile_tip_fixed = []      # rotation held ('Tip' = unrotated or fixed)
+    pile_tip_pinned = []     # translations held ('Tip' = pinned or fixed)
     for pl_idx in range(n_pile_lines):
         pile_data = pile_lines[pl_idx]
         head_fixity = pile_data.get("head_fixity", pile_data.get("fixity", "free"))

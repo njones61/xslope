@@ -781,12 +781,12 @@ def _leg_pullout(failures, results):
         results.append(f"row 3  embedment {s:4.1f} m: joints {got:8.2f} kN/m, "
                        f"envelope {want:8.2f} kN/m ({100*(got-want)/want:+.2f}%)")
 
-    # The bar on a jointed line has no bond-slip cap: its only limit is rupture.
+    # The bar on a jointed line has no bond-slip cap: its peak is Tmax.
     t_allow = np.asarray(fem_data['t_allow_by_1d_elem'])
     if t_allow.size and not np.allclose(t_allow, line_row['t_max']):
         failures.append("row 3: a bar on a jointed line still carries the "
                         "pullout envelope as its cap; on a jointed line the "
-                        "grip is the joints' and the bar's only limit is Tmax")
+                        "grip is the joints' and the bar's peak cap is Tmax")
     return worst
 
 

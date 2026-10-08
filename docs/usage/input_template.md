@@ -934,10 +934,10 @@ How the force is then *used* differs by analysis:
 it are one body; a jointed line is a slip surface, and the mesh is split along it into an upper face, the bar, and a
 lower face, with an interface element between each pair carrying the `Adhesion` and `Delta` as a Mohr-Coulomb
 strength. Use it where the failure surface can run **along** a sheet rather than across it — a base geotextile under
-an embankment, a wall whose fill slides on its sheets, a smooth liner. `Lp1`, `Lp2` and `Tres` are not read on a
-jointed line: the grip is what the interface elements integrate, and the bar's only limit is `Tmax`. A non-blank
-`Tend1` / `Tend2` ties that end of the sheet to the soil or facing at the stated capacity; a blank end is free and
-can pull out. LEM ignores `Joint` and reads the line as a reinforcement force either way. See
+an embankment, a wall whose fill slides on its sheets, a smooth liner. `Lp1` and `Lp2` are not read on a jointed
+line: the grip is what the interface elements integrate. The bar still yields at `Tmax` and softens to `Tres` where
+one is given. A non-blank `Tend1` / `Tend2` ties that end of the sheet to the soil or facing at the stated capacity;
+a blank end is free and can pull out. LEM ignores `Joint` and reads the line as a reinforcement force either way. See
 [Choosing a bonded bar or a joint](../fem/reinforcement.md#bonded-bar-or-joint).
 
 ---

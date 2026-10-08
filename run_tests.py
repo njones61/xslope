@@ -6585,12 +6585,23 @@ PREFLIGHT_RULE_SPECS = [
              {'polygon': [(10.0, 0.0), (30.0, 0.0), (30.0, 10.0), (10.0, 10.0)],
               'label': 'North block', 'size': None, 'mat_id': None}]),
          expect='never meshed as a region'),
+    # The control keeps the file's Tres (600 on every line): the bar on a
+    # jointed line still softens to it, so a filled Tres is no finding.
     dict(rule='joint.bond_inputs_ignored', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_joint(sd),
-         control=lambda sd: _pf_joint(sd, lp1=0.0, lp2=0.0,
-                                      t_res=float('nan')),
+         control=lambda sd: _pf_joint(sd, lp1=0.0, lp2=0.0),
          expect='does not read on a jointed line'),
+    # Two bonded bars that cross are joined at the crossing in the FEM mesh. The
+    # sample's second sheet is stood up at x = 12 to cross the first (y = 0); the
+    # control stops it ON the first, a T, which is a meeting and no crossing.
+    dict(rule='structural.members_cross', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: (sd['reinforcement_lines'][1].update(
+             x1=12.0, y1=-4.0, x2=12.0, y2=6.0) or sd),
+         control=lambda sd: (sd['reinforcement_lines'][1].update(
+             x1=12.0, y1=0.0, x2=12.0, y2=6.0) or sd),
+         expect='joined at the crossing', count=1),
 
     # --- magnitude plausibility (the sniff tests) --------------------------
     dict(rule='mat.E_off_soil_type_band', base=PREFLIGHT_BASE_FEM, mode='excel',
@@ -9610,6 +9621,12 @@ MODULE_CHECKS = {
         "block on a plane cut in two, the same slab as a two-course stack, and "
         "an elastic block sliding out of an L-shaped joint at the friction the "
         "joint states."),
+    'bonded_junction': (
+        'bonded_junction_check.py',
+        "Bonded reinforcement and pile lines that meet share a mesh node: a bar "
+        "ending partway down a pile, a bar crossing a pile, two bars crossing and "
+        "a T, in tri6 and quad8; lines that do not meet are left alone, and a 1D "
+        "element off the soil edges is refused."),
     'joint_junction_mesh': (
         'joint_junction_check.py',
         "The junction fixtures alone — the wedge counts at a T, an X, an L, a "
@@ -15658,7 +15675,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'indep_bishop': 3, 'tension_crack_symmetry': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
-              'reinforce_mesh_geometry': 2, 'joint_mesh': 3,
+              'reinforce_mesh_geometry': 2, 'bonded_junction': 2, 'joint_mesh': 3,
               'joint_junction': 5, 'joint_junction_mesh': 3,
               'joint_element': 5, 'joint_surfaces': 4, 'joint_network': 3,
               'joint_network_dialog': 2, 'joint_verdict': 1,
@@ -16275,6 +16292,13 @@ def main():
         tests.append({'type': 'reinforce_mesh_geometry',
                       'file': 'reinforcement line mesh geometry (both laws)',
                       'method': '-', 'source': 'reinforce_mesh_geometry'})
+        # Bonded lines that meet (a tieback ending on a pile, a bar crossing a pile
+        # or another bar) must share a node, and no 1D element may leave the soil
+        # edges; before, gmsh honored one curve and the other's element cut
+        # through the soil with no message.
+        tests.append({'type': 'bonded_junction',
+                      'file': 'bonded lines that meet (shared nodes)',
+                      'method': '-', 'source': 'bonded_junction'})
         # A jointed reinforcement line is a slip surface: the mesh splits along
         # it into soil-above, bar and soil-below node sets, with joint elements
         # between them and the soil faces rejoining at the ends.

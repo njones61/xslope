@@ -389,13 +389,23 @@ form, along with the count of each kind.
 
 The lines are embedded in the 2D mesh rather than meshed separately: gmsh is required to
 place element edges along each polyline, and the 1D elements are then extracted from those
-edges. For bonded reinforcement and piles, every 1D node is a node of the surrounding 2D mesh, and load transfers
-between the reinforcement and the soil through these shared nodes. A line that runs along the domain
-boundary — on the base at `max_depth`, or along the ground surface — or that extends
-outside the section cannot be embedded; it is rejected before meshing starts, with a
-message naming the line, rather than producing a mesh the line is silently missing from.
-A line end within one twentieth of the target size of a polygon vertex is moved onto that
-vertex, and a line no longer than that is refused.
+edges. For bonded reinforcement and piles, every 1D element lies along an edge of the surrounding 2D elements and
+stands on that edge's nodes, and load transfers between the member and the soil through these shared nodes.
+
+Bonded lines that meet share a node at the meeting point: a tieback ending partway down a pile, a bar crossing a
+pile, two bars crossing, a bar ending on another bar. The two members are joined there. A line end that misses
+another line by no more than one part in a million of the model's span is moved onto it, so a meeting entered with
+a rounding error still meets. Where two lines cross, the [model checks](../studio/analysis.md#model-checks-before-a-run)
+note that the members are joined at the crossing; if they pass each other without a connection, end one short of
+the other. A bonded line cannot end on or cross a jointed one
+([A reinforcement line as a joint](joints.md#a-reinforcement-line-as-a-joint)).
+
+If gmsh cannot lay a line along the element edges at some point, the mesh is refused with a message naming the line
+and the place, rather than returned with an element cutting across the soil elements. A line that runs along the
+domain boundary — on the base at `max_depth`, or along the ground surface — or that extends outside the section
+cannot be embedded; it is rejected before meshing starts, with a message naming the line, rather than producing a
+mesh the line is silently missing from. A line end within one twentieth of the target size of a polygon vertex is
+moved onto that vertex, unless it stands partway along another line, and a line no longer than that is refused.
 
 Node spacing along a line comes from the size field like everything else.
 `element_size_1d` (the main sheet's **1D element size**, edited in Studio's *Build mesh*

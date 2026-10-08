@@ -28,7 +28,7 @@ End 1 is on the face of the slope and end 2 at the buried end, so the line is as
 The capacity is `Tend1` at the face (zero where the layer ends free) and zero at the buried end; it grows with
 the friction on both faces of the layer and is capped at `Tmax`.
 
-<p class="rc-legend">Sheet header colors: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
+<p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Entry | Typical values |
 |---|---|---|
@@ -71,7 +71,7 @@ inclination to its tip, end 2.
 At end 1 the capacity starts at the head's `Tend1` and at end 2 at zero, and bond adds to each over `Lp1` and
 `Lp2` until the bar's `Tmax` caps it.
 
-<p class="rc-legend">Sheet header colors: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
+<p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Entry | Typical values |
 |---|---|---|
@@ -112,7 +112,7 @@ With `Lp1` = 0 the full `Tmax` is available from the anchor head to within `Lp2`
 `Lp2` the capacity falls linearly to zero, as in GEC 4's limit equilibrium treatment of an anchor (p. 100). Where
 the bond governs, as in the figure, `Lp2` is the bond length.
 
-<p class="rc-legend">Sheet header colors: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
+<p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Entry | Typical values |
 |---|---|---|
@@ -160,7 +160,7 @@ End 1 is at the wall and end 2 at the deadman, with `Lp1` = 0 and `Lp2` = 0.
 
 The bar then delivers `Tmax` wherever a slip surface crosses it between its anchorages.
 
-<p class="rc-legend">Sheet header colors: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
+<p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Entry | Typical values |
 |---|---|---|
@@ -286,7 +286,7 @@ The sheet runs along the base of the embankment from end 1 to end 2 with `Joint`
 The sheet's `Tmax`, `E`, `Area` and `Tres` are entered as for a [geosynthetic layer](#geosynthetic-layer); a jointed
 sheet differs in these columns:
 
-<p class="rc-legend">Sheet header colors: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
+<p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Entry |
 |---|---|

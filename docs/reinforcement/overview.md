@@ -54,7 +54,7 @@ divided by `Spacing` in the same way.
 Each name carries the sheet's header color, which shows the analysis that reads the column. In the Units column F
 is a force and L a length; elsewhere on this page F is the factor of safety.
 
-<p class="rc-legend">Sheet header colors: <span class="rc rc-geom">geometry</span><span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
+<p class="rc-legend">Used by: <span class="rc rc-geom">geometry (both)</span><span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Name | Units | Meaning |
 |---|---|---|---|

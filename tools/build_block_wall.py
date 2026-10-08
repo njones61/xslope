@@ -74,6 +74,7 @@ from shapely.geometry import Polygon
 from xslope.fileio import (default_template_path, load_slope_data,
                            save_slope_data_to_xlsx)
 from xslope.preflight import preflight
+from fill_reinforce_formula_cache import fill_reinforce_cache
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(REPO, "docs", "tutorials", "files")
@@ -332,6 +333,7 @@ def main(argv=None):
         fname, fn = BUILDS[name]
         path = os.path.join(OUT, fname)
         save_slope_data_to_xlsx(fn(), path)
+        fill_reinforce_cache(path)    # Dir/Appl formula results, for non-Excel readers
         back = load_slope_data(path)
         rep = preflight(back, "fem")
         errs = [f for f in rep.findings if f.severity == "error"]

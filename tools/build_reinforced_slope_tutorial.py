@@ -57,6 +57,7 @@ import sys
 
 from xslope.fileio import (load_slope_data, save_slope_data_to_xlsx,
                            default_template_path)
+from fill_reinforce_formula_cache import fill_reinforce_cache
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LEM_BASE = os.path.join(REPO_ROOT, "docs", "lem", "files", "xslope_reinforce.xlsx")
@@ -148,6 +149,7 @@ def _model():
 def _write(sd, filename):
     out = os.path.join(TUTORIAL_FILES, filename)
     save_slope_data_to_xlsx(sd, out, template=default_template_path())
+    fill_reinforce_cache(out)    # Dir/Appl formula results, for non-Excel readers
     print(f"wrote {os.path.relpath(out, REPO_ROOT)}")
     return out
 

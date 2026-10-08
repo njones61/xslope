@@ -29,6 +29,7 @@ from benchmarks._xlsx_writer import emit_water_mode  # noqa: E402
 from elastic_props import assign_elastic_props, resolve_unit_system  # noqa: E402
 from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
 from benchmarks.tag_k0 import apply_tag_k0  # noqa: E402
+from tools.fill_reinforce_formula_cache import fill_reinforce_cache  # noqa: E402
 
 # Files these builders load purely as a GEOMETRY/FORMAT donor, then overwrite with
 # their own problem. Their elastic constants belong to THEIR problem, so they are
@@ -138,13 +139,20 @@ def save_slope_data_to_xlsx(slope_data, path):
     so every rebuild re-proves the equivalence rather than assuming it. A block over
     the pool that the derivation does NOT reproduce raises. vp068 is the recorded
     exception and sets water_loads='manual' with its reason.
+
+    The reinforce sheet's Dir/Appl cells are formulas on the row's Type; the
+    writer leaves them without a stored result, so every reader but Excel (the
+    docs sheet renders among them) would see them blank. fill_reinforce_cache
+    stores the results the formulas give (tools/fill_reinforce_formula_cache.py).
     """
     resolve_unit_system(slope_data)
     _vendor_set = apply_vendor_e_nu(slope_data.get('materials', []), path)
     assign_elastic_props(slope_data.get('materials', []), pinned=_vendor_set)
     apply_vendor_t_cut(slope_data.get('materials', []), path)
     apply_tag_k0(slope_data, path)
-    return _write_xlsx(emit_water_mode(slope_data, os.path.basename(path)), path)
+    out = _write_xlsx(emit_water_mode(slope_data, os.path.basename(path)), path)
+    fill_reinforce_cache(path)
+    return out
 
 
 def vp002():

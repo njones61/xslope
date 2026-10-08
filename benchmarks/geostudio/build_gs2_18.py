@@ -61,6 +61,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
 from _gs2_donor import donor_material, load_donor  # noqa: E402
+from tools.fill_reinforce_formula_cache import fill_reinforce_cache  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'geostudio')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -123,6 +124,7 @@ def gs2_18():
 
     path = os.path.join(OUT, 'gs2_18.xlsx')
     save_slope_data_to_xlsx(sd, path)
+    fill_reinforce_cache(path)     # Dir/Appl formula results, stored for non-Excel readers
     return 'gs2_18.xlsx'
 
 

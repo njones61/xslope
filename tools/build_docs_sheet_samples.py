@@ -42,6 +42,7 @@ from xslope.fileio import (
     load_slope_data, save_slope_data_to_xlsx, default_template_path,
     mat_header_cols, write_cells_to_xlsx, cell_ref, _read_template_info,
 )
+from fill_reinforce_formula_cache import fill_reinforce_cache
 
 
 def _template_version(path):
@@ -346,6 +347,7 @@ def build_joints(out_path):
     ]
     template = os.path.join(REPO_ROOT, "docs", "inputs", "input_template.xlsx")
     save_slope_data_to_xlsx(sd, out_path, template=template)
+    fill_reinforce_cache(out_path)    # Dir/Appl formula results, for the render
     return out_path
 
 

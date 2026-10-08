@@ -8025,7 +8025,7 @@ FEM_FIELD_PANELS = tuple(entry for entry in FEM_PANELS
 #: Both formulations differ from the limit equilibrium treatment of the same
 #: member, so the paragraph that describes one links the page that derives it.
 FEM_DETAIL_DOC_PAGES = {
-    "reinforcement": "fem/reinforcement.md",
+    "reinforcement": "reinforcement/fem.md",
     "pile": "fem/piles.md",
 }
 

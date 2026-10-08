@@ -7,7 +7,7 @@ than the fill alone would; soil nails are drilled and grouted into a cut as it i
 with a grouted bond length deep behind the slip surface, and end-anchored bars with a plate or deadman at each end.
 In each case the part of the
 member beyond the slip surface grips the stable ground, and the member pulls back on the sliding mass. The
-[Reinforcement Overview](../reinforcement/overview.md) shows the three kinds and how a line is entered.
+[Reinforcement Overview](overview.md) shows the three kinds and how a line is entered.
 
 In a limit equilibrium analysis each reinforcement line is a straight line defined by its end points, and wherever a
 trial slip surface crosses a line, a tensile force is applied to the sliding mass at the crossing point. Three
@@ -26,10 +26,10 @@ settings — selecting a support type fills Dir and Appl with the appropriate de
 
 What to enter for a particular support (a geosynthetic layer, a soil nail, a tieback or an end-anchored bar), and
 how to connect it to a wall or make it a joint, is set out column by column on
-[Reinforcement Types](../reinforcement/types.md).
+[Reinforcement Types](types.md).
 
 The finite element treatment, in which each reinforcement line is a row of bar elements in the mesh and carries the
-tension its stretch produces, is on the [FEM reinforcement](../fem/reinforcement.md) page.
+tension its stretch produces, is on the [FEM reinforcement](fem.md) page.
 
 ## Capacity Envelope
 
@@ -63,14 +63,14 @@ Special cases:
 - **Line shorter than $L_{p1} + L_{p2}$** with no anchorage: the envelopes from the two ends intersect below
   $T_{max}$ and only partial tension is mobilized.
 
-![reinf_envelope.png](images/reinf_envelope.png)
+![reinf_envelope.png](../lem/images/reinf_envelope.png)
 
 The envelope for each of the four end conditions. The force available where a trial surface crosses the line is
 the envelope value at the crossing point, so a surface that clips a line near a free end mobilizes only a
 fraction of $T_{max}$.
 
 Typical end capacities for each support, from the FHWA manuals, are on
-[Reinforcement Types](../reinforcement/types.md).
+[Reinforcement Types](types.md).
 
 ### Pullout from the effective overburden
 
@@ -114,7 +114,7 @@ table; the entry is under
 length; the sleeved unbonded length transfers no load to the ground. Its envelope is the development-length law,
 with $L_{p1} = 0$ at the head and the ramp $L_{p2}$ at the bonded end, $T_{max}$ divided by the load transfer per
 unit length. The overburden law would accumulate resistance from the head along the unbonded length. The entries
-are under [Tieback](../reinforcement/types.md#tieback-grouted-ground-anchor).
+are under [Tieback](types.md#tieback-grouted-ground-anchor).
 
 ### Per-unit-width convention and spacing
 
@@ -133,7 +133,7 @@ applied to the sliding mass at that point. In the slice free-body diagram it is 
 $\psi$ measured from the horizontal — the same reference the slice base inclination $\alpha$ is measured from.
 (The $T$ in that diagram is the tension-crack water force, a separate quantity.)
 
-![slice_adv.png](images/slice_adv.png)
+![slice_adv.png](../lem/images/slice_adv.png)
 
 The **Dir** setting sets $\psi$:
 
@@ -150,7 +150,7 @@ normal and tangential to the slice base — $P\sin(\alpha - \psi)$ normal (zero 
 $P\cos(\alpha - \psi)$ tangential — and for moment-based methods it contributes a moment about the circle center
 through its real moment arm at point $r$.
 
-![The force direction for Dir = Tangent and Dir = Axial at a slice base](images/reinf_direction.png){width=874}
+![The force direction for Dir = Tangent and Dir = Axial at a slice base](../lem/images/reinf_direction.png){width=874}
 
 Tangent reinforcement acts with its whole magnitude along the base and has no component across it. Axial
 reinforcement has a smaller component along the base, and the remainder presses the sliding mass onto the base,
@@ -158,8 +158,8 @@ where it adds frictional resistance $P\sin(\alpha - \psi)\tan\phi$. Which of the
 safety therefore depends on $\phi$ and on the angle between the line and the surface it crosses. For tangent reinforcement on a circular surface the force is tangent to
 the circle and its moment arm is exactly $R$, which is why the classical formulation reduces to a bare $\sum P$ in
 the OMS and Bishop denominators. The per-method equations are given on the
-[OMS](oms.md), [Bishop](bishop.md), [Janbu](janbu.md), [force equilibrium](force_eq.md), [Spencer](spencer.md),
-and [Morgenstern-Price](mprice.md) pages.
+[OMS](../lem/oms.md), [Bishop](../lem/bishop.md), [Janbu](../lem/janbu.md), [force equilibrium](../lem/force_eq.md), [Spencer](../lem/spencer.md),
+and [Morgenstern-Price](../lem/mprice.md) pages.
 
 ## Force Application (Appl)
 
@@ -190,7 +190,7 @@ The **Type** column fills Dir and Appl automatically (either can be overridden b
 | Anchor | Axial | Active | end-anchored bars |
 
 Leave Type blank for a generic tensile line with the defaults (Tangent, Active). A micropile, pile or pier resists by
-shear and bending rather than tension and is entered on the [piles](piles.md) sheet.
+shear and bending rather than tension and is entered on the [piles](../lem/piles.md) sheet.
 
 ## LEM vs. FEM
 
@@ -205,7 +205,7 @@ Both engines use the same reinforcement lines, but the mechanics differ:
   where the residual is the lower of the two, and holds the envelope value where the envelope is. Both engines
   therefore treat bond slip the same way; what $T_{res}$ adds in the FEM is rupture of the reinforcement itself.
   Dir and Appl have no meaning in the FEM.
-  See [Soil Reinforcement in FEM](../fem/reinforcement.md).
+  See [Soil Reinforcement in FEM](fem.md).
 
 ## References
 

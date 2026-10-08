@@ -916,7 +916,7 @@ preflight reports both as errors, naming the lines.
 
 The interface element, its constitutive law, the derived stiffnesses and what the results show are the same as for a
 jointed reinforcement line: see
-[Joints without reinforcement](../fem/reinforcement.md#joints-without-reinforcement).
+[Joints without reinforcement](../reinforcement/fem.md#joints-without-reinforcement).
 
 ### Generated sets {#joint-sets}
 

@@ -13,7 +13,7 @@ Joint lines come from two places. A line on the **joints** worksheet is a joint 
 the rock joint, the bedding plane, the block contact above. A line on the **reinforce** worksheet
 whose `Joint` column reads **Yes** is a reinforcement sheet that is *also* a slip surface: the mesh
 splits along it, and the sheet keeps its own tension. Everything on this page applies to both
-kinds; [Two ways to represent a sheet](reinforcement.md#two-ways-to-represent-a-sheet) covers what
+kinds; [Two ways to represent a sheet](../reinforcement/fem.md#two-ways-to-represent-a-sheet) covers what
 is particular to the reinforced one.
 
 A joint line is finite element geometry. The limit equilibrium engines do not read the joints
@@ -40,7 +40,7 @@ geomembrane or liner, a wrap-around geotextile wall (no facing blocks: each lift
 sheet, which is folded back over the face and buried under the next lift): the fill slides *on* the
 sheet at the interface friction. Those are reinforce-sheet lines with `Joint = Yes`; which of the two a sheet
 needs is set out under
-[Choosing a bonded bar or a joint](reinforcement.md#bonded-bar-or-joint).
+[Choosing a bonded bar or a joint](../reinforcement/fem.md#bonded-bar-or-joint).
 
 ![A segmental block wall: the blocks stand on a joint under the base, a joint on the back face against the fill and a joint between every course of blocks, with geogrid layers tied into the blocks and running back through the reinforced fill](images/joints_block_wall.png){width=900}
 
@@ -284,7 +284,7 @@ one against the soil below, whose strength comes from the line's own **Adhesion*
 The sheet's two interfaces act in series where a line on the joints worksheet has a single
 contact. How such a sheet is anchored, and what the bar carries once the interfaces carry the
 grip, is on the reinforcement page under
-[Ends, ties and the bar](reinforcement.md#ends-ties-and-the-bar); when a sheet should be a
+[Ends, ties and the bar](../reinforcement/fem.md#ends-ties-and-the-bar); when a sheet should be a
 joint and when it should be a bonded bar is worked through in
 [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md#part-3-when-a-sheet-is-a-slip-surface-and-when-it-is-bonded).
 

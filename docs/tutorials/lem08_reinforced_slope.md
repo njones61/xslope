@@ -122,7 +122,7 @@ whatever its own inclination. *Axial* is a nail or a tieback, stiff enough to
 hold its own line. **Appl** is whether the force is divided by the factor of
 safety: *Active* is an allowable working load applied against the driving side,
 *Passive* a nominal capacity that mobilizes with the soil.
-[Soil Reinforcement in LEM](../lem/reinforcement.md) derives both. A line left
+[Soil Reinforcement in LEM](../reinforcement/lem.md) derives both. A line left
 with no Type at all is a generic tensile line, and behaves as *Tangent* and
 *Active* — the same physics, without saying what the reinforcement is.
 
@@ -579,7 +579,7 @@ this same model through the finite element engine, where each line is meshed
 into bar elements that carry an axial stiffness and develop their force from the
 movement of the soil around them. The [tutorials index](index.md) lists the
 series.
-[Soil Reinforcement in LEM](../lem/reinforcement.md) derives the capacity
+[Soil Reinforcement in LEM](../reinforcement/lem.md) derives the capacity
 envelope and the per-method equations the force enters, and
 [Piles and Concrete Piers](../lem/piles.md) is the other support family — where
 shear and bending govern rather than tension.

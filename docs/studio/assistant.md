@@ -102,7 +102,7 @@ the answer you will get.*
 > [VP58 — tied-back wall in layered soil](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp58),
 > [VP59 — tieback wall in sand with a drawdown water table](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp59).
 > Theory:
-> [reinforcement](https://xslope.readthedocs.io/en/latest/lem/reinforcement/)
+> [reinforcement](https://xslope.readthedocs.io/en/latest/reinforcement/lem/)
 
 **Interpretation** — *"Why did my FS drop when the reservoir drew down?"*
 

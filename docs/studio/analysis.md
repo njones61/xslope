@@ -709,7 +709,7 @@ On a jointed model the deformation plot draws the blocks and their joints colore
 - **Export** writes the current view as PNG and its series as CSV, named for the field state.
 - The button is dimmed when there are no reinforcement lines or piles; its tooltip gives the reason.
 
-Reinforcement rows and the plot label show *within capacity*, *near capacity*, *pullout*, *yielded*, *softened*, *ruptured* or *inactive*, with the meaning in the tooltip; see [The state of a line](../fem/reinforcement.md#the-state-of-a-line). Profile interpretation is on [FEM Reinforcement](../fem/reinforcement.md#inspecting-the-results) and [FEM Piles](../fem/piles.md#inspecting-the-results).
+Reinforcement rows and the plot label show *within capacity*, *near capacity*, *pullout*, *yielded*, *softened*, *ruptured* or *inactive*, with the meaning in the tooltip; see [The state of a line](../reinforcement/fem.md#the-state-of-a-line). Profile interpretation is on [FEM Reinforcement](../reinforcement/fem.md#inspecting-the-results) and [FEM Piles](../fem/piles.md#inspecting-the-results).
 
 ---
 

@@ -214,8 +214,8 @@ its neighbors through the soil. That profile depends on two inputs the limit equ
 the reinforcement's elastic modulus `E` and its cross-sectional area `Area`.
 Their product *EA* is the axial stiffness.
 
-[Soil reinforcement in LEM](../lem/reinforcement.md) and
-[soil reinforcement in FEM](../fem/reinforcement.md) give the formulations
+[Soil reinforcement in LEM](../reinforcement/lem.md) and
+[soil reinforcement in FEM](../reinforcement/fem.md) give the formulations
 and the four end conditions of the envelope;
 [Reinforcement Types](../reinforcement/types.md) gives the entries
 for each kind of support.
@@ -812,8 +812,8 @@ This tutorial covered:
   lands on steps rather than a curve, and what changes when the bond is read from
   the depth of burial instead of a stated length.
 
-**Where to go next:** [Soil reinforcement in FEM](../fem/reinforcement.md) and
-[soil reinforcement in LEM](../lem/reinforcement.md) give both formulations; in
+**Where to go next:** [Soil reinforcement in FEM](../reinforcement/fem.md) and
+[soil reinforcement in LEM](../reinforcement/lem.md) give both formulations; in
 [LEM-8](lem08_reinforced_slope.md) we build this model from scratch and measure
 what the geogrid adds to the bare section, and in
 [FEM-1](fem01_strength_reduction.md) the method is run on an unreinforced

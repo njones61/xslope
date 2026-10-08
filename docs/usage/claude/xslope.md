@@ -266,7 +266,7 @@ derivation so the user can go deeper than a chat reply. Real pages, all under
 |:------|:-----|
 | LEM formulation, slice forces, method comparison | `lem/overview/` |
 | A single method in full | `lem/oms/`, `lem/bishop/`, `lem/janbu/`, `lem/spencer/`, `lem/mprice/`, `lem/force_eq/` |
-| Reinforcement, piles (LEM) | `lem/reinforcement/`, `lem/piles/` |
+| Reinforcement, piles (LEM) | `reinforcement/lem/`, `lem/piles/` |
 | Rapid drawdown (three-stage Duncan-Wright-Brandon) | `lem/rapid/` |
 | Automated search for the critical surface | `lem/search/` |
 | Seepage FE formulation, unsaturated models | `seep/overview/` |
@@ -1053,7 +1053,7 @@ read (the grip is the interface traction); the bar still yields at `t_max` and s
 where one is given. A blank `tend1`/`tend2` leaves that end free to pull out, and a filled one
 ties it at that capacity. LEM ignores `joint` entirely. Preflight
 reports the geometry that indicates a bonded line should have been a joint. See
-`docs/fem/reinforcement.md`, "Choosing a Bonded Bar or a Joint".
+`docs/reinforcement/fem.md`, "Choosing a Bonded Bar or a Joint".
 
 ### Joint lines (v27 `joints` sheet, FEM only)
 
@@ -1093,7 +1093,7 @@ jointed too (`joint='Yes'`) or stop short of it, and a pile must stop short: the
 node, and a bonded member there has no side to attach to (preflight
 `joint.crosses_constraint_line` refuses it). A thin zone crossed by many joint lines needs a per-polygon `size`
 (the polygon sheet's Size column) — a 0.3 m facing column crossed every 0.6 m does not mesh at a
-1 m target size. LEM ignores the sheet entirely. See `docs/fem/reinforcement.md`, "Joints without
+1 m target size. LEM ignores the sheet entirely. See `docs/reinforcement/fem.md`, "Joints without
 reinforcement".
 
 #### Joint networks (`xslope.joints`)

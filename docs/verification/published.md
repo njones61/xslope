@@ -77,7 +77,7 @@ with $F^{*} = 0.45$ and $\alpha = 0.8$ for these geogrids, $C = 2$ for the two
 bearing faces of a sheet, and a coverage ratio $R_c = 1.0$ for continuous
 geogrid. XSLOPE states the same resistance as a rate per unit length of line,
 $r(s) = 2(a + \sigma'_v(s)\tan\delta)$, and integrates it along the embedment
-([overburden-dependent pullout](../lem/reinforcement.md#pullout-from-the-effective-overburden)).
+([overburden-dependent pullout](../reinforcement/lem.md#pullout-from-the-effective-overburden)).
 The two are the same statement with the adhesion set to zero and
 
 >$\delta = \arctan(F^{*}\alpha) = \arctan(0.36) = 19.80°$

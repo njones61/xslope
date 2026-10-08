@@ -97,7 +97,7 @@ The **distributed load** resultant force $D$ is calculated from the distributed 
 
 The **seismic force** $kW$ is calculated as a horizontal pseudo-static force acting on the slice through the center of gravity of the slice. It is assumed to act in the direction of sliding. It is equal to the seismic coefficient $k$ multiplied by the weight of the slice $W$. The seismic coefficient is a user-defined input, depending on the seismic conditions of the site.
 
-The **reinforcement force** $P$ is applied at the point $r = (x_r, y_r)$ where a reinforcement line crosses the base of the slice, in a direction resisting sliding. Its magnitude is the available tensile capacity of the line at the crossing point, interpolated from the line's capacity envelope (tensile strength, pullout development, and end anchorage — see the [reinforcement page](reinforcement.md)). Its *direction* depends on the line's **Dir** setting in the input:
+The **reinforcement force** $P$ is applied at the point $r = (x_r, y_r)$ where a reinforcement line crosses the base of the slice, in a direction resisting sliding. Its magnitude is the available tensile capacity of the line at the crossing point, interpolated from the line's capacity envelope (tensile strength, pullout development, and end anchorage — see the [reinforcement page](../reinforcement/lem.md)). Its *direction* depends on the line's **Dir** setting in the input:
 
 - **Tangent** (the default): flexible reinforcement (geosynthetics) is assumed to bend with the sliding mass so the force acts parallel to the base of the slice, i.e. $\psi = \alpha$.
 - **Axial**: rigid reinforcement (soil nails, tiebacks) carries the force along its own axis, so $\psi$ equals the inclination of the reinforcement line itself.

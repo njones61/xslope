@@ -65,7 +65,7 @@ QUESTIONS = [
         "prompt": "Does xslope support line loads?",
         "expect": ("usage/input_template/", "lem/overview/", "fem/overview/",
                    "lem/oms/", "lem/bishop/", "lem/janbu/", "lem/spencer/",
-                   "lem/mprice/", "lem/force_eq/", "lem/reinforcement/",
+                   "lem/mprice/", "lem/force_eq/", "reinforcement/lem/",
                    "studio/editing/", "tutorials/lem02_loads_on_the_crest/"),
     },
     {
@@ -97,7 +97,7 @@ QUESTIONS = [
     {
         "name": "anchors",
         "prompt": "Does xslope support anchors or tiebacks?",
-        "expect": ("lem/reinforcement/", "fem/reinforcement/",
+        "expect": ("reinforcement/lem/", "reinforcement/fem/",
                    "usage/input_template/", "studio/editing/",
                    "tutorials/lem09_tieback_wall/"),
     },

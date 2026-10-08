@@ -1103,7 +1103,7 @@ def vp060():
     # applies the tensile/pullout envelope directly — but the FEM models each nail as
     # a bar and needs EA). E is steel (29e6 psi = 4.176e9 psf); Area is set per unit
     # width to EA/Tmax ~ 2000, the mid-range of the grouted-soil-nail convention in
-    # docs/fem/reinforcement.md (well above the ~100-200x mobilization plateau, at the
+    # docs/reinforcement/fem.md (well above the ~100-200x mobilization plateau, at the
     # stiff end wished-in-place SSRM needs). t_max is already the per-unit-width value
     # (per-nail 25918.14 lb/ft over the 5 ft spacing), so Area is per unit width too.
     E_nail = 4.176e9

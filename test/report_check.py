@@ -19371,7 +19371,7 @@ def test_the_reinforcement_direction_is_named_as_the_column_prints_it():
     # the line's own axis. A model whose lines are all tangent still prints the
     # sentence, and a reader of that model has to be able to tell what the other
     # setting would have meant.
-    with open(os.path.join(_REPO, "docs", "lem", "reinforcement.md"),
+    with open(os.path.join(_REPO, "docs", "reinforcement", "lem.md"),
               encoding="utf-8") as f:
         page = f.read()
     for what, in_prose, on_page in (
@@ -19382,7 +19382,7 @@ def test_the_reinforcement_direction_is_named_as_the_column_prints_it():
             fails.append(f"the sentence never describes the {what} case: "
                          f"{prose!r}")
         if on_page not in page:
-            fails.append(f"docs/lem/reinforcement.md no longer defines the "
+            fails.append(f"docs/reinforcement/lem.md no longer defines the "
                          f"{what} case as {on_page!r}; the sentence and the page "
                          f"have to be changed together")
     return fails

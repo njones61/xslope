@@ -1217,7 +1217,7 @@ def joint_yield_violation(st, cj_r, tanphi_r, floor=0.0):
 # ---------------------------------------------------------------------------
 # What a BONDED run says about the joint it did not have
 #
-# The selection rule (docs/fem/reinforcement.md, "Bonded bar or joint?") is
+# The selection rule (docs/reinforcement/fem.md, "Bonded bar or joint?") is
 # about the mechanism, and a bonded run has already found the mechanism. Two of
 # its readings say the surface wanted to run ALONG a sheet rather than across
 # it, and both are one pass over a solution the engine already holds.

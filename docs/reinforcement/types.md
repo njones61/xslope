@@ -55,8 +55,8 @@ T<sub>al</sub> ÷ FS<sub>R</sub>, where FS<sub>R</sub> is the factor of safety t
 | <code class="rc rc-both">Tend1</code> | 0 where the layer ends free at the face. Where it is connected to facing blocks or panels, the connection's capacity:<br>Appl Active: T<sub>alc</sub>, the long-term strength of the connection (see [below](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face)), divided by the factor of safety the design applies to the connection.<br>Appl Passive: T<sub>alc</sub>.<br>For a wrapped face, the pullout resistance of the folded-back return (see [below](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face)). | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
 | <code class="rc rc-both">Tend2</code> | 0: the buried end has no anchorage, so the capacity there starts from zero | — |
 | <code class="rc rc-both">Spacing</code> | blank: a continuous sheet is entered per unit width of slope, so nothing is divided by a spacing | — |
-| <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> | `E` × `Area` = EA, the sheet's tensile stiffness per unit width ([Axial Stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea)). Only the product matters, so `Area` = 1 with `E` = EA will do. | EA = T<sub>ult</sub> ÷ ε<sub>ult</sub>, from the manufacturer's tensile test: the ultimate strength over the strain at which it is reached |
-| <code class="rc rc-fem">Tres</code> | blank: once the sheet reaches `Tmax` it holds it. `Tmax` is well below the sheet's ultimate strength, so a sheet at `Tmax` has not broken. Enter 0 only to model a sheet that breaks ([Force Behavior and Failure Modes](../fem/reinforcement.md#force-behavior-and-failure-modes)). | — |
+| <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> | `E` × `Area` = EA, the sheet's tensile stiffness per unit width ([Axial Stiffness (EA)](fem.md#axial-stiffness-ea)). Only the product matters, so `Area` = 1 with `E` = EA will do. | EA = T<sub>ult</sub> ÷ ε<sub>ult</sub>, from the manufacturer's tensile test: the ultimate strength over the strain at which it is reached |
+| <code class="rc rc-fem">Tres</code> | blank: once the sheet reaches `Tmax` it holds it. `Tmax` is well below the sheet's ultimate strength, so a sheet at `Tmax` has not broken. Enter 0 only to model a sheet that breaks ([Force Behavior and Failure Modes](fem.md#force-behavior-and-failure-modes)). | — |
 | <code class="rc rc-fem">Joint</code> | blank; `Yes` where the soil can slide along the sheet ([A sheet the soil slides along](#a-sheet-the-soil-slides-along)) | — |
 
 The `Geosynthetic` preset's tangent direction is the one FHWA gives for continuous sheets ([GEC 11][gec11] p. 8-6).
@@ -98,7 +98,7 @@ At end 1 the capacity starts at the head's `Tend1` and at end 2 at zero, and bon
 | <code class="rc rc-both">Spacing</code> | horizontal nail spacing | 4 to 6 ft (1.22 to 1.83 m), routinely 5 ft (1.52 m) ([GEC 7][gec7] p. 148) |
 | <code class="rc rc-fem">E</code> | modulus of the steel bar | 29,000 ksi ([GEC 7][gec7] p. 250): 4.176 × 10⁹ psf, or about 2.0 × 10⁸ kPa (200 GPa) |
 | <code class="rc rc-fem">Area</code> | bar area per nail | as for `Tmax` |
-| <code class="rc rc-fem">Tres</code> | blank: once the bar reaches `Tmax` it holds it, as yielding steel does ([Force Behavior and Failure Modes](../fem/reinforcement.md#force-behavior-and-failure-modes)) | — |
+| <code class="rc rc-fem">Tres</code> | blank: once the bar reaches `Tmax` it holds it, as yielding steel does ([Force Behavior and Failure Modes](fem.md#force-behavior-and-failure-modes)) | — |
 | <code class="rc rc-fem">Joint</code> | blank: the bar is bonded to the soil along its length | — |
 
 In [GEC 7][gec7]'s allowable stress design, which programs such as SNAILZ follow with an allowable bond stress (p. 117), the
@@ -137,11 +137,11 @@ the bond governs, as in the figure, `Lp2` is the bond length.
 | <code class="rc rc-both">Tmax</code> | allowable anchor load per anchor: the smallest of the tendon's design load, the allowable capacity of the head's connection to the wall, and the bond length times the allowable load transfer per unit length | design load at most 0.6 × the tendon's specified minimum tensile strength ([GEC 4][gec4] p. 77); design loads of 260 to 1,160 kN (58.5 to 260.8 kip) are typical (p. 70) |
 | <code class="rc rc-both">Lp1</code> | 0: the head holds the full `Tmax`, and the sleeved unbonded length adds no friction | — |
 | <code class="rc rc-both">Lp2</code> | `Tmax` ÷ the allowable load transfer per unit length, which is the ultimate load transfer ÷ 2.0 in soil or ÷ 3.0 in rock ([GEC 4][gec4] pp. 71, 74): the bond length where the bond governs, shorter where the tendon or the head governs. A 580 kN anchor in medium dense sand (145 kN/m ultimate, 72.5 kN/m allowable) has `Lp2` = 580 ÷ 72.5 = 8.0 m. | ultimate load transfer of small-diameter gravity-grouted anchors: 30 to 290 kN/m (2 to 20 kip/ft) in soil ([GEC 4][gec4] Table 6, p. 71; [GEC 7][gec7] Table 4.6, p. 86) and 150 to 730 kN/m (10.3 to 50.0 kip/ft) in rock ([GEC 4][gec4] Table 8, p. 74); bond lengths 4.5 to 12 m (14.8 to 39.4 ft) in soil and 3 to 10 m (9.8 to 32.8 ft) in rock (pp. 71, 74) |
-| <code class="rc rc-both">Tend1</code>, <code class="rc rc-both">Tend2</code>, <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | blank: with `Lp1` = 0 the program does not read `Tend1`; for `Adhesion` and `Delta`, see grouted tiebacks under [Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden) | — |
+| <code class="rc rc-both">Tend1</code>, <code class="rc rc-both">Tend2</code>, <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | blank: with `Lp1` = 0 the program does not read `Tend1`; for `Adhesion` and `Delta`, see grouted tiebacks under [Pullout from the effective overburden](lem.md#pullout-from-the-effective-overburden) | — |
 | <code class="rc rc-both">Spacing</code> | horizontal anchor spacing | on a soldier-beam wall the anchors connect to the soldier beams, directly or through wales ([GEC 4][gec4] pp. 13–14); soldier beams are typically 1.5 to 3 m (4.9 to 9.8 ft) apart when driven and up to 3 m apart when drilled in (p. 76) |
 | <code class="rc rc-fem">E</code> | modulus of the tendon steel | 29,000 ksi for a bar tendon ([GEC 7][gec7] p. 250): 4.176 × 10⁹ psf, or about 2.0 × 10⁸ kPa; for strand, the manufacturer's value, which the Post-Tensioning Institute (PTI) allows to be reduced 3 to 5 percent for a long multistrand tendon when checking apparent free length ([GEC 4][gec4] p. 151) |
 | <code class="rc rc-fem">Area</code> | tendon area per anchor | Grade 150 bars 26 to 64 mm (1 to 2½ in.): 548 to 3,348 mm² (0.85 to 5.19 in²), or 5.48 × 10⁻⁴ to 3.348 × 10⁻³ m² (0.00590 to 0.0360 ft²), ultimate strength 568 to 3,461 kN (127.5 to 778.0 kip) ([GEC 4][gec4] Table 9, p. 77); 15-mm strand: 140 mm² (0.217 in²), or 1.40 × 10⁻⁴ m² (0.00151 ft²) and 260.7 kN (58.6 kip) per strand ([GEC 4][gec4] Table 10, p. 78) |
-| <code class="rc rc-fem">Tres</code> | blank: once the bar reaches `Tmax` it holds it, as yielding steel does ([Force Behavior and Failure Modes](../fem/reinforcement.md#force-behavior-and-failure-modes)) | — |
+| <code class="rc rc-fem">Tres</code> | blank: once the bar reaches `Tmax` it holds it, as yielding steel does ([Force Behavior and Failure Modes](fem.md#force-behavior-and-failure-modes)) | — |
 | <code class="rc rc-fem">Joint</code> | blank: the bar is bonded to the soil along its length | — |
 
 The unbonded length is at least 3 m (9.8 ft) for a bar tendon and 4.5 m (14.8 ft) for strand ([GEC 4][gec4] p. 70), and
@@ -190,13 +190,13 @@ The bar then delivers `Tmax` wherever a slip surface crosses it between its anch
 | <code class="rc rc-both">Tend1</code>, <code class="rc rc-both">Tend2</code>, <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | blank: with both development lengths 0 the program does not read `Tend1` or `Tend2`, the anchorages' capacities are part of `Tmax`, and the shaft develops no friction | — |
 | <code class="rc rc-both">Spacing</code> | out-of-plane (horizontal) spacing of the bars | — |
 | <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> | steel modulus; bar area per bar | `E` = 29,000 ksi ([GEC 7][gec7] p. 250): 4.176 × 10⁹ psf, or about 2.0 × 10⁸ kPa |
-| <code class="rc rc-fem">Tres</code> | blank: once the bar reaches `Tmax` it holds it, as yielding steel does ([Force Behavior and Failure Modes](../fem/reinforcement.md#force-behavior-and-failure-modes)) | — |
+| <code class="rc rc-fem">Tres</code> | blank: once the bar reaches `Tmax` it holds it, as yielding steel does ([Force Behavior and Failure Modes](fem.md#force-behavior-and-failure-modes)) | — |
 | <code class="rc rc-fem">Joint</code> | blank: the bar is bonded to the soil along its length | — |
 
 With both development lengths 0 the envelope does not read `Tend1` or `Tend2`: the shaft develops no friction
 between its anchorages, and their capacities enter through `Tmax`. A bar whose shaft also grips the soil is
 entered with the allowable anchorage capacities in `Tend1` and `Tend2` and the development lengths of the
-allowable friction in `Lp1` and `Lp2` ([Capacity Envelope](../lem/reinforcement.md#capacity-envelope)). In the
+allowable friction in `Lp1` and `Lp2` ([Capacity Envelope](lem.md#capacity-envelope)). In the
 FEM the shaft grips the soil along its whole length, and no plate or deadman is built into the mesh.
 
 No tutorial or verification model has an end-anchored bar.
@@ -282,8 +282,8 @@ connection strengths Table E1-7.6, p. E1-18), so on eight of the wall's eleven l
 force at the face.
 
 In the LEM, and in the FEM for a bonded layer, `Tend1` only raises the capacity at end 1
-([Capacity Envelope](../lem/reinforcement.md#capacity-envelope)); a jointed layer's `Tend1` ties its end to the
-facing at end 1, up to that capacity ([Ends, ties and the bar](../fem/reinforcement.md#ends-ties-and-the-bar)).
+([Capacity Envelope](lem.md#capacity-envelope)); a jointed layer's `Tend1` ties its end to the
+facing at end 1, up to that capacity ([Ends, ties and the bar](fem.md#ends-ties-and-the-bar)).
 In the block wall of [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md#part-2-the-same-wall-with-geogrid)
 the back face of the facing is a `joints`-sheet line, and a bonded line may not end on one, so all three layers
 are jointed, each tied to the blocks at `Tend1` = 40 kN/m. A wrapped face has no facing unit: the sheet is folded
@@ -303,7 +303,7 @@ as an ordinary reinforcement line, from `Tmax`, `Tend1`, `Tend2` and either `Lp1
 Where a slip surface can run along a sheet (a base geotextile under an embankment on soft clay, a smooth
 geomembrane liner, the sheets of a wrapped or block-faced wall), `Joint` = `Yes` splits the mesh along the line
 and the soil on each side slides on the sheet at the interface strength
-([Choosing a Bonded Bar or a Joint](../fem/reinforcement.md#bonded-bar-or-joint)). The figure shows one base sheet
+([Choosing a Bonded Bar or a Joint](fem.md#bonded-bar-or-joint)). The figure shows one base sheet
 under an embankment.
 
 ![A jointed base sheet under an embankment, with Adhesion and Delta on the interfaces above and below it](../usage/images/mr_joint_base_sheet.png){width=455}
@@ -327,7 +327,7 @@ sheet differs in these columns:
 | <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | blank: not read on a jointed line, whose grip on the soil is the interface strength from `Adhesion` and `Delta` |
 
 The model checks warn when a bonded sheet looks like a slip surface
-([Signs that a joint is needed](../fem/reinforcement.md#what-says-a-joint-was-needed)).
+([Signs that a joint is needed](fem.md#what-says-a-joint-was-needed)).
 [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md#part-3-when-a-sheet-is-a-slip-surface-and-when-it-is-bonded)
 runs a base geotextile and a liner both ways, with `kn`, `ks` and `Jred` blank on every jointed line.
 

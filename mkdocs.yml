@@ -29,6 +29,10 @@ extra_css:
   - css/custom.css
 plugins:
   - search
+  - redirects:
+      redirect_maps:
+        lem/reinforcement.md: reinforcement/lem.md
+        fem/reinforcement.md: reinforcement/fem.md
   - mkdocstrings:
       handlers:
         python:
@@ -122,8 +126,8 @@ nav:
   - Reinforcement:
     - Overview: reinforcement/overview.md
     - Reinforcement Types: reinforcement/types.md
-    - Reinforcement in LEM: lem/reinforcement.md
-    - Reinforcement in FEM: fem/reinforcement.md
+    - Reinforcement in LEM: reinforcement/lem.md
+    - Reinforcement in FEM: reinforcement/fem.md
   - Reliability:
     - Overview: reliability/index.md
     - Taylor Series (TSPM): reliability/taylor.md

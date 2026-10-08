@@ -844,7 +844,7 @@ This tutorial covered:
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Joints and Interface Elements](../fem/joints.md) describes the element and the
-split mesh, [Soil Reinforcement](../fem/reinforcement.md) describes the bar, the
+split mesh, [Soil Reinforcement](../reinforcement/fem.md) describes the bar, the
 interface and the ties, and
 [Worksheet: joints](../usage/input_template.md#worksheet-joints) documents the
 inputs with the rest of the template. In

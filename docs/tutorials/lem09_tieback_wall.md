@@ -119,7 +119,7 @@ over two settings:
 Picking `Anchor` fills **Dir** with `Axial` — the force acts along the bar, not
 along the slip surface — and **Appl** with `Active`, meaning the capacity is an
 allowable working load applied as it stands rather than an ultimate capacity
-divided by the factor of safety. [Soil Reinforcement in LEM](../lem/reinforcement.md)
+divided by the factor of safety. [Soil Reinforcement in LEM](../reinforcement/lem.md)
 derives what each choice does to the equilibrium equations.
 
 **Dir and Appl are not entered.** Choosing a Type sets both — in the worksheet
@@ -541,7 +541,7 @@ This tutorial covered:
 that has two competing mechanisms, where the surface a search returns depends
 on the circle it started from. The [tutorials index](index.md) lists the series.
 [VP49](../verification/rocscience.md#vp49) catalogs this model against the
-published solutions it comes from, [Soil Reinforcement in LEM](../lem/reinforcement.md)
+published solutions it comes from, [Soil Reinforcement in LEM](../reinforcement/lem.md)
 derives the capacity envelope and the per-method equations the anchor force enters,
 and [Piles and Concrete Piers](../lem/piles.md) covers the support family the
 soldier pile belongs to.

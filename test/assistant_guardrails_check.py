@@ -1870,7 +1870,7 @@ DOC_QUESTIONS = [
                                           "seep/seep_slope/", "studio/editing/",
                                           "tutorials/lem04_water_in_the_slope/")),
     ("Does xslope support anchors or tiebacks?",
-     ("lem/reinforcement/", "usage/input_template/",
+     ("reinforcement/lem/", "usage/input_template/",
       "tutorials/lem09_tieback_wall/")),
 ]
 

@@ -625,13 +625,13 @@ types and how the midside nodes are added.
 
 XSLOPE supports two kinds of one-dimensional structural element embedded in the 2D soil mesh. Bonded
 reinforcement and piles share nodes with the surrounding soil elements and participate in the viscoplastic
-iteration through body-force corrections; [jointed sheets](reinforcement.md#two-ways-to-represent-a-sheet)
+iteration through body-force corrections; [jointed sheets](../reinforcement/fem.md#two-ways-to-represent-a-sheet)
 couple to the soil through interfaces instead.
 
 For a member of length $L$, $A$ is its cross-sectional area and $I$ its second moment of area;
 $E$ is the member's Young's modulus, not the soil's.
 
-- **[Soil Reinforcement](reinforcement.md)**: geotextiles, soil nails and ground anchors as
+- **[Soil Reinforcement](../reinforcement/fem.md)**: geotextiles, soil nails and ground anchors as
   tension-only truss elements with axial stiffness $EA/L$, on every node of the soil edge they lie
   on — including the failure modes (perfectly
   plastic pullout, peak-residual softening, brittle rupture) and typical material properties.
@@ -859,7 +859,7 @@ The line's peak tensile capacity is $T_{max}$ and its entered residual capacity 
 These two flags, together with whether the elements at capacity sit inside a pullout ramp or out on the
 $T_{max}$ plateau, are what the line's reported state is built from — *within capacity*, *near capacity*,
 *pullout*, *yielded*, *softened*, *ruptured* or *inactive*, defined in
-[The state of a line](reinforcement.md#the-state-of-a-line).
+[The state of a line](../reinforcement/fem.md#the-state-of-a-line).
 
 ### Pile results columns
 

@@ -54,7 +54,7 @@ The FEM models flexible reinforcement as **truss elements** (axial only, tension
 | Failure mode | Tension rupture / pullout | Shear / bending capacity (plastic hinge) |
 | DOFs per node | 2 (translational only) | 3 (translational + rotational) |
 
-For details on the truss element formulation used for reinforcement, see [Soil Reinforcement](reinforcement.md).
+For details on the truss element formulation used for reinforcement, see [Soil Reinforcement](../reinforcement/fem.md).
 
 
 ## Beam Element Formulation
@@ -245,7 +245,7 @@ Columns G and H, the pile force $H$ and **Appl**, are not used by the finite ele
 ## Inspecting the Results
 
 The FEM results view colors pile elements by the shear they carry. The **1D Details…** panel, described under
-[Inspecting the results](reinforcement.md#inspecting-the-results) on the reinforcement page, lists each member with a
+[Inspecting the results](../reinforcement/fem.md#inspecting-the-results) on the reinforcement page, lists each member with a
 utilization badge and draws a selected pile's profiles; piles whose rows share a label are numbered so they can be
 told apart.
 
@@ -274,7 +274,7 @@ Four panels share one depth axis, pile head at the top:
   scaled to the mobilized profile and the limit runs off the sides. For a pile far enough inside its
   working range that the envelope does not reach the panel at all, it is not drawn, that panel carries no legend,
   and the note that states the peak fraction gives how far off the envelope is. The envelope does not change with
-  the [Field state](reinforcement.md#inspecting-the-results) setting.
+  the [Field state](../reinforcement/fem.md#inspecting-the-results) setting.
 
 Capacity lines appear only where the model declares a capacity: $V_{\text{cap}}$ and $M_{\text{cap}}$ are inputs,
 and no substitute is computed from an assumed section — the pile inputs carry force capacities, not section

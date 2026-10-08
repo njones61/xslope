@@ -310,19 +310,12 @@ $T_{max}$ and the end ties are not reduced. Iteration budgets, and how a jointed
 ## Joints Without Reinforcement {#joints-without-reinforcement}
 
 A slip surface with no member in it goes on the **joints** worksheet ([Joints and interface
-elements](../fem/joints.md)). Its mesh split differs from a jointed
-sheet's: each station carries two coincident nodes and one interface, where a jointed sheet carries three nodes and
-two interfaces:
+elements](../fem/joints.md)). The mesh splits along it differently from a jointed sheet:
 
-```
-  Joint = Yes on a sheet             a joints-sheet line
+![A jointed sheet with soil, bar and soil nodes and two interfaces at each station, beside a joints-sheet line with two soil nodes and one interface](../fem/images/joint_line_split.png){width=1000}
 
-   ----o----o----o----  upper        ----o----o----o----  upper face nodes
-   ~~~~~~~~~~~~~~~~~~~  interface    ~~~~~~~~~~~~~~~~~~~  the interface
-   ====b====b====b====  the bar      ----o'---o'---o'---  lower face nodes
-   ~~~~~~~~~~~~~~~~~~~  interface
-   ----o'---o'---o'---  lower
-```
+At each station a jointed sheet carries three nodes, the bar's between the two soil faces, and an interface on each
+side of the bar; a joints-sheet line carries the two soil faces' nodes and one interface between them.
 
 ### Both kinds in one model
 

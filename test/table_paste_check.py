@@ -26,7 +26,14 @@ both halves of it.
      compared against the published completed model for that tutorial -- to the
      precision the page prints. A page whose table gains a column, loses a column,
      or drifts from the model it builds fails here, on the page, rather than in a
-     reader's model.
+     reader's model. Where a table's headers are the editor's own column names (the
+     circles, reinforcement and piles tables), the columns it must carry are read
+     off the LIVE editor (``_editor_run``), never written here: a header list kept
+     in this file only ever agrees with the page it was copied from. Where the page
+     builds the completed model as it stands, its cells are also held to that
+     model's own worksheet (``_sheet_cells``), because the loader reads a blank and
+     a default the same way and so cannot see a page that prints one for the
+     other.
 
 Skips cleanly (exit 0) when PySide6 is not installed.
 """
@@ -354,9 +361,10 @@ def test_the_support_editors_columns_are_the_worksheets():
     orders are one fact. A column added, dropped or moved on either side shifts a
     reader's values one field to the left with nothing on screen saying so.
 
-    Only ``#`` (the sheet's row number) and the piles sheet's ``qp`` are dropped: qp
-    is the pile force angle, which the editor derives from the pile's own axis on
-    save, and which is why LEM-9's pile goes in as two blocks."""
+    Only ``#`` (the sheet's row number) is dropped. Nothing else is excused: a
+    column the editor derives rather than takes (the pile force angle, computed
+    from the pile's axis) has no place on the sheet either, so a sheet that carried
+    one would be a sheet a page's block could not paste across in one piece."""
     import openpyxl
 
     from studio.editors import PilesEditor, ReinforcementEditor
@@ -364,15 +372,15 @@ def test_the_support_editors_columns_are_the_worksheets():
     template = os.path.join(_REPO, "docs", "inputs", "input_template.xlsx")
     wb = openpyxl.load_workbook(template, read_only=True)
     out = []
-    for sheet, editor, derived in (("reinforce", ReinforcementEditor, ()),
-                                   ("piles", PilesEditor, ("qp",))):
+    for sheet, editor in (("reinforce", ReinforcementEditor),
+                          ("piles", PilesEditor)):
         ws = wb[sheet]
         # The header run from column A, stopping at the first empty cell: both sheets
         # keep their drop-down source lists in the same row, far off to the right.
         headers = [str(c.value).strip() for c in itertools.takewhile(
             lambda c: c.value is not None,
             next(ws.iter_rows(min_row=2, max_row=2)))]
-        want = [h for h in headers if h != "#" and h not in derived]
+        want = [h for h in headers if h != "#"]
         got = [f.header for f in editor.FIELDS]
         out += _fail(got == want,
                      f"the {editor.label} editor's columns are {got}, the {sheet!r} "
@@ -577,13 +585,37 @@ def _matches(pasted, printed, published):
     return abs(float(pasted) - float(published)) <= 0.5 * 10 ** (-dec) + 1e-9
 
 
+def _blank(v):
+    """An empty cell however a reader of it spells one: None, '', or NaN."""
+    return v is None or (isinstance(v, str) and v.strip() == "") or (
+        isinstance(v, float) and v != v)
+
+
+def _same(a, b):
+    """Two stored values that mean the same input: both blank, the same word in any
+    case, or the same number."""
+    if _blank(a) or _blank(b):
+        return _blank(a) and _blank(b)
+    if isinstance(a, str) or isinstance(b, str):
+        return str(a).strip().lower() == str(b).strip().lower()
+    return abs(float(a) - float(b)) <= 1e-9
+
+
+def _pasted(rows, cols):
+    """The status line a clean paste of a rows × cols block leaves."""
+    return "Pasted %d %s × %d %s." % (rows, "row" if rows == 1 else "rows",
+                                      cols, "column" if cols == 1 else "columns")
+
+
 def _compare(label, pasted_rows, printed_rows, published_rows, keys):
     """Field for field: what the page's block produced against the model the page
     ships, on the keys the block carries.
 
     A key the loaded model does not carry (a circle's Option, which the loader
     consumes into R rather than storing) is compared against the page's own cell —
-    the block still has to have landed in that column."""
+    the block still has to have landed in that column. A blank cell must come back
+    as whatever the model holds there, read the same way (both blank, or both the
+    default the blank stands for)."""
     out = _fail(len(pasted_rows) == len(published_rows),
                 f"{label}: the page's table built {len(pasted_rows)} records, "
                 f"the completed model has {len(published_rows)}")
@@ -591,9 +623,103 @@ def _compare(label, pasted_rows, printed_rows, published_rows, keys):
             zip(pasted_rows, printed_rows, published_rows)):
         for k, cell in zip(keys, printed):
             ref = want[k] if k in want else cell
-            out += _fail(_matches(got[k], cell, ref),
-                         f"{label}: row {i + 1} {k} pasted as {got[k]!r} from "
-                         f"{cell!r}; expected {ref!r}")
+            ok = _same(got[k], ref) if cell == "" else _matches(got[k], cell, ref)
+            out += _fail(ok, f"{label}: row {i + 1} {k} pasted as {got[k]!r} from "
+                             f"{cell!r}; expected {ref!r}")
+    return out
+
+
+def _editor_run(label, page, editor, first, last, occurrence=0):
+    """The taught table on ``page`` that runs from column ``first`` to column
+    ``last``, checked against the LIVE editor's columns rather than against a
+    header list written in this file.
+
+    The columns a block pasted at ``first`` lands in are the editor's own, from
+    ``first`` through ``last`` in the editor's order, and that run is read off
+    ``editor.FIELDS`` every time this runs. The page's table is found by its first
+    and last headers alone and then compared column for column, so a page still
+    printing a column the editor no longer has — or missing one it has gained —
+    fails here with both header rows in the message, instead of being sliced
+    around the difference by a list that was copied from the page.
+
+    Returns ``(headers, rows, keys, col, failures)``: the page's own header row and
+    data rows, the editor field keys of the run, and the editor column the block
+    anchors at."""
+    columns = [f.header for f in editor.FIELDS]
+    for h in (first, last):
+        if h not in columns:
+            raise AssertionError(f"{label}: the {editor.label} editor has no {h!r} "
+                                 f"column; its columns are {columns}")
+    i, j = columns.index(first), columns.index(last)
+    want = columns[i:j + 1]
+    found = [t for t in _page_tables(page) if t[0][0] == first and t[0][-1] == last]
+    if len(found) <= occurrence:
+        raise AssertionError(f"{page}: no table #{occurrence + 1} running from "
+                             f"{first!r} to {last!r} (found {len(found)})")
+    table = found[occurrence]
+    out = _fail(table[0] == want,
+                f"{label}: the page's table has the columns {table[0]}; the live "
+                f"{editor.label} editor's columns from {first} to {last} are {want}")
+    return table[0], table[1:], [f.key for f in editor.FIELDS][i:j + 1], i, out
+
+
+def _sheet_cells(label, headers, printed, model_path, sheet):
+    """The page's printed cells against the completed model's own worksheet, cell
+    for cell.
+
+    The paste legs measure what the editor makes of a block against what the loader
+    makes of the file, and both of them normalize: an empty Appl and an ``Active``
+    one load the same, so a page printing the one where the file holds the other
+    passes them. This reads the destination sheet itself — headers in row 2, one
+    record per row from row 3 until ``x1`` is empty — and holds each printed cell to
+    the cell under the same header: a blank to a blank, a word to the same word in
+    any case, a number to the file's value at the precision the page prints. A
+    column the page prints and the sheet does not have fails on its own."""
+    import openpyxl
+    from openpyxl.utils import get_column_letter
+
+    name = os.path.basename(model_path)
+    wb = openpyxl.load_workbook(model_path, read_only=True)
+    try:
+        ws = wb[sheet]
+        # The header run from column A to the first empty cell, as in the template
+        # check above: the drop-down source lists further right share the row.
+        head = [str(v).strip() for v in itertools.takewhile(
+            lambda v: v is not None,
+            next(ws.iter_rows(min_row=2, max_row=2, values_only=True)))]
+        cols = {h: n for n, h in enumerate(head)}
+        data = []
+        for r in ws.iter_rows(min_row=3, values_only=True):
+            if len(r) <= cols["x1"] or r[cols["x1"]] is None:
+                break
+            data.append(r)
+    finally:
+        wb.close()
+    out = []
+    for h in headers:
+        out += _fail(h in cols, f"{label}: the page prints a {h!r} column; the "
+                                f"{sheet!r} sheet of {name} has none (its columns "
+                                f"are {head[1:]})")
+    out += _fail(len(data) == len(printed),
+                 f"{label}: the page prints {len(printed)} rows; the {sheet!r} sheet "
+                 f"of {name} holds {len(data)}")
+    for n, (cells, r) in enumerate(zip(printed, data)):
+        for h, cell in zip(headers, cells):
+            if h not in cols:
+                continue
+            v = r[cols[h]] if cols[h] < len(r) else None
+            if cell == "" or _blank(v):
+                ok = cell == "" and _blank(v)
+            elif isinstance(v, str):
+                ok = cell.lower() == v.strip().lower()
+            else:
+                try:
+                    ok = _matches(float(cell), cell, v)
+                except ValueError:
+                    ok = False
+            out += _fail(ok, f"{label}: row {n + 1} {h} is printed {cell!r}; "
+                             f"{name} holds {v!r} in "
+                             f"{sheet}!{get_column_letter(cols[h] + 1)}{n + 3}")
     return out
 
 
@@ -629,15 +755,18 @@ def test_lem03_profile_lines_and_circles():
                          f"LEM-3 line {n + 1}: pasted ({gx}, {gy}) against "
                          f"({wx}, {wy})")
 
-    circles = _taught(page, ["Xo", "Yo", "Option", "Depth"])
+    _, circles, keys, col, bad = _editor_run("LEM-3 circles", page, CirclesEditor,
+                                             "Xo", "Depth")
+    if bad:
+        return out + bad
     editor = CirclesEditor()
     cdlg = editor.build(dict(model, circles=[]), None)
-    _paste(cdlg._editable, _tsv(circles))
+    _paste(cdlg._editable, _tsv(circles), row=0, col=col)
     landed = dict(model, circles=[])
     cdlg.accept()
     editor.apply(landed, cdlg)
     out += _compare("LEM-3 circles", landed["circles"], circles, model["circles"],
-                    ["Xo", "Yo", "Option", "Depth"])
+                    keys)
     # Option is not a stored key — what it does is set R, which is what the model
     # carries. A block that pasted "Depth" into the wrong column would not.
     for i, (got, want) in enumerate(zip(landed["circles"], model["circles"])):
@@ -959,7 +1088,10 @@ def test_lem10_seed_circle():
     from xslope.search import circular_search, file_search_window
 
     page = "lem10_global_minimum.md"
-    printed = _taught(page, ["Xo", "Yo", "Option", "Depth"])
+    _, printed, keys, col, out = _editor_run("LEM-10 seed", page, CirclesEditor,
+                                             "Xo", "Depth")
+    if out:
+        return out
     model = _load(os.path.join(_MODELS, "xslope_mult_min_KEY.xlsx"))
     out = _fail(len(printed) == 1,
                 f"LEM-10 seed: the page prints {len(printed)} rows; the edit is one")
@@ -970,8 +1102,8 @@ def test_lem10_seed_circle():
 
     editor = CirclesEditor()
     dlg = editor.build(model, None)
-    _paste(dlg._editable, _tsv(printed))
-    out += _fail(_summary(dlg._editable) == "Pasted 1 row × 4 columns.",
+    _paste(dlg._editable, _tsv(printed), row=0, col=col)
+    out += _fail(_summary(dlg._editable) == _pasted(1, len(keys)),
                  f"LEM-10 seed: the status line read {_summary(dlg._editable)!r}")
     landed = dict(model)
     editor.apply(landed, dlg)
@@ -986,130 +1118,117 @@ def test_lem10_seed_circle():
     return out
 
 
-def test_lem08_reinforcement_blocks():
-    """LEM-8's two reinforcement blocks pasted into the real editor's table view: the
-    Label..y2 table whole (Label is the editor's first column, as it is the sheet's),
-    then Type set per line, then the capacity block at Tmax."""
+def _reinforcement_leg(label, page, model_path, type_word):
+    """One page's two reinforcement blocks pasted into the real editor's table view,
+    the way the pages' Studio steps teach it: the Label..y2 table whole at the
+    editor's first column, the Type set per line, then the capacity table at Tmax.
+
+    Both tables are found and checked by ``_editor_run``, so each block's columns
+    are the live editor's run between its first and last header, and its anchor
+    column is wherever the editor has its first header now. Both are also held to
+    the completed model's reinforce sheet, cell for cell. Then every field the two
+    blocks carry is measured against the loaded model, blanks included, and Type,
+    Dir and Appl against the model's own — the reader types none but the Type."""
     from studio.editors import ReinforcementEditor
 
-    page = "lem08_reinforced_slope.md"
-    model = _load(os.path.join(_MODELS, "xslope_reinforce.xlsx"))
-    ends = _taught(page, ["Label", "x1", "y1", "x2", "y2"])
-    caps = _taught(page, ["Tmax", "Lp1", "Lp2", "Adhesion", "Delta",
-                          "Tend1", "Tend2", "Spacing"])
+    model = _load(model_path)
+    e_head, ends, e_keys, e_col, out = _editor_run(
+        f"{label} endpoints", page, ReinforcementEditor, "Label", "y2")
+    c_head, caps, c_keys, c_col, bad = _editor_run(
+        f"{label} capacities", page, ReinforcementEditor, "Tmax", "Spacing")
+    out += bad
+    out += _sheet_cells(f"{label} endpoints", e_head, ends, model_path, "reinforce")
+    out += _sheet_cells(f"{label} capacities", c_head, caps, model_path, "reinforce")
+    if out:
+        return out
     editor = ReinforcementEditor()
     dlg = editor.build(dict(model, reinforcement_lines=[]), None)
     dlg.set_view_mode("table")
     dlg._table.apply_usage_filter({"lem", "fem"})
     keys = [f.key for f in ReinforcementEditor.FIELDS]
-    _paste(dlg._table, _tsv(ends))                             # Label..y2, whole
-    out = _fail(_summary(dlg._table) == "Pasted 6 rows × 5 columns.",
-                f"LEM-8's endpoint block reported {_summary(dlg._table)!r}")
-    _paste(dlg._table, _tsv([["Geosynthetic"]] * len(ends)),
-           row=0, col=keys.index("type"))
-    _paste(dlg._table, _tsv(caps), row=0, col=keys.index("t_max"))
-    out += _fail(_summary(dlg._table) == "Pasted 6 rows × 8 columns.",
-                 f"LEM-8's capacity block reported {_summary(dlg._table)!r}")
-    landed = dict(model, reinforcement_lines=[])
-    dlg.accept()
-    editor.apply(landed, dlg)
-    rows = landed["reinforcement_lines"]
-    out += _compare("LEM-8 labels and endpoints", rows, ends,
-                    model["reinforcement_lines"],
-                    ["label", "x1", "y1", "x2", "y2"])
-    out += _compare("LEM-8 capacities", rows, caps, model["reinforcement_lines"],
-                    ["t_max", "lp1", "lp2", "tend1", "tend2", "spacing"])
-    for i, (got, want) in enumerate(zip(rows, model["reinforcement_lines"])):
-        for k in ("type", "dir", "appl"):
-            out += _fail(str(got[k]).lower() == str(want[k]).lower(),
-                         f"LEM-8 line {i + 1} {k}: {got[k]!r} against {want[k]!r}")
-    return out
-
-
-def test_lem09_anchor_blocks():
-    """LEM-9's two anchors, built the way its Studio step now tells the reader to: the
-    Label..y2 block, the Type set to Anchor, the capacity block at Tmax — and then
-    every field measured against the model the page ships.
-
-    This is the leg the preset is FOR. The page says picking Anchor answers Dir and
-    Appl; vp049 carries dir='axial', appl='active' on both lines; and a reader who
-    never types either has to land on exactly that, or the page teaches a model
-    different from the one it publishes results for."""
-    from studio.editors import ReinforcementEditor
-
-    page = "lem09_tieback_wall.md"
-    model = _load(LEM09_MODEL)
-    ends = _taught(page, ["Label", "x1", "y1", "x2", "y2"])
-    caps = _taught(page, ["Tmax", "Lp1", "Lp2", "Adhesion", "Delta",
-                          "Tend1", "Tend2", "Spacing"])
-    editor = ReinforcementEditor()
-    dlg = editor.build(dict(model, reinforcement_lines=[]), None)
-    dlg.set_view_mode("table")
-    dlg._table.apply_usage_filter({"lem", "fem"})
-    keys = [f.key for f in ReinforcementEditor.FIELDS]
-    _paste(dlg._table, _tsv(ends))                             # Label..y2, whole
-    _paste(dlg._table, _tsv([["Anchor"]] * len(ends)), row=0, col=keys.index("type"))
-    _paste(dlg._table, _tsv(caps), row=0, col=keys.index("t_max"))
-    out = _fail(_summary(dlg._table) == "Pasted 2 rows × 8 columns.",
-                f"LEM-9's capacity block reported {_summary(dlg._table)!r}")
+    _paste(dlg._table, _tsv(ends), row=0, col=e_col)
+    out += _fail(_summary(dlg._table) == _pasted(len(ends), len(e_keys)),
+                 f"{label}'s endpoint block reported {_summary(dlg._table)!r}")
+    _paste(dlg._table, _tsv([[type_word]] * len(ends)), row=0,
+           col=keys.index("type"))
+    _paste(dlg._table, _tsv(caps), row=0, col=c_col)
+    out += _fail(_summary(dlg._table) == _pasted(len(caps), len(c_keys)),
+                 f"{label}'s capacity block reported {_summary(dlg._table)!r}")
     landed = dict(model, reinforcement_lines=[])
     dlg.accept()
     editor.apply(landed, dlg)
     rows = landed["reinforcement_lines"]
     want = model["reinforcement_lines"]
-    out += _compare("LEM-9 labels and endpoints", rows, ends, want,
-                    ["label", "x1", "y1", "x2", "y2"])
-    out += _compare("LEM-9 capacities", rows, caps, want,
-                    ["t_max", "lp1", "lp2", "tend1", "tend2", "spacing"])
+    out += _compare(f"{label} labels and endpoints", rows, ends, want, e_keys)
+    out += _compare(f"{label} capacities", rows, caps, want, c_keys)
     for i, (got, w) in enumerate(zip(rows, want)):
         for k in ("type", "dir", "appl"):
             out += _fail(str(got[k]).lower() == str(w[k]).lower(),
-                         f"LEM-9 anchor {i + 1} {k}: pasted {got[k]!r}, the model "
+                         f"{label} line {i + 1} {k}: pasted {got[k]!r}, the model "
                          f"has {w[k]!r} — neither Dir nor Appl is typed by the reader")
     return out
 
 
+def test_lem08_reinforcement_blocks():
+    """LEM-8's six geogrid layers."""
+    return _reinforcement_leg("LEM-8", "lem08_reinforced_slope.md",
+                              os.path.join(_MODELS, "xslope_reinforce.xlsx"),
+                              "Geosynthetic")
+
+
+def test_lem09_anchor_blocks():
+    """LEM-9's two anchors. This is the leg the preset is FOR: the page says picking
+    Anchor answers Dir and Appl, vp049 carries dir='axial', appl='active' on both
+    lines, and a reader who never types either has to land on exactly that, or the
+    page teaches a model different from the one it publishes results for."""
+    return _reinforcement_leg("LEM-9", "lem09_tieback_wall.md", LEM09_MODEL,
+                              "Anchor")
+
+
 def test_lem09_pile_row():
-    """LEM-9's soldier pile: ONE table in the piles sheet's own columns, its θp and
-    Appl cells printed empty (the editor derives one and defaults the other). The
-    Studio step slices it into two pieces around θp/Appl, and the second piece lands
-    contiguously only while the piles editor's columns are the piles sheet's."""
+    """LEM-9's soldier pile: one table, pasted whole into the live piles editor at
+    its first column, and held three ways, none of them to a list kept here.
+
+    * Its columns are the editor's own run from Label to S (``_editor_run``). A
+      column the page prints that the editor does not have — the pile force angle,
+      which the editor derives from the pile's axis — fails here rather than being
+      stepped over.
+    * Its cells are vp049's piles sheet, cell for cell (``_sheet_cells``): the file
+      holds ``Active`` under Appl, and a page printing that cell empty describes a
+      different file even though the loader reads both as active.
+    * Every field of the pile the block builds is the completed model's — the
+      columns the table carries to the precision it prints them, and every column
+      past S, which the table leaves to the editor, at the value the model has, so
+      stopping the table at S is only right while the editor's defaults are what
+      the model holds. The derived force angle is included."""
     from studio.editors import PilesEditor
 
     page = "lem09_tieback_wall.md"
+    head, rows, keys, col, out = _editor_run("LEM-9 pile", page, PilesEditor,
+                                             "Label", "S")
+    out += _sheet_cells("LEM-9 pile", head, rows, LEM09_MODEL, "piles")
+    if out:
+        return out
     model = _load(LEM09_MODEL)
-    whole = _taught(page, ["Label", "x1", "y1", "x2", "y2", "H", "θp", "Appl",
-                           "D", "S"])
-    out = _fail(all(r[6] == "" and r[7] == "" for r in whole),
-                "LEM-9's pile table printed something in θp or Appl; the page "
-                "teaches both stay empty")
-    head = [r[:6] for r in whole]
-    size = [r[8:10] for r in whole]
     editor = PilesEditor()
     dlg = editor.build(dict(model, pile_lines=[]), None)
     dlg.set_view_mode("table")
     dlg._table.apply_usage_filter({"lem", "fem"})
-    keys = [f.key for f in PilesEditor.FIELDS]
-    _paste(dlg._table, _tsv(head))
-    _paste(dlg._table, _tsv(size), row=0, col=keys.index("D_pile"))
-    out += _fail(_summary(dlg._table) == "Pasted 1 row × 2 columns.",
-                 f"LEM-9's pile size block reported {_summary(dlg._table)!r}")
+    _paste(dlg._table, _tsv(rows), row=0, col=col)
+    out += _fail(_summary(dlg._table) == _pasted(len(rows), len(keys)),
+                 f"LEM-9's pile row reported {_summary(dlg._table)!r}")
     landed = dict(model, pile_lines=[])
     dlg.accept()
     editor.apply(landed, dlg)
-    out += _compare("LEM-9 pile", landed["pile_lines"], head, model["pile_lines"],
-                    ["label", "x1", "y1", "x2", "y2", "H"])
-    out += _compare("LEM-9 pile size", landed["pile_lines"], size,
-                    model["pile_lines"], ["D_pile", "S"])
-    got = landed["pile_lines"][0]
-    # The two columns the blocks step over: Appl defaults to active (a blank cell on
-    # the sheet means the same), and θ is derived from the axis rather than pasted.
-    out += _fail(got["appl"] == "active",
-                 f"the pile's Appl came back {got['appl']!r}; the page leaves the "
-                 f"column empty and a blank Appl is active")
-    out += _fail(abs(got["theta_p"] - float(model["pile_lines"][0]["theta_p"])) < 1e-9,
-                 f"the pile's θ came back {got['theta_p']!r}, the model has "
-                 f"{model['pile_lines'][0]['theta_p']!r}")
+    out += _compare("LEM-9 pile", landed["pile_lines"], rows, model["pile_lines"],
+                    keys)
+    rest = [f.key for f in PilesEditor.FIELDS if f.key not in keys] + ["theta_p"]
+    for i, (got, want) in enumerate(zip(landed["pile_lines"], model["pile_lines"])):
+        for k in rest:
+            out += _fail(_same(got.get(k), want.get(k)),
+                         f"LEM-9 pile: row {i + 1} {k} came back {got.get(k)!r} "
+                         f"from the page's row; the completed model has "
+                         f"{want.get(k)!r}")
     return out
 
 
@@ -1136,7 +1255,10 @@ def test_lem12_stated_pile_force():
     from xslope.solve import solve_selected
 
     page = "lem12_piles.md"
-    printed = _taught(page, ["H"])
+    _, printed, _, _, out = _editor_run("LEM-12 stated H", page, PilesEditor,
+                                        "H", "H")
+    if out:
+        return out
     model = _load(os.path.join(_MODELS, "xslope_piles.xlsx"))
     before = [dict(p) for p in model["pile_lines"]]
     out = _fail(len(printed) == len(before),

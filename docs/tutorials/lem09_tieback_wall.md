@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-9 — A Tieback Wall"
-description: "Build a 30 ft soldier-pile tieback wall in XSLOPE — two grouted anchors entered as axial reinforcement with a bond length at the far end, plus the pile that carries their heads — search it for its critical wedge, solve the wedge the reference manual gives, and measure how much the anchors and the Appl option change the factor of safety."
+description: "Build a 30 ft soldier-pile tieback wall in XSLOPE — two grouted anchors entered as axial reinforcement with a development length at the far end, plus the pile that carries their heads — search it for its critical wedge, solve the reference manual's wedge, and measure how much the anchors and the Appl option change the factor of safety."
 ---
 
 # Tutorial LEM-9 — A Tieback Wall
@@ -139,21 +139,22 @@ division has already been done.
 
 **Lp1 = 0 represents the plate.** A pullout length of zero means *fully anchored*: the
 whole capacity is available right at that end, which is what a bearing plate on
-the wall face provides. **Lp2** is the far end's bond length — the length of grout
-it takes to develop Tmax — so the tension available tapers from full capacity down
-to zero over the last 8.87 ft of the upper anchor and the last 12.1 ft of the
-lower one. **Adhesion** and **Delta** stay blank, which keeps the bond lengths in
-effect; they are the alternative law, where the grout's resistance would follow the
-effective overburden instead. **Tend1** and **Tend2**, the end anchorage
-capacities, are 0 because
-the plate is already expressed as Lp1 = 0.
+the wall face provides. **Lp2** is the far end's development length, the length
+of grout it takes to develop the bar's capacity at the source's bond strength of
+13,571.68 lb per foot of anchor: 120,344.9 / 13,571.68 = 8.86735 ft for the upper
+anchor and 164,217.3 / 13,571.68 = 12.1 ft for the lower. Over that length at the
+far end, the tension available tapers from full capacity down to zero.
+**Adhesion** and **Delta** stay blank, which keeps the development lengths in
+effect; they are the alternative law, where the grout's resistance would follow
+the effective overburden instead. **Tend1** and **Tend2**, the end anchorage
+capacities, are 0 because the plate is already expressed as Lp1 = 0.
 
 **Soldier pile** — a separate input, on its own sheet and its own editor, because
 a pile resists in shear and bending rather than in tension:
 
-| Label | x1 | y1 | x2 | y2 | H | θp | Appl | D | S |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: | --- | :---: | :---: |
-| soldier pile | 0.5 | 30 | 0.5 | -7 | 5900 |  |  | 0.5 | 1 |
+| Label | x1 | y1 | x2 | y2 | H | Appl | D | S |
+| --- | :---: | :---: | :---: | :---: | :---: | --- | :---: | :---: |
+| soldier pile | 0.5 | 30 | 0.5 | -7 | 5900 | Active | 0.5 | 1 |
 
 A real soldier-pile wall is discrete — piles at intervals along the wall, with
 the anchors seating on them. The reference states no pile spacing; like Slide,
@@ -162,9 +163,9 @@ same way. **H** = 5900 is the reference's shear resistance, per
 foot of wall, delivered to any surface that crosses the pile axis; **S** = 1
 because the division by spacing is already in that number — a
 continuous-equivalent of the discrete row, exactly as the anchors are entered —
-and **D** = 0.5 is the pile diameter. `θp` and `Appl` stay empty, and blank
-gives what this model needs: the force acts along the pile's own axis, applied
-`active` — an allowable working load, the same meaning it has on an anchor.
+and **D** = 0.5 is the pile diameter. **Appl** is `Active`, as on the anchors,
+because the 5,900 lb/ft is a stated resistance to apply as it stands, not an
+ultimate capacity to divide by the factor of safety.
 
 `H` does not have to be given. Left blank, xslope computes the limiting force
 itself by the Ito & Matsui (1975) method, which treats the soil uphill of the
@@ -222,7 +223,7 @@ it:
 
 <div class="prompt-block" markdown>
 ```text
-Build a model for a 30 ft vertical soldier-pile wall with its toe at (0, 0), ground running 20 ft out in front at elevation 0, and a cut slope above the wall from (0, 30) through (29, 51) to (33, 53), then ground rising to (60, 66), (70, 71) and (178, 80). Layer 1 is the upper wedge above a contact from (33, 53) to (195, 26): 120 pcf, c = 600 psf, phi = 24. Layer 2 is everything below it: 130 pcf, c = 300 psf, phi = 34. Bottom of the model is elevation -20. Add two grouted tiebacks of type Anchor starting on the wall face at elevations 20 and 8, both declined 25 degrees, 35 ft and 33 ft long, with capacities of 15043.1 and 20527.2 lb per foot of wall, fully anchored at the wall end and bond lengths of 8.86735 ft and 12.1 ft at the far end. Add a vertical soldier pile at x = 0.5 from elevation 30 to elevation -7 carrying 5900 lb/ft of shear, diameter 0.5, spacing 1. Enter a non-circular failure surface through (0, 0), (37, 33.6) and (61, 67.069).
+Build a model for a 30 ft vertical soldier-pile wall with its toe at (0, 0), ground running 20 ft out in front at elevation 0, and a cut slope above the wall from (0, 30) through (29, 51) to (33, 53), then ground rising to (60, 66), (70, 71) and (178, 80). Layer 1 is the upper wedge above a contact from (33, 53) to (195, 26): 120 pcf, c = 600 psf, phi = 24. Layer 2 is everything below it: 130 pcf, c = 300 psf, phi = 34. Bottom of the model is elevation -20. Add two grouted tiebacks of type Anchor starting on the wall face at elevations 20 and 8, both declined 25 degrees, 35 ft and 33 ft long, with capacities of 15043.1 and 20527.2 lb per foot of wall, fully anchored at the wall end and development lengths of 8.86735 ft and 12.1 ft at the far end. Add a vertical soldier pile at x = 0.5 from elevation 30 to elevation -7 carrying 5900 lb/ft of shear, diameter 0.5, spacing 1. Enter a non-circular failure surface through (0, 0), (37, 33.6) and (61, 67.069).
 ```
 </div>
 
@@ -232,9 +233,9 @@ Build a model for a 30 ft vertical soldier-pile wall with its toe at (0, 0), gro
   it acts *tangent* to the slip surface — a flexible geogrid, not a grouted bar.
   If the Type column came back empty, say: *"Set the support type to Anchor on
   both reinforcement lines."*
-- **Lp1 = 0 and Lp2 is the bond length.** The plate end is fully anchored and the
-  grouted end tapers. Both pullout lengths equal, or both zero, is a different
-  anchor from this one.
+- **Lp1 = 0 and Lp2 is the development length.** The plate end is fully anchored
+  and the grouted end tapers. Both pullout lengths equal, or both zero, is a
+  different anchor from this one.
 - **The capacities are per foot of wall**, not per anchor. An anchor at 8 ft
   centers delivers an eighth of its bar capacity to each foot of wall, and the
   numbers above already include that division, with Spacing left at 1.
@@ -357,10 +358,8 @@ between them loses nothing. Click **OK**.
 
 ### 4. The soldier pile
 
-Open **Piles** in the same tree and press **Table view**. Its columns are the
-piles worksheet's except `θp`, which Studio derives from the pile's endpoints —
-so the row from the table above pastes in as two pieces: `Label` through `H` at
-the first cell, then `D` and `S` at the `D` cell:
+Open **Piles** in the same tree, press **Table view**, and paste the row from the
+table above into the first cell:
 
 ![The piles editor's table view on the soldier pile](images/lem09_studio_piles_table.png)
 
@@ -419,10 +418,10 @@ The sliding mass weighs 119,150 lb/ft on an 84.1 ft base. The surface crosses th
 lower anchor 5.0 ft out from the face and the upper one 12.4 ft out, and both
 deliver their full capacity — 35,570 lb/ft between them, which at 25° below
 horizontal resolves into 32,238 lb/ft holding the mass back and 15,033 lb/ft
-pressing down on it. Neither crossing is anywhere near a bond zone: more than 20 ft
-of each anchor lies behind the surface, against the 8.87 ft and 12.1 ft it takes to
-develop the bar, so both are governed by the steel rather than by the grout. The
-pile adds its 5,900 lb/ft of shear where the surface passes it at the toe.
+pressing down on it. Neither crossing comes near a development length: more than
+20 ft of each anchor lies behind the surface, against the 8.87 ft and 12.1 ft it
+takes to develop the bar, so both are governed by the steel rather than by the
+grout. The pile adds its 5,900 lb/ft of shear where the surface passes it at the toe.
 
 Each method runs its own search and finds its own critical surface:
 
@@ -468,7 +467,7 @@ it, and 1.439 with Spencer's method — the values
 [verification problem VP49](../verification/rocscience.md#vp49) records against
 the published solutions. The wedge carries 157,936 lb/ft on a 90.1 ft base, 33%
 more soil than the searched surface, and takes the same 35,570 lb/ft from the
-anchors, since a crossing anywhere in the free length gives full capacity. Its
+anchors, since it too crosses both outside their development lengths. Its
 lower leg leaves the toe at 42° against the search's 49°. A specified surface is a
 trial surface, not necessarily the critical one, which is why the search comes
 first.
@@ -530,8 +529,8 @@ This tutorial covered:
 
 - Grouted tiebacks entered with the **Anchor** preset — force along the bar's
   own axis, applied as a working load.
-- Anchorage different at the two ends: a plate at the wall face, a grout bond
-  length developing the far end.
+- Anchorage different at the two ends: a plate at the wall face, a development
+  length at the grouted far end.
 - A discrete anchor's capacity divided by its spacing into force per foot of
   wall.
 - A soldier pile as a separate shear contribution beside the tensile rows.

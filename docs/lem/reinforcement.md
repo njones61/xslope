@@ -28,6 +28,10 @@ This decomposition follows the convention used by Slide2 and other commercial pr
 results to be compared directly against them. The **Type** column in the input template is a *preset* over these
 settings — selecting a support type fills Dir and Appl with the appropriate defaults — not a separate mechanism.
 
+What to enter for a particular support (a geosynthetic layer, a soil nail, a tieback or an end-anchored bar), and
+how to connect it to a wall or make it a joint, is set out column by column on
+[Modeling Reinforcement](../usage/modeling_reinforcement.md).
+
 The finite element treatment, in which each reinforcement line is a row of bar elements in the mesh and carries the
 tension its stretch produces, is on the [FEM reinforcement](../fem/reinforcement.md) page.
 
@@ -105,10 +109,14 @@ table; the entry is under
 [published problems](../verification/published.md#fhwa-e1).
 
 **Grouted tiebacks with a bonded length.** A tieback develops pullout resistance only over its grouted (bonded)
-length $L_{bond}$ at the far end, at a bond strength $b$ (force per unit length); the free length carries whatever
-force the bond zone can supply. This is expressed in the envelope by entering an effective
-$T_{max}' = \min(T_{tendon},\, b \cdot L_{bond})$ and $L_p = T_{max}'/b$ at the bonded end, with the connection
-capacity as $T_{end}$ at the face end.
+length $L_{bond}$ at the far end, at a bond strength $b$ (force per unit length); the sleeved free length transfers
+no load to the ground and carries whatever force the bond zone can supply. $T_{max}$ is therefore the smallest of
+the tendon capacity, the capacity of the head's connection to the wall and the bond capacity $b \cdot L_{bond}$.
+$L_{p1} = 0$ at the head makes the full $T_{max}$ available along the free length, and $L_{p2} = T_{max}/b$ at the
+bonded end, which equals $L_{bond}$ where the bond governs and is shorter where the tendon or the head governs.
+$T_{end1}$, $T_{end2}$, Adhesion and Delta are left blank. With $L_{p1} = 0$ the envelope does not read
+$T_{end1}$, so the head's capacity enters through $T_{max}$; a nonzero $L_{p1}$ would add friction from the head
+along the free length, and the overburden law accumulates resistance from end 1 along the free length as well.
 
 ### Per-unit-width convention and spacing
 
@@ -209,7 +217,7 @@ Approximate ranges for the $T_{end}$ columns, for preliminary estimates only:
 |---|---|---|
 | Soil nail bearing plate | 50-150 kN (10-35 kip) per nail | plate punching or facing flexure governs |
 | Geosynthetic facing connection | 30-80% of $T_{max}$ | per connection test data (wrap-around, bodkin, panel) |
-| Tieback anchor head / connection | tendon capacity | usually the tendon governs, not the head |
+| Tieback anchor head / connection | — | enters through $T_{max}$ with $L_{p1} = 0$ (see grouted tiebacks under [Pullout from the effective overburden](#pullout-from-the-effective-overburden)) |
 | Free (no plate) | 0 | the friction-only default |
 
 Capacities are per element; with a Spacing entry they are converted to per-unit-width automatically.

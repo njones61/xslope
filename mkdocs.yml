@@ -45,6 +45,7 @@ nav:
     - Installation: getting_started/install.md
     - Ways to Use XSLOPE: usage/index.md
     - Input Template: usage/input_template.md
+    - Modeling Reinforcement: usage/modeling_reinforcement.md
     - Project Packaging: usage/packaging.md
     - Preflight Input Checks: usage/preflight.md
     - Colab Notebooks: usage/notebooks.md

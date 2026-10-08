@@ -849,7 +849,8 @@ The **reinforce** worksheet defines soil reinforcement elements such as soil nai
 reinforcement, or tiebacks. These elements provide additional resistance to sliding by mobilizing tensile forces 
 along the failure surface. Each reinforcement object is represented as a straight line defined by the XY coordinates of 
 the endpoints. Each line also has a set of properties that define the type of support, the strength of the
-reinforcement, and the anchorage at each end.
+reinforcement, and the anchorage at each end. What to enter for each kind of support, with typical values, is set
+out on [Modeling Reinforcement](modeling_reinforcement.md).
 
 ![reinforce.png](images/reinforce.png)
 

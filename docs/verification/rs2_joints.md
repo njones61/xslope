@@ -111,7 +111,7 @@ joint model whose output is a stress-displacement curve.
 | [13](#rj-13) | 🟢 | Plowing sliding slab, example 4 | SSRM 0.998 vs Alejano Eq. (7) 1.0002 (−0.2%) | 1.0 vs 1.0002 (0.0%) | UDEC 1.0 (−0.2%) · Alejano prints 1.0 | 1.0 / 1.05 | |
 | [14](#rj-14) | 🟢 | Plowing sliding slab, example 5 | SSRM 1.232 vs Alejano Eq. (7) 1.2034 (+2.4%) | 0.89 vs 1.2034 (−26.0%) | UDEC 0.9 (+36.9%) · Alejano prints 1.00 | 0.89 / 1.09 | The 1.00 the paper prints for this example does not follow from the inputs it prints; Eq. (7) on them gives 1.2034. |
 | [15](#rj-15) | 🟢 | Partially joint-controlled footwall | SSRM 1.271 vs Slide2 LE search 1.25 (+1.7%) | 1.28 vs 1.25 (+2.4%) | Alejano Eqs. (9)–(10) 1.7985 (single-bed formula; the paper prints 1.72) · UDEC 1.6 (−20.6%) | 1.28 / 1.42 | Alejano's closed form drives a wedge out through a single 2 m bed and its factor rises with bed thickness; the three programs free to search for a surface agree at 1.25–1.28, so the limit-equilibrium search is the referee, as the rigid-block ceiling is on problem 11. |
-| [16](#rj-16) | 🔴 | Barla et al. tilt-table block toppling | Tilt 10.24° vs UDEC 11° (−6.9%) | 9° vs 11° (−18.2%) | Experiment 9° · Goodman & Bray, plate tilted, 7.6° | 9° / 7° | Scored as a tilt angle rather than a factor of safety. With the tilt represented by a seismic coefficient and the strengths unreduced, the stack stands at 10.20° and topples at 10.28°. That is above Goodman & Bray's rigid-column lower bound and the physical test, and below UDEC. |
+| [16](#rj-16) | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | Tilt 10.24° | 9° | UDEC 11° · Experiment 9° · Goodman & Bray, plate tilted, 7.6° | 9° / 7° | *no reference value* — UDEC built each stack at its tilt against a support block that was then removed, a sequence XSLOPE does not model, and rigid-block statics lets the stack topple anywhere from 7.8° to 19.6°, so no single tilt is the answer. With the tilt represented by a seismic coefficient and the strengths unreduced, the stack stands at 10.20° and topples at 10.28°. |
 | [17](#rj-17) | 🟡 | Step-path, en-echelon joints | SSRM 1.213 vs UDEC 1.29 (−6.0%) | 1.24 vs 1.29 (−3.9%) | — | 1.24 / 1.2 | No closed form exists. Three rock bridges decide the factor, and the two finite element programs, XSLOPE and RS2, both give factors below UDEC's, their differences from it 2.1 percentage points apart. |
 | [18](#rj-18) | 🟢 | Step-path, continuous joints | SSRM 0.998 vs UDEC 1.01 (−1.2%) | 1.01 vs 1.01 (0.0%) | — | 1.01 / 1.0 | |
 | [19](#rj-19) | 🟢 | Bi-planar step-path failure | SSRM 1.623 vs rigid-block limit equilibrium 1.5914 (+2.0%) | 1.5 vs 1.5914 (−5.7%) | UDEC 1.46 (+11.2%) | 1.5 / 1.41 | One block slides on the basal joint, held by friction and by the rock bridge in tension. The referee is that block's rigid-block equilibrium, with the tensile cap divided by the trial factor as in the vendor's model, and UDEC's and RS2's factors are both below it. |
@@ -683,7 +683,7 @@ tensile cap is above the apex of its Mohr-Coulomb envelope and never controls.
 
 ![RJ-15: partially joint-controlled footwall slope (rj015) — FEM inputs, mesh, viscoplastic shear strain with joint slip at the critical SRF, and the deformed section at true scale. The bedding slips over a long stretch behind the face, and the rock's only strain is a small patch at the toe where the slab has to break through to get out — the coupled mechanism the source paper describes](images/RJ-15.png)
 
-### 🔴 RJ-16: Barla et al. tilt-table block toppling (rj016) {#rj-16}
+### ⊘ RJ-16: Barla et al. tilt-table block toppling (rj016) {#rj-16}
 
 Problem 16 is a laboratory test rather than a slope. Fourteen columns of 9 cm blocks are stacked
 into a 63.4° staircase on a plate, and the plate is tilted until the stack topples; the problem
@@ -704,9 +704,9 @@ Re-solving the standing and failing coefficients with every unit weight scaled b
 stack no longer stands, and the tilt reported is arctan k. The mesh size is the block size, 0.09 m,
 following the corpus's rule of meshing at the joint spacing.
 
-| XSLOPE tilt | UDEC referee | RS2 vs referee | Experiment | Goodman & Bray, plate tilted | RS2 without / with improvement |
+| XSLOPE tilt | UDEC | RS2 | Experiment | Goodman & Bray, plate tilted | RS2 without / with improvement |
 |---|---|---|---|---|---|
-| **10.24°** | 11° (−6.9%) | 9° vs 11° (−18.2%) | 9° | 7.6° | 9° / 7° |
+| **10.24°** | 11° | 9° | 9° | 7.6° | 9° / 7° |
 
 <!-- test: file=files/rocscience/joints/rj016.xlsx, type=fem_tilt, k_stand=0.179846, k_fail=0.181396, expected_tilt=10.24, tolerance=0.1, element_type=tri6, target_size=0.09, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-16 -->
 
@@ -716,10 +716,15 @@ test for this row re-solves both coefficients at full strength. When the solver 
 no rule deciding whether a trial stands or fails, the result is the same: the stack comes to rest
 at every tilt up to 9.9° and moves at a steady rate from 10.2° on.
 
-Goodman & Bray's column analysis, with the plate tilted, puts the toppling tilt of these rigid
-columns at 7.6°. It allows no contact pressure below a column's corner, so it is a lower bound, and
-every other value is above it: the physical stack and RS2 at 9°, XSLOPE at 10.2°, and UDEC, whose
-block contacts roll and re-form as the columns lean, at 11°.
+The row carries no dot because the source publishes nothing comparable to this run. Barla et al.
+built each UDEC stack at its tilt against a support block in front of the face, let it settle, and
+then removed the block (pp. 418–419). XSLOPE applies the body force to the stack from rest and has
+no staged construction, so it cannot set the problem up that way. Rigid-block statics of the stack,
+with these joints, does not fix a single answer either: the columns can stand at any tilt up to
+19.6°, and they can topple at any tilt from 7.8°, so the tilt a model reaches depends on how it is
+loaded. XSLOPE, RS2, UDEC and the physical stack all fall in that range. Goodman & Bray's 7.6°, just
+below it, treats each column as one rigid block with one assumed arrangement of contact forces. The
+physical test is a laboratory measurement, shown beside the computed values.
 
 The vendor's plate has no weight, but XSLOPE's finite element model requires a positive unit
 weight, so the plate is given the 27 kN/m³ stated in its row of the vendor's material properties.

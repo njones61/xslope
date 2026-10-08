@@ -107,7 +107,7 @@ Every row on a corpus page's summary table carries exactly one of these:
 - *planned* — can be built with the program and the source data as they stand, and is not built yet;
 - *blocked* — cannot be built yet; the row names what is missing;
 - *not supported* — left out on purpose;
-- *no reference value* — the source publishes nothing to compare against.
+- *no reference value* — the source publishes nothing comparable to the run.
 
 A row with a status term shows <span class="nodata">⊘</span> in place of a dot. A row whose
 problem is built on another corpus page reads *covered* and links there.

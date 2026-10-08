@@ -148,6 +148,15 @@ ABSENT = [
            "The opening ITSELF is buildable — the domain is the union of the "
            "material zones (preflight.py:2583), so a region no zone covers is "
            "simply not meshed"),
+    Absent("staged construction: a support placed for one stage and removed in the next",
+           "rs2_joints", "does not model",
+           "the template and Studio take one model state; fem.py's stage_list is a "
+           "LOAD stage list with one entry (fem.py:8464), and the only carried "
+           "state (_init_state) is internal to the corrector's hold test, not an "
+           "input"),
+    Absent("staged construction: a support placed for one stage and removed in the next",
+           "rs2_joints", "no staged construction",
+           "as above"),
 
     # ------------------------------------------------------------------ joints
     Absent("a hyperbolic displacement- and work-softening joint law",

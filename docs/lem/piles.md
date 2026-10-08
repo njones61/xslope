@@ -22,7 +22,7 @@ A row of piles is installed through the sliding mass and embedded into stable gr
 In the limit equilibrium framework, a pile is characterized by:
 
 - A **force magnitude** $H$ (per unit width of slope, i.e., force/length) acting at the point where the pile intersects the failure surface
-- A **force angle** $\theta_p$ measured from horizontal (positive = counterclockwise/upward, default = 0)
+- A **force angle** $\theta_p$, the inclination of that force from horizontal (positive upward), which XSLOPE computes from the pile's end points so that the force is perpendicular to the pile (see [Force Direction](#force-direction))
 
 The force is decomposed into horizontal and vertical components:
 
@@ -30,17 +30,17 @@ The force is decomposed into horizontal and vertical components:
 
 >$H_v = H \sin\theta_p \qquad \text{(vertical, positive upward)}$
 
-When $\theta_p = 0$ (the default and most common case), the force is purely horizontal: $H_h = H$ and $H_v = 0$.
+For a vertical pile, the most common case, $\theta_p = 0$ and the force is purely horizontal: $H_h = H$ and $H_v = 0$.
 
 ### Force Resolution on the Slice
 
 The pile force acts at point $e$ on the failure surface where the pile intersects the slice base. Relative to the slice base (inclined at angle $\alpha$), the force resolves into:
 
->**Normal to base** (increases effective stress): $H \sin(\alpha - \theta_p)$
+>**Normal to base**: $H \sin(\alpha - \theta_p)$
 
 >**Tangential to base** (resists sliding): $H \cos(\alpha - \theta_p)$
 
-The normal component increases the effective normal stress on the failure surface, which in turn increases frictional resistance. The tangential component directly opposes the sliding force. Both components contribute to stability.
+The tangential component directly opposes the sliding force. The normal component adds to the normal force on the base where $\alpha > \theta_p$, raising the frictional resistance, and subtracts from it where $\alpha < \theta_p$: near the toe of a circle, where the base rises toward the toe, or under a force tilted upward more steeply than the base. The Ordinary Method of Slices takes $N'$ from this resolution; the other methods take it from their own equilibrium equations, listed under [Integration with LEM Methods](#integration-with-lem-methods).
 
 ### Moment Contribution
 
@@ -48,19 +48,26 @@ For methods that use moment equilibrium about a circle center $(X_o, Y_o)$, the 
 
 >$M_{\text{pile}} = H \cos\theta_p \cdot (Y_o - y_e) + H \sin\theta_p \cdot (x_e - X_o)$
 
-where $(x_e, y_e)$ is the pile-failure surface intersection point. When $\theta_p = 0$, this reduces to $M_{\text{pile}} = H(Y_o - y_e)$.
+where $(x_e, y_e)$ is the pile-failure surface intersection point. The equation is written for a slope that descends to the left; on one that descends to the right the arm $x_e - X_o$ changes sign. When $\theta_p = 0$, this reduces to $M_{\text{pile}} = H(Y_o - y_e)$.
 
-The pile force is a **known applied force** and is **not** divided by the factor of safety $F$. This is because $H$ represents the structural resistance of the pile, not a soil strength parameter. It appears in the denominator of the factor of safety equation (reducing driving forces) rather than in the numerator (which contains soil shear strength divided by $F$).
+How the pile force enters the factor of safety is set by the row's **Appl** entry:
 
-### Setting the Force Angle $\theta_p$
+- **Active** (the default, and how a blank cell is read): $H$ is an allowable force, applied at full value and **not** divided by the factor of safety $F$. It is a known force, like the weight of the slice: in the moment equations its moment reduces the driving moment (the denominator), and its components enter the force equations, including the one for $N'$, at full value.
+- **Passive**: $H$ is an ultimate capacity that is mobilized with the soil strength, so its components are divided by $F$, as $c$ and $\tan\phi$ are. In the moment equations the passive pile moment joins the resisting side (the numerator). The Ordinary Method of Slices, which computes $F$ directly without iteration, takes that moment only and leaves the passive force out of $N'$.
 
-A stabilizing pile always **resists** the sliding mass, so adding a pile can only increase the factor of safety. The angle $\theta_p$ sets the tilt of the pile force away from horizontal:
+### Force Direction
 
-- $\theta_p = 0$ — a horizontal force pushing back against the moving soil. This is the default and most common case.
-- $\theta_p > 0$ — the force is tilted **upward** (for example, a raking pile that also lifts the mass).
-- $\theta_p < 0$ — the force is tilted **downward**.
+A pile is entered by its two end points, $(x_1, y_1)$ and $(x_2, y_2)$, in either order: XSLOPE takes the higher end as the head and the lower end as the tip. The pile force is directed perpendicular to the pile's axis, with its horizontal component against the movement of the sliding soil, so the pile resists the slide whether the slope descends to the left or to the right. The force angle is therefore the pile's inclination from vertical:
 
-You enter the same $\theta_p$ regardless of which way the slope faces. XSLOPE always directs the horizontal component *against* the soil movement, so $\theta_p = 0$ resists the slide whether the slope descends to the left or to the right — there is no need to flip the angle for a mirror-image slope. The sign of $\theta_p$ only controls the up/down tilt, where positive is upward.
+>$\theta_p = \tan^{-1}\!\left(\dfrac{d_u}{y_h - y_t}\right)$
+
+where $y_h$ and $y_t$ are the elevations of the head and the tip, and $d_u$ is the horizontal distance by which the tip lies upslope of the head (negative when the tip lies downslope, toward the toe). Upslope is opposite to the movement of the sliding mass, which XSLOPE determines for each failure surface, so a model and its mirror image give a pile the same angle.
+
+- **Vertical pile** ($x_2 = x_1$): $\theta_p = 0$, a horizontal force pushing back against the moving soil.
+- **Battered pile, tip upslope of the head** (the head leans out toward the toe): $\theta_p > 0$, and the force tilts **upward**.
+- **Battered pile, tip downslope of the head** (the head leans back into the slope): $\theta_p < 0$, and the force tilts **downward**.
+
+The Ito & Matsui computation described below applies to vertical piles only, so a battered pile needs its $H$ entered. If a workbook's `piles` sheet carries a $\theta_p$ column, an angle entered there is used in place of the computed one, measured the same way, and a blank cell leaves the computed angle.
 
 ### Per-Unit-Width Convention
 
@@ -82,7 +89,7 @@ The pile force $H$ at angle $\theta_p$ is incorporated into each limit equilibri
 - [**Force Equilibrium** (Corps of Engineers, Lowe-Karafiath)](force_eq.md): $-H\cos\theta_p$ added to horizontal equilibrium ($b_0$); $-H\sin\theta_p$ added to vertical equilibrium ($b_1$)
 - [**Spencer**](spencer.md): $H\cos\theta_p$ added to $F_h$; $H\sin\theta_p$ added to $F_v$; moment terms added to $M_o$
 
-In all methods, when $\theta_p = 0$, the equations reduce to the simpler horizontal-force-only case.
+In all methods, for a vertical pile ($\theta_p = 0$) the equations reduce to the simpler horizontal-force-only case.
 
 
 ## Determining the Pile Force $H$
@@ -96,7 +103,7 @@ The simplest approach is for the user to specify $H$ directly based on external 
 - Published design charts or empirical correlations
 - Full 3D finite element analysis
 
-When using user-specified forces, the user enters $H$ (per unit width) and $\theta_p$ in the `piles` sheet of the input template. This approach gives the user full control and is appropriate when detailed pile analysis has already been performed.
+When using user-specified forces, the user enters $H$ (per unit width) in the `piles` sheet of the input template or in Studio's Piles editor, and XSLOPE computes $\theta_p$ from the pile's end points. This approach gives the user full control and is appropriate when detailed pile analysis has already been performed.
 
 ### Ito & Matsui (1975) Theory
 

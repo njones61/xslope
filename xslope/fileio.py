@@ -2458,9 +2458,9 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     if 'piles' in xls.sheet_names:
         # Header-name-driven with case-normalized headers, so the v12 column
         # regrouping (and the v11 layout) both load. The force-angle override
-        # column was dropped in v23 (never used; the direction auto-derives
-        # from the pile endpoints) — pre-v23 files may still carry it as 'qp'
-        # ('theta' in some older files) and either is honored when present.
+        # column was dropped in v23 (the angle derives from the pile end
+        # points) — pre-v23 files may still carry it as 'qp' ('theta' in some
+        # older files), and an angle entered there is kept as stated.
         piles_df = xls.parse('piles', header=1)
         piles_df.columns = [str(c).strip().lower() for c in piles_df.columns]
         _theta_col = 'qp' if 'qp' in piles_df.columns else 'theta'
@@ -2485,10 +2485,14 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                 if pd.notna(row.get(_theta_col)):
                     theta_p = float(row[_theta_col])
                 else:
-                    # Auto-compute: perpendicular to pile axis (0 for vertical)
-                    dx = x2 - x1
-                    dy = y2 - y1
-                    theta_p = np.degrees(np.arctan2(dx, -dy))
+                    # Derived: the force is perpendicular to the pile, with the
+                    # higher end as the head in either entry order. A vertical
+                    # pile's angle is 0 for either slope facing; a battered
+                    # pile's depends on which way the slide moves, so it is
+                    # left None here and resolved per failure surface when the
+                    # slices are built (slice.pile_force_angle).
+                    from .slice import pile_force_angle
+                    theta_p = pile_force_angle(x1, y1, x2, y2)
                 D_pile = float(row['d']) if pd.notna(row.get('d')) else None
                 S = float(row['s']) if pd.notna(row.get('s')) else None
                 E_pile = float(row['e']) if pd.notna(row.get('e')) else None

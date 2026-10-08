@@ -6569,10 +6569,13 @@ class PilesEditor(CategoryEditor):
             field_help=PILES_HELP)
 
     def apply(self, slope_data, dlg):
+        from xslope.slice import pile_force_angle
         rows = dlg.result_rows()
-        for p in rows:  # θ is auto-derived from the axis (loader does the same)
-            dx, dy = p["x2"] - p["x1"], p["y2"] - p["y1"]
-            p["theta_p"] = math.degrees(math.atan2(dx, -dy))
+        # θ is derived from the end points by the loader's own rule: 0 for a
+        # vertical pile, and None for a battered one, whose angle depends on
+        # the slope's facing and is resolved per failure surface.
+        for p in rows:
+            p["theta_p"] = pile_force_angle(p["x1"], p["y1"], p["x2"], p["y2"])
         slope_data["pile_lines"] = rows
 
 

@@ -1043,6 +1043,38 @@ def _corner_claim_is_this_slice(x_cross, x_l, x_r, i, n_slices, right_facing):
     return True
 
 
+def pile_force_angle(x1, y1, x2, y2, right_facing=None):
+    """The force angle θp (degrees) of a pile, from its two end points.
+
+    θp is the convention every solver reads: the inclination of the pile force
+    from horizontal, positive upward, with its horizontal component pointing
+    against the movement of the sliding mass (the solvers mirror that component
+    on a right-facing slope). The force is perpendicular to the pile. The higher
+    end is the head, whichever end was entered first, and
+
+        θp = atan(d_u / (y_head - y_tip))
+
+    where d_u is the horizontal distance the tip lies UPSLOPE of the head.
+    Upslope is -x on a right-facing slope (one that descends to the right) and
+    +x on a left-facing one, so a battered pile and its mirror image take the
+    same θp. A vertical pile gives 0, and a pile whose tip lies upslope of its
+    head (the head leaning out toward the toe) gives a positive, upward θp.
+
+    ``right_facing=None`` asks for the angle without a facing: 0 for a vertical
+    pile, whose angle does not depend on it, and None for a battered one, which
+    is resolved per failure surface once that surface's facing is known.
+    """
+    if y2 > y1:
+        x1, y1, x2, y2 = x2, y2, x1, y1        # the higher end is the head
+    dx = x2 - x1                                # tip relative to head
+    if dx == 0.0:
+        return 0.0
+    if right_facing is None:
+        return None
+    d_u = -dx if right_facing else dx
+    return degrees(atan2(d_u, y1 - y2))
+
+
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True,
                     composite=False, right_facing=None,
                     suction_phi_b=None, suction_cap=None, check_inputs=True,
@@ -1282,10 +1314,17 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     if slope_data.get("pile_lines"):
         for _pi, pile in enumerate(slope_data["pile_lines"]):
             geom = LineString([(pile["x1"], pile["y1"]), (pile["x2"], pile["y2"])])
+            # A stated force angle (a pre-v23 sheet's column, or a caller's
+            # slope_data) is used as stated; a blank one is resolved from the
+            # end points once the surface's facing is known (pile_force_angle).
+            _tp = pile.get("theta_p")
+            if _tp is not None and pd.isna(_tp):
+                _tp = None
             pile_lines_data.append({
                 "geom": geom,
+                "ends": (pile["x1"], pile["y1"], pile["x2"], pile["y2"]),
                 "H": pile["H"] if pile["H"] is not None else None,
-                "theta_p": pile["theta_p"],
+                "theta_p": _tp,
                 "D_pile": pile.get("D_pile"),
                 "S": pile.get("S"),
                 "V_cap": pile.get("V_cap"),
@@ -2148,7 +2187,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 h_pile += pile_H
                 if pl["appl"] == "passive":
                     h_pile_pas += pile_H
-                theta_p_val = pl["theta_p"]  # last pile's angle if multiple (unusual)
+                # last pile's angle if multiple (unusual)
+                theta_p_val = (pl["theta_p"] if pl["theta_p"] is not None
+                               else pile_force_angle(*pl["ends"], right_facing))
                 x_pile = intersec.x
                 y_pile = intersec.y
         # === END: "Pile lines" ===

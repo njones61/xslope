@@ -2747,7 +2747,7 @@ def _pile_assumption(slope_data, engine):
     its own section stiffness by the spacing declared for it. That is exact for a
     wall and an idealization of a row of separate piles — the row's average
     stiffness is reproduced; the soil arching between piles at wide spacing, and
-    the slip on each pile's surface, are not (``docs/fem/piles.md``,
+    the slip on each pile's surface, are not (``docs/piles/fem.md``,
     Applicability). Every number in the table beside this sentence is stated
     under that assumption, so it is stated before them.
 
@@ -8026,7 +8026,7 @@ FEM_FIELD_PANELS = tuple(entry for entry in FEM_PANELS
 #: member, so the paragraph that describes one links the page that derives it.
 FEM_DETAIL_DOC_PAGES = {
     "reinforcement": "reinforcement/fem.md",
-    "pile": "fem/piles.md",
+    "pile": "piles/fem.md",
 }
 
 #: What a run records itself as when it solved the section once, at one strength.

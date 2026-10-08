@@ -266,7 +266,7 @@ derivation so the user can go deeper than a chat reply. Real pages, all under
 |:------|:-----|
 | LEM formulation, slice forces, method comparison | `lem/overview/` |
 | A single method in full | `lem/oms/`, `lem/bishop/`, `lem/janbu/`, `lem/spencer/`, `lem/mprice/`, `lem/force_eq/` |
-| Reinforcement, piles (LEM) | `reinforcement/lem/`, `lem/piles/` |
+| Reinforcement, piles (LEM) | `reinforcement/lem/`, `piles/lem/` |
 | Rapid drawdown (three-stage Duncan-Wright-Brandon) | `lem/rapid/` |
 | Automated search for the critical surface | `lem/search/` |
 | Seepage FE formulation, unsaturated models | `seep/overview/` |

@@ -1235,7 +1235,7 @@ A slope standing just above failure on a 1 m band of weak clay, stabilized by a 
 pile wall driven through that band into the stiff soil below, and run with
 SIGMA/W's **Strength Reduction Stability (SRS)**, the procedure XSLOPE's [SSRM](ssrm.md)
 implements. It is the reference behind the applicability of XSLOPE's
-[pile beam element](../fem/piles.md#applicability-continuous-walls-and-discrete-pile-rows). Three
+[pile beam element](../piles/fem.md#applicability-continuous-walls-and-discrete-pile-rows). Three
 zones, all γ = 20 kN/m³ and ν′ = 0.4:
 
 | Zone | Elevation | E′ (kPa) | c′ (kPa) | φ′ (°) | Stress model |

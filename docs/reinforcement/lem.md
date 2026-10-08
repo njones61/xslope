@@ -135,7 +135,7 @@ The **Dir** setting sets $\psi$:
 - **Axial** ($\psi$ = the inclination of the reinforcement line itself) — rigid supports such as soil nails,
   grouted tiebacks, and anchored bars carry their force along their own axis; the soil cannot reorient them.
 
-The direction affects each solution method the same way a [pile force](../lem/piles.md) does: the force is resolved into components
+The direction affects each solution method the same way a [pile force](../piles/lem.md) does: the force is resolved into components
 normal and tangential to the slice base — $P\sin(\alpha - \psi)$ normal (zero for tangent) and
 $P\cos(\alpha - \psi)$ tangential — and for moment-based methods it contributes a moment about the circle center
 through its real moment arm at point $r$.

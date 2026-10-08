@@ -581,5 +581,5 @@ movement of the soil around them. The [tutorials index](index.md) lists the
 series.
 [Soil Reinforcement in LEM](../reinforcement/lem.md) derives the capacity
 envelope and the per-method equations the force enters, and
-[Piles and Concrete Piers](../lem/piles.md) is the other support family — where
+[Piles and Concrete Piers](../piles/lem.md) is the other support family — where
 shear and bending govern rather than tension.

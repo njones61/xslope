@@ -695,9 +695,9 @@ This tutorial covered:
   for it that no limit equilibrium analysis can: moment, shear, deflection and
   soil reaction down the member.
 
-**Where to go next:** [Piles and concrete piers in FEM](../fem/piles.md) gives
+**Where to go next:** [Piles and concrete piers in FEM](../piles/fem.md) gives
 the beam formulation, the assembly and the applicability rule in full, and
-[stabilizing piles in LEM](../lem/piles.md) gives the Ito & Matsui theory and
+[stabilizing piles in LEM](../piles/lem.md) gives the Ito & Matsui theory and
 the same rule from the other side; in [LEM-12](lem12_piles.md) the pile row is
 analyzed on its own. For a sheet pile wall checked against a published analysis,
 see

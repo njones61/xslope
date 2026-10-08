@@ -33,6 +33,8 @@ plugins:
       redirect_maps:
         lem/reinforcement.md: reinforcement/lem.md
         fem/reinforcement.md: reinforcement/fem.md
+        lem/piles.md: piles/lem.md
+        fem/piles.md: piles/fem.md
   - mkdocstrings:
       handlers:
         python:
@@ -107,7 +109,6 @@ nav:
     - Force Equilibrium Methods: lem/force_eq.md
     - Spencer's Method: lem/spencer.md
     - Morgenstern–Price Method: lem/mprice.md
-    - Piles and Concrete Piers: lem/piles.md
     - Rapid Drawdown Analysis: lem/rapid.md
     - Automated Search Algorithms: lem/search.md
     - Sample Problems: lem/samples.md
@@ -120,7 +121,6 @@ nav:
     - Overview: fem/overview.md
     - Solver: fem/solver.md
     - Joints and Interface Elements: fem/joints.md
-    - Piles and Concrete Piers: fem/piles.md
     - Mesh Generation: fem/mesh.md
     - Sample Problems: fem/samples.md
   - Reinforcement:
@@ -128,6 +128,9 @@ nav:
     - Reinforcement Types: reinforcement/types.md
     - Reinforcement in LEM: reinforcement/lem.md
     - Reinforcement in FEM: reinforcement/fem.md
+  - Piles and Walls:
+    - Piles in LEM: piles/lem.md
+    - Piles in FEM: piles/fem.md
   - Reliability:
     - Overview: reliability/index.md
     - Taylor Series (TSPM): reliability/taylor.md

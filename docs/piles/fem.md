@@ -5,7 +5,7 @@ description: "Piles and concrete piers as embedded Euler-Bernoulli beam elements
 
 # Piles and Concrete Piers in Finite Element Analysis
 
-A pile or concrete pier is modeled as a chain of Euler-Bernoulli beam elements embedded in the soil mesh and sharing its nodes. [Limit equilibrium](../lem/piles.md) applies one pile force, $H$, entered or computed by Ito & Matsui; here no pile force is applied: the beam carries axial force, shear and bending moment, in tension or compression, as the soil deforms around it, up to the structural capacities $V_{\text{cap}}$ and $M_{\text{cap}}$ where they are given.
+A pile or concrete pier is modeled as a chain of Euler-Bernoulli beam elements embedded in the soil mesh and sharing its nodes. [Limit equilibrium](lem.md) applies one pile force, $H$, entered or computed by Ito & Matsui; here no pile force is applied: the beam carries axial force, shear and bending moment, in tension or compression, as the soil deforms around it, up to the structural capacities $V_{\text{cap}}$ and $M_{\text{cap}}$ where they are given.
 
 
 ## Applicability: Continuous Walls and Discrete Pile Rows
@@ -28,7 +28,7 @@ does not reproduce the slip that develops on each pile's surface (see
 
 The wall section and pile-row plan below show what the spacing conversion represents.
 
-![Continuous wall in section and discrete pile row in plan](images/pile_row_plane_strain.png){width=880px}
+![Continuous wall in section and discrete pile row in plan](../fem/images/pile_row_plane_strain.png){width=880px}
 
 The row's center-to-center spacing $S$, not the pile diameter $D$, divides its axial and bending stiffnesses to give stiffness per unit wall width.
 
@@ -37,7 +37,7 @@ plane-strain beam gives a factor of safety 16.0% above it with a free head and 9
 rotation restrained ([VP106 finite-element diagnostic](../verification/rocscience.md#vp106-fem)). For a
 discrete row, use limit equilibrium with the Ito & Matsui (1975) force, which models the three-dimensional
 mechanism; use the finite element analysis for a continuous wall, and for a pile row only as a study of
-stiffness and member forces. [LEM vs. FEM pile modeling](../lem/piles.md#lem-vs-fem-pile-modeling) sets out
+stiffness and member forces. [LEM vs. FEM pile modeling](lem.md#lem-vs-fem-pile-modeling) sets out
 the choice and compares both engines on the pile sample.
 
 
@@ -69,7 +69,7 @@ where $E$ is Young's modulus, $A$ is the cross-sectional area, $I$ is the moment
 
 On a quadratic soil mesh (tri6, quad8, quad9) the edge a beam element lies on carries a midside node as well as its
 two corners, and the beam element stands on all three. It then has 9 DOFs — $u_x$, $u_y$ and $\theta$ at every one of
-its nodes — and its local stiffness is 9×9 (see [Quadratic elements](mesh.md#quadratic-elements)).
+its nodes — and its local stiffness is 9×9 (see [Quadratic elements](../fem/mesh.md#quadratic-elements)).
 
 The deflection of the three-node element is the quintic that matches a value and a slope at all three of its nodes —
 six conditions on six coefficients. That keeps Euler-Bernoulli exactly: the bending block is
@@ -88,7 +88,7 @@ The 2D soil elements have 2 DOFs per node ($u_x$, $u_y$), while beam elements re
 
 The figure shows a vertical three-node beam element on the edge of a quadratic soil element, with the degrees of freedom at each of its nodes:
 
-![Translations and rotations of a vertical three-node pile beam](images/pile_beam_dofs.png){width=640px}
+![Translations and rotations of a vertical three-node pile beam](../fem/images/pile_beam_dofs.png){width=640px}
 
 The midpoint the beam shares with the soil carries a rotation as the two ends do, which gives the element its nine degrees of freedom.
 
@@ -119,7 +119,7 @@ translations, and each pile node has one extra rotation. Pile nodes are included
 
 A pile line is meshed like any constraint line: its two endpoints from the `piles` sheet are embedded in the mesh,
 element edges follow the line, and its beam elements are those edges
-([Reinforcement and pile lines](mesh.md#reinforcement-and-pile-lines)).
+([Reinforcement and pile lines](../fem/mesh.md#reinforcement-and-pile-lines)).
 
 
 ## Force and Moment Computation
@@ -159,7 +159,7 @@ is applied on the shear's own internal-force pattern — $+1$ and $-1$ on the tr
 
 The hinge check runs first; the shear is then read off the released element:
 
-![One plastic release at a shared pile node and the ordered capacity checks](images/pile_capacity_checks.png){width=880px}
+![One plastic release at a shared pile node and the ordered capacity checks](../fem/images/pile_capacity_checks.png){width=880px}
 
 The third step caps the shear without changing the capped end moments.
 
@@ -181,7 +181,7 @@ Each end of a pile carries its own boundary condition. The **Head** column in th
 
 The four choices below act on the same three nodal degrees of freedom at either end.
 
-![Free, pinned, unrotated and fixed pile end restraints](images/pile_end_restraints.png){width=880px}
+![Free, pinned, unrotated and fixed pile end restraints](../fem/images/pile_end_restraints.png){width=880px}
 
 Red arrows mark the degrees of freedom an end leaves free, and black stop bars mark those it holds.
 
@@ -195,7 +195,7 @@ Neither column has any effect on LEM analysis.
 ## SSRM Treatment
 
 Strength reduction leaves the pile's $E$, $I$, $A$, $V_{\text{cap}}$ and $M_{\text{cap}}$ unchanged, as it does every
-[structural property](overview.md#structural-elements).
+[structural property](../fem/overview.md#structural-elements).
 
 
 ## Pile-Soil Interface and Load Transfer
@@ -204,7 +204,7 @@ A pile's beam elements stand on the nodes of the soil element edges they lie on,
 quadratic mesh, so pile and soil have the same displacement at every node. The interface is perfectly bonded: the
 shaft cannot slip, and no interface strength limits the shear passed between pile and soil; only the soil's yield
 and the pile's $V_{\text{cap}}$ and $M_{\text{cap}}$ do. XSLOPE has no interface element along a
-pile shaft; [interface elements](joints.md) apply only to joint lines and jointed reinforcement lines.
+pile shaft; [interface elements](../fem/joints.md) apply only to joint lines and jointed reinforcement lines.
 
 **Passive (stabilizing) piles.** The soil pushes laterally on the pile, and the soil yielding around it limits the
 load. The bond overstates the pile's resistance and makes the factor of safety unconservative; the excess measured
@@ -215,7 +215,7 @@ plane-strain smear.
 the soil elements at each node, not through skin friction and end bearing. The pile cannot slip or punch through,
 and the depth at which the load is transferred depends on the mesh. For a pile near a slope that also carries a
 structural load, model the pile as a passive beam and bracket the load as described under
-[Load-bearing piles](../lem/piles.md#load-bearing-piles): once as a surcharge on the `dloads` sheet, once without
+[Load-bearing piles](lem.md#load-bearing-piles): once as a surcharge on the `dloads` sheet, once without
 it.
 
 
@@ -240,7 +240,7 @@ If $D$ is provided and $I$/$Area$ are omitted, a solid circular section is assum
 
 >$A = \dfrac{\pi D^2}{4}, \qquad I = \dfrac{\pi D^4}{64}$
 
-Columns G and H, the pile force $H$ and **Appl**, are not used by the finite element analysis. See [LEM Piles](../lem/piles.md) for typical material property values and structural capacities.
+Columns G and H, the pile force $H$ and **Appl**, are not used by the finite element analysis. See [LEM Piles](lem.md) for typical material property values and structural capacities.
 
 ## Inspecting the Results
 
@@ -252,7 +252,7 @@ told apart.
 The screenshot below is a strength reduction run on the two pile rows of [LEM-12](../tutorials/lem12_piles.md),
 used again in [FEM-4](../tutorials/fem04_piles.md), shown at the mechanism it developed:
 
-![Pile detail for the lower pile of the piles sample](images/piles_fem_details.png){width=1000}
+![Pile detail for the lower pile of the piles sample](../fem/images/piles_fem_details.png){width=1000}
 
 Four panels share one depth axis, pile head at the top:
 
@@ -269,7 +269,7 @@ Four panels share one depth axis, pile head at the top:
   $p(z) = (c A_1 + \gamma z A_2)/S$ is drawn dashed beside it, where $c$ and $\gamma$ are the cohesion and unit
   weight of the soil at depth $z$ below the pile head, and $A_1$ and $A_2$ are the Ito & Matsui coefficients from
   $D$, the clear spacing $S - D$ and the soil's friction angle $\phi$, the same coefficients the LEM uses for its
-  passive-pile force (see [LEM Piles](../lem/piles.md)). The panel states the peak fraction of that limit. The
+  passive-pile force (see [LEM Piles](lem.md)). The panel states the peak fraction of that limit. The
   limiting resistance grows with depth and is often far above anything mobilized, in which case the panel is
   scaled to the mobilized profile and the limit runs off the sides. For a pile far enough inside its
   working range that the envelope does not reach the panel at all, it is not drawn, that panel carries no legend,

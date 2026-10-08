@@ -20,8 +20,8 @@ XSLOPE models each of these, and an end-anchored bar held by a plate or deadman 
 with a tensile capacity. The limit equilibrium (LEM) and finite element (FEM) analyses read the same line but use
 it differently ([LEM vs FEM](#lem-vs-fem)). What to enter for each kind of support, with typical
 values from the design manuals, is on [Reinforcement Types](types.md). A micropile, pile or pier resists by shear
-and bending rather than tension and is entered on the `piles` sheet instead ([LEM](../lem/piles.md),
-[FEM](../fem/piles.md)).
+and bending rather than tension and is entered on the `piles` sheet instead ([LEM](../piles/lem.md),
+[FEM](../piles/fem.md)).
 
 ## Entering a Line
 

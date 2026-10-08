@@ -13,7 +13,7 @@ Pile stabilization is widely used in practice for:
 
 A row of piles is installed through the sliding mass and embedded into stable ground below the failure surface. As the soil mass attempts to move, it pushes against the piles, which resist through their lateral stiffness and embedment in the stable zone.
 
-![Pile stabilization concept](images/pile_diagram.png){width=1000px}
+![Pile stabilization concept](../lem/images/pile_diagram.png){width=1000px}
 
 ## Pile Force in Limit Equilibrium Analysis
 
@@ -83,11 +83,11 @@ The pile force formulation for Janbu, Corps of Engineers, Lowe-Karafiath, and Sp
 
 The pile force $H$ at angle $\theta_p$ is incorporated into each limit equilibrium method supported by XSLOPE. The specific modifications for each method are presented in the respective method documentation pages:
 
-- [**OMS**](oms.md): $H\sin(\alpha-\theta_p)$ added to $N'$; pile moment terms added to the denominator
-- [**Bishop**](bishop.md): $-H\sin\theta_p$ enters vertical equilibrium for $N'$; pile moment terms added to the denominator
-- [**Janbu**](janbu.md): $-H\sin\theta_p$ enters vertical equilibrium for $N'$; $-H\cos\theta_p$ enters the horizontal force balance
-- [**Force Equilibrium** (Corps of Engineers, Lowe-Karafiath)](force_eq.md): $-H\cos\theta_p$ added to horizontal equilibrium ($b_0$); $-H\sin\theta_p$ added to vertical equilibrium ($b_1$)
-- [**Spencer**](spencer.md): $H\cos\theta_p$ added to $F_h$; $H\sin\theta_p$ added to $F_v$; moment terms added to $M_o$
+- [**OMS**](../lem/oms.md): $H\sin(\alpha-\theta_p)$ added to $N'$; pile moment terms added to the denominator
+- [**Bishop**](../lem/bishop.md): $-H\sin\theta_p$ enters vertical equilibrium for $N'$; pile moment terms added to the denominator
+- [**Janbu**](../lem/janbu.md): $-H\sin\theta_p$ enters vertical equilibrium for $N'$; $-H\cos\theta_p$ enters the horizontal force balance
+- [**Force Equilibrium** (Corps of Engineers, Lowe-Karafiath)](../lem/force_eq.md): $-H\cos\theta_p$ added to horizontal equilibrium ($b_0$); $-H\sin\theta_p$ added to vertical equilibrium ($b_1$)
+- [**Spencer**](../lem/spencer.md): $H\cos\theta_p$ added to $F_h$; $H\sin\theta_p$ added to $F_v$; moment terms added to $M_o$
 
 In all methods, for a vertical pile ($\theta_p = 0$) the equations reduce to the simpler horizontal-force-only case.
 
@@ -113,7 +113,7 @@ The Ito & Matsui method is the most widely used closed-form approach for computi
 
 Consider a row of piles embedded in a slope:
 
-![Ito & Matsui plan view](images/pile_ito_matsui_plan.png)
+![Ito & Matsui plan view](../lem/images/pile_ito_matsui_plan.png)
 
 - $D$ = pile diameter (or width of the pile cross-section)
 - $S$ = center-to-center spacing between piles
@@ -178,7 +178,7 @@ where $S = D_1 + D$ is the center-to-center spacing and $c_u$ is the undrained s
 
 #### Total Force per Pile
 
-![Ito & Matsui pressure distribution](images/pile_ito_matsui_pressure.png)
+![Ito & Matsui pressure distribution](../lem/images/pile_ito_matsui_pressure.png)
 
 The total lateral force on a single pile is obtained by integrating $p(z)$ from the ground surface down to the failure surface depth $z_f$:
 
@@ -324,7 +324,7 @@ A pile row can be put into either of XSLOPE's engines, but the two engines repre
 
 **How LEM models piles**: the pile contributes a single concentrated force $H$ at the point where the failure surface crosses it. With Ito & Matsui that force is computed from the diameter $D$ and the center-to-center spacing $S$ — a plasticity solution for soil squeezing *between* adjacent piles — then capped by $V_{\text{cap}}$ and $M_{\text{cap}}$, resolved onto the slice base, and carried into the equilibrium equations. Spacing is a direct input: change $S$ and the arching coefficients, the force per pile and the force per unit width of slope all change with it.
 
-**How FEM models piles**: the pile is meshed as a chain of Euler-Bernoulli beam elements sharing nodes with the soil continuum, and its $EA$ and $EI$ are divided by $S$ and smeared over a unit width of section (see [Assembly](../fem/piles.md#assembly)). Nothing is prescribed — the beam carries whatever the deforming soil pushes onto it, over its whole length rather than at one point — and the analysis returns the moment, shear, deflection and soil reaction down the member.
+**How FEM models piles**: the pile is meshed as a chain of Euler-Bernoulli beam elements sharing nodes with the soil continuum, and its $EA$ and $EI$ are divided by $S$ and smeared over a unit width of section (see [Assembly](fem.md#assembly)). Nothing is prescribed — the beam carries whatever the deforming soil pushes onto it, over its whole length rather than at one point — and the analysis returns the moment, shear, deflection and soil reaction down the member.
 
 **Plane strain and pile spacing**: a two-dimensional analysis is plane strain, so every member in it is continuous out of plane. There is no gap between piles for soil to move through. A discrete row modeled in the FEM is therefore a *wall* at $1/S$ of one pile's stiffness, and the mechanism has to pass over, under or around it. Spacing enters the finite element model exactly once, as that divisor, so the quantity that governs the real three-dimensional mechanism reaches the model only as a stiffness.
 
@@ -336,7 +336,7 @@ A pile row can be put into either of XSLOPE's engines, but the two engines repre
 | Contiguous or very closely spaced row | nearly continuous | FEM, with the smear stated | the same, with the gap unrepresented |
 | Discrete row at spacing | discrete | LEM with Ito & Matsui | factor of safety per spacing, force per row, capacity checks |
 
-For a **continuous member** the beam formulation is an exact description rather than an idealization, its $EA$ and $EI$ already are per unit width, and it returns internal actions that a limit equilibrium analysis cannot produce at all. It is compared with GeoStudio's SIGMA/W sheet pile wall example: XSLOPE gives 1.048 without the wall and 1.691 with it, against about 1.025 and 1.4 from SIGMA/W, a gap with the wall that is not yet resolved — see [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) and [Applicability](../fem/piles.md#applicability-continuous-walls-and-discrete-pile-rows) in the FEM pile documentation.
+For a **continuous member** the beam formulation is an exact description rather than an idealization, its $EA$ and $EI$ already are per unit width, and it returns internal actions that a limit equilibrium analysis cannot produce at all. It is compared with GeoStudio's SIGMA/W sheet pile wall example: XSLOPE gives 1.048 without the wall and 1.691 with it, against about 1.025 and 1.4 from SIGMA/W, a gap with the wall that is not yet resolved — see [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) and [Applicability](fem.md#applicability-continuous-walls-and-discrete-pile-rows) in the FEM pile documentation.
 
 For a **discrete row** the limit equilibrium analysis models the actual mechanism, with the soil moving between the piles. The size of the difference is measured on the pile model of [Tutorial LEM-12](../tutorials/lem12_piles.md) and [FEM-4](../tutorials/fem04_piles.md) — a 1:1 slope in c = 200 psf, $\phi$ = 20° soil with two rows of 2 ft drilled shafts at 6 ft spacing — which is solved by both engines on the same section, soil and pile rows:
 
@@ -411,7 +411,7 @@ For load-bearing piles near slopes, the recommended approach in XSLOPE is:
 
 The distributed loads in XSLOPE handle the surcharge case, so load-bearing piles need no additional input.
 
-The finite element analysis does not remove these bounds: its pile is bonded to the soil with no shaft interface ([FEM piles](../fem/piles.md#pile-soil-interface-and-load-transfer)).
+The finite element analysis does not remove these bounds: its pile is bonded to the soil with no shaft interface ([FEM piles](fem.md#pile-soil-interface-and-load-transfer)).
 
 
 ## Typical Parameter Values

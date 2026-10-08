@@ -950,7 +950,7 @@ Each pile is defined by:
 >>x2, y2 **[L]**: Second end coordinates (the higher of the two ends is the head)<br>
 - **LEM Properties**:<br>
 >>H — **[F/L]** (per unit width of slope): Pile force magnitude. If the user has a row of piles at spacing $S$ with individual capacity $H_{\text{single}}$, input $H = H_{\text{single}} / S$.<br>
->>The force direction $\theta$ is not an input: it is computed as the direction perpendicular to the pile axis (0°, i.e. horizontal, for vertical piles), with its horizontal component against the movement of the sliding soil, so a battered pile takes its angle from the pile's inclination and the facing of each failure surface (see [Force Direction](../lem/piles.md#force-direction)). Files from template v22 and earlier may carry a $\theta$ ("qp") override column, which is still honored when present.<br>
+>>The force direction $\theta$ is not an input: it is computed as the direction perpendicular to the pile axis (0°, i.e. horizontal, for vertical piles), with its horizontal component against the movement of the sliding soil, so a battered pile takes its angle from the pile's inclination and the facing of each failure surface (see [Force Direction](../piles/lem.md#force-direction)). Files from template v22 and earlier may carry a $\theta$ ("qp") override column, which is still honored when present.<br>
 >>Appl: Force application. **Active** = $H$ is a known *allowable* force, not divided by the factor of safety. **Passive** = $H$ is an *ultimate* capacity added to the resisting side and divided by FS. A blank cell is read as Active; files XSLOPE saves write the choice out explicitly. Has no effect on FEM analysis, where the pile resistance is computed rather than prescribed.<br>
 - **Pile Geometry**:<br>
 >>D **[L]**: Pile diameter. Required for Ito & Matsui auto-computation of $H$. Also used by FEM to compute $I$ and $Area$ if those columns are left blank.<br>
@@ -975,7 +975,7 @@ For methods with moment equilibrium (OMS, Bishop), the pile force also contribut
 
 When $H$ is left blank and $D$ and $S$ are provided, xslope auto-computes $H$ using the [Ito & Matsui (1975)](https://doi.org/10.3208/sandf1972.15.4_43) method for each trial failure surface. This auto-computation requires vertical piles ($x_1 = x_2$). For battered piles, $H$ must be specified directly.
 
-See the [LEM Piles](../lem/piles.md) section for detailed equation derivations and the [FEM Piles](../fem/piles.md) section for the beam element formulation used in finite element analysis.
+See the [LEM Piles](../piles/lem.md) section for detailed equation derivations and the [FEM Piles](../piles/fem.md) section for the beam element formulation used in finite element analysis.
 
 ---
 

@@ -236,7 +236,7 @@ pushing on the pile. On the critical surface above:
 The deeper the surface, the larger the force: the upper row, whose head
 stands 5 ft higher on the
 face, has 44% more soil above the surface and develops 85% more force per shaft.
-[Piles and Concrete Piers](../lem/piles.md#ito-matsui-1975-theory)
+[Piles and Concrete Piers](../piles/lem.md#ito-matsui-1975-theory)
 gives the derivation, the coefficients in full and the φ = 0 and c = 0 special
 cases; the method is applicable for S/D between about **2 and 8**, and this
 model's S/D = 3 sits in the middle of that band.
@@ -510,7 +510,7 @@ This tutorial covered:
   and takes almost nothing from the row it slides over.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
-[Piles and Concrete Piers](../lem/piles.md) derives the Ito & Matsui equations,
+[Piles and Concrete Piers](../piles/lem.md) derives the Ito & Matsui equations,
 the capacity checks and the per-unit-width convention;
 in [LEM-9](lem09_tieback_wall.md) we enter a pile with its force stated, beside
 the tieback anchors it carries; and

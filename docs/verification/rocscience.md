@@ -2601,7 +2601,7 @@ out of plane, and it is verified as one against a sheet pile wall in
 [GeoStudio's SIGMA/W benchmark](geostudio.md#sigmaw-wall). For a discrete pile row the validated
 route is limit equilibrium with the Ito & Matsui limit pressure — [VP106](#vp106) across four
 spacings, and [VP54](#vp54). See
-[Pile Elements in FEM](../fem/piles.md#applicability-continuous-walls-and-discrete-pile-rows).
+[Pile Elements in FEM](../piles/fem.md#applicability-continuous-walls-and-discrete-pile-rows).
 
 **Sources:** Cai & Ugai (2000), the three-dimensional shear-strength-reduction results.
 

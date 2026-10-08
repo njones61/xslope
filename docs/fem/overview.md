@@ -636,10 +636,10 @@ $E$ is the member's Young's modulus, not the soil's.
   on — including the failure modes (perfectly
   plastic pullout, peak-residual softening, brittle rupture) and typical material properties.
 
-- **[Piles and Concrete Piers](piles.md)**: beam elements carrying both axial stiffness ($EA/L$) and
+- **[Piles and Concrete Piers](../piles/fem.md)**: beam elements carrying both axial stiffness ($EA/L$) and
   lateral bending stiffness ($12EI/L^3$), and — unlike reinforcement — both tension and compression.
   Pile nodes carry a rotational DOF as well as their two translations; other nodes carry only the
-  translations. See the [mixed DOF system](piles.md#mixed-dof-system).
+  translations. See the [mixed DOF system](../piles/fem.md#mixed-dof-system).
 
 Structural properties are **not reduced** during strength reduction; only soil $c$ and $\tan\phi$
 are. The factor of safety is therefore the margin in the soil strength, given the structural

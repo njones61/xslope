@@ -209,7 +209,7 @@ a node the two share or, for a jointed sheet, through a tie at its end.
 
 ### A tieback and a soldier-pile or sheet-pile wall
 
-The wall is entered on the `piles` sheet ([Piles and Concrete Piers in LEM](../lem/piles.md)) and each tieback on
+The wall is entered on the `piles` sheet ([Piles and Concrete Piers in LEM](../piles/lem.md)) and each tieback on
 the `reinforce` sheet, with end 1 on the wall face. The wall's resistance is its shear force `H`, which [GEC 4][gec4]
 takes as the smaller of the wall's allowable shear capacity and the passive force the soil develops below the
 surface, divided by the soldier beam spacing ([GEC 4][gec4] p. 101). The `piles` sheet has its own `Appl`, read as on the
@@ -224,7 +224,7 @@ The trial surface starts at the corner of the excavation, where it passes throug
 A trial surface that passes below the toe of the wall receives no force from the wall.
 
 In the FEM the wall is a row of beam elements
-([Piles and Concrete Piers in Finite Element Analysis](../fem/piles.md)) and a tieback is a row of bar elements.
+([Piles and Concrete Piers in Finite Element Analysis](../piles/fem.md)) and a tieback is a row of bar elements.
 A bar that ends on a pile line, or crosses it, shares a node with the pile at that point, so the tieback pulls on
 the wall at that node. The figure shows one tieback whose end 1 lies on the pile line below the pile's head.
 

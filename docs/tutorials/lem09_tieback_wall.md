@@ -172,7 +172,7 @@ itself by the Ito & Matsui (1975) method, which treats the soil uphill of the
 pile row as squeezing plastically through the gaps between piles and integrates
 the resulting pressure on the pile from the ground surface down to each trial
 surface. That is the route to take when the design gives a diameter and spacing
-but no resistance number, and [Piles and Concrete Piers](../lem/piles.md)
+but no resistance number, and [Piles and Concrete Piers](../piles/lem.md)
 derives it. Here the reference publishes the 5,900 lb/ft itself, so we use it
 directly.
 
@@ -543,5 +543,5 @@ on the circle it started from. The [tutorials index](index.md) lists the series.
 [VP49](../verification/rocscience.md#vp49) catalogs this model against the
 published solutions it comes from, [Soil Reinforcement in LEM](../reinforcement/lem.md)
 derives the capacity envelope and the per-method equations the anchor force enters,
-and [Piles and Concrete Piers](../lem/piles.md) covers the support family the
+and [Piles and Concrete Piers](../piles/lem.md) covers the support family the
 soldier pile belongs to.

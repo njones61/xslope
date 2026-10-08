@@ -154,12 +154,16 @@ pile line is one beam, and `I`, `Area` and `Mcap` are entered for one beam.
 A segmental, or modular block, wall is a column of dry-stacked concrete units, usually with geogrid layers laid
 between the courses and running back into a reinforced fill. Its strength lies in its contacts: each course can
 slide on the one below it, the column can slide on its foundation, and its back face can part from the fill. The
-blocks themselves do not fail. The figure shows the wall of [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md).
+blocks themselves do not fail. The figure shows the wall of [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) in section, and in
+plan.
 
-![A segmental block wall with a joint line under its base, up its back face and between each pair of courses, and geogrid layers tied into the blocks](../fem/images/joints_block_wall.png){width=1000}
+![In section, a segmental block wall with a joint line under its base, up its back face and between each pair of courses, and geogrid layers tied into the blocks; in plan, the units laid over the joints of the course below, and a geogrid layer running back into the reinforced fill](images/pw_block_wall.png){width=653}
 
-Each course is a polygon of block material, and a joint line runs under the base, up the back face and between
-each pair of courses; each geogrid layer ends in a block and is tied to it.
+In section, each course is a polygon of block material, and a joint line runs under the base, up the back face and
+between each pair of courses; each geogrid layer ends in a block, at the dot, where it is tied to it. The plan
+looks down on the wall with its face at the bottom: the solid lines are the joints between the units of the top
+course, the dashed lines those of the course below, offset by half a unit, and the geogrid runs back from the blocks
+into the reinforced fill, here along the whole length of the wall.
 
 The wall is drawn, not entered on the `piles` sheet:
 
@@ -212,14 +216,15 @@ On the right, the FEM's base joint and back-face joint.
 
 Load-bearing piles carry structural loads (vertical forces from foundations) and transfer them to the subsurface through a combination of **skin friction** along the pile shaft and **end bearing** at the pile tip. The key question for slope stability is: does the structural load contribute to the driving forces on the failure surface?
 
-![A footing on a slope's crest on a pile, twice: in Case 1 the pile's tip is above the failure surface, in Case 2 the pile crosses it and its tip is in stable ground](images/pw_load_bearing.png){width=729}
+![A footing on a slope's crest on a pile, twice: in Case 1 the pile's tip is above the failure surface, in Case 2 the pile crosses it and its tip is in stable ground; in plan, footings of width B along the crest at spacing s](images/pw_load_bearing.png){width=871}
 
 In Case 1 the pile ends inside the sliding mass, so the pile and its load move with it. In Case 2 the pile reaches
-stable ground below the failure surface.
+stable ground below the failure surface. In plan, the footings stand along the crest, the line with ticks hanging
+down the slope, at spacing *s* center to center, each *B* wide across the crest, with its pile dashed below it.
 
 ### Case 1: Pile tip above the failure surface
 
-If the pile tip is entirely within the sliding mass (a friction pile in weak soil, for example), the entire pile and its load are part of the sliding mass. The structural load **does** contribute to driving forces and should be included in the analysis. Standard practice is to apply the structural load as a **distributed surface surcharge** using the distributed loads (`dloads`) sheet in the XSLOPE input template. This is slightly conservative because it places all the weight at the surface rather than distributing it with depth through skin friction, but the conservatism is generally small and accepted in practice.
+If the pile tip is entirely within the sliding mass (a friction pile in weak soil, for example), the entire pile and its load are part of the sliding mass. The structural load **does** contribute to driving forces and should be included in the analysis. Standard practice is to apply the structural load as a **distributed surface surcharge** using the distributed loads (`dloads`) sheet in the XSLOPE input template. For a row of footings along the crest, each *B* wide across the crest and carrying a force *P*, at spacing *s* along it, the surcharge is *P* ÷ (*B* × *s*). It is entered in the `Normal` column at two points on the ground at the footing's edges, with Direction `vertical` ([Worksheet: dloads](../usage/input_template.md#worksheet-dloads)). This is slightly conservative because it places all the weight at the surface rather than distributing it with depth through skin friction, but the conservatism is generally small and accepted in practice.
 
 ### Case 2: Pile tip below the failure surface
 

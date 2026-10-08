@@ -846,9 +846,9 @@ def lem09_reinforcement():
     The same editor LEM-8 photographs, on a row whose Type is ``anchor`` rather
     than blank: the shot's subject is the Type group at the bottom of the form,
     where the preset has filled Dir with ``axial`` and Appl with ``active``, and
-    the Anchorage group above it, where the two pullout lengths are 0 at the wall
-    and the bond length at the far end. The first line is selected because it is
-    the one the page reads its capacity off.
+    the Anchorage group above it, where Lp1 is 0 at the wall, Lp2 is the
+    development length at the far end, and Adhesion and Delta are blank. The
+    first line is selected because it is the one the page reads its capacity off.
     """
     from studio.editors import ReinforcementEditor
 
@@ -858,9 +858,9 @@ def lem09_reinforcement():
 
 def lem09_piles_table():
     """The piles editor's table view on the soldier pile — the view the page
-    teaches first: the worksheet's columns minus the derived θp, taking the
-    Problem-section row as two pieces. LEM columns only, per the page's
-    toggles."""
+    teaches first: the worksheet's LEM columns, Label through Mcap, in the
+    sheet's order, so the Problem-section row pastes in as one block. LEM
+    columns only, per the page's toggles."""
     from studio.editors import PilesEditor
 
     dlg = PilesEditor().build(_load(LEM09), None)

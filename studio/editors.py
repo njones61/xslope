@@ -6511,10 +6511,9 @@ class PilesEditor(CategoryEditor):
     # label/edit hover; the same dict feeds the context-sensitive help strip.
     # Field order mirrors the piles sheet's columns (Label, the endpoints, H, Appl,
     # D, S, Vcap, Mcap, then the FEM tail E, I, Area, Head, Tip) so a block copied from
-    # the sheet or the docs' tables pastes straight in. The sheet's qp (θ) sits
-    # between H and Appl and has no column here: θ is derived from the pile axis on
-    # save, so a block spanning it goes in as two — the endpoints through H, then D
-    # onward, which is how the tutorials print it.
+    # the sheet or the docs' tables pastes straight in as one piece. Neither the
+    # sheet nor this editor has a force-angle column: apply() derives θ from the
+    # pile axis on save, as the loader does.
     LF = {"lem", "fem"}
     FIELDS = [
         Field("label", "Label", "str", tooltip=PILES_HELP["label"]),

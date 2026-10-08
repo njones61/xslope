@@ -1232,6 +1232,51 @@ def test_lem09_pile_row():
     return out
 
 
+def test_lem12_pile_rows():
+    """LEM-12's two pile rows: the full table the page reads the shipped file by,
+    pasted whole into the live piles editor at its first column.
+
+    * Its columns are the editor's own run from Label to Mcap (``_editor_run``),
+      which is every column a limit equilibrium run reads; the page names the five
+      past Mcap as the finite element ones its LEM view hides.
+    * Its cells are xslope_piles.xlsx's piles sheet, cell for cell
+      (``_sheet_cells``): a blank H where the file has a blank H (the blank is
+      what selects the Ito & Matsui force), and the file's Appl word.
+    * Every pile the block builds is the completed model's on the columns the
+      table carries, to the precision it prints them, and on the force angle the
+      editor derives from the axis. The finite element columns past Mcap are not
+      compared: the table stops at the LEM view by design, and the file's E is
+      there for Tutorial FEM-4."""
+    from studio.editors import PilesEditor
+
+    page = "lem12_piles.md"
+    model_path = os.path.join(_MODELS, "xslope_piles.xlsx")
+    head, rows, keys, col, out = _editor_run("LEM-12 piles", page, PilesEditor,
+                                             "Label", "Mcap")
+    out += _sheet_cells("LEM-12 piles", head, rows, model_path, "piles")
+    if out:
+        return out
+    model = _load(model_path)
+    editor = PilesEditor()
+    dlg = editor.build(dict(model, pile_lines=[]), None)
+    dlg.set_view_mode("table")
+    dlg._table.apply_usage_filter({"lem", "fem"})
+    _paste(dlg._table, _tsv(rows), row=0, col=col)
+    out += _fail(_summary(dlg._table) == _pasted(len(rows), len(keys)),
+                 f"LEM-12's pile rows reported {_summary(dlg._table)!r}")
+    landed = dict(model, pile_lines=[])
+    dlg.accept()
+    editor.apply(landed, dlg)
+    out += _compare("LEM-12 piles", landed["pile_lines"], rows, model["pile_lines"],
+                    keys)
+    for i, (got, want) in enumerate(zip(landed["pile_lines"], model["pile_lines"])):
+        out += _fail(_same(got.get("theta_p"), want.get("theta_p")),
+                     f"LEM-12 piles: row {i + 1} theta_p came back "
+                     f"{got.get('theta_p')!r} from the page's row; the completed "
+                     f"model has {want.get('theta_p')!r}")
+    return out
+
+
 def test_lem12_stated_pile_force():
     """LEM-12's edit: the pile force stated instead of computed, pasted into the
     piles editor's H column.
@@ -1426,6 +1471,7 @@ CHECKS = [
     ("LEM-7 c/p -> constant", test_lem07_profile_to_constant),
     ("LEM-10 seed circle", test_lem10_seed_circle),
     ("LEM-11 σ block", test_lem11_sigma_block),
+    ("LEM-12 pile rows", test_lem12_pile_rows),
     ("LEM-12 stated pile force", test_lem12_stated_pile_force),
     ("LEM-8 materials", test_lem08_materials),
     ("LEM-9 materials", test_lem09_materials),

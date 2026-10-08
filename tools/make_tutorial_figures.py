@@ -1118,17 +1118,21 @@ def lem09_sheets():
     """The five worksheets LEM-9's Excel path fills.
 
     ``reinforce`` and ``piles`` are the two this page is about, and both windows
-    run to the last input column so the reader sees the columns they are told to
-    leave alone as well as the ones they fill. ``non-circ`` runs to F for the
-    sheet's own Movement legend, as LEM-5's does. ``mat`` and ``profile`` take
-    the two-material frames LEM-3 and LEM-8 use.
+    run to the last column a limit equilibrium analysis reads, so the reader sees
+    the columns they are told to leave alone or blank as well as the ones they
+    fill. ``non-circ`` runs to F for the sheet's own Movement legend, as LEM-5's
+    does. ``mat`` and ``profile`` take the two-material frames LEM-3 and LEM-8
+    use.
     """
     render("lem09_sheet_mat.png", LEM09, "mat", rows=(10, 13), cols="A:O")
     render("lem09_sheet_profile.png", LEM09, "profile", rows=(1, 14), cols="A:H")
     render("lem09_sheet_noncirc.png", LEM09, "non-circ", rows=(1, 6), cols="A:F")
-    render("lem09_sheet_reinforce.png", LEM09, "reinforce", rows=(2, 6), cols="A:O")
-    # LEM problem: stop before the FEM-only pile columns (E, I, Area, Head, Tip).
-    render("lem09_sheet_piles.png", LEM09, "piles", rows=(2, 6), cols="A:M")
+    # LEM problem: run to Spacing (Q), stopping before the FEM-only reinforce
+    # columns (Tres, E, Area).
+    render("lem09_sheet_reinforce.png", LEM09, "reinforce", rows=(2, 6), cols="A:Q")
+    # LEM problem: run to Mcap (L), stopping before the FEM-only pile columns
+    # (E, I, Area, Head, Tip).
+    render("lem09_sheet_piles.png", LEM09, "piles", rows=(2, 6), cols="A:L")
 
 
 def lem09_plots():

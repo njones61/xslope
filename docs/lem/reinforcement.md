@@ -3,8 +3,9 @@
 Soil and rock carry compression and shear well but little or no tension. Reinforcement supplies the tension:
 members placed across the zone where a slip surface would form and anchored in the stable ground beyond it.
 Geosynthetic layers (geotextiles and geogrids) are built into a fill as it is placed, so a slope can stand steeper
-than the fill alone would; soil nails are drilled and grouted into a cut as it is excavated; tiebacks and
-end-anchored bars hold a wall, with a grouted bond length deep behind the slip surface. In each case the part of the
+than the fill alone would; soil nails are drilled and grouted into a cut as it is excavated; tiebacks hold a wall
+with a grouted bond length deep behind the slip surface, and end-anchored bars with a plate or deadman at each end.
+In each case the part of the
 member beyond the slip surface grips the stable ground, and the member pulls back on the sliding mass.
 
 ![Three kinds of reinforcement: geosynthetic layers in a fill, soil nails in a cut, tiebacks behind a wall](../fem/images/reinf_types.png){width=1000}
@@ -108,15 +109,11 @@ where the design failure surface crosses each of that wall's eleven layers repro
 table; the entry is under
 [published problems](../verification/published.md#fhwa-e1).
 
-**Grouted tiebacks with a bonded length.** A tieback develops pullout resistance only over its grouted (bonded)
-length $L_{bond}$ at the far end, at a bond strength $b$ (force per unit length); the sleeved free length transfers
-no load to the ground and carries whatever force the bond zone can supply. $T_{max}$ is therefore the smallest of
-the tendon capacity, the capacity of the head's connection to the wall and the bond capacity $b \cdot L_{bond}$.
-$L_{p1} = 0$ at the head makes the full $T_{max}$ available along the free length, and $L_{p2} = T_{max}/b$ at the
-bonded end, which equals $L_{bond}$ where the bond governs and is shorter where the tendon or the head governs.
-$T_{end1}$, $T_{end2}$, Adhesion and Delta are left blank. With $L_{p1} = 0$ the envelope does not read
-$T_{end1}$, so the head's capacity enters through $T_{max}$; a nonzero $L_{p1}$ would add friction from the head
-along the free length, and the overburden law accumulates resistance from end 1 along the free length as well.
+**Grouted tiebacks with a bonded length.** A tieback develops pullout resistance only over its grouted bond
+length; the sleeved unbonded length transfers no load to the ground. Its envelope is the development-length law,
+with $L_{p1} = 0$ at the head and the ramp $L_{p2}$ at the bonded end, $T_{max}$ divided by the load transfer per
+unit length. The overburden law would accumulate resistance from the head along the unbonded length. The entries
+are under [Tieback](../usage/modeling_reinforcement.md#tieback-grouted-ground-anchor).
 
 ### Per-unit-width convention and spacing
 

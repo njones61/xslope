@@ -20,10 +20,6 @@ the soil mesh. A bar has axial stiffness $EA/L$ — $E$ the reinforcement's modu
 unit width, $L$ the element length — carries tension only, and is capped at a tensile capacity set by the line's
 strength and its embedment ([Force behavior and failure modes](#force-behavior-and-failure-modes)).
 
-What to enter for a particular support (a geosynthetic layer, a soil nail, a tieback or an end-anchored bar), and
-how to connect it to a wall or make it a joint, is set out column by column on
-[Modeling Reinforcement](../usage/modeling_reinforcement.md).
-
 A bonded bar shares the nodes of the soil element edge it lies on, so bar and soil move together
 ([Reinforcement and pile lines](mesh.md#reinforcement-and-pile-lines)). On a linear mesh that is the edge's two
 corner nodes. On a quadratic mesh (tri6, quad8, quad9) the bar also takes the edge's midside node, which makes it a
@@ -47,6 +43,10 @@ circle:
 
 On the left, the limit equilibrium force at each crossing acts tangent to the circle, and the axial alternative is
 drawn at the middle layer. On the right, each bar carries tension along its own length, from how much it stretches.
+
+What to enter for a particular support (a geosynthetic layer, a soil nail, a tieback or an end-anchored bar), and
+how to connect it to a wall or make it a joint, is set out column by column on
+[Modeling Reinforcement](../usage/modeling_reinforcement.md).
 
 ## Mathematical Formulation
 

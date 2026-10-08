@@ -877,8 +877,8 @@ resisting side and divided by FS, i.e. it mobilizes with the soil. Filled by Typ
 - **Strength / Capacity Properties** (LEM &amp; FEM):<br>
 >>Tmax — **[F] per element (÷ Spacing)** or **[F/L] per unit width** when Spacing is blank: Maximum tensile force that can be mobilized. Per unit width of slope; for discrete supports (nails,
 tiebacks) enter the per-element capacity and provide **Spacing**, and xslope divides for you.<br>
->>Lp1 **[L]**: Pullout bond length at end 1<br>
->>Lp2 **[L]**: Pullout bond length at end 2<br>
+>>Lp1 **[L]**: Length over which friction develops Tmax from end 1; 0 is a fully anchored end<br>
+>>Lp2 **[L]**: Length over which friction develops Tmax from end 2; 0 is a fully anchored end<br>
 >>Adhesion **[F/L²]**: Soil-reinforcement interface adhesion. Leave blank to use Lp1/Lp2.<br>
 >>Delta **[degrees]**: Soil-reinforcement interface friction angle. Leave blank to use Lp1/Lp2.<br>
 >>Tend1 — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Anchorage/plate/connection capacity at end 1 (0 = friction only)<br>

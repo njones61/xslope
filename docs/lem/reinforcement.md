@@ -183,17 +183,8 @@ The **Type** column fills Dir and Appl automatically (either can be overridden b
 | Tieback | Axial | Active | pre-tensioned grouted anchors |
 | Anchor | Axial | Active | end-anchored bars |
 
-Leave Type blank for a generic tensile line with the defaults (Tangent, Active).
-
-## Choosing the sheet for a support {#which-sheet-models-my-support}
-
-| Support | Sheet | Settings | Why |
-|---|---|---|---|
-| Geotextile / geogrid | reinforce | Tangent, Active | flexible; reorients with the soil |
-| Soil nail | reinforce | Axial, Passive, $T_{end}$ = plate capacity | tension-dominated |
-| Grouted tieback | reinforce | Axial, Active, $T_{end}$ = connection capacity | pre-tensioned tension member |
-| Micropile / pile / pier | [piles](piles.md) | $H$ (user or Ito-Matsui), $V_{cap}$/$M_{cap}$ | shear and bending govern, not tension |
-| Facing weight (shotcrete) | lloads | $L$ at the face, $\delta = -90°$ | a load, not a resistance |
+Leave Type blank for a generic tensile line with the defaults (Tangent, Active). A micropile, pile or pier resists by
+shear and bending rather than tension and is entered on the [piles](piles.md) sheet.
 
 ## LEM vs. FEM
 
@@ -209,10 +200,6 @@ Both engines use the same reinforcement lines, but the mechanics differ:
   therefore treat bond slip the same way; what $T_{res}$ adds in the FEM is rupture of the reinforcement itself.
   Dir and Appl have no meaning in the FEM.
   See [Soil Reinforcement in FEM](../fem/reinforcement.md).
-
-For typical stiffness values ($E$, $Area$) and guidance on pullout lengths by reinforcement type, see the
-[FEM reinforcement page](../fem/reinforcement.md#reinforcement-line-input-parameters-and-element-properties) —
-the same table serves both engines' inputs.
 
 ## Typical Anchorage Capacities
 

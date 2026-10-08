@@ -70,7 +70,9 @@ where a slip surface cuts it, and develops that tension by friction on both face
 surface. Its line runs along the layer from the face of the slope, or from the back of a facing, to the buried
 end, so the line is as long as the layer. The figure shows one layer in a reinforced slope.
 
-<!-- figure: reinf-geosynthetic -->
+![A geosynthetic layer running horizontally from the face of a slope, end 1, into the fill, end 2](images/mr_geosynthetic.png){width=466}
+
+End 1 is on the face of the slope and end 2 at the buried end of the layer.
 
 The capacity starts at `Tend1` at the face (zero where the layer ends free) and at zero at the buried end, grows
 with the friction on both faces of the layer, and is capped at `Tmax`.
@@ -108,11 +110,14 @@ A soil nail is a steel bar grouted into a hole drilled into a cut as the cut is 
 plate at the head bearing on a shotcrete facing. It carries tension where a slip surface crosses it, developed by
 bond between the grout and the soil along its length and, at the head, by the facing. Its line runs from the nail
 head on the face, end 1, along the nail's inclination to its tip, end 2; nails are installed 10 to 20 degrees
-below horizontal, most commonly 15 (GEC 7, p. 150). The figure shows one nail in a cut.
+below horizontal, most commonly 15 (GEC 7, p. 150). The figure shows one nail through the facing of a vertical
+cut.
 
-<!-- figure: reinf-nail -->
+![A soil nail running from its head on the facing of a vertical cut, end 1, down into the soil to its tip, end 2](images/mr_nail.png){width=521}
 
-At end 1 the capacity starts at the plate's `Tend1` and at end 2 at zero, and bond adds to each over `Lp1` and
+End 1 is the nail head on the facing, where `Tend1` is the head capacity, and end 2 is the tip.
+
+At end 1 the capacity starts at the head's `Tend1` and at end 2 at zero, and bond adds to each over `Lp1` and
 `Lp2` until the bar's `Tmax` caps it.
 
 | Column | Entry | Typical values |
@@ -148,11 +153,14 @@ ground behind the critical slip surface (GEC 4, pp. 4–5). Its line runs from t
 through the unbonded length to the far end of the bond length, end 2. The figure shows one tieback through a
 wall.
 
-<!-- figure: reinf-tieback -->
+![A tieback running from its head on a wall, end 1, through the unbonded length and the bond length to end 2](images/mr_tieback.png){width=533}
+
+End 1 is the anchor head on the wall, with `Lp1` = 0, and the tendon runs through the unbonded length into the
+bond length, which `Lp2` spans to end 2.
 
 With `Lp1` = 0 the full `Tmax` is available from the anchor head to within `Lp2` of end 2, and over that last
 `Lp2` the capacity falls linearly to zero, as in GEC 4's limit equilibrium treatment of an anchor (p. 100). Where
-the bond governs, as drawn, `Lp2` is the bond length.
+the bond governs, as in the figure, `Lp2` is the bond length.
 
 | Column | Entry | Typical values |
 |---|---|---|
@@ -192,11 +200,13 @@ in front of the bond length carry the full `Tmax`. Both files enter `Type` = `An
 An end-anchored bar is a steel bar or tie rod held by a plate or a deadman at each end. It carries tension along
 its axis when the ground at its two ends moves apart, and is held by its two anchorages, with little or no bond
 along the shaft. Its line runs from the anchorage at one end, end 1, to the anchorage at the other, end 2. The
-figure shows one bar held by a plate at each end.
+figure shows one bar running from a wall to a deadman.
 
-<!-- figure: reinf-end-anchored-bar -->
+![A horizontal bar running from a wall, end 1, to a deadman, end 2](images/mr_end_anchored_bar.png){width=470}
 
-With `Lp1` = `Lp2` = 0 the bar delivers `Tmax` wherever a slip surface crosses it between the two plates.
+End 1 is at the wall and end 2 at the deadman, with `Lp1` = 0 and `Lp2` = 0.
+
+The bar then delivers `Tmax` wherever a slip surface crosses it between its anchorages.
 
 | Column | Entry | Typical values |
 |---|---|---|
@@ -230,9 +240,10 @@ takes as the smaller of the wall's shear capacity and the passive force the soil
 divided by the soldier beam spacing (p. 101). The figure shows one tieback through a soldier-pile wall, with a
 trial surface that crosses both.
 
-<!-- figure: connect-tieback-wall-lem -->
+![A tieback through a wall, with a trial surface from the excavation corner crossing its unbonded length, and the forces Tmax on the tendon and H on the wall](images/mr_connect_tieback_wall_lem.png){width=450}
 
-The tieback's force acts along the tendon at its crossing and the wall's `H` at the pile line.
+The trial surface starts at the corner of the excavation, where it passes through the pile line and the wall's
+`H` acts, and crosses the tieback on its unbonded length, where `Tmax` acts along the tendon.
 
 A trial surface that passes below the toe of the wall receives no force from the wall. In
 [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) each tieback starts on the wall face at x = 0, 0.5 ft in
@@ -240,16 +251,14 @@ front of the soldier pile line; the offset has no effect in the LEM.
 
 In the FEM the wall is a row of beam elements
 ([Piles and Concrete Piers in Finite Element Analysis](../fem/piles.md)) and a tieback is a row of bar elements.
-A bar shares a node with the wall only where its end 1 is
-placed exactly at an end of the pile line, the pile's head or its tip. A bar that starts partway down the pile,
-stops short of it, or starts in front of it and passes through it is not attached to the wall, and its force
-reaches the wall only through the soil around both. The figure shows one tieback whose end 1 lies on the pile
-line below the pile's head.
+A bar that ends on a pile line, or crosses it, shares a node with the pile at that point, so the tieback pulls on
+the wall at that node. A crossing that is not end-on draws a note in the
+[model checks](../studio/analysis.md#model-checks-before-a-run) that the two members are joined there. The figure
+shows one tieback whose end 1 lies on the pile line below the pile's head.
 
-<!-- figure: connect-tieback-wall-fem -->
+![A tieback whose first node is a node of the wall's pile line below its head, with the bar's other nodes running back into the soil](images/mr_connect_tieback_wall_fem.png){width=447}
 
-The bar's first node lies on the pile line but belongs to the soil alone, so the bar and the wall share no
-node.
+End 1 of the tieback is a node of the pile, and the bar's other nodes run back into the soil.
 
 ### A soil nail and a shotcrete facing
 
@@ -260,9 +269,10 @@ face, so one vertical force at the top of the face gives the same force and mome
 provided the slip surface exits at the toe; on a battered face it is approximate. The figure shows one nail head
 on a shotcrete facing.
 
-<!-- figure: connect-nail-facing -->
+![A soil nail with its head on a shotcrete facing, and the facing's weight as a line load at the top of the face](images/mr_connect_nail_facing.png){width=466}
 
-The head capacity acts at end 1 and the facing's weight at the crest.
+`Tend1`, the head capacity, acts at end 1 on the facing, and the facing's weight acts as a line load at the top of
+the face.
 
 [VP47](../verification/rocscience.md#vp47) and [VP48](../verification/rocscience.md#vp48) enter their facings
 this way, with line loads of 14.6 kN/m and 13.2 kN/m. The FEM has no facing member: a beam cannot be laid along
@@ -280,9 +290,9 @@ p. B-13), and it rises with the normal pressure on the connection: in Example E1
 p. E1-18), so on eight of the wall's eleven layers the connection limits the force at the face. The figure shows
 one layer connected to a block facing.
 
-<!-- figure: connect-geosynthetic-facing -->
+![A geosynthetic layer running from the back of a block facing, end 1, into the fill, end 2](images/mr_connect_geosynthetic_facing.png){width=455}
 
-The connection acts at end 1; end 2 is buried and free.
+End 1 is on the back of the block facing, where `Tend1` is the connection, and end 2 is in the fill.
 
 In the LEM, and in the FEM for a bonded layer, `Tend1` only raises the capacity at end 1
 ([Capacity Envelope](../lem/reinforcement.md#capacity-envelope)); a jointed layer's `Tend1` ties its end to the
@@ -309,10 +319,10 @@ and the soil on each side slides on the sheet at the interface strength
 ([Choosing a Bonded Bar or a Joint](../fem/reinforcement.md#bonded-bar-or-joint)). The figure shows one base sheet
 under an embankment.
 
-<!-- figure: joint-base-sheet -->
+![A jointed base sheet under an embankment, with Adhesion and Delta on the interfaces above and below it](images/mr_joint_base_sheet.png){width=455}
 
-The sheet lies between two interfaces, one against the embankment above it and one against the foundation below;
-both ends are free, so the sheet can pull out at either end.
+The sheet runs along the base of the embankment from end 1 to end 2 with `Joint` = `Yes`, and `Adhesion` and
+`Delta` set both of its interfaces, against the embankment above and the foundation below.
 
 | Column | Entry |
 |---|---|
@@ -333,9 +343,11 @@ runs a base geotextile and a liner both ways, with `kn`, `ks` and `Jred` blank o
 
 A slip surface with no member in it (a rock joint, a contact between facing blocks, the back of a wall against its
 fill) goes on the `joints` sheet, with its own `c`, `phi` and `t_cut`
-([Joints and Interface Elements](../fem/joints.md)). The figure shows one contact between two facing blocks.
+([Joints and Interface Elements](../fem/joints.md)). The figure shows one contact between two stacked blocks.
 
-<!-- figure: joint-no-reinforcement -->
+![Two stacked blocks with one joint line along their contact](images/mr_joint_no_reinforcement.png){width=267}
+
+The contact is one `joints`-sheet line from (`x1`, `y1`) to (`x2`, `y2`), whose `c` and `phi` are its strength.
 
 The mesh splits along the line into two faces with one interface between them, and no member.
 

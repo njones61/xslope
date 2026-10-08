@@ -39,9 +39,9 @@ the friction on both faces of the layer and is capped at `Tmax`.
 | <code class="rc rc-both">Tend1</code> | Appl Active: the nominal long-term connection strength `Talc` divided by the factor of safety the design applies to the connection. Appl Passive: `Talc`. 0 where the layer ends free at the face. | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
 | <code class="rc rc-both">Tend2</code> | 0 | — |
 | <code class="rc rc-both">Spacing</code> | blank | — |
-| <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> (FEM) | `E` × `Area` = the sheet's tensile stiffness per unit width ([Axial Stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea)) | — |
-| <code class="rc rc-fem">Tres</code> (FEM) | blank | — |
-| <code class="rc rc-fem">Joint</code> (FEM) | blank; `Yes` where the soil can slide along the sheet ([A sheet the soil slides along](#a-sheet-the-soil-slides-along)) | — |
+| <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> | `E` × `Area` = the sheet's tensile stiffness per unit width ([Axial Stiffness (EA)](../fem/reinforcement.md#axial-stiffness-ea)) | — |
+| <code class="rc rc-fem">Tres</code> | blank | — |
+| <code class="rc rc-fem">Joint</code> | blank; `Yes` where the soil can slide along the sheet ([A sheet the soil slides along](#a-sheet-the-soil-slides-along)) | — |
 
 The two `Tmax` entries are FHWA's two conventions (GEC 11, pp. 8-7 and 8-8): a program that adds the
 reinforcement force to the resisting moment takes `Tal` unreduced, and one that subtracts it from the driving
@@ -82,9 +82,9 @@ At end 1 the capacity starts at the head's `Tend1` and at end 2 at zero, and bon
 | <code class="rc rc-both">Tend1</code> | nail-head capacity: the smallest of the facing's resistances in flexure, in punching shear and in headed-stud tension (GEC 7 pp. 104–105); with Appl Active, each resistance divided by its own factor before the smallest is taken | nominal resistances: flexure 12 to 143 kip (53 to 636 kN) for the initial facing; punching shear 32 to 111 kip (142 to 494 kN) initial and 21 to 55 kip (93 to 245 kN) final; headed studs 28 to 146 kip (125 to 649 kN) (GEC 7 Tables 6.6 to 6.8, pp. 171–178); flexure and stud values for Grade 60 steel, × 1.24 for Grade 75; factors of safety 1.5 for flexure and punching shear, 2.0 for A307 and 1.7 for A325 headed studs (Table 5.1, p. 108) |
 | <code class="rc rc-both">Tend2</code> | 0 | — |
 | <code class="rc rc-both">Spacing</code> | horizontal nail spacing | 4 to 6 ft (1.22 to 1.83 m), routinely 5 ft (1.52 m) (GEC 7 p. 148) |
-| <code class="rc rc-fem">E</code> (FEM) | modulus of the steel bar | 29,000 ksi (GEC 7 p. 250): 4.176 × 10⁹ psf, or about 2.0 × 10⁸ kPa (200 GPa) |
-| <code class="rc rc-fem">Area</code> (FEM) | bar area per nail | as for `Tmax` |
-| <code class="rc rc-fem">Tres</code>, <code class="rc rc-fem">Joint</code> (FEM) | blank | — |
+| <code class="rc rc-fem">E</code> | modulus of the steel bar | 29,000 ksi (GEC 7 p. 250): 4.176 × 10⁹ psf, or about 2.0 × 10⁸ kPa (200 GPa) |
+| <code class="rc rc-fem">Area</code> | bar area per nail | as for `Tmax` |
+| <code class="rc rc-fem">Tres</code>, <code class="rc rc-fem">Joint</code> | blank | — |
 
 In GEC 7's allowable stress design, which programs such as SNAILZ follow with an allowable bond stress (p. 117), the
 factor of safety on the soil is at least 1.5 (Table 5.1, p. 108). How the head connects to the facing in each
@@ -122,9 +122,9 @@ the bond governs, as in the figure, `Lp2` is the bond length.
 | <code class="rc rc-both">Lp2</code> | `Tmax` ÷ the allowable load transfer per unit length, which is the ultimate load transfer ÷ 2.0 in soil or ÷ 3.0 in rock (GEC 4 pp. 71, 74): the bond length where the bond governs, shorter where the tendon or the head governs. A 580 kN anchor in medium dense sand (145 kN/m ultimate, 72.5 kN/m allowable) has `Lp2` = 580 ÷ 72.5 = 8.0 m. | ultimate load transfer of small-diameter gravity-grouted anchors: 30 to 290 kN/m (2 to 20 kip/ft) in soil (GEC 4 Table 6, p. 71; GEC 7 Table 4.6, p. 86) and 150 to 730 kN/m (10.3 to 50.0 kip/ft) in rock (GEC 4 Table 8, p. 74); bond lengths 4.5 to 12 m (14.8 to 39.4 ft) in soil and 3 to 10 m (9.8 to 32.8 ft) in rock (pp. 71, 74) |
 | <code class="rc rc-both">Tend1</code>, <code class="rc rc-both">Tend2</code>, <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | blank: with `Lp1` = 0 the program does not read `Tend1`; for `Adhesion` and `Delta`, see grouted tiebacks under [Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden) | — |
 | <code class="rc rc-both">Spacing</code> | horizontal anchor spacing | on a soldier-beam wall the anchors connect to the soldier beams, directly or through wales (GEC 4 pp. 13–14); soldier beams are typically 1.5 to 3 m (4.9 to 9.8 ft) apart when driven and up to 3 m apart when drilled in (p. 76) |
-| <code class="rc rc-fem">E</code> (FEM) | modulus of the tendon steel | 29,000 ksi for a bar tendon (GEC 7 p. 250); for strand, the manufacturer's value, which the Post-Tensioning Institute (PTI) allows to be reduced 3 to 5 percent for a long multistrand tendon when checking apparent free length (GEC 4 p. 151) |
-| <code class="rc rc-fem">Area</code> (FEM) | tendon area per anchor | Grade 150 bars 26 to 64 mm (1 to 2½ in.): 548 to 3,348 mm² (0.85 to 5.19 in²), ultimate strength 568 to 3,461 kN (127.5 to 778.0 kip) (GEC 4 Table 9, p. 77); 15-mm strand: 140 mm² (0.217 in²) and 260.7 kN (58.6 kip) per strand (GEC 4 Table 10, p. 78) |
-| <code class="rc rc-fem">Tres</code>, <code class="rc rc-fem">Joint</code> (FEM) | blank | — |
+| <code class="rc rc-fem">E</code> | modulus of the tendon steel | 29,000 ksi for a bar tendon (GEC 7 p. 250); for strand, the manufacturer's value, which the Post-Tensioning Institute (PTI) allows to be reduced 3 to 5 percent for a long multistrand tendon when checking apparent free length (GEC 4 p. 151) |
+| <code class="rc rc-fem">Area</code> | tendon area per anchor | Grade 150 bars 26 to 64 mm (1 to 2½ in.): 548 to 3,348 mm² (0.85 to 5.19 in²), ultimate strength 568 to 3,461 kN (127.5 to 778.0 kip) (GEC 4 Table 9, p. 77); 15-mm strand: 140 mm² (0.217 in²) and 260.7 kN (58.6 kip) per strand (GEC 4 Table 10, p. 78) |
+| <code class="rc rc-fem">Tres</code>, <code class="rc rc-fem">Joint</code> | blank | — |
 
 The unbonded length is at least 3 m (9.8 ft) for a bar tendon and 4.5 m (14.8 ft) for strand (GEC 4 p. 70), and
 the bond length starts at least one fifth of the wall height or 1.5 m (4.9 ft) behind the critical slip surface
@@ -169,8 +169,8 @@ The bar then delivers `Tmax` wherever a slip surface crosses it between its anch
 | <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | 0 | — |
 | <code class="rc rc-both">Tend1</code>, <code class="rc rc-both">Tend2</code>, <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | blank | — |
 | <code class="rc rc-both">Spacing</code> | out-of-plane (horizontal) spacing of the bars | — |
-| <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> (FEM) | steel modulus; bar area per bar | `E` = 29,000 ksi (GEC 7 p. 250) |
-| <code class="rc rc-fem">Tres</code>, <code class="rc rc-fem">Joint</code> (FEM) | blank | — |
+| <code class="rc rc-fem">E</code>, <code class="rc rc-fem">Area</code> | steel modulus; bar area per bar | `E` = 29,000 ksi (GEC 7 p. 250) |
+| <code class="rc rc-fem">Tres</code>, <code class="rc rc-fem">Joint</code> | blank | — |
 
 With both development lengths 0 the envelope does not read `Tend1` or `Tend2`: the shaft develops no friction
 between its anchorages, and their capacities enter through `Tmax`. A bar whose shaft also grips the soil is

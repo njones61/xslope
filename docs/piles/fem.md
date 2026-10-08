@@ -10,30 +10,20 @@ A pile or concrete pier is modeled as a chain of Euler-Bernoulli beam elements e
 
 ## Applicability: Continuous Walls and Discrete Pile Rows
 
-A two-dimensional beam element is a plane-strain member. It is continuous out of plane, and its $EA$ and
-$EI$ are stiffnesses per unit width of wall. That is an exact description of one kind of structure and an
-idealization of another, and the difference determines which of XSLOPE's two analyses suits a problem.
+The beam is a plane-strain member: it is continuous out of plane, and its axial and bending stiffnesses, $EA$ and
+$EI$, are per unit width of wall. Which members that suits, and why, is set out with a figure under
+[LEM vs FEM](overview.md#lem-vs-fem) on the Piles and Walls Overview.
 
 **Continuous walls.** Sheet pile, diaphragm and secant pile walls are continuous out of plane, so the beam
 represents them directly, with $S = 1$. The element is checked against closed-form beam theory in
 `test/beam_element_check.py`, and a wall analysis is compared with GeoStudio's in
 [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall).
 
-**Discrete pile rows.** A row of separate piles is not continuous out of plane. Soil arches onto the piles and,
-at wide enough spacing, moves between them, so the load a pile attracts is set by a three-dimensional mechanism.
-Dividing $EA$ and $EI$ by the spacing (see [Assembly](#assembly)) smears one pile's stiffness over a unit width
-of wall. That reproduces the row's average stiffness; it does not reproduce the arching, and shared-node coupling
-does not reproduce the slip that develops on each pile's surface (see
-[Pile-Soil Interface and Load Transfer](#pile-soil-interface-and-load-transfer)).
-
-The wall section and pile-row plan below show what the spacing conversion represents.
-
-![Continuous wall in section and discrete pile row in plan](../fem/images/pile_row_plane_strain.png){width=880px}
-
-The row's center-to-center spacing $S$, not the pile diameter $D$, divides its axial and bending stiffnesses to give stiffness per unit wall width.
-
-Which analysis suits which member is set out under [LEM vs FEM](overview.md#lem-vs-fem), and the two are compared
-on the same slopes under [LEM vs. FEM Pile Modeling](lem.md#lem-vs-fem-pile-modeling).
+**Discrete pile rows.** Dividing $EA$ and $EI$ by the spacing (see [Assembly](#assembly)) reproduces the row's
+average stiffness and nothing more. It misses the soil arching onto the piles and, at wide enough spacing, moving
+between them. It also misses the slip that develops on each pile's surface, since pile and soil share their nodes
+(see [Pile-Soil Interface and Load Transfer](#pile-soil-interface-and-load-transfer)). The two analyses are
+compared on the same slopes under [LEM vs. FEM Pile Modeling](lem.md#lem-vs-fem-pile-modeling).
 
 
 ## Comparison with Reinforcement (Truss) Elements
@@ -202,9 +192,10 @@ and the pile's $V_{\text{cap}}$ and $M_{\text{cap}}$ do. XSLOPE has no interface
 pile shaft; [interface elements](../fem/joints.md) apply only to joint lines and jointed reinforcement lines.
 
 **Passive (stabilizing) piles.** The soil pushes laterally on the pile, and the soil yielding around it limits the
-load. The bond overstates the pile's resistance and makes the factor of safety unconservative; the excess measured
-under [Applicability](#applicability-continuous-walls-and-discrete-pile-rows) includes this effect together with the
-plane-strain smear.
+load. The bond overstates the pile's resistance and makes the factor of safety unconservative. On the one
+pile-stabilized slope with a three-dimensional answer, the FEM's factor of safety stands above it
+([LEM vs. FEM Pile Modeling](lem.md#lem-vs-fem-pile-modeling)), and the bond and the spreading of the row into a
+wall both contribute to the difference.
 
 **Load-bearing piles.** An axial load at the head reaches the soil in proportion to the stiffness of the beam and of
 the soil elements at each node, not through skin friction and end bearing. The pile cannot slip or punch through,

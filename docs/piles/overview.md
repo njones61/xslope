@@ -84,15 +84,21 @@ the soil's pressure along its whole length: the sliding mass pushes it downslope
 stable ground holds it below.
 
 A two-dimensional analysis is plane strain, so every member in it is continuous out of plane. A continuous wall is
-exactly that, but a row of separate piles is not: dividing a pile's EI and EA by `S` makes the row a wall of the
-same average stiffness, with no gap for the soil to move through between piles. That decides which analysis suits
-which member:
+exactly that, but a row of separate piles is not:
+
+![A continuous wall in section, with S = 1, beside a row of piles of diameter D at spacing S in plan, whose stiffnesses EA and EI per pile become EA/S and EI/S per unit width](images/pile_row_plane_strain.png){width=880}
+
+On the left, a wall in section, continuous out of plane, entered with `S` = 1. On the right, a row of piles in plan,
+of diameter `D` at spacing `S`. The FEM divides each pile's EA and EI by `S`, which makes the row a wall of the same
+average stiffness, with no gap for the soil to move through between piles. In the ground, the soil arches onto the
+piles and, at wide enough spacing, moves between them, and a two-dimensional analysis cannot represent either. That
+decides which analysis suits which member:
 
 | Member | Out of plane | Analysis | What it gives |
 |---|---|---|---|
 | Sheet-pile, diaphragm or secant wall | continuous | FEM, `S` = 1 | factor of safety, plus moment, shear, deflection and soil reaction down the member |
-| Contiguous or very closely spaced row | nearly continuous | FEM, noting that the row is spread into a continuous wall | the same, with the gaps unrepresented |
-| Discrete row at spacing | discrete | LEM with Ito & Matsui | factor of safety for the spacing, force per pile, capacity checks |
+| Contiguous or very closely spaced row | nearly continuous | FEM, which treats the row as a continuous wall | the same, with the gaps unrepresented |
+| Row of separate piles | discrete | LEM with Ito & Matsui | factor of safety for the spacing, force per pile, capacity checks |
 
 Take the factor of safety for a discrete pile row from the LEM with Ito & Matsui, and read the FEM's result for the
 row as a study of stiffness and member forces. The two analyses are compared on the same slopes, including the one

@@ -22,7 +22,7 @@ questions determine that force, and they are independent of one another:
 2. **In what direction does it act?** — governed by the **Dir** setting: tangent to the slip surface (flexible
    reinforcement) or along the reinforcement's own axis (rigid supports).
 3. **Is it factored by the safety factor?** — governed by the **Appl** setting: active (a known allowable force,
-   not divided by $F$) or passive (an ultimate capacity that mobilizes with the soil, divided by $F$).
+   not divided by $F$) or passive (a nominal (unfactored) capacity that mobilizes with the soil, divided by $F$).
 
 This decomposition follows the convention used by Slide2 and other commercial programs, which allows xslope
 results to be compared directly against them. The **Type** column in the input template is a *preset* over these
@@ -168,13 +168,13 @@ so the choice is set per line:
   to the driving side of the equilibrium equations and is **not** divided by $F$ — the factor of safety applies to
   the soil strength only. Appropriate for pre-tensioned supports (tiebacks) and whenever the entered capacity
   already carries its own safety factor.
-- **Passive** (Slide2's "Method B"): the force is an *ultimate* capacity that mobilizes together with the soil
+- **Passive** (Slide2's "Method B"): the force is a *nominal* (unfactored) capacity that mobilizes together with the soil
   strength. It is added to the resisting side and **is** divided by $F$. Appropriate when the support only develops
   force as the soil deforms (nails, geosynthetics in some formulations) and the entered capacity is unfactored.
 
 The distinction matters numerically: on the classic Duncan & Wright tieback example (their Fig. 6.34), the same
 9,000 lb/ft support gives FS = 1.51 active and FS = 1.32 passive. It also changes what you should enter in the
-$T_{max}$ column — an **allowable** force for active, an **ultimate** force for passive.
+$T_{max}$ column — an **allowable** force for active, a **nominal** (unfactored) force for passive.
 
 ## Support Type Presets
 

@@ -10,9 +10,8 @@ member beyond the slip surface grips the stable ground, and the member pulls bac
 
 ![Three kinds of reinforcement: geosynthetic layers in a fill, soil nails in a cut, tiebacks behind a wall](../fem/images/reinf_types.png){width=1000}
 
-From left to right: geogrid layers in the [FEM-2](../tutorials/fem02_reinforcement.md) reinforced fill, soil nails in a
-nailed cut (Pockoski & Duncan), and tiebacks behind a soldier-pile wall
-([LEM-9](../tutorials/lem09_tieback_wall.md)), each with the critical slip surface its source reports.
+From left to right: geosynthetic layers in a reinforced fill, soil nails in a cut, and tiebacks behind a wall,
+each with a slip surface they cross.
 
 In a limit equilibrium analysis each reinforcement line is a straight line defined by its end points, and wherever a
 trial slip surface crosses a line, a tensile force is applied to the sliding mass at the crossing point. Three

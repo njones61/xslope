@@ -22,6 +22,15 @@ the soil's nodes along the whole line and start at zero force in the finished ge
 sequence ([Initial state and EA selection](../fem/reinforcement.md#initial-state-and-ea-selection)); a bar carries
 force along its own length, so `Dir` and `Appl` have no effect there.
 
+`Appl` decides what the LEM's factor of safety F divides. With Appl Active the LEM does not divide the line's force
+by F, so every capacity entered is an allowable value, the nominal capacity divided by its own factor of safety:
+`Tmax`, the pullout entry (`Lp1` and `Lp2` from an allowable load transfer, or `Adhesion` and `Delta`) and `Tend1`
+and `Tend2`. With Appl Passive every capacity is nominal, and the LEM divides all of them by F together with the
+soil's strength. A design that applies different factors to different parts, such as GEC 7's 1.8 on a nail bar and
+2.0 on pullout (Table 5.1, p. 108), enters allowable values with Appl Active. The FEM's strength reduction divides
+the soil's strength only: a bonded line's capacities act as entered whatever `Appl` says, and a jointed line's
+interface strength is reduced with the soil unless `Jred` is `No`.
+
 XSLOPE does not enforce a unit system: every value is entered in one consistent set, such as kN and m or lb and
 ft. A continuous sheet is entered per unit width of slope, with `Spacing` blank. A discrete member (a nail, a
 tieback, a bar) is entered per member, with its out-of-plane spacing in `Spacing`; the program divides `Tmax`,
@@ -68,21 +77,20 @@ with the friction on both faces of the layer, and is capped at `Tmax`.
 
 | Column | Entry | Typical values |
 |---|---|---|
-| `Type` | `Geosynthetic`: Dir Tangent, Appl Active; set `Appl` to `Passive` to enter `Tal` as it stands | — |
+| `Type` | `Geosynthetic`: Dir Tangent, Appl Active; set `Appl` to `Passive` to enter the nominal values instead | — |
 | `Tmax` | Appl Active: the long-term allowable strength divided by the target factor of safety, `Tal` ÷ FS<sub>R</sub>. Appl Passive: `Tal`. | `Tal` = `Tult` ÷ RF, with RF the product of the creep, durability and installation-damage factors. In FHWA Example E1, `Tult` = 3,000, 6,000 and 9,000 lb/ft (43.8, 87.6 and 131.3 kN/m) gives `Tal` = 1,085, 2,169 and 3,525 lb/ft (15.8, 31.7 and 51.4 kN/m), with RF<sub>CR</sub> = 1.85, RF<sub>D</sub> = 1.15 and RF<sub>ID</sub> = 1.3, 1.3 and 1.2 (NHI-10-025 Table E1-7.3, p. E1-15). RF = 7 for preliminary design of routine structures in granular fill (p. 9-5). |
-| `Adhesion`, `Delta` | `Adhesion` = 0 and `Delta` = arctan(F\*α), with F\* the pullout resistance factor and α the scale-effect correction | F\* = 0.67 tan φ with α = 0.6, the most conservative defaults (NHI-10-025 p. E8-6); α = 0.6 to 0.8 for extensible reinforcement without pullout tests (p. B-2); F\* = 0.45 and α = 0.8 for the geogrids of Example E1 (p. E1-16); minimum embedment beyond the critical surface 3 ft (1 m) (p. 9-5) |
+| `Adhesion`, `Delta` | `Adhesion` = 0. Appl Active: `Delta` = arctan(F\*α ÷ FS<sub>PO</sub>), with FS<sub>PO</sub> the factor of safety against pullout (NHI-10-025 Eq. 9-9, p. 9-13). Appl Passive: `Delta` = arctan(F\*α). F\* is the pullout resistance factor and α the scale-effect correction. | F\* = 0.67 tan φ with α = 0.6, the most conservative defaults (NHI-10-025 p. E8-6); α = 0.6 to 0.8 for extensible reinforcement without pullout tests (p. B-2); F\* = 0.45 and α = 0.8 for the geogrids of Example E1 (p. E1-16); FS<sub>PO</sub> = 1.5 in granular soil and 2 in cohesive soil, and minimum embedment beyond the critical surface 3 ft (1 m) (p. 9-5) |
 | `Lp1`, `Lp2` | in place of `Adhesion` and `Delta`: the length over which friction develops `Tmax` at each end | — |
-| `Tend1` | the facing connection strength; 0 where the layer ends free at the face | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
+| `Tend1` | Appl Active: the long-term connection strength `Talc` divided by the factor of safety the design applies to the connection. Appl Passive: `Talc`. 0 where the layer ends free at the face. | see [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face) |
 | `Tend2` | 0 | — |
 | `Spacing` | blank | — |
 | `E`, `Area` (FEM) | `E` × `Area` = the sheet's tensile stiffness per unit width | see [Initial state and EA selection](../fem/reinforcement.md#initial-state-and-ea-selection) |
 | `Tres` (FEM) | blank | — |
 | `Joint` (FEM) | blank; `Yes` where the soil can slide along the sheet ([A sheet the soil slides along](#a-sheet-the-soil-slides-along)) | — |
 
-The two `Tmax` entries follow FHWA (NHI-10-025, pp. 8-7 and 8-8). Added to the resisting moment, the force is
-divided by the factor of safety with the soil's strength, so `Tal` is entered as it stands (Appl Passive).
-Subtracted from the driving moment, it is not, so `Tal` is first divided by the target factor of safety (Appl
-Active, which the `Geosynthetic` preset selects).
+The two `Tmax` entries are FHWA's two conventions (NHI-10-025, pp. 8-7 and 8-8): a program that adds the
+reinforcement force to the resisting moment takes `Tal` as it stands, and one that subtracts it from the driving
+moment takes `Tal` divided by the target factor of safety.
 
 The `Geosynthetic` preset's tangent direction is the one FHWA gives for continuous sheets (p. 8-6). In the FEM the
 fill is not placed in lifts, so the tension that construction puts into a layer is absent, and the soil cannot
@@ -109,22 +117,21 @@ At end 1 the capacity starts at the plate's `Tend1` and at end 2 at zero, and bo
 
 | Column | Entry | Typical values |
 |---|---|---|
-| `Type` | `Nail`: Dir Axial, Appl Passive | — |
-| `Tmax` | nominal tensile resistance of the bar per nail, `At` × `fy` (GEC 7 Eq. 6.5, p. 163) | solid threaded bars #6 to #14: area 0.44 to 2.25 in² (284 to 1,452 mm²); yield load 26 to 135 kip (116 to 601 kN) in Grade 60 and 33 to 168 kip (147 to 747 kN) in Grade 75 (GEC 7 Tables A.1a and A.1b, p. 286) |
-| `Lp1`, `Lp2` | `Tmax` ÷ `rPO` at both ends, with `rPO` = π × `qu` × `DDH` the nominal pullout resistance per unit length, from the bond strength `qu` and the drill-hole diameter `DDH` (GEC 7 Eq. 6.1, p. 161) | `rPO` = 2 to 20 kip/ft (30 to 290 kN/m) for small-diameter gravity-grouted holes, by soil type and density (GEC 7 Table 4.6, p. 86; GEC 4 Table 6, p. 71); `qu` = 3 to 70 psi (21 to 483 kPa) in soil, by soil type and drilling method (GEC 7 Tables 4.4a and 4.4b, pp. 84–85) |
+| `Type` | `Nail`: Dir Axial, Appl Passive, with the nominal values below; set `Appl` to `Active` to enter GEC 7's allowable values instead | — |
+| `Tmax` | nominal tensile resistance of the bar per nail, `At` × `fy` (GEC 7 Eq. 6.5, p. 163); with Appl Active, `At` × `fy` ÷ FS<sub>T</sub> | solid threaded bars #6 to #14: area 0.44 to 2.25 in² (284 to 1,452 mm²); yield load 26 to 135 kip (116 to 601 kN) in Grade 60 and 33 to 168 kip (147 to 747 kN) in Grade 75 (GEC 7 Tables A.1a and A.1b, p. 286); FS<sub>T</sub> = 1.8 for Grades 60 and 75 (Table 5.1, p. 108) |
+| `Lp1`, `Lp2` | `Tmax` ÷ `rPO` at both ends, with `rPO` = π × `qu` × `DDH` the nominal pullout resistance per unit length, from the bond strength `qu` and the drill-hole diameter `DDH` (GEC 7 Eq. 6.1, p. 161); with Appl Active, `Tmax` ÷ (`rPO` ÷ FS<sub>PO</sub>) | `rPO` = 2 to 20 kip/ft (30 to 290 kN/m) for small-diameter gravity-grouted holes, by soil type and density (GEC 7 Table 4.6, p. 86; GEC 4 Table 6, p. 71); `qu` = 3 to 70 psi (21 to 483 kPa) in soil, by soil type and drilling method (GEC 7 Tables 4.4a and 4.4b, pp. 84–85); FS<sub>PO</sub> = 2.0 (Table 5.1, p. 108) |
 | `Adhesion`, `Delta` | blank: GEC 7 states bond as a constant `qu` along the nail, so the development length applies; the `Adhesion` and `Delta` law is written for a sheet with soil on both faces | — |
-| `Tend1` | nail-head capacity: the smallest of the facing's resistances in flexure, in punching shear and in headed-stud tension (GEC 7 pp. 104–105) | nominal resistances: flexure 12 to 143 kip (53 to 636 kN) for the initial facing; punching shear 32 to 111 kip (142 to 494 kN) initial and 21 to 55 kip (93 to 245 kN) final; headed studs 28 to 146 kip (125 to 649 kN) (GEC 7 Tables 6.6 to 6.8, pp. 171–178); flexure and stud values for Grade 60 steel, × 1.24 for Grade 75 |
+| `Tend1` | nail-head capacity: the smallest of the facing's resistances in flexure, in punching shear and in headed-stud tension (GEC 7 pp. 104–105); with Appl Active, each resistance divided by its own factor before the smallest is taken | nominal resistances: flexure 12 to 143 kip (53 to 636 kN) for the initial facing; punching shear 32 to 111 kip (142 to 494 kN) initial and 21 to 55 kip (93 to 245 kN) final; headed studs 28 to 146 kip (125 to 649 kN) (GEC 7 Tables 6.6 to 6.8, pp. 171–178); flexure and stud values for Grade 60 steel, × 1.24 for Grade 75; factors of safety 1.5 for flexure and punching shear, 2.0 for A307 and 1.7 for A325 headed studs (Table 5.1, p. 108) |
 | `Tend2` | 0 | — |
 | `Spacing` | horizontal nail spacing | 4 to 6 ft (1.22 to 1.83 m), routinely 5 ft (1.52 m) (GEC 7 p. 148) |
 | `E` (FEM) | modulus of the steel bar | 29,000 ksi (GEC 7 p. 250): 4.176 × 10⁹ psf, or about 2.0 × 10⁸ kPa (200 GPa) |
 | `Area` (FEM) | bar area per nail | as for `Tmax` |
 | `Tres`, `Joint` (FEM) | blank | — |
 
-`Nail` sets `Appl` to Passive, so `Tmax`, the bond and the head capacity are nominal values, divided by the same
-factor of safety as the soil's strength. GEC 7 recommends separate minimums for allowable stress design (1.5 for
-overall stability, 2.0 for pullout, and 1.8 for Grade 60 and 75 bars in tension, Table 5.1, p. 108), and one
-factor does not reproduce them. The FEM has no facing member (see
-[A soil nail and a shotcrete facing](#a-soil-nail-and-a-shotcrete-facing)).
+The `Nail` preset enters nominal values. GEC 7's allowable stress design, in which programs such as SNAILZ use an
+allowable bond stress (p. 117), is entered with `Appl` set to Active and the allowable values in the table; F then
+applies to the soil alone, for which GEC 7 sets a minimum of 1.5 (Table 5.1, p. 108). The FEM has no facing member
+(see [A soil nail and a shotcrete facing](#a-soil-nail-and-a-shotcrete-facing)).
 
 [VP47](../verification/rocscience.md#vp47) enters this envelope: `Tmax` = 118 kN per nail, `Tend1` = 86 kN,
 `Lp1` = `Lp2` = 118 ÷ 15 = 7.87 m from a bond of 15 kN per meter, and `Spacing` = 1.5 m. The 4.9 m nails are
@@ -150,7 +157,7 @@ the bond governs, as drawn, `Lp2` is the bond length.
 | Column | Entry | Typical values |
 |---|---|---|
 | `Type` | `Tieback`: Dir Axial, Appl Active | — |
-| `Tmax` | allowable anchor load per anchor: the smallest of the tendon's design load, the capacity of the head's connection to the wall, and the bond length times the allowable load transfer per unit length | design load at most 0.6 × the tendon's specified minimum tensile strength (GEC 4 p. 77); design loads of 260 to 1,160 kN (58.5 to 260.8 kip) are typical (p. 70) |
+| `Tmax` | allowable anchor load per anchor: the smallest of the tendon's design load, the allowable capacity of the head's connection to the wall, and the bond length times the allowable load transfer per unit length | design load at most 0.6 × the tendon's specified minimum tensile strength (GEC 4 p. 77); design loads of 260 to 1,160 kN (58.5 to 260.8 kip) are typical (p. 70) |
 | `Lp1` | 0: the head holds the full `Tmax`, and the sleeved unbonded length adds no friction | — |
 | `Lp2` | `Tmax` ÷ the allowable load transfer per unit length, which is the ultimate load transfer ÷ 2.0 in soil or ÷ 3.0 in rock (GEC 4 pp. 71, 74): the bond length where the bond governs, shorter where the tendon or the head governs. A 580 kN anchor in medium dense sand (145 kN/m ultimate, 72.5 kN/m allowable) has `Lp2` = 580 ÷ 72.5 = 8.0 m. | ultimate load transfer of small-diameter gravity-grouted anchors: 30 to 290 kN/m (2 to 20 kip/ft) in soil (GEC 4 Table 6, p. 71; GEC 7 Table 4.6, p. 86) and 150 to 730 kN/m (10.3 to 50.0 kip/ft) in rock (GEC 4 Table 8, p. 74); bond lengths 4.5 to 12 m (14.8 to 39.4 ft) in soil and 3 to 10 m (9.8 to 32.8 ft) in rock (pp. 71, 74) |
 | `Tend1`, `Tend2`, `Adhesion`, `Delta` | blank: with `Lp1` = 0 the program does not read `Tend1`; for `Adhesion` and `Delta`, see grouted tiebacks under [Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden) | — |
@@ -203,8 +210,8 @@ With `Lp1` = `Lp2` = 0 the bar delivers `Tmax` wherever a slip surface crosses i
 
 With both development lengths 0 the envelope does not read `Tend1` or `Tend2`: the shaft develops no friction
 between its anchorages, and their capacities enter through `Tmax`. A bar whose shaft also grips the soil is
-entered with the anchorage capacities in `Tend1` and `Tend2` and the development lengths of that friction in `Lp1`
-and `Lp2` ([Capacity Envelope](../lem/reinforcement.md#capacity-envelope)). In the FEM the shaft grips the soil
+entered with the allowable anchorage capacities in `Tend1` and `Tend2` and the development lengths of the
+allowable friction in `Lp1` and `Lp2` ([Capacity Envelope](../lem/reinforcement.md#capacity-envelope)). In the FEM the shaft grips the soil
 along its whole length, and no plate or deadman is built into the mesh.
 
 No tutorial or verification model has an end-anchored bar.

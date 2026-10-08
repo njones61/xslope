@@ -11,9 +11,8 @@ the stable ground beyond it:
 
 ![Three kinds of reinforcement: geosynthetic layers in a fill, soil nails in a cut, tiebacks behind a wall](images/reinf_types.png){width=1000}
 
-From left to right: geogrid layers in the [FEM-2](../tutorials/fem02_reinforcement.md) reinforced fill, soil nails in a
-nailed cut (Pockoski & Duncan, 2000), and tiebacks behind a soldier-pile wall
-([LEM-9](../tutorials/lem09_tieback_wall.md)), each with the critical slip surface its source reports.
+From left to right: geosynthetic layers in a reinforced fill, soil nails in a cut, and tiebacks behind a wall,
+each with a slip surface they cross.
 
 Geotextiles, geogrids, soil nails and ground anchors are modeled as one-dimensional truss (bar) elements embedded in
 the soil mesh. A bar has axial stiffness $EA/L$ — $E$ the reinforcement's modulus, $A$ its cross-sectional area per
@@ -470,7 +469,3 @@ Two stronger signals come out of a bonded run itself, and a strength reduction r
 shear strain band at the critical factor running **along** a sheet rather than across it, and **every bar element
 on one sheet at its capacity**. In the second case the sheet is held only by its capacity cap, and the factor of
 safety changes as the mesh along the sheet is refined instead of converging.
-
-## References
-
-Pockoski, M., & Duncan, J. M. (2000). *Comparison of Computer Programs for Analysis of Reinforced Slopes*. Center for Geotechnical Practice and Research (CGPR), Virginia Tech, Blacksburg, VA.

@@ -3108,7 +3108,7 @@
      "offset": 173845
     }
    ],
-   "title": "Soil Reinforcement",
+   "title": "Reinforcement in FEM",
    "url": "fem/reinforcement/"
   },
   {
@@ -4487,7 +4487,7 @@
      "offset": 464703
     }
    ],
-   "title": "Soil Reinforcement",
+   "title": "Reinforcement in LEM",
    "url": "lem/reinforcement/"
   },
   {

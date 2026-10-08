@@ -32,7 +32,9 @@ the friction on both faces of the layer and is capped at `Tmax`.
 
 | Column | Entry | Typical values |
 |---|---|---|
-| <code class="rc rc-lem">Type</code> | `Geosynthetic`: Dir Tangent, Appl Active; set `Appl` to `Passive` to enter the nominal values instead | — |
+| <code class="rc rc-lem">Type</code> | `Geosynthetic` | — |
+| <code class="rc rc-lem">Dir</code> | `Tangent`, set automatically by `Type`: the force acts tangent to the slip surface where it crosses the layer | — |
+| <code class="rc rc-lem">Appl</code> | `Active`, set automatically by `Type`: enter allowable capacities, which the LEM does not divide by F. To enter nominal capacities instead, change it to `Passive`. | — |
 | <code class="rc rc-both">Tmax</code> | Appl Active: the nominal long-term strength `Tal` divided by the target factor of safety, `Tal` ÷ FS<sub>R</sub>. Appl Passive: `Tal`. | `Tal` = `Tult` ÷ RF, with `Tult` the ultimate tensile strength and RF the product of the creep, durability and installation-damage factors. In FHWA Example E1, `Tult` = 3,000, 6,000 and 9,000 lb/ft (43.8, 87.6 and 131.3 kN/m) gives `Tal` = 1,085, 2,169 and 3,525 lb/ft (15.8, 31.7 and 51.4 kN/m), with RF<sub>CR</sub> = 1.85, RF<sub>D</sub> = 1.15 and RF<sub>ID</sub> = 1.3, 1.3 and 1.2 (GEC 11 Table E1-7.3, p. E1-15). RF = 7 for preliminary design of routine structures in granular fill (p. 9-5). |
 | <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | `Adhesion` = 0. Appl Active: `Delta` = arctan(F\*α ÷ FS<sub>PO</sub>), with FS<sub>PO</sub> the factor of safety against pullout (GEC 11 Eq. 9-9, p. 9-13). Appl Passive: `Delta` = arctan(F\*α). F\* is the pullout resistance factor and α the scale-effect correction. | F\* = 0.67 tan φ with α = 0.6, the most conservative defaults (GEC 11 p. E8-6); α = 0.6 to 0.8 for extensible reinforcement without pullout tests (p. B-2); F\* = 0.45 and α = 0.8 for the geogrids of Example E1 (p. E1-16); FS<sub>PO</sub> = 1.5 in granular soil and 2 in cohesive soil, and minimum embedment beyond the critical surface 3 ft (1 m) (p. 9-5) |
 | <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | in place of `Adhesion` and `Delta`: `Tmax` ÷ the pullout resistance per unit length at each end; with Appl Active, the allowable pullout resistance (÷ FS<sub>PO</sub>) | — |
@@ -75,7 +77,9 @@ At end 1 the capacity starts at the head's `Tend1` and at end 2 at zero, and bon
 
 | Column | Entry | Typical values |
 |---|---|---|
-| <code class="rc rc-lem">Type</code> | `Nail`: Dir Axial, Appl Passive, with the nominal values below; set `Appl` to `Active` to enter GEC 7's allowable values instead | — |
+| <code class="rc rc-lem">Type</code> | `Nail` | — |
+| <code class="rc rc-lem">Dir</code> | `Axial`, set automatically by `Type`: the force acts along the nail | — |
+| <code class="rc rc-lem">Appl</code> | `Passive`, set automatically by `Type`: enter nominal capacities, which the LEM divides by F. To enter GEC 7's allowable capacities instead, change it to `Active`. | — |
 | <code class="rc rc-both">Tmax</code> | nominal tensile resistance of the bar per nail, `At` × `fy`, the bar's cross-sectional area times its yield strength (GEC 7 Eq. 6.5, p. 163); with Appl Active, `At` × `fy` ÷ FS<sub>T</sub>, the factor of safety on bar tension | solid threaded bars #6 to #14: area 0.44 to 2.25 in² (284 to 1,452 mm²); yield load 26 to 135 kip (116 to 601 kN) in Grade 60 and 33 to 168 kip (147 to 747 kN) in Grade 75 (GEC 7 Tables A.1a and A.1b, p. 286); FS<sub>T</sub> = 1.8 for Grades 60 and 75 (Table 5.1, p. 108) |
 | <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | `Tmax` ÷ `rPO` at both ends, with `rPO` = π × `qu` × `DDH` the nominal pullout resistance per unit length, from the bond strength `qu` and the drill-hole diameter `DDH` (GEC 7 Eq. 6.1, p. 161); with Appl Active, `Tmax` ÷ (`rPO` ÷ FS<sub>PO</sub>) | `rPO` = 2 to 20 kip/ft (30 to 290 kN/m) for small-diameter gravity-grouted holes, by soil type and density (GEC 7 Table 4.6, p. 86; GEC 4 Table 6, p. 71); `qu` = 3 to 70 psi (21 to 483 kPa) in soil, by soil type and drilling method (GEC 7 Tables 4.4a and 4.4b, pp. 84–85); FS<sub>PO</sub> = 2.0 (Table 5.1, p. 108) |
 | <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | blank: GEC 7 states bond as a constant `qu` along the nail, so the development length applies; the `Adhesion` and `Delta` law is written for a sheet with soil on both faces | — |
@@ -116,7 +120,9 @@ the bond governs, as in the figure, `Lp2` is the bond length.
 
 | Column | Entry | Typical values |
 |---|---|---|
-| <code class="rc rc-lem">Type</code> | `Tieback`: Dir Axial, Appl Active | — |
+| <code class="rc rc-lem">Type</code> | `Tieback` | — |
+| <code class="rc rc-lem">Dir</code> | `Axial`, set automatically by `Type`: the force acts along the tendon | — |
+| <code class="rc rc-lem">Appl</code> | `Active`, set automatically by `Type`: enter allowable capacities, which the LEM does not divide by F | — |
 | <code class="rc rc-both">Tmax</code> | allowable anchor load per anchor: the smallest of the tendon's design load, the allowable capacity of the head's connection to the wall, and the bond length times the allowable load transfer per unit length | design load at most 0.6 × the tendon's specified minimum tensile strength (GEC 4 p. 77); design loads of 260 to 1,160 kN (58.5 to 260.8 kip) are typical (p. 70) |
 | <code class="rc rc-both">Lp1</code> | 0: the head holds the full `Tmax`, and the sleeved unbonded length adds no friction | — |
 | <code class="rc rc-both">Lp2</code> | `Tmax` ÷ the allowable load transfer per unit length, which is the ultimate load transfer ÷ 2.0 in soil or ÷ 3.0 in rock (GEC 4 pp. 71, 74): the bond length where the bond governs, shorter where the tendon or the head governs. A 580 kN anchor in medium dense sand (145 kN/m ultimate, 72.5 kN/m allowable) has `Lp2` = 580 ÷ 72.5 = 8.0 m. | ultimate load transfer of small-diameter gravity-grouted anchors: 30 to 290 kN/m (2 to 20 kip/ft) in soil (GEC 4 Table 6, p. 71; GEC 7 Table 4.6, p. 86) and 150 to 730 kN/m (10.3 to 50.0 kip/ft) in rock (GEC 4 Table 8, p. 74); bond lengths 4.5 to 12 m (14.8 to 39.4 ft) in soil and 3 to 10 m (9.8 to 32.8 ft) in rock (pp. 71, 74) |
@@ -164,7 +170,9 @@ The bar then delivers `Tmax` wherever a slip surface crosses it between its anch
 
 | Column | Entry | Typical values |
 |---|---|---|
-| <code class="rc rc-lem">Type</code> | `Anchor`: Dir Axial, Appl Active | — |
+| <code class="rc rc-lem">Type</code> | `Anchor` | — |
+| <code class="rc rc-lem">Dir</code> | `Axial`, set automatically by `Type`: the force acts along the bar | — |
+| <code class="rc rc-lem">Appl</code> | `Active`, set automatically by `Type`: enter allowable capacities, which the LEM does not divide by F | — |
 | <code class="rc rc-both">Tmax</code> | the smallest of the bar's allowable tension and the allowable capacities of its two anchorages | bar sizes and strengths as for a nail or a tieback bar (GEC 7 Tables A.1a and A.1b, p. 286; GEC 4 Table 9, p. 77). The tabulated strengths are nominal; divide by the factor of safety the design uses for the bar (GEC 7 uses 1.8 for Grade 60 and 75 nail bars, Table 5.1, p. 108). |
 | <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | 0 | — |
 | <code class="rc rc-both">Tend1</code>, <code class="rc rc-both">Tend2</code>, <code class="rc rc-both">Adhesion</code>, <code class="rc rc-both">Delta</code> | blank | — |

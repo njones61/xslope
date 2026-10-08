@@ -628,6 +628,6 @@
   "unit_system": "si",
   "converged": true,
   "iterations": 320,
-  "residual": 0.001631755718178339,
-  "max_displacement": 0.19325235259486992
+  "residual": 0.0016669677479365442,
+  "max_displacement": 0.19324156427065634
 }

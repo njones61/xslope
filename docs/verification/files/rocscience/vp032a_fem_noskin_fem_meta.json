@@ -601,7 +601,7 @@
   "F_max": 2.0,
   "unit_system": "si",
   "converged": true,
-  "iterations": 11115,
-  "residual": 7.14985256243723e-07,
-  "max_displacement": 0.060687376622556126
+  "iterations": 9994,
+  "residual": 6.847896930419088e-07,
+  "max_displacement": 0.058799141868196424
 }

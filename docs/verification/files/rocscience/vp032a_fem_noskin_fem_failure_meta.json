@@ -1,12 +1,12 @@
 {
   "F": 0.81640625,
   "converged": true,
-  "iterations": 11115,
-  "max_displacement": 0.060687376622556126,
+  "iterations": 9994,
+  "max_displacement": 0.058799141868196424,
   "algorithm": "Griffiths & Lane (1999) Viscoplastic",
-  "residual": 7.14985256243723e-07,
-  "unbalanced_force_ratio": 0.0009870729180367205,
-  "plastic_fraction": 0.0005841121495327102,
+  "residual": 6.847896930419088e-07,
+  "unbalanced_force_ratio": 0.000997104221153872,
+  "plastic_fraction": 0.0005875440658049354,
   "capture_truncated_max_u": null,
   "capture_failed": true,
   "capture_failed_reason": "the at-failure capture returned a field that is not a number"

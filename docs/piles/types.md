@@ -270,9 +270,6 @@ mass. The load adds to the driving force, so include it. Apply it as a surcharge
 surface, one at each edge of the footing, with Direction set to `vertical`
 ([Worksheet: dloads](../usage/input_template.md#worksheet-dloads)).
 
-The surcharge puts all of the load at the ground surface. In reality, skin friction spreads it down the pile. The
-surcharge is therefore slightly conservative, but the difference is usually small and is accepted in practice.
-
 Use either analysis. Both read the `dloads` sheet. In the FEM, do not enter the pile on the `piles` sheet, since the
 FEM would spread the row of piles into a continuous wall
 ([Continuous Walls and Discrete Pile Rows](fem.md#applicability-continuous-walls-and-discrete-pile-rows)).

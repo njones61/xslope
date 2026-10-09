@@ -5,7 +5,7 @@ pile line is entered, are on the [Piles and Walls Overview](overview.md), and wh
 values, on [Pile and Wall Types](types.md). In a limit equilibrium analysis the pile is one force on the sliding
 mass, at the point where a trial slip surface crosses it:
 
-![A row of piles through a sliding mass, each pushing back on it with a force H where the failure surface crosses the pile](../lem/images/pile_diagram.png){width=1000px}
+![A row of piles through a sliding mass, each pushing back on it with a force H where the failure surface crosses the pile](../lem/images/pile_diagram.png){width=598}
 
 Each pile pushes back on the sliding mass with a force $H$ at the point where the failure surface crosses it,
 against the direction the mass moves.

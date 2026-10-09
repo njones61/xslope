@@ -9366,6 +9366,33 @@ def run_beam_element_test(test):
     return 0.0, None
 
 
+def run_elastic_base_test(test):
+    """A slip surface riding along the underside of an elastic zone.
+
+    A wall drawn as an elastic polygon sits on its foundation, so a surface along
+    its base finds the wall as each slice's deepest layer. The slice must bind
+    the foundation's strength, and a circular search that grazes the wall must
+    score the circle rather than stop.
+
+    The check itself lives in test/elastic_base_check.py, on Tutorial FEM-3's
+    block wall.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'elastic_base_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('elastic_base_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_pile_capacity_test(test):
     """A pile's shear and moment capacities, ENFORCED rather than reported.
 
@@ -15448,6 +15475,8 @@ def _dispatch_test(test):
         return run_nr_ssrm_test(test)
     if test_type == 'beam_element':
         return run_beam_element_test(test)
+    if test_type == 'elastic_base':
+        return run_elastic_base_test(test)
     if test_type == 'pile_capacity':
         return run_pile_capacity_test(test)
     if test_type == 'one_d_compatibility':
@@ -15642,7 +15671,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -16362,6 +16391,8 @@ def main():
         # assembles only the beam matrices build_fem_data returns).
         tests.append({'type': 'beam_element', 'file': 'pile beam element vs beam theory',
                       'method': '-', 'source': 'beam_element'})
+        tests.append({'type': 'elastic_base', 'file': 'surface along the underside of an elastic wall',
+                      'method': '-', 'source': 'elastic_base'})
         # Guard that a pile's structural capacities are enforced by the
         # equilibrium and not merely reported: the moment capacity as a plastic
         # hinge whose moment diagram the equilibrium bounds (a correction at the

@@ -1420,6 +1420,17 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 f"Failure surface crosses elastic (impenetrable) material "
                 f"'{_elastic_name}'. An elastic zone cannot fail; keep the surface "
                 f"above it (it may run along its boundary).")
+    # The elastic materials, and how far a base may sit from an elastic zone's
+    # boundary while riding along it (twice the crossing check's tolerance), for
+    # the base-material rule in the slice loop.
+    elastic_idx = {k for k, m in enumerate(materials)
+                   if str(m.get('option', '')).strip().lower() == 'elastic'}
+    _dom = slope_data.get('domain_polygon')
+    if _dom is not None:
+        _bx0, _by0, _bx1, _by1 = _dom.bounds
+        elastic_tol = 2.0 * max(1e-6, 1e-4 * max(_bx1 - _bx0, _by1 - _by0))
+    else:
+        elastic_tol = 2e-6
 
     # Determine if the failure surface is right-facing. Byte-identical to the
     # historical `y_left > y_right` for a normal slope; the surface-asymmetry
@@ -1879,6 +1890,25 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 if overlap_bot < base_overlap_bot:
                     base_overlap_bot = overlap_bot
                     base_material_idx = mat_index
+
+        # A base running along the UNDERSIDE of an elastic (impenetrable) zone --
+        # a wall on its foundation, which the crossing check allows the surface to
+        # ride along -- finds that zone as its deepest present layer. The zone
+        # cannot fail, so the slip is in the material it sits on: bind the
+        # strength of the layer whose top is at the base.
+        if base_material_idx is not None and base_material_idx in elastic_idx:
+            best_top = -float('inf')
+            for p_idx, pe in enumerate(poly_edges):
+                mat_id = pe['mat_id']
+                mi = (mat_id if mat_id is not None and 0 <= mat_id < len(materials)
+                      else pe['poly_index'])
+                if mi in elastic_idx or not poly_inrange[p_idx][i]:
+                    continue
+                pt = poly_top_all[p_idx][i]
+                if np.isnan(pt) or abs(pt - y_cb) > elastic_tol or pt <= best_top:
+                    continue
+                best_top = pt
+                base_material_idx = mi
 
         # Center of gravity
         y_cg = (sum_gam_h_y) / sum_gam_h if sum_gam_h > 0 else None
@@ -2471,6 +2501,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 phi = degrees(atan(slope0))
                 c1 = 0; phi1 = 0; d = 0; psi = 0
                 pow_flag = True
+            elif base_material_idx in elastic_idx:
+                # Riding an elastic zone with no material beneath it: no strength
+                # to bind, so reject the trial as the crossing check would.
+                return False, (
+                    f"Failure surface runs along elastic (impenetrable) material "
+                    f"'{materials[base_material_idx]['name']}' with no material "
+                    f"beneath it.")
             elif mat_option not in ('mc', 'cp'):
                 # Was silently treated as 'cp'. A blank option is legal on seep-only
                 # material rows, but not on one a failure surface passes through.

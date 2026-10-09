@@ -248,43 +248,40 @@ A load-bearing pile carries a vertical load from a structure, such as a footing,
 load to the soil by skin friction along its shaft and by end bearing at its tip. For slope stability, the question is
 whether that load adds to the driving force on the failure surface.
 
-**Use either analysis.** Apply the structural load as a surcharge on the `dloads` sheet, or leave it out, as Case 1
-and Case 2 below describe. Both analyses read the `dloads` sheet. In the FEM, leave the piles out of the mesh. The FEM
-would spread a row of separate piles into a continuous wall
-([Continuous Walls and Discrete Pile Rows](fem.md#applicability-continuous-walls-and-discrete-pile-rows)).
-
-A pile whose tip is below the failure surface also crosses it and resists the slide. Leaving that resistance out
-is conservative. To count it, use the LEM and enter the pile on the `piles` sheet, with `S` = *s* and `D` the pile
-diameter, as for any row of separate piles ([Piles and Walls](overview.md#lem-vs-fem)). Ito & Matsui's method
-applies for `S`/`D` between 2 and 8. Above 8, it overestimates the force, so enter `H` from a lateral analysis of
-the pile.
+**Use either analysis.** To count the resistance of a pile that crosses the failure surface, use the LEM.
 
 ![A footing on a slope's crest on a pile, twice: in Case 1 the pile's tip is above the failure surface, in Case 2 the pile crosses it and its tip is in stable ground; in plan, footings of width B along the crest at spacing s](images/pw_load_bearing.png){width=871}
 
 In plan, the footings stand along the crest (the line with ticks pointing down the slope) at center-to-center
 spacing *s*. Each is *B* wide across the crest, with its pile dashed below it.
 
+Which case applies depends on the critical failure surface, which is not known before the run. If the critical
+surface passes on the other side of the pile tip from the one assumed, switch to the other case and run again.
+
 ### Case 1: Pile tip above the failure surface
 
 If the pile ends inside the sliding mass, as a friction pile in weak soil can, the pile and its load slide with the
-mass. The load adds to the driving force, so include it. Apply it as a surcharge on the `dloads` sheet. Each footing
-is *B* wide across the crest, carries a force *P*, and is spaced *s* from the next. The surcharge is
-*P* ÷ (*B* × *s*). Enter it in the `Normal` column at two points on the ground surface, one at each edge of the
-footing, with Direction set to `vertical` ([Worksheet: dloads](../usage/input_template.md#worksheet-dloads)).
+mass. The load adds to the driving force, so include it. Apply it as a surcharge on the `dloads` sheet. For a force
+*P* on each footing, the surcharge is *P* ÷ (*B* × *s*). Enter it in the `Normal` column at two points on the ground
+surface, one at each edge of the footing, with Direction set to `vertical`
+([Worksheet: dloads](../usage/input_template.md#worksheet-dloads)).
 
 The surcharge puts all of the load at the ground surface. In reality, skin friction spreads it down the pile. The
 surcharge is therefore slightly conservative, but the difference is usually small and is accepted in practice.
+
+Use either analysis. Both read the `dloads` sheet. In the FEM, do not enter the pile on the `piles` sheet, since the
+FEM would spread the row of piles into a continuous wall
+([Continuous Walls and Discrete Pile Rows](fem.md#applicability-continuous-walls-and-discrete-pile-rows)).
 
 ### Case 2: Pile tip below the failure surface
 
 A load-bearing pile near a slope is usually designed to reach stable ground below the failure surface. To get there,
 it passes through the sliding mass. Skin friction develops along the whole shaft, above and below the failure
-surface. The load carried by skin friction above the failure surface adds to the sliding mass. The rest, carried
+surface. The load carried by skin friction above the failure surface adds to the driving force. The rest, carried
 by skin friction below the failure surface and by end bearing, goes to stable ground.
 
 Finding this split takes a load-transfer analysis, such as one with t-z curves. That is rarely done for slope
-stability, because the extra effort is not justified. Instead, two assumptions bracket the load: leave it out, or
-apply all of it.
+stability. Instead, two assumptions bracket the load: leave it out, or apply all of it.
 
 #### Leave the load out
 
@@ -309,13 +306,22 @@ mass, so it is conservative. It suits these cases:
 - The structural load is large compared with the driving force of the soil, so leaving it out would noticeably
   change the factor of safety.
 
-When in doubt, run both.
+When in doubt, run both. Use either analysis. In the FEM, do not enter the pile on the `piles` sheet, as in Case 1.
+
+#### The pile's resistance to sliding
+
+The pile crosses the failure surface, so it also resists the slide. Leaving that resistance out is conservative. To
+count it, use the LEM and enter the pile on the `piles` sheet, with `D` the pile diameter and `S` = *s* for one pile
+per footing, as for any row of separate piles ([Piles and Walls](overview.md#lem-vs-fem)). Enter `Vcap` and `Mcap`
+for the pile, so that `H` is limited to what the pile can carry. Ito & Matsui's method applies for `S`/`D` between
+2 and 8. Above 8, it overestimates the force, so enter `H` from a lateral analysis of the pile. Do not count it in
+the FEM, which would spread the row into a continuous wall.
 
 ### Summary
 
 1. If the pile tip is above the failure surface, apply the structural load as a surcharge on the `dloads` sheet.
-2. If the pile tip is below the failure surface, leave the load out. When in doubt, also run with the full
-   surcharge to bracket the result.
+2. If the pile tip is below the failure surface, leave the load out or apply all of it, as the lists above describe.
+   When in doubt, run both.
 3. To count the pile's resistance to sliding, enter the pile on the `piles` sheet and use the LEM.
 
 ## Connecting Reinforcement to a Wall or Facing
@@ -402,12 +408,36 @@ about four elements across it ([A Size on one zone](../fem/mesh.md#a-size-on-one
 
 ### A geosynthetic and facing blocks, panels or a wrapped face
 
-A geosynthetic layer connected to facing blocks or panels starts at the back of the facing, at its end 1. The
-figure shows one layer connected to a block facing.
+Use the FEM for a block facing ([Segmental Block Wall](#segmental-block-wall)). Use either analysis for a wrapped
+face.
+
+Enter each layer with end 1 at the back of the facing and end 2 in the fill. `Tend1` is the capacity of the
+connection. The figure shows one layer connected to a block facing.
 
 ![A geosynthetic layer running from the back of a block facing, end 1, into the fill, end 2](../usage/images/mr_connect_geosynthetic_facing.png){width=455}
 
-`Tend1` sets the capacity of the connection at end 1. End 2 is in the fill.
+A wrapped face has no facing unit. The sheet is folded back over the face and buried under the next lift. Enter each
+layer with end 1 at the face, and set `Tend1` to the pullout resistance of the folded-back part.
+
+#### In the LEM
+
+For a wrapped face, `Tend1` sets the layer's capacity at end 1, where its capacity envelope starts
+([Capacity Envelope](../reinforcement/lem.md#capacity-envelope)).
+
+#### In the FEM
+
+Draw a block facing as described under [Segmental Block Wall](#segmental-block-wall): one polygon per course, with
+joint lines under the base, up the back face and between the courses. A bonded line cannot end on a joint line, so
+set `Joint` to `Yes` on each layer that ends on the back face. `Tend1` then ties end 1 to the blocks, up to that
+capacity ([Ends, ties and the bar](../reinforcement/fem.md#ends-ties-and-the-bar)). In
+[Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md#part-2-the-same-wall-with-geogrid), each of the three layers
+is tied to the blocks with `Tend1` = 40 kN/m (2,740 lb/ft).
+
+A wrapped face has no blocks and needs no joint lines. Run it twice, once with the layers bonded and once with them
+jointed ([Choosing a Bonded Bar or a Joint](../reinforcement/fem.md#bonded-bar-or-joint)). For a jointed layer,
+`Tend1` ties end 1 to the soil at the face.
+
+#### Connection strength
 
 FHWA bases the connection's long-term strength, per unit width of the layer, on connection tests of the facing
 unit with the geosynthetic:
@@ -423,15 +453,9 @@ GG-II, with long-term strengths T<sub>al</sub> ([Geosynthetic Layer](../reinforc
 of 1,085 and 2,169 lb/ft (15.8 and 31.7 kN/m) (Table E1-7.3, p. E1-15). On eight of the wall's eleven layers, the
 connection is weaker than the layer and limits the force at the face.
 
-In the LEM, and for a bonded layer in the FEM, `Tend1` only sets the layer's capacity at end 1
-([Capacity Envelope](../reinforcement/lem.md#capacity-envelope)). For a jointed layer in the FEM, `Tend1` also ties
-end 1 to the facing, up to that capacity ([Ends, ties and the bar](../reinforcement/fem.md#ends-ties-and-the-bar)).
-In the block wall of [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md#part-2-the-same-wall-with-geogrid),
-the back face of the facing is a line on the `joints` sheet, and a bonded line cannot end on a joint line, so all
-three layers are jointed, each tied to the blocks with `Tend1` = 40 kN/m. A wrapped face has no facing unit: the
-sheet is folded back over the face and buried under the next lift
-([When a Model Needs a Joint](../fem/joints.md#when-a-model-needs-a-joint)). Its line starts at the face, and
-`Tend1` is the pullout resistance of the folded-back part.
+Enter T<sub>alc</sub> as `Tend1`. With `Appl` set to Active, first divide it by the factor of safety the design
+applies to the connection. With `Appl` set to Passive, enter it as it is
+([Geosynthetic Layer](../reinforcement/types.md#geosynthetic-layer)).
 
 ## References
 

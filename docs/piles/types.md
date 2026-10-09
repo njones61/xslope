@@ -288,8 +288,7 @@ stability. Instead, two assumptions bracket the load: leave it out, or apply all
 #### Leave the load out
 
 Assume the pile delivers all of its load to stable ground below the failure surface, and leave the load out of the
-model. The FHWA and the American Association of State Highway and Transportation Officials (AASHTO) recommend this
-approach. It is also the approach used with commercial programs such as SLOPE/W and Slide2. It suits these cases:
+model. It suits these cases:
 
 - The pile is an end-bearing pile in competent material, such as rock or dense sand. Most of the load reaches the
   tip.

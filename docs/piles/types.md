@@ -23,91 +23,91 @@ inches or millimeters (ksi, in², in⁴, mm²) is also given in model units, bui
 
 ## A Row of Stabilizing Piles or Drilled Shafts
 
-A row of drilled shafts, or piers, is installed through the sliding mass and into stable ground below it, at a
-spacing that lets the soil arch between them; the shafts act as shear dowels across the slip surface
-([GEC 10][gec10] p. 12-59). A discrete row is analyzed with the LEM and the Ito & Matsui force
-([LEM vs FEM](overview.md#lem-vs-fem)). The figure shows one shaft of a row in section, and the row in plan.
+A row of drilled shafts, or piers, is installed through the sliding mass into stable ground, at a spacing close
+enough for the soil to arch between them. The shafts act as shear dowels across the slip surface
+([GEC 10][gec10] p. 12-59). Analyze a row of separate shafts with the LEM, with `H` from Ito & Matsui's method
+([LEM vs FEM](overview.md#lem-vs-fem)). The figure shows one shaft in section and the row in plan.
 
 ![In section, a drilled shaft through a slope, from its head at the ground surface, across the slip surface, to its tip in stable ground, with the force H at the crossing; in plan, a row of shafts of diameter D at spacing S](images/pw_shaft.png){width=842}
 
-In section, the pile line runs from the head to the tip, and where a trial slip surface crosses the shaft, the LEM
-applies `H`, pointing into the slope, against the movement of the sliding mass. In plan, the shafts of diameter `D`
-stand in a row across the slope at spacing `S`, center to center, and the sliding mass moves past them.
+In section, the pile line runs from the head to the tip. Where a trial slip surface crosses the shaft, the LEM
+applies `H` into the slope, against the movement of the sliding mass. In plan, shafts of diameter `D` stand in a row
+across the slope at center-to-center spacing `S`, and the sliding mass moves past them.
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Entry | Typical values |
 |---|---|---|
-| <code class="rc rc-lem">H</code> | Blank: Ito & Matsui computes it from `D` and `S` for each trial surface (vertical piles only).<br>Otherwise the force per unit width from a lateral analysis of the pile, the force on one pile ÷ `S`. [GEC 10][gec10] sizes a row for the smaller of the passive force on the shafts and the force the slope needs to reach its target factor of safety (p. 12-58). | None given in the sources. |
-| <code class="rc rc-lem">Appl</code> | `Active`: `H` is not divided by F, as in [Tutorial LEM-12](../tutorials/lem12_piles.md). | — |
-| <code class="rc rc-both">D</code> | shaft diameter | Drilled-shaft casing and tools come in 6 in (152 mm), or 0.5 ft (0.152 m), steps ([GEC 10][gec10] p. 4-11); GEC 10's wall example uses 4 ft (1.22 m) shafts (pp. 12-14, 12-15). |
-| <code class="rc rc-both">S</code> | center-to-center spacing along the row | 3 diameters is routine practice for groups of shafts, 2.5 sometimes advantageous ([GEC 10][gec10] p. 14-2). |
-| <code class="rc rc-both">Vcap</code> | shear capacity of one shaft; blank for no limit | [GEC 10][gec10] gives the design method, not typical values. |
-| <code class="rc rc-both">Mcap</code> | nominal moment capacity of one shaft | About 27 D³ kip-ft with 1 percent longitudinal steel and 40 D³ with 1.5 percent, D in ft ([GEC 10][gec10] p. 12-14): 1,290 D³ and 1,915 D³ kN·m with D in m. For D = 4 ft (1.22 m), 1.73 × 10⁶ to 2.56 × 10⁶ lb-ft (2,340 to 3,470 kN·m). Longitudinal steel is typically 1 to 2 percent of the gross area (pp. 16-4, 16-5). |
-| <code class="rc rc-fem">E</code> | modulus of the concrete | E<sub>c</sub> = 1,820 √f′<sub>c</sub> ksi, with f′<sub>c</sub> the concrete's compressive strength in ksi, generally 3.5 to 5.0 ([GEC 10][gec10] pp. 16-3, 16-4): 3,400 to 4,070 ksi, or 4.9 × 10⁸ to 5.9 × 10⁸ psf (2.35 × 10⁷ to 2.81 × 10⁷ kPa). |
-| <code class="rc rc-fem">I</code>, <code class="rc rc-fem">Area</code> | Blank: computed from `D` for the gross section, πD⁴/64 and πD²/4. | For D = 4 ft: I = 12.6 ft⁴ (0.109 m⁴), Area = 12.6 ft² (1.17 m²). |
-| <code class="rc rc-fem">Head</code> | Blank (free), unless a cap beam ties the heads (`unrotated`) or anchors hold them (`pinned` or `fixed`). | — |
-| <code class="rc rc-fem">Tip</code> | Blank (free): the embedment below the slip surface holds the shaft. `fixed` only for a tip socketed into rock. | — |
+| <code class="rc rc-lem">H</code> | Leave blank to have the LEM compute `H` by Ito & Matsui's method from `D` and `S` for each trial surface (vertical piles only).<br>Or enter the force per unit width from a lateral analysis of the pile: the force on one pile ÷ `S`. [GEC 10][gec10] sizes a row for the smaller of the passive force on the shafts and the force the slope needs to reach its target factor of safety (p. 12-58). | None given in the sources. |
+| <code class="rc rc-lem">Appl</code> | `Active`, so that `H` is not divided by F, as in [Tutorial LEM-12](../tutorials/lem12_piles.md). | — |
+| <code class="rc rc-both">D</code> | Shaft diameter. | Casing and drilling tools come in 6 in. (0.5 ft, 0.152 m) steps ([GEC 10][gec10] p. 4-11). GEC 10's wall example uses 4 ft (1.22 m) shafts (pp. 12-14, 12-15). |
+| <code class="rc rc-both">S</code> | Center-to-center spacing along the row. | 3 diameters is routine for groups of shafts, and 2.5 is sometimes advantageous ([GEC 10][gec10] p. 14-2). |
+| <code class="rc rc-both">Vcap</code> | Shear capacity of one shaft, or leave blank for no limit. | [GEC 10][gec10] gives the design method, not typical values. |
+| <code class="rc rc-both">Mcap</code> | Nominal moment capacity of one shaft. | About 27 D³ kip-ft with 1 percent longitudinal steel and 40 D³ kip-ft with 1.5 percent, with D in ft ([GEC 10][gec10] p. 12-14); in SI, 1,290 D³ and 1,915 D³ kN·m with D in m. For D = 4 ft (1.22 m), that is 1.73 × 10⁶ to 2.56 × 10⁶ lb-ft (2,340 to 3,470 kN·m). Longitudinal steel is typically 1 to 2 percent of the gross area (pp. 16-4, 16-5). |
+| <code class="rc rc-fem">E</code> | Modulus of the concrete. | E<sub>c</sub> = 1,820 √f′<sub>c</sub> ksi, where f′<sub>c</sub> is the concrete's compressive strength in ksi, generally 3.5 to 5.0 ([GEC 10][gec10] pp. 16-3, 16-4). That gives 3,400 to 4,070 ksi, or 4.9 × 10⁸ to 5.9 × 10⁸ psf (2.35 × 10⁷ to 2.81 × 10⁷ kPa). |
+| <code class="rc rc-fem">I</code>, <code class="rc rc-fem">Area</code> | Leave blank. They are computed from `D` for the gross section, as πD⁴/64 and πD²/4. | For D = 4 ft: I = 12.6 ft⁴ (0.109 m⁴), Area = 12.6 ft² (1.17 m²). |
+| <code class="rc rc-fem">Head</code> | Leave blank (free) unless a cap beam ties the heads (`unrotated`) or anchors hold them (`pinned` or `fixed`). | — |
+| <code class="rc rc-fem">Tip</code> | Leave blank (free), since the embedment below the slip surface holds the shaft. Use `fixed` only for a tip socketed into rock. | — |
 
 ## Micropiles
 
 A micropile is a small drilled and grouted pile, typically less than 300 mm (12 in) in diameter, reinforced with a
 steel casing or bar ([micropile manual][mp] p. 1-4). To stabilize a slope, micropiles are installed in rows, often
 in pairs battered across the slip surface, with their heads tied together by a concrete cap beam at the ground
-surface (pp. 6-44, 6-54). Ito & Matsui applies to vertical piles only, so a battered micropile's `H` is entered,
-not computed. The figure shows one battered pair under its cap beam in section, and three pairs in plan.
+surface (pp. 6-44, 6-54). Ito & Matsui's method applies to vertical piles only, so enter `H` for a battered
+micropile. The figure shows one battered pair under its cap beam in section, and three pairs in plan.
 
 ![In section, a pair of micropiles battered in opposite directions from a cap beam on a bench in a slope, each crossing the slip surface with its own force H perpendicular to it; in plan, three pairs along the cap beam at spacing S](images/pw_micropiles.png){width=801}
 
-In section, each leg is a pile line of its own, from its head in the cap beam to its tip in stable ground, with its
+In section, each leg is a separate pile line, from its head in the cap beam to its tip in stable ground, with its
 own `H` perpendicular to the leg where the slip surface crosses it. In plan, the pairs stand along the cap beam at
-spacing `S`, and each pair's legs run upslope and downslope from it below the ground.
+spacing `S`, with each pair's legs running upslope and downslope below the ground.
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Entry | Typical values |
 |---|---|---|
-| <code class="rc rc-lem">H</code> | the resistance per unit width: the force one micropile develops at the slip surface ÷ `S`. Each leg of a pair is a line of its own, with its own `H`. | In the manual's slope example, 365 kN (82 kip) for the upslope leg and 450 kN (101 kip) for the downslope leg, against 650 kN/m (44.5 kip/ft) required (pp. 6-51, 6-52). |
-| <code class="rc rc-lem">Appl</code> | `Active` for an allowable `H`.<br>`Passive` for an ultimate `H`, such as the example's, which the LEM then divides by F. | — |
-| <code class="rc rc-both">D</code> | Blank: `H`, `I` and `Area` are entered, so the diameter is not read. | Grouted diameter typically less than 0.3 m (1 ft) (p. 1-4); 0.2 m (0.66 ft) in the manual's group example (p. 5-25). |
-| <code class="rc rc-both">S</code> | spacing along the row, between micropiles or between pairs | At least 0.76 m (2.5 ft) or 3 diameters, whichever is greater (p. 5-8); 1.25 m (4.1 ft) between pairs in the slope example (p. 6-52). |
-| <code class="rc rc-both">Vcap</code> | shear capacity of one micropile | 365 kN (82 kip) at zero axial load for the slope example's 177.8 mm (7 in) casing (p. 6-51). |
-| <code class="rc rc-both">Mcap</code> | moment capacity of one micropile | 161 kN·m (119,000 lb-ft) at zero axial load for the same casing ([micropile manual][mp] Table 6-2, p. 6-47). |
-| <code class="rc rc-fem">E</code> | modulus of the steel casing | 29,000 ksi: 4.18 × 10⁹ psf, or about 2.0 × 10⁸ kPa ([micropile manual][mp] p. 5-16) |
-| <code class="rc rc-fem">Area</code> | area of the steel casing | 3,760 to 8,760 mm² (5.8 to 13.6 in²) for 139.7 to 244.5 mm (5.5 to 9.625 in) casings (Table 4-5, p. 4-33): 0.00376 to 0.00876 m², or 0.0405 to 0.0943 ft². |
-| <code class="rc rc-fem">I</code> | moment of inertia of the casing, π(OD⁴ − ID⁴)/64, with OD and ID its outside and inside diameters | For the same casings, 8.05 × 10⁻⁶ to 5.94 × 10⁻⁵ m⁴, or 9.32 × 10⁻⁴ to 6.88 × 10⁻³ ft⁴. |
-| <code class="rc rc-fem">Head</code> | `unrotated` where a cap beam ties the heads, as in the slope example (p. 6-54); blank (free) otherwise | — |
-| <code class="rc rc-fem">Tip</code> | Blank (free): the bond length below the slip surface holds it. `fixed` for a tip socketed into rock. | The slope example sockets its tips 4.5 m (15 ft) into bedrock (p. 6-57). |
+| <code class="rc rc-lem">H</code> | The resistance per unit width: the force one micropile develops at the slip surface ÷ `S`. Enter each leg of a pair as a separate line, with its own `H`. | In the manual's slope example, 365 kN (82 kip) for the upslope leg and 450 kN (101 kip) for the downslope leg, against 650 kN/m (44.5 kip/ft) required (pp. 6-51, 6-52). |
+| <code class="rc rc-lem">Appl</code> | `Active` for an allowable `H`.<br>`Passive` for an ultimate `H`, such as the example's; the LEM then divides it by F. | — |
+| <code class="rc rc-both">D</code> | Leave blank. `H`, `I` and `Area` are entered, so the diameter is not used. | The grouted diameter is typically less than 0.3 m (1 ft) (p. 1-4), and 0.2 m (0.66 ft) in the manual's group example (p. 5-25). |
+| <code class="rc rc-both">S</code> | Spacing along the row, between micropiles or between pairs. | At least 0.76 m (2.5 ft) or 3 diameters, whichever is greater (p. 5-8); 1.25 m (4.1 ft) between pairs in the slope example (p. 6-52). |
+| <code class="rc rc-both">Vcap</code> | Shear capacity of one micropile. | 365 kN (82 kip) at zero axial load for the slope example's 177.8 mm (7 in) casing (p. 6-51). |
+| <code class="rc rc-both">Mcap</code> | Moment capacity of one micropile. | 161 kN·m (119,000 lb-ft) at zero axial load for the same casing ([micropile manual][mp] Table 6-2, p. 6-47). |
+| <code class="rc rc-fem">E</code> | Modulus of the steel casing. | 29,000 ksi (4.18 × 10⁹ psf, or about 2.0 × 10⁸ kPa) ([micropile manual][mp] p. 5-16). |
+| <code class="rc rc-fem">Area</code> | Area of the steel casing. | 3,760 to 8,760 mm² (5.8 to 13.6 in²) for 139.7 to 244.5 mm (5.5 to 9.625 in.) casings (Table 4-5, p. 4-33); in model units, 0.00376 to 0.00876 m², or 0.0405 to 0.0943 ft². |
+| <code class="rc rc-fem">I</code> | Moment of inertia of the casing, π(OD⁴ − ID⁴)/64, where OD and ID are its outside and inside diameters. | For the same casings, 8.05 × 10⁻⁶ to 5.94 × 10⁻⁵ m⁴, or 9.32 × 10⁻⁴ to 6.88 × 10⁻³ ft⁴. |
+| <code class="rc rc-fem">Head</code> | `unrotated` where a cap beam ties the heads, as in the slope example (p. 6-54); otherwise leave blank (free). | — |
+| <code class="rc rc-fem">Tip</code> | Leave blank (free), since the bond length below the slip surface holds the tip. Use `fixed` for a tip socketed into rock. | The slope example sockets its tips 4.5 m (15 ft) into bedrock (p. 6-57). |
 
-The grout inside the casing is left out of `I` and `Area` here; the moment capacity above includes it.
+The values of `I` and `Area` above leave out the grout inside the casing; the moment capacity includes it.
 
 ## Sheet-Pile Wall
 
 A sheet-pile wall is a line of interlocking steel sheets driven to form a continuous wall, cantilevered or held by
-tiebacks. It is continuous out of plane, so the FEM represents it directly, and it is entered per unit length of
-wall, with `S` = 1. The figure shows a wall held by a tieback in section, and its sheets in plan.
+tiebacks. Because it is continuous out of plane, the FEM represents it directly. Enter it per unit length of wall,
+with `S` = 1. The figure shows a wall held by a tieback in section, and its sheets in plan.
 
 ![A sheet-pile wall in section, retaining soil above an excavation, held by a tieback and embedded below the excavation's base, beside the interlocked Z-shaped sheets in plan](images/pw_sheet_pile.png){width=766}
 
-The pile line runs from the top of the wall to its tip, which lies below the excavation's base by the embedment.
-The tieback is a line on the `reinforce` sheet, connected as under
-[A tieback and a soldier-pile or sheet-pile wall](#a-tieback-and-a-soldier-pile-or-sheet-pile-wall). In plan the
-interlocked sheets form one continuous wall, so `I`, `Area` and `Mcap` are entered per unit length of it.
+The pile line runs from the top of the wall to its tip, which is below the excavation's base by the embedment depth.
+The tieback is a line on the `reinforce` sheet, connected as described under
+[A tieback and a soldier-pile or sheet-pile wall](#a-tieback-and-a-soldier-pile-or-sheet-pile-wall). In plan, the
+interlocked sheets form one continuous wall, so `I`, `Area` and `Mcap` are entered per unit length of wall.
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Entry | Typical values |
 |---|---|---|
-| <code class="rc rc-lem">H</code> | the wall's resistance per unit length where a slip surface crosses it: the smaller of its shear capacity and the passive force the soil develops below the excavation ([GEC 4][gec4] p. 101) | — |
-| <code class="rc rc-lem">Appl</code> | `Active`: `H` is not divided by F (an allowable resistance). | — |
-| <code class="rc rc-both">D</code> | Blank: not read for a wall, whose `I` and `Area` are entered. | — |
-| <code class="rc rc-both">S</code> | 1: the values are per unit length of wall. | — |
-| <code class="rc rc-both">Vcap</code> | Blank: no limit. | The sources give no typical value. |
-| <code class="rc rc-both">Mcap</code> | plastic moment per unit length of wall, F<sub>y</sub> × Z, with F<sub>y</sub> the steel's yield strength and Z the plastic section modulus | F<sub>y</sub> = 50 ksi (345 MPa) is the most common grade ([Nucor Skyline][nucor] p. 6); values for four sections in the table below. |
-| <code class="rc rc-fem">E</code> | modulus of the steel | 29,000 ksi: 4.18 × 10⁹ psf, or about 2.0 × 10⁸ kPa ([micropile manual][mp] p. 5-16) |
-| <code class="rc rc-fem">I</code>, <code class="rc rc-fem">Area</code> | per unit length of wall, from the section table | the table below |
-| <code class="rc rc-fem">Head</code> | Blank (free); tiebacks are entered on the `reinforce` sheet and connected as under [A tieback and a soldier-pile or sheet-pile wall](#a-tieback-and-a-soldier-pile-or-sheet-pile-wall). | — |
-| <code class="rc rc-fem">Tip</code> | Blank (free): the embedment holds the toe. | — |
+| <code class="rc rc-lem">H</code> | The wall's resistance per unit length where a slip surface crosses it: the smaller of its shear capacity and the passive force the soil develops below the excavation ([GEC 4][gec4] p. 101). | — |
+| <code class="rc rc-lem">Appl</code> | `Active`, since `H` is an allowable resistance and is not divided by F. | — |
+| <code class="rc rc-both">D</code> | Leave blank. A wall's `I` and `Area` are entered, so the diameter is not used. | — |
+| <code class="rc rc-both">S</code> | 1, since the values are per unit length of wall. | — |
+| <code class="rc rc-both">Vcap</code> | Leave blank for no limit. | The sources give no typical value. |
+| <code class="rc rc-both">Mcap</code> | Plastic moment per unit length of wall, F<sub>y</sub> × Z, where F<sub>y</sub> is the steel's yield strength and Z the plastic section modulus. | F<sub>y</sub> = 50 ksi (345 MPa) is the most common grade ([Nucor Skyline][nucor] p. 6). The table below gives values for four sections. |
+| <code class="rc rc-fem">E</code> | Modulus of the steel. | 29,000 ksi (4.18 × 10⁹ psf, or about 2.0 × 10⁸ kPa) ([micropile manual][mp] p. 5-16). |
+| <code class="rc rc-fem">I</code>, <code class="rc rc-fem">Area</code> | Per unit length of wall, from the section table. | The table below. |
+| <code class="rc rc-fem">Head</code> | Leave blank (free). Tiebacks are entered on the `reinforce` sheet and connected as described under [A tieback and a soldier-pile or sheet-pile wall](#a-tieback-and-a-soldier-pile-or-sheet-pile-wall). | — |
+| <code class="rc rc-fem">Tip</code> | Leave blank (free), since the embedment holds the toe. | — |
 
 Four common hot-rolled PZ (Z-shaped) sections, per foot and per meter of wall ([Nucor Skyline][nucor] p. 5; `Mcap` computed with
 F<sub>y</sub> = 50 ksi):
@@ -123,82 +123,83 @@ The manufacturer states these as 6.47 to 11.77 in² and 84.4 to 491 in⁴ per fo
 
 ## Soldier-Pile Wall
 
-A soldier-pile wall is a row of steel beams, driven H-piles or pairs of channels or wide-flange beams set in
+A soldier-pile wall is a row of steel beams, either driven H-piles or pairs of channels or wide-flange beams set in
 concrete-filled drilled holes, with timber lagging spanning between them to hold the soil ([GEC 4][gec4] p. 13).
-The beams are discrete, but the lagging makes the wall continuous, so the wall is entered per beam with `S` the
-beam spacing. [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) builds one held by tiebacks. The figure shows
+The beams are discrete, but the lagging makes the wall continuous. Enter the wall per beam, with `S` the beam
+spacing. [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) builds one held by tiebacks. The figure shows
 the wall in section and in plan.
 
 ![A soldier-pile wall in section, the lagging down to the excavation's base and the beam embedded below it, and in plan, steel beams at spacing S with timber lagging between them](images/pw_soldier_pile.png){width=658}
 
 In section, the lagging stops at the excavation's base, and the beam continues below it as the embedment. In plan,
-the soldier piles, steel beams, stand at spacing `S`, and the lagging spans between them and holds the soil. The
-pile line is one beam, and `I`, `Area` and `Mcap` are entered for one beam.
+the soldier piles stand at spacing `S`, with the lagging spanning between them. The pile line represents one beam,
+and `I`, `Area` and `Mcap` are entered for one beam.
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 
 | Column | Entry | Typical values |
 |---|---|---|
-| <code class="rc rc-lem">H</code> | the wall's resistance per unit length: the smaller of the beam's allowable shear capacity and the passive force the soil develops below the excavation, divided by the beam spacing ([GEC 4][gec4] p. 101) | — |
-| <code class="rc rc-lem">Appl</code> | `Active`: `H` is not divided by F (an allowable resistance), as in [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md). | — |
-| <code class="rc rc-both">D</code> | Blank: `H`, `I` and `Area` are entered. | A drilled-in beam's hole is 0.61 m (2 ft) in GEC 4's examples (pp. A-10, A-29). |
-| <code class="rc rc-both">S</code> | center-to-center spacing of the beams | 1.5 to 3 m (4.9 to 9.8 ft) for driven beams, up to 3 m for drilled-in beams ([GEC 4][gec4] p. 76); 2.5 m (8.2 ft) in GEC 4's examples (p. A-7). |
-| <code class="rc rc-both">Vcap</code> | Blank: no limit. | The sources give no typical value. |
-| <code class="rc rc-both">Mcap</code> | moment capacity of one beam about its strong axis, F<sub>y</sub> × Z. For allowable stress design GEC 4 takes the allowable bending stress F<sub>b</sub> = 0.55 F<sub>y</sub> (p. A-10). | Grade 50 (F<sub>y</sub> = 50 ksi) steel H-piles (HP sections): HP 12×84, 500,000 lb-ft (678 kN·m); HP 14×117, 808,000 lb-ft (1,096 kN·m) ([Nucor Skyline][nucor] pp. 6, 33). |
-| <code class="rc rc-fem">E</code> | modulus of the steel | 29,000 ksi: 4.18 × 10⁹ psf, or about 2.0 × 10⁸ kPa ([micropile manual][mp] p. 5-16) |
-| <code class="rc rc-fem">I</code>, <code class="rc rc-fem">Area</code> | of one beam, strong axis | HP 12×84: `I` = 650 in⁴, or 0.0314 ft⁴ (2.71 × 10⁻⁴ m⁴); `Area` = 24.6 in², or 0.171 ft² (0.0159 m²). HP 14×117: `I` = 1,220 in⁴, or 0.0588 ft⁴ (5.08 × 10⁻⁴ m⁴); `Area` = 34.4 in², or 0.239 ft² (0.0222 m²) ([Nucor Skyline][nucor] p. 33). |
-| <code class="rc rc-fem">Head</code> | Blank (free); tiebacks are connected as under [A tieback and a soldier-pile or sheet-pile wall](#a-tieback-and-a-soldier-pile-or-sheet-pile-wall). | — |
-| <code class="rc rc-fem">Tip</code> | Blank (free): the embedment holds the toe. | — |
+| <code class="rc rc-lem">H</code> | The wall's resistance per unit length: the smaller of the beam's allowable shear capacity and the passive force the soil develops below the excavation, divided by the beam spacing ([GEC 4][gec4] p. 101). | — |
+| <code class="rc rc-lem">Appl</code> | `Active`, since `H` is an allowable resistance and is not divided by F, as in [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md). | — |
+| <code class="rc rc-both">D</code> | Leave blank. `H`, `I` and `Area` are entered, so the diameter is not used. | A drilled-in beam's hole is 0.61 m (2 ft) in GEC 4's examples (pp. A-10, A-29). |
+| <code class="rc rc-both">S</code> | Center-to-center spacing of the beams. | 1.5 to 3 m (4.9 to 9.8 ft) for driven beams, up to 3 m for drilled-in beams ([GEC 4][gec4] p. 76); 2.5 m (8.2 ft) in GEC 4's examples (p. A-7). |
+| <code class="rc rc-both">Vcap</code> | Leave blank for no limit. | The sources give no typical value. |
+| <code class="rc rc-both">Mcap</code> | Moment capacity of one beam about its strong axis, F<sub>y</sub> × Z. For allowable stress design, GEC 4 uses an allowable bending stress F<sub>b</sub> = 0.55 F<sub>y</sub> (p. A-10). | Grade 50 (F<sub>y</sub> = 50 ksi) steel H-piles (HP sections): HP 12×84, 500,000 lb-ft (678 kN·m); HP 14×117, 808,000 lb-ft (1,096 kN·m) ([Nucor Skyline][nucor] pp. 6, 33). |
+| <code class="rc rc-fem">E</code> | Modulus of the steel. | 29,000 ksi (4.18 × 10⁹ psf, or about 2.0 × 10⁸ kPa) ([micropile manual][mp] p. 5-16). |
+| <code class="rc rc-fem">I</code>, <code class="rc rc-fem">Area</code> | For one beam, about its strong axis. | HP 12×84: `I` = 650 in⁴, or 0.0314 ft⁴ (2.71 × 10⁻⁴ m⁴); `Area` = 24.6 in², or 0.171 ft² (0.0159 m²). HP 14×117: `I` = 1,220 in⁴, or 0.0588 ft⁴ (5.08 × 10⁻⁴ m⁴); `Area` = 34.4 in², or 0.239 ft² (0.0222 m²) ([Nucor Skyline][nucor] p. 33). |
+| <code class="rc rc-fem">Head</code> | Leave blank (free). Tiebacks are connected as described under [A tieback and a soldier-pile or sheet-pile wall](#a-tieback-and-a-soldier-pile-or-sheet-pile-wall). | — |
+| <code class="rc rc-fem">Tip</code> | Leave blank (free), since the embedment holds the toe. | — |
 
 ## Segmental Block Wall
 
 A segmental, or modular block, wall is a column of dry-stacked concrete units, usually with geogrid layers laid
-between the courses and running back into a reinforced fill. Its strength lies in its contacts: each course can
-slide on the one below it, the column can slide on its foundation, and its back face can part from the fill. The
-blocks themselves do not fail. The figure shows the wall of [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) in section, and in
-plan.
+between the courses and running back into a reinforced fill. The blocks themselves do not fail. The wall fails at
+its contacts: a course can slide on the one below it, the whole column can slide on its foundation, and its back
+face can separate from the fill. The figure shows the wall of
+[Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) in section and in plan.
 
 ![In section, a segmental block wall with a joint line under its base, up its back face and between each pair of courses, and geogrid layers tied into the blocks; in plan, the units laid over the joints of the course below, and a geogrid layer running back into the reinforced fill](images/pw_block_wall.png){width=653}
 
-In section, each course is a polygon of block material, and a joint line runs under the base, up the back face and
-between each pair of courses; each geogrid layer ends in a block, at the dot, where it is tied to it. The plan
-looks down on the wall with its face at the bottom: the solid lines are the joints between the units of the top
-course, the dashed lines those of the course below, offset by half a unit, and the geogrid runs back from the blocks
-into the reinforced fill, here along the whole length of the wall.
+In section, each course is a polygon of block material, and joint lines run under the base, up the back face and
+between the courses. Each geogrid layer is tied to a block at the dot where it ends. The plan looks down on the
+wall with its face at the bottom. Solid lines are the joints between the units of the top course, and dashed lines
+are those of the course below, offset by half a unit. The geogrid runs back from the blocks into the reinforced
+fill along the whole length of the wall.
 
-The wall is drawn, not entered on the `piles` sheet:
+The wall is drawn as polygons rather than entered on the `piles` sheet:
 
-- **Blocks.** One polygon per course on the `polygon` sheet, in a block material whose strength option is
-  `elastic` ([Worksheet: mat](../usage/input_template.md#worksheet-mat)). An elastic material cannot fail: in the
-  FEM the strength reduction has nothing in the blocks to weaken, and in the LEM a trial slip surface may run along
-  the wall's boundary but not through it. Give each block polygon a local `Size` of about half the course height,
+- **Blocks.** Draw one polygon per course on the `polygon` sheet, in a block material with the `elastic` strength
+  option ([Worksheet: mat](../usage/input_template.md#worksheet-mat)). An elastic material cannot fail: the FEM's
+  strength reduction does not weaken the blocks, and an LEM trial slip surface can run along the wall's boundary
+  but not through it. Give each block polygon a local `Size` of about half the course height,
   so the mesh resolves every course without refining the whole section.
-- **Contacts** (FEM). One row on the `joints` sheet for the base, one for the back face, and one for each course
-  joint ([The joints worksheet](../fem/joints.md#the-joints-worksheet)). A battered wall, each course set back from
-  the one below, has a step in its back face at every course, and each step is a joint line of its own.
-- **Geogrid.** Each layer is a line on the `reinforce` sheet, entered as under
+- **Contacts** (FEM). Enter one row on the `joints` sheet for the base, one for the back face, and one for each
+  course joint ([The joints worksheet](../fem/joints.md#the-joints-worksheet)). In a battered wall, where each
+  course is set back from the one below, the back face steps at every course, and each step needs its own joint
+  line.
+- **Geogrid.** Enter each layer as a line on the `reinforce` sheet, as described under
   [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face).
 
-The LEM does not read the `joints` sheet, so sliding on a course joint or at the base is a mechanism only the FEM
-can find; the LEM takes the geogrid as reinforcement where its slip surfaces cross it.
+The LEM does not read the `joints` sheet, so only the FEM can find sliding on a course joint or at the base. The
+LEM does count the geogrid as reinforcement where a slip surface crosses it.
 
 Typical values for the blocks and their contacts:
 
 | Quantity | Entry | Typical values |
 |---|---|---|
-| Block size | the polygons' height and depth | Units 0.33 to 1.25 ft (0.10 to 0.375 m) high and 0.67 to 2 ft (0.20 to 0.60 m) deep ([GEC 11][gec11v1] Vol. I p. 3-43). |
-| Batter | a setback at each course | From near vertical up to 15 degrees (Vol. I p. 2-40). |
-| Course joints | `c` = 0, `phi` from the manufacturer's inter-unit shear tests, `t_cut` 0 | GEC 11 requires the inter-unit shear capacity from tests on the unit (ASTM D6916) (Vol. I p. 4-58) and gives no typical value. |
-| Base and back face | `c` = 0, `phi` the friction of concrete on the soil there, `t_cut` 0 | As for a [gravity wall](#gravity-or-cantilever-wall) below. |
-| `kn`, `ks`, `Jred` | blank: the stiffnesses come from the softer adjacent material, and the strength reduction weakens the contacts with the soil | — |
+| Block size | The polygons' height and depth. | Units 0.33 to 1.25 ft (0.10 to 0.375 m) high and 0.67 to 2 ft (0.20 to 0.60 m) deep ([GEC 11][gec11v1] Vol. I p. 3-43). |
+| Batter | A setback at each course. | From near vertical up to 15 degrees (Vol. I p. 2-40). |
+| Course joints | `c` = 0; `phi` from the manufacturer's inter-unit shear tests; `t_cut` = 0. | GEC 11 requires the inter-unit shear capacity from tests on the unit (ASTM D6916) (Vol. I p. 4-58) and gives no typical value. |
+| Base and back face | `c` = 0; `phi` = the friction angle of concrete on the adjacent soil; `t_cut` = 0. | As for a [gravity wall](#gravity-or-cantilever-wall) below. |
+| `kn`, `ks`, `Jred` | Leave blank. The stiffnesses then come from the softer adjacent material, and the strength reduction weakens the contacts along with the soil. | — |
 
 ## Gravity or Cantilever Wall
 
-A concrete gravity wall stands by its weight, and a cantilever wall by its weight and the soil on its heel. Either
-is drawn as a polygon of concrete in a material whose strength option is `elastic`, so that it cannot fail. In the
-LEM a trial slip surface may run around it or along its base but not through it, so a non-circular surface along
-the base represents sliding on it. In the FEM the wall needs a joint line under its base and one up its back face, so that it can slide and
-part from the soil.
+A concrete gravity wall stands by its own weight, and a cantilever wall by its weight plus the soil on its heel.
+Draw either as a polygon of concrete, in a material with the `elastic` strength option so that it cannot fail. In
+the LEM, a trial slip surface can run around the wall or along its base but not through it, so a non-circular
+surface along the base represents sliding. In the FEM, the wall needs a joint line under its base and another up
+its back face, so that it can slide and separate from the soil.
 
 ![A concrete gravity wall twice: for the LEM, a trial surface along its base and up through the backfill; for the FEM, a joint line under its base and one up its back face](images/pw_gravity_wall.png){width=758}
 
@@ -207,10 +208,10 @@ On the right, the FEM's base joint and back-face joint.
 
 | Quantity | Entry | Typical values |
 |---|---|---|
-| Unit weight | γ of the concrete material | 150 lb/ft³ (23.6 kN/m³) for reinforced concrete ([GEC 4][gec4] p. A-13). |
-| `E` (FEM) | modulus of the concrete material | E<sub>c</sub> = 1,820 √f′<sub>c</sub> ksi: 4.9 × 10⁸ to 5.9 × 10⁸ psf (2.35 × 10⁷ to 2.81 × 10⁷ kPa) for f′<sub>c</sub> = 3.5 to 5.0 ksi ([GEC 10][gec10] p. 16-3). |
-| Base joint (FEM) | `c` = 0, since the sources give friction only; `phi` = δ, the friction angle of concrete on the foundation; `t_cut` 0 | Mass concrete on clean sound rock 35°; on clean gravel or coarse sand 29 to 31°; on clean fine to medium sand 24 to 29°; on fine sand, silty or clayey 19 to 24°; on very stiff to hard clay 22 to 26°; on medium stiff to stiff clay 17 to 19° ([GEC 10][gec10] p. 12-50). |
-| Back-face joint (FEM) | `c` = 0, `phi` = δ of the wall against the backfill, `t_cut` 0 | About two thirds of the backfill's φ′ in GEC 10's example: 24° against sand at 36°, 19° against clay at 28° (pp. 12-52, 12-53). |
+| Unit weight | Unit weight γ of the concrete material. | 150 lb/ft³ (23.6 kN/m³) for reinforced concrete ([GEC 4][gec4] p. A-13). |
+| `E` (FEM) | Modulus of the concrete material. | E<sub>c</sub> = 1,820 √f′<sub>c</sub> ksi: 4.9 × 10⁸ to 5.9 × 10⁸ psf (2.35 × 10⁷ to 2.81 × 10⁷ kPa) for f′<sub>c</sub> = 3.5 to 5.0 ksi ([GEC 10][gec10] p. 16-3). |
+| Base joint (FEM) | `c` = 0, since the sources give friction only; `phi` = δ, the friction angle of concrete on the foundation; `t_cut` = 0. | Mass concrete on clean sound rock 35°; on clean gravel or coarse sand 29 to 31°; on clean fine to medium sand 24 to 29°; on fine sand, silty or clayey 19 to 24°; on very stiff to hard clay 22 to 26°; on medium stiff to stiff clay 17 to 19° ([GEC 10][gec10] p. 12-50). |
+| Back-face joint (FEM) | `c` = 0; `phi` = δ, the friction angle of the wall against the backfill; `t_cut` = 0. | About two thirds of the backfill's φ′ in GEC 10's example: 24° against sand at 36°, 19° against clay at 28° (pp. 12-52, 12-53). |
 
 
 ## Load-Bearing Piles Near a Slope
@@ -220,12 +221,12 @@ Load-bearing piles carry structural loads (vertical forces from foundations) and
 ![A footing on a slope's crest on a pile, twice: in Case 1 the pile's tip is above the failure surface, in Case 2 the pile crosses it and its tip is in stable ground; in plan, footings of width B along the crest at spacing s](images/pw_load_bearing.png){width=871}
 
 In Case 1 the pile ends inside the sliding mass, so the pile and its load move with it. In Case 2 the pile reaches
-stable ground below the failure surface. In plan, the footings stand along the crest, the line with ticks hanging
-down the slope, at spacing *s* center to center, each *B* wide across the crest, with its pile dashed below it.
+stable ground below the failure surface. In plan, the footings stand along the crest (the line with ticks pointing
+down the slope) at center-to-center spacing *s*. Each is *B* wide across the crest, with its pile dashed below it.
 
 ### Case 1: Pile tip above the failure surface
 
-If the pile tip is entirely within the sliding mass (a friction pile in weak soil, for example), the entire pile and its load are part of the sliding mass. The structural load **does** contribute to driving forces and should be included in the analysis. Standard practice is to apply the structural load as a **distributed surface surcharge** using the distributed loads (`dloads`) sheet in the XSLOPE input template. For a row of footings along the crest, each *B* wide across the crest and carrying a force *P*, at spacing *s* along it, the surcharge is *P* ÷ (*B* × *s*). It is entered in the `Normal` column at two points on the ground at the footing's edges, with Direction `vertical` ([Worksheet: dloads](../usage/input_template.md#worksheet-dloads)). This is slightly conservative because it places all the weight at the surface rather than distributing it with depth through skin friction, but the conservatism is generally small and accepted in practice.
+If the pile tip is entirely within the sliding mass (a friction pile in weak soil, for example), the entire pile and its load are part of the sliding mass. The structural load **does** contribute to driving forces and should be included in the analysis. Standard practice is to apply the structural load as a **distributed surface surcharge** using the distributed loads (`dloads`) sheet in the XSLOPE input template. For a row of footings along the crest, each *B* wide across the crest and carrying a force *P*, at spacing *s* along it, the surcharge is *P* ÷ (*B* × *s*). Enter it in the `Normal` column at two points on the ground surface, at the footing's edges, with Direction `vertical` ([Worksheet: dloads](../usage/input_template.md#worksheet-dloads)). This is slightly conservative because it places all the weight at the surface rather than distributing it with depth through skin friction, but the conservatism is generally small and accepted in practice.
 
 ### Case 2: Pile tip below the failure surface
 
@@ -267,33 +268,33 @@ a node the two share or, for a jointed sheet, through a tie at its end.
 
 ### A tieback and a soldier-pile or sheet-pile wall
 
-The wall is entered on the `piles` sheet ([Piles in LEM](lem.md)) and each tieback on
-the `reinforce` sheet, with end 1 on the wall face. The wall's resistance is its shear force `H`, entered as under
-[Soldier-Pile Wall](#soldier-pile-wall). The `piles` sheet has its own `Appl`, read as on the
-`reinforce` sheet; [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) enters its stated `H` with Appl Active. The
-figure shows one tieback through a soldier-pile wall, with a trial surface that crosses both.
+Enter the wall on the `piles` sheet ([Piles in LEM](lem.md)) and each tieback on the `reinforce` sheet, with end 1
+on the wall face. The wall's resistance is its shear force `H`, entered as described under
+[Soldier-Pile Wall](#soldier-pile-wall). The `piles` sheet has its own `Appl` column, which works as it does on the
+`reinforce` sheet; [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) enters its stated `H` with `Appl` set to
+Active. The figure shows one tieback through a soldier-pile wall, with a trial surface that crosses both.
 
 ![A tieback through a wall, with a trial surface from the excavation corner crossing its unbonded length, and the forces Tmax on the tendon and H on the wall](../usage/images/mr_connect_tieback_wall_lem.png){width=450}
 
-The trial surface starts at the corner of the excavation, where it passes through the pile line and the wall's
-`H` acts, and crosses the tieback on its unbonded length, where `Tmax` acts along the tendon.
+The trial surface starts at the corner of the excavation, where it crosses the pile line and the wall's `H` acts.
+It then crosses the tieback's unbonded length, where `Tmax` acts along the tendon.
 
 A trial surface that passes below the toe of the wall receives no force from the wall.
 
-In the FEM the wall is a row of beam elements
-([Piles in FEM](fem.md)) and a tieback is a row of bar elements.
-A bar that ends on a pile line, or crosses it, shares a node with the pile at that point, so the tieback pulls on
-the wall at that node. The figure shows one tieback whose end 1 lies on the pile line below the pile's head.
+In the FEM, the wall is a chain of beam elements ([Piles in FEM](fem.md)) and a tieback is a chain of bar
+elements. A bar that ends on or crosses a pile line shares a node with the pile there, so the tieback pulls on the
+wall at that node. The figure shows one tieback whose end 1 lies on the pile line, below the pile's head.
 
 ![A tieback whose first node is a node of the wall's pile line below its head, with the bar's other nodes running back into the soil](../usage/images/mr_connect_tieback_wall_fem.png){width=447}
 
-End 1 of the tieback is a node of the pile, and the bar's other nodes run back into the soil.
+End 1 of the tieback is also a node of the pile; the bar's other nodes run back into the soil.
 
-A bar that crosses a pile line, rather than ending on it, draws a note in the
-[model checks](../studio/analysis.md#model-checks-before-a-run) that the two are joined at the crossing; a bar
-meant to pass the pile unconnected ends short of it. A tieback entered as in
-[Tutorial LEM-9](../tutorials/lem09_tieback_wall.md), starting on the wall face at x = 0 with the pile line 0.5 ft
-behind it, crosses the pile line and is joined to it there in the FEM; in the LEM the offset has no effect.
+If a bar crosses a pile line rather than ending on it, the
+[model checks](../studio/analysis.md#model-checks-before-a-run) note that the two are joined at the crossing. To
+keep a bar unconnected to the pile, end it short of the pile line. The tieback in
+[Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) starts on the wall face at x = 0, with the pile line 0.5 ft
+behind it, so in the FEM it crosses the pile line and is joined to it there; in the LEM the offset has no
+effect.
 
 ### A soil nail and a shotcrete facing
 
@@ -336,43 +337,43 @@ about four elements across it ([A Size on one zone](../fem/mesh.md#a-size-on-one
 
 | Quantity | Entry | Typical values |
 |---|---|---|
-| Facing thickness | the initial and final facings together: in the line load (LEM), and as the polygon's thickness normal to the face (FEM) | Initial facing of shotcrete: typically 4 in. (0.33 ft, 0.10 m), or 6 in. (0.5 ft, 0.15 m). Final facing of shotcrete: 6 or 8 in. (0.5 or 0.67 ft, 0.15 or 0.20 m), typically 8. Final facing cast in place: 10 in. (0.83 ft, 0.25 m) and thicker ([GEC 7][gec7] p. 164). |
-| Unit weight | in the line load (LEM); γ of the shotcrete material (FEM) | 150 lb/ft³ (23.6 kN/m³), as for reinforced concrete ([GEC 4][gec4] p. A-13). |
-| Line load (LEM) | `P` on the `lloads` sheet, with `Angle` blank (straight down) | Unit weight × facing thickness × face height: for a 4 in. initial and an 8 in. final facing, 1 ft in all, on a 20 ft face, 150 lb/ft³ × 1 ft × 20 ft = 3,000 lb/ft (43.8 kN/m). |
-| `E` (FEM) | modulus of the shotcrete material | E<sub>c</sub> = 1,820 √f′<sub>c</sub> ksi, with f′<sub>c</sub> in ksi ([GEC 10][gec10] p. 16-3): 3,640 ksi, or 5.24 × 10⁸ psf (2.51 × 10⁷ kPa), for f′<sub>c</sub> = 4 ksi (4,000 psi). Shotcrete is typically 3,000 to 4,000 psi, more commonly 4,000 ([GEC 7][gec7] p. 164). |
+| Facing thickness | The initial and final facings together, used in the line load (LEM) and as the polygon's thickness normal to the face (FEM). | Initial facing of shotcrete: typically 4 in. (0.33 ft, 0.10 m), or 6 in. (0.5 ft, 0.15 m). Final facing of shotcrete: 6 or 8 in. (0.5 or 0.67 ft, 0.15 or 0.20 m), typically 8. Final facing cast in place: 10 in. (0.83 ft, 0.25 m) and thicker ([GEC 7][gec7] p. 164). |
+| Unit weight | Used in the line load (LEM), and as γ of the shotcrete material (FEM). | 150 lb/ft³ (23.6 kN/m³), as for reinforced concrete ([GEC 4][gec4] p. A-13). |
+| Line load (LEM) | `P` on the `lloads` sheet, with `Angle` left blank (straight down). | Unit weight × facing thickness × face height: for a 4 in. initial and an 8 in. final facing, 1 ft in all, on a 20 ft face, 150 lb/ft³ × 1 ft × 20 ft = 3,000 lb/ft (43.8 kN/m). |
+| `E` (FEM) | Modulus of the shotcrete material. | E<sub>c</sub> = 1,820 √f′<sub>c</sub> ksi, with f′<sub>c</sub> in ksi ([GEC 10][gec10] p. 16-3): 3,640 ksi, or 5.24 × 10⁸ psf (2.51 × 10⁷ kPa), for f′<sub>c</sub> = 4 ksi (4,000 psi). Shotcrete is typically 3,000 to 4,000 psi, more commonly 4,000 ([GEC 7][gec7] p. 164). |
 
 ### A geosynthetic and facing blocks, panels or a wrapped face
 
-A layer connected to facing blocks or panels starts at the back of the facing, end 1. The figure shows one layer
-connected to a block facing.
+A geosynthetic layer connected to facing blocks or panels starts at the back of the facing, at its end 1. The
+figure shows one layer connected to a block facing.
 
 ![A geosynthetic layer running from the back of a block facing, end 1, into the fill, end 2](../usage/images/mr_connect_geosynthetic_facing.png){width=455}
 
-End 1 is on the back of the block facing, where `Tend1` is the connection, and end 2 is in the fill.
+`Tend1` sets the capacity of the connection at end 1. End 2 is in the fill.
 
-FHWA takes the long-term strength of the connection, per unit width of the layer, from connection tests on the
-facing unit and the geosynthetic:
+FHWA bases the connection's long-term strength, per unit width of the layer, on connection tests of the facing
+unit with the geosynthetic:
 
 >$T_{alc} = \dfrac{T_{ult} \times CR_{cr}}{RF_D}$
 
-where T<sub>ult</sub> is the layer's ultimate tensile strength, CR<sub>cr</sub> the fraction of it the connection
-keeps over the long term, measured in those tests, and RF<sub>D</sub> the reduction factor for chemical and
-biological degradation ([GEC 11][gec11] Eq. 4-41, p. B-13). T<sub>alc</sub> rises with the normal pressure on the
-connection: in Example E1 it runs
-from 533 lb/ft (7.8 kN/m) at the top layer to 2,550 lb/ft (37.2 kN/m) at the bottom, against the layers' long-term strength T<sub>al</sub> ([Geosynthetic Layer](../reinforcement/types.md#geosynthetic-layer)) = 1,085 and
-2,169 lb/ft (15.8 and 31.7 kN/m) for the two grades the wall uses, GG-I and GG-II (Table E1-7.3, p. E1-15;
-connection strengths Table E1-7.6, p. E1-18), so on eight of the wall's eleven layers the connection limits the
-force at the face.
+where T<sub>ult</sub> is the layer's ultimate tensile strength, CR<sub>cr</sub> is the fraction of that strength
+the connection keeps over the long term, measured in those tests, and RF<sub>D</sub> is the reduction factor for
+chemical and biological degradation ([GEC 11][gec11] Eq. 4-41, p. B-13). T<sub>alc</sub> increases with the normal
+pressure on the connection. In GEC 11's Example E1, it ranges from 533 lb/ft (7.8 kN/m) at the top layer to
+2,550 lb/ft (37.2 kN/m) at the bottom (Table E1-7.6, p. E1-18). The wall uses two grades of geogrid, GG-I and
+GG-II, with long-term strengths T<sub>al</sub> ([Geosynthetic Layer](../reinforcement/types.md#geosynthetic-layer))
+of 1,085 and 2,169 lb/ft (15.8 and 31.7 kN/m) (Table E1-7.3, p. E1-15). On eight of the wall's eleven layers, the
+connection is weaker than the layer and limits the force at the face.
 
-In the LEM, and in the FEM for a bonded layer, `Tend1` only raises the capacity at end 1
-([Capacity Envelope](../reinforcement/lem.md#capacity-envelope)); a jointed layer's `Tend1` ties its end to the
-facing at end 1, up to that capacity ([Ends, ties and the bar](../reinforcement/fem.md#ends-ties-and-the-bar)).
-In the block wall of [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md#part-2-the-same-wall-with-geogrid)
-the back face of the facing is a `joints`-sheet line, and a bonded line may not end on one, so all three layers
-are jointed, each tied to the blocks at `Tend1` = 40 kN/m. A wrapped face has no facing unit: the sheet is folded
-back over the face and buried under the next lift
+In the LEM, and for a bonded layer in the FEM, `Tend1` only sets the layer's capacity at end 1
+([Capacity Envelope](../reinforcement/lem.md#capacity-envelope)). For a jointed layer in the FEM, `Tend1` also ties
+end 1 to the facing, up to that capacity ([Ends, ties and the bar](../reinforcement/fem.md#ends-ties-and-the-bar)).
+In the block wall of [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md#part-2-the-same-wall-with-geogrid),
+the back face of the facing is a line on the `joints` sheet, and a bonded line cannot end on a joint line, so all
+three layers are jointed, each tied to the blocks with `Tend1` = 40 kN/m. A wrapped face has no facing unit: the
+sheet is folded back over the face and buried under the next lift
 ([When a Model Needs a Joint](../fem/joints.md#when-a-model-needs-a-joint)). Its line starts at the face, and
-`Tend1` is the pullout resistance of that folded-back return.
+`Tend1` is the pullout resistance of the folded-back part.
 
 ## References
 

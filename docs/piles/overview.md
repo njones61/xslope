@@ -94,9 +94,10 @@ On the left, a wall in section, entered with `S` = 1. On the right, a row of pil
 spacing `S`.
 
 The FEM divides each pile's EA and EI by `S`. This turns the row of piles into a continuous wall with the same
-average stiffness. In reality, soil can arch between the piles, and if the piles are far apart, soil can flow
-between them. A two-dimensional analysis cannot model either effect. The table shows which analysis to use for each
-type of member:
+average stiffness, and soil cannot pass through it. In reality, soil moves between separate piles, and the spacing
+controls how much force each pile takes. The LEM accounts for this: Ito & Matsui's method computes the pile force
+from the soil moving between piles of diameter `D` at spacing `S`. The FEM does not. So use the FEM for walls and
+nearly continuous rows, and the LEM for rows of separate piles:
 
 | Member | Out of plane | Analysis | What it gives |
 |---|---|---|---|

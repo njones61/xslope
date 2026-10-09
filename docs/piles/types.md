@@ -329,7 +329,7 @@ The polygon carries the facing's weight, so leave out the LEM's line load.
 
 ![The same soil nail and facing for the FEM: the facing a polygon of shotcrete with the nail's end 1 inside it, and no line load](../usage/images/mr_connect_nail_facing_fem.png){width=466}
 
-A facing is a foot thick or less, so the mesher's thin-zone refinement sizes it for about four elements across
+A facing is a foot (0.3 m) thick or less, so the mesher's thin-zone refinement sizes it for about four elements across
 ([Thin material zones](../fem/mesh.md#thin-material-zones)). That refinement is never finer than a sixth of the
 global element size, so on a large model the facing gets fewer elements across and the model checks report it.
 Give its polygon a Size of a quarter of its thickness then; a Size has no such limit

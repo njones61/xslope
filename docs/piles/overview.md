@@ -57,7 +57,7 @@ is a force and L a length.
 | B | <code class="rc rc-geom">Label</code> | — | name used in messages, plots and reports; optional |
 | C, D | <code class="rc rc-geom">x1</code>, <code class="rc rc-geom">y1</code> | L | one end of the pile |
 | E, F | <code class="rc rc-geom">x2</code>, <code class="rc rc-geom">y2</code> | L | the other end |
-| G | <code class="rc rc-lem">H</code> | F/L | pile force per unit width of slope, acting perpendicular to the pile where the slip surface crosses it. Blank, with `D` and `S`, computes it for a vertical pile by Ito & Matsui's closed-form solution for the soil squeezing between piles ([Ito & Matsui (1975) Theory](lem.md#ito-matsui-1975-theory)). |
+| G | <code class="rc rc-lem">H</code> | F/L | the force the pile row resists with, per unit width of slope. The LEM applies it where the slip surface crosses the pile, perpendicular to the pile. For a vertical pile, leave it blank to have it computed from `D` and `S` ([Ito & Matsui (1975) Theory](lem.md#ito-matsui-1975-theory)). |
 | H | <code class="rc rc-lem">Appl</code> | — | Active: `H` is an allowable force, not divided by the factor of safety.<br>Passive: `H` is a nominal force, divided by it with the soil's strength.<br>Blank reads as Active. |
 | I | <code class="rc rc-both">D</code> | L | pile diameter. Ito & Matsui needs it; the FEM computes `I` and `Area` from it when those are blank. |
 | J | <code class="rc rc-both">S</code> | L | center-to-center spacing of the piles in the row. Ito & Matsui and the capacity checks need it; the FEM divides EI and EA by it. 1 for a continuous wall. |

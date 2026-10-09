@@ -321,7 +321,7 @@ The pile crosses the failure surface, so it also resists the slide. Leaving that
   Matsui's method, which holds for `S`/`D` from 2 to 8. Above 8, the method overestimates the force, so enter `H`
   from a lateral analysis of the pile. Enter `Vcap` and `Mcap` to cap the force at what the pile can carry. The FEM
   models the row as a continuous wall, which overstates this resistance
-  ([Continuous Walls and Discrete Pile Rows](fem.md#applicability-continuous-walls-and-discrete-pile-rows)).
+  ([Limits of the Beam Model](fem.md#applicability-continuous-walls-and-discrete-pile-rows)).
 
 ## Connecting Reinforcement to a Wall or Facing
 

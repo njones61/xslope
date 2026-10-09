@@ -937,14 +937,14 @@ shape — `base joint` — is a name you chose, and it belongs to no set.
 
 ![sheet_piles.png](images/sheet_piles.png)
 
-The **piles** worksheet defines pile and concrete pier support elements that provide lateral resistance to slope movement. Unlike flexible reinforcement (soil nails, geogrids) which resists movement through tension along the reinforcement axis, piles are rigid structural elements that resist soil movement through lateral shear and bending at the failure surface intersection.
+The **piles** worksheet defines piles, piers and walls that resist a slide in shear and bending. Each is a straight
+line between its two end points, vertical or battered. The end points can be entered in either order, and the higher
+end is the head. The [Piles and Walls Overview](../piles/overview.md#the-columns) describes every column, and
+[Pile and Wall Types](../piles/types.md) gives the entries for each kind of pile and wall, with typical values.
 
 ![Pile Example](images/pile_example.png){width=800px}
 
-Each pile is represented as a straight line defined by its two endpoint coordinates, which may be entered in either order: the higher end is the head and the lower end the tip. The line geometry supports both vertical piles ($x_1 = x_2$) and battered (inclined) piles. The template is formatted for up to 20 piles, but additional rows can be added to the table as needed.
-
-The [Piles and Walls Overview](../piles/overview.md#the-columns) describes every column, and
-[Pile and Wall Types](../piles/types.md) gives the entries for each kind of pile and wall, with typical values.
+The template is formatted for up to 20 piles, but additional rows can be added to the table as needed.
 
 ---
 

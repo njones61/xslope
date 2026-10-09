@@ -244,88 +244,117 @@ along its base and up through the backfill. On the right, the FEM's base joint a
 
 ## Load-Bearing Piles Near a Slope
 
-Load-bearing piles carry structural loads (vertical forces from foundations) and transfer them to the subsurface through a combination of **skin friction** along the pile shaft and **end bearing** at the pile tip. The key question for slope stability is: does the structural load contribute to the driving forces on the failure surface?
+A load-bearing pile carries a vertical load from a structure, such as a footing, down into the ground. It passes the
+load to the soil by skin friction along its shaft and by end bearing at its tip. For slope stability, the question is
+whether that load adds to the driving force on the failure surface.
 
 **Use either analysis.** Apply the structural load as a surcharge on the `dloads` sheet, or leave it out, as Case 1
-and Case 2 below describe. Both analyses read the `dloads` sheet. In the FEM, do not apply the load at the pile head.
-The pile is bonded to the soil, so the load reaches the soil through the mesh rather than through skin friction and
-end bearing ([Pile-Soil Interface and Load Transfer](fem.md#pile-soil-interface-and-load-transfer)).
+and Case 2 below describe. Both analyses read the `dloads` sheet. In the FEM, leave the piles out of the mesh. The FEM
+would spread a row of separate piles into a continuous wall
+([Continuous Walls and Discrete Pile Rows](fem.md#applicability-continuous-walls-and-discrete-pile-rows)).
+
+A pile whose tip is below the failure surface also crosses it and resists the slide. Leaving that resistance out
+is conservative. To count it, use the LEM and enter the pile on the `piles` sheet, with `S` = *s* and `D` the pile
+diameter, as for any row of separate piles ([Piles and Walls](overview.md#lem-vs-fem)). Ito & Matsui's method
+applies for `S`/`D` between 2 and 8. Above 8, it overestimates the force, so enter `H` from a lateral analysis of
+the pile.
 
 ![A footing on a slope's crest on a pile, twice: in Case 1 the pile's tip is above the failure surface, in Case 2 the pile crosses it and its tip is in stable ground; in plan, footings of width B along the crest at spacing s](images/pw_load_bearing.png){width=871}
 
-In Case 1 the pile ends inside the sliding mass, so the pile and its load move with it. In Case 2 the pile reaches
-stable ground below the failure surface. In plan, the footings stand along the crest (the line with ticks pointing
-down the slope) at center-to-center spacing *s*. Each is *B* wide across the crest, with its pile dashed below it.
+In plan, the footings stand along the crest (the line with ticks pointing down the slope) at center-to-center
+spacing *s*. Each is *B* wide across the crest, with its pile dashed below it.
 
 ### Case 1: Pile tip above the failure surface
 
-If the pile tip is entirely within the sliding mass (a friction pile in weak soil, for example), the entire pile and its load are part of the sliding mass. The structural load **does** contribute to driving forces and should be included in the analysis. Standard practice is to apply the structural load as a **distributed surface surcharge** using the distributed loads (`dloads`) sheet in the XSLOPE input template. For a row of footings along the crest, each *B* wide across the crest and carrying a force *P*, at spacing *s* along it, the surcharge is *P* ÷ (*B* × *s*). Enter it in the `Normal` column at two points on the ground surface, at the footing's edges, with Direction `vertical` ([Worksheet: dloads](../usage/input_template.md#worksheet-dloads)). This is slightly conservative because it places all the weight at the surface rather than distributing it with depth through skin friction, but the conservatism is generally small and accepted in practice.
+If the pile ends inside the sliding mass, as a friction pile in weak soil can, the pile and its load slide with the
+mass. The load adds to the driving force, so include it. Apply it as a surcharge on the `dloads` sheet. Each footing
+is *B* wide across the crest, carries a force *P*, and is spaced *s* from the next. The surcharge is
+*P* ÷ (*B* × *s*). Enter it in the `Normal` column at two points on the ground surface, one at each edge of the
+footing, with Direction set to `vertical` ([Worksheet: dloads](../usage/input_template.md#worksheet-dloads)).
+
+The surcharge puts all of the load at the ground surface. In reality, skin friction spreads it down the pile. The
+surcharge is therefore slightly conservative, but the difference is usually small and is accepted in practice.
 
 ### Case 2: Pile tip below the failure surface
 
-This is the usual design intent for load-bearing piles near slopes — the pile is embedded in stable ground below the failure surface. The pile shaft necessarily passes **through** the sliding mass to reach that stable ground, and skin friction is mobilized along the full shaft length, both above and below the failure surface. The portion of the structural load transferred via skin friction **above** the failure surface loads the sliding mass; the remainder (skin friction below the failure surface plus end bearing) bypasses it.
+A load-bearing pile near a slope is usually designed to reach stable ground below the failure surface. To get there,
+it passes through the sliding mass. Skin friction develops along the whole shaft, above and below the failure
+surface. The load carried by skin friction above the failure surface adds to the sliding mass. The rest, carried
+by skin friction below the failure surface and by end bearing, goes to stable ground.
 
-In principle, determining the split requires a load-transfer analysis (t-z, or load-transfer, curves or similar). In practice, this is rarely done in the context of slope stability because the complexity is not justified. Instead, two bounding assumptions are used:
+Finding this split takes a load-transfer analysis, such as one with t-z curves. That is rarely done for slope
+stability, because the extra effort is not justified. Instead, two assumptions bracket the load: leave it out, or
+apply all of it.
 
-**Lower bound (omit the load)**: Assume the pile delivers all of its load to stable ground below the failure surface. The structural load is omitted entirely from the slope stability model. This is the approach recommended by FHWA and the American Association of State Highway and Transportation Officials (AASHTO), and used by commercial slope stability software (SLOPE/W, Slide2). It is appropriate when:
+#### Leave the load out
 
-- The pile is designed as an end-bearing pile in competent material (rock, dense sand) — most of the load genuinely reaches the tip
-- The skin friction above the failure surface is small relative to the total pile capacity (shallow failure surface relative to the pile length, or weak soil in the sliding mass)
-- The structural load is modest relative to the soil driving forces
+Assume the pile delivers all of its load to stable ground below the failure surface, and leave the load out of the
+model. The FHWA and the American Association of State Highway and Transportation Officials (AASHTO) recommend this
+approach. It is also the approach used with commercial programs such as SLOPE/W and Slide2. It suits these cases:
 
-**Upper bound (full surcharge)**: Treat the full structural load as a surface surcharge, as in Case 1. This is conservative — it assumes all of the load enters the sliding mass, ignoring the load that bypasses via end bearing and deep skin friction. This approach is appropriate when:
+- The pile is an end-bearing pile in competent material, such as rock or dense sand. Most of the load reaches the
+  tip.
+- The skin friction above the failure surface is small compared with the pile's total capacity. This is the case
+  when the failure surface is shallow compared with the pile's length, or when the soil in the sliding mass is weak.
+- The structural load is small compared with the driving force of the soil.
 
-- A significant portion of the pile shaft is above the failure surface
-- The soil above the failure surface has high skin friction capacity (the pile sheds substantial load before reaching the failure surface)
-- The structural load is large relative to the soil driving forces, and the lower-bound assumption would meaningfully affect the computed factor of safety
+#### Apply the full load
 
-For most practical cases with end-bearing piles through a shallow sliding mass, the lower-bound (omit) approach is standard and the error is small. When in doubt, run both assumptions to bracket the answer.
+Apply the full structural load as a surcharge, as in Case 1. This assumes that all of the load enters the sliding
+mass, so it is conservative. It suits these cases:
+
+- A large part of the pile shaft is above the failure surface.
+- The soil above the failure surface develops high skin friction, so the pile sheds much of its load before it
+  reaches the failure surface.
+- The structural load is large compared with the driving force of the soil, so leaving it out would noticeably
+  change the factor of safety.
+
+When in doubt, run both.
 
 ### Summary
 
-For load-bearing piles near slopes, the recommended approach in XSLOPE is:
-
-1. If the pile tip is above the failure surface, apply the structural load as a distributed surface load on the `dloads` sheet
-2. If the pile tip is below the failure surface, omit the structural load from the slope stability model (lower bound). If the structural load is significant, also run with full surcharge (upper bound) to bracket the result.
-3. If the pile also provides lateral resistance to sliding, model that separately as a stabilizing pile force $H$
-
-The distributed loads in XSLOPE handle the surcharge case, so load-bearing piles need no additional input.
+1. If the pile tip is above the failure surface, apply the structural load as a surcharge on the `dloads` sheet.
+2. If the pile tip is below the failure surface, leave the load out. When in doubt, also run with the full
+   surcharge to bracket the result.
+3. To count the pile's resistance to sliding, enter the pile on the `piles` sheet and use the LEM.
 
 ## Connecting Reinforcement to a Wall or Facing
 
-A support that bears on a wall or a facing is connected at end 1. The two analyses treat the connection
-differently: the LEM applies each member's force on its own, and the FEM connects a bar to another member only at
-a node the two share or, for a jointed sheet, through a tie at its end.
+A tieback, nail or geosynthetic that bears on a wall or a facing is connected at its end 1. The two analyses treat
+the connection differently. The LEM applies each member's force separately. The FEM connects a bar to another
+member only at a node the two share or, for a jointed sheet, through a tie at end 1.
 
 ### A tieback and a soldier-pile or sheet-pile wall
 
-Enter the wall on the `piles` sheet ([Piles in LEM](lem.md)) and each tieback on the `reinforce` sheet, with end 1
-on the wall face. The wall's resistance is its shear force `H`, entered as described under
-[Soldier-Pile Wall](#soldier-pile-wall). The `piles` sheet has its own `Appl` column, which works as it does on the
-`reinforce` sheet; [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) enters its stated `H` with `Appl` set to
-Active. The figure shows one tieback through a soldier-pile wall, with a trial surface that crosses both.
+Use the LEM for a soldier-pile wall and the FEM for a sheet-pile wall ([Soldier-Pile Wall](#soldier-pile-wall),
+[Sheet-Pile Wall](#sheet-pile-wall)). Enter the wall on the `piles` sheet and each tieback on the `reinforce` sheet,
+with end 1 at the wall.
+
+#### In the LEM
+
+The wall resists with the force `H` where a trial surface crosses it ([Piles in LEM](lem.md)). Enter `H` as
+described under [Soldier-Pile Wall](#soldier-pile-wall). The `piles` sheet has its own `Appl` column, which works as
+it does on the `reinforce` sheet. [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) enters the `H` its reference
+publishes, with `Appl` set to Active. The figure shows one tieback through a soldier-pile wall, with a trial
+surface that crosses both.
 
 ![A tieback through a wall, with a trial surface from the excavation corner crossing its unbonded length, and the forces Tmax on the tendon and H on the wall](../usage/images/mr_connect_tieback_wall_lem.png){width=450}
 
 The trial surface starts at the corner of the excavation, where it crosses the pile line and the wall's `H` acts.
-It then crosses the tieback's unbonded length, where `Tmax` acts along the tendon.
+It then crosses the tieback's unbonded length, where `Tmax` acts along the tendon. A trial surface that passes
+below the toe of the wall receives no force from the wall.
 
-A trial surface that passes below the toe of the wall receives no force from the wall.
+#### In the FEM
 
-In the FEM, the wall is a chain of beam elements ([Piles in FEM](fem.md)) and a tieback is a chain of bar
-elements. A bar that ends on or crosses a pile line shares a node with the pile there, so the tieback pulls on the
-wall at that node. The figure shows one tieback whose end 1 lies on the pile line, below the pile's head.
+The wall is a chain of beam elements ([Piles in FEM](fem.md)), and a tieback is a chain of bar elements. A bar
+that ends on or crosses a pile line shares a node with the pile there, so the tieback pulls on the wall at that
+node. The figure shows one tieback whose end 1 lies on the pile line, below the pile's head.
 
 ![A tieback whose first node is a node of the wall's pile line below its head, with the bar's other nodes running back into the soil](../usage/images/mr_connect_tieback_wall_fem.png){width=447}
 
-End 1 of the tieback is also a node of the pile; the bar's other nodes run back into the soil.
-
-If a bar crosses a pile line rather than ending on it, the
-[model checks](../studio/analysis.md#model-checks-before-a-run) note that the two are joined at the crossing. To
-keep a bar unconnected to the pile, end it short of the pile line. The tieback in
-[Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) starts on the wall face at x = 0, with the pile line 0.5 ft
-behind it, so in the FEM it crosses the pile line and is joined to it there; in the LEM the offset has no
-effect.
+End 1 can also lie on the wall face in front of the pile line. In [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md),
+the face is at x = 0 and the pile line 0.5 ft (0.15 m) behind it. The bar then crosses the pile line and is joined to
+it at the crossing. The [model checks](../studio/analysis.md#model-checks-before-a-run) note the join.
 
 ### A soil nail and a shotcrete facing
 

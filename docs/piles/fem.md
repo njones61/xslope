@@ -199,10 +199,11 @@ wall both contribute to the difference.
 
 **Load-bearing piles.** An axial load at the head reaches the soil in proportion to the stiffness of the beam and of
 the soil elements at each node, not through skin friction and end bearing. The pile cannot slip or punch through,
-and the depth at which the load is transferred depends on the mesh. For a pile near a slope that also carries a
-structural load, model the pile as a passive beam and bracket the load as described under
-[Load-bearing piles](types.md#load-bearing-piles-near-a-slope): once as a surcharge on the `dloads` sheet, once without
-it.
+and the depth at which the load is transferred depends on the mesh. For a load-bearing pile near a slope, leave the
+pile out of the mesh and apply its load as described under
+[Load-Bearing Piles Near a Slope](types.md#load-bearing-piles-near-a-slope). The FEM spreads a row of separate piles
+into a continuous wall and overstates its resistance
+([Applicability](#applicability-continuous-walls-and-discrete-pile-rows)).
 
 
 ## Input Parameters

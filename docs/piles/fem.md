@@ -186,9 +186,9 @@ Strength reduction leaves the pile's $E$, $I$, $A$, $V_{\text{cap}}$ and $M_{\te
 ## Pile-Soil Interface and Load Transfer
 
 A pile's beam elements stand on the nodes of the soil element edges they lie on, the midside node included on a
-quadratic mesh, so pile and soil have the same displacement at every node. The interface is perfectly bonded: the
-shaft cannot slip, and no interface strength limits the shear passed between pile and soil; only the soil's yield
-and the pile's $V_{\text{cap}}$ and $M_{\text{cap}}$ do. XSLOPE has no interface element along a
+quadratic mesh, so pile and soil have the same displacement at every node. The interface is perfectly bonded. The
+shaft cannot slip, and no interface strength limits the load passed between pile and soil. Only the soil's strength
+limits it, and, for sideways load, the pile's `Vcap` and `Mcap`. XSLOPE has no interface element along a
 pile shaft; [interface elements](../fem/joints.md) apply only to joint lines and jointed reinforcement lines.
 
 **Passive (stabilizing) piles.** The soil pushes laterally on the pile, and the soil yielding around it limits the

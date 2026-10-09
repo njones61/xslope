@@ -953,9 +953,11 @@ The [Piles and Walls Overview](../piles/overview.md#the-columns) describes every
 ![sheet_lloads.png](images/sheet_lloads.png)
 
 The **lloads** worksheet defines line loads — concentrated forces applied at a point on the ground surface, per
-unit width of slope. A typical use is the self-weight of a facing element, such as the shotcrete plate of a soil
-nail wall, applied as a point load on the wall face. (For loads spread over an area of the surface, use the
-**dloads** worksheet instead.)
+unit width of slope. A typical use is the weight of a soil nail wall's shotcrete facing in a limit equilibrium
+model, applied on the crest just behind the top of the face; in a finite element model, draw the facing as a
+polygon instead
+([A soil nail and a shotcrete facing](../piles/types.md#a-soil-nail-and-a-shotcrete-facing)). (For loads spread
+over an area of the surface, use the **dloads** worksheet instead.)
 
 The template is formatted for up to 20 line loads (rows 3-22). Each line load is defined by:
 
@@ -968,7 +970,8 @@ The template is formatted for up to 20 line loads (rows 3-22). Each line load is
 
 During limit equilibrium analysis, the load is applied to the slice whose top boundary contains the point, entering
 the equilibrium equations as force components with a real moment arm (analogous to the pile force terms, but applied
-at the top of the slice rather than at the failure surface).
+at the top of the slice rather than at the failure surface). The finite element analysis applies it as a force at
+the nearest mesh node ([Loads](../fem/overview.md#distributed-loads)).
 
 ---
 

@@ -1194,9 +1194,15 @@ slope_data['pile_lines'] = [
 
 #### Line loads (`line_loads`)
 
-Concentrated forces per unit width on the ground surface (v12) — e.g. a shotcrete facing
-plate's weight on a nailed wall face. Points are snapped to the ground surface within a small
-tolerance and refused beyond it.
+Concentrated forces per unit width on the ground surface (v12) — e.g. a shotcrete facing's
+weight on the crest just behind the top of a nailed wall face, in an LEM model: P = unit
+weight × the whole facing thickness × face height, with the facing itself not drawn and each
+nail's end 1 on the cut face. Points are snapped to the ground surface within a small tolerance
+and refused beyond it. The FEM applies a line load at one node, and a facing's weight there can
+fail the soil under that node: in an FEM model draw the facing as a polygon of shotcrete
+(strength option `elastic`) with the nails ending inside it, enter no line load for it, and
+give the polygon a Size of a quarter of its thickness if the model checks report it
+under-resolved.
 
 ```python
 slope_data['line_loads'] = [

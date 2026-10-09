@@ -15,7 +15,8 @@ safety, and LEM and FEM are the limit equilibrium and finite element analyses.
 
 Typical values come from the Federal Highway Administration (FHWA) manuals on drilled shafts (Geotechnical
 Engineering Circular 10, cited as [GEC 10][gec10]), micropiles (the [micropile manual][mp]), ground anchors and
-anchored walls ([GEC 4][gec4]) and mechanically stabilized earth walls ([GEC 11][gec11v1]), and, for steel
+anchored walls ([GEC 4][gec4]), soil nail walls ([GEC 7][gec7]) and mechanically stabilized earth walls
+([GEC 11][gec11v1]), and, for steel
 sections, one sheet-pile maker's published tables ([Nucor Skyline][nucor]) ([References](#references)). Where a
 source gives a value in one unit system only, the value in parentheses is converted from it, and a value given in
 inches or millimeters (ksi, in², in⁴, mm²) is also given in model units, built on feet or meters.
@@ -296,23 +297,55 @@ behind it, crosses the pile line and is joined to it there in the FEM; in the LE
 
 ### A soil nail and a shotcrete facing
 
-A nail's head plate bears on the shotcrete facing at end 1. The LEM takes the facing into account in two ways:
-the head's capacity, in `Tend1`, and the facing's weight, entered as a vertical line load at the top of the face
-([Worksheet: lloads](../usage/input_template.md#worksheet-lloads)). On a vertical face the facing's weight acts along the
-face, so one vertical force at the top of the face gives the same force and moment as the weight spread down it,
-provided the slip surface exits at the toe; on a battered face it is approximate. The figure shows one nail head
-on a shotcrete facing.
+A nail's head plate bears on the shotcrete facing at end 1, where `Tend1` sets the head's capacity in both
+analyses ([Soil Nail](../reinforcement/types.md#soil-nail)). The two analyses take the facing itself differently.
 
-![A soil nail with its head on a shotcrete facing, and the facing's weight as a line load at the top of the face](../usage/images/mr_connect_nail_facing.png){width=466}
+In the LEM the facing is not drawn. The cut face is the ground surface, each nail's end 1 is on it, and the
+facing's weight is a vertical line load on the crest, at the crest's elevation and a few inches (about 0.1 m)
+behind the top of the face ([Worksheet: lloads](../usage/input_template.md#worksheet-lloads)). The nails carry the facing
+([GEC 7][gec7] p. 200), so its weight bears on the reinforced soil behind it, which is the soil that slides. On a
+vertical face, one force at the top gives the same force and moment as the weight spread down the face, provided
+the slip surface exits at the toe; on a battered face it is approximate. A polygon of concrete does not work in the
+LEM. A trial surface does not cut through a material whose strength option is `elastic`, so to reach the toe it
+passes under the facing. The slip surface beneath the facing is then nearly level, and the facing's weight adds
+almost nothing to the force driving the slide. A circle can pass under the facing only as a long, deep arc, so a
+circular search misses the shallow surfaces that govern.
 
-End 1 is the nail head on the facing, where `Tend1` sets the capacity, and the facing's weight is a line load at
-the top of the face.
+![A soil nail on a cut face, with the facing a dashed outline not in the model, and the facing's weight as a line load on the crest just behind the top of the face](../usage/images/mr_connect_nail_facing.png){width=478}
 
-Verification problems [VP47](../verification/rocscience.md#vp47) and [VP48](../verification/rocscience.md#vp48) enter their facings
-this way, with line loads of 14.6 kN/m and 13.2 kN/m. The FEM has no facing member: a beam cannot be laid along
-the face, because the mesher rejects a line that runs along the ground surface
-([Reinforcement and pile lines](../fem/mesh.md#reinforcement-and-pile-lines)), so each nail head is a soil node on
-the face and `Tend1` only raises the capacity of the bar at that end.
+End 1 is the nail head on the cut face, where `Tend1` sets the capacity, and the facing's weight is a line load on
+the crest. The dashed outline shows where the facing is; the LEM's model does not include it. Verification problems
+[VP47](../verification/rocscience.md#vp47) and [VP48](../verification/rocscience.md#vp48), both limit equilibrium
+problems, enter their facings this way, with line loads of 14.6 kN/m and 13.2 kN/m.
+
+In the FEM the facing is a polygon of shotcrete, drawn on the air side of the cut face from the toe to the crest,
+as thick as the initial and final facings together, so that its outer face becomes the ground surface. Its material's
+strength option is `elastic`, as for a [gravity wall](#gravity-or-cantilever-wall). Each nail is extended to end 1
+inside the polygon, at its head plate, and there is no line load. The FEM applies a line load as a force at one
+node ([Loads](../fem/overview.md#distributed-loads)), and a facing's whole weight on one node can fail the soil
+under that node before the slope fails. The polygon spreads the weight down the face and gives the facing the
+stiffness of concrete.
+
+A facing is a foot thick or less, so the mesher's thin-zone refinement sizes it for about four elements across
+([Thin material zones](../fem/mesh.md#thin-material-zones)). That refinement is never finer than a sixth of the
+global element size, so on a large model the facing gets fewer elements across and the model checks report it.
+Give its polygon a Size of a quarter of its thickness then; a Size has no such limit
+([A Size on one zone](../fem/mesh.md#a-size-on-one-zone)).
+
+![The same soil nail and facing for the FEM: the facing a polygon of shotcrete with the nail's end 1 inside it, and no line load](../usage/images/mr_connect_nail_facing_fem.png){width=466}
+
+The facing is one polygon of shotcrete. The nail's bar runs through it to end 1 at the head plate, and the nail's
+grouted length runs on into the soil.
+
+To run both analyses, keep two copies of the model. The LEM's has the line load, no facing polygon, and each nail's
+end 1 on the cut face; the FEM's has the polygon, each end 1 inside it, and no line load.
+
+| Quantity | Entry | Typical values |
+|---|---|---|
+| Facing thickness | in the line load (LEM); the polygon's thickness normal to the face, the initial and final facings together (FEM) | Initial facing of shotcrete: typically 4 in. (0.33 ft, 0.10 m), or 6 in. (0.5 ft, 0.15 m). Final facing of shotcrete: 6 or 8 in. (0.5 or 0.67 ft, 0.15 or 0.20 m), typically 8. Final facing cast in place: 10 in. (0.83 ft, 0.25 m) and thicker ([GEC 7][gec7] p. 164). |
+| Unit weight | in the line load (LEM); γ of the shotcrete material (FEM) | 150 lb/ft³ (23.6 kN/m³), as for reinforced concrete ([GEC 4][gec4] p. A-13). |
+| Line load (LEM) | `P` on the `lloads` sheet, on the crest a few inches behind the top of the face, with `Angle` blank (straight down) | Unit weight × the whole facing thickness, initial and final together, × face height: for a 4 in. initial and an 8 in. final facing on a 20 ft face, 150 lb/ft³ × 1 ft × 20 ft = 3,000 lb/ft (43.8 kN/m). |
+| `E` (FEM) | modulus of the shotcrete material | E<sub>c</sub> = 1,820 √f′<sub>c</sub> ksi, with f′<sub>c</sub> in ksi ([GEC 10][gec10] p. 16-3): 3,640 ksi, or 5.24 × 10⁸ psf (2.51 × 10⁷ kPa), for f′<sub>c</sub> = 4 ksi (4,000 psi). Shotcrete is typically 3,000 to 4,000 psi, more commonly 4,000 ([GEC 7][gec7] p. 164). |
 
 ### A geosynthetic and facing blocks, panels or a wrapped face
 
@@ -353,6 +386,11 @@ back over the face and buried under the next lift
 Anchors and Anchored Systems*. [FHWA-IF-99-015](https://www.fhwa.dot.gov/engineering/geotech/pubs/if99015.pdf).
 Federal Highway Administration, Washington, D.C.
 
+**GEC 7:** Lazarte, C.A., Robinson, H., Gómez, J.E., Baxter, A., Cadden, A., & Berg, R. (2015). *Geotechnical
+Engineering Circular No. 7: Soil Nail Walls Reference Manual*.
+[FHWA-NHI-14-007](https://www.fhwa.dot.gov/engineering/geotech/pubs/nhi14007.pdf). Federal Highway Administration,
+Washington, D.C.
+
 **GEC 10:** Brown, D.A., Turner, J.P., & Castelli, R.J. (2010). *Drilled Shafts: Construction Procedures and LRFD
 Design Methods* (Geotechnical Engineering Circular No. 10).
 [FHWA-NHI-10-016](https://rosap.ntl.bts.gov/view/dot/40746/dot_40746_DS1.pdf). Federal Highway Administration,
@@ -371,6 +409,7 @@ Federal Highway Administration, Washington, D.C.
 [nucorskyline.com](https://www.nucorskyline.com/file%20library/document%20library/english/brochures/product_manual_en.pdf).
 
 [gec4]: https://www.fhwa.dot.gov/engineering/geotech/pubs/if99015.pdf
+[gec7]: https://www.fhwa.dot.gov/engineering/geotech/pubs/nhi14007.pdf
 [gec10]: https://rosap.ntl.bts.gov/view/dot/40746/dot_40746_DS1.pdf
 [gec11v1]: https://www.fhwa.dot.gov/engineering/geotech/pubs/nhi10024/nhi10024.pdf
 [gec11]: https://www.fhwa.dot.gov/engineering/geotech/pubs/nhi10025/nhi10025.pdf

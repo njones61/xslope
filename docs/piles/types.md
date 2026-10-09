@@ -179,43 +179,47 @@ and `I`, `Area` and `Mcap` are entered for one beam.
 
 ## Segmental Block Wall
 
-A segmental, or modular block, wall is a column of dry-stacked concrete units, usually with geogrid layers laid
-between the courses and running back into a reinforced fill. The blocks themselves do not fail. The wall fails at
-its contacts: a course can slide on the one below it, the whole column can slide on its foundation, and its back
-face can separate from the fill.
+A segmental, or modular block, wall is a column of dry-stacked concrete units. The blocks themselves do not fail.
+The wall fails at its contacts: a course can slide on the one below it, the whole column can slide on its
+foundation, and its back face can separate from the fill. Many block walls also have geogrid layers laid between
+the courses and running back into the fill
+([A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face)).
 
-**Use the FEM.** Only the FEM models the contacts, as joint lines; the LEM does not read the `joints` sheet.
+**Use the FEM.** Only the FEM models the contacts.
 
 The figure shows the wall of [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) in section and in plan.
 
-![In section, a segmental block wall with a joint line under its base, up its back face and between each pair of courses, and geogrid layers tied into the blocks; in plan, the units laid over the joints of the course below, and a geogrid layer running back into the reinforced fill](images/pw_block_wall.png){width=653}
+![In section, a segmental block wall of six courses on its foundation, with backfill behind it and retained fill beyond; in plan, the units of the top course laid over the gaps between the units of the course below](images/pw_block_wall.png){width=600}
 
-In section, each course is a polygon of block material, and joint lines run under the base, up the back face and
-between the courses. Each geogrid layer is tied to a block at the dot where it ends. The plan looks down on the
-wall with its face at the bottom. Solid lines are the joints between the units of the top course, and dashed lines
-are those of the course below, offset by half a unit. The geogrid runs back from the blocks into the reinforced
-fill along the whole length of the wall.
+The plan looks down on the wall with its face at the bottom. Solid lines separate the units of the top course, and
+dashed lines separate those of the course below, offset by half a unit.
+
+#### In the LEM
+
+The LEM cannot model a block wall. It does not read the `joints` sheet. If the blocks are drawn as a soil material,
+with the `mc` strength option, trial surfaces cut through them, and the factor of safety comes out far too low.
+
+#### In the FEM
 
 The wall is drawn as polygons rather than entered on the `piles` sheet:
 
 - **Blocks.** Draw one polygon per course on the `polygon` sheet, in a block material with the `elastic` strength
-  option ([Worksheet: mat](../usage/input_template.md#worksheet-mat)). An elastic material cannot fail: the FEM's
-  strength reduction does not weaken the blocks, and an LEM trial slip surface can run along the wall's boundary
-  but not through it. Give each block polygon a local `Size` of about half the course height,
+  option ([Worksheet: mat](../usage/input_template.md#worksheet-mat)). An elastic material cannot fail, so the
+  strength reduction does not weaken the blocks. Give each block polygon a local `Size` of about half the course height,
   so the mesh resolves every course without refining the whole section.
-- **Contacts** (FEM). Enter one row on the `joints` sheet for the base, one for the back face, and one for each
+- **Contacts.** Enter one row on the `joints` sheet for the base, one for the back face, and one for each
   course joint ([The joints worksheet](../fem/joints.md#the-joints-worksheet)). In a battered wall, where each
   course is set back from the one below, the back face steps at every course, and each step needs its own joint
   line.
-- **Geogrid.** Enter each layer as a line on the `reinforce` sheet, as described under
-  [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face).
+
+#### Typical values
 
 Typical values for the blocks and their contacts:
 
 | Quantity | Entry | Typical values |
 |---|---|---|
 | Block size | The polygons' height and depth. | Units 0.33 to 1.25 ft (0.10 to 0.375 m) high and 0.67 to 2 ft (0.20 to 0.60 m) deep ([GEC 11][gec11v1] Vol. I p. 3-43). |
-| Batter | A setback at each course. | From near vertical up to 15 degrees (Vol. I p. 2-40). |
+| Batter | Set each course polygon back from the one below. | From near vertical up to 15 degrees (Vol. I p. 2-40). |
 | Course joints | `c` = 0; `phi` from the manufacturer's inter-unit shear tests; `t_cut` = 0. | GEC 11 requires the inter-unit shear capacity from tests on the unit (ASTM D6916) (Vol. I p. 4-58) and gives no typical value. |
 | Base and back face | `c` = 0; `phi` = the friction angle of concrete on the adjacent soil; `t_cut` = 0. | As for a [gravity wall](#gravity-or-cantilever-wall) below. |
 | `kn`, `ks`, `Jred` | Leave blank. The stiffnesses then come from the softer adjacent material, and the strength reduction weakens the contacts along with the soil. | — |
@@ -421,21 +425,28 @@ layer with end 1 at the face, and set `Tend1` to the pullout resistance of the f
 
 #### In the LEM
 
-For a wrapped face, `Tend1` sets the layer's capacity at end 1, where its capacity envelope starts
+A block facing needs the FEM. For a wrapped face, `Tend1` sets the layer's capacity at end 1, where its capacity
+envelope starts
 ([Capacity Envelope](../reinforcement/lem.md#capacity-envelope)).
 
 #### In the FEM
 
-Draw a block facing as described under [Segmental Block Wall](#segmental-block-wall): one polygon per course, with
-joint lines under the base, up the back face and between the courses. A bonded line cannot end on a joint line, so
-set `Joint` to `Yes` on each layer that ends on the back face. `Tend1` then ties end 1 to the blocks, up to that
-capacity ([Ends, ties and the bar](../reinforcement/fem.md#ends-ties-and-the-bar)). In
+Draw the blocks and their joint lines as described under [Segmental Block Wall](#segmental-block-wall). A bonded
+layer cannot end on a joint line, so set `Joint` to `Yes` on every layer. `Tend1` is the strength of the tie between
+end 1 and the blocks ([Ends, ties and the bar](../reinforcement/fem.md#ends-ties-and-the-bar)). In
 [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md#part-2-the-same-wall-with-geogrid), each of the three layers
-is tied to the blocks with `Tend1` = 40 kN/m (2,740 lb/ft).
+is tied to the blocks with `Tend1` = 40 kN/m (2,740 lb/ft). The figure shows that wall.
 
-A wrapped face has no blocks and needs no joint lines. Run it twice, once with the layers bonded and once with them
-jointed ([Choosing a Bonded Bar or a Joint](../reinforcement/fem.md#bonded-bar-or-joint)). For a jointed layer,
-`Tend1` ties end 1 to the soil at the face.
+![In section, the FEM-3 block wall with a joint line under its base, up its back face and between each pair of courses, and three geogrid layers starting on the back face, each tied to the blocks; in plan, the units of the top course and a geogrid layer running back into the reinforced fill](images/pw_block_wall_geogrid.png){width=653}
+
+In section, joint lines run under the base, up the back face and between the courses. Each layer starts on the back
+face, where a dot marks its tie to the blocks. In plan, one layer runs back from the blocks into the reinforced fill
+along the whole length of the wall.
+
+A wrapped face has no blocks and needs no joint lines. Run the model twice, once with the layers bonded and once
+with them jointed ([Choosing a Bonded Bar or a Joint](../reinforcement/fem.md#bonded-bar-or-joint)). For a bonded
+layer, `Tend1` sets the layer's capacity at end 1. For a jointed layer, `Tend1` is the strength of the tie between
+end 1 and the soil at the face.
 
 #### Connection strength
 
@@ -453,9 +464,10 @@ GG-II, with long-term strengths T<sub>al</sub> ([Geosynthetic Layer](../reinforc
 of 1,085 and 2,169 lb/ft (15.8 and 31.7 kN/m) (Table E1-7.3, p. E1-15). On eight of the wall's eleven layers, the
 connection is weaker than the layer and limits the force at the face.
 
-Enter T<sub>alc</sub> as `Tend1`. With `Appl` set to Active, first divide it by the factor of safety the design
-applies to the connection. With `Appl` set to Passive, enter it as it is
-([Geosynthetic Layer](../reinforcement/types.md#geosynthetic-layer)).
+Enter T<sub>alc</sub> as `Tend1`. In the LEM, with `Appl` set to Active, first divide it by the factor of safety
+the design applies to the connection. With `Appl` set to Passive, enter it as it is
+([Geosynthetic Layer](../reinforcement/types.md#geosynthetic-layer)). The FEM ignores `Appl` and uses `Tend1` as
+entered.
 
 ## References
 

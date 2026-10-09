@@ -96,14 +96,15 @@ spacing `S`.
 The FEM divides each pile's EA and EI by `S`. This turns the row of piles into a continuous wall with the same
 average stiffness, and soil cannot pass through it. In reality, soil moves between separate piles, and the spacing
 controls how much force each pile takes. The LEM brings this in through `H`: Ito & Matsui's method computes the
-pile force from the soil moving between piles of diameter `D` at spacing `S`. The FEM has no such term. So use the FEM for walls and
-nearly continuous rows, and the LEM for rows of separate piles:
+pile force from the soil moving between piles of diameter `D` at spacing `S`. The FEM has no such term. So use the FEM for continuous
+walls and nearly continuous rows, and the LEM for separate piles:
 
 | Member | Out of plane | Analysis | What it gives |
 |---|---|---|---|
 | Sheet-pile, diaphragm or secant wall | continuous | FEM, `S` = 1 | factor of safety, plus moment, shear, deflection and soil reaction down the member |
 | Contiguous or very closely spaced row | nearly continuous | FEM, as a continuous wall | the same, ignoring the gaps |
 | Row of separate piles | discrete | LEM with Ito & Matsui | factor of safety for the spacing, force per pile, capacity checks |
+| Soldier-pile wall | continuous above the excavation, discrete below | LEM, with `H` entered | factor of safety for the entered `H` |
 
 [LEM vs FEM Pile Modeling](lem.md#lem-vs-fem-pile-modeling) compares the two analyses on the same slopes,
 including the one pile-stabilized slope with a published three-dimensional solution. The formulations are on

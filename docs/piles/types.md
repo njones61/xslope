@@ -25,8 +25,13 @@ inches or millimeters (ksi, in², in⁴, mm²) is also given in model units, bui
 
 A row of drilled shafts, or piers, is installed through the sliding mass into stable ground, at a spacing close
 enough for the soil to arch between them. The shafts act as shear dowels across the slip surface
-([GEC 10][gec10] p. 12-59). Analyze a row of separate shafts with the LEM, with `H` from Ito & Matsui's method
-([LEM vs FEM](overview.md#lem-vs-fem)). The figure shows one shaft in section and the row in plan.
+([GEC 10][gec10] p. 12-59).
+
+**Use the LEM**, with `H` computed by Ito & Matsui's method. The shafts are separate piles, and Ito & Matsui's
+method accounts for the soil moving between them ([LEM vs FEM](overview.md#lem-vs-fem)). If the shafts touch, as in
+a contiguous or secant pile wall, the row is a wall: use the FEM, as for a [sheet-pile wall](#sheet-pile-wall).
+
+The figure shows one shaft in section and the row in plan.
 
 ![In section, a drilled shaft through a slope, from its head at the ground surface, across the slip surface, to its tip in stable ground, with the force H at the crossing; in plan, a row of shafts of diameter D at spacing S](images/pw_shaft.png){width=842}
 
@@ -54,8 +59,12 @@ across the slope at center-to-center spacing `S`, and the sliding mass moves pas
 A micropile is a small drilled and grouted pile, typically less than 300 mm (12 in) in diameter, reinforced with a
 steel casing or bar ([micropile manual][mp] p. 1-4). To stabilize a slope, micropiles are installed in rows, often
 in pairs battered across the slip surface, with their heads tied together by a concrete cap beam at the ground
-surface (pp. 6-44, 6-54). Ito & Matsui's method applies to vertical piles only, so enter `H` for a battered
-micropile. The figure shows one battered pair under its cap beam in section, and three pairs in plan.
+surface (pp. 6-44, 6-54).
+
+**Use the LEM**, since the micropiles in a row are separate piles. Ito & Matsui's method applies to vertical piles
+only, so enter `H` for each battered micropile.
+
+The figure shows one battered pair under its cap beam in section, and three pairs in plan.
 
 ![In section, a pair of micropiles battered in opposite directions from a cap beam on a bench in a slope, each crossing the slip surface with its own force H perpendicular to it; in plan, three pairs along the cap beam at spacing S](images/pw_micropiles.png){width=801}
 
@@ -84,8 +93,12 @@ The values of `I` and `Area` above leave out the grout inside the casing; the mo
 ## Sheet-Pile Wall
 
 A sheet-pile wall is a line of interlocking steel sheets driven to form a continuous wall, cantilevered or held by
-tiebacks. Because it is continuous out of plane, the FEM represents it directly. Enter it per unit length of wall,
-with `S` = 1. The figure shows a wall held by a tieback in section, and its sheets in plan.
+tiebacks.
+
+**Use the FEM.** The wall is continuous out of plane, so the FEM represents it directly and also returns the moment,
+shear and deflection in it. Enter it per unit length of wall, with `S` = 1.
+
+The figure shows a wall held by a tieback in section, and its sheets in plan.
 
 ![A sheet-pile wall in section, retaining soil above an excavation, held by a tieback and embedded below the excavation's base, beside the interlocked Z-shaped sheets in plan](images/pw_sheet_pile.png){width=766}
 
@@ -125,9 +138,14 @@ The manufacturer states these as 6.47 to 11.77 in² and 84.4 to 491 in⁴ per fo
 
 A soldier-pile wall is a row of steel beams, either driven H-piles or pairs of channels or wide-flange beams set in
 concrete-filled drilled holes, with timber lagging spanning between them to hold the soil ([GEC 4][gec4] p. 13).
-The beams are discrete, but the lagging makes the wall continuous. Enter the wall per beam, with `S` the beam
-spacing. [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md) builds one held by tiebacks. The figure shows
-the wall in section and in plan.
+
+**Use the LEM**, with `H` entered, as in [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md). Above the
+excavation, the lagging makes the wall continuous. Below it, the beams are separate piles, and the soil can move
+between them. `H` comes from the passive resistance of each embedded beam ([GEC 4][gec4] p. 101), as in the table
+below. The FEM cannot represent this: it treats the beams below the excavation as a continuous wall. Enter the wall
+per beam, with `S` the beam spacing.
+
+The figure shows the wall in section and in plan.
 
 ![A soldier-pile wall in section, the lagging down to the excavation's base and the beam embedded below it, and in plan, steel beams at spacing S with timber lagging between them](images/pw_soldier_pile.png){width=658}
 
@@ -155,8 +173,11 @@ and `I`, `Area` and `Mcap` are entered for one beam.
 A segmental, or modular block, wall is a column of dry-stacked concrete units, usually with geogrid layers laid
 between the courses and running back into a reinforced fill. The blocks themselves do not fail. The wall fails at
 its contacts: a course can slide on the one below it, the whole column can slide on its foundation, and its back
-face can separate from the fill. The figure shows the wall of
-[Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) in section and in plan.
+face can separate from the fill.
+
+**Use the FEM.** Only the FEM models the contacts, as joint lines; the LEM does not read the `joints` sheet.
+
+The figure shows the wall of [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) in section and in plan.
 
 ![In section, a segmental block wall with a joint line under its base, up its back face and between each pair of courses, and geogrid layers tied into the blocks; in plan, the units laid over the joints of the course below, and a geogrid layer running back into the reinforced fill](images/pw_block_wall.png){width=653}
 
@@ -180,9 +201,6 @@ The wall is drawn as polygons rather than entered on the `piles` sheet:
 - **Geogrid.** Enter each layer as a line on the `reinforce` sheet, as described under
   [A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face).
 
-The LEM does not read the `joints` sheet, so only the FEM can find sliding on a course joint or at the base. The
-LEM does count the geogrid as reinforcement where a slip surface crosses it.
-
 Typical values for the blocks and their contacts:
 
 | Quantity | Entry | Typical values |
@@ -196,15 +214,16 @@ Typical values for the blocks and their contacts:
 ## Gravity or Cantilever Wall
 
 A concrete gravity wall stands by its own weight, and a cantilever wall by its weight plus the soil on its heel.
-Draw either as a polygon of concrete, in a material with the `elastic` strength option so that it cannot fail. In
-the LEM, a trial slip surface can run around the wall or along its base but not through it, so a non-circular
-surface along the base represents sliding. In the FEM, the wall needs a joint line under its base and another up
-its back face, so that it can slide and separate from the soil.
+Draw either as a polygon of concrete, in a material with the `elastic` strength option so that it cannot fail.
+
+**Use the FEM**, with a joint line under the wall's base and another up its back face, so that the wall can slide
+and separate from the soil. The base joint slides at δ, the friction angle of concrete on the foundation. The LEM
+has no entry for δ.
 
 ![A concrete gravity wall twice: for the LEM, a trial surface along its base and up through the backfill; for the FEM, a joint line under its base and one up its back face](images/pw_gravity_wall.png){width=758}
 
-On the left, the LEM's non-circular trial surface runs along the wall's base and up through the backfill behind it.
-On the right, the FEM's base joint and back-face joint.
+On the left, for comparison, the LEM: a trial surface cannot pass through the wall, so a non-circular surface runs
+along its base and up through the backfill. On the right, the FEM's base joint and back-face joint.
 
 | Quantity | Entry | Typical values |
 |---|---|---|

@@ -425,9 +425,17 @@ In section, joint lines run under the base, up the back face and between the cou
 face, where a dot marks its tie to the blocks. In plan, one layer runs back from the blocks into the reinforced fill
 along the whole length of the wall.
 
-A wrapped face has no facing unit. The sheet is folded back over the face and buried under the next lift. Enter each
-layer with end 1 at the face, and set `Tend1` to the pullout resistance of the folded-back part. Run the model twice,
-once with the layers bonded and once with them jointed, and use the lower factor of safety
+For a wrapped face, each sheet runs up the face and back into the next lift. The length back into the fill is the
+return length *L*<sub>r</sub>. Enter each layer with end 1 at the face and end 2 in the fill, and run the ground
+surface down the face. Leave the return out of the model. Set `Tend1` to the return's pullout resistance,
+*L*<sub>r</sub> × 2(*a* + σ′<sub>v</sub> tan δ). Here *a* and δ are the sheet's `Adhesion` and `Delta`, and
+σ′<sub>v</sub> is the vertical effective stress at the return
+([Capacity Along a Line](../reinforcement/overview.md#capacity-along-a-line)).
+
+![A wrapped-face wall twice: as built, five lifts of fill, each sheet running out to the face, up it and back into the next lift for a return of length Lr; as entered, the ground surface down the face and each sheet one straight line from end 1 at the face to end 2 in the fill, with Tend1 at end 1 the pullout of the return](images/pw_wrapped_face.png){width=693}
+
+Run the model twice, once with the layers bonded and once with `Joint` set to `Yes`, and use the lower factor of
+safety
 ([Choosing a Bonded Bar or a Joint](../reinforcement/fem.md#bonded-bar-or-joint)).
 
 #### Connection strength

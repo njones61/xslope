@@ -298,33 +298,38 @@ behind it, crosses the pile line and is joined to it there in the FEM; in the LE
 ### A soil nail and a shotcrete facing
 
 A nail's head plate bears on the shotcrete facing at end 1, where `Tend1` sets the head's capacity in both
-analyses ([Soil Nail](../reinforcement/types.md#soil-nail)). The two analyses take the facing itself differently.
+analyses ([Soil Nail](../reinforcement/types.md#soil-nail)). The two analyses take the facing itself differently,
+so a model run in both is kept as two input files, one for each analysis.
 
-In the LEM the facing is not drawn. The cut face is the ground surface, each nail's end 1 is on it, and the
-facing's weight is a vertical line load on the crest, at the crest's elevation and a few inches (about 0.1 m)
-behind the top of the face ([Worksheet: lloads](../usage/input_template.md#worksheet-lloads)). The nails carry the facing
+#### In the LEM
+
+The facing is not drawn. The cut face is the ground surface, each nail's end 1 is on it, and the facing's weight is
+a vertical line load on the crest, at the crest's elevation and a few inches (about 0.1 m) behind the top of the
+face ([Worksheet: lloads](../usage/input_template.md#worksheet-lloads)). The nails carry the facing
 ([GEC 7][gec7] p. 200), so its weight bears on the reinforced soil behind it, which is the soil that slides. On a
 vertical face, one force at the top gives the same force and moment as the weight spread down the face, provided
-the slip surface exits at the toe; on a battered face it is approximate. A polygon of concrete does not work in the
-LEM. A trial surface does not cut through a material whose strength option is `elastic`, so to reach the toe it
-passes under the facing. The slip surface beneath the facing is then nearly level, and the facing's weight adds
-almost nothing to the force driving the slide. A circle can pass under the facing only as a long, deep arc, so a
-circular search misses the shallow surfaces that govern.
+the slip surface exits at the toe; on a battered face it is approximate. Verification problems
+[VP47](../verification/rocscience.md#vp47) and [VP48](../verification/rocscience.md#vp48) enter their facings this
+way, with line loads of 14.6 kN/m and 13.2 kN/m.
 
 ![A soil nail on a cut face, with the facing a dashed outline not in the model, and the facing's weight as a line load on the crest just behind the top of the face](../usage/images/mr_connect_nail_facing.png){width=478}
 
-End 1 is the nail head on the cut face, where `Tend1` sets the capacity, and the facing's weight is a line load on
-the crest. The dashed outline shows where the facing is; the LEM's model does not include it. Verification problems
-[VP47](../verification/rocscience.md#vp47) and [VP48](../verification/rocscience.md#vp48), both limit equilibrium
-problems, enter their facings this way, with line loads of 14.6 kN/m and 13.2 kN/m.
+Drawing the facing as a polygon of concrete, as in the FEM, does not work here. A trial surface cannot cut through
+a material whose strength option is `elastic`, so to reach the toe it passes under the facing, where it runs nearly
+level and the facing's weight adds almost nothing to the force driving the slide. A circle can pass under the
+facing only as a long, deep arc, so a circular search misses the shallow surfaces that govern.
 
-In the FEM the facing is a polygon of shotcrete, drawn on the air side of the cut face from the toe to the crest,
-as thick as the initial and final facings together, so that its outer face becomes the ground surface. Its material's
-strength option is `elastic`, as for a [gravity wall](#gravity-or-cantilever-wall). Each nail is extended to end 1
-inside the polygon, at its head plate, and there is no line load. The FEM applies a line load as a force at one
-node ([Loads](../fem/overview.md#distributed-loads)), and a facing's whole weight on one node can fail the soil
-under that node before the slope fails. The polygon spreads the weight down the face and gives the facing the
-stiffness of concrete.
+#### In the FEM
+
+The facing is a polygon of shotcrete, drawn on the air side of the cut face from the toe to the crest, as thick as
+the whole facing, so that its outer face becomes the ground surface. Its material's strength
+option is `elastic`, as for a [gravity wall](#gravity-or-cantilever-wall). Each nail is extended to end 1 inside
+the polygon, at its head plate, and there is no line load. The FEM applies a line load as a force at one node
+([Loads](../fem/overview.md#distributed-loads)), and a facing's whole weight on one node can fail the soil under
+that node before the slope fails. The polygon spreads the weight down the face and gives the facing the stiffness
+of concrete.
+
+![The same soil nail and facing for the FEM: the facing a polygon of shotcrete with the nail's end 1 inside it, and no line load](../usage/images/mr_connect_nail_facing_fem.png){width=466}
 
 A facing is a foot thick or less, so the mesher's thin-zone refinement sizes it for about four elements across
 ([Thin material zones](../fem/mesh.md#thin-material-zones)). That refinement is never finer than a sixth of the
@@ -332,19 +337,13 @@ global element size, so on a large model the facing gets fewer elements across a
 Give its polygon a Size of a quarter of its thickness then; a Size has no such limit
 ([A Size on one zone](../fem/mesh.md#a-size-on-one-zone)).
 
-![The same soil nail and facing for the FEM: the facing a polygon of shotcrete with the nail's end 1 inside it, and no line load](../usage/images/mr_connect_nail_facing_fem.png){width=466}
-
-The facing is one polygon of shotcrete. The nail's bar runs through it to end 1 at the head plate, and the nail's
-grouted length runs on into the soil.
-
-To run both analyses, keep two copies of the model. The LEM's has the line load, no facing polygon, and each nail's
-end 1 on the cut face; the FEM's has the polygon, each end 1 inside it, and no line load.
+#### Typical values
 
 | Quantity | Entry | Typical values |
 |---|---|---|
-| Facing thickness | in the line load (LEM); the polygon's thickness normal to the face, the initial and final facings together (FEM) | Initial facing of shotcrete: typically 4 in. (0.33 ft, 0.10 m), or 6 in. (0.5 ft, 0.15 m). Final facing of shotcrete: 6 or 8 in. (0.5 or 0.67 ft, 0.15 or 0.20 m), typically 8. Final facing cast in place: 10 in. (0.83 ft, 0.25 m) and thicker ([GEC 7][gec7] p. 164). |
+| Facing thickness | the initial and final facings together: in the line load (LEM), and as the polygon's thickness normal to the face (FEM) | Initial facing of shotcrete: typically 4 in. (0.33 ft, 0.10 m), or 6 in. (0.5 ft, 0.15 m). Final facing of shotcrete: 6 or 8 in. (0.5 or 0.67 ft, 0.15 or 0.20 m), typically 8. Final facing cast in place: 10 in. (0.83 ft, 0.25 m) and thicker ([GEC 7][gec7] p. 164). |
 | Unit weight | in the line load (LEM); γ of the shotcrete material (FEM) | 150 lb/ft³ (23.6 kN/m³), as for reinforced concrete ([GEC 4][gec4] p. A-13). |
-| Line load (LEM) | `P` on the `lloads` sheet, on the crest a few inches behind the top of the face, with `Angle` blank (straight down) | Unit weight × the whole facing thickness, initial and final together, × face height: for a 4 in. initial and an 8 in. final facing on a 20 ft face, 150 lb/ft³ × 1 ft × 20 ft = 3,000 lb/ft (43.8 kN/m). |
+| Line load (LEM) | `P` on the `lloads` sheet, with `Angle` blank (straight down) | Unit weight × facing thickness × face height: for a 4 in. initial and an 8 in. final facing, 1 ft in all, on a 20 ft face, 150 lb/ft³ × 1 ft × 20 ft = 3,000 lb/ft (43.8 kN/m). |
 | `E` (FEM) | modulus of the shotcrete material | E<sub>c</sub> = 1,820 √f′<sub>c</sub> ksi, with f′<sub>c</sub> in ksi ([GEC 10][gec10] p. 16-3): 3,640 ksi, or 5.24 × 10⁸ psf (2.51 × 10⁷ kPa), for f′<sub>c</sub> = 4 ksi (4,000 psi). Shotcrete is typically 3,000 to 4,000 psi, more commonly 4,000 ([GEC 7][gec7] p. 164). |
 
 ### A geosynthetic and facing blocks, panels or a wrapped face

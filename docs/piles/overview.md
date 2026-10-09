@@ -106,6 +106,24 @@ walls and nearly continuous rows, and the LEM for separate piles:
 | Row of separate piles | discrete | LEM with Ito & Matsui | factor of safety for the spacing, force per pile, capacity checks |
 | Soldier-pile wall | continuous above the excavation, discrete below | LEM, with `H` entered | factor of safety for the entered `H` |
 
+The LEM can also analyze a wall on the `piles` sheet. It applies `H` where a trial slip surface crosses the wall,
+as it does for a pile, with `S` = 1. Ito & Matsui's method does not apply to a wall, because there are no gaps for
+the soil to move through, so `H` must be entered. A common choice is the smaller of the wall's shear capacity and
+the passive resistance of the soil below the excavation ([Sheet-Pile Wall](types.md#sheet-pile-wall)), or a value
+from a separate lateral analysis of the wall. An entered `H` has three limits:
+
+- It is the same at every depth where a trial surface crosses the wall. In reality, the resistance depends on how
+  much embedment remains below the crossing. Only the `Mcap` check changes with depth: it uses a moment arm of one
+  third of the depth to the crossing ([Case 2: User-Specified H](lem.md#case-2-user-specified-h)).
+- A trial surface that passes below the toe of the wall gets no force from it.
+- The LEM gives a factor of safety for the `H` entered, but no moment, shear or deflection in the wall, and no
+  check that the wall can develop that `H`.
+
+The FEM computes the wall's resistance from its stiffness and the soil around it, and gives the member forces. That
+is why the table uses the FEM for continuous walls. Gravity walls and segmental block walls are different: they are
+drawn as polygons rather than entered on the `piles` sheet, so they have no `H`
+([Pile and Wall Types](types.md#segmental-block-wall)).
+
 [LEM vs FEM Pile Modeling](lem.md#lem-vs-fem-pile-modeling) compares the two analyses on the same slopes,
 including the one pile-stabilized slope with a published three-dimensional solution. The formulations are on
 [Piles in LEM](lem.md) and [Piles in FEM](fem.md).

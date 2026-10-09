@@ -253,15 +253,15 @@ A load-bearing pile carries a vertical load from a structure, such as a footing,
 load to the soil by skin friction along its shaft and by end bearing at its tip. For slope stability, the question is
 whether that load adds to the driving force on the failure surface.
 
-**Use either analysis.** To count the resistance of a pile that crosses the failure surface, use the LEM.
+**Use either analysis**, except to count the pile's resistance to sliding in Case 2, which takes the LEM.
 
 ![A footing on a slope's crest on a pile, twice: in Case 1 the pile's tip is above the failure surface, in Case 2 the pile crosses it and its tip is in stable ground; in plan, footings of width B along the crest at spacing s](images/pw_load_bearing.png){width=871}
 
 In plan, the footings stand along the crest (the line with ticks pointing down the slope) at center-to-center
-spacing *s*. Each is *B* wide across the crest, with its pile dashed below it.
+spacing *s*. Each is *B* wide, measured perpendicular to the crest, with its pile dashed below it.
 
-Which case applies depends on the critical failure surface, which is not known before the run. If the critical
-surface passes on the other side of the pile tip from the one assumed, switch to the other case and run again.
+Which case applies depends on the critical failure surface, which is not known before the run. Pick a case and run
+it. If the critical surface passes the pile tip on the other side, switch cases and run again.
 
 ### Case 1: Pile tip above the failure surface
 
@@ -271,9 +271,10 @@ mass. The load adds to the driving force, so include it. Apply it as a surcharge
 surface, one at each edge of the footing, with Direction set to `vertical`
 ([Worksheet: dloads](../usage/input_template.md#worksheet-dloads)).
 
-Use either analysis. Both read the `dloads` sheet. In the FEM, do not enter the pile on the `piles` sheet, since the
-FEM would spread the row of piles into a continuous wall
-([Continuous Walls and Discrete Pile Rows](fem.md#applicability-continuous-walls-and-discrete-pile-rows)).
+#### Which analysis to use
+
+Use either analysis. Both read the `dloads` sheet. Do not enter the pile on the `piles` sheet. It slides with the
+mass, so it does not resist the slide.
 
 ### Case 2: Pile tip below the failure surface
 
@@ -307,23 +308,20 @@ mass, so it is conservative. It suits these cases:
 - The structural load is large compared with the driving force of the soil, so leaving it out would noticeably
   change the factor of safety.
 
-When in doubt, run both. Use either analysis. In the FEM, do not enter the pile on the `piles` sheet, as in Case 1.
+When in doubt, run the model with and without the load.
 
-#### The pile's resistance to sliding
+#### Which analysis to use
 
-The pile crosses the failure surface, so it also resists the slide. Leaving that resistance out is conservative. To
-count it, use the LEM and enter the pile on the `piles` sheet, with `D` the pile diameter and `S` = *s* for one pile
-per footing, as for any row of separate piles ([Piles and Walls](overview.md#lem-vs-fem)). Enter `Vcap` and `Mcap`
-for the pile, so that `H` is limited to what the pile can carry. Ito & Matsui's method applies for `S`/`D` between
-2 and 8. Above 8, it overestimates the force, so enter `H` from a lateral analysis of the pile. Do not count it in
-the FEM, which would spread the row into a continuous wall.
+The pile crosses the failure surface, so it also resists the slide. Leaving that resistance out is conservative.
 
-### Summary
-
-1. If the pile tip is above the failure surface, apply the structural load as a surcharge on the `dloads` sheet.
-2. If the pile tip is below the failure surface, leave the load out or apply all of it, as the lists above describe.
-   When in doubt, run both.
-3. To count the pile's resistance to sliding, enter the pile on the `piles` sheet and use the LEM.
+- **To ignore the pile's resistance,** use either analysis, and do not enter the pile on the `piles` sheet.
+- **To count the pile's resistance,** use the LEM. Enter the pile on the `piles` sheet, with `D` the pile diameter
+  and `S` = *s* for one pile per footing, as for any row of separate piles
+  ([Piles and Walls](overview.md#lem-vs-fem)). Leave `H` blank, and the LEM computes the pile's force by Ito &
+  Matsui's method, which holds for `S`/`D` from 2 to 8. Above 8, the method overestimates the force, so enter `H`
+  from a lateral analysis of the pile. Enter `Vcap` and `Mcap` to cap the force at what the pile can carry. The FEM
+  models the row as a continuous wall, which overstates this resistance
+  ([Continuous Walls and Discrete Pile Rows](fem.md#applicability-continuous-walls-and-discrete-pile-rows)).
 
 ## Connecting Reinforcement to a Wall or Facing
 

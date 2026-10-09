@@ -62,7 +62,7 @@ for each trial surface. The method treats the soil between adjacent piles as in 
 moves, it squeezes between the piles and arches onto them. The method applies to the part of the pile above the
 failure surface, where the soil moves.
 
-![Ito & Matsui plan view](../lem/images/pile_ito_matsui_plan.png)
+![Two piles of a row in plan, of diameter D at center-to-center spacing S with a clear gap D1 between them, and a soil arch bearing on them as the soil slides toward the row](../lem/images/pile_ito_matsui_plan.png){width=379}
 
 | Symbol | Meaning |
 |---|---|
@@ -123,7 +123,7 @@ discuss other limits of the formulation.
 
 ### Force per Unit Width
 
-![Ito & Matsui pressure distribution](../lem/images/pile_ito_matsui_pressure.png)
+![The pressure p(z) on one pile from the ground surface down to the failure surface at depth zf, its resultant Fpile at Lm above the failure surface, and the force H where the pile crosses the failure surface](../lem/images/pile_ito_matsui_pressure.png){width=326}
 
 The force on one pile is $p(z)$ integrated from the ground surface down to the failure surface. In one layer,
 $p(z)$ is linear in $z$, so

@@ -183,7 +183,7 @@ A segmental, or modular block, wall is a column of dry-stacked concrete units. T
 The wall fails at its contacts: a course can slide on the one below it, the whole column can slide on its
 foundation, and its back face can separate from the fill. Many block walls also have geogrid layers laid between
 the courses and running back into the fill
-([A geosynthetic and facing blocks, panels or a wrapped face](#a-geosynthetic-and-facing-blocks-panels-or-a-wrapped-face)).
+([A geosynthetic and facing blocks or a wrapped face](#a-geosynthetic-and-facing-blocks-or-a-wrapped-face)).
 
 **Use the FEM.** Only the FEM models the contacts.
 
@@ -405,7 +405,7 @@ about four elements across it ([A Size on one zone](../fem/mesh.md#a-size-on-one
 | Line load (LEM) | `P` on the `lloads` sheet, with `Angle` left blank (straight down). | Unit weight × facing thickness × face height: for a 4 in. initial and an 8 in. final facing, 1 ft in all, on a 20 ft face, 150 lb/ft³ × 1 ft × 20 ft = 3,000 lb/ft (43.8 kN/m). |
 | `E` (FEM) | Modulus of the shotcrete material. | E<sub>c</sub> = 1,820 √f′<sub>c</sub> ksi, with f′<sub>c</sub> in ksi ([GEC 10][gec10] p. 16-3): 3,640 ksi, or 5.24 × 10⁸ psf (2.51 × 10⁷ kPa), for f′<sub>c</sub> = 4 ksi (4,000 psi). Shotcrete is typically 3,000 to 4,000 psi, more commonly 4,000 ([GEC 7][gec7] p. 164). |
 
-### A geosynthetic and facing blocks, panels or a wrapped face
+### A geosynthetic and facing blocks or a wrapped face
 
 **Use the FEM** for both a block facing and a wrapped face.
 
@@ -440,7 +440,7 @@ safety
 
 #### Connection strength
 
-For a block or panel facing, FHWA bases the connection's long-term strength, per unit width of the layer, on
+For a block facing, FHWA bases the connection's long-term strength, per unit width of the layer, on
 connection tests of the facing unit with the geosynthetic:
 
 >$T_{alc} = \dfrac{T_{ult} \times CR_{cr}}{RF_D}$

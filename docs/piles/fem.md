@@ -193,7 +193,7 @@ pile shaft; [interface elements](../fem/joints.md) apply only to joint lines and
 
 **Passive (stabilizing) piles.** The soil pushes laterally on the pile, and the soil yielding around it limits the
 load. The bond overstates the pile's resistance and makes the factor of safety unconservative. On the one
-pile-stabilized slope with a three-dimensional answer, the FEM's factor of safety stands above it
+benchmark with a three-dimensional answer, the FEM's factor of safety stands above it
 ([LEM vs. FEM Pile Modeling](lem.md#lem-vs-fem-pile-modeling)). The bond and the spreading of the row into a wall
 both push it up. That comparison does not separate the two.
 

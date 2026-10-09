@@ -114,7 +114,7 @@ the passive force the soil can develop against the wall, from the slip surface d
 
 - It is the same at every depth where a trial surface crosses the wall. In reality, the resistance depends on how
   much embedment remains below the crossing. Only the `Mcap` check changes with depth: it uses a moment arm of one
-  third of the depth to the crossing ([Case 2: User-Specified H](lem.md#case-2-user-specified-h)).
+  third of the depth to the crossing ([With an Entered H](lem.md#case-2-user-specified-h)).
 - A trial surface that passes below the toe of the wall gets no force from it.
 - The LEM gives a factor of safety for the `H` entered, but no moment, shear or deflection in the wall, and no
   check that the wall can develop that `H`.
@@ -125,7 +125,7 @@ drawn as polygons rather than entered on the `piles` sheet, so they have no `H`
 ([Pile and Wall Types](types.md#segmental-block-wall)).
 
 [LEM vs FEM Pile Modeling](lem.md#lem-vs-fem-pile-modeling) compares the two analyses on the same slopes,
-including the one pile-stabilized slope with a published three-dimensional solution. The formulations are on
+including the one benchmark with a published three-dimensional solution. The formulations are on
 [Piles in LEM](lem.md) and [Piles in FEM](fem.md).
 
 ## Worked Examples

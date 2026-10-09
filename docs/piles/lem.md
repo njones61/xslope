@@ -1,136 +1,89 @@
 # Piles and Concrete Piers in LEM Slope Stability
 
-A pile resists a slide by shear and bending where the slip surface crosses it. The kinds of pile and wall, and how a
-pile line is entered, are on the [Piles and Walls Overview](overview.md), and what to enter for each, with typical
-values, on [Pile and Wall Types](types.md). In a limit equilibrium analysis the pile is one force on the sliding
-mass, at the point where a trial slip surface crosses it:
+In a limit equilibrium analysis, a pile is one force on the sliding mass, at the point where a trial slip surface
+crosses it. The `piles` sheet and its columns are on the [Piles and Walls Overview](overview.md), and what to enter
+for each type of pile or wall is on [Pile and Wall Types](types.md).
 
 ![A row of piles through a sliding mass, each pushing back on it with a force H where the failure surface crosses the pile](../lem/images/pile_diagram.png){width=598}
 
-Each pile pushes back on the sliding mass with a force $H$ at the point where the failure surface crosses it,
-against the direction the mass moves.
+## The Pile Force
 
-## Pile Force in Limit Equilibrium Analysis
+$H$ is a force per unit width of slope. It acts at the point $e$ where the pile crosses the failure surface,
+perpendicular to the pile. Its inclination $\theta_p$ from horizontal, positive upward, gives the components
 
-The pile force enters each slice's equilibrium through its magnitude, its direction and the point where it acts.
+>$H_h = H\cos\theta_p, \qquad H_v = H\sin\theta_p$
 
-### Force Definition
+For a vertical pile, $\theta_p = 0$ and the force is horizontal.
 
-In the limit equilibrium framework, a pile is characterized by:
-
-- A **force magnitude** $H$ (per unit width of slope, i.e., force/length) acting at the point where the pile intersects the failure surface
-- A **force angle** $\theta_p$, the inclination of that force from horizontal (positive upward), which XSLOPE computes from the pile's end points so that the force is perpendicular to the pile (see [Force Direction](#force-direction))
-
-The force is decomposed into horizontal and vertical components:
-
->$H_h = H \cos\theta_p \qquad \text{(horizontal)}$
-
->$H_v = H \sin\theta_p \qquad \text{(vertical, positive upward)}$
-
-For a vertical pile, the most common case, $\theta_p = 0$ and the force is purely horizontal: $H_h = H$ and $H_v = 0$.
-
-### Force Resolution on the Slice
-
-The pile force acts at point $e$ on the failure surface where the pile intersects the slice base. Relative to the slice base (inclined at angle $\alpha$), the force resolves into:
-
->**Normal to base**: $H \sin(\alpha - \theta_p)$
-
->**Tangential to base** (resists sliding): $H \cos(\alpha - \theta_p)$
-
-The tangential component directly opposes the sliding force. The normal component adds to the normal force on the base where $\alpha > \theta_p$, raising the frictional resistance, and subtracts from it where $\alpha < \theta_p$: near the toe of a circle, where the base rises toward the toe, or under a force tilted upward more steeply than the base. The Ordinary Method of Slices takes $N'$ from this resolution; the other methods take it from their own equilibrium equations, listed under [Integration with LEM Methods](#integration-with-lem-methods).
-
-### Moment Contribution
-
-For methods that use moment equilibrium about a circle center $(X_o, Y_o)$, the pile force creates a resisting moment. The horizontal and vertical components of $H$ each contribute through their respective moment arms:
-
->$M_{\text{pile}} = H \cos\theta_p \cdot (Y_o - y_e) + H \sin\theta_p \cdot (x_e - X_o)$
-
-where $(x_e, y_e)$ is the pile-failure surface intersection point. The equation is written for a slope that descends to the left; on one that descends to the right the arm $x_e - X_o$ changes sign. When $\theta_p = 0$, this reduces to $M_{\text{pile}} = H(Y_o - y_e)$.
-
-How the pile force enters the factor of safety is set by the row's **Appl** entry:
-
-- **Active** (the default, and how a blank cell is read): $H$ is an allowable force, applied at full value and **not** divided by the factor of safety $F$. It is a known force, like the weight of the slice: in the moment equations its moment reduces the driving moment (the denominator), and its components enter the force equations, including the one for $N'$, at full value.
-- **Passive**: $H$ is an ultimate capacity that is mobilized with the soil strength, so its components are divided by $F$, as $c$ and $\tan\phi$ are. In the moment equations the passive pile moment joins the resisting side (the numerator). The Ordinary Method of Slices, which computes $F$ directly without iteration, takes that moment only and leaves the passive force out of $N'$.
-
-### Force Direction
-
-A pile is entered by its two end points, $(x_1, y_1)$ and $(x_2, y_2)$, in either order: XSLOPE takes the higher end as the head and the lower end as the tip. The pile force is directed perpendicular to the pile's axis, with its horizontal component against the movement of the sliding soil, so the pile resists the slide whether the slope descends to the left or to the right. The force angle is therefore the pile's inclination from vertical:
+XSLOPE takes the higher end of the pile as its head and the lower end as its tip. The force is perpendicular to the
+pile, with its horizontal component against the movement of the sliding mass. So $\theta_p$ equals the pile's
+inclination from vertical:
 
 >$\theta_p = \tan^{-1}\!\left(\dfrac{d_u}{y_h - y_t}\right)$
 
-where $y_h$ and $y_t$ are the elevations of the head and the tip, and $d_u$ is the horizontal distance by which the tip lies upslope of the head (negative when the tip lies downslope, toward the toe). Upslope is opposite to the movement of the sliding mass, which XSLOPE determines for each failure surface, so a model and its mirror image give a pile the same angle.
+where $y_h$ and $y_t$ are the elevations of the head and the tip, and $d_u$ is how far the tip lies upslope of the
+head, negative when it lies downslope. A pile whose head leans out toward the toe gets a force tilted upward. One
+whose head leans back into the slope gets a force tilted downward. XSLOPE finds the direction of movement for each
+failure surface, so a model and its mirror image give a pile the same angle.
 
-- **Vertical pile** ($x_2 = x_1$): $\theta_p = 0$, a horizontal force pushing back against the moving soil.
-- **Battered pile, tip upslope of the head** (the head leans out toward the toe): $\theta_p > 0$, and the force tilts **upward**.
-- **Battered pile, tip downslope of the head** (the head leans back into the slope): $\theta_p < 0$, and the force tilts **downward**.
+On a slice base inclined at $\alpha$, the force has a component $H\cos(\alpha - \theta_p)$ along the base, which
+opposes sliding, and a component $H\sin(\alpha - \theta_p)$ normal to it. The normal component adds to the normal
+force, and so to the friction, where $\alpha > \theta_p$. It reduces the normal force where $\alpha < \theta_p$:
+near the toe of a circle, where the base rises toward the toe, or under a force tilted upward more steeply than the
+base. OMS takes the base normal force from this resolution. The other methods take it from their own equilibrium
+equations.
 
-The Ito & Matsui computation described below applies to vertical piles only, so a battered pile needs its $H$ entered. If a workbook's `piles` sheet carries a $\theta_p$ column, an angle entered there is used in place of the computed one, measured the same way, and a blank cell leaves the computed angle.
+The methods that take moments about a circle center $(X_o, Y_o)$ add the pile's moment:
 
-### Per-Unit-Width Convention
+>$M_{\text{pile}} = H\cos\theta_p\,(Y_o - y_e) + H\sin\theta_p\,(x_e - X_o)$
 
-All forces in 2D limit equilibrium analysis are expressed per unit width of slope (perpendicular to the cross-section). If a row of piles has individual capacity $H_{\text{single}}$ at center-to-center spacing $S$, the equivalent force per unit width is:
+where $(x_e, y_e)$ is the point $e$. The equation is written for a slope that descends to the left. On a slope that
+descends to the right, the arm $x_e - X_o$ changes sign. For a vertical pile, the moment is $H(Y_o - y_e)$.
 
->$H = \dfrac{H_{\text{single}}}{S}$
+Each method's page gives the pile terms in its equations: [OMS](../lem/oms.md), [Bishop](../lem/bishop.md),
+[Janbu](../lem/janbu.md), [Corps of Engineers and Lowe-Karafiath](../lem/force_eq.md), and
+[Spencer](../lem/spencer.md). Only the moment about a circle center depends on the shape of the surface, and only OMS
+and Bishop use it. The other methods apply the pile force on any non-circular surface unchanged.
 
-### Non-Circular Failure Surfaces
+The `Appl` column sets how $H$ enters the factor of safety $F$. With Active, the default, $H$ is an allowable force.
+It is applied at full value, like the slice's weight: its moment reduces the driving moment, and its components
+enter the force equations in full. With Passive, $H$ is a capacity that is mobilized with the soil's strength, so
+its components are divided by $F$, as $c$ and $\tan\phi$ are, and its moment joins the resisting side. OMS, which
+computes $F$ directly, takes only that moment and leaves the passive force out of the base normal force.
 
-The pile force formulation for Janbu, Corps of Engineers, Lowe-Karafiath, and Spencer's method uses only per-slice quantities ($\alpha$, force components) and has no dependence on circle geometry. These methods work with any failure surface shape, and the pile terms carry over without modification. The only circle-dependent pile terms appear in OMS and Bishop (the moment term), but those methods inherently require circular surfaces.
+## Computing H by Ito & Matsui {#ito-matsui-1975-theory}
 
-### Integration with LEM Methods
+An entered `H` is used as it stands. It can come from a lateral analysis of the pile with p-y curves (LPILE, GROUP or
+RSPile), a structural analysis of the section, or a three-dimensional finite element model. A battered pile always
+needs `H` entered, since Ito & Matsui's method is for vertical piles.
 
-The pile force $H$ at angle $\theta_p$ is incorporated into each limit equilibrium method supported by XSLOPE. The specific modifications for each method are presented in the respective method documentation pages:
-
-- [**OMS**](../lem/oms.md): $H\sin(\alpha-\theta_p)$ added to $N'$; pile moment terms added to the denominator
-- [**Bishop**](../lem/bishop.md): $-H\sin\theta_p$ enters vertical equilibrium for $N'$; pile moment terms added to the denominator
-- [**Janbu**](../lem/janbu.md): $-H\sin\theta_p$ enters vertical equilibrium for $N'$; $-H\cos\theta_p$ enters the horizontal force balance
-- [**Force Equilibrium** (Corps of Engineers, Lowe-Karafiath)](../lem/force_eq.md): $-H\cos\theta_p$ added to horizontal equilibrium ($b_0$); $-H\sin\theta_p$ added to vertical equilibrium ($b_1$)
-- [**Spencer**](../lem/spencer.md): $H\cos\theta_p$ added to $F_h$; $H\sin\theta_p$ added to $F_v$; moment terms added to $M_o$
-
-In all methods, for a vertical pile ($\theta_p = 0$) the equations reduce to the simpler horizontal-force-only case.
-
-
-## Determining the Pile Force $H$
-
-### User-Specified Force
-
-The simplest approach is for the user to specify $H$ directly based on external analysis. The pile force may come from:
-
-- p-y curve analysis software (e.g., LPILE, GROUP, RSPile)
-- Structural analysis of the pile section
-- Published design charts or empirical correlations
-- Full 3D finite element analysis
-
-When using user-specified forces, the user enters $H$ (per unit width) in the `piles` sheet of the input template or in Studio's Piles editor, and XSLOPE computes $\theta_p$ from the pile's end points. This approach gives the user full control and is appropriate when detailed pile analysis has already been performed.
-
-### Ito & Matsui (1975) Theory
-
-The Ito & Matsui method is the most widely used closed-form approach for computing the lateral force that soil exerts on passive stabilizing piles. It models the soil between adjacent piles as being in a state of **plastic equilibrium** — the soil deforms plastically as it squeezes between the piles, like material flowing through a constriction. Using Mohr-Coulomb plasticity theory, Ito & Matsui derived closed-form equations for the lateral pressure on the piles as a function of depth.
-
-#### Setup and Notation
-
-Consider a row of piles embedded in a slope:
+If `H` is left blank for a vertical pile, XSLOPE computes it from `D` and `S` by the method of Ito & Matsui (1975),
+for each trial surface. The method treats the soil between adjacent piles as in plastic flow. As the sliding mass
+moves, it squeezes between the piles and arches onto them. The method applies to the part of the pile above the
+failure surface, where the soil moves.
 
 ![Ito & Matsui plan view](../lem/images/pile_ito_matsui_plan.png)
 
-- $D$ = pile diameter (or width of the pile cross-section)
-- $S$ = center-to-center spacing between piles
-- $D_1 = S - D$ = clear spacing between adjacent pile faces
-- $z$ = depth below the ground surface
-- $z_f$ = depth from the ground surface to the failure surface at the pile location
-- Soil properties: cohesion $c$, friction angle $\phi$, unit weight $\gamma$
-- Passive earth pressure coefficient: $N_\phi = \tan^2\!\left(45° + \dfrac{\phi}{2}\right)$
+| Symbol | Meaning |
+|---|---|
+| $D$ | Pile diameter, or width of the pile section. |
+| $S$ | Center-to-center spacing of the piles. |
+| $D_1 = S - D$ | Clear spacing between the faces of adjacent piles. |
+| $z$ | Depth below the ground surface at the pile. |
+| $z_f$ | Depth to the failure surface at the pile. |
+| $c$, $\phi$, $\gamma$ | The soil's cohesion, friction angle and unit weight. |
+| $N_\phi = \tan^2(45° + \phi/2)$ | Passive earth pressure coefficient. |
 
-The theory applies to the portion of the pile **above** the failure surface — this is the zone where soil is actively moving and pushing against the pile.
+The paper writes $d$ for the diameter, $D_1$ for the center-to-center spacing and $D_2$ for the clear spacing. The
+equations are the same.
 
-**Notation**: The original paper uses $d$ for pile diameter, $D_1$ for center-to-center spacing, and $D_2$ for clear spacing. XSLOPE uses $D$, $S$, and $D_1$ respectively. The equations are identical; only the symbols differ.
+### Pressure on One Pile
 
-#### General $c$-$\phi$ Soil
-
-For a soil with both cohesion and friction ($c > 0$, $\phi > 0$), the distributed lateral force $p(z)$ (force per unit length of pile) at depth $z$ is:
+At depth $z$, the soil pushes on the pile with a force per unit length of pile
 
 >$p(z) = c \cdot A_1 + \gamma z \cdot A_2$
 
-where $A_1$ and $A_2$ are arching coefficients with units of length. Let $S = D_1 + D$ (center-to-center spacing). The coefficients are computed from three intermediate quantities:
+where the arching coefficients $A_1$ and $A_2$ have units of length. They are built from three quantities:
 
 >$R = \left(\dfrac{S}{D_1}\right)^{\sqrt{N_\phi}\,\tan\phi + N_\phi - 1}$
 
@@ -138,200 +91,131 @@ where $A_1$ and $A_2$ are arching coefficients with units of length. Let $S = D_
 
 >$F = \dfrac{2\tan\phi + 2\sqrt{N_\phi} + N_\phi^{-1/2}}{\sqrt{N_\phi}\,\tan\phi + N_\phi - 1}$
 
-$R$ is the geometric amplification from the ratio of center-to-center to clear spacing, $\mathcal{E}$ captures the exponential plastic flow between piles, and $F$ is a dimensionless grouping of friction and earth pressure terms.
-
-The overburden coefficient (from Eq. 14, the $c = 0$ specialization of Eq. 13) is:
+$R$ grows with the ratio of center-to-center to clear spacing, $\mathcal{E}$ carries the exponential effect of
+plastic flow between the piles, and $F$, not to be confused with the factor of safety, groups the friction and earth
+pressure terms. The overburden coefficient is the paper's
+Eq. 14, the $c = 0$ case of its Eq. 13, and the cohesion coefficient is Eq. 13:
 
 >$A_2 = \dfrac{S \cdot R \cdot \mathcal{E}\, -\, D_1}{N_\phi}$
 
-The cohesion coefficient (from Eq. 13) is:
-
 >$A_1 = \dfrac{S \cdot R\,(\mathcal{E} - 2\sqrt{N_\phi}\,\tan\phi - 1)}{N_\phi\tan\phi} + S \cdot F\,(R - 1) + \dfrac{2\,D_1}{\sqrt{N_\phi}}$
 
-These expressions were verified against the original paper's parametric charts (Figs. 7–9) and field measurements (Table 1, Figs. 13–14).
+These expressions were checked against the paper's parametric charts (Figs. 7–9) and field measurements (Table 1,
+Figs. 13–14). In a cohesionless soil, $p(z) = \gamma z \cdot A_2$, which rises linearly from zero at the ground
+surface.
 
-Key behavior of $p(z)$:
-
-- **Increases with depth** through the $\gamma z$ term — deeper soil mobilizes more pressure against the pile
-- **Increases as $D_1/D$ decreases** (closer piles = more arching = more force per pile)
-- **Increases with $\phi$** — higher friction angle produces stronger soil arching between piles
-- **Increases with $c$** — cohesion contributes a constant (depth-independent) component
-
-#### Cohesionless Soil ($c = 0$)
-
-For a purely frictional soil with $c = 0$, the cohesion term vanishes and the lateral pressure is:
-
->$p(z) = \gamma z \cdot A_2$
-
-where $A_2$ is the same expression as above. The pressure increases linearly from zero at the ground surface.
-
-#### Undrained Clay ($\phi = 0$)
-
-For a purely cohesive (undrained) soil with $\phi = 0$, the general $c$-$\phi$ expressions become indeterminate because $N_\phi = 1$ and $\tan\phi = 0$. Deriving the solution independently for $\phi = 0$ (Ito & Matsui Eq. 23) yields:
+In undrained clay, $\phi = 0$, the expressions above are indeterminate, since $N_\phi = 1$ and $\tan\phi = 0$. Ito &
+Matsui derive this case separately (Eq. 23):
 
 >$p(z) = c_u \left[S\left(3\ln\dfrac{S}{D_1} + \dfrac{D}{D_1}\tan\dfrac{\pi}{8} - 2\right) + 2D_1\right] + \gamma z \cdot D$
 
-where $S = D_1 + D$ is the center-to-center spacing and $c_u$ is the undrained shear strength. The first term represents the cohesion contribution (constant with depth) and the second term represents the overburden contribution (linear with depth), which simplifies to $\gamma z \cdot D$ (the pile diameter).
+where $c_u$ is the undrained shear strength.
 
-#### Total Force per Pile
-
-![Ito & Matsui pressure distribution](../lem/images/pile_ito_matsui_pressure.png)
-
-The total lateral force on a single pile is obtained by integrating $p(z)$ from the ground surface down to the failure surface depth $z_f$:
-
->$F_{\text{pile}} = \int_0^{z_f} p(z) \, dz$
-
-Since $p(z)$ is linear in $z$ within a homogeneous layer, the integration is straightforward:
-
->$F_{\text{pile}} = c \cdot A_1 \cdot z_f + \gamma \cdot A_2 \cdot \dfrac{z_f^2}{2}$
-
-#### Force per Unit Width
-
-The 2D plane-strain equivalent force used in LEM (per unit width of slope) is:
-
->$H = \dfrac{F_{\text{pile}}}{S}$
-
-This is the value entered (or computed) for the pile force in the slope stability analysis.
-
-#### Multi-Layer Soils
-
-When the pile passes through multiple material zones above the failure surface (common in practice), the integration is performed piecewise. For each layer $j$ with properties $c_j$, $\phi_j$, $\gamma_j$ between depths $z_{\text{top},j}$ and $z_{\text{bot},j}$:
-
->$F_j = c_j \cdot A_{1,j} \cdot (z_{\text{bot},j} - z_{\text{top},j}) + \gamma_j \cdot A_{2,j} \cdot \dfrac{z_{\text{bot},j}^2 - z_{\text{top},j}^2}{2}$
-
-The total force per pile is the sum over all layers:
-
->$F_{\text{pile}} = \sum_j F_j$
-
-Note that $A_{1,j}$ and $A_{2,j}$ must be recomputed for each layer since $\phi$ may differ between layers. The pile geometry ($D$, $D_1$) remains the same for all layers.
-
-#### Computation at Each Trial Surface
-
-An important characteristic of the Ito & Matsui calculation is that **$H$ depends on the failure surface location**. A deeper failure surface means more soil above it pushing on the pile, giving a higher $H$. Therefore, $H$ should be recomputed for each trial failure surface during an automated search. Since the computation involves only closed-form expressions and simple integration, it is essentially instantaneous and adds no meaningful computational cost.
-
-In XSLOPE, when $H$ is left blank in the `piles` sheet but the pile diameter $D$ and spacing $S$ are provided, the Ito & Matsui force is computed automatically at slice generation time for each trial surface. If the user provides an explicit $H$ value, that value is used instead (override mode).
-
-#### Soil Arching Between Piles
-
-A critical aspect of pile-stabilized slopes is the three-dimensional soil arching that develops between adjacent piles. As the sliding soil mass pushes against the pile row, stress concentrations develop around each pile, and the soil "arches" between piles in a manner analogous to arching above a tunnel. This is the mechanism captured by the Ito & Matsui theory.
-
-The effectiveness of soil arching depends on:
-
-- **Pile spacing**: Closer spacing produces stronger arching and higher force per pile. The optimal spacing balances structural efficiency (fewer piles) against arching effectiveness (closer piles).
-- **Soil strength**: Stronger soils develop more effective arching. In very weak soils (soft clay), arching may be minimal and the soil may flow between the piles without mobilizing significant resistance.
-- **Pile rigidity**: Rigid piles provide fixed points for arch development. Flexible piles may deflect enough to reduce arching effectiveness.
-
-For design purposes, $S/D$ ratios of 3 to 6 are typical for slope stabilization applications.
-
-#### Low Friction Angle Floor
-
-The general $c$-$\phi$ equation (Eq. 13) and the undrained clay equation (Eq. 23) were derived independently using different mathematical approaches. As $\phi \to 0$, the $c$-$\phi$ equation does **not** converge to the $\phi = 0$ result — the overburden coefficient $A_2$ drops to near zero for small $\phi$ before recovering and exceeding the $\phi = 0$ value at approximately $\phi = 12$–$15°$. This creates an unphysical discontinuity where a soil with $\phi = 2°$ would produce less pile force than one with $\phi = 0°$.
-
-Since friction can only strengthen soil arching (and thus increase the lateral force on the pile), XSLOPE enforces the $\phi = 0$ coefficients as a lower bound for all friction angles:
+The two derivations do not meet. As $\phi$ falls toward zero, the $c$–$\phi$ coefficient $A_2$ drops to near zero
+before it recovers, and it passes the $\phi = 0$ value only at about 12° to 15°. A soil at $\phi = 2°$ would then push
+less on the pile than one at $\phi = 0°$. Friction can only strengthen the arching, so XSLOPE uses the $\phi = 0$
+coefficients as a floor at every friction angle:
 
 >$A_1 = \max(A_{1,c\text{-}\phi},\; A_{1,\phi=0}) \qquad A_2 = \max(A_{2,c\text{-}\phi},\; A_{2,\phi=0})$
 
-This ensures that the computed pile force increases monotonically with $\phi$. For further discussion of limitations in the Ito & Matsui formulation, see [Ukritchon & Keawsawasvong (2017)](https://doi.org/10.1061/(ASCE)GT.1943-5606.0001753).
+The force then never decreases as $\phi$ rises. [Ukritchon & Keawsawasvong (2017)](https://doi.org/10.1061/(ASCE)GT.1943-5606.0001753)
+discuss other limits of the formulation.
 
-#### Applicability and Limitations
+### Force per Unit Width
 
-The Ito & Matsui method has the following characteristics and limitations:
+![Ito & Matsui pressure distribution](../lem/images/pile_ito_matsui_pressure.png)
 
-- **Rigid pile assumption**: The theory assumes piles do not deflect significantly. This is conservative for flexible piles, which mobilize less soil pressure than rigid piles.
-- **Plastic flow assumption**: The method gives an **upper bound** on the soil's capacity to push on the pile. The actual mobilized resistance may be lower if the soil has not fully reached the plastic state.
-- **Spacing ratio**: The theory is applicable for $S/D$ between approximately **2 and 8**. Below $S/D \approx 2$, the piles act more like a continuous retaining wall. Above $S/D \approx 8$, soil arching between piles becomes negligible and the method overestimates the force. XSLOPE's model checks warn before a run when an auto-computed row sits outside this band.
-- **Originally derived for horizontal ground**: The overburden term $\gamma z$ in $p(z)$ assumes the vertical stress at depth $z$ equals $\gamma z$, which is exact only for horizontal ground. On a slope face, the actual vertical stress at the pile location is less than $\gamma z$ because the soil column above is truncated by the slope geometry. This means the method can overestimate the overburden contribution for piles on the slope face, particularly near the toe where the soil column is shallowest relative to a horizontal surface at the same elevation. For piles behind the crest on level ground, the approximation is accurate. In practice, the theory is routinely applied to slopes and the overestimation is generally accepted as conservative (it increases the computed pile resistance, not the driving forces). XSLOPE uses the vertical depth from the ground surface at the pile location to the failure surface, consistent with standard practice in commercial software (Slide2, SLOPE/W).
-- **Upper bound on soil force**: The computed $H$ represents the soil's capacity to push on the pile. The actual pile resistance used in the LEM is the **lesser** of the Ito-Matsui soil force and the pile's structural shear/bending capacity. See [Structural Capacity Checks](#structural-capacity-checks) below for how XSLOPE enforces this limit when $V_{\text{cap}}$ and $M_{\text{cap}}$ are provided.
+The force on one pile is $p(z)$ integrated from the ground surface down to the failure surface. In one layer,
+$p(z)$ is linear in $z$, so
 
+>$F_{\text{pile}} = \int_0^{z_f} p(z) \, dz = c \cdot A_1 \cdot z_f + \gamma \cdot A_2 \cdot \dfrac{z_f^2}{2}$
+
+Where the pile passes through several layers above the failure surface, each layer $j$, between depths
+$z_{\text{top},j}$ and $z_{\text{bot},j}$, adds
+
+>$F_j = c_j \cdot A_{1,j} \cdot (z_{\text{bot},j} - z_{\text{top},j}) + \gamma_j \cdot A_{2,j} \cdot \dfrac{z_{\text{bot},j}^2 - z_{\text{top},j}^2}{2}$
+
+with $A_{1,j}$ and $A_{2,j}$ computed from that layer's $\phi_j$, and $F_{\text{pile}} = \sum_j F_j$. The force per
+unit width of slope is
+
+>$H = \dfrac{F_{\text{pile}}}{S}$
+
+A deeper failure surface leaves more soil above it to push on the pile, so $H$ changes from one trial surface to the
+next. XSLOPE recomputes it for each one.
+
+### Limits of the Method
+
+The method assumes rigid piles. A flexible pile deflects and mobilizes less pressure than the method gives.
+
+It assumes the soil between the piles is fully plastic, so it gives the most the soil can push on a pile. Less may be
+mobilized. The [structural capacity checks](#structural-capacity-checks) also cap the force at what the pile can
+carry.
+
+It holds for $S/D$ between about 2 and 8. Below 2, the row acts as a wall. Above 8, the arching fades and the method
+overstates the force. The [model checks](../studio/analysis.md#model-checks-before-a-run) warn before a run when a
+computed row is outside this range.
+
+It was derived for level ground, where the vertical stress at depth $z$ is $\gamma z$. On a slope face, the slope cuts
+the soil column above the pile, the vertical stress is less, and the method overstates the overburden term, most of
+all near the toe. Behind the crest, the approximation is accurate. XSLOPE makes no correction for this. It measures
+$z$ vertically from the ground surface at the pile.
 
 ## Structural Capacity Checks
 
-The pile resistance used in LEM should not exceed the structural capacity of the pile. Two structural failure modes are checked when the optional $V_{\text{cap}}$ and $M_{\text{cap}}$ columns are provided in the `piles` sheet:
+If `Vcap` or `Mcap` is entered, the LEM limits the force on each pile to what the pile can carry. Both are for a
+single pile, so the check uses the force on one pile, $F_{\text{pile}} = H \times S$:
 
-- **Shear capacity** ($V_{\text{cap}}$): The maximum lateral shear force that the pile cross-section can resist. For concrete piles, this is governed by the concrete and steel reinforcement; for steel piles, by the web and flange dimensions.
-- **Moment capacity** ($M_{\text{cap}}$): The maximum bending moment the pile can resist. The limiting lateral force from bending is $M_{\text{cap}} / L_m$, where $L_m$ is the moment arm from the pressure centroid to the failure surface.
+>$H = \dfrac{1}{S}\min\!\left(F_{\text{pile}},\; V_{\text{cap}},\; \dfrac{M_{\text{cap}}}{L_m}\right)$
 
-Both $V_{\text{cap}}$ and $M_{\text{cap}}$ are properties of a **single pile** (not per unit width). The capacity check compares them against the per-pile force $F_{\text{pile}}$, not the per-unit-width force $H$. The pile forces xslope reports back — and the FEM pile-shear colorbar — are per unit width of slope; multiply by the spacing $S$ to recover the per-pile force for comparison against the single-pile $V_{\text{cap}}$ / $M_{\text{cap}}$.
+where $L_m$ is the moment arm from the centroid of the pressure on the pile down to the failure surface. The capped
+$H$ is used in the slice equations. XSLOPE reports pile forces per unit width of slope, so multiply one by $S$ to
+compare it with `Vcap` or `Mcap`.
 
-### Capacity Check Procedure
-
-The capacity check applies regardless of how the pile force was obtained, but the details differ between the two cases.
-
-**Common steps** (both cases):
-
-1. If $V_{\text{cap}}$ is provided: $\;F_{\text{pile}} = \min(F_{\text{pile}},\; V_{\text{cap}})$
-2. If $M_{\text{cap}}$ is provided: $\;F_{\text{pile}} = \min(F_{\text{pile}},\; M_{\text{cap}} / L_m)$
-3. Convert back to per-unit-width: $\;H = F_{\text{pile}} / S$
-
-The capped $H$ is then used in the slice equilibrium equations.
-
-### Case 1: Ito & Matsui Auto-Computed $H$
-
-When $H$ is left blank and $D$ and $S$ are provided, XSLOPE computes $F_{\text{pile}}$ by integrating the Ito & Matsui pressure distribution $p(z) = c \cdot A_1 + \gamma z \cdot A_2$ from the ground surface to the failure surface. Because the full pressure distribution is known, XSLOPE also computes the **exact moment arm** $L_m$ from the centroid of that distribution:
+With $H$ from Ito & Matsui, the pressure distribution is known, and $L_m$ comes from its centroid, layer by layer:
 
 >$L_m = \dfrac{\displaystyle\int_0^{z_f} (z_f - z)\, p(z)\, dz}{F_{\text{pile}}}$
 
-The integration is performed piecewise over each soil layer (the same segments used for the force calculation). Some limiting cases:
+It is $z_f/2$ for a uniform pressure ($\gamma = 0$), $z_f/3$ for a triangular one ($c = 0$), and between the two in a
+$c$–$\phi$ soil.
 
-- **Uniform pressure** ($c > 0$, $\gamma = 0$): $L_m = z_f / 2$
-- **Triangular pressure** ($c = 0$, $\gamma > 0$): $L_m = z_f / 3$
-- **General** $c$-$\phi$ **soil**: $z_f / 3 < L_m < z_f / 2$
+### With an Entered H {#case-2-user-specified-h}
 
-The controlling design value is:
+With an entered $H$, the pressure distribution is unknown, so XSLOPE takes $L_m = z_f/3$, the triangular case. That
+gives the largest $M_{\text{cap}}/L_m$, and so the least restrictive cap. If the pressure is more uniform, the true
+arm is longer and the cap tighter. To account for that, cap the force outside XSLOPE and enter the result as `H`.
 
->$H = \dfrac{1}{S}\min(F_{\text{Ito-Matsui}},\; V_{\text{cap}},\; M_{\text{cap}} / L_m)$
+### Run Summary
 
-The summary output reports the soil force, each capacity check with $[\text{GOVERNS}]$ or $[\text{OK}]$ status, and the capped values if the structural capacity controls.
-
-### Case 2: User-Specified $H$
-
-When the user provides $H$ directly, the per-pile force is computed as $F_{\text{pile}} = H \times S$. The $V_{\text{cap}}$ check is straightforward — it is a direct comparison of $F_{\text{pile}}$ against the shear capacity.
-
-For the $M_{\text{cap}}$ check, the pressure distribution behind the pile is unknown, so XSLOPE cannot compute $L_m$ from integration. Instead, it uses a default of:
-
->$L_m = z_f / 3$
-
-This corresponds to a triangular pressure distribution (linearly increasing with depth), which gives the **largest** $M_{\text{cap}} / L_m$ and therefore the **least restrictive** cap on $F_{\text{pile}}$. If the actual pressure distribution is more uniform (top-heavy), the true $L_m$ would be larger and the $M_{\text{cap}}$ check would be more restrictive. Users who know their pressure distribution can account for this by pre-computing the capped force externally:
-
->$H = \dfrac{1}{S}\min(F_{\text{soil}},\; V_{\text{cap}},\; M_{\text{cap}} / L_m) \qquad \text{(enter this value directly)}$
-
-### Summary of Differences
-
-| | $F_{\text{pile}}$ source | $L_m$ for $M_{\text{cap}}$ check | Summary detail |
-|---|---|---|---|
-| **Ito & Matsui** | From integration of $p(z)$ | Exact, from pressure centroid | Full Ito & Matsui summary with capacity check |
-| **User-specified** $H$ | $H \times S$ | Default $z_f / 3$ | Capacity check only (no Ito & Matsui summary) |
-
-### Run-Summary Output
-
-A limit equilibrium run on a model with pile rows prints one line per row
-with the factor of safety, so the applied forces are visible without
-generating a report: the Ito & Matsui soil force per pile, the capacity
-that governed (`bending governs (Mcap/Lm, Lm = ...)` or
-`shear governs (Vcap)`), and the force applied per unit width, with a total
-when more than
-one row contributes. A row with a user-specified $H$ prints its stated
-value, or — when a capacity binds it — the governing check and the applied
-force. The full per-slice accounting remains in the
+A run on a model with pile rows prints one line per row with the factor of safety: the Ito & Matsui force per pile,
+the capacity that governed (`bending governs (Mcap/Lm, Lm = ...)` or `shear governs (Vcap)`), and the force applied
+per unit width, with a total when more than one row contributes. A row with an entered `H` prints that value, or,
+when a capacity binds it, the governing check and the applied force. The per-slice accounting is in the
 [Analysis Report](../studio/reports.md).
 
 ## LEM vs. FEM Pile Modeling
 
-Which analysis suits which member is set out under [LEM vs FEM](overview.md#lem-vs-fem). The two are compared here
-on the slopes where both have been run.
+The [Overview](overview.md#lem-vs-fem) says which analysis suits which member. This section compares the two on
+the slopes where both have been run.
 
-For a **continuous member** the beam formulation is an exact description rather than an idealization, its $EA$ and $EI$ already are per unit width, and it returns internal actions that a limit equilibrium analysis cannot produce at all. It is compared with GeoStudio's SIGMA/W sheet pile wall example: XSLOPE gives 1.048 without the wall and 1.691 with it, against about 1.025 and 1.4 from SIGMA/W, a gap with the wall that remains — see [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) and [Applicability](fem.md#applicability-continuous-walls-and-discrete-pile-rows) in the FEM pile documentation.
+On GeoStudio's SIGMA/W sheet-pile wall example, a continuous wall, XSLOPE's FEM gives 1.048 without the wall and
+1.691 with it, against about 1.025 and 1.4 from SIGMA/W. With the wall, XSLOPE is about 20% above SIGMA/W
+([the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall)).
 
-For a **discrete row** the limit equilibrium analysis models the actual mechanism, with the soil moving between the piles. The size of the difference is measured on the pile model of [Tutorial LEM-12](../tutorials/lem12_piles.md) and [FEM-4](../tutorials/fem04_piles.md) — a 1:1 slope in c = 200 psf, $\phi$ = 20° soil with two rows of 2 ft drilled shafts at 6 ft spacing — which is solved by both engines on the same section, soil and pile rows:
+For a row of separate piles, [Tutorial LEM-12](../tutorials/lem12_piles.md) and
+[Tutorial FEM-4](../tutorials/fem04_piles.md) solve the same slope both ways: a 1:1 slope in soil with
+c = 200 psf (9.6 kPa) and $\phi$ = 20°, with two rows of 2 ft (0.6 m) drilled shafts at 6 ft (1.8 m) spacing.
 
 | | Without piles | With piles | Credit for the row |
 |---|---|---|---|
 | **LEM** (Spencer) | 1.149 | 1.842 | ×1.60 |
 | **FEM** (SSRM) | 1.137 | 1.363 | ×1.20 |
 
-Without the piles the two engines agree to about 1%, so the difference in the second column comes from the pile row alone. The row raises the factor of safety by a factor of 1.60 in the limit equilibrium analysis and 1.20 in the finite element analysis, a difference in the quantity being designed that is far larger than rounding.
+Without the piles, the two agree to about 1%. The LEM credits the pile rows with a factor of 1.60, and the FEM with
+1.20.
 
-Neither of those is a three-dimensional answer, and the direction of the error is only known where a three-dimensional reference exists. Cai & Ugai (2000) analyzed a pile-stabilized slope with a shear-strength-reduction finite element model that meshes the individual piles, the soil between them and the slip interfaces on each pile's surface. XSLOPE solves the same slope with both of its engines:
+Neither is a three-dimensional answer. Cai & Ugai (2000) solved a pile-stabilized slope by three-dimensional
+strength reduction, meshing each pile, the soil between the piles and a slip interface on each pile's surface. XSLOPE
+solves the same slope with both engines. The FEM gives:
 
 | Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
 |---|---|---|
@@ -339,7 +223,12 @@ Neither of those is a three-dimensional answer, and the direction of the error i
 | Pile at $D_1/D$ = 3, free head | 1.578 | 1.36 (+16.0%) |
 | Pile, head rotation restrained | 1.594 | 1.45 (+9.9%) |
 
-The unpiled case agrees to 0.4%, so the differences in the other two rows come from the pile. With the row in place the plane-strain model gives higher values: it credits the row with multiplying the unreinforced factor of safety by 1.389 where the three-dimensional model credits 1.193. On the same slope a Bishop search with the Ito & Matsui force gives 1.451 against the paper's own limit-equilibrium value of 1.37 and Slide2's 1.43, a credit of 1.269. Both two-dimensional credits stand above the three-dimensional one, the beam's by 0.196 and the limit-equilibrium search's by 0.076, so neither recovers it and the limit-equilibrium search lands nearer. This is the only benchmark with a published three-dimensional answer. Both comparisons are quantified in [VP106](../verification/rocscience.md#vp106) and [the VP106 finite-element diagnostic](../verification/rocscience.md#vp106-fem).
+Without the pile, the two agree to 0.4%, so the other two rows' differences come from the pile. The FEM credits the
+row with a factor of 1.389, and the three-dimensional model with 1.193. On the same slope, an LEM Bishop search gives
+1.143 without the pile and 1.451 with the Ito & Matsui force, a credit of 1.269. The paper's own limit equilibrium
+value is 1.37, and Slide2's is 1.43. Both two-dimensional credits are above the three-dimensional one, the FEM's by 0.196 and the LEM's by
+0.076, so the LEM lands nearer. This is the only benchmark here with a published three-dimensional answer
+([VP106](../verification/rocscience.md#vp106), [the VP106 finite element diagnostic](../verification/rocscience.md#vp106-fem)).
 
 ## References
 

@@ -41,7 +41,8 @@ picking `Geosynthetic`, `Nail`, `Tieback` or `Anchor` fills `Dir` and `Appl` wit
 either can then be changed. A blank `Type` is a generic tensile line, with `Dir` set to Tangent and `Appl` to
 Active ([The Columns](#the-columns)).
 
-XSLOPE does not enforce a unit system: every value is entered in one consistent set, such as kN and m or lb and
+The user picks a unit system, SI or Imperial, on the `main` sheet
+([Worksheet: main](../usage/input_template.md#worksheet-main)), and enters every value in it: kN and m, or lb and
 ft. A continuous sheet is entered per unit width of slope, with `Spacing` blank. A discrete member (a nail, a
 tieback, a bar) is entered per member, with its out-of-plane spacing in `Spacing`; the program divides its
 capacities and `Area` by that spacing and reports forces per unit width

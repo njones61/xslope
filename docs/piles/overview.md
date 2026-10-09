@@ -38,7 +38,8 @@ A pile runs between (`x1`, `y1`) and (`x2`, `y2`), entered in either order: the 
 end the tip. A vertical pile has `x1` = `x2`; a battered pile leans. The template is formatted for 20 piles, and
 more rows can be added below them.
 
-XSLOPE does not enforce a unit system: every value is entered in one consistent set, such as kN and m or lb and ft.
+The user picks a unit system, SI or Imperial, on the `main` sheet
+([Worksheet: main](../usage/input_template.md#worksheet-main)), and enters every value in it: kN and m, or lb and ft.
 The pile force `H` is entered per unit width of slope, as every force in a two-dimensional analysis is. The section
 and capacity columns, `Vcap`, `Mcap`, `I` and `Area`, are entered for a single pile, and the spacing `S` converts
 between the two: the force on one pile is `H` × `S`, and the FEM divides a pile's flexural stiffness EI and axial

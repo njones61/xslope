@@ -197,7 +197,8 @@ dashed lines separate those of the course below, offset by half a unit.
 #### In the LEM
 
 The LEM cannot model a block wall. It does not read the `joints` sheet. If the blocks are drawn as a soil material,
-with the `mc` strength option, trial surfaces cut through them, and the factor of safety comes out far too low.
+with the `mc` strength option, trial surfaces cut through them, and the factor of safety comes out far too low. If
+they are drawn as `elastic`, trial surfaces must pass under the wall, and the factor of safety comes out too high.
 
 #### In the FEM
 

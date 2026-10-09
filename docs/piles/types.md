@@ -298,9 +298,8 @@ behind it, crosses the pile line and is joined to it there in the FEM; in the LE
 ### A soil nail and a shotcrete facing
 
 A nail's head plate bears on the shotcrete facing at end 1, where `Tend1` sets the head's capacity in both
-analyses ([Soil Nail](../reinforcement/types.md#soil-nail)). The LEM and the FEM need the facing itself entered
-differently, as below. Both apply every line load and polygon in a workbook, so a wall analyzed both ways needs two
-workbooks, one for each analysis.
+analyses ([Soil Nail](../reinforcement/types.md#soil-nail)). The facing itself is entered differently in each
+analysis.
 
 #### In the LEM
 

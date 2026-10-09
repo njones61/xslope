@@ -1588,8 +1588,12 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         # Move to next profile line (skip 3 columns: A->D, D->G, etc.)
         col += 3
 
-    if profile_lines and pd.isna(max_depth):
-        raise ValueError("The profile sheet has no bottom elevation (cell B2).")
+    # A profile-line model with a blank bottom elevation (B2) still opens: the
+    # loader checks structure only. It has no zones until a bottom is entered,
+    # and preflight's geometry.bottom_elevation_missing stops a run until then.
+    _no_bottom = bool(profile_lines) and pd.isna(max_depth)
+    if _no_bottom:
+        max_depth = None
 
     # Ground surface, domain polygon, and tensile-crack line are built from the
     # unified polygon representation after materials are parsed — see below.
@@ -1898,7 +1902,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         # maximum-depth elevation nobody typed into their reports and plot extents.
         if max_depth is None or max_depth != max_depth or max_depth == 0:
             max_depth = None
-    elif any(len(p['coords']) >= 2 for p in profile_lines):
+    elif not _no_bottom and any(len(p['coords']) >= 2 for p in profile_lines):
         # Convert profile lines -> polygons. max_depth is used ONLY here, as the
         # bottom boundary for build_polygons (mat_id is 0-based in both).
         # build_polygons emits one zone per profile line, in line order, so the
@@ -3017,12 +3021,6 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     # upgrades older files to the current template format. The trade-off is that
     # user-added custom formulas/formatting in the destination are not preserved.
     # Callers may pass an explicit `template` (e.g. Save As from a chosen file).
-    if slope_data.get('profile_lines'):
-        md = slope_data.get('max_depth')
-        if md is None or pd.isna(md):
-            raise ValueError(
-                "Profile-line models require a bottom elevation "
-                "(max_depth; profile sheet cell B2).")
     if template is None:
         template = default_template_path()
     # An automatic-water model states its reservoir as the water definition plus the
@@ -3327,8 +3325,10 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
         _prof_size_row = 7 if _dest_version >= 21 else None
         _prof_coord_row = 9 if _dest_version >= 21 else 8
         prof = {}
+        # A model with no bottom elevation is saved with B2 blank, as it was
+        # loaded; preflight asks for the bottom before a run.
         md = slope_data.get('max_depth')
-        prof['B2'] = _f(md)
+        prof['B2'] = None if _isnan(md) else _f(md)
         for n, line in enumerate(profile_lines):              # n is 0-based
             x_col = 1 + n * 3                                  # A, D, G, ...
             y_col = x_col + 1

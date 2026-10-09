@@ -111,7 +111,7 @@ interlocked sheets form one continuous wall, so `I`, `Area` and `Mcap` are enter
 
 | Column | Entry | Typical values |
 |---|---|---|
-| <code class="rc rc-lem">H</code> | The wall's resistance per unit length where a slip surface crosses it: the smaller of its shear capacity and the passive force the soil develops below the excavation ([GEC 4][gec4] p. 101). | — |
+| <code class="rc rc-lem">H</code> | The wall's resistance per unit length where a slip surface crosses it: the smaller of its shear capacity and the passive force the soil can develop against the wall, from the slip surface down to its toe ([GEC 4][gec4] p. 101). | — |
 | <code class="rc rc-lem">Appl</code> | `Active`, since `H` is an allowable resistance and is not divided by F. | — |
 | <code class="rc rc-both">D</code> | Leave blank. A wall's `I` and `Area` are entered, so the diameter is not used. | — |
 | <code class="rc rc-both">S</code> | 1, since the values are per unit length of wall. | — |
@@ -141,9 +141,18 @@ concrete-filled drilled holes, with timber lagging spanning between them to hold
 
 **Use the LEM**, with `H` entered, as in [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md). Above the
 excavation, the lagging makes the wall continuous. Below it, the beams are separate piles, and the soil can move
-between them. `H` comes from the passive resistance of each embedded beam ([GEC 4][gec4] p. 101), as in the table
-below. The FEM cannot represent this: it treats the beams below the excavation as a continuous wall. Enter the wall
-per beam, with `S` the beam spacing.
+between them. Enter the wall per beam, with `S` the beam spacing.
+
+`H` is the smaller of the beam's allowable shear capacity and the passive force the soil can develop in front of the
+beam, from the slip surface down to its toe, divided by the beam spacing `S` ([GEC 4][gec4] p. 101). GEC 4
+computes the passive force by Broms' method (pp. 84–86). In sand, and in clay under drained conditions, the Rankine
+passive pressure acts over three times the beam width. In clay under undrained conditions, a pressure of 9 times
+the undrained shear strength acts over one beam width, with none in the top 1.5 beam widths below the excavation.
+The beam width is the flange width for a driven beam, or the hole diameter for a beam set in concrete. Compute `H`
+for the depth where the critical slip surface crosses the wall.
+
+The FEM cannot represent this. It spreads each beam over the full spacing `S`, so the soil in front of the embedded
+beams resists across the whole spacing.
 
 The figure shows the wall in section and in plan.
 
@@ -157,7 +166,7 @@ and `I`, `Area` and `Mcap` are entered for one beam.
 
 | Column | Entry | Typical values |
 |---|---|---|
-| <code class="rc rc-lem">H</code> | The wall's resistance per unit length: the smaller of the beam's allowable shear capacity and the passive force the soil develops below the excavation, divided by the beam spacing ([GEC 4][gec4] p. 101). | — |
+| <code class="rc rc-lem">H</code> | The wall's resistance per unit length, computed as described above. | — |
 | <code class="rc rc-lem">Appl</code> | `Active`, since `H` is an allowable resistance and is not divided by F, as in [Tutorial LEM-9](../tutorials/lem09_tieback_wall.md). | — |
 | <code class="rc rc-both">D</code> | Leave blank. `H`, `I` and `Area` are entered, so the diameter is not used. | A drilled-in beam's hole is 0.61 m (2 ft) in GEC 4's examples (pp. A-10, A-29). |
 | <code class="rc rc-both">S</code> | Center-to-center spacing of the beams. | 1.5 to 3 m (4.9 to 9.8 ft) for driven beams, up to 3 m for drilled-in beams ([GEC 4][gec4] p. 76); 2.5 m (8.2 ft) in GEC 4's examples (p. A-7). |

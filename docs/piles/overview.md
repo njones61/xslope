@@ -109,8 +109,8 @@ walls and nearly continuous rows, and the LEM for separate piles:
 The LEM can also analyze a wall on the `piles` sheet. It applies `H` where a trial slip surface crosses the wall,
 as it does for a pile, with `S` = 1. Ito & Matsui's method does not apply to a wall, because there are no gaps for
 the soil to move through, so `H` must be entered. A common choice is the smaller of the wall's shear capacity and
-the passive resistance of the soil below the excavation ([Sheet-Pile Wall](types.md#sheet-pile-wall)), or a value
-from a separate lateral analysis of the wall. An entered `H` has three limits:
+the passive force the soil can develop against the wall, from the slip surface down to its toe
+([Sheet-Pile Wall](types.md#sheet-pile-wall)), or a value from a separate lateral analysis of the wall. An entered `H` has three limits:
 
 - It is the same at every depth where a trial surface crosses the wall. In reality, the resistance depends on how
   much embedment remains below the crossing. Only the `Mcap` check changes with depth: it uses a moment arm of one

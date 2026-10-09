@@ -102,10 +102,9 @@ member:
 | Contiguous or very closely spaced row | nearly continuous | FEM, as a continuous wall | the same, ignoring the gaps |
 | Row of separate piles | discrete | LEM with Ito & Matsui | factor of safety for the spacing, force per pile, capacity checks |
 
-For a row of separate piles, take the factor of safety from the LEM with Ito & Matsui, and use the FEM to study
-stiffness and member forces. [LEM vs FEM Pile Modeling](lem.md#lem-vs-fem-pile-modeling) compares the two analyses
-on the same slopes, including the one pile-stabilized slope with a published three-dimensional solution. The
-formulations are on [Piles in LEM](lem.md) and [Piles in FEM](fem.md).
+[LEM vs FEM Pile Modeling](lem.md#lem-vs-fem-pile-modeling) compares the two analyses on the same slopes,
+including the one pile-stabilized slope with a published three-dimensional solution. The formulations are on
+[Piles in LEM](lem.md) and [Piles in FEM](fem.md).
 
 ## Worked Examples
 

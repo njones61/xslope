@@ -334,10 +334,8 @@ way, with line loads of 14.6 kN/m and 13.2 kN/m.
 
 ![A soil nail on a cut face, with the facing a dashed outline not in the model, and the facing's weight as a line load on the crest just behind the top of the face](../usage/images/mr_connect_nail_facing.png){width=478}
 
-Drawing the facing as a polygon of concrete, as in the FEM, does not work here. A trial surface cannot cut through
-a material whose strength option is `elastic`, so to reach the toe it passes under the facing, where it runs nearly
-level and the facing's weight adds almost nothing to the force driving the slide. A circle can pass under the
-facing only as a long, deep arc, so a circular search misses the shallow surfaces that govern.
+Do not draw the facing as a concrete polygon in the LEM: a trial surface cannot cut through an `elastic` material,
+so it passes under the facing and misses the surfaces that govern.
 
 #### In the FEM
 

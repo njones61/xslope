@@ -58,17 +58,17 @@ F is force and L is length.
 | B | <code class="rc rc-geom">Label</code> | — | Optional name, used in messages, plots and reports. |
 | C, D | <code class="rc rc-geom">x1</code>, <code class="rc rc-geom">y1</code> | L | One end of the pile. |
 | E, F | <code class="rc rc-geom">x2</code>, <code class="rc rc-geom">y2</code> | L | The other end. |
-| G | <code class="rc rc-lem">H</code> | F/L | Force the pile row exerts on the sliding mass, per unit width of slope. The LEM applies it perpendicular to the pile, where the slip surface crosses it. For a vertical pile, leave it blank to have it computed from `D` and `S` ([Ito & Matsui (1975) Theory](lem.md#ito-matsui-1975-theory)). |
-| H | <code class="rc rc-lem">Appl</code> | — | Active (or blank): `H` is an allowable force and is not divided by the factor of safety.<br>Passive: `H` is a nominal force and is divided by the factor of safety, as the soil's strength is. |
+| G | <code class="rc rc-lem">H</code> | F/L | Force the pile row exerts on the sliding mass, per unit width of slope. The LEM applies it perpendicular to the pile, where the slip surface crosses it. For a vertical pile, if left blank, `H` is computed from `D` and `S` by [Ito & Matsui's method](lem.md#ito-matsui-1975-theory). |
+| H | <code class="rc rc-lem">Appl</code> | — | Active, or left blank: `H` is an allowable force and is not divided by the factor of safety.<br>Passive: `H` is a nominal force and is divided by the factor of safety, as the soil's strength is. |
 | I | <code class="rc rc-both">D</code> | L | Pile diameter. Used to compute `H` by Ito & Matsui, and by the FEM to compute `I` and `Area` when they are blank. |
 | J | <code class="rc rc-both">S</code> | L | Center-to-center spacing of the piles in the row; 1 for a continuous wall. Used to compute `H` by Ito & Matsui, to convert `H` to the force on one pile for the capacity checks, and by the FEM to convert each pile's stiffness to stiffness per unit width. |
-| K | <code class="rc rc-both">Vcap</code> | F per pile | Shear capacity of one pile. Leave blank for no limit ([Structural Capacity Checks](lem.md#structural-capacity-checks)). |
-| L | <code class="rc rc-both">Mcap</code> | F·L per pile | Moment capacity of one pile. Leave blank for no limit. The LEM limits the force on a pile to `Mcap` divided by the moment arm. In the FEM, the pile forms a plastic hinge where the moment reaches `Mcap`: the section yields there and rotates freely. |
+| K | <code class="rc rc-both">Vcap</code> | F per pile | Shear capacity of one pile. If left blank, there is no limit ([Structural Capacity Checks](lem.md#structural-capacity-checks)). |
+| L | <code class="rc rc-both">Mcap</code> | F·L per pile | Moment capacity of one pile. If left blank, there is no limit. The LEM limits the force on a pile to `Mcap` divided by the moment arm. In the FEM, the pile forms a plastic hinge where the moment reaches `Mcap`: the section yields there and rotates freely. |
 | M | <code class="rc rc-fem">E</code> | F/L² | Elastic modulus of the pile material. |
-| N | <code class="rc rc-fem">I</code> | L⁴ per pile | Moment of inertia of one pile. If blank, it is computed from `D` as πD⁴/64. |
-| O | <code class="rc rc-fem">Area</code> | L² per pile | Cross-sectional area of one pile. If blank, it is computed from `D` as πD²/4. |
-| P | <code class="rc rc-fem">Head</code> | `free`, `pinned`, `unrotated` or `fixed` | Restraint at the pile head. Blank means free ([Head and Tip Fixity](fem.md#head-and-tip-fixity)). |
-| Q | <code class="rc rc-fem">Tip</code> | the same four | Restraint at the pile tip. Blank means free. |
+| N | <code class="rc rc-fem">I</code> | L⁴ per pile | Moment of inertia of one pile. If left blank, `I` is computed from the pile diameter, `D`, as πD⁴/64. |
+| O | <code class="rc rc-fem">Area</code> | L² per pile | Cross-sectional area of one pile. If left blank, `Area` is computed from the pile diameter, `D`, as πD²/4. |
+| P | <code class="rc rc-fem">Head</code> | `free`, `pinned`, `unrotated` or `fixed` | Restraint at the pile head. If left blank, the head is free ([Head and Tip Fixity](fem.md#head-and-tip-fixity)). |
+| Q | <code class="rc rc-fem">Tip</code> | the same four | Restraint at the pile tip. If left blank, the tip is free. |
 
 ## LEM vs FEM
 

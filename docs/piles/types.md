@@ -246,6 +246,11 @@ along its base and up through the backfill. On the right, the FEM's base joint a
 
 Load-bearing piles carry structural loads (vertical forces from foundations) and transfer them to the subsurface through a combination of **skin friction** along the pile shaft and **end bearing** at the pile tip. The key question for slope stability is: does the structural load contribute to the driving forces on the failure surface?
 
+**Use the LEM.** The pile itself is not modeled. Its structural load is either applied as a surcharge on the `dloads`
+sheet or left out, as Case 1 and Case 2 below describe. The FEM adds nothing here: its pile is bonded to the soil, so
+an axial load at the head reaches the soil through the mesh rather than through skin friction and end bearing
+([Pile-Soil Interface and Load Transfer](fem.md#pile-soil-interface-and-load-transfer)).
+
 ![A footing on a slope's crest on a pile, twice: in Case 1 the pile's tip is above the failure surface, in Case 2 the pile crosses it and its tip is in stable ground; in plan, footings of width B along the crest at spacing s](images/pw_load_bearing.png){width=871}
 
 In Case 1 the pile ends inside the sliding mass, so the pile and its load move with it. In Case 2 the pile reaches
@@ -285,8 +290,6 @@ For load-bearing piles near slopes, the recommended approach in XSLOPE is:
 3. If the pile also provides lateral resistance to sliding, model that separately as a stabilizing pile force $H$
 
 The distributed loads in XSLOPE handle the surcharge case, so load-bearing piles need no additional input.
-
-A finite element run does not remove the need for these bounds: its pile is bonded to the soil with no shaft interface ([FEM piles](fem.md#pile-soil-interface-and-load-transfer)).
 
 ## Connecting Reinforcement to a Wall or Facing
 

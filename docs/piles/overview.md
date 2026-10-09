@@ -90,11 +90,13 @@ true of a wall but not of a row of separate piles:
 
 ![A continuous wall in section, with S = 1, beside a row of piles of diameter D at spacing S in plan, whose stiffnesses EA and EI per pile become EA/S and EI/S per unit width](images/pile_row_plane_strain.png){width=880}
 
-On the left, a wall in section, entered with `S` = 1. On the right, a row of piles in plan, of diameter `D` at
-spacing `S`. Dividing each pile's EA and EI by `S` turns the row into a wall of the same average stiffness, with no
-gaps between the piles. In the ground, the soil arches between the piles and, if they are far enough apart, flows
-between them. A two-dimensional analysis can represent neither, and that decides which analysis suits which
-member:
+On the left, a wall in section, entered with `S` = 1. On the right, a row of piles in plan, with diameter `D` and
+spacing `S`.
+
+The FEM divides each pile's EA and EI by `S`. This turns the row of piles into a continuous wall with the same
+average stiffness. In reality, soil can arch between the piles, and if the piles are far apart, soil can flow
+between them. A two-dimensional analysis cannot model either effect. The table shows which analysis to use for each
+type of member:
 
 | Member | Out of plane | Analysis | What it gives |
 |---|---|---|---|

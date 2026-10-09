@@ -46,6 +46,7 @@ hours of iterations, are marked for the release gate and run there.
 | [Rocscience Slide2 Corpus](rocscience.md) | The 111-problem Slide2 verification manual, problem by problem |
 | [Rocscience Groundwater Corpus](rocscience_groundwater.md) | The 21-problem Slide2 groundwater (FE seepage) verification manual, problem by problem |
 | [Rocscience RS2 (SSRM) Corpus](rs2.md) | The RS2 shear-strength-reduction manual, Parts I–IV — the corpus's FEM/SSRM backbone |
+| [Rocscience RS2 Joint Corpus](rs2_joints.md) | The 23-problem RS2 joint verification manual: jointed rock slopes and the joint's own law, problem by problem |
 | [GeoStudio (SLOPE/W) Corpus](geostudio.md) | The 47-problem SLOPE/W verification manual, cross-referenced |
 | [Published Problems](published.md) | Worked hand calculations from design manuals and the literature, table by table |
 

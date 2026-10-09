@@ -325,10 +325,7 @@ Draw the facing as a polygon of shotcrete on the air side of the cut face, from 
 as the whole facing, so that its outer face becomes the ground surface. Give its material the unit weight and
 stiffness of concrete ([Typical values](#typical-values)) and the `elastic` strength option, as for a
 [gravity wall](#gravity-or-cantilever-wall). Extend each nail into the polygon so that end 1 sits at the head plate.
-
-Leave out the LEM's line load for the facing's weight, since the polygon has that weight already, spread down the
-face. In the FEM a line load acts at a single node ([Loads](../fem/overview.md#distributed-loads)), and the
-facing's whole weight on one node can fail the soil under it before the slope fails.
+The polygon carries the facing's weight, so leave out the LEM's line load.
 
 ![The same soil nail and facing for the FEM: the facing a polygon of shotcrete with the nail's end 1 inside it, and no line load](../usage/images/mr_connect_nail_facing_fem.png){width=466}
 

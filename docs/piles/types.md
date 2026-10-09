@@ -407,28 +407,15 @@ about four elements across it ([A Size on one zone](../fem/mesh.md#a-size-on-one
 
 ### A geosynthetic and facing blocks, panels or a wrapped face
 
-Use the FEM for a block facing ([Segmental Block Wall](#segmental-block-wall)). Use either analysis for a wrapped
-face.
+**Use the FEM** for both a block facing and a wrapped face.
 
-Enter each layer with end 1 at the back of the facing and end 2 in the fill. `Tend1` is the capacity of the
-connection. The figure shows one layer connected to a block facing.
+For a block facing, enter each layer with end 1 at the back of the facing and end 2 in the fill.
 
 ![A geosynthetic layer running from the back of a block facing, end 1, into the fill, end 2](../usage/images/mr_connect_geosynthetic_facing.png){width=455}
 
-A wrapped face has no facing unit. The sheet is folded back over the face and buried under the next lift. Enter each
-layer with end 1 at the face, and set `Tend1` to the pullout resistance of the folded-back part.
-
-#### In the LEM
-
-A block facing needs the FEM. For a wrapped face, `Tend1` sets the layer's capacity at end 1, where its capacity
-envelope starts
-([Capacity Envelope](../reinforcement/lem.md#capacity-envelope)).
-
-#### In the FEM
-
 Draw the blocks and their joint lines as described under [Segmental Block Wall](#segmental-block-wall). A bonded
-layer cannot end on a joint line, so set `Joint` to `Yes` on every layer. `Tend1` is the strength of the tie between
-end 1 and the blocks ([Ends, ties and the bar](../reinforcement/fem.md#ends-ties-and-the-bar)). In
+layer cannot end on a joint line, so set `Joint` to `Yes` on every layer. `Tend1` is then the strength of the tie
+between end 1 and the blocks ([Ends, ties and the bar](../reinforcement/fem.md#ends-ties-and-the-bar)). In
 [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md#part-2-the-same-wall-with-geogrid), each of the three layers
 is tied to the blocks with `Tend1` = 40 kN/m (2,740 lb/ft). The figure shows that wall.
 
@@ -438,15 +425,15 @@ In section, joint lines run under the base, up the back face and between the cou
 face, where a dot marks its tie to the blocks. In plan, one layer runs back from the blocks into the reinforced fill
 along the whole length of the wall.
 
-A wrapped face has no blocks and needs no joint lines. Run the model twice, once with the layers bonded and once
-with them jointed ([Choosing a Bonded Bar or a Joint](../reinforcement/fem.md#bonded-bar-or-joint)). For a bonded
-layer, `Tend1` sets the layer's capacity at end 1. For a jointed layer, `Tend1` is the strength of the tie between
-end 1 and the soil at the face.
+A wrapped face has no facing unit. The sheet is folded back over the face and buried under the next lift. Enter each
+layer with end 1 at the face, and set `Tend1` to the pullout resistance of the folded-back part. Run the model twice,
+once with the layers bonded and once with them jointed, and use the lower factor of safety
+([Choosing a Bonded Bar or a Joint](../reinforcement/fem.md#bonded-bar-or-joint)).
 
 #### Connection strength
 
-FHWA bases the connection's long-term strength, per unit width of the layer, on connection tests of the facing
-unit with the geosynthetic:
+For a block or panel facing, FHWA bases the connection's long-term strength, per unit width of the layer, on
+connection tests of the facing unit with the geosynthetic:
 
 >$T_{alc} = \dfrac{T_{ult} \times CR_{cr}}{RF_D}$
 
@@ -459,10 +446,7 @@ GG-II, with long-term strengths T<sub>al</sub> ([Geosynthetic Layer](../reinforc
 of 1,085 and 2,169 lb/ft (15.8 and 31.7 kN/m) (Table E1-7.3, p. E1-15). On eight of the wall's eleven layers, the
 connection is weaker than the layer and limits the force at the face.
 
-Enter T<sub>alc</sub> as `Tend1`. In the LEM, with `Appl` set to Active, first divide it by the factor of safety
-the design applies to the connection. With `Appl` set to Passive, enter it as it is
-([Geosynthetic Layer](../reinforcement/types.md#geosynthetic-layer)). The FEM ignores `Appl` and uses `Tend1` as
-entered.
+Enter T<sub>alc</sub> as `Tend1`.
 
 ## References
 

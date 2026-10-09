@@ -85,8 +85,8 @@ On the left, the LEM's force $H$ where each pile crosses the circle. On the righ
 FEM beam: the sliding mass pushes the pile downslope above the slip surface, and the stable ground holds it back
 below.
 
-A two-dimensional analysis assumes plane strain, so it treats every member as continuous out of plane. That is
-true of a wall but not of a row of separate piles:
+The LEM and the FEM are both two-dimensional, so both treat every member as continuous out of plane. That is true
+of a wall but not of a row of separate piles:
 
 ![A continuous wall in section, with S = 1, beside a row of piles of diameter D at spacing S in plan, whose stiffnesses EA and EI per pile become EA/S and EI/S per unit width](images/pile_row_plane_strain.png){width=880}
 
@@ -95,8 +95,8 @@ spacing `S`.
 
 The FEM divides each pile's EA and EI by `S`. This turns the row of piles into a continuous wall with the same
 average stiffness, and soil cannot pass through it. In reality, soil moves between separate piles, and the spacing
-controls how much force each pile takes. The LEM accounts for this: Ito & Matsui's method computes the pile force
-from the soil moving between piles of diameter `D` at spacing `S`. The FEM does not. So use the FEM for walls and
+controls how much force each pile takes. The LEM brings this in through `H`: Ito & Matsui's method computes the
+pile force from the soil moving between piles of diameter `D` at spacing `S`. The FEM has no such term. So use the FEM for walls and
 nearly continuous rows, and the LEM for rows of separate piles:
 
 | Member | Out of plane | Analysis | What it gives |

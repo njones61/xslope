@@ -15847,7 +15847,7 @@ def main():
     run_all = not (args.lem or args.fem or args.seep or args.tseep or args.roundtrip
                    or args.dxf or args.gsz or args.slide2 or args.rs2
                    or args.preflight or args.mesh or args.tutorials
-                   or args.joints)
+                   or args.joints or args.drivers)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all

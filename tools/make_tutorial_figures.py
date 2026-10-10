@@ -4631,23 +4631,22 @@ FEM02_SLICES = 40
 FEM02_CRITERION = "non_convergence"
 FEM02_F_MIN, FEM02_F_MAX = 1.0, 2.0
 FEM02_TOLERANCE = 0.01
-#: 12,000, which is also ``solve_ssrm``'s default budget.  On this model the
-#: number no longer decides the answer: a trial that spends its budget while still
-#: making progress is extended rather than failed, so both runs return the same
-#: factors of safety (1.5664 elastic-perfectly-plastic, 1.5352 peak-residual) from
-#: a 3,000 budget and from 12,000, with the same brackets and the same converged
-#: field.  What the budget still decides is how far the captured failure state has
-#: developed, which is why the producers ask for the larger one.
+#: The iteration budget per trial passed to ``solve_ssrm`` for every FEM-2 run
+#: here: 12,000, which is also its default, and the value the page shows in
+#: **Max iterations per trial**.  A trial that spends its budget while the
+#: residual is still falling is extended rather than failed, so the number sets
+#: where that extension starts; it also bounds how far the captured failure state
+#: develops.
 FEM02_MAX_ITERATIONS = 12000
-#: The line the bar-force profiles are drawn for: the most heavily loaded of the
-#: six in both runs (peak 800 lb/ft elastic-perfectly-plastic, 762.8 lb/ft
-#: peak-residual, both at the last converged trial).
+#: The reinforcement line the bar-force profiles are drawn for, in both runs
+#: (elastic-perfectly-plastic and peak-residual), from the last converged trial.
+#: The producer prints that line's largest force and its hardest-worked point, so
+#: the choice can be checked against each run.
 FEM02_PROFILE_LINE = 5
 #: The residual capacities the sweep asks for, highest first.  ``None`` is the
-#: blank cell — no post-peak drop at all.  The sweep runs down to zero because
-#: that is where the answer moves: Tres = Tmax is the same run as a blank cell,
-#: 600 and 400 each give a lower factor of safety of their own (1.5352 and
-#: 1.5195), and Tres = 0 — the bar tearing and carrying nothing — gives another.
+#: blank cell — no post-peak drop at all.  Tres = Tmax (800) is the same run as a
+#: blank cell; the sweep then steps down through 600 and 400 to 0, the bar tearing
+#: and carrying nothing, solving one strength reduction at each value.
 FEM02_TRES_SWEEP = (None, 800.0, 600.0, 400.0, 0.0)
 
 
@@ -4659,12 +4658,12 @@ def _fem02_mesh(model):
 
     The dialog's own default for that box is ticked, and on this section it is not
     inert: the shell is a 1.19 ft facing band, thinner than one element at the
-    target size, so the refinement drives the local size there to 0.33 ft and the
-    mesh from 2,101 elements to 5,096.  That mesh is a different model's worth of
-    answer (peak-residual 1.4570 against 1.5352, elastic-perfectly-plastic 1.5195
-    against 1.5664; 1.4414 is what a 1 ft element size gives), so the page has to
-    tell the reader which box to clear, and
-    this producer draws the mesh the page's own numbers come from.
+    target size, so the refinement would drive the local element size down there
+    and build a much finer mesh, which gives different factors of safety. The page
+    tells the reader to clear the box, and this producer builds the mesh without
+    that refinement: it passes only the size regions the file declares, so no
+    thin-zone sizes (Studio adds those from ``mesh.thin_zone_plan``) reach the
+    mesher. That is the mesh the page's own numbers come from.
     """
     from xslope.mesh import (build_mesh_from_polygons,
                              extract_constraint_line_geometry,

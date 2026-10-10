@@ -3238,8 +3238,9 @@ class GlobalParamsDialog(QDialog):
     The two dropdowns sit above the numeric fields; picking a Units system autofills
     the unit-weight-of-water field with that system's canonical value (9.81 SI /
     62.4 Imperial) — typeable-over, so a seawater/brine override still stands. A
-    blank Units selection leaves the entered value untouched. Unit-suffix field
-    labels are a later phase and are deliberately not added here.
+    blank Units selection leaves the entered value untouched. The numeric rows'
+    unit suffixes ("Unit weight of water (pcf)") follow the selectors while the
+    dialog is open, so a row never names one system beside a value in the other.
     """
 
     def __init__(self, numeric_fields, values, parent=None):
@@ -3251,6 +3252,7 @@ class GlobalParamsDialog(QDialog):
         self._edits = {}
         layout = QVBoxLayout(self)
         form = QFormLayout()
+        self._form = form
 
         # Units selector — canonical si/imperial/None <-> SI/Imperial/blank label.
         self._units = QComboBox()
@@ -3298,8 +3300,8 @@ class GlobalParamsDialog(QDialog):
 
         # Numeric fields (gamma_water first — the Units autofill targets it). The
         # header carries a unit suffix ("Unit weight of water (pcf)") when the project
-        # declares a system; unlabeled otherwise. Reflects the STORED declaration at
-        # open time; it does not live-update when the selector changes (a later pass).
+        # declares a system; unlabeled otherwise. It opens on the STORED declaration
+        # and follows the selectors from then on (_relabel_units).
         unit_labels = _unit_labels_for(values)
         for f in numeric_fields:
             _v = values.get(f.key, f.default)
@@ -3319,6 +3321,22 @@ class GlobalParamsDialog(QDialog):
         # Wire the autofill only AFTER the initial combo state is set, so opening the
         # dialog on an existing project never clobbers its stored gamma_w override.
         self._units.currentIndexChanged.connect(self._autofill_gamma)
+        self._units.currentIndexChanged.connect(self._relabel_units)
+        self._time.currentTextChanged.connect(self._relabel_units)
+
+    def _relabel_units(self, *_):
+        """Re-suffix the numeric rows for the system (and time unit) the selectors
+        now show — the same headers the dialog would open on had the file declared
+        them."""
+        i = self._units.currentIndex()
+        system = _UNIT_SYSTEM_ITEMS[i][1] if 0 <= i < len(_UNIT_SYSTEM_ITEMS) else None
+        unit_labels = _unit_labels_for(
+            {"unit_system": system,
+             "time_unit": self._time.currentText().strip() or None})
+        for f in self._numeric_fields:
+            label = self._form.labelForField(self._edits.get(f.key))
+            if label is not None:
+                label.setText(f.display_header(unit_labels))
 
     def _autofill_gamma(self, index):
         from xslope.units import GAMMA_W

@@ -47,7 +47,6 @@ inclined tension cracks and the vertical seismic coefficient.
 
 import csv
 import datetime
-import functools
 import io
 import math
 import os
@@ -59,7 +58,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 from shapely.geometry import Polygon
 
-from .fileio import build_ground_surface_from_polygons
+from .fileio import build_ground_surface_from_polygons, main_sheet_cell
 from .mesh import ensure_ccw_elements, interpolate_at_point
 from .units import GAMMA_W, require_gamma_water, units_check, normalize_unit_system
 # Water geometry lives in a neutral module. material_above_ground_dload is used here
@@ -86,37 +85,10 @@ _GAMMA_W_METRIC = 9.807                   # kN/m3 -- GeoStudio vendor canonical
 _GAMMA_W_IMPERIAL = GAMMA_W["imperial"]   # lb/ft3
 
 
-@functools.lru_cache(maxsize=None)
-def _main_sheet_cell(label):
-    """The 'main' sheet cell holding the value labelled ``label`` (``"Water loads"``)
-    on the current input template -- the one an import is written into -- e.g.
-    ``"D24"``; ``None`` when the template cannot be read or has no such row.
-
-    Read off the template itself rather than restated here: the main-sheet rows move
-    when the template gains one (v25 pushed Water loads from D23 to D24), and a
-    message naming the cell a reader should change has to follow it.
-    """
-    try:
-        import openpyxl
-        from .fileio import default_template_path
-        wb = openpyxl.load_workbook(default_template_path(), read_only=True)
-        try:
-            for row in wb["main"].iter_rows(min_col=3, max_col=4):
-                text = str(row[0].value or "").strip().rstrip(":").strip()
-                if text.lower() == label.lower():
-                    return f"D{row[0].row}"
-        finally:
-            wb.close()
-    except Exception:                                       # noqa: BLE001
-        return None
-    return None
-
-
 def _water_loads_cell():
     """How a message names the Water loads cell: by its label, and by its address on
-    the current template where that can be read."""
-    cell = _main_sheet_cell("Water loads")
-    return f"Water loads cell ({cell})" if cell else "Water loads cell"
+    the current template, which is the one an import is written into."""
+    return f"Water loads cell ({main_sheet_cell('water_loads')})"
 
 
 def _detect_units(gamma_water, declared=None):

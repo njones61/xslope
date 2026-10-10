@@ -894,6 +894,71 @@ SURFACE_FAMILY_OPTIONS = ('circular', 'non-circular')
 #: The cell spelling of each internal surface-family name, for the writer.
 SURFACE_FAMILY_CELL = {'circular': 'circular', 'noncircular': 'non-circular'}
 
+#: The main sheet's run-option block (column D), by the ``slope_data`` key each cell
+#: holds: the label in column C, the row on the template version that introduced the
+#: cell, and that version. Every row from D20 down moved one row lower at v25, when
+#: the 1D element size was inserted at D20 (:data:`_ELEMENT_SIZE_1D_TEMPLATE_VERSION`)
+#: -- the same one-row shift the loader and writer apply.
+MAIN_SHEET_CELLS = {
+    'lem_method': ('LEM method', 14, 19),
+    'num_slices': ('Number of slices', 15, 19),
+    'k0': ('K0 initial stress (FEM)', 16, 19),
+    'tension_srf': ('Tension SRF (FEM)', 17, 19),
+    'element_type': ('Mesh element type', 18, 19),
+    'target_size': ('Mesh target size', 19, 19),
+    'element_size_1d': ('1D element size', 20, _ELEMENT_SIZE_1D_TEMPLATE_VERSION),
+    'ssrm_f_min': ('SSRM F min', 20, 19),
+    'ssrm_f_max': ('SSRM F max', 21, 19),
+    'side_bc': ('Side BC', 22, 21),
+    'water_loads': ('Water loads', 23, _WATER_LOADS_TEMPLATE_VERSION),
+    'surface_family': ('Surface family', 24, 22),
+}
+
+
+def main_sheet_cell(key, version=None):
+    """The 'main' sheet cell that holds ``slope_data[key]`` on a template of
+    ``version`` -- the current template when ``None`` -- e.g.
+    ``main_sheet_cell('water_loads')`` is ``'D24'``, and ``'D23'`` on a v22-v24 file.
+    ``None`` when that version has no such cell.
+
+    The one place a message, a remedy or an import note looks up which cell a reader
+    should change, so none of them restates a row that the next template moves. It
+    names the cells the loader reads and the writer fills (both apply the v25 shift
+    themselves); ``test/docs_links_check.py`` holds the table to every template's own
+    labels and to the writer.
+    """
+    _label, row, since = MAIN_SHEET_CELLS[key]
+    v = SUPPORTED_TEMPLATE_VERSION if version is None else int(float(version))
+    if v < since:
+        return None
+    if key != 'element_size_1d' and row >= 20 and v >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
+        row += 1
+    return f"D{row}"
+
+
+def template_main_sheet_cell(label, template=None):
+    """The 'main' sheet cell a template itself labels ``label`` (column C, the
+    trailing colon ignored), e.g. ``'D24'`` for ``'Water loads'`` on the current
+    template; ``None`` when the workbook cannot be read or has no such row.
+
+    ``template`` is a workbook path, the bundled template by default. This reads
+    the layout off the file rather than off :data:`MAIN_SHEET_CELLS`, which is what
+    makes it the cross-check of that table.
+    """
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(template or default_template_path(), read_only=True)
+        try:
+            for row in wb['main'].iter_rows(min_col=3, max_col=3):
+                text = str(row[0].value or '').strip().rstrip(':').strip()
+                if text.lower() == label.lower():
+                    return f"D{row[0].row}"
+        finally:
+            wb.close()
+    except Exception:                                       # noqa: BLE001
+        return None
+    return None
+
 # Optional circles-sheet search window (v19, J8:K17). Each entry maps the label
 # in column J to the slope_data['search_window'] key its value in column K feeds.
 # Order IS the sheet order: the reader walks rows 8..17 positionally.
@@ -3035,12 +3100,13 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         if _tpl_version < _WATER_LOADS_TEMPLATE_VERSION:
             raise ValueError(
                 f"Cannot save this model into a version {_tpl_version} template: it "
-                f"takes its water loads automatically (main sheet D23 = auto), and "
-                f"cell D23 does not exist before template version "
+                f"takes its water loads automatically (Water loads = auto), and the "
+                f"main sheet has no Water loads cell before template version "
                 f"{_WATER_LOADS_TEMPLATE_VERSION}. The file would load back as manual "
                 f"carrying no water load at all, losing the standing water. Save into "
-                f"the current template, or set the mode to manual and enter the water "
-                f"loads on the dloads sheet.")
+                f"the current template (Water loads is main "
+                f"{main_sheet_cell('water_loads')}), or set the mode to manual and "
+                f"enter the water loads on the dloads sheet.")
     # The workbook is built in a temporary file beside the destination and moved
     # into place only once every sheet has been written: a failure partway
     # (a None where a number was expected, a template mismatch) must not leave a

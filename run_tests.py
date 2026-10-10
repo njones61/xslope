@@ -14326,7 +14326,7 @@ def run_rs2_import_test(test):
         # and its piezometric surface is a whole-domain surface rather than a water
         # table drawn on the ground. Deriving ground-against-piezo here would invent a
         # plateau of water the model never had -- wrong, not merely redundant. So the
-        # import pins D23 to manual, keeps the vendor's own loads, and says why.
+        # import pins Water loads to manual, keeps the vendor's own loads, and says why.
         from xslope.water import with_water_loads, derived_blocks, derive_water_loads
         if sd.get("water_loads") != "manual":
             problems.append(
@@ -14336,7 +14336,9 @@ def run_rs2_import_test(test):
         if derived_blocks(with_water_loads(sd), 1):
             problems.append("an RS2 import derived a water load on top of the "
                             "vendor's own explicit ponded-water load")
-        if not any("D23" in c and "MANUAL" in c.upper() for c in caveats):
+        from xslope.fileio import main_sheet_cell
+        if not any(main_sheet_cell("water_loads") in c and "MANUAL" in c.upper()
+                   for c in caveats):
             problems.append("the import did not report that it left the water-load "
                             "mode on manual, or did not name the cell")
         # The REASON for pinning the mode is a claim about RS2's whole-domain piezo,

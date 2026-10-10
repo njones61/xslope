@@ -339,10 +339,10 @@ class ProjectDocument(QObject):
         # engine measures the reservoir itself. Getting this wrong in the permissive
         # direction would count the pool twice the moment the user prices the block.
         from xslope.cad import water_like_dloads
-        # The cell is read off the current template, which the model is saved into,
-        # so the notes name the row the reader will find (D23 before template v25).
-        from xslope.geostudio import _water_loads_cell
-        cell = _water_loads_cell()
+        # The cell is the current template's, which the model is saved into, so the
+        # notes name the row the reader will find (D23 before template v25).
+        from xslope.fileio import main_sheet_cell
+        cell = f"Water loads cell ({main_sheet_cell('water_loads')})"
         found = water_like_dloads(sd)
         if found["indices"]:
             sd["water_loads"] = "manual"

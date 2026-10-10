@@ -1461,6 +1461,27 @@ def _seep01_editor_labels(mw):
                      f"{sorted(r for r in rows if r)}")
     glob.deleteLater()
 
+    # SEEP-1 starts from the template's Imperial and picks SI. The water row's value
+    # follows (9.81), and so must its unit: the label once kept "(pcf)" beside 9.81
+    # until the form was reopened.
+    from xslope.units import labels as _unit_labels
+    glob = GlobalEditor().build(dict(data, unit_system="imperial"), None)
+    edit = glob._edits["gamma_water"]
+    water = next(f.labelForField(edit) for f in glob.findChildren(QFormLayout)
+                 if f.labelForField(edit) is not None)
+    glob._units.setCurrentIndex(glob._units.findText("SI"))
+    want = f"({_unit_labels('si')['unit_weight']})"
+    if not water.text().endswith(want):
+        fails.append(f"Global parameters' water row reads {water.text()!r} after "
+                     f"Units was switched to SI and the value to "
+                     f"{glob._edits['gamma_water'].text()}; SEEP-1's screenshot "
+                     f"shows it ending {want!r}")
+    glob._units.setCurrentIndex(glob._units.findText(""))
+    if "(" in water.text():
+        fails.append(f"with Units blank the water row still names a unit: "
+                     f"{water.text()!r}")
+    glob.deleteLater()
+
     panel = SeepDisplayPanel(data.get("materials") or [])
     rows = {lab.text() for lab in panel.findChildren(QLabel)}
     if SEEP01_LEVELS_ROW not in rows:
@@ -3071,6 +3092,123 @@ def test_w02_import_notes():
     return fails
 
 
+def test_main_sheet_cells():
+    """Every message that tells a reader which main-sheet cell to change reads it
+    from ``fileio.main_sheet_cell``, and that lookup names the cells the files use.
+
+    Three ways it could still be wrong, each checked here:
+
+    * the table: on every input template the docs ship (v19 to the current one),
+      each run option sits where the template's own label says it does, so a row
+      inserted above the block cannot go unnoticed (D23 became D24 at v25);
+    * the writer: a model saved into the current template carries each run option
+      in the cell the lookup names;
+    * the messages: no import note, remedy or save refusal spells a cell from D20
+      down as text -- the rows that move -- instead of asking the lookup. A remedy
+      label names the cell of the model's own template (D23 on a v23 file).
+    """
+    import ast
+
+    import openpyxl
+
+    from xslope import remedies
+    from xslope.fileio import (MAIN_SHEET_CELLS, load_slope_data, main_sheet_cell,
+                               save_slope_data_to_xlsx, template_main_sheet_cell)
+
+    fails = []
+    for path in sorted(glob.glob(os.path.join(_REPO, "docs", "inputs",
+                                              "input_template*.xlsx"))):
+        wb = openpyxl.load_workbook(path, read_only=True)
+        try:
+            version = int(float(wb["main"]["D5"].value))
+        finally:
+            wb.close()
+        for key, (label, _row, _since) in MAIN_SHEET_CELLS.items():
+            on_sheet = template_main_sheet_cell(label, path)
+            if on_sheet is not None and on_sheet != main_sheet_cell(key, version):
+                fails.append(f"{os.path.basename(path)} (v{version}) labels "
+                             f"{label!r} at {on_sheet}; main_sheet_cell names "
+                             f"{main_sheet_cell(key, version)}")
+    for key, (label, _row, _since) in MAIN_SHEET_CELLS.items():
+        if template_main_sheet_cell(label) != main_sheet_cell(key):
+            fails.append(f"the bundled template labels {label!r} at "
+                         f"{template_main_sheet_cell(label)}, not "
+                         f"{main_sheet_cell(key)}")
+
+    stated = {"lem_method": ("bishop", "bishop"), "num_slices": (33, 33),
+              "k0": (0.6, 0.6), "tension_srf": (False, "NO"),
+              "element_type": ("tri6", "tri6"), "target_size": (1.3, 1.3),
+              "element_size_1d": (0.7, 0.7), "ssrm_f_min": (1.1, 1.1),
+              "ssrm_f_max": (2.2, 2.2), "side_bc": ("fixed", "fixed"),
+              "water_loads": ("manual", "manual"),
+              "surface_family": ("noncircular", "non-circular")}
+    sd = _quiet(load_slope_data, W02_FILE)
+    sd.update({k: v for k, (v, _cell) in stated.items()})
+    out = os.path.join(_tmp(), "main_cells.xlsx")
+    _quiet(save_slope_data_to_xlsx, sd, out)
+    wb = openpyxl.load_workbook(out, read_only=True)
+    try:
+        for key, (_v, want) in stated.items():
+            cell = main_sheet_cell(key)
+            got = wb["main"][cell].value
+            if str(got).strip().lower() != str(want).lower() and got != want:
+                fails.append(f"main_sheet_cell({key!r}) names {cell}, but the "
+                             f"writer put {got!r} there, not {want!r}")
+    finally:
+        wb.close()
+
+    moving = re.compile(r"\bD2\d\b")
+    for rel in ("xslope/fileio.py", "xslope/geostudio.py", "xslope/slide2.py",
+                "xslope/rs2.py", "xslope/remedies.py", "studio/document.py"):
+        tree = ast.parse(open(os.path.join(_REPO, rel), encoding="utf-8").read())
+        docs = {id(n.body[0].value) for n in ast.walk(tree)
+                if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                                  ast.AsyncFunctionDef))
+                and n.body and isinstance(n.body[0], ast.Expr)
+                and isinstance(n.body[0].value, ast.Constant)}
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    and id(node) not in docs and " " in node.value
+                    and moving.search(node.value)):
+                fails.append(f"{rel}:{node.lineno} spells a moving main-sheet "
+                             f"cell in a message: {node.value.strip()[:70]!r}")
+
+    for version, want in ((None, main_sheet_cell("water_loads")),
+                          (23, main_sheet_cell("water_loads", 23))):
+        model = dict(sd, water_loads="manual", template_version=version,
+                     piezo_line=[(-60.0, 6.0), (60.0, 6.0), (140.0, 6.0)])
+        labels = [p.label for p in remedies._propose_switch_to_auto(model)]
+        if labels != [f"Water loads (main {want})"]:
+            fails.append(f"the switch-to-auto remedy on a v{version or 'current'} "
+                         f"model is labeled {labels}, not 'Water loads (main "
+                         f"{want})'")
+    return fails
+
+
+def test_fem01_nu_message():
+    """The model checks' Poisson's ratio note says only what holds on any model.
+
+    FEM-1's pass found it claiming nu = 0 moved "the reference model's" factor of
+    safety by a third -- a model it never named, and a claim nothing measured
+    supports (FEM-1's own run returns the same factor of safety at nu = 0).
+    """
+    from xslope.fileio import load_slope_data
+    from xslope.preflight import preflight
+
+    sd = _quiet(load_slope_data, W02_FILE)
+    for m in sd["materials"]:
+        m["nu"], m["E"] = 0.0, 1.0e5
+    notes = [f.message for f in preflight(sd, "fem").errors
+             if f.rule_id == "mat.nu_unusable"]
+    if not notes:
+        return ["nu = 0 raised no mat.nu_unusable finding"]
+    fails = []
+    for claim in ("reference model", "by a third"):
+        if any(claim in n for n in notes):
+            fails.append(f"the nu = 0 note still claims {claim!r}: {notes[0]!r}")
+    return fails
+
+
 CHECKS = [
     ("A. one verb, and it is named", test_verb_gate),
     ("B. only XSLOPE's own sites", test_allowlist),
@@ -3083,6 +3221,8 @@ CHECKS = [
     ("I. code spans stay on one line", test_split_code_spans),
     ("J. LEM-12 quotes the pile summary the code prints", test_lem12_pile_console_block),
     ("K. W-2's import note names the water-load cell", test_w02_import_notes),
+    ("L. messages name the main-sheet cells the files use", test_main_sheet_cells),
+    ("M. the nu = 0 note says what holds on any model", test_fem01_nu_message),
 ]
 
 

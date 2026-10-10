@@ -3574,8 +3574,8 @@ def _seep_bc_short(ctx):
 # Family: finite element elastic properties and the tensile cap
 #
 # The asymmetry these rules exist to close: a blank E is caught at assembly with
-# a clear message, a blank nu is NOT -- it reads as 0.0, passes the [0, 0.5)
-# range check, and moves the strength-reduction factor by a third. And a blank
+# a clear message, a blank nu is NOT -- it reads as 0.0 and passes the [0, 0.5)
+# range check, describing a material with no lateral coupling at all. And a blank
 # t_cut is silent in both engines while leaving a cohesive material the tension
 # its own envelope admits, c/tan(phi), which strength reduction never reduces --
 # the transcription defect the RS2 campaign traced a 2x factor to.
@@ -3620,10 +3620,10 @@ def _mat_nu_unusable(ctx):
             what = ("is blank or not a number. The finite element engine needs a "
                     "Poisson's ratio for every material it meshes")
         elif nu == 0.0:
-            what = ("is 0 -- which is what a BLANK cell reads as. A soil with no "
-                    "lateral coupling is not a soil, and the value is not inert: on "
-                    "the reference model it moved the strength-reduction factor of "
-                    "safety by a third against nu = 0.3")
+            what = ("is 0 -- which is what a BLANK cell reads as. A Poisson's "
+                    "ratio of 0 couples no lateral strain to vertical load, so the "
+                    "gravity turn-on gives level ground no horizontal stress at all "
+                    "(K0 = nu/(1 - nu) = 0), which describes no soil or rock")
         else:
             what = (f"is {nu:g}, outside the admissible range [0, 0.5). The finite "
                     f"element engine refuses it at assembly")
@@ -6549,12 +6549,16 @@ def _k0_nonpositive(ctx):
             f"initialization {_at_global('D16')}.")
 
 
-def _main_row(ctx, base_row):
-    """The main-sheet row of a run option at or below D20, which moved down one
-    row when the 1D element size arrived (template version 25)."""
-    from .fileio import _ELEMENT_SIZE_1D_TEMPLATE_VERSION as _v1d
-    tv = _num(ctx.sd.get("template_version"))
-    return base_row + (1 if tv is None or tv >= _v1d else 0)
+def _main_cell(ctx, key):
+    """The main-sheet cell of run option ``key`` on this model's own template
+    (:func:`xslope.fileio.main_sheet_cell`), or the current template's where the
+    model's own has none."""
+    from .fileio import main_sheet_cell
+    try:
+        cell = main_sheet_cell(key, ctx.sd.get("template_version"))
+    except (TypeError, ValueError):
+        cell = None
+    return cell or main_sheet_cell(key)
 
 
 @rule("mesh.size_nonpositive", ERROR, ("fem", "seep"),
@@ -6610,11 +6614,11 @@ def _ssrm_bracket(ctx):
     lo, hi = _num(ctx.sd.get("ssrm_f_min")), _num(ctx.sd.get("ssrm_f_max"))
     if lo is None or hi is None or lo < hi:
         return None
-    r = _main_row(ctx, 20)
     return (f"F min (SSRM) is {lo:g} and F max (SSRM) is {hi:g}. The search for the "
             f"factor of safety runs from F min up to F max, so F min must be the "
             f"smaller. Enter them in that order, or leave both blank for the "
-            f"defaults (Run FEM; main D{r} and D{r + 1}).")
+            f"defaults (Run FEM; main {_main_cell(ctx, 'ssrm_f_min')} and "
+            f"{_main_cell(ctx, 'ssrm_f_max')}).")
 
 
 @rule("surface.search_window_reversed", ERROR, ("lem",),

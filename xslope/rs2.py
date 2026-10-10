@@ -73,7 +73,7 @@ import zipfile
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import polygonize, unary_union
 
-from .fileio import build_ground_surface_from_polygons
+from .fileio import build_ground_surface_from_polygons, main_sheet_cell
 from .units import GAMMA_W, classify_elastic, units_check, normalize_unit_system
 from .water import _y_on
 
@@ -1553,18 +1553,20 @@ def fez_to_slope_data(d):
     # WHOLE-DOMAIN surface rather than a water table drawn on the ground, so measuring
     # ground against piezo would invent a plateau of water the model never had. Auto
     # mode would therefore be wrong here, not merely redundant: the vendor's own load
-    # object is authoritative, and the import keeps it, with D23 = manual.
+    # object is authoritative, and the import keeps it, with Water loads = manual.
+    cell = main_sheet_cell("water_loads")
     if dl_report["water"]:
         caveats.append(
-            "the main sheet's water-load mode (D23) was set to MANUAL, and the RS2 "
+            f"the main sheet's water-load mode ({cell}) was set to MANUAL, and the RS2 "
             "ponded-water load(s) above are what carries the water's weight. xslope's "
             "automatic mode measures the ground surface against the piezometric line, "
             "and RS2's piezo is a whole-domain surface rather than a water table drawn "
             "on the ground — deriving from it would invent a plateau this model does "
-            "not have. Leave D23 on manual unless you rebuild the water definition")
+            f"not have. Leave {cell} on manual unless you rebuild the water "
+            "definition")
     else:
         caveats.append(
-            "the main sheet's water-load mode (D23) was set to MANUAL: RS2 stores "
+            f"the main sheet's water-load mode ({cell}) was set to MANUAL: RS2 stores "
             "ponded water as explicit load objects (this model defines none), and its "
             "piezometric surface is a whole-domain surface, so xslope's automatic "
             "ground-against-piezo derivation does not describe an RS2 model")

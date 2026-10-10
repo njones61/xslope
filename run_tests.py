@@ -10872,6 +10872,42 @@ def run_circles_editor_test(test):
     return 0.0, None
 
 
+def run_studio_results_teardown_test(test):
+    """Studio's FEM results view being closed mid-session: that the Run menu still
+    updates afterwards.
+
+    OK on an input editor, a mesh rebuild and opening another file each close the
+    FEM results view, whose toolbar buttons go with it. A handle the main window
+    kept on a deleted button raised at the next Run menu update, which stopped part
+    way and left Run FEM disabled for the rest of the session: no second FEM run
+    without restarting Studio.
+
+    The check itself lives in test/studio_results_teardown_check.py: each of the
+    three actions after a results view is open, the Run menu update that follows,
+    and the window's handles cleared.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'studio_results_teardown_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('studio_results_teardown_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_seep_bc_series_test(test):
     """The value fields of Studio's Seep BC editor: that a head and a flux read a
     typed value by the same rule, and that Set 2 holds both of them to numbers.
@@ -15520,6 +15556,8 @@ def _dispatch_test(test):
         return run_noncircular_generator_test(test)
     if test_type == 'circles_editor':
         return run_circles_editor_test(test)
+    if test_type == 'studio_results_teardown':
+        return run_studio_results_teardown_test(test)
     if test_type == 'seep_bc_series':
         return run_seep_bc_series_test(test)
     if test_type == 'table_paste':
@@ -15698,7 +15736,8 @@ def _expected_and_tol(test, default_tolerance):
                        'rapid_stage1_frames', 'pullout_envelope',
                        'water_hoist', 'piezo_visibility',
                        'project_package', 'docs_links',
-                       'noncircular_generator', 'circles_editor', 'seep_bc_series', 'table_paste',
+                       'noncircular_generator', 'circles_editor', 'studio_results_teardown',
+                       'seep_bc_series', 'table_paste',
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
                        'report_template_field', 'report_no_resolve',
@@ -16574,6 +16613,12 @@ def main():
         # rows the user already has. Builds dialogs offscreen and solves nothing.
         tests.append({'type': 'circles_editor', 'file': 'Studio circles editor',
                       'method': '-', 'source': 'circles_editor'})
+        # Guard a second FEM run in one Studio session: OK on an editor, a mesh
+        # rebuild or opening a file closes the FEM results view, and the Run menu
+        # must still update afterwards. Builds the window offscreen; solves nothing.
+        tests.append({'type': 'studio_results_teardown',
+                      'file': 'Studio FEM results view closed',
+                      'method': '-', 'source': 'studio_results_teardown'})
         # Guard the Seep BC editor's value fields: that a flux takes a tseep series
         # name the way a head does (a series name typed into a flux used to be
         # answered with 0.0, turning a time-varying boundary into a no-flow one),
